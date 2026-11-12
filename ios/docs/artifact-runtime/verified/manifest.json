@@ -1,0 +1,324 @@
+[
+  {
+    "attachments": [
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "corrupt-image-tree.txt",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "corrupt-image-tree_0_38750D63-A83F-44E8-ADBF-0D2A5B6EFCB0.txt",
+        "timestamp": 1791005316.813,
+        "originalExportedFileName": "0F3EF801-61BA-4DBE-8E57-C3DEB407B320.txt"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "corrupt-image.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "corrupt-image_0_FAD8013F-2CB2-437A-8069-0E1C096585B8.png",
+        "timestamp": 1791005316.69,
+        "originalExportedFileName": "5D89D3F7-5E67-4968-A57E-0CD53056328E.png"
+      }
+    ],
+    "testIdentifier": "ArtifactRuntimeUITests/testCorruptImageShowsRecoveryAction()",
+    "testIdentifierURL": "test://com.apple.xcode/BBStudio/BBStudioUITests/ArtifactRuntimeUITests/testCorruptImageShowsRecoveryAction"
+  },
+  {
+    "attachments": [
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "corrupt-pdf-error-tree.txt",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "corrupt-pdf-error-tree_0_DF9B3364-F06B-48DD-8EB9-113DE403A3B1.txt",
+        "timestamp": 1791005336.905,
+        "originalExportedFileName": "CA364639-46F7-4FF9-A7C3-31A3664896CF.txt"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "corrupt-pdf-error.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "corrupt-pdf-error_0_00046A1B-6619-4AA9-B644-39CE30C0A255.png",
+        "timestamp": 1791005336.762,
+        "originalExportedFileName": "6F76AA68-14A8-4150-8A22-EA4002E277F8.png"
+      }
+    ],
+    "testIdentifier": "ArtifactRuntimeUITests/testCorruptPDFShowsRecoveryAction()",
+    "testIdentifierURL": "test://com.apple.xcode/BBStudio/BBStudioUITests/ArtifactRuntimeUITests/testCorruptPDFShowsRecoveryAction"
+  },
+  {
+    "attachments": [
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "empty-text-copy-action-tree.txt",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "empty-text-copy-action-tree_0_0B079692-308C-4CF3-B2AC-CEEF2428664D.txt",
+        "timestamp": 1791005361.398,
+        "originalExportedFileName": "D25E284F-02C4-4CA1-8659-48A466B07898.txt"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "empty-text-copy-action.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "empty-text-copy-action_0_E70B81DB-EF20-4859-B0E7-A8BBAFE160BE.png",
+        "timestamp": 1791005361.254,
+        "originalExportedFileName": "83F9F8E7-68FA-4328-B675-ED808B048392.png"
+      }
+    ],
+    "testIdentifier": "ArtifactRuntimeUITests/testEmptyTextRemainsValid()",
+    "testIdentifierURL": "test://com.apple.xcode/BBStudio/BBStudioUITests/ArtifactRuntimeUITests/testEmptyTextRemainsValid"
+  },
+  {
+    "attachments": [
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "pdf-tree.txt",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "pdf-tree_0_F00A1CC2-82C3-4B01-A8C6-1645014918AC.txt",
+        "timestamp": 1791005416.99,
+        "originalExportedFileName": "867ED98A-D7A3-4B0A-9F50-DD0EBAEBE0EF.txt"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "pdf.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "pdf_0_7666DDD3-E1F9-4DC9-A0A3-D0C0C897D827.png",
+        "timestamp": 1791005416.795,
+        "originalExportedFileName": "FC6A4F8D-EAB7-4054-A4B9-296ECFF2884C.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "image-tree.txt",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "image-tree_0_1B4B413C-F91F-4B33-9740-306E3529AFB6.txt",
+        "timestamp": 1791005407.287,
+        "originalExportedFileName": "07750307-1D6A-4D78-B125-FDEA0DD4FB5E.txt"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "image.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "image_0_17D35931-6D6A-4BF5-9E55-751CEE67F8DC.png",
+        "timestamp": 1791005407.156,
+        "originalExportedFileName": "24B0CAD6-EDE4-4C64-9D92-3E9B16C1D19F.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "html-tree.txt",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "html-tree_0_8870298D-EE4C-42D6-861F-025475243369.txt",
+        "timestamp": 1791005397.841,
+        "originalExportedFileName": "C81BECBB-5A47-493D-B7FF-3C98913509F7.txt"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "html.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "html_0_7B8C7BD1-A623-46A0-BE97-58548FD57D87.png",
+        "timestamp": 1791005397.666,
+        "originalExportedFileName": "7C496A6E-7735-4DFE-86FD-513171490060.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "markdown-tree.txt",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "markdown-tree_0_7400443F-19B9-4CE6-865F-0B43B637AD9C.txt",
+        "timestamp": 1791005386.488,
+        "originalExportedFileName": "5274F103-36E9-47B9-828D-D05B300D7D13.txt"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "markdown.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "markdown_0_59FD6A22-FE9E-4D06-B949-F2DAEA6316FC.png",
+        "timestamp": 1791005386.344,
+        "originalExportedFileName": "9CEF1F46-8310-4616-91A8-05E266E4005A.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "text-tree.txt",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "text-tree_0_72ADB765-405B-470A-844E-ABB46F52E641.txt",
+        "timestamp": 1791005378.882,
+        "originalExportedFileName": "6846A5BE-40BC-4037-B679-5E4692943F6E.txt"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "text.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "text_0_75C6B637-1B01-4E19-AA84-799D544F1109.png",
+        "timestamp": 1791005378.743,
+        "originalExportedFileName": "7587D1E3-0AEC-4AB2-956D-3AC6D999C7C1.png"
+      }
+    ],
+    "testIdentifier": "ArtifactRuntimeUITests/testHealthyNativePreviews()",
+    "testIdentifierURL": "test://com.apple.xcode/BBStudio/BBStudioUITests/ArtifactRuntimeUITests/testHealthyNativePreviews"
+  },
+  {
+    "attachments": [
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "recovered-html-tree.txt",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "recovered-html-tree_0_41264543-E171-4512-A995-E9567AF14B53.txt",
+        "timestamp": 1791005442.523,
+        "originalExportedFileName": "52717736-2DDB-4706-880E-CA85B08E6EA3.txt"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "recovered-html.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "recovered-html_0_CDFA98DB-91DD-4C47-BEF1-22A8FEF376CB.png",
+        "timestamp": 1791005442.113,
+        "originalExportedFileName": "D04C6D35-CD13-4597-A207-6E190287A8B0.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "missing-html-error-tree.txt",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "missing-html-error-tree_0_83EC9B7C-02D3-48A5-A804-8ED146BFB020.txt",
+        "timestamp": 1791005438.312,
+        "originalExportedFileName": "FB807E63-023D-4891-8D12-56F732C20943.txt"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "missing-html-error.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "missing-html-error_0_8374A5BB-1781-400D-ACDC-F49AD66F6834.png",
+        "timestamp": 1791005438.108,
+        "originalExportedFileName": "5E744239-3750-4BF1-856B-1A80D14B5349.png"
+      }
+    ],
+    "testIdentifier": "ArtifactRuntimeUITests/testUnavailableHTMLCanRecover()",
+    "testIdentifierURL": "test://com.apple.xcode/BBStudio/BBStudioUITests/ArtifactRuntimeUITests/testUnavailableHTMLCanRecover"
+  },
+  {
+    "attachments": [
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "recovered-image-tree.txt",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "recovered-image-tree_0_FD8471BF-A750-4F36-A5AB-A66B5359126D.txt",
+        "timestamp": 1791005465.342,
+        "originalExportedFileName": "C5BD8CE4-B3A0-4CEA-B796-22D5407046A6.txt"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "recovered-image.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "recovered-image_0_83465F17-68DE-4AB2-8F68-E592C60B42AF.png",
+        "timestamp": 1791005465.111,
+        "originalExportedFileName": "E01CCB54-E5DC-4BB2-8155-63EF21608F4E.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "missing-image-error-tree.txt",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "missing-image-error-tree_0_9A9DA642-0FAA-4949-8B46-D762AC9D04DC.txt",
+        "timestamp": 1791005463.381,
+        "originalExportedFileName": "09121DA4-36A3-4958-AA65-5D3AA1FFE354.txt"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "missing-image-error.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "missing-image-error_0_1BEE9F87-A542-439E-8B97-574BBBB38ACE.png",
+        "timestamp": 1791005463.18,
+        "originalExportedFileName": "7327C443-2A3F-42F0-8EE8-960B658CE27B.png"
+      }
+    ],
+    "testIdentifier": "ArtifactRuntimeUITests/testUnavailableImageCanRecover()",
+    "testIdentifierURL": "test://com.apple.xcode/BBStudio/BBStudioUITests/ArtifactRuntimeUITests/testUnavailableImageCanRecover"
+  },
+  {
+    "attachments": [
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "recovered-text-tree.txt",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "recovered-text-tree_0_968A026E-0560-4D69-9796-93A7212583FA.txt",
+        "timestamp": 1791005489.241,
+        "originalExportedFileName": "1940DDAD-8023-4CC1-8062-ECC4C96E9EBE.txt"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "recovered-text.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "recovered-text_0_FFF6D148-D85A-4BBA-8BA2-828AC15ED609.png",
+        "timestamp": 1791005489.021,
+        "originalExportedFileName": "CE06FB2B-0CFF-4A99-AE40-796A6CC83CCE.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "missing-text-error-tree.txt",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "missing-text-error-tree_0_91AD499A-0980-435B-8CCC-E773ACB7FE56.txt",
+        "timestamp": 1791005487.45,
+        "originalExportedFileName": "9DD89952-C652-499D-A528-6CC7457197DC.txt"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "4D50597B-6F7F-4EE2-86E2-20701C8E22C4",
+        "deviceName": "BBArtifactRuntimePrivate",
+        "exportedFileName": "missing-text-error.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "missing-text-error_0_74607CEF-8303-42D5-BCEE-C5C935A64B64.png",
+        "timestamp": 1791005487.273,
+        "originalExportedFileName": "FC0DEAF9-72F1-4D3F-921B-02A8EA056846.png"
+      }
+    ],
+    "testIdentifier": "ArtifactRuntimeUITests/testUnavailableTextCanRecover()",
+    "testIdentifierURL": "test://com.apple.xcode/BBStudio/BBStudioUITests/ArtifactRuntimeUITests/testUnavailableTextCanRecover"
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "hittable" : true,
+  "label" : "Configured limit, Automatic",
+  "ordinaryScrolls" : 0,
+  "row" : [
+    20,
+    867.5,
+    794,
+    93.5
+  ],
+  "tabBar" : [
+
+  ],
+  "visibleBottom" : 1168,
+  "visibleTop" : 167,
+  "window" : [
+    834,
+    1210
+  ]
+}

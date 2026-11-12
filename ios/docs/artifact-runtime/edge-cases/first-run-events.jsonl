@@ -1,0 +1,4 @@
+{"check": "old-version-held", "version": "45a1bdea-c4e3-4579-962d-6217a77e9acd", "status": 200}
+{"check": "old-version-released", "version": "45a1bdea-c4e3-4579-962d-6217a77e9acd", "sha256": "301d34243e79f788a85bc45405ccc43fae61c060fa0c926d29257704ecb499a1", "status": 200}
+{"check": "lookup", "status": 503}
+{"check": "lookup", "status": 200}

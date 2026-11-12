@@ -1,0 +1,4 @@
+Private fresh-copy build stopped before app launch. No artifact test result was produced.
+/tmp/bb-artifact-edge.cFEDUW/project/iOS/Studio/StudioHomeView.swift:31:41: error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+    |                                         `- error: the compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+** TEST BUILD FAILED **

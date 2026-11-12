@@ -1,0 +1,70 @@
+import { describe, expect, it } from "vitest";
+import { BROWSE, closeTab, emptyWorkspace, openItem, panes, parseWorkspace } from "./workspace-state";
+const page = { href: "/plugins/studio/studio/pages/pg_one", title: "Notes" };
+const recording = { href: "/plugins/studio/studio/recordings/rec_one", title: "Launch" };
+const drawing = { href: "/plugins/excalidraw/drawings/draw_one", title: "Diagram" };
+describe("Studio workspace", () => {
+  it("focuses an existing tab without reordering or duplicating it", () => {
+    let state = openItem(emptyWorkspace(), page);
+    state = openItem(state, recording);
+    state = openItem(state, page);
+    expect(panes(state.layout)[0]!.tabs).toEqual([page, recording]);
+    expect(panes(state.layout)[0]!.active).toBe(page.href);
+  });
+  it("moves a live tab into a split and merges the emptied pane on moving back", () => {
+    let state = openItem(openItem(emptyWorkspace(), page), recording);
+    const first = state.focused;
+    state = openItem(state, recording, "right", first);
+    expect(panes(state.layout).map(p => p.tabs)).toEqual([[page], [recording]]);
+    state = openItem(state, recording, "tab", first);
+    expect(panes(state.layout).map(p => p.tabs)).toEqual([[page, recording]]);
+    expect(state.focused).toBe(first);
+  });
+  it("reorders tabs and closes just the view, choosing a surviving neighbor", () => {
+    let state = openItem(openItem(openItem(emptyWorkspace(), page), recording), drawing);
+    state = openItem(state, drawing, "tab", state.focused, page.href);
+    expect(panes(state.layout)[0]!.tabs).toEqual([drawing, page, recording]);
+    state = closeTab(state, drawing.href);
+    expect(panes(state.layout)[0]!.active).toBe(page.href);
+    state = closeTab(closeTab(state, page.href), recording.href);
+    expect(panes(state.layout)).toHaveLength(1);
+    expect(panes(state.layout)[0]!.tabs).toEqual([]);
+  });
+  it("restores splits, tab order and active selection; rejects corrupt storage", () => {
+    const state = openItem(openItem(emptyWorkspace(), page), recording, "bottom");
+    expect(parseWorkspace(JSON.parse(JSON.stringify(state)))).toEqual(state);
+    expect(panes(parseWorkspace({ layout: { kind: "split" } }).layout)[0]!.tabs).toEqual([]);
+    expect(openItem(state, { href: "https://elsewhere.test", title: "Bad" })).toBe(state);
+  });
+  it("opens empty, and an item opened from the new tab page takes its place", () => {
+    let state = emptyWorkspace();
+    expect(panes(state.layout)[0]!.tabs).toEqual([]);
+    state = openItem(openItem(state, BROWSE, "tab", state.focused), page);
+    expect(panes(state.layout)[0]!.tabs).toEqual([page]);
+    // "+" opens it beside the open items; the next item replaces it.
+    state = openItem(state, BROWSE, "tab", state.focused);
+    expect(panes(state.layout)[0]!.tabs).toEqual([page, BROWSE]);
+    state = openItem(state, recording);
+    expect(panes(state.layout)[0]!.tabs).toEqual([page, recording]);
+    // Away from it, items open as new tabs and it stays.
+    state = openItem(openItem(state, BROWSE, "tab", state.focused), page);
+    expect(panes(state.layout)[0]!.tabs).toEqual([page, recording, BROWSE]);
+    expect(panes(state.layout)[0]!.active).toBe(page.href);
+  });
+});
+
+it("restores the maximum nested eight-pane arrangement", () => {
+  let state = emptyWorkspace();
+  for (let index = 0; index < 8; index++) state = openItem(state, { href: `/plugins/studio/studio/pages/page_${index}`, title: `Page ${index}` }, "right");
+  expect(panes(state.layout)).toHaveLength(8);
+  expect(parseWorkspace(JSON.parse(JSON.stringify(state)))).toEqual(state);
+});
+
+describe("tools with their own page", () => {
+  it("keeps saved Code tabs and maps their old addresses to Studio", () => {
+    const pane = { kind: "pane", id: "p1", tabs: [{ href: "/plugins/studio-code/workspaces/cws_1", title: "Repo" }, { href: "/plugins/studio/studio/pages/pg_1", title: "Notes" }], active: "/plugins/studio-code/workspaces/cws_1" };
+    const tabs = panes(parseWorkspace({ layout: pane, focused: "p1" }).layout)[0]!;
+    expect(tabs.tabs.map(tab => tab.href)).toEqual(["/plugins/studio/studio/workspaces/cws_1", "/plugins/studio/studio/pages/pg_1"]);
+    expect(tabs.active).toBe("/plugins/studio/studio/workspaces/cws_1");
+  });
+});

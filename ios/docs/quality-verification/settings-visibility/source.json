@@ -1,0 +1,14 @@
+{
+  "repositoryHead": "f53f1ec1f4d703b198ab620f46d34a68efe868eb",
+  "serverControlsSha256": "6e7e708b9774eb8b9238d8f2c530563525e8cfe8f025c648eddbfd2938147061",
+  "scratch": "/var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/bb-share-review-vhuq54aq/ios",
+  "derivedData": "/tmp/bb-share-derived",
+  "privateFallbacks": {
+    "AppGroup.swift": "http://127.0.0.1:49486",
+    "BBClient.swift": "http://127.0.0.1:49486"
+  },
+  "privateSimulatorIds": [
+    "2FF2A8F1-3BFF-49CC-A459-AD20EE8733D6",
+    "901FF4CB-B83C-4E8C-A889-6449C134ED45"
+  ]
+}

@@ -1,0 +1,356 @@
+// APNs delivery for BB Studio. BB's push-notifications plugin posts Expo-format
+// batches to its relay URL; this module sends `apns:` tokens to Apple and
+// answers with Expo-format tickets so the sender's bookkeeping keeps working.
+import { createHash, createPrivateKey, sign, type KeyObject } from "node:crypto";
+import { connect, type ClientHttp2Session } from "node:http2";
+
+export const APNS_TOKEN_PREFIX = "apns:";
+
+export type ExpoMessage = {
+  to: string;
+  title?: string;
+  body?: string;
+  sound?: string;
+  data?: Record<string, unknown>;
+  /** Pushes sharing this key replace each other on the device (`apns-collapse-id`). */
+  collapseId?: string;
+  [key: string]: unknown;
+};
+
+/** APNs caps `apns-collapse-id` at 64 bytes; longer keys are hashed to exactly 64 hex characters. */
+export function apnsCollapseId(key: string): string {
+  return Buffer.byteLength(key) <= 64 ? key : createHash("sha256").update(key).digest("hex");
+}
+
+export type ExpoTicket =
+  | { status: "ok"; id?: string }
+  | { status: "error"; message?: string; details?: { error?: string } };
+
+export type ApnsEnvironment = "production" | "development";
+
+export type ApnsConfig = {
+  keyPem: string;
+  keyId: string;
+  teamId: string;
+  bundleId: string;
+  /** `auto` tries production first and falls back to development for sandbox tokens. */
+  environment: ApnsEnvironment | "auto";
+};
+
+export type ApnsResult = { status: number; reason?: string; id?: string };
+
+export type ApnsSend = (
+  environment: ApnsEnvironment,
+  deviceToken: string,
+  payload: string,
+  headers: Record<string, string>,
+) => Promise<ApnsResult>;
+
+const HOSTS: Record<ApnsEnvironment, string> = {
+  production: "https://api.push.apple.com",
+  development: "https://api.sandbox.push.apple.com",
+};
+
+/** Accepts a full PEM or just its base64 body, with or without line breaks. */
+export function normalizePem(value: string): string {
+  const body = value
+    .replace(/-----(BEGIN|END) [A-Z ]+-----/g, "")
+    .replace(/\\n/g, "")
+    .replace(/\s+/g, "");
+  const lines = body.match(/.{1,64}/g) ?? [];
+  return `-----BEGIN PRIVATE KEY-----\n${lines.join("\n")}\n-----END PRIVATE KEY-----\n`;
+}
+
+/** Apple accepts a provider token for up to an hour; refresh well before that. */
+export class ProviderToken {
+  private key: KeyObject;
+  private cached: { token: string; issuedAt: number } | null = null;
+
+  constructor(
+    private config: Pick<ApnsConfig, "keyPem" | "keyId" | "teamId">,
+    private now: () => number = Date.now,
+  ) {
+    this.key = createPrivateKey(normalizePem(config.keyPem));
+  }
+
+  get(): string {
+    const nowSeconds = Math.floor(this.now() / 1000);
+    if (this.cached && nowSeconds - this.cached.issuedAt < 45 * 60) {
+      return this.cached.token;
+    }
+    const encode = (value: object) =>
+      Buffer.from(JSON.stringify(value)).toString("base64url");
+    const unsigned = `${encode({ alg: "ES256", kid: this.config.keyId })}.${encode({ iss: this.config.teamId, iat: nowSeconds })}`;
+    const signature = sign("sha256", Buffer.from(unsigned), {
+      key: this.key,
+      dsaEncoding: "ieee-p1363",
+    }).toString("base64url");
+    this.cached = { token: `${unsigned}.${signature}`, issuedAt: nowSeconds };
+    return this.cached.token;
+  }
+}
+
+/**
+ * The app's notification category, which decides the lock-screen actions:
+ * Approve/Deny for approvals, Approve plan/Keep planning for plans, and an
+ * answer box for questions, and a Reply box on finished turns (the Bot's
+ * messages among them) so the user can answer from the lock screen. Errors
+ * are plain alerts.
+ * `BB_CHOICE` questions and `BB_LOOP` loops also get `mutable-content`, so the
+ * app's notification extension can add a button per option. Interaction details come from
+ * `enrichInteraction` in server.ts.
+ */
+export function notificationCategory(data: Record<string, unknown>): string | undefined {
+  if (data.category === 'BB_LOOP' && typeof data.loopId === 'string') return 'BB_LOOP';
+  switch (data.kind) {
+    case "pending-interaction": {
+      if (typeof data.interactionId !== "string") return undefined;
+      if (data.interactionKind === "user_question") {
+        return Array.isArray(data.choices) && data.choices.length > 0 ? "BB_CHOICE" : "BB_QUESTION";
+      }
+      if (data.interactionKind !== "approval") return undefined;
+      const decisions = Array.isArray(data.decisions) ? data.decisions : [];
+      if (!decisions.includes("allow_once") || !decisions.includes("deny")) return undefined;
+      return data.subjectKind === "plan" ? "BB_PLAN" : "BB_APPROVAL";
+    }
+    case "turn-finished":
+      return typeof data.threadId === "string" ? "BB_REPLY" : undefined;
+    default:
+      return undefined;
+  }
+}
+
+/** APNs rejects alert payloads larger than this many bytes (PayloadTooLarge). */
+export const APNS_MAX_PAYLOAD_BYTES = 4096;
+
+/** Maps a BB push message onto an APNs payload. The app reads `threadId` on tap. */
+export function apnsPayload(message: ExpoMessage): string {
+  const body = message.body ?? "";
+  const full = renderPayload(message, body);
+  if (Buffer.byteLength(full) <= APNS_MAX_PAYLOAD_BYTES) return full;
+  const minimum = renderPayload(message, "");
+  if (Buffer.byteLength(minimum) > APNS_MAX_PAYLOAD_BYTES) {
+    throw new Error("PayloadTooLarge: APNs title or data exceeds the 4096-byte payload budget");
+  }
+  if (Buffer.byteLength(renderPayload(message, "…")) > APNS_MAX_PAYLOAD_BYTES) return minimum;
+  // Shorten the body by whole code points so multi-byte text is never split.
+  const chars = Array.from(body);
+  let low = 0;
+  let high = chars.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (Buffer.byteLength(renderPayload(message, `${chars.slice(0, mid).join("")}…`)) <= APNS_MAX_PAYLOAD_BYTES) low = mid;
+    else high = mid - 1;
+  }
+  return renderPayload(message, `${chars.slice(0, low).join("")}…`);
+}
+
+function renderPayload(message: ExpoMessage, body: string): string {
+  // `aps` belongs to Apple; a data field of that name would replace the alert.
+  const { aps: _reserved, ...data } = message.data ?? {};
+  const threadId = typeof data.conversationId === "string" ? data.conversationId : typeof data.threadId === "string" ? data.threadId : undefined;
+  const category = notificationCategory(data);
+  return JSON.stringify({
+    aps: {
+      alert: { title: message.title ?? "BB", body },
+      sound: message.sound ?? "default",
+      ...(threadId ? { "thread-id": threadId } : {}),
+      ...(category ? { category } : {}),
+      // The app's extension gives loops per-kind buttons (and one per decision option).
+      ...(category === "BB_CHOICE" || category === "BB_LOOP" ? { "mutable-content": 1 } : {}),
+    },
+    ...data,
+  });
+}
+
+/** Tokens Apple will never accept again; the sender deletes their subscription rows. */
+const GONE_REASONS = new Set(["BadDeviceToken", "Unregistered", "DeviceTokenNotForTopic"]);
+
+/** Apple will never accept this token again. */
+export function isGoneResult(result: ApnsResult): boolean {
+  return result.status === 410 || (result.reason !== undefined && GONE_REASONS.has(result.reason));
+}
+
+export type ApnsPush = {
+  deviceToken: string;
+  payload: string;
+  /** `alert` and `background` pushes use the bundle ID; Live Activity pushes use `<bundle>.push-type.liveactivity`. */
+  pushType: "alert" | "background" | "liveactivity";
+  priority: 5 | 10;
+  collapseId?: string;
+};
+
+/** Sends one push, retrying in the sandbox when `auto` meets a development-build token. */
+export async function sendApns(
+  push: ApnsPush,
+  config: ApnsConfig,
+  token: ProviderToken,
+  send: ApnsSend,
+): Promise<ApnsResult> {
+  const headers = {
+    authorization: `bearer ${token.get()}`,
+    "apns-topic": push.pushType === "liveactivity" ? `${config.bundleId}.push-type.liveactivity` : config.bundleId,
+    "apns-push-type": push.pushType,
+    "apns-priority": String(push.priority),
+    ...(push.collapseId ? { "apns-collapse-id": apnsCollapseId(push.collapseId) } : {}),
+  };
+  const environments: ApnsEnvironment[] =
+    config.environment === "auto" ? ["production", "development"] : [config.environment];
+  let result: ApnsResult = { status: 0, reason: "NotSent" };
+  for (const environment of environments) {
+    try {
+      result = await send(environment, push.deviceToken, push.payload, headers);
+    } catch (error) {
+      result = { status: 0, reason: error instanceof Error ? error.message : String(error) };
+    }
+    if (!(result.status === 400 && result.reason === "BadDeviceToken")) break;
+  }
+  return result;
+}
+
+/** `apns:<token>` with the token trimmed and lowercased, so one device has one key. */
+export function normalizeDeviceKey(to: string): string {
+  return `${APNS_TOKEN_PREFIX}${to.slice(APNS_TOKEN_PREFIX.length).trim().toLowerCase()}`;
+}
+
+export function isHexToken(value: string): boolean {
+  return /^[0-9a-f]{64,200}$/.test(value);
+}
+
+export async function deliverApns(
+  message: ExpoMessage,
+  config: ApnsConfig,
+  token: ProviderToken,
+  send: ApnsSend,
+): Promise<ExpoTicket> {
+  const deviceToken = normalizeDeviceKey(message.to).slice(APNS_TOKEN_PREFIX.length);
+  if (!isHexToken(deviceToken)) {
+    return { status: "error", message: "Malformed APNs token", details: { error: "DeviceNotRegistered" } };
+  }
+  let payload: string;
+  try { payload = apnsPayload(message); }
+  catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "PayloadTooLarge", details: { error: "PayloadTooLarge" } };
+  }
+  const result = await sendApns(
+    {
+      deviceToken,
+      payload,
+      pushType: "alert",
+      priority: 10,
+      ...(typeof message.collapseId === "string" && message.collapseId !== "" ? { collapseId: message.collapseId } : {}),
+    },
+    config,
+    token,
+    send,
+  );
+  if (result.status === 200) return { status: "ok", ...(result.id ? { id: result.id } : {}) };
+  const reason = result.reason ?? `HTTP ${result.status}`;
+  return {
+    status: "error",
+    message: `APNs rejected the notification: ${reason}`,
+    details: { error: isGoneResult(result) ? "DeviceNotRegistered" : reason },
+  };
+}
+
+/** One HTTP/2 connection per APNs host, reopened after errors or GOAWAY. */
+export class Http2ApnsSender {
+  private sessions = new Map<ApnsEnvironment, ClientHttp2Session>();
+  private owned = new Set<ClientHttp2Session>();
+
+  send: ApnsSend = (environment, deviceToken, payload, headers) =>
+    new Promise((resolve) => {
+      let close: (() => void) | undefined;
+      try {
+        const request = this.session(environment).request({
+          ":method": "POST",
+          ":path": `/3/device/${deviceToken}`,
+          "content-type": "application/json",
+          ...headers,
+        });
+        close = () => request.close();
+        request.setTimeout(15_000, () => request.close());
+        let status = 0;
+        let id: string | undefined;
+        let body = "";
+        request.on("response", (responseHeaders) => {
+          status = Number(responseHeaders[":status"] ?? 0);
+          const apnsId = responseHeaders["apns-id"];
+          id = typeof apnsId === "string" ? apnsId : undefined;
+        });
+        request.setEncoding("utf8");
+        request.on("data", (chunk: string) => { body += chunk; });
+        request.on("error", (error) => resolve({ status: 0, reason: error.message }));
+        request.on("close", () => {
+          let reason: string | undefined;
+          try {
+            reason = body ? (JSON.parse(body) as { reason?: string }).reason : undefined;
+          } catch {
+            reason = undefined;
+          }
+          resolve({ status, reason: status === 0 ? (reason ?? "Timeout") : reason, id });
+        });
+        request.end(payload);
+      } catch (error) {
+        resolve({ status: 0, reason: error instanceof Error ? error.message : String(error) });
+        try { close?.(); } catch { /* The transport may already be closed. */ }
+      }
+    });
+
+  private session(environment: ApnsEnvironment): ClientHttp2Session {
+    const existing = this.sessions.get(environment);
+    if (existing && !existing.closed && !existing.destroyed) return existing;
+    const session = connect(HOSTS[environment]);
+    const forget = () => {
+      if (this.sessions.get(environment) === session) this.sessions.delete(environment);
+    };
+    session.on("error", forget);
+    session.on("goaway", () => {
+      forget();
+      session.close(); // Drains existing streams; disposal still owns it.
+    });
+    session.on("close", () => {
+      forget();
+      this.owned.delete(session);
+    });
+    this.owned.add(session);
+    this.sessions.set(environment, session);
+    return session;
+  }
+
+  close(): void {
+    for (const session of this.owned) session.close();
+    this.sessions.clear();
+    this.owned.clear();
+  }
+}
+
+/** Recipients forgotten after this long without a successful push. */
+export const DEVICE_TTL_MS = 30 * 86_400_000;
+
+/**
+ * The relay's APNs recipients after a delivery: delivered tokens are refreshed,
+ * tokens Apple rejects for good are dropped, and stale ones expire.
+ */
+export function rememberedDevices(
+  devices: Record<string, number>,
+  messages: ExpoMessage[],
+  tickets: ExpoTicket[],
+  now: number,
+): Record<string, number> {
+  // Entries stored before normalization collapse into one key, keeping the latest sighting.
+  const next: Record<string, number> = {};
+  for (const [to, seen] of Object.entries(devices)) {
+    const key = to.startsWith(APNS_TOKEN_PREFIX) ? normalizeDeviceKey(to) : to;
+    next[key] = Math.max(next[key] ?? 0, seen);
+  }
+  messages.forEach((message, index) => {
+    if (!message.to.startsWith(APNS_TOKEN_PREFIX)) return;
+    const key = normalizeDeviceKey(message.to);
+    const ticket = tickets[index];
+    if (ticket?.status === "ok") next[key] = now;
+    else if (ticket?.details?.error === "DeviceNotRegistered") delete next[key];
+  });
+  for (const [to, seen] of Object.entries(next)) if (now - seen > DEVICE_TTL_MS) delete next[to];
+  return next;
+}

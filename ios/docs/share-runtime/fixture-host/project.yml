@@ -1,0 +1,19 @@
+name: ShareRuntimeHost
+options:
+  deploymentTarget:
+    iOS: '26.0'
+targets:
+  ShareRuntimeHost:
+    type: application
+    platform: iOS
+    sources: ['Host.swift']
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: local.bb.qa.ShareRuntimeHost
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        TARGETED_DEVICE_FAMILY: '1,2'
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 3753DAN98U
+        SWIFT_VERSION: '5.0'

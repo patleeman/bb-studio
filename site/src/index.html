@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BB Studio</title>
+<meta name="description" content="BB Studio is a desktop app for working with AI agents through Bots. It is a very opinionated fork of bb.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="BB Studio">
+<meta property="og:description" content="A desktop app for working with AI agents through Bots. A very opinionated fork of bb.">
+<meta property="og:image" content="img/theme-miami-1985-1600.webp">
+<link rel="icon" href="icon.png">
+<link rel="preload" href="fonts/Jost-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" as="image" type="image/avif" imagesrcset="{{srcset theme-miami-1985 avif}}" imagesizes="(min-width: 1180px) 1100px, 94vw">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+
+<header class="top">
+  <nav class="nav" aria-label="Sections">
+    <a class="brand" href="#main"><img src="icon.png" alt="" width="28" height="28"> BB Studio</a>
+    <ul>
+      <li><a href="#bots">Bots</a></li>
+      <li><a href="#pages">Bot pages</a></li>
+      <li><a href="#workbench">Workbench</a></li>
+      <li><a href="#themes">Themes</a></li>
+      <li><a href="#credits">Credits</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main id="main">
+
+<section class="hero">
+  <div class="hero-text">
+    <h1>BB Studio</h1>
+    <p class="lead">A desktop app where you work with AI agents through your Bots.</p>
+    <p>Each Bot is a space of its own: a Main conversation, parallel conversations, the workers it runs, and its own memory, library, todos and automations. You talk to the Bot. The Bot runs the work and comes back to you when it needs you.</p>
+    <p class="fork-line">A very opinionated fork of the excellent <a href="https://github.com/get-bb/bb">bb</a>, by Michael Yong.</p>
+  </div>
+  <figure class="shot hero-shot">
+    {{pic theme-miami-1985 "BB Studio with the Miami 1985 theme. The sidebar shows the Bot Atlas with its pages, four conversations and its workers. The Main conversation shows a morning summary with a table of broken links, two replies and the workers line above the composer." "(min-width: 1180px) 1100px, 94vw" eager}}
+  </figure>
+</section>
+
+<section id="bots" class="band">
+  <div class="text">
+    <h2>Bots are the interface</h2>
+    <p>You work with your Bots, not with a list of threads. BB Studio is a collaboration between you and your Bots: you set the direction, they do the work, and you see what they are doing.</p>
+    <ul class="facts">
+      <li><strong>Main.</strong> Each Bot has a Main conversation. Reports and alerts arrive there.</li>
+      <li><strong>Conversations.</strong> Open as many conversations with a Bot as you need. Each has its own transcript and model. All of them share the Bot's memory, skills and todos.</li>
+      <li><strong>Workers.</strong> A Bot starts workers for longer jobs. Workers are read-only: you watch them, and you steer them through the Bot.</li>
+      <li><strong>Needs you.</strong> A conversation that waits on you is outlined in amber, with the reason on its second line. The Bot's icon in the switcher gets an amber mark.</li>
+      <li><strong>Awareness.</strong> Each conversation knows what the Bot's other conversations and workers are doing.</li>
+    </ul>
+  </div>
+  <figure class="shot side">
+    {{pic sidebar "The Bot sidebar for Atlas: Memory, Library, Automations and Todos, then the conversations Main, Kitchen renovation budget (outlined in amber: needs you, pick a countertop), Book club: Thursday, forked from Main, and Lisbon trip in March, then the workers with their repository chips, and the Bot switcher at the bottom." "290px"}}
+  </figure>
+</section>
+
+<section class="band reverse">
+  <div class="text">
+    <h2>Workers and approvals</h2>
+    <p>A worker opens read-only, with its state in the header. In place of a composer it has one box: Ask the Bot about this worker. Your question goes to the Bot, in the conversation that owns the worker.</p>
+    <p>When a worker needs an approval, the card shows in that conversation, not in the worker. It names the worker and shows the command and its folder. Deny, approve once, or approve for that worker.</p>
+    <figure class="shot inline">
+      {{pic approval "An approval card at the top of Main: Refactor the settings form asks for your approval. Adds a dependency for the new toggle rows. Command: pnpm add @radix-ui/react-switch. Buttons: Deny, Approve for this worker, Approve." "(min-width: 900px) 520px, 94vw"}}
+    </figure>
+  </div>
+  <figure class="shot">
+    {{pic worker "A worker thread, Fix broken docs links, marked Running. Its transcript shows the task and the first reply. At the bottom, a box reads Ask the Bot about this worker, and sends to Atlas in Main." "(min-width: 900px) 620px, 94vw"}}
+  </figure>
+</section>
+
+<section id="pages" class="stack">
+  <h2>Bot pages</h2>
+  <p class="intro">Every Bot has the same pages, one click from its sidebar.</p>
+  <div class="grid two">
+    <figure class="shot">
+      {{pic page-memory "The Memory page for Atlas: topic filters and five records, such as orbit-web ships on Thursdays and notes are reviewed by Wednesday noon." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>Memory.</strong> A core profile and dated records the Bot saves and searches. A finished conversation leaves a summary here.</figcaption>
+    </figure>
+    <figure class="shot">
+      {{pic page-library "The Library page for Atlas: pages made by you, such as Release notes: 2.4, Team note: 2.4 and Lisbon: four days, with kind filters for pages, whiteboards, designs, apps and artifacts." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>Library.</strong> The Bot's files: pages, whiteboards, designs, apps and artifacts, grouped by conversation.</figcaption>
+    </figure>
+    <figure class="shot">
+      {{pic page-todos "The Todos page for Atlas: Today has Water the tomatoes at 4:07 PM, Choose a countertop and Review the 2.4 release notes. Later has Replace the furnace filter, Reply to the book club when Juniper finishes the list, and Book the Sintra train when you get home." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>Todos.</strong> Things to do, decide or read, each with its trigger: a time, an event or a place.</figcaption>
+    </figure>
+    <figure class="shot">
+      {{pic page-automations "The Automations page for Atlas: Maintenance, Morning summary and Nightly link check, each with its kind, schedule and last run." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>Automations.</strong> Check-ins, reminders and scheduled runs, each paused or running on its own schedule.</figcaption>
+    </figure>
+  </div>
+  <p class="note">The Archive page holds older and finished conversations and older workers. A finished conversation opens read-only, with Reopen.</p>
+</section>
+
+<section id="workbench" class="stack">
+  <h2>The workbench</h2>
+  <p class="intro">Documents open beside the conversation, in a side panel with up to two panes. Links, cards in replies, search results and the Bot itself open things there.</p>
+  <figure class="shot wide">
+    {{pic workbench "Main with Atlas on the left and the workbench on the right in two panes: the page Release notes: 2.4 and the page Book club: reading list." "(min-width: 1180px) 1100px, 94vw"}}
+  </figure>
+  <div class="grid two">
+    <figure class="shot">
+      {{pic cmdk "The Cmd+K palette over Main, searching lis: Lisbon: four days (page), Lisbon: route sketch (whiteboard), Lisbon trip in March (conversation), Book club: reading list (page), and Ask Atlas." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>Cmd+K.</strong> One palette for conversations, files, apps, actions, commands and settings. Type a sentence to ask the Bot. Option+Space opens the same palette over any app.</figcaption>
+    </figure>
+    <figure class="shot hud">
+      {{pic hud "The HUD: the Main conversation in a small see-through window, with the composer as one bar at the bottom." "(min-width: 900px) 360px, 80vw"}}
+      <figcaption><strong>The HUD.</strong> A conversation in a see-through window that floats over other apps. Click-through lets clicks pass to the app underneath.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="themes" class="stack">
+  <h2>Themes</h2>
+  <p class="intro">Each Bot has its own theme. A scene theme is a live WebGL scene behind frosted glass cards. A Classic theme is a solid palette. Workers, finished runs and things that need you show up in the scene.</p>
+  <div class="grid themes">
+    {{theme theme-miami-1985 "Miami 1985" "A striped sun, palms, wireframe hills and a neon grid. Workers are chrome gliders."}}
+    {{theme theme-event-horizon "Event Horizon" "A ray-traced black hole with a lensed disk. Workers are orbiting particles."}}
+    {{theme theme-grid "Grid" "Neon skylines over a mirrored grid floor. Workers are light cycles."}}
+    {{theme theme-kyoto-garden "Kyoto Garden" "A temple garden in the season and light of the real day. Workers are paper lanterns."}}
+    {{theme theme-forest "Forest" "Pines, mist and fireflies, with the local time of day and weather."}}
+    {{theme theme-aurora-fjord "Aurora Fjord" "Aurora over snowy peaks and still water. Workers are fishing boats."}}
+    {{theme theme-tonights-sky "Tonight's Sky" "The real night sky over your place, with 2,887 stars, the Moon and the planets. Workers are satellites."}}
+    {{theme theme-data-city "Data City" "A glide down an avenue of towers made of scrolling hex glyphs. Workers are data packets."}}
+    {{theme theme-deep-sea "Deep Sea" "A deep-sea scene with a whale, a manta, fish and jellyfish."}}
+  </div>
+  <h3>Motion</h3>
+  <div class="grid three clips">
+    {{clip clip-miami-1985 "Miami 1985 in motion: the grid scrolls and the gliders move."}}
+    {{clip clip-event-horizon "Event Horizon in motion: the disk turns around the black hole."}}
+    {{clip clip-aurora-fjord "Aurora Fjord in motion: the aurora curtains move over the fjord."}}
+  </div>
+  <h3>Classic</h3>
+  <p>Eight Classic themes use published palettes: bb Default, One Dark, Dracula, Solarized Light, GitHub Light, GitHub Dark, Nord and Catppuccin Mocha.</p>
+  <div class="grid two">
+    {{theme theme-github-light "GitHub Light" ""}}
+    {{theme theme-catppuccin-mocha "Catppuccin Mocha" ""}}
+  </div>
+  <p class="note">Every theme passes contrast and frame-time checks before it is saved. The scene pauses when the window is not in front, holds still under reduced motion, and renders smaller on battery. Bots can make new themes with the theme tools.</p>
+</section>
+
+<section id="presence" class="band">
+  <div class="text">
+    <h2>Presence</h2>
+    <p>A Bot's icon is a live form drawn in its theme's colors. The form shows what the Bot is doing:</p>
+    <ul class="facts">
+      <li><strong>Idle.</strong> Slow breathing.</li>
+      <li><strong>Thinking.</strong> Faster, with a shimmer, while a turn runs.</li>
+      <li><strong>Working.</strong> One orbiting satellite for each running worker.</li>
+      <li><strong>Needs you.</strong> Amber, with two pulse rings.</li>
+    </ul>
+    <p>There are eight forms: orb, tesseract, torus knot, particle swarm, Möbius ribbon, polyhedron, Lorenz attractor and Klein bottle. A Bot can also write its own form. Custom forms run in a sandbox with no network.</p>
+  </div>
+  <figure class="shot side sheet">
+    {{pic presence-sheet "A sheet of the eight presence forms in four states: idle, thinking, working and needs you, each at a large size and at 36 and 24 pixels. The needs-you column is amber." "(min-width: 900px) 460px, 94vw"}}
+  </figure>
+</section>
+
+<section class="stack">
+  <h2>Edit space</h2>
+  <p class="intro">Edit space sets a Bot's name, presence, theme and default model in one view. Previews run live as you choose.</p>
+  <figure class="shot wide">
+    {{pic edit-space "Edit space for Atlas: the name field, the presence preview with its state switch and the eight form tiles, the color and motion controls, and the scene theme cards." "(min-width: 1180px) 1100px, 94vw"}}
+  </figure>
+</section>
+
+<section class="stack">
+  <h2>Studio items</h2>
+  <p class="intro">Everything you and your Bots make is in one collection, with search, tags and stars. Each item opens as a tab in the workbench or in a window of its own.</p>
+  <ul class="items">
+    <li><strong>Pages</strong> with dictation, checklists and comments.</li>
+    <li><strong>Whiteboards</strong> inside pages.</li>
+    <li><strong>Designs</strong> made in rounds of screens, with comments.</li>
+    <li><strong>Artifacts</strong> that the agents save.</li>
+    <li><strong>Dashboards</strong> of widgets with live data.</li>
+    <li><strong>Mini apps</strong> that run in a sandbox.</li>
+    <li><strong>Recordings</strong> of calls and voice notes, with transcripts.</li>
+    <li><strong>Visual Chat</strong> boards.</li>
+  </ul>
+</section>
+
+<section class="stack">
+  <h2>Threads and forks</h2>
+  <p class="intro">Point at a Bot's reply and choose Reply in thread. The thread opens in the side panel, beside the conversation. Under the message, a row shows how many replies the thread has and when the last one came. A fork of a message becomes a conversation of its own, at the same level as the others, with a link to where it came from. In the sidebar, Book club: Thursday shows ⑂ Main.</p>
+  <figure class="shot inline-wide">
+    {{pic replies "Under a reply from Atlas: the message actions with the Reply in thread icon at the end, and below them the row 2 replies, 1h ago." "(min-width: 900px) 620px, 94vw"}}
+  </figure>
+  <figure class="shot wide">
+    {{pic replies-open "Main with Atlas on the left, with the replies row under the morning summary, and the thread open in the side panel on the right: a question about the book club, three discussion questions in reply, and Forked from Atlas above its composer." "(min-width: 1180px) 1100px, 94vw"}}
+  </figure>
+</section>
+
+<section class="stack">
+  <h2>iPhone</h2>
+  <p class="intro">An iPhone app is in progress. It follows the same model: your Bots, their Main, conversations and workers, and approvals from the phone. It is not released yet.</p>
+</section>
+
+<section id="credits" class="stack credits">
+  <h2>Credits</h2>
+  <p>BB Studio is a very opinionated fork of the excellent <a href="https://github.com/get-bb/bb">bb</a>. bb is by Michael Yong and is released under the MIT License. BB Studio keeps bb's license file unchanged and adds the Studio plugins.</p>
+  <ul class="facts">
+    <li><strong>bb:</strong> <a href="https://github.com/get-bb/bb">github.com/get-bb/bb</a>. Copyright (c) 2026 Michael Yong. MIT License.</li>
+    <li><strong>BB Studio:</strong> Copyright (c) 2026 Patrick Lee. MIT License.</li>
+    <li><strong>Theme palettes:</strong> One Dark (GitHub Inc., MIT), Dracula (Dracula Theme, MIT), Solarized (Ethan Schoonover, MIT), GitHub Light and Dark (Primer, MIT), Nord (Sven Greb, MIT), Catppuccin (Catppuccin, MIT).</li>
+    <li><strong>Jost font:</strong> The Jost Project Authors, SIL Open Font License 1.1. This site uses it for headings.</li>
+    <li><strong>Tonight's Sky:</strong> Astronomy Engine (Don Cross, MIT), the Yale Bright Star Catalogue (public domain) and d3-celestial constellation data (Olaf Frohn, BSD-3-Clause).</li>
+    <li><strong>Weather in Forest and Kyoto Garden:</strong> <a href="https://open-meteo.com/">Open-Meteo</a>, data under CC BY 4.0.</li>
+  </ul>
+  <p>The full list is in the <a href="NOTICE.txt">NOTICE</a> file.</p>
+  <p class="note">The screenshots show a demo with made-up Bots, conversations and data.</p>
+</section>
+
+</main>
+
+<footer class="foot">
+  <p>BB Studio. A fork of <a href="https://github.com/get-bb/bb">bb</a>. MIT License.</p>
+</footer>
+<script src="site.js" defer></script>
+</body>
+</html>

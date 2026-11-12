@@ -1,0 +1,420 @@
+#!/usr/bin/env node
+/**
+ * Run a staged BB for README screenshots: the current stable BB on its own
+ * data directory and ports, every plugin installed from GitHub at a pushed
+ * commit the way users install them, and seeded demo data. It never touches
+ * ~/.bb or the BB you work in. Some fixtures are real agent replies on small
+ * models, using the staged Codex sign-in (below), so start takes a few minutes.
+ *
+ *   node scripts/staged-bb.mjs start [--ref <pushed commit>] [--plugin <id>]
+ *   . "$TMPDIR/bb-studio-staged/capture.env"
+ *   node scripts/capture-plugin-screenshots.mjs --plugin thread-list-plus
+ *   node scripts/staged-bb.mjs stop
+ *
+ * BB_STAGED_DIR moves the instance (default $TMPDIR/bb-studio-staged) and
+ * BB_STAGED_PORT picks its server port (default 48986); the host daemon, the
+ * capture Chrome take the next two ports. stop deletes the directory, so
+ * every start seeds the same state.
+ *
+ * Agents keep their sessions inside the instance, so fixture runs never land
+ * in your real session history: Codex and Claude Code each get a fixed staged
+ * home (~/.bb-staged/codex, ~/.bb-staged/claude) with its OWN one-time sign-in.
+ * Nothing is shared with or copied from ~/.codex or ~/.claude: a staged Codex
+ * that refreshed a shared sign-in once spent the real one's refresh token. Pi can't be moved: bb passes its bridge no environment and it
+ * saves to ~/.bb/pi-bridge-sessions, so don't use Pi in fixtures.
+ */
+import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { chmod, cp, mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
+import { homedir, tmpdir } from "node:os";
+import { dirname, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { confirmStopped } from "./staged-stop.mjs";
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoSource = "git:github.com/patleeman/bb-studio";
+const releaseFeedUrl = "https://github.com/get-bb/bb/releases/download/desktop-latest/latest-mac.yml";
+const requestedDir = resolve(process.env.BB_STAGED_DIR || join(tmpdir(), "bb-studio-staged"));
+let existingParent = dirname(requestedDir);
+while (!existsSync(existingParent)) existingParent = dirname(existingParent);
+const stagedDir = resolve(realpathSync(existingParent), relative(existingParent, requestedDir));
+if (existsSync(stagedDir) && realpathSync(stagedDir) !== stagedDir) throw new Error(`Refusing a symlinked BB_STAGED_DIR: ${stagedDir}`);
+// start and stop delete stagedDir: refuse anything that holds the repository,
+// the home directory, the current directory, or the BB you work in.
+{
+  const within = (child, parent) => !relative(parent, child).startsWith("..") && !relative(parent, child).startsWith(sep);
+  const realBB = join(homedir(), ".bb");
+  const unsafe = [repoRoot, homedir(), process.cwd()].some((path) => within(path, stagedDir)) || within(stagedDir, realBB);
+  if (unsafe || stagedDir === dirname(stagedDir)) throw new Error(`Refusing to use ${stagedDir} as BB_STAGED_DIR: it would delete the repository, your home directory, or ~/.bb.`);
+}
+const port = Number(process.env.BB_STAGED_PORT ?? "48986");
+if (!Number.isInteger(port) || port < 1024 || port > 65531) throw new Error(`BB_STAGED_PORT must be a port from 1024 to 65531, not ${process.env.BB_STAGED_PORT}`);
+const serverUrl = `http://127.0.0.1:${port}`;
+const dataDir = join(stagedDir, "data");
+const binDir = join(stagedDir, "bb-app", "node_modules", ".bin");
+// One fixed Codex home shared by every staged BB, with its own sign-in. Never
+// the real one: Codex rotates its refresh token on use, so a staged Codex
+// sharing ~/.codex/auth.json (as a symlink, once) left the real sign-in with a
+// spent token. Sign in once with
+//   CODEX_HOME=~/.bb-staged/codex codex login --device-auth
+// It sits outside ~/.codex, so the transcript archive never sees its sessions.
+const codexHome = resolve(process.env.BB_STAGED_CODEX_HOME?.trim() || join(homedir(), ".bb-staged", "codex"));
+const realCodexHome = resolve(process.env.CODEX_HOME?.trim() || join(homedir(), ".codex"));
+for (const real of new Set([realCodexHome, resolve(homedir(), ".codex")])) {
+  if (codexHome === real || codexHome.startsWith(`${real}/`) || real.startsWith(`${codexHome}/`)) {
+    throw new Error(`Refusing to use ${codexHome} as the staged Codex home: it overlaps your real Codex home ${real}.`);
+  }
+}
+// One fixed Claude Code folder shared by every staged BB. Claude Code keys its
+// Keychain sign-in to its config folder, so a fresh folder per instance is never
+// signed in. Sign in to this one once (CLAUDE_CONFIG_DIR=~/.bb-staged/claude
+// claude, then /login); it sits outside ~/.claude, so the transcript archive
+// never sees staged sessions. Nothing is ever copied into it from ~/.claude.
+const claudeHome = process.env.BB_STAGED_CLAUDE_HOME?.trim() || join(homedir(), ".bb-staged", "claude");
+// Holds the claude wrapper; it goes first on PATH.
+const shimDir = join(stagedDir, "shims");
+const fixturesDir = join(repoRoot, "scripts/capture/fixtures");
+const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
+
+// Demo threads in the seeded project. Their first message is scheduled weeks
+// out, so no agent runs and the sidebar shows the same rows every time.
+const ORBIT_THREADS = [
+  "Draft the ORBIT-42 release notes",
+  "Review the launch checklist",
+  "Plan the Friday release window",
+];
+
+// Drop the variables of the agent session this script may run inside:
+// - BB_*: BB_CLI and BB_HOST_DAEMON_PORT would send the CLI to the BB you work in.
+// - CLAUDE_*, ANTHROPIC_* and CLAUDECODE: a Claude Code session's own
+//   (ANTHROPIC_BASE_URL, CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST, …) tell the
+//   staged Claude Code that its host signs it in, so it never reads its own
+//   Keychain sign-in and says "Not logged in".
+const INHERITED = /^(BB_|CLAUDE_|_CLAUDE_|ANTHROPIC_|CLAUDECODE$)/;
+function stagedEnv(extra) {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !INHERITED.test(name)));
+  return {
+    ...env,
+    PATH: `${shimDir}:${binDir}:${process.env.PATH}`,
+    CODEX_HOME: codexHome,
+    npm_config_cache: join(stagedDir, "npm-cache"),
+    ...(existsSync(join(shimDir, "claude")) ? { BB_CLAUDE_CODE_EXECUTABLE: join(shimDir, "claude") } : {}),
+    ...extra,
+  };
+}
+
+function run(command, args, { cwd = stagedDir, quiet = false } = {}) {
+  const env = stagedEnv({ BB_DATA_DIR: dataDir, BB_SERVER_URL: serverUrl });
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(command, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => (stdout += chunk));
+    child.stderr.on("data", (chunk) => (stderr += chunk));
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) return resolvePromise(stdout);
+      reject(new Error(`${command} ${args.join(" ")} failed: ${stderr || stdout}`));
+    });
+    if (!quiet) child.stderr.pipe(process.stderr);
+  });
+}
+
+const bb = async (...args) => JSON.parse(await run(join(binDir, "bb"), [...args, "--json"], { quiet: true }));
+
+async function healthy() {
+  try {
+    return (await fetch(`${serverUrl}/health`)).ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether nothing listens on 127.0.0.1:port, so the staged BB can't reach another server. */
+function portFree(candidate) {
+  return new Promise((resolvePromise) => {
+    const server = createServer();
+    server.once("error", () => resolvePromise(false));
+    server.listen(candidate, "127.0.0.1", () => server.close(() => resolvePromise(true)));
+  });
+}
+
+async function stableVersion() {
+  if (process.env.BB_STABLE_VERSION) return process.env.BB_STABLE_VERSION;
+  const response = await fetch(releaseFeedUrl);
+  if (!response.ok) throw new Error(`GET ${releaseFeedUrl} failed: ${response.status}`);
+  const version = /^version:\s*(\S+)\s*$/m.exec(await response.text())?.[1];
+  if (!version) throw new Error(`No version in ${releaseFeedUrl}`);
+  return version;
+}
+
+async function pushedRef(ref) {
+  const commit = (await run("git", ["rev-parse", ref], { cwd: repoRoot, quiet: true })).trim();
+  const branches = await run("git", ["branch", "-r", "--contains", commit], { cwd: repoRoot, quiet: true });
+  if (!/\borigin\/main\b/.test(branches)) {
+    throw new Error(`${commit} isn't on origin/main yet. BB installs from GitHub, so push it first or pass --ref.`);
+  }
+  return commit;
+}
+
+/**
+ * A thread that asks "SQLite or Postgres?", so its reply ends with Pages'
+ * Next row offering both as quick replies. Running it also gives the thread a
+ * workspace in the Orbit repository, where the artifact capture stages its
+ * report. GPT-6-Luna leaves the quick replies out, so this uses GPT-6.1-Sol.
+ * The Next row is optional for the model, and on low reasoning it sometimes
+ * skips it, so the prompt asks for it and a reply without it is retried in a
+ * fresh thread; only the thread with the row is kept.
+ */
+async function seedWorkspaceThread(project, machine, orbitDir) {
+  const attempts = 3;
+  const replies = [];
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const thread = await bb(
+      "thread", "spawn", "--project", project.id, "--machine", machine.id, "--environment", orbitDir,
+      "--provider", "codex", "--model", "gpt-6.1-sol", "--reasoning-level", "low",
+      "--title", "Pick a database for the todo app",
+      "--prompt", "I'm building a small todo app just for me. Should it store its data in SQLite or Postgres? Give me two short sentences on the trade-off, then ask me which one I want, and end with the Next row offering SQLite and Postgres as quick replies.",
+    );
+    await bb("thread", "wait", thread.id, "--timeout", "5m");
+    const events = await bb("thread", "messages", thread.id);
+    const reply = events.findLast((event) => event.type === "item/completed" && event.data.item.type === "agentMessage")?.data.item.text ?? "";
+    if (/::next\{[^}]*SQLite[^}]*Postgres/.test(reply)) {
+      await bb("thread", "read", thread.id);
+      return thread;
+    }
+    replies.push(reply);
+    process.stdout.write(`The SQLite or Postgres reply has no Next row quick replies (attempt ${attempt} of ${attempts})\n`);
+    await bb("thread", "archive", thread.id).catch(() => {});
+  }
+  throw new Error(`The SQLite or Postgres reply had no Next row quick replies in ${attempts} attempts. Last reply: ${replies.at(-1)}`);
+}
+
+async function start() {
+  const { plugins } = JSON.parse(await readFile(join(repoRoot, ".bb/plugins.json"), "utf8"));
+  const pluginFlag = process.argv.indexOf("--plugin");
+  const capturePlugin = pluginFlag >= 0 ? process.argv[pluginFlag + 1] : null;
+  if (pluginFlag >= 0 && !plugins.some(({ name }) => name === capturePlugin)) throw new Error("Use --plugin with an installed plugin ID from .bb/plugins.json.");
+  const refFlag = process.argv.indexOf("--ref");
+  const ref = await pushedRef(refFlag >= 0 ? process.argv[refFlag + 1] : "HEAD");
+  if (await healthy()) throw new Error(`Something already answers at ${serverUrl}. Run stop, or set BB_STAGED_PORT.`);
+  // Anything else on these ports (another BB that rejects /health, a Chrome
+  // with remote debugging) would receive the staged CLI calls and captures.
+  for (const candidate of [port, port + 1, port + 2]) {
+    if (!(await portFree(candidate))) throw new Error(`Port ${candidate} is in use. Set BB_STAGED_PORT to a free range of five ports.`);
+  }
+  if (existsSync(stagedDir)) throw new Error(`Staged directory already exists: ${stagedDir}. Run stop first; failed instances keep their logs.`);
+  await mkdir(stagedDir, { recursive: true });
+  await useOwnAgentHomes();
+
+  const version = await stableVersion();
+  process.stdout.write(`Installing bb-app ${version} in ${stagedDir}\n`);
+  await run("npm", ["install", "--prefix", join(stagedDir, "bb-app"), `bb-app@${version}`, "--no-audit", "--no-fund"]);
+
+  const talkTap = await useStubTalkTap();
+  const log = await open(join(stagedDir, "launcher.log"), "a");
+  const launcher = spawn(
+    join(binDir, "bb-app"),
+    ["--bundled", "--data-dir", dataDir, "--server-port", String(port), "--host-daemon-port", String(port + 1)],
+    { cwd: stagedDir, detached: true, stdio: ["ignore", log.fd, log.fd], env: stagedEnv({ BB_TELEMETRY: "0", ...talkTap }) },
+  );
+  await new Promise((resolve, reject) => {
+    launcher.once("spawn", resolve);
+    launcher.once("error", reject);
+  });
+  launcher.unref();
+  await log.close();
+  await writeFile(join(stagedDir, "instance.json"), JSON.stringify({
+    kind: "bb-studio-staged", directory: stagedDir, dataDir, port, serverUrl,
+    cdpPort: port + 2, cli: join(binDir, "bb"), launcherPid: launcher.pid,
+  }, null, 2));
+  // From here a failure or Ctrl-C stops the staged BB instead of leaving it
+  // running; the directory stays for launcher.log until stop.
+  const stopLaunched = async () => {
+    await stopOwned().catch((error) => { process.stderr.write(`Stop failed: ${error.message}. Keeping ${stagedDir}; logs: ${join(stagedDir, "launcher.log")}\n`); });
+  };
+  const interrupted = async () => {
+    await stopLaunched();
+    process.exit(130);
+  };
+  process.once("SIGINT", interrupted);
+  process.once("SIGTERM", interrupted);
+  try {
+    await seed({ plugins, capturePlugin, ref, version });
+  } catch (error) {
+    process.stderr.write(`Start failed; stopping the staged BB. Logs: ${join(stagedDir, "launcher.log")}\n`);
+    await stopLaunched();
+    throw error;
+  } finally {
+    process.off("SIGINT", interrupted);
+    process.off("SIGTERM", interrupted);
+  }
+}
+
+async function seed({ plugins, capturePlugin, ref, version }) {
+  const started = Date.now();
+  while (!(await healthy())) {
+    if (Date.now() - started > 120000) throw new Error(`BB didn't start; see ${join(stagedDir, "launcher.log")}`);
+    await sleep(1000);
+  }
+  process.stdout.write(`BB ${version} is running at ${serverUrl}\n`);
+  // BB 0.46+ opens a first-run setup guide over every page of a new install;
+  // a fixture is set up already.
+  await bb("settings", "general", "onboardingCompletedAt", new Date().toISOString());
+
+  // Install every plugin as users do, from this repository's Git source.
+  for (const { name } of plugins) {
+    process.stdout.write(`Installing ${name} from ${repoSource}@${ref.slice(0, 7)}\n`);
+    await run(join(binDir, "bb"), ["plugin", "install", `${repoSource}@${ref}`, "--plugin", name, "--yes"], { quiet: true });
+  }
+  // A plugin outside BB Studio, so captures can show that its rows stay. Copy
+  // it first: a path install builds into the plugin directory.
+  const forecastDir = join(stagedDir, "forecast");
+  await cp(join(repoRoot, "scripts/capture/fixtures/forecast"), forecastDir, { recursive: true });
+  await run(join(binDir, "bb"), ["plugin", "install", forecastDir, "--yes"], { quiet: true });
+
+  // A demo project backed by its own small Git repository.
+  const orbitDir = join(stagedDir, "orbit");
+  await mkdir(orbitDir);
+  await writeFile(join(orbitDir, "README.md"), "# Orbit\n\nThe ORBIT-42 release.\n");
+  // Code for staged agent threads to read.
+  await cp(join(fixturesDir, "orbit"), join(orbitDir, "src"), { recursive: true });
+  await run("git", ["init", "-q"], { cwd: orbitDir });
+  await run("git", ["add", "README.md", "src"], { cwd: orbitDir });
+  await run("git", ["-c", "user.name=Staged", "-c", "user.email=staged@example.com", "commit", "-qm", "Start Orbit"], { cwd: orbitDir });
+  const [machine] = await bb("machine", "list");
+  const project = await bb("project", "create", "--name", "Orbit", "--root", orbitDir, "--machine", machine.id);
+  const threads = [];
+  for (const title of ORBIT_THREADS) {
+    threads.push(await bb("thread", "spawn", "--project", project.id, "--title", title, "--prompt", `${title}.`, "--send-at", "30d"));
+  }
+
+  // Talk's meeting notes and Studio Decisions fall back to this model.
+  await bb("studio", "decisions", "fallback", "codex", "gpt-6-luna", "low");
+  process.stdout.write(`Seeding fixtures${capturePlugin ? ` for ${capturePlugin}` : " for the suite"}\n`);
+  const workspaceThread = !capturePlugin || capturePlugin === "studio" || capturePlugin === "artifacts"
+    ? (stagedCodexSignedIn() ? await seedWorkspaceThread(project, machine, orbitDir) : failNoCodex()) : null;
+
+  const envFile = join(stagedDir, "capture.env");
+  await writeFile(
+    envFile,
+    [
+      `export BB_CAPTURE_INSTANCE="${join(stagedDir, "instance.json")}"`,
+      `export BB_DATA_DIR="${dataDir}"`,
+      `export BB_SERVER_URL=${serverUrl}`,
+      `export BB_CAPTURE_PROJECT_ID=${project.id}`,
+      `export BB_CAPTURE_THREAD_ID=${threads[0].id}`,
+      "unset BB_CAPTURE_WORKSPACE_THREAD_ID",
+      ...(workspaceThread ? [
+        `export BB_CAPTURE_WORKSPACE_THREAD_ID=${workspaceThread.id}`,
+      ] : []),
+      "unset BB_CAPTURE_ONLY BB_CAPTURE_PLUGIN",
+      ...(capturePlugin ? [`export BB_CAPTURE_PLUGIN=${capturePlugin}`] : []),
+      `export BB_CAPTURE_CDP_PORT=${port + 2}`,
+      `export PATH="${binDir}:$PATH"`,
+      "unset BB_CLI BB_HOST_DAEMON_PORT BB_THREAD_ID BB_PROJECT_ID BB_ENVIRONMENT_ID BB_THREAD_STORAGE",
+      "",
+    ].join("\n"),
+  );
+  process.stdout.write(`\nSeeded project Orbit (${project.id}). Point captures at it with:\n  . "${envFile}"\n`);
+}
+
+// Talk's call capture runs the stub helper in fake mode: it plays a short
+// made-up call, so a staged BB never taps this Mac's audio or mic, and never
+// shows a permission prompt. Studio checks it against its checksum like the
+// real helper.
+async function useStubTalkTap() {
+  const dir = join(stagedDir, "talk-tap");
+  const helper = join(dir, "bb-talk-tap");
+  await mkdir(join(dir, "fake"), { recursive: true });
+  await cp(join(repoRoot, "packages/bb-studio/src/talk/test/stub-tap.mjs"), helper);
+  await chmod(helper, 0o755);
+  const hash = createHash("sha256").update(await readFile(helper)).digest("hex");
+  await writeFile(`${helper}.sha256`, `${hash}  bb-talk-tap\n`);
+  await writeFile(join(dir, "fake", "them.wav"), "");
+  await writeFile(join(dir, "fake", "me.wav"), "");
+  return { BB_STUDIO_TALK_TAP: helper, BB_STUDIO_TALK_TAP_FAKE: join(dir, "fake") };
+}
+
+// Agents save every session to their home folder, and those folders are
+// archived as your own history. Give each one a home inside the instance.
+/**
+ * Whether the staged Codex home has its own sign-in. Throws if its auth.json
+ * is a link, or resolves to the real one, so a leftover link from the old
+ * setup can never refresh the real sign-in again.
+ */
+function failNoCodex() {
+  throw new Error(`The studio and artifacts fixtures need a Codex reply. Sign in the staged Codex home once: CODEX_HOME=${codexHome} codex login --device-auth`);
+}
+
+function stagedCodexSignedIn() {
+  const auth = join(codexHome, "auth.json");
+  let stat = null;
+  try { stat = lstatSync(auth); } catch { /* Not signed in. */ }
+  if (!stat) {
+    console.warn(`Codex in staged BBs isn't signed in yet, so Codex fixtures can't run. Sign in once with: CODEX_HOME=${codexHome} codex login --device-auth`);
+    return false;
+  }
+  const real = [join(realCodexHome, "auth.json"), join(homedir(), ".codex", "auth.json")].filter(existsSync).map((path) => realpathSync(path));
+  if (stat.isSymbolicLink() || real.includes(realpathSync(auth))) {
+    throw new Error(`${auth} links to your real Codex sign-in. Delete it and sign in the staged home on its own: CODEX_HOME=${codexHome} codex login --device-auth`);
+  }
+  return true;
+}
+
+async function useOwnAgentHomes() {
+  // Codex: the fixed staged home (codexHome) with its own sign-in. Nothing is
+  // linked or copied from the real one.
+  await mkdir(codexHome, { recursive: true });
+  stagedCodexSignedIn();
+
+  // Claude Code: bb passes it only BB_CLAUDE_CODE_EXECUTABLE and its OAuth
+  // token, so a wrapper sets CLAUDE_CONFIG_DIR to the fixed staged folder
+  // (claudeHome), which has its own one-time sign-in.
+  const claude = process.env.BB_CLAUDE_CODE_EXECUTABLE?.trim() || (await which("claude"));
+  if (claude) {
+    await mkdir(claudeHome, { recursive: true });
+    await mkdir(shimDir, { recursive: true });
+    const shim = join(shimDir, "claude");
+    await writeFile(shim, `#!/bin/sh\nCLAUDE_CONFIG_DIR=${JSON.stringify(claudeHome)} exec ${JSON.stringify(claude)} "$@"\n`);
+    await chmod(shim, 0o755);
+    if (!existsSync(join(claudeHome, ".claude.json"))) {
+      console.warn(`Claude Code in staged BBs isn't signed in yet. Sign in once with: CLAUDE_CONFIG_DIR=${claudeHome} claude, then /login`);
+    }
+  }
+}
+
+async function which(name) {
+  for (const dir of (process.env.PATH ?? "").split(":")) {
+    if (dir && existsSync(join(dir, name))) return join(dir, name);
+  }
+  return undefined;
+}
+
+async function stopOwned() {
+  await confirmStopped({
+    stop: async () => {
+      if (existsSync(join(binDir, "bb-app"))) await run(join(binDir, "bb-app"), ["stop", "--data-dir", dataDir]);
+    },
+    processes: async () => (await run("ps", ["-axo", "pid=,command="], { quiet: true }))
+      .split("\n").filter((line) => line.includes(`${stagedDir}/`)),
+    portsFree: async () => (await Promise.all([port, port + 1, port + 2].map(portFree))).every(Boolean),
+    sleep,
+  });
+}
+
+async function stop() {
+  if (!existsSync(stagedDir)) return;
+  try { await stopOwned(); }
+  catch (error) { throw new Error(`${error.message}. Instance kept at ${stagedDir}; logs: ${join(stagedDir, "launcher.log")}`, { cause: error }); }
+  await rm(stagedDir, { recursive: true, force: true });
+  process.stdout.write(`Stopped the staged BB and removed ${stagedDir}\n`);
+}
+
+const command = process.argv[2];
+if (command === "start") await start();
+else if (command === "stop") await stop();
+else throw new Error("Usage: node scripts/staged-bb.mjs start [--ref <commit>] [--plugin <id>] | stop");

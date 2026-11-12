@@ -1,0 +1,513 @@
+import { createServer } from "node:net";
+import { spawn } from "node:child_process";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { serverUrl, cdpPort, threadId, sleep } from "./bb.mjs";
+
+export class CdpClient {
+  constructor(webSocketUrl) {
+    this.webSocketUrl = webSocketUrl;
+    this.socket = null;
+    this.nextId = 0;
+    this.pending = new Map();
+  }
+
+  async connect() {
+    this.socket = new WebSocket(this.webSocketUrl);
+    this.socket.addEventListener("message", (event) => {
+      const message = JSON.parse(event.data);
+      const pending = this.pending.get(message.id);
+      if (!pending) return;
+      this.pending.delete(message.id);
+      if (message.error) pending.reject(new Error(JSON.stringify(message.error)));
+      else pending.resolve(message.result);
+    });
+    await new Promise((resolvePromise, reject) => {
+      this.socket.addEventListener("open", resolvePromise, { once: true });
+      this.socket.addEventListener("error", reject, { once: true });
+    });
+    await this.command("Page.enable");
+  }
+
+  command(method, params = {}, timeoutMs = 60000, sessionId = undefined) {
+    const id = ++this.nextId;
+    return new Promise((resolvePromise, reject) => {
+      // A wedged page never answers; fail the capture instead of hanging it.
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`CDP ${method} timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+      const settle = (fn) => (value) => {
+        clearTimeout(timer);
+        fn(value);
+      };
+      this.pending.set(id, { resolve: settle(resolvePromise), reject: settle(reject) });
+      try {
+        this.socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
+      } catch (error) {
+        // A socket that never opened or already closed: don't leave the timer holding the process open.
+        this.pending.delete(id);
+        settle(reject)(error);
+      }
+    });
+  }
+
+  async evaluate(expression, awaitPromise = false) {
+    const result = await this.command("Runtime.evaluate", {
+      expression,
+      awaitPromise,
+      returnByValue: true,
+    });
+    if (result.exceptionDetails) {
+      throw new Error(
+        result.exceptionDetails.exception?.description ??
+          result.exceptionDetails.text ??
+          "Runtime evaluation failed",
+      );
+    }
+    if (result.result?.subtype === "error") {
+      throw new Error(result.result.description ?? "Runtime evaluation failed");
+    }
+    return result.result?.value;
+  }
+
+  async resetCaptureState() {
+    const token = String(++this.nextId);
+    const { identifier } = await this.command("Page.addScriptToEvaluateOnNewDocument", { source: `
+      if (location.origin === ${JSON.stringify(serverUrl)}) {
+        localStorage.removeItem("bb:studio-workspace:v1");
+        sessionStorage.removeItem("studio.sidebar.listMode");
+        window.__bbCaptureReset = ${JSON.stringify(token)};
+      }
+    ` });
+    this.captureReset = { identifier, token };
+  }
+
+  async navigate(path) {
+    if (path === "about:blank" && this.captureReset) {
+      await this.command("Page.removeScriptToEvaluateOnNewDocument", { identifier: this.captureReset.identifier });
+      this.captureReset = null;
+    }
+    const url = path === "about:blank" ? path : `${serverUrl}${path}`;
+    await this.command("Page.navigate", { url });
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+      const reset = this.captureReset;
+      const resetDone = !reset || await this.poll(`window.__bbCaptureReset === ${JSON.stringify(reset.token)}`);
+      // Item routes can replace their URL once the loaded app opens its tab.
+      const ready = resetDone && await this.poll(`document.readyState === "complete" && (location.href === ${JSON.stringify(url)} || (${JSON.stringify(path)} !== "about:blank" && location.origin === ${JSON.stringify(serverUrl)} && location.pathname === "/plugins/studio/studio"))`);
+      if (ready) {
+        if (reset) {
+          await this.command("Page.removeScriptToEvaluateOnNewDocument", { identifier: reset.identifier });
+          this.captureReset = null;
+        }
+        return;
+      }
+      await sleep(100);
+    }
+    throw new Error(`Navigation did not finish: ${url}`);
+  }
+
+  /** Evaluates for a poll; a page that navigates mid-poll just isn't ready yet. */
+  async poll(expression) {
+    try {
+      return await this.evaluate(expression);
+    } catch (error) {
+      if (/navigated or closed|context was destroyed|Cannot find context/i.test(String(error?.message))) return null;
+      throw error;
+    }
+  }
+
+  async waitForText(text, timeoutMs = 15000) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      const bodyText = await this.poll("document.body?.innerText ?? \"\"");
+      if (bodyText?.includes(text)) return;
+      await sleep(250);
+    }
+    const bodyText = await this.evaluate("document.body?.innerText ?? \"\"");
+    throw new Error(`Timed out waiting for ${JSON.stringify(text)}.\n${bodyText.slice(-1200)}`);
+  }
+
+  /**
+   * The text of every child frame. Sandboxed frames (mini apps, custom
+   * widgets) are other origins, and Chrome runs them out of process, so each
+   * is attached as its own target and read there.
+   */
+  async frameTexts() {
+    const { targetInfos } = await this.command("Target.getTargets");
+    const texts = [];
+    for (const target of targetInfos.filter((info) => info.type === "iframe")) {
+      let sessionId = null;
+      try {
+        ({ sessionId } = await this.command("Target.attachToTarget", { targetId: target.targetId, flatten: true }));
+        const result = await this.command("Runtime.evaluate", { expression: "document.body?.innerText ?? \"\"", returnByValue: true }, 10000, sessionId);
+        texts.push(result.result?.value ?? "");
+      } catch {
+        // A frame that went away while we looked.
+      } finally {
+        if (sessionId) await this.command("Target.detachFromTarget", { sessionId }).catch(() => {});
+      }
+    }
+    return texts;
+  }
+
+  /** Waits until one child frame shows every text. */
+  async waitForFrameText(texts, timeoutMs = 15000) {
+    const wanted = Array.isArray(texts) ? texts : [texts];
+    const started = Date.now();
+    let last = [];
+    while (Date.now() - started < timeoutMs) {
+      last = await this.frameTexts();
+      if (last.some((text) => wanted.every((each) => text.includes(each)))) return;
+      await sleep(300);
+    }
+    throw new Error(`Timed out waiting for a frame showing ${JSON.stringify(wanted)}.\n${last.map((text) => text.slice(0, 600)).join("\n---\n")}`);
+  }
+
+  async waitForSelector(selector, timeoutMs = 15000) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      if (await this.poll(`Boolean(document.querySelector(${JSON.stringify(selector)}))`)) return;
+      await sleep(250);
+    }
+    throw new Error(`Timed out waiting for selector ${JSON.stringify(selector)}`);
+  }
+
+  /** Waits for a Studio workspace tab titled `title`; items open as tabs, which name them. */
+  async waitForTab(title, timeoutMs = 15000) {
+    const started = Date.now();
+    const expression = `[...document.querySelectorAll('[data-studio-workspace-tabs] [role="tab"]')].some((tab) => tab.lastElementChild?.textContent === ${JSON.stringify(title)})`;
+    while (Date.now() - started < timeoutMs) {
+      if (await this.poll(expression)) return;
+      await sleep(250);
+    }
+    throw new Error(`Timed out waiting for a Studio tab titled ${JSON.stringify(title)}`);
+  }
+
+  async waitForInputValue(label, expected, timeoutMs = 15000) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      const value = await this.evaluate(`(() => {
+        const field = Array.from(document.querySelectorAll("input, textarea"))
+          .find((candidate) => candidate.getAttribute("aria-label") === ${JSON.stringify(label)});
+        return field?.value ?? null;
+      })()`);
+      if (value === expected) return;
+      await sleep(250);
+    }
+    const value = await this.evaluate(`(() => {
+      const field = Array.from(document.querySelectorAll("input, textarea"))
+        .find((candidate) => candidate.getAttribute("aria-label") === ${JSON.stringify(label)});
+      return field?.value ?? null;
+    })()`);
+    throw new Error(`Timed out waiting for ${JSON.stringify(label)} to equal ${JSON.stringify(expected)}; actual value was ${JSON.stringify(value)}`);
+  }
+
+  async waitForAriaButton(label, timeoutMs = 15000) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      const present = await this.evaluate(`Array.from(document.querySelectorAll("button"))
+        .some((candidate) => candidate.getAttribute("aria-label") === ${JSON.stringify(label)})`);
+      if (present) return;
+      await sleep(250);
+    }
+    throw new Error(`Timed out waiting for button ${JSON.stringify(label)}`);
+  }
+
+  async hasText(text, timeoutMs = 2500) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      const bodyText = await this.evaluate("document.body?.innerText ?? \"\"");
+      if (bodyText.includes(text)) return true;
+      await sleep(250);
+    }
+    return false;
+  }
+
+  async clickButtonText(label) {
+    const clicked = await this.evaluate(`(() => {
+      const button = Array.from(document.querySelectorAll("button"))
+        .find((candidate) => candidate.innerText.trim() === ${JSON.stringify(label)});
+      if (!button) throw new Error("Button not found: ${label}");
+      button.click();
+      return true;
+    })()`);
+    if (!clicked) throw new Error(`Unable to click ${label}`);
+    await sleep(900);
+  }
+
+  async drawRectangle() {
+    await this.evaluate(`(() => {
+      const tool = Array.from(document.querySelectorAll("[aria-label]"))
+        .find((candidate) => candidate.getAttribute("aria-label") === "Rectangle");
+      if (!tool) throw new Error("Excalidraw Rectangle tool not found");
+      tool.click();
+      return true;
+    })()`);
+    await this.command("Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      x: 560,
+      y: 300,
+      buttons: 0,
+    });
+    await this.command("Input.dispatchMouseEvent", {
+      type: "mousePressed",
+      x: 560,
+      y: 300,
+      button: "left",
+      buttons: 1,
+      clickCount: 1,
+    });
+    await this.command("Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      x: 960,
+      y: 550,
+      button: "left",
+      buttons: 1,
+      clickCount: 1,
+    });
+    await this.command("Input.dispatchMouseEvent", {
+      type: "mouseReleased",
+      x: 960,
+      y: 550,
+      button: "left",
+      buttons: 0,
+      clickCount: 1,
+    });
+    await sleep(1200);
+  }
+
+  async clickSidebarButton(label) {
+    const clicked = await this.evaluate(`(() => {
+      const button = Array.from(document.querySelectorAll("button"))
+        .find((candidate) => candidate.innerText.trim() === ${JSON.stringify(label)});
+      if (!button) throw new Error("Sidebar button not found: ${label}");
+      button.click();
+      return true;
+    })()`);
+    if (!clicked) throw new Error(`Unable to click sidebar button ${label}`);
+    await sleep(900);
+  }
+
+  async clickFirstButtonWithAria(label) {
+    const clicked = await this.evaluate(`(() => {
+      const button = Array.from(document.querySelectorAll("button"))
+        .find((candidate) => candidate.getAttribute("aria-label") === ${JSON.stringify(label)});
+      if (!button) throw new Error("Button not found: ${label}");
+      button.click();
+      return true;
+    })()`);
+    if (!clicked) throw new Error(`Unable to click ${label}`);
+    await sleep(900);
+  }
+
+  /** `within`, a selector, picks the button inside it, such as an open menu's. */
+  async clickAriaButtonWithPointer(label, within = null) {
+    const point = await this.evaluate(`(() => {
+      const root = ${JSON.stringify(within)} ? document.querySelector(${JSON.stringify(within)}) : document;
+      const button = Array.from(root?.querySelectorAll("button") ?? [])
+        .find((candidate) => candidate.getAttribute("aria-label") === ${JSON.stringify(label)});
+      if (!button) throw new Error("Button not found: ${label}");
+      const rect = button.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    })()`);
+    await this.command("Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      x: point.x,
+      y: point.y,
+      buttons: 0,
+    });
+    await this.command("Input.dispatchMouseEvent", {
+      type: "mousePressed",
+      x: point.x,
+      y: point.y,
+      button: "left",
+      buttons: 1,
+      clickCount: 1,
+    });
+    await this.command("Input.dispatchMouseEvent", {
+      type: "mouseReleased",
+      x: point.x,
+      y: point.y,
+      button: "left",
+      buttons: 0,
+      clickCount: 1,
+    });
+    await sleep(300);
+  }
+
+  async clickElementWithTextAndPointer(selector, text) {
+    const point = await this.evaluate(`(() => {
+      const element = Array.from(document.querySelectorAll(${JSON.stringify(selector)}))
+        .find((candidate) => candidate.textContent?.trim() === ${JSON.stringify(text)});
+      if (!element) throw new Error("Element not found: ${text}");
+      const rect = element.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    })()`);
+    await this.command("Input.dispatchMouseEvent", {
+      type: "mouseMoved",
+      x: point.x,
+      y: point.y,
+      buttons: 0,
+    });
+    await this.command("Input.dispatchMouseEvent", {
+      type: "mousePressed",
+      x: point.x,
+      y: point.y,
+      button: "left",
+      buttons: 1,
+      clickCount: 1,
+    });
+    await this.command("Input.dispatchMouseEvent", {
+      type: "mouseReleased",
+      x: point.x,
+      y: point.y,
+      button: "left",
+      buttons: 0,
+      clickCount: 1,
+    });
+    await sleep(300);
+  }
+
+  async openThreadContextMenu() {
+    const point = await this.evaluate(`(() => {
+      const anchor = Array.from(document.querySelectorAll(
+        '[data-sidebar-thread-id], [data-thread-id], [data-session-id], a[href*="/threads/"]',
+      )).find((candidate) =>
+        candidate.getAttribute("data-sidebar-thread-id") === ${JSON.stringify(threadId)} ||
+        candidate.getAttribute("data-thread-id") === ${JSON.stringify(threadId)} ||
+        candidate.getAttribute("data-session-id") === ${JSON.stringify(threadId)} ||
+        candidate.getAttribute("href")?.includes("/threads/" + ${JSON.stringify(threadId)}),
+      );
+      if (!anchor) throw new Error("Seed thread row not found in the sidebar");
+      const rect = anchor.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    })()`);
+    await this.command("Input.dispatchMouseEvent", {
+      type: "mousePressed",
+      x: point.x,
+      y: point.y,
+      button: "right",
+      clickCount: 1,
+    });
+    // Release clear of the menu: near the window's bottom it opens over the
+    // pointer, and releasing on an item picks it.
+    await this.command("Input.dispatchMouseEvent", {
+      type: "mouseReleased",
+      x: point.x + 400,
+      y: point.y,
+      button: "right",
+      clickCount: 1,
+    });
+    await sleep(700);
+  }
+
+  /** Right-clicks the first element matching `selector`, opening its context menu. */
+  async openContextMenu(selector) {
+    const point = await this.evaluate(`(() => {
+      const element = document.querySelector(${JSON.stringify(selector)});
+      if (!element) throw new Error("Element not found: " + ${JSON.stringify(selector)});
+      element.scrollIntoView({ block: "center" });
+      const rect = element.getBoundingClientRect();
+      return { x: rect.left + Math.min(rect.width / 2, 80), y: rect.top + rect.height / 2 };
+    })()`);
+    await this.command("Input.dispatchMouseEvent", { type: "mousePressed", x: point.x, y: point.y, button: "right", clickCount: 1 });
+    // Release clear of the menu, as in openThreadContextMenu: a menu that opens
+    // over the pointer would take the release as picking an item.
+    await this.command("Input.dispatchMouseEvent", { type: "mouseReleased", x: point.x + 400, y: point.y, button: "right", clickCount: 1 });
+    await sleep(700);
+  }
+
+  /**
+   * Drags the first element matching `selector` by `dx`, `dy` with real mouse
+   * events, pressing `atX` pixels in from its left edge (default: its middle).
+   */
+  async dragBy(selector, dx, dy, { atX } = {}) {
+    const start = await this.evaluate(`(() => {
+      const element = document.querySelector(${JSON.stringify(selector)});
+      if (!element) throw new Error("Element not found: " + ${JSON.stringify(selector)});
+      const rect = element.getBoundingClientRect();
+      const atX = ${JSON.stringify(atX ?? null)};
+      return { x: rect.left + (atX ?? rect.width / 2), y: rect.top + rect.height / 2 };
+    })()`);
+    await this.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: start.x, y: start.y, buttons: 0 });
+    await this.command("Input.dispatchMouseEvent", { type: "mousePressed", x: start.x, y: start.y, button: "left", buttons: 1, clickCount: 1 });
+    const steps = 12;
+    for (let step = 1; step <= steps; step += 1) {
+      const x = start.x + (dx * step) / steps;
+      const y = start.y + (dy * step) / steps;
+      await this.command("Input.dispatchMouseEvent", { type: "mouseMoved", x, y, button: "left", buttons: 1 });
+      await sleep(16);
+    }
+    await this.command("Input.dispatchMouseEvent", { type: "mouseReleased", x: start.x + dx, y: start.y + dy, button: "left", buttons: 0, clickCount: 1 });
+    await sleep(500);
+  }
+
+  async capture(outputPath, clip) {
+    const screenshot = await this.command("Page.captureScreenshot", {
+      format: "png",
+      captureBeyondViewport: false,
+      ...(clip ? { clip: { ...clip, scale: 1 } } : {}),
+    });
+    await mkdir(dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, Buffer.from(screenshot.data, "base64"));
+  }
+}
+
+async function findPageTarget() {
+  const targets = await (await fetch(`http://127.0.0.1:${cdpPort}/json/list`)).json();
+  const target = targets.find((candidate) => candidate.type === "page" && !candidate.url.startsWith("chrome://"));
+  if (!target?.webSocketDebuggerUrl) throw new Error("No controllable Chrome page target found");
+  return target.webSocketDebuggerUrl;
+}
+
+export async function ensureChrome() {
+  const free = await new Promise((resolve) => {
+    const server = createServer();
+    server.once("error", () => resolve(false));
+    server.listen(cdpPort, "127.0.0.1", () => server.close(() => resolve(true)));
+  });
+  if (!free) throw new Error(`Capture Chrome port ${cdpPort} is occupied; refusing to use an unrelated browser.`);
+  {
+    const chromePath = process.env.BB_CAPTURE_CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+    const profileDir = await mkdtemp(join(tmpdir(), "bb-plugin-capture-"));
+    const chromeProcess = spawn(
+      chromePath,
+      [
+        "--headless=new",
+        "--disable-gpu",
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+        `--user-data-dir=${profileDir}`,
+        `--remote-debugging-address=127.0.0.1`,
+        `--remote-debugging-port=${cdpPort}`,
+        "--window-size=1440,1000",
+        // Talk records from a synthetic microphone without a permission prompt.
+        "--use-fake-ui-for-media-stream",
+        "--use-fake-device-for-media-stream",
+        // Speech's Play sample plays without a real click, and silently.
+        "--autoplay-policy=no-user-gesture-required",
+        "--mute-audio",
+        // Opt-in extras, such as --use-file-for-fake-audio-capture=<wav> for a synthetic voice (scripts/capture/voice-desktop.mjs).
+        ...(process.env.BB_CAPTURE_CHROME_ARGS ? process.env.BB_CAPTURE_CHROME_ARGS.split(" ").filter(Boolean) : []),
+        "about:blank",
+      ],
+      { stdio: "ignore" },
+    );
+    let launchError;
+    chromeProcess.once("error", (error) => { launchError = error; });
+    const started = Date.now();
+    while (!launchError && chromeProcess.exitCode === null && Date.now() - started < 20000) {
+      try {
+        return { webSocketUrl: await findPageTarget(), process: chromeProcess, profileDir };
+      } catch {
+        await sleep(250);
+      }
+    }
+    chromeProcess.kill();
+    await rm(profileDir, { recursive: true, force: true });
+    throw new Error(`Could not start owned Chrome on port ${cdpPort}: ${launchError?.message ?? "timeout or early exit"}`);
+  }
+}

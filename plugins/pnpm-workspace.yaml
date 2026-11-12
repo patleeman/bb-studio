@@ -1,0 +1,9 @@
+packages:
+  - 'packages/*'
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
+# Several agents share this checkout. pnpm 11 reinstalls stale dependencies
+# before every script by default, which can purge node_modules under another
+# thread; warn instead and run `pnpm install` deliberately.
+verifyDepsBeforeRun: warn

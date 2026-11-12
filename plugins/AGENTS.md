@@ -1,0 +1,151 @@
+# Agent instructions
+
+## Way of working
+
+Work directly on `main`. Don't create branches or pull requests.
+
+- Commit small, self-contained changes and push them to `origin main` as soon
+  as they're verified.
+- Other agents work in this checkout at the same time. Before you start, run
+  `git status` and `bb status`, and don't touch files you didn't change. Stage
+  your own paths explicitly (`git add <path>`), never `git add -A` or
+  `git commit -a`.
+- Don't revert, stash, reset, or reformat someone else's uncommitted work. If
+  another agent's change is in the way, coordinate with that thread first
+  (`bb thread ...`).
+- Pull with `git pull --rebase` before pushing. If the push is rejected,
+  rebase again and push again; never force-push `main`.
+- Resolve conflicts by keeping both sides' intent. If you can't tell what the
+  other change meant, ask its thread or the user instead of guessing.
+
+## Screenshots and evidence
+
+Never commit screenshots, captures or review evidence; they go in `~/workingdir/.bb-studio-plan/`. Only intentional product images are committed, under an `assets/`, `public/`, `brand/`, `icons/`, `textures/` or `fonts/` folder or an `.xcassets` catalog. The repository's `pre-commit` hook refuses any other new image or video file.
+
+## UI text
+
+UI text names things and states facts: titles, counts, status, dates, actions, errors. No explanatory taglines, asides, or "shared by / lives in / so you can" quips. If a concept needs explaining, it belongs in docs, not on screen.
+
+`packages/bb-studio/src/ui-copy.test.ts` fails on common quip patterns in UI text; a line that must keep a match carries `// ui-copy-ok`.
+
+## Releases
+
+Marketplace entries install from the `stable` branch (`ref: "stable"`;
+`node scripts/check-marketplace.mjs` enforces it). Keep committing to `main`;
+never commit to `stable` or push it by hand. CI moves it: when the `check`
+job in `.github/workflows/ci.yml` passes on a push to `main`, the
+`promote-stable` job fast-forwards `stable` to that commit. A red `main`
+therefore never reaches users; fix `main` and the next green push releases.
+`node scripts/release.mjs [--ref <commit>]` stays as a manual fallback (it
+also runs BB-identical clean installs and builds) if CI is down.
+
+## Marketplace maintenance
+
+Keep the root `marketplace.json` current in the same change as the plugins it
+lists.
+
+- When adding, renaming, moving, or removing a plugin, update both
+  `marketplace.json` and `.bb/plugins.json`.
+- When changing a plugin's display name, description, icon, or author, update
+  its marketplace entry to match. Keep tags accurate for its capabilities.
+- Keep each entry's ID aligned with the plugin's installed ID. Use this
+  repository's Git URL, the correct package subdirectory, and the intended
+  branch or release selector in its source.
+- Before handoff, validate `marketplace.json` against BB's marketplace schema.
+  Confirm that both indexes list the same plugins, IDs are unique, and all
+  referenced package directories and local icon assets exist.
+
+## Stable BB compatibility
+
+Every plugin must install on the current stable BB release. npm's `latest`
+tag for `@get-bb/plugin-sdk` tracks BB Nightly, so `npm install`, `pnpm add`,
+and plugin scaffolding all default to an SDK that stable BB does not ship yet.
+Stable BB then refuses the plugin with "requires bb plugin SDK ...".
+
+- Pin `@get-bb/plugin-sdk` to an exact version no newer than the SDK in the
+  current stable release (`pnpm check:compat` prints it), for example
+  `pnpm add -D -E @get-bb/plugin-sdk@<stable-sdk>`. Typecheck against that
+  version so nightly-only APIs fail to compile.
+- Keep `engines.bbPluginSdk` at or below that version and `engines.bb` at or
+  below the stable app version. Don't copy the version the scaffold or
+  `bb plugin build` on Nightly writes.
+- Run `pnpm check:compat` before handoff. It prints the current stable app and
+  SDK versions and fails on any plugin that stable BB would refuse. On a Mac
+  with `bb`, it also fails when the BB running there (Patrick's Nightly can be
+  older than stable) would refuse a plugin on reload: update that BB before
+  raising an SDK floor. Don't
+  raise a floor past stable to make it pass; wait for the API to ship in
+  stable instead.
+
+## Studio is required
+
+Add-ons (Pages, Draw, Talk, Artifacts and the rest) are built to run
+with Studio installed. They may rely on Studio, and don't need to work or
+degrade when it's absent.
+
+## Plugin documentation
+
+All new plugins must include at least one screenshot captured from the running
+BB application in a staged environment before handoff.
+
+- Start the normal BB application and use its full rendered UI. Seed the
+  plugin's primary workflow with safe, deterministic local data.
+- Capture from a staged BB, not the one you work in, whose projects, threads,
+  and channels are private. `node scripts/staged-bb.mjs start` runs stable BB
+  on its own data directory and ports, installs every plugin from GitHub at a
+  pushed commit, seeds a demo project, and writes a `capture.env` to source
+  before capturing. `node scripts/staged-bb.mjs stop` removes it.
+- Keep test agent runs out of Patrick's real session history. Agents that run
+  in a staged BB save transcripts to the provider's home folder, and those
+  folders are archived and searched as his own conversations. Staged runs once
+  added over 1,200 fake ORBIT-42 sessions that had to be deleted.
+  - Start staged BBs only through `scripts/staged-bb.mjs`, using
+    `BB_STAGED_DIR` and `BB_STAGED_PORT` for extra instances. It gives Codex
+    its own fixed `CODEX_HOME`, `~/.bb-staged/codex`, with its own sign-in
+    (never a link to `~/.codex/auth.json`; the script refuses one) and
+    Claude Code its own `CLAUDE_CONFIG_DIR` through a `claude` wrapper (the
+    sign-in stays in the Keychain). Don't launch `bb-app` with your own
+    environment.
+  - Don't use Pi in staged fixtures. bb gives the Pi bridge no environment,
+    so its sessions always land in the real `~/.bb/pi-bridge-sessions`.
+  - If you add a script that runs agents outside a staged BB, give it a
+    separate provider home, or use a mode that saves nothing, such as
+    `codex exec --ephemeral`.
+- For Electron-native checks, follow [native desktop staging](docs/native-desktop-staging.md).
+  Never launch the installed `/Applications` app as a test fixture. A separate
+  data directory and `--user-data-dir` do not isolate its updater. Use an owned
+  app build only after updater execution is demonstrably disabled and its
+  installer cannot target the user's app or shared updater state.
+- Add the plugin to the capture definitions in
+  `scripts/capture/captures/<plugin>.mjs`, including an assertion for the
+  live surface and the data that must be visible. Run it with a seeded thread:
+
+  ```sh
+  BB_CAPTURE_PROJECT_ID=proj_... \
+  BB_CAPTURE_THREAD_ID=thr_... \
+  node scripts/capture-plugin-screenshots.mjs --plugin mobile
+  ```
+
+- `scripts/capture-plugin-screenshots.mjs` composes the driver, BB helpers, seeders,
+  and per-plugin captures in `scripts/capture/`. Use `--plugin <id>` for one plugin, `BB_CAPTURE_ONLY` for capture IDs, or omit both to capture all.
+- The script must drive the real BB nav panel, settings page, thread action,
+  host surface, or CLI-backed surface and write
+  `packages/<plugin>/assets/staged-preview.png`.
+- For plugins without a frontend, capture the real settings, provider, host,
+  or CLI surface where the plugin is used. Do not substitute image generation,
+  hand-authored SVG/HTML mockups, diagrams, or placeholder artwork.
+- Add the PNG to the plugin README under `## Staged preview` and describe the
+  live surface and staged data shown.
+- If an expected live label or data assertion fails, fix the staging workflow;
+  do not weaken the assertion to make an empty or broken screen pass.
+
+Before handoff, verify the live capture and README links:
+
+```sh
+for readme in packages/*/README.md; do
+  base=${readme%/README.md}
+  test -f "$base/assets/staged-preview.png" || exit 1
+done
+file packages/*/assets/staged-preview.png | grep -q 'PNG image data'
+git diff --check
+```

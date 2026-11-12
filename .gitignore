@@ -1,0 +1,15 @@
+node_modules
+.DS_Store
+*.log
+.env*
+*.p8
+*.p12
+*.pem
+*.mobileprovision
+auth.json
+auth-secret
+*.db
+*.sqlite
+MERGE_REVIEW.md
+REBASE_REVIEW.md
+.turbo

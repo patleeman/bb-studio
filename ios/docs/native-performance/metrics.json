@@ -1,0 +1,153 @@
+[
+  {
+    "testIdentifier" : "ReviewPerformanceUITests/testRepeatedStudioPageNavigation()",
+    "testIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ReviewPerformanceUITests/testRepeatedStudioPageNavigation",
+    "testRuns" : [
+      {
+        "device" : {
+          "deviceId" : "72C31764-402B-4CA1-962D-D138FB7C3057",
+          "deviceName" : "BBNativePerformancePrivate"
+        },
+        "metrics" : [
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "Memory Peak Physical (bbgo)",
+            "identifier" : "com.apple.dt.XCTMetric_Memory-nyc.plee.bbgo.physical_peak",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              116492.832,
+              116427.296,
+              116083.232,
+              115935.776,
+              115984.928
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "kB"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "CPU Cycles (bbgo)",
+            "identifier" : "com.apple.dt.XCTMetric_CPU-nyc.plee.bbgo.cycles",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              67895342.876,
+              68171251.541,
+              67967120.897,
+              66999301.605,
+              70172354.012
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "kC"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "Clock Monotonic Time",
+            "identifier" : "com.apple.dt.XCTMetric_Clock.time.monotonic",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              37.592814351,
+              38.129368846000006,
+              38.01661122,
+              37.328237702,
+              38.205066695
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "s"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "Memory Physical (bbgo)",
+            "identifier" : "com.apple.dt.XCTMetric_Memory-nyc.plee.bbgo.physical",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              360.448,
+              -196.608,
+              -278.528,
+              98.304,
+              49.152
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "kB"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "Absolute Memory Physical (bbgo)",
+            "identifier" : "com.apple.dt.XCTMetric_Memory-nyc.plee.bbgo.physical_absolute",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              112593.44,
+              112396.832,
+              112118.304,
+              112216.608,
+              112265.76
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "kB"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "CPU Instructions Retired (bbgo)",
+            "identifier" : "com.apple.dt.XCTMetric_CPU-nyc.plee.bbgo.instructions_retired",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              228734426.855,
+              228566227.59,
+              225537085.996,
+              226663339.601,
+              238787089.656
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "kI"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "CPU Time (bbgo)",
+            "identifier" : "com.apple.dt.XCTMetric_CPU-nyc.plee.bbgo.time",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              16.366906809,
+              16.577006635,
+              16.412381590000003,
+              16.007380638,
+              17.043473803
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "s"
+          }
+        ],
+        "testPlanConfiguration" : {
+          "configurationId" : "1",
+          "configurationName" : "Test Scheme Action"
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,4 @@
+{"check": "old-version-held", "version": "affa878c-0948-4502-90b5-d51c52abd9ba", "status": 200}
+{"check": "old-version-released", "version": "affa878c-0948-4502-90b5-d51c52abd9ba", "sha256": "301d34243e79f788a85bc45405ccc43fae61c060fa0c926d29257704ecb499a1", "status": 200}
+{"check": "selected-version-copy", "sha256": "472270ac09371be8758ea26de07ad8b11afaa67cd1f44826b9a91503d66b5682", "matchesNewest": true}
+{"check": "selected-version-share", "version": ["av_357762ed405c3a11"], "sha256": "472270ac09371be8758ea26de07ad8b11afaa67cd1f44826b9a91503d66b5682", "bytes": 28, "status": 200}

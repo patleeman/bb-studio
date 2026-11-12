@@ -1,0 +1,230 @@
+import AppIntents
+
+// Shortcuts the Action button (Settings → Action Button → Shortcut) and Siri can run.
+// Each one opens the app straight into the matching screen.
+
+struct ThreadEntity: AppEntity {
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "BB Thread"
+    static let defaultQuery = ThreadQuery()
+
+    var id: String
+    var title: String
+
+    init(threadId: String, title: String, serverURL: URL) {
+        id = ServerScope.namespace(serverURL) + "|" + threadId
+        self.title = title
+    }
+
+    func threadId(on serverURL: URL) throws -> String {
+        let parts = id.split(separator: "|", maxSplits: 1)
+        guard parts.count == 2, parts[0] == ServerScope.namespace(serverURL) else {
+            throw BBError(status: 409, message: "This shortcut belongs to another server. Choose its thread again.")
+        }
+        return String(parts[1])
+    }
+
+    var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(title)") }
+}
+
+struct ThreadQuery: EntityStringQuery {
+    func entities(for identifiers: [String]) async throws -> [ThreadEntity] {
+        try await recent().filter { identifiers.contains($0.id) }
+    }
+
+    func entities(matching string: String) async throws -> [ThreadEntity] {
+        try await recent().filter { $0.title.localizedCaseInsensitiveContains(string) }
+    }
+
+    func suggestedEntities() async throws -> [ThreadEntity] {
+        Array(try await recent().prefix(20))
+    }
+
+    private func recent() async throws -> [ThreadEntity] {
+        let client = BBClient()
+        let threads = try await client.threads()
+        guard client.baseURL == ServerScope.selectedURL else { return [] }
+        return threads
+            .filter { $0.parentThreadId == nil && $0.visibility != "hidden" }
+            .sorted { ($0.latestAttentionAt ?? $0.updatedAt) > ($1.latestAttentionAt ?? $1.updatedAt) }
+            .map { ThreadEntity(threadId: $0.id, title: $0.displayTitle, serverURL: client.baseURL) }
+    }
+}
+
+struct DictateIntent: AppIntent {
+    static let title: LocalizedStringResource = "Dictate to BB"
+    static let description = IntentDescription("Start a Talk dictation.")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        AppModel.shared.startDictation()
+        return .result()
+    }
+}
+
+struct OpenThreadIntent: AppIntent {
+    static let title: LocalizedStringResource = "Open BB thread"
+    static let openAppWhenRun = true
+
+    @Parameter(title: "Thread")
+    var thread: ThreadEntity
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        AppModel.shared.openThread(try thread.threadId(on: AppModel.shared.serverURL))
+        return .result()
+    }
+}
+
+/// Hands-free: Siri asks for the message, sends it, and reads the reply back
+/// without opening the app.
+struct AskBBIntent: AppIntent {
+    static let title: LocalizedStringResource = "Ask BB"
+    static let description = IntentDescription(
+        "Send a message to BB and hear the reply. Without a thread, it starts a new one in your default project.")
+
+    @Parameter(title: "Message", requestValueDialog: "What should I ask BB?")
+    var message: String
+
+    @Parameter(title: "Thread")
+    var thread: ThreadEntity?
+
+    func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
+        let client = BBClient()
+        let threadId: String
+        var baseline: String?
+        if let thread {
+            threadId = try thread.threadId(on: client.baseURL)
+            baseline = try await client.latestReply(threadId)?.id
+            try await client.send(threadId, text: message)
+        } else {
+            let projectId = try await defaultProjectId(client)
+            threadId = try await client.createThread(projectId: projectId, text: message).id
+            baseline = nil
+        }
+        guard let reply = try await client.waitForReply(threadId, after: baseline, timeout: .seconds(25)) else {
+            return .result(value: "", dialog: "Sent. BB is still working, and you'll get a notification when it's done.")
+        }
+        guard client.baseURL == ServerScope.selectedURL else {
+            return .result(value: "", dialog: "The server changed. Your message was sent to the original server.")
+        }
+        let spoken = Speakable.text(reply)
+        let dialog = spoken.count > 700 ? String(spoken.prefix(700)) + "… The rest is in the app." : spoken
+        return .result(value: reply, dialog: IntentDialog(stringLiteral: dialog))
+    }
+
+    private func defaultProjectId(_ client: BBClient) async throws -> String {
+        let projects = try await client.projects()
+        let saved = AppGroup.defaults.string(forKey: ServerScope.key("newThreadProjectId", serverURL: client.baseURL))
+        return NewThreadProject.resolve(saved: saved, projects: projects)
+    }
+}
+
+struct NewThreadIntent: AppIntent {
+    static let title: LocalizedStringResource = "New BB thread"
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        AppModel.shared.newThread()
+        return .result()
+    }
+}
+
+struct CaptureIntent: AppIntent {
+    static let title: LocalizedStringResource = "Capture to BB"
+    static let description = IntentDescription("Choose what to save in BB Studio.")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        AppModel.shared.sheet = .capture
+        return .result()
+    }
+}
+
+/// Kept under its old type name so shortcuts people made still run.
+struct TalkToChiefIntent: AppIntent {
+    static let title: LocalizedStringResource = "Talk to Bot"
+    static let description = IntentDescription("Start a hands-free voice session with your Bot; run it again to end it.")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        AppModel.shared.toggleBotTalk()
+        return .result()
+    }
+}
+
+struct TellChiefIntent: AppIntent {
+    static let title: LocalizedStringResource = "Tell Bot"
+    static let description = IntentDescription("Send a message to your Bot and hear the reply.")
+
+    @Parameter(title: "Message", requestValueDialog: "What should I tell your bot?")
+    var message: String
+
+    func perform() async throws -> some IntentResult & ProvidesDialog & ReturnsValue<String> {
+        let client = BBClient()
+        let leadId: String?
+        do {
+            leadId = try await client.botThreadId()
+        } catch {
+            return .result(value: "", dialog: "I couldn't find your bot. \(BBClient.describe(error, server: client.baseURL))")
+        }
+        guard let threadId = leadId else {
+            return .result(value: "", dialog: "You don't have a Bot yet. Make one in Studio, or choose Make this my Bot from a thread's menu.")
+        }
+        guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return .result(value: "", dialog: "There was nothing to send.")
+        }
+        let baseline = try await client.latestReply(threadId)?.id
+        try await client.send(threadId, text: message)
+        guard let reply = try await client.waitForReply(threadId, after: baseline, timeout: .seconds(25)) else {
+            return .result(value: "", dialog: "Sent. Your bot is still working, and you'll get a notification when it's done.")
+        }
+        let spoken = Speakable.text(reply)
+        let dialog = spoken.count > 700 ? String(spoken.prefix(700)) + "… The rest is in the app." : spoken
+        return .result(value: reply, dialog: IntentDialog(stringLiteral: dialog))
+    }
+}
+
+struct WriteIntent: AppIntent {
+    static let title: LocalizedStringResource = "Write in BB Studio"
+    static let description = IntentDescription("Open a blank note to save as a page or start a thread.")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        AppModel.shared.sheet = .write
+        return .result()
+    }
+}
+
+struct BBShortcuts: AppShortcutsProvider {
+    // Symbol names must be literals here; they match StudioKind and Symbols.
+    static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: TalkToChiefIntent(), phrases: ["Talk to my bot in \(.applicationName)", "Talk to my chief of staff in \(.applicationName)"], shortTitle: "Bot",
+            systemImageName: "person.crop.circle.badge.checkmark")
+        AppShortcut(intent: CaptureIntent(), phrases: ["Capture in \(.applicationName)"], shortTitle: "Capture", systemImageName: "square.and.arrow.down")
+        // At the limit of ten: Open page stays in the Shortcuts app's action list.
+        AppShortcut(
+            intent: TellChiefIntent(),
+            phrases: ["Tell my bot in \(.applicationName)", "Ask my bot in \(.applicationName)", "Tell my chief of staff in \(.applicationName)"],
+            shortTitle: "Tell Bot", systemImageName: "bubble.left.and.text.bubble.right")
+        AppShortcut(intent: SendToThreadIntent(), phrases: ["Send to a thread in \(.applicationName)"], shortTitle: "Send to thread", systemImageName: "paperplane")
+        AppShortcut(intent: StartRecordingIntent(), phrases: ["Start recording in \(.applicationName)"], shortTitle: "Record", systemImageName: "record.circle")
+        AppShortcut(
+            intent: AskBBIntent(), phrases: ["Ask \(.applicationName)", "Ask \(.applicationName) in \(\.$thread)"],
+            shortTitle: "Ask BB", systemImageName: "bubble.left.and.text.bubble.right")
+        AppShortcut(
+            intent: DictateIntent(), phrases: ["Dictate to \(.applicationName)"], shortTitle: "Dictate",
+            systemImageName: "mic.fill")
+        AppShortcut(
+            intent: NewThreadIntent(), phrases: ["New \(.applicationName) thread"], shortTitle: "New thread",
+            systemImageName: "square.and.pencil")
+        AppShortcut(
+            intent: WriteIntent(), phrases: ["Write in \(.applicationName)", "Take a note in \(.applicationName)"],
+            shortTitle: "Write", systemImageName: "square.and.pencil")
+    }
+}

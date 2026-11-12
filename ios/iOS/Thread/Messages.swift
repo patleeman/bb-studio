@@ -1,0 +1,666 @@
+import ImageIO
+import SwiftUI
+
+struct MessageBubble: View {
+    let row: TimelineRow
+    var projectId: String?
+    var react: (String) -> Void = { _ in }
+    var reactionItems: [String] = ReactionSettings.defaults.items
+    var quote: (String) -> Void = { _ in }
+    var select: (String) -> Void = { _ in }
+    /// Nil where side chats aren't available.
+    var sideChat: ((String) -> Void)?
+    /// Only on the newest message the user sent.
+    var edit: ((String) -> Void)?
+    /// Saves the files this reply produced to Studio; nil without the artifacts plugin.
+    var saveFiles: ((Int?) -> Void)?
+    var thread: BotSideThread? = nil
+    var replier: BotLook? = nil
+    var replyInThread: (() -> Void)? = nil
+    var fork: (() -> Void)? = nil
+    @EnvironmentObject private var app: AppModel
+
+    private var text: String { row.text ?? "" }
+
+    var body: some View {
+        if row.isUser {
+            VStack(alignment: .trailing, spacing: 6) {
+                attachments
+                if !text.isEmpty {
+                    ClampedText(text: text)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.accentColor.opacity(0.18), in: .rect(cornerRadius: 18))
+                        .contentShape(.contextMenuPreview, .rect(cornerRadius: 18))
+                        .contextMenu { menu }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.leading, 40)
+        } else if row.isPassReply {
+            // The agent had nothing to say (docs/silent-output.md).
+            QuietCheckMarker()
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                MarkdownText(text)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.contextMenuPreview, .rect(cornerRadius: 8))
+                    .contextMenu { menu }
+                let reactions = Directive.reactions(in: text)
+                if !reactions.isEmpty {
+                    ReactionChips(items: reactions, react: react)
+                }
+                let next = Directive.next(in: text)
+                if !next.isEmpty {
+                    NextCard(next: next, react: react)
+                }
+                if let replyInThread {
+                    ConversationReplyRow(messageId: row.id, thread: thread, look: replier, open: replyInThread)
+                }
+            }
+        }
+    }
+
+    /// The text without directive lines, for copying and quoting.
+    private var plainText: String {
+        text.components(separatedBy: "\n")
+            .filter { Directive(line: $0.trimmingCharacters(in: .whitespaces)) == nil }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    @ViewBuilder
+    private var menu: some View {
+        if let createdAt = row.createdAt {
+            Section {
+                Text(Self.sentLabel(createdAt))
+            }
+        }
+        Button { UIPasteboard.general.string = plainText } label: { Label("Copy", systemImage: "doc.on.doc") }
+        Button { select(plainText) } label: { Label("Select Text", systemImage: "selection.pin.in.out") }
+        Button { quote(plainText) } label: { Label("Quote", systemImage: "text.quote") }
+        if let edit {
+            Button { edit(plainText) } label: { Label("Edit", systemImage: "pencil") }
+        }
+        if let replyInThread {
+            Button(action: replyInThread) {
+                Label(thread == nil ? ConversationReplies.replyTitle : "Open thread", systemImage: "bubble.left.and.bubble.right")
+            }
+        }
+        if let fork {
+            Button(action: fork) { Label(ConversationReplies.forkTitle, systemImage: "arrow.triangle.branch") }
+        }
+        if let sideChat {
+            Button { sideChat(plainText) } label: { Label("Side Chat", systemImage: "bubble.left.and.text.bubble.right") }
+        }
+        ShareLink(item: plainText) { Label("Share", systemImage: "square.and.arrow.up") }
+        if !row.isUser, let saveFiles {
+            Button { saveFiles(row.sourceSeqEnd.map { Int($0) }) } label: {
+                Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
+            }
+        }
+        if !row.isUser {
+            Section("React") {
+                ForEach(reactionItems, id: \.self) { item in
+                    Button(item) { react(item) }
+                }
+            }
+        }
+    }
+
+    /// "Sent Today at 2:46 PM", or the date for older messages.
+    static func sentLabel(_ createdAt: Double) -> String {
+        let date = Date(timeIntervalSince1970: createdAt / 1000)
+        let time = date.formatted(date: .omitted, time: .shortened)
+        if Calendar.current.isDateInToday(date) { return "Sent Today at \(time)" }
+        if Calendar.current.isDateInYesterday(date) { return "Sent Yesterday at \(time)" }
+        return "Sent \(date.formatted(date: .abbreviated, time: .shortened))"
+    }
+
+    @ViewBuilder
+    private var attachments: some View {
+        let images = (row.attachments?.imageUrls ?? []) + (row.attachments?.localImagePaths ?? [])
+        let files = row.attachments?.localFilePaths ?? []
+        if !images.isEmpty, let projectId {
+            // Three to a row, so a batch of screenshots wraps instead of running off screen.
+            let side: CGFloat = images.count == 1 ? 160 : 96
+            Grid(horizontalSpacing: 6, verticalSpacing: 6) {
+                ForEach(Array(stride(from: 0, to: images.count, by: 3)), id: \.self) { start in
+                    GridRow {
+                        ForEach(images[start..<min(start + 3, images.count)], id: \.self) { path in
+                            if let url = app.client.attachmentURL(projectId: projectId, path: path) {
+                                AttachmentImage(url: url, side: side)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        ForEach(files, id: \.self) { path in
+            Label(URL(fileURLWithPath: path).lastPathComponent, systemImage: "doc")
+                .font(.footnote)
+                .lineLimit(1)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(.fill.tertiary, in: .capsule)
+        }
+    }
+}
+
+struct QuietCheckMarker: View {
+    var body: some View {
+        Label {
+            Text("Quiet check")
+        } icon: {
+            Image(systemName: "checkmark").font(.caption2.weight(.semibold))
+        }
+        .labelStyle(.titleAndIcon)
+        .font(.caption)
+        .foregroundStyle(.tertiary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Quiet check")
+        .accessibilityIdentifier("quietCheck")
+    }
+}
+
+/// A sent message, cut to about 15 lines with Show more when longer, as in BB web.
+struct ClampedText: View {
+    let text: String
+    @State private var expanded = false
+    @State private var fullHeight: CGFloat = 0
+    @ScaledMetric(relativeTo: .body) private var lineHeight: CGFloat = 22
+
+    private var limit: CGFloat { lineHeight * 15 }
+    private var clamped: Bool { !expanded && fullHeight > limit + 1 }
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            MarkdownText(text)
+                .environment(\.threadId, nil)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    if abs(height - fullHeight) >= 0.5 { fullHeight = height }
+                }
+                .frame(maxHeight: expanded ? nil : limit, alignment: .top)
+                .clipped()
+                .mask {
+                    VStack(spacing: 0) {
+                        Rectangle()
+                        LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                            .frame(height: clamped ? lineHeight * 1.5 : 0)
+                    }
+                }
+            if fullHeight > limit + 1 {
+                Button(expanded ? "Show less" : "Show more") {
+                    withAnimation(.snappy) { expanded.toggle() }
+                }
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(.secondary)
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+/// A sent photo. Tap to see it full screen; after a failed load, tap to try again.
+///
+/// Not `AsyncImage`: it started a fresh download each time its view was
+/// built again (a transcript cell reconfigured, scrolled away and back),
+/// kept nothing (URLSession's shared cache skips a multi-megabyte camera
+/// photo), and decoded the full photo (a 4194 × 6102 JPEG is 100 MB) to
+/// show it 200 points wide. Over a slow link the box could spin for good.
+/// `AttachmentImages` shares one download per photo, outliving the cell,
+/// keeps a thumbnail at the size shown, and gives up after a timeout.
+struct AttachmentImage: View {
+    let url: URL
+    let side: CGFloat
+    @Environment(\.displayScale) private var displayScale
+    @State private var image: UIImage?
+    @State private var failed = false
+    @State private var attempt = 0
+    @State private var viewing = false
+
+    init(url: URL, side: CGFloat) {
+        self.url = url
+        self.side = side
+        _image = State(initialValue: AttachmentImages.shared.cached(url, pixels: AttachmentImages.pixels(side)))
+    }
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else if failed {
+                Image(systemName: "arrow.clockwise").foregroundStyle(.secondary)
+                    .accessibilityLabel("Couldn't load the photo. Try again")
+            } else {
+                ProgressView()
+            }
+        }
+        // A small tile until the photo is in, not an empty box of its full size.
+        .frame(width: image == nil ? min(side, 120) : side, height: image == nil ? min(side, 72) : side)
+        .background(.fill.tertiary)
+        .clipShape(.rect(cornerRadius: 14))
+        .contentShape(.rect)
+        .onTapGesture {
+            if failed { failed = false; attempt += 1 } else { viewing = true }
+        }
+        .task(id: attempt) {
+            guard image == nil else { return }
+            if let loaded = await AttachmentImages.shared.image(url, pixels: AttachmentImages.pixels(side)) {
+                image = loaded
+            } else if !Task.isCancelled {
+                failed = true
+            }
+        }
+        .fullScreenCover(isPresented: $viewing) {
+            ImageViewer(url: url)
+        }
+        .accessibilityLabel("Attached image")
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// Sent photos, loaded once each and kept as thumbnails.
+@MainActor
+final class AttachmentImages {
+    static let shared = AttachmentImages()
+
+    /// Twice the points shown, at 3x: sharp in the box and in a zoomed preview.
+    static func pixels(_ side: CGFloat) -> Int { Int(side * 3 * 2) }
+
+    private let cache = NSCache<NSString, UIImage>()
+    private var loads: [NSString: Task<UIImage?, Never>] = [:]
+    private nonisolated let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        // A stalled transfer fails rather than spinning for good; the box offers a retry.
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 180
+        config.urlCache = URLCache(memoryCapacity: 8 << 20, diskCapacity: 200 << 20)
+        return URLSession(configuration: config)
+    }()
+
+    private init() { cache.totalCostLimit = 64 << 20 }
+
+    private static func key(_ url: URL, _ pixels: Int) -> NSString { "\(pixels)|\(url.absoluteString)" as NSString }
+
+    func cached(_ url: URL, pixels: Int) -> UIImage? { cache.object(forKey: Self.key(url, pixels)) }
+
+    /// The photo as a thumbnail, or nil if it can't be had. One download per
+    /// photo at a time, kept going when the view that asked goes away.
+    func image(_ url: URL, pixels: Int) async -> UIImage? {
+        let key = Self.key(url, pixels)
+        if let hit = cache.object(forKey: key) { return hit }
+        let load = loads[key] ?? Task.detached(priority: .userInitiated) { [session] in
+            guard let (data, response) = try? await session.data(from: url) else { return nil }
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { return nil }
+            return Self.thumbnail(data, pixels: pixels)
+        }
+        loads[key] = load
+        let image = await load.value
+        loads[key] = nil
+        if let image {
+            cache.setObject(image, forKey: key, cost: Int(image.size.width * image.size.height * image.scale * image.scale * 4))
+        }
+        return image
+    }
+
+    /// Decoded straight to `pixels` on its long side, never at full size.
+    nonisolated static func thumbnail(_ data: Data, pixels: Int) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: pixels,
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return UIImage(cgImage: image)
+    }
+}
+
+struct ImageViewer: View {
+    let url: URL
+    @Environment(\.dismiss) private var dismiss
+    @State private var scale: CGFloat = 1
+
+    var body: some View {
+        NavigationStack {
+            AsyncImage(url: url) { image in
+                image.resizable().scaledToFit()
+                    .scaleEffect(scale)
+                    .gesture(MagnifyGesture().onChanged { scale = max(1, $0.magnification) }.onEnded { _ in
+                        withAnimation { scale = 1 }
+                    })
+            } placeholder: {
+                ProgressView()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(.black)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .topBarTrailing) { ShareLink(item: url) }
+            }
+            .toolbarBackground(.hidden, for: .navigationBar)
+        }
+    }
+}
+
+/// Pages' Next row as a "What next?" card, as in BB web: labeled rows of
+/// replies, requests, and notes on what the agent noticed. Every tap drafts
+/// text. A note's Tell me more and Fix this draft the same requests as on the
+/// web.
+struct NextCard: View {
+    let next: Directive.Next
+    let react: (String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("What next?")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+            if !next.reply.isEmpty {
+                section("Reply") { ReactionChips(items: next.reply, react: react) }
+            }
+            if !next.ask.isEmpty {
+                section("Ask for") { ReactionChips(items: next.ask, request: true, react: react) }
+            }
+            if !next.notes.isEmpty {
+                section("By the way") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(next.notes, id: \.self) { note in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("\(note.emoji) \(note.text)")
+                                    .font(.subheadline)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                ReactionChips(items: Self.actions(for: note).map(\.label), request: true) { label in
+                                    if let action = Self.actions(for: note).first(where: { $0.label == label }) { react(action.draft) }
+                                }
+                            }
+                            .accessibilityElement(children: .contain)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.separator))
+        .accessibilityIdentifier("next-card")
+    }
+
+    /// A short label over each row, saying what its buttons are for.
+    private func section(_ title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
+            content()
+        }
+    }
+
+    /// A note's buttons, and what each drafts.
+    static func actions(for note: Directive.Note) -> [(label: String, draft: String)] {
+        var actions = [(label: "💬 Tell me more", draft: "💬 Tell me more: \(note.text)")]
+        if note.isBug { actions.append((label: "🔧 Fix this", draft: "🐛 Fix this: \(note.text)")) }
+        return actions
+    }
+}
+
+/// Suggested replies under an assistant message. A tap drafts the reply.
+struct ReactionChips: View {
+    let items: [String]
+    /// Things the agent does (the Next row's requests and note actions), drawn
+    /// as dashed rounded squares as in BB web; replies are capsules.
+    var request = false
+    let react: (String) -> Void
+    @State private var taps = 0
+
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: request ? 8 : 100, style: .continuous) }
+
+    var body: some View {
+        FlowLayout(spacing: 8) {
+            ForEach(items, id: \.self) { item in
+                Button {
+                    taps += 1
+                    react(item)
+                } label: {
+                    Text(item)
+                        .font(.subheadline)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(.fill.secondary, in: shape)
+                        .overlay(shape.strokeBorder(.separator, style: StrokeStyle(lineWidth: 1, dash: request ? [4, 3] : [])))
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(request ? "Drafts this request" : "Drafts this reply")
+                .accessibilityIdentifier(request ? "next-request" : "reaction")
+            }
+        }
+        .sensoryFeedback(.selection, trigger: taps)
+    }
+}
+
+/// Lays children out left to right, wrapping onto new lines. A child wider
+/// than `maxItemWidth` (or the row) is offered that width, so its text truncates.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+    var maxItemWidth: CGFloat = .infinity
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
+        let width = rows.map { $0.width }.max() ?? 0
+        let height = rows.reduce(0) { $0 + $1.height } + spacing * CGFloat(max(0, rows.count - 1))
+        return CGSize(width: proposal.width ?? width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(width: bounds.width, subviews: subviews) {
+            var x = bounds.minX
+            for (index, size) in row.items {
+                subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += row.height + spacing
+        }
+    }
+
+    private struct Row {
+        var items: [(Int, CGSize)] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
+        let limit = min(width, maxItemWidth)
+        var rows: [Row] = []
+        var row = Row()
+        for index in subviews.indices {
+            let ideal = subviews[index].sizeThatFits(.unspecified)
+            let size = ideal.width > limit ? subviews[index].sizeThatFits(ProposedViewSize(width: limit, height: ideal.height)) : ideal
+            let needed = row.items.isEmpty ? size.width : row.width + spacing + size.width
+            if !row.items.isEmpty, needed > width {
+                rows.append(row)
+                row = Row()
+            }
+            row.width = row.items.isEmpty ? size.width : row.width + spacing + size.width
+            row.height = max(row.height, size.height)
+            row.items.append((index, size))
+        }
+        if !row.items.isEmpty { rows.append(row) }
+        return rows
+    }
+}
+
+/// A run of tool calls and reasoning, collapsed to one line. Expanded, each step
+/// shows what it did, and a tap on a step shows its output.
+struct ActivityGroup: View {
+    let rows: [TimelineRow]
+    @State private var expanded = false
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $expanded) {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(rows) { row in ActivityStep(row: row) }
+            }
+            .padding(.top, 6)
+        } label: {
+            HStack(spacing: 6) {
+                if running {
+                    ProgressView().controlSize(.mini)
+                } else if failed {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                }
+                Text(summary).lineLimit(1)
+                if !running, let stats = diffStats { DiffStats(stats: stats) }
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
+        .tint(.secondary)
+    }
+
+    private var work: [TimelineRow] { rows.filter { $0.kind == "work" } }
+
+    private var diffStats: TimelineRow.FileChange.Stats? {
+        let all = rows.compactMap { $0.change?.diffStats }
+        guard !all.isEmpty else { return nil }
+        return .init(added: all.map(\.added).reduce(0, +), removed: all.map(\.removed).reduce(0, +))
+    }
+    private var running: Bool { rows.contains { $0.status == "inProgress" || $0.status == "running" || $0.status == "pending" } }
+    private var failed: Bool { rows.contains { $0.status == "failed" || $0.status == "error" } }
+
+    private var summary: String {
+        if work.isEmpty { return rows.last?.title ?? "Thinking" }
+        if running, let current = rows.last(where: { $0.kind == "work" }) {
+            return ActivityStep.label(for: current)
+        }
+        var counts: [String] = []
+        let commands = work.filter { $0.workKind == "command" }.count
+        let reads = work.filter { $0.workKind == "file-read" }.count
+        let edits = Set(work.filter { $0.workKind == "file-change" }.compactMap { $0.change?.path ?? $0.path }).count
+        let tools = work.filter { $0.workKind == "tool" }.count
+        if commands > 0 { counts.append("\(commands) command\(commands == 1 ? "" : "s")") }
+        if reads > 0 { counts.append("read \(reads) file\(reads == 1 ? "" : "s")") }
+        if edits > 0 { counts.append("edited \(edits) file\(edits == 1 ? "" : "s")") }
+        if tools > 0 { counts.append("\(tools) tool call\(tools == 1 ? "" : "s")") }
+        return counts.isEmpty ? "\(work.count) step\(work.count == 1 ? "" : "s")" : counts.joined(separator: ", ").capitalizedFirst
+    }
+}
+
+struct ActivityStep: View {
+    let row: TimelineRow
+    @Environment(\.openURL) private var openURL
+    @State private var showingOutput = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                if hasDetail { withAnimation(.snappy) { showingOutput.toggle() } }
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: icon).frame(width: 16).foregroundStyle(tint)
+                    Text(Self.label(for: row))
+                        .font(row.workKind == "command" ? .caption.monospaced() : .caption)
+                        .lineLimit(showingOutput ? nil : 2)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                    if let stats = row.change?.diffStats { DiffStats(stats: stats) }
+                    if hasDetail {
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                            .rotationEffect(.degrees(showingOutput ? 90 : 0))
+                    }
+                }
+                .foregroundStyle(.secondary)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .contextMenu {
+                if let path = filePath {
+                    if row.change?.kind != "delete", let url = FilePathLink.url(path) {
+                        Button { openURL(url) } label: { Label("Open File", systemImage: "doc.text") }
+                    }
+                    Button { UIPasteboard.general.string = path } label: { Label("Copy Path", systemImage: "doc.on.doc") }
+                }
+                if let command = row.command {
+                    Button { UIPasteboard.general.string = command } label: { Label("Copy Command", systemImage: "doc.on.doc") }
+                }
+            }
+            if showingOutput, let diff = row.change?.diff {
+                DiffView(diff: diff)
+                    .frame(maxHeight: 360)
+                    .padding(.leading, 24)
+            } else if showingOutput, let detail {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    Text(detail)
+                        .font(.caption2.monospaced())
+                        .textSelection(.enabled)
+                        .padding(8)
+                }
+                .frame(maxHeight: 240)
+                .background(.fill.tertiary, in: .rect(cornerRadius: 8))
+                .padding(.leading, 24)
+            }
+        }
+    }
+
+    private var detail: String? {
+        let text = row.output ?? row.detail
+        guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let lines = text.components(separatedBy: "\n")
+        return lines.count > 60 ? lines.prefix(60).joined(separator: "\n") + "\n… \(lines.count - 60) more lines" : text
+    }
+
+    /// The file an edit or read touched.
+    private var filePath: String? {
+        row.change?.path ?? (["file-change", "file-read"].contains(row.workKind ?? "") ? row.path : nil)
+    }
+
+    private var hasDetail: Bool { detail != nil || row.change?.diff?.isEmpty == false }
+
+    private var icon: String {
+        if row.status == "failed" || row.status == "error" { return "xmark.circle" }
+        switch row.workKind {
+        case "command": return "terminal"
+        case "file-read": return "doc.text"
+        case "file-change": return "pencil"
+        case "tool": return "wrench.and.screwdriver"
+        case "workflow": return "flowchart"
+        default: return row.systemKind == "operation" ? "sparkle" : "circle.dotted"
+        }
+    }
+
+    private var tint: Color {
+        row.status == "failed" || row.status == "error" ? .red : .secondary
+    }
+
+    static func label(for row: TimelineRow) -> String {
+        if let command = row.command { return "$ \(command)" }
+        let done = !(row.status == "inProgress" || row.status == "running" || row.status == "pending")
+        if let path = row.change?.path {
+            let verb = switch row.change?.kind {
+            case "add": done ? "Created" : "Creating"
+            case "delete": done ? "Deleted" : "Deleting"
+            default: done ? "Edited" : "Editing"
+            }
+            return "\(verb) \(URL(fileURLWithPath: path).lastPathComponent)"
+        }
+        let verb = done ? row.presentation?.label?.completed : row.presentation?.label?.pending
+        let subject = row.presentation?.title ?? row.path.map { URL(fileURLWithPath: $0).lastPathComponent }
+        if let verb, let subject { return "\(verb) \(subject)" }
+        if let tool = row.toolName {
+            return (verb ?? "Ran") + " " + (tool.split(separator: ":").last.map(String.init) ?? tool)
+        }
+        return verb ?? subject ?? row.title ?? row.workKind ?? row.systemKind ?? row.kind
+    }
+}
+
+private extension String {
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+}

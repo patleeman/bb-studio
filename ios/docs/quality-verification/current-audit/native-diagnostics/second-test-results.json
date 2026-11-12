@@ -1,0 +1,82 @@
+{
+  "devices" : [
+    {
+      "architecture" : "arm64",
+      "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+      "deviceName" : "BB isolated native contrast diagnostics",
+      "modelName" : "iPhone 18 Pro",
+      "osBuildNumber" : "24A434",
+      "osVersion" : "27.0",
+      "platform" : "iOS Simulator"
+    }
+  ],
+  "testNodes" : [
+    {
+      "children" : [
+        {
+          "children" : [
+            {
+              "children" : [
+                {
+                  "children" : [
+                    {
+                      "name" : "Contrast failed",
+                      "nodeType" : "Failure Message",
+                      "sourceLocation" : {
+                        "filePath" : "/tmp/bb-current-diagnostic.6v09KU/project/UITests/ReviewQualityUITests.swift",
+                        "lineNumber" : 178
+                      }
+                    }
+                  ],
+                  "duration" : "11s",
+                  "durationInSeconds" : 11.455772995948792,
+                  "name" : "testSettingsSecondContrastNativeDiagnostic()",
+                  "nodeIdentifier" : "ReviewQualityUITests/testSettingsSecondContrastNativeDiagnostic()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ReviewQualityUITests/testSettingsSecondContrastNativeDiagnostic",
+                  "nodeType" : "Test Case",
+                  "result" : "Failed"
+                },
+                {
+                  "children" : [
+                    {
+                      "name" : "Contrast failed",
+                      "nodeType" : "Failure Message",
+                      "sourceLocation" : {
+                        "filePath" : "/tmp/bb-current-diagnostic.6v09KU/project/UITests/ReviewQualityUITests.swift",
+                        "lineNumber" : 178
+                      }
+                    }
+                  ],
+                  "duration" : "18s",
+                  "durationInSeconds" : 18.052515983581543,
+                  "name" : "testStudioRowSecondContrastNativeDiagnosticAtAccessibilityText()",
+                  "nodeIdentifier" : "ReviewQualityUITests/testStudioRowSecondContrastNativeDiagnosticAtAccessibilityText()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ReviewQualityUITests/testStudioRowSecondContrastNativeDiagnosticAtAccessibilityText",
+                  "nodeType" : "Test Case",
+                  "result" : "Failed"
+                }
+              ],
+              "name" : "ReviewQualityUITests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ReviewQualityUITests",
+              "nodeType" : "Test Suite",
+              "result" : "Failed"
+            }
+          ],
+          "name" : "BBStudioUITests",
+          "nodeIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests",
+          "nodeType" : "UI test bundle",
+          "result" : "Failed"
+        }
+      ],
+      "name" : "BBStudio",
+      "nodeType" : "Test Plan",
+      "result" : "Failed"
+    }
+  ],
+  "testPlanConfigurations" : [
+    {
+      "configurationId" : "1",
+      "configurationName" : "Test Scheme Action"
+    }
+  ]
+}

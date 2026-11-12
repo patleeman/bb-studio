@@ -1,0 +1,1055 @@
+{
+  "scope": "Native Swift RPC call sites; method parity only. Handwritten payloads require decoder/transport tests. Dynamic dispatch and external plugins are listed separately.",
+  "calls": [
+    {
+      "file": "ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.text",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.update",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.move",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.delete",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.saveAsPage",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.threadArtifacts",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.candidates",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Artifacts.swift",
+      "plugin": "studio",
+      "method": "artifacts.saveFiles",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Automations.swift",
+      "plugin": "automations",
+      "method": "automations_overview",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/Automations.swift",
+      "plugin": "automations",
+      "method": "automations_runs",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/Automations.swift",
+      "plugin": "automations",
+      "method": "automations_run",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/Automations.swift",
+      "plugin": "automations",
+      "method": "enabled",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/Shared/Automations.swift",
+      "plugin": "automations",
+      "method": "automations_create",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/Automations.swift",
+      "plugin": "automations",
+      "method": "automations_update",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "searchAll",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "recordings.meeting_regenerate",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "links",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "itemThreads",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "comments",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "commentCreate",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "commentResolve",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+Notes.swift",
+      "plugin": "studio",
+      "method": "notes.create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+Notes.swift",
+      "plugin": "studio",
+      "method": "notes.forThread",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+Notes.swift",
+      "plugin": "studio",
+      "method": "notes.send",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+Notes.swift",
+      "plugin": "studio",
+      "method": "notes.keep",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+Notes.swift",
+      "plugin": "studio",
+      "method": "notes.discard",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+PageEditing.swift",
+      "plugin": "studio",
+      "method": "pages.editableMarkdown",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+PageEditing.swift",
+      "plugin": "studio",
+      "method": "pages.editDocument",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+PageEditing.swift",
+      "plugin": "studio",
+      "method": "pages.requests",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+Push.swift",
+      "plugin": "push-notifications",
+      "method": "pushSubscriptions.add",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/BBClient+Push.swift",
+      "plugin": "push-notifications",
+      "method": "pushSubscriptions.remove",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/BBClient.swift",
+      "plugin": "thread-list",
+      "method": "listPreferences",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/BBClient.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient.swift",
+      "plugin": "studio",
+      "method": "recordings.segment_put",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_state",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_heartbeat",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient.swift",
+      "plugin": "studio",
+      "method": "recordings.recordings_list",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_list",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_set",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_profile_changes",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_profile_revert",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_memory",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_skills",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_learning",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_learning_set",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_skill_pin",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_skill_restore",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_set_thread",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "method",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_set_run",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_chain",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_side_threads",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_side_thread_open",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_checkin_preset",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_activity",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_attention",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_attention",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_cache_state",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_runners",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "paused",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/Shared/Bot.swift",
+      "plugin": "studio",
+      "method": "bot_runner_run_now",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotApprovals.swift",
+      "plugin": "studio",
+      "method": "bot_conversation_approvals",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotApprovals.swift",
+      "plugin": "studio",
+      "method": "bot_worker_approval_resolve",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotAutomations.swift",
+      "plugin": "studio",
+      "method": "bot_automations",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotAutomations.swift",
+      "plugin": "studio",
+      "method": "bot_automation_create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotAutomations.swift",
+      "plugin": "studio",
+      "method": "bot_automation_update",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotAutomations.swift",
+      "plugin": "studio",
+      "method": "method",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/Shared/BotAutomations.swift",
+      "plugin": "studio",
+      "method": "bot_automation_delete",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotAutomations.swift",
+      "plugin": "studio",
+      "method": "bot_automation_runs",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotConversations.swift",
+      "plugin": "studio",
+      "method": "bot_thread_reply",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotConversations.swift",
+      "plugin": "studio",
+      "method": "bot_fork_conversation",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotConversations.swift",
+      "plugin": "studio",
+      "method": "thread_model",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotConversations.swift",
+      "plugin": "studio",
+      "method": "bot_finish",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotConversations.swift",
+      "plugin": "studio",
+      "method": "bot_get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotConversations.swift",
+      "plugin": "studio",
+      "method": "bot_conversation_start",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotSpaces.swift",
+      "plugin": "studio",
+      "method": "bot_spaces",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotSpaces.swift",
+      "plugin": "studio",
+      "method": "bot_threads_view",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotThreads.swift",
+      "plugin": "studio",
+      "method": "bot_chain",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotWorkers.swift",
+      "plugin": "studio",
+      "method": "bot_thread_info",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BotWorkers.swift",
+      "plugin": "studio",
+      "method": "bot_worker_ask",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Dashboards.swift",
+      "plugin": "studio",
+      "method": "dashboards.get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Dashboards.swift",
+      "plugin": "studio",
+      "method": "dashboards.view",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Dashboards.swift",
+      "plugin": "studio",
+      "method": "dashboards.refresh",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Designs.swift",
+      "plugin": "studio",
+      "method": "designs.getDesign",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Drawings.swift",
+      "plugin": "studio",
+      "method": "drawings.listDrawings",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Drawings.swift",
+      "plugin": "studio",
+      "method": "drawings.getDrawing",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Drawings.swift",
+      "plugin": "studio",
+      "method": "drawings.getDrawingUpdatedAt",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Drawings.swift",
+      "plugin": "studio",
+      "method": "drawings.renameDrawing",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Drawings.swift",
+      "plugin": "studio",
+      "method": "drawings.deleteDrawing",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Minis.swift",
+      "plugin": "studio",
+      "method": "minis.get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/ModelHandoff.swift",
+      "plugin": "studio",
+      "method": "thread_handoff_to_model",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.tree",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.markdown",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.search",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.work",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.chats",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.chatPage",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.update",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.snapshots",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.snapshot",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.restore",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.comments",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.commentBlocks",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.commentCreate",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.commentReply",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Pages.swift",
+      "plugin": "studio",
+      "method": "pages.commentResolve",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/PluginExtras.swift",
+      "plugin": "plannotator",
+      "method": "getActiveReview",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/PluginExtras.swift",
+      "plugin": "plannotator",
+      "method": "cancelReview",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/ReactionSettings.swift",
+      "plugin": "studio",
+      "method": "settings.get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/ServerTools.swift",
+      "plugin": "account-pool",
+      "method": "account.list",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/ServerTools.swift",
+      "plugin": "keep-awake",
+      "method": "getConfiguration",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/ServerTools.swift",
+      "plugin": "keep-awake",
+      "method": "setConfiguration",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/ServerTools.swift",
+      "plugin": "concurrency-limit",
+      "method": "getConfiguration",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/ServerTools.swift",
+      "plugin": "concurrency-limit",
+      "method": "setConfiguration",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/ServerTools.swift",
+      "plugin": "side-chat",
+      "method": "createSideChat",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "overview",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "create",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "createTag",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "renameTag",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "deleteTag",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "starred",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "starItems",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "tagItems",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "archive",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "move",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "action",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "search",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "remove",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_rename",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_retry",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "recordings.recording_delete",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "pages.remove",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "pages.create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/StudioChat.swift",
+      "plugin": "studio",
+      "method": "chat.start",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/StudioChat.swift",
+      "plugin": "studio",
+      "method": "chat.home",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Capture/CaptureSheet.swift",
+      "plugin": "studio",
+      "method": "pages.create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Capture/CaptureSheet.swift",
+      "plugin": "studio",
+      "method": "artifacts.importFile",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.list",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "request",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.add",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.update",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.update",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.place",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.setPlaces",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.morning",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Studio/MiniAppView.swift",
+      "plugin": "studio",
+      "method": "minis.live.close",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Studio/MiniAppView.swift",
+      "plugin": "studio",
+      "method": "minis.live.save",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Studio/MiniAppView.swift",
+      "plugin": "studio",
+      "method": "minis.live.emit",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Studio/MiniAppView.swift",
+      "plugin": "studio",
+      "method": "minis.live.result",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Studio/MiniAppView.swift",
+      "plugin": "studio",
+      "method": "call",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/iOS/Studio/MiniAppView.swift",
+      "plugin": "studio",
+      "method": "method",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/iOS/Thread/InlineVis.swift",
+      "plugin": "inline-vis",
+      "method": "preparePreview",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "ios/iOS/Thread/MutedThreads.swift",
+      "plugin": "mobile",
+      "method": "mute_list",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "ios/iOS/Thread/MutedThreads.swift",
+      "plugin": "mobile",
+      "method": "mute_set",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "ios/iOS/VisualChat/VisualChatModel.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_get",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/iOS/VisualChat/VisualChatModel.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_renderer",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/iOS/VisualChat/VisualChatModel.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_view",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/iOS/VisualChat/VisualChatModel.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_version",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/iOS/VisualChat/VisualChatModel.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_send",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/iOS/VisualChat/VisualChatModel.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_create",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/iOS/VisualChat/VisualChatModel.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_webpage",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/iOS/VisualChat/VisualChatView.swift",
+      "plugin": "VisualChatPlugin.id",
+      "method": "VisualChat.Method.canvas_list",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/iOS/VoiceLive/VoiceLiveClient.swift",
+      "plugin": "studio",
+      "method": "voiceLive.state",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/VoiceLive/VoiceLiveClient.swift",
+      "plugin": "studio",
+      "method": "voiceLive.start",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/VoiceLive/VoiceLiveClient.swift",
+      "plugin": "studio",
+      "method": "voiceLive.tool",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/VoiceLive/VoiceLiveClient.swift",
+      "plugin": "studio",
+      "method": "voiceLive.event",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/VoiceLive/VoiceLiveClient.swift",
+      "plugin": "studio",
+      "method": "voiceLive.poll",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/VoiceLive/VoiceLiveClient.swift",
+      "plugin": "studio",
+      "method": "voiceLive.end",
+      "coverage": "generated method"
+    }
+  ]
+}

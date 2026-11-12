@@ -1,0 +1,68 @@
+import { untitled } from "../../kit/format";
+// Pasting a lone link on an empty line turns it into an embed: a page,
+// thread, drawing, artifact, recording for a BB
+// link, a bookmark for anything else on the web.
+import { itemAtPath, parseStudioItemHref } from "../../kit/contract";
+import { STUDIO_EMBEDS, isEmbedKindItem, type EmbedKind, type StudioEmbedKind } from "../schema-config";
+
+const PAGE_PATH = /^\/plugins\/pages\/pages\/(pg_[a-f0-9]{12}(?:[a-f0-9]{4})?)(?:\/|$)/;
+const THREAD_PATH = /(?:^|\/)threads\/(thr_[a-z0-9]+)(?:\/|$)/;
+const ITEM_PATH = /^\/plugins\/([a-z0-9-]+)\/([a-z0-9-]+)\/([A-Za-z0-9_-]+)\/?$/;
+
+/** The embed for a Studio add-on's item page, e.g. `/plugins/excalidraw/drawings/<id>`. */
+export function studioLink(pathname: string): { kind: StudioEmbedKind; target: string } | null {
+  // A kind built into Studio lives under Studio's panel, e.g. /plugins/studio/studio/artifacts/<id>.
+  if (pathname.startsWith("/plugins/studio/studio/")) {
+    const ref = parseStudioItemHref(pathname);
+    const kind = ref && (Object.keys(STUDIO_EMBEDS) as StudioEmbedKind[]).find((each) => isEmbedKindItem(each, ref.pluginId));
+    return ref && kind ? { kind, target: ref.id } : null;
+  }
+  const match = ITEM_PATH.exec(pathname);
+  if (!match) return null;
+  const [, pluginId, panel, id] = match;
+  const target = decodeURIComponent(id!);
+  const kind = (Object.keys(STUDIO_EMBEDS) as StudioEmbedKind[]).find(
+    (each) => isEmbedKindItem(each, pluginId!) && STUDIO_EMBEDS[each].panel === panel,
+  );
+  return kind ? { kind, target } : null;
+}
+
+export function linkEmbed(text: string, origin: string): { kind: EmbedKind; target: string } | null {
+  const trimmed = text.trim();
+  if (!trimmed || /\s/.test(trimmed)) return null;
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+  if (url.origin === origin) {
+    const page = PAGE_PATH.exec(url.pathname);
+    if (page) return { kind: "page", target: page[1]! };
+    const thread = THREAD_PATH.exec(url.pathname);
+    if (thread) return { kind: "thread", target: thread[1]! };
+    const item = studioLink(url.pathname);
+    if (item) return item;
+  }
+  return { kind: "bookmark", target: url.toString() };
+}
+
+/** The mention a pasted item reference makes: a page, or an item the Studio index lists. */
+export function referenceMention(
+  href: string,
+  items: readonly { pluginId: string; id: string; href: string }[],
+): { kind: "page" | "item"; target: string } | null {
+  const page = PAGE_PATH.exec(href.split(/[?#]/)[0]!);
+  if (page) return { kind: "page", target: page[1]! };
+  const item = itemAtPath(items, href);
+  return item ? { kind: "item", target: `${item.pluginId}:${item.id}` } : null;
+}
+
+/** Paste immediately, before the cursor or editor can change during discovery. */
+export function referenceContent(reference: { href: string; title?: string | null }) {
+  const label = untitled(reference.title ?? "");
+  const ref = parseStudioItemHref(reference.href);
+  const mention = referenceMention(reference.href, []) ?? (ref ? { kind: "item", target: `${ref.pluginId}:${ref.id}` } : null);
+  return [mention ? { type: "mention", props: { ...mention, label } } : { type: "link", href: reference.href, content: label }, " "];
+}

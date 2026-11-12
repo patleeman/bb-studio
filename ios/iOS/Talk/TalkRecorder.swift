@@ -1,0 +1,700 @@
+import AVFoundation
+import Foundation
+import os
+
+private let log = Logger(subsystem: "nyc.plee.bbgo", category: "talk")
+
+/// Native capture for Studio recordings, following its web client's lifecycle:
+/// `recording_create` → `segment_put` per cut → heartbeat every 20s →
+/// `recording_state: finishing` → poll `recording_get` until the transcript is done.
+/// Segments are 16 kHz mono PCM, cut at a pause once they pass the target length
+/// (Talk's segmenter policy), and pass through an on-disk outbox so a dropped
+/// connection loses nothing.
+@MainActor
+final class TalkRecorder: ObservableObject {
+    enum Phase: Equatable {
+        case idle, recording, finishing, done, failed(String)
+    }
+
+    @Published private(set) var phase: Phase = .idle
+    @Published private(set) var level: Float = 0
+    @Published private(set) var startedAt: Date?
+    @Published private(set) var transcript = ""
+    @Published private(set) var recordingId: String?
+    /// Set while recording when the microphone has sent only silence for a few seconds.
+    @Published private(set) var silentInput: String?
+    @Published private(set) var needsRecovery = false
+    /// Between the tap and capture starting: permission, the session, `recording_create`.
+    @Published private(set) var starting = false
+    private var echoCancelling = false
+    /// Closed while starting, so the start stops before it turns the microphone on.
+    private var abandoned = false
+    /// Discarded while starting: the start throws away whatever it made.
+    private var discardRequested = false
+    /// This start's recording, not yet handed to the outbox to finish: `discard()` may delete it.
+    private var ownsRecording = false
+
+    private let client: BBClient
+    private let outbox = TalkOutbox.shared
+    private let capture = SegmentCapture()
+    private var heartbeatTask: Task<Void, Never>?
+    private var handoff: TalkHandoff?
+    private var stoppedSegments: Int?
+    private var completing = false
+    private var captureSession: TalkCaptureJournal.Session?
+
+    init(client: BBClient) {
+        self.client = client
+        outbox.kick()
+    }
+
+    #if DEBUG
+    /// `StateDemo`: a finished dictation, to review without recording.
+    func showDemoTranscript(_ text: String) {
+        transcript = text
+        phase = .done
+    }
+    #endif
+
+    /// A recorder dropped mid-capture (its view went away) releases the
+    /// microphone and the audio session; what it captured stays in the journal.
+    deinit {
+        if capture.isCapturing {
+            _ = capture.stop()
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
+    }
+
+    /// `policy` decides where segments are cut: an inline dictation cuts short ones so the words show up while you talk.
+    /// `echoCancelling` records in the voice-chat mode, which takes the app's own playback out of the mic.
+    func start(kind: String = "dictation", threadId: String? = nil, projectId: String? = nil, policy: SegmentPolicy = .talk,
+               echoCancelling: Bool = false) async {
+        guard !starting, !needsRecovery, phase == .idle || phase == .done || phase.isFailure else { return }
+        capture.policy = policy
+        starting = true
+        abandoned = false
+        discardRequested = false
+        recordingId = nil
+        ownsRecording = false
+        self.echoCancelling = echoCancelling
+        await begin(kind: kind, threadId: threadId, projectId: projectId)
+        starting = false
+        if discardRequested {
+            discardRequested = false
+            await discard()
+        }
+    }
+
+    private func begin(kind: String, threadId: String?, projectId: String?) async {
+        transcript = ""
+        captureSession = nil
+        stoppedSegments = nil
+        do {
+            guard await AVAudioApplication.requestRecordPermission() else {
+                phase = .failed("Microphone access is off. Enable it in Settings.")
+                return
+            }
+            guard !abandoned, !Task.isCancelled else { return }
+            let session = AVAudioSession.sharedInstance()
+            // A car's or headset's mic over Bluetooth HFP when one is connected (VoiceAudioConfig): the
+            // input is chosen here, before the engine starts, since switching to it mid-start stalled the
+            // engine. A route change later restarts capture on the new input (SegmentCapture.restart).
+            // Voice chat cancels echo.
+            let config = VoiceAudioConfig.dictation(echoCancelling: echoCancelling)
+            try config.apply(to: session)
+            try session.setActive(true)
+            // Set up again if the mic reads 0 Hz (a voice session's unit not yet let go of it).
+            capture.sessionConfig = config
+
+            let recording = try await client.createRecording(kind: kind, threadId: threadId, projectId: projectId)
+            if discardRequested {
+                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                recordingId = recording.id
+                ownsRecording = true
+                return
+            }
+            if abandoned || Task.isCancelled {
+                // Talk discards a recording that finishes with no audio.
+                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                _ = try? await client.setRecordingState(recording.id, "finishing")
+                return
+            }
+            recordingId = recording.id
+            ownsRecording = true
+            let sessionId = Self.clientId()
+            let captureSession = try outbox.beginCapture(recordingId: recording.id, sessionId: sessionId, serverURL: client.baseURL)
+            self.captureSession = captureSession
+            let handoff = TalkHandoff { [outbox, client] segment in
+                try outbox.add(segment, recordingId: recording.id, sessionId: sessionId, serverURL: client.baseURL)
+            }
+            self.handoff = handoff
+            stoppedSegments = nil
+            try await capture.start(journal: outbox.captureJournal, session: captureSession,
+                onError: { [weak self] error in Task { @MainActor in
+                    guard let self else { return }
+                    self.needsRecovery = true
+                    _ = self.stopCapture()
+                    self.phase = .failed("Audio could not be written. Free some storage and retry saving. Interrupted audio is preserved for recovery in Settings.")
+                } },
+                onLevel: { [weak self] level in Task { @MainActor in self?.level = level } },
+                onSegment: { [weak self] segment in
+                    Task { @MainActor in
+                        guard let self, self.handoff === handoff else { return }
+                        handoff.receive(segment)
+                        if handoff.failedCount > 0 {
+                            // Stop producing more audio when storage fails, but
+                            // retain every failed source file for Retry saving.
+                            self.needsRecovery = true
+                            _ = self.stopCapture()
+                            self.phase = .failed("Couldn't save the audio on this phone. Keep this screen open, free some storage if needed, then retry saving.")
+                        }
+                    }
+                })
+            startedAt = Date()
+            silentInput = nil
+            phase = .recording
+            if kind == "recording" { LiveItems.recordingStarted(recording.id) }
+            _ = try? await client.setRecordingState(recording.id, "recording")
+            startHeartbeat(recording.id)
+            watchInput()
+        } catch {
+            log.error("start failed: \(error.localizedDescription, privacy: .public)")
+            _ = stopCapture()
+            needsRecovery = captureSession != nil
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            phase = .failed(error.localizedDescription)
+        }
+    }
+
+    /// Reads what Talk has transcribed so far, while recording. An inline
+    /// dictation streams it into the composer; `finish()` still waits for all of it.
+    func refreshTranscript() async {
+        guard phase == .recording, let id = recordingId, let detail = try? await client.recording(id),
+            recordingId == id, phase == .recording
+        else { return }
+        transcript = detail.transcript
+    }
+
+    /// Stops capture and waits for Talk to transcribe every segment.
+    @discardableResult
+    func finish() async -> String? {
+        guard !completing, (phase == .recording || needsRecovery), let id = recordingId else { return nil }
+        completing = true
+        defer { completing = false }
+        phase = .finishing
+        needsRecovery = true
+        let segments = stopCapture()
+        guard await saveHandoff(segments) else { return nil }
+        let stats = capture.stats()
+        ownsRecording = false
+        outbox.finishWhenSent(id, serverURL: client.baseURL)
+        guard await outbox.waitForFinish(id, serverURL: client.baseURL, until: Date().addingTimeInterval(120)) else {
+            phase = .failed("Still uploading. The transcript will show up in Studio once the audio reaches BB.")
+            return nil
+        }
+        guard segments > 0 else {
+            // Too short to keep; Talk discards the empty recording.
+            phase = .failed(stats.heardNothing ? silenceMessage : "Nothing was recorded. Try again.")
+            return nil
+        }
+        do {
+            let deadline = Date().addingTimeInterval(180)
+            while Date() < deadline {
+                let detail = try await client.recording(id)
+                transcript = detail.transcript
+                if detail.recording.status == "done" { break }
+                try await Task.sleep(for: .seconds(1.5))
+            }
+            phase = .done
+            return transcript
+        } catch let error as BBError where error.message.hasPrefix("No recording") {
+            // Talk deletes a recording that finishes without a word.
+            phase = .failed(stats.heardNothing ? silenceMessage : "Talk didn't catch any words. Try again, a little closer to the microphone.")
+            return nil
+        } catch {
+            phase = .failed(error.localizedDescription)
+            return nil
+        }
+    }
+
+    /// Waits for local persistence before closing; uploads and transcription
+    /// continue through the outbox after this view leaves.
+    func cancel() async -> Bool {
+        if starting {
+            abandoned = true
+            return true
+        }
+        if completing { return !needsRecovery }
+        guard phase == .recording || needsRecovery, let id = recordingId else { return true }
+        completing = true
+        defer { completing = false }
+        phase = .finishing
+        needsRecovery = true
+        let segments = stopCapture()
+        guard await saveHandoff(segments) else { return false }
+        ownsRecording = false
+        outbox.finishWhenSent(id, serverURL: client.baseURL)
+        phase = .idle
+        return true
+    }
+
+    /// Push-to-talk's cancel: stops and releases the microphone like `cancel()`,
+    /// but keeps nothing. Local audio is removed, nothing more uploads, and
+    /// the recording is deleted on the server it was recorded to (later, if
+    /// that server can't be reached now).
+    func discard() async {
+        if starting {
+            abandoned = true
+            discardRequested = true
+            return
+        }
+        // Late segments from the capture's last cut go nowhere.
+        handoff = nil
+        if phase == .recording || phase == .finishing { _ = stopCapture() }
+        else { heartbeatTask?.cancel() }
+        needsRecovery = false
+        phase = .idle
+        startedAt = nil
+        level = 0
+        captureSession = nil
+        guard ownsRecording, let id = recordingId else { return }
+        ownsRecording = false
+        recordingId = nil
+        outbox.discard(id, serverURL: client.baseURL)
+        await outbox.deleteDiscarded(using: client)
+    }
+
+    /// Always releases the microphone, including when enqueueing failed.
+    private func stopCapture() -> Int {
+        if let stoppedSegments { return stoppedSegments }
+        let segments = capture.stop()
+        stoppedSegments = segments
+        heartbeatTask?.cancel()
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        if let recordingId { LiveItems.recordingEnded(recordingId) }
+        return segments
+    }
+
+    /// The input the microphone audio comes from, like "AirPods Pro".
+    private var inputName: String? {
+        AVAudioSession.sharedInstance().currentRoute.inputs.first?.portName
+    }
+
+    private var silenceMessage: String {
+        let from = inputName.map { " from \($0)" } ?? ""
+        return "The microphone sent only silence\(from). Check that BB Studio has microphone access in Settings and no other app is using the mic, then try again."
+    }
+
+    private func saveHandoff(_ segments: Int) async -> Bool {
+        guard let handoff else { return false }
+        handoff.retry()
+        do {
+            try await handoff.waitUntilDurable(segments)
+            needsRecovery = false
+            return true
+        } catch {
+            needsRecovery = true
+            phase = .failed(error.localizedDescription)
+            return false
+        }
+    }
+
+    /// Flags a microphone that sends only silence, and restarts a capture whose
+    /// audio stopped arriving (an interruption or a route change it missed).
+    private func watchInput() {
+        Task { [weak self] in
+            while let self, self.phase == .recording {
+                try? await Task.sleep(for: .seconds(1))
+                guard self.phase == .recording, let startedAt = self.startedAt else { return }
+                let stats = self.capture.stats()
+                if stats.stalled, Date().timeIntervalSince(startedAt) > 2 {
+                    log.error("capture: no audio for 2s, restarting")
+                    self.capture.restart()
+                }
+                let silent = Date().timeIntervalSince(startedAt) > 3 && stats.heardNothing
+                self.silentInput = silent ? (self.inputName ?? "the microphone") : nil
+            }
+        }
+    }
+
+    /// Ends with the capture, and with the recorder if it goes away mid-capture.
+    private func startHeartbeat(_ id: String) {
+        heartbeatTask?.cancel()
+        heartbeatTask = Task { [weak self, client] in
+            while true {
+                try? await Task.sleep(for: .seconds(20))
+                guard !Task.isCancelled, self != nil else { return }
+                try? await client.heartbeat(id)
+            }
+        }
+    }
+
+    private static func clientId() -> String {
+        let alphabet = Array("abcdefghijklmnopqrstuvwxyz0123456789")
+        return String((0..<12).map { _ in alphabet.randomElement()! })
+    }
+}
+
+extension TalkRecorder.Phase {
+    var isFailure: Bool { if case .failed = self { true } else { false } }
+}
+
+struct CaptureStats: Sendable {
+    var peakRMS: Float
+    var lastAudioAt: Date
+
+    /// Digital silence: a quiet room still reads well above this.
+    var heardNothing: Bool { peakRMS < 0.0003 }
+    /// The engine stopped delivering audio.
+    var stalled: Bool { Date().timeIntervalSince(lastAudioAt) > 2 }
+}
+
+struct CapturedSegment: Sendable {
+    var url: URL
+    var index: Int
+    var startedAt: Int
+    var durationMs: Int
+}
+
+/// The capture engine (AVAudioEngine's input; a fake in tests).
+protocol CaptureEngine: AnyObject {
+    /// The input's format, or nil when it reads 0 Hz or no channels: no mic yet.
+    func inputFormat() -> AVAudioFormat?
+    var isRunning: Bool { get }
+    func installTap(bufferSize: AVAudioFrameCount, format: AVAudioFormat, block: @escaping AVAudioNodeTapBlock)
+    func removeTap()
+    func prepare()
+    func start() throws
+    func stop()
+    /// What posts `AVAudioEngineConfigurationChange` for it.
+    var notificationObject: AnyObject? { get }
+}
+
+final class SystemCaptureEngine: CaptureEngine {
+    private let engine = AVAudioEngine()
+
+    func inputFormat() -> AVAudioFormat? {
+        let format = engine.inputNode.outputFormat(forBus: 0)
+        log.info("capture: input \(format.description, privacy: .public)")
+        return format.sampleRate > 0 && format.channelCount > 0 ? format : nil
+    }
+    var isRunning: Bool { engine.isRunning }
+    func installTap(bufferSize: AVAudioFrameCount, format: AVAudioFormat, block: @escaping AVAudioNodeTapBlock) {
+        engine.inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: format, block: block)
+    }
+    func removeTap() { engine.inputNode.removeTap(onBus: 0) }
+    func prepare() { engine.prepare() }
+    func start() throws { try engine.start() }
+    func stop() { engine.stop() }
+    var notificationObject: AnyObject? { engine }
+}
+
+/// Runs on the engine's tap thread. All segment state lives on `queue`.
+final class SegmentCapture: @unchecked Sendable {
+    static let noMicrophone = "No microphone is available."
+
+    private let makeEngine: () -> CaptureEngine
+    private var engine: CaptureEngine
+    private let audioSession: AudioSessionControl
+    /// The recorder's session config, set again when the input reads 0 Hz.
+    var sessionConfig: VoiceAudioConfig?
+    /// Tries to start the engine, in ms after the first: restart()'s pattern.
+    var retryDelays = [0, 200, 600, 1500]
+    /// One line per try, for the logs and tests.
+    var trace: ((String) -> Void)?
+    private var engineObserver: NSObjectProtocol?
+    private let queue = DispatchQueue(label: "talk.capture")
+    private let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false)!
+    private var converter: AVAudioConverter?
+    private var file: FileHandle?
+    private var journal: TalkCaptureJournal?
+    private var session: TalkCaptureJournal.Session?
+    private var onError: ((Error) -> Void)?
+    private var fileURL: URL?
+    private var index = 0
+    private var segmentStarted = Date()
+    private var segmentFrames: AVAudioFramePosition = 0
+    private var tracker = LevelTracker()
+    private var onSegment: ((CapturedSegment) -> Void)?
+    private var onLevel: ((Float) -> Void)?
+    private var capturing = false
+    var isCapturing: Bool { capturing }
+    private var observers: [NSObjectProtocol] = []
+    private var peakRMS: Float = 0
+    private var lastAudioAt = Date()
+
+    /// Set before `start`; read on the capture queue.
+    var policy = SegmentPolicy.talk
+
+    init(makeEngine: @escaping () -> CaptureEngine = { SystemCaptureEngine() }, audioSession: AudioSessionControl = AVAudioSession.sharedInstance()) {
+        self.makeEngine = makeEngine
+        self.engine = makeEngine()
+        self.audioSession = audioSession
+    }
+
+    @MainActor
+    func start(journal: TalkCaptureJournal, session: TalkCaptureJournal.Session, onError: @escaping (Error) -> Void, onLevel: @escaping (Float) -> Void, onSegment: @escaping (CapturedSegment) -> Void) async throws {
+        self.journal = journal
+        self.session = session
+        self.onError = onError
+        self.onSegment = onSegment
+        self.onLevel = onLevel
+        try queue.sync {
+            index = 0
+            peakRMS = 0
+            lastAudioAt = Date()
+            try openSegment()
+        }
+        capturing = true
+        do {
+            try await startEngineRecovering()
+        } catch {
+            _ = stop()
+            throw error
+        }
+        observeEngine()
+        let center = NotificationCenter.default
+        observers = [
+            center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) {
+                [weak self] note in
+                let type = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt)
+                    .flatMap(AVAudioSession.InterruptionType.init(rawValue:))
+                log.info("capture: interruption \(type == .began ? "began" : "ended", privacy: .public)")
+                if type == .ended { self?.restart() }
+            },
+            // A headset or the car connecting: record from its mic. The engine's configuration change
+            // above restarts capture on it.
+            center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { note in
+                let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt ?? 0
+                guard let reason = AVAudioSession.RouteChangeReason(rawValue: raw), VoiceRouteAction.forReason(reason) == .reroute else { return }
+                log.info("capture: route changed (\(raw, privacy: .public))")
+                try? VoiceAudioConfig.preferBluetoothInput(AVAudioSession.sharedInstance())
+            },
+        ]
+    }
+
+    func stats() -> CaptureStats {
+        queue.sync { CaptureStats(peakRMS: peakRMS, lastAudioAt: lastAudioAt) }
+    }
+
+    /// A route change (AirPods, a call, another app's audio) stops the engine
+    /// and can change the input format; pick up where it left off.
+    private func observeEngine() {
+        engineObserver.map(NotificationCenter.default.removeObserver)
+        engineObserver = engine.notificationObject.map {
+            NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: $0, queue: .main) { [weak self] _ in
+                log.info("capture: audio configuration changed")
+                self?.restart()
+            }
+        }
+    }
+
+    /// Starts the engine again after it stopped, retrying while a new route settles.
+    func restart() {
+        guard capturing else { return }
+        engine.stop()
+        engine.removeTap()
+        queue.sync { lastAudioAt = Date() }
+        try? audioSession.setActive(true, options: [])
+        Task { @MainActor [weak self] in
+            do { try await self?.startEngineRecovering() } catch {
+                log.error("capture restart failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
+    /// Starts the engine, trying again over about 2 s. An input that reads 0 Hz (a voice
+    /// session's voice-processing unit not yet let go of the mic) gets the recorder's session
+    /// config and activation again, and a new engine: the old one keeps the stale format.
+    @MainActor
+    private func startEngineRecovering() async throws {
+        var lastError: Error?
+        for (attempt, delay) in retryDelays.enumerated() {
+            if delay > 0 { try? await Task.sleep(for: .milliseconds(delay)) }
+            guard capturing else { return }
+            if engine.isRunning { return }
+            do {
+                try startEngine()
+                trace?("try \(attempt + 1): started")
+                if attempt > 0 { log.info("capture: started on try \(attempt + 1)") }
+                return
+            } catch {
+                lastError = error
+                engine.removeTap()
+                trace?("try \(attempt + 1): \(error.localizedDescription)")
+                log.error("capture start, try \(attempt + 1): \(error.localizedDescription, privacy: .public)")
+                guard Self.isNoMicrophone(error) else { continue }
+                if let sessionConfig {
+                    try? sessionConfig.apply(to: audioSession)
+                    try? audioSession.setActive(true, options: [])
+                }
+                engine.stop()
+                engine = makeEngine()
+                observeEngine()
+            }
+        }
+        throw lastError ?? NSError(domain: "Talk", code: 1, userInfo: [NSLocalizedDescriptionKey: Self.noMicrophone])
+    }
+
+    static func isNoMicrophone(_ error: Error) -> Bool {
+        let error = error as NSError
+        return error.domain == "Talk" && error.code == 1
+    }
+
+    private func startEngine() throws {
+        guard let inputFormat = engine.inputFormat() else {
+            throw NSError(domain: "Talk", code: 1, userInfo: [NSLocalizedDescriptionKey: Self.noMicrophone])
+        }
+        let converter = AVAudioConverter(from: inputFormat, to: format)
+        queue.sync { self.converter = converter }
+        engine.installTap(bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
+            guard let self else { return }
+            self.queue.sync {
+                guard let converted = self.convert(buffer) else { return }
+                self.write(converted)
+            }
+        }
+        engine.prepare()
+        try engine.start()
+    }
+
+    /// Stops capture and hands off the last segment. Returns how many segments
+    /// were handed off in total.
+    func stop() -> Int {
+        guard capturing else { return queue.sync { index } }
+        capturing = false
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers = []
+        engineObserver.map(NotificationCenter.default.removeObserver)
+        engineObserver = nil
+        log.info("capture stop: engine running \(self.engine.isRunning), frames \(self.segmentFrames)")
+        engine.removeTap()
+        engine.stop()
+        return queue.sync {
+            closeSegment()
+            return index
+        }
+    }
+
+    private func convert(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+        guard let converter else { return nil }
+        let ratio = format.sampleRate / buffer.format.sampleRate
+        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 32
+        guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return nil }
+        var consumed = false
+        var error: NSError?
+        converter.convert(to: output, error: &error) { _, status in
+            if consumed {
+                status.pointee = .noDataNow
+                return nil
+            }
+            consumed = true
+            status.pointee = .haveData
+            return buffer
+        }
+        return error == nil ? output : nil
+    }
+
+    private func write(_ buffer: AVAudioPCMBuffer) {
+        guard let file else { return }
+        guard let samples = buffer.floatChannelData?[0] else { return }
+        let pcm = (0..<Int(buffer.frameLength)).map { i -> Int16 in
+            let value = samples[i].isFinite ? min(1, max(-1, samples[i])) : 0
+            return Int16(value * 32767).littleEndian
+        }
+        do {
+            try pcm.withUnsafeBytes { try file.write(contentsOf: Data($0)) }
+            if segmentFrames / 16_000 != (segmentFrames + AVAudioFramePosition(buffer.frameLength)) / 16_000 { try file.synchronize() }
+            segmentFrames += AVAudioFramePosition(buffer.frameLength)
+        } catch { onError?(error); return }
+
+        let dtMs = Double(buffer.frameLength) / format.sampleRate * 1000
+        let rms = Self.rms(buffer)
+        peakRMS = max(peakRMS, rms)
+        lastAudioAt = Date()
+        let quietMs = tracker.push(rms: rms, dtMs: dtMs)
+        onLevel?(tracker.level)
+
+        let elapsedMs = Double(segmentFrames) / format.sampleRate * 1000
+        if policy.shouldCut(elapsedMs: elapsedMs, quietMs: quietMs) {
+            closeSegment()
+            do { try openSegment() } catch { onError?(error) }
+        }
+    }
+
+    private func openSegment() throws {
+        guard let journal, let session else { throw CocoaError(.fileWriteUnknown) }
+        segmentStarted = Date()
+        let url = try journal.open(session, index: index, startedAt: Int(segmentStarted.timeIntervalSince1970 * 1000))
+        fileURL = url
+        file = try FileHandle(forWritingTo: url)
+        segmentFrames = 0
+        tracker.resetQuiet()
+    }
+
+    private func closeSegment() {
+        guard let file, let fileURL else { return }
+        try? file.synchronize()
+        try? file.close()
+        self.file = nil
+        self.fileURL = nil
+        let durationMs = (try? TalkCaptureJournal.duration(of: fileURL)) ?? Int(Double(segmentFrames) / format.sampleRate * 1000)
+        log.info("segment \(self.index) closed: \(durationMs)ms peak level \(self.tracker.level)")
+        guard durationMs > 0 else {
+            journal?.discardEmpty(fileURL)
+            return
+        }
+        onSegment?(
+            CapturedSegment(
+                url: fileURL, index: index, startedAt: Int(segmentStarted.timeIntervalSince1970 * 1000),
+                durationMs: durationMs))
+        index += 1
+    }
+
+    private static func rms(_ buffer: AVAudioPCMBuffer) -> Float {
+        guard let samples = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return 0 }
+        var sum: Float = 0
+        for i in 0..<Int(buffer.frameLength) { sum += samples[i] * samples[i] }
+        return (sum / Float(buffer.frameLength)).squareRoot()
+    }
+}
+
+/// When to close one audio segment and open the next: at a pause once it
+/// reaches the target length, or at the hard maximum. Talk's `SegmentPolicy`
+/// (packages/bb-studio/src/talk/ui/segmenter.ts).
+struct SegmentPolicy: Equatable, Sendable {
+    var targetMs: Double
+    var maxMs: Double
+    /// How long the level must stay low to count as a pause.
+    var pauseMs: Double
+
+    /// Talk's default: 25s target, 40s hard max, 350ms of quiet counts as a pause.
+    static let talk = SegmentPolicy(targetMs: 25_000, maxMs: 40_000, pauseMs: 350)
+    /// Inline dictations, a phrase at a time, so the words land in the draft while you talk.
+    static let voice = SegmentPolicy(targetMs: 2_500, maxMs: 8_000, pauseMs: 300)
+
+    func shouldCut(elapsedMs: Double, quietMs: Double) -> Bool {
+        elapsedMs >= maxMs || (elapsedMs >= targetMs && quietMs >= pauseMs)
+    }
+}
+
+/// Port of Talk's `LevelTracker`: an adaptive noise floor so a noisy room does not read as constant speech.
+struct LevelTracker {
+    private var floor: Float = 0.004
+    private var quietMs: Double = 0
+    private(set) var level: Float = 0
+
+    mutating func push(rms: Float, dtMs: Double) -> Double {
+        floor = rms < floor ? rms : floor + (rms - floor) * Float(min(1, dtMs / 8000))
+        floor = max(0.001, floor)
+        let threshold = max(0.008, floor * 2.5)
+        quietMs = rms < threshold ? quietMs + dtMs : 0
+        let target = min(1, rms.squareRoot() * 2.2)
+        level = target > level ? target : level * 0.85 + target * 0.15
+        return quietMs
+    }
+
+    mutating func resetQuiet() {
+        quietMs = 0
+    }
+}

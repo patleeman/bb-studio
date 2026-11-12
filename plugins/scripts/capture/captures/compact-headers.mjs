@@ -1,0 +1,72 @@
+export default context => {
+  const { projectId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc, sleep } = context;
+  const fixtures = [
+    { id: "pages", packageDir: "bb-studio", fileName: "pages-compact-header.png", seed: async () => { const { page, cleanup } = await seedPages(); return { path: `/plugins/studio/studio/pages/${page.id}`, ready: '.pages-editor .ProseMirror', cleanup }; } },
+    { id: "draw", packageDir: "bb-studio", fileName: "drawings-compact-header.png", seed: async () => { const { drawing, cleanup } = await seedDrawing(); return { path: `/plugins/studio/studio/drawings/${drawing.id}`, ready: 'canvas.excalidraw__canvas', cleanup }; } },
+    { id: "artifacts", packageDir: "bb-studio", fileName: "artifacts-compact-header.png", seed: async () => { const { artifactId, cleanup } = await seedArtifact(); return { path: `/plugins/studio/studio/artifacts/${artifactId}`, ready: 'iframe[title="q3-usage-report.html"]', cleanup }; } },
+    { id: "talk", packageDir: "bb-studio", fileName: "recordings-compact-header.png", seed: async () => { const id = await seedTalkRecording(projectId, { transcribe: false }); return { path: `/plugins/studio/studio/recordings/${id}`, ready: 'input[aria-label="Title"]', cleanup: () => talkRpc("recording_delete", { id }) }; } },
+  ];
+  return fixtures.map(fixture => ({
+    id: `${fixture.id}-compact-header`, packageDir: fixture.packageDir, fileName: fixture.fileName ?? "compact-header.png", privateSidebar: false,
+    setup: async client => {
+      const { path, ready, cleanup } = await fixture.seed();
+      let sidebarToggle;
+      const forget = async () => {
+        await cleanup();
+        if (sidebarToggle) await client.evaluate(`document.querySelector('button[aria-label=${JSON.stringify(sidebarToggle)}]')?.click()`);
+        await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+      };
+      const fits = async selector => {
+        const clipped = await client.evaluate(`(() => [...document.querySelectorAll(${JSON.stringify(selector)})].filter(button => {
+          if (!button.checkVisibility()) return false;
+          const r = button.getBoundingClientRect();
+          const covered = !button.disabled && !button.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+          return r.width <= 0 || r.left < 0 || r.right > innerWidth + 1 || r.top < 0 || r.bottom > innerHeight + 1 || covered;
+        }).map(button => button.getAttribute('aria-label') || button.innerText))()`);
+        if (clipped.length) throw new Error(`${fixture.id} clips compact controls: ${JSON.stringify(clipped)}`);
+      };
+      try {
+        await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+        await client.navigate(path);
+        await client.waitForSelector(ready);
+        sidebarToggle = await client.evaluate(`(() => {
+          const sidebar = document.querySelector('[data-sidebar="sidebar"]');
+          if (['closed', 'collapsed'].includes(sidebar?.closest('[data-state]')?.getAttribute('data-state'))) return null;
+          if (!sidebar?.checkVisibility() || sidebar.getBoundingClientRect().right <= 0) return null;
+          return [...document.querySelectorAll('button')].find(button => /^Toggle sidebar/i.test(button.getAttribute('aria-label') || '') && button.checkVisibility())?.getAttribute('aria-label') || null;
+        })()`);
+        if (sidebarToggle) await client.clickAriaButtonWithPointer(sidebarToggle);
+        await client.waitForAriaButton("Item actions");
+        await sleep(500);
+        // A workspace tab row shows only the item's own tools (no Chat, no
+        // Open in split): the workspace splits tabs itself. Elsewhere the
+        // compact bar keeps Chat visible.
+        const { inWorkspace, chat } = await client.evaluate(`(() => {
+          const header = document.querySelector('[data-studio-item-header]');
+          const button = [...document.querySelectorAll('[data-studio-item-header] button')].find(button => button.innerText.trim() === 'Chat');
+          return { inWorkspace: !!header?.closest('[data-studio-workspace-bar]'), chat: !!button?.checkVisibility() && !button.disabled };
+        })()`);
+        if (!inWorkspace && !chat) throw new Error(`${fixture.id} has no available compact Chat action`);
+        if (inWorkspace && chat) throw new Error(`${fixture.id} offers Chat in the workspace tab row`);
+        if (fixture.id === "draw") {
+          await client.dragBy('canvas.excalidraw__canvas', 0, 0);
+          await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "!", code: "Digit1", modifiers: 8 });
+          await client.command("Input.dispatchKeyEvent", { type: "keyUp", key: "!", code: "Digit1", modifiers: 8 });
+        }
+        await fits('[data-studio-item-header] button');
+        await client.clickAriaButtonWithPointer("Item actions");
+        await client.waitForSelector('[data-studio-item-actions]');
+        await fits('[data-studio-item-header] button');
+        if (await client.evaluate(`document.documentElement.scrollWidth > innerWidth + 1`)) throw new Error(`${fixture.id} overflows the compact viewport`);
+        const expanded = await client.evaluate(`document.querySelector('button[aria-label="Item actions"]').getAttribute('aria-expanded') === 'true'`);
+        if (!expanded) await client.clickAriaButtonWithPointer("Item actions");
+        await fits('[data-studio-item-header] button');
+      } catch (error) {
+        console.error(await client.evaluate(`JSON.stringify({ path: location.pathname, text: document.body.innerText.slice(-2200) })`).catch(() => "Capture unavailable"));
+        if (process.env.BB_CAPTURE_DEBUG_PATH) await client.capture(process.env.BB_CAPTURE_DEBUG_PATH).catch(() => {});
+        await forget(); throw error;
+      }
+      return forget;
+    },
+  }));
+};

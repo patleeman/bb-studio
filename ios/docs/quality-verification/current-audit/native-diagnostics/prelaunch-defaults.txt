@@ -1,0 +1,10 @@
+nyc.plee.bbgo = http://127.0.0.1:49486
+group.nyc.plee.bbgo = http://127.0.0.1:49486
+nyc.plee.bbgo = http://127.0.0.1:49486
+group.nyc.plee.bbgo = http://127.0.0.1:49486
+nyc.plee.bbgo = http://127.0.0.1:49486
+group.nyc.plee.bbgo = http://127.0.0.1:49486
+nyc.plee.bbgo = http://127.0.0.1:49486
+group.nyc.plee.bbgo = http://127.0.0.1:49486
+nyc.plee.bbgo = http://127.0.0.1:49486
+group.nyc.plee.bbgo = http://127.0.0.1:49486

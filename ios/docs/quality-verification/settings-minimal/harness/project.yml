@@ -1,0 +1,34 @@
+name: MinimalSettings
+options:
+  bundleIdPrefix: local.bbsettingsreview
+  deploymentTarget:
+    iOS: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGNING_ALLOWED: NO
+    GENERATE_INFOPLIST_FILE: YES
+targets:
+  MinimalSettings:
+    type: application
+    platform: iOS
+    sources: [App]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: local.bbsettingsreview.minimal
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+  MinimalSettingsUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: MinimalSettings
+schemes:
+  MinimalSettings:
+    build:
+      targets:
+        MinimalSettings: all
+        MinimalSettingsUITests: [test]
+    test:
+      targets: [MinimalSettingsUITests]

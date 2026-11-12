@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.10.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: plugins/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Stock bb compatibility (the current stable bb release and its plugin SDK)
+        run: pnpm check:compat
+      - run: pnpm check:marketplace
+      - run: pnpm check:contracts
+      - run: pnpm check:native-payloads
+      - name: Monorepo invariant (main:desktop equals the desktop branch tree)
+        working-directory: .
+        run: |
+          git fetch --no-tags --depth=1 origin desktop
+          test "$(git rev-parse HEAD:desktop)" = "$(git rev-parse FETCH_HEAD^{tree})"
+
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node site/scripts/build.mjs
+
+  promote-stable:
+    needs:
+      - check
+      - site
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: promote-stable
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Advance stable to this commit, with packages/ copies for installs from the old layout
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          parents=""
+          if git fetch origin stable; then
+            if git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+              echo "stable already includes $GITHUB_SHA"; exit 0
+            fi
+            last_main=$(git log -1 --format=%P FETCH_HEAD | awk '{print $NF}')
+            git merge-base --is-ancestor "$last_main" "$GITHUB_SHA" || { echo "stable's main $last_main is not an ancestor of $GITHUB_SHA; not moving stable"; exit 1; }
+            parents="-p $(git rev-parse FETCH_HEAD)"
+          fi
+          export GIT_INDEX_FILE="$RUNNER_TEMP/stable-index"
+          git read-tree "$GITHUB_SHA"
+          for dir in bb-studio bb-studio-mobile bb-studio-visual-chat; do
+            git read-tree --prefix="packages/$dir/" "$GITHUB_SHA:plugins/packages/$dir"
+          done
+          tree=$(git write-tree)
+          commit=$(git commit-tree "$tree" $parents -p "$GITHUB_SHA" -m "stable: main $(git rev-parse --short "$GITHUB_SHA"), with packages/ copies for installs from the old layout")
+          git push origin "$commit:refs/heads/stable"

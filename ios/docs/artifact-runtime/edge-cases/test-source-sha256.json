@@ -1,0 +1,21 @@
+[
+  {
+    "privateRun": "lTiVwJ",
+    "testSHA256": "836291bdda7ad5b5c5cec6eba254ddb5a952ad9fc4cba2e8b21a2fdc8d91f189"
+  },
+  {
+    "privateRun": "RQOtM0",
+    "testSHA256": "63f65652d12cc15fc10d1a8d36864678f9ec154d375781ab05a00b0f089c2c16"
+  },
+  {
+    "privateRun": "XdKXhG",
+    "testSHA256": "cfdcd65a715157dcdf07c6d2458c3f06bb14cb788223d358d5657bd84a9db6b0"
+  },
+  {
+    "privateRun": "LWSdl5",
+    "testSHA256": "c23a1d6c9b81344c5996026b479f6a772e6304eb07d4747fc7837c0ae6c1ba35"
+  },
+  {
+    "currentTestSHA256": "c23a1d6c9b81344c5996026b479f6a772e6304eb07d4747fc7837c0ae6c1ba35"
+  }
+]

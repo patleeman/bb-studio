@@ -1,0 +1,183 @@
+import Database from "better-sqlite3";
+import { describe, expect, it } from "vitest";
+import { MAX_NOTE_LENGTH, NEXT_LIMITS, parseNextItems, preferredReplies } from "./next";
+import { MAX_LABEL_LENGTH, parseExploreItem } from "./shared";
+import { INSTRUCTIONS_LIMIT, nextInstructions } from "./prompt";
+import { ExploreStore, NEXT_LOG_DAYS, NEXT_LOG_MIGRATIONS } from "./store";
+import { appendDraft } from "./ui/composer";
+
+describe("the ::next directive", () => {
+  it("parses each group, capped and deduped", () => {
+    const items = parseNextItems({
+      reply: "👍 Ship it|👍 ship  it|❓ Why",
+      btw: "🐛 I noticed retries don't wait. If the server is down, it gets hammered.",
+      do: "📄 One|📄 Two|📄 Three|📄 Four",
+      other: "🙃 Ignored",
+    });
+    expect(items.reply.map((item) => item.label)).toEqual(["Ship it", "Why"]);
+    expect(items.btw).toEqual([
+      {
+        emoji: "🐛",
+        label: "I noticed retries don't wait. If the server is down, it gets hammered.",
+        text: "I noticed retries don't wait. If the server is down, it gets hammered.",
+      },
+    ]);
+    expect(items.do).toHaveLength(NEXT_LIMITS.do);
+  });
+
+  it("keeps a note's whole text, and cuts its label", () => {
+    const sentence = `I noticed ${"something long ".repeat(12)}here.`;
+    const [note] = parseNextItems({ btw: `🔗 ${sentence}` }).btw;
+    expect(note.text).toBe(sentence.replace(/\s+/g, " "));
+    expect(note.label.length).toBeLessThanOrEqual(80);
+    expect(parseNextItems({ btw: `🔗 ${"word ".repeat(80)}` }).btw[0].text.length).toBeLessThanOrEqual(MAX_NOTE_LENGTH);
+    // Without an emoji it gets the default one and keeps all its words.
+    expect(parseNextItems({ btw: "I noticed a thing." }).btw[0]).toMatchObject({ emoji: "🔎", text: "I noticed a thing." });
+    expect(parseNextItems({ btw: "🐛 One|🐛 one|🏗️ Two|🔗 Three|🕐 Four" }).btw).toHaveLength(NEXT_LIMITS.btw);
+  });
+
+  it("shows older explore items as notes", () => {
+    const items = parseNextItems({ explore: "🐛 Backoff disagrees — your retry fix depends on it|🕐 Re-entrant lock-free queue" });
+    expect(items.btw).toEqual([
+      { emoji: "🐛", label: "Backoff disagrees", text: "Backoff disagrees — your retry fix depends on it" },
+      { emoji: "🕐", label: "Re-entrant lock-free queue", text: "Re-entrant lock-free queue" },
+    ]);
+  });
+
+  it("has nothing for missing attributes", () => {
+    expect(parseNextItems({})).toEqual({ reply: [], btw: [], do: [] });
+  });
+});
+
+describe("the Next instructions", () => {
+  it("fit, and show a directive that parses", () => {
+    const text = nextInstructions({ explore: true, replies: ["👍 Agree", "❓ Clarify"] });
+    expect(text.length).toBeLessThan(INSTRUCTIONS_LIMIT);
+    const example = /::next\{([^}]+)\}/.exec(text)?.[1] ?? "";
+    const attributes = Object.fromEntries([...example.matchAll(/(\w+)="([^"]*)"/g)].map((match) => [match[1], match[2]]));
+    const items = parseNextItems(attributes);
+    expect(items.reply).toHaveLength(2);
+    expect(items.btw).toHaveLength(1);
+    expect(items.btw[0].text).toMatch(/^I noticed /);
+    expect(items.do).toHaveLength(1);
+    expect(text).toContain("Prefer these when they fit: 👍 Agree | ❓ Clarify");
+    expect(text).toContain("Don't also write ::reactions or ::explore lines");
+    expect(text).not.toMatch(/Visual explainer|explore_explain|Studio Page/);
+  });
+
+  it("keeps notes apart when they start the same, and the first keeps its old label", () => {
+    const start = "I noticed the retry loop in the billing worker and the retry loop in the email worker share";
+    const first = `${start} one counter. If one fails, both stop.`;
+    const second = `${start} one timer. If one is slow, both wait.`;
+    const notes = parseNextItems({ btw: `🐛 ${first}|🐛 ${second}|🐛 ${first}` }).btw;
+    expect(notes.map((note) => note.text)).toEqual([first, second]);
+    expect(notes[0].label).toBe(parseExploreItem(`🐛 ${first}`)!.label);
+    expect(notes[1].label).not.toBe(notes[0].label);
+    expect(notes[1].label.length).toBeLessThanOrEqual(MAX_LABEL_LENGTH);
+    expect(parseNextItems({ btw: `🐛 ${first}|🐛 ${second}` }).btw[1].label).toBe(notes[1].label);
+  });
+
+  it("tell the agent how to quote, since one straight double quote turns the whole line into raw text", () => {
+    const text = nextInstructions({ explore: true, replies: [] });
+    expect(text).toContain("one stray \" breaks the whole line");
+    expect(text).toContain("“curly” quotes");
+  });
+
+  it("keep curly quotes in notes", () => {
+    const items = parseNextItems({ btw: "🐛 I noticed the “retry” setting is ignored. Changing it does nothing." });
+    expect(items.btw[0].text).toBe("I noticed the “retry” setting is ignored. Changing it does nothing.");
+  });
+
+  it("leave notes out when Explore is off", () => {
+    const text = nextInstructions({ explore: false, replies: [] });
+    expect(text).not.toContain("btw=");
+    expect(text).not.toContain("- btw:");
+    expect(text).not.toContain("Prefer these");
+  });
+
+  it("read the saved preferred replies", () => {
+    expect(preferredReplies("👍 Agree, 👎 Disagree;✅ Do it\n❓")).toEqual(["👍 Agree", "👎 Disagree", "✅ Do it"]);
+    expect(preferredReplies('🙃 say "hi"|bye')).toEqual(["🙃 say hi bye"]);
+    expect(preferredReplies("")).toEqual([]);
+    expect(preferredReplies(undefined)).toBeNull();
+  });
+});
+
+describe("the click log", () => {
+  function store() {
+    let at = 1_000;
+    const db = new Database(":memory:");
+    for (const statement of NEXT_LOG_MIGRATIONS) db.exec(statement);
+    return { store: new ExploreStore(db, () => at), tick: (ms: number) => (at += ms) };
+  }
+
+  it("counts each suggestion once as shown, and clicks per kind", () => {
+    const { store: log } = store();
+    const message = { threadId: "thr_1", messageId: "msg_1" };
+    const items = [
+      { kind: "reply" as const, emoji: "👍", label: "Ship it" },
+      { kind: "do" as const, emoji: "📄", label: "Write it up" },
+      { kind: "explore" as const, emoji: "🐛", label: "Backoff" },
+    ];
+    log.nextShown({ ...message, items });
+    log.nextShown({ ...message, items });
+    log.nextClicked({ ...message, ...items[1] });
+    log.nextClicked({ ...message, ...items[1] });
+    // A click on something never logged as shown still counts as shown.
+    log.nextClicked({ threadId: "thr_1", messageId: "msg_2", kind: "do", emoji: "📄", label: "write it up" });
+    const stats = log.nextStats(0);
+    expect(stats.kinds).toEqual([
+      { kind: "reply", shown: 1, clicked: 0 },
+      { kind: "explore", shown: 1, clicked: 0 },
+      { kind: "do", shown: 2, clicked: 2 },
+      { kind: "fix", shown: 0, clicked: 0 },
+      { kind: "more", shown: 0, clicked: 0 },
+    ]);
+    expect(stats.top).toEqual([{ kind: "do", emoji: "📄", label: "Write it up", shown: 2, clicked: 2 }]);
+  });
+
+  it("only counts suggestions shown since the given time", () => {
+    const { store: log, tick } = store();
+    log.nextShown({ threadId: "thr_1", messageId: "msg_1", items: [{ kind: "reply", emoji: "👍", label: "Old" }] });
+    const since = tick(1_000);
+    log.nextShown({ threadId: "thr_1", messageId: "msg_2", items: [{ kind: "reply", emoji: "👍", label: "New" }] });
+    expect(log.nextStats(since).kinds[0]).toEqual({ kind: "reply", shown: 1, clicked: 0 });
+  });
+});
+
+describe("the click log's size", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const item = (label: string) => [{ kind: "reply" as const, emoji: "👍", label }];
+
+  it("forgets suggestions older than its window", () => {
+    let at = 1_000;
+    const db = new Database(":memory:");
+    for (const statement of NEXT_LOG_MIGRATIONS) db.exec(statement);
+    const log = new ExploreStore(db, () => at);
+    log.nextShown({ threadId: "thr_1", messageId: "msg_1", items: item("Old") });
+    at += (NEXT_LOG_DAYS + 1) * DAY;
+    log.nextShown({ threadId: "thr_1", messageId: "msg_2", items: item("New") });
+    expect(db.prepare("SELECT label FROM next_suggestions").all()).toEqual([{ label: "New" }]);
+    expect(log.nextStats(0).kinds[0]).toEqual({ kind: "reply", shown: 1, clicked: 0 });
+  });
+
+  it("keeps at most its row cap, newest first", () => {
+    let at = 1_000;
+    const db = new Database(":memory:");
+    for (const statement of NEXT_LOG_MIGRATIONS) db.exec(statement);
+    const log = new ExploreStore(db, () => at, { days: NEXT_LOG_DAYS, maxRows: 2 });
+    for (const label of ["a", "b", "c"]) {
+      log.nextShown({ threadId: "thr_1", messageId: `msg_${label}`, items: item(label) });
+      at += 2 * 60 * 60 * 1000;
+    }
+    expect(db.prepare("SELECT label FROM next_suggestions ORDER BY shown_at").all()).toEqual([{ label: "b" }, { label: "c" }]);
+  });
+});
+
+describe("drafting", () => {
+
+  it("adds the suggestion after the draft", () => {
+    expect(appendDraft("", "👍 Ship it")).toBe("👍 Ship it");
+    expect(appendDraft("> quote\n", "👍 Ship it")).toBe("> quote\n\n👍 Ship it");
+  });
+});

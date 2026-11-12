@@ -1,0 +1,30 @@
+#!/bin/sh
+# Install every bb plugin in packages/ (idempotent).
+# Usage: bash scripts/install-all.sh   (or: pnpm plugins:install)
+set -eu
+
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ok=0
+failed=0
+for pkg in "$REPO_DIR"/packages/bb-studio*/; do
+	# A plugin names itself in bb.name; the kit's bb block is build config.
+	node -e 'process.exit(require(process.argv[1]).bb?.name ? 0 : 1)' "${pkg}package.json" 2>/dev/null || continue
+	name="$(basename "$pkg")"
+	echo "==> bb plugin install $name"
+	if bb plugin install "$pkg" --yes; then
+		echo "    installed: $name"
+		ok=$((ok + 1))
+	else
+		echo "    FAILED: $name" >&2
+		failed=$((failed + 1))
+	fi
+done
+
+echo
+echo "Installed $ok plugin(s). Installed plugins from this repo:"
+plugin_ids="$(node -e 'const {plugins}=require(process.argv[1]); process.stdout.write(plugins.map(p=>p.name).join("|"))' "$REPO_DIR/.bb/plugins.json")"
+bb plugin list 2>/dev/null | grep -E "^($plugin_ids)@" || true
+if [ "$failed" -gt 0 ]; then
+	echo "$failed plugin(s) failed to install." >&2
+	exit 1
+fi

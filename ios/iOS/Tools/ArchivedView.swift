@@ -1,0 +1,125 @@
+import SwiftUI
+
+/// Archived threads, newest first, with swipe to restore.
+struct ArchivedView: View {
+    @EnvironmentObject private var app: AppModel
+    @State private var threads: [ThreadEntry] = []
+    @State private var loaded = false
+    @State private var more = true
+    /// Archived threads read from BB so far: the next page's offset.
+    @State private var fetched = 0
+    @State private var error: String?
+    @State private var query = ""
+    @State private var done = 0
+
+    private static let page = 50
+
+    var body: some View {
+        List {
+            if let error {
+                Section { ConnectionBanner(message: error) { await load() } }
+            }
+            ForEach(shown) { thread in
+                NavigationLink(value: Route.thread(id: thread.id)) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ThreadRow(thread: thread, project: thread.projectName)
+                        if let archived = thread.archivedAt {
+                            Text("Archived \(Date(timeIntervalSince1970: archived / 1000), format: .relative(presentation: .named))")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .padding(.leading, 18)
+                        }
+                    }
+                }
+                .swipeActions(edge: .trailing) {
+                    Button { Task { await unarchive(thread) } } label: {
+                        Label("Unarchive", systemImage: "tray.and.arrow.up")
+                    }
+                    .tint(.blue)
+                }
+                .contextMenu {
+                    Button { Task { await unarchive(thread) } } label: {
+                        Label("Unarchive", systemImage: "tray.and.arrow.up")
+                    }
+                }
+            }
+            if more, loaded, query.isEmpty {
+                // Keyed by the offset, so a spinner still on screen after a page asks for the next.
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .task(id: fetched) { await load(more: true) }
+            }
+        }
+        .overlay {
+            if !loaded {
+                ProgressView()
+            } else if shown.isEmpty, error == nil, !(more && query.isEmpty) {
+                ContentUnavailableView(query.isEmpty ? "Nothing archived" : "No matches", systemImage: "archivebox")
+            }
+        }
+        .searchable(text: $query, prompt: "Search loaded threads")
+        .navigationTitle("Archived")
+        .refreshable { await load() }
+        .task { if !loaded { await load() } }
+        .sensoryFeedback(.success, trigger: done)
+    }
+
+    private var shown: [ThreadEntry] {
+        query.isEmpty ? threads : threads.filter { $0.displayTitle.localizedCaseInsensitiveContains(query) }
+    }
+
+    struct Pages: Equatable {
+        var threads: [ThreadEntry]
+        var offset: Int
+        var more: Bool
+    }
+
+    /// Reads pages from `offset` until one adds a row `shown` keeps, or BB has no more.
+    /// When `shown` filters, a page can add nothing to show; stopping there would
+    /// leave the spinner row, whose task already ran, spinning for good.
+    static func fetch(
+        after existing: [ThreadEntry], offset: Int, pageSize: Int, shown: ([ThreadEntry]) -> Int,
+        page: (_ offset: Int) async throws -> [ThreadEntry]
+    ) async throws -> Pages {
+        var result = Pages(threads: existing, offset: offset, more: true)
+        let before = shown(existing)
+        repeat {
+            let next = try await page(result.offset)
+            result.offset += next.count
+            let seen = Set(result.threads.map(\.id))
+            result.threads += next.filter { !seen.contains($0.id) }
+            result.more = next.count == pageSize
+        } while result.more && shown(result.threads) == before
+        return result
+    }
+
+    private func load(more: Bool = false) async {
+        do {
+            let client = app.client
+            let pages = try await Self.fetch(
+                after: more ? threads : [], offset: more ? fetched : 0, pageSize: Self.page,
+                shown: { $0.count }
+            ) { try await client.archivedThreads(limit: Self.page, offset: $0) }
+            threads = pages.threads
+            fetched = pages.offset
+            self.more = pages.more
+            error = nil
+        } catch where BBClient.isCancellation(error) {
+        } catch {
+            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.more = false
+        }
+        loaded = true
+    }
+
+    private func unarchive(_ thread: ThreadEntry) async {
+        do {
+            try await app.client.unarchive(thread.id)
+            threads.removeAll { $0.id == thread.id }
+            fetched = max(0, fetched - 1)
+            done += 1
+        } catch {
+            self.error = BBClient.describe(error, server: app.client.baseURL)
+        }
+    }
+}

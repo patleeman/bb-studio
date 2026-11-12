@@ -1,0 +1,254 @@
+Attributes: Application, 0x1125057c0, pid: 88154, label: 'BB Studio'
+Element subtree:
+ →Application, 0x1125057c0, pid: 88154, label: 'BB Studio'
+    Window (Main), 0x112507e80, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x112507ac0, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x112507480, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x1125075c0, {{0.0, 0.0}, {402.0, 874.0}}
+          Other, 0x112506440, {{0.0, 0.0}, {402.0, 874.0}}
+            Other, 0x112506a80, {{0.0, 0.0}, {402.0, 874.0}}
+              Other, 0x112504c80, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x112507840, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x112505b80, {{0.0, 0.0}, {402.0, 874.0}}
+                    Other, 0x112507980, {{0.0, 0.0}, {402.0, 874.0}}
+                      Other, 0x112507340, {{0.0, 0.0}, {402.0, 874.0}}
+                        Other, 0x112504a00, {{0.0, 0.0}, {402.0, 874.0}}
+                          Other, 0x112505a40, {{0.0, 0.0}, {402.0, 874.0}}
+                            NavigationBar, 0x1125048c0, {{0.0, 62.0}, {402.0, 54.0}}, identifier: 'Studio'
+                              Button, 0x112504dc0, {{20.0, 66.0}, {36.0, 36.0}}, identifier: 'studioToday', label: 'Today'
+                              StaticText, 0x112504b40, {{72.0, 73.7}, {51.7, 20.7}}, label: 'Studio'
+                              Other, 0x112505900, {{206.3, 66.0}, {37.7, 36.0}}
+                                Other, 0x112505cc0, {{206.3, 66.0}, {37.7, 36.0}}
+                                  Button, 0x112505e00, {{206.3, 66.0}, {37.7, 36.0}}, label: 'New'
+                                    Button, 0x112507200, {{206.3, 66.0}, {37.7, 36.0}}
+                                      Image, 0x1125fad00, {{216.0, 75.0}, {18.0, 18.0}}, identifier: 'plus', label: 'Add'
+                              Other, 0x1125fb0c0, {{260.0, 66.0}, {44.0, 36.0}}
+                                Other, 0x1125fb200, {{260.0, 66.0}, {44.0, 36.0}}
+                                  Button, 0x1125fb840, {{260.0, 66.0}, {44.0, 36.0}}, label: 'Project'
+                                    Button, 0x1125fb340, {{260.0, 66.0}, {44.0, 36.0}}
+                                      Image, 0x1125fb480, {{269.7, 74.0}, {24.7, 20.0}}, identifier: 'folder', label: 'Move'
+                              Other, 0x1125fbc00, {{320.0, 66.0}, {62.0, 36.0}}
+                                Other, 0x1125fbac0, {{320.0, 66.0}, {62.0, 36.0}}
+                                  Button, 0x1125fb700, {{320.0, 66.0}, {62.0, 36.0}}, label: 'Select'
+                            Other, 0x1125fbe80, {{0.0, 0.0}, {402.0, 874.0}}
+                              Other, 0x1125faf80, {{0.0, 0.0}, {402.0, 874.0}}
+                                Other, 0x1125fbd40, {{0.0, 0.0}, {402.0, 874.0}}
+                                  Other, 0x1125fb5c0, {{0.0, 0.0}, {402.0, 874.0}}
+                                    CollectionView, 0x1125fae40, {{0.0, 0.0}, {402.0, 874.0}}
+                                      Other, 0x1125fb980, {{-16.0, -292.0}, {434.0, 3951.0}}
+                                      Cell, 0x112458280, {{16.0, -55.0}, {370.0, 92.7}}
+                                        Other, 0x112458140, {{16.0, -55.0}, {370.0, 92.7}}
+                                          Other, 0x112458000, {{16.0, -55.0}, {370.0, 92.7}}
+                                        Other, 0x107c5e6c0, {{16.0, -55.0}, {370.0, 92.7}}
+                                          Other, 0x107c5ef80, {{16.0, -55.0}, {370.0, 92.7}}
+                                            Other, 0x107c5d400, {{16.0, -55.0}, {370.0, 92.7}}
+                                              Button, 0x107c5e080, {{16.0, -55.0}, {370.0, 92.7}}, identifier: 'studioItem', label: 'Native Performance 20, 16 min. ago, Navigation fixture, Page'
+                                                StaticText, 0x107c5f0c0, {{32.0, -38.0}, {316.0, 58.7}}, label: 'Native Performance 20, 16 min. ago, Navigation fixture, Page'
+                                                  StaticText, 0x107c5ea80, {{80.0, -38.0}, {180.0, 20.3}}, label: 'Native Performance 20'
+                                                  Image, 0x107c5ebc0, {{43.0, -29.0}, {14.3, 18.0}}, identifier: 'doc.richtext', label: 'Rich Text Document'
+                                                  StaticText, 0x107c5e940, {{283.0, -33.0}, {65.0, 14.3}}, label: '16 min. ago'
+                                                  StaticText, 0x107c5ee40, {{80.0, -14.7}, {120.7, 18.0}}, label: 'Navigation fixture'
+                                                  StaticText, 0x107c5cf00, {{80.0, 6.3}, {28.3, 14.3}}, label: 'Page'
+                                                Image, 0x107c5dcc0, {{360.7, -14.7}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                      Other, 0x107c5e300, {{0.0, 0.0}, {402.0, 874.0}}
+                                        Other, 0x107c5de00, {{0.0, 0.0}, {402.0, 156.0}}
+                                        Other, 0x107c5d2c0, {{0.0, 741.0}, {402.0, 133.0}}
+                                      Other, 0x107c5df40, {{0.0, 0.0}, {402.0, 874.0}}
+                                        Other, 0x107c5d180, {{0.0, 0.0}, {402.0, 156.0}}
+                                        Other, 0x107c5db80, {{0.0, 741.0}, {402.0, 133.0}}
+                                      Cell, 0x107c5d900, {{16.0, 37.7}, {370.0, 92.7}}
+                                        Other, 0x107c5ed00, {{16.0, 37.7}, {370.0, 92.7}}
+                                          Other, 0x107c5e1c0, {{16.0, 37.7}, {370.0, 92.7}}
+                                        Other, 0x107c5e800, {{16.0, 37.7}, {370.0, 92.7}}
+                                          Other, 0x107c5e440, {{16.0, 37.7}, {370.0, 92.7}}
+                                            Other, 0x107c5e580, {{16.0, 37.7}, {370.0, 92.7}}
+                                              Button, 0x104e3d400, {{16.0, 37.7}, {370.0, 92.7}}, identifier: 'studioItem', label: 'Native Performance 19, 16 min. ago, Navigation fixture, Page'
+                                                StaticText, 0x1125717c0, {{32.0, 54.7}, {316.0, 58.7}}, label: 'Native Performance 19, 16 min. ago, Navigation fixture, Page'
+                                                  StaticText, 0x112571a40, {{80.0, 54.7}, {177.7, 20.3}}, label: 'Native Performance 19'
+                                                  Image, 0x112572f80, {{43.0, 63.7}, {14.3, 18.0}}, identifier: 'doc.richtext', label: 'Rich Text Document'
+                                                  StaticText, 0x112573e80, {{283.0, 59.7}, {65.0, 14.3}}, label: '16 min. ago'
+                                                  StaticText, 0x112571b80, {{80.0, 78.0}, {120.7, 18.0}}, label: 'Navigation fixture'
+                                                  StaticText, 0x112571900, {{80.0, 99.0}, {28.3, 14.3}}, label: 'Page'
+                                                Image, 0x112573ac0, {{360.7, 78.0}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                      Other, 0x112573c00, {{80.0, 36.7}, {290.0, 1.0}}
+                                      Cell, 0x112573480, {{16.0, 130.3}, {370.0, 92.7}}
+                                        Other, 0x1125730c0, {{16.0, 130.3}, {370.0, 92.7}}
+                                          Other, 0x112573d40, {{16.0, 130.3}, {370.0, 92.7}}
+                                        Other, 0x112572e40, {{16.0, 130.3}, {370.0, 92.7}}
+                                          Other, 0x1125735c0, {{16.0, 130.3}, {370.0, 92.7}}
+                                            Other, 0x112573840, {{16.0, 130.3}, {370.0, 92.7}}
+                                              Button, 0x112573200, {{16.0, 130.3}, {370.0, 92.7}}, identifier: 'studioItem', label: 'Native Performance 18, 16 min. ago, Navigation fixture, Page'
+                                                StaticText, 0x112573700, {{32.0, 147.3}, {316.0, 58.7}}, label: 'Native Performance 18, 16 min. ago, Navigation fixture, Page'
+                                                  StaticText, 0x112572d00, {{80.0, 147.3}, {178.0, 20.3}}, label: 'Native Performance 18'
+                                                  Image, 0x112571cc0, {{43.0, 156.3}, {14.3, 18.0}}, identifier: 'doc.richtext', label: 'Rich Text Document'
+                                                  StaticText, 0x112573340, {{283.0, 152.3}, {65.0, 14.3}}, label: '16 min. ago'
+                                                  StaticText, 0x112573980, {{80.0, 170.7}, {120.7, 18.0}}, label: 'Navigation fixture'
+                                                  StaticText, 0x1124ed680, {{80.0, 191.7}, {28.3, 14.3}}, label: 'Page'
+                                                Image, 0x1124ecc80, {{360.7, 170.7}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                      Other, 0x1124ed2c0, {{80.0, 129.3}, {290.0, 1.0}}
+                                      Cell, 0x1124ecdc0, {{16.0, 223.0}, {370.0, 92.7}}
+                                        Other, 0x1124ec8c0, {{16.0, 223.0}, {370.0, 92.7}}
+                                          Other, 0x1124ed180, {{16.0, 223.0}, {370.0, 92.7}}
+                                        Other, 0x1124eca00, {{16.0, 223.0}, {370.0, 92.7}}
+                                          Other, 0x112688f00, {{16.0, 223.0}, {370.0, 92.7}}
+                                            Other, 0x11268a580, {{16.0, 223.0}, {370.0, 92.7}}
+                                              Button, 0x11268b480, {{16.0, 223.0}, {370.0, 92.7}}, identifier: 'studioItem', label: 'Native Performance 17, 16 min. ago, Navigation fixture, Page'
+                                                StaticText, 0x11268a800, {{32.0, 240.0}, {316.0, 58.7}}, label: 'Native Performance 17, 16 min. ago, Navigation fixture, Page'
+                                                  StaticText, 0x112689400, {{80.0, 240.0}, {176.7, 20.3}}, label: 'Native Performance 17'
+                                                  Image, 0x11268abc0, {{43.0, 249.0}, {14.3, 18.0}}, identifier: 'doc.richtext', label: 'Rich Text Document'
+                                                  StaticText, 0x112689a40, {{283.0, 245.0}, {65.0, 14.3}}, label: '16 min. ago'
+                                                  StaticText, 0x11268b5c0, {{80.0, 263.3}, {120.7, 18.0}}, label: 'Navigation fixture'
+                                                  StaticText, 0x11268b840, {{80.0, 284.3}, {28.3, 14.3}}, label: 'Page'
+                                                Image, 0x1126897c0, {{360.7, 263.3}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                      Other, 0x112689900, {{80.0, 222.0}, {290.0, 1.0}}
+                                      Cell, 0x11268be80, {{16.0, 315.7}, {370.0, 92.7}}
+                                        Other, 0x11268a940, {{16.0, 315.7}, {370.0, 92.7}}
+                                          Other, 0x11268ae40, {{16.0, 315.7}, {370.0, 92.7}}
+                                        Other, 0x112688b40, {{16.0, 315.7}, {370.0, 92.7}}
+                                          Other, 0x11268a440, {{16.0, 315.7}, {370.0, 92.7}}
+                                            Other, 0x11268a080, {{16.0, 315.7}, {370.0, 92.7}}
+                                              Button, 0x11268a6c0, {{16.0, 315.7}, {370.0, 92.7}}, identifier: 'studioItem', label: 'Native Performance 16, 16 min. ago, Navigation fixture, Page'
+                                                StaticText, 0x11268aa80, {{32.0, 332.7}, {316.0, 58.7}}, label: 'Native Performance 16, 16 min. ago, Navigation fixture, Page'
+                                                  StaticText, 0x112688dc0, {{80.0, 332.7}, {177.7, 20.3}}, label: 'Native Performance 16'
+                                                  Image, 0x11268b700, {{43.0, 341.7}, {14.3, 18.0}}, identifier: 'doc.richtext', label: 'Rich Text Document'
+                                                  StaticText, 0x1126888c0, {{283.0, 337.7}, {65.0, 14.3}}, label: '16 min. ago'
+                                                  StaticText, 0x112689040, {{80.0, 356.0}, {120.7, 18.0}}, label: 'Navigation fixture'
+                                                  StaticText, 0x112689e00, {{80.0, 377.0}, {28.3, 14.3}}, label: 'Page'
+                                                Image, 0x11268bac0, {{360.7, 356.0}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                      Other, 0x112689680, {{80.0, 314.7}, {290.0, 1.0}}
+                                      Cell, 0x1126892c0, {{16.0, 408.3}, {370.0, 92.7}}
+                                        Other, 0x112688a00, {{16.0, 408.3}, {370.0, 92.7}}
+                                          Other, 0x112689540, {{16.0, 408.3}, {370.0, 92.7}}
+                                        Other, 0x112688c80, {{16.0, 408.3}, {370.0, 92.7}}
+                                          Other, 0x11268a1c0, {{16.0, 408.3}, {370.0, 92.7}}
+                                            Other, 0x11268b0c0, {{16.0, 408.3}, {370.0, 92.7}}
+                                              Button, 0x11268bc00, {{16.0, 408.3}, {370.0, 92.7}}, identifier: 'studioItem', label: 'Native Performance 15, 16 min. ago, Navigation fixture, Page'
+                                                StaticText, 0x11268ad00, {{32.0, 425.3}, {316.0, 58.7}}, label: 'Native Performance 15, 16 min. ago, Navigation fixture, Page'
+                                                  StaticText, 0x11268b980, {{80.0, 425.3}, {177.3, 20.3}}, label: 'Native Performance 15'
+                                                  Image, 0x11268b340, {{43.0, 434.3}, {14.3, 18.0}}, identifier: 'doc.richtext', label: 'Rich Text Document'
+                                                  StaticText, 0x11268af80, {{283.0, 430.3}, {65.0, 14.3}}, label: '16 min. ago'
+                                                  StaticText, 0x112689180, {{80.0, 448.7}, {120.7, 18.0}}, label: 'Navigation fixture'
+                                                  StaticText, 0x112689cc0, {{80.0, 469.7}, {28.3, 14.3}}, label: 'Page'
+                                                Image, 0x112689f40, {{360.7, 448.7}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                      Other, 0x11268a300, {{80.0, 407.3}, {290.0, 1.0}}
+                                      Cell, 0x11268b200, {{16.0, 501.0}, {370.0, 92.7}}
+                                        Other, 0x112689b80, {{16.0, 501.0}, {370.0, 92.7}}
+                                          Other, 0x11268bd40, {{16.0, 501.0}, {370.0, 92.7}}
+                                        Other, 0x108e68a00, {{16.0, 501.0}, {370.0, 92.7}}
+                                          Other, 0x108e6b5c0, {{16.0, 501.0}, {370.0, 92.7}}
+                                            Other, 0x108e68dc0, {{16.0, 501.0}, {370.0, 92.7}}
+                                              Button, 0x108e69400, {{16.0, 501.0}, {370.0, 92.7}}, identifier: 'studioItem', label: 'Native Performance 14, 16 min. ago, Navigation fixture, Page'
+                                                StaticText, 0x108e69040, {{32.0, 518.0}, {316.0, 58.7}}, label: 'Native Performance 14, 16 min. ago, Navigation fixture, Page'
+                                                  StaticText, 0x108e69900, {{80.0, 518.0}, {178.0, 20.3}}, label: 'Native Performance 14'
+                                                  Image, 0x108e68640, {{43.0, 527.0}, {14.3, 18.0}}, identifier: 'doc.richtext', label: 'Rich Text Document'
+                                                  StaticText, 0x108e6a080, {{283.0, 523.0}, {65.0, 14.3}}, label: '16 min. ago'
+                                                  StaticText, 0x108e6a440, {{80.0, 541.3}, {120.7, 18.0}}, label: 'Navigation fixture'
+                                                  StaticText, 0x108e692c0, {{80.0, 562.3}, {28.3, 14.3}}, label: 'Page'
+                                                Image, 0x108e68140, {{360.7, 541.3}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                      Other, 0x108e69cc0, {{80.0, 500.0}, {290.0, 1.0}}
+                                      Cell, 0x108e6b340, {{16.0, 593.7}, {370.0, 92.7}}
+                                        Other, 0x108e69540, {{16.0, 593.7}, {370.0, 92.7}}
+                                          Other, 0x108e697c0, {{16.0, 593.7}, {370.0, 92.7}}
+                                        Other, 0x108e68c80, {{16.0, 593.7}, {370.0, 92.7}}
+                                          Other, 0x108e68000, {{16.0, 593.7}, {370.0, 92.7}}
+                                            Other, 0x108e6b700, {{16.0, 593.7}, {370.0, 92.7}}
+                                              Button, 0x108e6aa80, {{16.0, 593.7}, {370.0, 92.7}}, identifier: 'studioItem', label: 'Native Performance 13, 16 min. ago, Navigation fixture, Page'
+                                                StaticText, 0x108e6abc0, {{32.0, 610.7}, {316.0, 58.7}}, label: 'Native Performance 13, 16 min. ago, Navigation fixture, Page'
+                                                  StaticText, 0x108e69f40, {{80.0, 610.7}, {177.7, 20.3}}, label: 'Native Performance 13'
+                                                  Image, 0x108e68780, {{43.0, 619.7}, {14.3, 18.0}}, identifier: 'doc.richtext', label: 'Rich Text Document'
+                                                  StaticText, 0x108e6af80, {{283.0, 615.7}, {65.0, 14.3}}, label: '16 min. ago'
+                                                  StaticText, 0x108e6ad00, {{80.0, 634.0}, {120.7, 18.0}}, label: 'Navigation fixture'
+                                                  StaticText, 0x108e6a1c0, {{80.0, 655.0}, {28.3, 14.3}}, label: 'Page'
+                                                Image, 0x108e6a940, {{360.7, 634.0}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                      Other, 0x108e6bc00, {{80.0, 592.7}, {290.0, 1.0}}
+                                      Cell, 0x108e69b80, {{16.0, 686.3}, {370.0, 92.7}}
+                                        Other, 0x108e68f00, {{16.0, 686.3}, {370.0, 92.7}}
+                                          Other, 0x108e69180, {{16.0, 686.3}, {370.0, 92.7}}
+                                        Other, 0x108e69680, {{16.0, 686.3}, {370.0, 92.7}}
+                                          Other, 0x108e69e00, {{16.0, 686.3}, {370.0, 92.7}}
+                                            Other, 0x108e6a800, {{16.0, 686.3}, {370.0, 92.7}}
+                                              Button, 0x108e6a6c0, {{16.0, 686.3}, {370.0, 92.7}}, identifier: 'studioItem', label: 'Native Performance 12, 16 min. ago, Navigation fixture, Page'
+                                                StaticText, 0x108e68b40, {{32.0, 703.3}, {316.0, 58.7}}, label: 'Native Performance 12, 16 min. ago, Navigation fixture, Page'
+                                                  StaticText, 0x108e69a40, {{80.0, 703.3}, {177.3, 20.3}}, label: 'Native Performance 12'
+                                                  Image, 0x108e6a580, {{43.0, 712.3}, {14.3, 18.0}}, identifier: 'doc.richtext', label: 'Rich Text Document'
+                                                  StaticText, 0x108e6b200, {{283.0, 708.3}, {65.0, 14.3}}, label: '16 min. ago'
+                                                  StaticText, 0x108e68500, {{80.0, 726.7}, {120.7, 18.0}}, label: 'Navigation fixture'
+                                                  StaticText, 0x108e6b480, {{80.0, 747.7}, {28.3, 14.3}}, label: 'Page'
+                                                Image, 0x108e688c0, {{360.7, 726.7}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                      Other, 0x108e6b0c0, {{80.0, 685.3}, {290.0, 1.0}}
+                                      Cell, 0x108e68280, {{16.0, 779.0}, {370.0, 92.7}}
+                                        Other, 0x108e6ae40, {{16.0, 779.0}, {370.0, 92.7}}
+                                          Other, 0x108e683c0, {{16.0, 779.0}, {370.0, 92.7}}
+                                        Other, 0x108e6a300, {{16.0, 779.0}, {370.0, 92.7}}
+                                          Other, 0x1135d4b40, {{16.0, 779.0}, {370.0, 92.7}}
+                                            Other, 0x1135d4c80, {{16.0, 779.0}, {370.0, 92.7}}
+                                              Button, 0x1135d4dc0, {{16.0, 779.0}, {370.0, 92.7}}, identifier: 'studioItem', label: 'Native Performance 11, 16 min. ago, Navigation fixture, Page'
+                                                StaticText, 0x1135d4f00, {{32.0, 796.0}, {316.0, 58.7}}, label: 'Native Performance 11, 16 min. ago, Navigation fixture, Page'
+                                                  StaticText, 0x1135d5040, {{80.0, 796.0}, {175.0, 20.3}}, label: 'Native Performance 11'
+                                                  Image, 0x1135d4500, {{43.0, 805.0}, {14.3, 18.0}}, identifier: 'doc.richtext', label: 'Rich Text Document'
+                                                  StaticText, 0x1135d4640, {{283.3, 801.0}, {64.7, 14.3}}, label: '16 min. ago'
+                                                  StaticText, 0x1135d4780, {{80.0, 819.3}, {120.7, 18.0}}, label: 'Navigation fixture'
+                                                  StaticText, 0x1135d48c0, {{80.0, 840.3}, {28.3, 14.3}}, label: 'Page'
+                                                Image, 0x1135d4a00, {{360.7, 819.3}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                      Other, 0x1135d4000, {{80.0, 778.0}, {290.0, 1.0}}
+                                      Cell, 0x1135d4140, {{16.0, 871.7}, {370.0, 92.7}}
+                                        Other, 0x1135d4280, {{16.0, 871.7}, {370.0, 92.7}}
+                                          Other, 0x1135d43c0, {{16.0, 871.7}, {370.0, 92.7}}
+                                        Other, 0x113c3e080, {{16.0, 871.7}, {370.0, 92.7}}
+                                          Other, 0x113c3e1c0, {{16.0, 871.7}, {370.0, 92.7}}
+                                            Other, 0x113c3ed00, {{16.0, 871.7}, {370.0, 92.7}}
+                                              Button, 0x113c3e940, {{16.0, 871.7}, {370.0, 92.7}}, identifier: 'studioItem', label: 'Native Performance 10, 16 min. ago, Navigation fixture, Page'
+                                                StaticText, 0x113c3ee40, {{32.0, 888.7}, {316.0, 58.7}}, label: 'Native Performance 10, 16 min. ago, Navigation fixture, Page'
+                                                  StaticText, 0x113c3db80, {{80.0, 888.7}, {177.7, 20.3}}, label: 'Native Performance 10'
+                                                  Image, 0x113c3dcc0, {{43.0, 897.7}, {14.3, 18.0}}, identifier: 'doc.richtext', label: 'Rich Text Document'
+                                                  StaticText, 0x113c3e300, {{283.0, 893.7}, {65.0, 14.3}}, label: '16 min. ago'
+                                                  StaticText, 0x113c3de00, {{80.0, 912.0}, {120.7, 18.0}}, label: 'Navigation fixture'
+                                                  StaticText, 0x113c3df40, {{80.0, 933.0}, {28.3, 14.3}}, label: 'Page'
+                                                Image, 0x113c3d540, {{360.7, 912.0}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                      Other, 0x113c3d680, {{80.0, 870.7}, {290.0, 1.0}}
+                                      Other, 0x113c3d7c0, {{369.0, 116.0}, {30.0, 675.0}}, label: 'Vertical scroll bar, 4 pages', value: 33%
+                                        Other, 0x113c3d900, {{396.0, 265.3}, {3.0, 229.0}}
+                                      Other, 0x113c3da40, {{369.0, 116.0}, {30.0, 675.0}}, label: 'Vertical scroll bar, 4 pages', value: 33%
+                                        Other, 0x113c3cf00, {{396.0, 265.3}, {3.0, 229.0}}
+                            Toolbar, 0x113c3d040, {{0.0, 0.0}, {402.0, 874.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                              Other, 0x113c3d180, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x113c3d2c0, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x113c3d400, {{0.0, 791.0}, {402.0, 83.0}}
+                    Other, 0x113c3c8c0, {{0.0, 0.0}, {402.0, 874.0}}
+                      TabBar, 0x113c3ca00, {{0.0, 791.0}, {402.0, 83.0}}, label: 'Tab Bar'
+                        Other, 0x113c3cb40, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x113c3cc80, {{21.0, 791.0}, {98.0, 54.0}}
+                          Other, 0x113c3cdc0, {{21.0, 791.0}, {360.0, 62.0}}
+                            Button, 0x113c3c280, {{25.0, 795.0}, {98.0, 54.0}}, identifier: 'house', label: 'Home'
+                              Image, 0x113c3c3c0, {{57.3, 801.0}, {33.3, 28.0}}, identifier: 'house.fill', label: 'home'
+                            Button, 0x113c3c500, {{109.7, 795.0}, {98.0, 54.0}}, identifier: 'square.stack', label: 'Studio', Selected
+                              Image, 0x113c3c640, {{145.7, 799.7}, {26.0, 32.3}}, identifier: 'square.stack.fill', label: 'Stack of squares, filled'
+                            Button, 0x113c3c780, {{194.3, 795.0}, {98.0, 54.0}}, identifier: 'globe', label: 'Web'
+                              Image, 0x113c3c000, {{229.7, 801.3}, {27.3, 27.0}}, identifier: 'globe.fill', label: 'Globe, filled'
+                            Button, 0x113c3c140, {{279.0, 795.0}, {98.0, 54.0}}, identifier: 'gear', label: 'Settings'
+                              Image, 0x113c3f0c0, {{313.0, 799.7}, {30.3, 30.3}}, identifier: 'gear', label: 'settings'
+                          Other, 0x113c3f200, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x113c3f340, {{109.7, 795.0}, {98.0, 54.0}}
+                            Other, 0x113c3e440, {{109.7, 795.0}, {98.0, 54.0}}
+                              Other, 0x113c3f480, {{109.7, 795.0}, {98.0, 54.0}}
+                              Other, 0x113c3f5c0, {{109.7, 795.0}, {98.0, 54.0}}
+                                Other, 0x113c3f700, {{109.7, 795.0}, {98.0, 54.0}}
+                                  Other, 0x113c3f840, {{109.7, 795.0}, {98.0, 54.0}}
+                                    Other, 0x113c3f980, {{109.7, 795.0}, {98.0, 54.0}}
+                                  Other, 0x113c3fac0, {{109.7, 795.0}, {98.0, 54.0}}
+                                Other, 0x113c3fc00, {{109.7, 795.0}, {98.0, 54.0}}
+                    Other, 0x113c3fd40, {{0.0, 791.0}, {402.0, 83.0}}
+                      Other, 0x113c3fe80, {{0.0, 791.0}, {402.0, 83.0}}
+                        Other, 0x113c3e6c0, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x113c3e800, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x113c3ea80, {{0.0, 791.0}, {402.0, 83.0}}
+                              Other, 0x113c3ebc0, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x113c3e580, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x114648140, {{0.0, 791.0}, {402.0, 83.0}}
+Path to element:
+ →Application, 0x1125057c0, pid: 88154, label: 'BB Studio'
+Query chain:
+ →Find: Target Application 'nyc.plee.bbgo'
+  Output: {
+    Application, 0x11464a300, pid: 88154, label: 'BB Studio'
+  }

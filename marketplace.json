@@ -1,0 +1,89 @@
+{
+  "$schema": "https://getbb.app/schemas/marketplace.schema.json",
+  "schemaVersion": 1,
+  "name": "bb-studio",
+  "displayName": "BB Studio",
+  "description": "BB Studio: one Studio plugin with pages and their whiteboards, recordings, designs, dashboards, artifacts, Code and Decisions built in, plus Mobile for iOS notifications.",
+  "plugins": [
+    {
+      "id": "studio",
+      "displayName": "Studio",
+      "description": "The home of BB Studio, with pages and their whiteboards, recordings, designs, dashboards, mini apps and artifacts built in: one collection with search, tags, project leads, item conversations, quotes, emoji reactions on replies, VS Code on each thread\u2019s worktree, and Decisions for Jev, fallback models and Smart Queue.",
+      "icon": {
+        "url": "./plugins/packages/bb-studio/icons/studio.svg"
+      },
+      "tags": [
+        "documents",
+        "drawing",
+        "design",
+        "voice",
+        "dictation",
+        "files",
+        "collaboration",
+        "bb-studio",
+        "decisions",
+        "smart-queue"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-studio.git",
+          "subdir": "plugins/packages/bb-studio",
+          "ref": "stable"
+        }
+      }
+    },
+    {
+      "id": "mobile",
+      "displayName": "Studio Mobile",
+      "description": "Part of BB Studio. The server side of the BB Studio iOS app: push notifications with lock-screen actions and muted threads.",
+      "icon": "Smartphone",
+      "tags": [
+        "mobile",
+        "notifications",
+        "ios",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-studio.git",
+          "subdir": "plugins/packages/bb-studio-mobile",
+          "ref": "stable"
+        }
+      }
+    },
+    {
+      "id": "studio-visual-chat",
+      "displayName": "BB Studio Visual Chat",
+      "description": "Part of BB Studio (prototype). Visual Chat: talk with an agent that answers on a board it designs each turn, with pictures, charts and numbers that animate as they change. Off unless you install it.",
+      "icon": "GridView",
+      "tags": [
+        "visual-chat",
+        "canvas",
+        "visualization",
+        "charts",
+        "voice",
+        "prototype",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-studio.git",
+          "subdir": "plugins/packages/bb-studio-visual-chat",
+          "ref": "stable"
+        }
+      }
+    }
+  ]
+}

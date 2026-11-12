@@ -1,0 +1,60 @@
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "0025F620-2473-48AA-BCD7-AC9BBF53E7E6",
+        "deviceName" : "BBArtifactEdgePrivate",
+        "modelName" : "iPhone 18 Pro",
+        "osBuildNumber" : "24A434",
+        "osVersion" : "27.0",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 2,
+      "passedTests" : 1,
+      "skippedTests" : 0,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription" : "BBStudio · Built with macOS 26.6.2",
+  "expectedFailures" : 0,
+  "failedTests" : 2,
+  "finishTime" : 1791014068.861,
+  "passedTests" : 1,
+  "result" : "Failed",
+  "runtimeWarnings" : [
+
+  ],
+  "skippedTests" : 0,
+  "startTime" : 1791013941.793,
+  "statistics" : [
+
+  ],
+  "testFailures" : [
+    {
+      "failureText" : "XCTAssertTrue failed",
+      "targetName" : "BBStudioUITests",
+      "testIdentifier" : 1,
+      "testIdentifierString" : "ArtifactRuntimeUITests/testCorruptHeaderPDFShowsRecoveryAction()",
+      "testIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ArtifactRuntimeUITests/testCorruptHeaderPDFShowsRecoveryAction",
+      "testName" : "testCorruptHeaderPDFShowsRecoveryAction()"
+    },
+    {
+      "failureText" : "XCTAssertTrue failed",
+      "targetName" : "BBStudioUITests",
+      "testIdentifier" : 2,
+      "testIdentifierString" : "ArtifactRuntimeUITests/testDelayedVersionCannotReplaceSelection()",
+      "testIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ArtifactRuntimeUITests/testDelayedVersionCannotReplaceSelection",
+      "testName" : "testDelayedVersionCannotReplaceSelection()"
+    }
+  ],
+  "title" : "Test - BBStudio",
+  "topInsights" : [
+
+  ],
+  "totalTestCount" : 3
+}

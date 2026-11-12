@@ -1,0 +1,87 @@
+Attributes: Application, 0x105b9f200, pid: 85498, label: 'BB Studio'
+Element subtree:
+ →Application, 0x105b9f200, pid: 85498, label: 'BB Studio'
+    Window (Main), 0x105b9f340, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x105b9f0c0, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x105b9f480, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x105b9f700, {{0.0, 0.0}, {402.0, 874.0}}
+          Other, 0x105b9f840, {{0.0, 0.0}, {402.0, 874.0}}
+            Other, 0x105b9f5c0, {{0.0, 0.0}, {402.0, 874.0}}
+              Other, 0x105b9f980, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x105b9fac0, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x105b9fd40, {{0.0, 0.0}, {402.0, 874.0}}
+                    Other, 0x105b9fe80, {{0.0, 0.0}, {402.0, 874.0}}
+                      Other, 0x105b9fc00, {{0.0, 0.0}, {402.0, 874.0}}
+                        Other, 0x105b9c500, {{0.0, 0.0}, {402.0, 874.0}}
+                          Other, 0x105b9c3c0, {{0.0, 0.0}, {402.0, 874.0}}
+                            NavigationBar, 0x105b9cdc0, {{0.0, 62.0}, {402.0, 54.0}}, identifier: 'Edge header corrupt'
+                              Button, 0x105b9cf00, {{16.0, 62.0}, {44.0, 44.0}}, identifier: 'BackButton', label: 'Studio'
+                              StaticText, 0x105b9cc80, {{72.0, 73.7}, {141.3, 20.7}}, label: 'Edge header corrupt'
+                              Button, 0x105b9d040, {{229.3, 66.0}, {41.7, 36.0}}, label: 'Related'
+                              Other, 0x105b9d680, {{287.0, 66.0}, {39.0, 36.0}}
+                                Other, 0x105b9d180, {{287.0, 66.0}, {39.0, 36.0}}
+                                  Button, 0x105b9d900, {{287.0, 66.0}, {39.0, 36.0}}, identifier: 'square.and.arrow.up', label: 'Share'
+                              Other, 0x105b9da40, {{342.0, 66.0}, {40.0, 36.0}}
+                                Other, 0x105b9db80, {{342.0, 66.0}, {40.0, 36.0}}
+                                  Button, 0x105b9de00, {{342.0, 66.0}, {40.0, 36.0}}, label: 'More'
+                                    Button, 0x105b9dcc0, {{342.0, 66.0}, {40.0, 36.0}}
+                                      Image, 0x105b9e080, {{351.0, 73.0}, {22.0, 22.0}}, identifier: 'ellipsis.circle', label: 'More'
+                            Other, 0x105b9e1c0, {{0.0, 0.0}, {402.0, 874.0}}
+                              Other, 0x105b9df40, {{0.0, 0.0}, {402.0, 874.0}}
+                                Other, 0x105b9e300, {{0.0, 0.0}, {402.0, 874.0}}
+                                  Other, 0x105b9e580, {{0.0, 0.0}, {402.0, 874.0}}
+                                    WebView, 0x105b9e6c0, {{0.0, 116.0}, {402.0, 758.0}}
+                                      WebView, 0x105b9e940, {{0.0, 116.0}, {402.0, 758.0}}
+                                        Other, 0x105b9e800, {{0.0, 116.0}, {402.0, 758.0}}
+                                          Other, 0x105b9ea80, {{0.0, 741.0}, {402.0, 133.0}}
+                                        Other, 0x105b9ebc0, {{0.0, 116.0}, {402.0, 758.0}}
+                                        Other, 0x105b9ee40, {{369.0, 116.0}, {30.0, 675.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                                          Other, 0x105b9ed00, {{396.0, 781.0}, {3.0, 7.0}}
+                                        Other, 0x105a17480, {{62.0, 758.0}, {278.0, 30.0}}, label: 'Horizontal scroll bar, 1 page', value: 0%
+                                          Other, 0x105a17700, {{334.3, 785.0}, {7.0, 3.0}}
+                                        Other, 0x105a17840, {{369.0, 116.0}, {30.0, 675.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                                          Other, 0x105a175c0, {{396.0, 781.0}, {3.0, 7.0}}
+                                        Other, 0x105a14780, {{62.0, 758.0}, {278.0, 30.0}}, label: 'Horizontal scroll bar, 1 page', value: 0%
+                                          Other, 0x105a14f00, {{334.3, 785.0}, {7.0, 3.0}}
+                            Toolbar, 0x109a58000, {{0.0, 0.0}, {402.0, 874.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                              Other, 0x109a58140, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x109a58280, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x109a583c0, {{0.0, 791.0}, {402.0, 83.0}}
+                    Other, 0x109a58500, {{0.0, 0.0}, {402.0, 874.0}}
+                      TabBar, 0x109a58640, {{0.0, 791.0}, {402.0, 83.0}}, label: 'Tab Bar'
+                        Other, 0x109a58780, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x109a588c0, {{21.0, 791.0}, {98.0, 54.0}}
+                          Other, 0x109a58a00, {{21.0, 791.0}, {360.0, 62.0}}
+                            Button, 0x109a58b40, {{25.0, 795.0}, {98.0, 54.0}}, label: 'Home'
+                              Image, 0x109a58c80, {{57.3, 801.0}, {33.3, 28.0}}, identifier: 'house.fill', label: 'home'
+                            Button, 0x109a58dc0, {{109.7, 795.0}, {98.0, 54.0}}, label: 'Studio', Selected
+                              Image, 0x109a58f00, {{145.7, 799.7}, {26.0, 32.3}}, identifier: 'square.stack.fill', label: 'Stack of squares, filled'
+                            Button, 0x109a59040, {{194.3, 795.0}, {98.0, 54.0}}, label: 'Web'
+                              Image, 0x109a59180, {{229.7, 801.3}, {27.3, 27.0}}, identifier: 'globe.fill', label: 'Globe, filled'
+                            Button, 0x109a592c0, {{279.0, 795.0}, {98.0, 54.0}}, label: 'Settings'
+                              Image, 0x109a59400, {{313.0, 799.7}, {30.3, 30.3}}, identifier: 'gear', label: 'settings'
+                          Other, 0x109a59540, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x109a59680, {{109.7, 795.0}, {98.0, 54.0}}
+                            Other, 0x109a597c0, {{109.7, 795.0}, {98.0, 54.0}}
+                              Other, 0x109a59900, {{109.7, 795.0}, {98.0, 54.0}}
+                              Other, 0x109a59a40, {{109.7, 795.0}, {98.0, 54.0}}
+                                Other, 0x109a59b80, {{109.7, 795.0}, {98.0, 54.0}}
+                                  Other, 0x109a59cc0, {{109.7, 795.0}, {98.0, 54.0}}
+                                    Other, 0x109a59e00, {{109.7, 795.0}, {98.0, 54.0}}
+                                  Other, 0x109a59f40, {{109.7, 795.0}, {98.0, 54.0}}
+                                Other, 0x109a5a080, {{109.7, 795.0}, {98.0, 54.0}}
+                    Other, 0x109a5a1c0, {{0.0, 791.0}, {402.0, 83.0}}
+                      Other, 0x109a5a300, {{0.0, 791.0}, {402.0, 83.0}}
+                        Other, 0x109a5a440, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x109a5a580, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x109a5a6c0, {{0.0, 791.0}, {402.0, 83.0}}
+                              Other, 0x109a5a800, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x109a5a940, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x109a5aa80, {{0.0, 791.0}, {402.0, 83.0}}
+Path to element:
+ →Application, 0x105b9f200, pid: 85498, label: 'BB Studio'
+Query chain:
+ →Find: Target Application 'nyc.plee.bbgo'
+  Output: {
+    Application, 0x109a5abc0, pid: 85498, label: 'BB Studio'
+  }

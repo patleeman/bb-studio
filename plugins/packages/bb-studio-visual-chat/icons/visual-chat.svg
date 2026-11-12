@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <title>Visual Chat</title>
+  <!-- A board of tiles where the biggest tile is speaking: a chat that answers on a board. -->
+  <path d="M2.5 6C2.5 4.34 3.84 3 5.5 3H10.5C12.16 3 13.5 4.34 13.5 6V14.5C13.5 16.16 12.16 17.5 10.5 17.5H9L6.66 20.62C6.25 21.17 5.5 20.88 5.5 20.2V17.5C3.84 17.5 2.5 16.16 2.5 14.5V6Z"/>
+  <rect x="16.5" y="3" width="5" height="7" rx="2"/>
+  <rect x="16.5" y="13" width="5" height="8" rx="2"/>
+</svg>

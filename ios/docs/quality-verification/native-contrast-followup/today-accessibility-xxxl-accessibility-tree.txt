@@ -1,0 +1,114 @@
+Attributes: Application, 0x110309040, pid: 29247, label: 'BB Studio'
+Element subtree:
+ →Application, 0x110309040, pid: 29247, label: 'BB Studio'
+    Window (Main), 0x110309180, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x1103092c0, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x110309400, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x110309540, {{0.0, 0.0}, {402.0, 874.0}}
+          Other, 0x110309680, {{0.0, 0.0}, {402.0, 874.0}}
+            Other, 0x1103097c0, {{0.0, 0.0}, {402.0, 874.0}}
+              Other, 0x110309900, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x110309a40, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x110309b80, {{0.0, 0.0}, {402.0, 874.0}}
+                    Other, 0x110309cc0, {{0.0, 0.0}, {402.0, 874.0}}
+                      Other, 0x110309e00, {{0.0, 0.0}, {402.0, 874.0}}
+                        Other, 0x110309f40, {{0.0, 0.0}, {402.0, 874.0}}
+                          Other, 0x11030a080, {{0.0, 0.0}, {402.0, 874.0}}
+                            NavigationBar, 0x11030b340, {{0.0, 62.0}, {402.0, 127.0}}, identifier: 'Today'
+                              Button, 0x11030a1c0, {{346.0, 66.0}, {36.0, 36.0}}, identifier: 'studioCollection', label: 'Collection'
+                              StaticText, 0x11030a300, {{16.0, 116.0}, {165.7, 71.7}}, label: 'Today'
+                            Other, 0x11030a440, {{0.0, 0.0}, {402.0, 874.0}}
+                              Other, 0x11030a580, {{0.0, 0.0}, {402.0, 874.0}}
+                                Other, 0x11030a6c0, {{0.0, 0.0}, {402.0, 874.0}}
+                                  Other, 0x11030a800, {{0.0, 0.0}, {402.0, 874.0}}
+                                    CollectionView, 0x11030a940, {{0.0, 0.0}, {402.0, 874.0}}
+                                      Other, 0x11030aa80, {{-16.0, -1559.0}, {434.0, 2687.0}}
+                                      Other, 0x11030abc0, {{0.0, 0.0}, {402.0, 874.0}}
+                                        Other, 0x11030ad00, {{0.0, 0.0}, {402.0, 156.0}}
+                                        Other, 0x11030ae40, {{0.0, 741.0}, {402.0, 133.0}}
+                                      Other, 0x11030af80, {{0.0, 0.0}, {402.0, 874.0}}
+                                        Other, 0x11030b0c0, {{0.0, 741.0}, {402.0, 133.0}}
+                                      Cell, 0x11030b200, {{16.0, 189.0}, {370.0, 145.3}}
+                                        Other, 0x11030b480, {{16.0, 189.0}, {370.0, 145.3}}
+                                        Other, 0x11030b5c0, {{16.0, 189.0}, {370.0, 145.3}}
+                                          Other, 0x11030b700, {{16.0, 189.0}, {370.0, 145.3}}
+                                            Other, 0x11030b840, {{16.0, 189.0}, {370.0, 145.3}}
+                                              StaticText, 0x11030b980, {{16.0, 189.0}, {370.0, 145.3}}, label: 'Agents working now'
+                                      Cell, 0x11030bac0, {{16.0, 334.3}, {370.0, 279.3}}
+                                        Other, 0x11030bc00, {{16.0, 334.3}, {370.0, 279.3}}
+                                          Other, 0x11030bd40, {{16.0, 334.3}, {370.0, 279.3}}
+                                        Other, 0x11030be80, {{16.0, 334.3}, {370.0, 279.3}}
+                                          Other, 0x106ea9400, {{16.0, 334.3}, {370.0, 279.3}}
+                                            Other, 0x106ea9540, {{16.0, 334.3}, {370.0, 279.3}}
+                                              Button, 0x106eab340, {{16.0, 334.3}, {370.0, 279.3}}, label: 'Plan the Friday release window'
+                                                StaticText, 0x106eab480, {{43.0, 349.3}, {265.0, 249.3}}, label: 'Plan the Friday release window'
+                                                Image, 0x106eab5c0, {{43.0, 361.0}, {45.3, 42.7}}, identifier: 'bubble.left', label: 'Comment Left'
+                                                Image, 0x106eabac0, {{339.7, 455.3}, {21.7, 37.3}}, identifier: 'chevron.forward'
+                                      Cell, 0x106eabc00, {{16.0, 613.7}, {370.0, 217.3}}
+                                        Other, 0x106eab700, {{16.0, 613.7}, {370.0, 217.3}}
+                                          Other, 0x106eab840, {{16.0, 613.7}, {370.0, 217.3}}
+                                        Other, 0x106eab980, {{16.0, 613.7}, {370.0, 217.3}}
+                                          Other, 0x106ea9680, {{16.0, 613.7}, {370.0, 217.3}}
+                                            Other, 0x106ea97c0, {{16.0, 613.7}, {370.0, 217.3}}
+                                              Button, 0x106ea9900, {{16.0, 613.7}, {370.0, 217.3}}, label: 'Review the launch checklist'
+                                                StaticText, 0x106eaa800, {{43.0, 628.7}, {245.3, 187.3}}, label: 'Review the launch checklist'
+                                                Image, 0x106eaa940, {{43.0, 640.3}, {45.3, 42.7}}, identifier: 'bubble.left', label: 'Comment Left'
+                                                Image, 0x106eaabc0, {{339.7, 703.7}, {21.7, 37.3}}, identifier: 'chevron.forward'
+                                      Other, 0x106eab200, {{32.0, 612.7}, {338.0, 1.0}}
+                                      Cell, 0x106eaad00, {{16.0, 831.0}, {370.0, 279.3}}
+                                        Other, 0x106eab0c0, {{16.0, 831.0}, {370.0, 279.3}}
+                                          Other, 0x106eaae40, {{16.0, 831.0}, {370.0, 279.3}}
+                                        Other, 0x106eaaf80, {{16.0, 831.0}, {370.0, 279.3}}
+                                          Other, 0x106eaaa80, {{16.0, 831.0}, {370.0, 279.3}}
+                                            Other, 0x106eaa6c0, {{16.0, 831.0}, {370.0, 279.3}}
+                                              Button, 0x106ea9b80, {{16.0, 831.0}, {370.0, 279.3}}, label: 'Draft the ORBIT-42 release notes'
+                                                StaticText, 0x106eaa440, {{43.0, 846.0}, {274.3, 249.3}}, label: 'Draft the ORBIT-42 release notes'
+                                                Image, 0x106eaa580, {{43.0, 857.7}, {45.3, 42.7}}, identifier: 'bubble.left', label: 'Comment Left'
+                                                Image, 0x106eaa1c0, {{339.7, 952.0}, {21.7, 37.3}}, identifier: 'chevron.forward'
+                                      Other, 0x106eaa300, {{32.0, 830.0}, {338.0, 1.0}}
+                                      Other, 0x106ea9f40, {{369.0, 116.0}, {30.0, 675.0}}, label: 'Vertical scroll bar, 4 pages', value: 0%
+                                        Other, 0x106eaa080, {{396.0, 781.0}, {3.0, 7.0}}
+                                      Other, 0x106ea9cc0, {{369.0, 116.0}, {30.0, 675.0}}, label: 'Vertical scroll bar, 4 pages', value: 0%
+                                        Other, 0x106ea9e00, {{396.0, 781.0}, {3.0, 7.0}}
+                            Toolbar, 0x106ea9a40, {{0.0, 0.0}, {402.0, 874.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                              Other, 0x106ea9180, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x106ea92c0, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x106ea8f00, {{0.0, 791.0}, {402.0, 83.0}}
+                    Other, 0x106ea9040, {{0.0, 0.0}, {402.0, 874.0}}
+                      TabBar, 0x106ea8c80, {{0.0, 791.0}, {402.0, 83.0}}, label: 'Tab Bar'
+                        Other, 0x106ea8dc0, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x106ea8000, {{21.0, 791.0}, {98.0, 54.0}}
+                          Other, 0x106ea8140, {{21.0, 791.0}, {360.0, 62.0}}
+                            Button, 0x106ea8280, {{25.0, 795.0}, {98.0, 54.0}}, identifier: 'house', label: 'Home'
+                              Image, 0x106ea8b40, {{57.3, 801.0}, {33.3, 28.0}}, identifier: 'house.fill', label: 'home'
+                            Button, 0x106ea83c0, {{109.7, 795.0}, {98.0, 54.0}}, identifier: 'square.stack', label: 'Studio', Selected
+                              Image, 0x106ea8a00, {{145.7, 799.7}, {26.0, 32.3}}, identifier: 'square.stack.fill', label: 'Stack of squares, filled'
+                            Button, 0x106ea88c0, {{194.3, 795.0}, {98.0, 54.0}}, identifier: 'globe', label: 'Web'
+                              Image, 0x106ea8780, {{229.7, 801.3}, {27.3, 27.0}}, identifier: 'globe.fill', label: 'Globe, filled'
+                            Button, 0x106ea8640, {{279.0, 795.0}, {98.0, 54.0}}, identifier: 'gear', label: 'Settings'
+                              Image, 0x106ea8500, {{313.0, 799.7}, {30.3, 30.3}}, identifier: 'gear', label: 'settings'
+                          Other, 0x105859a40, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x10585b200, {{109.7, 795.0}, {98.0, 54.0}}
+                            Other, 0x105858500, {{109.7, 795.0}, {98.0, 54.0}}
+                              Other, 0x10585b480, {{109.7, 795.0}, {98.0, 54.0}}
+                              Other, 0x105858dc0, {{109.7, 795.0}, {98.0, 54.0}}
+                                Other, 0x105859040, {{109.7, 795.0}, {98.0, 54.0}}
+                                  Other, 0x105858f00, {{109.7, 795.0}, {98.0, 54.0}}
+                                    Other, 0x10585ae40, {{109.7, 795.0}, {98.0, 54.0}}
+                                  Other, 0x10585abc0, {{109.7, 795.0}, {98.0, 54.0}}
+                                Other, 0x105859180, {{109.7, 795.0}, {98.0, 54.0}}
+                    Other, 0x105858780, {{0.0, 791.0}, {402.0, 83.0}}
+                      Other, 0x10585b340, {{0.0, 791.0}, {402.0, 83.0}}
+                        Other, 0x10585b0c0, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x10585bc00, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x10585af80, {{0.0, 791.0}, {402.0, 83.0}}
+                              Other, 0x1058583c0, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x10585bac0, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x10585be80, {{0.0, 791.0}, {402.0, 83.0}}
+Path to element:
+ →Application, 0x110309040, pid: 29247, label: 'BB Studio'
+Query chain:
+ →Find: Target Application 'nyc.plee.bbgo'
+  Output: {
+    Application, 0x10585bd40, pid: 29247, label: 'BB Studio'
+  }

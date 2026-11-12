@@ -1,0 +1,13 @@
+#!/bin/sh
+added=$(git diff --cached --name-only --diff-filter=A -z | tr '\0' '\n' | grep -iE '\.(png|jpe?g|gif|webp|avif|heic|tiff?|bmp|mov|mp4|webm|m4v)$' || true)
+[ -z "$added" ] && exit 0
+case "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" in
+  main) skip='^desktop/' ;;
+  *) skip='^$' ;;
+esac
+blocked=$(printf '%s\n' "$added" | grep -vE "$skip" | grep -vE '(^|/)(assets|public|brand|icons|textures|fonts)/|\.xcassets/' || true)
+[ -z "$blocked" ] && exit 0
+echo "pre-commit: screenshots, captures and review evidence are not committed. Put them in ~/workingdir/.bb-studio-plan/." >&2
+echo "Product images go under an assets/, public/, brand/, icons/, textures/ or fonts/ folder, or an .xcassets catalog." >&2
+printf '  %s\n' $blocked >&2
+exit 1

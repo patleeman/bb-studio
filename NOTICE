@@ -1,0 +1,104 @@
+BB Studio
+Copyright (c) 2026 Patrick Lee
+
+BB Studio includes bb (https://github.com/get-bb/bb),
+Copyright (c) 2026 Michael Yong, MIT License.
+desktop/ is a fork of bb. Its history descends from get-bb/bb; the fork was
+first imported here on upstream commit 7c1353d80729983b86ea1555d18b42407f320406.
+The current upstream base is named in the subject of the newest
+"desktop: import" commit on main. bb's license is desktop/LICENSE, unchanged.
+
+Third-party work used by the Studio plugins (plugins/packages/bb-studio)
+=========================================================================
+
+The full record, with the changes made to each palette and the methods, is
+plugins/packages/bb-studio/docs/theme-credits.md.
+
+Theme palettes (hex values read from the sources on 2026-11-11)
+
+  bb Default        https://github.com/get-bb/bb
+                    MIT. Copyright (c) 2026 Michael Yong
+  One Dark          https://github.com/atom/atom (packages/one-dark-syntax,
+                    packages/one-dark-ui)
+                    MIT. Copyright (c) 2016 GitHub Inc. (one-dark-syntax);
+                    Copyright (c) 2014 GitHub Inc. (one-dark-ui)
+  Dracula           https://draculatheme.com/spec and
+                    https://github.com/dracula/visual-studio-code
+                    MIT. Copyright (c) 2023 Dracula Theme (dracula-theme);
+                    Copyright (c) 2016 Dracula Theme (visual-studio-code)
+  Solarized Light   https://github.com/altercation/solarized
+                    MIT. Copyright (c) 2011 Ethan Schoonover
+  GitHub Light,     https://github.com/primer/github-vscode-theme
+  GitHub Dark       MIT. Copyright (c) 2020 Primer
+  Nord              https://github.com/nordtheme/nord
+                    MIT. Copyright (c) 2016-present Sven Greb
+  Catppuccin Mocha  https://github.com/catppuccin/palette (v1.8.0)
+                    MIT. Copyright (c) 2021 Catppuccin
+
+Bundled font
+
+  Jost (variable, Latin subset), embedded in the Studio app bundle
+                    https://github.com/indestructible-type/Jost
+                    SIL Open Font License 1.1. Copyright 2020 The Jost Project
+                    Authors (https://github.com/indestructible-type)
+                    License text:
+                    plugins/packages/bb-studio/src/theme/fonts/Jost-OFL.txt
+  All other theme fonts are system fonts named in a font stack; they are not
+  bundled. bb itself ships Inter Variable (@fontsource-variable/inter).
+
+Bundled code and data
+
+  Astronomy Engine 2.1.19 (npm astronomy-engine)
+                    https://github.com/cosinekitty/astronomy
+                    MIT. Copyright (c) 2019-2023 Don Cross
+  Yale Bright Star Catalogue, 5th Revised Ed. (Preliminary Version),
+  Hoffleit D., Warren Jr W.H., 1991 (ADC/CDS catalog V/50)
+                    http://tdc-www.harvard.edu/catalogs/bsc5.dat.gz
+                    Public domain; no copyright is claimed on the catalog.
+                    Yale University Observatory; distributed by the
+                    Astronomical Data Center (NSSDC/ADC)
+  d3-celestial constellation lines, names and label spots (commit 7e720a3)
+                    https://github.com/ofrohn/d3-celestial
+                    BSD-3-Clause. Copyright (c) 2015, Olaf Frohn.
+                    All rights reserved.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met:
+    1. Redistributions of source code must retain the above copyright notice,
+       this list of conditions and the following disclaimer.
+    2. Redistributions in binary form must reproduce the above copyright
+       notice, this list of conditions and the following disclaimer in the
+       documentation and/or other materials provided with the distribution.
+    3. Neither the name of the copyright holder nor the names of its
+       contributors may be used to endorse or promote products derived from
+       this software without specific prior written permission.
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+    THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+    PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+    CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+    EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+    PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+    PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+    LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+    NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+  International Meteor Organization working list of visual meteor showers
+                    https://www.imo.net/resources/calendar/
+                    Facts typed in by hand; no file is bundled.
+
+Data read at run time
+
+  Open-Meteo        https://open-meteo.com/ (Forecast and Geocoding APIs)
+                    Data CC BY 4.0. Weather data by Open-Meteo.com.
+                    The free API is for non-commercial use; check the terms
+                    before any paid distribution.
+  tz database       zone1970.tab / zone.tab on the user's computer
+                    Public domain.
+
+Methods
+
+  The Forest theme's sun position uses the low-precision solar coordinates of
+  the Astronomical Almanac.

@@ -1,0 +1,21 @@
+import WidgetKit
+
+/// Asks the home and lock screen widgets to redraw when the counts they show change.
+@MainActor
+enum StatusWidgets {
+    private static var lastKey = ""
+
+    static func reset() {
+        lastKey = ""
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    static func reloadIfChanged(_ threads: [ThreadEntry], needs: NeedsYouCount? = nil) {
+        let summary = ThreadSummary(threads)
+        let key = (summary.needsYou + summary.running).map { "\($0.id):\($0.status)" }.joined(separator: ",")
+            + "|\(needs?.count ?? -1):\(needs?.reason ?? "")"
+        guard key != lastKey else { return }
+        lastKey = key
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+}

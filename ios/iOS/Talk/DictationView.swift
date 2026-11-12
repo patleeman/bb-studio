@@ -1,0 +1,272 @@
+import SwiftUI
+
+/// Records into Talk and hands back the transcript. With `onInsert` the text
+/// goes straight into the caller's field when you finish; otherwise it can be
+/// sent, turned into a thread, or copied. The recording stays in Talk either way.
+struct DictationView: View {
+    @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var recorder = TalkRecorder(client: AppModel.shared.client)
+    @ObservedObject private var outbox = TalkOutbox.shared
+    let threadId: String?
+    let autoStart: Bool
+    var kind = "dictation"
+    var onInsert: ((String) -> Void)?
+    /// Label and symbol for the `onInsert` button.
+    var insertLabel = ("Insert", "text.insert")
+    /// The calling composer's Send, held until the words are in its field.
+    var gate: DictationGate?
+    @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
+
+    @StateObject private var submission = DictationSubmission()
+    @State private var text = ""
+    @State private var creatingThread = false
+    @State private var savingPage = false
+    @State private var saveError: String?
+
+    init(
+        threadId: String?, autoStart: Bool, kind: String = "dictation", insertLabel: (String, String) = ("Insert", "text.insert"),
+        gate: DictationGate? = nil, onInsert: ((String) -> Void)? = nil
+    ) {
+        self.threadId = threadId
+        self.autoStart = autoStart
+        self.kind = kind
+        self.insertLabel = insertLabel
+        self.onInsert = onInsert
+        self.gate = gate
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                switch recorder.phase {
+                case .idle:
+                    Spacer()
+                    recordButton
+                    Spacer()
+                case .recording:
+                    Spacer()
+                    if let startedAt = recorder.startedAt {
+                        Text(startedAt, style: .timer).font(.system(size: 48, weight: .light).monospacedDigit())
+                    }
+                    LevelMeter(level: recorder.level).frame(height: 60)
+                    if let input = recorder.silentInput {
+                        Label("No sound from \(input)", systemImage: "mic.slash")
+                            .font(.callout)
+                            .foregroundStyle(.orange)
+                            .accessibilityIdentifier("dictationSilent")
+                    }
+                    if outbox.pending > 0 { Text("\(outbox.pending) segment(s) uploading").font(.caption) }
+                    Spacer()
+                    HStack(spacing: 40) {
+                        Button(role: .cancel) {
+                            Task { if await recorder.cancel() { operation.complete(on: app) { dismiss() } } }
+                        } label: { circle("xmark", .gray) }
+                        Button { Task { await finish() } } label: { circle("checkmark", .green) }
+                    }
+                case .finishing:
+                    Spacer()
+                    ProgressView(recorder.needsRecovery ? "Saving audio…" : "Transcribing…")
+                    if !recorder.transcript.isEmpty { Text(recorder.transcript).foregroundStyle(.secondary) }
+                    Spacer()
+                case .done:
+                    TextEditor(text: $text)
+                        .scrollContentBackground(.hidden)
+                        .padding(8)
+                        .background(.fill.tertiary, in: .rect(cornerRadius: 12))
+                    actions
+                case .failed(let message):
+                    Spacer()
+                    Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
+                    if recorder.needsRecovery {
+                        Button("Retry saving") { Task { await finish() } }
+                            .buttonStyle(.borderedProminent)
+                    } else {
+                        recordButton
+                    }
+                    Spacer()
+                }
+            }
+            .padding()
+            .navigationTitle(kind == "recording" ? "Recording" : "Dictation")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        Task { if await recorder.cancel() { operation.complete(on: app) { dismiss() } } }
+                    }
+                }
+            }
+            .sheet(isPresented: $creatingThread) { NewThreadView(text: text) }
+        }
+        .interactiveDismissDisabled(recorder.phase == .recording || recorder.needsRecovery || recorder.starting)
+        .task {
+            #if DEBUG
+            if StateDemo.variant == "dictation" {
+                recorder.showDemoTranscript(StateDemo.transcript)
+                text = StateDemo.transcript
+                return
+            }
+            #endif
+            if autoStart { await recorder.start(kind: kind, threadId: threadId) }
+        }
+        .onChange(of: recorder.phase, initial: true) { _, phase in
+            if let event = DictationState.sheet(phase) { gate?.handle(event) }
+        }
+        // Closed, cancelled or swiped away: Send is free again.
+        .onDisappear { gate?.handle(.cancelled(.sheet)) }
+    }
+
+    /// A field that asked for dictation gets the text right away and is where
+    /// it gets edited, so only standalone dictation stops to review.
+    private func finish() async {
+        let spoken = (await recorder.finish() ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard client.baseURL == app.serverURL else { return }
+        if let onInsert, !spoken.isEmpty {
+            onInsert(spoken)
+            gate?.handle(.inserted(.sheet))
+            operation.complete(on: app) { dismiss() }
+        } else {
+            text = spoken
+        }
+    }
+
+    private var recordButton: some View {
+        Button { Task { await recorder.start(kind: kind, threadId: threadId) } } label: { circle("mic.fill", .red) }
+    }
+
+    @ViewBuilder
+    private var actions: some View {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        VStack(spacing: 12) {
+            if let onInsert {
+                Button {
+                    onInsert(trimmed)
+                    gate?.handle(.inserted(.sheet))
+                    operation.complete(on: app) { dismiss() }
+                } label: { wide(insertLabel.0, insertLabel.1) }
+                .buttonStyle(.borderedProminent)
+            } else if let threadId {
+                Button {
+                    Task {
+                        if await submission.send(trimmed, to: threadId, client: client) {
+                            operation.complete(on: app) { dismiss() }
+                        }
+                    }
+                } label: {
+                    if submission.sending { ProgressView().frame(maxWidth: .infinity) } else { wide("Send to thread", "paperplane.fill") }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(submission.sending)
+                .accessibilityLabel(submission.sending ? "Sending to thread" : "Send to thread")
+                if let error = submission.error { failure(error) }
+            } else if runningPlugins.split(separator: ",").contains("studio") {
+                Button { Task { await saveAsPage(trimmed) } } label: {
+                    if savingPage { ProgressView().frame(maxWidth: .infinity) } else { wide("Save as Page", "doc.richtext") }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(savingPage)
+                if let saveError { failure(saveError) }
+            }
+            HStack {
+                Button { creatingThread = true } label: { wide("New thread", "square.and.pencil") }
+                Button {
+                    UIPasteboard.general.string = trimmed
+                    operation.complete(on: app) { dismiss() }
+                } label: { wide("Copy", "doc.on.doc") }
+            }
+            .buttonStyle(.bordered)
+        }
+        .disabled(trimmed.isEmpty)
+    }
+
+    private func saveAsPage(_ markdown: String) async {
+        savingPage = true
+        defer { savingPage = false }
+        do {
+            let page = try await client.createPage(title: PageTitle.from(markdown), markdown: markdown)
+            operation.complete(on: app) { dismiss() }
+            operation.complete(on: app) { app.openPage(page.id) }
+        } catch {
+            saveError = BBClient.describe(error, server: client.baseURL)
+        }
+    }
+
+    private func circle(_ symbol: String, _ color: Color) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 32, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 84, height: 84)
+            .background(color, in: .circle)
+    }
+
+    /// Why the last action failed, under its button. The text stays, so it can be tried again.
+    private func failure(_ message: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+            Text(message)
+        }
+        .font(.footnote)
+        .foregroundStyle(.red)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func wide(_ title: String, _ symbol: String) -> some View {
+        Label(title, systemImage: symbol).frame(maxWidth: .infinity)
+    }
+}
+
+struct LevelMeter: View {
+    let level: Float
+    @State private var history: [Float] = Array(repeating: 0, count: 40)
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 3) {
+            ForEach(Array(history.enumerated()), id: \.offset) { _, value in
+                Capsule()
+                    .fill(.red.opacity(0.8))
+                    .frame(width: 4, height: max(4, CGFloat(value) * 60))
+            }
+        }
+        .onChange(of: level) { _, value in
+            history.removeFirst()
+            history.append(value)
+        }
+    }
+}
+
+enum PageTitle {
+    /// The first sentence or line of what was said, cut to a title's length.
+    static func from(_ text: String) -> String {
+        let line = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? text
+        var sentence = line.prefix { !".?!".contains($0) }.trimmingCharacters(in: .whitespaces)
+        if sentence.count > 60 {
+            sentence = String(sentence.prefix(60))
+            if let space = sentence.lastIndex(of: " ") { sentence = String(sentence[..<space]) }
+            sentence += "…"
+        }
+        return sentence
+    }
+}
+
+@MainActor
+final class DictationSubmission: ObservableObject {
+    @Published private(set) var sending = false
+    @Published private(set) var error: String?
+
+    func send(_ text: String, to threadId: String, client: BBClient) async -> Bool {
+        guard !sending else { return false }
+        sending = true
+        error = nil
+        defer { sending = false }
+        do {
+            try await client.send(threadId, text: text)
+            return true
+        } catch {
+            self.error = BBClient.describe(error, server: client.baseURL)
+            return false
+        }
+    }
+}

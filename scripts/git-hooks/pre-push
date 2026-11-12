@@ -1,0 +1,39 @@
+#!/bin/sh
+remote="$1"
+url="$2"
+case "$url" in
+  *get-bb/*|*patleeman/bb|*patleeman/bb.git|*patleeman/bb-studio-app|*patleeman/bb-studio-app.git)
+    echo "pre-push: refusing to push to $url" >&2
+    exit 1
+    ;;
+esac
+case "$url" in
+  *patleeman/bb-studio|*patleeman/bb-studio.git) ;;
+  *)
+    echo "pre-push: only patleeman/bb-studio is a push target, not $url" >&2
+    exit 1
+    ;;
+esac
+main=
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main) main=1 ;;
+    refs/heads/desktop|refs/heads/stable|refs/tags/v*) ;;
+    *)
+      echo "pre-push: refusing to push $remote_ref (allowed: main, desktop, stable, v* tags)" >&2
+      exit 1
+      ;;
+  esac
+done
+if [ -n "$main" ]; then
+  plugins="$(git rev-parse --show-toplevel)/plugins"
+  if [ ! -d "$plugins/node_modules" ]; then
+    echo "pre-push: run pnpm install in $plugins, then push again" >&2
+    exit 1
+  fi
+  if ! (cd "$plugins" && pnpm -s check:contracts >/dev/null); then
+    echo "pre-push: the generated contracts are stale or ios/ is missing; run pnpm gen:contracts in plugins/ and commit" >&2
+    exit 1
+  fi
+fi
+exit 0

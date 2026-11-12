@@ -1,0 +1,87 @@
+Attributes: Application, 0x11261db80, pid: 19884, label: 'BB Studio'
+Element subtree:
+ →Application, 0x11261db80, pid: 19884, label: 'BB Studio'
+    Window (Main), 0x11261dcc0, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x11261df40, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x11261de00, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x11261d900, {{0.0, 0.0}, {402.0, 874.0}}
+          Other, 0x11261da40, {{0.0, 0.0}, {402.0, 874.0}}
+            Other, 0x11261d7c0, {{0.0, 0.0}, {402.0, 874.0}}
+              Other, 0x11261d040, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x11261d540, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x11261d680, {{0.0, 0.0}, {402.0, 874.0}}
+                    Other, 0x11261d2c0, {{0.0, 0.0}, {402.0, 874.0}}
+                      Other, 0x11261d400, {{0.0, 0.0}, {402.0, 874.0}}
+                        Other, 0x11261d180, {{0.0, 0.0}, {402.0, 874.0}}
+                          Other, 0x11261cf00, {{0.0, 0.0}, {402.0, 874.0}}
+                            NavigationBar, 0x11261cb40, {{0.0, 62.0}, {402.0, 54.0}}, identifier: 'Native approval card QA'
+                              Button, 0x11261cc80, {{16.0, 62.0}, {44.0, 44.0}}, identifier: 'BackButton', label: 'Today'
+                              StaticText, 0x11261cdc0, {{72.0, 73.7}, {191.3, 20.7}}, label: 'Native approval card QA'
+                              Other, 0x11261c500, {{288.0, 66.0}, {40.0, 36.0}}
+                                Other, 0x11261c8c0, {{288.0, 66.0}, {40.0, 36.0}}
+                                  Button, 0x11261ca00, {{288.0, 66.0}, {40.0, 36.0}}, identifier: 'stop.circle', label: 'Stop'
+                              Other, 0x11261c640, {{344.0, 66.0}, {38.0, 36.0}}
+                                Other, 0x11261c780, {{344.0, 66.0}, {38.0, 36.0}}
+                                  Button, 0x11261c3c0, {{344.0, 66.0}, {38.0, 36.0}}, label: 'More'
+                                    Button, 0x11261c280, {{344.0, 66.0}, {38.0, 36.0}}
+                                      Image, 0x11261c140, {{353.0, 82.0}, {20.0, 4.3}}, identifier: 'ellipsis', label: 'More'
+                            Other, 0x11261c000, {{0.0, 0.0}, {402.0, 874.0}}
+                              Other, 0x11261f840, {{0.0, 0.0}, {402.0, 874.0}}
+                                Other, 0x11261f480, {{0.0, 0.0}, {402.0, 874.0}}
+                                  Other, 0x11261f340, {{0.0, 0.0}, {402.0, 874.0}}
+                                    ScrollView, 0x11261e300, {{0.0, 0.0}, {402.0, 874.0}}
+                                      Other, 0x11261fac0, {{0.0, 0.0}, {402.0, 874.0}}
+                                        Other, 0x11261fc00, {{0.0, 0.0}, {402.0, 156.0}}
+                                      Other, 0x11261fd40, {{0.0, 0.0}, {402.0, 874.0}}
+                                        Other, 0x11261fe80, {{0.0, 0.0}, {402.0, 156.0}}
+                                      Other, 0x11261f5c0, {{0.0, 72.0}, {402.0, 652.0}}
+                                        Other, 0x11261ed00, {{16.0, 88.0}, {370.0, 615.3}}
+                                          StaticText, 0x11261ee40, {{68.0, 88.0}, {306.0, 460.3}}, label: '/plan This is a bounded, harmless native Watch plan-approval QA fixture. Budget: at most 2000 output tokens, finish within 5 minutes. Do not read project files or explore this environment. Do not use tools except the built-in ExitPlanMode. You are in plan mode. Present exactly this inert plan: "After approval, return only WATCH_APPROVAL_OK. Do not use any tools, change files, execute commands, access the network, or send messages." Invoke ExitPlanMode with that plan so the normal provider requests user approval. Await the decision. If approved, return only WATCH_APPROVAL_OK and stop. If denied, return only WATCH_APPROVAL_DENIED and stop. The only action authorized after approval is the fixed text response.'
+                                          Button, 0x11261ef80, {{304.7, 422.0}, {69.3, 15.7}}, label: 'Show more'
+                                          Button, 0x11261f0c0, {{16.0, 459.7}, {370.0, 23.7}}, label: 'Presenting plan ExitPlanMode', value: 1
+                                            DisclosureTriangle, 0x11261f200, {{16.0, 464.7}, {14.0, 14.0}}, value: 1
+                                              ActivityIndicator, 0x107c7b840, {{16.0, 464.7}, {14.0, 14.0}}, value: 1
+                                            StaticText, 0x107c7b480, {{36.0, 463.7}, {180.3, 15.7}}, label: 'Presenting plan ExitPlanMode'
+                                            Image, 0x107c7b340, {{378.3, 465.7}, {7.0, 12.0}}, identifier: 'collapsed'
+                                          StaticText, 0x107c7b0c0, {{31.0, 510.1}, {179.0, 15.7}}, label: 'Waiting for your approval'
+                                          Image, 0x107c79e00, {{31.0, 510.3}, {10.7, 14.3}}, identifier: 'hand.raised.fill', label: 'Block'
+                                          StaticText, 0x107c79680, {{28.0, 535.7}, {322.0, 78.0}}, label: 'After approval, return only WATCH_APPROVAL_OK. Do not use any tools, change files, execute commands, access the network, or send messages.'
+                                          Button, 0x107c7af80, {{28.0, 623.7}, {105.3, 15.7}}, label: 'Read the full plan'
+                                          Button, 0x107c7b200, {{28.0, 649.3}, {110.3, 54.0}}, label: 'Approve plan'
+                                          Button, 0x107c7ad00, {{146.3, 649.3}, {117.3, 54.0}}, label: 'Keep planning'
+                                      Other, 0x107c7ae40, {{369.0, 116.0}, {30.0, 608.0}}, label: 'Vertical scroll bar, 2 pages', value: 100%
+                                        Other, 0x107c7abc0, {{396.0, 148.0}, {3.0, 573.0}}
+                                      Other, 0x107c7aa80, {{369.0, 116.0}, {30.0, 608.0}}, label: 'Vertical scroll bar, 2 pages', value: 100%
+                                        Other, 0x107c7a300, {{396.0, 148.0}, {3.0, 573.0}}
+                                    Image, 0x107c7a800, {{30.0, 750.3}, {14.0, 21.3}}, identifier: 'list.bullet.clipboard', label: 'Bulleted List On A Clipboard'
+                                    StaticText, 0x107c7a940, {{56.0, 753.2}, {65.3, 15.7}}, label: 'Plan mode'
+                                    Button, 0x107c7a580, {{362.0, 756.0}, {10.0, 10.0}}, identifier: 'xmark', label: 'Exit plan mode'
+                                    CollectionView, 0x107c7a1c0, {{16.0, 788.0}, {370.0, 0.0}}
+                                      Other, 0x107c7a440, {{353.0, 788.0}, {30.0, 0.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                                        Other, 0x107c7a080, {{380.0, 749.0}, {3.0, 36.0}}
+                                      Other, 0x107c79cc0, {{353.0, 788.0}, {30.0, 0.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                                        Other, 0x107c79f40, {{380.0, 749.0}, {3.0, 36.0}}
+                                    Button, 0x107c7b700, {{16.0, 796.0}, {36.0, 36.0}}, label: 'Attachments'
+                                      Button, 0x107c7b5c0, {{16.0, 796.0}, {36.0, 36.0}}
+                                        Image, 0x108ebb0c0, {{24.0, 803.0}, {20.0, 22.3}}, identifier: 'paperclip', label: 'Attachments'
+                                    Button, 0x108eb97c0, {{56.0, 796.0}, {36.0, 36.0}}, identifier: 'mic.fill', label: 'Dictate'
+                                    TextView, 0x108eb9a40, {{96.0, 794.0}, {250.0, 38.0}}, label: 'Message'
+                                      StaticText, 0x108eb9b80, {{108.0, 802.0}, {68.7, 20.3}}, label: 'Message'
+                                      Other, 0x108eb9cc0, {{313.0, 794.0}, {30.0, 32.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                                        Other, 0x108eb9e00, {{340.0, 793.0}, {3.0, 36.0}}
+                                      Other, 0x108eb9f40, {{96.0, 810.0}, {244.0, 19.0}}, label: 'Horizontal scroll bar, 1 page', value: 0%
+                                        Other, 0x108eba080, {{99.0, 826.0}, {244.0, 3.0}}
+                                    Button, 0x108eba1c0, {{350.0, 796.0}, {36.0, 36.0}}, identifier: 'text.append', label: 'Queue message', Disabled
+                            Toolbar, 0x108eba300, {{0.0, 0.0}, {402.0, 874.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                              Other, 0x108eba440, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x108eba580, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x108eba6c0, {{0.0, 791.0}, {402.0, 83.0}}
+                    Other, 0x108ebbac0, {{0.0, 0.0}, {402.0, 874.0}}
+                    Other, 0x108ebbc00, {{0.0, 791.0}, {402.0, 83.0}}
+Path to element:
+ →Application, 0x11261db80, pid: 19884, label: 'BB Studio'
+Query chain:
+ →Find: Target Application 'nyc.plee.bbgo'
+  Output: {
+    Application, 0x108ebbd40, pid: 19884, label: 'BB Studio'
+  }

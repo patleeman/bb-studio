@@ -1,0 +1,585 @@
+import type { StudioChanged } from "../kit/server/core";
+import type { StudioServices } from "../services";
+// Drawings, built into Studio: sketch Excalidraw drawings with your agents.
+//
+// Drawings live in Studio's SQLite database as serialized Excalidraw scenes
+// (src/draw/server/store.ts). The app edits them with the real
+// @excalidraw/excalidraw component, loaded only when a drawing opens, and
+// autosaves through the `drawings.*` RPCs. Agents read and edit the live
+// scene with the excalidraw_* tools; writes from either side go through the
+// same element-level merge, so both survive.
+//
+// This was the Draw plugin (id `excalidraw`). Its items keep that id as their
+// namespace, its agent tools, skill, mention provider, message directive,
+// thread tab and composer entry keep their names (docs/merging-add-ons.md).
+import { studioSchemas } from "../kit/contract";
+import { errorMessage } from "../kit/format";
+import { createChangeBus, defineItemMention, readThreadFile, resolveSource, serveBytes, threadRoots, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type Database from "better-sqlite3";
+import { z } from "zod";
+import { rpcContract } from "./contract";
+import {
+  applyElementUpserts,
+  elementCount,
+  getNonDeletedElements,
+  mergeFullScene,
+  parseSceneData,
+  serializeSceneData,
+  type SceneElement,
+  type StoredScene,
+} from "./merge";
+import { createDrawBackup } from "./server/backup";
+import { mentionContext as buildMentionContext } from "./server/mention";
+import { drawingProvider } from "./server/provider";
+import { DrawingStore, displayName, toMeta, type DrawingRow, type Writer } from "./server/store";
+import { sceneThumbnail } from "./server/thumbnail";
+import { migrateOrphanDrawings, NEW_WHITEBOARD_PAGE_HEIGHT, ORPHAN_MIGRATION_KEY, pagePath, whiteboardMarkdown, type OrphanMigrationState, type WhiteboardPage, type WhiteboardPages } from "./server/whiteboards";
+import { DRAWING_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, ROUTE_SEGMENT, drawingHref } from "./shared";
+
+const MAX_TOOL_SCENE_CHARS = 400_000;
+
+export const DRAWINGS_USAGE = [
+  "usage: bb studio whiteboards <command>",
+  "  list                                  List whiteboards",
+  "  create --page <page-id> <name>        Create a whiteboard at the end of a page",
+  "  show <id> [--raw]                     Print a whiteboard's scene JSON (deleted elements left out unless --raw)",
+  "  rename <id> <new-name>                Rename a whiteboard",
+  "  delete <id>                           Delete a whiteboard",
+  "  merge <id> <scene-file.json>          Upsert elements from a JSON file (an elements array or a full scene)",
+  "  remove-elements <id> <element-id…>    Delete elements by id",
+].join("\n");
+
+/**
+ * The old excalidraw_* names, kept as aliases of the whiteboard tools for two
+ * releases (from the release that renamed them, Nov 2026). Remove them, and
+ * this map, after that.
+ */
+export const TOOL_ALIASES = {
+  excalidraw_list_drawings: "whiteboard_list",
+  excalidraw_get_drawing: "whiteboard_get",
+  excalidraw_create_drawing: "whiteboard_create",
+  excalidraw_update_drawing: "whiteboard_update",
+} as const;
+
+/** Available in every agent session. */
+export const DRAW_TOOLS = ["whiteboard_list", "whiteboard_get", "whiteboard_create", "whiteboard_update", ...Object.keys(TOOL_ALIASES)];
+
+export interface BuiltinDrawings {
+  store: DrawingStore;
+  getDrawing(id: string): { id: string; name: string; createdAt: number; updatedAt: number; projectId: string | null; data: string } | null;
+  saveDrawing(input: { id: string; name?: string; data: string; expectedUpdatedAt?: number }): { ok: boolean; updatedAt: number };
+  /** Studio's provider methods, which the hub calls in-process. */
+  provider: StudioProviderHandlers;
+  /** Its section of a Studio backup, still named `excalidraw`. */
+  backup: BackupHandlers;
+  /** Pages registers after Drawings; until it connects, whiteboard tools say so. */
+  connectPages(pages: WhiteboardPages): void;
+  /** `bb studio whiteboards …` */
+  cli(argv: string[], ctx: { threadId?: string | null; projectId?: string | null; cwd?: string | null }): Promise<{ exitCode: number; stdout?: string; stderr?: string }>;
+  dispose(): void;
+}
+
+/** Registers drawings' RPC, HTTP route, agent tools and mention provider on Studio. Studio has run the migrations. */
+export function registerDraw(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created" | "linkThread">, notify: StudioChanged): BuiltinDrawings {
+  const store = new DrawingStore(db);
+  let pages: WhiteboardPages | null = null;
+  const needPages = (): WhiteboardPages => {
+    if (!pages) throw new Error("Pages isn't ready yet. Try again in a moment.");
+    return pages;
+  };
+  /** The page a whiteboard is in: a live page first. */
+  const homePage = (id: string): WhiteboardPage | null => {
+    const found = pages?.embeddings().get(id) ?? [];
+    return found.find((page) => !page.archived) ?? found[0] ?? null;
+  };
+
+  // In a thread, the file is on the thread's host, inside its workspace or
+  // thread storage; from a terminal with no thread, it's a local file.
+  async function readSceneFile(filePath: string, ctx: { threadId?: string | null; cwd?: string | null }): Promise<string> {
+    if (!ctx.threadId) {
+      const { readFile } = await import("node:fs/promises");
+      const { resolve } = await import("node:path");
+      return readFile(resolve(ctx.cwd ?? process.cwd(), filePath), "utf8");
+    }
+    const { roots } = await threadRoots(bb, ctx.threadId);
+    const source = resolveSource(filePath, roots, ctx.cwd);
+    if ("error" in source) throw new Error(source.error);
+    return Buffer.from((await readThreadFile(bb, source)).bytes).toString("utf8");
+  }
+  /** A drawing an agent made is linked to its thread. */
+  const created = (id: string, threadId: string) => services.created({ pluginId: PLUGIN_ID, id }, threadId);
+  /** A drawing an agent changed belongs to its thread too, so the thread's tab lists it. */
+  const edited = (id: string, threadId: string) => {
+    const at = Date.now();
+    services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id }, role: "edited", state: "working", createdAt: at, updatedAt: at, metadata: {} });
+  };
+  /** The reply card: the page the whiteboard is in. A drawing in no page keeps its own card. */
+  const card = (id: string, page: WhiteboardPage | null = homePage(id)) => page
+    ? `Put this line on its own in your reply so the user can open the page with the whiteboard beside the chat:\n::page{id="${page.id}"}`
+    : `Put this line on its own in your reply so the user can open the drawing beside the chat:\n::drawing{id="${id}"}`;
+
+  /** Makes a drawing and embeds it in a page as a whiteboard. */
+  function createWhiteboard(input: { pageId: string; name: string; afterBlockId?: string; by: Writer }): { row: DrawingRow; page: WhiteboardPage } {
+    const target = needPages();
+    const page = target.page(input.pageId);
+    if (!page) throw new Error(`Page ${input.pageId} not found.`);
+    const row = create(input.name, input.by, page.projectId);
+    try {
+      target.embed(page.id, [row.id], { afterBlockId: input.afterBlockId, by: input.by === "agent" || input.by === "cli" ? "agent" : "studio" });
+    } catch (error) {
+      remove(row.id, input.by);
+      throw error;
+    }
+    return { row, page };
+  }
+
+  /** A new page holding one tall whiteboard: New → Whiteboard, or whiteboard_create without a page. */
+  function createWhiteboardPage(input: { projectId: string | null; title: string; name: string; by: Writer }): { row: DrawingRow; page: WhiteboardPage } {
+    const target = needPages();
+    const row = create(input.name, input.by, input.projectId);
+    try {
+      const pageId = target.createPage({ projectId: input.projectId, title: input.title, markdown: whiteboardMarkdown(row.id, { height: NEW_WHITEBOARD_PAGE_HEIGHT }) });
+      return { row, page: target.page(pageId) ?? { id: pageId, title: input.title, projectId: input.projectId, archived: false } };
+    } catch (error) {
+      remove(row.id, input.by);
+      throw error;
+    }
+  }
+
+  const studio = studioSchemas(z);
+  // Agents write drawings a few elements at a time; Studio only needs to hear about it now and then.
+  const changeBus = createChangeBus({ bb, notify, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id, updatedAt, by) => ({ type: DRAWING_UPDATE_TYPE, drawingId: id, updatedAt, by }), delayMs: 1500 });
+
+  /** Tells open editors, galleries, and Studio that a drawing changed. Drawings keep no versions. */
+  function changed(id: string, updatedAt: number, by: Writer | "studio") {
+    changeBus.changed(id, updatedAt, by);
+  }
+
+  function mustGet(id: string): DrawingRow {
+    const row = store.get(id);
+    if (!row) throw new Error(`Drawing ${id} not found`);
+    return row;
+  }
+
+  function create(name: string, by: Writer, projectId: string | null = null): DrawingRow {
+    const row = store.create({ name, projectId, by });
+    changed(row.id, row.updated_at, by);
+    return row;
+  }
+
+  /** Writes a scene and notifies. Returns the new revision. */
+  function write(row: DrawingRow, scene: StoredScene, by: Writer, options: { name?: string } = {}): number {
+    const updatedAt = store.write(row.id, serializeSceneData(scene), by, options);
+    changed(row.id, updatedAt, by);
+    return updatedAt;
+  }
+
+  function remove(id: string, by: Writer) {
+    if (store.delete(id)) changed(id, Date.now(), by);
+  }
+
+  /** What an `@drawing` mention gives the agent. */
+  function mention(id: string): string {
+    const row = store.get(id);
+    if (!row) throw new Error(`Excalidraw drawing ${id} not found`);
+    return buildMentionContext({ ...row, name: displayName(row) });
+  }
+
+  /** Human-readable one-line summary of a scene (agent tool results). */
+  function sceneSummary(scene: StoredScene | null, fallback = "empty drawing"): string {
+    const elements = getNonDeletedElements(scene);
+    if (!elements.length) return fallback;
+    const byType = new Map<string, number>();
+    for (const el of elements) {
+      const t = typeof el.type === "string" ? el.type : "unknown";
+      byType.set(t, (byType.get(t) ?? 0) + 1);
+    }
+    const parts = [...byType.entries()].map(([t, n]) => `${n} ${t}${n > 1 ? "s" : ""}`);
+    return `${elements.length} element(s): ${parts.join(", ")}`;
+  }
+
+  /** Image files without their data: what an agent needs to reference them. */
+  function fileSummaries(files: Record<string, unknown> | undefined) {
+    return Object.fromEntries(Object.entries(files ?? {}).map(([id, file]) => {
+      const f = (file && typeof file === "object" ? file : {}) as { mimeType?: unknown; dataURL?: unknown };
+      return [id, { id, mimeType: typeof f.mimeType === "string" ? f.mimeType : null, dataURLChars: typeof f.dataURL === "string" ? f.dataURL.length : 0 }];
+    }));
+  }
+
+  function getDrawing(id: string) {
+    const row = store.get(id);
+    if (!row) return null;
+    return { id: row.id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at, projectId: row.project_id, data: row.data };
+  }
+
+  function saveDrawing({ id, name, data, expectedUpdatedAt }: Parameters<BuiltinDrawings["saveDrawing"]>[0]) {
+    return db.transaction(() => {
+      const row = mustGet(id);
+      if (expectedUpdatedAt !== undefined && row.updated_at !== expectedUpdatedAt)
+        throw new Error("The drawing changed on the server. Save this draft as a copy to keep both versions.");
+      // Multi-writer merge: element-level union, higher `version` wins,
+      // tombstones preserved — so concurrent user edits and agent writes
+      // both survive instead of last-writer-wins clobbering.
+      const updatedAt = write(row, mergeFullScene(row.data, data), "editor", { name });
+      return { ok: true, updatedAt };
+    })();
+  }
+
+  bb.rpc.register(rpcContract, {
+    "drawings.getDrawingMeta"({ id }) {
+      const row = store.get(id);
+      return { drawing: row ? toMeta(row) : null };
+    },
+    "drawings.listDrawings"() {
+      return { drawings: store.list().map(toMeta) };
+    },
+    "drawings.createDrawing"({ name, projectId }) {
+      return { drawing: toMeta(create(name, "app", projectId ?? null)) };
+    },
+    "drawings.getDrawing": ({ id }) => ({ drawing: getDrawing(id) }),
+    "drawings.newWhiteboardPage"({ projectId }) {
+      const { row, page } = createWhiteboardPage({ projectId, title: "Untitled whiteboard", name: "", by: "app" });
+      return { drawingId: row.id, page: { id: page.id, title: page.title, href: pagePath(page.id) } };
+    },
+    "drawings.whiteboardPage"({ id }) {
+      const page = homePage(id);
+      return { page: page ? { id: page.id, title: page.title, href: pagePath(page.id) } : null };
+    },
+    /** Cheap per-drawing revision check for the editor's polling fallback. */
+    "drawings.getDrawingUpdatedAt"({ id }) {
+      return { updatedAt: store.get(id)?.updated_at ?? 0 };
+    },
+    "drawings.saveDrawing": saveDrawing,
+    "drawings.recoverDrawingCopy"({ sourceDrawingId, draftId, draftToken, name, data, projectId }) {
+      const scene = parseSceneData(data);
+      if (!scene) throw new Error("This recovery draft is not a valid drawing scene.");
+      const source = store.get(sourceDrawingId);
+      const { row, created: isNew } = store.recoverCopy({
+        key: JSON.stringify([sourceDrawingId, draftId, draftToken]),
+        name, data: serializeSceneData(scene), projectId: source ? source.project_id : projectId,
+      });
+      // Notify only after the transaction has committed a complete scene.
+      if (isNew) changed(row.id, row.updated_at, "editor");
+      return { drawing: toMeta(row) };
+    },
+    "drawings.renameDrawing"({ id, name }) {
+      mustGet(id);
+      const updatedAt = store.rename(id, name, "editor");
+      changed(id, updatedAt, "editor");
+      return { ok: true, updatedAt };
+    },
+    "drawings.deleteDrawing"({ id }) {
+      remove(id, "app");
+      return { ok: true };
+    },
+    async "drawings.attachDrawingImage"({ threadId, drawingId, pngBase64 }) {
+      const row = mustGet(drawingId);
+      const bytes = new Uint8Array(Buffer.from(pngBase64, "base64"));
+      if (!bytes.length) throw new Error("Empty image payload");
+      const thread = await bb.sdk.threads.get({ threadId });
+      const slug = row.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "drawing";
+      await bb.sdk.projects.attachments.upload({
+        projectId: thread.projectId,
+        clientFile: bytes,
+        filename: `${slug}-${row.id.slice(0, 8)}.png`,
+        mimeType: "image/png",
+      });
+      return { ok: true };
+    },
+  });
+
+  // Thumbnails for Studio's cards. The URL carries the revision, so a
+  // response never goes stale.
+  bb.http.route("GET", `/${ROUTE_SEGMENT}/thumbnail`, (context) => {
+    const row = store.get(context.req.query("drawing") ?? "");
+    const svg = row ? sceneThumbnail(parseSceneData(row.data)) : null;
+    if (!svg) return context.text("Not found", 404);
+    return serveBytes(svg, {
+      "content-type": "image/svg+xml; charset=utf-8",
+      // The SVG is built from scene data; never let it run anything.
+      "content-security-policy": "default-src 'none'; img-src data:; style-src 'unsafe-inline'",
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // Agent tools — the "multiplayer" path: while the user has a whiteboard
+  // open, the agent reads the live scene (whiteboard_get), edits it
+  // (whiteboard_update), and the open editor and the page's whiteboard apply
+  // the change live (realtime + polling sync). Writes go through the same
+  // element-level merge as editor autosaves, so both writers' edits survive.
+  //
+  // Each tool is also registered under its old excalidraw_* name, taking the
+  // old `drawingId`, so automations, saved prompts and skills keep working.
+  // The aliases go after two releases (see TOOL_ALIASES).
+  // ---------------------------------------------------------------------
+
+  const excalidrawElementSchema = z.object({ id: z.string().min(1), type: z.string().min(1) }).passthrough();
+  type ToolResult = string | { content: { type: "text"; text: string }[]; isError: true };
+  const failed = (text: string): ToolResult => ({ content: [{ type: "text", text }], isError: true });
+  const notFound = (id: string) => failed(`Whiteboard ${id} not found.`);
+
+  function listWhiteboards(): ToolResult {
+    const rows = store.list();
+    if (!rows.length) return "No whiteboards yet. Use whiteboard_create to add one to a page, or to make a whiteboard page.";
+    const embeddings = pages?.embeddings() ?? new Map<string, WhiteboardPage[]>();
+    const lines = rows.map((r) => {
+      const m = toMeta(r);
+      const where = embeddings.get(m.id)?.map((page) => `[${page.title.replace(/[[\]]/g, "")}](${pagePath(page.id)})${page.archived ? " (archived)" : ""}`).join(", ");
+      return `- ${displayName(r)} (id ${m.id}) — ${m.elementCount} element(s), updated ${new Date(m.updatedAt).toISOString()}, ${where ? `in ${where}` : `not in a page; open it at ${drawingHref(m.id)}`}`;
+    });
+    return `Whiteboards:\n${lines.join("\n")}`;
+  }
+
+  function getWhiteboard(id: string): ToolResult {
+    const row = store.get(id);
+    if (!row) return notFound(id);
+    const scene = parseSceneData(row.data);
+    const clean = getNonDeletedElements(scene);
+    const payload = {
+      whiteboard: { id: row.id, name: displayName(row), elementCount: clean.length, updatedAt: row.updated_at, summary: sceneSummary(scene, "empty whiteboard") },
+      scene: {
+        type: "excalidraw",
+        version: 2,
+        elements: clean,
+        appState: scene?.appState ?? {},
+        // Image data URLs would push most scenes with an image past the
+        // inline limit, hiding the elements; list the files instead.
+        files: fileSummaries(scene?.files),
+      },
+    };
+    const json = JSON.stringify(payload, null, 2);
+    if (json.length > MAX_TOOL_SCENE_CHARS) {
+      const ids = clean.map((el) => (typeof el.id === "string" ? el.id : "?")).join(", ");
+      return [
+        `Whiteboard "${displayName(row)}" (id ${row.id}) has ${clean.length} element(s); scene JSON is ${json.length} bytes — too large to inline.`,
+        sceneSummary(scene, "empty whiteboard"),
+        `Element ids (in z-order):\n${ids}`,
+        `To edit, pass element ids in whiteboard_update. Raw scene: bb studio whiteboards show ${row.id}`,
+      ].join("\n\n");
+    }
+    return json;
+  }
+
+  function createWhiteboardTool(input: { pageId?: string; name: string; afterBlockId?: string }, ctx: { threadId: string; projectId?: string | null }): ToolResult {
+    let made: { row: DrawingRow; page: WhiteboardPage };
+    try {
+      made = input.pageId
+        ? createWhiteboard({ pageId: input.pageId, name: input.name, afterBlockId: input.afterBlockId, by: "agent" })
+        : createWhiteboardPage({ projectId: ctx.projectId ?? null, title: input.name, name: input.name, by: "agent" });
+    } catch (error) {
+      return failed(errorMessage(error));
+    }
+    const { row, page } = made;
+    created(row.id, ctx.threadId);
+    const link = `[${page.title.replace(/[[\]]/g, "")}](${pagePath(page.id)})`;
+    return `${input.pageId ? `Added whiteboard "${input.name}" (id ${row.id}) to the page ${link}` : `Made the whiteboard page ${link} with whiteboard "${input.name}" (id ${row.id})`}. Draw on it with whiteboard_update.\n${card(row.id, page)}`;
+  }
+
+  function updateWhiteboard(input: { id: string; elements?: unknown[]; deletedElementIds?: string[]; appState?: Record<string, unknown>; files?: Record<string, unknown> }, ctx: { threadId?: string | null }): ToolResult {
+    const { id, elements, deletedElementIds, appState, files } = input;
+    const row = store.get(id);
+    if (!row) return notFound(id);
+    if ((!elements || elements.length === 0) && (!deletedElementIds || deletedElementIds.length === 0)) {
+      return failed("Nothing to do: provide elements and/or deletedElementIds.");
+    }
+    const skipped: string[] = [];
+    const merged = applyElementUpserts(row.data, (elements ?? []) as SceneElement[], { deletedElementIds, appState, files, skipped });
+    const updatedAt = write(row, merged, "agent");
+    if (ctx.threadId) edited(row.id, ctx.threadId);
+    const clean = getNonDeletedElements(merged);
+    return [
+      `Updated whiteboard "${displayName(row)}" (id ${row.id}) — now ${clean.length} element(s): ${sceneSummary(merged)}.`,
+      `- upserted ${(elements?.length ?? 0) - skipped.length} element(s), deleted ${deletedElementIds?.length ?? 0} element(s)`,
+      ...(skipped.length ? [`- NOT applied: ${skipped.join(", ")} — already deleted in the whiteboard. Use new ids to add them again.`] : []),
+      `- saved at ${new Date(updatedAt).toISOString()}`,
+      `The user's open editor and the page's whiteboard have been notified and show the change live.`,
+      card(row.id),
+    ].join("\n");
+  }
+
+  const editFields = {
+    elements: z.array(excalidrawElementSchema).max(500).optional(),
+    deletedElementIds: z.array(z.string()).max(500).optional(),
+    appState: z.record(z.string(), z.unknown()).optional(),
+    files: z.record(z.string(), z.unknown()).optional(),
+  };
+  const createFields = {
+    name: z.string().min(1).max(200).describe("The whiteboard's name; without pageId, also the new page's title"),
+    afterBlockId: z.string().min(1).optional().describe("Put the whiteboard after this block instead of at the end"),
+  };
+  const alias = (name: string) => `Old name of ${name}; it does the same. Use ${name}.`;
+
+  bb.agents.registerTool({
+    name: "whiteboard_list",
+    description:
+      "List the whiteboards in the user's BB Studio pages: id, name, element count, last updated, and the page each one is in. Use when the user asks you to work with a whiteboard, sketch or diagram. To read or edit one, pass its id to whiteboard_get or whiteboard_update.",
+    parameters: z.object({}),
+    execute: () => listWhiteboards(),
+  });
+  bb.agents.registerTool({ name: "excalidraw_list_drawings", description: alias("whiteboard_list"), parameters: z.object({}), execute: () => listWhiteboards() });
+
+  bb.agents.registerTool({
+    name: "whiteboard_get",
+    description:
+      "Read the current scene of a whiteboard (Excalidraw elements; a page embeds it as ```embed {\"kind\":\"drawing\",\"target\":\"<id>\"}```, and whiteboard_list lists them): element JSON, appState, a text summary, and each image file's id, mimeType and size (image data is left out; `bb studio whiteboards show <id>` prints it). Always call this immediately before editing so you see the user's latest changes. To edit, use whiteboard_update.",
+    parameters: z.object({ whiteboardId: z.string().min(1) }),
+    execute: ({ whiteboardId }) => getWhiteboard(whiteboardId),
+  });
+  bb.agents.registerTool({ name: "excalidraw_get_drawing", description: alias("whiteboard_get"), parameters: z.object({ drawingId: z.string().min(1) }), execute: ({ drawingId }) => getWhiteboard(drawingId) });
+
+  bb.agents.registerTool({
+    name: "whiteboard_create",
+    description:
+      "Add a new empty whiteboard to a BB Studio page and return its id. It goes at the end of the page, or after afterBlockId (a block id from pages_read). Without pageId it makes a new page holding just the whiteboard, titled with name. Then draw on it with whiteboard_update; the user sees it in the page. A whiteboard's height in a page is the embed's \"height\" in pixels (160–1200; pages_edit can change it).",
+    parameters: z.object({ pageId: z.string().min(1).optional().describe("The page to add the whiteboard to, e.g. pg_…; leave out to make a whiteboard page"), ...createFields }),
+    execute: (input, ctx) => createWhiteboardTool(input, ctx),
+  });
+  bb.agents.registerTool({
+    name: "excalidraw_create_drawing",
+    description: alias("whiteboard_create"),
+    parameters: z.object({ pageId: z.string().min(1), ...createFields }),
+    execute: (input, ctx) => createWhiteboardTool(input, ctx),
+  });
+
+  bb.agents.registerTool({
+    name: "whiteboard_update",
+    description:
+      "Edit a whiteboard the user may have open right now, in a page or full size: upsert elements and/or delete elements by id. The user's open editor and the page's whiteboard update live. Merge is element-level: only the elements you send change, and any element you send wins (its version is bumped) unless it was already deleted (re-add it with a new id), so concurrent user edits to other elements are preserved. Fetch the latest scene with whiteboard_get first. Element objects must match Excalidraw's shape (id, type, x, y, width, height, strokeColor, backgroundColor, fillStyle, strokeWidth, roughness, opacity, seed, groupIds, frameId, roundness, ...) — safest to copy an existing element from whiteboard_get and change id/type/position/text. Upserting an existing id merges into it, so {id, type, x, y} moves an element and keeps the rest. `index` (z-order) is assigned automatically when omitted. deletedElementIds removes elements for the user, not just hides them.",
+    parameters: z.object({ whiteboardId: z.string().min(1), ...editFields }),
+    execute: ({ whiteboardId, ...rest }, ctx) => updateWhiteboard({ id: whiteboardId, ...rest }, ctx),
+  });
+  bb.agents.registerTool({
+    name: "excalidraw_update_drawing",
+    description: alias("whiteboard_update"),
+    parameters: z.object({ drawingId: z.string().min(1), ...editFields }),
+    execute: ({ drawingId, ...rest }, ctx) => updateWhiteboard({ id: drawingId, ...rest }, ctx),
+  });
+
+  // Studio calls bb.agents.configure once, with DRAW_TOOLS (BB allows one configuration per plugin).
+
+  // A drawing's mention still resolves, so older `@drawing` mentions and a
+  // whiteboard's item chat give the agent its scene. It offers nothing in the
+  // composer's @ menu: whiteboards live in pages, and `@page` finds them.
+  bb.ui.registerMentionProvider(defineItemMention({
+    id: "drawing",
+    label: "Whiteboards",
+    search: () => [],
+    resolve: (itemId) => ({ context: mention(itemId) }),
+  }));
+
+  // CLI: `bb studio whiteboards …`. A plugin registers one CLI command, and
+  // Studio's is `studio`, so `bb excalidraw …` went with the old plugin.
+  async function cli(argv: string[], ctx: { threadId?: string | null; projectId?: string | null; cwd?: string | null }): Promise<{ exitCode: number; stdout?: string; stderr?: string }> {
+    const [cmd, ...rest] = argv;
+    const notFound = (id: string) => ({ exitCode: 1, stderr: `Drawing ${id} not found\n` });
+    switch (cmd) {
+      case "list": {
+        const rows = store.list();
+        if (!rows.length) return { exitCode: 0, stdout: "No whiteboards yet.\n" };
+        const lines = rows.map((r) => {
+          const meta = toMeta(r);
+          return `${meta.id}\t${displayName(r)}\t${meta.elementCount} elements\t${new Date(meta.updatedAt).toISOString()}`;
+        });
+        return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
+      }
+      case "create": {
+        const usage = { exitCode: 1, stderr: "usage: bb studio whiteboards create --page <page-id> <name>\n" };
+        if (rest[0] !== "--page" || !rest[1]) return usage;
+        const name = rest.slice(2).join(" ");
+        if (!name) return usage;
+        try {
+          const { row, page } = createWhiteboard({ pageId: rest[1], name, by: "cli" });
+          if (ctx.threadId) created(row.id, ctx.threadId);
+          return { exitCode: 0, stdout: `${row.id}\t${name}\t${page.id}\n` };
+        } catch (error) {
+          return { exitCode: 1, stderr: `${errorMessage(error)}\n` };
+        }
+      }
+      case "show": {
+        const [id, flag] = rest;
+        if (!id) return { exitCode: 1, stderr: "usage: bb studio whiteboards show <id> [--raw]\n" };
+        const row = store.get(id);
+        if (!row) return notFound(id);
+        // Default view filters tombstones (deleted elements) so agents and
+        // humans reason about the live drawing; --raw dumps everything.
+        const scene = parseSceneData(row.data);
+        const out = flag === "--raw"
+          ? row.data
+          : serializeSceneData({ elements: getNonDeletedElements(scene), appState: scene?.appState ?? {}, files: scene?.files ?? {} });
+        return { exitCode: 0, stdout: out.length > 900_000 ? `${out.slice(0, 900_000)}\n…(truncated)\n` : `${out}\n` };
+      }
+      case "rename": {
+        const [id, ...nameParts] = rest;
+        const name = nameParts.join(" ");
+        if (!id || !name) return { exitCode: 1, stderr: "usage: bb studio whiteboards rename <id> <new-name>\n" };
+        if (!store.get(id)) return notFound(id);
+        changed(id, store.rename(id, name, "cli"), "cli");
+        return { exitCode: 0, stdout: `renamed ${id} → ${name}\n` };
+      }
+      case "delete": {
+        const id = rest[0];
+        if (!id) return { exitCode: 1, stderr: "usage: bb studio whiteboards delete <id>\n" };
+        if (!store.get(id)) return notFound(id);
+        remove(id, "cli");
+        return { exitCode: 0, stdout: `deleted ${id}\n` };
+      }
+      case "merge": {
+        const [id, filePath, ...extra] = rest;
+        if (!id || !filePath || extra.length) return { exitCode: 1, stderr: "usage: bb studio whiteboards merge <id> <scene-file.json>\n" };
+        const row = store.get(id);
+        if (!row) return notFound(id);
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(await readSceneFile(filePath, ctx));
+        } catch (error) {
+          return { exitCode: 1, stderr: `cannot read/parse ${filePath}: ${errorMessage(error)}\n` };
+        }
+        const incoming = Array.isArray(parsed) ? parsed : (parsed as { elements?: unknown[] })?.elements ?? [];
+        const upserts = incoming.filter((el): el is SceneElement => !!el && typeof el === "object" && typeof (el as SceneElement).id === "string");
+        // A full scene's image elements need its files, or they merge as broken images.
+        const files = Array.isArray(parsed) ? undefined : (parsed as { files?: Record<string, unknown> })?.files;
+        const merged = applyElementUpserts(row.data, upserts, { files: files && typeof files === "object" ? files : undefined });
+        const updatedAt = write(row, merged, "cli");
+        return { exitCode: 0, stdout: `merged ${upserts.length} element(s) into ${id}; now ${elementCount(merged)} element(s); updatedAt ${updatedAt}\n` };
+      }
+      case "remove-elements": {
+        const [id, ...elementIds] = rest;
+        if (!id || elementIds.length === 0) return { exitCode: 1, stderr: "usage: bb studio whiteboards remove-elements <id> <element-id> [<element-id>…]\n" };
+        const row = store.get(id);
+        if (!row) return notFound(id);
+        const merged = applyElementUpserts(row.data, [], { deletedElementIds: elementIds });
+        const updatedAt = write(row, merged, "cli");
+        return { exitCode: 0, stdout: `deleted ${elementIds.length} element(s) from ${id}; now ${elementCount(merged)} element(s); updatedAt ${updatedAt}\n` };
+      }
+      default:
+        return { exitCode: 1, stderr: `${DRAWINGS_USAGE}\n` };
+    }
+  }
+
+  return {
+    store,
+    getDrawing,
+    saveDrawing,
+    provider: drawingProvider({ store, changed: (id) => changed(id, store.get(id)?.updated_at ?? Date.now(), "studio") }),
+    backup: createDrawBackup({ db, store, changed: (id, updatedAt) => changed(id, updatedAt, "studio") }),
+    connectPages: (connected) => { pages = connected; },
+    cli,
+    dispose: () => changeBus.dispose(),
+  };
+}
+
+/** Embeds drawings no page shows in a "Drawings" page; nothing happens when there are none. */
+export async function moveOrphanDrawings(bb: Pick<BbPluginApi, "storage" | "log">, drawings: Pick<BuiltinDrawings, "store">, pages: WhiteboardPages): Promise<string[]> {
+  const rows = drawings.store.list({ includeArchived: true });
+  if (!rows.length) return [];
+  const result = migrateOrphanDrawings({
+    drawings: rows.map((row) => ({ id: row.id, name: row.name, projectId: row.project_id, archived: row.archived_at !== null, template: row.template === 1, createdAt: row.created_at })),
+    pages,
+    state: ((await bb.storage.kv.get(ORPHAN_MIGRATION_KEY)) as OrphanMigrationState | null | undefined) ?? null,
+  });
+  if (!result) return [];
+  await bb.storage.kv.set(ORPHAN_MIGRATION_KEY, result.state);
+  bb.log.info(`Moved ${result.moved.length} drawing(s) into a Drawings page.`);
+  return result.moved;
+}

@@ -1,0 +1,147 @@
+import XCTest
+@testable import BBStudio
+
+final class ComposerTests: XCTestCase {
+    func testSmartReactionRules() {
+        XCTAssertEqual(Directive.reactions(in: "Answer\n::reactions{items=\"👍 Ship it|🧪 Tests, then ship\"}"),
+            ["👍 Ship it", "🧪 Tests, then ship"])
+        XCTAssertEqual(Directive.reactions(in: "::reactions{items=\"👍|👍 Agree|👍  Agree|❓ Why\"}"),
+            ["👍 Agree", "❓ Why"])
+        XCTAssertEqual(Directive.parseReactions("✅\n Do   it"), ["✅ Do it"])
+        XCTAssertEqual(Directive.reactions(in: "::reactions{items=\" | \"}"), [])
+        let many = (1...9).map { "🔢 Option \($0)" }.joined(separator: "|")
+        XCTAssertEqual(Directive.reactions(in: "::reactions{items=\"\(many)\"}").count, 5)
+        XCTAssertEqual(Directive.reactions(in: "```\n::reactions{items=\"👍 Agree\"}\n```"), [])
+        XCTAssertEqual(Directive.reactions(in: "::reactions{items=\"👍 Agree\"}\nLater text"), [])
+        let long = "🐢 " + String(repeating: "slow ", count: 20)
+        XCTAssertEqual(Directive.reactions(in: "::reactions{items=\"\(long)|❓ Why\"}"), ["❓ Why"])
+    }
+
+    func testNextRowParsing() {
+        let next = Directive.next(in: "Done.\n::next{reply=\"👍 Ship it|🧪 Add tests first\" explore=\"🐛 Something\" do=\"📄 Write up the plan as a page\"}")
+        XCTAssertEqual(next.reply, ["👍 Ship it", "🧪 Add tests first"])
+        XCTAssertEqual(next.ask, ["📄 Write up the plan as a page"])
+        // The older explore attribute shows as notes when there's no btw.
+        XCTAssertEqual(next.notes, [.init(emoji: "🐛", text: "Something")])
+        XCTAssertEqual(Directive.next(in: "::next{do=\"🧵 Start a thread\"}"), .init(reply: [], ask: ["🧵 Start a thread"]))
+        // No emoji gets 🔎; emoji without a space, variation selectors, keycaps and flags split; dupes and empties drop.
+        XCTAssertEqual(Directive.parseNextItems("Ship it|🐛Retry| 🏗️  How it  works |1️⃣ First|🇺🇸 Flag||👍 ship IT|3 tries|🐛", max: 9),
+            ["🔎 Ship it", "🐛 Retry", "🏗️ How it works", "1️⃣ First", "🇺🇸 Flag", "🔎 3 tries"])
+        XCTAssertEqual(Directive.parseNextItems((1...9).map { "🔢 Option \($0)" }.joined(separator: "|"), max: 5).count, 5)
+        let long = Directive.parseNextItems("🐢 " + String(repeating: "slow ", count: 30), max: 5)
+        XCTAssertEqual(long.count, 1)
+        XCTAssertTrue(long[0].hasSuffix("slow…"))
+        XCTAssertLessThanOrEqual(long[0].count, 82)
+        // A stray quote or brace doesn't crash, and the directive must be the last line outside code.
+        _ = Directive.next(in: "::next{reply=\"👍 Ship \"it\"|❓ Why\" do=\"📄 {x}\"}")
+        _ = Directive.next(in: "::next{reply=\"👍 Ship it}")
+        XCTAssertEqual(Directive.parseNextItems("👍 \"Ship\" {it}", max: 5), ["👍 Ship it"])
+        XCTAssertTrue(Directive.next(in: "```\n::next{reply=\"👍 Ship it\"}\n```").isEmpty)
+        XCTAssertTrue(Directive.next(in: "::next{reply=\"👍 Ship it\"}\nLater").isEmpty)
+        // ::reactions still works alongside, and neither reads the other's line.
+        XCTAssertEqual(Directive.reactions(in: "::reactions{items=\"👍 Agree|❓ Why\"}"), ["👍 Agree", "❓ Why"])
+        XCTAssertEqual(Directive.reactions(in: "::next{reply=\"👍 Agree\"}"), [])
+        XCTAssertTrue(Directive.next(in: "::reactions{items=\"👍 Agree\"}").isEmpty)
+    }
+
+    func testNextRowNotes() {
+        let sentence = "I noticed retries don't wait. If the server is down, it gets hammered."
+        let next = Directive.next(in: "::next{btw=\"🐛 \(sentence)|🏗️ I noticed a thing.|🐛 \(sentence.uppercased())\" explore=\"🔗 Ignored\"}")
+        // btw wins over explore; whole sentences are kept; repeats drop.
+        XCTAssertEqual(next.notes, [.init(emoji: "🐛", text: sentence), .init(emoji: "🏗️", text: "I noticed a thing.")])
+        XCTAssertFalse(next.isEmpty)
+        XCTAssertEqual(Directive.parseNotes("No emoji here.", max: 3), [.init(emoji: "🔎", text: "No emoji here.")])
+        XCTAssertEqual(Directive.parseNotes("🐛 a|🐛 b|🐛 c|🐛 d", max: 3).count, 3)
+        let long = Directive.parseNotes("🔗 " + String(repeating: "word ", count: 80), max: 3)
+        XCTAssertLessThanOrEqual(long[0].text.count, 281)
+        XCTAssertTrue(long[0].text.hasSuffix("…"))
+        // 🐛 notes offer Fix this, drafted as on the web; every note offers Tell me more.
+        XCTAssertEqual(NextCard.actions(for: next.notes[0]).map(\.draft), ["💬 Tell me more: \(sentence)", "🐛 Fix this: \(sentence)"])
+        XCTAssertEqual(NextCard.actions(for: next.notes[1]).map(\.label), ["💬 Tell me more"])
+    }
+
+    func testCommandAndReactionParsing() {
+        XCTAssertEqual(CommandSuggestions.query(in: "/review"), "review")
+        XCTAssertEqual(CommandSuggestions.query(in: "Please /review"), "review")
+        XCTAssertNil(CommandSuggestions.query(in: "path/to/file"))
+        XCTAssertEqual(CommandSuggestions.query(in: "line one\n/"), "")
+        XCTAssertNil(CommandSuggestions.query(in: "/review "))
+        XCTAssertNil(CommandSuggestions.query(in: "/" + String(repeating: "a", count: 81)))
+        XCTAssertEqual(MentionSuggestions.query(in: "Ask @jun"), "jun")
+        XCTAssertEqual(MentionSuggestions.query(in: "@"), "")
+        XCTAssertNil(MentionSuggestions.query(in: "me@example.com"))
+        XCTAssertNil(MentionSuggestions.query(in: "@a@b"))
+        XCTAssertNil(MentionSuggestions.query(in: "@" + String(repeating: "a", count: 41)))
+        XCTAssertEqual(ReactionSettings.parseItems("👍 Agree; 👎 Disagree\n✅ Do it"),
+            ["👍 Agree", "👎 Disagree", "✅ Do it"])
+        var settings = ReactionSettings.defaults
+        XCTAssertEqual(settings.draft("👍 Agree", selection: "first\nsecond"),
+            "> first\n> second\n\n👍 Agree")
+        settings.quotePosition = "after"
+        XCTAssertEqual(settings.draft("👍 Agree", selection: "first"), "👍 Agree\n\n> first")
+        settings.quoteSelection = false
+        XCTAssertEqual(settings.draft("👍 Agree", selection: "first"), "👍 Agree")
+    }
+
+    func testStudioMentionUsesProviderItemId() throws {
+        let results = try JSONDecoder().decode(MentionResults.self, from: Data(#"{"groups":[{"pluginId":"pages","providerId":"page","label":"Pages","items":[{"itemId":"page:pg_123","title":"QA page"}]}]}"#.utf8))
+        let mention = Mention.plugin(results.groups[0].pluginId, results.groups[0].items[0])
+        XCTAssertEqual(mention.resource["pluginId"]?.stringValue, "pages")
+        XCTAssertEqual(mention.resource["itemId"]?.stringValue, "page:pg_123")
+    }
+
+    func testPluginRPCBodiesMatchServerSchemas() async throws {
+        let client = BBClient(baseURL: URL(string: "https://client.invalid")!)
+        client.transport = { _, path, body in
+            let value = try JSONDecoder().decode(JSONValue.self, from: body ?? Data())
+            switch path {
+            case "/api/v1/plugins/studio/rpc/recordings.recording_rename":
+                XCTAssertEqual(value["id"]?.stringValue, "rec_aaaaaaaaaaaa")
+                XCTAssertEqual(value["title"]?.stringValue, "QA recording")
+            case "/api/v1/plugins/studio/rpc/drawings.renameDrawing":
+                XCTAssertEqual(value["id"]?.stringValue, "drawing-id")
+                XCTAssertEqual(value["name"]?.stringValue, "QA drawing")
+            case "/api/v1/plugins/studio/rpc/tagItems":
+                XCTAssertEqual(value["items"]?.arrayValue?.first?["id"]?.stringValue, "pg_aaaaaaaaaaaa")
+                XCTAssertEqual(value["items"]?.arrayValue?.first?["pluginId"]?.stringValue, "pages")
+            case "/api/v1/plugins/studio/rpc/pages.chats":
+                XCTAssertEqual(value["pageId"]?.stringValue, "pg_aaaaaaaaaaaa")
+                return (200, Data(#"{"ok":true,"result":{"chats":[]}}"#.utf8))
+            default: XCTFail("Unexpected path: \(path)")
+            }
+            return (200, Data(#"{"ok":true,"result":{}}"#.utf8))
+        }
+        try await client.renameRecording("rec_aaaaaaaaaaaa", title: "QA recording")
+        try await client.renameDrawing("drawing-id", name: "QA drawing")
+        let item = StudioItem(pluginId: "pages", itemId: "pg_aaaaaaaaaaaa", kind: "page",
+            title: "QA page", createdAt: 0, updatedAt: 0)
+        try await client.tagStudioItems([item], add: ["tag_aaa"], remove: [])
+        let chats = try await client.pageChats("pg_aaaaaaaaaaaa")
+        XCTAssertTrue(chats.isEmpty)
+    }
+
+    func testLivePluginInputsReachHandlers() async throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let address = env["TEST_RUNNER_BBGO_QA_SERVER"] ?? env["BBGO_QA_SERVER"],
+              !address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw XCTSkip("Set TEST_RUNNER_BBGO_QA_SERVER (BBGO_QA_SERVER in the runner) to an isolated staged BB. No default server is allowed.")
+        }
+        let url = try XCTUnwrap(URL(string: address))
+        XCTAssertTrue(["http", "https"].contains(url.scheme ?? "") && url.host != nil)
+        guard ["http", "https"].contains(url.scheme ?? ""), url.host != nil else { return }
+        let client = BBClient(baseURL: url)
+        do {
+            try await client.renameRecording("rec_aaaaaaaaaaaa", title: "QA recording")
+            XCTFail("The nonexistent recording should fail")
+        } catch let error as BBError { XCTAssertNotEqual(error.status, 400) }
+        do {
+            try await client.renameDrawing("drawing_missing", name: "QA drawing")
+            XCTFail("The nonexistent drawing should fail")
+        } catch let error as BBError { XCTAssertNotEqual(error.status, 400) }
+        let item = StudioItem(pluginId: "pages", itemId: "pg_aaaaaaaaaaaa", kind: "page",
+            title: "QA page", createdAt: 0, updatedAt: 0)
+        try await client.tagStudioItems([item], add: [], remove: [])
+        let chats = try await client.pageChats("pg_aaaaaaaaaaaa")
+        XCTAssertTrue(chats.isEmpty)
+    }
+}

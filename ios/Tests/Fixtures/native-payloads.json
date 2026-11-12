@@ -1,0 +1,322 @@
+[
+  {
+    "id": "talk-create",
+    "plugin": "studio",
+    "method": "recordings.recording_create",
+    "input": {
+      "kind": "dictation",
+      "projectId": null,
+      "threadId": null
+    },
+    "output": {
+      "id": "rec_aaaaaaaa",
+      "title": "Contract recording",
+      "titleSource": "user",
+      "kind": "dictation",
+      "status": "done",
+      "projectId": null,
+      "threadId": null,
+      "createdAt": 1,
+      "updatedAt": 2,
+      "endedAt": 2,
+      "durationMs": 1200,
+      "segmentCount": 1,
+      "pendingCount": 0,
+      "failedCount": 0,
+      "wordCount": 2,
+      "preview": "Contract transcript",
+      "archived": false,
+      "audioRemoved": false,
+      "meetingNotes": null
+    }
+  },
+  {
+    "id": "talk-segment",
+    "plugin": "studio",
+    "method": "recordings.segment_put",
+    "input": {
+      "recordingId": "rec_aaaaaaaa",
+      "sessionId": "session01",
+      "index": 0,
+      "startedAt": 1700000000000,
+      "durationMs": 1200,
+      "mimeType": "audio/mp4",
+      "audioBase64": "AQID"
+    },
+    "output": {
+      "stored": true
+    }
+  },
+  {
+    "id": "talk-read",
+    "plugin": "studio",
+    "method": "recordings.recording_get",
+    "input": {
+      "id": "rec_aaaaaaaa"
+    },
+    "output": {
+      "recording": {
+        "id": "rec_aaaaaaaa",
+        "title": "Contract recording",
+        "titleSource": "user",
+        "kind": "dictation",
+        "status": "done",
+        "projectId": null,
+        "threadId": null,
+        "createdAt": 1,
+        "updatedAt": 2,
+        "endedAt": 2,
+        "durationMs": 1200,
+        "segmentCount": 1,
+        "pendingCount": 0,
+        "failedCount": 0,
+        "wordCount": 2,
+        "preview": "Contract transcript",
+        "archived": false,
+        "audioRemoved": false,
+        "meetingNotes": null
+      },
+      "segments": [
+        {
+          "id": "session01-0",
+          "sessionId": "session01",
+          "startedAt": 1,
+          "offsetMs": 0,
+          "durationMs": 1200,
+          "mimeType": "audio/mp4",
+          "bytes": 3,
+          "status": "done",
+          "text": "Contract transcript",
+          "cleanedText": null,
+          "error": null,
+          "attempts": 1
+        }
+      ]
+    }
+  },
+  {
+    "id": "chat-start",
+    "plugin": "studio",
+    "method": "chat.start",
+    "input": {
+      "item": {
+        "pluginId": "pages",
+        "id": "pg_contract"
+      },
+      "request": {
+        "projectId": "proj_contract",
+        "providerId": "claude-code",
+        "model": "",
+        "reasoningLevel": "medium",
+        "permissionMode": "auto",
+        "executionInputSources": {},
+        "environment": {
+          "type": "project-default"
+        },
+        "input": [
+          {
+            "type": "text",
+            "text": "Discuss",
+            "mentions": []
+          }
+        ]
+      }
+    },
+    "output": {
+      "threadId": "thr_chat"
+    }
+  },
+  {
+    "id": "bot-spaces",
+    "plugin": "studio",
+    "method": "bot_spaces",
+    "input": {},
+    "output": {
+      "bots": [
+        {
+          "id": "bot_main",
+          "name": "Chief of Staff",
+          "avatar": "🧭",
+          "shape": "square",
+          "color": "#5b8def",
+          "primary": true,
+          "mainThreadId": "thr_fixture01",
+          "needsYou": false,
+          "appearance": {
+            "themeId": "data-city",
+            "intensity": 0.8,
+            "glass": 0.6,
+            "motion": 0.4,
+            "effects": {
+              "workers": true,
+              "finished": true,
+              "needsYou": true,
+              "error": true
+            }
+          },
+          "presence": {
+            "form": "tesseract",
+            "color": {
+              "source": "theme"
+            },
+            "motion": 1
+          },
+          "activity": {
+            "turn": false,
+            "workers": 1
+          }
+        }
+      ],
+      "currentBotId": "bot_main"
+    }
+  },
+  {
+    "id": "bot-threads-view",
+    "plugin": "studio",
+    "method": "bot_threads_view",
+    "input": {
+      "botId": "bot_main"
+    },
+    "output": {
+      "botId": "bot_main",
+      "conversations": [
+        {
+          "threadId": "thr_fixture01",
+          "title": "Main",
+          "isMain": true,
+          "forkedFrom": null,
+          "projectId": "proj_personal",
+          "updatedAt": 1794365106370,
+          "latest": "The latest reply, shortened for the row.",
+          "running": false,
+          "needsYou": null,
+          "mirrored": true
+        },
+        {
+          "threadId": "thr_fixture02",
+          "title": "Fork from Main",
+          "isMain": false,
+          "forkedFrom": {
+            "threadId": "thr_fixture01",
+            "messageId": "thr_fixture01:user-seed:1",
+            "turnId": null,
+            "title": "Main"
+          },
+          "projectId": "proj_personal",
+          "updatedAt": 1794467291236,
+          "latest": null,
+          "running": false,
+          "needsYou": null,
+          "mirrored": true
+        },
+        {
+          "threadId": "thr_fixture03",
+          "title": "Plan a trip",
+          "isMain": false,
+          "forkedFrom": null,
+          "projectId": "proj_fixture01",
+          "updatedAt": 1793453815741,
+          "latest": "The latest reply, shortened for the row.",
+          "running": false,
+          "needsYou": null,
+          "mirrored": true
+        }
+      ],
+      "workers": [
+        {
+          "threadId": "thr_fixture04",
+          "title": "Build the prototype",
+          "status": "running",
+          "ownerConversationId": "thr_fixture01",
+          "ownerTitle": "Main",
+          "projectId": "proj_fixture01",
+          "updatedAt": 1794493014133,
+          "tag": "fixture-repo",
+          "branch": "feature/fixture",
+          "mirrored": true,
+          "sameTitle": 1
+        },
+        {
+          "threadId": "thr_fixture05",
+          "title": "Nightly runner",
+          "status": "done",
+          "ownerConversationId": "thr_fixture01",
+          "ownerTitle": "Main",
+          "projectId": "proj_personal",
+          "updatedAt": 1794364224913,
+          "tag": null,
+          "branch": null,
+          "mirrored": true,
+          "sameTitle": 1
+        },
+        {
+          "threadId": "thr_fixture06",
+          "title": "Review the design",
+          "status": "done",
+          "ownerConversationId": "thr_fixture01",
+          "ownerTitle": "Main",
+          "projectId": "proj_fixture01",
+          "updatedAt": 1794364172204,
+          "tag": "fixture-repo",
+          "branch": "feature/fixture",
+          "mirrored": true,
+          "sameTitle": 1
+        },
+        {
+          "threadId": "thr_fixture07",
+          "title": "Skill review",
+          "status": "done",
+          "ownerConversationId": "thr_fixture01",
+          "ownerTitle": "Main",
+          "projectId": "proj_personal",
+          "updatedAt": 1794363906772,
+          "tag": "fixture-repo",
+          "branch": "main",
+          "mirrored": true,
+          "sameTitle": 5
+        },
+        {
+          "threadId": "thr_fixture08",
+          "title": "Draft mockups",
+          "status": "failed",
+          "ownerConversationId": "thr_fixture01",
+          "ownerTitle": "Main",
+          "projectId": "proj_fixture01",
+          "updatedAt": 1794357283391,
+          "tag": "fixture-repo",
+          "branch": "feature/fixture",
+          "mirrored": true,
+          "sameTitle": 1
+        },
+        {
+          "threadId": "thr_fixture09",
+          "title": "Weekly runner",
+          "status": "done",
+          "ownerConversationId": "thr_fixture01",
+          "ownerTitle": "Main",
+          "projectId": "proj_personal",
+          "updatedAt": 1794348909474,
+          "tag": null,
+          "branch": null,
+          "mirrored": true,
+          "sameTitle": 1
+        }
+      ],
+      "hiddenWorkers": 359,
+      "hiddenToday": 0,
+      "olderConversations": 0
+    }
+  },
+  {
+    "id": "bot-threads-changed",
+    "plugin": "studio",
+    "event": "bot-threads-changed",
+    "payload": {
+      "botId": "bot_main",
+      "changes": [
+        "conversations",
+        "needs-you"
+      ]
+    }
+  }
+]

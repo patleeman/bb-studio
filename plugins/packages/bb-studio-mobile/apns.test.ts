@@ -1,0 +1,261 @@
+import { createPublicKey, generateKeyPairSync, verify } from "node:crypto";
+import { describe, expect, it } from "vitest";
+import { apnsPayload, deliverApns, normalizePem, notificationCategory, ProviderToken, rememberedDevices, DEVICE_TTL_MS, type ApnsConfig, type ApnsSend } from "./apns.js";
+
+const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+const token = "ab".repeat(32);
+
+const config: ApnsConfig = {
+  keyPem: pem,
+  keyId: "KEY123",
+  teamId: "TEAM123",
+  bundleId: "nyc.plee.bbgo",
+  environment: "auto",
+};
+
+function recordingSend(results: Record<string, { status: number; reason?: string }>) {
+  const calls: { environment: string; deviceToken: string; payload: string; headers: Record<string, string> }[] = [];
+  const send: ApnsSend = async (environment, deviceToken, payload, headers) => {
+    calls.push({ environment, deviceToken, payload, headers });
+    return results[environment] ?? { status: 200 };
+  };
+  return { calls, send };
+}
+
+describe("normalizePem", () => {
+  it("rebuilds a key pasted without line breaks", () => {
+    const flat = pem.replace(/\n/g, "");
+    expect(normalizePem(flat)).toBe(pem);
+  });
+
+  it("accepts the bare base64 body", () => {
+    const body = pem.replace(/-----[A-Z ]+-----/g, "").replace(/\s/g, "");
+    expect(normalizePem(body)).toBe(pem);
+  });
+});
+
+describe("ProviderToken", () => {
+  it("signs a verifiable ES256 JWT and caches it", () => {
+    let now = 1_700_000_000_000;
+    const provider = new ProviderToken(config, () => now);
+    const jwt = provider.get();
+    const [header, claims, signature] = jwt.split(".");
+    expect(JSON.parse(Buffer.from(header!, "base64url").toString())).toEqual({ alg: "ES256", kid: "KEY123" });
+    expect(JSON.parse(Buffer.from(claims!, "base64url").toString())).toEqual({ iss: "TEAM123", iat: 1_700_000_000 });
+    const valid = verify(
+      "sha256",
+      Buffer.from(`${header}.${claims}`),
+      { key: createPublicKey(privateKey), dsaEncoding: "ieee-p1363" },
+      Buffer.from(signature!, "base64url"),
+    );
+    expect(valid).toBe(true);
+    now += 10 * 60_000;
+    expect(provider.get()).toBe(jwt);
+    now += 40 * 60_000;
+    expect(provider.get()).not.toBe(jwt);
+  });
+});
+
+describe("apnsPayload", () => {
+  it("can remove the body entirely when fixed fields leave no room for an ellipsis", () => {
+    const base = { to: "apns:x", title: "", body: "" };
+    const title = "x".repeat(4096 - Buffer.byteLength(apnsPayload(base)));
+    const payload = apnsPayload({ ...base, title, body: "long body" });
+    expect(Buffer.byteLength(payload)).toBe(4096);
+    expect(JSON.parse(payload).aps.alert.body).toBe("");
+  });
+
+  it.each([{ title: "x".repeat(5000) }, { data: { extra: "x".repeat(5000) } }])("rejects fixed fields that cannot fit: %j", async (fields) => {
+    const send = recordingSend({});
+    const message = { to: `apns:${token}`, body: "long".repeat(2000), ...fields };
+    expect(() => apnsPayload(message)).toThrow("PayloadTooLarge");
+    expect(await deliverApns(message, config, new ProviderToken(config), send.send)).toMatchObject({
+      status: "error", details: { error: "PayloadTooLarge" },
+    });
+    expect(send.calls).toEqual([]);
+  });
+
+  it("puts the alert in aps and keeps BB's data at the top level", () => {
+    const payload = JSON.parse(
+      apnsPayload({ to: "apns:x", title: "T", body: "B", data: { threadId: "thr_1", kind: "turn-finished" } }),
+    );
+    expect(payload).toEqual({
+      aps: { alert: { title: "T", body: "B" }, sound: "default", "thread-id": "thr_1", category: "BB_REPLY" },
+      threadId: "thr_1",
+      kind: "turn-finished",
+    });
+  });
+
+  it("never lets data replace the aps dictionary", () => {
+    const payload = JSON.parse(apnsPayload({ to: "apns:x", title: "T", body: "B", data: { threadId: "thr_1", aps: { alert: "spoof" } } }));
+    expect(payload.aps).toMatchObject({ alert: { title: "T", body: "B" }, "thread-id": "thr_1" });
+    expect(payload.threadId).toBe("thr_1");
+  });
+
+  it("shortens long multi-byte bodies to fit APNs' 4 KB limit without splitting characters", () => {
+    const body = "日本語の結果😀".repeat(400);
+    const payload = apnsPayload({ to: "apns:x", title: "T", body, data: { threadId: "thr_1", kind: "turn-finished" } });
+    expect(Buffer.byteLength(payload)).toBeLessThanOrEqual(4096);
+    const parsed = JSON.parse(payload);
+    expect(parsed.aps.alert.body.endsWith("…")).toBe(true);
+    expect(body.startsWith(parsed.aps.alert.body.slice(0, -1))).toBe(true);
+    expect(parsed.aps.alert.body).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+    expect(parsed.threadId).toBe("thr_1");
+  });
+});
+
+describe("notificationCategory", () => {
+  const approval = { kind: "pending-interaction", interactionId: "pint_abcdefghij", interactionKind: "approval" };
+
+  it("offers Approve and Deny only when both are allowed", () => {
+    expect(notificationCategory({ ...approval, subjectKind: "command", decisions: ["allow_once", "deny"] })).toBe(
+      "BB_APPROVAL",
+    );
+    expect(notificationCategory({ ...approval, subjectKind: "plan", decisions: ["allow_once", "deny"] })).toBe("BB_PLAN");
+    expect(notificationCategory({ ...approval, decisions: ["allow_once"] })).toBeUndefined();
+  });
+
+  it("uses an answer box for questions, a Reply box for finished turns and plain alerts for errors", () => {
+    expect(notificationCategory({ ...approval, interactionKind: "user_question" })).toBe("BB_QUESTION");
+    expect(notificationCategory({ kind: "turn-finished", threadId: "thr_bot" })).toBe("BB_REPLY");
+    expect(notificationCategory({ kind: "turn-finished" })).toBeUndefined();
+    expect(notificationCategory({ kind: "thread-error" })).toBeUndefined();
+  });
+
+  it("leaves unenriched or plugin interactions as plain alerts", () => {
+    expect(notificationCategory({ kind: "pending-interaction" })).toBeUndefined();
+    expect(notificationCategory({ ...approval, interactionKind: "plugin" })).toBeUndefined();
+  });
+
+  it("gives single-select questions option buttons through the notification extension", () => {
+    const question = { kind: "pending-interaction", interactionId: "int_1", interactionKind: "user_question" };
+    expect(notificationCategory({ ...question, choices: ["Red", "Green"] })).toBe("BB_CHOICE");
+    expect(notificationCategory({ ...question, choices: [] })).toBe("BB_QUESTION");
+    const payload = JSON.parse(apnsPayload({ to: "apns:x", data: { ...question, threadId: "thr_1", choices: ["Red"] } }));
+    expect(payload.aps).toMatchObject({ category: "BB_CHOICE", "mutable-content": 1 });
+    expect(payload.choices).toEqual(["Red"]);
+  });
+
+  it("gives turn-finished a Reply box and keeps it tappable", () => {
+    const payload = JSON.parse(apnsPayload({ to: "apns:x", data: { kind: "turn-finished", threadId: "thr_1" } }));
+    expect(payload.aps).toMatchObject({ category: "BB_REPLY", "thread-id": "thr_1" });
+    expect(payload.aps).not.toHaveProperty("mutable-content");
+    expect(payload.threadId).toBe("thr_1");
+  });
+
+  it.each(["thread-error"])("keeps %s tappable without notification actions", (kind) => {
+    const payload = JSON.parse(apnsPayload({ to: "apns:x", data: { kind, threadId: "thr_1" } }));
+    expect(payload.aps).not.toHaveProperty("category");
+    expect(payload.aps).not.toHaveProperty("mutable-content");
+    expect(payload.aps["thread-id"]).toBe("thr_1");
+    expect(payload.threadId).toBe("thr_1");
+  });
+});
+
+describe("deliverApns", () => {
+  const provider = new ProviderToken(config);
+
+  it("sends to production with the bundle topic", async () => {
+    const { calls, send } = recordingSend({});
+    const ticket = await deliverApns({ to: `apns:${token.toUpperCase()}`, title: "T" }, config, provider, send);
+    expect(ticket).toEqual({ status: "ok" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.environment).toBe("production");
+    expect(calls[0]!.deviceToken).toBe(token);
+    expect(calls[0]!.headers["apns-topic"]).toBe("nyc.plee.bbgo");
+  });
+
+  it("falls back to the sandbox for development-build tokens", async () => {
+    const { calls, send } = recordingSend({ production: { status: 400, reason: "BadDeviceToken" } });
+    const ticket = await deliverApns({ to: `apns:${token}` }, config, provider, send);
+    expect(ticket.status).toBe("ok");
+    expect(calls.map((call) => call.environment)).toEqual(["production", "development"]);
+  });
+
+  it("reports dead tokens as DeviceNotRegistered so the sender prunes them", async () => {
+    const { send } = recordingSend({ production: { status: 410, reason: "Unregistered" } });
+    const ticket = await deliverApns({ to: `apns:${token}` }, config, provider, send);
+    expect(ticket).toMatchObject({ status: "error", details: { error: "DeviceNotRegistered" } });
+  });
+
+  it("keeps other failures as retryable errors", async () => {
+    const { send } = recordingSend({ production: { status: 403, reason: "InvalidProviderToken" } });
+    const ticket = await deliverApns({ to: `apns:${token}` }, { ...config, environment: "production" }, provider, send);
+    expect(ticket).toMatchObject({ status: "error", details: { error: "InvalidProviderToken" } });
+  });
+
+  it("rejects malformed tokens without calling Apple", async () => {
+    const { calls, send } = recordingSend({});
+    const ticket = await deliverApns({ to: "apns:not-hex" }, config, provider, send);
+    expect(ticket.status).toBe("error");
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe("rememberedDevices", () => {
+  it("keeps delivered APNs tokens, drops rejected and stale ones, and ignores Expo", () => {
+    const now = DEVICE_TTL_MS * 2;
+    const devices = rememberedDevices(
+      { "apns:gone": 1, "apns:stale": 1, "apns:recent": now - 1000 },
+      [{ to: "apns:new" }, { to: "apns:gone" }, { to: "ExponentPushToken[x]" }, { to: "apns:failed" }],
+      [
+        { status: "ok" },
+        { status: "error", details: { error: "DeviceNotRegistered" } },
+        { status: "ok" },
+        { status: "error", message: "APNs key is not set" },
+      ],
+      now,
+    );
+    expect(devices).toEqual({ "apns:new": now, "apns:recent": now - 1000 });
+  });
+
+  it("stores one trimmed, lowercase key per device and merges case variants", () => {
+    const now = DEVICE_TTL_MS * 2;
+    const devices = rememberedDevices(
+      { "apns:ABCD": now - 5000, "apns:abcd": now - 9000, "apns:Gone": now - 1000 },
+      [{ to: "apns: EF01 " }, { to: "apns:GONE" }],
+      [{ status: "ok" }, { status: "error", details: { error: "DeviceNotRegistered" } }],
+      now,
+    );
+    expect(devices).toEqual({ "apns:abcd": now - 5000, "apns:ef01": now });
+  });
+});
+
+it("returns individual results over a local HTTP/2 transport", async () => {
+  const { createServer, connect, constants } = await import("node:http2");
+  const { Http2ApnsSender } = await import("./apns.js");
+  const { vi } = await import("vitest");
+  const server = createServer();
+  server.on("stream", (stream, headers) => {
+    stream.on("error", () => {});
+    if (String(headers[":path"]).endsWith("bad")) stream.close(constants.NGHTTP2_INTERNAL_ERROR);
+    else { stream.respond({ ":status": 200 }); stream.end(); }
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address() as { port: number };
+  const session = connect(`http://127.0.0.1:${address.port}`);
+  const sender = new Http2ApnsSender();
+  const spy = vi.spyOn(sender as any, "session").mockReturnValue(session);
+  try {
+    const results = await Promise.all([sender.send("production", "bad", "{}", {}), sender.send("production", "good", "{}", {})]);
+    expect(results[0]).toMatchObject({ status: 0, reason: expect.any(String) });
+    expect(results[1]).toMatchObject({ status: 200 });
+  } finally {
+    spy.mockRestore();
+    session.destroy();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+it('preserves loop notification actions and selects BB_LOOP', () => {
+  const data = {category:'BB_LOOP',loopId:'loop_123',actions:['done','snooze','got_it'],threadId:'thr_bot',kind:'turn-finished'};
+  expect(notificationCategory(data)).toBe('BB_LOOP');
+  const payload = apnsPayload({to:'apns:abc',title:'Call plumber',body:'Home repair',data});
+  expect(JSON.parse(payload)).toMatchObject({...data,aps:{category:'BB_LOOP','mutable-content':1}});
+  expect(notificationCategory({category:'BB_LOOP'})).toBeUndefined();
+});
+it('carries a loop kind and decision options for the app extension', () => {
+  const data = {category:'BB_LOOP',loopId:'loop_1',loopKind:'decide',options:['Bayside','Hudson'],actions:['choose','snooze'],threadId:'thr_bot',kind:'turn-finished'};
+  expect(JSON.parse(apnsPayload({to:'apns:abc',title:'Choose',body:'',data}))).toMatchObject({loopKind:'decide',options:['Bayside','Hudson'],aps:{category:'BB_LOOP','mutable-content':1}});
+});

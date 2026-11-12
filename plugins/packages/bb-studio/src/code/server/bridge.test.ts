@@ -1,0 +1,256 @@
+import { readFileSync } from "node:fs";
+import { request } from "node:http";
+import { mkdtemp, rm, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { Bridges, bridgeSocketPath, editorContext, tokenFileFor } from "./bridge";
+import type { EditorState } from "../shared";
+
+/** The bridge's secret, read from its file beside the socket, as the extension does. */
+const auth = (socketPath: string) => ({ authorization: `Bearer ${readFileSync(tokenFileFor(socketPath), "utf8").trim()}` });
+
+let dir = "";
+beforeAll(async () => { dir = await mkdtemp(join(tmpdir(), "scb-")); });
+afterAll(() => rm(dir, { recursive: true, force: true }));
+
+function call(socketPath: string, method: string, path: string, body?: unknown): Promise<{ status: number; text: string }> {
+  return new Promise((resolve, reject) => {
+    const req = request({ socketPath, method, path, headers: { "content-type": "application/json", ...auth(socketPath) } }, (res) => {
+      let text = "";
+      res.on("data", (chunk) => { text += chunk; });
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, text }));
+    });
+    req.on("error", reject);
+    if (body !== undefined) req.write(JSON.stringify(body));
+    req.end();
+  });
+}
+
+/** Opens the event stream and resolves with the first event. */
+function nextEvent(socketPath: string, window?: string): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const req = request({ socketPath, path: window ? `/events?window=${window}` : "/events", headers: auth(socketPath) }, (res) => {
+      let buffer = "";
+      res.on("data", (chunk) => {
+        buffer += chunk;
+        const match = /^data: (.*)$/m.exec(buffer);
+        if (match) { resolve(JSON.parse(match[1]!)); req.destroy(); }
+      });
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+const state: EditorState = {
+  focused: true,
+  activeFile: {
+    path: "/repo/src/retry.ts",
+    language: "typescript",
+    selection: { startLine: 12, startColumn: 1, endLine: 14, endColumn: 2 },
+    selectedText: "if (attempt > MAX_ATTEMPTS) throw error;",
+    visible: { startLine: 1, endLine: 40 },
+    problems: [{ line: 14, severity: "error", message: "Cannot find name 'delay'." }],
+  },
+  openFiles: ["/repo/src/retry.ts", "/repo/src/queue.ts"],
+  unsavedFiles: ["/repo/src/queue.ts"],
+};
+
+describe("bridge socket", () => {
+  it("keeps the socket path short enough for Unix sockets, and private", async () => {
+    expect(bridgeSocketPath(dir, "cws_1").length).toBeLessThan(104);
+    expect(bridgeSocketPath(`/${"x".repeat(200)}`, "cws_1").length).toBeLessThan(104);
+    const bridges = new Bridges();
+    const socket = await bridges.open("cws_mode", dir);
+    expect((await stat(socket)).mode & 0o777).toBe(0o600);
+    await bridges.close("cws_mode");
+  });
+
+  it("stores what the editor reports, and refuses malformed reports", async () => {
+    const bridges = new Bridges();
+    const socket = await bridges.open("cws_state", dir);
+    // State counts only from a connected window.
+    const window = request({ socketPath: socket, path: "/events", headers: auth(socket) });
+    window.end();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect((await call(socket, "POST", "/state", state)).status).toBe(204);
+    expect(bridges.state("cws_state")?.activeFile?.path).toBe("/repo/src/retry.ts");
+    expect((await call(socket, "POST", "/state", { focused: "yes" })).status).toBe(400);
+    window.destroy();
+    await bridges.close("cws_state");
+    expect(bridges.state("cws_state")).toBeNull();
+  });
+
+  it("sends commands to a connected editor, and holds one for an editor that connects later", async () => {
+    const bridges = new Bridges();
+    const socket = await bridges.open("cws_cmd", dir);
+    expect(bridges.connected("cws_cmd")).toBe(false);
+    // Nobody listening yet: held, then delivered on connect.
+    bridges.send("cws_cmd", { type: "show", path: "/repo/a.ts", startLine: 3, endLine: 5 });
+    await expect(nextEvent(socket)).resolves.toEqual({ type: "show", path: "/repo/a.ts", startLine: 3, endLine: 5 });
+    await bridges.close("cws_cmd");
+  });
+});
+
+describe("newer commands and older editors", () => {
+  it("sends a reload to every window, and knows an editor that named no version is too old for it", async () => {
+    const bridges = new Bridges();
+    const socket = await bridges.open("cws_refresh", dir);
+    // The extension names its version from 0.7.0 on.
+    const current = nextEvent(socket, "new&v=0.7.0");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(bridges.upToDate("cws_refresh")).toBe(true);
+    expect(bridges.broadcast("cws_refresh", { type: "refresh", path: "/repo/a.ts" })).toBe(1);
+    await expect(current).resolves.toEqual({ type: "refresh", path: "/repo/a.ts" });
+    const old = nextEvent(socket, "old");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(bridges.upToDate("cws_refresh")).toBe(false);
+    bridges.broadcast("cws_refresh", { type: "theme", base: "Dark Modern", colors: { "editor.background": "#101010" } });
+    await expect(old).resolves.toEqual({ type: "theme", base: "Dark Modern", colors: { "editor.background": "#101010" } });
+    await bridges.close("cws_refresh");
+  });
+
+  it("has the extension name its version when it connects", async () => {
+    const { BRIDGE_SOURCE, BRIDGE_VERSION } = await import("./bridge-extension");
+    expect(BRIDGE_VERSION).toBe("0.7.0");
+    expect(BRIDGE_SOURCE).toContain(`const VERSION = "${BRIDGE_VERSION}";`);
+    expect(BRIDGE_SOURCE).toContain('"&v=" + VERSION');
+  });
+});
+
+describe("what the agent is told", () => {
+  it("describes the file, lines, selection, problems and unsaved files, relative to the workspace", () => {
+    const text = editorContext([{ title: "Orbit", folders: ["/repo"], state }]);
+    expect(text).toContain('VS Code workspace "Orbit"');
+    expect(text).toContain("src/retry.ts");
+    expect(text).toContain("lines 1–40");
+    expect(text).toContain("lines 12–14");
+    expect(text).toContain("if (attempt > MAX_ATTEMPTS) throw error;");
+    expect(text).toContain("line 14: Cannot find name 'delay'.");
+    expect(text).toMatch(/unsaved[^\n]*src\/queue\.ts/i);
+    expect(text).toMatch(/don't edit/i);
+    expect(text).toContain("code_show");
+  });
+
+  it("says nothing when no editor is connected", () => {
+    expect(editorContext([])).toBeNull();
+  });
+});
+
+describe("bridge extension", () => {
+  it("is valid JavaScript", async () => {
+    const { BRIDGE_SOURCE } = await import("./bridge-extension");
+    expect(() => new Function("require", "exports", "process", BRIDGE_SOURCE)).not.toThrow();
+  });
+
+  it("installs once, and replaces an older version", async () => {
+    const { BRIDGE_ID, BRIDGE_VERSION, installBridge } = await import("./bridge-extension");
+    const { mkdir, readdir, writeFile, readFile } = await import("node:fs/promises");
+    const extensions = join(dir, "extensions");
+    await mkdir(join(extensions, `${BRIDGE_ID}-0.0.1`), { recursive: true });
+    await writeFile(join(extensions, "extensions.json"), JSON.stringify([{ identifier: { id: BRIDGE_ID }, version: "0.0.1" }, { identifier: { id: "other.ext" }, version: "1.0.0" }]));
+    await installBridge(extensions);
+    await installBridge(extensions);
+    expect((await readdir(extensions)).filter((name) => name.startsWith(BRIDGE_ID))).toEqual([`${BRIDGE_ID}-${BRIDGE_VERSION}`]);
+    // The old version's entry is replaced by the new one; others stay.
+    expect(JSON.parse(await readFile(join(extensions, "extensions.json"), "utf8"))).toEqual([
+      { identifier: { id: "other.ext" }, version: "1.0.0" },
+      expect.objectContaining({ identifier: { id: BRIDGE_ID }, version: BRIDGE_VERSION }),
+    ]);
+    expect(JSON.parse(await readFile(join(extensions, `${BRIDGE_ID}-${BRIDGE_VERSION}`, "package.json"), "utf8")).main).toBe("./extension.js");
+  });
+});
+
+describe("bridge registration", () => {
+  it("registers itself where VS Code already keeps a list, and undoes VS Code marking it removed", async () => {
+    const { BRIDGE_ID, BRIDGE_VERSION, installBridge } = await import("./bridge-extension");
+    const { mkdir, writeFile, readFile } = await import("node:fs/promises");
+    const extensions = join(dir, "existing-registry");
+    await mkdir(extensions, { recursive: true });
+    // What VS Code had written: an empty list, and our folder marked removed.
+    await writeFile(join(extensions, "extensions.json"), "[]");
+    await writeFile(join(extensions, ".obsolete"), JSON.stringify({ [`${BRIDGE_ID}-${BRIDGE_VERSION}`]: true, "other.ext-1.0.0": true }));
+    await installBridge(extensions);
+    const registry = JSON.parse(await readFile(join(extensions, "extensions.json"), "utf8"));
+    expect(registry).toEqual([expect.objectContaining({ identifier: { id: BRIDGE_ID }, version: BRIDGE_VERSION, relativeLocation: `${BRIDGE_ID}-${BRIDGE_VERSION}` })]);
+    expect(registry[0].location).toEqual({ $mid: 1, path: join(extensions, `${BRIDGE_ID}-${BRIDGE_VERSION}`), scheme: "file" });
+    expect(JSON.parse(await readFile(join(extensions, ".obsolete"), "utf8"))).toEqual({ "other.ext-1.0.0": true });
+  });
+});
+
+describe("live typing types only what changes", () => {
+  /** The extension's own helpers, loaded with a stand-in for the vscode module. */
+  async function helpers() {
+    const { BRIDGE_SOURCE } = await import("./bridge-extension");
+    const stub: unknown = new Proxy(function () {}, { get: () => stub, apply: () => stub, construct: () => stub as object });
+    const module = { exports: {} as Record<string, unknown> };
+    new Function("require", "exports", "process", BRIDGE_SOURCE)((name: string) => (name === "vscode" ? stub : require(name)), module.exports, { env: {} });
+    return module.exports as { narrow(oldText: string, newText: string): { skip: number; remove: number; text: string } };
+  }
+
+  it("keeps the shared start and end of a replacement", async () => {
+    const { narrow } = await helpers();
+    // Adding a comment above a line types only the comment.
+    expect(narrow("export async function f", "/** Does f. */\nexport async function f")).toEqual({ skip: 0, remove: 0, text: "/** Does f. */\n" });
+    // Dropping "/ 1000" removes just that.
+    expect(narrow("MAX_DELAY_MS / 1000", "MAX_DELAY_MS")).toEqual({ skip: 12, remove: 7, text: "" });
+    expect(narrow("abc", "abc")).toEqual({ skip: 3, remove: 0, text: "" });
+  });
+});
+
+describe("/call", () => {
+  it("passes the extension's calls through and answers with the result or the error", async () => {
+    const calls: unknown[] = [];
+    const bridges = new Bridges(undefined, undefined, undefined, async (_id, input) => {
+      calls.push(input);
+      if ((input as { method?: string }).method === "submit") throw new Error("There are no comments to submit.");
+      return { threads: [] };
+    });
+    const socket = await bridges.open("ws_call", dir);
+    try {
+      expect(await call(socket, "POST", "/call", { method: "list" })).toEqual({ status: 200, text: JSON.stringify({ ok: true, result: { threads: [] } }) });
+      expect(await call(socket, "POST", "/call", { method: "submit" })).toEqual({ status: 400, text: JSON.stringify({ ok: false, error: "There are no comments to submit." }) });
+      expect(calls).toEqual([{ method: "list" }, { method: "submit" }]);
+    } finally {
+      await bridges.close("ws_call");
+    }
+  });
+});
+
+describe("broadcast", () => {
+  it("reaches every connected window, not only the one in use", async () => {
+    const bridges = new Bridges();
+    const socket = await bridges.open("ws_cast", dir);
+    try {
+      const first = nextEvent(socket, "a");
+      const second = nextEvent(socket, "b");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(bridges.broadcast("ws_cast", { type: "comments" })).toBe(2);
+      expect(await first).toEqual({ type: "comments" });
+      expect(await second).toEqual({ type: "comments" });
+    } finally {
+      await bridges.close("ws_cast");
+    }
+  });
+});
+
+it.each(["{broken", "{}", "[null]"])("preserves an unreadable extension registry: %s", async (text) => {
+  const { installBridge } = await import("./bridge-extension");
+  const { mkdtemp, readFile, writeFile } = await import("node:fs/promises");
+  const extensions = await mkdtemp(join(dir, "bad-registry-"));
+  const file = join(extensions, "extensions.json");
+  await writeFile(file, text);
+  await expect(installBridge(extensions)).rejects.toThrow();
+  expect(await readFile(file, "utf8")).toBe(text);
+});
+
+it("serializes concurrent bridge installations without losing other extensions", async () => {
+  const { installBridge, BRIDGE_ID } = await import("./bridge-extension");
+  const { mkdtemp, readFile, writeFile } = await import("node:fs/promises");
+  const extensions = await mkdtemp(join(dir, "parallel-registry-"));
+  const other = { identifier: { id: "other.ext" }, version: "1" };
+  await writeFile(join(extensions, "extensions.json"), JSON.stringify([other]));
+  await Promise.all(Array.from({ length: 5 }, () => installBridge(extensions)));
+  expect(JSON.parse(await readFile(join(extensions, "extensions.json"), "utf8"))).toEqual([other, expect.objectContaining({ identifier: { id: BRIDGE_ID } })]);
+});

@@ -1,0 +1,34 @@
+{
+  "name": "bb-studio",
+  "version": "0.1.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "check:compat": "node scripts/check-sdk-compat.mjs",
+    "dev": "pnpm -r --if-present dev",
+    "clean": "pnpm -r --if-present clean",
+    "plugins:install": "bash scripts/install-all.sh",
+    "test": "pnpm -r --if-present test",
+    "check:docs": "node scripts/check-docs.mjs",
+    "check:marketplace": "node scripts/check-marketplace.mjs",
+    "check": "pnpm typecheck && pnpm test && pnpm check:compat && pnpm check:docs && pnpm check:marketplace && pnpm check:icons && pnpm check:contracts && pnpm check:native-payloads",
+    "gen:contracts": "tsx scripts/gen-contracts.mjs",
+    "check:contracts": "tsx scripts/gen-contracts.mjs --check",
+    "check:native-payloads": "node scripts/check-native-payload-fixtures.mjs",
+    "check:icons": "node scripts/check-icons.mjs"
+  },
+  "devDependencies": {
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1",
+    "tsx": "4.20.6",
+    "typescript": "^5.7.0",
+    "zod": "4.6.5"
+  },
+  "packageManager": "pnpm@11.10.0",
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}
