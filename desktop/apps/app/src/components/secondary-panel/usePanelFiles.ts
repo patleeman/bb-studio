@@ -1,0 +1,156 @@
+import { useCallback } from "react";
+import {
+  getEnvironmentFilePreviewSourceAtRef,
+  type ThreadStorageFileTabState,
+  type WorkspaceFileTabState,
+} from "@bb/client-core";
+import type { AppFilePreviewIntent } from "@/lib/app-navigation-host";
+import {
+  normalizeExperimentalFileOpenOptions,
+  toFilePreviewLineRange,
+} from "@/lib/live-file-navigation";
+import type { FileOpenerOverride } from "@/lib/plugin-slot-resolvers";
+import type { OpenSecondaryPanelTabRequest } from "./useThreadFileTabs";
+
+export interface PanelFileScope {
+  threadId: string | null;
+  environmentId: string | null;
+  hostId: string | null;
+}
+
+interface PanelFileOpenOptions {
+  viewer?: FileOpenerOverride;
+}
+
+interface UsePanelFilesArgs {
+  available: boolean;
+  openTab: (
+    request: OpenSecondaryPanelTabRequest,
+    options?: PanelFileOpenOptions,
+  ) => unknown;
+  reveal: () => void;
+  scope: PanelFileScope | null;
+}
+
+export interface PanelFiles {
+  openFilePreview: (intent: AppFilePreviewIntent) => boolean;
+  openStorageFile: (
+    file: ThreadStorageFileTabState,
+    options?: PanelFileOpenOptions,
+  ) => void;
+  openWorkspaceFile: (
+    file: WorkspaceFileTabState,
+    options?: PanelFileOpenOptions,
+  ) => void;
+}
+
+function livePreviewRequest(
+  intent: AppFilePreviewIntent,
+  scope: PanelFileScope | null,
+): OpenSecondaryPanelTabRequest | null {
+  const normalized = normalizeExperimentalFileOpenOptions({
+    target: intent.target,
+    location: intent.location,
+  });
+  if (normalized === null) return null;
+  const { target } = normalized;
+  const lineRange = toFilePreviewLineRange(normalized.location);
+  switch (target.kind) {
+    case "workspace":
+      if (scope !== null && target.environmentId !== scope.environmentId) {
+        return null;
+      }
+      return {
+        kind: "workspace-file-preview",
+        environmentId: target.environmentId,
+        tab: {
+          lineRange,
+          path: target.path,
+          source: getEnvironmentFilePreviewSourceAtRef(target.experimental_ref),
+          statusLabel: null,
+        },
+      };
+    case "host":
+      if (scope === null || scope.threadId === null) {
+        if (scope?.hostId != null && target.hostId !== scope.hostId) {
+          return null;
+        }
+        return {
+          kind: "host-file-preview",
+          hostId: target.hostId,
+          tab: { lineRange, path: target.path },
+        };
+      }
+      if (scope.environmentId === null || target.hostId !== scope.hostId) {
+        return null;
+      }
+      return {
+        kind: "host-file-preview",
+        tab: { lineRange, path: target.path },
+      };
+    case "thread-storage":
+      if (scope !== null && target.threadId !== scope.threadId) return null;
+      return {
+        kind: "thread-storage-file-preview",
+        threadId: target.threadId,
+        tab: { lineRange, path: target.path },
+      };
+  }
+}
+
+export function usePanelFiles({
+  available,
+  openTab,
+  reveal,
+  scope,
+}: UsePanelFilesArgs): PanelFiles {
+  const openWorkspaceFile = useCallback(
+    (file: WorkspaceFileTabState, options?: PanelFileOpenOptions) => {
+      openTab({ kind: "workspace-file-preview", tab: file }, options);
+    },
+    [openTab],
+  );
+  const openStorageFile = useCallback(
+    (file: ThreadStorageFileTabState, options?: PanelFileOpenOptions) => {
+      openTab({ kind: "thread-storage-file-preview", tab: file }, options);
+    },
+    [openTab],
+  );
+  const hasScope = scope !== null;
+  const scopeThreadId = scope?.threadId ?? null;
+  const scopeEnvironmentId = scope?.environmentId ?? null;
+  const scopeHostId = scope?.hostId ?? null;
+  const openFilePreview = useCallback(
+    (intent: AppFilePreviewIntent) => {
+      if (!available) return false;
+      const request = livePreviewRequest(
+        intent,
+        hasScope
+          ? {
+              threadId: scopeThreadId,
+              environmentId: scopeEnvironmentId,
+              hostId: scopeHostId,
+            }
+          : null,
+      );
+      if (request === null) return false;
+      const tab = openTab(
+        request,
+        intent.viewer === undefined ? undefined : { viewer: intent.viewer },
+      );
+      if (tab === null) return false;
+      reveal();
+      return true;
+    },
+    [
+      available,
+      hasScope,
+      openTab,
+      reveal,
+      scopeEnvironmentId,
+      scopeHostId,
+      scopeThreadId,
+    ],
+  );
+  return { openFilePreview, openStorageFile, openWorkspaceFile };
+}

@@ -1,0 +1,55 @@
+import {
+  getEnvironmentActionInvalidationQueryKeys,
+  getEnvironmentWorkspaceStateInvalidationQueryKeys,
+} from "./query-cache";
+import {
+  environmentFilePreviewQueryKeyPrefix,
+  environmentPathsQueryKeyPrefix,
+  systemExecutionOptionsEnvironmentQueryKeyPrefix,
+} from "../queries/query-keys";
+import type {
+  EnvironmentArg,
+  OptionalEnvironmentArg,
+} from "../cache-effect-types";
+import { invalidateQueryKeys } from "./cache-effect-utils";
+
+export function removeEnvironmentScopedQueries({
+  environmentId,
+  queryClient,
+}: OptionalEnvironmentArg): void {
+  if (!environmentId) {
+    return;
+  }
+
+  queryClient.removeQueries({
+    queryKey: environmentFilePreviewQueryKeyPrefix(environmentId),
+  });
+  queryClient.removeQueries({
+    queryKey: environmentPathsQueryKeyPrefix(environmentId),
+  });
+  queryClient.removeQueries({
+    queryKey: systemExecutionOptionsEnvironmentQueryKeyPrefix(environmentId),
+  });
+}
+
+export function invalidateEnvironmentActionQueries({
+  environmentId,
+  queryClient,
+}: EnvironmentArg): void {
+  invalidateQueryKeys({
+    queryClient,
+    queryKeys: getEnvironmentActionInvalidationQueryKeys({ environmentId }),
+  });
+}
+
+export function invalidateEnvironmentWorkspaceStateQueries({
+  environmentId,
+  queryClient,
+}: EnvironmentArg): void {
+  invalidateQueryKeys({
+    queryClient,
+    queryKeys: getEnvironmentWorkspaceStateInvalidationQueryKeys({
+      environmentId,
+    }),
+  });
+}

@@ -1,0 +1,157 @@
+import { renderHookStatically } from "@/test/render-hook-statically";
+import { describe, expect, it, vi } from "vitest";
+import type { ExperimentalLiveFileTarget } from "@get-bb/plugin-sdk";
+import { usePanelFiles, type PanelFileScope } from "./usePanelFiles";
+import type { OpenSecondaryPanelTabRequest } from "./useThreadFileTabs";
+
+interface SurfaceCase {
+  name: string;
+  scope: PanelFileScope | null;
+  accepts: Record<
+    "ownWorkspace" | "ownHost" | "ownStorage" | "otherWorkspace",
+    boolean
+  >;
+}
+
+const OWN_WORKSPACE: ExperimentalLiveFileTarget = {
+  kind: "workspace",
+  environmentId: "env_1",
+  path: "src/a.ts",
+};
+const OTHER_WORKSPACE: ExperimentalLiveFileTarget = {
+  kind: "workspace",
+  environmentId: "env_other",
+  path: "src/a.ts",
+};
+const OWN_HOST: ExperimentalLiveFileTarget = {
+  kind: "host",
+  hostId: "host_1",
+  path: "/tmp/log.txt",
+};
+const OWN_STORAGE: ExperimentalLiveFileTarget = {
+  kind: "thread-storage",
+  threadId: "thr_1",
+  path: "notes.md",
+};
+
+const SURFACES: readonly SurfaceCase[] = [
+  {
+    name: "thread view",
+    scope: { threadId: "thr_1", environmentId: "env_1", hostId: "host_1" },
+    accepts: {
+      ownWorkspace: true,
+      ownHost: true,
+      ownStorage: true,
+      otherWorkspace: false,
+    },
+  },
+  {
+    name: "New thread screen without a thread",
+    scope: { threadId: null, environmentId: "env_1", hostId: "host_1" },
+    accepts: {
+      ownWorkspace: true,
+      ownHost: true,
+      ownStorage: false,
+      otherWorkspace: false,
+    },
+  },
+  {
+    name: "New thread screen with a machine terminal",
+    scope: { threadId: null, environmentId: null, hostId: null },
+    accepts: {
+      ownWorkspace: false,
+      ownHost: true,
+      ownStorage: false,
+      otherWorkspace: false,
+    },
+  },
+  {
+    name: "plugin page",
+    scope: null,
+    accepts: {
+      ownWorkspace: true,
+      ownHost: true,
+      ownStorage: true,
+      otherWorkspace: true,
+    },
+  },
+];
+
+function renderSurface(surface: SurfaceCase, available = true) {
+  const openTab = vi.fn((_request: OpenSecondaryPanelTabRequest) => ({
+    id: "tab",
+  }));
+  const reveal = vi.fn();
+  const panelFiles = renderHookStatically(() =>
+    usePanelFiles({ available, openTab, reveal, scope: surface.scope }),
+  );
+  return { openTab, panelFiles, reveal };
+}
+
+describe.each(SURFACES)("panel files on the $name", (surface) => {
+  it.each([
+    ["ownWorkspace", OWN_WORKSPACE],
+    ["ownHost", OWN_HOST],
+    ["ownStorage", OWN_STORAGE],
+    ["otherWorkspace", OTHER_WORKSPACE],
+  ] as const)("applies the surface rule to a %s target", (caseName, target) => {
+    const { openTab, panelFiles, reveal } = renderSurface(surface);
+    const accepted = panelFiles.openFilePreview({ target, location: null });
+
+    expect(accepted).toBe(surface.accepts[caseName]);
+    expect(openTab).toHaveBeenCalledTimes(accepted ? 1 : 0);
+    expect(reveal).toHaveBeenCalledTimes(accepted ? 1 : 0);
+  });
+
+  it.runIf(surface.accepts.ownWorkspace).each([
+    ["HEAD", { kind: "head" }],
+    ["abc1234", { kind: "merge-base", ref: "abc1234" }],
+  ] as const)("opens the %s revision as a read-only preview", (ref, source) => {
+    const { openTab, panelFiles } = renderSurface(surface);
+    panelFiles.openFilePreview({
+      target: { ...OWN_WORKSPACE, experimental_ref: ref },
+      location: null,
+    });
+
+    expect(openTab).toHaveBeenCalledWith(
+      {
+        kind: "workspace-file-preview",
+        environmentId: "env_1",
+        tab: { lineRange: null, path: "src/a.ts", source, statusLabel: null },
+      },
+      undefined,
+    );
+  });
+
+  it.runIf(surface.accepts.ownHost)(
+    "passes a one-off viewer through to the opened tab",
+    () => {
+      const { openTab, panelFiles } = renderSurface(surface);
+      const viewer = { pluginId: "pages", openerId: "page" };
+
+      expect(
+        panelFiles.openFilePreview({ target: OWN_HOST, location: null, viewer }),
+      ).toBe(true);
+      expect(openTab).toHaveBeenCalledWith(expect.anything(), { viewer });
+    },
+  );
+
+  it("declines malformed targets and unavailable surfaces", () => {
+    const { panelFiles: available } = renderSurface(surface);
+    const { panelFiles: unavailable, openTab } = renderSurface(surface, false);
+
+    expect(
+      available.openFilePreview({
+        target: { ...OWN_WORKSPACE, path: "../escape" },
+        location: null,
+      }),
+    ).toBe(false);
+    expect(
+      unavailable.openFilePreview({
+        target: OWN_WORKSPACE,
+        location: null,
+      }),
+    ).toBe(false);
+    expect(openTab).not.toHaveBeenCalled();
+  });
+});

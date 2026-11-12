@@ -1,0 +1,730 @@
+import { describe, expect, it } from "vitest";
+import { getAppKeybindingOverrides } from "@bb/db";
+import {
+  PANE_FOCUS_APP_COMMAND_IDS,
+  THREAD_JUMP_APP_COMMAND_IDS,
+  applyAppKeybindingOverrides,
+  appKeybindingOverridesSchema,
+  isAppKeybindingAvailableForClient,
+  matchesAppShortcut,
+} from "@bb/domain";
+import { systemConfigResponseSchema } from "@bb/server-contract";
+import { DEFAULT_APP_KEYBINDINGS } from "../../src/services/system/app-keybindings.js";
+import { readJson } from "../helpers/json.js";
+import { withTestHarness } from "../helpers/test-app.js";
+
+const DEFAULT_KEYBINDING_CLIENTS = [
+  { name: "desktop-mac", isDesktop: true, isMac: true, platform: "mac" },
+  { name: "desktop-other", isDesktop: true, isMac: false, platform: "linux" },
+  { name: "web-mac", isDesktop: false, isMac: true, platform: "mac" },
+  { name: "web-other", isDesktop: false, isMac: false, platform: "linux" },
+] as const;
+
+function shortcutIdentity(
+  binding: ReturnType<typeof applyAppKeybindingOverrides>[number],
+  isMac: boolean,
+): string {
+  const { shortcut } = binding;
+  return JSON.stringify({
+    key: shortcut.key.toLowerCase(),
+    meta: shortcut.meta || (shortcut.mod && isMac),
+    control: shortcut.control || (shortcut.mod && !isMac),
+    alt: shortcut.alt,
+    shift: shortcut.shift,
+  });
+}
+
+function bindingContextsOverlap(
+  left: ReturnType<typeof applyAppKeybindingOverrides>[number],
+  right: ReturnType<typeof applyAppKeybindingOverrides>[number],
+): boolean {
+  const leftAll = new Set(left.when.all);
+  const rightAll = new Set(right.when.all);
+  return (
+    !left.when.none.some((context) => rightAll.has(context)) &&
+    !right.when.none.some((context) => leftAll.has(context))
+  );
+}
+
+function commandPair(left: string, right: string): string {
+  return [left, right].sort().join("+");
+}
+
+describe("app keybindings", () => {
+  it.each(DEFAULT_KEYBINDING_CLIENTS)(
+    "offers local logs only to desktop clients: $name",
+    (client) => {
+      const binding = DEFAULT_APP_KEYBINDINGS.find(
+        (binding) => binding.command === "logs.openServerDaemon",
+      );
+      expect(binding).toBeDefined();
+      if (binding)
+        expect(isAppKeybindingAvailableForClient(binding, client)).toBe(
+          client.isDesktop,
+        );
+    },
+  );
+
+  it.each(DEFAULT_KEYBINDING_CLIENTS)(
+    "binds terminal find to terminal focus without shell control keys: $name",
+    (client) => {
+      const bindings = applyAppKeybindingOverrides(
+        DEFAULT_APP_KEYBINDINGS,
+        [],
+      ).filter(
+        (binding) =>
+          binding.command === "terminal.find" &&
+          isAppKeybindingAvailableForClient(binding, client),
+      );
+      expect(bindings).toHaveLength(1);
+      expect(bindings[0]?.when.all).toContain("terminalFocus");
+      expect(bindings[0]?.shortcut).toMatchObject({
+        key: "f",
+        mod: true,
+        shift: !client.isMac,
+      });
+    },
+  );
+
+  it("persists plugin bindings even before the plugin is loaded", async () => {
+    await withTestHarness(async (harness) => {
+      const overrides = [
+        {
+          command: "plugin:example/open",
+          platform: "mac",
+          shortcut: {
+            key: "i",
+            mod: true,
+            meta: false,
+            control: false,
+            alt: false,
+            shift: true,
+          },
+        },
+      ];
+      const response = await harness.app.request("/api/v1/settings/keyboard", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(overrides),
+      });
+      expect(response.status).toBe(200);
+      expect(getAppKeybindingOverrides(harness.db)).toEqual(overrides);
+      const config = systemConfigResponseSchema.parse(
+        await readJson(await harness.app.request("/api/v1/system/config")),
+      );
+      expect(config.keybindingOverrides).toEqual(overrides);
+      expect(
+        config.keybindings.some(
+          (binding) => binding.command === "plugin:example/open",
+        ),
+      ).toBe(false);
+    });
+  });
+
+  it("assigns distinct panel navigation defaults", () => {
+    for (const [command, key] of [
+      ["panel.previousTab", "ArrowLeft"],
+      ["panel.nextTab", "ArrowRight"],
+      ["panel.previousNewTabItem", "ArrowUp"],
+      ["panel.nextNewTabItem", "ArrowDown"],
+    ] as const) {
+      const binding = DEFAULT_APP_KEYBINDINGS.find(
+        (item) => item.command === command,
+      );
+      expect(binding).toMatchObject({
+        desktopOnly: false,
+        shortcut: { key, mod: true, control: true, shift: false, alt: false },
+        when: { all: ["mainSurface", "macPlatform"], none: ["modalOpen"] },
+      });
+    }
+  });
+
+  it("preserves non-Mac Ctrl arrow editing while keeping navigation rebindable", () => {
+    const defaults = applyAppKeybindingOverrides(DEFAULT_APP_KEYBINDINGS, []);
+    const client = { isDesktop: false, isMac: false, platform: "linux" };
+    for (const key of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]) {
+      for (const shiftKey of [false, true]) {
+        const input = {
+          key,
+          code: key,
+          ctrlKey: true,
+          metaKey: false,
+          altKey: false,
+          shiftKey,
+        };
+        expect(
+          defaults.filter(
+            (binding) =>
+              isAppKeybindingAvailableForClient(binding, client) &&
+              matchesAppShortcut(input, binding.shortcut, false),
+          ),
+        ).toEqual([]);
+      }
+    }
+    const command = "panel.nextTab";
+    const custom = {
+      key: "ArrowRight",
+      mod: false,
+      meta: false,
+      control: true,
+      alt: true,
+      shift: false,
+    };
+    const bindings = applyAppKeybindingOverrides(DEFAULT_APP_KEYBINDINGS, [
+      { command, shortcut: custom },
+    ]).filter(
+      (binding) =>
+        binding.command === command &&
+        isAppKeybindingAvailableForClient(binding, client),
+    );
+    expect(bindings).toHaveLength(1);
+    expect(bindings[0]?.shortcut).toEqual(custom);
+  });
+
+  it("lets a user's own Mod+[ binding win over Go back", () => {
+    const bindings = applyAppKeybindingOverrides(
+      DEFAULT_APP_KEYBINDINGS,
+      appKeybindingOverridesSchema.parse([
+        {
+          command: "thread.previous",
+          shortcut: {
+            key: "[",
+            mod: true,
+            meta: false,
+            control: false,
+            alt: false,
+            shift: false,
+          },
+        },
+      ]),
+    );
+    const input = {
+      key: "[",
+      code: "BracketLeft",
+      metaKey: true,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+    };
+    expect(
+      [...bindings]
+        .reverse()
+        .find((binding) => matchesAppShortcut(input, binding.shortcut, true))
+        ?.command,
+    ).toBe("thread.previous");
+  });
+
+  it.each(DEFAULT_KEYBINDING_CLIENTS)(
+    "runs question actions from the card's text field but not other text fields: $name",
+    (client) => {
+      const defaults = applyAppKeybindingOverrides(DEFAULT_APP_KEYBINDINGS, []);
+      const commandsFor = (
+        input: Parameters<typeof matchesAppShortcut>[0],
+        active: readonly string[],
+      ) =>
+        defaults
+          .filter(
+            (binding) =>
+              binding.command.startsWith("question.") &&
+              isAppKeybindingAvailableForClient(binding, client) &&
+              matchesAppShortcut(input, binding.shortcut, client.isMac) &&
+              binding.when.all.every((key) => active.includes(key)) &&
+              !binding.when.none.some((key) => active.includes(key)),
+          )
+          .map((binding) => binding.command);
+      const key = (key: string, mod: boolean) => ({
+        key,
+        code: key,
+        metaKey: mod && client.isMac,
+        ctrlKey: mod && !client.isMac,
+        altKey: false,
+        shiftKey: false,
+      });
+      const presses = [
+        key("Enter", true),
+        key(".", true),
+        key("ArrowLeft", false),
+        key("ArrowRight", false),
+      ];
+      const pressed = (active: readonly string[]) =>
+        presses.map((input) => commandsFor(input, active)[0] ?? null);
+
+      expect(pressed(["mainSurface", "questionOpen", "editableFocus"])).toEqual(
+        [null, null, null, null],
+      );
+      expect(
+        pressed([
+          "mainSurface",
+          "questionOpen",
+          "questionFocus",
+          "editableFocus",
+        ]),
+      ).toEqual(["question.submit", "question.cancel", null, null]);
+      expect(pressed(["mainSurface", "questionOpen", "questionFocus"])).toEqual(
+        [
+          "question.submit",
+          "question.cancel",
+          "question.previous",
+          "question.next",
+        ],
+      );
+      expect(pressed(["mainSurface", "questionOpen"])).toEqual([
+        "question.submit",
+        "question.cancel",
+        null,
+        null,
+      ]);
+    },
+  );
+
+  it("limits overlapping default chords to intentional scoped navigation", () => {
+    const assignedDefaults = applyAppKeybindingOverrides(
+      DEFAULT_APP_KEYBINDINGS,
+      [],
+    );
+    const actualCollisions = new Set<string>();
+
+    for (const client of DEFAULT_KEYBINDING_CLIENTS) {
+      const availableBindings = assignedDefaults.filter((binding) =>
+        isAppKeybindingAvailableForClient(binding, client),
+      );
+      for (const [index, left] of availableBindings.entries()) {
+        for (const right of availableBindings.slice(index + 1)) {
+          if (
+            left.command === right.command ||
+            shortcutIdentity(left, client.isMac) !==
+              shortcutIdentity(right, client.isMac) ||
+            !bindingContextsOverlap(left, right)
+          ) {
+            continue;
+          }
+          actualCollisions.add(
+            `${client.name}:${commandPair(left.command, right.command)}`,
+          );
+        }
+      }
+    }
+
+    const intentionalCommandPairs = PANE_FOCUS_APP_COMMAND_IDS.map(
+      (paneCommand, index) =>
+        commandPair(paneCommand, THREAD_JUMP_APP_COMMAND_IDS[index]),
+    );
+    const allowedCollisions = DEFAULT_KEYBINDING_CLIENTS.flatMap((client) =>
+      intentionalCommandPairs.map((pair) => `${client.name}:${pair}`),
+    );
+    expect([...actualCollisions].sort()).toEqual(allowedCollisions.sort());
+  });
+
+  it("serves validated explicit defaults from system config", async () => {
+    await withTestHarness(async (harness) => {
+      const response = await harness.app.request("/api/v1/system/config");
+      expect(response.status).toBe(200);
+      const config = systemConfigResponseSchema.parse(await readJson(response));
+      expect(config.defaultKeybindings).toEqual(DEFAULT_APP_KEYBINDINGS);
+      expect(config.keybindingOverrides).toEqual([]);
+      expect(config.keybindings).toEqual(
+        applyAppKeybindingOverrides(config.defaultKeybindings, []),
+      );
+    });
+  });
+
+  it.each([
+    ["desktop-mac", "Mod+N", [], "thread.new"],
+    ["web-mac", "Mod+N", [], null],
+    ["web-other", "Mod+Shift+O", [], "thread.new"],
+    ["desktop-other", "Mod+Shift+N", [], "window.new"],
+    ["web-other", "Mod+Shift+N", [], null],
+    ["desktop-mac", "Mod+Shift+T", [], "panel.reopenClosedTab"],
+    ["web-mac", "Mod+Shift+T", [], null],
+    ["desktop-other", "Mod+Shift+[", [], "thread.previous"],
+    ["web-mac", "Mod+Shift+[", [], null],
+    ["web-mac", "Ctrl+Shift+[", [], "thread.previous"],
+    ["web-other", "Ctrl+Shift+]", [], "thread.next"],
+    ["web-mac", "Mod+[", [], "history.back"],
+    ["desktop-other", "Mod+]", [], "history.forward"],
+    ["desktop-mac", "Mod+[", ["browserFocus"], null],
+    ["desktop-mac", "Mod+1", [], "thread.jump.1"],
+    ["web-mac", "Mod+1", [], null],
+    ["web-mac", "Ctrl+1", [], "thread.jump.1"],
+    ["web-other", "Ctrl+1", [], null],
+    ["web-other", "Ctrl+Shift+1", [], "thread.jump.1"],
+  ] as const)(
+    "on %s, %s with %j resolves to %s by default",
+    (clientName, chord, extraContexts, expected) => {
+      const client = DEFAULT_KEYBINDING_CLIENTS.find(
+        (candidate) => candidate.name === clientName,
+      );
+      if (!client) throw new Error(`Unknown client ${clientName}`);
+      const parts = chord.split("+");
+      const key = parts.at(-1) ?? "";
+      const has = (modifier: string) => parts.includes(modifier);
+      const input = {
+        key,
+        code: key,
+        metaKey: has("Mod") && client.isMac,
+        ctrlKey: has("Ctrl") || (has("Mod") && !client.isMac),
+        altKey: false,
+        shiftKey: has("Shift"),
+      };
+      const active: string[] = [
+        "mainSurface",
+        ...(client.isDesktop ? [] : ["webSurface"]),
+        ...(client.isMac ? ["macPlatform"] : []),
+        ...extraContexts,
+      ];
+      expect(
+        applyAppKeybindingOverrides(DEFAULT_APP_KEYBINDINGS, [])
+          .filter(
+            (binding) =>
+              isAppKeybindingAvailableForClient(binding, client) &&
+              matchesAppShortcut(input, binding.shortcut, client.isMac) &&
+              binding.when.all.every((context) => active.includes(context)) &&
+              !binding.when.none.some((context) => active.includes(context)),
+          )
+          .map((binding) => binding.command),
+      ).toEqual(expected === null ? [] : [expected]);
+    },
+  );
+
+  it("persists command overrides and resolves every scoped binding", async () => {
+    await withTestHarness(async (harness) => {
+      const shortcut = {
+        key: "u",
+        mod: true,
+        meta: false,
+        control: false,
+        alt: false,
+        shift: true,
+      };
+      const overrides = [
+        { command: "thread.new" as const, shortcut },
+        { command: "terminal.find" as const, shortcut },
+        { command: "modelPicker.toggle" as const, shortcut },
+      ];
+      const response = await harness.app.request("/api/v1/settings/keyboard", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(overrides),
+      });
+      expect(response.status).toBe(200);
+      expect(
+        appKeybindingOverridesSchema.parse(await readJson(response)),
+      ).toEqual(overrides);
+      expect(getAppKeybindingOverrides(harness.db)).toEqual(overrides);
+
+      const configResponse = await harness.app.request("/api/v1/system/config");
+      const config = systemConfigResponseSchema.parse(
+        await readJson(configResponse),
+      );
+      expect(config.keybindingOverrides).toEqual(overrides);
+      expect(
+        config.keybindings.find((binding) => binding.command === "thread.new"),
+      ).toMatchObject({ shortcut });
+      expect(
+        config.keybindings.filter(
+          (binding) => binding.command === "terminal.find",
+        ),
+      ).toEqual([
+        expect.objectContaining({
+          shortcut,
+          when: {
+            all: ["mainSurface", "terminalFocus", "macPlatform"],
+            none: ["modalOpen"],
+          },
+        }),
+        expect.objectContaining({
+          shortcut,
+          when: {
+            all: ["mainSurface", "terminalFocus"],
+            none: ["modalOpen", "macPlatform"],
+          },
+        }),
+      ]);
+      expect(
+        config.keybindings.filter(
+          (binding) => binding.command === "modelPicker.toggle",
+        ),
+      ).toHaveLength(2);
+      expect(
+        config.keybindings
+          .filter((binding) => binding.command === "modelPicker.toggle")
+          .every((binding) => binding.shortcut.key === "u"),
+      ).toBe(true);
+    });
+  });
+
+  it("activates an assignable command without a default shortcut", async () => {
+    await withTestHarness(async (harness) => {
+      const shortcut = {
+        key: "r",
+        mod: true,
+        meta: false,
+        control: false,
+        alt: false,
+        shift: true,
+      };
+      const response = await harness.app.request("/api/v1/settings/keyboard", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify([{ command: "thread.rename", shortcut }]),
+      });
+      expect(response.status).toBe(200);
+
+      const configResponse = await harness.app.request("/api/v1/system/config");
+      const config = systemConfigResponseSchema.parse(
+        await readJson(configResponse),
+      );
+      expect(
+        config.keybindings.filter(
+          (binding) => binding.command === "thread.rename",
+        ),
+      ).toEqual([
+        {
+          command: "thread.rename",
+          desktopOnly: false,
+          shortcut,
+          when: { all: ["mainSurface"], none: ["modalOpen"] },
+        },
+      ]);
+    });
+  });
+
+  it("uses null overrides to disable a command", async () => {
+    await withTestHarness(async (harness) => {
+      const response = await harness.app.request("/api/v1/settings/keyboard", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify([{ command: "panel.newTab", shortcut: null }]),
+      });
+      expect(response.status).toBe(200);
+
+      const configResponse = await harness.app.request("/api/v1/system/config");
+      const config = systemConfigResponseSchema.parse(
+        await readJson(configResponse),
+      );
+      expect(
+        config.keybindings.some(
+          (binding) => binding.command === "panel.newTab",
+        ),
+      ).toBe(false);
+      expect(
+        config.defaultKeybindings.some(
+          (binding) => binding.command === "panel.newTab",
+        ),
+      ).toBe(true);
+    });
+  });
+
+  it("rejects duplicate command overrides", async () => {
+    await withTestHarness(async (harness) => {
+      const shortcut = {
+        key: "n",
+        mod: true,
+        meta: false,
+        control: false,
+        alt: false,
+        shift: false,
+      };
+      const response = await harness.app.request("/api/v1/settings/keyboard", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify([
+          { command: "thread.new", shortcut },
+          { command: "thread.new", shortcut },
+        ]),
+      });
+      expect(response.status).toBe(400);
+    });
+  });
+
+  it("moves a saved Diff toggle override to the Git plugin's command", async () => {
+    const shortcut = {
+      key: "g",
+      mod: true,
+      meta: false,
+      control: false,
+      alt: false,
+      shift: false,
+    };
+    await withTestHarness(async (harness) => {
+      harness.db.$client
+        .prepare(
+          `INSERT INTO app_settings_values (key, value, updated_at)
+           VALUES (?, ?, ?)
+           ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
+        )
+        .run(
+          "keybindingOverrides",
+          JSON.stringify([{ command: "diff.toggle", shortcut }]),
+          Date.now(),
+        );
+
+      const response = await harness.app.request("/api/v1/system/config");
+      const config = systemConfigResponseSchema.parse(await readJson(response));
+      expect(config.keybindingOverrides).toEqual([
+        { command: "plugin:bb--git/toggle-diff", shortcut },
+      ]);
+
+      harness.db.$client
+        .prepare(
+          `INSERT INTO app_settings_values (key, value, updated_at)
+           VALUES (?, ?, ?)
+           ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
+        )
+        .run(
+          "keybindingOverrides",
+          JSON.stringify([
+            { command: "diff.toggle", shortcut },
+            { command: "plugin:bb--git/toggle-diff", shortcut: null },
+          ]),
+          Date.now(),
+        );
+      const explicit = systemConfigResponseSchema.parse(
+        await readJson(await harness.app.request("/api/v1/system/config")),
+      );
+      expect(explicit.keybindingOverrides).toEqual([
+        { command: "plugin:bb--git/toggle-diff", shortcut: null },
+      ]);
+    });
+    expect(
+      appKeybindingOverridesSchema.safeParse([
+        { command: "diff.toggle", shortcut },
+      ]).success,
+    ).toBe(false);
+  });
+
+  it("falls back to defaults when stored overrides are corrupt", async () => {
+    await withTestHarness(async (harness) => {
+      harness.db.$client
+        .prepare(
+          `INSERT INTO app_settings_values (key, value, updated_at)
+           VALUES (?, ?, ?)
+           ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
+        )
+        .run("keybindingOverrides", "not-json", Date.now());
+
+      const response = await harness.app.request("/api/v1/system/config");
+      expect(response.status).toBe(200);
+      const config = systemConfigResponseSchema.parse(await readJson(response));
+      expect(config.keybindingOverrides).toEqual([]);
+      expect(config.keybindings).toEqual(
+        applyAppKeybindingOverrides(config.defaultKeybindings, []),
+      );
+    });
+  });
+});
+
+it.each(["left", "right", "up", "down"] as const)(
+  "scopes migrated %s bindings to macOS and resets to the new chord",
+  (direction) => {
+    const command = `pane.focus.${direction}` as const;
+    const key = `Arrow${direction[0].toUpperCase()}${direction.slice(1)}`;
+    const overrides = appKeybindingOverridesSchema.parse([
+      {
+        command,
+        platform: "mac",
+        shortcut: {
+          key,
+          mod: true,
+          meta: false,
+          control: false,
+          alt: false,
+          shift: true,
+        },
+      },
+    ]);
+    const input = {
+      key,
+      code: key,
+      metaKey: true,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: true,
+    };
+    for (const client of DEFAULT_KEYBINDING_CLIENTS) {
+      const effective = applyAppKeybindingOverrides(
+        DEFAULT_APP_KEYBINDINGS,
+        overrides,
+      ).filter(
+        (binding) =>
+          binding.command === command &&
+          isAppKeybindingAvailableForClient(binding, client),
+      );
+      expect(effective).toHaveLength(client.isMac ? 1 : 0);
+      if (client.isMac)
+        expect(matchesAppShortcut(input, effective[0]!.shortcut, true)).toBe(
+          true,
+        );
+      const reset = applyAppKeybindingOverrides(
+        DEFAULT_APP_KEYBINDINGS,
+        [],
+      ).filter(
+        (binding) =>
+          binding.command === command &&
+          isAppKeybindingAvailableForClient(binding, client),
+      );
+      expect(reset).toHaveLength(client.isMac ? 1 : 0);
+      if (client.isMac) {
+        expect(matchesAppShortcut(input, reset[0]!.shortcut, true)).toBe(false);
+        expect(
+          matchesAppShortcut(
+            { ...input, ctrlKey: true },
+            reset[0]!.shortcut,
+            true,
+          ),
+        ).toBe(true);
+      }
+    }
+  },
+);
+
+it("resolves platform overrides before general bindings regardless of ordering", () => {
+  const base = DEFAULT_APP_KEYBINDINGS.find(
+    (binding) => binding.command === "thread.search",
+  )!;
+  const shortcut = {
+    key: "g",
+    mod: true,
+    meta: false,
+    control: false,
+    alt: false,
+    shift: false,
+  };
+  const overrides = appKeybindingOverridesSchema.parse([
+    { command: "thread.search", shortcut },
+    {
+      command: "thread.search",
+      platform: "windows",
+      shortcut: { ...shortcut, key: "w" },
+    },
+    { command: "thread.search", platform: "linux", shortcut: null },
+  ]);
+  for (const ordered of [overrides, [...overrides].reverse()]) {
+    const bindings = applyAppKeybindingOverrides([base], ordered);
+    for (const [platform, keys] of [
+      ["MacIntel", ["g"]],
+      ["Win32", ["w"]],
+      ["Linux", []],
+    ] as const) {
+      expect(
+        bindings
+          .filter((binding) =>
+            isAppKeybindingAvailableForClient(binding, {
+              isDesktop: false,
+              platform,
+            }),
+          )
+          .map((binding) => binding.shortcut.key),
+      ).toEqual(keys);
+    }
+  }
+  expect(
+    appKeybindingOverridesSchema.safeParse([...overrides, overrides[1]])
+      .success,
+  ).toBe(false);
+  expect(
+    appKeybindingOverridesSchema.safeParse([
+      { command: "thread.search", shortcut, platform: "other" },
+    ]).success,
+  ).toBe(false);
+});

@@ -1,0 +1,157 @@
+[
+  {
+    "id": "account-pool",
+    "name": "Account Pooler [Experimental]",
+    "icon": "Layers"
+  },
+  {
+    "id": "ask-user-question",
+    "name": "Ask User Question",
+    "icon": "MessageQuestion"
+  },
+  {
+    "id": "automations",
+    "name": "Automations",
+    "icon": "Repeat"
+  },
+  {
+    "id": "bb--composer",
+    "name": "Composer",
+    "icon": "MessageSquare"
+  },
+  {
+    "id": "browser-automation",
+    "name": "Browser Automation",
+    "icon": "Globe"
+  },
+  {
+    "id": "concurrency-limit",
+    "name": "Concurrency limit",
+    "icon": "Limitation"
+  },
+  {
+    "id": "drafts",
+    "name": "Drafts",
+    "icon": "EditFile"
+  },
+  {
+    "id": "bb--git",
+    "name": "Git",
+    "icon": "GitBranch"
+  },
+  {
+    "id": "bb--github-pr-status",
+    "name": "GitHub PR Status",
+    "icon": "GitPullRequest"
+  },
+  {
+    "id": "keep-awake",
+    "name": "Keep Awake",
+    "icon": "Coffee"
+  },
+  {
+    "id": "navigation",
+    "name": "Navigation",
+    "icon": "PanelLeft"
+  },
+  {
+    "id": "environment-personal-workspace",
+    "name": "Personal workspace",
+    "icon": "Folder"
+  },
+  {
+    "id": "environment-project-checkout",
+    "name": "Project checkout",
+    "icon": "Laptop"
+  },
+  {
+    "id": "bb--provider-usage",
+    "name": "Provider usage",
+    "icon": "ChartColumn"
+  },
+  {
+    "id": "provider-retry",
+    "name": "Provider retry",
+    "icon": "ArrowReloadHorizontal"
+  },
+  {
+    "id": "push-notifications",
+    "name": "Push notifications",
+    "icon": "BellDot"
+  },
+  {
+    "id": "connect",
+    "name": "bb connect",
+    "icon": "ComputerCloud"
+  },
+  {
+    "id": "secrets",
+    "name": "Secrets",
+    "icon": "Lock"
+  },
+  {
+    "id": "scheduled-send",
+    "name": "Send later",
+    "icon": "Calendar"
+  },
+  {
+    "id": "bb--storage-retention",
+    "name": "Storage & retention [Experimental]",
+    "icon": null
+  },
+  {
+    "id": "workflows",
+    "name": "Workflows",
+    "icon": "Workflow"
+  },
+  {
+    "id": "environment-git-worktree",
+    "name": "Worktree",
+    "icon": "FolderGit"
+  },
+  {
+    "id": "provider-acp",
+    "name": "ACP providers",
+    "icon": null
+  },
+  {
+    "id": "provider-claude-code",
+    "name": "Claude Code provider",
+    "icon": null
+  },
+  {
+    "id": "provider-codex",
+    "name": "Codex provider",
+    "icon": null
+  },
+  {
+    "id": "provider-pi",
+    "name": "Pi provider",
+    "icon": null
+  },
+  {
+    "id": "agent-annotations",
+    "name": "Agent Annotations",
+    "icon": "MessageSquarePlus"
+  },
+  {
+    "id": "bb-account",
+    "name": "bb account",
+    "icon": "UserRound"
+  },
+  {
+    "id": "bb-guide",
+    "name": "BB guide",
+    "icon": "Explore"
+  },
+  {
+    "id": "pdf-preview",
+    "name": "PDF preview",
+    "icon": "FileText"
+  },
+  {
+    "id": "thread-list",
+    "name": "Thread list",
+    "icon": "ListView"
+  }
+]

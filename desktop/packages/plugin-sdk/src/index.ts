@@ -1,0 +1,41 @@
+/**
+ * `@get-bb/plugin-sdk` — the typed facade plugin authors compile against.
+ *
+ * The root export carries the side-effect-free app and host-contract types
+ * plus the backend contract (`BbPluginApi`, the
+ * `server.ts` factory argument — types only, implemented by the BB server).
+ * The `./app` subpath adds the runtime bindings that `bb plugin build` shims
+ * to the host's shared runtime.
+ */
+export * from "./app-contract.js";
+export * from "./backend-contract.js";
+export * from "./cli-spec.js";
+export * from "./host-contract.js";
+export type * from "./json-value.js";
+export * from "./rpc-contract.js";
+export { experimental_THREAD_ACTION_GROUPS } from "./thread-action-groups.js";
+export {
+  experimental_THREAD_CONTEXT_SEGMENT_GROUPS,
+  experimental_THREAD_INFO_ROW_GROUPS,
+  experimental_THREAD_INFO_SECTION_GROUPS,
+} from "./thread-info-groups.js";
+export type {
+  ExperimentalDesktopBrowsersArea,
+  ExperimentalDesktopBrowserScope,
+  ExperimentalDesktopBrowserLease,
+  ExperimentalDesktopBrowserCreateInput,
+  ExperimentalDesktopBrowserAcquireInput,
+} from "@bb/sdk";
+
+export type * from "./machine-bootstrap.js";
+
+export {
+  normalizeHostPath as experimental_normalizeHostPath,
+  resolveHostPath as experimental_resolveHostPath,
+  isHostPathWithin as experimental_isHostPathWithin,
+  joinHostPath as experimental_joinHostPath,
+  getHostPathDirname as experimental_getHostPathDirname,
+  getHostPathBasename as experimental_getHostPathBasename,
+  getRelativeHostPath as experimental_getRelativeHostPath,
+  getHostPathComparisonKey as experimental_getHostPathComparisonKey,
+} from "@bb/domain";

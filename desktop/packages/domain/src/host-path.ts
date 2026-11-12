@@ -1,0 +1,260 @@
+export type HostPathFlavor = "posix" | "windows";
+
+interface HostPathRoot {
+  flavor: HostPathFlavor;
+  root: string;
+  relativePath: string;
+}
+
+interface ParsedHostPath {
+  flavor: HostPathFlavor;
+  root: string;
+  segments: string[];
+}
+
+interface JoinHostPathArgs {
+  rootPath: string;
+  relativePath: string;
+}
+
+interface IsHostPathWithinArgs {
+  rootPath: string;
+  candidatePath: string;
+}
+
+const WINDOWS_DRIVE_PATH_PATTERN = /^([A-Za-z]):(?:[\\/]+|$)/u;
+const WINDOWS_UNC_PATH_PATTERN =
+  /^[\\/]{2}([^\\/]+)[\\/]+([^\\/]+)(?:[\\/]+|$)/u;
+const WINDOWS_SEPARATOR_PATTERN = /[\\/]+/u;
+
+function collapseSegments(rawSegments: string[]): string[] {
+  const segments: string[] = [];
+  for (const segment of rawSegments) {
+    if (segment.length === 0 || segment === ".") {
+      continue;
+    }
+    if (segment === "..") {
+      segments.pop();
+      continue;
+    }
+    segments.push(segment);
+  }
+  return segments;
+}
+
+export function splitHostPathRoot(path: string): HostPathRoot | null {
+  const drive = WINDOWS_DRIVE_PATH_PATTERN.exec(path);
+  if (drive) {
+    return {
+      flavor: "windows",
+      root: `${(drive[1] ?? "").toUpperCase()}:\\`,
+      relativePath: path.slice(drive[0].length),
+    };
+  }
+  const unc = WINDOWS_UNC_PATH_PATTERN.exec(path);
+  if (unc) {
+    return {
+      flavor: "windows",
+      root: `\\\\${unc[1] ?? ""}\\${unc[2] ?? ""}\\`,
+      relativePath: path.slice(unc[0].length),
+    };
+  }
+  if (path.startsWith("/")) {
+    return { flavor: "posix", root: "/", relativePath: path.slice(1) };
+  }
+  return null;
+}
+
+function parseHostPath(path: string): ParsedHostPath | null {
+  const split = splitHostPathRoot(path);
+  if (split === null) {
+    return null;
+  }
+  return {
+    flavor: split.flavor,
+    root: split.root,
+    segments: collapseSegments(
+      split.relativePath.split(
+        split.flavor === "windows" ? WINDOWS_SEPARATOR_PATTERN : "/",
+      ),
+    ),
+  };
+}
+
+function formatHostPath(parsed: ParsedHostPath): string {
+  if (parsed.flavor === "posix") {
+    return `/${parsed.segments.join("/")}`;
+  }
+  if (parsed.segments.length === 0) {
+    return parsed.root;
+  }
+  return `${parsed.root}${parsed.segments.join("\\")}`;
+}
+
+function comparisonSegments(parsed: ParsedHostPath): string[] {
+  return parsed.flavor === "windows"
+    ? parsed.segments.map((segment) => segment.toLowerCase())
+    : parsed.segments;
+}
+
+function comparisonRoot(parsed: ParsedHostPath): string {
+  return parsed.flavor === "windows" ? parsed.root.toLowerCase() : parsed.root;
+}
+
+export function getHostPathFlavor(path: string): HostPathFlavor | null {
+  return parseHostPath(path)?.flavor ?? null;
+}
+
+export function isWindowsHostPath(path: string): boolean {
+  return getHostPathFlavor(path) === "windows";
+}
+
+export function isWindowsUncHostPath(path: string): boolean {
+  return WINDOWS_UNC_PATH_PATTERN.test(path);
+}
+
+export function isAbsoluteHostPath(path: string): boolean {
+  return parseHostPath(path) !== null;
+}
+
+export function isHostPathRoot(path: string): boolean {
+  const parsed = parseHostPath(path);
+  return parsed !== null && parsed.segments.length === 0;
+}
+
+export function normalizeHostPath(path: string): string | null {
+  const parsed = parseHostPath(path);
+  return parsed === null ? null : formatHostPath(parsed);
+}
+
+export function getHostPathComparisonKey(path: string): string | null {
+  const parsed = parseHostPath(path);
+  if (parsed === null) {
+    return null;
+  }
+  return formatHostPath({
+    flavor: parsed.flavor,
+    root: comparisonRoot(parsed),
+    segments: comparisonSegments(parsed),
+  });
+}
+
+export function areHostPathsEqual(left: string, right: string): boolean {
+  const leftKey = getHostPathComparisonKey(left);
+  return leftKey !== null && leftKey === getHostPathComparisonKey(right);
+}
+
+export function isHostPathWithin({
+  rootPath,
+  candidatePath,
+}: IsHostPathWithinArgs): boolean {
+  const root = parseHostPath(rootPath);
+  const candidate = parseHostPath(candidatePath);
+  if (
+    root === null ||
+    candidate === null ||
+    root.flavor !== candidate.flavor ||
+    comparisonRoot(root) !== comparisonRoot(candidate)
+  ) {
+    return false;
+  }
+  const rootSegments = comparisonSegments(root);
+  const candidateSegments = comparisonSegments(candidate);
+  return (
+    rootSegments.length <= candidateSegments.length &&
+    rootSegments.every((segment, index) => segment === candidateSegments[index])
+  );
+}
+
+export function joinHostPath({
+  rootPath,
+  relativePath,
+}: JoinHostPathArgs): string | null {
+  const parsed = parseHostPath(rootPath);
+  if (parsed === null) {
+    return null;
+  }
+  const relativeSegments = relativePath.split(
+    parsed.flavor === "windows" ? WINDOWS_SEPARATOR_PATTERN : "/",
+  );
+  return formatHostPath({
+    ...parsed,
+    segments: collapseSegments([...parsed.segments, ...relativeSegments]),
+  });
+}
+
+export function resolveHostPath({
+  rootPath,
+  path,
+}: {
+  rootPath: string;
+  path: string;
+}): string | null {
+  if (path.length === 0 || path.includes("\0") || rootPath.includes("\0")) {
+    return null;
+  }
+  const absolute = normalizeHostPath(path);
+  if (absolute !== null) return absolute;
+  if (path.startsWith("\\") || /^[A-Za-z]:/u.test(path)) return null;
+  return joinHostPath({ rootPath, relativePath: path });
+}
+
+export function getHostPathDirname(path: string): string | null {
+  const parsed = parseHostPath(path);
+  if (parsed === null) {
+    return null;
+  }
+  return formatHostPath({ ...parsed, segments: parsed.segments.slice(0, -1) });
+}
+
+export function getHostPathBasename(path: string): string | null {
+  const parsed = parseHostPath(path);
+  if (parsed === null) {
+    return null;
+  }
+  return parsed.segments.at(-1) ?? "";
+}
+
+export function getHostPathSegments(path: string): string[] | null {
+  return parseHostPath(path)?.segments ?? null;
+}
+
+export function canonicalizeHostPath(path: string): string {
+  const parsed = parseHostPath(path);
+  if (parsed === null) {
+    return path;
+  }
+  if (parsed.flavor === "windows") {
+    return formatHostPath(parsed);
+  }
+  return path.replace(/\/+$/u, "") || "/";
+}
+
+export function getRelativeHostPath({
+  rootPath,
+  candidatePath,
+}: IsHostPathWithinArgs): string | null {
+  if (!isHostPathWithin({ rootPath, candidatePath })) {
+    return null;
+  }
+  const rootSegments = parseHostPath(rootPath)?.segments ?? [];
+  const candidateSegments = parseHostPath(candidatePath)?.segments ?? [];
+  return candidateSegments.slice(rootSegments.length).join("/");
+}
+
+export function getRelativeHostPathSegments(path: string): string[] | null {
+  if (
+    path.length === 0 ||
+    path.includes("\0") ||
+    path.includes("\\") ||
+    isAbsoluteHostPath(path)
+  ) {
+    return null;
+  }
+  const segments = path.split("/");
+  return segments.every(
+    (segment) => segment !== "" && segment !== "." && segment !== "..",
+  )
+    ? segments
+    : null;
+}

@@ -1,0 +1,227 @@
+import type { ChildProcess } from "node:child_process";
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  truncateSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { spawnLoggedProcess } from "../src/logged-process.js";
+
+const scratchDirs: string[] = [];
+
+afterEach(() => {
+  for (const dir of scratchDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+function scratchDir(): string {
+  const dir = mkdtempSync(join(tmpdir(), "bb-logged-process-"));
+  scratchDirs.push(dir);
+  return dir;
+}
+
+function waitForExit(child: ChildProcess): Promise<number | null> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error("Child stalled while writing logs"));
+    }, 5_000);
+    child.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once("exit", (code) => {
+      clearTimeout(timer);
+      resolve(code);
+    });
+  });
+}
+
+describe("spawnLoggedProcess", () => {
+  it.each(["server", "host-daemon"] as const)(
+    "captures %s stdout and stderr bursts without a parent stream reader",
+    async (logName) => {
+      const logDir = join(scratchDir(), "logs");
+      const child = spawnLoggedProcess({
+        appScheduling: false,
+        command: process.execPath,
+        args: [
+          "-e",
+          `
+            const { fstatSync } = require("node:fs");
+            if (!fstatSync(1).isFile() || !fstatSync(2).isFile()) process.exit(2);
+            console.log("o".repeat(2 * 1024 * 1024));
+            console.error("e".repeat(2 * 1024 * 1024));
+            setImmediate(() => console.log("event loop responsive"));
+          `,
+        ],
+        env: process.env,
+        logDir,
+        logName,
+      });
+
+      expect(await waitForExit(child)).toBe(0);
+      const logPath = join(logDir, `${logName}-stdio.log`);
+      expect(readFileSync(logPath, "utf8")).toBe(
+        `${"o".repeat(2 * 1024 * 1024)}\n${"e".repeat(2 * 1024 * 1024)}\nevent loop responsive\n`,
+      );
+      if (process.platform !== "win32")
+        expect(statSync(logPath).mode & 0o777).toBe(0o600);
+    },
+  );
+
+  it("keeps the spawned pid and IPC channel when the child runs under a scheduling wrapper", async () => {
+    const child = spawnLoggedProcess({
+      appScheduling: true,
+      command: process.execPath,
+      args: [
+        "-e",
+        `process.send({ pid: process.pid });
+         process.once("message", (message) => {
+           process.send({ echo: message });
+           process.disconnect();
+         });`,
+      ],
+      env: process.env,
+      ipc: true,
+      logDir: scratchDir(),
+      logName: "server",
+    });
+    const messages: unknown[] = [];
+    child.on("message", (message) => {
+      messages.push(message);
+      if (messages.length === 1) child.send("ping");
+    });
+
+    expect(await waitForExit(child)).toBe(0);
+    expect(messages).toEqual([{ pid: child.pid }, { echo: "ping" }]);
+  });
+
+  it.runIf(process.platform === "darwin")(
+    "wraps the resolved command in app scheduling only when requested",
+    async () => {
+      const launches = await Promise.all(
+        [true, false].map(async (appScheduling) => {
+          const child = spawnLoggedProcess({
+            appScheduling,
+            command: process.execPath,
+            args: ["-e", ""],
+            env: process.env,
+            logDir: scratchDir(),
+            logName: "server",
+          });
+          expect(await waitForExit(child)).toBe(0);
+          return { file: child.spawnfile, args: child.spawnargs };
+        }),
+      );
+      expect(launches[0]?.file).toBe("/usr/sbin/taskpolicy");
+      expect(launches[0]?.args.slice(1, 3)).toEqual(["-a", process.execPath]);
+      expect(launches[1]?.file).toBe(process.execPath);
+    },
+  );
+
+  it.runIf(process.platform === "darwin")(
+    "keeps the loopback proxy bypass for a proxied child under app scheduling",
+    async () => {
+      const logDir = scratchDir();
+      const child = spawnLoggedProcess({
+        appScheduling: true,
+        command: process.execPath,
+        args: ["--use-env-proxy", "-e", "console.log(process.env.NO_PROXY)"],
+        env: {
+          ...process.env,
+          HTTPS_PROXY: "http://proxy.invalid:3128",
+          NO_PROXY: "example.com",
+        },
+        logDir,
+        logName: "server",
+      });
+      expect(await waitForExit(child)).toBe(0);
+      expect(child.spawnfile).toBe("/usr/sbin/taskpolicy");
+      expect(
+        readFileSync(join(logDir, "server-stdio.log"), "utf8").split("\n")[0],
+      ).toBe("example.com,localhost,127.0.0.1,::1,[::1]");
+    },
+  );
+
+  it("preserves output across child restarts, including early failures", async () => {
+    const logDir = scratchDir();
+    for (const message of ["first startup", "second startup"]) {
+      const child = spawnLoggedProcess({
+        appScheduling: false,
+        command: process.execPath,
+        args: [
+          "-e",
+          `console.error(${JSON.stringify(message)}); process.exit(1);`,
+        ],
+        env: process.env,
+        logDir,
+        logName: "server",
+      });
+      expect(await waitForExit(child)).toBe(1);
+    }
+    expect(readFileSync(join(logDir, "server-stdio.log"), "utf8")).toBe(
+      "first startup\nsecond startup\n",
+    );
+  });
+
+  it("moves an oversized capture aside at spawn, keeping one previous file", async () => {
+    const logDir = scratchDir();
+    const logPath = join(logDir, "host-daemon-stdio.log");
+    const previousPath = join(logDir, "host-daemon-stdio.1.log");
+    writeFileSync(previousPath, "older capture");
+    writeFileSync(logPath, "oversized capture");
+    truncateSync(logPath, 10 * 1024 * 1024 + 1);
+
+    const child = spawnLoggedProcess({
+      appScheduling: false,
+      command: process.execPath,
+      args: ["-e", `console.error("fresh startup"); process.exit(1);`],
+      env: process.env,
+      logDir,
+      logName: "host-daemon",
+    });
+
+    expect(await waitForExit(child)).toBe(1);
+    expect(readFileSync(logPath, "utf8")).toBe("fresh startup\n");
+    expect(statSync(previousPath).size).toBe(10 * 1024 * 1024 + 1);
+    expect(
+      readFileSync(previousPath, "utf8").startsWith("oversized capture"),
+    ).toBe(true);
+  });
+
+  it("fails instead of falling back to terminal output when logs cannot be opened", () => {
+    const logDir = scratchDir();
+    const blockedPath = join(logDir, "not-a-directory");
+    writeFileSync(blockedPath, "occupied");
+    expect(() =>
+      spawnLoggedProcess({
+        appScheduling: false,
+        command: process.execPath,
+        args: ["-e", "process.exit(0)"],
+        env: process.env,
+        logDir: blockedPath,
+        logName: "server",
+      }),
+    ).toThrow();
+  });
+
+  it("reports executable spawn failures", async () => {
+    const logDir = scratchDir();
+    const child = spawnLoggedProcess({
+      appScheduling: false,
+      command: join(logDir, "missing-executable"),
+      args: [],
+      env: process.env,
+      logDir,
+      logName: "server",
+    });
+    await expect(waitForExit(child)).rejects.toThrow("ENOENT");
+  });
+});

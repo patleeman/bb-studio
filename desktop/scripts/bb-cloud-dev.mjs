@@ -1,0 +1,396 @@
+#!/usr/bin/env node
+
+import { spawn, spawnSync } from "node:child_process";
+import { createServer } from "node:http";
+import { createServer as createTcpServer } from "node:net";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+import { resolveCurrentDevInstanceConfig } from "../packages/config/src/runtime.ts";
+import { CLOUD_DEV_HOST_HEADER } from "../apps/connect/src/cloud-dev.ts";
+import { startCloudDevDatabase } from "../packages/connect-db-pg/src/dev.ts";
+import { createCloudDevProxy } from "./lib/cloud-dev-proxy.mjs";
+import { waitForCloudService } from "./lib/cloud-dev-readiness.mjs";
+
+const REPO_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
+const STATE_DIR =
+  process.env.BB_CLOUD_DEV_STATE_DIR?.trim() ||
+  path.join(REPO_ROOT, ".wrangler", "cloud-dev");
+const EXTERNAL_DATABASE_URL = process.env.BB_CLOUD_DEV_DATABASE_URL?.trim();
+const PGLITE_DIR = path.join(STATE_DIR, "connect-db-pglite");
+const DEV_SECRET =
+  "6c9e2f41a7d58b30c4e918f267bd5a0c3f1468e2d9a57b04c8f31a6d72e95b40";
+const DEV_BASE_DOMAIN = "bb.localhost";
+const { ports } = resolveCurrentDevInstanceConfig(REPO_ROOT);
+const CLOUD_URL = `http://${DEV_BASE_DOMAIN}:${ports.cloudPort}`;
+const GATEWAY_URL = `http://127.0.0.1:${ports.cloudPort}`;
+const WORKER_URL = `http://127.0.0.1:${ports.cloudWorkerPort}`;
+const webPort = ports.cloudWorkerPort + 8_000;
+const webUrl = `http://127.0.0.1:${webPort}`;
+const databasePort = ports.appPort - 8_000;
+const AI_GATEWAY_PATH_PREFIX = "/api/ai/";
+let aiGatewayUrl;
+let aiGatewayInspectorPort;
+const SHUTDOWN_GRACE_MS = 5_000;
+const BOLD = process.stdout.isTTY ? "\u001b[1m" : "";
+const RESET = process.stdout.isTTY ? "\u001b[0m" : "";
+const services = new Set();
+let gateway;
+let database;
+let stopping;
+
+function fail(message) {
+  console.error(`bb Cloud dev: ${message}`);
+  process.exit(1);
+}
+
+function run(args, env = {}, hint = "") {
+  const result = spawnSync("pnpm", args, {
+    cwd: REPO_ROOT,
+    env: { ...process.env, CI: "1", ...env },
+    stdio: "inherit",
+  });
+  if (result.error) fail(result.error.message);
+  if (result.status !== 0) {
+    fail(`command failed: pnpm ${args.join(" ")}${hint ? `\n${hint}` : ""}`);
+  }
+}
+
+function redactedUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.password) parsed.password = "***";
+    return parsed.toString();
+  } catch {
+    return "the configured database";
+  }
+}
+
+function spawnService(args, env = {}) {
+  const child = spawn("pnpm", args, {
+    cwd: REPO_ROOT,
+    detached: process.platform !== "win32",
+    env: { ...process.env, ...env },
+    stdio: "inherit",
+  });
+  services.add(child);
+  child.once("error", (error) => {
+    services.delete(child);
+    console.error(`bb Cloud dev: ${error.message}`);
+    if (!stopping) void stop(1);
+  });
+  child.once("exit", (code) => {
+    services.delete(child);
+    if (!stopping) void stop(code ?? 1);
+  });
+  return child;
+}
+
+function signalService(child, signal) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  try {
+    if (process.platform === "win32" || child.pid === undefined) {
+      child.kill(signal);
+    } else {
+      process.kill(-child.pid, signal);
+    }
+  } catch {
+  }
+}
+
+async function stopService(child) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const exited = new Promise((resolve) => {
+    child.once("error", resolve);
+    child.once("exit", resolve);
+  });
+  signalService(child, "SIGTERM");
+  const graceful = await Promise.race([
+    exited.then(() => true),
+    new Promise((resolve) =>
+      setTimeout(() => resolve(false), SHUTDOWN_GRACE_MS),
+    ),
+  ]);
+  if (!graceful) {
+    signalService(child, "SIGKILL");
+    await exited;
+  }
+}
+
+function stop(exitCode = 0) {
+  if (stopping) return stopping;
+  stopping = (async () => {
+    if (gateway?.listening) gateway.close();
+    await Promise.all([...services].map((child) => stopService(child)));
+    await database?.close().catch((error) => {
+      console.error(`bb Cloud dev: ${error.message}`);
+    });
+    process.exit(exitCode);
+  })();
+  return stopping;
+}
+
+process.on("SIGINT", () => void stop(0));
+process.on("SIGTERM", () => void stop(0));
+process.on("SIGHUP", () => void stop(0));
+
+function assertPortAvailable(port, label) {
+  return new Promise((resolve, reject) => {
+    const server = createTcpServer();
+    server.once("error", (error) => {
+      reject(
+        new Error(`${label} port ${port} is unavailable: ${error.message}`),
+      );
+    });
+    server.listen(port, "127.0.0.1", () => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  });
+}
+
+function reserveLoopbackPort() {
+  return new Promise((resolve, reject) => {
+    const server = createTcpServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      server.close((error) => (error ? reject(error) : resolve(address.port)));
+    });
+  });
+}
+
+function routeRequest(request) {
+  try {
+    const hostname = new URL(`http://${request.headers.host ?? ""}`).hostname;
+    if (hostname === DEV_BASE_DOMAIN) {
+      delete request.headers[CLOUD_DEV_HOST_HEADER];
+      if (request.url?.startsWith(AI_GATEWAY_PATH_PREFIX)) {
+        return { target: aiGatewayUrl, changeOrigin: false };
+      }
+      return { target: webUrl, changeOrigin: false };
+    }
+    const suffix = `.${DEV_BASE_DOMAIN}`;
+    if (hostname.endsWith(suffix)) {
+      const label = hostname.slice(0, -suffix.length);
+      if (label && !label.includes(".")) {
+        request.headers[CLOUD_DEV_HOST_HEADER] = label;
+        return { target: WORKER_URL, changeOrigin: true };
+      }
+    }
+  } catch {
+  }
+  return null;
+}
+
+try {
+  await Promise.all([
+    assertPortAvailable(ports.cloudPort, "Cloud gateway"),
+    assertPortAvailable(ports.cloudWorkerPort, "Connect worker"),
+    assertPortAvailable(webPort, "Cloud dashboard"),
+    ...(EXTERNAL_DATABASE_URL
+      ? []
+      : [assertPortAvailable(databasePort, "Local Postgres")]),
+  ]);
+  aiGatewayUrl = `http://127.0.0.1:${await reserveLoopbackPort()}`;
+  aiGatewayInspectorPort = await reserveLoopbackPort();
+} catch (error) {
+  fail(error instanceof Error ? error.message : String(error));
+}
+
+await mkdir(STATE_DIR, { recursive: true });
+let databaseUrl;
+if (EXTERNAL_DATABASE_URL) {
+  databaseUrl = EXTERNAL_DATABASE_URL;
+  console.log(
+    `Preparing local Cloud data in ${STATE_DIR} and ${redactedUrl(databaseUrl)}`,
+  );
+  run(
+    ["--filter", "@bb/connect-db-pg", "run", "db:migrate"],
+    { CONNECT_DB_PG_MIGRATOR_URL: databaseUrl },
+    "Check that BB_CLOUD_DEV_DATABASE_URL points at a reachable Postgres, or unset it to use the built-in PGlite database.",
+  );
+} else {
+  console.log(`Preparing local Cloud data in ${STATE_DIR}`);
+  try {
+    database = await startCloudDevDatabase({
+      dataDir: PGLITE_DIR,
+      port: databasePort,
+      onError: (error) =>
+        console.error(
+          `bb Cloud dev: local Postgres: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+    });
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
+  }
+  databaseUrl = database.connectionString;
+  console.log(
+    `Local Postgres (PGlite) is serving ${PGLITE_DIR} at ${databaseUrl}` +
+      (database.applied.length > 0
+        ? `; applied ${database.applied.length} migrations`
+        : ""),
+  );
+}
+const DATABASE_ENV = {
+  CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: databaseUrl,
+};
+
+const proxy = createCloudDevProxy();
+gateway = createServer((request, response) => {
+  const route = routeRequest(request);
+  if (route === null) {
+    response.writeHead(404).end("Unknown local Cloud host\n");
+    return;
+  }
+  proxy.web(request, response, route, () => {
+    if (!response.headersSent) response.writeHead(502);
+    response.end("Local Cloud service is starting\n");
+  });
+});
+gateway.on("upgrade", (request, socket, head) => {
+  const route = routeRequest(request);
+  if (route === null) {
+    socket.destroy();
+    return;
+  }
+  proxy.ws(request, socket, head, route, () => socket.destroy());
+});
+
+try {
+  await new Promise((resolve, reject) => {
+    gateway.once("error", reject);
+    gateway.listen(ports.cloudPort, "127.0.0.1", resolve);
+  });
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  await stop(1);
+}
+
+const worker = spawnService(
+  [
+    "--filter",
+    "@bb/connect",
+    "exec",
+    "wrangler",
+    "dev",
+    "--port",
+    String(ports.cloudWorkerPort),
+    "--ip",
+    "127.0.0.1",
+    "--persist-to",
+    STATE_DIR,
+    "--var",
+    `BASE_DOMAIN:${DEV_BASE_DOMAIN}`,
+    "--var",
+    `ACCOUNT_APP_URL:${CLOUD_URL}`,
+    "--var",
+    `BETTER_AUTH_SECRET:${DEV_SECRET}`,
+    "--var",
+    "CLOUD_DEV:true",
+    "--var",
+    `NEXT_BASE_DOMAIN:next.${DEV_BASE_DOMAIN}`,
+    ...(process.env.BB_CLOUD_DEV_GATE_SECRET?.trim()
+      ? ["--var", `GATE_SECRET:${process.env.BB_CLOUD_DEV_GATE_SECRET.trim()}`]
+      : []),
+    "--show-interactive-dev-session=false",
+  ],
+  DATABASE_ENV,
+);
+
+const aiGateway = spawnService(
+  [
+    "--filter",
+    "@bb/ai-gateway",
+    "exec",
+    "wrangler",
+    "dev",
+    "--port",
+    new URL(aiGatewayUrl).port,
+    "--ip",
+    "127.0.0.1",
+    "--inspector-port",
+    String(aiGatewayInspectorPort),
+    "--persist-to",
+    STATE_DIR,
+    ...(process.env.BB_CLOUD_DEV_AI_UPSTREAM_BASE_URL
+      ? [
+          "--var",
+          `AI_UPSTREAM_BASE_URL:${process.env.BB_CLOUD_DEV_AI_UPSTREAM_BASE_URL}`,
+        ]
+      : []),
+    "--show-interactive-dev-session=false",
+  ],
+  DATABASE_ENV,
+);
+
+const web = spawnService(
+  [
+    "--filter",
+    "@bb/web",
+    "exec",
+    "vite",
+    "dev",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    String(webPort),
+  ],
+  {
+    BB_CLOUD_DEV_APP_URL: CLOUD_URL,
+    BB_CLOUD_DEV_SERVER_URL_TEMPLATE: `http://{label}.${DEV_BASE_DOMAIN}:${ports.cloudPort}`,
+    BB_CLOUD_DEV_STATE_PATH: STATE_DIR,
+    BETTER_AUTH_SECRET: DEV_SECRET,
+    CLOUDFLARE_ENV: "production",
+    CLOUDFLARE_INCLUDE_PROCESS_ENV: "true",
+    GITHUB_CLIENT_ID: "local-cloud-dev-unused",
+    GITHUB_CLIENT_SECRET: "local-cloud-dev-unused",
+    LANDING_POSTHOG_KEY: "local-cloud-dev-unused",
+    RESEND_API_KEY: "local-cloud-dev-unused",
+    ...DATABASE_ENV,
+  },
+);
+
+try {
+  await Promise.all([
+    waitForCloudService({
+      url: `${GATEWAY_URL}/dashboard`,
+      host: `${DEV_BASE_DOMAIN}:${ports.cloudPort}`,
+      serviceExited: () => web.exitCode !== null,
+    }),
+    waitForCloudService({
+      url: `${GATEWAY_URL}/`,
+      host: `probe.${DEV_BASE_DOMAIN}:${ports.cloudPort}`,
+      serviceExited: () => worker.exitCode !== null,
+    }),
+    waitForCloudService({
+      url: `${GATEWAY_URL}/api/ai/v1/usage`,
+      host: `${DEV_BASE_DOMAIN}:${ports.cloudPort}`,
+      serviceExited: () => aiGateway.exitCode !== null,
+    }),
+  ]);
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  await stop(1);
+}
+
+console.log(`
+Local bb Cloud is ready at ${BOLD}${CLOUD_URL}/dashboard${RESET}
+
+Claim a handle, generate a pairing code, and run the command shown in the
+dashboard against a bb started with pnpm dev. Local handles use:
+  http://<handle>.${DEV_BASE_DOMAIN}:${ports.cloudPort}
+
+Hosted generation is served at ${CLOUD_URL}/api/ai/v1/*. ${
+  process.env.OPENROUTER_API_KEY?.trim()
+    ? "It uses OPENROUTER_API_KEY from this shell."
+    : "Set OPENROUTER_API_KEY before starting to enable it; until then it answers 503."
+}
+
+Press Ctrl-C to stop local Cloud.
+`);
+
+await new Promise(() => {});

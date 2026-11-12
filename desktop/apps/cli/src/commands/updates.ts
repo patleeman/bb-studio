@@ -1,0 +1,812 @@
+import { Command } from "commander";
+import type { Host } from "@bb/domain";
+import {
+  UPDATE_STATE_PRESENTATION,
+  type UpdateState,
+} from "@bb/domain/update-state";
+import { BbHttpError } from "@bb/sdk";
+import type {
+  HostProviderCliStatusResponse,
+  SystemAppUpdateResult,
+  SystemAppUpdateRevision,
+  SystemAppUpdateStatus,
+  SystemVersionResponse,
+} from "@bb/server-contract";
+import { z } from "zod";
+import { action, CliExitError } from "../action.js";
+import { CliUsageError } from "../cli-usage-error.js";
+import { createCliBbSdk } from "../client.js";
+import { columnWidths, printBorderlessTable } from "../table.js";
+import { confirmDestructiveAction, outputJson } from "./helpers.js";
+import { resolveMachineId, selectMachines } from "./machine.js";
+
+const APP_UPDATE_POLL_INTERVAL_MS = 1_000;
+const APP_UPDATE_WAIT_TIMEOUT_MS = 15 * 60 * 1000;
+const INCOMING_SUBJECTS_SHOWN = 10;
+
+type ProviderCliKey = string;
+type ProviderCliStatus = HostProviderCliStatusResponse[string];
+type ProviderCliStatusResponse = HostProviderCliStatusResponse;
+
+interface UpdatesCommandOptions {
+  json?: boolean;
+  machine?: string;
+}
+
+interface AppUpdateStatusOptions {
+  json?: boolean;
+}
+
+interface AppUpdateApplyOptions {
+  json?: boolean;
+  wait: boolean;
+  whenIdle?: boolean;
+  yes?: boolean;
+}
+
+type CliSdk = ReturnType<typeof createCliBbSdk>;
+
+interface ProviderUpdateTarget {
+  host: Host;
+  provider: ProviderCliKey;
+  status: ProviderCliStatus;
+}
+
+interface MachineUpdatesEntry {
+  host: Host;
+  providerStatus: ProviderCliStatusResponse | null;
+  statusError: string | null;
+}
+
+export function providerState(status: ProviderCliStatus): UpdateState {
+  if (!status.installed) return "not-installed";
+  if (status.needsUpdate || status.versionUnsupported) {
+    return status.installAction === null
+      ? "update-manually"
+      : "update-available";
+  }
+  if (status.latestVersion === null) return "latest-unknown";
+  return "up-to-date";
+}
+
+function providerStateLabel(status: ProviderCliStatus): string {
+  return UPDATE_STATE_PRESENTATION[providerState(status)].label;
+}
+
+function providerVersionLabel(status: ProviderCliStatus): string {
+  const current = status.currentVersion ?? "unknown";
+  const latest = status.latestVersion;
+  if (latest !== null && latest !== status.currentVersion) {
+    return `${current} -> ${latest}`;
+  }
+  return current;
+}
+
+function isActionableProviderStatus(status: ProviderCliStatus): boolean {
+  return (
+    status.installAction !== null &&
+    (!status.installed || status.needsUpdate || status.versionUnsupported)
+  );
+}
+
+function selectUpdateHosts(
+  hosts: readonly Host[],
+  machine: string | undefined,
+): Host[] {
+  return machine === undefined
+    ? selectMachines(hosts, "persistent")
+    : hosts.filter((host) => host.id === resolveMachineId(hosts, machine));
+}
+
+async function collectMachineUpdates(
+  sdk: ReturnType<typeof createCliBbSdk>,
+  hosts: readonly Host[],
+): Promise<MachineUpdatesEntry[]> {
+  return Promise.all(
+    hosts.map(async (host): Promise<MachineUpdatesEntry> => {
+      if (host.status !== "connected") {
+        return { host, providerStatus: null, statusError: null };
+      }
+      try {
+        return {
+          host,
+          providerStatus: await sdk.hosts.providerCliStatus({
+            hostId: host.id,
+            refresh: true,
+          }),
+          statusError: null,
+        };
+      } catch (error) {
+        return {
+          host,
+          providerStatus: null,
+          statusError: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }),
+  );
+}
+
+function actionableTargets(
+  entries: readonly MachineUpdatesEntry[],
+): ProviderUpdateTarget[] {
+  const targets: ProviderUpdateTarget[] = [];
+  for (const entry of entries) {
+    if (entry.providerStatus === null) continue;
+    for (const [provider, status] of Object.entries(entry.providerStatus)) {
+      if (isActionableProviderStatus(status)) {
+        targets.push({ host: entry.host, provider, status });
+      }
+    }
+  }
+  return targets;
+}
+
+function printUpdatesTable(args: {
+  appRow: readonly [string, string, string];
+  entries: readonly MachineUpdatesEntry[];
+}): void {
+  const rows: string[][] = [[...args.appRow]];
+  for (const entry of args.entries) {
+    if (entry.host.status !== "connected") {
+      rows.push([entry.host.name, "-", "offline"]);
+      continue;
+    }
+    if (entry.providerStatus === null) {
+      rows.push([entry.host.name, "-", entry.statusError ?? "status failed"]);
+      continue;
+    }
+    for (const status of Object.values(entry.providerStatus)) {
+      rows.push([
+        `${entry.host.name} · ${status.displayName}`,
+        providerVersionLabel(status),
+        providerStateLabel(status),
+      ]);
+    }
+  }
+  printBorderlessTable(
+    {
+      head: ["Target", "Version", "State"],
+      colWidths: columnWidths(rows, [6, 7, 5]),
+      trimTrailingWhitespace: true,
+    },
+    rows,
+  );
+}
+
+function formatRevision(revision: SystemAppUpdateRevision): string {
+  return revision.commit === null
+    ? revision.version
+    : `source checkout ${revision.commit.slice(0, 10)}`;
+}
+
+function formatAvailableTarget(status: SystemAppUpdateStatus): string | null {
+  const available = status.available;
+  if (available === null) return null;
+  if (available.commit === null) return available.version;
+  const count = available.commitCount ?? 0;
+  return `${available.commit.slice(0, 10)} (+${String(count)} commit${count === 1 ? "" : "s"})`;
+}
+
+function unsupportedAppUpdateMessage(status: SystemAppUpdateStatus): string {
+  if (status.support.kind === "supported") return "";
+  switch (status.support.reason) {
+    case "development":
+      return "In-app updates are unavailable in development mode.";
+    case "desktop":
+      return "The desktop app updates itself; use its update controls.";
+    case "unmanaged":
+      return "In-app updates are off. Start bb with `npx bb-app start` or `pnpm start`, without `--no-in-app-updates`, to turn them on.";
+  }
+}
+
+const UPDATE_WHEN_IDLE_EXPERIMENT_DISABLED_ERROR_CODE =
+  "update_when_idle_experiment_disabled";
+const errorMessageBodySchema = z.object({ message: z.string().min(1) });
+
+async function callUpdateWhenIdleRoute<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (
+      error instanceof BbHttpError &&
+      error.code === UPDATE_WHEN_IDLE_EXPERIMENT_DISABLED_ERROR_CODE
+    ) {
+      const body = errorMessageBodySchema.safeParse(error.body);
+      throw new CliExitError(
+        body.success ? body.data.message : error.message,
+        1,
+      );
+    }
+    throw error;
+  }
+}
+
+function threadCountLabel(count: number): string {
+  return `${String(count)} running thread${count === 1 ? "" : "s"}`;
+}
+
+function hasScheduledUpdate(status: SystemAppUpdateStatus): boolean {
+  return (status.scheduled ?? null) !== null;
+}
+
+function isWaitingForThreads(status: SystemAppUpdateStatus): boolean {
+  return hasScheduledUpdate(status) && status.activity.phase === "idle";
+}
+
+function printScheduledUpdate(status: SystemAppUpdateStatus): void {
+  console.log(describeScheduledUpdate(status));
+  console.log(
+    "Run bb updates app apply --yes to update now, or bb updates app cancel to skip this version.",
+  );
+}
+
+function describeScheduledUpdate(status: SystemAppUpdateStatus): string {
+  const available = status.available;
+  const target =
+    available === null
+      ? "the latest version"
+      : available.commit === null
+        ? available.version
+        : available.commit.slice(0, 10);
+  const count = status.runningThreadCount;
+  const requiredIdleMs = status.scheduled?.requiredIdleMs ?? 0;
+  if (requiredIdleMs >= 60_000) {
+    const minutes = Math.round(requiredIdleMs / 60_000);
+    const idle = `${String(minutes)} minute${minutes === 1 ? "" : "s"}`;
+    return count === 0
+      ? `bb will update to ${target} once no thread has run for ${idle}.`
+      : `bb will update to ${target} once no thread has run for ${idle} (${String(count)} running).`;
+  }
+  return count === 0
+    ? `All threads are idle; bb will update to ${target} shortly.`
+    : `bb will update to ${target} when all threads are idle (${String(count)} running).`;
+}
+
+function describeAppUpdateResult(result: SystemAppUpdateResult): string {
+  const target = formatRevision(result.to);
+  switch (result.outcome) {
+    case "updated":
+      return `Updated bb to ${target}.`;
+    case "failed":
+      return `Update to ${target} failed: ${result.message ?? "unknown error"}`;
+  }
+}
+
+async function readAppUpdateStatus(
+  sdk: CliSdk,
+  force: boolean,
+): Promise<SystemAppUpdateStatus | null> {
+  try {
+    return await sdk.system.appUpdate({ force });
+  } catch {
+    return null;
+  }
+}
+
+function appRowFromStatus(args: {
+  appUpdate: SystemAppUpdateStatus | null;
+  version: SystemVersionResponse;
+}): readonly [string, string, string] {
+  const { appUpdate, version } = args;
+  if (
+    appUpdate !== null &&
+    (appUpdate.support.kind === "supported" ||
+      appUpdate.desktopUpdateSupported === true)
+  ) {
+    const target = formatAvailableTarget(appUpdate);
+    const current = formatRevision(appUpdate.current);
+    const state =
+      appUpdate.activity.phase !== "idle"
+        ? `Updating to ${appUpdate.activity.targetVersion}`
+        : isWaitingForThreads(appUpdate)
+          ? `Scheduled (waiting for ${threadCountLabel(appUpdate.runningThreadCount)})`
+          : target === null
+            ? appUpdate.blocked?.reason === "fetch-failed"
+              ? `${UPDATE_STATE_PRESENTATION["latest-unknown"].label} (${appUpdate.blocked.message})`
+              : appUpdate.blocked !== null
+                ? `${UPDATE_STATE_PRESENTATION["update-manually"].label} (${appUpdate.blocked.message})`
+                : appUpdate.support.kind === "supported" &&
+                    appUpdate.support.mode === "npm" &&
+                    version.latestVersion === null
+                  ? UPDATE_STATE_PRESENTATION["latest-unknown"].label
+                  : UPDATE_STATE_PRESENTATION["up-to-date"].label
+            : appUpdate.blocked !== null
+              ? `${UPDATE_STATE_PRESENTATION["update-available"].label} (blocked: ${appUpdate.blocked.message})`
+              : `${UPDATE_STATE_PRESENTATION["update-available"].label} (run: bb updates app apply)`;
+    return [
+      "bb-app",
+      target === null ? current : `${current} -> ${target}`,
+      state,
+    ];
+  }
+  if (version.installKind === "source") {
+    return [
+      "bb-app",
+      `source checkout ${version.currentCommit === null ? `build ${version.currentVersion}` : version.currentCommit.slice(0, 10)}`,
+      "Latest unknown (update this checkout with Git; automatic update checks are off)",
+    ];
+  }
+  const appState = version.isDevelopment
+    ? "development mode"
+    : version.updateAvailable
+      ? `${UPDATE_STATE_PRESENTATION["update-available"].label} (run: ${version.upgradeCommand})`
+      : version.latestVersion === null
+        ? UPDATE_STATE_PRESENTATION["latest-unknown"].label
+        : UPDATE_STATE_PRESENTATION["up-to-date"].label;
+  const appVersionLabel =
+    version.latestVersion !== null &&
+    version.latestVersion !== version.currentVersion
+      ? `${version.currentVersion} -> ${version.latestVersion}`
+      : version.currentVersion;
+  return ["bb-app", appVersionLabel, appState];
+}
+
+function printAppUpdateStatus(status: SystemAppUpdateStatus): void {
+  const current = formatRevision(status.current);
+  if (
+    status.support.kind !== "supported" &&
+    status.desktopUpdateSupported !== true
+  ) {
+    console.log(`bb-app ${current}`);
+    console.log(unsupportedAppUpdateMessage(status));
+    return;
+  }
+  const target = formatAvailableTarget(status);
+  console.log(
+    target === null
+      ? status.blocked !== null ||
+        status.activity.phase !== "idle" ||
+        (status.lastResult !== null &&
+          !status.lastResult.acknowledged &&
+          status.lastResult.outcome === "failed")
+        ? `bb-app ${current}`
+        : `bb-app ${current} is up to date.`
+      : `bb-app ${current} -> ${target}`,
+  );
+  if (status.available?.behindSince != null) {
+    console.log(`Behind origin/main since ${status.available.behindSince}`);
+  }
+  if (status.activity.phase === "preparing") {
+    console.log(
+      `Updating to ${status.activity.targetVersion}: ${status.activity.step}`,
+    );
+  } else if (status.activity.phase === "restarting") {
+    console.log(`Restarting into ${status.activity.targetVersion}`);
+  }
+  const subjects = status.available?.subjects ?? [];
+  for (const subject of subjects.slice(0, INCOMING_SUBJECTS_SHOWN)) {
+    console.log(`  ${subject}`);
+  }
+  const hiddenCount =
+    (status.available?.commitCount ?? subjects.length) -
+    Math.min(subjects.length, INCOMING_SUBJECTS_SHOWN);
+  if (hiddenCount > 0) {
+    console.log(`  … ${String(hiddenCount)} more`);
+  }
+  if (status.autoUpdate && status.availableSkipped) {
+    console.log(
+      "Skipped: automatic updates wait for a newer version. bb updates app apply still installs this one.",
+    );
+  }
+  if (status.blocked !== null) {
+    console.log(`Blocked: ${status.blocked.message}`);
+  } else if (isWaitingForThreads(status)) {
+    printScheduledUpdate(status);
+  } else if (target !== null && status.activity.phase === "idle") {
+    console.log("Run bb updates app apply to update and restart bb.");
+  }
+  if (status.lastResult !== null && !status.lastResult.acknowledged) {
+    console.log(describeAppUpdateResult(status.lastResult));
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
+}
+
+async function waitForAppUpdate(args: {
+  json: boolean;
+  previousResultId: string | null;
+  sdk: CliSdk;
+}): Promise<SystemAppUpdateStatus> {
+  const deadline = Date.now() + APP_UPDATE_WAIT_TIMEOUT_MS;
+  let lastLine: string | null = null;
+  const report = (line: string): void => {
+    if (args.json || line === lastLine) return;
+    lastLine = line;
+    console.log(line);
+  };
+  while (Date.now() < deadline) {
+    await delay(APP_UPDATE_POLL_INTERVAL_MS);
+    const status = await readAppUpdateStatus(args.sdk, false);
+    if (status === null) {
+      report("Restarting bb…");
+      continue;
+    }
+    const result = status.lastResult;
+    if (result !== null && result.id !== args.previousResultId) {
+      return status;
+    }
+    if (isWaitingForThreads(status)) return status;
+    if (status.activity.phase === "preparing") {
+      report(`${status.activity.step}…`);
+    } else if (status.activity.phase === "restarting") {
+      report("Restarting bb…");
+    }
+  }
+  throw new CliExitError(
+    "Timed out waiting for the update to finish. Run bb updates app to check on it; if bb did not come back, check the terminal running it.",
+    1,
+  );
+}
+
+function registerAppUpdateCommands(
+  updates: Command,
+  getUrl: () => string,
+): void {
+  const app = updates
+    .command("app")
+    .description("Inspect and apply in-app updates to bb itself");
+
+  app
+    .command("status", { isDefault: true })
+    .description("Show whether bb can update itself and what is available")
+    .option("--json", "Print machine-readable JSON output")
+    .action(
+      action(async (opts: AppUpdateStatusOptions) => {
+        const sdk = createCliBbSdk(getUrl());
+        const status = await sdk.system.appUpdate({ force: true });
+        if (outputJson(opts, status)) return;
+        printAppUpdateStatus(status);
+      }),
+    );
+
+  app
+    .command("apply")
+    .description("Download the available bb update and restart bb into it")
+    .option("--yes", "Update without asking about running threads")
+    .option(
+      "--when-idle",
+      "Update once no thread is running instead of interrupting running threads",
+    )
+    .option(
+      "--no-wait",
+      "Return once the update starts instead of following it",
+    )
+    .option("--json", "Print machine-readable JSON output")
+    .action(
+      action(async (opts: AppUpdateApplyOptions) => {
+        if (opts.whenIdle === true && opts.yes === true) {
+          throw new CliUsageError({
+            code: "invalid_value",
+            hint: null,
+            message: "Use either --when-idle or --yes, not both.",
+          });
+        }
+        const sdk = createCliBbSdk(getUrl());
+        const status = await sdk.system.appUpdate({ force: true });
+        if (
+          status.support.kind !== "supported" &&
+          status.desktopUpdateSupported !== true
+        ) {
+          throw new CliExitError(unsupportedAppUpdateMessage(status), 1);
+        }
+        if (status.blocked !== null) {
+          throw new CliExitError(status.blocked.message, 1);
+        }
+        if (status.available === null) {
+          if (outputJson(opts, status)) return;
+          console.log(
+            `bb-app ${formatRevision(status.current)} is up to date.`,
+          );
+          return;
+        }
+        const previousResultId = status.lastResult?.id ?? null;
+        let started: SystemAppUpdateStatus;
+        if (opts.whenIdle === true) {
+          started = await callUpdateWhenIdleRoute(() =>
+            sdk.system.experimental_scheduleAppUpdate(),
+          );
+          if (isWaitingForThreads(started)) {
+            if (outputJson(opts, started)) return;
+            printScheduledUpdate(started);
+            return;
+          }
+        } else {
+          let confirmInterruptingThreads = opts.yes === true;
+          if (status.runningThreadCount > 0 && !confirmInterruptingThreads) {
+            const count = status.runningThreadCount;
+            const { experiments } = await sdk.system.config();
+            const threadsResume = experiments.resumeThreadsAfterRestart;
+            const running = `${String(count)} thread${count === 1 ? " is" : "s are"} running.`;
+            const warning = threadsResume
+              ? `${running} Updating restarts bb, and ${count === 1 ? "it resumes" : "they resume"} after the update.`
+              : `${running} Updating restarts bb and interrupts ${count === 1 ? "it" : "them"}.`;
+            const whenIdleEnabled = experiments.updateWhenIdle;
+            if (
+              whenIdleEnabled &&
+              (!process.stdin.isTTY || !process.stdout.isTTY)
+            ) {
+              throw new CliExitError(
+                `${warning} Re-run with --when-idle to update once they finish, or --yes to ${threadsResume ? "update now" : "interrupt them"}.`,
+                1,
+              );
+            }
+            confirmInterruptingThreads = await confirmDestructiveAction(
+              `${warning} Continue?`,
+            );
+            if (!confirmInterruptingThreads) {
+              console.log(
+                whenIdleEnabled
+                  ? "Update cancelled. Run bb updates app apply --when-idle to update once they finish."
+                  : "Update cancelled.",
+              );
+              return;
+            }
+          }
+          started = await sdk.system.applyAppUpdate({
+            confirmInterruptingThreads,
+          });
+        }
+        if (!opts.wait) {
+          if (outputJson(opts, started)) return;
+          console.log(
+            `Updating bb to ${status.available.version}. Run bb updates app to follow it.`,
+          );
+          return;
+        }
+        if (!opts.json) {
+          console.log(`Updating bb to ${status.available.version}`);
+        }
+        const finished = await waitForAppUpdate({
+          json: opts.json === true,
+          previousResultId,
+          sdk,
+        });
+        if (isWaitingForThreads(finished)) {
+          if (outputJson(opts, finished)) return;
+          printScheduledUpdate(finished);
+          return;
+        }
+        const result = finished.lastResult;
+        if (outputJson(opts, finished)) {
+          if (result?.outcome !== "updated") process.exitCode = 1;
+          return;
+        }
+        if (result === null) return;
+        if (result.outcome !== "updated") {
+          throw new CliExitError(describeAppUpdateResult(result), 1);
+        }
+        console.log(describeAppUpdateResult(result));
+      }),
+    );
+
+  app
+    .command("cancel")
+    .description("Skip a waiting update until a newer version appears")
+    .option("--json", "Print machine-readable JSON output")
+    .action(
+      action(async (opts: AppUpdateStatusOptions) => {
+        const sdk = createCliBbSdk(getUrl());
+        const before = await sdk.system.appUpdate();
+        const status = await callUpdateWhenIdleRoute(() =>
+          sdk.system.experimental_cancelScheduledAppUpdate(),
+        );
+        if (outputJson(opts, status)) return;
+        console.log(
+          hasScheduledUpdate(before)
+            ? "Skipped this version until a newer one appears."
+            : "No update is scheduled.",
+        );
+      }),
+    );
+
+  app
+    .command("auto [state]")
+    .description(
+      "Show whether bb updates itself automatically, or turn it on or off. `on` checks every hour and restarts bb into a new version once no thread has run for 15 minutes; `off` stops checking and drops a waiting update",
+    )
+    .option("--json", "Print machine-readable JSON output")
+    .action(
+      action(
+        async (state: string | undefined, opts: AppUpdateStatusOptions) => {
+          if (state !== undefined && state !== "on" && state !== "off") {
+            throw new CliUsageError({
+              code: "invalid_value",
+              hint: "Use bb updates app auto on or bb updates app auto off.",
+              message: `Expected "on" or "off", got "${state}".`,
+            });
+          }
+          const sdk = createCliBbSdk(getUrl());
+          const status =
+            state === undefined
+              ? await sdk.system.appUpdate()
+              : await callUpdateWhenIdleRoute(() =>
+                  sdk.system.experimental_setAppUpdateAuto({
+                    enabled: state === "on",
+                  }),
+                );
+          if (outputJson(opts, status)) return;
+          console.log(
+            status.autoUpdate
+              ? "Automatic updates are on: bb checks every hour and restarts into a new version once no thread has run for 15 minutes."
+              : "Automatic updates are off.",
+          );
+        },
+      ),
+    );
+
+  app
+    .command("dismiss")
+    .description("Mark the last update result as seen")
+    .option("--json", "Print machine-readable JSON output")
+    .action(
+      action(async (opts: AppUpdateStatusOptions) => {
+        const sdk = createCliBbSdk(getUrl());
+        const status = await sdk.system.appUpdate();
+        const result = status.lastResult;
+        if (result === null || result.acknowledged) {
+          if (outputJson(opts, status)) return;
+          console.log("No update result to dismiss.");
+          return;
+        }
+        const next = await sdk.system.acknowledgeAppUpdate({ id: result.id });
+        if (outputJson(opts, next)) return;
+        console.log("Dismissed the last update result.");
+      }),
+    );
+}
+
+export function registerUpdatesCommands(
+  program: Command,
+  getUrl: () => string,
+): void {
+  const updates = program
+    .command("updates")
+    .description("Inspect and apply bb and provider CLI updates");
+  registerAppUpdateCommands(updates, getUrl);
+
+  updates
+    .command("status", { isDefault: true })
+    .description("Show bb and provider CLI update status across machines")
+    .option("--machine <id-or-name>", "Limit to one machine")
+    .option("--json", "Print machine-readable JSON output")
+    .action(
+      action(async (opts: UpdatesCommandOptions) => {
+        const sdk = createCliBbSdk(getUrl());
+        const [version, appUpdate, hosts] = await Promise.all([
+          sdk.system.version(),
+          readAppUpdateStatus(sdk, false),
+          sdk.hosts.list(),
+        ]);
+        const entries = await collectMachineUpdates(
+          sdk,
+          selectUpdateHosts(hosts, opts.machine),
+        );
+        if (
+          outputJson(opts, {
+            app: version,
+            appUpdate,
+            machines: entries.map((entry) => ({
+              host: entry.host,
+              providerStatus: entry.providerStatus,
+              statusError: entry.statusError,
+            })),
+          })
+        ) {
+          return;
+        }
+
+        printUpdatesTable({
+          appRow: appRowFromStatus({ appUpdate, version }),
+          entries,
+        });
+      }),
+    );
+
+  updates
+    .command("apply")
+    .description("Run every available provider CLI install/update")
+    .option("--machine <id-or-name>", "Limit to one machine")
+    .option("--json", "Print machine-readable JSON output")
+    .action(
+      action(async (opts: UpdatesCommandOptions) => {
+        const sdk = createCliBbSdk(getUrl());
+        const hosts = await sdk.hosts.list();
+        const entries = await collectMachineUpdates(
+          sdk,
+          selectUpdateHosts(hosts, opts.machine),
+        );
+        const targets = actionableTargets(entries);
+        if (targets.length === 0) {
+          if (outputJson(opts, { results: [] })) return;
+          const hasManualUpdates = entries.some(
+            (entry) =>
+              entry.providerStatus !== null &&
+              Object.values(entry.providerStatus).some(
+                (status) =>
+                  status.installed &&
+                  status.needsUpdate &&
+                  status.installAction === null,
+              ),
+          );
+          console.log(
+            hasManualUpdates
+              ? "No updates bb can apply. Run bb updates status for manual updates."
+              : "Everything is up to date.",
+          );
+          return;
+        }
+
+        const results: {
+          hostId: string;
+          hostName: string;
+          provider: ProviderCliKey;
+          success: boolean;
+          message: string | null;
+        }[] = [];
+        for (const target of targets) {
+          const actionKind = target.status.installAction?.kind ?? "install";
+          if (!opts.json) {
+            console.log(
+              `${target.status.displayName} on ${target.host.name}: running ${actionKind}…`,
+            );
+          }
+          try {
+            const events = await sdk.hosts.installProviderCli({
+              hostId: target.host.id,
+              provider: target.provider,
+              actionKind,
+            });
+            const completed = events.find(
+              (event) => event.type === "completed",
+            );
+            const errorEvent = events.find((event) => event.type === "error");
+            const success =
+              completed?.type === "completed" && completed.success;
+            results.push({
+              hostId: target.host.id,
+              hostName: target.host.name,
+              provider: target.provider,
+              success,
+              message: errorEvent?.type === "error" ? errorEvent.message : null,
+            });
+            if (!opts.json) {
+              console.log(
+                success
+                  ? `${target.status.displayName} on ${target.host.name}: done`
+                  : `${target.status.displayName} on ${target.host.name}: failed${
+                      errorEvent?.type === "error"
+                        ? ` (${errorEvent.message})`
+                        : ""
+                    }`,
+              );
+            }
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            results.push({
+              hostId: target.host.id,
+              hostName: target.host.name,
+              provider: target.provider,
+              success: false,
+              message,
+            });
+            if (!opts.json) {
+              console.log(
+                `${target.status.displayName} on ${target.host.name}: failed (${message})`,
+              );
+            }
+          }
+        }
+        if (outputJson(opts, { results })) return;
+        const failures = results.filter((result) => !result.success);
+        if (failures.length > 0) {
+          throw new Error(
+            `${failures.length} update${failures.length === 1 ? "" : "s"} failed.`,
+          );
+        }
+      }),
+    );
+}

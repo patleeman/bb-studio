@@ -1,0 +1,798 @@
+import { getHost, updateHost } from "@bb/db";
+import { setPluginMachineProviderBridge } from "../../src/services/plugins/plugin-machine-provider-registry.js";
+import type {
+  HostDaemonOnlineRpcRequestMessage,
+  ProviderCliStatusResponse,
+} from "@bb/host-daemon-contract";
+import {
+  hostProviderCliInstallJobListResponseSchema,
+  hostProviderCliInstallJobResponseSchema,
+  systemProviderInfoSchema,
+} from "@bb/server-contract";
+import { DEFAULT_BB_REQUEST_TIMEOUT_MS } from "@bb/sdk";
+import {
+  validatePluginProviderDeclaration,
+  validatePluginMachineProviderDeclaration,
+} from "@get-bb/plugin-sdk/internal/host-policy";
+import { describe, expect, it, vi } from "vitest";
+import { COMMAND_TIMEOUT_MS } from "../../src/constants.js";
+import { buildPluginProviderRegistration } from "../../src/services/providers/plugin-provider-registration.js";
+import {
+  aggregateProviderInstallations,
+  PROVIDER_INSTALLATION_STATUS_FRESH_MS,
+  PROVIDER_INSTALLATION_STATUS_TIMEOUT_MS,
+} from "../../src/services/system/provider-installations.js";
+import { registerHostRpcResponder } from "../helpers/host-rpc.js";
+import { readJson } from "../helpers/json.js";
+import { seedHostSession } from "../helpers/seed.js";
+import { handleDaemonSessionSilent } from "../../src/internal/session-owner-side-effects.js";
+import { type TestAppHarness, withTestHarness } from "../helpers/test-app.js";
+
+const API = "/api/v1";
+
+function registerInstallationProviders(
+  harness: TestAppHarness,
+  providerIds: readonly string[],
+  visibility: "always" | "installed" = "always",
+): void {
+  const bridgeArtifact = harness.deps.pluginHostArtifacts.get("provider-acp");
+  if (bridgeArtifact === undefined) {
+    throw new Error("Expected the test ACP provider bridge artifact");
+  }
+  for (const providerId of providerIds) {
+    const pluginId = `provider-${providerId}`;
+    harness.deps.providerRegistry.register({
+      ...buildPluginProviderRegistration({
+        iconHash: null,
+        available: true,
+        pluginId,
+        declaration: validatePluginProviderDeclaration({
+          id: providerId,
+          displayName: providerId,
+          experimental_visibility: visibility,
+          maintenance: {
+            health: visibility === "installed",
+            usage: false,
+            installation: true,
+          },
+          capabilities: {
+            supportsServiceTier: false,
+            supportsNativeUserQuestion: false,
+            fork: "none",
+            supportsManualCompaction: false,
+            supportsThreadArchive: false,
+            supportsThreadRename: false,
+            permissionModes: ["full"],
+            reasoningLevels: ["medium"],
+          },
+          composerActions: [],
+        }),
+        readSettings: () => ({}),
+      }),
+      pluginId,
+      iconNames: new Set<string>(),
+    });
+    harness.deps.pluginHostArtifacts.set(pluginId, bridgeArtifact);
+  }
+}
+
+function installationStatus(providerId: string) {
+  const executableName =
+    providerId === "claude-code"
+      ? "claude"
+      : providerId === "acp-cursor"
+        ? "cursor-agent"
+        : providerId === "pi"
+          ? "pi"
+          : "codex";
+  return {
+    executableName,
+    executablePath: `/usr/local/bin/${executableName}`,
+    installed: true,
+    installSource: "external" as const,
+    currentVersion: "1.0.0",
+    latestVersion: "1.1.0",
+    minimumSupportedVersion: null,
+    npmPackageName: null,
+    npmGlobalPackageVersion: null,
+    installAction: {
+      kind: "update" as const,
+      label: "Update" as const,
+      command: `${executableName} update`,
+    },
+    needsUpdate: true,
+    versionUnsupported: false,
+  };
+}
+
+function handleProviderInstallationRpc(
+  request: HostDaemonOnlineRpcRequestMessage,
+  installed = false,
+) {
+  const { command } = request;
+  if (command.type === "provider.health") {
+    return {
+      ok: true as const,
+      result: {
+        supported: true as const,
+        health: {
+          status: installed ? ("ready" as const) : ("not_installed" as const),
+          statusMessage: null,
+          accountEmail: null,
+          planLabel: null,
+          installedVersion: null,
+          minimumSupportedVersion: null,
+          canInstall: false,
+          canUpdate: false,
+          loginCommand: null,
+        },
+      },
+    };
+  }
+  if (command.type === "provider.installation.status") {
+    return {
+      ok: true as const,
+      result: installationStatus(command.providerId),
+    };
+  }
+  if (command.type === "provider.installation.run") {
+    return {
+      ok: true as const,
+      result: {
+        events: [
+          {
+            type: "completed" as const,
+            provider: command.providerId,
+            exitCode: 0,
+            signal: null,
+            success: true,
+          },
+        ],
+      },
+    };
+  }
+  throw new Error(`Unexpected host RPC ${command.type}`);
+}
+
+describe("public provider installation routes", () => {
+  it("shares status probes, serves a stale status while refreshing it, and pushes changed statuses", async () => {
+    await withTestHarness(async (harness) => {
+      const { host, session } = seedHostSession(harness.deps, {
+        id: "cached-installations",
+      });
+      let version = "1.0.0";
+      const responder = registerHostRpcResponder(harness, {
+        hostId: host.id,
+        sessionId: session.id,
+        async handle(request) {
+          const { command } = request;
+          if (command.type !== "provider.installation.status") {
+            return handleProviderInstallationRpc(request);
+          }
+          const currentVersion = version;
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          return {
+            ok: true as const,
+            result: {
+              ...installationStatus(command.providerId),
+              currentVersion,
+            },
+          };
+        },
+      });
+      let pushes = 0;
+      harness.deps.hub.onChangedMessage((message) => {
+        if (
+          message.entity === "host" &&
+          message.id === host.id &&
+          message.changes.includes("provider-cli-status-changed")
+        ) {
+          pushes += 1;
+        }
+      });
+      const url = `${API}/hosts/${host.id}/provider-clis/status`;
+      const readVersions = async (query = "") => {
+        const response = await harness.app.request(`${url}${query}`);
+        expect(response.status).toBe(200);
+        const body: ProviderCliStatusResponse = await response.json();
+        expect(Object.keys(body)).toHaveLength(4);
+        return [...new Set(Object.values(body).map((s) => s.currentVersion))];
+      };
+      const count = () =>
+        responder.requests.filter(
+          (request) => request.command.type === "provider.installation.status",
+        ).length;
+      let clock = Date.now();
+      const dateNow = vi.spyOn(Date, "now").mockImplementation(() => clock);
+      try {
+        await Promise.all(Array.from({ length: 8 }, () => readVersions()));
+        expect(count()).toBe(4);
+        harness.hub.notifyHost(host.id, ["host-connected"]);
+        expect(await readVersions()).toEqual(["1.0.0"]);
+        expect(count()).toBe(4);
+
+        version = "1.1.0";
+        clock += PROVIDER_INSTALLATION_STATUS_FRESH_MS + 1;
+        expect(await readVersions()).toEqual(["1.0.0"]);
+        await vi.waitFor(() => expect(pushes).toBe(4));
+        expect(await readVersions()).toEqual(["1.1.0"]);
+        expect(count()).toBe(8);
+
+        expect(await readVersions("?refresh=true")).toEqual(["1.1.0"]);
+        expect(count()).toBe(12);
+        expect(pushes).toBe(4);
+
+        version = "1.2.0";
+        expect(await readVersions("?refresh=true")).toEqual(["1.2.0"]);
+        expect(count()).toBe(16);
+        expect(pushes).toBe(8);
+
+        const installed = await harness.app.request(
+          `${API}/hosts/${host.id}/provider-clis/install`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ provider: "codex", actionKind: "update" }),
+          },
+        );
+        expect(installed.status).toBe(200);
+        version = "1.3.0";
+        expect(await readVersions()).toEqual(["1.3.0"]);
+        expect(count()).toBe(20);
+        expect(pushes).toBe(8);
+      } finally {
+        dateNow.mockRestore();
+        responder.unregister();
+      }
+    });
+  });
+
+  it("lists installation-capable registered providers in registry order", async () => {
+    await withTestHarness(async (harness) => {
+      const { host, session } = seedHostSession(harness.deps, {
+        id: "provider-installation-status-host",
+      });
+      const responder = registerHostRpcResponder(harness, {
+        hostId: host.id,
+        sessionId: session.id,
+        handle: handleProviderInstallationRpc,
+      });
+
+      const response = await harness.app.request(
+        `${API}/hosts/${host.id}/provider-clis/status`,
+      );
+
+      expect(response.status).toBe(200);
+      const body = (await readJson(response)) as ProviderCliStatusResponse;
+      expect(Object.keys(body)).toEqual([
+        "codex",
+        "claude-code",
+        "pi",
+        "acp-cursor",
+      ]);
+      expect(Object.values(body).map((status) => status.displayName)).toEqual([
+        "Codex",
+        "Claude Code",
+        "Pi",
+        "Cursor",
+      ]);
+      expect(
+        responder.requests
+          .filter((request) => request.command.type === "provider.health")
+          .map((request) =>
+            request.command.type === "provider.health"
+              ? request.command.providerId
+              : null,
+          ),
+      ).toEqual([]);
+      expect(
+        responder.requests
+          .filter(
+            (request) =>
+              request.command.type === "provider.installation.status",
+          )
+          .map((request) =>
+            request.command.type === "provider.installation.status"
+              ? request.command.providerId
+              : null,
+          ),
+      ).toEqual(["codex", "claude-code", "pi", "acp-cursor"]);
+    });
+  });
+
+  it("preserves healthy providers in registry order when one status request fails", async () => {
+    await withTestHarness(async (harness) => {
+      const warn = vi.fn();
+      harness.deps.logger = { ...harness.deps.logger, warn };
+      const { host, session } = seedHostSession(harness.deps, {
+        id: "provider-installation-partial-status-host",
+      });
+      registerHostRpcResponder(harness, {
+        hostId: host.id,
+        sessionId: session.id,
+        handle: (request) => {
+          if (
+            request.command.type === "provider.installation.status" &&
+            request.command.providerId === "claude-code"
+          ) {
+            return {
+              ok: false,
+              errorCode: "provider_status_failed",
+              errorMessage: "provider status failed",
+            };
+          }
+          return handleProviderInstallationRpc(request);
+        },
+      });
+
+      const response = await harness.app.request(
+        `${API}/hosts/${host.id}/provider-clis/status`,
+      );
+
+      expect(response.status).toBe(200);
+      const body = (await readJson(response)) as ProviderCliStatusResponse;
+      expect(Object.keys(body)).toEqual(["codex", "pi", "acp-cursor"]);
+      expect(Object.values(body).map((status) => status.displayName)).toEqual([
+        "Codex",
+        "Pi",
+        "Cursor",
+      ]);
+      expect(warn).toHaveBeenCalledWith(
+        {
+          failure: "status_request_failed",
+          hostId: host.id,
+          providerId: "claude-code",
+        },
+        "Failed to load provider installation status; omitting provider",
+      );
+    });
+  });
+
+  it("preserves the host unavailable route error when the target host is offline", async () => {
+    await withTestHarness(async (harness) => {
+      const { host, session } = seedHostSession(harness.deps, {
+        id: "provider-installation-offline-host",
+      });
+      handleDaemonSessionSilent(harness.deps, { sessionId: session.id });
+      harness.hub.cancelPendingDaemonDisconnect(session.id);
+
+      const response = await harness.app.request(
+        `${API}/hosts/${host.id}/provider-clis/status`,
+      );
+
+      expect(response.status).toBe(502);
+      expect(await readJson(response)).toMatchObject({
+        code: "host_unavailable",
+      });
+    });
+  });
+
+  it.each(["suspended", "suspending"] as const)(
+    "does not resume a %s machine when reading provider status",
+    async (phase) => {
+      await withTestHarness(async (harness) => {
+        const { host } = seedHostSession(harness.deps, {
+          id: "provider-installation-suspended-host",
+        });
+        registerInstallationProviders(
+          harness,
+          ["suspended-installed-provider"],
+          "installed",
+        );
+        const resume = vi.fn(async () => ({ resource: { id: "owned" } }));
+        const record = {
+          pluginId: "test-machine",
+          provider: validatePluginMachineProviderDeclaration({
+            description: "Provision a test machine.",
+            icon: "Terminal",
+            id: "test-machine",
+            displayName: "Test machine",
+
+            reconcileCleanup: async () => ({ status: "removed" }),
+            create: async () => ({
+              status: "created",
+              name: "Test machine",
+              hostId: host.id,
+              resource: { id: "owned" },
+            }),
+            suspend: async () => ({ resource: { id: "owned" } }),
+            resume,
+            remove: async () => ({ status: "removed" }),
+          }),
+        };
+        setPluginMachineProviderBridge({
+          listMachineProviders: () => [record],
+          getMachineProvider: () => record,
+          invokeProvider: async (_pluginId, _label, run) => ({
+            ok: true,
+            value: await run(),
+          }),
+          decisionTimeoutMs: 10_000,
+        });
+        try {
+          updateHost(harness.db, harness.hub, host.id, {
+            machineProviderId: "test-machine",
+            phase,
+            suspendedAt: phase === "suspended" ? Date.now() : null,
+            resource: { id: "owned" },
+          });
+          const rpc = vi.spyOn(harness.hub, "requestHostOnlineRpc");
+          const response = await harness.app.request(
+            `${API}/hosts/${host.id}/provider-clis/status`,
+          );
+          expect(response.status).toBe(502);
+          expect(await readJson(response)).toMatchObject({
+            code: "host_unavailable",
+          });
+          expect(getHost(harness.db, host.id)?.phase).toBe(phase);
+          expect(resume).not.toHaveBeenCalled();
+          expect(rpc).not.toHaveBeenCalled();
+        } finally {
+          setPluginMachineProviderBridge(undefined);
+        }
+      });
+    },
+  );
+
+  it("finishes stalled provider aggregation before the SDK request timeout", async () => {
+    const statusRequestBatchSize = 3;
+    const expectedStatusRequestCount = 9;
+    const providers = Array.from({ length: 11 }, (_, index) => ({
+      id: `stalled-installation-${index + 1}`,
+      displayName: `Stalled installation ${index + 1}`,
+    }));
+    const statusTimeouts: number[] = [];
+    const deadlineExceededProviderIds: string[] = [];
+    const pendingStatusRequests: Array<{
+      resolve: (value: null) => void;
+      timeoutMs: number;
+    }> = [];
+    let now = 0;
+    let resolveStatusRequestBatch: (() => void) | null = null;
+    const waitForStatusRequestBatch = async (): Promise<void> => {
+      if (pendingStatusRequests.length === statusRequestBatchSize) return;
+      await new Promise<void>((resolve) => {
+        resolveStatusRequestBatch = resolve;
+      });
+    };
+    const responsePromise = aggregateProviderInstallations(providers, {
+      deadlineMs: PROVIDER_INSTALLATION_STATUS_TIMEOUT_MS,
+      now: () => now,
+      onDeadlineExceeded: (provider) => {
+        deadlineExceededProviderIds.push(provider.id);
+      },
+      prepare: () => async (timeoutMs) => {
+        statusTimeouts.push(timeoutMs);
+        return new Promise<null>((resolve) => {
+          pendingStatusRequests.push({ resolve, timeoutMs });
+          if (pendingStatusRequests.length === statusRequestBatchSize) {
+            resolveStatusRequestBatch?.();
+            resolveStatusRequestBatch = null;
+          }
+        });
+      },
+    });
+
+    for (
+      let completedRequests = 0;
+      completedRequests < expectedStatusRequestCount;
+      completedRequests += statusRequestBatchSize
+    ) {
+      await waitForStatusRequestBatch();
+      const batch = pendingStatusRequests.splice(0, statusRequestBatchSize);
+      now += Math.max(...batch.map(({ timeoutMs }) => timeoutMs));
+      for (const { resolve } of batch) resolve(null);
+    }
+
+    await expect(responsePromise).resolves.toEqual({});
+    expect(now).toBe(PROVIDER_INSTALLATION_STATUS_TIMEOUT_MS);
+    expect(now).toBeLessThan(DEFAULT_BB_REQUEST_TIMEOUT_MS);
+    expect(statusTimeouts).toHaveLength(expectedStatusRequestCount);
+    expect(statusTimeouts.some((timeout) => timeout < COMMAND_TIMEOUT_MS)).toBe(
+      true,
+    );
+    expect(deadlineExceededProviderIds).toEqual([
+      "stalled-installation-10",
+      "stalled-installation-11",
+    ]);
+    expect(pendingStatusRequests).toEqual([]);
+  });
+
+  it("dispatches install/update by registered provider id", async () => {
+    await withTestHarness(async (harness) => {
+      const { host, session } = seedHostSession(harness.deps, {
+        id: "provider-installation-run-host",
+      });
+      const responder = registerHostRpcResponder(harness, {
+        hostId: host.id,
+        sessionId: session.id,
+        handle: handleProviderInstallationRpc,
+      });
+
+      const response = await harness.app.request(
+        `${API}/hosts/${host.id}/provider-clis/install`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            provider: "claude-code",
+            actionKind: "update",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toContain(
+        '"type":"completed","provider":"claude-code"',
+      );
+      expect(responder.requests.at(-1)?.command).toMatchObject({
+        type: "provider.installation.run",
+        providerId: "claude-code",
+        action: "update",
+      });
+
+      const unsupported = await harness.app.request(
+        `${API}/hosts/${host.id}/provider-clis/install`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            provider: "no-such-provider",
+            actionKind: "install",
+          }),
+        },
+      );
+      expect(unsupported.status).toBe(404);
+      expect(await readJson(unsupported)).toMatchObject({
+        code: "provider_installation_unavailable",
+      });
+    });
+  });
+
+  it("runs installs as server jobs that any client can follow to completion", async () => {
+    await withTestHarness(async (harness) => {
+      const { host, session } = seedHostSession(harness.deps, {
+        id: "provider-installation-job-host",
+      });
+      let finishInstall: () => void = () => {};
+      const installFinished = new Promise<void>((resolve) => {
+        finishInstall = resolve;
+      });
+      const responder = registerHostRpcResponder(harness, {
+        hostId: host.id,
+        sessionId: session.id,
+        async handle(request) {
+          if (request.command.type === "provider.installation.run") {
+            await installFinished;
+          }
+          return handleProviderInstallationRpc(request);
+        },
+      });
+      let pushes = 0;
+      harness.deps.hub.onChangedMessage((message) => {
+        if (
+          message.entity === "host" &&
+          message.id === host.id &&
+          message.changes.includes("provider-cli-install-jobs-changed")
+        ) {
+          pushes += 1;
+        }
+      });
+      const jobsUrl = `${API}/hosts/${host.id}/provider-clis/install-jobs`;
+      const start = () =>
+        harness.app.request(jobsUrl, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ provider: "codex", actionKind: "update" }),
+        });
+      try {
+        const started = await start();
+        expect(started.status).toBe(202);
+        const { job } = hostProviderCliInstallJobResponseSchema.parse(
+          await readJson(started),
+        );
+        expect(job).toMatchObject({ provider: "codex", state: "running" });
+
+        const duplicate = hostProviderCliInstallJobResponseSchema.parse(
+          await readJson(await start()),
+        );
+        expect(duplicate.job.id).toBe(job.id);
+        const listed = hostProviderCliInstallJobListResponseSchema.parse(
+          await readJson(await harness.app.request(jobsUrl)),
+        );
+        expect(listed.jobs.map((entry) => entry.id)).toEqual([job.id]);
+
+        finishInstall();
+        await vi.waitFor(async () => {
+          const response = await harness.app.request(`${jobsUrl}/${job.id}`);
+          const current = hostProviderCliInstallJobResponseSchema.parse(
+            await readJson(response),
+          );
+          expect(current.job).toMatchObject({
+            state: "completed",
+            events: [{ type: "completed", provider: "codex", success: true }],
+          });
+        });
+        expect(pushes).toBe(2);
+        expect(
+          responder.requests.filter(
+            (request) => request.command.type === "provider.installation.run",
+          ),
+        ).toHaveLength(1);
+
+        const missing = await harness.app.request(`${jobsUrl}/no-such-job`);
+        expect(missing.status).toBe(404);
+        expect(await readJson(missing)).toMatchObject({
+          code: "provider_cli_install_job_not_found",
+        });
+      } finally {
+        responder.unregister();
+      }
+    });
+  });
+
+  it("completes an update the machine no longer needs once its status shows it current", async () => {
+    await withTestHarness(async (harness) => {
+      const { host, session } = seedHostSession(harness.deps, {
+        id: "provider-installation-already-current-host",
+      });
+      let current = true;
+      const responder = registerHostRpcResponder(harness, {
+        hostId: host.id,
+        sessionId: session.id,
+        handle(request) {
+          const { command } = request;
+          if (command.type === "provider.installation.run") {
+            return {
+              ok: true as const,
+              result: {
+                events: [
+                  {
+                    type: "error" as const,
+                    provider: command.providerId,
+                    message: "Codex update is no longer available on this host.",
+                  },
+                ],
+              },
+            };
+          }
+          if (command.type === "provider.installation.status") {
+            return {
+              ok: true as const,
+              result: {
+                ...installationStatus(command.providerId),
+                currentVersion: current ? "1.1.0" : "1.0.0",
+                needsUpdate: !current,
+                installAction: current
+                  ? null
+                  : installationStatus(command.providerId).installAction,
+              },
+            };
+          }
+          return handleProviderInstallationRpc(request);
+        },
+      });
+      const install = async () =>
+        harness.app.request(`${API}/hosts/${host.id}/provider-clis/install`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ provider: "codex", actionKind: "update" }),
+        });
+      try {
+        expect(await (await install()).text()).toBe(
+          `${JSON.stringify({
+            type: "completed",
+            provider: "codex",
+            exitCode: null,
+            signal: null,
+            success: true,
+          })}\n`,
+        );
+
+        current = false;
+        expect(await (await install()).text()).toContain(
+          '"type":"error","provider":"codex","message":"Codex update is no longer available on this host."',
+        );
+      } finally {
+        responder.unregister();
+      }
+    });
+  });
+
+  it("records a failed install job when the machine cannot run it", async () => {
+    await withTestHarness(async (harness) => {
+      const { host, session } = seedHostSession(harness.deps, {
+        id: "provider-installation-failed-job-host",
+      });
+      const responder = registerHostRpcResponder(harness, {
+        hostId: host.id,
+        sessionId: session.id,
+        handle(request) {
+          if (request.command.type === "provider.installation.run") {
+            throw new Error("npm is not installed");
+          }
+          return handleProviderInstallationRpc(request);
+        },
+      });
+      const jobsUrl = `${API}/hosts/${host.id}/provider-clis/install-jobs`;
+      try {
+        const { job } = hostProviderCliInstallJobResponseSchema.parse(
+          await readJson(
+            await harness.app.request(jobsUrl, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ provider: "codex", actionKind: "update" }),
+            }),
+          ),
+        );
+        await vi.waitFor(async () => {
+          const current = hostProviderCliInstallJobResponseSchema.parse(
+            await readJson(await harness.app.request(`${jobsUrl}/${job.id}`)),
+          );
+          expect(current.job).toMatchObject({
+            state: "failed",
+            error: expect.stringContaining("npm is not installed"),
+          });
+        });
+      } finally {
+        responder.unregister();
+      }
+    });
+  });
+
+  it("refreshes an installed-only provider after a successful install", async () => {
+    await withTestHarness(async (harness) => {
+      registerInstallationProviders(
+        harness,
+        ["installable-agent"],
+        "installed",
+      );
+      const { host, session } = seedHostSession(harness.deps, {
+        id: "provider-installation-refresh-host",
+      });
+      let installed = false;
+      const responder = registerHostRpcResponder(harness, {
+        hostId: host.id,
+        sessionId: session.id,
+        handle: (request) => {
+          if (request.command.type === "provider.installation.run") {
+            installed = true;
+          }
+          return handleProviderInstallationRpc(request, installed);
+        },
+      });
+      const listProviderIds = async (): Promise<string[]> => {
+        const response = await harness.app.request(
+          `${API}/system/providers?hostId=${host.id}`,
+        );
+        expect(response.status).toBe(200);
+        return systemProviderInfoSchema
+          .array()
+          .parse(await readJson(response))
+          .map((provider) => provider.id);
+      };
+      const installProvider = () =>
+        harness.app.request(`${API}/hosts/${host.id}/provider-clis/install`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            provider: "installable-agent",
+            actionKind: "install",
+          }),
+        });
+      const providerHealthRequests = () =>
+        responder.requests.filter(
+          (request) =>
+            request.command.type === "provider.health" &&
+            request.command.providerId === "installable-agent",
+        );
+
+      expect(await listProviderIds()).not.toContain("installable-agent");
+      const installResponse = await installProvider();
+      expect(installResponse.status).toBe(200);
+      expect(await installResponse.text()).toContain('"success":true');
+      expect(await listProviderIds()).toContain("installable-agent");
+      expect(providerHealthRequests()).toHaveLength(2);
+    });
+  });
+});

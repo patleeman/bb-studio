@@ -1,0 +1,455 @@
+{
+  "about": "Every upstream file the fork edits by hand. seam names the section of STUDIO_FORK.md; intent says what the edit must keep doing after a conflict is resolved; budget is the most added plus removed lines the file may carry. Checked by scripts/fork/check-core-diff.mjs.",
+  "files": {
+    "AGENTS.md": {
+      "seam": "rules",
+      "intent": "Points agents at AGENTS.fork.md before upstream's guidelines.",
+      "budget": 4
+    },
+    "CLAUDE.md": {
+      "seam": "rules",
+      "intent": "Loads AGENTS.fork.md for Claude Code.",
+      "budget": 4
+    },
+    "apps/app/src/components/commands/ThreadSearchPaletteMode.tsx": {
+      "seam": "palette-search",
+      "intent": "Plugin rows join the thread search list. usePluginPaletteOptions (ForkPaletteSearch.tsx) merges them before and after the thread options; usePluginPaletteHighlightReset must stay AFTER the effect that sets the highlighted key from activeIndex, or the highlight starts on the first thread instead of the first plugin row; PluginPaletteSection draws them. This file keeps the plugin field on an option, its key, a one-line select branch (selectPluginPaletteRow: Mod+Enter runs experimental_onModSelect, else navigate to the row's path), the empty-state check and the two section renders. The main-view split shortcut is gated by MAIN_SPLITS_ENABLED. Fork imports sit at the top of the file.",
+      "budget": 61
+    },
+    "apps/app/src/components/commands/CommandPalette.tsx": {
+      "seam": "command-palette",
+      "intent": "One fork import at the top of the file (ForkCommandPalette.tsx). The dialog's body (bb's command list or ThreadSearchPaletteMode) is wrapped in <ForkCommandPalette>, given openCount, searchingThreads, actions, installedPlugins, chooseAction and runAfterClose; it draws the first slots.experimental_commandPalette registration instead of its children, and the children when there is none or it crashed. The Escape handler first returns when forkCommandPaletteEscape(event) is true (the replacement's experimental_onEscape handler claimed the key), then keeps the dialog open to leave search mode only when forkCommandPaletteActive() is false, so Escape otherwise closes a replacement.",
+      "budget": 6
+    },
+    "apps/app/src/components/layout/AppLayout.tsx": {
+      "seam": "narrow-window, workbench, approvals, main-header, item-drag, pop-out, app-backdrop",
+      "intent": "One fork import at the top of the file (components/fork/ForkLayout.tsx). SidebarStateBridge's sidebar state goes through useForkLayoutBridge(useAtom(sidebarOpenAtom)): useNarrowWindowSidebar.fork.ts collapses the sidebar below 1100px and keeps it closed in a bare window, and useWorkbenchForkCommands is mounted there (panel.close and the desktop close request go to slots.experimental_closeFallback first). ForkLayoutHosts is the first child of the content shell: ForkAppBackdropHost (slots.experimental_appBackdrop: the backdrop portaled behind the layout, its appearance on <html>), ForkMainHeader (slots.experimental_mainHeader rows above the header and main view), ForkApprovalHost (pending approvals to the desktop dialog or bb's own) ForkItemDropHost (bb's composer, side panel and main view as drop targets for slots.experimental_itemDrop) and ForkSidebarStyleHost (runs the sidebar thread list's experimental_useSidebarStyle). In a bare window (isBareWindow: loaded with ?bbBare=1 by experimental_popOut) AppLayoutSidebar, SidebarTriggerOverlay and the AppHeader are not rendered: two inserted guard lines around each of the first two, one condition in showHeader.",
+      "budget": 10
+    },
+    "apps/app/src/components/pickers/model-load-error-message.tsx": {
+      "seam": "model-load-notice",
+      "intent": "ModelLoadErrorMessage draws forkModelLoadNotice (ForkModelLoadNotices.tsx) right after \"Could not load models for …\", so plugins' slots.experimental_modelLoadNotice components can state why (an Account Pooler that is signed out). The fork import sits at the top of the file.",
+      "budget": 2
+    },
+    "apps/app/src/lib/command-palette/palette-thread-search.ts": {
+      "seam": "search-highlight",
+      "intent": "The palette's loaded title matches go through forkStrongMatches (lib/fork-palette-match.ts): a title is kept only when the whole query or a query word at a word start is in it, and those ranges are its highlight, never bb's scattered fuzzy letters. A one-letter query keeps bb's fuzzy matches and their positions.",
+      "budget": 7
+    },
+    "apps/app/src/components/pickers/ModelReasoningPicker.tsx": {
+      "seam": "composer-labels",
+      "intent": "An unknown model id shows a readable label (formatUnknownModelLabel, unknownModelLabel.fork.ts, imported at the top of the file) instead of the raw id, and the trigger's reasoning half comes from triggerReasoningLabel (same file): a model the catalog lacks still shows its stored level, so a thread reads \"Opus 5.5 Medium\" like the new-thread page.",
+      "budget": 8
+    },
+    "apps/app/src/components/secondary-panel/NewTabFileSearch.tsx": {
+      "seam": "new-tab-items",
+      "intent": "Plugin New Tab items flow through NewTabFileSearch.fork.tsx: useForkNewTab merges plugin recents into the recent list and gives search results; a `fork` entry kind and a `fork` section (between files and recent) render them with ForkNewTabRow and ForkNewTabResults, Enter opens them, and {fork.node} mounts the plugins' useRecents collectors. The `actions` prop is renamed registeredActions and passed through useForkNewTabActions, which drops action tabs registered with experimental_showInNewTab: false from the Actions list and action search. The idle Actions list is drawn as one NewTabActions per group from useForkNewTabActionGroups, with the group's label (bb's Actions first, then experimental_newTabGroup headings). The fork import sits at the top of the file.",
+      "budget": 32
+    },
+    "apps/app/src/components/secondary-panel/NewTabActions.tsx": {
+      "seam": "new-tab-items",
+      "intent": "NewTabActions takes an optional label prop for its section heading, defaulting to \"Actions\", so the New Tab page can draw one reorderable list per experimental_newTabGroup heading.",
+      "budget": 5
+    },
+    "apps/app/src/components/secondary-panel/SecondaryPanelLayout.tsx": {
+      "seam": "narrow-window",
+      "intent": "renderAsDrawer goes through useForkPanelDrawer (lib/fork-narrow-panel.ts): below 1000px wide the side panel uses bb's compact drawer (an overlay the panel shortcut toggles) instead of sitting inline; fork.css narrows that drawer on non-phone widths.",
+      "budget": 3
+    },
+    "apps/app/src/components/pickers/PermissionModePicker.tsx": {
+      "seam": "composer-labels",
+      "intent": "The compact permission labels are off (FORK_PERMISSION_COMPACT_LABELS in unknownModelLabel.fork.ts), so the label keeps a stable width and the row under the composer does not shift. One import at the top, one changed line.",
+      "budget": 3
+    },
+    "apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx": {
+      "seam": "workbench-global-tabs",
+      "intent": "Plugin pages show fixed plugin tabs in their side panel (through the merged tab state). One call, useForkCloseFileTabCommand (workbenchFork.tsx), between the panel.newTab and panel.reopenClosedTab handlers, keeps Mod+W closing the active file tab there. One line inside the AppNavigationHostProvider, after the AppPanelTabsPublisher, mounts forkPageWorkbenchSurface(pluginId, panel id, panelStateId) so experimental_workbench(\"page:<pluginId>/<panelId>\") reaches this page's panel.",
+      "budget": 3
+    },
+    "apps/app/src/components/promptbox/FollowUpPromptBox.tsx": {
+      "seam": "composer-footer",
+      "intent": "Renders PluginComposerFooter (ForkComposerFooter.tsx, which resolves the slots' experimental_footer items itself) in the row under an existing thread's input, before bb's own controls.",
+      "budget": 6
+    },
+    "apps/app/src/components/secondary-panel/SecondaryPanelTabStrip.tsx": {
+      "seam": "workbench, item-drag",
+      "intent": "One row of tabs, with every rule in workbenchFork.tsx: fixedPanelTabsFirst sorts fixed plugin tabs to the front, useFixedPanelTabDisplay turns off dragging for them and draws them icon-only when the registration sets experimental_compactWhenFixed (title as tooltip and aria-label), FixedPanelTabGroupEnd draws the divider after the last fixed tab, and PanelTabActionMenuItems is the one line that puts plugins' slots.experimental_panelTabAction items first in a tab's context menu. Tabs shrink instead of scrolling early, and the active tab always shows its close button. Every non-fixed tab is a native drag source: usePanelTabNativeDrag returns the draggable/onDragStart/onDragEnd props spread on the tab's wrapper (after dnd-kit's listeners), and when it does, the wrapper's onPointerDown skips bb's pane drag (onBeginTabDrag); the mouse sensor is InertMouseSensor so the mouse never starts dnd-kit's sort, while touch keeps dnd-kit's sensor, the sort and PanelTabItemDragSource (one line inside the DndContext, sending the item payload to whatever is under the pointer outside the strip).",
+      "budget": 45
+    },
+    "apps/app/src/components/secondary-panel/SidebarSplitContainer.tsx": {
+      "seam": "workbench-panes",
+      "intent": "bb's split container, limited by workbenchSplitLimits.fork.ts through one fork import at the top of the file: MAX_PANES is WORKBENCH_MAX_PANES (2); a stored layout is restored only when restoresWorkbenchSplit accepts it (a row of up to two panes); canMoveSidebarActiveTab is false while WORKBENCH_MOVE_PANE_CONTROLS is false (no left/right/top/bottom move grid); a tab drag engages only inside the panel (isPointInWorkbench) and also when it leaves its pane's tab row sideways; limitWorkbenchDrop wraps decide (one pane: right edge only; two panes: the other pane, as a center drop). One hook line, useWorkbenchSplits, before the first early return, hands moveTab, removeSplit, resize and commitState to the menu items and the plugin API.",
+      "budget": 13
+    },
+    "apps/app/src/components/secondary-panel/ThreadSecondaryPanel.tsx": {
+      "seam": "workbench, workbench-panes",
+      "intent": "usePinnedFixedPanelTabs marks the fixed plugin tabs that apply to this panel as pinned, which is what removes their close button and keeps them out of Close other tabs and the mobile pager's close. WorkbenchPanelScope wraps the tab row so tab menu items know which panel they are in. PinnedIconTabsDivider follows bb's own icon tabs when no fixed plugin tab does. WORKBENCH_NEW_TAB_IN_EVERY_PANE gives every split pane its own New Tab button (one condition in each of the two new-tab lines of renderPane).",
+      "budget": 20
+    },
+    "apps/app/src/components/secondary-panel/usePanelTabPresenter.tsx": {
+      "seam": "workbench",
+      "intent": "Uses the per-instance icon for plugin action tabs.",
+      "budget": 3
+    },
+    "apps/app/src/components/sidebar/AppSidebar.tsx": {
+      "seam": "sidebar, sidebar-style",
+      "intent": "Renders PluginSidebarSections (ForkSidebarSections.tsx) under the thread list, and spreads useForkSidebarStyle() (ForkSidebarStyle.tsx) onto bb's Sidebar so a thread list's experimental_useSidebarStyle reaches the sidebar panel as CSS variables and data attributes; both imported at the top of the file. Nothing else: the rail and the sidebar footer are upstream's.",
+      "budget": 5
+    },
+    "apps/app/src/components/thread/timeline/ThreadTimelineRows.tsx": {
+      "seam": "quiet-turns, message-menu",
+      "intent": "A finished assistant message that a plugin's reply classifier calls quiet (useQuietReply, lib/fork-reply-classifiers.ts, which redraws the row when a classifier registers after it was drawn) draws as QuietTurnMarker instead of a message. Core has no rule of its own. ConversationRowContent reads the plugins' slots.experimental_messageAction items (useForkMessageActions) and wraps the row's plugin actions in withForkMessageMenu (forkMessageActions.ts), which adds the items that are available for that message, keyed as menu items.",
+      "budget": 15
+    },
+    "apps/app/src/components/ui/tab-pill.tsx": {
+      "seam": "workbench",
+      "intent": "keepCloseVisibleWhenActive: the active tab's close button stays visible.",
+      "budget": 12
+    },
+    "apps/app/src/lib/fixed-panel-tabs.ts": {
+      "seam": "workbench-global-tabs",
+      "intent": "One import at the top and one line after resetFixedPanelTabsStateForTest create forkFixedPanelTabs (fixed-panel-tabs.fork.ts) from the thread-owned atom family. getFixedPanelTabsStateAtom returns forkFixedPanelTabs.merged (withGlobalPanelTabs, fork-global-panel-tabs.ts), so reads and writes see fixed plugin tabs before the surface's own and a write that would close one is ignored. useFixedPanelTabsState hydrates the owned atom (forkFixedPanelTabs.owned) and returns the merged state; useUpdateFixedPanelTabsState writes through the merged atom inside forkFixedPanelTabs.ownedTabs and persists only the thread's own tabs (owned.before/owned.after), so fixed tabs are never saved into a thread. forkFixedPanelTabs.ids lists this window's thread panels for tab renames (fork-tab-titles.ts).",
+      "budget": 19
+    },
+    "apps/app/src/lib/plugin-navigation-hooks.ts": {
+      "seam": "app-route, pop-out",
+      "intent": "useBbNavigate calls useForkNavigate(pluginId) (plugin-navigation.fork.ts: experimental_toAppPath, experimental_popOut, experimental_renameTab, experimental_closeFixedTab) and spreads it first into the result, with fork in the dependency list.",
+      "budget": 4
+    },
+    "apps/app/src/lib/plugin-panel-controller.ts": {
+      "seam": "workbench-global-tabs",
+      "intent": "openTab passes its options through withGlobalPlacement (fork-plugin-global-tabs.ts), inside the optional call so nothing happens without a controller: with experimental_global the tab becomes a fixed tab (placePluginTabInGlobal) before the surface opens it.",
+      "budget": 3
+    },
+    "apps/app/src/lib/plugin-sdk-app-impl.tsx": {
+      "seam": "sdk-tables",
+      "intent": "Spreads forkPluginSdkAppImplementation (plugin-sdk-app-impl.fork.tsx) first into the app's implementation of the SDK.",
+      "budget": 2
+    },
+    "apps/app/src/lib/plugin-slots.ts": {
+      "seam": "sdk-tables",
+      "intent": "The app's slot tables take the fork's slots from fork-slots.ts: the import at the top of the file, two extends, and one spread each, as the FIRST entry, in the empty snapshot, the kinds list and the stamping step (upstream appends at the end).",
+      "budget": 14
+    },
+    "apps/app/src/lib/split-layout/ops.ts": {
+      "seam": "splits-off, workbench-panes",
+      "intent": "MAIN_SPLITS_ENABLED = false caps the main view at one pane (MAX_PANES). splitPane keeps upstream's tree limit of 8 (SPLIT_TREE_MAX_PANES), since every main-view caller checks MAX_PANES before splitting and the side panel's split needs the shared operation.",
+      "budget": 6
+    },
+    "apps/app/src/lib/thread-actions/thread-action-registry.tsx": {
+      "seam": "app-route",
+      "intent": "The stable BbNavigate that thread actions build spreads forkLatestNavigate(latest) (plugin-navigation.fork.ts) first, so the fork's navigate methods forward too.",
+      "budget": 2
+    },
+    "apps/app/src/main.tsx": {
+      "seam": "fork-styles",
+      "intent": "Imports fork.css right after app.css, so the fork's unlayered rules (sidebar header row, focus rings, narrow drawer width) win over bb's layered ones.",
+      "budget": 1
+    },
+    "apps/app/src/views/thread-detail/SplitThreadArea.tsx": {
+      "seam": "pane-close",
+      "intent": "Both single-pane paths (StandalonePaneContent's onRequestClose and the single WorkspacePaneContent's onClosePane) treat a plugin-panel like a thread or the New thread screen: no close button, since a rail page alone in the main view has nowhere to close to. One condition on one line each; split panes keep theirs. focusPane and closePane are upstream's; experimental_useAppPanes uses its own copy in splitPaneActions.fork.ts.",
+      "budget": 4
+    },
+    "apps/app/src/views/thread-detail/ThreadScreen.tsx": {
+      "seam": "composer-replace, thread-banner",
+      "intent": "bb's prompt area is built as bbPromptArea and passed through forkComposerArea (ForkComposerReplace.tsx), so a plugin's experimental_replace can stand in for the composer in the thread page and in every ThreadChat; null stays null. In the page presentation (only ThreadDetailView draws it), forkThreadBanner (ForkThreadBanners.tsx) is the first child of the thread window, so plugins' slots.experimental_threadBanner rows sit above the transcript; ThreadChat's panel and transcript presentations draw none. Both fork imports sit at the top of the file.",
+      "budget": 6
+    },
+    "apps/app/src/views/thread-detail/ThreadDetailHeader.tsx": {
+      "seam": "thread-header",
+      "intent": "The header asks useForkThreadHeader (components/fork/ForkThreadHeader.tsx) for the thread's decoration: the title text shown when not editing is its title (plugins' slots.experimental_threadHeader may replace it), and its after node is drawn right after the title div, before the actions menu. useSidebarRename, the pane drag label and the rename save keep the real threadTitle.",
+      "budget": 5
+    },
+    "apps/cli/src/commands/server.ts": {
+      "seam": "import-sync",
+      "intent": "Registers the `bb server mirror` commands (commands/fork-import.ts).",
+      "budget": 2
+    },
+    "apps/server/src/internal/events.ts": {
+      "seam": "quiet-turns",
+      "intent": "No completion notice is queued to the parent thread when a plugin's turn classifier called the turn quiet (isQuietTurn).",
+      "budget": 4
+    },
+    "apps/server/src/server.ts": {
+      "seam": "import-sync, approvals",
+      "intent": "Registers the fork's import routes (/api/v1/fork/import/*) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp.",
+      "budget": 4
+    },
+    "apps/server/src/services/plugins/plugin-service.ts": {
+      "seam": "quiet-turns, plugin-events",
+      "intent": "The thread.idle plugin event spreads forkIdleFields (quiet-turn.fork.ts: experimental_quiet) as its first field, on its own line. The events object also registers the fork's event wiring (registerForkPluginEvents: emitThreadEvent, the database, buildThreadDto, toHostRecord) so fork-plugin-events.ts can emit its three events.",
+      "budget": 10
+    },
+    "apps/server/src/services/threads/dispatch-attempt.ts": {
+      "seam": "import-sync",
+      "intent": "When startsNoTurn(thread, input) (services/threads/turnless-dispatch.fork.ts) says the attempt is the first dispatch of a pending fork with an empty input, runDispatchAttempt skips the message.dispatch hook pass and waitOn returns dispatched without writing a queued row. An empty-input fork (Reply in thread) then starts as an idle fork even when the concurrency limit is full, and never stores an empty queued message.",
+      "budget": 4
+    },
+    "apps/server/src/services/threads/thread-send.ts": {
+      "seam": "import-sync",
+      "intent": "ensureThreadIsWritable ends with ensureForkThreadWritable(thread) (services/threads/thread-write-guards.fork.ts), which throws a 409 thread_read_only for the first registered fork guard that refuses; fork-import registers the mirrored-thread guard. This one call also covers the queue path.",
+      "budget": 2
+    },
+    "apps/server/src/services/threads/thread-create.ts": {
+      "seam": "import-sync",
+      "intent": "assertForkSourceHost returns early when forkHostStandsIn(sourceThread, sourceHostId, childHostId) (services/threads/thread-fork-hosts.fork.ts) says yes; fork-import registers one that lets a mirrored thread, whose environment is on the bb machine it was imported from, be forked onto this machine.",
+      "budget": 2
+    },
+    "apps/server/src/start-server.ts": {
+      "seam": "import-sync",
+      "intent": "Calls forkBeforeDatabase right after refuseInterruptedServerImport and before initDb. It runs the first-run import (services/fork-import/first-run.ts) when the data dir has no database yet, and tells the fork module which data dir is active.",
+      "budget": 2
+    },
+    "apps/server/test/services/plugins/plugin-authoring-docs.test.ts": {
+      "seam": "quiet-turns, plugin-events",
+      "intent": "The event field table lists experimental_quiet for thread.idle and the fields of the fork's four events (a type assertion requires every event name).",
+      "budget": 7
+    },
+    "packages/domain/src/ui-preferences.ts": {
+      "seam": "workbench-global-tabs",
+      "intent": "Two lines at the top import and re-export ui-preferences.fork.ts, and two spreads put the fork's preference keys (FORK_UI_PREFERENCE_KEYS: the synced workbench.globalTabs, which stores the fixed plugin tabs) and their definitions FIRST in UI_PREFERENCE_KEYS and uiPreferenceDefinitions. All defaults are upstream's.",
+      "budget": 4
+    },
+    "packages/plugin-sdk/src/app-contract.ts": {
+      "seam": "sdk-tables",
+      "intent": "Imports and re-exports app-contract.fork.ts at the top of the file, and hangs the fork's members on upstream types: ExperimentalTabCommon and ExperimentalTabInput take ForkTabFields; the setup slots is PluginAppSlots & ForkPluginAppSlots; ComposerCustomization, BbNavigate and PluginSdkApp extend their Fork* interface; action-tab open options accept experimental_global (first field of that member). PluginFileOpenerRegistration extends ForkFileOpenerFields and PluginThreadListRegistration extends ForkThreadListFields. No fork type is declared here.",
+      "budget": 28
+    },
+    "packages/plugin-sdk/src/app.ts": {
+      "seam": "sdk-tables",
+      "intent": "One named re-export at the top of the file of the runtime functions and components in app.fork.ts (app route, sidebar New items, Global tabs, theme, panes, launcher items, windows, context card, drag item write and read, two project menus, app commands, tab window). Named, not export *: the runtime export manifest generator reads esbuild's unbundled export list, which does not follow export *. Add a new fork runtime export to both app.fork.ts and this line.",
+      "budget": 1
+    },
+    "packages/plugin-sdk/src/backend-contract.ts": {
+      "seam": "quiet-turns, plugin-events",
+      "intent": "Imports and re-exports backend-contract.fork.ts. PluginHooks extends ForkPluginHooks, PluginThreadEventPayloads extends ForkPluginEventPayloads (three events), and the thread.idle payload is intersected with ForkThreadIdlePayload on upstream's one line.",
+      "budget": 13
+    },
+    "packages/plugin-sdk/src/internal/composer-customization-validation.ts": {
+      "seam": "composer-footer, composer-replace",
+      "intent": "One import at the top of the file and one spread right after id in collectComposerCustomization's result: parseForkComposerRegions (internal/fork-composer.ts) validates experimental_footer and experimental_replace, rejecting bad entries through onRejected like bb's own regions.",
+      "budget": 2
+    },
+    "packages/plugin-sdk/src/internal/plugin-app-registration-collector.ts": {
+      "seam": "sdk-tables, file-opener-handle, sidebar-header, sidebar-style",
+      "intent": "The collector takes the fork's slots and fields from internal/fork-slots.ts (imported at the top of the file): the collected type extends ForkSlotRegistrations; spreads add the empty lists (first in the literal), the slot methods (first in slots) and the action-tab fields; the fileOpener registration spreads forkFileOpenerFields first (experimental_handleOpen); the experimental_threadList registration is wrapped in withForkThreadListFields (experimental_hideSidebarHeader, experimental_useSidebarStyle).",
+      "budget": 18
+    },
+    "packages/plugin-sdk/src/testing/app.tsx": {
+      "seam": "sdk-tables",
+      "intent": "The test host takes the fork's hooks, navigate methods and calls, slot environment and options from testing/app.fork.tsx: the import at the top of the file, ForkNavigateCall as the first NavigateCall member, extends, and spreads first in their literals.",
+      "budget": 19
+    },
+    "plugins/bb-guide/skills/bb-cli/references/command-index.md": {
+      "seam": "import-sync",
+      "intent": "Lists the `bb server mirror` commands; a test requires every core command path here.",
+      "budget": 7
+    },
+    "plugins/bb-guide/skills/bb-plugin-authoring/SKILL.md": {
+      "seam": "sdk-tables",
+      "intent": "One line pointing at references/fork-api.md.",
+      "budget": 1
+    },
+    "plugins/bb-guide/skills/bb-plugin-authoring/references/backend-events.md": {
+      "seam": "sdk-tables, quiet-turns",
+      "intent": "Documents experimental_quiet on thread.idle (the docs test requires every event field).",
+      "budget": 2
+    },
+    "plugins/plugin-api-docs/src/surfaces.ts": {
+      "seam": "sdk-tables",
+      "intent": "SURFACE_GROUPS is wrapped in withForkApiSymbols (surfaces.fork.ts), which adds the fork's SDK symbols to their surfaces.",
+      "budget": 6
+    },
+    "plugins/push-notifications/sender.ts": {
+      "seam": "quiet-turns",
+      "intent": "No push is sent for a quiet thread.idle event.",
+      "budget": 3
+    },
+    "vitest.shared.ts": {
+      "seam": "test-skips",
+      "intent": "Adds scripts/fork/vitest-skips.ts as a setup file in the shared base config, so tests listed in skipped-tests.json are skipped at run time.",
+      "budget": 4
+    },
+    "apps/server/src/services/threads/thread-commands.ts": {
+      "seam": "turn-context",
+      "intent": "buildThreadStartCommand and prepareTurnSubmitCommandPayload (only for target.mode start, never a steer) pass their input through withTurnContext (turn-context.fork.ts), which appends each plugin's experimental_turnContext text as agent-only items to input and the last input group. Nothing is stored; no wire field changes.",
+      "budget": 3
+    },
+    "apps/server/src/services/plugins/plugin-api.ts": {
+      "seam": "quiet-turns, thread-delete-hook, plugin-events, turn-context, fork-point",
+      "intent": "Spreads forkPluginHooks (services/threads/turn-classifiers.fork.ts, given the database) into the plugin's experimental_hooks object, which gives plugins experimental_classifyTurns, experimental_beforeThreadDelete, experimental_requestApproval, experimental_turnContext and experimental_threadForkPoint. The registrations are removed with the plugin's other dispose hooks. The per-plugin event handler map spreads forkEventHandlerLists so bb.events.on accepts the fork's event names.",
+      "budget": 4
+    },
+    "packages/plugin-sdk/src/testing/fake-plugin-host.ts": {
+      "seam": "quiet-turns, plugin-events",
+      "intent": "The fake plugin host spreads the fork's hooks (forkFakeHooks) and the fork's event names into its handler table and its counts (forkEventLists, forkEventCounts), so it satisfies PluginHooks and the event name type.",
+      "budget": 8
+    },
+    "apps/server/src/routes/threads/base.ts": {
+      "seam": "thread-delete-hook",
+      "intent": "The thread delete route awaits askBeforeThreadDelete (services/threads/thread-delete-hooks.fork.ts) for the thread and every thread deleted with it, before anything is marked deleted. A plugin that throws stops the deletion with a 409.",
+      "budget": 2
+    },
+    "apps/demo-server/src/demo-world.ts": {
+      "seam": "workbench-global-tabs",
+      "intent": "The demo server lists every UI preference by hand; this adds `workbench.globalTabs` (the fixed plugin tabs) so the list stays complete.",
+      "budget": 1
+    },
+    "apps/app/src/lib/url-open-routing.tsx": {
+      "seam": "link-handlers, workbench-api",
+      "intent": "Before bb opens a clicked link by the user's preference, it asks plugin link handlers (openUrlWithPlugin, lib/fork-link-handlers.ts); a handler that returns true has opened it. InAppBrowserUrlOpenContext is exported so the workbench seam (fork-workbench.ts) opens a URL in the thread view's in-app browser.",
+      "budget": 4
+    },
+    "apps/server/src/services/threads/lifecycle-outcome.ts": {
+      "seam": "plugin-events, quiet-turns",
+      "intent": "Both lifecycle apply functions take forkBefore = forkBeforeLifecycle(deps.db, args) next to previousStatus and call forkAfterLifecycle(deps, args, outcome, previousStatus, forkBefore) after announceTurnFailed (services/threads/lifecycle-outcome.fork.ts). It puts latestAttentionAt back after a quiet run.succeeded from active and calls announceTurnInterrupted (fork-plugin-events.ts). Every turn completion and interruption path goes through these two functions.",
+      "budget": 5
+    },
+    "apps/server/src/ws/daemon-protocol.ts": {
+      "seam": "plugin-events",
+      "intent": "onDaemonSocketOpen emits experimental_host.connected right after the hub registers the daemon, so a listener that reads the host sees it connected.",
+      "budget": 2
+    },
+    "apps/server/src/internal/session-owner-side-effects.ts": {
+      "seam": "plugin-events",
+      "intent": "handleHostSessionOpened notes whether the daemon is a new process (noteDaemonInstance), and handleDaemonSessionLost emits experimental_host.disconnected after the session is closed.",
+      "budget": 6
+    },
+    "apps/desktop/src/main.ts": {
+      "seam": "approvals, windows, studio-release",
+      "intent": "Registers the fork's approval IPC handler (registerForkApprovalIpc, fork-approvals.ts) beside the desktop info handler. Importing that module also makes the per-launch signing key and puts its public half in the environment before the server is started. It also registers the fork's window IPC handler (registerForkWindowIpc, fork-windows.ts). Its first import is studio-desktop.fork.ts (a test build's scratch data dir, ports and user data are set there before anything reads them), and About shows the Studio version with its bb base (studioAboutVersion).",
+      "budget": 7
+    },
+    "apps/desktop/src/preload.ts": {
+      "seam": "approvals, windows, studio-release",
+      "intent": "Exposes experimental_answerApproval and experimental_window on window.bbDesktop; each invokes the main process. It also exposes experimental_studioBuild (the Studio version and its bb base, from studio-release.fork.ts).",
+      "budget": 11
+    },
+    "packages/desktop-contract/src/info.ts": {
+      "seam": "approvals, windows",
+      "intent": "BbDesktopApi also extends ForkDesktopApi (info.fork.ts: experimental_answerApproval and experimental_window), imported at the top of the file.",
+      "budget": 3
+    },
+    "apps/app/src/App.tsx": {
+      "seam": "windows",
+      "intent": "Adds the bare route /fork-window/:pluginId/:windowId (ForkWindowView), outside the onboarding gate and the app layout, so a plugin window shows only the plugin's component.",
+      "budget": 5
+    },
+    "apps/app/src/components/secondary-panel/useThreadFileTabs.ts": {
+      "seam": "file-opener-handle",
+      "intent": "openResolvedTab inserts the tab through update = forkDeferUntilHandled(updateFixedPanelTabsState, ...) (components/plugin/file-opener-handle.fork.ts) instead of calling updateFixedPanelTabsState directly; only the identifier on upstream's call line changes. For a plain open with no Open with choice, a file opener's experimental_handleOpen runs first and the tab is inserted only if it does not answer true within 3 s; otherwise update is updateFixedPanelTabsState itself.",
+      "budget": 4
+    },
+    "apps/server/src/ws/hub.ts": {
+      "seam": "plugin-events",
+      "intent": "notifyThread, where events-appended is announced to plugins, also calls announceThreadFilesChanged (fork-plugin-events.ts), which emits experimental_thread.fileChanged for new completed file-change items.",
+      "budget": 2
+    },
+    "plugins/git/ui/diff/DiffTab.tsx": {
+      "seam": "diff-to-editor",
+      "intent": "The diff view's open-in-editor button passes the first changed line of the file (fork-first-changed-line.ts), so the editor opens at the change and not at the top. DiffTab turns the line into the open request's location.",
+      "budget": 5
+    },
+    "plugins/git/ui/diff/DiffFileCard.tsx": {
+      "seam": "diff-to-editor",
+      "intent": "The diff view's open-in-editor button passes the first changed line of the file (fork-first-changed-line.ts, imported at the top of the file), so the editor opens at the change and not at the top. DiffFileCard computes the line from the loaded patch; the prop type gains the optional line. Each change is one line.",
+      "budget": 5
+    },
+    "plugins/git/ui/diff/DiffFilesPanel.tsx": {
+      "seam": "diff-to-editor",
+      "intent": "Passes the wider open-in-editor callback type (path, line) through.",
+      "budget": 4
+    },
+    "apps/app/src/components/thread/timeline/ThreadContextWindowIndicator.tsx": {
+      "seam": "context-card",
+      "intent": "The context card renders plugin rows (ForkContextCardRows) under its own rows; the popover also opens when a plugin asks (useForkContextCardOpen) and stays hoverable when plugin rows exist, since they may hold actions.",
+      "budget": 13
+    },
+    "apps/app/src/components/layout/AppPageHeader.tsx": {
+      "seam": "sidebar-header, app-backdrop",
+      "intent": "ForkMainHistoryControls (components/sidebar/ForkSidebarHeader.tsx) is the first child of the header's content row. It draws bb's back and forward buttons there when the sidebar's thread list set experimental_hideSidebarHeader, the header owns the window's top left, and the layout is not the framed title bar (which keeps its own). The center's inner row carries data-fork-header-group=\"title\" and the actions row data-fork-header-group=\"actions\", so fork.css can draw them as separate pills when an app backdrop asks for a card layout. The title group is wrapped in ForkHeaderTitle (components/fork/ForkTitleHost.tsx, imported at the top of the file): two lines around the group, which moves the same nodes into the page's [data-fork-title-host] when an app backdrop asks for layout.cards.titleRow, and renders them in place otherwise.",
+      "budget": 8
+    },
+    "apps/app/src/components/sidebar/SidebarHistoryNavigationControls.tsx": {
+      "seam": "app-backdrop",
+      "intent": "The back and forward buttons' row carries data-fork-header-group=\"history\", so fork.css can draw it as one pill when an app backdrop asks for a card layout.",
+      "budget": 1
+    },
+    "apps/app/src/components/sidebar/SidebarChrome.tsx": {
+      "seam": "sidebar-header",
+      "intent": "SidebarTopReserveRow asks useForkSidebarHeader (ForkSidebarHeader.tsx) for its header slot: while the thread list set experimental_hideSidebarHeader the slot is dropped, the back and forward buttons are not drawn, and in the browser rail layout (no window chrome) the row returns null.",
+      "budget": 8
+    },
+    "apps/app/src/components/thread/timeline/MessageActionBar.tsx": {
+      "seam": "message-menu",
+      "intent": "Plugin actions keyed as fork menu items (forkMessageActions.ts) are left out of the inline candidates (forkInlineMessageActions) and added to the ··· menu after Add to chat and before Fork (forkMenuMessageActions). bb's own Fork item is left out when forkKeepsThreadFork(pluginActions) is false: a plugin item on that message declared experimental_replaces: \"thread.fork\".",
+      "budget": 6
+    },
+    "apps/app/src/lib/bb-desktop.ts": {
+      "seam": "close-fallback",
+      "intent": "getBbDesktopInfo returns the desktop API through withForkCloseGuard (bb-desktop.fork.ts), so every onCloseWindowRequest listener first asks the close fallback (fork-close-fallback.ts installs closeFallbackHandled as the guard) and only runs when no plugin took the close. This is why ThreadDetailView, RootComposeView and ToolsView carry no close guard; panel.close reaches the fallback first through useWorkbenchForkCommands' priority-100 handler.",
+      "budget": 3
+    },
+    "apps/app/src/components/tools/SkillsCollection.tsx": {
+      "seam": "skill-sources",
+      "intent": "SkillsOverview calls useForkSkillSources (components/tools/ForkSkillSources.tsx, imported at the top of the file) after visibleSkills with the normalized query, whether bb's Type or Provider filter is set, and whether bb's list has rows or is loading or failed; its filterGroups are spread last into the filter menu's groups, and its body(libraryBody) replaces the band div around the library body, adding each slots.experimental_skillSource's rows under bb's list.",
+      "budget": 5
+    },
+    "apps/app/src/components/secondary-panel/sidebarSplitLayout.ts": {
+      "seam": "workbench-panes",
+      "intent": "MAX_PANES is WORKBENCH_MAX_PANES (2) from workbenchSplitLimits.fork.ts, imported at the top of the file in place of the shared cap, so moveSidebarTab and the stored-state schema allow two panes while the main view stays at one.",
+      "budget": 2
+    },
+    "apps/app/src/lib/thread-actions/core-thread-actions.ts": {
+      "seam": "splits-off",
+      "intent": "The \"Open in split\" thread action is unavailable while MAIN_SPLITS_ENABLED is false (one condition, plus the import).",
+      "budget": 4
+    },
+    "plugins/workflows/src/app.tsx": {
+      "seam": "workbench-api",
+      "intent": "The workflow-run action tab is registered with experimental_openableByPlugins: true, so other plugins (Studio) open a run in a thread's side panel with experimental_workbench(...).open. One added line.",
+      "budget": 1
+    },
+    "apps/app/src/hooks/useTheme.ts": {
+      "seam": "app-backdrop",
+      "intent": "An app backdrop's mode overrides this window's resolved light or dark: getPreferredTheme returns forkThemeModeOverride() (lib/fork-theme-mode.ts) before the preference or the system, and ensureThemeObserver subscribes emitTheme to subscribeForkThemeModeOverride, so .dark and usePreferredTheme follow it. The fork import sits at the top of the file.",
+      "budget": 4
+    },
+    "apps/app/src/components/ui/page-shell.tsx": {
+      "seam": "app-backdrop",
+      "intent": "One fork import at the top of the file and one line: <ForkTitleHost kind=\"page\" /> is the first child of the static shell's content column, before {children}. It is empty and not displayed unless an app backdrop asks for layout.cards.titleRow, when the header's title group is moved into it as the card's first row.",
+      "budget": 2
+    },
+    "apps/app/src/views/ToolsView.tsx": {
+      "seam": "app-backdrop",
+      "intent": "One fork import at the top of the file and two lines in ResourceScrollPage: <ForkTitleHost kind=\"tools\" /> is the first child of the fill-viewport wrapper (box-border h-full w-full) and of the scrolling wrapper (relative h-full overflow-hidden, before the scroller, which must stay a direct child for fork.css's card rule). Empty and not displayed unless an app backdrop asks for layout.cards.titleRow.",
+      "budget": 3
+    },
+    "apps/app/src/lib/pierre-strict-mode-recovery.ts": {
+      "seam": "app-backdrop",
+      "intent": "Every Pierre diff and file view gets the fork's shadow-root CSS: usePierreStrictModeRecoveryOptions passes its options through withForkPierreCSS (lib/fork-pierre-css.ts), which prepends FORK_PIERRE_CSS to unsafeCSS, and its TOptions accepts unsafeCSS. The CSS gives the line-number gutter its own fill, --fork-diffs-gutter-bg, defaulting to the diff's background. The fork import sits at the top of the file.",
+      "budget": 5
+    },
+    "apps/desktop/scripts/build.mjs": {
+      "seam": "studio-release",
+      "intent": "The esbuild defines end with studioBuildDefines(readStudioBuild(process.env)) (scripts/studio-release.fork.mjs): BB_DESKTOP_VERSION is the Studio version and BB_STUDIO_BUILD carries the bb base and the update feed.",
+      "budget": 2
+    },
+    "apps/desktop/scripts/run-electron-builder.mjs": {
+      "seam": "studio-release",
+      "intent": "After the publish config is set, applyStudioBuilderConfig(config, readStudioBuild(env)) (scripts/studio-release.fork.mjs) sets extraMetadata.version to the Studio version and publish to the Studio feed, so the packaged app's version is the one electron-updater compares.",
+      "budget": 2
+    },
+    "apps/app/src/components/settings/UpdatesSettingsSection.tsx": {
+      "seam": "studio-release",
+      "intent": "RowName draws <ForkStudioBase version={current} /> (ForkStudioBase.tsx) after the versions: a row showing the Studio build's version gets \"based on bb <version> @ <sha>\".",
+      "budget": 2
+    },
+    "apps/server/src/services/system/desktop-app-update.ts": {
+      "seam": "studio-release",
+      "intent": "A desktop-owned server reports the hosting desktop's version (info.version, the Studio version) as current, falling back to its own; bb's desktop and server versions are the same, BB Studio's are not.",
+      "budget": 2
+    }
+  }
+}
