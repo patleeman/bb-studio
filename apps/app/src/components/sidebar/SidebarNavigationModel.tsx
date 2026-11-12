@@ -1,3 +1,4 @@
+import { useForkVisibleNavigationRows } from "@/components/fork/ForkHiddenHostEntries";
 import {
   createContext,
   useContext,
@@ -173,10 +174,11 @@ export function SidebarNavigationModelProvider({
 }: SidebarNavigationHostOptions & { children: ReactNode }) {
   const store = useStore();
   const panelEntries = usePluginNavPanelChrome();
-  const rows = useMemo(
+  const allRows = useMemo(
     () => createSidebarNavigationRows(panelEntries),
     [panelEntries],
   );
+  const rows = useForkVisibleNavigationRows(allRows);
   const arrangement = useSidebarNavigationArrangement(
     rows,
     SIDEBAR_NAVIGATION_LEADING_KEYS,
