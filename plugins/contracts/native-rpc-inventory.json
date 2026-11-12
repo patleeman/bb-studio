@@ -848,6 +848,72 @@
       "coverage": "generated method"
     },
     {
+      "file": "ios/iOS/Bot/BotPagesModel.swift",
+      "plugin": "studio",
+      "method": "memory.overview",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/BotPagesModel.swift",
+      "plugin": "studio",
+      "method": "memory.list",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/BotPagesModel.swift",
+      "plugin": "studio",
+      "method": "memory.get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/BotPagesModel.swift",
+      "plugin": "studio",
+      "method": "memory.profile",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/BotPagesModel.swift",
+      "plugin": "studio",
+      "method": "memory.add",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/BotPagesModel.swift",
+      "plugin": "studio",
+      "method": "memory.update",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/BotPagesModel.swift",
+      "plugin": "studio",
+      "method": "memory.archive",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/BotPagesModel.swift",
+      "plugin": "studio",
+      "method": "bot_library",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/BotPagesModel.swift",
+      "plugin": "studio",
+      "method": "bot_threads_older",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/BotPagesModel.swift",
+      "plugin": "studio",
+      "method": "bot_finished",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/BotPagesModel.swift",
+      "plugin": "studio",
+      "method": "bot_reopen",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/iOS/Capture/CaptureSheet.swift",
       "plugin": "studio",
       "method": "pages.create",

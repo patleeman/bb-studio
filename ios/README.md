@@ -49,6 +49,7 @@ are unchanged, and old `bbgo://` links still open.
 | Side chat: ask about one message in a hidden fork without derailing the thread | `MessageBubble` |
 | A Bot's conversations (the Bot's list as home): + New conversation (`bot_conversation_start`); Reply in thread under and in the menu of every reply (`bot_thread_reply`), opening the thread as a sheet (pushed on iPad and the unfolded Duo), with "💬 N replies · time" and the last replier's mark under the message (`bot_side_threads`); Fork conversation from a reply's menu (`bot_fork_conversation`), opening as its own conversation under its parent; the model chip in the header (`thread_model`) and Model and Finish (`bot_finish`) in ···; "N workers from here" above the composer; a compact input with dictation first. Side chat is hidden there. `[PASS]` reads "Quiet check" | `iOS/Bot/BotConversationChrome.swift`, `Shared/BotConversations.swift`, `ThreadView` |
 | A Bot's workers open read-only, from the list's Workers (and its "N done") or the "N workers from here" line: the worker's transcript with no composer, its title and status in the header with the list's glyph (Running, Waiting for your approval, Waiting on an answer, Failed or Done, and how long ago), and over where the composer was its Bot, the conversation it works for (opens it) and its branch. "Ask the Bot about this worker…" sends the question with dictation to the Bot in that conversation (Main when it has none; `bot_worker_ask`) and goes there, back down the stack when it was open under the worker. A worker waiting on a question offers Answer it here; one waiting on an approval shows what it waits on with a link to the conversation that has its card ("Push to origin · Main ›"), and isn't resolved there. No Stop, edit or side chat on a worker. Status comes from `bot_threads_view` and `bot_thread_info` | `iOS/Bot/BotConversationChrome.swift`, `Shared/BotWorkers.swift`, `ThreadView` |
+| A Bot's pages, from the five buttons in its list's header, as desktop's: Memory (the core profile folded with its length against the cap, opening in Pages to edit; records with search, topic chips from the data, sort, New, and a record's source, what it replaced, Edit as a new record and Archive or Restore; replaced records folded; `memory.*`), Library (the Bot's files by conversation, kind or date, with search and Kind chips, lookalikes folded with a count, 8 rows then "N more", each opening in its Studio viewer; Visual Chat from its ⋯; `bot_library`), Todos (the Todos screen), Automations (the Bot's automations, pushed) and Archive (older and finished conversations and older workers, with search and All, Conversations, Workers and Failed; a finished one shows its summary and Reopen; `bot_threads_older`, `bot_finished`, `bot_reopen`) | `iOS/Bot/BotPages.swift`, `iOS/Bot/BotPagesModel.swift` |
 | Host settings: keep the Mac awake, and how many threads run at once | `iOS/Tools/ServerControls.swift` |
 | Installed plugin status and errors in Settings → Plugins. Today (Studio), Pages (Studio Pages), Drawings (Studio Draw) and Automations show "Install <plugin> to use this." when their plugin is missing or not running, instead of BB's raw 404 or 503 text | `iOS/Tools/PluginStatusView.swift`, `Shared/BBClient.swift` |
 | Files & changes: a thread's uncommitted changes with diffs, a file browser, file search, and file previews (images, rendered Markdown, text) | `iOS/Thread/FilesView.swift` |
@@ -466,6 +467,15 @@ a failed worker from the list's "N done", Ask landing in Launch prep, a
 running worker from the workers line with Ask going back to Main, and a worker
 waiting on an approval showing its status only. `TEST_RUNNER_STEP6_OUT` keeps
 its PNGs.
+
+`BotPagesUITests` opens each Bot page from the list's header offline
+(`-qaSpacesDemo list` with `-qaBotDemo chat`; `BotSpacesDemo.State` answers
+`memory.*`, `bot_library`, `bot_threads_older`, `bot_finished` and
+`bot_reopen`, and `-qaLoopsDemo` answers Todos): Memory's profile, topic
+filter, a record's edit and a new record; Library's groups, folding, Kind
+filter and a design opening; Todos and Automations; Archive's Failed filter,
+a finished conversation's summary, and Reopen bringing it back to the list.
+`TEST_RUNNER_STEP8_OUT` keeps its PNGs.
 
 `ApprovalsUITests` checks worker approvals offline (`-qaSpacesDemo needs` with
 `-qaBotDemo chat`; `BotSpacesDemo.State` answers `bot_conversation_approvals`

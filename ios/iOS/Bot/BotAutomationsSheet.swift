@@ -8,6 +8,7 @@ struct BotAutomationsSheet: View {
     var botId: String? = nil
     var botName: String = BotInfo.defaultName
     var active = true
+    var embedded = false
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var automations: [BotAutomation]?
@@ -35,19 +36,21 @@ struct BotAutomationsSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            list
-            .overlay { emptyState }
-            .refreshable { await load() }
-            .navigationTitle("Automations")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { toolbarItems }
-            .sheet(item: $editing) { editing in
-                BotAutomationEditor(kind: editing.kind, automation: editing.automation, botId: botId, runners: runners) { await load() }
-            }
-            .confirmationDialog(deleteTitle, isPresented: deletingShown, titleVisibility: .visible) { deleteButton }
-            .task { await load() }
+        if embedded { content } else { NavigationStack { content } }
+    }
+
+    private var content: some View {
+        list
+        .overlay { emptyState }
+        .refreshable { await load() }
+        .navigationTitle("Automations")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { toolbarItems }
+        .sheet(item: $editing) { editing in
+            BotAutomationEditor(kind: editing.kind, automation: editing.automation, botId: botId, runners: runners) { await load() }
         }
+        .confirmationDialog(deleteTitle, isPresented: deletingShown, titleVisibility: .visible) { deleteButton }
+        .task { await load() }
     }
 
     // `body` in parts, so each type-checks quickly (Xcode 26 took 1.6 s on it whole).
@@ -80,7 +83,7 @@ struct BotAutomationsSheet: View {
     }
 
     @ToolbarContentBuilder private var toolbarItems: some ToolbarContent {
-        ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+        if !embedded { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
         ToolbarItem(placement: .primaryAction) {
             Menu {
                 ForEach(BotAutomation.Kind.allCases) { kind in

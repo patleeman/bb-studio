@@ -158,6 +158,13 @@ final class BotShellModel: ObservableObject {
         compactColumn = .detail
     }
 
+    func open(_ item: BotShellItem) {
+        landed = true
+        detailPath = []
+        selection = item
+        compactColumn = .detail
+    }
+
     func showList() {
         detailPath = []
         selection = nil

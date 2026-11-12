@@ -57,7 +57,11 @@ struct BotSpacesRoot: View {
         case .conversation(let id), .worker(let id):
             ThreadView(threadId: id).id(id)
         case .page(let page):
-            BotPagePlaceholder(page: page)
+            let bot = BotShell.shownBot(store.spaces, chosen: shell.shownBotId)
+            BotPageScreen(page: page, bot: bot, open: { [shell] in shell.open($0) }, openMain: { [shell, store] in
+                if let main = BotShell.mainThreadId(bot, view: bot.flatMap { store.view(for: $0.id) }) { shell.openConversation(main) }
+            }, refresh: { [store] in Task { await store.refresh() } })
+            .id(bot?.id)
         case nil:
             ContentUnavailableView("No conversation selected", systemImage: Symbols.thread)
         }
@@ -140,6 +144,7 @@ struct BotSpaceList: View {
                     .buttonStyle(.plain)
                     .glassEffect(.regular.interactive(), in: .circle)
                     .accessibilityLabel(page.title)
+                    .accessibilityIdentifier("BotPage-\(page.rawValue)")
                     if page != BotPage.allCases.last { Spacer(minLength: 4) }
                 }
             }
@@ -348,15 +353,5 @@ struct BotSpaceDots: View {
         .glassEffect(.regular, in: .capsule)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("BotSpaceDots")
-    }
-}
-
-struct BotPagePlaceholder: View {
-    let page: BotPage
-
-    var body: some View {
-        ContentUnavailableView(page.title, systemImage: page.symbol, description: Text("Coming soon."))
-            .navigationTitle(page.title)
-            .navigationBarTitleDisplayMode(.inline)
     }
 }
