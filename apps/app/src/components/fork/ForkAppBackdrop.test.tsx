@@ -134,13 +134,13 @@ describe("cleanAppearance", () => {
   it("keeps a card layout and clamps its gap and radius", () => {
     expect(
       cleanAppearance({ layout: { cards: { gap: 8, radius: 14 } } }).cards,
-    ).toEqual({ gap: 8, radius: 14 });
+    ).toEqual({ gap: 8, radius: 14, titleRow: false });
     expect(
       cleanAppearance({ layout: { cards: { gap: 40, radius: -3 } } }).cards,
-    ).toEqual({ gap: 24, radius: 0 });
+    ).toEqual({ gap: 24, radius: 0, titleRow: false });
     expect(
       cleanAppearance({ layout: { cards: { gap: -1, radius: 99 } } }).cards,
-    ).toEqual({ gap: 0, radius: 28 });
+    ).toEqual({ gap: 0, radius: 28, titleRow: false });
   });
 
   it.each([

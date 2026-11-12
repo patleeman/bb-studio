@@ -1,3 +1,4 @@
+import { ForkTitleHost } from "@/components/fork/ForkTitleHost";
 import { AppPanelTabsPublisher } from "@/lib/app-panel-tabs";
 import { AppNavigationHostProvider } from "@/lib/app-navigation-host";
 import {
@@ -131,12 +132,14 @@ function ResourceScrollPage({
   if (fillViewport) {
     return (
       <div className="box-border h-full w-full pb-4 pt-3 md:pt-4">
+        <ForkTitleHost kind="tools" />
         {children}
       </div>
     );
   }
   return (
     <div className="relative h-full overflow-hidden">
+      <ForkTitleHost kind="tools" />
       <div ref={scrollRef} className="h-full overflow-y-auto">
         <div ref={topSentinelRef} aria-hidden className="h-0" />
         <div

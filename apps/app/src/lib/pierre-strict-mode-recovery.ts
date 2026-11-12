@@ -1,3 +1,4 @@
+import { withForkPierreCSS } from "./fork-pierre-css";
 import type { PostRenderPhase } from "@pierre/diffs";
 import { useMemo } from "react";
 
@@ -37,11 +38,11 @@ export function withPierreStrictModeRecovery<
 
 export function usePierreStrictModeRecoveryOptions<
   TInstance extends RerenderablePierreInstance,
-  TOptions extends PierrePostRenderOptions<TInstance>,
+  TOptions extends PierrePostRenderOptions<TInstance> & { unsafeCSS?: string },
 >(options: TOptions | undefined) {
   return useMemo(
     () =>
-      withPierreStrictModeRecovery<TInstance, HTMLElement, TOptions>(options),
+      withPierreStrictModeRecovery<TInstance, HTMLElement, TOptions>(withForkPierreCSS(options)),
     [options],
   );
 }
