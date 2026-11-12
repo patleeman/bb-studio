@@ -1,7 +1,7 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it } from "vitest";
 import { MIGRATIONS } from "./migrations";
-import { ADOPT_RECENT, agentFork, BotThreads, botNeedsYou, classifyThread, forkMessageIdOf, latestLine, olderView, repoTag, threadsView, type Signals, type ThreadFacts } from "./bot-threads";
+import { ADOPT_RECENT, agentFork, BotThreads, botNeedsYou, classifyThread, forkMessageIdOf, latestLine, olderView, repoTag, threadRunning, threadsView, workerStatus, type Signals, type ThreadFacts } from "./bot-threads";
 
 const dispose: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
@@ -519,4 +519,13 @@ it("lists every Bot's open conversations latest activity first for the New Tab p
   store.update("thr_c", { archived: true });
   expect(store.recent(10).map((rec) => rec.threadId)).toEqual(["thr_a", "thr_b"]);
   expect(store.recent(1).map((rec) => rec.threadId)).toEqual(["thr_a"]);
+});
+
+it("counts a thread as running only once a turn can be under way", () => {
+  expect(threadRunning({ status: "pending", queuedMessageCount: 0 })).toBe(false);
+  expect(threadRunning({ status: "pending" })).toBe(false);
+  expect(threadRunning({ status: "pending", queuedMessageCount: 1 })).toBe(true);
+  expect(threadRunning({ status: "active" })).toBe(true);
+  expect(threadRunning({ status: "idle" })).toBe(false);
+  expect(workerStatus({ status: "pending", queuedMessageCount: 0 })).toBe("done");
 });

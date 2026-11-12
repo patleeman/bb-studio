@@ -1,29 +1,13 @@
 import Database from "better-sqlite3";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { BOT_ID } from "./bot";
-import { PERSONAL_PROJECT_ID } from "./project-lead";
-import { WELCOME_BOT_NAME, WELCOME_TITLE } from "./onboarding-message";
+import { ONBOARDING_BOT_NAME, ONBOARDING_PROVIDER_ORDER, onboardingPrompt } from "./onboarding-prompt";
 
 export const ONBOARDING_FILE = join("plugins", "studio", "onboarding.json");
-const FAR_FUTURE_MS = 10 * 365 * 24 * 60 * 60_000;
-export const NO_PROVIDER_MODEL = { providerId: "claude-code", model: "default" } as const;
-const WAIT_CODES = new Set(["host_unavailable", "host_not_ready", "host_offline"]);
-const NO_MODEL_CODES = new Set(["model_catalog_unavailable", "model_required"]);
-
-function errorCode(error: unknown): string | null {
-  const value = error as { code?: unknown; body?: { code?: unknown } } | null;
-  const code = value?.code ?? value?.body?.code;
-  if (typeof code === "string") return code;
-  const message = error instanceof Error ? error.message : String(error);
-  if (/host is not connected/i.test(message)) return "host_unavailable";
-  if (/unable to load .* models to resolve the default|pick a model/i.test(message)) return "model_catalog_unavailable";
-  return null;
-}
 
 export type OnboardingReason = "ran" | "bots" | "import" | "threads";
 
-export interface OnboardingFlag {
+export interface OnboardingDone {
   version: 1;
   state: "done";
   reason: OnboardingReason;
@@ -31,6 +15,19 @@ export interface OnboardingFlag {
   botId: string | null;
   welcomeThreadId: string | null;
   opened: boolean;
+}
+
+export interface OnboardingWaiting {
+  version: 1;
+  state: "waiting";
+  at: number;
+}
+
+export type OnboardingFlag = OnboardingDone | OnboardingWaiting;
+
+export interface OnboardingProviderState {
+  providerId: string;
+  status: string;
 }
 
 interface UiPreference {
@@ -45,25 +42,15 @@ export interface OnboardingSdk {
       set(input: { key: string; value: unknown; expectedRevision: number }): Promise<unknown>;
     };
   };
-  threads: {
-    spawn(args: Record<string, unknown>): Promise<{ id: string }>;
-    queuedMessages: {
-      list(args: { threadId: string }): Promise<readonly { id: string }[]>;
-      delete(args: { threadId: string; queuedMessageId: string }): Promise<unknown>;
-    };
-  };
 }
 
 export interface OnboardingDeps {
   dataDir: string;
   db: Database.Database;
   sdk: OnboardingSdk;
-  createBot(input: { name: string; avatar: string; threadId: string }): Promise<{ id: string }>;
-  recordConversation(threadId: string, botId: string): void;
+  providers(): Promise<readonly OnboardingProviderState[]>;
+  createBot(input: { name: string; avatar: string; providerId: string; prompt: string }): Promise<{ id: string; threadId: string | null }>;
   now?(): number;
-  sleep?(ms: number): Promise<void>;
-  waitMs?: number;
-  attempts?: number;
 }
 
 const flagPath = (dataDir: string) => join(dataDir, ONBOARDING_FILE);
@@ -80,13 +67,18 @@ export async function showBotSidebar(sdk: OnboardingSdk): Promise<boolean> {
   return true;
 }
 
-export function readOnboarding(dataDir: string): OnboardingFlag | null {
+export function readFlag(dataDir: string): OnboardingFlag | null {
   try {
     const value = JSON.parse(readFileSync(flagPath(dataDir), "utf8")) as Partial<OnboardingFlag>;
-    return value.version === 1 && value.state === "done" ? value as OnboardingFlag : null;
+    return value.version === 1 && (value.state === "done" || value.state === "waiting") ? value as OnboardingFlag : null;
   } catch {
     return null;
   }
+}
+
+export function readOnboarding(dataDir: string): OnboardingDone | null {
+  const flag = readFlag(dataDir);
+  return flag?.state === "done" ? flag : null;
 }
 
 export function writeOnboarding(dataDir: string, flag: OnboardingFlag): void {
@@ -118,39 +110,20 @@ export function existingData(dataDir: string, db: Database.Database): Exclude<On
   return null;
 }
 
-async function spawnWhenReady(deps: OnboardingDeps, args: Record<string, unknown>): Promise<{ id: string }> {
-  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
-  const attempts = deps.attempts ?? 120;
-  let model: Record<string, unknown> = {};
-  for (let attempt = 1; ; attempt++) {
-    if (!deps.db.open) throw new Error("Studio stopped before onboarding finished.");
-    try {
-      return await deps.sdk.threads.spawn({ ...args, ...model });
-    } catch (error) {
-      const code = errorCode(error);
-      if (code && NO_MODEL_CODES.has(code) && !("model" in model)) {
-        model = { ...NO_PROVIDER_MODEL };
-        continue;
-      }
-      if (!code || !WAIT_CODES.has(code) || attempt >= attempts) throw error;
-      await sleep(deps.waitMs ?? 5_000);
-    }
-  }
+export function decideOnboarding(dataDir: string, db: Database.Database, now = Date.now()): OnboardingFlag {
+  const before = readFlag(dataDir);
+  if (before) return before;
+  const existing = existingData(dataDir, db);
+  const flag: OnboardingFlag = existing
+    ? { version: 1, state: "done", reason: existing, at: now, botId: null, welcomeThreadId: null, opened: true }
+    : { version: 1, state: "waiting", at: now };
+  writeOnboarding(dataDir, flag);
+  return flag;
 }
 
-async function turnlessThread(deps: OnboardingDeps, title: string, pluginMetadata: Record<string, string>, now: number): Promise<string> {
-  const thread = await spawnWhenReady(deps, {
-    projectId: PERSONAL_PROJECT_ID,
-    title,
-    environment: { type: "project-default" },
-    pluginMetadata,
-    input: [{ type: "text", text: title, mentions: [] }],
-    sendAt: now + FAR_FUTURE_MS,
-  });
-  for (const row of await deps.sdk.threads.queuedMessages.list({ threadId: thread.id })) {
-    await deps.sdk.threads.queuedMessages.delete({ threadId: thread.id, queuedMessageId: row.id });
-  }
-  return thread.id;
+export function readyProvider(states: readonly OnboardingProviderState[]): string | null {
+  const ready = states.filter((state) => state.status === "ready").map((state) => state.providerId);
+  return ONBOARDING_PROVIDER_ORDER.find((id) => ready.includes(id)) ?? ready[0] ?? null;
 }
 
 const running = new WeakMap<Database.Database, Promise<OnboardingFlag>>();
@@ -165,22 +138,15 @@ export function runOnboarding(deps: OnboardingDeps): Promise<OnboardingFlag> {
 
 async function onboard(deps: OnboardingDeps): Promise<OnboardingFlag> {
   const now = (deps.now ?? Date.now)();
-  const before = readOnboarding(deps.dataDir);
-  if (before) return before;
-  const existing = existingData(deps.dataDir, deps.db);
-  if (existing) {
-    const flag: OnboardingFlag = { version: 1, state: "done", reason: existing, at: now, botId: null, welcomeThreadId: null, opened: true };
-    writeOnboarding(deps.dataDir, flag);
-    return flag;
-  }
-  const mainId = await turnlessThread(deps, WELCOME_BOT_NAME, { bot: BOT_ID }, now);
-  const bot = await deps.createBot({ name: WELCOME_BOT_NAME, avatar: "🤖", threadId: mainId });
-  const welcomeId = await turnlessThread(deps, WELCOME_TITLE, { botConversation: bot.id }, now);
-  deps.recordConversation(welcomeId, bot.id);
+  const flag = decideOnboarding(deps.dataDir, deps.db, now);
+  if (flag.state === "done") return flag;
+  const providerId = readyProvider(await deps.providers());
+  if (!providerId || !deps.db.open) return flag;
+  const bot = await deps.createBot({ name: ONBOARDING_BOT_NAME, avatar: "🤖", providerId, prompt: onboardingPrompt(ONBOARDING_BOT_NAME) });
   await showBotSidebar(deps.sdk).catch(() => false);
-  const flag: OnboardingFlag = { version: 1, state: "done", reason: "ran", at: now, botId: bot.id, welcomeThreadId: welcomeId, opened: false };
-  writeOnboarding(deps.dataDir, flag);
-  return flag;
+  const done: OnboardingDone = { version: 1, state: "done", reason: "ran", at: now, botId: bot.id, welcomeThreadId: bot.threadId, opened: false };
+  writeOnboarding(deps.dataDir, done);
+  return done;
 }
 
 export function welcomeThreadOf(dataDir: string): { threadId: string; botId: string; opened: boolean } | null {

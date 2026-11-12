@@ -232,10 +232,27 @@ export interface ThreadBannerRegistration {
   component: (props: { threadId: string }) => ReactNode;
 }
 
-export function registerFirstRun(slots: object, registration: { id: string }): boolean {
+export interface FirstRunRegistration {
+  id: string;
+  component?: ComponentType<{ finish(): void }>;
+}
+
+export function registerFirstRun(slots: object, registration: FirstRunRegistration): boolean {
   const slot = member(slots, "experimental_firstRun");
   if (typeof slot !== "function") return false;
-  (slot as (registration: { id: string }) => void).call(slots, registration);
+  (slot as (registration: FirstRunRegistration) => void).call(slots, registration);
+  return true;
+}
+
+export interface ModelPickerGateRegistration {
+  id: string;
+  component: ComponentType<{ hasSelectedModel: boolean; children: ReactNode }>;
+}
+
+export function registerModelPickerGate(slots: object, registration: ModelPickerGateRegistration): boolean {
+  const slot = member(slots, "experimental_modelPickerGate");
+  if (typeof slot !== "function") return false;
+  (slot as (registration: ModelPickerGateRegistration) => void).call(slots, registration);
   return true;
 }
 

@@ -242,7 +242,7 @@ test("recovery cleans hidden classifier sessions owned by both IDs and preserves
 
 test("no Jev provider is not a problem while the fallback model answers, and is broken when the fallback is off too", async () => {
   const { bb, handlers } = setup();
-  bb.settings.define = () => ({ get: async () => ({ enabled: true }) });
+  bb.settings.define = () => ({ get: async () => ({ enabled: true, jevProvider: "auto" }) });
   await plugin(bb as never);
   const first = await handlers["decisions.studio_health"]!(null);
   assert.deepEqual(first.checks.map((check: { id: string; status: string }) => [check.id, check.status]), [["jev-route", "ok"]]);

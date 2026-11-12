@@ -9,8 +9,8 @@ import { BotThreads } from "./bot-threads";
 import { runLinkAction, setLinkActionHandler } from "./links/actions";
 import { openLink, parseLink, type LinkDeps } from "./links/router";
 import { MIGRATIONS } from "./migrations";
-import { ACCOUNTS_LINK, EDIT_SPACE_LINK, WELCOME_BOT_NAME, WELCOME_TITLE, welcomeLinks, welcomeText } from "./onboarding-message";
-import { markWelcomeOpened, readOnboarding, runOnboarding, welcomeThreadOf } from "./onboarding";
+import { ONBOARDING_BOT_NAME, onboardingPrompt } from "./onboarding-prompt";
+import { markWelcomeOpened, readFlag, readOnboarding, readyProvider, runOnboarding, welcomeThreadOf } from "./onboarding";
 import { PERSONAL_PROJECT_ID, ProjectLeads } from "./project-lead";
 import { testScheduler } from "./test/scheduler-fixture";
 
@@ -19,9 +19,8 @@ afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 
 type Thread = ReturnType<typeof makeThreadResponse>;
 
-async function studio(threadList: string = "__automatic__", options: { hostDownFor?: number; noProvider?: boolean } = {}) {
-  let hostDown = options.hostDownFor ?? 0;
-  const sleeps: number[] = [];
+async function studio(threadList: string = "__automatic__") {
+  const providerStates: { providerId: string; status: string }[] = [{ providerId: "claude-code", status: "not_installed" }, { providerId: "codex", status: "unauthenticated" }];
   const prefs = new Map<string, { value: unknown; revision: number }>([["sidebar.threadListProvider", { value: threadList, revision: 1 }]]);
   const dataDir = mkdtempSync(join(tmpdir(), "studio-onboarding-"));
   dispose.push(() => rmSync(dataDir, { recursive: true, force: true }));
@@ -43,8 +42,6 @@ async function studio(threadList: string = "__automatic__", options: { hostDownF
     },
     threads: {
       spawn: (async (args: Record<string, unknown>) => {
-        if (hostDown > 0) { hostDown--; throw Object.assign(new Error("Host is not connected"), { code: "host_unavailable" }); }
-        if (options.noProvider && args.model === undefined) throw Object.assign(new Error("Unable to load acp-hermes-agent models to resolve the default."), { code: "model_catalog_unavailable" });
         spawns.push(args);
         const id = `thr_${spawns.length}`;
         const thread = makeThreadResponse({ id, projectId: String(args.projectId), title: String(args.title), status: "pending" });
@@ -70,12 +67,12 @@ async function studio(threadList: string = "__automatic__", options: { hostDownF
   const store = new BotThreads({ db, sdk: bb.sdk, signals: () => ({ bots: [], focusedBotId: null, sideThread: () => null, runnerBot: () => null, leadThreads: new Set(), internal: new Set(), managedBot: () => null }), changed: () => {} });
   const run = () => runOnboarding({
     dataDir, db, sdk: bb.sdk as never,
-    createBot: async (input) => (await bots.create(input)).bot!,
-    recordConversation: (threadId, botId) => { store.recordConversation(threadId, botId); },
+    providers: async () => providerStates,
+    createBot: async (input) => { const made = (await bots.create({ ...input, promptHidden: true })).bot!; return { id: made.id, threadId: made.threadId ?? null }; },
     now: () => 1_000,
-    sleep: async (ms) => { sleeps.push(ms); },
   });
-  return { dataDir, db, bots, store, leads, run, spawns, turns, queued, prefs, sleeps };
+  const connect = (providerId: string) => { for (const state of providerStates) if (state.providerId === providerId) state.status = "ready"; };
+  return { dataDir, db, bots, store, leads, run, connect, spawns, turns, queued, prefs };
 }
 
 function bbDatabase(dataDir: string, threadIds: string[]) {
@@ -86,72 +83,72 @@ function bbDatabase(dataDir: string, threadIds: string[]) {
 }
 
 describe("first-run onboarding", () => {
-  it("on a fresh data dir makes the Bot, the Welcome conversation and its message once, with no turn, and sets the flag", async () => {
+  it("waits for a connected provider, then makes the Bot and starts its first chat on Main on that provider", async () => {
     const env = await studio();
     bbDatabase(env.dataDir, []);
+    expect(await env.run()).toEqual({ version: 1, state: "waiting", at: 1_000 });
+    expect(env.spawns).toEqual([]);
+    expect(env.bots.list()).toEqual([]);
+    expect(readOnboarding(env.dataDir)).toBeNull();
+    expect(await env.run()).toMatchObject({ state: "waiting" });
+    env.connect("codex");
     const flag = await env.run();
-    expect(flag).toMatchObject({ state: "done", reason: "ran", botId: BOT_ID, opened: false });
+    expect(flag).toMatchObject({ state: "done", reason: "ran", botId: BOT_ID, welcomeThreadId: "thr_1", opened: false });
     const bot = env.bots.stored(BOT_ID)!;
-    expect(bot.name).toBe(WELCOME_BOT_NAME);
-    expect(env.spawns.map((each) => each.title)).toEqual([WELCOME_BOT_NAME, WELCOME_TITLE]);
-    expect(env.spawns.every((each) => each.projectId === PERSONAL_PROJECT_ID && typeof each.sendAt === "number")).toBe(true);
-    expect(env.turns).toEqual([]);
-    expect(env.queued.size).toBe(0);
+    expect(bot.name).toBe(ONBOARDING_BOT_NAME);
     expect(bot.threadId).toBe("thr_1");
     expect(env.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("thr_1");
-    expect(env.store.get("thr_2")).toMatchObject({ botId: BOT_ID, kind: "conversation", isMain: false });
-    expect(env.spawns[1]!.pluginMetadata).toEqual({ botConversation: BOT_ID });
-    expect(env.bots.presenceOf(BOT_ID)).toBeTruthy();
-    expect(bot.appearance ?? null).toBeNull();
-    expect(welcomeThreadOf(env.dataDir)).toEqual({ threadId: "thr_2", botId: BOT_ID, opened: false });
-    expect(readOnboarding(env.dataDir)).toEqual(flag);
+    expect(env.spawns).toHaveLength(1);
+    expect(env.spawns[0]).toMatchObject({ providerId: "codex", pluginMetadata: { bot: BOT_ID } });
+    expect(env.spawns[0]!.sendAt).toBeUndefined();
+    expect(env.spawns[0]!.input).toEqual([{ type: "text", text: onboardingPrompt(ONBOARDING_BOT_NAME), mentions: [], visibility: "agent-only" }]);
+    expect(env.turns).toEqual(["thr_1"]);
+    expect(env.queued.size).toBe(0);
+    expect((env.db.prepare("SELECT count(*) AS n FROM bot_threads WHERE kind = 'conversation' AND is_main = 0").get() as { n: number }).n).toBe(0);
+    expect(welcomeThreadOf(env.dataDir)).toEqual({ threadId: "thr_1", botId: BOT_ID, opened: false });
     expect(markWelcomeOpened(env.dataDir)).toBe(true);
     expect(markWelcomeOpened(env.dataDir)).toBe(false);
-    expect(welcomeThreadOf(env.dataDir)?.opened).toBe(true);
     expect(env.prefs.get("sidebar.threadListProvider")).toEqual({ value: "studio/everything", revision: 2 });
   });
 
-  it("waits for the host to connect, and starts on Claude Code's default model when no provider can name one", async () => {
-    const env = await studio("__automatic__", { hostDownFor: 3, noProvider: true });
-    const flag = await env.run();
-    expect(flag).toMatchObject({ reason: "ran", welcomeThreadId: "thr_2" });
-    expect(env.sleeps).toEqual([5_000, 5_000, 5_000]);
-    expect(env.spawns.map((each) => [each.title, each.providerId, each.model])).toEqual([
-      [WELCOME_BOT_NAME, "claude-code", "default"],
-      [WELCOME_TITLE, "claude-code", "default"],
-    ]);
-    expect(env.turns).toEqual([]);
+  it("keeps waiting after the user makes threads before connecting", async () => {
+    const env = await studio();
+    expect(await env.run()).toMatchObject({ state: "waiting" });
+    bbDatabase(env.dataDir, ["thr_early"]);
+    env.connect("claude-code");
+    expect(await env.run()).toMatchObject({ state: "done", reason: "ran" });
+    expect(env.spawns[0]).toMatchObject({ providerId: "claude-code" });
   });
 
-  it("stops waiting when Studio stops, without making anything", async () => {
-    const env = await studio("__automatic__", { hostDownFor: 2 });
-    const first = env.run().catch((error: Error) => error);
-    env.db.close();
-    expect(await first).toBeInstanceOf(Error);
-    expect(env.spawns).toEqual([]);
-    expect(readOnboarding(env.dataDir)).toBeNull();
+  it("prefers Claude Code, then Codex, then any ready provider", () => {
+    expect(readyProvider([{ providerId: "codex", status: "ready" }, { providerId: "claude-code", status: "ready" }])).toBe("claude-code");
+    expect(readyProvider([{ providerId: "pi", status: "ready" }, { providerId: "codex", status: "ready" }])).toBe("codex");
+    expect(readyProvider([{ providerId: "pi", status: "ready" }])).toBe("pi");
+    expect(readyProvider([{ providerId: "codex", status: "unauthenticated" }])).toBeNull();
+  });
+
+  it("does nothing on a later start", async () => {
+    const env = await studio();
+    env.connect("codex");
+    const first = await env.run();
+    const second = await env.run();
+    expect(second).toEqual(first);
+    expect(env.spawns).toHaveLength(1);
+    expect(env.bots.list()).toHaveLength(1);
   });
 
   it("leaves a thread list the user chose", async () => {
     const env = await studio("thread-list/thread-list");
+    env.connect("codex");
     await env.run();
     expect(env.prefs.get("sidebar.threadListProvider")?.value).toBe("thread-list/thread-list");
-  });
-
-  it("does nothing on a second start", async () => {
-    const env = await studio();
-    const first = await env.run();
-    const second = await env.run();
-    expect(second).toEqual(first);
-    expect(env.spawns).toHaveLength(2);
-    expect(env.bots.list()).toHaveLength(1);
-    expect((env.db.prepare("SELECT count(*) AS n FROM bot_threads WHERE kind = 'conversation' AND is_main = 0").get() as { n: number }).n).toBe(1);
   });
 
   it("never runs on an imported data dir, and marks it done", async () => {
     for (const marker of ["fork-import.json", "fork-import.db"]) {
       const env = await studio();
       writeFileSync(join(env.dataDir, marker), marker.endsWith(".json") ? JSON.stringify({ version: 1, sourceDataDir: "/nowhere" }) : "");
+      env.connect("codex");
       const flag = await env.run();
       expect(flag).toMatchObject({ reason: "import", botId: null, welcomeThreadId: null, opened: true });
       expect(env.spawns).toEqual([]);
@@ -165,6 +162,7 @@ describe("first-run onboarding", () => {
   it("never runs on a data dir with threads from before, and marks it done", async () => {
     const env = await studio();
     bbDatabase(env.dataDir, ["thr_old"]);
+    env.connect("codex");
     expect(await env.run()).toMatchObject({ reason: "threads" });
     expect(env.spawns).toEqual([]);
     expect(env.bots.list()).toEqual([]);
@@ -173,21 +171,37 @@ describe("first-run onboarding", () => {
   it("never runs on a data dir that already has Bots, and marks it done", async () => {
     const env = await studio();
     env.db.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, created_at, updated_at) VALUES (?, 'Dot', '🤖', 'active', 'thr_main', 0, 1, 1)").run(BOT_ID);
+    env.connect("codex");
     expect(await env.run()).toMatchObject({ reason: "bots" });
     expect(env.spawns).toEqual([]);
     expect(env.bots.list().map((bot) => bot.name)).toEqual(["Dot"]);
-    expect(readOnboarding(env.dataDir)?.reason).toBe("bots");
+    expect(readFlag(env.dataDir)).toMatchObject({ state: "done", reason: "bots" });
+  });
+
+  it("makes nothing once Studio's database is closed", async () => {
+    const env = await studio();
+    env.connect("codex");
+    env.db.close();
+    await env.run().catch(() => null);
+    expect(env.spawns).toEqual([]);
   });
 });
 
-describe("the welcome message", () => {
-  it("links Accounts and Edit space, and both resolve through the link router", async () => {
-    expect(welcomeLinks()).toEqual([EDIT_SPACE_LINK, ACCOUNTS_LINK]);
-    expect(welcomeText()).toContain(`[Accounts](${ACCOUNTS_LINK})`);
-    expect(welcomeText()).toContain(`[Edit space](${EDIT_SPACE_LINK})`);
+describe("the first-chat prompt", () => {
+  it("asks for a short chat that personalizes through the Bot's own tools, then hands off", () => {
+    const prompt = onboardingPrompt("Assistant");
+    expect(prompt).toContain("You are Assistant");
+    for (const tool of ["presence_list", "theme_list", "presence_apply", "theme_apply", "bot_set"]) expect(prompt).toContain(tool);
+    expect(prompt).toMatch(/two to four exchanges/);
+    expect(prompt).toMatch(/skip/);
+  });
+});
+
+describe("the Accounts and Edit space links", () => {
+  it("resolve through the link router", async () => {
     const opened: string[] = [];
     const deps = { inMain: () => true, action: (action: string) => { opened.push(action); return true; } } as unknown as LinkDeps;
-    for (const link of welcomeLinks()) {
+    for (const link of ["bb://edit-space", "bb://accounts"]) {
       const target = parseLink(link);
       expect(target).toMatchObject({ type: "action", link });
       expect(await openLink(target!, { source: "transcript" }, deps)).toMatchObject({ via: "action", opened: true });

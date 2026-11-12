@@ -666,7 +666,7 @@ export class Bots {
    * first is the primary (the personal project's lead); later ones are
    * additional Bots with their own thread.
    */
-  async create(input: { name: string; avatar: string; shape?: string; color?: string; threadId?: string; prompt?: string; setup?: string; external?: { providerId: string; model: string; permissionMode?: PermissionMode } }): Promise<BotView> {
+  async create(input: { name: string; avatar: string; shape?: string; color?: string; threadId?: string; prompt?: string; promptHidden?: boolean; providerId?: string; setup?: string; external?: { providerId: string; model: string; permissionMode?: PermissionMode } }): Promise<BotView> {
     let external = input.external;
     if (external && !EXTERNAL_PROVIDERS.some((each) => each.id === external!.providerId)) throw new Error(`${external.providerId} isn't an external agent provider.`);
     // Accept edits unless asked otherwise, where the provider supports it.
@@ -688,9 +688,9 @@ export class Bots {
           environment: { type: "project-default" },
           pluginMetadata: { bot: id },
           // Studio Agents' providers take no reasoning levels; the permission is the bot's (accept edits by default).
-          ...(external ? { providerId: external.providerId, model: external.model, reasoningLevel: "none", permissionMode: external.permissionMode, executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit", permissionMode: "explicit" } } : {}),
+          ...(external ? { providerId: external.providerId, model: external.model, reasoningLevel: "none", permissionMode: external.permissionMode, executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit", permissionMode: "explicit" } } : input.providerId ? { providerId: input.providerId } : {}),
           // Its instructions come from agents.configure (botInstructions), so the first message is the user's.
-          input: [{ type: "text", text: input.prompt ?? (input.setup !== undefined ? setupPrompt(input.setup) : `Hi ${input.name}. Introduce yourself in a sentence and ask what I'd like you to keep an eye on.`), mentions: [] }],
+          input: [{ type: "text", text: input.prompt ?? (input.setup !== undefined ? setupPrompt(input.setup) : `Hi ${input.name}. Introduce yourself in a sentence and ask what I'd like you to keep an eye on.`), mentions: [], ...(input.promptHidden ? { visibility: "agent-only" } : {}) }],
         } as never);
         threadId = thread.id;
       }

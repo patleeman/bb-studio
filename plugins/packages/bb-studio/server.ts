@@ -91,12 +91,12 @@ import { readPreview, readView, tonightContract, writePreview, writeView } from 
 import { ThemeService } from "./src/theme/service";
 import { ThemeGpuRouter } from "./src/theme/gpu-server";
 import { THEME_GPU_CHANNEL } from "./src/theme/gpu";
-import { themeTools } from "./src/theme/agent-tools";
+import { THEME_TOOLS, themeTools } from "./src/theme/agent-tools";
 import { runThemeCli } from "./src/theme/cli";
 import { PresenceStore } from "./src/presence/store";
 import { PresenceService } from "./src/presence/service";
 import { PRESENCE_CHECK_CHANNEL, PresenceCheckRouter } from "./src/presence/check-router";
-import { presenceTools } from "./src/presence/agent-tools";
+import { PRESENCE_TOOLS, presenceTools } from "./src/presence/agent-tools";
 import { runPresenceCli } from "./src/presence/cli";
 import { presenceAskText } from "./src/presence/contract";
 import { SideThreads } from "./src/bot-side-threads";
@@ -159,7 +159,7 @@ import { healthContract } from "./src/health-contract";
 import { registerAuth } from "./src/auth/register";
 import { AUTH_USAGE, authCli } from "./src/auth/cli";
 import { createLiveBbPool, registerAccounts } from "./src/accounts/register";
-import { markWelcomeOpened, readOnboarding, runOnboarding, welcomeThreadOf } from "./src/onboarding";
+import { registerOnboarding } from "./src/onboarding-register";
 import { ACCOUNTS_USAGE, accountsCli } from "./src/accounts/cli";
 import { formatSetup, SetupService } from "./src/setup";
 import { setupContract } from "./src/setup-contract";
@@ -432,7 +432,7 @@ export default async function plugin(bb: BbPluginApi) {
       bot: bot ? bots.instructions(bot) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
       pages: !off.has("page"), minis: !off.has("mini"), endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
     });
-    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
+    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
   }));
   /** Which conversation a Bot's session is in (src/bot-threads.ts conversationInstructions); "" before Studio has placed it. */
   const conversationNote = (threadId: string): string => {
@@ -1018,33 +1018,7 @@ export default async function plugin(bb: BbPluginApi) {
     sideThreads,
     defaultModel: (botId) => bots.defaultModel(botId),
   });
-  const onboardingDir = bb.server.experimental_dataDir;
-  let onboardingRunning = true;
-  void runOnboarding({
-    dataDir: onboardingDir, db, sdk: bb.sdk as never,
-    createBot: async (input) => {
-      const made = (await bots.create(input)).bot;
-      if (!made) throw new Error("The Bot wasn't made.");
-      return made;
-    },
-    recordConversation: (threadId, botId) => {
-      botThreads.store.recordConversation(threadId, botId);
-      botThreadsChanged([{ botId, kinds: ["conversations"] }]);
-    },
-  })
-    .then((flag) => { if (flag.reason === "ran") bb.log.info(`Onboarding made ${flag.botId} and the Welcome conversation ${flag.welcomeThreadId}.`); })
-    .catch((error) => bb.log.warn(`Onboarding failed; retrying next startup: ${errorText(error)}`))
-    .finally(() => { onboardingRunning = false; });
-  const welcomeView = () => {
-    const flag = readOnboarding(onboardingDir);
-    if (!flag) return { threadId: null, opened: false, pending: onboardingRunning, bot: null };
-    const welcome = welcomeThreadOf(onboardingDir);
-    const bot = welcome ? bots.stored(welcome.botId) : null;
-    return {
-      threadId: welcome && bot ? welcome.threadId : null, opened: welcome?.opened ?? true, pending: false,
-      bot: bot ? { id: bot.id, name: bot.name, primary: !!bot.primary, presence: bots.presenceOf(bot.id), appearance: bot.appearance ?? null } : null,
-    };
-  };
+  const onboarding = registerOnboarding(bb, { db, bots, errorText });
   // Awareness (src/live-activity.ts): what each conversation and worker is
   // doing now, the per-turn digest of the others, and bot_activity_lookup.
   const liveActivity = registerLiveActivity(bb, db, { threads: botThreads.store, actingBot: async (threadId) => (await acting(threadId))?.botId ?? null, log: (message) => bb.log.warn(message) });
@@ -1437,8 +1411,8 @@ export default async function plugin(bb: BbPluginApi) {
     bot_side_thread_open: async ({ threadId, messageId }) => { const opened = await botThreads.messageThreads.reply({ threadId, messageId }); return { threadId: opened.threadId, created: opened.created }; },
     bot_thread_owner: ({ threadId }) => ({ botId: ownedThreads.ownerOf(threadId) ?? runners.forThread(threadId)?.bot_id ?? botThreads.store.get(threadId)?.botId ?? null }),
     bot_thread_release: ({ threadId }) => ownedThreads.release(threadId),
-    bot_welcome: () => welcomeView(),
-    bot_welcome_opened: () => ({ ok: markWelcomeOpened(onboardingDir) }),
+    bot_welcome: onboarding.bot_welcome,
+    bot_welcome_opened: onboarding.bot_welcome_opened,
     bot_thread_adopt: ({ botId, threadId }) => { const bot = bots.stored(botId); if (!bot) throw new Error("That bot isn't there anymore."); return ownedThreads.adopt(threadId, bot.id); },
     bot_checkin_preset: ({ botId, preset }) => bots.checkinPreset(preset, botId),
     bot_skills: ({ botId }) => ({ skills: bots.skills(botId) }),
