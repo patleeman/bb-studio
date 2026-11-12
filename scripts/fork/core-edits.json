@@ -450,6 +450,11 @@
       "seam": "studio-release",
       "intent": "A desktop-owned server reports the hosting desktop's version (info.version, the Studio version) as current, falling back to its own; bb's desktop and server versions are the same, BB Studio's are not. The fetch-failed message is STUDIO_NO_RELEASE_MESSAGE (desktop-app-update.fork.ts), imported at the top of the file.",
       "budget": 5
+    },
+    "apps/app/src/components/onboarding/OnboardingGate.tsx": {
+      "seam": "first-run",
+      "intent": "OnboardingGate asks useForkFirstRun (components/fork/ForkFirstRun.tsx, imported at the top of the file) while bb's first run is not done; when it answers (a plugin's slots.experimental_firstRun, or a wait while plugin frontends load) the gate draws <ForkFirstRun> instead of bb's setup screens. Without a plugin's first run, bb's flow is unchanged.",
+      "budget": 3
     }
   }
 }
