@@ -289,7 +289,7 @@ describe("a title row's style", () => {
     );
     expect(backing("mask-image")).toContain("transparent");
     expect(forkCascade(root, "--fork-title-row-background")).toBe(
-      "linear-gradient( color-mix(in oklab, var(--canvas) 40%, transparent) 0 0 ), var(--fork-surface-main-background, transparent)",
+      "linear-gradient(color-mix(in oklab, var(--canvas) 40%, transparent) 0 0), var(--fork-surface-main-background, transparent)",
     );
     expect(forkCascade(root, "--fork-title-row-filter")).toBe(
       "var(--fork-surface-main-backdrop-filter,) blur(14px)",

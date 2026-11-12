@@ -488,6 +488,16 @@ html[data-fork-cards] aside[data-surface-tone="sidebar"]:not([inert]) {
   max-width: calc(100% - var(--fork-cards-gap));
 }
 
+html[data-fork-cards]
+  [data-testid="app-layout-root"][data-framed]
+  aside[data-surface-tone="sidebar"]:not(
+    [inert],
+    [data-app-content-shell] > header ~ * aside
+  ) {
+  top: var(--fork-cards-gap);
+  height: calc(100% - var(--fork-cards-gap));
+}
+
 html[data-fork-cards] [data-sidebar="content"]:not(:hover) {
   scrollbar-color: transparent transparent;
 }
