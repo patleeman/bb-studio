@@ -169,6 +169,47 @@ describe("the overlay scrollbar", () => {
     expect(thumb().hasAttribute("data-visible")).toBe(false);
   });
 
+  it("moves with its scroller when the layout changes under a resting pointer, and goes when the scroller is removed", () => {
+    unmount();
+    const observers: { run: () => void; seen: Element[] }[] = [];
+    const original = window.ResizeObserver;
+    window.ResizeObserver = class {
+      private entry: { run: () => void; seen: Element[] };
+      constructor(run: () => void) {
+        this.entry = { run, seen: [] };
+        observers.push(this.entry);
+      }
+      observe(element: Element) {
+        this.entry.seen.push(element);
+      }
+      unobserve() {}
+      disconnect() {
+        this.entry.seen.length = 0;
+      }
+    } as unknown as typeof ResizeObserver;
+    unmount = mountForkOverlayScrollbar(document);
+    root.setAttribute("data-fork-cards", "");
+    let right = 900;
+    const page = scroller(
+      "data-page-scroll-viewport",
+      { top: 0, right, height: 604 },
+      { scrollTop: 0, scrollHeight: 1812 },
+    );
+    page.getBoundingClientRect = () =>
+      ({ top: 0, right, height: 604, bottom: 604, left: 0 }) as DOMRect;
+    page.dispatchEvent(new MouseEvent("pointermove", { bubbles: true }));
+    expect(thumb().style.left).toBe(`${900 - 2 - 6}px`);
+    expect(observers[0]?.seen).toEqual([page]);
+    right = 1400;
+    observers[0]?.run();
+    expect(thumb().style.left).toBe(`${1400 - 2 - 6}px`);
+    page.remove();
+    observers[0]?.run();
+    expect(thumb().hasAttribute("data-visible")).toBe(false);
+    expect(observers[0]?.seen).toEqual([]);
+    window.ResizeObserver = original;
+  });
+
   it("removes its thumb on unmount", () => {
     unmount();
     expect(thumb()).toBeNull();
