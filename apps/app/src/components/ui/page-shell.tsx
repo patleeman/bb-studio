@@ -1,3 +1,4 @@
+import { ForkTitleHost } from "@/components/fork/ForkTitleHost";
 import type { ReactNode } from "react";
 import { BottomAnchoredScrollBody } from "./bottom-anchored-scroll-body.js";
 import { PAGE_SHELL_CONTENT_STYLE } from "./page-shell-content-style.js";
@@ -135,6 +136,7 @@ export function PageShell({
             )}
             style={PAGE_SHELL_CONTENT_STYLE}
           >
+            <ForkTitleHost kind="page" />
             {children}
           </div>
         </div>
