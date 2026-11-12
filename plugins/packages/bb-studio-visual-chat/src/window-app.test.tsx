@@ -34,19 +34,17 @@ interface Registered {
   panels: { id: string; title: string; icon: string; path: string; headerContent?: ComponentType<{ subPath: string }>; experimental_hideFromNavigation?: boolean }[];
   windows: { id: string; title: string }[];
   overlays: Map<string, ComponentType>;
-  newItems: { id: string; title: string; group?: string; run(): void }[];
   launcherItems: { id: string; title: string; icon: string; section: string; keywords?: readonly string[]; run(): void }[];
   commands: { id: string; title: string; run(context: unknown): void }[];
 }
 
 function windowsApp({ launcher = true }: { launcher?: boolean } = {}): Registered {
-  const registered: Registered = { panels: [], windows: [], overlays: new Map(), newItems: [], launcherItems: [], commands: [] };
+  const registered: Registered = { panels: [], windows: [], overlays: new Map(), launcherItems: [], commands: [] };
   (plugin as unknown as { setup(app: unknown): void }).setup({
     slots: {
       navPanel: (panel: Registered["panels"][number]) => { registered.panels.push(panel); },
       experimental_window: (window: { id: string; title: string }) => { registered.windows.push(window); },
       experimental_appOverlay: (overlay: { id: string; component: ComponentType }) => { registered.overlays.set(overlay.id, overlay.component); },
-      experimental_sidebarNewItem: (item: Registered["newItems"][number]) => { registered.newItems.push(item); },
       ...(launcher ? { experimental_launcherItem: (item: Registered["launcherItems"][number]) => { registered.launcherItems.push(item); } } : {}),
     },
     commands: { register: (command: Registered["commands"][number]) => { registered.commands.push(command); } },
@@ -76,12 +74,11 @@ afterEach(() => {
   window.history.replaceState({}, "", "/");
 });
 
-it("registers its page off the rail, a window, a New menu row and a command", () => {
+it("registers its page off the rail, a window and a command", () => {
   expect(hasHostWindows).toBe(true);
   const registered = windowsApp();
   expect(registered.panels.map(({ id, title, icon, path, experimental_hideFromNavigation }) => ({ id, title, icon, path, experimental_hideFromNavigation }))).toEqual([{ id: "canvas", title: "Visual Chat", icon: "studio-visual-chat/visual-chat", path: "canvas", experimental_hideFromNavigation: true }]);
   expect(registered.windows.map(({ id, title }) => ({ id, title }))).toEqual([{ id: "canvas", title: "Visual Chat" }]);
-  expect(registered.newItems.map(({ id, title, group }) => ({ id, title, group }))).toEqual([{ id: "visual-chat", title: "Visual Chat", group: "apps" }]);
   expect(registered.commands.map((command) => command.id)).toEqual(["window", "ask"]);
   expect([...registered.overlays.keys()]).toEqual(["window-bridge", "quick-card"]);
 });
@@ -109,7 +106,6 @@ it("the page's Open in window shows the chat on screen in the window: the last o
 it("keeps its launchers on a BB with windows but no launcher slot", () => {
   const registered = windowsApp({ launcher: false });
   expect(registered.launcherItems).toEqual([]);
-  expect(registered.newItems.map((item) => item.id)).toEqual(["visual-chat"]);
   expect(registered.commands.map((command) => command.id)).toEqual(["window", "ask"]);
 });
 
@@ -142,10 +138,9 @@ it("registers no system-wide shortcut by default or for a stored old default, an
   state.settings = { windowHotkey: "Alt+Shift+V" };
   await mountBridge(registered, "/threads/thr_1");
   expect(state.log).toEqual([`register ${WINDOW_ID}`]);
-  registered.newItems[0]!.run();
   registered.commands.find((command) => command.id === "window")!.run({});
   await settle();
-  expect(state.log.slice(1)).toEqual([`open ${WINDOW_ID}`, `open ${WINDOW_ID}`]);
+  expect(state.log.slice(1)).toEqual([`open ${WINDOW_ID}`]);
 });
 
 it("follows the shortcut setting when the user assigns one", async () => {
@@ -192,7 +187,6 @@ it("opens the window from the launcher's own window, by asking BB's main window"
 it("registers no launcher item on a BB without the slot", () => {
   const registered = windowsApp({ launcher: false });
   expect(registered.launcherItems).toEqual([]);
-  expect(registered.newItems.map((item) => item.id)).toEqual(["visual-chat"]);
 });
 
 it("does not register itself from inside the window", async () => {
@@ -205,7 +199,7 @@ it("shows a chat from the quick card by reopening the window on it, then puts th
   const { registerWindowApp } = await import("./window-app");
   const overlays = new Map<string, ComponentType>();
   const windowApp = registerWindowApp({
-    slots: { experimental_window() {}, experimental_sidebarNewItem() {}, experimental_appOverlay: (overlay: { id: string; component: ComponentType }) => { overlays.set(overlay.id, overlay.component); } },
+    slots: { experimental_window() {}, experimental_appOverlay: (overlay: { id: string; component: ComponentType }) => { overlays.set(overlay.id, overlay.component); } },
     commands: { register() {} },
   } as never)!;
   await mountBridge({ overlays } as Registered, "/");

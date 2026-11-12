@@ -57,4 +57,5 @@ it("registers its whole frontend on stock BB, with its pages on the rail", async
   const panels = calls.filter((call) => call.slot === "navPanel").map((call) => call.registration);
   expect(panels.map((panel) => panel.id)).toEqual(expect.arrayContaining(["studio"]));
   for (const panel of panels) expect(panel).not.toHaveProperty("experimental_hideFromNavigation");
+  expect(calls.filter((call) => call.slot === "experimental_appOverlay").map((call) => call.registration.id)).toContain("new-menu");
 }, 60_000);

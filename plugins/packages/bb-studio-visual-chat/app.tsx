@@ -33,7 +33,7 @@ export default definePluginApp((app) => {
   // Its window, where BB has plugin windows.
   const windowApp = registerWindowApp(app);
   // The page, with a window: its header opens the chat there. Off the rail and the command palette
-  // (`experimental_hideFromNavigation: true`, only where BB has plugin windows: stock BB refuses a panel with a field it doesn't know, and keeps it in the rail): BB Studio opens it from its launcher and New menu.
+  // (`experimental_hideFromNavigation: true`, only where BB has plugin windows: stock BB refuses a panel with a field it doesn't know, and keeps it in the rail): BB Studio opens it from its launcher.
   const offRail: object = windowApp ? { experimental_hideFromNavigation: true } : {};
   app.slots.navPanel({ id: "canvas", title: "Visual Chat", icon: WINDOW_ICON, path: "canvas", component: Panel, ...(windowApp ? { headerContent: openInWindowButton(windowApp) } : {}), ...offRail });
   // A board as a tab beside a conversation (src/board-tab.tsx): BB Studio opens it from its New Tab rows, drops and the

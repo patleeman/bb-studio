@@ -53,8 +53,8 @@ there the page stays on the rail.
 
 - Open it with **Open in window** in the page's header (it shows the chat on
   the page; the page's root shows your last chat), from BB Studio's launcher
-  (Option+Space; type "visual", "canvas" or "board"), **Visual Chat** in BB's
-  New menu, or **Visual Chat: Open window** in the command palette.
+  (Option+Space; type "visual", "canvas" or "board"), or **Visual Chat: Open
+  window** in the command palette.
 - **No global shortcut by default.** The launcher replaces the old ⌥⇧V. To
   have one, set **Settings → Plugins → BB Studio Visual Chat → Window
   shortcut** (written like `Control+Alt+V`); it then shows and hides the
