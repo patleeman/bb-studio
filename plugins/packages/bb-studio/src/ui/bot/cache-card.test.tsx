@@ -127,11 +127,12 @@ it("adds no row where the cache chip doesn't apply: not a Bot's chat, or no thre
   expect(state.inputs.every((input) => input.enabled === false)).toBe(true);
 });
 
-it("the chip is the clock and the time, and a click or Enter opens BB's card", async () => {
+it("the chip is only the clock and the time, with no tooltip of its own, and a click opens BB's card", async () => {
   const { module } = await load(true);
   await act(async () => root.render(<module.BotCacheChip threadId="thr_bot" />));
   const chip = container.querySelector<HTMLButtonElement>('button[data-testid="bot-cache-chip"]')!;
-  expect(chip.textContent).toBe("cache 58m");
+  expect(chip.textContent).toBe("58m");
+  expect(chip.title).toBe("");
   expect(chip.querySelector('[data-icon="Clock"]')).not.toBeNull();
   expect(chip.type).toBe("button");
   expect(container.querySelector("[data-popover], [data-testid=bot-cache-popover]")).toBeNull();
@@ -139,15 +140,17 @@ it("the chip is the clock and the time, and a click or Enter opens BB's card", a
   expect(state.card.open).toHaveBeenCalledTimes(1);
 });
 
-it("before the thread has a context ring, the chip is plain text with the state as its tooltip", async () => {
+it("shows nothing beside the ring while the cache is cold or warming is off, and plain text before there is a ring", async () => {
   const { module } = await load(true);
-  state.card = { available: false, open: vi.fn() };
   state.cache = cold;
+  await act(async () => root.render(<module.BotCacheChip threadId="thr_bot" />));
+  expect(container.querySelector('[data-testid="bot-cache-chip"]')).toBeNull();
+  state.card = { available: false, open: vi.fn() };
+  state.cache = warm;
   await act(async () => root.render(<module.BotCacheChip threadId="thr_bot" />));
   const chip = container.querySelector<HTMLElement>('[data-testid="bot-cache-chip"]')!;
   expect(chip.tagName).toBe("SPAN");
-  expect(chip.textContent).toBe("cache cold");
-  expect(chip.title).toBe("Prompt cache: cold");
+  expect(chip.textContent).toBe("58m");
   expect(container.querySelector("button, [data-popover]")).toBeNull();
 });
 
@@ -160,5 +163,5 @@ it("on a BB without the row slot the chip keeps Studio's own popover", async () 
   const popover = container.querySelector('[data-testid="bot-cache-popover"]')!;
   expect(popover.textContent).toContain("Turn warming off");
   expect(popover.textContent).toContain("Compact now…");
-  expect(container.querySelector('[data-testid="bot-cache-chip"]')!.textContent).toBe("cache 58m");
+  expect(container.querySelector('[data-testid="bot-cache-chip"]')!.textContent).toBe("58m");
 });

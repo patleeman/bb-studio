@@ -188,7 +188,7 @@ export function registerSidebarNewItem(slots: object, registration: SidebarNewIt
  * `customization` with items for the row under the composer's input
  * (`experimental_footer`). A BB without that row ignores the field.
  */
-export function withComposerFooter<Customization extends { id: string }>(customization: Customization, items: readonly { id: string; component: () => ReactNode }[]): Customization {
+export function withComposerFooter<Customization extends { id: string }>(customization: Customization, items: readonly { id: string; component: () => ReactNode; placement?: "context" }[]): Customization {
   const footer: object = { experimental_footer: items };
   return { ...customization, ...footer };
 }
