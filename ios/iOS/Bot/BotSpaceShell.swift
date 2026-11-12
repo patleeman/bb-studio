@@ -261,7 +261,6 @@ struct BotSpaceList: View {
             })
             Spacer()
             Menu {
-                Button { app.tab = .inbox } label: { Label("All BB threads", systemImage: "bubble.left.and.bubble.right") }
                 Button { app.tab = .studio } label: { Label("Studio", systemImage: "square.stack") }
             } label: {
                 Image(systemName: "ellipsis").font(.body.weight(.medium)).frame(width: 44, height: 44)

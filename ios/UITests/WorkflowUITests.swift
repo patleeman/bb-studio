@@ -18,7 +18,7 @@ final class WorkflowUITests: StagedServerUITestCase {
 
         app.open(URL(string: "bbstudio://new")!)
         XCTAssertTrue(app.navigationBars["New thread"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["newThreadProject"].exists)
+        XCTAssertFalse(app.buttons["newThreadProject"].exists, "no project picker")
         XCTAssertTrue(app.buttons["newThreadAgent"].exists)
         app.buttons["newThreadWorkspace"].tap()
         XCTAssertTrue(app.buttons["Project checkout"].waitForExistence(timeout: 5))

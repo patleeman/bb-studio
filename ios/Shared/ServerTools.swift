@@ -114,15 +114,6 @@ extension BBClient {
             ["globalLimit": globalLimit.map { .number(Double($0)) } ?? .null, "hostOverrides": .array(overrides)])
     }
 
-    /// Forks the thread into a hidden side chat seeded with `anchor`, so a
-    /// question about one message doesn't derail the main thread.
-    public func sideChat(from threadId: String, about anchor: String) async throws -> String {
-        struct Result: Decodable { var threadId: String }
-        let result: Result = try await rpc(
-            "side-chat", "createSideChat", ["sourceThreadId": .string(threadId), "anchorText": .string(String(anchor.prefix(4000)))])
-        return result.threadId
-    }
-
     /// Queues the message to go at `date` rather than now.
     public func send(_ threadId: String, text: String, mentions: [Mention] = [], at date: Date) async throws -> SendResult {
         var body: [String: JSONValue] = [

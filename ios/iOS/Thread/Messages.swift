@@ -8,8 +8,6 @@ struct MessageBubble: View {
     var reactionItems: [String] = ReactionSettings.defaults.items
     var quote: (String) -> Void = { _ in }
     var select: (String) -> Void = { _ in }
-    /// Nil where side chats aren't available.
-    var sideChat: ((String) -> Void)?
     /// Only on the newest message the user sent.
     var edit: ((String) -> Void)?
     /// Saves the files this reply produced to Studio; nil without the artifacts plugin.
@@ -89,9 +87,6 @@ struct MessageBubble: View {
         }
         if let fork {
             Button(action: fork) { Label(ConversationReplies.forkTitle, systemImage: "arrow.triangle.branch") }
-        }
-        if let sideChat {
-            Button { sideChat(plainText) } label: { Label("Side Chat", systemImage: "bubble.left.and.text.bubble.right") }
         }
         ShareLink(item: plainText) { Label("Share", systemImage: "square.and.arrow.up") }
         if !row.isUser, let saveFiles {

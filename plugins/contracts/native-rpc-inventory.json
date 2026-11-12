@@ -722,12 +722,6 @@
       "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
-      "file": "ios/Shared/ServerTools.swift",
-      "plugin": "side-chat",
-      "method": "createSideChat",
-      "coverage": "external host plugin; contract maintained outside this repository"
-    },
-    {
       "file": "ios/Shared/Studio.swift",
       "plugin": "studio",
       "method": "overview",
