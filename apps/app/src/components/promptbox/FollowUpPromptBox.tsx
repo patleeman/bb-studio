@@ -830,9 +830,12 @@ function FollowUpPromptBoxWithComposer({
             />
             {sessionOptionsControl}
             {permissionControl}
+            <span data-fork-context-control="" className="flex shrink-0 items-center gap-0.5">
+              <PluginComposerFooter scope={suppressPluginComposerCustomizations ? null : composerScope} placement="context" />
             {contextWindowUsage ? (
               <ThreadContextWindowIndicator usage={contextWindowUsage} />
             ) : null}
+            </span>
           </div>
         </div>
       ) : null}
