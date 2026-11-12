@@ -276,7 +276,7 @@ describe("a title row's style", () => {
     );
   });
 
-  it("backs the row with dense blurred glass that fades out below it, so what scrolls under does not show through", () => {
+  it("backs the row with the card's own glass, a little denser and more blurred, fading out below it, so what scrolls under does not show through", () => {
     const element = pageHost(true);
     root.setAttribute("data-fork-cards", "");
     root.setAttribute(FORK_TITLE_ROWS_ATTRIBUTE, "");
@@ -289,9 +289,11 @@ describe("a title row's style", () => {
     );
     expect(backing("mask-image")).toContain("transparent");
     expect(forkCascade(root, "--fork-title-row-background")).toBe(
-      "color-mix( in oklab, var(--canvas) 80%, transparent )",
+      "linear-gradient( color-mix(in oklab, var(--canvas) 40%, transparent) 0 0 ), var(--fork-surface-main-background, transparent)",
     );
-    expect(forkCascade(root, "--fork-title-row-filter")).toBe("blur(18px)");
+    expect(forkCascade(root, "--fork-title-row-filter")).toBe(
+      "var(--fork-surface-main-backdrop-filter,) blur(14px)",
+    );
   });
 
   it("draws the title group in a host bare: no pill, no padding, the row's width", () => {
