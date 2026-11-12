@@ -5,6 +5,7 @@ import type {
   ForkPluginHooks,
 } from "@get-bb/plugin-sdk";
 import { requestPluginApproval } from "../fork-approvals/index.js";
+import { registerSkillsRegistryPolicy } from "../skills/registry-policy.fork.js";
 import { registerBeforeThreadDelete } from "./thread-delete-hooks.fork.js";
 import { registerTurnContextProvider } from "./turn-context.fork.js";
 import { readThreadForkPoint } from "./thread-fork-point.fork.js";
@@ -69,6 +70,15 @@ export function forkPluginHooks(args: {
         return Promise.resolve(null);
       }
       return Promise.resolve(readThreadForkPoint(args.db, threadId));
+    },
+    experimental_skillsRegistryPolicy(policy) {
+      args.assertLive();
+      if (typeof policy !== "function") {
+        throw new Error("experimental_skillsRegistryPolicy expects a function");
+      }
+      args.disposeHooks.push(
+        registerSkillsRegistryPolicy(args.pluginId, policy),
+      );
     },
     experimental_turnContext(provider) {
       args.assertLive();
