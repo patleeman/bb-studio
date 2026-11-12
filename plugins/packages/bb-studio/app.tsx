@@ -26,13 +26,14 @@ import { registerQuietReplyClassifier } from "./src/kit/quiet-turns";
 import { NewMenuBridge, registerNewMenu } from "./src/ui/new-menu";
 import { BotSidebarList } from "./src/ui/conversations/BotSidebarList";
 import { showBot } from "./src/ui/conversations/show-bot";
-import { registerBotSkillSources } from "./src/ui/bot/skill-sources";
+import { hideBbSkills } from "./src/ui/skills/hide-bb-skills";
 import { askAboutItemHandler } from "./src/ui/ask-about-item";
 import { setAskAboutItem } from "./src/kit/app/item-header";
 import { registerReadOnlyComposer } from "./src/ui/conversations/ReadOnlyComposer";
 import { FinishedCard } from "./src/ui/conversations/finish";
 import { finishThreadAction } from "./src/ui/conversations/finish-action";
 import { OLDER_SUBPATH, olderBotFromPath } from "./src/ui/conversations/model";
+import { SKILLS_SUBPATH, skillsBotFromPath } from "./src/ui/skills/paths";
 import { newConversationRoute } from "./src/ui/conversations/new-conversation";
 import { NewConversationPage } from "./src/ui/conversations/NewConversation";
 import { LibraryPage } from "./src/ui/library/LibraryPage";
@@ -178,6 +179,7 @@ const StudioTab = lazy(() => import("./src/ui/studio-tab/StudioTab"));
 const MemoryView = lazy(() => import("./src/memory/ui/MemoryView"));
 /** What the Bot sidebar leaves out, and finished conversations (src/ui/conversations/OlderPage.tsx). */
 const OlderPage = lazy(() => import("./src/ui/conversations/OlderPage"));
+const SkillsPage = lazy(() => import("./src/ui/skills/SkillsPage"));
 
 /** The Studio app: links in it open as Studio tabs (src/ui/studio-open.tsx). */
 function StudioRoot({ subPath }: { subPath: string }) {
@@ -197,6 +199,7 @@ function StudioRootView({ subPath }: { subPath: string }) {
   if (path === MEMORY_SUBPATH || path.startsWith(`${MEMORY_SUBPATH}/`)) return <Suspense fallback={null}><MemoryView botId={memoryBotFromPath(path)} /></Suspense>;
   // The Bot sidebar's "N older conversations" and "N older workers": `conversations` or `conversations/<botId>`.
   if (path === OLDER_SUBPATH || path.startsWith(`${OLDER_SUBPATH}/`)) return <Suspense fallback={null}><OlderPage botId={olderBotFromPath(path)} /></Suspense>;
+  if (path === SKILLS_SUBPATH || path.startsWith(`${SKILLS_SUBPATH}/`)) return <Suspense fallback={null}><SkillsPage botId={skillsBotFromPath(path)} /></Suspense>;
   const entry = /^(automation|todo|record)\/([^/]+)$/.exec(path);
   if (entry) return <EntryView kind={entry[1] as "automation" | "todo" | "record"} id={decodeSegment(entry[2]!)} />;
   // A Bot's + New: BB's new-thread composer on its default model (`new-conversation/<botId>[/<projectId>]`).
@@ -263,6 +266,7 @@ export default definePluginApp((app) => {
   // Studio's settings sections (src/settings/ui), first so they keep their
   // order after BB's API key fields; and push status on BB's Mobile page.
   registerSettingsApp(app);
+  hideBbSkills(app.slots);
   registerCodeApp(app);
   // First, so the overlays below read BB's own route from their first render.
   registerQuietReplyClassifier(app.slots);
@@ -329,7 +333,6 @@ export default definePluginApp((app) => {
     // row (the Bot's + New is beside Conversations). In the desktop app's title bar layout the traffic lights, back,
     // forward and the sidebar toggle stay in the title bar; in the browser layout back and forward move to the start
     // of the main view's header and the toggle stays.
-    registerBotSkillSources(app.slots);
     const sidebarStyle: object = { experimental_hideSidebarHeader: true };
     app.slots.experimental_threadList({ id: UNIFIED_LIST_ID, title: "Bot (Studio)", component: BotSidebarList, ...sidebarStyle });
   }

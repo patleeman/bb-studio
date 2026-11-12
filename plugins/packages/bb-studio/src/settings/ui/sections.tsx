@@ -22,6 +22,7 @@ import { botPath } from "../../ui/bot/selection";
 import { SETTINGS_GROUPS, STUDIO_SETTINGS } from "../schema";
 import { Card, Disclosure, Row, SectionState, Segmented, SettingControl, SettingRow, SubHeading } from "./controls";
 import { PushSection } from "./PushSection";
+import { SkillsRegistrySection } from "./SkillsRegistrySection";
 import { useStudioSettings } from "./use-settings";
 import { takeVoiceSectionRequest, VOICE_SECTION_ANCHOR } from "./voice-anchor";
 import { hasHostWindows, useHostWindows } from "../../kit/app/windows";
@@ -227,5 +228,6 @@ export function registerSettingsApp(app: PluginAppBuilder, windows: boolean = ha
     if (group.id === "windows" && !windows) continue;
     app.slots.settingsSection({ id: `settings-${group.id}`, title: group.title, component: SECTIONS[group.id] });
   }
+  app.slots.settingsSection({ id: "skills-registry", title: "Skill registry", component: SkillsRegistrySection });
   app.slots.settingsSection({ id: "mobile-push", title: "Phone notifications", component: PushSection });
 }

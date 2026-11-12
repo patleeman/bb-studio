@@ -7,6 +7,9 @@ import { CODE_TOOLS, registerCode } from "./src/code/server";
 import { registerWorkbenchAgent, WORKBENCH_TOOLS } from "./src/workbench-agent/server";
 import { cutOffByHost, listenForHostEvents } from "./src/kit/host-events";
 import { registerThreadExportHook } from "./src/thread-export-hook";
+import { createSkillsRegistryGate } from "./src/skills-registry";
+import { skillsRegistryContract } from "./src/skills-registry-contract";
+import { hostApproval } from "./src/kit/host-approval";
 import { registerQuietTurnClassifier } from "./src/kit/quiet-turns";
 import { registerDecisions } from "./src/decisions/server";
 import { BotMaintenance } from "./src/bot-maintenance";
@@ -296,6 +299,11 @@ export default async function plugin(bb: BbPluginApi) {
     explore.update(next);
   });
   registerThreadExportHook(bb, () => ({ enabled: settingValues.exportDeletedThreads === true, folder: typeof settingValues.exportDeletedThreadsFolder === "string" ? settingValues.exportDeletedThreadsFolder : "" }));
+  const skillsRegistry = createSkillsRegistryGate({ hooks: (bb as { experimental_hooks?: object }).experimental_hooks, kv: bb.storage.kv, approval: hostApproval(bb) });
+  bb.rpc.register(skillsRegistryContract, {
+    "skillsRegistry.state": () => skillsRegistry.state(),
+    "skillsRegistry.set": ({ enabled }) => skillsRegistry.set(enabled),
+  });
   // Reactions keep only settings: copy the old plugin's once, in the background.
   const reactionsImport = {
     plugins: bb.sdk.plugins,
@@ -378,7 +386,7 @@ export default async function plugin(bb: BbPluginApi) {
   void refreshRoutes();
   const BOT_TOOLS = ["bot_get", "bot_set", "bot_pause", "bot_resume", "bot_stop", "bot_activity"] as const;
   /** Only the Bot's own thread gets these: its skills and its history. */
-  const BOT_OWN_TOOLS = ["bot_profile_update", "bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_skill_lint", "bot_history_search", "bot_threads_list", "runner_create", "runner_update", "runner_migrate", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
+  const BOT_OWN_TOOLS = ["bot_profile_update", "bot_skill_list", "skill_search", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_skill_lint", "bot_history_search", "bot_threads_list", "runner_create", "runner_update", "runner_migrate", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
   /**
    * Every conversation of a Bot gets these too (src/bot-threads-server.ts):
    * its conversations and workers, and raising something with the user. A
@@ -1426,7 +1434,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_learning_review: async ({ botId }) => ({ started: await learning.start(learnerId(botId), "review", "manual") }),
     bot_skill_curate: ({ botId, dryRun }) => learning.curate(learnerId(botId), { dryRun }),
     // Deprecated for one release: old iOS clients receive an empty pending list.
-    bot_skill_history: ({ botId, before }) => ({ versions: bots.skillHistory(botId, before) }),
+    bot_skill_history: ({ botId, before, name }) => ({ versions: bots.skillHistory(botId, before, name) }),
     bot_skill_revert: ({ botId, versionId }) => { bots.revertSkill(versionId, botId); return { reverted: true }; },
     bot_automations: async ({ botId }) => ({ automations: await automations.list(botId) }),
     bot_automation_create: ({ botId, ...input }) => automations.create(input as never, botId),
@@ -1904,6 +1912,16 @@ export default async function plugin(bb: BbPluginApi) {
     execute: (_input, ctx) => {
       const list = bots.skills(ownBot(ctx.threadId)).filter((skill) => skill.state !== "archived");
       return list.map((skill) => `- ${skill.name}${skill.pinned ? " (pinned)" : ""}${skill.state === "stale" ? " (stale)" : ""}: ${skill.description}`).join("\n") || "No skills yet.";
+    },
+  });
+  bb.agents.registerTool({
+    name: "skill_search",
+    description: "Search your own skills by words: their names, descriptions and full text. Returns the best matches first; load one with bot_skill_view before you follow it.",
+    parameters: z.object({ query: z.string().trim().min(1).max(200), limit: z.number().int().min(1).max(20).optional() }),
+    execute: ({ query, limit }, ctx) => {
+      const hits = bots.searchSkills(query, limit ?? 5, ownBot(ctx.threadId));
+      if (!hits.length) return `No skill of yours matches "${query}".`;
+      return hits.map((hit, index) => `${index + 1}. ${hit.name}: ${hit.description} (matched ${hit.fields.join(", ")})${hit.snippet ? `\n   ${hit.snippet}` : ""}`).join("\n");
     },
   });
   bb.agents.registerTool({

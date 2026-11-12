@@ -39,13 +39,13 @@ import { conversationLines, doneLabel, hiddenThreadTarget, isOlderPage, landingT
 import { currentBot, hasLanded, isLaunchPage, lastConversation, markLanded, rememberConversation, setBotSwitcher, setCurrentBot, setFocusHandler, setThreadOpener, useCurrentBot } from "./state";
 
 import { MEMORY_SUBPATH } from "../../memory/shared";
+import { skillsPagePath } from "../skills/paths";
 import { loopsPath, useLoopsEnabled } from "../../loops/ui/hooks";
 import { EditSpace } from "./EditSpace";
 import { setLinkActionHandler } from "../../links/actions";
 import { useMainViewRect } from "./EditSpaceStage";
 import { DefaultModelDialog } from "../bot/DefaultModel";
 import { newConversationPath } from "./new-conversation";
-import { rememberBots } from "../bot/skill-sources";
 import { SpaceHeader, spaceLine, spacePageAt, type SpacePage } from "./SpaceHeader";
 import { useAppMode } from "./app-mode";
 import { accentOf } from "../../theme/engine";
@@ -181,8 +181,6 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const spaces = useLive("bot_spaces", {}, { pollMs: 60_000 });
   const bots = spaces.data?.bots ?? NO_BOTS;
   const bot = shownBot(bots, chosen, spaces.data?.currentBotId ?? null);
-  // BB's Skills page lists each Bot's skills under its name (src/ui/bot/skill-sources.ts).
-  useEffect(() => { if (spaces.data) rememberBots(spaces.data.bots); }, [spaces.data]);
   const view = useLive("bot_threads_view", bot ? { botId: bot.id } : {}, { enabled: !!bot, pollMs: 15_000 });
   const sidebar = experimental_useSidebarThreads();
   const pathname = usePathname();
@@ -332,6 +330,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const openPage = (next: SpacePage) => {
     if (!bot) return;
     if (next === "memory") toPanel(`${MEMORY_SUBPATH}/${encodeURIComponent(bot.id)}`);
+    else if (next === "skills") toPanel(skillsPagePath(bot.id));
     else if (next === "library") toPanel();
     else if (next === "automations") { navigate.toPluginPanel("automations"); onNavigate(); }
     else openAppPathTo(loopsPath(bot.id));

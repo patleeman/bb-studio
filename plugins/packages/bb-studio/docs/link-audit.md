@@ -70,6 +70,7 @@ registry doesn't know (Settings) parses to nothing and stays bb's.
 | Recording | `bb://recording/rec_0123456789` | `/plugins/studio/studio/recordings/rec_0123456789` | `::recording{id="rec_0123456789"}` |
 | Visual Chat board | `bb://board/thr_board` | `/plugins/studio-visual-chat/canvas/thr_board` |  |
 | Memory | `bb://memory/bot_main` | `/plugins/studio/studio/memory/bot_main` |  |
+| Skills | `bb://skills/bot_main` | `/plugins/studio/studio/skills/bot_main` |  |
 | Library | `bb://library` | `/plugins/studio/studio` |  |
 | Automations | `bb://automations` | `/plugins/studio/automations` |  |
 | Todos | `bb://todos/bot_main` | `/plugins/studio/studio/bot/bot_main/loops` |  |
@@ -103,6 +104,7 @@ the rule above; **n/a** says why it can't.
 | Recording | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Visual Chat board | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Memory | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
+| Skills | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Library | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Automations | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Todos | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |

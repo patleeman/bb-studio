@@ -42,6 +42,7 @@ import { BOT_SHAPES } from "./bot-shapes";
 import { turnStartedAt } from "./turn-started";
 import { botAttention, pendingInteractions, threadWaitingFor, type BotAttention } from "./bot-attention";
 import { lineDiff, lintSkill } from "./skill-learning";
+import { rankSkills, type SearchableSkill, type SkillHit } from "./skill-search";
 
 /** Thread statuses that mean a turn is under way. */
 const BUSY_CHAT = new Set(["starting", "active", "stopping"]);
@@ -103,13 +104,22 @@ export function externalBotInstructions(bot: { name: string; state: BotState; ro
 }
 
 /** Instructions for the Bot's own thread, given at each session start. Short: they point at the page and tools. */
-export function botInstructions(bot: { name: string; state: BotState; role?: string | null; memoryPageId?: string | null; skills?: readonly { name: string; description: string }[]; primary?: boolean }): string {
+const SKILLS_LISTED = 8;
+
+export function listedSkills<T extends { name: string; pinned?: boolean; usedAt?: number | null }>(skills: readonly T[]): T[] {
+  return [...skills].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || (b.usedAt ?? 0) - (a.usedAt ?? 0) || a.name.localeCompare(b.name)).slice(0, SKILLS_LISTED).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function botInstructions(bot: { name: string; state: BotState; role?: string | null; memoryPageId?: string | null; skills?: readonly { name: string; description: string; pinned?: boolean; usedAt?: number | null }[]; primary?: boolean }): string {
   const who = `You are ${JSON.stringify(bot.name)}, ${bot.primary === false ? "one of the user's Bots: an always-on agent that sees every project" : "the user's Bot: an always-on agent that leads their personal project and sees every project"}. The user can rename, pause or stop you in Studio.${bot.role?.trim() ? `\nYour role, in the user's words: ${bot.role.trim()}` : ""}`;
   if (bot.state === "active") {
     // Progressive disclosure: names and one-line descriptions here, the full skill through bot_skill_view.
+    const all = bot.skills ?? [];
+    const listed = listedSkills(all);
     const skills = [
-      "Save a reusable procedure as a skill with bot_skill_write (bot_skill_patch fixes one). Search past threads with bot_history_search.",
-      ...(bot.skills?.length ? ["Your skills (load one with bot_skill_view before you follow it):", ...bot.skills.map((skill) => `- ${skill.name}: ${skill.description}`)] : []),
+      "Save a reusable procedure as a skill with bot_skill_write (bot_skill_patch fixes one); find one with skill_search. Search past threads with bot_history_search.",
+      ...(all.length ? ["Your skills (load one with bot_skill_view before you follow it):", ...listed.map((skill) => `- ${skill.name}: ${skill.description}`)] : []),
+      ...(all.length > listed.length ? [`${all.length - listed.length} more: find them with skill_search.`] : []),
     ].join("\n");
     // The Bot is the triage layer (docs/needs-you/REDO.md): reports, alerts and its threads' questions come
     // to it, and nothing else in Studio asks the user for attention.
@@ -1053,6 +1063,13 @@ export class Bots {
     return skill ? { ...skillView(skill), body: skill.body } : null;
   }
 
+  searchSkills(query: string, limit = 10, botId?: string): SkillHit[] {
+    const row = this.row(botId);
+    if (!row) return [];
+    const rows = this.deps.db.prepare("SELECT name, description, body FROM bot_skills WHERE bot_id = ? AND state != 'archived'").all(row.id) as SearchableSkill[];
+    return rankSkills(rows, query, limit);
+  }
+
   /** The Bot loaded a skill (bot_skill_view): it's in use, so a stale one is active again. */
   touchSkill(name: string, botId?: string): void {
     const row = this.row(botId);
@@ -1089,9 +1106,9 @@ export class Bots {
   }
 
   /** All content versions, including removed skills; reverting appends another version. */
-  skillHistory(botId?: string, before?: number) {
+  skillHistory(botId?: string, before?: number, name?: string) {
     const bot = this.need(botId);
-    const rows = this.deps.db.prepare("SELECT * FROM bot_skill_versions WHERE bot_id = ? AND (? IS NULL OR id < ?) ORDER BY id DESC LIMIT 50").all(bot.id, before ?? null, before ?? null) as { id: number; name: string; description: string | null; body: string | null; old_body: string; warnings: string; at: number }[];
+    const rows = this.deps.db.prepare("SELECT * FROM bot_skill_versions WHERE bot_id = ? AND (? IS NULL OR id < ?) AND (? IS NULL OR name = ?) ORDER BY id DESC LIMIT 50").all(bot.id, before ?? null, before ?? null, name ?? null, name ?? null) as { id: number; name: string; description: string | null; body: string | null; old_body: string; warnings: string; at: number }[];
     return rows.map((row) => ({ id: row.id, name: row.name, description: row.description, body: row.body, at: row.at,
       diff: lineDiff(row.old_body, row.body ?? ""),
       warnings: [...JSON.parse(row.warnings) as string[], ...(this.deps.db.prepare("SELECT warning FROM bot_skill_lints WHERE version_id = ? ORDER BY id").all(row.id) as { warning: string }[]).map((lint) => lint.warning)],

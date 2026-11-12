@@ -621,7 +621,7 @@ export const rpcContract = defineRpcContract({
   /** Runs the skill curator now; dryRun lists what it would change. */
   bot_skill_curate: { input: z.object({ botId, dryRun: z.boolean().optional() }), output: z.object({ changes: z.array(z.object({ name: z.string(), from: z.string(), to: z.string() })), consolidating: z.boolean(), result: z.string() }) },
   /** Content history includes deletes, diffs and advisory lint warnings. */
-  bot_skill_history: { input: z.object({ botId, before: z.number().int().positive().optional() }), output: z.object({ versions: z.array(z.object({ id: z.number(), name: z.string(), description: z.string().nullable(), body: z.string().nullable(), diff: z.string(), warnings: z.array(z.string()), at: z.number() })) }) },
+  bot_skill_history: { input: z.object({ botId, before: z.number().int().positive().optional(), name: z.string().min(1).max(100).optional() }), output: z.object({ versions: z.array(z.object({ id: z.number(), name: z.string(), description: z.string().nullable(), body: z.string().nullable(), diff: z.string(), warnings: z.array(z.string()), at: z.number() })) }) },
   /** Restores a version immediately, keeping the current content in history. */
   bot_skill_revert: { input: z.object({ botId, versionId: z.number().int().positive() }), output: z.object({ reverted: z.boolean() }) },
   /** The Bot's runners, and threads it started that an automation wakes (Adopt as runner). */

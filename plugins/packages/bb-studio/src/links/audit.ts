@@ -14,6 +14,7 @@ export const SAMPLE_REFS: Record<TabKindId, TabRef> = {
   recording: { kind: "recording", id: "rec_0123456789" },
   board: { kind: "board", id: "thr_board" },
   memory: { kind: "memory", id: "bot_main" },
+  skills: { kind: "skills", id: "bot_main" },
   library: { kind: "library", id: null },
   automations: { kind: "automations", id: null },
   todos: { kind: "todos", id: "bot_main" },

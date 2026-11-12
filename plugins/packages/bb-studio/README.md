@@ -3295,8 +3295,12 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `bot_skill_write` (name, one-line description, Markdown steps) and fixes
   one in place with `bot_skill_patch` (exact text → new text). Only the
   Bot's thread has these: they live in Studio's `bot_skills` table. Its
-  instructions list each skill's name and one-line description, and it
-  loads the full skill with `bot_skill_view` (`bot_skill_list` lists them).
+  instructions list up to eight skills (pinned, then most recently used)
+  by name and one-line description, and say how many more there are.
+  `skill_search` finds the rest on demand: it ranks the Bot's own
+  non-archived skills by its words in their names, descriptions and full
+  text (BM25, names weigh most) and returns the best with a body snippet.
+  It loads the full skill with `bot_skill_view` (`bot_skill_list` lists them).
   Writes and patches return advisory notes, never blocking: a body that
   reads like a log of one session (dates, PR numbers, "we tried"), one over
   about 8,000 characters, or a name close to another skill's. BB
@@ -3306,12 +3310,18 @@ of Staff", with the same thread and check-ins; rename it from its page.
   (`<BB data dir>/skills/<name>/SKILL.md`, scope `bb-user`; see
   `bb skill list`), where every agent finds it; it refuses a name that's
   already there. **Delete** removes it. See "Skills that learn" below.
-  On the fork, BB's **Skills** page lists each Bot's own skills too, under
-  the Bot's name, with one Source filter option per Bot
-  (`slots.experimental_skillSource`, `src/ui/bot/skill-sources.ts`); a row
-  opens the Bot's Controls at Skills. BB takes a source's name when the
-  plugin loads, so the Bots are the ones this browser last saw; a new or
-  renamed Bot shows after the next reload.
+  Each Bot has a **Skills** page (`skills/<botId>`, `src/ui/skills/`) on
+  the Bot-page template, beside Memory: its skills (archived ones apart),
+  each opening to its body and its versions with diffs and Revert, Delete,
+  Restore for archived ones, and History, every version of every skill,
+  deletes included. On the fork Studio hides BB's own Skills page, its
+  sidebar row and General's "bb CLI skills" (`slots.experimental_hideHostEntries`),
+  and refuses BB's public skill registry (skills.sh search, reads and
+  installs, from the app, the CLI, the SDK and agents) through
+  `experimental_skillsRegistryPolicy` until a person turns **Public skill
+  registry** on in Settings, which needs BB's approval dialog
+  (`src/skills-registry.ts`). The harnesses' own skill folders
+  (`~/.claude/skills`, `~/.agents/skills`) and plugin skills are left alone.
 - **Skills that learn** (`src/skill-learning.ts`; after Hermes Agent's
   background review and curator). A Studio bot reviews its own work in the
   background and keeps its skills current. External bots learn on their own
@@ -3532,7 +3542,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `bot_resume`, `bot_stop`, `bot_activity` (`bot_pause` and `bot_stop` work only
   in the Bot's own chat or its handoff chain; threads it started, its runners
   and other threads are refused and the user uses Studio → Bot); only the Bot's thread also gets
-  `bot_profile_update`, `bot_skill_list`, `bot_skill_view`, `bot_skill_write`, `bot_skill_patch`,
+  `bot_profile_update`, `bot_skill_list`, `skill_search`, `bot_skill_view`, `bot_skill_write`, `bot_skill_patch`,
   `bot_skill_delete` and `bot_history_search`.
 - **Watchers**, for script authors. Studio creates a BB script automation
   (bash, sh, node or python3; timeout up to 15 minutes; working directory
