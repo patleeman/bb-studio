@@ -561,6 +561,26 @@
       "title": "creates a separate nightly app identity and update feed"
     },
     {
+      "file": "apps/desktop/test/electron-builder-config.test.ts",
+      "title": "signs local builds via keychain auto-discovery when signing secrets are absent"
+    },
+    {
+      "file": "apps/desktop/test/electron-builder-config.test.ts",
+      "title": "keeps builds unsigned when keychain auto-discovery is explicitly disabled"
+    },
+    {
+      "file": "apps/desktop/test/electron-builder-config.test.ts",
+      "title": "enables app signing and notarization when signing and Apple credentials are complete"
+    },
+    {
+      "file": "apps/desktop/test/electron-builder-windows-config.test.ts",
+      "title": "leaves the package name alone for other platforms"
+    },
+    {
+      "file": "apps/desktop/test/preload-build.test.ts",
+      "title": "starts Electron with a working preload bridge"
+    },
+    {
       "file": "apps/app/src/components/plugin/PluginsOverview.test.tsx",
       "title": "keeps Browse filters in the toolbar rather than a separate pill band"
     },
