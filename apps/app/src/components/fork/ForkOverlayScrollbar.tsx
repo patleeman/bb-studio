@@ -93,9 +93,23 @@ export function mountForkOverlayScrollbar(doc: Document): () => void {
   let timer: number | null = null;
   let drag: { y: number; scrollTop: number; scale: number } | null = null;
 
+  const resized =
+    typeof view.ResizeObserver === "function"
+      ? new view.ResizeObserver(() => {
+          if (current === null) return;
+          if (current.isConnected) show(current);
+          else hide();
+        })
+      : null;
+  const follow = (scroller: HTMLElement | null) => {
+    if (scroller === current) return;
+    resized?.disconnect();
+    current = scroller;
+    if (scroller !== null) resized?.observe(scroller);
+  };
   const hide = () => {
     thumb.removeAttribute("data-visible");
-    current = null;
+    follow(null);
   };
   const idle = () => {
     if (timer !== null) view.clearTimeout(timer);
@@ -115,7 +129,7 @@ export function mountForkOverlayScrollbar(doc: Document): () => void {
       if (current === scroller) hide();
       return;
     }
-    current = scroller;
+    follow(scroller);
     thumb.style.top = `${box.top}px`;
     thumb.style.left = `${box.left}px`;
     thumb.style.height = `${box.height}px`;
@@ -177,6 +191,7 @@ export function mountForkOverlayScrollbar(doc: Document): () => void {
   view.addEventListener("resize", onResize);
   return () => {
     if (timer !== null) view.clearTimeout(timer);
+    resized?.disconnect();
     doc.removeEventListener("scroll", onScroll, { capture: true });
     doc.removeEventListener("pointermove", onPointerMove);
     doc.documentElement.removeEventListener("pointerleave", onPointerLeave);
