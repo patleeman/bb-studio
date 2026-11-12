@@ -1,3 +1,4 @@
+import { restartForkFromTranscript } from "./fork-start-fallback.fork.js";
 import { advanceEnvironmentProvisioning } from "../environments/environment-engine.js";
 import { revokeThreadDesktopBrowserControl } from "../desktop-browsers.js";
 import {
@@ -929,7 +930,7 @@ export function settleThreadStartCommandResult(
   }
   if (!args.report.ok) {
     clearThreadProvisionSchedule(thread.id);
-    return settleThreadCommandFailure({
+    return restartForkFromTranscript(args) ?? settleThreadCommandFailure({
       command: args.command,
       deps: args.deps,
       report: args.report,
