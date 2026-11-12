@@ -5,6 +5,7 @@ import { forkCascade } from "@/test/fork-css-cascade";
 import {
   FORK_OVERLAY_SCROLL_ATTRIBUTE,
   FORK_SCROLL_THUMB_ATTRIBUTE,
+  forkScrollCardRight,
   forkScrollThumbBox,
   mountForkOverlayScrollbar,
 } from "./ForkOverlayScrollbar";
@@ -119,6 +120,26 @@ describe("the overlay scrollbar", () => {
     plugin.dispatchEvent(new Event("scroll"));
     expect(thumb().hasAttribute("data-visible")).toBe(true);
     expect(thumb().style.left).toBe("492px");
+  });
+
+  it("puts the thumb on the inner right edge of a card narrower than its scroller, and never outside the scroller", () => {
+    root.setAttribute("data-fork-cards", "");
+    const page = scroller(
+      FORK_OVERLAY_SCROLL_ATTRIBUTE,
+      { top: 0, right: 1260, height: 604 },
+      { scrollTop: 0, scrollHeight: 1812 },
+    );
+    const card = document.createElement("div");
+    card.setAttribute("data-fork-card", "main");
+    card.getBoundingClientRect = () =>
+      ({ left: 190, right: 1070, top: 0, bottom: 2000 }) as DOMRect;
+    page.appendChild(card);
+    expect(forkScrollCardRight(page)).toBe(1070);
+    page.dispatchEvent(new Event("scroll"));
+    expect(thumb().style.left).toBe("1062px");
+    card.getBoundingClientRect = () =>
+      ({ left: 0, right: 1400, top: 0, bottom: 2000 }) as DOMRect;
+    expect(forkScrollCardRight(page)).toBe(1260);
   });
 
   it("stays while the pointer is over the scroller, and dragging the thumb scrolls it", () => {
