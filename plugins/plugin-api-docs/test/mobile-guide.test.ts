@@ -184,20 +184,15 @@ it("pages mobile panes without using annotation selection as navigation", () => 
         '[aria-label="Next example plugin"]',
       )!;
     expect(previousExample().disabled).toBe(true);
-    for (const name of [
-      "Automations",
-      "Docs",
-      "GitHub",
-      "Tasks",
-      "Theme Preview",
-    ]) {
+    for (const name of ["Automations", "Storage & retention [Experimental]"]) {
       expect(examples().textContent).toContain(name);
       expect(
         examples().querySelectorAll(
           '[aria-live="polite"] > span:not(.sr-only)',
         ),
       ).toHaveLength(1);
-      if (name !== "Theme Preview") act(() => nextExample().click());
+      if (name !== "Storage & retention [Experimental]")
+        act(() => nextExample().click());
     }
     expect(nextExample().disabled).toBe(true);
     act(() => {
@@ -205,7 +200,7 @@ it("pages mobile panes without using annotation selection as navigation", () => 
         new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }),
       );
     });
-    expect(examples().textContent).toContain("Tasks");
+    expect(examples().textContent).toContain("Automations");
     expect(visiblePage()).toBe("Sidebar");
     expect(navigate).not.toHaveBeenCalled();
     act(() => {
