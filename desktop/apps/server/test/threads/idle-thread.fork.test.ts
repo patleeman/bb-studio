@@ -2,6 +2,7 @@ import { getThread, listQueuedThreadMessages } from "@bb/db";
 import { threadSchema } from "@bb/domain";
 import { describe, expect, it } from "vitest";
 import { createsIdleThread } from "../../src/services/threads/idle-thread.fork.js";
+import { resolvePendingThreadSessionOptions } from "../../src/services/threads/thread-session-options.js";
 import { registerTestHostRpcCapture } from "../helpers/commands.js";
 import { readJson } from "../helpers/json.js";
 import { installFakeGitWorktreeProvider } from "../helpers/environment-provider.js";
@@ -64,6 +65,23 @@ describe("an idle thread a plugin creates", () => {
         environmentId: null,
       });
       expect(listQueuedThreadMessages(harness.db, thread.id)).toEqual([]);
+    });
+  });
+
+  it("keeps the session options it was created with for its first message", async () => {
+    await withTestHarness(async (harness) => {
+      const project = seed(harness, "host-idle-thread-options");
+      const response = await create(harness, project.id, {
+        origin: "plugin",
+        originPluginId: "studio",
+        input: [],
+        sessionOptions: { mode: "plan" },
+      });
+      expect(response.status).toBe(201);
+      const thread = threadSchema.parse(await readJson(response));
+      expect(resolvePendingThreadSessionOptions(harness.db, thread.id)).toEqual(
+        { mode: "plan" },
+      );
     });
   });
 

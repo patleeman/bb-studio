@@ -45,15 +45,15 @@ vi.mock("@/components/onboarding/OnboardingFlow", () => ({
   OnboardingFlow: () => <p>bb setup guide</p>,
 }));
 
-function renderGate(plugins: unknown[] | "pending") {
+function renderGate(plugins: unknown[] | "pending" | "unfetched") {
   const client = new QueryClient();
-  if (plugins !== "pending")
-    client.setQueryData(pluginListQueryKey(true), plugins);
-  else
+  if (plugins === "pending")
     client.prefetchQuery({
       queryKey: pluginListQueryKey(true),
       queryFn: () => new Promise(() => {}),
     });
+  else if (plugins !== "unfetched")
+    client.setQueryData(pluginListQueryKey(true), plugins);
   return render(
     <QueryClientProvider client={client}>
       <OnboardingGate>
@@ -78,6 +78,13 @@ describe("a plugin's first run", () => {
     renderGate([studio]);
     expect(screen.queryByText("bb setup guide")).toBeNull();
     expect(screen.queryByText("App shell")).toBeNull();
+    act(() => markPluginFrontendsSettled());
+    expect(await screen.findByText("bb setup guide")).toBeTruthy();
+  });
+
+  it("holds bb's setup guide until the plugin list is fetched or plugin frontends settle", async () => {
+    renderGate("unfetched");
+    expect(screen.queryByText("bb setup guide")).toBeNull();
     act(() => markPluginFrontendsSettled());
     expect(await screen.findByText("bb setup guide")).toBeTruthy();
   });

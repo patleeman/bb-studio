@@ -45,9 +45,10 @@ export function useForkFirstRun(active: boolean): ForkFirstRunState {
   );
   if (!active) return null;
   if (owner !== null) return owner;
-  if (plugins?.status === "pending") return "wait";
+  if (plugins === undefined) return settled ? null : "wait";
+  if (plugins.status === "pending") return "wait";
   const hasApps =
-    plugins?.data?.some(
+    plugins.data?.some(
       (plugin) => plugin.enabled && plugin.app.bundle !== null,
     ) ?? false;
   return hasApps && !settled ? "wait" : null;

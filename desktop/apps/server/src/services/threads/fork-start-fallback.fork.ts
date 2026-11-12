@@ -123,14 +123,37 @@ function forgetDispatchedFork(
   return dispatched.request.execution;
 }
 
+export function isSessionCopyFailure(
+  errorMessage: string,
+  sourceProviderThreadId: string,
+): boolean {
+  return (
+    errorMessage.includes(sourceProviderThreadId) &&
+    /not found|fork/i.test(errorMessage)
+  );
+}
+
 export function restartForkFromTranscript(
   args: ForkStartFallbackArgs,
 ): CommandResultSideEffectsResult | null {
   const { command, deps } = args;
   if (args.report.ok || command.fork === undefined) return null;
+  if (
+    !isSessionCopyFailure(
+      args.report.errorMessage,
+      command.fork.sourceProviderThreadId,
+    )
+  ) {
+    return null;
+  }
   const db = deps.db;
   const thread = getThread(db, command.threadId);
-  if (!thread || thread.deletedAt !== null || thread.archivedAt !== null) {
+  if (
+    !thread ||
+    thread.deletedAt !== null ||
+    thread.archivedAt !== null ||
+    thread.status !== "starting"
+  ) {
     return null;
   }
   const seed = forkTranscriptSeed(db, thread.id);

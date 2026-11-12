@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -40,6 +41,35 @@ export function copyRuntime(sourceDir, targetDir) {
     join(targetDir, "package.json"),
     `${JSON.stringify(runtimePackageJson(source), null, 2)}\n`,
   );
+  copyRuntimeFiles(sourceDir, targetDir, source.studioRuntimeFiles ?? []);
+}
+
+export function runtimeFilePackage(file) {
+  const parts = file.split("/");
+  const length = file.startsWith("@") ? 2 : 1;
+  return {
+    name: parts.slice(0, length).join("/"),
+    subpath: parts.slice(length).join("/"),
+  };
+}
+
+export function copyRuntimeFiles(sourceDir, targetDir, files) {
+  for (const file of files) {
+    const { name, subpath } = runtimeFilePackage(file);
+    const linked = join(sourceDir, "node_modules", name);
+    if (!existsSync(linked)) {
+      throw new Error(`${file}: ${name} is not installed in ${sourceDir}`);
+    }
+    const packageDir = realpathSync(linked);
+    const from = join(packageDir, subpath);
+    if (subpath.length === 0 || !existsSync(from)) {
+      throw new Error(`${file} is missing in ${packageDir}`);
+    }
+    const into = join(targetDir, "node_modules", name);
+    mkdirSync(into, { recursive: true });
+    cpSync(join(packageDir, "package.json"), join(into, "package.json"));
+    cpSync(from, join(into, subpath), { recursive: true, dereference: true });
+  }
 }
 
 function fail(message) {
@@ -63,8 +93,10 @@ function main(argv) {
   node scripts/fork/bundle-studio-plugins.mjs --packages <monorepo plugins/packages> --out <dir> [--out <dir>]
 
 Each --out gets <dir>/bb-studio and <dir>/bb-studio-visual-chat: the package without
-node_modules, its dist/ from \`bb plugin build\`, and a package.json whose entries
-point at dist/. Point --out at packages/bb-app/server/dist/builtin-plugins
+node_modules, its dist/ from \`bb plugin build\`, a package.json whose entries
+point at dist/, and under node_modules only the files its package.json lists in
+studioRuntimeFiles (files the server resolves at run time, which esbuild does not
+inline). Point --out at packages/bb-app/server/dist/builtin-plugins
 before electron-builder runs.`);
     process.exit(packages === null || outs.length === 0 ? 2 : 0);
   }
