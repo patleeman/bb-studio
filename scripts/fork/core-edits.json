@@ -186,6 +186,11 @@
       "intent": "When startsNoTurn(thread, input) (services/threads/turnless-dispatch.fork.ts) says the attempt is the first dispatch of a pending fork with an empty input, runDispatchAttempt skips the message.dispatch hook pass and waitOn returns dispatched without writing a queued row. An empty-input fork (Reply in thread) then starts as an idle fork even when the concurrency limit is full, and never stores an empty queued message.",
       "budget": 4
     },
+    "apps/server/src/services/threads/thread-lifecycle.ts": {
+      "seam": "fork-transcript",
+      "intent": "settleThreadStartCommandResult's failure branch first asks restartForkFromTranscript(args) (services/threads/fork-start-fallback.fork.ts, imported at the top of the file) and returns its result when it handles a failed thread.start that carried a fork; otherwise settleThreadCommandFailure runs as upstream. A fork whose session copy fails then starts from the transcript and writes no error row.",
+      "budget": 4
+    },
     "apps/server/src/services/threads/thread-send.ts": {
       "seam": "import-sync",
       "intent": "ensureThreadIsWritable ends with ensureForkThreadWritable(thread) (services/threads/thread-write-guards.fork.ts), which throws a 409 thread_read_only for the first registered fork guard that refuses; fork-import registers the mirrored-thread guard. This one call also covers the queue path.",
