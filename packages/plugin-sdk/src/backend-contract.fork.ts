@@ -80,6 +80,18 @@ export type ExperimentalTurnContextProvider = (context: {
   threadId: string;
 }) => string | null | undefined | Promise<string | null | undefined>;
 
+export type ExperimentalSkillsRegistryOperation = "search" | "read" | "install";
+
+export type ExperimentalSkillsRegistryDecision =
+  | { allowed: true }
+  | { allowed: false; message: string };
+
+export type ExperimentalSkillsRegistryPolicy = (request: {
+  operation: ExperimentalSkillsRegistryOperation;
+}) =>
+  | ExperimentalSkillsRegistryDecision
+  | Promise<ExperimentalSkillsRegistryDecision>;
+
 /** Hooks the fork adds to `bb.experimental_hooks`. */
 export interface ForkPluginHooks {
   /**
@@ -118,6 +130,9 @@ export interface ForkPluginHooks {
    * docs/api_to_audit.fork.md.
    */
   experimental_turnContext(provider: ExperimentalTurnContextProvider): void;
+  experimental_skillsRegistryPolicy(
+    policy: ExperimentalSkillsRegistryPolicy,
+  ): void;
   /**
    * Where thread `threadId` was forked from: its source thread and the
    * source turn its copied history ends with. Resolves null when the thread
