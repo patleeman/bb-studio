@@ -37,9 +37,9 @@
       "budget": 7
     },
     "apps/app/src/components/pickers/ModelReasoningPicker.tsx": {
-      "seam": "composer-labels",
-      "intent": "An unknown model id shows a readable label (formatUnknownModelLabel, unknownModelLabel.fork.ts, imported at the top of the file) instead of the raw id, and the trigger's reasoning half comes from triggerReasoningLabel (same file): a model the catalog lacks still shows its stored level, so a thread reads \"Opus 5.5 Medium\" like the new-thread page.",
-      "budget": 8
+      "seam": "composer-labels, model-picker-gate",
+      "intent": "An unknown model id shows a readable label (formatUnknownModelLabel, unknownModelLabel.fork.ts, imported at the top of the file) instead of the raw id, and the trigger's reasoning half comes from triggerReasoningLabel (same file): a model the catalog lacks still shows its stored level, so a thread reads \"Opus 5.5 Medium\" like the new-thread page. ModelReasoningPicker returns forkModelPickerGate(<Popover…>, { hasSelectedModel }) (components/fork/ForkModelPickerGate.tsx, imported at the top of the file), so a plugin's slots.experimental_modelPickerGate can stand in for the picker (Studio's \"Sign in\" while no provider is ready).",
+      "budget": 13
     },
     "apps/app/src/components/secondary-panel/NewTabFileSearch.tsx": {
       "seam": "new-tab-items",
