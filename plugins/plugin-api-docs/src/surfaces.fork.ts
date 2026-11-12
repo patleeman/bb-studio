@@ -43,6 +43,11 @@ const FORK_API_SYMBOLS: Readonly<Record<string, readonly string[]>> = {
     "PluginAppSlots.experimental_modelPickerGate",
     "ExperimentalModelPickerGateRegistration",
     "ExperimentalModelPickerGateProps",
+    "PluginAppSlots.experimental_hideHostEntries",
+    "ExperimentalHideHostEntriesRegistration",
+    "ExperimentalHostPage",
+    "ExperimentalHostSetting",
+    "ExperimentalHostSettingsSection",
     "PluginAppSlots.experimental_threadHeader",
     "ExperimentalThreadHeaderRegistration",
     "ExperimentalThreadHeaderArgs",
@@ -95,6 +100,11 @@ const FORK_API_SYMBOLS: Readonly<Record<string, readonly string[]>> = {
   "agent-tools": [
     "PluginHooks.experimental_turnContext",
     "ExperimentalTurnContextProvider",
+    "PluginHooks.experimental_skillsRegistryPolicy",
+    "ExperimentalSkillsRegistryPolicy",
+    "ExperimentalSkillsRegistryOperation",
+    "ExperimentalSkillsRegistryCaller",
+    "ExperimentalSkillsRegistryDecision",
   ],
   "thread-events": [
     "PluginHooks.experimental_threadForkPoint",
