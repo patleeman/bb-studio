@@ -831,12 +831,10 @@ html[data-fork-cards]
 html[data-fork-title-rows] {
   --fork-title-row-height: 44px;
   --fork-title-row-tail: 10px;
-  --fork-title-row-background: color-mix(
-    in oklab,
-    var(--canvas) 80%,
-    transparent
-  );
-  --fork-title-row-filter: blur(18px);
+  --fork-title-row-background:
+    linear-gradient(color-mix(in oklab, var(--canvas) 40%, transparent) 0 0),
+    var(--fork-surface-main-background, transparent);
+  --fork-title-row-filter: var(--fork-surface-main-backdrop-filter,) blur(14px);
 }
 
 html[data-fork-title-rows]
@@ -970,11 +968,10 @@ html[data-fork-cards]
 }
 
 @media (width >= 48rem) {
-  html[data-fork-title-rows]
+  html[data-fork-cards]
     [data-sidebar="inset"]
-    .box-border.h-full.w-full
-    > [data-fork-title-host="tools"] {
-    max-width: min(calc(100% - 0.75rem), 64rem);
-    margin-inline: max(0px, calc((100% - 0.75rem - 64rem) / 2)) auto;
+    .box-border.h-full.w-full:has([data-resource-collection-viewport])
+    .md\:pr-3 {
+    padding-right: 0;
   }
 }
