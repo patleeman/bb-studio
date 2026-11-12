@@ -42,7 +42,7 @@ export function useProviderCards(enabled = true): ProviderCard[] | null {
       try {
         const { primaryHostId } = await sdk.system.config();
         const { providers } = await sdk.system.providerStates(primaryHostId ? { hostId: primaryHostId } : undefined);
-        if (live) setCards(sortCards(providers.map((each) => ({ providerId: each.providerId, displayName: each.displayName, status: each.status, accountEmail: each.accountEmail ?? null, loginCommand: each.loginCommand ?? null }))));
+        if (live) setCards(sortCards(providers.filter((each) => !!each.loginCommand).map((each) => ({ providerId: each.providerId, displayName: each.displayName, status: each.status, accountEmail: each.accountEmail ?? null, loginCommand: each.loginCommand ?? null }))));
       } catch {
         if (live) setCards((current) => current ?? []);
       }

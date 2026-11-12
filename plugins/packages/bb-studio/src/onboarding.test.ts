@@ -20,7 +20,7 @@ afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 type Thread = ReturnType<typeof makeThreadResponse>;
 
 async function studio(threadList: string = "__automatic__") {
-  const providerStates: { providerId: string; status: string }[] = [{ providerId: "claude-code", status: "not_installed" }, { providerId: "codex", status: "unauthenticated" }];
+  const providerStates: { providerId: string; status: string; loginCommand: string | null }[] = [{ providerId: "claude-code", status: "not_installed", loginCommand: "claude /login" }, { providerId: "codex", status: "unauthenticated", loginCommand: "codex login" }, { providerId: "acp-omp", status: "ready", loginCommand: null }];
   const prefs = new Map<string, { value: unknown; revision: number }>([["sidebar.threadListProvider", { value: threadList, revision: 1 }]]);
   const dataDir = mkdtempSync(join(tmpdir(), "studio-onboarding-"));
   dispose.push(() => rmSync(dataDir, { recursive: true, force: true }));
@@ -120,11 +120,13 @@ describe("first-run onboarding", () => {
     expect(env.spawns[0]).toMatchObject({ providerId: "claude-code" });
   });
 
-  it("prefers Claude Code, then Codex, then any ready provider", () => {
-    expect(readyProvider([{ providerId: "codex", status: "ready" }, { providerId: "claude-code", status: "ready" }])).toBe("claude-code");
-    expect(readyProvider([{ providerId: "pi", status: "ready" }, { providerId: "codex", status: "ready" }])).toBe("codex");
-    expect(readyProvider([{ providerId: "pi", status: "ready" }])).toBe("pi");
-    expect(readyProvider([{ providerId: "codex", status: "unauthenticated" }])).toBeNull();
+  it("prefers Claude Code, then Codex, then any signed-in provider, and never one that can't say it is signed in", () => {
+    const login = "login";
+    expect(readyProvider([{ providerId: "codex", status: "ready", loginCommand: login }, { providerId: "claude-code", status: "ready", loginCommand: login }])).toBe("claude-code");
+    expect(readyProvider([{ providerId: "pi", status: "ready", loginCommand: login }, { providerId: "codex", status: "ready", loginCommand: login }])).toBe("codex");
+    expect(readyProvider([{ providerId: "pi", status: "ready", loginCommand: login }])).toBe("pi");
+    expect(readyProvider([{ providerId: "codex", status: "unauthenticated", loginCommand: login }])).toBeNull();
+    expect(readyProvider([{ providerId: "acp-omp", status: "ready", loginCommand: null }])).toBeNull();
   });
 
   it("does nothing on a later start", async () => {

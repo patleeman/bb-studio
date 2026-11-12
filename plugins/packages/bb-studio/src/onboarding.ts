@@ -28,6 +28,7 @@ export type OnboardingFlag = OnboardingDone | OnboardingWaiting;
 export interface OnboardingProviderState {
   providerId: string;
   status: string;
+  loginCommand?: string | null;
 }
 
 interface UiPreference {
@@ -122,7 +123,7 @@ export function decideOnboarding(dataDir: string, db: Database.Database, now = D
 }
 
 export function readyProvider(states: readonly OnboardingProviderState[]): string | null {
-  const ready = states.filter((state) => state.status === "ready").map((state) => state.providerId);
+  const ready = states.filter((state) => state.status === "ready" && !!state.loginCommand).map((state) => state.providerId);
   return ONBOARDING_PROVIDER_ORDER.find((id) => ready.includes(id)) ?? ready[0] ?? null;
 }
 
