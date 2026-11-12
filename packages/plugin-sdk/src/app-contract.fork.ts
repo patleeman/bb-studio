@@ -23,38 +23,6 @@ export interface ExperimentalSidebarSectionProps {
 }
 
 /**
- * Registration for `slots.experimental_sidebarNewItem`: one thing the
- * sidebar's New menu can create, listed after New thread. Experimental: see
- * docs/api_to_audit.md.
- */
-export interface ExperimentalSidebarNewItemRegistration {
-  /** Unique within the plugin; letters, digits, `-`, `_`. */
-  id: string;
-  /** The menu row, such as "Page". */
-  title: string;
-  icon: string;
-  /** Rows with the same group sit together under one divider. */
-  group?: string;
-  /** Creates the thing and shows it. */
-  run(): void | Promise<void>;
-}
-
-/**
- * One registered New menu row, as `experimental_useSidebarNewItems()`
- * reports it. Experimental: see docs/api_to_audit.md.
- */
-export interface ExperimentalSidebarNewItem {
-  /** Unique across plugins. */
-  key: string;
-  pluginId: string;
-  id: string;
-  title: string;
-  icon: string;
-  group: string | null;
-  run(): void | Promise<void>;
-}
-
-/**
  * Registration for `slots.experimental_sidebarSection`: a section of the
  * plugin's own rows in the sidebar, below the thread list and scrolling with
  * it. The component draws its own heading and rows. Experimental: see
@@ -131,66 +99,6 @@ export interface ForkThreadListFields {
    * Experimental: see docs/api_to_audit.fork.md.
    */
   experimental_hideSidebarHeader?: boolean;
-  /**
-   * React hook bb runs in your plugin's scope, inside its sidebar, while this
-   * thread list is the sidebar's. `background` (any CSS background: a color
-   * or a gradient) is painted on the sidebar's body, the thread list area
-   * and the footer under it; the rail keeps bb's. `accent` becomes the
-   * sidebar body's `--fork-sidebar-accent` and bb's `--sidebar-accent` there,
-   * so bb's selected and hovered rows use it; read the variable in your own
-   * rows. bb changes nothing else, text colors included: choose colors that
-   * keep text readable in light and dark (see `experimental_useAppTheme`).
-   * Return null, or leave a field out, for bb's own. A throw is treated as
-   * null. Experimental: see docs/api_to_audit.fork.md.
-   */
-  experimental_useSidebarStyle?: () => ExperimentalSidebarStyle | null;
-}
-
-/**
- * Colors a thread list asks bb to paint on its sidebar (see
- * `PluginThreadListRegistration.experimental_useSidebarStyle`).
- * Experimental: see docs/api_to_audit.fork.md.
- */
-export interface ExperimentalSidebarStyle {
-  /** A CSS `background` value, such as a color or a gradient. */
-  background?: string;
-  /** A CSS color for selected and hovered rows. */
-  accent?: string;
-}
-
-/**
- * One skill a `slots.experimental_skillSource` lists on bb's Skills page.
- * Experimental: see docs/api_to_audit.fork.md.
- */
-export interface ExperimentalSourceSkill {
-  /** Unique within the source. */
-  id: string;
-  name: string;
-  description?: string;
-  /** The skill's file on the host, opened in the preferred editor when there is no `onOpen`. */
-  path?: string;
-  /** Called when the person opens the row. */
-  onOpen?(): void;
-}
-
-/**
- * Registration for `slots.experimental_skillSource`: a group of skills on
- * bb's Skills page, such as one Bot's own. bb lists them under its own
- * skills and adds one option per source, named `label`, to the page's
- * filter menu. Choosing sources lists only their skills, plus bb's own
- * that match when bb's Type or Provider filter is also set; with bb's
- * filters alone, no source is listed. `useSkills` is a
- * React hook bb runs in your plugin's scope while the page is open; return
- * the current list (keep the array stable between renders when nothing
- * changed). A throw hides the source's rows. Experimental: see
- * docs/api_to_audit.fork.md.
- */
-export interface ExperimentalSkillSourceRegistration {
-  /** Unique within the plugin; letters, digits, `-`, `_`. */
-  id: string;
-  /** The filter option and the heading over the source's rows. */
-  label: string;
-  useSkills(): readonly ExperimentalSourceSkill[];
 }
 
 /**
@@ -243,14 +151,6 @@ export interface ForkTabFields {
    * docs/api_to_audit.md.
    */
   experimental_instanceIcon?(params: JsonValue | null): string | null;
-  /**
-   * Draw this action tab as its icon alone while it is a fixed tab (opened
-   * with `experimental_global: true`): no title text, the title as tooltip
-   * and accessible name. Has no effect on an ordinary instance of the tab.
-   * Ignored on fixed-availability tabs. Experimental: see
-   * docs/api_to_audit.fork.md.
-   */
-  experimental_compactWhenFixed?: boolean;
   /**
    * Set to false to leave this action tab out of the New Tab page's Actions
    * list and its action search. The tab stays registered: `openTab`, links
@@ -376,17 +276,6 @@ export interface ExperimentalLauncherItem extends ExperimentalLauncherItemRegist
 }
 
 /**
- * Registration for `slots.experimental_mainHeader`: a component bb draws in
- * a row above the main view, spanning the view and its side panel (a tab
- * strip, a breadcrumb). It draws its own height and returns null to take no
- * room. Experimental: see docs/api_to_audit.fork.md.
- */
-export interface ExperimentalMainHeaderRegistration {
-  id: string;
-  component: ComponentType;
-}
-
-/**
  * Props for a `slots.experimental_threadBanner` component: the thread whose
  * view it is drawn in. Experimental: see docs/api_to_audit.fork.md.
  */
@@ -439,41 +328,6 @@ export interface ExperimentalThreadHeaderRegistration {
   useDecoration(
     args: ExperimentalThreadHeaderArgs,
   ): ExperimentalThreadHeaderDecoration | null;
-}
-
-/**
- * The side panel tab a `slots.experimental_panelTabAction` item was opened
- * on. Only plugin action tabs get these items, never bb's own file, diff or
- * terminal tabs. Experimental: see docs/api_to_audit.fork.md.
- */
-export interface ExperimentalPanelTabActionTab {
-  /** The plugin that registered the tab. */
-  pluginId: string;
-  /** The registered tab's id. */
-  tabId: string;
-  /** The instance's params when they are an object; undefined otherwise. */
-  params: Record<string, unknown> | undefined;
-  title: string;
-  /** The thread whose side panel holds the tab; null on a plugin page. */
-  threadId: string | null;
-}
-
-/**
- * Registration for `slots.experimental_panelTabAction`: an item in the
- * right-click menu of a plugin action tab in the side panel's tab strip,
- * any plugin's tab. `icon` is a bb icon name. `isAvailable` runs while the
- * menu renders, so it must be synchronous, pure and fast; leave it out to
- * show the item on every plugin action tab. A throw from `isAvailable`
- * hides the item; a throw or rejection from `run` is logged. Experimental:
- * see docs/api_to_audit.fork.md.
- */
-export interface ExperimentalPanelTabActionRegistration {
-  /** Unique within the plugin; letters, digits, `-`, `_`. */
-  id: string;
-  title: string;
-  icon?: string;
-  isAvailable?(tab: ExperimentalPanelTabActionTab): boolean;
-  run(tab: ExperimentalPanelTabActionTab): void | Promise<void>;
 }
 
 /**
@@ -587,18 +441,6 @@ export interface ExperimentalItemDropRegistration {
     item: ExperimentalDragItem,
     target: ExperimentalItemDropTarget,
   ): void | Promise<void>;
-}
-
-/**
- * Registration for `slots.experimental_closeFallback`: what the close
- * command (Mod+W) closes when it is not closing a side panel tab. `close`
- * returns true when it closed something, and bb then does nothing else.
- * Experimental: see docs/api_to_audit.fork.md.
- */
-export interface ExperimentalCloseFallbackRegistration {
-  /** Unique within the plugin; letters, digits, `-`, `_`. */
-  id: string;
-  close(): boolean;
 }
 
 /**
@@ -810,8 +652,7 @@ export interface ExperimentalAppCommand {
 /**
  * How a plugin window looks and behaves. Sizes are in points. `hotkey` is a
  * system-wide shortcut in Electron's accelerator form (such as
- * `Alt+Space`) that shows or hides the window; `menuBarTitle` adds a menu
- * bar entry that does the same. Experimental: see
+ * `Alt+Space`) that shows or hides the window. Experimental: see
  * docs/api_to_audit.fork.md.
  */
 export interface ExperimentalWindowOptions {
@@ -823,11 +664,8 @@ export interface ExperimentalWindowOptions {
   transparent?: boolean;
   frame?: boolean;
   alwaysOnTop?: boolean;
-  /** Clicks pass through to whatever is behind the window. */
-  clickThrough?: boolean;
   resizable?: boolean;
   hotkey?: string;
-  menuBarTitle?: string;
   minWidth?: number;
   minHeight?: number;
   /** `"hiddenInset"`: no title bar; the traffic lights sit inside the content. */
@@ -841,13 +679,6 @@ export interface ExperimentalWindowOptions {
   center?: boolean;
   /** Close when the window loses focus (a launcher). */
   hideOnBlur?: boolean;
-  /**
-   * macOS only, with `transparent`: the system's blurred material behind the
-   * component, kept active when the window is not focused. `"hud"` is the
-   * dark heads-up material, `"under-window"` the window background one.
-   * Ignored elsewhere and without `transparent`.
-   */
-  vibrancy?: "hud" | "under-window";
   /** Passed to the window as its query string. */
   params?: Readonly<Record<string, string>>;
 }
@@ -855,12 +686,12 @@ export interface ExperimentalWindowOptions {
 /**
  * `experimental_useWindows()`. `native` is true in the desktop app, where
  * every option applies. In a browser `open` opens a plain popup and the
- * styling, hotkey and menu bar options are ignored. Experimental: see
+ * styling and hotkey options are ignored. Experimental: see
  * docs/api_to_audit.fork.md.
  */
 export interface ExperimentalWindows {
   native: boolean;
-  /** Set up a window's hotkey and menu bar entry without showing it. */
+  /** Set up a window's hotkey without showing it. */
   register(
     windowId: string,
     options?: ExperimentalWindowOptions,
@@ -877,21 +708,6 @@ export interface ExperimentalWindows {
    * app; ask after `register` or `open`.
    */
   hotkeyRegistered(windowId: string): Promise<boolean>;
-  /**
-   * Turn click-through on or off for an open window. While it is on, the
-   * window's hotkey and menu bar entry turn it off instead of hiding the
-   * window, so there is always a way back. The window's page gets a
-   * `bb-fork-window-click-through` event with `detail.on` on every change.
-   * It still receives mouse-move events while clicks pass through.
-   * `hold: true` only pauses (`on: false`) or resumes (`on: true`) passing
-   * clicks through while click-through stays on: no event is sent, and the
-   * hotkey and menu bar entry still turn click-through off, not hide.
-   */
-  setClickThrough(
-    windowId: string,
-    on: boolean,
-    how?: { hold?: boolean },
-  ): Promise<boolean>;
 }
 
 /** Arguments passed to a file opener's `experimental_handleOpen`. */
@@ -1061,14 +877,6 @@ export interface ForkPluginAppSlots {
    */
   experimental_window(registration: ExperimentalWindowRegistration): void;
   /**
-   * Draw a row above the main view (see
-   * {@link ExperimentalMainHeaderRegistration}). Rows are stacked in
-   * plugin-id order. Experimental: see docs/api_to_audit.fork.md.
-   */
-  experimental_mainHeader(
-    registration: ExperimentalMainHeaderRegistration,
-  ): void;
-  /**
    * Draw a row under each thread's header (see
    * {@link ExperimentalThreadBannerRegistration}). Rows are stacked in
    * plugin-id order. Experimental: see docs/api_to_audit.fork.md.
@@ -1119,29 +927,11 @@ export interface ForkPluginAppSlots {
     registration: ExperimentalMessageActionRegistration,
   ): void;
   /**
-   * Add an item to the menu of plugin action tabs in the side panel's tab
-   * strip (see {@link ExperimentalPanelTabActionRegistration}). Items are
-   * listed in plugin-id order, before bb's own Close items. Experimental:
-   * see docs/api_to_audit.fork.md.
-   */
-  experimental_panelTabAction(
-    registration: ExperimentalPanelTabActionRegistration,
-  ): void;
-  /**
    * Take items dropped on bb's own surfaces (see
    * {@link ExperimentalItemDropRegistration}). Handlers are asked in
    * plugin-id order. Experimental: see docs/api_to_audit.fork.md.
    */
   experimental_itemDrop(registration: ExperimentalItemDropRegistration): void;
-  /**
-   * Take the close command when it is not closing a side panel tab (see
-   * {@link ExperimentalCloseFallbackRegistration}). Handlers are asked in
-   * plugin-id order; the first to return true wins. Experimental: see
-   * docs/api_to_audit.fork.md.
-   */
-  experimental_closeFallback(
-    registration: ExperimentalCloseFallbackRegistration,
-  ): void;
   /**
    * Replace bb's quick palette with the plugin's own component (see
    * {@link ExperimentalCommandPaletteRegistration}). Experimental: see
@@ -1192,29 +982,12 @@ export interface ForkPluginAppSlots {
     registration: ExperimentalSidebarSectionRegistration,
   ): void;
   /**
-   * Add a row to the sidebar's New menu (see
-   * {@link ExperimentalSidebarNewItemRegistration}). Experimental: see
-   * docs/api_to_audit.md.
-   */
-  experimental_sidebarNewItem(
-    registration: ExperimentalSidebarNewItemRegistration,
-  ): void;
-  /**
    * List the plugin's own items in bb's search palette (see
    * {@link ExperimentalPaletteSearchRegistration}). Experimental: see
    * docs/api_to_audit.md.
    */
   experimental_paletteSearch(
     registration: ExperimentalPaletteSearchRegistration,
-  ): void;
-  /**
-   * List a group of the plugin's skills on bb's Skills page, with a filter
-   * option of its own (see {@link ExperimentalSkillSourceRegistration}).
-   * Sources are listed in plugin-id order. Experimental: see
-   * docs/api_to_audit.fork.md.
-   */
-  experimental_skillSource(
-    registration: ExperimentalSkillSourceRegistration,
   ): void;
   /**
    * Add the plugin's items to the side panel's New Tab page: recent items
@@ -1624,27 +1397,6 @@ export interface ExperimentalAppRoute {
 /**
  * Hooks the fork adds to the app runtime surface.
  */
-/**
- * Props of `experimental_ProjectActionsMenu`: bb's own project menu (rename,
- * add a local path, settings, delete) behind its "more" button.
- * Experimental: see docs/api_to_audit.fork.md.
- */
-export interface ExperimentalProjectActionsMenuProps {
-  projectId: string;
-  /** Classes for the trigger button. */
-  className?: string;
-}
-
-/**
- * Props of `experimental_ProjectActionsContextMenu`: the same menu on a
- * right-click of `children` (one element). Experimental: see
- * docs/api_to_audit.fork.md.
- */
-export interface ExperimentalProjectActionsContextMenuProps {
-  projectId: string;
-  children: ReactNode;
-}
-
 export interface ForkPluginSdkApp {
   /**
    * Every plugin's launcher items, apps before actions, then by `order`,
@@ -1662,17 +1414,6 @@ export interface ForkPluginSdkApp {
    * docs/api_to_audit.fork.md.
    */
   experimental_useWindows(): ExperimentalWindows;
-  /**
-   * bb's own project menu behind a "more" button, for a plugin that draws
-   * project rows. Renders nothing for an unknown project. Experimental: see
-   * docs/api_to_audit.fork.md.
-   */
-  experimental_ProjectActionsMenu: ComponentType<ExperimentalProjectActionsMenuProps>;
-  /**
-   * bb's own project menu as the context menu of its child. Experimental:
-   * see docs/api_to_audit.fork.md.
-   */
-  experimental_ProjectActionsContextMenu: ComponentType<ExperimentalProjectActionsContextMenuProps>;
   /**
    * Put an item on a drag as the shared payload, under the MIME type
    * `application/x-bb-item`. Call it in `dragstart`; it leaves the drag's
@@ -1708,11 +1449,6 @@ export interface ForkPluginSdkApp {
    * docs/api_to_audit.fork.md.
    */
   experimental_useGlobalTabs(): readonly ExperimentalGlobalTab[];
-  /**
-   * The rows plugins added to the sidebar's New menu, for a plugin that
-   * draws that menu. Experimental: see docs/api_to_audit.md.
-   */
-  experimental_useSidebarNewItems(): readonly ExperimentalSidebarNewItem[];
   /**
    * bb's light or dark mode and a counter that changes with the theme. The
    * calling component renders again when either changes, so a plugin that
