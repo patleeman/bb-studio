@@ -93,6 +93,9 @@ export function ForkTabWindow() {
     <TooltipProvider delayDuration={300} disableHoverableContent>
       <div
         data-fork-tab-window=""
+        data-fork-tab-window-tabs={
+          panelState === null || panelState.tabCount === 1 ? "one" : "many"
+        }
         className="flex h-dvh w-dvw flex-col overflow-hidden bg-background"
       >
         <header
