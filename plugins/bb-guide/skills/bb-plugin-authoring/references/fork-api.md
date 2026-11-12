@@ -27,7 +27,8 @@ each member before using it. The types are in the SDK file
   new pane with `useBbNavigate().experimental_toAppPath(path, { split: true })`.
 - Composer footer items register `[{ id, component }]` through
   `experimental_footer` on a `thread`-scoped customization, in the row under
-  the input before bb's own controls. Draw one one-line chip, or return null.
+  the input before bb's own controls; `placement: "context"` puts the item
+  right before the context ring as one control with it. Draw one one-line chip, or return null.
   Read the thread with `useBbContext()`. Hidden while the composer is collapsed.
 - `useBbNavigate().experimental_toAppPath(path, { replace?, split? }?)` →
   navigate the main view to any bb route by path, like an in-app link;
