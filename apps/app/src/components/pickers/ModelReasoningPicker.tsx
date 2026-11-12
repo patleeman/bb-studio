@@ -1,3 +1,4 @@
+import { forkModelPickerGate } from "@/components/fork/ForkModelPickerGate";
 import { formatUnknownModelLabel, triggerReasoningLabel as forkTriggerReasoningLabel } from "./unknownModelLabel.fork";
 import {
   useCallback,
@@ -1062,7 +1063,7 @@ export function ModelReasoningPicker({
       activeModelOptions.length + activeMoreModelOptions.length >
         MODEL_SEARCH_MIN_OPTIONS);
 
-  return (
+  return forkModelPickerGate(
     <Popover open={open} onOpenChange={setOpen} modal={modal}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent
@@ -1195,7 +1196,7 @@ export function ModelReasoningPicker({
           }
         />
       </PopoverContent>
-    </Popover>
+    </Popover>, { hasSelectedModel },
   );
 }
 
