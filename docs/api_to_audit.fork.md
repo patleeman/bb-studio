@@ -645,6 +645,24 @@ Sign in, instead of leaving only the pooler's HTTP 429.
 2. The composer's send-blocking message (`formatModelLoadErrorText`) is text
    and draws no notice.
 
+## The model picker's stand-in (`slots.experimental_modelPickerGate`)
+
+A plugin's component is drawn wherever bb draws its model picker, with bb's
+picker as `children` and `hasSelectedModel`. It returns `children` to keep
+the picker or its own node instead. The first registration by plugin id,
+then registration id, wins; one that throws falls back to bb's picker.
+Studio is the caller: "Sign in", opening Accounts, while no agent provider
+is ready.
+
+**Core callers.** `components/fork/ForkModelPickerGate.tsx`
+(`forkModelPickerGate`), around the picker in
+`pickers/ModelReasoningPicker.tsx`.
+
+**Audit before stabilizing.**
+
+1. Every picker gets it, Settings' default-model pickers included; decide
+   whether the gate should know where it is drawn.
+
 ## bb's first run (`slots.experimental_firstRun`)
 
 A plugin takes over bb's first run, the setup screens shown while
@@ -655,8 +673,9 @@ registration in plugin-id order wins: its `component` is drawn full-window
 with `finish()`, which sets `onboardingCompletedAt` as bb's own screens do;
 a registration with no component is finished at once. A component that
 crashes finishes too. With no registration bb's own screens show. Studio is
-the caller: no component; its onboarding makes the Assistant Bot and the
-Welcome conversation and lands the first window there.
+the caller: "Connect a model", provider sign-in cards with Skip for now; once a
+provider is ready its onboarding makes the Assistant Bot and starts its first
+chat on Main.
 
 **Core callers.** `components/fork/ForkFirstRun.tsx` (`useForkFirstRun`,
 `ForkFirstRun`), drawn by `onboarding/OnboardingGate.tsx`.
