@@ -1,3 +1,4 @@
+import { withForkBundledPlugins } from "./builtin-registry.fork.js";
 import {
   capturePluginUse,
   forgetPluginRecommendation,
@@ -669,7 +670,7 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
     }
   }
   const bundledPlugins =
-    deps.bundledPlugins ?? listBundledPluginRegistrations();
+    deps.bundledPlugins ?? withForkBundledPlugins(listBundledPluginRegistrations());
   const retiredBundledPlugins =
     deps.retiredBundledPlugins ?? RETIRED_BUNDLED_PLUGINS;
   function isOrphanedBuiltinRow(row: InstalledPluginRow): boolean {
