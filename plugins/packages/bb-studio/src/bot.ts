@@ -666,7 +666,7 @@ export class Bots {
    * first is the primary (the personal project's lead); later ones are
    * additional Bots with their own thread.
    */
-  async create(input: { name: string; avatar: string; shape?: string; color?: string; threadId?: string; prompt?: string; promptHidden?: boolean; providerId?: string; setup?: string; external?: { providerId: string; model: string; permissionMode?: PermissionMode } }): Promise<BotView> {
+  async create(input: { name: string; avatar: string; shape?: string; color?: string; threadId?: string; prompt?: string; setup?: string; external?: { providerId: string; model: string; permissionMode?: PermissionMode } }): Promise<BotView> {
     let external = input.external;
     if (external && !EXTERNAL_PROVIDERS.some((each) => each.id === external!.providerId)) throw new Error(`${external.providerId} isn't an external agent provider.`);
     // Accept edits unless asked otherwise, where the provider supports it.
@@ -688,9 +688,9 @@ export class Bots {
           environment: { type: "project-default" },
           pluginMetadata: { bot: id },
           // Studio Agents' providers take no reasoning levels; the permission is the bot's (accept edits by default).
-          ...(external ? { providerId: external.providerId, model: external.model, reasoningLevel: "none", permissionMode: external.permissionMode, executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit", permissionMode: "explicit" } } : input.providerId ? { providerId: input.providerId } : {}),
+          ...(external ? { providerId: external.providerId, model: external.model, reasoningLevel: "none", permissionMode: external.permissionMode, executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit", permissionMode: "explicit" } } : {}),
           // Its instructions come from agents.configure (botInstructions), so the first message is the user's.
-          input: [{ type: "text", text: input.prompt ?? (input.setup !== undefined ? setupPrompt(input.setup) : `Hi ${input.name}. Introduce yourself in a sentence and ask what I'd like you to keep an eye on.`), mentions: [], ...(input.promptHidden ? { visibility: "agent-only" } : {}) }],
+          input: [{ type: "text", text: input.prompt ?? (input.setup !== undefined ? setupPrompt(input.setup) : `Hi ${input.name}. Introduce yourself in a sentence and ask what I'd like you to keep an eye on.`), mentions: [] }],
         } as never);
         threadId = thread.id;
       }
@@ -703,6 +703,33 @@ export class Bots {
     await this.claimChains();
     this.deps.changed();
     return this.get(id);
+  }
+
+  async seedStarter(input: { name: string; avatar: string }): Promise<{ id: string; threadId: string }> {
+    const thread = await this.deps.sdk.threads.spawn({ projectId: PERSONAL_PROJECT_ID, title: input.name, environment: { type: "project-default" }, pluginMetadata: { bot: BOT_ID }, input: [] } as never);
+    const made = (await this.create({ name: input.name, avatar: input.avatar, threadId: thread.id })).bot;
+    if (!made) throw new Error("The Bot wasn't made.");
+    return { id: made.id, threadId: thread.id };
+  }
+
+  async startFirstChat(input: { botId: string; providerId: string; prompt: string }): Promise<string | null> {
+    const threadId = this.stored(input.botId)?.threadId;
+    if (!threadId) throw new Error("That Bot has no Main.");
+    const thread = await this.deps.sdk.threads.get({ threadId });
+    if (thread.status !== "pending" || (thread as { queuedMessageCount?: number }).queuedMessageCount) return null;
+    const prompt = [{ type: "text", text: input.prompt, mentions: [], visibility: "agent-only" }];
+    if (thread.providerId === input.providerId) {
+      await this.deps.sdk.threads.send({ threadId, mode: "auto", input: prompt } as never);
+      return threadId;
+    }
+    const next = await this.deps.sdk.threads.spawn({ projectId: thread.projectId, title: thread.title ?? input.botId, environment: { type: "project-default" }, providerId: input.providerId, pluginMetadata: { handoffFrom: threadId }, input: prompt } as never);
+    const row = this.need(input.botId);
+    if (this.isPrimary(row)) await this.deps.leads.setLead(PERSONAL_PROJECT_ID, next.id);
+    else this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(next.id, Date.now(), row.id);
+    await this.deps.sdk.threads.delete({ threadId, childThreadsConfirmed: false }).catch(() => {});
+    await this.claimChains();
+    this.deps.changed();
+    return next.id;
   }
 
   async set(input: { botId?: string; name?: string; avatar?: string; shape?: string | null; color?: string; role?: string }): Promise<BotView> {

@@ -1,10 +1,13 @@
-export const ONBOARDING_BOT_NAME = "Assistant";
+export const STARTER_BOT = {
+  name: "Assistant",
+  avatar: "🤖",
+} as const;
 
-export const ONBOARDING_PROVIDER_ORDER = ["claude-code", "codex"] as const;
+export const STARTER_PROVIDER_ORDER = ["claude-code", "codex"] as const;
 
-export function onboardingPrompt(botName: string): string {
+export function starterFirstChatPrompt(botName: string): string {
   return [
-    `You are ${botName}, the user's Bot in BB Studio. This is your first conversation with them; they just installed BB Studio and connected a model. This message is from BB Studio, not from the user, and the user does not see it.`,
+    `You are ${botName}, the user's Bot in BB Studio. This is your first conversation with them; they just installed BB Studio and connected a model, and BB Studio made you for them with a default name, presence and theme. This message is from BB Studio, not from the user, and the user does not see it.`,
     "",
     "Run a short first chat, two to four exchanges in all:",
     "1. In two or three sentences, say who you are: their Bot, which works with them in BB Studio and can start threads for bigger jobs. Then ask their name and what they will mostly use you for.",

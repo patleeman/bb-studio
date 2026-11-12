@@ -11,9 +11,13 @@ export function WelcomeLanding() {
   const live = useLive("bot_welcome", {}, { enabled: !done && inMainWindow(), pollMs: 3_000 });
   const data = live.data;
   useEffect(() => {
-    if (done || !data || data.pending) return;
+    if (done || !data) return;
+    if (!data.threadId || !data.bot) {
+      if (!data.pending) setDone(true);
+      return;
+    }
     setDone(true);
-    if (!data.threadId || data.opened || !data.bot) return;
+    if (data.opened) return;
     rememberConversation(data.bot.id, data.threadId);
     void call("bot_welcome_opened", {}).catch(() => {});
     navigate.toThread(data.threadId);

@@ -1,7 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import type { Bots } from "./bot";
-import { markWelcomeOpened, readFlag, readOnboarding, runOnboarding, welcomeThreadOf, type OnboardingProviderState } from "./onboarding";
+import { markWelcomeOpened, readFlag, runOnboarding, welcomeThreadOf, type OnboardingProviderState } from "./onboarding";
 
 export const ONBOARDING_POLL_MS = 5_000;
 
@@ -19,11 +19,8 @@ export function registerOnboarding(bb: BbPluginApi, deps: { db: Database.Databas
     try {
       const flag = await runOnboarding({
         dataDir, db: deps.db, sdk: bb.sdk as never, providers,
-        createBot: async (input) => {
-          const made = (await deps.bots.create({ ...input, promptHidden: true })).bot;
-          if (!made) throw new Error("The Bot wasn't made.");
-          return { id: made.id, threadId: made.threadId ?? null };
-        },
+        seedBot: (input) => deps.bots.seedStarter(input),
+        startFirstChat: (input) => deps.bots.startFirstChat(input),
       });
       if (flag.state === "done" && flag.reason === "ran" && !flag.opened) bb.log.info(`Onboarding made ${flag.botId} and started its first chat in ${flag.welcomeThreadId}.`);
     } catch (error) {
@@ -39,12 +36,11 @@ export function registerOnboarding(bb: BbPluginApi, deps: { db: Database.Databas
   }, ONBOARDING_POLL_MS);
   bb.onDispose(() => clearInterval(timer));
   const welcomeView = () => {
-    const flag = readOnboarding(dataDir);
-    if (!flag) return { threadId: null, opened: false, pending: true, bot: null };
+    const flag = readFlag(dataDir);
     const welcome = welcomeThreadOf(dataDir);
     const bot = welcome ? deps.bots.stored(welcome.botId) : null;
     return {
-      threadId: welcome && bot ? welcome.threadId : null, opened: welcome?.opened ?? true, pending: false,
+      threadId: welcome && bot ? welcome.threadId : null, opened: welcome?.opened ?? true, pending: flag?.state !== "done",
       bot: bot ? { id: bot.id, name: bot.name, primary: !!bot.primary, presence: deps.bots.presenceOf(bot.id), appearance: bot.appearance ?? null } : null,
     };
   };
