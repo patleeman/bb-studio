@@ -1031,6 +1031,17 @@ export interface ExperimentalModelPickerGateRegistration {
   component: ComponentType<ExperimentalModelPickerGateProps>;
 }
 
+export type ExperimentalHostPage = "skills";
+
+export type ExperimentalHostSetting = "cli-skills";
+
+export interface ExperimentalHideHostEntriesRegistration {
+  id: string;
+  navigation?: readonly string[];
+  pages?: readonly ExperimentalHostPage[];
+  settings?: readonly ExperimentalHostSetting[];
+}
+
 /**
  * Slots the fork adds beside `PluginAppSlots`.
  */
@@ -1086,6 +1097,9 @@ export interface ForkPluginAppSlots {
    */
   experimental_modelPickerGate(
     registration: ExperimentalModelPickerGateRegistration,
+  ): void;
+  experimental_hideHostEntries(
+    registration: ExperimentalHideHostEntriesRegistration,
   ): void;
   /**
    * Change the title text and add a node after it in each thread's header
