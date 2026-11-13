@@ -1,9 +1,11 @@
+import { registerClaudeAiService } from "./src/ai-service.fork.js";
 import { registerUsageSource } from "./src/usage-source.js";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { CLAUDE_NATIVE_ROOTS_DECLARATION } from "./src/native-roots.js";
 
 export default function plugin(bb: BbPluginApi) {
   registerUsageSource(bb);
+  registerClaudeAiService(bb);
   bb.settings.define({
     memoryEnabled: {
       type: "boolean",
