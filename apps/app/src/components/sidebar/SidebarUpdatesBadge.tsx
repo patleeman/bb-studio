@@ -1,3 +1,4 @@
+import { forkSidebarUpdateLabel } from "./sidebarUpdateLabel.fork";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { ProviderInfo } from "@bb/domain";
@@ -177,6 +178,8 @@ export function SidebarUpdatesBadge({ onNavigate }: SidebarUpdatesBadgeProps) {
 
 export function sidebarUpdateButtonLabel(model: SidebarUpdateModel): string {
   if (model.updating) return "Updating";
+  const forkLabel = forkSidebarUpdateLabel(model);
+  if (forkLabel !== null) return forkLabel;
   const count = model.rows.length + (model.bb === null ? 0 : 1);
   return count === 1 ? "1 update available" : `${count} updates available`;
 }
