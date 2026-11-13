@@ -1,7 +1,6 @@
 // The Next row at the end of a reply (`::next{reply="…" btw="…" do="…"}`):
 // quick replies and actions as buttons that draft into the composer, then
-// notes about what the agent noticed, each with Tell me more (asks this
-// agent) and, for 🐛 notes, Fix this. Each message logs its suggestions
+// notes about what the agent noticed, with Fix this for 🐛 notes. Each message logs its suggestions
 // once as shown, and every click, so `bb studio pages explore stats` can tell which kinds
 // earn their place. On a thread you can't write in here (a worker, a thread
 // mirrored from bb, a finished conversation) the row isn't drawn: its
@@ -34,7 +33,6 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
       ...items.reply.map((item) => ({ kind: "reply" as const, emoji: item.emoji, label: item.label })),
       ...items.do.map((item) => ({ kind: "do" as const, emoji: item.emoji, label: item.label })),
       ...items.btw.filter(isBug).map((note) => ({ kind: "fix" as const, emoji: note.emoji, label: note.label })),
-      ...items.btw.map((note) => ({ kind: "more" as const, emoji: note.emoji, label: note.label })),
     ],
     [items],
   );
@@ -104,7 +102,6 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
           <BtwNotes
             notes={items.btw}
             onFix={(note) => draft("fix", note, `${BUG_EMOJI} Fix this: ${note.text}`)}
-            onMore={(note) => draft("more", note, `${MORE_EMOJI} Tell me more: ${note.text}`)}
           />
         </NextSection>
       ) : null}
@@ -126,11 +123,8 @@ function NextSection({ label, children }: { label: string; children: ReactNode }
 
 const isBug = (note: BtwNote) => note.emoji === BUG_EMOJI;
 
-/** Drafted by Tell me more; matches the iOS app. */
-const MORE_EMOJI = "💬";
-
-/** Notes back to the user, each with Tell me more (asks this agent) and Fix this for 🐛 notes. */
-function BtwNotes({ notes, onFix, onMore }: { notes: readonly BtwNote[]; onFix(note: BtwNote): void; onMore(note: BtwNote): void }) {
+/** Notes back to the user, with Fix this for 🐛 notes. */
+function BtwNotes({ notes, onFix }: { notes: readonly BtwNote[]; onFix(note: BtwNote): void }) {
   return (
     <ul className="space-y-1.5" aria-label="Things the agent noticed">
       {notes.map((note) => {
@@ -142,18 +136,14 @@ function BtwNotes({ notes, onFix, onMore }: { notes: readonly BtwNote[]; onFix(n
             </span>
             <div className="min-w-0 flex-1">
               <p className="leading-5 text-foreground">{note.text}</p>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                <button type="button" onClick={() => onMore(note)} className={ACTION_CHIP}>
-                  <span aria-hidden="true">{MORE_EMOJI}</span>
-                  <span>Tell me more</span>
-                </button>
-                {isBug(note) ? (
+              {isBug(note) ? (
+                <div className="mt-1 flex flex-wrap gap-1.5">
                   <button type="button" onClick={() => onFix(note)} className={ACTION_CHIP}>
                     <span aria-hidden="true">🔧</span>
                     <span>Fix this</span>
                   </button>
-                ) : null}
-              </div>
+                </div>
+              ) : null}
             </div>
           </li>
         );

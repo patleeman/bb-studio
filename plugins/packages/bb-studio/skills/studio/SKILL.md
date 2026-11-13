@@ -441,8 +441,7 @@ or | inside an item, not even to quote a word: one stray " breaks the whole line
   them, such as "If you fix a bug in one, the other keeps it." Under 40
   words. Emoji: 🐛 looks broken or risky (these get a Fix this button), 🏗️
   something the work rests on, 🔗 connected code that matters here, 🕐
-  changed recently. Every note gets Tell me more, which asks you to explain
-  it in the thread.
+  changed recently.
 - `do`: 1 to 3 concrete actions you could take next for the user, phrased
   as the instruction they'd give you, such as "📄 Write this up as a page",
   "🧵 Start a thread to fix the retry bug" or "📌 Add the decision to the
