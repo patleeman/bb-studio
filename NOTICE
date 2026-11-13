@@ -8,6 +8,30 @@ first imported here on upstream commit 7c1353d80729983b86ea1555d18b42407f320406.
 The current upstream base is named in the subject of the newest
 "desktop: import" commit on main. bb's license is desktop/LICENSE, unchanged.
 
+Third-party software bundled in the desktop app (desktop/apps/desktop)
+=====================================================================
+
+The full notice, shipped inside the app at
+Contents/Resources/desktop-control/NOTICE.md, is
+desktop/apps/desktop/native/desktop-control-NOTICE.md.
+
+  Cua Driver 0.47.24 (cua-driver, run as a helper for desktop control)
+                    https://github.com/trycua/cua (libs/cua-driver), tag
+                    cua-driver-rs-v0.47.24, commit b168ff3
+                    MIT. Copyright (c) 2025 Cua AI, Inc.
+                    Unmodified release binary; telemetry and update checks
+                    are turned off when BB Studio starts it.
+  Included in Cua Driver, each MIT (see the full notice):
+                    trope-cua, Copyright (c) 2026 Victor Vannara;
+                    Interface-Agent, Copyright (c) 2024 Francesco Bonacci;
+                    yabai, Copyright (c) 2019 Åsmund Vikane;
+                    QuickJS-ng, Copyright (c) 2017-2026 Fabrice Bellard,
+                    (c) 2017-2024 Charlie Gordon, (c) 2023-2026 Ben Noordhuis,
+                    (c) 2023-2026 Saúl Ibarra Corretgé;
+                    rquickjs, Copyright (c) 2020 Mees Delzenne,
+                    (c) 2025 Rquickjs Contributors;
+                    T3 Code, Copyright (c) 2026 T3 Tools Inc.
+
 Third-party work used by the Studio plugins (plugins/packages/bb-studio)
 =========================================================================
 

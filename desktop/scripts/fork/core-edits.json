@@ -223,7 +223,7 @@
     },
     "packages/plugin-sdk/src/app.ts": {
       "seam": "sdk-tables",
-      "intent": "One named re-export at the top of the file of the runtime functions and components in app.fork.ts (app route, Global tabs, theme, panes, launcher items, windows, context card, drag item write and read, app commands, tab window). Named, not export *: the runtime export manifest generator reads esbuild's unbundled export list, which does not follow export *. Add a new fork runtime export to both app.fork.ts and this line.",
+      "intent": "One named re-export at the top of the file of the runtime functions and components in app.fork.ts (app route, Global tabs, theme, panes, launcher items, windows, desktop control, context card, drag item write and read, app commands, tab window). Named, not export *: the runtime export manifest generator reads esbuild's unbundled export list, which does not follow export *. Add a new fork runtime export to both app.fork.ts and this line.",
       "budget": 1
     },
     "packages/plugin-sdk/src/backend-contract.ts": {
@@ -327,9 +327,9 @@
       "budget": 7
     },
     "apps/desktop/src/preload.ts": {
-      "seam": "approvals, windows, studio-release, launch-theme",
-      "intent": "Exposes experimental_answerApproval and experimental_window on window.bbDesktop; each invokes the main process. It also exposes experimental_studioBuild (the Studio version and its bb base, from studio-release.fork.ts). It spreads forkLaunchThemeApi(ipcRenderer) (fork-launch-theme-preload.ts) into the API: that paints the main window from the cached backdrop appearance before the page runs and adds experimental_launchAppearance and experimental_saveLaunchAppearance.",
-      "budget": 13
+      "seam": "approvals, windows, studio-release, launch-theme, desktop-control",
+      "intent": "Exposes experimental_answerApproval and experimental_window on window.bbDesktop; each invokes the main process. It also exposes experimental_studioBuild (the Studio version and its bb base, from studio-release.fork.ts). It spreads forkLaunchThemeApi(ipcRenderer) (fork-launch-theme-preload.ts) into the API: that paints the main window from the cached backdrop appearance before the page runs and adds experimental_launchAppearance and experimental_saveLaunchAppearance. It spreads forkDesktopControlApi(ipcRenderer) (fork-desktop-control-preload.ts), which adds experimental_desktopControl (request and subscribe) for desktop control; its import is the file's first line.",
+      "budget": 15
     },
     "packages/desktop-contract/src/info.ts": {
       "seam": "approvals, windows",

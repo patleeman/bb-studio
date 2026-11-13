@@ -128,6 +128,7 @@ import { forgetView } from "./src/ui/studio-tab/view-state";
 import { registerThreadHeader } from "./src/ui/thread-header";
 import { registerThreadContext } from "./src/ui/thread-context";
 import { openPathFromRoute, StudioContainerProvider } from "./src/ui/studio-open";
+import { registerDesktopApp } from "./src/desktop/register";
 
 /**
  * An old address that showed the item list (`collection`, a kind such as
@@ -474,6 +475,7 @@ export default definePluginApp((app) => {
   if (on("recording")) registerTalkApp(app);
   // Off: the `::recording` line still renders, as nothing.
   else app.slots.messageDirective({ id: "recording", component: () => null });
+  registerDesktopApp(app);
   // Reactions (built in; was Studio Reactions): emoji message actions that
   // draft a reply, the old `::reactions` line, and their settings preview.
   registerReactionsApp(app);
