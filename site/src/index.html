@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BB Studio</title>
-<meta name="description" content="Your AI doesn't just answer. It makes things. BB Studio gives your agents a place to work: docs, designs, dashboards and apps that open right beside the chat.">
+<meta name="description" content="Work with your AI as a team. BB Studio gives you a Bot that remembers your work, learns how you like things done and hands long jobs to workers, with pages, designs, apps, whiteboards and VS Code beside the chat.">
 <meta name="color-scheme" content="dark">
 <meta property="og:title" content="BB Studio">
-<meta property="og:description" content="Your AI doesn't just answer. It makes things.">
+<meta property="og:description" content="Work with your AI as a team.">
 <meta property="og:image" content="img/hero-1600.webp">
 <link rel="icon" href="icon.png">
 <link rel="preload" href="fonts/Jost-latin.woff2" as="font" type="font/woff2" crossorigin>
@@ -21,12 +21,10 @@
   <nav class="nav" aria-label="Sections">
     <a class="brand" href="#main"><img src="icon.png" alt="" width="28" height="28"> BB Studio</a>
     <ul>
-      <li><a href="#pages">Pages</a></li>
-      <li><a href="#designs">Designs</a></li>
-      <li><a href="#apps">Apps</a></li>
-      <li><a href="#spaces">Spaces</a></li>
-      <li><a href="#voice">Voice</a></li>
-      <li><a href="#themes">Themes</a></li>
+      <li><a href="#bots">Bots</a></li>
+      <li><a href="#collaboration">Collaboration</a></li>
+      <li><a href="#platform">Platform</a></li>
+      <li><a href="#bb">bb</a></li>
       <li><a href="#download">Download</a></li>
     </ul>
   </nav>
@@ -36,66 +34,29 @@
 
 <section class="hero">
   <div class="hero-text">
-    <h1>Your AI doesn't just answer. It makes things.</h1>
-    <p class="lead">BB Studio gives your agents a place to work: docs, designs, dashboards and apps that open right beside the chat, and Bots that remember what you're building.</p>
-    <p class="fork-line">A very opinionated fork of the excellent <a href="https://getbb.app/">bb</a></p>
+    <h1>Work with your AI as a team.</h1>
+    <p class="lead">BB Studio gives you a Bot, an AI teammate that remembers your work, learns how you like things done, and hands long jobs to workers while you keep talking. You work together in pages, designs, apps, whiteboards and VS Code, all open beside the chat.</p>
     <div class="actions">
-      <span class="button disabled" data-release-button aria-disabled="true">Download <span class="soon">Coming soon</span></span>
+      <a class="button" href="https://github.com/patleeman/bb-studio/releases/latest">Download for macOS</a>
       <a class="button ghost" href="https://github.com/patleeman/bb-studio">GitHub</a>
     </div>
+    <p class="fork-line">A very opinionated fork of the excellent <a href="https://getbb.app/">bb</a></p>
   </div>
   <figure class="shot hero-shot">
     {{pic hero "BB Studio in the Event Horizon theme: the conversation Main with Atlas on the left, and beside it the page orbit-web 2.4: launch plan, with a tip, four stats, an area chart of beta adoption and a checklist." "(min-width: 1180px) 1100px, 94vw" eager}}
   </figure>
 </section>
 
-<section id="pages" class="feature">
-  <div class="feature-text">
-    <h2>Ask for a plan, get a real doc.</h2>
-    <p>Pages are documents with charts, stats, tables and live embeds. You and the agent edit the same page at the same time, and it stays linked to the chat that made it.</p>
-  </div>
-  <figure class="shot wide">
-    {{pic item-page "The page orbit-web 2.4: launch plan: a tip callout, a row of four stats (1,284 weekly active teams, 212 beta teams, 0.4% sync conflicts, 180 ms p95 search), an area chart of teams on the beta by day, and a checklist." "(min-width: 1180px) 1100px, 94vw"}}
-  </figure>
-  <figure class="shot wide">
-    {{pic item-page-embeds "Further down the same page: the Beta feedback mini app embedded live, with five items and their votes, and the Search latency report artifact embedded below it." "(min-width: 1180px) 1100px, 94vw"}}
-  </figure>
-</section>
-
-<section id="designs" class="feature">
-  <div class="feature-text">
-    <h2>Describe it. Click through it.</h2>
-    <p>Designs are live screens and clickable prototypes. Play them, comment on any element, and get the next round.</p>
-  </div>
-  <figure class="shot wide">
-    {{pic item-design "The design Offline sync settings, Round 1: a settings panel for offline sync, a phone sync-status sheet and a conflict prompt, side by side, with Select, Edit text and Comment tools at the top." "(min-width: 1180px) 1100px, 94vw"}}
-  </figure>
-</section>
-
-<section id="apps" class="feature">
-  <div class="feature-text">
-    <h2>Need a tracker? Ask.</h2>
-    <p>Mini apps, live dashboards and saved artifacts, built on the spot and kept for next time. They run beside the chat, in a page or in their own tab.</p>
-  </div>
-  <figure class="shot wide">
-    {{pic item-dashboard "The dashboard orbit-web health: stat tiles for weekly active teams, sync conflicts and p95 search with sparklines, a gauge for the 2.4 checklist, a line chart of errors per thousand sessions, a bar chart of beta teams by plan, a table of open beta issues and a note for this week." "(min-width: 1180px) 1100px, 94vw"}}
-  </figure>
-  <div class="grid two">
-    <figure class="shot">
-      {{pic item-mini "The mini app Beta feedback in its own tab: five feedback items with vote buttons, an area label and a status (planned, fixed or new), and a field to add feedback." "(min-width: 900px) 540px, 94vw"}}
-      <figcaption><strong>A mini app</strong></figcaption>
-    </figure>
-    <figure class="shot">
-      {{pic item-artifact "The artifact 2.4 release timeline open in a tab: four milestones on a line, from Beta opens on Oct 30 to 2.4 for everyone on Nov 14." "(min-width: 900px) 540px, 94vw"}}
-      <figcaption><strong>An artifact</strong></figcaption>
-    </figure>
-  </div>
+<section id="bots" class="pillar">
+  <p class="eyebrow">Bots</p>
+  <h2>A working relationship.</h2>
+  <p>Your Bot keeps its memory and skills across all of its conversations with you, so you never start from zero. It holds many conversations at once and manages workers that do long jobs in parallel.</p>
 </section>
 
 <section id="spaces" class="feature">
   <div class="feature-text">
-    <h2>One Bot. Many conversations. One memory.</h2>
-    <p>Workers take the long jobs, approvals come to you, and replies thread like Slack, right under the message.</p>
+    <h3 class="feature-title">One Bot holds many conversations and remembers all of them.</h3>
+    <p>Start a new conversation whenever you like. Long jobs go to workers that run while you keep talking, approvals come to you, and replies thread right under the message.</p>
   </div>
   <figure class="shot wide">
     {{pic replies-open "Main on the left, with the lines 2 replies · Last reply and Forked here under the morning summary, and the reply thread open in the side panel on the right: a question about the book club and three discussion questions in reply." "(min-width: 1180px) 1100px, 94vw"}}
@@ -109,42 +70,10 @@
     </figure>
   </div>
 </section>
-
-<section id="workbench" class="feature">
-  <div class="feature-text">
-    <h2>Everything side by side.</h2>
-    <p>Docs, apps and code open in tabs beside the conversation. Split them, or find anything with ⌘K.</p>
-  </div>
-  <figure class="shot wide">
-    {{pic cmdk "The Cmd+K palette over Main, searching lis: Lisbon: four days (page), Lisbon: route sketch (whiteboard), Lisbon trip in March (conversation), Book club: reading list (page), and Ask Atlas." "(min-width: 1180px) 1100px, 94vw"}}
-  </figure>
-</section>
-
-<section id="voice" class="feature">
-  <div class="feature-text">
-    <h2>Talk instead of type.</h2>
-    <p>Dictate into any message, page or comment: text appears as you speak, and the audio is saved as you go. Record a meeting and turn it into notes with decisions and to-dos.</p>
-    <p class="fine">Transcription uses the voice service you choose in Settings. Recorded calls can be transcribed on your Mac.</p>
-  </div>
-  <figure class="shot wide">
-    {{pic item-recording "The recording Kitchen walkthrough with the contractor: 8 minutes and 149 words, a Summary toggle, Open notes and Update notes, the player, and the transcript with a timestamp on each line." "(min-width: 1180px) 1100px, 94vw"}}
-  </figure>
-  <div class="grid two">
-    <figure class="shot">
-      {{pic item-notes "The notes page made from the walkthrough: Decisions (quartz counters, keep the cabinet boxes, the sink stays), To do (pick a countertop slab by Friday, confirm the start date, ask for the electrical quote) and a table of numbers." "(min-width: 900px) 540px, 94vw"}}
-      <figcaption><strong>Notes from a meeting</strong></figcaption>
-    </figure>
-    <figure class="shot">
-      {{pic item-dictation "A dictation's own page: the title Reply to the contractor, its length and word count, Keep as a recording, the player and the dictated text." "(min-width: 900px) 540px, 94vw"}}
-      <figcaption><strong>A dictation</strong></figcaption>
-    </figure>
-  </div>
-</section>
-
 <section id="memory" class="feature">
   <div class="feature-text">
-    <h2>It remembers. It learns your routines. It runs them for you.</h2>
-    <p>Memory keeps what matters, Skills capture how you like things done, and Automations and Todos bring the work back at the right time.</p>
+    <h3 class="feature-title">Your Bot remembers what matters, learns how you like things done, and runs your routines on schedule.</h3>
+    <p>Memory, Skills, Automations and Todos are its own pages, so you can see and change what it knows and what it will do next.</p>
   </div>
   <div class="grid two">
     <figure class="shot">
@@ -165,51 +94,131 @@
     </figure>
   </div>
 </section>
-
-<section id="code" class="feature">
-  <div class="feature-text">
-    <h2>Code, with the agent pointing.</h2>
-    <p>VS Code opens beside the chat, and the agent can show you exactly which lines it means.</p>
-  </div>
-  <figure class="shot wide">
-    {{pic item-code "VS Code inside BB Studio on the folder orbit-web, with src/sync/queue.ts open and lines 9 to 14 highlighted. The status bar reads BB showed you src/sync/queue.ts:9-14." "(min-width: 1180px) 1100px, 94vw"}}
-  </figure>
+<section id="collaboration" class="pillar">
+  <p class="eyebrow">Collaboration</p>
+  <h2>More ways to work than chat.</h2>
+  <p>Pages, designs, apps, whiteboards and VS Code open beside the conversation, and you and your Bot edit them together. You can also speak: dictation, Talk and meeting recordings are built in, because speaking is faster than typing.</p>
 </section>
 
+<section id="pages" class="feature">
+  <div class="feature-text">
+    <h3 class="feature-title">Ask for a plan and get a real document.</h3>
+    <p>Pages hold charts, stats, tables and live embeds. You and your Bot edit the same page at the same time, and it stays linked to the conversation that made it.</p>
+  </div>
+  <figure class="shot wide">
+    {{pic item-page "The page orbit-web 2.4: launch plan: a tip callout, a row of four stats (1,284 weekly active teams, 212 beta teams, 0.4% sync conflicts, 180 ms p95 search), an area chart of teams on the beta by day, and a checklist." "(min-width: 1180px) 1100px, 94vw"}}
+  </figure>
+  <figure class="shot wide">
+    {{pic item-page-embeds "Further down the same page: the Beta feedback mini app embedded live, with five items and their votes, and the Search latency report artifact embedded below it." "(min-width: 1180px) 1100px, 94vw"}}
+  </figure>
+</section>
+<section id="designs" class="feature">
+  <div class="feature-text">
+    <h3 class="feature-title">Describe a screen and get a prototype you can click through.</h3>
+    <p>Play the screens, comment on any element, and get the next round.</p>
+  </div>
+  <figure class="shot wide">
+    {{pic item-design "The design Offline sync settings, Round 1: a settings panel for offline sync, a phone sync-status sheet and a conflict prompt, side by side, with Select, Edit text and Comment tools at the top." "(min-width: 1180px) 1100px, 94vw"}}
+  </figure>
+</section>
 <section id="whiteboards" class="feature">
   <div class="feature-text">
-    <h2>Sketch it together.</h2>
-    <p>Whiteboards live inside your pages, and you and the agent draw on the same one.</p>
+    <h3 class="feature-title">Sketch an idea instead of describing it.</h3>
+    <p>Whiteboards live inside your pages, and you and your Bot draw on the same one.</p>
   </div>
   <figure class="shot wide">
     {{pic item-whiteboard "The whiteboard 2.4 rollout: three boxes joined by arrows, Beta: 212 teams, 10% of teams and Everyone, Thu, a Roll back box below, and two handwritten notes." "(min-width: 1180px) 1100px, 94vw"}}
   </figure>
 </section>
+<section id="code" class="feature">
+  <div class="feature-text">
+    <h3 class="feature-title">Open the code beside the conversation.</h3>
+    <p>VS Code is built in, and your Bot can point you at exactly the lines it means.</p>
+  </div>
+  <figure class="shot wide">
+    {{pic item-code "VS Code inside BB Studio on the folder orbit-web, with src/sync/queue.ts open and lines 9 to 14 highlighted. The status bar reads BB showed you src/sync/queue.ts:9-14." "(min-width: 1180px) 1100px, 94vw"}}
+  </figure>
+</section>
+<section id="workbench" class="feature">
+  <div class="feature-text">
+    <h3 class="feature-title">Keep everything side by side.</h3>
+    <p>Pages, apps and code open in tabs beside the conversation. Split them, or find anything with ⌘K.</p>
+  </div>
+  <figure class="shot wide">
+    {{pic cmdk "The Cmd+K palette over Main, searching lis: Lisbon: four days (page), Lisbon: route sketch (whiteboard), Lisbon trip in March (conversation), Book club: reading list (page), and Ask Atlas." "(min-width: 1180px) 1100px, 94vw"}}
+  </figure>
+</section>
+<section id="voice" class="feature">
+  <div class="feature-text">
+    <h3 class="feature-title">Speaking is faster than typing.</h3>
+    <p>Dictate into any message, page or comment and the text appears as you speak, with the audio saved as you go. Record a meeting and turn it into notes with decisions and to-dos.</p>
+    <p class="fine">Dictation and recordings are transcribed by the voice service you choose in Settings. Recorded Zoom, Meet and FaceTime calls are transcribed on your Mac with WhisperKit by default.</p>
+  </div>
+  <figure class="shot wide">
+    {{pic item-recording "The recording Kitchen walkthrough with the contractor: 8 minutes and 149 words, a Summary toggle, Open notes and Update notes, the player, and the transcript with a timestamp on each line." "(min-width: 1180px) 1100px, 94vw"}}
+  </figure>
+  <div class="grid two">
+    <figure class="shot">
+      {{pic item-notes "The notes page made from the walkthrough: Decisions (quartz counters, keep the cabinet boxes, the sink stays), To do (pick a countertop slab by Friday, confirm the start date, ask for the electrical quote) and a table of numbers." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>Notes from a meeting</strong></figcaption>
+    </figure>
+    <figure class="shot">
+      {{pic item-dictation "A dictation's own page: the title Reply to the contractor, its length and word count, Keep as a recording, the player and the dictated text." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>A dictation</strong></figcaption>
+    </figure>
+  </div>
+</section>
+<section id="platform" class="pillar">
+  <p class="eyebrow">Platform</p>
+  <h2>Apps, not just answers.</h2>
+  <p>When you need a tracker or a dashboard, your Bot builds it as an app that you keep and reopen. Underneath is bb, which supplies the providers, the plugins and the threads that talk to each other.</p>
+</section>
+
+<section id="apps" class="feature">
+  <div class="feature-text">
+    <h3 class="feature-title">Ask for a tracker and your Bot builds one you can keep.</h3>
+    <p>Apps run beside the chat, in a page or in their own tab, from a small tracker to a live dashboard, and they keep their own data for next time.</p>
+  </div>
+  <figure class="shot wide">
+    {{pic item-dashboard "The dashboard orbit-web health: stat tiles for weekly active teams, sync conflicts and p95 search with sparklines, a gauge for the 2.4 checklist, a line chart of errors per thousand sessions, a bar chart of beta teams by plan, a table of open beta issues and a note for this week." "(min-width: 1180px) 1100px, 94vw"}}
+  </figure>
+  <div class="grid two">
+    <figure class="shot">
+      {{pic item-mini "The mini app Beta feedback in its own tab: five feedback items with vote buttons, an area label and a status (planned, fixed or new), and a field to add feedback." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>A tracker</strong></figcaption>
+    </figure>
+    <figure class="shot">
+      {{pic item-artifact "The artifact 2.4 release timeline open in a tab: four milestones on a line, from Beta opens on Oct 30 to 2.4 for everyone on Nov 14." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>A saved timeline</strong></figcaption>
+    </figure>
+  </div>
+</section>
+<section id="also" class="pillar">
+  <p class="eyebrow">Also in BB Studio</p>
+</section>
 
 <section id="library" class="feature">
   <div class="feature-text">
-    <h2>Find anything you've made.</h2>
+    <h3 class="feature-title">Find anything you have made.</h3>
     <p>The Library keeps every page, design, whiteboard and app in one place, searchable down to the content.</p>
   </div>
   <figure class="shot wide">
     {{pic item-collection "The Library for Atlas: a search field, kind filters (All, Page, Whiteboard, Design, App, Artifact) and the items made by you: notes from the kitchen walkthrough, the 2.4 rollout whiteboard, the launch plan page, the orbit-web health dashboard, the Beta feedback app and two artifacts." "(min-width: 1180px) 1100px, 94vw"}}
   </figure>
 </section>
-
 <section id="accounts" class="feature">
   <div class="feature-text">
-    <h2>All your accounts, one glance.</h2>
-    <p>See every sign-in, its limits and what is running on it. When one runs low, switch with one click.</p>
+    <h3 class="feature-title">See all your accounts at a glance.</h3>
+    <p>Every sign-in, its limits and the work running on it. When one runs low, switch with one click.</p>
   </div>
   <figure class="shot accounts">
     {{pic accounts "Accounts open from the sidebar footer: two Claude accounts and one Codex account, each with its status, its 5-hour and 7-day windows as bars with reset times, and the threads that used it." "(min-width: 900px) 460px, 94vw"}}
   </figure>
 </section>
-
 <section id="themes" class="feature">
   <div class="feature-text">
-    <h2>Make it yours.</h2>
-    <p>Nine living scenes, eight classic themes, and a presence for every Bot that shows what it's doing.</p>
+    <h3 class="feature-title">Make it yours.</h3>
+    <p>Nine living scenes, eight classic themes, and a presence for every Bot that shows what it is doing.</p>
   </div>
   <div class="grid themes">
     {{theme theme-miami-1985 "Miami 1985" "A striped sun, palms and a neon grid."}}
@@ -246,11 +255,10 @@
     </figure>
   </div>
 </section>
-
 <section id="iphone" class="feature">
   <div class="feature-text">
-    <h2>Your Bots, in your pocket.</h2>
-    <p>Chat, approve and reply from your iPhone. The app is in testing through TestFlight.</p>
+    <h3 class="feature-title">Chat, approve and reply from your iPhone.</h3>
+    <p>The iPhone app is in testing through TestFlight.</p>
   </div>
   <div class="grid three phones">
     <figure class="shot phone">
@@ -264,20 +272,18 @@
     </figure>
   </div>
 </section>
-
-<section id="philosophy" class="feature">
+<section id="bb" class="feature">
   <div class="feature-text">
-    <h2>Built on bb, with opinions.</h2>
-    <p><a href="https://getbb.app/">bb</a> is an excellent agentic IDE. BB Studio takes it in one direction: a few agents that know you, and the things you make together kept right beside the conversations that made them.</p>
+    <h2>Built on bb</h2>
+    <p><a href="https://getbb.app/">bb</a> is a metaharness: one app that runs many coding agents and providers. bb supplies the providers, the plugins and the threads that talk to each other. BB Studio is a very opinionated fork of the excellent bb: it adds a way of working on top.</p>
   </div>
 </section>
 
 <section id="download" class="feature download">
   <div class="feature-text">
     <h2>Get BB Studio</h2>
-    <p>For macOS. Free and open source under the MIT License.</p>
-    <p data-release-status><strong>Coming soon.</strong></p>
-    <p data-release-link hidden><a class="button" href="https://github.com/patleeman/bb-studio/releases/latest">Download <span data-release-name>the latest release</span></a></p>
+    <p>Free for macOS.</p>
+    <p><a class="button" href="https://github.com/patleeman/bb-studio/releases/latest">Download for macOS</a></p>
   </div>
 </section>
 

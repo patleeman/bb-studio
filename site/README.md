@@ -2,14 +2,14 @@
 
 The public showcase site for BB Studio: one static page, plain HTML and CSS with a few lines of JavaScript. It has no framework, no external fonts or CDNs, and no trackers.
 
-It is built and deployed by `.github/workflows/pages.yml` to GitHub Pages at `https://patleeman.github.io/bb-studio/`. For now that workflow runs only by hand (`workflow_dispatch`): the site goes public when Patrick says so. Every URL in the build is relative, so the same build works under `/bb-studio/`, at a domain root, and from a local server.
+It is built and deployed by `.github/workflows/pages.yml` to GitHub Pages at `https://patleeman.github.io/bb-studio/`. The workflow runs only by hand (`workflow_dispatch`). Every URL in the build is relative, so the same build works under `/bb-studio/`, at a domain root, and from a local server.
 
 ## Layout
 
 | Path | What |
 |---|---|
 | `src/index.html` | The page. `{{pic}}`, `{{theme}}`, `{{clip}}` and `{{srcset}}` tags expand at build time. |
-| `src/styles.css`, `src/site.js` | Styles, and the script that plays the scene clips while they are on screen (never under reduced motion) and fills in the download link. |
+| `src/styles.css`, `src/site.js` | Styles, and the script that plays the scene clips while they are on screen (never under reduced motion). |
 | `src/fonts/` | Jost (SIL OFL 1.1, license beside it), the font BB Studio bundles for Miami 1985's headings. |
 | `assets/img/`, `assets/video/` | The optimized screenshots (AVIF and WebP at several widths) and clips (WebM and MP4). Generated; do not edit. |
 | `scripts/` | The demo seeding (`demo-data.mjs`, `demo-features.mjs`), capture, image and build scripts. |
@@ -17,7 +17,7 @@ It is built and deployed by `.github/workflows/pages.yml` to GitHub Pages at `ht
 
 ## Download
 
-The Download section says "Coming soon". `site.js` asks GitHub for `repos/patleeman/bb-studio/releases/latest`, which returns only a published, non-prerelease release (drafts never), and then links its DMG, or the release page. That request is the page's only one to another site.
+The Download buttons link to `https://github.com/patleeman/bb-studio/releases/latest`. The page makes no request to another site.
 
 ## Build and preview
 
