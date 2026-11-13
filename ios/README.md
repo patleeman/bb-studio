@@ -533,12 +533,18 @@ found"). `TEST_RUNNER_STEP9_OUT` keeps its PNGs.
 `StudioPagingUITests` swipes Studio between its kinds and drags an item row
 partway open (`/tmp/qa-studio-paging-*.png`).
 
+The Duo UI tests (`Duo*UITests`, `HeaderTapUITests`, `TranscriptTapDismissUITests`)
+run on an iPhone Duo simulator, which needs the iOS 27.1 runtime; the Duo isn't
+offered on 27.0. `simctl io … screenshot` on it needs `--display=primary`.
+
 Unit tests use a private simulator clone:
 
 ```sh
 export BB_TEST_SIMULATOR_ID=<your-private-simulator-id>
-scripts/test.sh
+scripts/test.sh -skip-testing:BBStudioTests/TranscriptReplayTests/testReplayOnTheDuoOuterScreen
 ```
+
+That replay hangs on iOS 27.0 (BUGS.md B3), so runs skip it.
 
 On Apple silicon the simulator receives real (sandbox) pushes once you allow
 notifications, including through the notification extension.
