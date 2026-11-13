@@ -139,6 +139,48 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.collectionViews["BotSpaceList"].buttons["conversation-thr_demo_lisbon"].waitForExistence(timeout: 15), "back in the list")
     }
 
+    func testSlowMemoryAndLibraryLoadThroughTheBotFlip() {
+        launch(["-qaDemoPageLatency", "2500", "-qaDemoCachedBot"])
+        openPage("memory")
+        XCTAssertTrue(app.navigationBars["Memory"].waitForExistence(timeout: 5))
+        XCTAssertFalse(any("memoryProfile").exists, "still loading while the answer is slow")
+        shot("slow-memory-loading")
+        XCTAssertTrue(any("memoryProfile").waitForExistence(timeout: 20), "Memory loads after the Bot's id changes under it")
+        XCTAssertTrue(app.buttons["memory-record-mem_3"].waitForExistence(timeout: 20), "and its records")
+        XCTAssertFalse(app.activityIndicators.firstMatch.exists, "no spinner left")
+        shot("slow-memory-loaded")
+        app.navigationBars["Memory"].buttons.element(boundBy: 0).tap()
+        openPage("library")
+        XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'library-row-'")).firstMatch.exists,
+                       "still loading while the answer is slow")
+        shot("slow-library-loading")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'library-row-'")).firstMatch
+            .waitForExistence(timeout: 20), "the Library loads")
+        XCTAssertFalse(app.activityIndicators.firstMatch.exists, "no spinner left")
+        shot("slow-library-loaded")
+    }
+
+    func testAFailedLoadShowsRetryAndRetryLoads() {
+        launch(["-qaDemoPageLatency", "800", "-qaDemoPageFail", "memory,library"])
+        openPage("memory")
+        let retry = app.buttons["Retry"].firstMatch
+        XCTAssertTrue(retry.waitForExistence(timeout: 15), "an error with Retry, not a spinner")
+        XCTAssertTrue(app.staticTexts["Memory didn't load"].exists)
+        shot("memory-error-retry")
+        retry.tap()
+        XCTAssertTrue(any("memoryProfile").waitForExistence(timeout: 15), "Retry loads Memory")
+        app.navigationBars["Memory"].buttons.element(boundBy: 0).tap()
+        openPage("library")
+        let libraryRetry = app.buttons["Retry"].firstMatch
+        XCTAssertTrue(libraryRetry.waitForExistence(timeout: 15), "an error with Retry, not a spinner")
+        XCTAssertTrue(app.staticTexts["The library didn't load"].exists)
+        shot("library-error-retry")
+        libraryRetry.tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'library-row-'")).firstMatch
+            .waitForExistence(timeout: 15), "Retry loads the Library")
+    }
+
     private func shot(_ name: String) {
         guard let folder = ProcessInfo.processInfo.environment["STEP8_OUT"] else { return }
         sleep(1)

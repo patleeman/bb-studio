@@ -4,7 +4,7 @@ Reported 2026-10-17: in a long, busy thread (hundreds of turns, large Markdown
 tables in tool output, about 20 background-task notifications within a couple
 of minutes), typing in the composer lagged and the phone got warm until the
 burst ended. Fixed on a side branch then (bb-studio 806bcb96), and ported to
-the UIKit transcript on 2026-11-12 (BUGS.md B12).
+the UIKit transcript on 2026-11-12.
 
 ## Causes
 

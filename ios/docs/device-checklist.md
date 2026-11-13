@@ -2,7 +2,7 @@
 
 Run on the iPhone (and the Duo where marked) with the 0.2.0 TestFlight build,
 against the live BB with the current Studio and Mobile plugins. Tick each box;
-note the build number and anything that fails in BUGS.md.
+note the build number and anything that fails.
 
 Build: ________  Phone: ________  Duo: ________  Date: ________
 

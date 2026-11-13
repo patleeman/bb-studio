@@ -515,7 +515,15 @@ its PNGs.
 filter, a record's edit and a new record; Library's groups, folding, Kind
 filter and a design opening; Todos and Automations; Archive's Failed filter,
 a finished conversation's summary, and Reopen bringing it back to the list.
-`TEST_RUNNER_STEP8_OUT` keeps its PNGs.
+It also covers a slow network: `-qaDemoPageLatency <ms>` delays `memory.*`,
+`bot_library` and `bot_threads_older`; `-qaDemoCachedBot` starts from a
+cached Bot list whose Bot has an older id, then swaps in the loaded one while
+the first page is loading. `-qaDemoPageFail memory,library` fails each of
+those calls once, so the page shows its error with Retry. Each page loads
+through `PageLoad` (`iOS/Bot/PageLoad.swift`). The load is keyed by server
+and Bot, it is not cancelled when the view is rebuilt, and it retries a
+cancellation it didn't ask for. It ends loaded or with an error, never
+spinning. `TEST_RUNNER_STEP8_OUT` keeps its PNGs.
 
 `ApprovalsUITests` checks worker approvals offline (`-qaSpacesDemo needs` with
 `-qaBotDemo chat`; `BotSpacesDemo.State` answers `bot_conversation_approvals`
@@ -543,7 +551,7 @@ export BB_TEST_SIMULATOR_ID=<your-private-simulator-id>
 scripts/test.sh -skip-testing:BBStudioTests/TranscriptReplayTests/testReplayOnTheDuoOuterScreen
 ```
 
-That replay hangs on iOS 27.0 (BUGS.md B3), so runs skip it.
+That replay hangs on iOS 27.0, so runs skip it.
 
 On Apple silicon the simulator receives real (sandbox) pushes once you allow
 notifications, including through the notification extension.
@@ -592,7 +600,7 @@ notifications, including through the notification extension.
       scripts/testflight.sh --dry-run       # unsigned Release archive
       ```
    The build number is the UTC time, so each upload is newer than the last.
-   Upload only when Patrick asks for a build: batch changes into one upload,
+   Upload only when the owner asks for a build: batch changes into one upload,
    not one per commit. Apple caps uploads per day, and each build means a new
    install. To try a change on the phone meanwhile, use the Debug install above.
    Internal testers (you) get builds without App Review. TestFlight builds use

@@ -14,7 +14,9 @@ enum BotSpacesDemo {
         guard variant != nil else { return }
         let state = State.shared
         let previous = BBClient.demoTransport
+        let pages = PageQA.shared
         BBClient.demoTransport = { method, path, body in
+            try await pages.delay(path)
             if let answer = state.respond(method, path, body) { return answer }
             if let previous { return try await previous(method, path, body) }
             throw URLError(.cannotConnectToHost)
@@ -25,7 +27,56 @@ enum BotSpacesDemo {
         for botId in ["bot_juniper", "bot_home", "bot_research"] {
             if let wire = try? decoder.decode(Studio.BotThreadsViewOutput.self, from: state.viewJSON(botId)) { views[botId] = BotThreadsView(wire) }
         }
-        store.seedForDemo(BotSpaces(spaces), views: views)
+        guard ProcessInfo.processInfo.arguments.contains("-qaDemoCachedBot"),
+              let cached = try? decoder.decode(Studio.BotSpacesOutput.self, from: Data(String(decoding: state.spacesJSON(), as: UTF8.self)
+                  .replacingOccurrences(of: "bot_juniper", with: "bot_cached_before_cutover").utf8))
+        else { return store.seedForDemo(BotSpaces(spaces), views: views) }
+        var cachedViews = views
+        cachedViews["bot_cached_before_cutover"] = views["bot_juniper"]
+        store.seedForDemo(BotSpaces(cached), views: cachedViews)
+        pages.firstPage = {
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(300))
+                store.seedForDemo(BotSpaces(spaces), views: views)
+            }
+        }
+    }
+
+    final class PageQA: @unchecked Sendable {
+        static let shared = PageQA()
+        let latency: Int?
+        private let failing: Set<String>
+        private let lock = NSLock()
+        private var failed: Set<String> = []
+        private var started = false
+        var firstPage: (() -> Void)?
+
+        init(arguments: [String] = ProcessInfo.processInfo.arguments) {
+            func value(_ flag: String) -> String? {
+                arguments.firstIndex(of: flag).flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
+            }
+            latency = value("-qaDemoPageLatency").flatMap(Int.init)
+            failing = Set((value("-qaDemoPageFail") ?? "").split(separator: ",").map(String.init))
+        }
+
+        static func page(_ path: String) -> String? {
+            if path.contains("/rpc/memory.") { return "memory" }
+            if path.hasSuffix("/rpc/bot_library") { return "library" }
+            if path.hasSuffix("/rpc/bot_threads_older") { return "archive" }
+            return nil
+        }
+
+        func delay(_ path: String) async throws {
+            guard let page = Self.page(path) else { return }
+            let first = lock.withLock { () -> (() -> Void)? in
+                defer { started = true }
+                return started ? nil : firstPage
+            }
+            first?()
+            if let latency { try await Task.sleep(for: .milliseconds(latency)) }
+            let fail = lock.withLock { failing.contains(page) && failed.insert(path).inserted }
+            if fail { throw URLError(.timedOut) }
+        }
     }
 
     final class State: @unchecked Sendable {
