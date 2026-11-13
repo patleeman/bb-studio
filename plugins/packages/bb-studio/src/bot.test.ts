@@ -90,7 +90,7 @@ async function setup(migrations = MIGRATIONS) {
   const userSkillsDir = await mkdtemp(join(tmpdir(), "bot-skills-"));
   const memory = { exists: (id: string) => pages.has(id), create: (page: { title: string; markdown: string }) => { const id = `pg${++made}`; pages.set(id, page); return id; } };
   bots.current = new Bots({ db, sdk: bb.sdk, leads, changed: () => {}, presenceChanged: () => {}, memory, userSkillsDir });
-  return { send, clock, engine, scheduler, bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir, update, list, pending, replies };
+  return { send, clock, engine, scheduler, bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir, update, list, pending, replies, get };
 }
 
 /** What each check-in on Studio's scheduler sends when it runs: its key, the thread it wakes and the prompt after the marker. */
@@ -211,6 +211,42 @@ it("makes a second Bot with its own thread, check-in, memory, skills and handoff
   expect((await checkins(x)).map((each) => each.threadId)).toEqual([threadId]);
   expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("t1");
   await expect(x.bots.setThread(threadId)).rejects.toThrow(/Scout/);
+});
+
+it("gives a Bot whose Main was deleted a new, empty Main that its check-in follows, and leaves a Main that is there alone", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const id = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!.id;
+  await x.bots.setRun({ botId: id, enabled: true, cadence: "daily", time: "07:30" });
+  const spawned = x.spawn.mock.calls.length;
+  expect(await x.bots.restoreMains()).toEqual([]);
+  expect(x.spawn.mock.calls.length).toBe(spawned);
+
+  x.threads.delete("t2");
+  x.get.mockRejectedValueOnce(new Error("socket hang up"));
+  expect(await x.bots.restoreMain(id, "t2")).toBeNull();
+  expect(x.bots.stored(id)?.threadId).toBe("t2");
+
+  const [made] = await Promise.all([x.bots.restoreMain(id, "t2"), x.bots.restoreMains()]);
+  expect(x.spawn.mock.calls.length).toBe(spawned + 1);
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: PERSONAL_PROJECT_ID, title: "Scout", pluginMetadata: { bot: id }, input: [] }));
+  expect(x.bots.stored(id)?.threadId).toBe(made);
+  expect(x.bots.forThread(made!)?.id).toBe(id);
+  expect(await checkins(x)).toEqual([{ key: `bot:${id}`, threadId: made, prompt: botHeartbeat("Scout") }]);
+  expect(await x.bots.restoreMain(id, "t2")).toBeNull();
+
+  x.threads.set("t1", { ...x.threads.get("t1")!, deletedAt: 9 });
+  expect((await x.bots.get()).bot?.threadId).toBeNull();
+  const primary = await x.bots.restoreMain(BOT_ID, "t1");
+  expect(primary).toBeTruthy();
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe(primary);
+  expect(x.bots.list().map((bot) => bot.name)).toEqual(["Dot", "Scout"]);
+
+  await x.bots.pause(id);
+  x.threads.delete(made!);
+  const copy = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, importedAt: () => Date.now() });
+  expect(await copy.restoreMain(id, made!)).toBeNull();
+  expect(x.bots.stored(id)?.threadId).toBe(made);
 });
 
 it("keeps a drawn avatar and a role it's told, with the emoji as a fallback", async () => {

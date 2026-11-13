@@ -39,6 +39,7 @@ import { EXTERNAL_PROVIDERS, externalName, externalNote } from "./external-provi
 export { EXTERNAL_AGENTS_PLUGIN_ID, EXTERNAL_PROVIDERS, externalNote } from "./external-providers";
 import { BOT_RUN_PREFIX, heartbeatCron, PERSONAL_PROJECT_ID, type ProjectLeads } from "./project-lead";
 import { BOT_SHAPES } from "./bot-shapes";
+import { rpcErrorStatus } from "./kit/server/index";
 import { turnStartedAt } from "./turn-started";
 import { botAttention, pendingInteractions, threadWaitingFor, type BotAttention } from "./bot-attention";
 import { lineDiff, lintSkill } from "./skill-learning";
@@ -746,6 +747,58 @@ export class Bots {
     await this.claimChains();
     this.deps.changed();
     return next.id;
+  }
+
+  private readonly restoring = new Map<string, Promise<string | null>>();
+
+  restoreMain(botId: string, goneThreadId?: string): Promise<string | null> {
+    const pending = this.restoring.get(botId);
+    if (pending) return pending;
+    const run = this.replaceMain(botId, goneThreadId).finally(() => this.restoring.delete(botId));
+    this.restoring.set(botId, run);
+    return run;
+  }
+
+  async restoreMains(): Promise<string[]> {
+    const made: string[] = [];
+    for (const row of this.rows()) {
+      const threadId = await this.restoreMain(row.id).catch(() => null);
+      if (threadId) made.push(threadId);
+    }
+    return made;
+  }
+
+  private async replaceMain(botId: string, goneThreadId?: string): Promise<string | null> {
+    const row = this.row(botId);
+    if (!row || this.inBb(row)) return null;
+    const current = this.view(row).threadId;
+    const lost = goneThreadId ?? current;
+    if (!lost || (current !== lost && !(current === null && this.isPrimary(row)))) return null;
+    if (!(await this.threadGone(lost))) return null;
+    const preset = storedDefault(row);
+    const model = preset
+      ? { providerId: preset.providerId, model: preset.model, ...(preset.reasoning ? { reasoningLevel: preset.reasoning } : {}), executionInputSources: { providerId: "explicit", model: "explicit", ...(preset.reasoning ? { reasoningLevel: "explicit" } : {}) } }
+      : row.provider_id ? { providerId: row.provider_id } : {};
+    const thread = await this.deps.sdk.threads.spawn({ projectId: PERSONAL_PROJECT_ID, title: row.name, environment: { type: "project-default" }, pluginMetadata: { bot: row.id }, ...model, input: [] } as never);
+    if (this.isPrimary(row)) await this.deps.leads.setLead(PERSONAL_PROJECT_ID, thread.id);
+    else {
+      this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(thread.id, Date.now(), row.id);
+      const run = this.deps.leads.runs.get(this.runKey(row));
+      if (run?.enabled) await this.deps.leads.runs.set(this.runKey(row), thread.id, run);
+    }
+    await this.deps.automations?.follow(row.id).catch(() => {});
+    await this.claimChains();
+    this.deps.changed();
+    return thread.id;
+  }
+
+  private async threadGone(threadId: string): Promise<boolean> {
+    try {
+      const thread = await this.deps.sdk.threads.get({ threadId }) as { deletedAt?: number | null } | null;
+      return !thread || thread.deletedAt != null;
+    } catch (error) {
+      return rpcErrorStatus(error) === 404;
+    }
   }
 
   async set(input: { botId?: string; name?: string; avatar?: string; shape?: string | null; color?: string; role?: string }): Promise<BotView> {

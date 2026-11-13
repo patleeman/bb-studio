@@ -744,6 +744,12 @@ export default async function plugin(bb: BbPluginApi) {
       run: async (botId) => { await maintenance.run(botId); },
     },
   });
+  const restoreMainFailed = (error: unknown) => bb.log.warn(`Couldn't start a new Main: ${errorText(error)}`);
+  bb.events.on("thread.deleted", ({ thread }) => {
+    const bot = bots.list().find((each) => each.threadId === thread.id);
+    if (bot) void bots.restoreMain(bot.id, thread.id).catch(restoreMainFailed);
+  });
+  void bots.restoreMains().catch(restoreMainFailed);
   bb.rpc.register(scheduledContract, {
     "loops.scheduled": async ({ threadId }) => ({
       items: scheduledItems({

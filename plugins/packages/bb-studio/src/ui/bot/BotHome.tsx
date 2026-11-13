@@ -21,7 +21,7 @@ import { BOT_COLORS, BOT_SHAPES, botProvider, colorForName, DEFAULT_SHAPE, isBot
 import { BotFace } from "../../presence/ui/BotFace";
 import { Welcome } from "./Onboarding";
 import { useOpenThread } from "./workspace";
-import { botLanding, readLastBotThread, threadRoute } from "./threadListSwitch";
+import { botLanding, readLastBotThread, threadLocator } from "./threadListSwitch";
 import { BOT_PATH, botPath, forBot, rememberBot, useBotSelection } from "./selection";
 
 export { BOT_PATH };
@@ -104,13 +104,7 @@ function useBotLanding(bare: boolean, view: BotView | undefined): boolean {
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
-    const locate = async (threadId: string) => {
-      try {
-        const thread = await sdk.threads.get({ threadId }) as { id: string; projectId: string; deletedAt?: number | null };
-        return thread && !thread.deletedAt ? threadRoute(thread.id, thread.projectId) : null;
-      } catch { return null; }
-    };
-    void botLanding(readLastBotThread(), chatId, locate).then((target) => {
+    void botLanding(readLastBotThread(), chatId, threadLocator(sdk)).then((target) => {
       if (cancelled) return;
       if (!target) { setSettled(true); return; }
       window.history.replaceState(window.history.state, "", target.path);

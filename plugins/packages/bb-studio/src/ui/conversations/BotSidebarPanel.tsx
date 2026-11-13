@@ -23,7 +23,7 @@
 //   view goes to that Bot's last-open conversation, else its Main.
 // The server's view (bot_threads_view) and BB's live thread state are merged
 // in model.ts. The header and the switcher are marked no-drag.
-import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, experimental_useSidebarThreads, useBbNavigate, type PluginThreadActionTarget, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
+import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, experimental_useSidebarThreads, useBbNavigate, useSdk, type PluginThreadActionTarget, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type WheelEvent } from "react";
 import type { BotSpace } from "../../bot-threads-contract";
 import { Icon } from "../../kit/app/index";
@@ -47,6 +47,7 @@ import { setLinkActionHandler } from "../../links/actions";
 import { useMainViewRect } from "./EditSpaceStage";
 import { DefaultModelDialog } from "../bot/DefaultModel";
 import { newConversationPath } from "./new-conversation";
+import { botLanding, threadLocator } from "../bot/threadListSwitch";
 import { SpaceHeader, spaceLine, spacePageAt, type SpacePage } from "./SpaceHeader";
 import { useAppMode } from "./app-mode";
 import { accentOf } from "../../theme/engine";
@@ -176,6 +177,7 @@ export function SpaceDots({ bots, current, onSwitch, onNew, onEdit, accents, the
 
 export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThreadListProps, "onNavigate" | "activeThreadId">) {
   const navigate = useBbNavigate();
+  const sdk = useSdk();
   const call = useCall();
   const chosen = useCurrentBot();
   const spaces = useLive("bot_spaces", {}, { pollMs: 60_000 });
@@ -257,11 +259,15 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
     const space = bots.find((each) => each.id === botId);
     if (!space || space.id === bot?.id) return;
     setEditing(null);
-    const target = landingThread(space, lastConversation(botId), null);
-    stayOn.current = new Set([activeThreadId, target].filter((id): id is string => !!id));
+    const last = lastConversation(botId);
+    stayOn.current = new Set([activeThreadId, last, space.mainThreadId].filter((id): id is string => !!id));
     setCurrentBot(botId);
-    if (target) navigate.toThread(target);
-  }, [bots, bot?.id, navigate, activeThreadId]);
+    if (!last && !space.mainThreadId) return;
+    void botLanding(last, space.mainThreadId, threadLocator(sdk)).then((target) => {
+      if (target) navigate.toThread(target.threadId);
+      else navigate.toPluginPanel("studio", { subPath: `bot/${encodeURIComponent(botId)}` });
+    });
+  }, [bots, bot?.id, navigate, activeThreadId, sdk]);
 
   // "Studio: Show Bot <n>" (Ctrl+Option+1…9 by default, BB's own keybindings; app.tsx) while the sidebar is mounted.
   // BB keeps Ctrl+1…9 for its "Open thread <n>".

@@ -140,6 +140,13 @@ export async function botLanding(last: string | null, chatId: string | null, loc
   return null;
 }
 
+export const threadLocator = (sdk: { threads: { get(input: { threadId: string }): Promise<unknown> } }) => async (threadId: string): Promise<string | null> => {
+  try {
+    const thread = await sdk.threads.get({ threadId }) as { id: string; projectId: string; deletedAt?: number | null } | null;
+    return thread && !thread.deletedAt ? threadRoute(thread.id, thread.projectId) : null;
+  } catch { return null; }
+};
+
 /** Forgets this window's mode (tests: a fresh window). */
 export function forgetListMode(): void {
   try { sessionStorage.removeItem(MODE_KEY); } catch { /* private mode */ }
