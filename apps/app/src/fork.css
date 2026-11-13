@@ -248,11 +248,7 @@ html[data-fork-cards] {
   --fork-cards-composer-filter: blur(18px);
   --fork-cards-shadow: 0 14px 40px -14px
     color-mix(in oklab, var(--ink) 12%, transparent);
-  --fork-cards-composer-backing: linear-gradient(
-    to bottom,
-    transparent,
-    color-mix(in oklab, var(--canvas) 84%, transparent) var(--fork-cards-fade)
-  );
+  --fork-cards-composer-backing: none;
   --fork-cards-control-off: color-mix(in oklab, var(--ink) 30%, transparent);
   --fork-cards-icon-halo: drop-shadow(
       0 0 2px color-mix(in oklab, var(--canvas) 90%, transparent)
@@ -547,6 +543,15 @@ html[data-fork-cards]
     #000 var(--fork-cards-fade)
   );
   pointer-events: none;
+}
+
+html[data-fork-cards]
+  :where([data-sidebar="inset"], aside[data-surface-tone="sidebar"])
+  [data-scroll-footer] {
+  --surface-raised-solid: var(
+    --fork-surface-composer-background,
+    var(--surface-raised)
+  );
 }
 
 html[data-fork-cards] [data-fork-header-group] *,
