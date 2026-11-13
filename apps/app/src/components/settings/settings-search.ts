@@ -1,3 +1,4 @@
+import { SHOW_HOST_SETUP_GUIDE_ROW } from "@/views/settings-rows.fork";
 import type { IconName } from "@bb/shared-ui/icon";
 import type { PluginSettingsEntry } from "./plugin-settings-entries";
 import {
@@ -64,10 +65,10 @@ export const SETTINGS_SEARCH_INDEX: Record<
         title: "Show messages from before a context clear",
         keywords: ["history", "clear context"],
       },
-      {
+      ...(SHOW_HOST_SETUP_GUIDE_ROW ? [{
         title: "Setup guide",
         keywords: ["onboarding", "getting started", "welcome"],
-      },
+      }] : []),
       {
         title: "App links",
         keywords: [
