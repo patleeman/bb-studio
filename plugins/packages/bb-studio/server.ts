@@ -1,4 +1,5 @@
 import { registerWorkCards, WORK_TOOLS } from "./src/work/register";
+import { withToolLabel } from "./src/tool-labels";
 import { CONTINUE_TOOL, registerContinueNew } from "./src/continue-new";
 import { runWorkCli } from "./src/work/cli";
 import { registerLoops, LOOP_TOOLS, loopPushActions } from './src/loops/register';
@@ -229,7 +230,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool = ((tool: Parameters<typeof registerTool>[0]) => {
     const named = familyTool(withTagHint(tool as never, () => tagNames.list().map((tag) => tag.name)) as AgentTool, familyDeps);
     toolBook.add(named);
-    return registerTool(named as never);
+    return registerTool(withToolLabel(named) as never);
   }) as typeof bb.agents.registerTool;
   // Kinds built into Studio (docs/merging-add-ons.md); the hub calls them in-process.
   let appCards = false;
