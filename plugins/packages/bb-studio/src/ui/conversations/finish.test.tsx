@@ -18,8 +18,7 @@ vi.mock("../live", () => ({
 vi.mock("../thread-header", () => ({ useThreadLookup: () => new Map() }));
 vi.mock("../../kit/app/index", () => ({ Icon: () => null }));
 
-import { canFinish, FinishedCard, isFinished } from "./finish";
-import { finishThreadAction } from "./finish-action";
+import { FinishedCard, isFinished } from "./finish";
 
 const info = (over: Partial<BotThreadInfo>): BotThreadInfo => ({
   threadId: "prep", botId: "dot", botName: "Chief of Staff", kind: "conversation", isMain: false, title: "Launch prep", forkedFrom: null, owner: null, status: null, waitingOn: null, startedAt: 0,
@@ -43,24 +42,10 @@ beforeEach(() => {
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
 
-it("offers Finish on a conversation that isn't Main, a worker or already finished; Finishing… while it writes; off while it works", async () => {
-  expect(canFinish(info({}))).toBe(true);
-  expect(canFinish(info({ isMain: true }))).toBe(false);
-  expect(canFinish(info({ kind: "worker" }))).toBe(false);
-  expect(canFinish(info({ archivedAt: 5 }))).toBe(false);
+it("tells a finished conversation from one that was only archived", () => {
   expect(isFinished(info({ archivedAt: 5, finishedSummary: "x" }))).toBe(true);
   expect(isFinished(info({ archivedAt: 5 }))).toBe(false);
-  const finish = vi.fn(async () => {});
-  const item = (over: Partial<BotThreadInfo>, status = "idle") => finishThreadAction.item({ thread: { id: "prep", status } as never, data: { infos: new Map([["prep", info(over)]]), finish }, sdk: null as never, navigate: null as never, experimental_panel: null as never });
-  const action = item({})!;
-  expect(action).toMatchObject({ label: "Finish conversation", icon: "CircleCheck", disabled: false });
-  await action.run({} as never);
-  expect(finish).toHaveBeenCalledWith("prep");
-  expect(item({ finishing: true })).toMatchObject({ label: "Finishing…", disabled: true });
-  expect(item({}, "active")).toMatchObject({ disabled: true, detail: "Working" });
-  expect(item({ isMain: true })).toBeNull();
-  expect(item({ kind: "worker" })).toBeNull();
-  expect(finishThreadAction.placement ?? "menu").toBe("menu");
+  expect(isFinished(info({}))).toBe(false);
 });
 
 it("draws Main's card: the title, dates, the summary's sections and links back", async () => {
@@ -73,7 +58,7 @@ it("draws Main's card: the title, dates, the summary's sections and links back",
   state.finished = finished;
   await act(async () => { root.render(<FinishedCard {...directive("prep")} />); });
   const card = $('[data-testid="finished-card"]')!;
-  expect(card.querySelector("h3")?.textContent).toBe("Finished: Launch prep");
+  expect(card.querySelector("h3")?.textContent).toBe("Archived: Launch prep");
   expect(card.textContent).toContain("Nov 3 – Nov 10");
   expect([...card.querySelectorAll("h4")].map((each) => each.textContent)).toEqual(["Decisions", "Left open", "Made"]);
   expect([...card.querySelectorAll("li")].map((each) => each.textContent)).toEqual(["One 45-minute mock a day.", "Mock boards go next to their Breakdown page.", "Book a paid mock before Nov 20?"]);

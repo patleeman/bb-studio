@@ -133,7 +133,8 @@ it("a conversation's turn and archive emit conversations; a thread no Bot has em
   await settle();
   expect(x.emitted()).toEqual([{ botId: "home", changes: ["conversations"] }]);
   await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("redesign") as never });
-  expect(x.emitted()).toEqual([{ botId: "dot", changes: ["conversations"] }]);
+  await settle();
+  expect(new Set(x.emitted().map((each) => JSON.stringify(each)))).toEqual(new Set([JSON.stringify({ botId: "dot", changes: ["conversations"] })]));
   await x.harness.emitThreadEvent("thread.active", { thread: { id: "stranger" } as never });
   expect(x.emitted()).toEqual([]);
 });

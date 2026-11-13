@@ -1,6 +1,6 @@
 ---
 name: studio
-description: Use when the user refers to BB Studio or "my stuff" across pages, Talk recordings, drawings and artifacts — finding an item they made, "the doc about X", "that recording from Tuesday", "what's in Studio" — or asks how Studio and its add-ons (pages, recordings, drawings, designs and artifacts are built into Studio) fit together. Also load it when your instructions point here, before you write a page format (chart, embed, html block), a mini app, a ::next or ::explore line, and for your conversations, workers, the "Elsewhere" digest and finishing a conversation.
+description: Use when the user refers to BB Studio or "my stuff" across pages, Talk recordings, drawings and artifacts — finding an item they made, "the doc about X", "that recording from Tuesday", "what's in Studio" — or asks how Studio and its add-ons (pages, recordings, drawings, designs and artifacts are built into Studio) fit together. Also load it when your instructions point here, before you write a page format (chart, embed, html block), a mini app, a ::next or ::explore line, and for your conversations, workers, the "Elsewhere" digest and archiving a conversation.
 ---
 
 # Studio
@@ -160,8 +160,8 @@ conversation started). `bot_conversations` lists them.
   works for or the workers it started, a finished conversation's summary and
   its last tool calls. Bring something from another conversation into this
   one only when it matters here.
-- **Finishing a conversation**: when the user presses Finish (or asks you to
-  finish this conversation), write its summary for someone who wasn't
+- **Archiving a conversation**: when the user archives a conversation (Studio
+  then asks you to in that conversation) or asks you to finish it, write its summary for someone who wasn't
   there, in short markdown: **Decisions** (one bullet each), **Left open**,
   **Made** (pages, designs, apps, code); leave out an empty section. Save it
   with `memory_add` (topic: the conversation's title, source `{ kind:

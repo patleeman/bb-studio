@@ -1,6 +1,6 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
-import { fallbackSummary, FINISH_TIMEOUT_MS, finishInstruction, mainCard, registerBotFinish } from "./bot-finish";
+import { archiveQuietly, fallbackSummary, FINISH_TIMEOUT_MS, finishInstruction, mainCard, registerBotFinish } from "./bot-finish";
 import { BotThreads, type Signals, type ThreadFacts } from "./bot-threads";
 import { MIGRATIONS } from "./migrations";
 
@@ -10,7 +10,7 @@ afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 const SUMMARY = "**Decisions**\n- One 45-minute mock a day.\n\n**Left open**\n- Book a paid mock before Nov 20?";
 
 /** Dot (Main thr_main) with the conversation "prep" (Launch prep) and its worker "review". */
-async function setup() {
+async function setup(options: { isBotThread?: (threadId: string) => boolean } = {}) {
   const threads = new Map<string, ThreadFacts>([
     ["thr_main", { id: "thr_main", title: "Chief of Staff", createdAt: 1, status: "idle" }],
     ["prep", { id: "prep", title: "Launch prep", createdAt: 2, status: "idle" }],
@@ -37,7 +37,7 @@ async function setup() {
   await store.backfill();
   const records: { botId: string; topic: string; text: string; threadId: string; title: string; at: number }[] = [];
   const finish = registerBotFinish(bb, {
-    db, threads: store, mainOf: (botId) => (botId === "dot" ? "thr_main" : null),
+    db, threads: store, mainOf: (botId) => (botId === "dot" ? "thr_main" : null), isBotThread: options.isBotThread,
     memory: {
       add: (input) => { records.push({ ...input, at: now }); },
       count: (botId, threadId, since) => records.filter((each) => each.botId === botId && each.threadId === threadId && each.at >= (since ?? 0)).length,
@@ -53,7 +53,7 @@ it("sends the finishing turn into the conversation: a visible line and the agent
   expect(x.send).toHaveBeenCalledTimes(1);
   const input = (x.send.mock.calls[0]![0] as { threadId: string; input: { text: string; visibility?: string }[] });
   expect(input.threadId).toBe("prep");
-  expect(input.input[0]).toMatchObject({ text: "Finish this conversation." });
+  expect(input.input[0]).toMatchObject({ text: "Archive this conversation." });
   expect(input.input[1]).toMatchObject({ visibility: "agent-only", text: finishInstruction({ threadId: "prep", title: "Launch prep" }) });
   expect(input.input[1]!.text).toContain('memory_add: topic "Launch prep", the summary as text, source {"kind":"conversation","id":"prep","title":"Launch prep"}');
   expect(input.input[1]!.text).toContain("bot_finish_done");
@@ -85,11 +85,11 @@ it("bot_finish_done archives the conversation with its summary, posts the card t
   const post = x.send.mock.calls[0]![0] as { threadId: string; senderThreadId: string; input: { text: string; visibility?: string }[] };
   expect(post).toMatchObject({ threadId: "thr_main", senderThreadId: "prep" });
   expect(post.input[0]!.text).toBe(mainCard({ threadId: "prep", botId: "dot", title: "Launch prep", summary: SUMMARY }).text);
-  expect(post.input[0]!.text.split("\n")[0]).toBe("Finished “Launch prep” · summary saved");
+  expect(post.input[0]!.text.split("\n")[0]).toBe("Archived “Launch prep” · summary saved");
   expect(post.input[0]!.text).toContain("[Open the conversation](/threads/prep) · [See in Memory](/plugins/studio/studio/memory/dot)");
   expect(post.input[1]).toMatchObject({ visibility: "agent-only" });
   expect(post.input[1]!.text).toContain('::finished{thread="prep"}');
-  expect(x.store.get("thr_main")!.latest?.text).toBe("Finished “Launch prep” · summary saved");
+  expect(x.store.get("thr_main")!.latest?.text).toBe("Archived “Launch prep” · summary saved");
   // BB's archive waits for the turn to end.
   expect(x.archive).not.toHaveBeenCalled();
   x.threads.set("prep", { ...x.threads.get("prep")!, status: "idle" });
@@ -132,6 +132,43 @@ it("falls back after the timeout too, without a second memory record when the Bo
   expect(x.store.get("prep")!.archivedAt).not.toBeNull();
   expect(x.records).toHaveLength(1);
   expect(x.store.get("prep")!.finishedSummary).toMatch(/^\*\*Last replies\*\*/);
+});
+
+it("archiving a conversation in BB starts the same summary step; Main, a worker and a quiet archive don't", async () => {
+  const x = await setup();
+  await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never });
+  await vi.waitFor(() => expect(x.send).toHaveBeenCalledTimes(1));
+  const input = x.send.mock.calls[0]![0] as { threadId: string; input: { text: string; visibility?: string }[] };
+  expect(input.threadId).toBe("prep");
+  expect(input.input[0]).toMatchObject({ text: "Archive this conversation." });
+  expect(input.input[1]!.text).toContain("memory_add");
+  await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never });
+  await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("thr_main") as never });
+  await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("review") as never });
+  await x.harness.callAgentTool("bot_finish_done", { summary: SUMMARY }, { threadId: "prep" });
+  expect((x.send.mock.calls.at(-1)![0] as { threadId: string }).threadId).toBe("thr_main");
+  await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never });
+  expect(x.send).toHaveBeenCalledTimes(2);
+});
+
+it("a quiet archive, or a Bot's own thread it handed off from, gets no summary step", async () => {
+  const x = await setup();
+  await archiveQuietly("prep", async () => { await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never }); });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(x.send).not.toHaveBeenCalled();
+  const y = await setup({ isBotThread: (threadId) => threadId === "prep" });
+  await y.harness.emitThreadEvent("thread.archived", { thread: y.threads.get("prep") as never });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(y.send).not.toHaveBeenCalled();
+});
+
+it("an archived conversation that can't take the turn gets Studio's summary, saved to memory and posted to Main", async () => {
+  const x = await setup();
+  x.send.mockRejectedValueOnce(new Error("archived"));
+  await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never });
+  await vi.waitFor(() => expect(x.store.get("prep")!.finishedSummary).toMatch(/^\*\*Last replies\*\*/));
+  expect(x.records).toMatchObject([{ threadId: "prep", topic: "Launch prep" }]);
+  expect((x.send.mock.calls.at(-1)![0] as { threadId: string }).threadId).toBe("thr_main");
 });
 
 it("reopens a finished conversation: back in the sidebar and unarchived in BB, the summary kept", async () => {

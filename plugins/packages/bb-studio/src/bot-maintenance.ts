@@ -4,6 +4,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import { scheduleKey, type EngineScheduler } from "./triggers/scheduler";
+import { archiveQuietly } from "./bot-finish";
 
 type Sdk = BbPluginApi["sdk"];
 type Thread = Awaited<ReturnType<Sdk["threads"]["list"]>>[number];
@@ -236,7 +237,7 @@ export class BotMaintenance {
         // BB archives a thread's children with it: wait until none are left open.
         if ([...listed.values()].some((t) => t.parentThreadId === id && !t.archivedAt && !archiving.has(t.id))) continue;
         archiving.add(id);
-        await act(`Archive ${worker ? "worker" : "thread"}: ${thread.title || id}`, () => this.deps.sdk.threads.archive({ threadId: id }));
+        await act(`Archive ${worker ? "worker" : "thread"}: ${thread.title || id}`, () => archiveQuietly(id, () => this.deps.sdk.threads.archive({ threadId: id })));
         if (worker) workers++; else archived++;
       }
       if (settings.rules.automations) {

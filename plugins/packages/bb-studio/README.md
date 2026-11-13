@@ -299,7 +299,7 @@ or `forked_from_turn_id` (the last turn a BB fork copied, from the fork's
 conversation: the one whose thread spawned it, else Main); `title` (one
 given in Studio, else BB's); `archived_at` (out of the sidebar, still
 searchable); `finished_summary` (what a finished conversation decided, see
-Finishing a conversation);
+Archiving a conversation);
 `needs_you_reason`, `needs_you_at`, `needs_you_source` (why a conversation
 needs you, and who raised it); `latest`, `latest_at` (the latest reply's
 first line); `source` (`backfill`, `created`, `reconciled` or `user`). Table
@@ -449,37 +449,38 @@ conversations and workers are doing. Nothing shows on screen for it.
   conversation's summary, its latest reply and its last 8 tool calls (read
   from BB's events with a 2.5 s limit). Another Bot's thread is refused.
 
-### Finishing a conversation
+### Archiving a conversation
 
-**Finish conversation** is in a conversation's thread menus: its sidebar
-row's right-click menu and the ··· menu of its header (not Main, not a
-worker, and not while it is working). It (`src/bot-finish.ts`):
+Archiving a conversation (BB's **Archive** anywhere: its sidebar row, its
+header's ··· menu, or the iOS app) keeps its summary. There is no separate
+Finish item. Studio (`src/bot-finish.ts`):
 
-1. sends one last turn into the conversation, "Finish this conversation.",
+1. sends one last turn into the conversation, "Archive this conversation.",
    with agent-only steps: write a summary (**Decisions**, **Left open**,
    **Made**), save it with `memory_add` (topic: the conversation's title;
    source `{ kind: "conversation", id, title }`), then call
-   `bot_finish_done { summary }`. The menu reads "Finishing…" meanwhile.
-2. When `bot_finish_done` arrives, the conversation is archived
-   (`bot_threads.archived_at`, `finished_summary`; BB's own archive follows
-   once its turn is over), and Main gets the summary from the conversation,
-   with an agent-only note that has the Bot reply with the card
-   `::finished{thread="thr_…"}`: "✓ Finished: <title>", its dates, the
+   `bot_finish_done { summary }`.
+2. When `bot_finish_done` arrives, the conversation is marked finished
+   (`bot_threads.archived_at`, `finished_summary`; BB archives it again if
+   the turn brought it back), and Main gets the summary from the
+   conversation, with an agent-only note that has the Bot reply with the card
+   `::finished{thread="thr_…"}`: "✓ Archived: <title>", its dates, the
    summary's sections, **Open the conversation** and **See in Memory**, and
-   how many memory records cite it. Main's row reads "Finished “<title>” ·
-   summary saved".
-3. If the turn ends or fails without `bot_finish_done`, or nothing happens
-   for 10 minutes, Studio finishes it with a summary made of the last three
-   replies, and saves that to memory unless the Bot already saved a record
-   from this conversation.
+   how many memory records cite it. Main's row reads "Archived “<title>” ·
+   summary saved". Older `::finished` cards in transcripts render the same
+   card.
+3. If the conversation can't take the turn, the turn ends or fails without
+   `bot_finish_done`, or nothing happens for 10 minutes, Studio writes a
+   summary from the last three replies, saves it to memory unless the Bot
+   already saved a record from this conversation, and posts it to Main.
 
-You can also ask in the conversation ("finish it"): the Bot saves the summary
-and calls `bot_finish_done` itself. A finished conversation leaves the
-sidebar; Search and the Library still find it, and the older list has it
-under Finished. It opens read-only: "✓ Finished on <date>. Read-only." with
-**Reopen** where the composer goes (back in the sidebar, unarchived in BB;
-the summary stays). Finished conversations are kept indefinitely: nothing
-cleans them up (the plan's open question, decided as "keep").
+Main, workers, a Bot's earlier Main threads and the threads Maintenance
+archives on its own get no summary step. You can also ask in the
+conversation ("finish it"): the Bot saves the summary and calls
+`bot_finish_done` itself. An archived conversation with a summary opens
+read-only: "✓ Archived on <date>. Read-only." with **Reopen** where the
+composer goes (back in the sidebar, unarchived in BB; the summary stays).
+These conversations are kept indefinitely: nothing cleans them up.
 
 ### The Bot sidebar
 
@@ -1034,7 +1035,7 @@ never taken over or promoted. A conversation whose composer is replaced (Main mi
 bb, a finished conversation) keeps its workers line above the box. The
 "What next?" quick replies aren't drawn on a thread you can't write in (a
 worker, a mirror, a finished conversation). A **finished**
-conversation is read-only too, with "Finished on <date>" and **Reopen**. On the fork this is
+conversation is read-only too, with "Archived on <date>" and **Reopen**. On the fork this is
 `experimental_replace` on a composer customization; on a BB without it the
 same box is a composer banner and a style hides the composer's own input and
 buttons.
@@ -1401,8 +1402,9 @@ once, since signals sent while the socket was down are lost.
 - `bot_needs_you_set({ threadId, reason })` → `{ ok }`: marks a
   conversation as needing you with a reason, or clears it (null).
 - `bot_finish({ threadId })` → `{ state: "finishing" | "finished" |
-  "reopened" }`: starts Finish (see Finishing a conversation). Refused for
-  Main, a worker, an archived conversation and one that is working.
+  "reopened" }`: starts the summary step without archiving first (see
+  Archiving a conversation); the iOS app uses it. Refused for Main, a worker,
+  an archived conversation and one that is working.
 - `bot_reopen({ threadId })` → `{ ok }`: a finished conversation back in the
   sidebar, unarchived in BB; its summary stays.
 - `bot_finished({ threadId })` → `{ finished: { threadId, botId, title,

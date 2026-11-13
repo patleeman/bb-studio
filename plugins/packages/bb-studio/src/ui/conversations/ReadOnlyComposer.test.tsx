@@ -193,7 +193,7 @@ it("opens a finished conversation read-only, with when it was finished and Reope
   expect(readOnlyKind({ ...conversation, archivedAt: null, finishedSummary: "x" }, false)).toBeNull();
   await act(async () => { root.render(<ReadOnlyComposer threadId="done" />); });
   expect($('[data-testid="readonly-composer"]')?.dataset.studioReadonly).toBe("finished");
-  expect($('[data-testid="finished-box"]')?.textContent).toContain("Finished on Nov 10. Read-only.");
+  expect($('[data-testid="finished-box"]')?.textContent).toContain("Archived on Nov 10. Read-only.");
   await act(async () => { $('[data-testid="finished-reopen"]')!.click(); });
   expect(state.call).toHaveBeenCalledWith("bot_reopen", { threadId: "done" });
 });

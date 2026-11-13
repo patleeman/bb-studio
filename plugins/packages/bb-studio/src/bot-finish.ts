@@ -2,7 +2,7 @@
 // conversation"; mockup 6d). The conversation writes its own summary as a
 // memory record with a link back, and Main gets the card:
 //
-// 1. Finish (the row's menu, the conversation's ··· menu, or `bot_finish`)
+// 1. Archiving a conversation (BB's Archive anywhere, iOS, or `bot_finish`)
 //    sends one last turn INTO the conversation: write a summary of the
 //    decisions, what was left open and what was made; save it with
 //    memory_add (topic: the conversation, source: the conversation); call
@@ -12,14 +12,14 @@
 //    the conversation in Studio (bot_threads.archived_at, finished_summary),
 //    posts the summary to Main from the conversation with an agent-only note
 //    that has the Bot answer with the `::finished{thread="…"}` card, and
-//    sets Main's row to "Finished “<title>” · summary saved". BB's own
+//    sets Main's row to "Archived “<title>” · summary saved". BB's own
 //    archive follows once the conversation's turn is over.
 // 3. If the turn ends (or fails) without bot_finish_done, or nothing happens
 //    for FINISH_TIMEOUT_MS, Studio finishes it with a summary built from the
 //    conversation's last replies, and saves that to memory itself unless
 //    the Bot already saved a record from this conversation.
 // 4. A finished conversation is out of the sidebar; Search and the Library
-//    still find it. It opens read-only with "Finished on <date>" and Reopen
+//    still find it. It opens read-only with "Archived on <date>" and Reopen
 //    (bot_reopen: back in the sidebar, unarchived in BB). Finished
 //    conversations are kept indefinitely: nothing deletes them.
 //
@@ -48,7 +48,19 @@ interface Row {
   finished_at: number | null; via: string | null; bb_archive_pending: number;
 }
 
-/** Whether a conversation is being finished (its menu shows "Finishing…"). */
+const quietArchives = new Set<string>();
+
+export async function archiveQuietly(threadId: string, archive: () => Promise<unknown>): Promise<void> {
+  quietArchives.add(threadId);
+  try {
+    await archive();
+  } catch (error) {
+    quietArchives.delete(threadId);
+    throw error;
+  }
+}
+
+/** Whether a conversation is being finished. */
 export function isFinishing(db: Database.Database, threadId: string): boolean {
   return !!db.prepare("SELECT 1 FROM bot_finishes WHERE thread_id = ? AND state = 'finishing'").get(threadId);
 }
@@ -62,7 +74,7 @@ export function finishTopic(title: string): string {
 export function finishInstruction(input: { threadId: string; title: string }): string {
   const source = JSON.stringify({ kind: "conversation", id: input.threadId, title: input.title });
   return [
-    `Studio: the user is finishing this conversation (${JSON.stringify(input.title)}, ${input.threadId}). Do this now, in this turn:`,
+    `Studio: the user archived this conversation (${JSON.stringify(input.title)}, ${input.threadId}). Do this now, in this turn:`,
     `1. Write its summary for someone who wasn't here, in short markdown: "**Decisions**" with one bullet per decision, "**Left open**" with what is still undecided, "**Made**" with the pages, designs, apps or code it produced. Leave out an empty section.`,
     `2. Save it with memory_add: topic ${JSON.stringify(finishTopic(input.title))}, the summary as text, source ${source}.`,
     "3. Call bot_finish_done with the same summary.",
@@ -81,7 +93,7 @@ export function fallbackSummary(replies: readonly string[], latest: string | nul
 /** Main's message: the summary as the conversation's report, with links back. */
 export function mainCard(input: { threadId: string; botId: string; title: string; summary: string }): { text: string; note: string } {
   return {
-    text: [`Finished “${input.title}” · summary saved`, "", input.summary.trim(), "", `[Open the conversation](/threads/${input.threadId}) · [See in Memory](${memoryPath(input.botId)})`].join("\n"),
+    text: [`Archived “${input.title}” · summary saved`, "", input.summary.trim(), "", `[Open the conversation](/threads/${input.threadId}) · [See in Memory](${memoryPath(input.botId)})`].join("\n"),
     note: `Studio: the user finished the conversation ${JSON.stringify(input.title)} (${input.threadId}); its summary above is saved in your memory. Show it as a card: reply with exactly this line and nothing else:\n::finished{thread="${input.threadId}"}`,
   };
 }
@@ -112,6 +124,7 @@ export interface FinishDeps {
   threads: BotThreads;
   /** Every Bot's Main (its chat thread). */
   mainOf(botId: string): string | null;
+  isBotThread?(threadId: string): boolean;
   memory: FinishMemory;
   changed(changes: readonly BotChange[]): void;
   log(message: string): void;
@@ -155,16 +168,37 @@ export class BotFinish {
     if (this.state(threadId) === "finishing") return { state: "finishing" };
     const thread = await this.deps.sdk.threads.get({ threadId }).catch(() => null) as ThreadFacts | null;
     if (BUSY.has(thread?.status ?? "")) throw new Error("It's still working. Finish it when it's done.");
+    await this.begin(threadId, rec.botId);
+    return { state: "finishing" };
+  }
+
+  async archived(threadId: string): Promise<void> {
+    if (quietArchives.delete(threadId)) return;
+    const rec = this.deps.threads.get(threadId);
+    if (!rec || rec.kind !== "conversation" || rec.isMain || this.deps.isBotThread?.(threadId)) return;
+    const state = this.state(threadId);
+    if (state === "finishing" || state === "finished") return;
+    try {
+      await this.begin(threadId, rec.botId);
+    } catch (error) {
+      this.deps.log(`Finish: the archived conversation ${threadId} couldn't write its summary (${error instanceof Error ? error.message : String(error)}); Studio writes it.`);
+      await this.begin(threadId, rec.botId, false);
+      await this.fallback(threadId);
+    }
+  }
+
+  private async begin(threadId: string, botId: string, send = true): Promise<void> {
     const title = await this.titleOf(threadId);
     const now = this.now();
     this.deps.db.prepare(`INSERT INTO bot_finishes (thread_id, bot_id, title, state, requested_at, deadline_at, finished_at, via, bb_archive_pending) VALUES (?, ?, ?, 'finishing', ?, ?, NULL, NULL, 0)
       ON CONFLICT (thread_id) DO UPDATE SET bot_id = excluded.bot_id, title = excluded.title, state = 'finishing', requested_at = excluded.requested_at, deadline_at = excluded.deadline_at, finished_at = NULL, via = NULL, bb_archive_pending = 0`)
-      .run(threadId, rec.botId, title, now, now + FINISH_TIMEOUT_MS);
+      .run(threadId, botId, title, now, now + FINISH_TIMEOUT_MS);
+    if (!send) return;
     try {
       await this.deps.sdk.threads.send({
         threadId, mode: "auto",
         input: [
-          { type: "text", text: "Finish this conversation.", mentions: [] },
+          { type: "text", text: "Archive this conversation.", mentions: [] },
           { type: "text", text: finishInstruction({ threadId, title }), mentions: [], visibility: "agent-only" },
         ],
       } as never);
@@ -172,8 +206,7 @@ export class BotFinish {
       this.deps.db.prepare("DELETE FROM bot_finishes WHERE thread_id = ?").run(threadId);
       throw error;
     }
-    this.deps.changed([{ botId: rec.botId, kinds: ["conversations"] }]);
-    return { state: "finishing" };
+    this.deps.changed([{ botId: botId, kinds: ["conversations"] }]);
   }
 
   /**
@@ -199,7 +232,7 @@ export class BotFinish {
     })();
     const main = this.deps.mainOf(rec.botId);
     if (main) {
-      this.deps.threads.setLatest(main, `Finished “${row.title}” · summary saved`);
+      this.deps.threads.setLatest(main, `Archived “${row.title}” · summary saved`);
       const card = mainCard({ threadId, botId: rec.botId, title: row.title, summary: text });
       await this.deps.sdk.threads.send({
         threadId: main, mode: "auto", senderThreadId: threadId,
@@ -289,6 +322,7 @@ export function registerBotFinish(bb: Bb, deps: Omit<FinishDeps, "sdk">) {
   const later = (what: string, run: () => Promise<unknown>) => { void run().catch((error: unknown) => deps.log(`Finish (${what}): ${error instanceof Error ? error.message : String(error)}`)); };
   bb.events.on("thread.idle", ({ thread }) => later("idle", () => finish.ended(thread.id)));
   bb.events.on("thread.failed", ({ thread }) => later("failed", () => finish.ended(thread.id)));
+  bb.events.on("thread.archived", ({ thread }) => later("archived", () => finish.archived(thread.id)));
 
   bb.agents.registerTool({
     name: "bot_finish_done",

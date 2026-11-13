@@ -1017,6 +1017,7 @@ export default async function plugin(bb: BbPluginApi) {
   // Finishing a conversation (src/bot-finish.ts): its summary to memory, Main gets the card, then archived.
   const botFinish = registerBotFinish(bb, {
     db, threads: botThreads.store, mainOf: (botId) => bots.stored(botId)?.threadId ?? null,
+    isBotThread: (threadId) => bots.list().some((bot) => bots.chain(bot.id).includes(threadId)),
     memory: {
       add: ({ botId, topic, text, threadId, title }) => { memoryService.store.add({ botId, topic, text, source: { kind: "conversation", id: threadId, title, section: null } }); },
       count: (botId, threadId, since) => (db.prepare("SELECT COUNT(*) AS n FROM memory_records WHERE bot_id = ? AND source_id = ? AND created_at >= ?").get(botId, threadId, since ?? 0) as { n: number }).n,
