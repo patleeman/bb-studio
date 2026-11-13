@@ -731,6 +731,22 @@
     {
       "file": "apps/app/src/views/thread-detail/useThreadUnreadDividerState.test.ts",
       "title": "keeps the opening divider when the thread is marked read, and drops it after a watched reply"
+    },
+    {
+      "file": "apps/app/src/components/thread/timeline/ThreadTimelineRows.unread-divider.test.ts",
+      "title": "lands on the final answer of a flat turn that ran after the reader's prompt"
+    },
+    {
+      "file": "apps/app/src/components/thread/timeline/ThreadTimelineRows.unread-divider.test.ts",
+      "title": "skips thread setup rows above the work of a new thread"
+    },
+    {
+      "file": "apps/app/src/components/thread/timeline/ThreadTimelineRows.unread-divider.test.ts",
+      "title": "lands on the final answer of a collapsed turn the same way"
+    },
+    {
+      "file": "apps/app/src/components/thread/timeline/ThreadTimelineRows.unread-divider.test.ts",
+      "title": "lands on an error that ended the turn"
     }
   ],
   "removeLines": [
