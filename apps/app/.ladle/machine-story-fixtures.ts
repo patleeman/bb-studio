@@ -4,7 +4,9 @@ import type {
 } from "@bb/server-contract";
 import { machineServerAccessBlockedReason } from "../src/components/machines/machine-server-access";
 import type { MachineAccessState } from "../src/components/settings/MachineAccessSettings";
-import modalLogoUrl from "../../../plugins/environment-modal-sandbox/modal-logo.svg";
+
+const modalLogoUrl =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E";
 
 const noop = () => {};
 const noopAsync = async () => {};
