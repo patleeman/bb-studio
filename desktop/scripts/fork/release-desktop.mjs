@@ -18,6 +18,7 @@ import {
   parseStudioRelease,
   STUDIO_UPDATE_TEST_ENV,
 } from "../../apps/desktop/scripts/studio-release.fork.mjs";
+import { bumpProblems, foldVersion } from "./release-bump.mjs";
 import {
   caffeinateArgs,
   keychainProblem,
@@ -194,6 +195,12 @@ function generated(commit) {
       commit,
     ) !== ""
   );
+}
+
+function generatedCount(tip) {
+  let count = 0;
+  for (let commit = tip; generated(commit); commit = git(root, "rev-parse", `${commit}^`)) count += 1;
+  return count;
 }
 
 function handTip(tip) {
@@ -425,39 +432,29 @@ function bump(current, next) {
   );
   if (owner === "") fail(`no commit owns ${VERSION_FILE}`);
   if (DRY) {
-    plan(`fold version ${next} into "${owner}", sync.mjs --source desktop-release-work --onto ${base.slice(0, 10)} --candidate desktop-candidate --checks none`);
+    plan(`fold version ${next} into "${owner}" under the ${generatedCount(tip)} generated commits, sync.mjs --source desktop-release-work --onto ${base.slice(0, 10)} --candidate desktop-candidate --checks none`);
     return;
   }
-  const work = join(syncRoot, `release-bump-${next}`);
-  rmSync(work, { recursive: true, force: true });
-  run(root, "git", ["worktree", "add", "--quiet", "--detach", work, hand]);
-  const versionPath = join(work, VERSION_FILE);
-  const release = JSON.parse(readFileSync(versionPath, "utf8"));
-  release.version = next;
-  writeFileSync(versionPath, `${JSON.stringify(release, null, 2)}\n`);
-  run(work, "git", ["add", VERSION_FILE]);
-  run(work, "git", [
-    "commit",
-    "--quiet",
-    "-m",
-    `fixup! ${owner}\n\n${COAUTHOR}`,
-  ]);
-  run(
-    work,
-    "git",
-    [
-      "-c",
-      "rerere.enabled=false",
-      "rebase",
-      "--quiet",
-      "--autosquash",
-      "--interactive",
-      base,
-    ],
-    { env: { ...childEnv(), GIT_SEQUENCE_EDITOR: "true", GIT_EDITOR: "true" } },
-  );
-  run(work, "git", ["branch", "-f", "desktop-release-work", "HEAD"]);
-  run(root, "git", ["worktree", "remove", "--force", work]);
+  const folded = foldVersion({
+    repo: root,
+    tip,
+    base,
+    owner,
+    versionFile: VERSION_FILE,
+    version: next,
+    work: join(syncRoot, `release-bump-${next}`),
+    branch: "desktop-release-work",
+    coauthor: COAUTHOR,
+    env: childEnv(),
+  });
+  const problems = bumpProblems({
+    repo: root,
+    tip,
+    folded,
+    versionFile: VERSION_FILE,
+    generated: generatedCount(tip),
+  });
+  if (problems.length > 0) fail(problems.join("\n"));
   run(root, process.execPath, [
     "scripts/fork/sync.mjs",
     "--source",
@@ -579,7 +576,10 @@ function verifyApp(files, version) {
   ]) {
     if (!updateConfig.includes(line)) fail(`app-update.yml lacks "${line}"`);
   }
-  console.log(`  BB Studio.app is ${version}, ${bundleId}, feed github ${feed.owner}/${feed.repo}`);
+  if (existsSync(join(files.app, "Contents/Resources/desktop-control"))) {
+    fail("the app bundles desktop control (Contents/Resources/desktop-control): the HUD does not ship yet");
+  }
+  console.log(`  BB Studio.app is ${version}, ${bundleId}, feed github ${feed.owner}/${feed.repo}, no desktop control`);
 }
 
 function sign(files, version) {

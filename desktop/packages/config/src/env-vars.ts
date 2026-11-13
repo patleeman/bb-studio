@@ -453,8 +453,7 @@ export const DEFAULT_BB_EXTERNAL_URL = "";
 export const DEFAULT_BB_POSTHOG_API_KEY = "";
 export const DEFAULT_BB_TELEMETRY = false;
 export const DEFAULT_BB_DEV_APP_HOST = "";
-export const DEFAULT_BB_MARKETPLACE_URL =
-  "https://getbb.app/marketplace/v2/marketplace.json";
+export const DEFAULT_BB_MARKETPLACE_URL = "";
 export const DEFAULT_BB_CONNECT_GATE_KEYS_URL =
   "https://getbb.app/.well-known/bb-connect-gate-keys.json";
 export const DEFAULT_BB_FF_PLACEHOLDER = defaultFeatureFlags.placeholder;

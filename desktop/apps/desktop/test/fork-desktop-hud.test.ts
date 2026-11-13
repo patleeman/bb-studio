@@ -144,6 +144,7 @@ rl.on("line", (line) => {
   );
   chmodSync(helper, 0o755);
   process.env.BB_STUDIO_DESKTOP_CONTROL_DIR = dir;
+  process.env.BB_STUDIO_DESKTOP_HUD = "1";
   const { registerForkDesktopControlIpc } =
     await import("../src/fork-desktop-control.js");
   const ipc = {
@@ -156,6 +157,7 @@ rl.on("line", (line) => {
 afterAll(() => {
   delete process.env.BB_STUDIO_DESKTOP_CONTROL_DIR;
   delete process.env.BB_STUDIO_DESKTOP_CONTROL;
+  delete process.env.BB_STUDIO_DESKTOP_HUD;
   rmSync(dir, { recursive: true, force: true });
 });
 

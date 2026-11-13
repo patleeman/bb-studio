@@ -280,7 +280,7 @@ describe("first-run import from another bb data dir", () => {
     ).toBeNull();
   });
 
-  it("applies the optional import file: plugin folders to load from and which added plugins stay on", async () => {
+  it("applies the optional import file: plugin folders to load from and which added plugins stay on; bb account and bb connect come in off", async () => {
     const root = await makeSource();
     const source = join(root, "source");
     const target = join(root, "target");
@@ -323,6 +323,8 @@ describe("first-run import from another bb data dir", () => {
     };
     insert("studio", "path", "/old/studio");
     insert("other-tool", "path", "/old/other");
+    insert("bb-account", "builtin", "/old/bb-account");
+    insert("connect", "builtin", "/old/connect");
     seed.close();
     await writeFile(
       join(root, "target-import.json"),
@@ -347,7 +349,16 @@ describe("first-run import from another bb data dir", () => {
         "SELECT id, enabled, root_dir FROM plugins WHERE id IN ('studio', 'other-tool') ORDER BY id",
       )
       .all();
+    const getbb = db
+      .prepare(
+        "SELECT id, enabled, enabled_follows_default FROM plugins WHERE id IN ('bb-account', 'connect') ORDER BY id",
+      )
+      .all();
     db.close();
+    expect(getbb).toEqual([
+      { id: "bb-account", enabled: 0, enabled_follows_default: 0 },
+      { id: "connect", enabled: 0, enabled_follows_default: 0 },
+    ]);
     const imported = new Database(join(target, "bb.db"), { readonly: true });
     expect(
       imported

@@ -1133,8 +1133,14 @@ export function registerForkDesktopControlIpc(ipcMain: IpcMain): void {
   }
 }
 
+export const DESKTOP_HUD_ENV = "BB_STUDIO_DESKTOP_HUD";
+
+export function desktopHudEnabled(env: NodeJS.ProcessEnv): boolean {
+  return env[DESKTOP_HUD_ENV] === "1";
+}
+
 function registerDesktopControl(ipcMain: IpcMain): void {
-  if (process.platform !== "darwin") {
+  if (process.platform !== "darwin" || !desktopHudEnabled(process.env)) {
     ipcMain.handle(FORK_DESKTOP_CONTROL_CHANNEL, () => unsupportedState());
     return;
   }

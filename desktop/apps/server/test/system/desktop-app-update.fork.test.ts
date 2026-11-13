@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -26,9 +26,33 @@ function channelWith(info: DesktopAppUpdateInfo): DesktopUpdateChannel {
   };
 }
 
-async function serviceFor(info: DesktopAppUpdateInfo, serverVersion: string) {
+async function serviceFor(
+  info: DesktopAppUpdateInfo,
+  serverVersion: string,
+  pending: { from: string; to: string } | null = null,
+) {
   const dataDir = await mkdtemp(join(tmpdir(), "bb-studio-desktop-update-"));
   roots.push(dataDir);
+  if (pending !== null) {
+    await writeFile(
+      join(dataDir, "bb-desktop-app-update.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        lastResult: null,
+        pending: {
+          acknowledged: false,
+          finishedAt: new Date().toISOString(),
+          from: { commit: null, version: pending.from },
+          id: "update-1",
+          logTail: [],
+          message: null,
+          outcome: "failed",
+          phase: "prepare",
+          to: { commit: null, version: pending.to },
+        },
+      }),
+    );
+  }
   const service = createDesktopAppUpdateService({
     channel: channelWith(info),
     currentVersion: serverVersion,
@@ -87,5 +111,77 @@ describe("desktop-owned server update status in BB Studio", () => {
       reason: "fetch-failed",
       message: "No BB Studio release found.",
     });
+  });
+
+  it("records a Studio update as updated when the desktop restarts on the new Studio version", async () => {
+    const service = await serviceFor(
+      {
+        supported: true,
+        version: "1.0.2",
+        latestVersion: "1.0.2",
+        pendingVersion: null,
+        updateAvailable: false,
+        updateDownloaded: false,
+        downloadState: "idle",
+      },
+      "0.49.0",
+      { from: "1.0.1", to: "1.0.2" },
+    );
+    const status = await service.getStatus({ forceRefresh: false });
+    expect(status.lastResult).toMatchObject({
+      outcome: "updated",
+      message: null,
+      phase: null,
+      from: { version: "1.0.1" },
+      to: { version: "1.0.2" },
+    });
+  });
+
+  it("still flags a Studio update that restarted on the old version", async () => {
+    const service = await serviceFor(
+      {
+        supported: true,
+        version: "1.0.1",
+        latestVersion: "1.0.2",
+        pendingVersion: "1.0.2",
+        updateAvailable: true,
+        updateDownloaded: true,
+        downloadState: "downloaded",
+      },
+      "0.49.0",
+      { from: "1.0.1", to: "1.0.2" },
+    );
+    const status = await service.getStatus({ forceRefresh: false });
+    expect(status.lastResult).toMatchObject({
+      outcome: "failed",
+      phase: "startup",
+      message: "bb started 1.0.1 instead of 1.0.2.",
+    });
+  });
+
+  it("records the desktop's Studio version as the version an update starts from", async () => {
+    const service = await serviceFor(
+      {
+        supported: true,
+        version: "1.0.1",
+        latestVersion: "1.0.2",
+        pendingVersion: "1.0.2",
+        updateAvailable: true,
+        updateDownloaded: false,
+        downloadState: "failed",
+      },
+      "0.49.0",
+    );
+    await service.getStatus({ forceRefresh: false });
+    await service.apply({ runningThreads: { kind: "refuse" } });
+    await vi.waitFor(async () =>
+      expect(
+        (await service.getStatus({ forceRefresh: false })).lastResult,
+      ).toMatchObject({
+        outcome: "failed",
+        from: { version: "1.0.1" },
+        to: { version: "1.0.2" },
+      }),
+    );
   });
 });

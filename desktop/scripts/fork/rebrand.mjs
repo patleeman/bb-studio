@@ -53,6 +53,11 @@ const replacements = [
     `<meta name="apple-mobile-web-app-title" content="${NAME}" />`,
   ],
   [
+    "apps/desktop/src/main.ts",
+    'message: "Starting local services and opening the bb workspace.",\n        title: "Opening bb",',
+    `message: "Starting local services and opening ${NAME}.",\n        title: "Opening ${NAME}",`,
+  ],
+  [
     "apps/app/src/components/layout/AppLayout.tsx",
     '"/": { title: "bb" },',
     `"/": { title: "${NAME}" },`,
