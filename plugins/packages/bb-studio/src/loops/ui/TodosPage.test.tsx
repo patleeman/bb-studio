@@ -184,7 +184,7 @@ it("a deleted todo's tab says Not found, with its link", async () => {
   state.getError = null;
 });
 
-it("acts from the detail: Done, choose, Surface now, Take it back, Open thread, Nudge them and Undo", async () => {
+it("acts from the detail: Done, choose, Remind me now, Take it back, Open thread, Nudge them and Undo", async () => {
   await render();
   await openRow("Reply to Sam about the Q3 planning doc");
   await act(async () => buttonIn(detail()!, "Done").click());
@@ -193,7 +193,7 @@ it("acts from the detail: Done, choose, Surface now, Take it back, Open thread, 
   await act(async () => buttonIn(detail()!, "Hudson").click());
   expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_d", action: "choose", option: "Hudson" });
   await openRow("Call the plumber about the slow drain");
-  await act(async () => buttonIn(detail()!, "Surface now").click());
+  await act(async () => buttonIn(detail()!, "Remind me now").click());
   expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_c", surfaceNow: true });
   await openRow("Draft the Larkspur Q4 lead summary");
   await act(async () => buttonIn(detail()!, "Take it back").click());
@@ -210,11 +210,23 @@ it("acts from the detail: Done, choose, Surface now, Take it back, Open thread, 
   expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_x1", changes: { status: "surfaced" } });
 });
 
+it("names a todo's actions in plain words: Remind me now, Give to, Change when, Dismiss", async () => {
+  await render();
+  await openRow("Call the plumber about the slow drain");
+  const labels = [...detail()!.querySelectorAll("button")].map((each) => each.textContent?.trim());
+  expect(labels).toEqual(expect.arrayContaining(["Done", "Remind me now", "Snooze", "Give to", "Discuss", "Change when", "Dismiss"]));
+  for (const old of ["Surface now", "Hand off", "Change trigger", "Drop"]) expect(labels).not.toContain(old);
+  await act(async () => buttonIn(detail()!, "Dismiss").click());
+  expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_c", action: "drop" });
+  await act(async () => buttonIn(detail()!, "Chief of Staff").click());
+  expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_c", action: "hand_off", owner: "cos" });
+});
+
 it("changes a trigger from the detail to a phone place with Send to iPhone", async () => {
   await render();
   await openRow("Call the plumber about the slow drain");
-  await act(async () => buttonIn(detail()!, "Change trigger").click());
-  const form = tabHost.querySelector("form[aria-label='Change trigger']")!;
+  await act(async () => buttonIn(detail()!, "Change when").click());
+  const form = tabHost.querySelector("form[aria-label='Change when']")!;
   expect([...form.querySelectorAll("[role=radiogroup][aria-label=Place] label")].map((each) => each.textContent)).toEqual(["Home", "Office", "Mom’s"]);
   await act(async () => ([...form.querySelectorAll("input[type=radio]")][1] as HTMLInputElement).click());
   await act(async () => buttonIn(form, "Leave").click());
