@@ -20,6 +20,10 @@ struct BotEntry: TimelineEntry {
     var history: [BotLine] = []
     /// Threads the Bot is working on or waiting behind (large sizes; `bot_activity`).
     var tracking: [BotTracked] = []
+    /// From Bot spaces: which Bot, its presence state and running workers. Nil on an older Studio.
+    var botId: String? = nil
+    var presence: BotPresenceState = .idle
+    var workers = 0
 
     static let placeholder = BotEntry(date: .now, message: "Your Bot's latest message shows here.")
 
@@ -99,74 +103,172 @@ private struct BotCache: Codable {
     var approval: BotApproval?
     var history: [BotLine]? = nil
     var tracking: [BotTracked]? = nil
+    // Bot spaces: which Bot, and how it looks.
+    var botId: String? = nil
+    var title: String? = nil
+    var presence: BotPresenceState? = nil
+    var workers: Int? = nil
+    var shape: String? = nil
+    var color: String? = nil
+    var avatar: String? = nil
 }
 
-struct BotProvider: TimelineProvider {
+struct BotProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> BotEntry { .sample }
 
-    func getSnapshot(in context: Context, completion: @escaping (BotEntry) -> Void) {
-        completion(cached() ?? (context.isPreview ? .sample : .placeholder))
+    func snapshot(for configuration: BotWidgetIntent, in context: Context) async -> BotEntry {
+        cached(botId: configuration.bot?.id) ?? (context.isPreview ? .sample : .placeholder)
     }
 
     /// Only the large sizes show what the Bot is working on, so only they ask for it.
     private static func wantsActivity(_ family: WidgetFamily) -> Bool { family == .systemLarge || family == .systemExtraLarge }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<BotEntry>) -> Void) {
-        Task {
-            let client = BBClient()
-            var entry = cached() ?? BotEntry(date: .now)
+    static func cacheKey(_ botId: String?) -> String { "bot-widget-\(botId ?? "current")" }
+
+    func timeline(for configuration: BotWidgetIntent, in context: Context) async -> Timeline<BotEntry> {
+        let client = BBClient()
+        let botId = configuration.bot?.id
+        var entry: BotEntry
+        if BotWidgetData.usesSpaces(serverURL: client.baseURL) {
             do {
-                guard let threadId = try await client.botThreadId() else {
-                    entry = BotEntry(date: .now)
-                    // Forget the old lead, so a later offline refresh doesn't bring it back.
-                    DiskCache.save(BotCache(threadId: nil, message: nil, running: false, approval: nil), as: "chief-widget", serverURL: client.baseURL)
-                    throw CancellationError()
-                }
-                async let page = client.timeline(threadId, segments: 2)
-                async let thread = client.thread(threadId)
-                async let pending = client.interactions(threadId)
-                async let activity = Self.wantsActivity(context.family) ? try? await client.botActivity() : nil
-                entry.threadId = threadId
-                let rows = try await page.rows
-                // As `latestReply`: the newest assistant message.
-                let reply = rows.last { $0.isConversation && $0.role == "assistant" }
-                entry.message = reply?.text.map(Self.plain)
-                entry.history = Self.history(rows, before: reply?.id)
-                entry.running = try await thread.isRunning
-                if let activity = await activity { entry.tracking = Self.tracking(activity) }
-                entry.approval = (try? await pending)?
-                    .first { $0.status == "pending" && $0.payload.kind == "approval" }
-                    .map {
-                        BotApproval(interactionId: $0.id, summary: $0.payload.subject?.command ?? $0.payload.subject?.plan ?? $0.summary,
-                                      canApprove: $0.decisions.contains("allow_once"), canDeny: $0.decisions.contains("deny"),
-                                      subjectKind: $0.payload.subject?.kind)
-                    }
-                if entry.approval == nil, let workers = try? await client.conversationApprovals(threadId: threadId) {
-                    entry.approval = workers.lazy.compactMap(BotApproval.init(worker:)).first
-                }
-                entry.stale = false
-                DiskCache.save(BotCache(threadId: threadId, message: entry.message, running: entry.running, approval: entry.approval,
-                                        history: entry.history, tracking: entry.tracking),
-                               as: "chief-widget", serverURL: client.baseURL)
-            } catch is CancellationError {
+                let facts = try await BotWidgetData.load(client: client, botId: botId)
+                entry = await Self.entry(facts, client: client, cacheKey: Self.cacheKey(botId))
+            } catch where BBClient.isUnknownRPC(error) {
+                entry = await legacy(client: client, family: context.family)
             } catch {
+                entry = cached(botId: botId) ?? BotEntry(date: .now)
                 entry.stale = true
             }
-            entry.date = .now
-            entry.serverURL = client.baseURL
-            entry.title = client.cachedBotName
-            entry.look = client.cachedBotLook
-            if client.baseURL != ServerScope.selectedURL { entry = .placeholder }
-            // The app reloads widgets when a thread starts or stops running.
-            completion(Timeline(entries: [entry], policy: .after(.now + (entry.running ? 5 : 15) * 60)))
+        } else {
+            entry = await legacy(client: client, family: context.family)
         }
+        entry.date = .now
+        entry.serverURL = client.baseURL
+        if client.baseURL != ServerScope.selectedURL { entry = .placeholder }
+        // The app reloads widgets when a Bot's presence, workers or latest line change.
+        return Timeline(entries: [entry], policy: .after(.now + (entry.running ? 5 : 15) * 60))
     }
 
-    private func cached() -> BotEntry? {
-        guard let value = DiskCache.load(BotCache.self, key: "chief-widget") else { return nil }
+    /// One Bot from `bot_spaces` and `bot_threads_view`: Main's latest message and
+    /// the ones before it, its workers and running conversations, and the first
+    /// approval waiting in Main or in a conversation that needs you.
+    static func entry(_ facts: BotWidgetFacts, client: BBClient, cacheKey: String) async -> BotEntry {
+        var entry = BotEntry(date: .now)
+        entry.botId = facts.botId
+        entry.title = facts.bot?.name ?? BotInfo.defaultName
+        entry.look = facts.look
+        entry.presence = facts.presence
+        entry.workers = facts.view?.workers.filter { $0.status == .running }.count ?? facts.bot?.activity.workers ?? 0
+        entry.running = entry.presence == .thinking || entry.presence == .working
+        entry.tracking = tracking(facts)
+        entry.threadId = facts.mainThreadId
+        if let threadId = facts.mainThreadId {
+            async let page = client.timeline(threadId, segments: 2)
+            async let pending = client.interactions(threadId)
+            if let rows = try? await page.rows {
+                let reply = rows.last { $0.isConversation && $0.role == "assistant" }
+                entry.message = reply?.text.map(plain)
+                entry.history = history(rows, before: reply?.id)
+            } else {
+                entry.message = facts.view?.main?.latest.map(plain)
+            }
+            entry.approval = (try? await pending)?
+                .first { $0.status == "pending" && $0.payload.kind == "approval" }
+                .map {
+                    BotApproval(interactionId: $0.id, summary: $0.payload.subject?.command ?? $0.payload.subject?.plan ?? $0.summary,
+                                canApprove: $0.decisions.contains("allow_once"), canDeny: $0.decisions.contains("deny"),
+                                subjectKind: $0.payload.subject?.kind)
+                }
+        }
+        if entry.approval == nil {
+            var owners = [facts.mainThreadId].compactMap { $0 }
+            owners += (facts.view?.conversations ?? []).filter { $0.needsYou != nil }.map(\.threadId).filter { !owners.contains($0) }
+            for owner in owners.prefix(3) {
+                if let found = (try? await client.conversationApprovals(threadId: owner))?.lazy.compactMap(BotApproval.init(worker:)).first {
+                    entry.approval = found
+                    break
+                }
+            }
+        }
+        DiskCache.save(BotCache(threadId: entry.threadId, message: entry.message, running: entry.running, approval: entry.approval,
+                                history: entry.history, tracking: entry.tracking, botId: entry.botId, title: entry.title,
+                                presence: entry.presence, workers: entry.workers, shape: facts.bot?.shape, color: facts.bot?.color,
+                                avatar: facts.bot?.avatar),
+                       as: cacheKey, serverURL: client.baseURL)
+        return entry
+    }
+
+    /// Workers waiting on you, then running workers and conversations; never Main.
+    static func tracking(_ facts: BotWidgetFacts) -> [BotTracked] {
+        let workers = (facts.view?.workers ?? []).filter { $0.status == .needsYou || $0.status == .running }
+            .sorted { ($0.status == .needsYou ? 1 : 0, $0.updatedAt) > ($1.status == .needsYou ? 1 : 0, $1.updatedAt) }
+            .map { BotTracked(id: $0.threadId, title: $0.title.isEmpty ? "Worker" : $0.title, status: "active",
+                              waitingFor: $0.status == .needsYou ? "Waiting on you" : nil, at: $0.updatedAt) }
+        let conversations = (facts.view?.conversations ?? []).filter { !$0.isMain && ($0.running || $0.needsYou != nil) }
+            .map { BotTracked(id: $0.threadId, title: $0.title.isEmpty ? "Conversation" : $0.title, status: "active",
+                              waitingFor: $0.needsYou?.reason, at: $0.updatedAt) }
+        return Array((workers + conversations).prefix(8))
+    }
+
+    /// An older Studio, without Bot spaces: the lead thread, as before.
+    private func legacy(client: BBClient, family: WidgetFamily) async -> BotEntry {
+        var entry = cached(botId: nil, key: "chief-widget") ?? BotEntry(date: .now)
+        do {
+            guard let threadId = try await client.botThreadId() else {
+                entry = BotEntry(date: .now)
+                // Forget the old lead, so a later offline refresh doesn't bring it back.
+                DiskCache.save(BotCache(threadId: nil, message: nil, running: false, approval: nil), as: "chief-widget", serverURL: client.baseURL)
+                throw CancellationError()
+            }
+            async let page = client.timeline(threadId, segments: 2)
+            async let thread = client.thread(threadId)
+            async let pending = client.interactions(threadId)
+            async let activity = Self.wantsActivity(family) ? try? await client.botActivity() : nil
+            entry.threadId = threadId
+            let rows = try await page.rows
+            // As `latestReply`: the newest assistant message.
+            let reply = rows.last { $0.isConversation && $0.role == "assistant" }
+            entry.message = reply?.text.map(Self.plain)
+            entry.history = Self.history(rows, before: reply?.id)
+            entry.running = try await thread.isRunning
+            if let activity = await activity { entry.tracking = Self.tracking(activity) }
+            entry.approval = (try? await pending)?
+                .first { $0.status == "pending" && $0.payload.kind == "approval" }
+                .map {
+                    BotApproval(interactionId: $0.id, summary: $0.payload.subject?.command ?? $0.payload.subject?.plan ?? $0.summary,
+                                  canApprove: $0.decisions.contains("allow_once"), canDeny: $0.decisions.contains("deny"),
+                                  subjectKind: $0.payload.subject?.kind)
+                }
+            if entry.approval == nil, let workers = try? await client.conversationApprovals(threadId: threadId) {
+                entry.approval = workers.lazy.compactMap(BotApproval.init(worker:)).first
+            }
+            entry.stale = false
+            DiskCache.save(BotCache(threadId: threadId, message: entry.message, running: entry.running, approval: entry.approval,
+                                    history: entry.history, tracking: entry.tracking),
+                           as: "chief-widget", serverURL: client.baseURL)
+        } catch is CancellationError {
+        } catch {
+            entry.stale = true
+        }
+        entry.title = client.cachedBotName
+        entry.look = client.cachedBotLook
+        return entry
+    }
+
+    private func cached(botId: String?, key: String? = nil) -> BotEntry? {
+        let key = key ?? (BotWidgetData.usesSpaces(serverURL: ServerScope.selectedURL) ? Self.cacheKey(botId) : "chief-widget")
+        guard let value = DiskCache.load(BotCache.self, key: key) else { return nil }
         let client = BBClient()
-        return BotEntry(date: .now, threadId: value.threadId, message: value.message, running: value.running, approval: value.approval,
-                        title: client.cachedBotName, look: client.cachedBotLook, history: value.history ?? [], tracking: value.tracking ?? [])
+        var entry = BotEntry(date: .now, threadId: value.threadId, message: value.message, running: value.running, approval: value.approval,
+                             title: value.title ?? client.cachedBotName, look: client.cachedBotLook, history: value.history ?? [],
+                             tracking: value.tracking ?? [])
+        if let botId = value.botId {
+            entry.botId = botId
+            entry.presence = value.presence ?? .idle
+            entry.workers = value.workers ?? 0
+            entry.look = BotLook(shape: value.shape, color: value.color, emoji: value.avatar?.isEmpty == false ? value.avatar! : BotInfo.defaultAvatar)
+        }
+        return entry
     }
 
     /// The four messages before the latest reply, newest first, each cut short:
@@ -210,7 +312,10 @@ struct BotDecisionIntent: AppIntent {
 
     init() {}
     init(threadId: String, interactionId: String, decision: String, serverURL: URL, worker: String? = nil) {
-        self.server = ServerScope.namespace(serverURL)
+        self.init(threadId: threadId, interactionId: interactionId, decision: decision, server: ServerScope.namespace(serverURL), worker: worker)
+    }
+    init(threadId: String, interactionId: String, decision: String, server: String, worker: String? = nil) {
+        self.server = server
         self.threadId = threadId
         self.interactionId = interactionId
         self.decision = decision
@@ -219,12 +324,14 @@ struct BotDecisionIntent: AppIntent {
 
     func perform() async throws -> some IntentResult {
         // The widget may predate a server switch; never answer another server's request.
-        guard server == ServerScope.namespace(ServerScope.selectedURL) else { return .result() }
+        // An empty server is a Live Activity Studio started without knowing the phone's URL.
+        guard server.isEmpty || server == ServerScope.namespace(ServerScope.selectedURL) else { return .result() }
         if let worker, !worker.isEmpty, let choice = WorkerApproval.Decision(rawValue: decision) {
             _ = try await BBClient().resolveWorkerApproval(workerThreadId: worker, interactionId: interactionId, decision: choice)
         } else {
             try await BBClient().resolve(threadId: threadId, interactionId: interactionId, decision: decision)
         }
+        WidgetCenter.shared.reloadAllTimelines()
         return .result()
     }
 }
@@ -232,11 +339,11 @@ struct BotDecisionIntent: AppIntent {
 struct BotWidget: Widget {
     var body: some WidgetConfiguration {
         // Kept from the Chief of Staff widget, so widgets people placed stay.
-        StaticConfiguration(kind: "BBChief", provider: BotProvider()) { entry in
+        AppIntentConfiguration(kind: "BBChief", intent: BotWidgetIntent.self, provider: BotProvider()) { entry in
             BotWidgetView(entry: entry).containerBackground(.fill.tertiary, for: .widget)
         }
         .configurationDisplayName("Bot")
-        .description("Your Bot's latest message, with a mic to talk to it.")
+        .description("A Bot's latest message, what it's working on, and a mic to talk to it.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge, .accessoryCircular, .accessoryRectangular])
     }
 }
@@ -253,8 +360,17 @@ struct BotWidgetView: View {
     private var family: WidgetFamily { shownFamily ?? widgetFamily }
     private var entry: BotEntry { snapshot.serverURL == ServerScope.selectedURL ? snapshot : .placeholder }
 
-    private var talkURL: URL { AppLink.scoped(URL(string: "bbstudio://bot-talk")!, serverURL: entry.serverURL) }
-    private var openURL: URL { AppLink.scoped(URL(string: "bbstudio://bot")!, serverURL: entry.serverURL) }
+    private var talkURL: URL { WidgetText.link("bot-talk" + (entry.botId.map { "/\($0)" } ?? ""), serverURL: entry.serverURL) }
+    private var openURL: URL { WidgetText.link("bot" + (entry.botId.map { "/\($0)" } ?? ""), serverURL: entry.serverURL) }
+    /// The header's status: needs you, else the Bot's presence ("Working · 2 workers").
+    private var status: String {
+        if entry.approval != nil { return "Needs you" }
+        if entry.stale { return "Offline" }
+        guard entry.botId != nil else { return entry.running ? "Thinking…" : "Ready" }
+        if entry.presence == .working, entry.workers > 0 { return "Working · \(entry.workers) worker\(entry.workers == 1 ? "" : "s")" }
+        return entry.presence.widgetLabel
+    }
+    private var needsYou: Bool { entry.approval != nil || entry.presence == .needs }
     private var message: String {
         if entry.threadId == nil && entry.message == nil { return "You don't have a Bot yet. Make one in Studio → Bot." }
         return entry.message ?? "No messages yet."
@@ -271,8 +387,8 @@ struct BotWidgetView: View {
         case .accessoryRectangular:
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
-                    BotAvatar(entry.look, size: 16)
-                    Text(entry.approval != nil ? "Needs approval" : entry.running ? "\(entry.title) · Thinking…" : entry.title)
+                    WidgetPresence(botId: entry.botId, state: entry.presence, look: entry.look, size: 16)
+                    Text(entry.approval != nil ? "Needs approval" : entry.running ? "\(entry.title) · \(status)" : entry.title)
                 }
                 .font(.headline)
                 Text(entry.approval?.summary ?? message).font(.caption).lineLimit(2)
@@ -325,12 +441,12 @@ struct BotWidgetView: View {
 
     private var header: some View {
         HStack(spacing: 6) {
-            BotAvatar(entry.look, size: 30)
+            WidgetPresence(botId: entry.botId, state: entry.presence, look: entry.look, size: 30)
             VStack(alignment: .leading, spacing: 0) {
                 Text(entry.title).font(.caption.weight(.semibold)).lineLimit(1)
-                Text(entry.approval != nil ? "Needs you" : entry.running ? "Thinking…" : entry.stale ? "Offline" : "Ready")
+                Text(status)
                     .font(.caption2)
-                    .foregroundStyle(entry.approval != nil ? Color.orange : entry.running ? BotPalette.color(entry.look.color) : .secondary)
+                    .foregroundStyle(needsYou ? Color.orange : entry.running ? BotPalette.color(entry.look.color) : .secondary)
                     .lineLimit(1)
             }
             if entry.stale { Image(systemName: "wifi.slash").font(.caption2).foregroundStyle(.secondary) }

@@ -309,3 +309,11 @@ extension Studio.BotThreadsChangedEvent {
         self = decoded
     }
 }
+
+extension BotSpace {
+    /// Main's thread: from the Bot's threads view when it's this Bot's, else the Bot's own record.
+    public func mainThreadId(in view: BotThreadsView?) -> String? {
+        if let view, view.botId == nil || view.botId == id, let main = view.main { return main.threadId }
+        return mainThreadId
+    }
+}

@@ -30,4 +30,18 @@ extension BBClient {
     public func removePushSubscription(_ id: String) async throws {
         let _: JSONValue = try await rpc("push-notifications", "pushSubscriptions.remove", ["id": .string(id)])
     }
+
+    /// Hands the relay a Live Activity token for one Bot: the app's push-to-start
+    /// token, or a running activity's update token. Studio pushes to them.
+    public func registerLiveActivity(deviceId: String, botId: String, kind: Mobile.LiveActivityRegisterInputKind, token: String) async throws {
+        let input = Mobile.LiveActivityRegisterInput(deviceId: deviceId, botId: botId, kind: kind, token: token)
+        let body = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(input))
+        let _: Mobile.LiveActivityRegisterOutput = try await rpc("mobile", Mobile.Method.live_activity_register, body)
+    }
+
+    public func unregisterLiveActivities(deviceId: String, botId: String? = nil) async throws {
+        var input: [String: JSONValue] = ["deviceId": .string(deviceId)]
+        if let botId { input["botId"] = .string(botId) }
+        let _: JSONValue = try await rpc("mobile", Mobile.Method.live_activity_unregister, .object(input))
+    }
 }

@@ -137,19 +137,24 @@ extension BBClient {
         return output.bot?.defaultModel.map { ExecutionChoice(providerId: $0.providerId, model: $0.model, reasoningLevel: $0.reasoningLevel) }
     }
 
-    public func startConversation(botId: String, projectId: String, text: String, choice: ExecutionChoice) async throws -> String {
-        let request = Self.studioExecutionRequest(projectId: projectId, text: text, mentions: [], choice: choice)
+    public func startConversation(botId: String, projectId: String, text: String, choice: ExecutionChoice,
+                                  attachments: [JSONValue] = []) async throws -> String {
+        var request = Self.studioExecutionRequest(projectId: projectId, text: text, mentions: [], choice: choice)
+        if !attachments.isEmpty, case .object(var fields) = request {
+            fields["input"] = Self.input(text, attachments)
+            request = .object(fields)
+        }
         let output: Studio.BotConversationStartOutput = try await rpc("studio", Studio.Method.bot_conversation_start,
                                                                       ["botId": .string(botId), "request": request])
         guard let id = output.threadId, !id.isEmpty else { throw BBError(status: 200, message: "Studio didn't start the conversation.") }
         return id
     }
 
-    public func startConversation(botId: String, projectId: String, text: String) async throws -> String {
+    public func startConversation(botId: String, projectId: String, text: String, attachments: [JSONValue] = []) async throws -> String {
         let preset = try? await botDefaultModel(botId: botId)
         let defaults = preset == nil ? (try? await projectDefaults(projectId)) ?? nil : nil
         var choice = preset ?? defaults ?? ExecutionChoice()
         if choice.permissionMode == nil { choice.permissionMode = defaults?.permissionMode }
-        return try await startConversation(botId: botId, projectId: projectId, text: text, choice: choice)
+        return try await startConversation(botId: botId, projectId: projectId, text: text, choice: choice, attachments: attachments)
     }
 }

@@ -2,7 +2,8 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-/// Share sheet entry point: send shared text, links, photos, and files to a new or existing BB thread.
+/// Share sheet entry point: send shared text, links, photos, and files to a Bot's conversation (Main by default),
+/// one of its open conversations, or a new one.
 final class ShareViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -19,14 +20,20 @@ final class ShareViewController: UIViewController {
 
 @MainActor
 final class ShareModel: ObservableObject {
+    /// A Bot's conversation (Main by default), a new one, or, on a Studio
+    /// without Bot spaces, a BB thread or a new thread in the remembered project.
     enum Destination: Hashable {
-        case new(projectId: String)
+        case conversation(botId: String, threadId: String)
+        case newConversation(botId: String)
         case thread(String)
+        case newThread
     }
 
     @Published var text = ""
     @Published var files: [SharedFile] = []
-    @Published var projects: [Project] = []
+    @Published var bots: [BotSpace] = []
+    @Published var botId: String?
+    @Published var view: BotThreadsView?
     @Published var threads: [ThreadEntry] = []
     @Published var destination: Destination?
     @Published var sending = false
@@ -36,28 +43,102 @@ final class ShareModel: ObservableObject {
     private let context: NSExtensionContext?
     private let client = BBClient()
     private static let lastProjectKey = "newThreadProjectId"
+    private static let lastBotKey = "shareBotId"
 
     init(context: NSExtensionContext?) {
         self.context = context
     }
 
+    var usesSpaces: Bool { !bots.isEmpty }
+    var bot: BotSpace? { bots.first { $0.id == botId } }
+
+    /// Main first, then the Bot's other open conversations, newest first.
+    var conversations: [BotConversation] {
+        guard let view else { return [] }
+        let rest = view.conversations.filter { !$0.isMain && !$0.mirrored }.sorted { $0.updatedAt > $1.updatedAt }
+        return (view.main.map { [$0] } ?? []) + rest
+    }
+
     func load() async {
         await loadShared()
         guard checkServer() else { return }
-        if let snapshot = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey, serverURL: client.baseURL) {
-            threads = snapshot.threads
+        let serverURL = client.baseURL
+        if BotWidgetData.usesSpaces(serverURL: serverURL), let cached = BotSpacesCache.loadSpaces(serverURL: serverURL), !cached.bots.isEmpty {
+            show(cached)
         }
         do {
-            async let projects = client.projects()
+            let spaces = try await client.botSpaces()
+            guard checkServer() else { return }
+            if spaces.bots.isEmpty { return await loadThreads() }
+            show(spaces)
+            await loadView()
+        } catch where BBClient.isUnknownRPC(error) {
+            bots = []
+            await loadThreads()
+        } catch {
+            if bots.isEmpty { await loadThreads() } else { await loadView() }
+        }
+    }
+
+    private func show(_ spaces: BotSpaces) {
+        bots = spaces.bots
+        if botId == nil || bot == nil {
+            let last = AppGroup.defaults.string(forKey: ServerScope.key(Self.lastBotKey, serverURL: client.baseURL))
+            botId = spaces.bots.first(where: { $0.id == last })?.id ?? spaces.current?.id
+        }
+        if view == nil, let botId { view = BotSpacesCache.loadView(botId, serverURL: client.baseURL) }
+        defaultDestination()
+    }
+
+    /// Main, the Bot's own conversation.
+    private func defaultDestination() {
+        guard let bot else { return }
+        switch destination {
+        case .conversation(let id, _)? where id == bot.id: return
+        case .newConversation(let id)? where id == bot.id: return
+        default: break
+        }
+        if let main = bot.mainThreadId(in: view) {
+            destination = .conversation(botId: bot.id, threadId: main)
+        } else {
+            destination = .newConversation(botId: bot.id)
+        }
+    }
+
+    func choose(bot id: String) {
+        guard id != botId else { return }
+        botId = id
+        view = BotSpacesCache.loadView(id, serverURL: client.baseURL)
+        destination = nil
+        defaultDestination()
+        Task { await loadView() }
+    }
+
+    private func loadView() async {
+        guard let botId else { return }
+        do {
+            let next = try await client.botThreadsView(botId: botId)
+            guard checkServer(), botId == self.botId else { return }
+            view = next
+            BotSpacesCache.saveView(next, botId: botId, serverURL: client.baseURL)
+            defaultDestination()
+        } catch {
+            if view == nil { self.error = BBClient.describe(error, plugin: "Studio", server: client.baseURL) }
+        }
+    }
+
+    /// An older Studio: recent BB threads, or a new thread in the remembered project.
+    private func loadThreads() async {
+        if let snapshot = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey, serverURL: client.baseURL) {
+            threads = snapshot.threads.filter { $0.parentThreadId == nil }
+        }
+        do {
             threads = try await client.threads(limit: 60).filter { $0.parentThreadId == nil }
-            self.projects = try await projects
         } catch {
             self.error = BBClient.describe(error)
         }
         guard checkServer() else { return }
-        let last = AppGroup.defaults.string(forKey: ServerScope.key(Self.lastProjectKey, serverURL: client.baseURL))
-        let projectId = projects.first(where: { $0.id == last })?.id ?? projects.first?.id
-        if destination == nil, let projectId { destination = .new(projectId: projectId) }
+        if destination == nil { destination = .newThread }
     }
 
     func send() async {
@@ -67,16 +148,35 @@ final class ShareModel: ObservableObject {
         do {
             let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
             switch destination {
-            case .new(let projectId):
-                AppGroup.defaults.set(projectId, forKey: ServerScope.key(Self.lastProjectKey, serverURL: client.baseURL))
+            case .conversation(let botId, let id):
+                remember(botId)
+                let known = view?.conversations.first(where: { $0.threadId == id })?.projectId
+                let projectId: String
+                if let known { projectId = known } else { projectId = try await client.thread(id).projectId }
                 let inputs = try await upload(to: projectId)
-                _ = try await client.createThread(projectId: projectId, text: message, attachments: inputs)
+                try await client.send(id, text: message, attachments: inputs)
+            case .newConversation(let botId):
+                remember(botId)
+                guard let bot = bots.first(where: { $0.id == botId }) else { return }
+                var projectId = view?.main?.projectId
+                if projectId == nil, let main = bot.mainThreadId(in: view) { projectId = try await client.thread(main).projectId }
+                guard let projectId else { throw BBError(status: 0, message: "\(bot.name) has no Main conversation to start from.") }
+                let inputs = try await upload(to: projectId)
+                _ = try await client.startConversation(botId: botId, projectId: projectId, text: message, attachments: inputs)
             case .thread(let id):
                 let known = threads.first(where: { $0.id == id })?.projectId
                 let projectId: String
                 if let known { projectId = known } else { projectId = try await client.thread(id).projectId }
                 let inputs = try await upload(to: projectId)
                 try await client.send(id, text: message, attachments: inputs)
+            case .newThread:
+                let last = AppGroup.defaults.string(forKey: ServerScope.key(Self.lastProjectKey, serverURL: client.baseURL))
+                let projects = try await client.projects()
+                guard let projectId = projects.first(where: { $0.id == last })?.id ?? projects.first?.id else {
+                    throw BBError(status: 0, message: "BB has no project to start a thread in.")
+                }
+                let inputs = try await upload(to: projectId)
+                _ = try await client.createThread(projectId: projectId, text: message, attachments: inputs)
             }
             context?.completeRequest(returningItems: nil)
         } catch {
@@ -84,9 +184,13 @@ final class ShareModel: ObservableObject {
         }
     }
 
+    private func remember(_ botId: String) {
+        AppGroup.defaults.set(botId, forKey: ServerScope.key(Self.lastBotKey, serverURL: client.baseURL))
+    }
+
     private func checkServer() -> Bool {
         guard client.baseURL == ServerScope.selectedURL else {
-            projects = []; threads = []; destination = nil
+            bots = []; view = nil; threads = []; destination = nil
             error = "The server changed. Close and reopen Share to choose a destination."
             return false
         }
@@ -149,18 +253,45 @@ struct ShareView: View {
                         }
                     }
                 }
-                Section("Send to") {
-                    Picker("Destination", selection: $model.destination) {
-                        ForEach(model.projects) { project in
-                            Label("New thread in \(project.name)", systemImage: "square.and.pencil")
-                                .tag(ShareModel.Destination?.some(.new(projectId: project.id)))
-                        }
-                        ForEach(model.threads.prefix(20)) { thread in
-                            Text(thread.displayTitle).lineLimit(1).tag(ShareModel.Destination?.some(.thread(thread.id)))
+                if model.usesSpaces {
+                    if model.bots.count > 1 {
+                        Section("Bot") {
+                            Picker("Bot", selection: Binding(get: { model.botId ?? "" }, set: { model.choose(bot: $0) })) {
+                                ForEach(model.bots) { bot in
+                                    Text("\(bot.avatar.isEmpty ? "" : bot.avatar + " ")\(bot.name)").tag(bot.id)
+                                }
+                            }
+                            .accessibilityIdentifier("shareBot")
                         }
                     }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
+                    Section("Send to") {
+                        Picker("Conversation", selection: $model.destination) {
+                            ForEach(model.conversations) { conversation in
+                                Label(conversation.isMain ? "Main" : (conversation.title.isEmpty ? "Conversation" : conversation.title),
+                                      systemImage: conversation.isMain ? "star.bubble" : "bubble.left")
+                                    .lineLimit(1)
+                                    .tag(ShareModel.Destination?.some(.conversation(botId: model.botId ?? "", threadId: conversation.threadId)))
+                            }
+                            if let botId = model.botId {
+                                Label("New conversation", systemImage: "plus.bubble")
+                                    .tag(ShareModel.Destination?.some(.newConversation(botId: botId)))
+                            }
+                        }
+                        .pickerStyle(.inline)
+                        .labelsHidden()
+                    }
+                } else {
+                    Section("Send to") {
+                        Picker("Destination", selection: $model.destination) {
+                            Label("New thread", systemImage: "square.and.pencil")
+                                .tag(ShareModel.Destination?.some(.newThread))
+                            ForEach(model.threads.prefix(20)) { thread in
+                                Text(thread.displayTitle).lineLimit(1).tag(ShareModel.Destination?.some(.thread(thread.id)))
+                            }
+                        }
+                        .pickerStyle(.inline)
+                        .labelsHidden()
+                    }
                 }
                 if let error = model.error {
                     Text(error).font(.footnote).foregroundStyle(.red)
@@ -174,7 +305,7 @@ struct ShareView: View {
                     }
                 }
             }
-            .navigationTitle("Send to BB")
+            .navigationTitle(model.bot.map { "Send to \($0.name)" } ?? "Send to BB")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { model.cancel() } }

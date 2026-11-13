@@ -65,9 +65,7 @@ struct PresenceSpec: Hashable {
         return Self.digest(parts.joined(separator: "|"))
     }
 
-    static func digest(_ text: String) -> String {
-        SHA256.hash(data: Data(text.utf8)).prefix(12).map { String(format: "%02x", $0) }.joined()
-    }
+    static func digest(_ text: String) -> String { PresenceStillFiles.digest(text) }
 }
 
 /// Agent-made presences from `presences_list`, by id. Their code only ever runs
@@ -182,7 +180,7 @@ final class PresenceStills {
     }
 
     nonisolated static func widgetFolder(botId: String) -> URL {
-        AppGroup.containerURL.appending(path: "Look/presence/\(PresenceSpec.digest(botId))", directoryHint: .isDirectory)
+        PresenceStillFiles.folder(botId: botId)
     }
 
     func tearDown() {

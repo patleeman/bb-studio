@@ -142,7 +142,9 @@ enum BotShell {
 
 @MainActor
 final class BotShellModel: ObservableObject {
-    @Published var shownBotId: String?
+    @Published var shownBotId: String? {
+        didSet { BotSpacesStore.shared.shownBotId = shownBotId }
+    }
     @Published var selection: BotShellItem?
     @Published var compactColumn: NavigationSplitViewColumn = .sidebar
     @Published var detailPath: [Route] = []

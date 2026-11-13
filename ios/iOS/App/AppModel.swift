@@ -144,6 +144,7 @@ final class AppModel: ObservableObject {
         realtime.subscribeThreadList()
         flushOutboxOnConnect()
         BotSpacesStore.shared.attach(client: client, realtime: realtime)
+        BotLiveActivities.shared.attach(store: BotSpacesStore.shared, client: client)
         #if DEBUG
         BotSpacesDemo.install(BotSpacesStore.shared)
         #endif
@@ -174,6 +175,7 @@ final class AppModel: ObservableObject {
         realtime.subscribeThreadList()
         flushOutboxOnConnect()
         BotSpacesStore.shared.attach(client: client, realtime: realtime)
+        BotLiveActivities.shared.attach(store: BotSpacesStore.shared, client: client)
         path = []
         studioPath = []
         newThreadDraft = nil
@@ -259,7 +261,7 @@ final class AppModel: ObservableObject {
         case "loops": openLoops()
         case "bot": openBots(id.map { .bot($0) } ?? .primary)
         case "chief", "web": openBots(.primary)
-        case "bot-talk", "chief-talk": toggleBotTalk()
+        case "bot-talk", "chief-talk": toggleBotTalk(botId: id)
         case "settings": tab = .settings
         case "file": break  // Opened by the thread view, which knows the workspace.
         default: tab = .inbox
@@ -404,12 +406,22 @@ final class AppModel: ObservableObject {
 
     /// Talk to Bot (the Action button, Siri, `bbstudio://bot-talk`): a hands-free
     /// voice session with the Bot, started at once. Run again, it ends the session.
-    func toggleBotTalk() {
+    /// Talk to Bot: hands-free voice with a Bot's Main (the current Bot's, or
+    /// `botId`'s), started at once; again ends it. On a Studio without Bot
+    /// spaces, Studio picks the voice's identity as before.
+    func toggleBotTalk(botId: String? = nil) {
         if case .handsFree = sheet {
             sheet = nil
             return
         }
-        sheet = .handsFree(autoStart: true)
+        sheet = .handsFree(autoStart: true, threadId: Self.talkThreadId(store: BotSpacesStore.shared, botId: botId))
+    }
+
+    static func talkThreadId(store: BotSpacesStore, botId: String?) -> String? {
+        guard store.useSpaces, let spaces = store.spaces else { return nil }
+        let bot = spaces.bots.first { $0.id == botId } ?? BotShell.shownBot(spaces, chosen: store.shownBotId)
+        guard let bot else { return nil }
+        return bot.mainThreadId(in: store.view(for: bot.id))
     }
 
     /// The Bot's Loops screen.

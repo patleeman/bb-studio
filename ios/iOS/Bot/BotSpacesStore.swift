@@ -9,6 +9,8 @@ final class BotSpacesStore: ObservableObject {
     @Published private(set) var spaces: BotSpaces?
     @Published private(set) var views: [String: BotThreadsView] = [:]
     @Published private(set) var error: String?
+    /// The Bot the shell shows; "Talk to Bot" and the Live Activity follow it.
+    var shownBotId: String?
 
     var coalesceDelay: Duration = .milliseconds(300)
 

@@ -1,3 +1,4 @@
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -13,6 +14,8 @@ struct WorkEntry: TimelineEntry {
     var stale: Bool
     /// The threads waiting on an approval or answer, newest first (extra large).
     var pending: [ThreadEntry] = []
+    /// The Bot it shows, from Bot spaces; nil on an older Studio.
+    var space: WidgetBot? = nil
     static let placeholder = WorkEntry(date: .now, attention: 0, approvals: 0, running: [], stale: false)
 
     /// What Needs you counts: the rows it lists. The Bot's reason is one, plus each
@@ -41,36 +44,68 @@ struct WorkEntry: TimelineEntry {
     }
 }
 
-struct WorkProvider: TimelineProvider {
+struct WorkProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> WorkEntry { .sample }
-    func getSnapshot(in context: Context, completion: @escaping (WorkEntry) -> Void) {
-        completion(cached() ?? (context.isPreview ? .sample : .placeholder))
+
+    func snapshot(for configuration: BotWidgetIntent, in context: Context) async -> WorkEntry {
+        cached(botId: configuration.bot?.id) ?? (context.isPreview ? .sample : .placeholder)
     }
-    func getTimeline(in context: Context, completion: @escaping (Timeline<WorkEntry>) -> Void) {
-        Task {
-            let client = BBClient()
-            var entry = cached() ?? .placeholder
-            do {
-                let threadRows = try await client.threads(limit: 100)
-                let summary = ThreadSummary(threadRows)
-                entry.running = summary.running
-                let needs = await client.needsYouCount(fallback: summary)
-                entry.attention = needs.count
-                entry.reason = needs.reason
-                let pending = threadRows.filter { $0.hasPendingInteraction == true }
-                entry.approvals = pending.count
-                entry.pending = Array(pending.sorted { ($0.latestAttentionAt ?? $0.updatedAt) > ($1.latestAttentionAt ?? $1.updatedAt) }.prefix(8))
-                entry.stale = false
-                DiskCache.save(WorkCache(attention: entry.attention, reason: entry.reason, approvals: entry.approvals, running: entry.running,
-                                         pending: entry.pending), as: "work-widget", serverURL: client.baseURL)
-            } catch { entry.stale = true }
-            entry.date = .now
-            entry.serverURL = client.baseURL
-            if client.baseURL != ServerScope.selectedURL { entry = .placeholder }
-            completion(Timeline(entries: [entry], policy: .after(.now + 15 * 60)))
+
+    func timeline(for configuration: BotWidgetIntent, in context: Context) async -> Timeline<WorkEntry> {
+        let client = BBClient()
+        let botId = configuration.bot?.id
+        var entry: WorkEntry
+        do {
+            if BotWidgetData.usesSpaces(serverURL: client.baseURL) {
+                do {
+                    entry = Self.entry(try await BotWidgetData.load(client: client, botId: botId))
+                } catch where BBClient.isUnknownRPC(error) {
+                    entry = try await legacy(client)
+                }
+            } else {
+                entry = try await legacy(client)
+            }
+        } catch {
+            entry = cached(botId: botId) ?? .placeholder
+            entry.stale = true
         }
+        entry.date = .now
+        entry.serverURL = client.baseURL
+        if client.baseURL != ServerScope.selectedURL { entry = .placeholder }
+        return Timeline(entries: [entry], policy: .after(.now + 15 * 60))
     }
-    private func cached() -> WorkEntry? {
+
+    /// One Bot: why it needs you, its workers waiting on an approval or answer, and what's running.
+    static func entry(_ facts: BotWidgetFacts) -> WorkEntry {
+        let waiting = facts.waitingWorkers
+        let conversations = facts.needs.filter { need in !waiting.contains { $0.id == need.id } }
+        var entry = WorkEntry(date: .now, attention: conversations.count, reason: conversations.isEmpty ? nil : facts.reason, approvals: waiting.count,
+                              running: facts.running, stale: false, pending: Array(facts.needs.prefix(8)))
+        entry.space = WidgetBot(facts)
+        return entry
+    }
+
+    private func legacy(_ client: BBClient) async throws -> WorkEntry {
+        var entry = WorkEntry(date: .now, attention: 0, approvals: 0, running: [], stale: false)
+        let threadRows = try await client.threads(limit: 100)
+        let summary = ThreadSummary(threadRows)
+        entry.running = summary.running
+        let needs = await client.needsYouCount(fallback: summary)
+        entry.attention = needs.count
+        entry.reason = needs.reason
+        let pending = threadRows.filter { $0.hasPendingInteraction == true }
+        entry.approvals = pending.count
+        entry.pending = Array(pending.sorted { ($0.latestAttentionAt ?? $0.updatedAt) > ($1.latestAttentionAt ?? $1.updatedAt) }.prefix(8))
+        DiskCache.save(WorkCache(attention: entry.attention, reason: entry.reason, approvals: entry.approvals, running: entry.running,
+                                 pending: entry.pending), as: "work-widget", serverURL: client.baseURL)
+        return entry
+    }
+
+    private func cached(botId: String?) -> WorkEntry? {
+        let serverURL = ServerScope.selectedURL
+        if BotWidgetData.usesSpaces(serverURL: serverURL), let facts = BotWidgetData.cached(serverURL: serverURL, botId: botId) {
+            return Self.entry(facts)
+        }
         guard let value = DiskCache.load(WorkCache.self, key: "work-widget") else { return nil }
         return WorkEntry(date: .now, attention: value.attention, reason: value.reason, approvals: value.approvals, running: value.running, stale: false,
                          pending: value.pending ?? [])
@@ -87,7 +122,7 @@ private struct WorkCache: Codable {
 
 struct WorkWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "BBWork", provider: WorkProvider()) { entry in
+        AppIntentConfiguration(kind: "BBWork", intent: BotWidgetIntent.self, provider: WorkProvider()) { entry in
             WorkWidgetView(entry: entry).containerBackground(.fill.tertiary, for: .widget)
         }
         .configurationDisplayName("BB work")
@@ -146,10 +181,24 @@ struct WorkWidgetView: View {
 
     private var header: some View {
         HStack {
-            Label("Today", systemImage: "checklist").font(.headline)
+            if let space = entry.space { WidgetBotBadge(bot: space) } else { Label("Today", systemImage: "checklist").font(.headline) }
             Spacer()
             if entry.stale { Image(systemName: "wifi.slash").foregroundStyle(.secondary) }
         }
+    }
+
+    /// The first Needs you line: the Bot's reason, else what waits (never "0 attention", B18).
+    private var needsLabel: String {
+        if let reason = entry.reason { return reason }
+        if entry.attention > 0 { return "\(entry.attention) need\(entry.attention == 1 ? "s" : "") you" }
+        if entry.approvals > 0 { return "\(entry.approvals) waiting on approval" }
+        return "Nothing needs you."
+    }
+
+    /// Where the needs line goes: the Bot when there is one, else the inbox.
+    private var needsLink: URL {
+        if let space = entry.space { return space.link(serverURL: entry.serverURL) }
+        return WidgetText.link(entry.reason == nil ? "inbox" : "bot", serverURL: entry.serverURL)
     }
 
     /// Whether Needs you starts with the Bot's reason or BB's count.
@@ -161,12 +210,11 @@ struct WorkWidgetView: View {
         return VStack(alignment: .leading, spacing: 6) {
             WidgetSectionTitle(title: "Needs you", count: entry.needsCount)
             if needsReason {
-                WidgetRow(url: WidgetText.link(entry.reason == nil ? "inbox" : "bot", serverURL: entry.serverURL),
-                          title: entry.reason ?? "\(entry.attention) attention", note: entry.reason == nil ? nil : "Bot", dot: .orange)
+                WidgetRow(url: needsLink, title: needsLabel, note: entry.reason == nil ? nil : entry.space?.name ?? "Bot", dot: .orange)
                     .fontWeight(.semibold)
             }
             if entry.approvals > 0 {
-                Link(destination: WidgetText.link("inbox", serverURL: entry.serverURL)) {
+                Link(destination: entry.space.map { $0.link(serverURL: entry.serverURL) } ?? WidgetText.link("inbox", serverURL: entry.serverURL)) {
                     Label("Review \(entry.approvals) pending approval\(entry.approvals == 1 ? "" : "s")", systemImage: "hand.raised")
                 }
                 .font(.caption.weight(.semibold))
@@ -201,19 +249,19 @@ struct WorkWidgetView: View {
     private var standard: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Label("Today", systemImage: "checklist").font(.headline)
+                if let space = entry.space { WidgetBotBadge(bot: space) } else { Label("Today", systemImage: "checklist").font(.headline) }
                 Spacer()
                 if entry.stale { Image(systemName: "wifi.slash").foregroundStyle(.secondary) }
             }
             HStack(spacing: 12) {
                 // The Bot's reason opens the Bot; the BB-wide count opens the inbox.
-                Link(destination: AppLink.scoped(URL(string: entry.reason == nil ? "bbstudio://inbox" : "bbstudio://bot")!, serverURL: entry.serverURL)) {
-                    Label(entry.reason ?? (entry.needsCount == 0 ? "Nothing needs you." : "\(entry.attention) attention"), systemImage: "exclamationmark.bubble")
+                Link(destination: needsLink) {
+                    Label(needsLabel, systemImage: "exclamationmark.bubble")
                 }
                 Label("\(entry.running.count) running", systemImage: "circle.fill")
             }.font(.caption).lineLimit(1)
             if entry.approvals > 0 {
-                Link(destination: AppLink.scoped(URL(string: "bbstudio://inbox")!, serverURL: entry.serverURL)) {
+                Link(destination: entry.space.map { $0.link(serverURL: entry.serverURL) } ?? WidgetText.link("inbox", serverURL: entry.serverURL)) {
                     Label("Review \(entry.approvals) pending approval\(entry.approvals == 1 ? "" : "s")", systemImage: "hand.raised")
                 }
                 .accessibilityIdentifier("workReviewApprovals")

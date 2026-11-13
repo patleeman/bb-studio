@@ -521,6 +521,12 @@ struct ThreadView: View {
             Button { finding = true } label: { Image(systemName: "magnifyingglass") }
                 .accessibilityLabel("Find")
         }
+        // Hands-free voice speaks as this conversation (its identity comes from the thread).
+        if conversation != nil {
+            Button { app.sheet = .handsFree(threadId: model.threadId) } label: { Image(systemName: "waveform") }
+                .accessibilityLabel("Talk hands-free")
+                .accessibilityIdentifier("conversationHandsFree")
+        }
         // One menu rather than a row of buttons, so the title has room.
         Menu {
             Button { finding = true } label: { Label("Find in thread", systemImage: "magnifyingglass") }

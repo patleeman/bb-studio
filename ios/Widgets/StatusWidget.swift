@@ -1,3 +1,4 @@
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -13,6 +14,8 @@ struct StatusEntry: TimelineEntry {
     /// BB's threads waiting on an answer, newest first, even when the Bot counts
     /// what needs you: the large sizes list them by title.
     var waiting: [ThreadEntry] = []
+    /// The Bot it shows, from Bot spaces; nil on an older Studio.
+    var space: WidgetBot? = nil
 
     static let placeholder = StatusEntry(date: .now, needsYou: [], running: [], stale: false)
 
@@ -34,34 +37,53 @@ struct StatusEntry: TimelineEntry {
     var needsCount: Int { bot?.count ?? needsYou.count }
 }
 
-struct StatusProvider: TimelineProvider {
+struct StatusProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> StatusEntry { .sample }
 
-    func getSnapshot(in context: Context, completion: @escaping (StatusEntry) -> Void) {
-        completion(cached() ?? (context.isPreview ? .sample : .placeholder))
+    func snapshot(for configuration: BotWidgetIntent, in context: Context) async -> StatusEntry {
+        cached(botId: configuration.bot?.id) ?? (context.isPreview ? .sample : .placeholder)
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<StatusEntry>) -> Void) {
-        Task {
-            let client = BBClient()
-            var entry: StatusEntry
-            do {
-                let summary = ThreadSummary(try await client.threads(limit: 100))
-                let needs = await client.needsYouCount(fallback: summary)
-                entry = Self.entry(summary, needs: needs)
-                DiskCache.save(needs, as: Self.needsKey, serverURL: client.baseURL)
-            } catch {
-                entry = cached() ?? .placeholder
-                entry.stale = true
+    func timeline(for configuration: BotWidgetIntent, in context: Context) async -> Timeline<StatusEntry> {
+        let client = BBClient()
+        let botId = configuration.bot?.id
+        var entry: StatusEntry
+        do {
+            if BotWidgetData.usesSpaces(serverURL: client.baseURL) {
+                do {
+                    entry = Self.entry(try await BotWidgetData.load(client: client, botId: botId))
+                } catch where BBClient.isUnknownRPC(error) {
+                    entry = try await legacy(client)
+                }
+            } else {
+                entry = try await legacy(client)
             }
-            // The app also reloads widgets whenever the counts change while it's open.
-            entry.serverURL = client.baseURL
-            if client.baseURL != ServerScope.selectedURL { entry = .placeholder }
-            completion(Timeline(entries: [entry], policy: .after(.now + 15 * 60)))
+        } catch {
+            entry = cached(botId: botId) ?? .placeholder
+            entry.stale = true
         }
+        // The app also reloads widgets whenever the counts change while it's open.
+        entry.serverURL = client.baseURL
+        if client.baseURL != ServerScope.selectedURL { entry = .placeholder }
+        return Timeline(entries: [entry], policy: .after(.now + 15 * 60))
+    }
+
+    private func legacy(_ client: BBClient) async throws -> StatusEntry {
+        let summary = ThreadSummary(try await client.threads(limit: 100))
+        let needs = await client.needsYouCount(fallback: summary)
+        DiskCache.save(needs, as: Self.needsKey, serverURL: client.baseURL)
+        return Self.entry(summary, needs: needs)
     }
 
     private static let needsKey = "status-widget-needs"
+
+    /// One Bot: its conversations and workers that need you, and what's running.
+    static func entry(_ facts: BotWidgetFacts) -> StatusEntry {
+        let needs = facts.needs
+        var entry = StatusEntry(date: .now, needsYou: needs, running: facts.running, stale: false, bot: nil, waiting: needs)
+        entry.space = WidgetBot(facts)
+        return entry
+    }
 
     /// The Bot's attention when there is one; BB's waiting threads only on the fallback.
     static func entry(_ summary: ThreadSummary, needs: NeedsYouCount?) -> StatusEntry {
@@ -70,7 +92,11 @@ struct StatusProvider: TimelineProvider {
                            bot: fromBot ? needs : nil, waiting: Array(summary.needsYou.prefix(12)))
     }
 
-    private func cached() -> StatusEntry? {
+    private func cached(botId: String?) -> StatusEntry? {
+        let serverURL = ServerScope.selectedURL
+        if BotWidgetData.usesSpaces(serverURL: serverURL), let facts = BotWidgetData.cached(serverURL: serverURL, botId: botId) {
+            return Self.entry(facts)
+        }
         guard let snapshot = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey) else { return nil }
         return Self.entry(ThreadSummary(snapshot.threads), needs: DiskCache.load(NeedsYouCount.self, key: Self.needsKey))
     }
@@ -78,7 +104,7 @@ struct StatusProvider: TimelineProvider {
 
 struct StatusWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "BBStatus", provider: StatusProvider()) { entry in
+        AppIntentConfiguration(kind: "BBStatus", intent: BotWidgetIntent.self, provider: StatusProvider()) { entry in
             StatusWidgetView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
@@ -109,6 +135,7 @@ struct StatusWidgetView: View {
     private var url: URL {
         if reason != nil { return AppLink.scoped(URL(string: "bbstudio://bot")!, serverURL: entry.serverURL) }
         if let first = entry.needsYou.first { return AppLink.scoped(URL(string: "bbstudio://thread/\(first.id)")!, serverURL: entry.serverURL) }
+        if let space = entry.space { return space.link(serverURL: entry.serverURL) }
         return AppLink.scoped(URL(string: "bbstudio://inbox")!, serverURL: entry.serverURL)
     }
 
@@ -200,6 +227,9 @@ struct StatusWidgetView: View {
     /// The large sizes' top line: both counts across, then Dictate.
     private var bar: some View {
         HStack(spacing: 14) {
+            if let space = entry.space {
+                Link(destination: space.link(serverURL: entry.serverURL)) { WidgetBotBadge(bot: space, size: 26) }
+            }
             Label("\(entry.needsCount)", systemImage: "exclamationmark.circle.fill")
                 .foregroundStyle(entry.needsCount == 0 ? Color.secondary : Color.orange)
             Label("\(entry.running.count)", systemImage: "circle.fill")
@@ -255,6 +285,17 @@ struct StatusWidgetView: View {
     }
 
     private var counts: some View {
+        HStack(alignment: .top, spacing: 4) {
+            countLabels
+            if let space = entry.space {
+                Spacer(minLength: 0)
+                WidgetPresence(botId: space.id, state: space.state, look: space.look, size: 26)
+                    .accessibilityLabel("\(space.name), \(space.state.widgetLabel)")
+            }
+        }
+    }
+
+    private var countLabels: some View {
         VStack(alignment: .leading, spacing: 4) {
             Label("\(entry.needsCount)", systemImage: "exclamationmark.circle.fill")
                 .foregroundStyle(entry.needsCount == 0 ? Color.secondary : Color.orange)
