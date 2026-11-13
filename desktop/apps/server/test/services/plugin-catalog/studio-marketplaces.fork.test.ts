@@ -167,6 +167,15 @@ describe("BB Studio's default marketplaces", () => {
       "bb-community",
       "bb-studio",
     ]);
+    expect(
+      upgraded
+        .listMarketplaces()
+        .map((row) => ({ name: row.name, official: row.official })),
+    ).toEqual([
+      { name: "bb-official", official: true },
+      { name: "bb-community", official: false },
+      { name: "bb-studio", official: false },
+    ]);
     await upgraded.removeMarketplace("bb-community");
     expect(names(service(""))).toEqual(["bb-official", "bb-studio"]);
     expect(
@@ -177,6 +186,10 @@ describe("BB Studio's default marketplaces", () => {
   it("keeps bb's behavior when a Community catalog URL is configured", async () => {
     const catalog = service(GETBB_URL);
     expect(names(catalog)).toEqual(["bb-official", "bb-community"]);
+    expect(catalog.listMarketplaces().map((row) => row.official)).toEqual([
+      true,
+      true,
+    ]);
     await expect(catalog.removeMarketplace("bb-community")).rejects.toThrow(
       "cannot be removed",
     );

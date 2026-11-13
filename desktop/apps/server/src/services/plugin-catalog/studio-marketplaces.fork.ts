@@ -34,14 +34,16 @@ export function curatedSourceUrl(marketplaceUrl: string): string {
     : CURATED_MARKETPLACE_V2_URL;
 }
 
-export function isShippedMarketplace(
-  name: string,
-  marketplaceUrl: string,
-): boolean {
+let curatedShipped = true;
+
+export function configureShippedMarketplaces(marketplaceUrl: string): void {
+  curatedShipped = shipsCuratedMarketplace(marketplaceUrl);
+}
+
+export function isShippedMarketplace(name: string): boolean {
   return (
     name === BUNDLED_MARKETPLACE_NAME ||
-    (name === CURATED_PLUGIN_MARKETPLACE_NAME &&
-      shipsCuratedMarketplace(marketplaceUrl))
+    (name === CURATED_PLUGIN_MARKETPLACE_NAME && curatedShipped)
   );
 }
 
