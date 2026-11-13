@@ -30,6 +30,7 @@ async function studio(threadList: string = "__automatic__", options: { refuseIdl
   const turns: string[] = [];
   const sends: { threadId: string; input: unknown }[] = [];
   const deleted: string[] = [];
+  const archived: string[] = [];
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     system: {
       uiPreferences: {
@@ -60,6 +61,7 @@ async function studio(threadList: string = "__automatic__", options: { refuseIdl
         return {};
       }) as never,
       delete: (async ({ threadId }: { threadId: string }) => { deleted.push(threadId); threads.delete(threadId); return {}; }) as never,
+      archive: (async ({ threadId }: { threadId: string }) => { archived.push(threadId); return {}; }) as never,
       get: (async ({ threadId }: { threadId: string }) => { const thread = threads.get(threadId); if (!thread) throw Object.assign(new Error("Not found"), { status: 404 }); return thread; }) as never,
       list: (async () => [...threads.values()]) as never,
       defaultExecutionOptions: (async () => ({ model: "model" })) as never,
@@ -84,7 +86,7 @@ async function studio(threadList: string = "__automatic__", options: { refuseIdl
     now: () => 1_000,
   });
   const connect = (providerId: string) => { for (const state of providerStates) if (state.providerId === providerId) state.status = "ready"; };
-  return { dataDir, db, bots, store, leads, run, connect, spawns, turns, queued, prefs, sends, deleted, threads };
+  return { dataDir, db, bots, store, leads, run, connect, spawns, turns, queued, prefs, sends, deleted, archived, threads };
 }
 
 function bbDatabase(dataDir: string, threadIds: string[]) {
@@ -134,6 +136,7 @@ describe("first-run onboarding", () => {
     expect(env.spawns[1]).toMatchObject({ providerId: "claude-code", input: hidden(starterFirstChatPrompt(STARTER_BOT.name)), pluginMetadata: { handoffFrom: "thr_1" } });
     expect(env.deleted).toEqual([]);
     expect(env.threads.has("thr_1")).toBe(true);
+    expect(env.archived).toEqual(["thr_1"]);
     expect(env.bots.stored(BOT_ID)!.threadId).toBe("thr_2");
     expect(env.bots.list()).toHaveLength(1);
     expect(welcomeThreadOf(env.dataDir)).toEqual({ threadId: "thr_2", botId: BOT_ID, opened: false });

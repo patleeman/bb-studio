@@ -741,6 +741,7 @@ export class Bots {
     const row = this.need(input.botId);
     if (this.isPrimary(row)) await this.deps.leads.setLead(PERSONAL_PROJECT_ID, next.id);
     else this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(next.id, Date.now(), row.id);
+    await this.deps.sdk.threads.archive({ threadId }).catch(() => {});
     await this.claimChains();
     this.deps.changed();
     return next.id;
