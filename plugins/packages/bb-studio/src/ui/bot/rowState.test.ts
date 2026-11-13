@@ -51,3 +51,10 @@ test("error: the chat's last turn failed and isn't read", () => {
   expect(botRowState({ chat: chat({ isUnread: true, indicator: "unread-error" }), attention: { count: 1, unread: 0 } })).toBe("needs-you");
   expect(STATE_INDICATOR.error).toBe("unread-error");
 });
+
+test("error stays on a conversation whose last turn failed after it was read", () => {
+  expect(threadState(chat({ status: "error" } as Partial<Chat>))).toBe("error");
+  expect(threadState(chat({ runtimeStatus: "error" } as Partial<Chat>))).toBe("error");
+  expect(threadState(chat({ status: "error", hasPendingInteraction: true } as Partial<Chat>))).toBe("needs-you");
+  expect(threadState(chat({ status: "active", runtimeStatus: "active" } as Partial<Chat>))).toBe("working");
+});
