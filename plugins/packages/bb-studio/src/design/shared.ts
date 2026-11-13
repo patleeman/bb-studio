@@ -29,7 +29,7 @@ const HTTP = `/api/v1/plugins/studio/http/${ROUTE_SEGMENT}`;
  * cached forever per revision, so bump this whenever that script changes, or
  * open canvases keep the old copy.
  */
-export const SCREEN_SCRIPT_VERSION = 7;
+export const SCREEN_SCRIPT_VERSION = 8;
 
 /** `v` changes with every revision and `s` with the screen script, so frames reload only when either changed. */
 export function screenUrl(designId: string, screenId: string, updatedAt: number): string {
@@ -187,7 +187,7 @@ export type DesignView = {
   updatedAt: number;
   /** Newest round first, as the canvas shows them. */
   rounds: RoundView[];
-  /** Open comments, oldest first; their order numbers the pins. */
+  /** Open comments, oldest first. */
   comments: CommentView[];
   /** The latest review, while the server remembers it. */
   review: ReviewView | null;

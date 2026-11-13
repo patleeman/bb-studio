@@ -1,8 +1,8 @@
 // What the Studio sidebar lists, from Studio's overview and its tabs: the
-// starred count, the kinds (with item counts), saved views, tags, pinned items and recent ones.
+// starred count, the kinds (with item counts), tags, pinned items and recent ones.
 // Pure, so the grouping is tested directly.
 import type { CollectionItem } from "../kit/app/index";
-import type { ProviderView, SavedViewView, TabView, TagView } from "../contract";
+import type { ProviderView, TabView, TagView } from "../contract";
 import { formatQuery } from "../query";
 
 export interface SidebarKind { pluginId: string; id: string; label: string; icon: string; count: number; query: string }
@@ -12,7 +12,6 @@ export interface StudioSidebarModel {
   /** How many live items are starred. */
   starred: number;
   kinds: SidebarKind[];
-  views: SavedViewView[];
   tags: SidebarTag[];
   pinned: SidebarItem[];
   recent: SidebarItem[];
@@ -31,7 +30,7 @@ const kindQuery = (id: string) => formatQuery({ filters: [{ field: "kind", value
 const tagQuery = (name: string) => formatQuery({ filters: [{ field: "tag", value: name }], text: "" });
 
 export function studioSidebarModel(
-  data: { providers: ProviderView[]; items: CollectionItem[]; tags: TagView[]; views: SavedViewView[] },
+  data: { providers: ProviderView[]; items: CollectionItem[]; tags: TagView[] },
   tabs: TabView[],
   off: ReadonlySet<string> = new Set(),
 ): StudioSidebarModel {
@@ -61,5 +60,5 @@ export function studioSidebarModel(
     .sort((a, b) => b.updatedAt - a.updatedAt)
     .slice(0, RECENT_LIMIT)
     .map((item) => ({ key: `${item.pluginId}:${item.id}`, title: item.title, icon: item.icon, kindIcon: iconOf.get(`${item.pluginId}:${item.kind}`)!, href: item.href }));
-  return { starred: count((item) => item.starredAt != null), kinds, views: data.views, tags, pinned, recent };
+  return { starred: count((item) => item.starredAt != null), kinds, tags, pinned, recent };
 }

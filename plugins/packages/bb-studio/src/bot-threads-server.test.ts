@@ -173,7 +173,7 @@ it("lists the Bot's files: what its conversations and workers made, and for the 
   ]);
   expect(list("home").map((each) => each.id)).toEqual(["pg_trip"]);
   expect(list("dot")[1]!.href).toBe("/plugins/studio/studio/pages/pg_plan");
-  expect(["doc", "whiteboard", "design", "mini", "dashboard", "artifact", null].map(libraryKind)).toEqual(["page", "whiteboard", "design", "app", "app", "artifact", "other"]);
+  expect(["doc", "whiteboard", "design", "mini", "artifact", null].map(libraryKind)).toEqual(["page", "whiteboard", "design", "app", "artifact", "other"]);
   // Made through a conversation by one of the Bot's workers (its first activity names the worker): the worker gets the credit.
   const credited = libraryItems({ botId: "dot", primaryId: "dot", items, origins, creators: new Map([["pages:pg_plan", "lead"], ["pages:pg_trip", "lead"]]), record: (id) => (records.get(id) as never) ?? null, title: (id) => titles[id] ?? id });
   expect(credited.find((each) => each.id === "pg_plan")!.madeIn).toMatchObject({ threadId: "lead", kind: "worker", conversationTitle: "Fork redesign" });

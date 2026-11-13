@@ -30,7 +30,7 @@ export const newTabEntrySchema = z.object({
 });
 export type NewTabEntry = z.infer<typeof newTabEntrySchema>;
 
-/** An item of the Studio tab's kinds: a page, a whiteboard, a design, an app, a dashboard, an artifact, a recording. */
+/** An item of the Studio tab's kinds: a page, a whiteboard, a design, an app, an artifact, a recording. */
 export interface ItemRow { id: string; title: string; updatedAt: number; emoji?: string | null }
 export interface BotThreadRow { threadId: string; kind: "conversation" | "worker"; title: string; updatedAt: number }
 export interface BoardRow { threadId: string; title: string; updatedAt: number }

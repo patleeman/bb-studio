@@ -65,14 +65,3 @@ export const PagesUiContext = createContext<PagesUi>({
 });
 
 export const usePagesUi = () => useContext(PagesUiContext);
-
-/** Display name and colour for a comment/cursor author id. */
-export function authorInfo(id: string, bots: BotView[]): { name: string; avatar: string } {
-  if (id === "user") return { name: "You", avatar: "" };
-  if (id.startsWith("bot:")) {
-    const bot = bots.find((candidate) => candidate.id === id.slice(4));
-    return { name: bot?.name ?? "Bot", avatar: bot?.avatar ?? "🤖" };
-  }
-  if (id.startsWith("agent:")) return { name: "Agent", avatar: "✨" };
-  return { name: id, avatar: "" };
-}

@@ -2,7 +2,7 @@
 // Apps").
 // - Pages are documents: a doc, a design (UI screens or a slide deck), a
 //   whiteboard.
-// - Apps are things that run: a mini app, a dashboard, an artifact.
+// - Apps are things that run: a mini app, an artifact.
 // Recordings, VS Code workspaces and add-ons' kinds belong to neither.
 //
 // An item keeps the id and the namespace (`pluginId`) it always had, and the
@@ -11,7 +11,7 @@
 // Pure: the server, the app and tests share it.
 
 export type ItemFamily = "page" | "app";
-export type ItemType = "doc" | "design" | "whiteboard" | "mini" | "dashboard" | "artifact";
+export type ItemType = "doc" | "design" | "whiteboard" | "mini" | "artifact";
 
 export interface ItemTypeInfo {
   type: ItemType;
@@ -36,7 +36,6 @@ export const ITEM_TYPES: readonly ItemTypeInfo[] = [
   { type: "whiteboard", family: "page", pluginId: "excalidraw", kind: "drawing", segment: "drawings", label: "Whiteboard", plural: "Whiteboards", isId: (id) => UUID.test(id) || /^drw_[0-9a-f]{16}$/.test(id) },
   { type: "design", family: "page", pluginId: "design", kind: "design", segment: "designs", label: "Design", plural: "Designs", isId: (id) => /^dsn_[0-9a-f]{16}$/.test(id) },
   { type: "mini", family: "app", pluginId: "minis", kind: "mini", segment: "minis", label: "App", plural: "Apps", isId: (id) => /^mini_[0-9a-f]{16}$/.test(id) },
-  { type: "dashboard", family: "app", pluginId: "dashboards", kind: "dashboard", segment: "dashboards", label: "Dashboard", plural: "Dashboards", isId: (id) => /^dsh_[0-9a-f]{16}$/.test(id) },
   { type: "artifact", family: "app", pluginId: "artifacts", kind: "artifact", segment: "artifacts", label: "Artifact", plural: "Artifacts", isId: (id) => /^art_[0-9a-z]{16}$/.test(id) },
 ];
 
@@ -69,7 +68,7 @@ export function familyNamed(name: string): ItemFamily | null {
   return ITEM_FAMILIES.find((each) => each.id === value || each.segment === value)?.id ?? null;
 }
 
-/** The type an id belongs to, from its prefix (`pg_`, `dsn_`, `drw_` or a UUID, `mini_`, `dsh_`, `art_`). */
+/** The type an id belongs to, from its prefix (`pg_`, `dsn_`, `drw_` or a UUID, `mini_`, `art_`). */
 export function typeOfId(id: string): ItemTypeInfo | null {
   return ITEM_TYPES.find((each) => each.isId(id)) ?? null;
 }
@@ -82,7 +81,7 @@ export function familyAndType(pluginId: string, kind: string): { family: ItemFam
 
 /**
  * Kind names for a search or a list, with family and type names spelled out
- * as the kinds providers report: "apps" is mini, dashboard and artifact,
+ * as the kinds providers report: "apps" is mini and artifact,
  * "pages" is page, drawing and design, "doc" is page, "whiteboard" is
  * drawing. "page" stays the one kind it always named, and other names pass
  * through.

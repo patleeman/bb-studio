@@ -109,7 +109,7 @@ describe("drops on the workbench's panes", () => {
   });
 
   it("takes every kind a sidebar or Library row drags, and never a tab of that very workbench", () => {
-    const samples: Partial<Record<TabKindId, string | null>> = { conversation: "thr_1", worker: "thr_2", bot: "bot_main", page: PAGE, whiteboard: "drw_0123456789abcdef", design: "dsn_0123456789abcdef", app: "mini_0123456789abcdef", dashboard: "dsh_0123456789abcdef", artifact: "art_0123456789abcdef", memory: "bot_main", library: null, automations: null, todos: "bot_main", archive: "bot_main", automation: "bot_main:aut_1", todo: "loop_1", record: "mem_1" };
+    const samples: Partial<Record<TabKindId, string | null>> = { conversation: "thr_1", worker: "thr_2", bot: "bot_main", page: PAGE, whiteboard: "drw_0123456789abcdef", design: "dsn_0123456789abcdef", app: "mini_0123456789abcdef", artifact: "art_0123456789abcdef", memory: "bot_main", library: null, automations: null, todos: "bot_main", archive: "bot_main", automation: "bot_main:aut_1", todo: "loop_1", record: "mem_1" };
     for (const entry of TAB_KIND_REGISTRY.filter((each) => each.surfaces.sidebarDrag === "had" || each.surfaces.sidebarDrag === "added")) {
       const item = refDragItem({ kind: entry.id, id: samples[entry.id] ?? null }, entry.name);
       expect(item && canDropItem(item, { zone: "workbench", threadId: "thr_9", pane: 1, index: 0 }), entry.id).toBe(true);

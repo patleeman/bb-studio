@@ -1,6 +1,6 @@
 ---
 name: studio
-description: Use when the user refers to BB Studio or "my stuff" across pages, Talk recordings, drawings, dashboards and artifacts — finding an item they made, "the doc about X", "that recording from Tuesday", "what's in Studio" — or asks how Studio and its add-ons (pages, recordings, drawings, designs, dashboards and artifacts are built into Studio) fit together. Also load it when your instructions point here, before you write a page format (chart, embed, html block), a mini app, a ::next or ::explore line, and for your conversations, workers, the "Elsewhere" digest and finishing a conversation.
+description: Use when the user refers to BB Studio or "my stuff" across pages, Talk recordings, drawings and artifacts — finding an item they made, "the doc about X", "that recording from Tuesday", "what's in Studio" — or asks how Studio and its add-ons (pages, recordings, drawings, designs and artifacts are built into Studio) fit together. Also load it when your instructions point here, before you write a page format (chart, embed, html block), a mini app, a ::next or ::explore line, and for your conversations, workers, the "Elsewhere" digest and archiving a conversation.
 ---
 
 # Studio
@@ -14,14 +14,13 @@ the core: one collection that lists every item from every installed add-on.
 | Pages (built into Studio) | `pages` | Pages | the `pages` skill, `pages_*` tools and `bb studio pages` |
 | Studio Talk | `talk` | Recordings, dictations | the `talk` skill and `bb talk` |
 | Whiteboards (built into Studio, live in pages) | `excalidraw` | Whiteboards (kind `drawing`) | the `whiteboards` skill, `whiteboard_*` tools and `bb studio whiteboards` |
-| Dashboards (built into Studio) | `dashboards` | Dashboards: live stats, charts, tables and feeds | the `dashboards` skill, `dashboard_*` and `widget_*` tools and `bb studio dashboards` |
 | Studio Artifacts | `artifacts` | Artifacts: saved images, HTML, reports, files | the `artifacts` skill and `artifacts_*` tools |
 
 Items belong to a BB project or are global. Every item has a link
 (`/plugins/<plugin id>/<panel>/<item id>`); put it in replies as
 `[Title](link)` so the user can open it. Every Studio and BB entity also has
 a `bb://<kind>/<id>` link: `bb://page/pg_…`, `bb://whiteboard/drw_…`,
-`bb://design/dsn_…`, `bb://app/mini_…`, `bb://dashboard/dsh_…`,
+`bb://design/dsn_…`, `bb://app/mini_…`,
 `bb://artifact/art_…`, `bb://recording/rec_…`, `bb://conversation/thr_…`,
 `bb://worker/thr_…`, `bb://bot/bot_…`, `bb://board/thr_…`,
 `bb://memory/bot_…`, `bb://todos/bot_…`, `bb://archive/bot_…`,
@@ -39,7 +38,7 @@ Not found tab.
   project. `query` takes filters and words:
   `kind:page project:"Q4 launch" tag:draft -tag:done notes`.
   `family:page` lists every page type (docs, designs, whiteboards) and
-  `family:app` every app (mini apps, dashboards, artifacts); `type:design`
+  `family:app` every app (mini apps, artifacts); `type:design`
   lists one type.
 - Apps have their own tools: `apps_list`, `apps_read` (any app by id) and
   `apps_create`. Pages, designs and whiteboards share `pages_list`,
@@ -88,23 +87,6 @@ recordings, drawings, artifacts and other add-on items.
 A page takes its sub-pages with it. There's no undo, so delete only what the user asked
 to remove, and confirm first when the request is vague, like "clean up old
 stuff".
-
-## Filing in the Explorer
-
-The Explorer is Studio's sidebar tree: each project is a folder, with the
-user's own folders inside, and threads and items as rows. What you create is
-filed beside your thread already. File or move something only when the user
-asks, or to keep related work together.
-
-- `explorer_list` shows every project and its folders, nested, with folder
-  ids.
-- `explorer_file` with `target` (`{ kind: "thread" | "item", id }`, an item
-  by its id such as `pg_…`) and either `folder` (an id) or `path`
-  (`"Project/Sub/Folder"`; the first part is the project's name or
-  `No project`, and missing folders are created). A path that is only the
-  project puts the thing back at the project's root.
-- A folder holds only its own project's things. Move an item to the project
-  first with `studio_move_items`; a thread can't change project.
 
 ## Moving items and project leads
 
@@ -178,8 +160,8 @@ conversation started). `bot_conversations` lists them.
   works for or the workers it started, a finished conversation's summary and
   its last tool calls. Bring something from another conversation into this
   one only when it matters here.
-- **Finishing a conversation**: when the user presses Finish (or asks you to
-  finish this conversation), write its summary for someone who wasn't
+- **Archiving a conversation**: when the user archives a conversation (Studio
+  then asks you to in that conversation) or asks you to finish it, write its summary for someone who wasn't
   there, in short markdown: **Decisions** (one bullet each), **Left open**,
   **Made** (pages, designs, apps, code); leave out an empty section. Save it
   with `memory_add` (topic: the conversation's title, source `{ kind:
@@ -302,7 +284,7 @@ change nothing.
   `/plugins/studio/studio/pages/pg_…` or `/threads/thr_…`, a card directive
   such as `::page{id="pg_…"}`, a `file:///…` URL or an http(s) URL)
   opens a conversation, worker, board (thread `id`), a page, whiteboard,
-  design, app, dashboard, artifact or recording (its `id`), a Bot (its `id`),
+  design, app, artifact or recording (its `id`), a Bot (its `id`),
   Memory, the Library, Automations, Todos, the Archive (a Bot `id`, or none
   for the Bot on screen), one automation (`type: "automation"`, `id`
   `<botId>:<row id>`, or `bb://automation/<botId>:<row id>`), one todo
@@ -442,8 +424,7 @@ or | inside an item, not even to quote a word: one stray " breaks the whole line
   them, such as "If you fix a bug in one, the other keeps it." Under 40
   words. Emoji: 🐛 looks broken or risky (these get a Fix this button), 🏗️
   something the work rests on, 🔗 connected code that matters here, 🕐
-  changed recently. Every note gets Tell me more, which asks you to explain
-  it in the thread.
+  changed recently.
 - `do`: 1 to 3 concrete actions you could take next for the user, phrased
   as the instruction they'd give you, such as "📄 Write this up as a page",
   "🧵 Start a thread to fix the retry bug" or "📌 Add the decision to the

@@ -1,7 +1,6 @@
 // The Studio tab in a thread's workbench: what its params mean and which
 // kinds it shows. Pure, so cards, app.tsx and tests share it.
 import { ARTIFACT_ICON, PLUGIN_ID as ARTIFACTS_PLUGIN, REALTIME_CHANNEL as ARTIFACTS_CHANNEL, isArtifactId } from "../../artifacts/shared";
-import { DASHBOARD_ICON, DASHBOARD_KIND, PLUGIN_ID as DASHBOARDS_PLUGIN, REALTIME_CHANNEL as DASHBOARDS_CHANNEL, isDashboardId } from "../../dashboards/shared";
 import { DESIGN_ICON, PLUGIN_ID as DESIGN_PLUGIN, REALTIME_CHANNEL as DESIGN_CHANNEL, isDesignId } from "../../design/shared";
 import { DRAW_ICON, PLUGIN_ID as DRAW_PLUGIN, REALTIME_CHANNEL as DRAW_CHANNEL, isDrawingId } from "../../draw/shared";
 import { MINI_ICON, PLUGIN_ID as MINIS_PLUGIN, REALTIME_CHANNEL as MINIS_CHANNEL, isMiniId } from "../../minis/shared";
@@ -13,12 +12,12 @@ import { familyNamed, ITEM_FAMILIES as MODEL_FAMILIES, itemType, typeNamed, type
 /** The Studio tab's action id. */
 export const STUDIO_TAB = "studio";
 export const STUDIO_TAB_ICON = "studio/studio";
-export type TabKind = "page" | "drawing" | "design" | "dashboard" | "mini" | "artifact" | "recording" | "dictation";
+export type TabKind = "page" | "drawing" | "design" | "mini" | "artifact" | "recording" | "dictation";
 
 /**
  * The two kinds of thing Studio makes (src/item-model.ts). Pages are
  * documents: docs, whiteboards and designs. Apps are things that run: mini
- * apps, dashboards and artifacts. Recordings belong to neither. `types` are
+ * apps and artifacts. Recordings belong to neither. `types` are
  * what filters keep; `kinds` are the same types by the kind name providers
  * report.
  */
@@ -56,7 +55,6 @@ export const TAB_KINDS: readonly TabKindInfo[] = [
   { kind: "page", pluginId: PAGES_PLUGIN, channel: PAGES_CHANNEL, label: "Page", plural: "Pages", icon: "studio/pages", isId: isPageId, gate: "page" },
   { kind: "drawing", pluginId: DRAW_PLUGIN, channel: DRAW_CHANNEL, label: "Whiteboard", plural: "Whiteboards", icon: DRAW_ICON, isId: isDrawingId, gate: "drawing" },
   { kind: "design", pluginId: DESIGN_PLUGIN, channel: DESIGN_CHANNEL, label: "Design", plural: "Designs", icon: DESIGN_ICON, isId: isDesignId, gate: "design" },
-  { kind: DASHBOARD_KIND as "dashboard", pluginId: DASHBOARDS_PLUGIN, channel: DASHBOARDS_CHANNEL, label: "Dashboard", plural: "Dashboards", icon: DASHBOARD_ICON, isId: isDashboardId, gate: "dashboard" },
   { kind: "mini", pluginId: MINIS_PLUGIN, channel: MINIS_CHANNEL, label: "App", plural: "Apps", icon: MINI_ICON, isId: isMiniId, gate: "mini" },
   { kind: "artifact", pluginId: ARTIFACTS_PLUGIN, channel: ARTIFACTS_CHANNEL, label: "Artifact", plural: "Artifacts", icon: ARTIFACT_ICON, isId: isArtifactId, gate: "artifact" },
   { kind: "recording", pluginId: TALK_PLUGIN, channel: RECORDING_CHANGED, label: "Recording", plural: "Recordings", icon: TALK_ICON, isId: isRecordingId, gate: "recording" },
@@ -66,8 +64,8 @@ export const TAB_KINDS: readonly TabKindInfo[] = [
 /**
  * The tab kind a name means. Besides a tab kind's own name ("design"), it
  * reads a type ("doc", "whiteboard") and, with the item's id, a family: `page`
- * with a design's id is the design kind, `app` with a dashboard's the
- * dashboard kind. So `{ kind: "page", id }` opens any page type and
+ * with a design's id is the design kind, `app` with an artifact's the
+ * artifact kind. So `{ kind: "page", id }` opens any page type and
  * `{ kind: "app", id }` any app type, and the older `{ kind: "design", id }`
  * still opens what it did.
  */

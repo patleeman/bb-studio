@@ -52,10 +52,9 @@ describe("built-in kinds' addresses", () => {
     expect(builtinSegment("recordings/unsent")).toMatchObject({ route: { kind: "recording", pluginId: "talk" }, rest: "unsent" });
   });
 
-  it("opens dashboards at their Studio address only: they never had another", () => {
-    expect(builtinItemAt("/plugins/studio/studio/dashboards/dsh_0123456789abcdef")).toMatchObject({ pluginId: "dashboards", id: "dsh_0123456789abcdef", href: "/plugins/studio/studio/dashboards/dsh_0123456789abcdef" });
-    expect(builtinItemAt("/plugins/dashboards/dashboards/dsh_1")).toBeNull();
-    expect(builtinSegment("dashboards")).toMatchObject({ route: { kind: "dashboard", pluginId: "dashboards" }, rest: "" });
+  it("no longer opens dashboards", () => {
+    expect(builtinItemAt("/plugins/studio/studio/dashboards/dsh_0123456789abcdef")).toBeNull();
+    expect(builtinItemAt("/plugins/studio/studio/apps/dsh_0123456789abcdef")).toBeNull();
   });
 
   it("opens any page type at pages/<id> and any app type at apps/<id>, as the same item its own address opens", () => {
@@ -67,7 +66,7 @@ describe("built-in kinds' addresses", () => {
     expect(builtinItemAt("/plugins/studio/studio/pages/drw_0123456789abcdef")).toMatchObject({ pluginId: "excalidraw", route: { kind: "drawing" } });
     // A doc's family address is its own address.
     expect(builtinItemAt("/plugins/studio/studio/pages/pg_1")).toMatchObject({ pluginId: "pages", id: "pg_1", href: "/plugins/studio/studio/pages/pg_1" });
-    for (const [id, pluginId, segment] of [["dsh_0123456789abcdef", "dashboards", "dashboards"], ["art_0123456789abcdef", "artifacts", "artifacts"], ["mini_0123456789abcdef", "minis", "minis"]] as const) {
+    for (const [id, pluginId, segment] of [["art_0123456789abcdef", "artifacts", "artifacts"], ["mini_0123456789abcdef", "minis", "minis"]] as const) {
       const direct = builtinItemAt(`/plugins/studio/studio/${segment}/${id}`);
       expect(direct).toMatchObject({ pluginId, id });
       expect(builtinItemAt(`/plugins/studio/studio/apps/${id}`)).toEqual(direct);

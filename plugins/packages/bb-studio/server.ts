@@ -21,7 +21,7 @@ import { registerChat } from "./src/chat/server";
 import { ARTIFACT_TOOLS, registerArtifacts } from "./src/artifacts/server";
 import { DRAW_TOOLS, moveOrphanDrawings, registerDraw } from "./src/draw/server";
 import { DESIGN_TOOLS, registerDesign } from "./src/design/server";
-import { DASHBOARD_TOOLS, registerDashboards } from "./src/dashboards/server";
+import { registerDashboards } from "./src/dashboards/server";
 import { MINI_TOOLS, registerMinis } from "./src/minis/server";
 import { displayTitle as artifactTitle, versionType as artifactVersionType } from "./src/artifacts/server/store";
 import { registerTalk, TALK_TOOLS, type TalkSettingsHandle } from "./src/talk/server";
@@ -40,9 +40,6 @@ import { STUDIO_SETTINGS } from "./src/settings/schema";
 import { VoiceLive } from "./src/voice/live/live";
 import { registerVoiceLive } from "./src/voice/live/register";
 import { registerWindowRelay } from "./src/windows/server";
-import { MeetingLive } from "./src/voice/meeting/meeting";
-import { registerMeeting } from "./src/voice/meeting/register";
-import { MEETING_CHANNEL } from "./src/voice/meeting/shared";
 import { gatherSeed, type SeedMessage } from "./src/voice/live/identity";
 import { resolveTarget } from "./src/voice/live/targets";
 import { VOICE_LIVE_CHANNEL } from "./src/voice/live/shared";
@@ -60,14 +57,12 @@ import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // - Studio keeps tags, which group items across add-ons (src/tags.ts).
 // - Each BB project can have a lead thread with a heartbeat; the personal
 //   project's lead is the user's Bot (src/project-lead.ts, src/bot.ts).
-// - Studio keeps saved views, named collection queries (src/views.ts). The
-//   query language (src/query.ts) drives the agent tool and CLI too.
+// - The query language (src/query.ts) drives the Library, the agent tool and CLI.
 // - Studio keeps the sidebar's tabs, one per opened item (src/tabs.ts).
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { STUDIO_PLUGIN_ID, STUDIO_PROVIDER_CALL_METHOD, STUDIO_REALTIME_CHANNEL } from "./src/kit/contract";
-import { registerExplorer } from "./src/explorer/server";
 import { relativeTime, untitled } from "./src/kit/format";
 import { z } from "zod";
 import { rpcContract, schemas, TABS_CHANNEL, type SidebarView, type StarredItemView, type ThreadOptionView, type TabView } from "./src/contract";
@@ -138,13 +133,11 @@ import { TagStore, type ItemRef, type Tag } from "./src/tags";
 import { StarStore } from "./src/stars";
 import { planMove } from "./src/move-items";
 import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
-import { ViewStore } from "./src/views";
 import { ThreadTitles } from "./src/thread-titles";
 import { withTagHint } from "./src/create-tag-hint";
 import { excerpt, SearchIndex, tokens, type SearchHit } from "./src/search-index";
 import { externalResults } from "./src/search-external";
 import { StudioServices } from "./src/services";
-import { ProviderHistory } from "./src/provider-history";
 import { ProviderComments } from "./src/provider-comments";
 import { firstThreadItemRefs, firstThreadMentionPlugins, mentionProviderLookup } from "./src/thread-item-refs";
 import { zipFiles } from "./src/export-zip";
@@ -219,20 +212,6 @@ export default async function plugin(bb: BbPluginApi) {
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
     return id;
   };
-  // The former Explorer's folders and filing (src/explorer), kept underneath
-  // with no view of their own: what an agent's tool makes is filed beside the
-  // thread that made it, a child thread beside its parent.
-  const explorer = registerExplorer(bb, db, {
-    index: itemIndex,
-    thread: (threadId) => bb.sdk.threads.get({ threadId }).then((thread) => { const { projectId, parentThreadId } = thread as { projectId?: string | null; parentThreadId?: string | null }; return { projectId: projectId ?? null, parentThreadId: parentThreadId ?? null }; }, () => null),
-    projects: async () => ((await bb.sdk.projects.list({ includePersonal: true })) as { id: string; name: string }[]).map((project) => ({ id: project.id, name: project.name })),
-    changed: () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }),
-    // Both are made further down; the tree is only read once everything is.
-    sideThreads: () => sideThreads.parents(),
-    runnerThreads: () => [...runners.threadIds()],
-  });
-  const linkCreated = services.created.bind(services);
-  services.created = (ref, threadId) => { linkCreated(ref, threadId); try { explorer.itemCreated(ref.id, threadId); } catch { /* filing is a convenience */ } };
   // Create tools nudge agents to tag what they make (src/create-tag-hint.ts).
   const tagNames = new TagStore(db);
   // Tools by family (src/family-tools.ts): each type's tools keep their names
@@ -255,7 +234,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => drawings.dispose());
   const designs = registerDesign(bb, db, services, notifyBuiltin);
   bb.onDispose(() => designs.dispose());
-  const dashboards = registerDashboards(bb, db, services, notifyBuiltin);
+  const dashboards = registerDashboards(bb, db, notifyBuiltin);
   bb.onDispose(() => dashboards.dispose());
   // Mini apps' `playground.bb.studio.list` reads the collection through the hub, made below.
   const minis = registerMinis(bb, db, services, notifyBuiltin, {
@@ -363,8 +342,6 @@ export default async function plugin(bb: BbPluginApi) {
   const kindSettings = new KindSettingsStore(bb.storage.kv as never);
   await kindSettings.load();
   typeIsOn = (type) => builtinOn(kindSettings.current, itemType(type)!.pluginId);
-  // A dashboard kind that's off refreshes nothing.
-  dashboards.setEnabled(() => builtinOn(kindSettings.current, "dashboards"));
   const hub = new StudioHub(bb.sdk, [
     { pluginId: "studio-code", name: "VS Code", handlers: code.provider },
     { pluginId: "pages", name: "Pages", handlers: pages.provider },
@@ -372,7 +349,6 @@ export default async function plugin(bb: BbPluginApi) {
     { pluginId: "excalidraw", name: "Whiteboards", handlers: drawings.provider },
     { pluginId: "design", name: "Designs", handlers: designs.provider },
     { pluginId: "talk", name: "Recordings", handlers: recordings.provider },
-    { pluginId: "dashboards", name: "Dashboards", handlers: dashboards.provider },
     { pluginId: "minis", name: "Mini apps", handlers: minis.provider },
   ], {
     builtinOn: (pluginId) => builtinOn(kindSettings.current, pluginId),
@@ -402,7 +378,7 @@ export default async function plugin(bb: BbPluginApi) {
   for (const tool of appTools({ ...familyDeps, index: itemIndex })) bb.agents.registerTool(tool as never);
   /** Only a runner's thread gets this (src/runners.ts). */
   const RUNNER_TOOLS = ["runner_report"] as const;
-  const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS, dashboard: DASHBOARD_TOOLS, mini: MINI_TOOLS };
+  const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS, mini: MINI_TOOLS };
   // BB takes one agent configuration per plugin: the built-in kinds' tools in
   // every session, with Pages' instructions and the Next row's (Explore's), as
   // the Pages plugin gave them. A kind turned off gives neither, from the next
@@ -416,8 +392,6 @@ export default async function plugin(bb: BbPluginApi) {
     const tools = BUILTIN_KINDS.filter((each) => !off.has(each.kind)).flatMap((each) => [...(KIND_TOOLS[each.kind] ?? [])]);
     // The apps family's tools, while any app type is on.
     if (ITEM_TYPES.some((each) => each.family === "app" && !off.has(each.kind))) tools.push(...APP_TOOLS);
-    // The Explorer's tools (explorer_list, explorer_file) stay registered but
-    // aren't given out: the Explorer is gone, and its filing only runs underneath.
     tools.push(...CODE_TOOLS, ...WORKBENCH_TOOLS);
     // A skill review fork (src/skill-learning.ts) gets the skill tools and the Memory page's, nothing else of Studio's.
     if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") return { tools: [...REVIEW_TOOLS, ...CODE_TOOLS], skills: ["studio-code"], instructions: "" };
@@ -465,7 +439,6 @@ export default async function plugin(bb: BbPluginApi) {
   const tags = new TagStore(db);
   const stars = new StarStore(db);
   const tabs = new TabStore(db);
-  const views = new ViewStore(db);
   const threadTitles = new ThreadTitles(async (threadId) => ((await bb.sdk.threads.get({ threadId })) as { title?: string | null }).title ?? "");
   /** Adds each item's tag ids, when it was starred, and the thread that made it. */
   const listed = async <T extends { pluginId: string; id: string }>(items: readonly T[]) => {
@@ -485,8 +458,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => searchIndex.dispose());
   async function studioChanged({ pluginId, ids, removed }: { pluginId: string; ids?: string[]; removed?: string[] }) {
     await searchIndex.changed(pluginId, ids, removed);
-    await recordProviderChanges(hub, services, changes, pluginId, ids, removed);
-    try { explorer.itemsChanged(ids, removed); } catch { /* filing is a convenience */ }
+    await recordProviderChanges(hub, changes, pluginId, ids, removed);
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId, ids, removed });
     return { ok: true };
   }
@@ -499,15 +471,6 @@ export default async function plugin(bb: BbPluginApi) {
       snippets: Object.fromEntries(indexed.map((hit) => [`${hit.ref.pluginId}:${hit.ref.id}`, hit.snippet.text])),
     };
   };
-  const providerHistory = new ProviderHistory(bb.sdk, {
-    artifacts: {
-      versions: (id) => artifacts.store.versions(id).map((version) => ({ id: version.id, name: version.name, createdAt: version.created_at })),
-      bytes: (id, versionId) => {
-        const version = artifacts.store.version(id, versionId);
-        return version ? artifacts.store.bytes(version.sha256) : null;
-      },
-    },
-  });
   const providerComments = new ProviderComments(bb.sdk);
   const pendingThreadChecks = new Set(services.activeThreads().map((thread) => thread.threadId));
   let reconcilingThreads: Promise<void> | null = null;
@@ -606,7 +569,6 @@ export default async function plugin(bb: BbPluginApi) {
       providers: result.providers,
       items: await listed(result.items),
       tags: tags.list(),
-      views: views.list(),
     };
   };
 
@@ -626,12 +588,11 @@ export default async function plugin(bb: BbPluginApi) {
     changes.append(null);
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   };
-  /** Deletes an add-on's items and forgets their tags, stars, tabs and versions. */
+  /** Deletes an add-on's items and forgets their tags, stars and tabs. */
   const deleteItems = async (pluginId: string, ids: string[]) => {
     const result = await hub.call(pluginId, "studio_delete", { ids });
     tags.forget(pluginId, result.done);
     stars.forget(pluginId, result.done);
-    services.forgetVersions(pluginId, result.done);
     if (tabs.forget(pluginId, result.done)) tabsChanged();
     return result;
   };
@@ -1056,6 +1017,7 @@ export default async function plugin(bb: BbPluginApi) {
   // Finishing a conversation (src/bot-finish.ts): its summary to memory, Main gets the card, then archived.
   const botFinish = registerBotFinish(bb, {
     db, threads: botThreads.store, mainOf: (botId) => bots.stored(botId)?.threadId ?? null,
+    isBotThread: (threadId) => bots.list().some((bot) => bots.chain(bot.id).includes(threadId)),
     memory: {
       add: ({ botId, topic, text, threadId, title }) => { memoryService.store.add({ botId, topic, text, source: { kind: "conversation", id: threadId, title, section: null } }); },
       count: (botId, threadId, since) => (db.prepare("SELECT COUNT(*) AS n FROM memory_records WHERE bot_id = ? AND source_id = ? AND created_at >= ?").get(botId, threadId, since ?? 0) as { n: number }).n,
@@ -1270,7 +1232,6 @@ export default async function plugin(bb: BbPluginApi) {
   // Set once hands-free voice is wired, further down.
   let voiceSearch: ((query: string, limit: number) => SearchHit[]) | null = null;
   bb.rpc.register(rpcContract, {
-    ...explorer.rpc,
     overview: () => overview(),
     search: ({ query }) => contentSearch(query),
     searchStatus: () => searchIndex.status(),
@@ -1490,16 +1451,6 @@ export default async function plugin(bb: BbPluginApi) {
       await bots.handedOff(threadId, result.threadId);
       return result;
     },
-    saveView: ({ name, query }) => {
-      const view = views.save(name, query);
-      tagsChanged();
-      return { view };
-    },
-    deleteView: ({ id }) => {
-      views.remove(id);
-      tagsChanged();
-      return { ok: true };
-    },
     recentThreads: async () => ({ threads: await recentThreads() }),
     studio_changed: studioChanged,
     changes: ({ since }) => changes.since(since),
@@ -1604,9 +1555,6 @@ export default async function plugin(bb: BbPluginApi) {
       if (ok) { changes.append(null); bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }); }
       return { ok };
     },
-    versions: async ({ ref }) => ({ versions: (await providerHistory.versions(ref)) ?? services.versions(ref) }),
-    versionCreate: ({ ref, bytes, label, actor }) => ({ version: services.addVersion(ref, Buffer.from(bytes, "base64"), label, actor) }),
-    versionRead: async ({ ref, id }) => { const bytes = (await providerHistory.read(ref, id)) ?? services.versionBytes(ref, id); return { bytes: bytes ? Buffer.from(bytes).toString("base64") : null }; },
   });
 
   // Agents --------------------------------------------------------------------
@@ -1686,13 +1634,13 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "studio_list_items",
     description:
-      "List the user's BB Studio items — pages (docs, designs, whiteboards), apps (mini apps, dashboards, artifacts), Talk recordings and anything else a Studio add-on provides — newest first. It lists this thread's project's items and global ones (the user's Bot, the personal project's lead, sees every project); a project: filter or allProjects lists beyond that. Each line has a link and the item's #tags, and a content match shows the text that matched; open or mention it to work with the item.",
+      "List the user's BB Studio items — pages (docs, designs, whiteboards), apps (mini apps, artifacts), Talk recordings and anything else a Studio add-on provides — newest first. It lists this thread's project's items and global ones (the user's Bot, the personal project's lead, sees every project); a project: filter or allProjects lists beyond that. Each line has a link and the item's #tags, and a content match shows the text that matched; open or mention it to work with the item.",
     parameters: z.object({
       query: z
         .string()
         .max(500)
         .optional()
-        .describe('Words match titles and content. Filters: family:<page|app> type:<doc|design|whiteboard|mini|dashboard|artifact> kind:<kind> project:<name|global> tag:<name|none> is:archived is:template is:starred; quote names with spaces, repeat a field for any of its values, prefix - to exclude. E.g. kind:page -tag:draft project:"Q4 launch" pricing'),
+        .describe('Words match titles and content. Filters: family:<page|app> type:<doc|design|whiteboard|mini|artifact> kind:<kind> project:<name|global> tag:<name|none> is:archived is:template is:starred; quote names with spaces, repeat a field for any of its values, prefix - to exclude. E.g. kind:page -tag:draft project:"Q4 launch" pricing'),
       kind: z.string().max(100).optional().describe("Only this kind, e.g. page, recording, drawing; same as kind: in the query"),
       allProjects: z.boolean().optional().describe("Include every project, not just this one"),
       tag: z.string().max(100).optional().describe("Only items with this tag; same as tag: in the query"),
@@ -1845,25 +1793,6 @@ export default async function plugin(bb: BbPluginApi) {
   });
   registerVoiceLive(bb, voiceLive);
   registerWindowRelay(bb);
-  // Meeting mode (src/voice/meeting): a named voice participant in an in-person
-  // meeting. Each lookup is its own back-office thread, under the Bot like voice threads.
-  const meeting = new MeetingLive({
-    db,
-    key: () => openaiKey(settingValues),
-    settings: () => settingValues,
-    monthUsd: () => voiceLive.monthUsd(),
-    openThread: async ({ title, text, note }) => (await bb.sdk.threads.spawn({
-      projectId: PERSONAL_PROJECT_ID, title,
-      environment: { type: "project-default" },
-      pluginMetadata: { meetingLookup: true },
-      input: [{ type: "text", text, mentions: [] }, { type: "text", text: note, mentions: [], visibility: "agent-only" }],
-    } as never)).id,
-    claim: async (threadId) => { const bot = bots.stored(); if (bot) await ownedThreads.claim(threadId, bot.id); },
-    publish: (signal) => bb.realtime.publish(MEETING_CHANNEL, signal),
-    mockUrl: () => process.env.STUDIO_VOICE_MOCK_URL?.trim() || null,
-    warn: (message) => bb.log.warn(message),
-  });
-  registerMeeting(bb, meeting);
   registerGroupTool(bb, { state: pageState, acting, jobs: async (botId) => (await automations.list(botId)).map((job) => ({ id: job.id, name: job.name })) });
   voiceSearch = (query, limit) => {
     const words = tokens(query);
@@ -2472,7 +2401,6 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "designs", summary: "List and read designs: list, show, html, rename, delete", usage: "bb studio designs <list|show|html|rename|delete> …" },
       { name: "recordings", summary: "Read Talk recordings and their transcripts: list, show, transcript, notes", usage: "bb studio recordings <list|show|transcript|notes> …" },
       { name: "pages", summary: "Read and write pages: list, show, create, append; explore stats for the Next row", usage: "bb studio pages <list|show|create|append|explore> …" },
-      { name: "dashboards", summary: "List and read dashboards, and push data to their widgets", usage: "bb studio dashboards <list|show|set-data> …" },
       { name: "minis", summary: "List mini apps, read their records and state, and run their actions", usage: "bb studio minis <list|show|data|state|watch|actions|do> …" },
       { name: "theme", summary: "List, show, check, create, update, apply and delete Bot themes", usage: "bb studio theme <list|show|create|update|apply|check|delete|template> …" },
       { name: "presence", summary: "List, show, check, create, update, apply and delete Bot presences", usage: "bb studio presence <list|show|create|update|apply|check|delete|template> …" },
@@ -2488,7 +2416,6 @@ export default async function plugin(bb: BbPluginApi) {
       // `drawings` is the old name of `whiteboards`; both stay.
       if (argv[0] === "whiteboards" || argv[0] === "drawings") return drawings.cli(argv.slice(1), ctx);
       if (argv[0] === "designs") return designs.cli(argv.slice(1), ctx);
-      if (argv[0] === "dashboards") return dashboards.cli(argv.slice(1));
       if (argv[0] === "minis") return minis.cli(argv.slice(1));
       if (argv[0] === "recordings") return recordings.cli(argv.slice(1));
       if (argv[0] === "presence") return runPresenceCli(argv.slice(1), { service: presenceService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)) });
@@ -2592,7 +2519,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|starred|move|providers|health|setup|reindex|backup|restore|pages|artifacts|whiteboards|designs|recordings|dashboards|minis|theme|presence|decisions|work> …");
+            return usage("bb studio <list|tags|starred|move|providers|health|setup|reindex|backup|restore|pages|artifacts|whiteboards|designs|recordings|minis|theme|presence|decisions|work> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

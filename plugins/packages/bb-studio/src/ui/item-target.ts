@@ -23,7 +23,7 @@ function decode(segment: string): string | null {
 
 /**
  * What the main view's path shows: a thread, or an item in Studio's items
- * index (a page, whiteboard, design, mini app, dashboard, artifact), under
+ * index (a page, whiteboard, design, mini app, artifact), under
  * any of its addresses and sub-views. Null for every other page.
  */
 export function targetForPath(pathname: string): TabTarget | null {
@@ -43,7 +43,7 @@ export function pathForTarget(target: TabTarget): string | null {
   return type ? typeHref(type, target.id) : null;
 }
 
-/** The item kind name (page, drawing, design, mini, dashboard, artifact) an item id has, for its icon. */
+/** The item kind name (page, drawing, design, mini, artifact) an item id has, for its icon. */
 export function itemKindOf(id: string): string | null {
   return typeOfId(id)?.kind ?? null;
 }

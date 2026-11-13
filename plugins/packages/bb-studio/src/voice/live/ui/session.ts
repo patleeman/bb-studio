@@ -64,9 +64,6 @@ export class LiveSession {
   private version = 0;
   private syncing: Promise<void> | null = null;
   private failedSyncs = 0;
-  /** Meeting mode's address gate (src/voice/meeting/ui/gate.ts): shut, the voice stays muted whatever barge-in says. */
-  private audioGate = true;
-  private bargeMuted = false;
 
   constructor(private readonly server: LiveServer, private readonly options: SessionOptions = {}) {}
 
@@ -113,8 +110,7 @@ export class LiveSession {
         case "send": for (const event of encodeOutgoing(effect.outgoing, this.protocol)) this.transport?.send(event); break;
         case "muteAgentAudio":
           this.log(effect.muted ? "voice muted" : "voice unmuted");
-          this.bargeMuted = effect.muted;
-          this.transport?.setAgentAudio(!effect.muted && this.audioGate);
+          this.transport?.setAgentAudio(!effect.muted);
           break;
         case "runTool": void this.runTool(effect.callId, effect.name, effect.arguments, effect.reports); break;
         case "hangUp": void this.hangUp(effect.reports); break;
@@ -122,14 +118,6 @@ export class LiveSession {
       }
     }
     this.changed();
-  }
-
-  /** Meeting mode: whether the room may hear the voice now (on top of barge-in's own muting). */
-  setAudioGate(open: boolean): void {
-    if (open === this.audioGate) return;
-    this.audioGate = open;
-    this.log(open ? "gate open" : "gate shut");
-    this.transport?.setAgentAudio(open && !this.bargeMuted);
   }
 
   /** Adds a note to the conversation: spoken, the voice says it now; not spoken, something to know. */
@@ -165,7 +153,6 @@ export class LiveSession {
       this.micLabel = transport.micLabel;
       if (transport.micOpenedAt) this.trace.push({ at: transport.micOpenedAt, what: "mic open" });
       this.transport = transport;
-      if (!this.audioGate) transport.setAgentAudio(false);
       transport.onEvent((event) => this.receive(event));
       transport.onClose((reason) => { if (this.machine.isLive) this.apply(this.machine.fail(reason, this.now())); });
       this.startTimers();

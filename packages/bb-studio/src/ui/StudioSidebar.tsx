@@ -1,6 +1,6 @@
 // The Studio sidebar: Studio's thread list provider ("Studio (Studio)"), which
 // replaces BB's thread list while the Studio panel shows (bot/threadListSwitch.ts).
-// New (Studio's New menu), then Starred, the kinds with their counts, saved views, tags,
+// New (Studio's New menu), then Starred, the kinds with their counts, tags,
 // pinned items and recent ones (studio-sidebar-model.ts). A kind, view or tag
 // filters the library on the new tab page; an item opens as a Studio tab.
 import {
@@ -19,7 +19,7 @@ import {
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { useBbContext, useRealtime, useRpc, useSdk, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { ProviderView, rpcContract, SavedViewView, TabView, TagView } from "../contract";
+import type { ProviderView, rpcContract, TabView, TagView } from "../contract";
 import { TABS_CHANNEL } from "../ids";
 import { canonicalPath } from "../builtins";
 import { appliedKinds } from "./kinds-snapshot";
@@ -31,7 +31,7 @@ import { studioSidebarModel, type SidebarItem } from "./studio-sidebar-model";
 import { STARRED_QUERY } from "./starred";
 import { runCreateEntry, startsGroup, useCreateEntries } from "./create-menu";
 
-type Overview = { providers: ProviderView[]; items: CollectionItem[]; tags: TagView[]; views: SavedViewView[] };
+type Overview = { providers: ProviderView[]; items: CollectionItem[]; tags: TagView[] };
 const CLOSED_KEY = "studio.sidebar.closed";
 const NO_PROVIDERS: readonly ProviderView[] = [];
 const ROW = "flex h-7 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-state-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
@@ -186,16 +186,6 @@ function StudioItemsList({ onNavigate }: { onNavigate(): void }) {
               </button>
             ))}
           </div>
-          {model.views.length ? (
-            <Section id="views" label="Saved views" closed={closed} onToggle={toggle}>
-              {model.views.map((view) => (
-                <button key={view.id} type="button" aria-current={filterSelected(view.query) ? "page" : undefined} onClick={() => filter(view.query)} className={`${ROW} ${filterSelected(view.query) ? ACTIVE : ""}`}>
-                  <Icon name="Filter" className="size-3.5 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate">{view.name}</span>
-                </button>
-              ))}
-            </Section>
-          ) : null}
           {model.tags.length ? (
             <Section id="tags" label="Tags" closed={closed} onToggle={toggle}>
               {model.tags.map((tag) => (

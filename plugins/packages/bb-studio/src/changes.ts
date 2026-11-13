@@ -1,5 +1,4 @@
 import type { HubItem, StudioHub } from "./hub";
-import type { StudioServices } from "./services";
 
 /** Bounded change history for clients returning from the background. */
 export interface ItemChange { pluginId: string; id: string; kind: string; removed: boolean; at: number }
@@ -25,10 +24,9 @@ export class ChangeLog {
   }
 }
 
-/** Record provider notifications and discard versions only for confirmed deletions. */
+/** Record provider notifications. */
 export async function recordProviderChanges(
   hub: Pick<StudioHub, "providers" | "itemsResult">,
-  services: Pick<StudioServices, "forgetVersions">,
   changes: ChangeLog,
   pluginId: string,
   ids?: string[],
@@ -53,5 +51,4 @@ export async function recordProviderChanges(
   const byId = new Map(fresh?.map((item) => [item.id, item]));
   for (const id of fresh === null ? [] : (ids ?? []).filter((id) => complete || byId.has(id))) changes.append({ pluginId, id, kind: byId.get(id)?.kind ?? fallbackKind ?? "", removed: !byId.has(id), at: Date.now() });
   for (const id of removed ?? []) changes.append({ pluginId, id, kind: "", removed: true, at: Date.now() });
-  services.forgetVersions(pluginId, [...(removed ?? []), ...(!complete ? [] : (ids ?? []).filter((id) => !byId.has(id)))]);
 }

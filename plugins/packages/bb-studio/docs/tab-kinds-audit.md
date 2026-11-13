@@ -28,7 +28,6 @@ as it).
 | Whiteboard | had | had | added | had | had |
 | Design | had | had | added | had | had |
 | App | added | added | added | added | had |
-| Dashboard | added | added | added | added | had |
 | Artifact | added | added | added | added | had |
 | Recording | added | added | n/a [1] | added | had |
 | Visual Chat board | had | had | n/a [2] | added | had |
@@ -90,7 +89,7 @@ as it).
   dragged. That reaches every kind with a Recent or search row, sidebar or
   not.
 - The New Tab Actions sit under two headings (`experimental_newTabGroup`):
-  **New** (Conversation, Page, Whiteboard, Design, App, Dashboard) and
+  **New** (Conversation, Page, Whiteboard, Design, App) and
   **Open** (Conversation, Page, Memory, Library, Automations, Todos, Archive,
   VS Code), titled by the kind's name. bb's action search lists matches under
   its own Actions heading, where each tooltip says "New page" or "Open page".

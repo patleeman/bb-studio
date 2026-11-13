@@ -53,7 +53,7 @@ describe("frontend bundle", () => {
   });
 
   it("loads the design canvas only when a design opens", () => {
-    expect(importersOf(join(packageDir, "app.tsx"), (spec) => /(^|\/)(design-view|canvas|play-view|comments)$/.test(spec))).toEqual([]);
+    expect(importersOf(join(packageDir, "app.tsx"), (spec) => /(^|\/)(design-view|canvas|play-view|screen-frames)$/.test(spec))).toEqual([]);
   });
 
   it("loads a recording's page only when one opens", () => {
@@ -64,11 +64,6 @@ describe("frontend bundle", () => {
     const heavy = /^(@blocknote\/|@tiptap\/|yjs$|y-prosemirror|y-protocols|lib0|mermaid|shiki|recharts|pdf-lib)/;
     expect(importersOf(join(packageDir, "app.tsx"), (spec) => heavy.test(spec))).toEqual([]);
     expect(importersOf(join(packageDir, "app.tsx"), (spec) => /(^|\/)(PageEditor|PageView|PanelShell|PagePanel|PagesPanel|connection)$/.test(spec))).toEqual([]);
-  });
-
-  it("loads the dashboard grid only when a dashboard opens", () => {
-    expect(importersOf(join(packageDir, "app.tsx"), (spec) => /^(react-grid-layout|react-draggable|react-resizable)/.test(spec))).toEqual([]);
-    expect(importersOf(join(packageDir, "app.tsx"), (spec) => /(^|\/)(dashboard-view|widgets|settings-sheet|custom-frame)$/.test(spec))).toEqual([]);
   });
 
   it("loads Excalidraw only when a drawing opens", () => {

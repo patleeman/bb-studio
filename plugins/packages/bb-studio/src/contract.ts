@@ -5,7 +5,6 @@ import { themeRpcSchemas } from "./theme/contract";
 import { appearanceSchema } from "./theme/appearance";
 import { presenceRpcSchemas } from "./presence/contract";
 import { presenceSchema } from "./presence/schema";
-import { explorerSchemas } from "./explorer/contract";
 import { botThreadsSchemas } from "./bot-threads-contract";
 import { workerApprovalSchemas } from "./worker-approvals";
 import { defineRpcContract } from "@get-bb/plugin-sdk";
@@ -58,8 +57,6 @@ const threadOption = z.object({
   updatedAt: z.number(),
 });
 export type ThreadOptionView = z.infer<typeof threadOption>;
-const savedView = z.object({ id: z.string(), name: z.string(), query: z.string() });
-export type SavedViewView = z.infer<typeof savedView>;
 /** `thread` is the thread that made the item, with its title; null when no thread did. */
 /** `starredAt` is when the user starred the item, or null when it isn't starred. `createdBy` is who made the item (its first recorded activity), or null when nothing was recorded. */
 const listedItem = schemas.item.extend({ pluginId: z.string(), tags: z.array(z.string()), thread: z.object({ id: z.string(), title: z.string() }).nullable(), starredAt: z.number().nullable().optional(), createdBy: z.enum(["user", "agent"]).nullable().optional() });
@@ -424,7 +421,6 @@ export const rpcContract = defineRpcContract({
       /** Tag ids per item, in tag-name order. */
       items: z.array(listedItem),
       tags: z.array(tag),
-      views: z.array(savedView),
     }),
   },
   items: { input: z.object({ pluginId, ids }), output: z.object({ items: z.array(listedItem) }) },
@@ -652,9 +648,6 @@ export const rpcContract = defineRpcContract({
   bot_automation_runs: { input: z.object({ botId, id: automationId, limit: z.number().int().min(1).max(50).optional() }), output: z.object({ runs: z.array(botAutomationRun) }) },
   /** Continues a thread in a new one on the chosen provider and archives the old one; a lead stays the lead and the Bot keeps its new thread. */
   thread_handoff: { input: z.object({ threadId: z.string().min(1).max(200), request: newThreadRequest }), output: z.object({ threadId: z.string() }) },
-  /** Saves a collection query by name, replacing a view with that name. */
-  saveView: { input: z.object({ name: z.string().min(1).max(60), query: z.string().max(500) }), output: z.object({ view: savedView }) },
-  deleteView: { input: z.object({ id: z.string().min(1).max(100) }), output: z.object({ ok: z.boolean() }) },
   /** Add-ons call this when their items change. */
   studio_changed: schemas.changed,
   sidebar: { input: z.null(), output: sidebar },
@@ -684,8 +677,6 @@ export const rpcContract = defineRpcContract({
   /** The item a path opens, or an item by id, with its kind. Studio Chat calls it. */
   itemAt: schemas.itemAt,
   ...itemServicesContract,
-  // The former Explorer's folders and filing, kept underneath (src/explorer/contract.ts).
-  ...explorerSchemas,
   // One Bot, many conversations: spaces, conversations and workers, the Library (src/bot-threads-contract.ts).
   ...botThreadsSchemas,
   ...themeRpcSchemas,

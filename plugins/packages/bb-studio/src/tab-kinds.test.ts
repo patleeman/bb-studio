@@ -19,7 +19,6 @@ const SAMPLE: Record<TabKindId, TabRef> = {
   whiteboard: { kind: "whiteboard", id: "drw_0123456789abcdef" },
   design: { kind: "design", id: "dsn_0123456789abcdef" },
   app: { kind: "app", id: "mini_0123456789abcdef" },
-  dashboard: { kind: "dashboard", id: "dsh_0123456789abcdef" },
   artifact: { kind: "artifact", id: "art_0123456789abcdef" },
   recording: { kind: "recording", id: "rec_0123456789" },
   board: { kind: "board", id: "thr_board" },
@@ -60,7 +59,7 @@ describe("the registry", () => {
 
   it("covers the kinds the owner listed, and bb's own", () => {
     const names = TAB_KIND_REGISTRY.map((entry) => entry.name);
-    for (const name of ["Conversation", "Worker", "Page", "Whiteboard", "Design", "Visual Chat board", "Artifact", "App", "Dashboard", "Memory", "Library", "Automations", "Todos", "Archive", "VS Code", "File", "Diff", "Browser", "Workflow run"]) expect(names).toContain(name);
+    for (const name of ["Conversation", "Worker", "Page", "Whiteboard", "Design", "Visual Chat board", "Artifact", "App", "Memory", "Library", "Automations", "Todos", "Archive", "VS Code", "File", "Diff", "Browser", "Workflow run"]) expect(names).toContain(name);
     expect(TAB_KIND_REGISTRY.filter((entry) => entry.owner === "bb").map((entry) => entry.open)).toEqual([
       { via: "bb", spec: "file" }, { via: "bb", spec: "diff" }, { via: "bb", spec: "url" }, { via: "bb", spec: "terminal" },
       // The Workflows plugin lets other plugins open its run tab.
@@ -145,7 +144,7 @@ describe("addresses", () => {
 describe("naming", () => {
   it("lists the New Tab Actions under New and Open, titled New <kind>, Open <kind> or the page's name", () => {
     expect(NEW_TAB_ACTIONS.map((action) => `${action.group}: ${action.title}`)).toEqual([
-      "New: New conversation", "New: New page", "New: New whiteboard", "New: New design", "New: New app", "New: New dashboard",
+      "New: New conversation", "New: New page", "New: New whiteboard", "New: New design", "New: New app",
       "Open: Open conversation", "Open: Open page", "Open: Memory", "Open: Skills", "Open: Library", "Open: Automations", "Open: Todos", "Open: Archive", "Open: VS Code",
     ]);
     // bb's action search lists matches under one heading: no two titles are the same.

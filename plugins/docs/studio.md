@@ -1,6 +1,6 @@
 # BB Studio
 
-BB Studio collects every item in one searchable, tagged collection. Pages, recordings, drawings, designs and artifacts are built into Studio: they implement the shared contract in `packages/bb-studio/src/kit/contract.ts` in-process, keep `pages`, `talk`, `excalidraw`, `design` and `artifacts` as their item namespaces, and open at `/plugins/studio/studio/<segment>/<id>` (`pages`, `recordings`, `drawings`, `designs`, `artifacts`). VS Code also runs inside Studio, with the `studio-code` item namespace and `/plugins/studio/studio/workspaces/<id>` addresses. Its old URLs still resolve. Other plugins reach a built-in kind through Studio's `provider.call` (kit `callProvider`). [merging-add-ons.md](merging-add-ons.md) describes how the kinds moved in. Dashboards (`packages/bb-studio/src/dashboards`) were built in from the start: items are `dashboards:<id>` at `/plugins/studio/studio/dashboards/<id>`, with no older address.
+BB Studio collects every item in one searchable, tagged collection. Pages, recordings, drawings, designs and artifacts are built into Studio: they implement the shared contract in `packages/bb-studio/src/kit/contract.ts` in-process, keep `pages`, `talk`, `excalidraw`, `design` and `artifacts` as their item namespaces, and open at `/plugins/studio/studio/<segment>/<id>` (`pages`, `recordings`, `drawings`, `designs`, `artifacts`). VS Code also runs inside Studio, with the `studio-code` item namespace and `/plugins/studio/studio/workspaces/<id>` addresses. Its old URLs still resolve. Other plugins reach a built-in kind through Studio's `provider.call` (kit `callProvider`). [merging-add-ons.md](merging-add-ons.md) describes how the kinds moved in.
 
 ## Provider contract
 
@@ -73,7 +73,7 @@ The Studio hub stores links, item threads, activity, comments, and content versi
 
 `replaceLinks` replaces one source's outgoing edges for an item. Pages sends mentions and item links. `links` returns outgoing edges and backlinks. `spawnForItem` creates and records a thread; `linkItemThread` records threads created by existing workflows, and `threadItems` lists a thread's linked items. The thread panel's Studio tab uses both: it lists the thread's items first, and links each item it creates to the thread with the `created` role. Studio also links the first accepted composer input's item refs, including multiple selected items, while keeping the composer's model and workspace choices. Studio reconciles thread states at startup and tracks lifecycle events. Pages chats and Studio Chat links are linked the same way.
 
-`recordActivity` accepts a kit `Actor`, verb, item ref, time, and summary. `activity` reads a bounded feed, optionally filtered by item and cursor. Comments use `comments`, `commentCreate`, and `commentResolve`; Pages keeps its Yjs comments and maps them to this interface. Other item comments live in Studio. Versions use `versions`, `versionCreate`, and `versionRead`. Studio deduplicates new drawing blobs by SHA-256. Pages snapshots stay in Pages and are read through an adapter; artifact versions are read from Studio's own artifact tables.
+`recordActivity` accepts a kit `Actor`, verb, item ref, time, and summary. `activity` reads a bounded feed, optionally filtered by item and cursor. Comments use `comments`, `commentCreate`, and `commentResolve`; Pages keeps its Yjs comments and maps them to this interface. Other item comments live in Studio. Each kind keeps its own version history: Pages snapshots, artifact versions and the like.
 
 ## Search
 
@@ -173,7 +173,7 @@ passes its message's thread, and global surfaces (search, Talk, recording
 mentions in chat, the Talk "Go back" bridge) pass `"route"`, the container the
 main view shows. Code outside React uses `openPathIn` (a header action, with
 its panel) or `openPathFromRoute` (a content script). Links in a page's text
-and in its comments go through `PagesUi.openLink`, never a new window.
+go through `PagesUi.openLink`, never a new window.
 `studio-open.wiring.test.tsx` fails when a new file calls `openAppPath`,
 `useOpenMain`, `useOpenThreadTab` or `openWorkspaceItem` directly; Studio
 routes that aren't items (settings, the Bot pages, Loops, Setup), old-address

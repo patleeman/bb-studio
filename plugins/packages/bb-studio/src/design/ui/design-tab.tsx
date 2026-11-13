@@ -18,5 +18,5 @@ export function TabCanvas({ designId, backLabel, onBack }: { designId: string; b
       </div>
     </>
   );
-  return <div className="relative h-full min-h-0">{design ? <DesignBoard design={design} leftTools={back} inThread /> : null}</div>;
+  return <div className="relative h-full min-h-0">{design ? <DesignBoard design={design} leftTools={back} /> : null}</div>;
 }

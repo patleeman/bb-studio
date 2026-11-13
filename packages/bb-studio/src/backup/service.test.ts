@@ -97,7 +97,6 @@ it("backs up every add-on and Studio's data, then restores it on another BB with
   const tag = tags.ensure("draft");
   tags.apply([{ pluginId: "notes", id: "n1" }], [tag.id], []);
   services.addComment({ ref: { pluginId: "notes", id: "n1" }, parentId: null, anchor: null, actor: { kind: "user" }, body: "Check this" });
-  services.addVersion({ pluginId: "notes", id: "n1" }, Buffer.from("v1"), "First", { kind: "user" });
   services.linkThread({ threadId: "thr_saved", ref: { pluginId: "notes", id: "n1" }, role: "created", state: "idle", createdAt: 1, updatedAt: 1, metadata: {} });
   services.replaceLinks({ pluginId: "notes", id: "n1" }, "notes", [{ from: { pluginId: "notes", id: "n1" }, to: { pluginId: "notes", id: "n2" }, kind: "related", source: "notes" }]);
   const sourceNotes = new Map([
@@ -130,7 +129,7 @@ it("backs up every add-on and Studio's data, then restores it on another BB with
   // A new computer: different project ids, an empty Studio.
   const targetDir = await temp();
   const targetDb = studioDb();
-  for (const table of ["item_links", "item_threads", "item_comments", "item_blobs", "item_versions"]) {
+  for (const table of ["item_links", "item_threads", "item_comments"]) {
     targetDb.exec(`ALTER TABLE ${table} ADD COLUMN future TEXT NOT NULL DEFAULT ''`);
   }
   const targetNotes = new Map<string, { id: string; title: string; projectId: string | null; updatedAt: number }>();
@@ -160,7 +159,6 @@ it("backs up every add-on and Studio's data, then restores it on another BB with
   expect(targetDb.prepare("SELECT project_id, enabled, cadence, automation_id FROM project_runs").all()).toEqual([{ project_id: "p_new", enabled: 0, cadence: "daily", automation_id: null }]);
   const targetServices = new StudioServices(targetDb);
   expect(targetServices.comments({ pluginId: "notes", id: "n1" }).map((comment) => comment.body)).toEqual(["Check this"]);
-  expect(Buffer.from(targetServices.versionBytes({ pluginId: "notes", id: "n1" }, targetServices.versions({ pluginId: "notes", id: "n1" })[0]!.id)!).toString()).toBe("v1");
   expect(changed).toBe(1);
 
   const again = await target.restore(file, { dryRun: false });

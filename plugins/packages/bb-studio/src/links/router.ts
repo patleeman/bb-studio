@@ -48,10 +48,10 @@ export function refOf(kind: TabKindId, id: string | null): TabRef | null {
 
 const DIRECTIVE_KINDS: Record<string, TabKindId> = {
   page: "page", drawing: "whiteboard", whiteboard: "whiteboard", design: "design", mini: "app", app: "app",
-  dashboard: "dashboard", artifact: "artifact", recording: "recording", loop: "todos", loops: "todos", "bot-thread": "conversation", board: "board",
+  artifact: "artifact", recording: "recording", loop: "todos", loops: "todos", "bot-thread": "conversation", board: "board",
 };
 const DIRECTIVE_OF_KIND: Partial<Record<TabKindId, string>> = {
-  page: "page", whiteboard: "drawing", design: "design", app: "mini", dashboard: "dashboard", artifact: "artifact", recording: "recording",
+  page: "page", whiteboard: "drawing", design: "design", app: "mini", artifact: "artifact", recording: "recording",
 };
 
 function directiveAttributes(text: string): Record<string, string> {

@@ -123,3 +123,21 @@ describe("the Bot triages runner reports (docs/needs-you/REDO.md)", () => {
     expect(db.prepare("SELECT urgent FROM bot_runners").get()).toEqual({ urgent: 0 });
   });
 });
+
+describe("the empty-table cleanup", () => {
+  const DROPPED = ["bot_avatar_images", "bot_skill_pending", "space_runs", "space_thread_handoffs", "item_versions", "item_blobs", "filing", "folders", "views"];
+
+  it("drops the unused tables on an existing install, keeps the ones still in use, and runs again safely", async () => {
+    const { default: Database } = await import("better-sqlite3");
+    const db = new Database(":memory:");
+    const drop = MIGRATIONS.findIndex((sql) => sql.includes("DROP TABLE IF EXISTS bot_avatar_images;"));
+    expect(drop).toBeGreaterThan(0);
+    for (const sql of MIGRATIONS.slice(0, drop)) db.exec(sql);
+    const tables = () => new Set((db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((row) => row.name));
+    for (const table of DROPPED) expect(tables().has(table)).toBe(true);
+    db.exec(MIGRATIONS[drop]!);
+    for (const table of DROPPED) expect(tables().has(table)).toBe(false);
+    for (const table of ["project_thread_handoffs", "checklist_handoffs", "project_runs", "thread_seeds", "bot_nudges", "bot_profile_changes", "bot_cache_settings", "bot_skill_lints", "requests", "chats", "files", "dashboards"]) expect(tables().has(table)).toBe(true);
+    db.exec(MIGRATIONS[drop]!);
+  });
+});

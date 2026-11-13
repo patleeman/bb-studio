@@ -5,14 +5,12 @@ import { StudioServices } from "./services";
 import { registerDraw } from "./draw/server";
 import { registerDesign } from "./design/server";
 import { registerArtifacts } from "./artifacts/server";
-import { registerDashboards } from "./dashboards/server";
 
 describe("built-in item thread links", () => {
   for (const [kind, register, tool, input] of [
     ["excalidraw", registerDraw, "whiteboard_create", { pageId: "pg_plan", name: "Plan" }],
     ["design", registerDesign, "design_create", { name: "Plan" }],
     ["artifacts", registerArtifacts, "artifacts_save", { title: "Plan", name: "plan.md", content: "Plan" }],
-    ["dashboards", registerDashboards, "dashboard_create", { name: "Plan" }],
   ] as const) {
     it(`${kind} links its new item without the plugin RPC bridge`, async () => {
       const callRpc = vi.fn(async () => { throw new Error("bridge unavailable"); });

@@ -311,12 +311,12 @@ async function waitForFrame(client, sleep, title, text) {
   }
 }
 
-/** The floating pills: Select, Edit text and Comment modes on the left, zoom on the right. */
+/** The floating pills: Select and Edit text modes on the left, zoom on the right. */
 async function waitForPills(client) {
   await client.waitForAriaButton("Reload screens");
   await client.waitForSelector('[role="group"][aria-label="Mode"] button[aria-pressed="true"]');
   const modes = await client.evaluate(`[...document.querySelectorAll('[role="group"][aria-label="Mode"] button')].map((b) => b.textContent.trim()).join("|")`);
-  if (!/^Select\|Edit text\|Comment/.test(modes)) throw new Error(`The mode pill shows ${modes}`);
+  if (!/^Select\|Edit text$/.test(modes)) throw new Error(`The mode pill shows ${modes}`);
   await client.waitForAriaButton("Zoom out");
   await client.waitForAriaButton("Zoom in");
   await client.waitForSelector('button[title="Zoom to fit"]');

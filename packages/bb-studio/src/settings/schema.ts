@@ -45,8 +45,6 @@ export const STUDIO_SETTINGS = {
   voiceLiveVoice: { group: "voice", type: "select", label: "Hands-free voice", description: "A voice the model doesn’t have uses marin.", options: ALL_VOICES, default: DEFAULT_VOICE },
   voiceLiveBackendModel: { group: "voice", type: "select", label: "Backend model", description: "gpt-live-1 only. gpt-5.6-luna is the cheapest and fastest.", options: BACKEND_MODELS, default: DEFAULT_BACKEND_MODEL },
   voiceLiveMonthlyCapUsd: { group: "voice", type: "number", label: "Monthly limit (USD)", description: "Estimated from OpenAI’s usage reports.", default: DEFAULT_CAP_USD, min: 0, max: 10_000 },
-  meetingAgentName: { group: "voice", type: "string", label: "Meeting agent’s name", default: "Iris", maxLength: 24 },
-  meetingAddressing: { group: "voice", type: "select", label: "When the meeting agent answers", options: ["name", "judge"], optionLabels: { name: "When named", judge: "When named, or when it’s clear" }, default: "name" },
 
   // Recordings and calls
   autoTitle: { group: "recordings", type: "boolean", label: "Name recordings", default: true },

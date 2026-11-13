@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { BackupWriter } from "../kit/server/index";
 import Database from "better-sqlite3";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -118,25 +117,15 @@ it("preserves all current skill fields and reads old skill records", async () =>
   expect(target.prepare("SELECT state, pinned, used_at, lint_warnings FROM bot_skills WHERE name = 'old'").get()).toEqual({ state: "active", pinned: 0, used_at: null, lint_warnings: "[]" });
 });
 
-it("captures version blobs before the writer yields to deletion", async () => {
-  const db = database();
-  const bytes = Buffer.from("version content");
-  const sha = createHash("sha256").update(bytes).digest("hex");
-  db.prepare("INSERT INTO item_blobs (sha256, bytes) VALUES (?, ?)").run(sha, bytes);
-  db.prepare("INSERT INTO item_versions (id, plugin_id, item_id, sha256, label, actor, created_at) VALUES ('v1', 'pages', 'p1', ?, 'Saved', '{}', 1)").run(sha);
+it("ignores an older backup's versions.json and views.json", async () => {
+  const source = database();
   const dir = join(await folder(), "studio");
   await import("node:fs/promises").then(({ mkdir }) => mkdir(dir));
-  class Deleting extends BackupWriter {
-    override async json(...args: Parameters<BackupWriter["json"]>) {
-      db.exec("DELETE FROM item_versions; DELETE FROM item_blobs");
-      return super.json(...args);
-    }
-  }
-  await studioDataBackup(db, { threadExists: async () => true }).backup(new Deleting(dir));
-  const target = database();
-  const report = await runRestore(dir, studioDataBackup(target, { threadExists: async () => true }), { version: 1, projects: {}, dryRun: false });
+  await studioDataBackup(source, { threadExists: async () => true }).backup(new BackupWriter(dir));
+  await writeFile(join(dir, "versions.json"), JSON.stringify([{ id: "v1", plugin_id: "pages", item_id: "p1", sha256: "0".repeat(64), label: "Saved", actor: "{}", created_at: 1 }]));
+  await writeFile(join(dir, "views.json"), JSON.stringify([{ id: "view_1", name: "Mine", query: "kind:page", position: 0, created_at: 1 }]));
+  const report = await runRestore(dir, studioDataBackup(database(), { threadExists: async () => true }), { version: 1, projects: {}, dryRun: false });
   expect(report.failed).toBe(0);
-  expect(target.prepare("SELECT bytes FROM item_blobs WHERE sha256 = ?").get(sha)).toEqual({ bytes });
 });
 
 it("fails unavailable thread checks before restoring any links or Bots, and can retry", async () => {

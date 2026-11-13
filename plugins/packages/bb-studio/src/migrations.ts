@@ -1093,4 +1093,13 @@ export const MIGRATIONS = [
        finished_at INTEGER
      );
    CREATE INDEX work_cards_thread ON work_cards (thread_id, finished_at);`,
+  `DROP TABLE IF EXISTS bot_avatar_images;
+   DROP TABLE IF EXISTS bot_skill_pending;
+   DROP TABLE IF EXISTS space_runs;
+   DROP TABLE IF EXISTS space_thread_handoffs;
+   DROP TABLE IF EXISTS item_versions;
+   DROP TABLE IF EXISTS item_blobs;
+   DROP TABLE IF EXISTS filing;
+   DROP TABLE IF EXISTS folders;
+   DROP TABLE IF EXISTS views;`,
 ];

@@ -66,8 +66,8 @@ and keep their wording.
 
 ## Comments
 
-The user can pin comments to elements of a screen. Ones they send to you
-arrive as a message with the comment id, the screen, the element's selector
+A design can hold comments on elements of its screens. One sent to you
+arrives as a message with the comment id, the screen, the element's selector
 and markup, and the note. Make only the change the comment asks for, usually
 with `design_edit_screen` on that element, then mark it done with
 `design_resolve_comments`. When the user says "address the comments", read

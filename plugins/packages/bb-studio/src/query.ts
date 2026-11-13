@@ -35,7 +35,7 @@ export interface QueryItem {
   kind: string;
   /** "page" or "app"; absent for kinds outside the two families. */
   family?: string;
-  /** The page or app type, e.g. "doc", "design", "dashboard". */
+  /** The page or app type, e.g. "doc", "design", "mini". */
   type?: string;
   projectId: string | null;
   archived: boolean;

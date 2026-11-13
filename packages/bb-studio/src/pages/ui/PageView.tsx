@@ -17,7 +17,7 @@ import type { PageMetaView, RequestView } from "../contract";
 import { PageConnection } from "./connection";
 import { HistoryDialog } from "./dialogs";
 import { pagePath, REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
-import { PageEditor, type SidePanel } from "./PageEditor";
+import { PageEditor } from "./PageEditor";
 import { actorName, PageMenu, relativeTime, ICON_BUTTON, type BotsState, type Project, type Rpc } from "./shared";
 import { pageFieldKey, toggleTalk, useTalk, type TalkView } from "./talk";
 import { usePageTitle } from "./use-page-title";
@@ -291,7 +291,6 @@ export function PageView({
   const { connection, status, ready } = useConnection(page.id);
   const presence = usePresence(connection);
   const talk = useTalk(pageFieldKey(page.id));
-  const [sidePanel, setSidePanel] = useState<SidePanel>(null);
   const [dialog, setDialog] = useState<"history" | null>(null);
   const [requests, setRequests] = useState<RequestView[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
@@ -325,23 +324,16 @@ export function PageView({
   const shown = { ...page, title };
 
   return (
-    // Floating chrome, the comments card and the chat are placed against this box.
+    // Floating chrome and the chat are placed against this box.
     <div className="pages-doc relative flex h-full min-h-0 flex-col bg-background text-foreground">
       <WhiteboardExpandHost>
       {persistenceVisible(connection) ? <div className="shrink-0 px-4 pt-3 pb-2"><PersistenceBadge connection={connection} /></div> : null}
       <div className="min-h-0 flex-1 overflow-auto">
-        <PageColumn className={cn(sidePanel && "min-[1280px]:max-w-[1168px] min-[1280px]:pr-[340px]")}>
+        <PageColumn>
           <PageHeading page={page} rpc={rpc} titleSave={titleSave} />
           <PageBody missing={status === "missing"}>
             {connection && ready && status !== "missing" ? (
-              <PageEditor
-                connection={connection}
-                page={page}
-                bots={bots.bots}
-                pages={pages}
-                sidePanel={sidePanel}
-                onCloseSidePanel={() => setSidePanel(null)}
-              />
+              <PageEditor connection={connection} page={page} pages={pages} />
             ) : null}
           </PageBody>
         </PageColumn>
@@ -367,16 +359,6 @@ export function PageView({
           <DictateButton talk={talk} ready={Boolean(connection && ready && status !== "missing")} onToggle={() => toggleTalk(pageFieldKey(page.id))} />
           <button type="button" aria-label="Version history" title="Version history" className={cn(ICON_BUTTON, "max-md:hidden")} onClick={() => setDialog("history")}>
             <Icon name="Clock" className="size-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Comments"
-            title="Comments"
-            aria-pressed={sidePanel === "comments"}
-            className={ICON_BUTTON}
-            onClick={() => setSidePanel((panel) => (panel === "comments" ? null : "comments"))}
-          >
-            <Icon name="MessageCirclePlus" className="size-4" />
           </button>
           <PageMenu
             page={page}

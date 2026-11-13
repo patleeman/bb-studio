@@ -2,7 +2,7 @@
 // existing tag, and their result names the tags there are. Never tags anything itself.
 
 /** Studio's agent tools that make a new item. */
-export const CREATE_TOOLS: ReadonlySet<string> = new Set(["pages_create", "design_create", "dashboard_create", "whiteboard_create", "excalidraw_create_drawing"]);
+export const CREATE_TOOLS: ReadonlySet<string> = new Set(["pages_create", "design_create", "whiteboard_create", "excalidraw_create_drawing"]);
 
 export const TAG_DESCRIPTION = " If a tag fits, add it with studio_tag_items, reusing an existing tag rather than making a near-duplicate.";
 const MAX_NAMES = 12;

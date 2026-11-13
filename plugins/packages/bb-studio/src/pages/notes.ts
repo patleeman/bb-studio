@@ -1,5 +1,5 @@
-// Notes: "Expand to page" on a thread's composer turns the draft into a temp
-// page beside the thread, for typing meeting notes with room to work.
+// Notes: the iOS app turns a thread's draft into a temp page beside the
+// thread, for typing meeting notes with room to work.
 //
 // - A note is an ordinary page, tagged "Notes" in Studio, plus a row in
 //   `page_notes` that links it to its thread. The row is the page's thread

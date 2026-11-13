@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { collectionKinds, enabledKinds, itemOpening, tabTarget, TAB_KINDS, type ListedItem } from "./model";
 
 const DESIGN = "dsn_0123456789abcdef";
-const DASHBOARD = "dsh_0123456789abcdef";
+const MINI = "mini_0123456789abcdef";
 const DRAWING = "drw_0123456789abcdef";
 const ARTIFACT = "art_0123456789abcdef";
 describe("Studio tab params", () => {
@@ -14,7 +14,7 @@ describe("Studio tab params", () => {
   it("routes { kind, id } to that kind's view", () => {
     expect(tabTarget({ kind: "page", id: "pg_1" })).toEqual({ view: "item", kind: "page", id: "pg_1" });
     expect(tabTarget({ kind: "design", id: DESIGN })).toEqual({ view: "item", kind: "design", id: DESIGN });
-    expect(tabTarget({ kind: "dashboard", id: DASHBOARD })).toEqual({ view: "item", kind: "dashboard", id: DASHBOARD });
+    expect(tabTarget({ kind: "dashboard", id: "dsh_0123456789abcdef" })).toEqual({ view: "list" });
     expect(tabTarget({ kind: "drawing", id: DRAWING })).toEqual({ view: "item", kind: "drawing", id: DRAWING });
     expect(tabTarget({ kind: "artifact", id: ARTIFACT })).toEqual({ view: "item", kind: "artifact", id: ARTIFACT });
   });
@@ -24,7 +24,7 @@ describe("Studio tab params", () => {
     expect(tabTarget([1])).toEqual({ view: "list" });
     expect(tabTarget({ kind: "notion-page", id: "np_1" })).toEqual({ view: "list" });
     expect(tabTarget({ kind: "recording", id: "rec_1" })).toEqual({ view: "list" });
-    expect(tabTarget({ kind: "design", id: DASHBOARD })).toEqual({ view: "list" });
+    expect(tabTarget({ kind: "design", id: MINI })).toEqual({ view: "list" });
   });
 
   it("routes recordings and dictations to the recording view, gated by Recordings", () => {

@@ -9,7 +9,6 @@ export const SAMPLE_REFS: Record<TabKindId, TabRef> = {
   whiteboard: { kind: "whiteboard", id: "drw_0123456789abcdef" },
   design: { kind: "design", id: "dsn_0123456789abcdef" },
   app: { kind: "app", id: "mini_0123456789abcdef" },
-  dashboard: { kind: "dashboard", id: "dsh_0123456789abcdef" },
   artifact: { kind: "artifact", id: "art_0123456789abcdef" },
   recording: { kind: "recording", id: "rec_0123456789" },
   board: { kind: "board", id: "thr_board" },
@@ -70,7 +69,7 @@ const DESIGN_FRAMES = "A design's screens are sandboxed frames; a link in one op
 const NO_PALETTE_ROW = "Cmd+K lists no such rows; a typed bb:// link, app route or web address goes through the router.";
 const NO_DIFF_LINK = "Replies don't link a diff; bb's change cards open it.";
 const NO_PAGE_ROW = "No Bot page lists one.";
-const BOT_PAGE_ROWS: readonly TabKindId[] = ["conversation", "worker", "page", "whiteboard", "design", "app", "dashboard", "artifact", "automation", "todo", "record"];
+const BOT_PAGE_ROWS: readonly TabKindId[] = ["conversation", "worker", "page", "whiteboard", "design", "app", "artifact", "automation", "todo", "record"];
 const NO_AGENT_TERMINAL = "A terminal opens by starting one; workbench_focus selects an open one.";
 
 function cell(kind: TabKindId, source: LinkSource): LinkAuditCell {
@@ -79,7 +78,7 @@ function cell(kind: TabKindId, source: LinkSource): LinkAuditCell {
   const bbKind = kind === "file" || kind === "diff" || kind === "browser" || kind === "workflow";
   switch (source) {
     case "card":
-      return ["conversation", "page", "whiteboard", "design", "app", "dashboard", "artifact", "recording", "todos"].includes(kind) ? "routes" : { na: NO_CARD };
+      return ["conversation", "page", "whiteboard", "design", "app", "artifact", "recording", "todos"].includes(kind) ? "routes" : { na: NO_CARD };
     case "gesture":
       return bbKind ? { na: BB_LINK_ONLY } : "routes";
     case "palette": case "launcher":

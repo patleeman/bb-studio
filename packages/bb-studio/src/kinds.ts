@@ -32,7 +32,6 @@ export const BUILTIN_KINDS: readonly BuiltinKind[] = [
   { kind: "recording", pluginId: "talk", label: "Recordings and dictation", covers: "Recordings, the recorder, dictation, hold-to-talk, recording cards and Talk models." },
   { kind: "artifact", pluginId: "artifacts", label: "Artifacts", covers: "Artifacts, artifacts and the save picker in the thread's Studio tab, and artifact cards." },
   { kind: "design", pluginId: "design", label: "Designs", covers: "Designs, designs in the thread's Studio tab, and design cards." },
-  { kind: "dashboard", pluginId: "dashboards", label: "Dashboards", covers: "Dashboards, their agent tools and the refreshing of their widgets' data." },
   { kind: "mini", pluginId: "minis", label: "Mini apps", covers: "Mini apps, their agent tools, ::mini cards in replies and mini app blocks in pages." },
 ];
 

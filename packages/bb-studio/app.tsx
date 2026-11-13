@@ -33,7 +33,6 @@ import { askAboutItemHandler } from "./src/ui/ask-about-item";
 import { setAskAboutItem } from "./src/kit/app/item-header";
 import { registerReadOnlyComposer } from "./src/ui/conversations/ReadOnlyComposer";
 import { FinishedCard } from "./src/ui/conversations/finish";
-import { finishThreadAction } from "./src/ui/conversations/finish-action";
 import { OLDER_SUBPATH, olderBotFromPath } from "./src/ui/conversations/model";
 import { SKILLS_SUBPATH, skillsBotFromPath } from "./src/ui/skills/paths";
 import { newConversationRoute } from "./src/ui/conversations/new-conversation";
@@ -77,7 +76,6 @@ import { isDrawingId } from "./src/draw/shared";
 import { DrawingDirective } from "./src/draw/ui/drawing-directive";
 import { isDesignId, QUESTIONS_RENDERER } from "./src/design/shared";
 import { DesignCard } from "./src/design/ui/design-card";
-import { isDashboardId } from "./src/dashboards/shared";
 import { isMiniId } from "./src/minis/shared";
 import { MiniCard } from "./src/minis/ui/mini-card";
 import { QuestionFormView } from "./src/design/ui/question-form";
@@ -85,20 +83,18 @@ import { isRecordingId, UNSENT_PATH } from "./src/talk/shared/format";
 import { registerTalkApp } from "./src/talk/ui/register";
 import { isPageId, PageCard } from "./src/pages/ui/PageCard";
 import { enabledKinds, STUDIO_TAB, STUDIO_TAB_ICON } from "./src/ui/studio-tab/model";
-import { ExpandToPage, NotesInProgress } from "./src/pages/ui/notes/composer";
 import { TalkBridge } from "./src/pages/ui/talk-bridge";
 import { registerExploreApp } from "./src/explore/app";
 import { registerReactionsApp } from "./src/reactions/app";
 import "./src/pages/ui/styles.css";
-import "./src/dashboards/ui/dashboards.css";
 import "./src/ui/bot/timeline.css";
+import "./src/dashboards/ui/dashboards.css";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { openCollection, showLibrary, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
 import { HandsFreeComposerButton, HandsFreePill, startHandsFree } from "./src/voice/live/ui/HandsFree";
-import { MeetingStage, startMeeting } from "./src/voice/meeting/ui/MeetingStage";
 import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
 import { BotPanel } from "./src/ui/bot/BotTabs";
 import { BotCacheBanner } from "./src/ui/bot/BotCache";
@@ -173,8 +169,6 @@ const BUILTIN_VIEWS: Record<string, { isId(id: string): boolean; View: Component
   designs: { isId: isDesignId, View: lazy(() => import("./src/design/ui/route")) },
   // A recording's page, and the audio this device kept (`recordings/unsent`).
   recordings: { isId: (id) => isRecordingId(id) || id === UNSENT_PATH, View: lazy(() => import("./src/talk/ui/route")) },
-  // The grid (react-grid-layout) and the charts load when a dashboard first opens.
-  dashboards: { isId: isDashboardId, View: lazy(() => import("./src/dashboards/ui/route")) },
   // The app's frame loads its own libraries (the shelf); this is the host around it.
   minis: { isId: isMiniId, View: lazy(() => import("./src/minis/ui/route")) },
 };
@@ -350,10 +344,8 @@ export default definePluginApp((app) => {
   // this worker…" where the composer goes; a conversation shows its workers
   // above its composer (src/ui/conversations/ReadOnlyComposer.tsx).
   registerReadOnlyComposer(app);
-  // Finishing a conversation (src/bot-finish.ts): "Finish conversation" in its
-  // thread menus (the sidebar row's and the header's ···), and the card the
-  // Bot posts in Main, `::finished{thread="thr_…"}`.
-  app.slots.experimental_threadAction(finishThreadAction);
+  // Archiving a conversation writes its summary (src/bot-finish.ts); the card
+  // the Bot posts in Main is `::finished{thread="thr_…"}`.
   app.slots.messageDirective({ id: "finished", component: FinishedCard });
   // A worker's approval, as a card in the conversation that owns it (src/worker-approvals.ts):
   // `::approval{thread="thr_…" id="…"}`, Approve / Deny through BB's own resolution.
@@ -392,11 +384,9 @@ export default definePluginApp((app) => {
   // The Bot's other pages as tabs (Memory, Library, Automations, the Archive) and the New Tab page's "New …" actions (src/tab-kinds.ts).
   registerTabKindTabs(app);
   // Hands-free voice (src/voice/live/ui): a session is its own thread. Its
-  // composer button is registered below, after Notes' Expand; its pill floats
+  // composer button is registered below; its pill floats
   // over every page and thread until End.
   app.slots.experimental_appOverlay({ id: "handsfree", component: HandsFreePill });
-  // The meeting agent (src/voice/meeting/ui): a full-window stage for the room, or its pill.
-  app.slots.experimental_appOverlay({ id: "meeting", component: MeetingStage });
   registerThreadTab(app, { id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel, ...OFF_NEW_TAB });
   registerForkFromHere(app.slots, {
     call: async (method, input) => (await post(method, input)) as { threadId: string },
@@ -453,19 +443,10 @@ export default definePluginApp((app) => {
   // thread was started from, and opening a page Talk dictated into.
   if (on("page")) {
     app.slots.experimental_appOverlay({ id: "talk-bridge", component: TalkBridge });
-    // Notes (src/pages/notes.ts): the composer's Expand to page, which moves
-    // the draft into a temp page beside the thread, and the "Notes in
-    // progress" chip that reopens it.
-    app.composer.customize({
-      id: "notes",
-      scopes: ["thread"],
-      actions: [{ id: "expand", component: ExpandToPage }],
-      banners: [{ id: "in-progress", chrome: "bare", component: NotesInProgress }],
-    });
   }
   // The waveform button. BB puts a plugin's composer actions just before its
   // mic, in registration order (no order or priority field, SDK 0.6.37 or
-  // 0.6.104), so it's Studio's last action: Expand, waveform, mic, send. It
+  // 0.6.104), so it's Studio's last action: waveform, mic, send. It
   // starts a session; right-click for its quick settings.
   app.composer.customize({ id: "handsfree", scopes: ["thread"], actions: [{ id: "handsfree", component: HandsFreeComposerButton }] });
   app.slots.messageDirective({ id: "page", component: whenOn(kinds, "page", PageCard) });
@@ -519,5 +500,4 @@ export default definePluginApp((app) => {
   // The Bot's last conversation, with BB's sidebar unfolded (src/ui/conversations/show-bot.ts).
   if (sidebarSections) app.commands.register({ id: "show-bot", title: "Studio: Show the Bot", defaultShortcut: { key: "0", control: true }, run: () => showBot(async () => (await post("bot_spaces", {})) as { bots: { id: string; mainThreadId: string | null }[]; currentBotId: string | null }) });
   app.commands.register({ id: "handsfree", title: "Studio: Hands-free voice", run: () => startHandsFree() });
-  app.commands.register({ id: "meeting", title: "Studio: Start a meeting agent", run: () => void startMeeting() });
 });

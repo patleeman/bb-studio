@@ -69,7 +69,6 @@ const view = (name: string, idProp: string) => ({ [name]: (props: Record<string,
 vi.mock("../../pages/ui/PagePanel", () => view("PageTab", "pageId"));
 vi.mock("../../draw/ui/drawing-editor", () => view("DrawingEditor", "drawingId"));
 vi.mock("../../design/ui/design-tab", () => view("TabCanvas", "designId"));
-vi.mock("../../dashboards/ui/dashboard-tab", () => view("TabDashboard", "dashboardId"));
 vi.mock("../../talk/ui/recordings-panel", () => view("RecordingDetail", "id"));
 vi.mock("../../artifacts/ui/artifact-viewer", () => view("ArtifactViewer", "artifactId"));
 vi.mock("../../artifacts/ui/save-picker", () => ({ SavePicker: ({ params }: { params: unknown }) => <p data-view="SavePicker">{JSON.stringify(params)}</p> }));
@@ -111,7 +110,6 @@ describe("Studio tab", () => {
     [{ kind: "page", id: "pg_1" }, "PageTab:pg_1"],
     [{ kind: "drawing", id: "drw_0123456789abcdef" }, "DrawingEditor:drw_0123456789abcdef"],
     [{ kind: "design", id: "dsn_0123456789abcdef" }, "TabCanvas:dsn_0123456789abcdef"],
-    [{ kind: "dashboard", id: "dsh_0123456789abcdef" }, "TabDashboard:dsh_0123456789abcdef"],
     [{ kind: "artifact", id: "art_0123456789abcdef" }, "ArtifactViewer:art_0123456789abcdef"],
     [{ kind: "recording", id: "rec_aaaaaaaa" }, "RecordingDetail:rec_aaaaaaaa"],
     [{ kind: "dictation", id: "rec_bbbbbbbb" }, "RecordingDetail:rec_bbbbbbbb"],
@@ -187,7 +185,6 @@ describe("coming back to the Studio tab", () => {
     ["page", "pg_1", "PageTab:pg_1"],
     ["drawing", "drw_0123456789abcdef", "DrawingEditor:drw_0123456789abcdef"],
     ["design", "dsn_0123456789abcdef", "TabCanvas:dsn_0123456789abcdef"],
-    ["dashboard", "dsh_0123456789abcdef", "TabDashboard:dsh_0123456789abcdef"],
     ["mini", "mini_0123456789abcdef", "TabMini:mini_0123456789abcdef"],
     ["artifact", "art_0123456789abcdef", "ArtifactViewer:art_0123456789abcdef"],
     ["recording", "rec_aaaaaaaa", "RecordingDetail:rec_aaaaaaaa"],
@@ -328,7 +325,7 @@ it("New offers the shared create list, Record a call and templates included", as
     await act(async () => (container.querySelector("button[aria-haspopup=menu]") as HTMLButtonElement).click());
     const menu = [...container.querySelectorAll("[role=menuitem]")].map((each) => each.textContent);
     expect(menu).toEqual(createEntries(providers as never, { templates }).map((entry) => entry.label));
-    expect(menu).toEqual(["Page", "Recording", "Record a call", "Start a meeting agent", "From template: Weekly"]);
+    expect(menu).toEqual(["Page", "Recording", "Record a call", "From template: Weekly"]);
   } finally { rpcCall.mockImplementation(original); }
 });
 

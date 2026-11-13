@@ -19,7 +19,6 @@ describe("Studio tab view state", () => {
     [{ view: "item", kind: "page", id: "pg_1" }],
     [{ view: "item", kind: "artifact", id: "art_0123456789abcdef" }],
     [{ view: "item", kind: "design", id: "dsn_0123456789abcdef" }],
-    [{ view: "item", kind: "dashboard", id: "dsh_0123456789abcdef" }],
     [{ view: "item", kind: "mini", id: "mini_0123456789abcdef" }],
     [{ view: "item", kind: "drawing", id: "drw_0123456789abcdef" }],
     [{ view: "item", kind: "recording", id: "rec_aaaaaaaa" }],

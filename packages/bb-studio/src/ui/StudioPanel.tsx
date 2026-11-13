@@ -40,7 +40,7 @@ import { errorMessage, untitled } from "../kit/format";
 import { useBbContext, useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import type { rpcContract, SavedViewView, SidebarView } from "../contract";
+import type { rpcContract, SidebarView } from "../contract";
 import { compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type Query, type QueryVocabulary } from "../query";
 import { SearchFreshness, useSearchFreshness } from "./SearchFreshness";
 import { QueryBar } from "./QueryBar";
@@ -264,7 +264,6 @@ export function StudioLibrary({ thread }: { thread?: LibraryThreadHost } = {}) {
       },
       exportFormats: (item) => item.kind === "page" ? [{ format: "markdown", label: "Markdown and assets" }, { format: "html", label: "HTML and assets" }, { format: "pdf", label: "PDF" }]
         : item.kind === "drawing" ? [{ format: "png", label: "PNG" }, { format: "svg", label: "SVG" }, { format: "excalidraw", label: "Excalidraw JSON" }]
-          : item.kind === "dashboard" ? [{ format: "json", label: "Dashboard JSON" }]
           : item.kind === "mini" ? [{ format: "zip", label: "Source and data (ZIP)" }]
           : item.kind === "task" ? [{ format: "markdown", label: "Markdown" }, { format: "csv", label: "CSV" }]
           : item.kind === "table" ? [{ format: "csv", label: "CSV" }, { format: "markdown", label: "Markdown" }]
@@ -416,26 +415,6 @@ export function StudioLibrary({ thread }: { thread?: LibraryThreadHost } = {}) {
     );
   }
 
-  const saveView = async () => {
-    const name = window.prompt("Name this view", "");
-    if (!name?.trim()) return;
-    try {
-      await rpc.call("saveView", { name, query: formatQuery(query) });
-      toast.success(`Saved the view ${name.trim()}`);
-      refetch();
-    } catch (cause) {
-      toast.error(`Couldn't save the view: ${errorMessage(cause)}`);
-    }
-  };
-  const deleteView = async (view: SavedViewView) => {
-    try {
-      await rpc.call("deleteView", { id: view.id });
-      toast.success(`Deleted the view ${view.name}`);
-      refetch();
-    } catch (cause) {
-      toast.error(`Couldn't delete the view: ${errorMessage(cause)}`);
-    }
-  };
   const empty = starredOnly && query.filters.length === 1 && !searchText
     ? STARRED_EMPTY
     : compiled.unknown.length
@@ -478,7 +457,7 @@ export function StudioLibrary({ thread }: { thread?: LibraryThreadHost } = {}) {
             <button type="button" aria-pressed={starredOnly} data-testid="library-starred" className={PILL} onClick={toggleStarred}>
               <Icon name="Star" className={starredOnly ? "size-3.5 fill-current text-amber-500" : "size-3.5"} /> Starred <span className="tabular-nums">{starredCount}</span>
             </button>
-            <FilterToolbar query={query} vocabulary={vocabulary} counts={counts} onChange={setQuery} views={data?.views ?? []} tags={data?.tags ?? []} onSaveView={() => void saveView()} onDeleteView={(view) => void deleteView(view)} />
+            <FilterToolbar query={query} vocabulary={vocabulary} counts={counts} onChange={setQuery} tags={data?.tags ?? []} />
           </>,
           text: searchText,
           snippets,

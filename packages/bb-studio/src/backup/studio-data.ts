@@ -1,8 +1,8 @@
 import { readAvailable } from "../kit/server/read-available";
 // Studio's own section of a backup (docs/backup.md): tags and which items
-// have them, starred items, saved views, project leads and their heartbeat settings (the
+// have them, starred items, project leads and their heartbeat settings (the
 // personal project's lead is the Chief of Staff), and the item services
-// (links, item chats, comments, versions, activity). Older backups' Spaces
+// (links, item chats, comments, activity). Older backups' Spaces
 // are ignored. Items keep their add-on ids across a restore, so these
 // rows still point at the right items.
 //
@@ -10,7 +10,6 @@ import { readAvailable } from "../kit/server/read-available";
 // transaction and rolls it back, so its counts are what a real run would do,
 // except for links and activity that a real run's add-ons record for their
 // restored items first: those then count as already here.
-import { createHash } from "node:crypto";
 import type { RestoreTally } from "../kit/backup";
 import type { BackupHandlers } from "../kit/server/index";
 import type Database from "better-sqlite3";
@@ -27,7 +26,6 @@ const nullable = <T extends z.ZodType>(schema: T) => schema.nullable();
 const tagRow = z.object({ id, name: z.string().min(1).max(100), color: z.string().max(50), created_at: time });
 const itemTagRow = z.object({ plugin_id: id, item_id: id, tag_id: id, created_at: time });
 const starRow = z.object({ plugin_id: id, item_id: id, starred_at: time });
-const viewRow = z.object({ id, name: z.string().min(1).max(60), query: z.string().max(500), position: z.number(), created_at: time });
 const runRow = z.object({ cadence: z.string().max(50), time: z.string().max(50), cron: nullable(z.string().max(200)) });
 const leadRow = z.object({ project_id: id, lead_thread_id: nullable(id), created_at: time, updated_at: time, run: nullable(runRow) });
 const chiefRow = z.object({ thread_id: id, origin_space_id: nullable(id), updated_at: time, run: nullable(runRow) });
@@ -37,7 +35,6 @@ const botRow = z.object({ id, name: z.string().min(1).max(60), avatar: z.string(
 const linkRow = z.object({ from_plugin: id, from_id: id, to_plugin: id, to_id: id, kind: z.string().max(50), source: z.string().max(300) });
 const threadRow = z.object({ thread_id: id, plugin_id: id, item_id: id, role: z.string().max(50), state: z.string().max(50), created_at: time, updated_at: time, metadata: text });
 const commentRow = z.object({ id, plugin_id: id, item_id: id, parent_id: nullable(id), anchor: nullable(text), actor: text, body: text, created_at: time, resolved_at: nullable(time) });
-const versionRow = z.object({ id, plugin_id: id, item_id: id, sha256: z.string().regex(/^[a-f0-9]{64}$/), label: z.string().max(1000), actor: text, created_at: time });
 const activityRow = z.object({ plugin_id: id, item_id: id, actor: text, verb: z.string().max(100), at: time, summary: text });
 
 const FILES = {
@@ -45,7 +42,6 @@ const FILES = {
   itemTags: ["item-tags.json", z.array(itemTagRow)],
   /** Starred items; older backups have none. */
   stars: ["stars.json", z.array(starRow)],
-  views: ["views.json", z.array(viewRow)],
   leads: ["project-leads.json", z.array(leadRow)],
   /** Each Bot's conversation, provider identity and own skills. */
   bots: ["bots.json", z.array(botRow).max(10)],
@@ -53,7 +49,6 @@ const FILES = {
   links: ["links.json", z.array(linkRow)],
   threads: ["item-chats.json", z.array(threadRow)],
   comments: ["comments.json", z.array(commentRow)],
-  versions: ["versions.json", z.array(versionRow)],
   activity: ["activity.json", z.array(activityRow)],
   /** Written by older Studios; restored into the personal project's lead. Their spaces.json is ignored. */
   chief: ["chief-of-staff.json", z.array(chiefRow).max(1)],
@@ -84,12 +79,11 @@ export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): B
     version: 3,
     async backup(writer) {
       const all = <T>(sql: string) => db.prepare(sql).all() as T[];
-      const { data, blobs } = db.transaction(() => {
+      const data = db.transaction(() => {
         const data: Data = {
           tags: all("SELECT id, name, color, created_at FROM tags ORDER BY created_at, id"),
           itemTags: all("SELECT plugin_id, item_id, tag_id, created_at FROM item_tags ORDER BY plugin_id, item_id, tag_id"),
           stars: all("SELECT plugin_id, item_id, starred_at FROM stars ORDER BY starred_at, plugin_id, item_id"),
-          views: all("SELECT id, name, query, position, created_at FROM views ORDER BY position, id"),
           leads: all<{ project_id: string; lead_thread_id: string | null; created_at: number; updated_at: number }>("SELECT project_id, lead_thread_id, created_at, updated_at FROM project_leads ORDER BY project_id")
             .map((lead) => ({ ...lead, run: (db.prepare("SELECT cadence, time, cron FROM project_runs WHERE project_id = ?").get(lead.project_id) as Data["leads"][number]["run"] | undefined) ?? null })),
           bots: all("SELECT id, name, avatar, state, thread_id, provider_id, memory_page_id, shape, color, role, created_at, updated_at FROM bots ORDER BY created_at, id"),
@@ -97,18 +91,15 @@ export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): B
           links: all("SELECT * FROM item_links ORDER BY from_plugin, from_id, to_plugin, to_id"),
           threads: all("SELECT * FROM item_threads ORDER BY created_at, thread_id"),
           comments: all("SELECT * FROM item_comments ORDER BY created_at, id"),
-          versions: all("SELECT * FROM item_versions ORDER BY created_at, id"),
           activity: all("SELECT plugin_id, item_id, actor, verb, at, summary FROM item_activity ORDER BY id"),
           // The Chief of Staff is saved as the personal project's lead.
           chief: [],
         };
-        const blobs = db.prepare("SELECT sha256, bytes FROM item_blobs WHERE sha256 IN (SELECT sha256 FROM item_versions) ORDER BY sha256").all() as { sha256: string; bytes: Buffer }[];
-        return { data, blobs };
+        return data;
       })();
       for (const key of Object.keys(FILES) as (keyof Data)[]) await writer.json(FILES[key][0], data[key]);
-      for (const { sha256, bytes } of blobs) await writer.bytesAt(`blobs/${sha256}`, bytes);
       return {
-        counts: { tags: data.tags.length, taggings: data.itemTags.length, stars: data.stars.length, views: data.views.length, leads: data.leads.length, bots: data.bots.length, botSkills: data.botSkills.length, links: data.links.length, itemChats: data.threads.length, comments: data.comments.length, versions: data.versions.length, activity: data.activity.length },
+        counts: { tags: data.tags.length, taggings: data.itemTags.length, stars: data.stars.length, leads: data.leads.length, bots: data.bots.length, botSkills: data.botSkills.length, links: data.links.length, itemChats: data.threads.length, comments: data.comments.length, activity: data.activity.length },
         notes: STUDIO_EXCLUDED,
       };
     },
@@ -124,15 +115,7 @@ export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): B
         if (!parsed.success) throw new Error(`Studio's ${name} in this backup isn't valid: ${parsed.error.issues[0]?.message ?? "invalid"}`);
         (data as Record<string, unknown>)[key] = parsed.data;
       }
-      // Blobs and thread checks are async; read them before the transaction.
-      const blobs = new Map<string, Buffer>();
-      for (const version of data.versions) {
-        if (blobs.has(version.sha256) || db.prepare("SELECT 1 FROM item_blobs WHERE sha256 = ?").get(version.sha256)) continue;
-        const rel = `blobs/${version.sha256}`;
-        if (!(await reader.exists(rel))) continue;
-        const bytes = await reader.bytes(rel);
-        if (createHash("sha256").update(bytes).digest("hex") === version.sha256) blobs.set(version.sha256, bytes);
-      }
+      // Thread checks are async; read them before the transaction.
       const threadIds = new Set([
         ...data.threads.map((row) => row.thread_id),
         ...data.leads.flatMap((lead) => (lead.lead_thread_id ? [lead.lead_thread_id] : [])),
@@ -150,7 +133,7 @@ export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): B
       }
       try {
         db.transaction(() => {
-          apply(db, data, { projects, blobs, threads: existing, tally });
+          apply(db, data, { projects, threads: existing, tally });
           if (dryRun) throw new DryRun();
         })();
       } catch (error) {
@@ -166,9 +149,9 @@ export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): B
 function apply(
   db: Database.Database,
   data: Data,
-  context: { projects: Readonly<Record<string, string | null>>; blobs: Map<string, Buffer>; threads: Set<string>; tally: RestoreTally },
+  context: { projects: Readonly<Record<string, string | null>>; threads: Set<string>; tally: RestoreTally },
 ): void {
-  const { projects, blobs, threads, tally } = context;
+  const { projects, threads, tally } = context;
   const counted = (changes: number, item?: { id: string; title?: string }) => tally.record(changes ? "created" : "unchanged", item);
 
   // Tags: the same id, else the same name, else a new tag with the backup's id.
@@ -193,16 +176,6 @@ function apply(
   // A star already here keeps when it was starred.
   const star = db.prepare("INSERT OR IGNORE INTO stars (plugin_id, item_id, starred_at) VALUES (?, ?, ?)");
   for (const row of data.stars) counted(star.run(row.plugin_id, row.item_id, row.starred_at).changes);
-
-  for (const view of data.views) {
-    if (db.prepare("SELECT 1 FROM views WHERE id = ? OR name = ? COLLATE NOCASE").get(view.id, view.name)) {
-      tally.record("unchanged");
-      continue;
-    }
-    const position = (db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS next FROM views").get() as { next: number }).next;
-    db.prepare("INSERT INTO views (id, name, query, position, created_at) VALUES (?, ?, ?, ?, ?)").run(view.id, view.name, view.query, position, view.created_at);
-    tally.record("created");
-  }
 
   // Leads go only into an empty slot, and a thread leads one project. An older
   // backup's Chief of Staff goes first, as the personal project's lead.
@@ -275,17 +248,6 @@ function apply(
   // A comment is keyed by its id; one edited here keeps its local text.
   const comment = db.prepare("INSERT OR IGNORE INTO item_comments (id, plugin_id, item_id, parent_id, anchor, actor, body, created_at, resolved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
   for (const row of data.comments) counted(comment.run(row.id, row.plugin_id, row.item_id, row.parent_id, row.anchor, row.actor, row.body, row.created_at, row.resolved_at).changes);
-  const blob = db.prepare("INSERT OR IGNORE INTO item_blobs (sha256, bytes) VALUES (?, ?)");
-  const version = db.prepare("INSERT OR IGNORE INTO item_versions (id, plugin_id, item_id, sha256, label, actor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
-  for (const row of data.versions) {
-    const bytes = blobs.get(row.sha256);
-    if (bytes) blob.run(row.sha256, bytes);
-    if (!db.prepare("SELECT 1 FROM item_blobs WHERE sha256 = ?").get(row.sha256)) {
-      tally.record("failed", { id: row.id, title: row.label }, "This version's content is missing from the backup.");
-      continue;
-    }
-    counted(version.run(row.id, row.plugin_id, row.item_id, row.sha256, row.label, row.actor, row.created_at).changes);
-  }
   const seen = db.prepare("SELECT 1 FROM item_activity WHERE plugin_id = ? AND item_id = ? AND actor = ? AND verb = ? AND at = ? AND summary = ?");
   const activity = db.prepare("INSERT INTO item_activity (plugin_id, item_id, actor, verb, at, summary) VALUES (?, ?, ?, ?, ?, ?)");
   for (const row of data.activity) {

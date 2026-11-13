@@ -25,7 +25,7 @@ const LEGACY_NAMESPACES: Record<string, readonly string[]> = {
  * Kinds built into Studio: their mention provider id (registered by Studio)
  * and the item namespace they keep, their old add-on's plugin id.
  */
-const STUDIO_BUILTIN_MENTIONS: Record<string, string> = { workspace: "studio-code", page: "pages", artifact: "artifacts", drawing: "excalidraw", design: "design", recordings: "talk", dashboard: "dashboards" };
+const STUDIO_BUILTIN_MENTIONS: Record<string, string> = { workspace: "studio-code", page: "pages", artifact: "artifacts", drawing: "excalidraw", design: "design", recordings: "talk" };
 /** Studio's panel, where built-in kinds' items live at <segment>/<id>. */
 const STUDIO_PANEL = "/plugins/studio/studio/";
 const STUDIO_REFERENCE_ROUTES: readonly ReferenceRoute[] = [
@@ -46,8 +46,6 @@ const STUDIO_REFERENCE_ROUTES: readonly ReferenceRoute[] = [
   { pluginId: "talk", path: `${STUDIO_PANEL}recordings/` },
   // The address recordings had before they were built into Studio.
   { pluginId: "talk", path: "/plugins/talk/recordings/" },
-  // Dashboards were built into Studio from the start.
-  { pluginId: "dashboards", path: `${STUDIO_PANEL}dashboards/` },
 ];
 /**
  * Family addresses: `pages/<id>` is any page type and `apps/<id>` any app
@@ -63,7 +61,6 @@ const FAMILY_REFERENCE_ROUTES: readonly { path: string; types: readonly { plugin
   ] },
   { path: `${STUDIO_PANEL}apps/`, types: [
     { pluginId: "minis", id: /^mini_[0-9a-f]{16}$/ },
-    { pluginId: "dashboards", id: /^dsh_[0-9a-f]{16}$/ },
     { pluginId: "artifacts", id: /^art_[0-9a-z]{16}$/ },
   ] },
 ];

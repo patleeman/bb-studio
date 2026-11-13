@@ -3,7 +3,6 @@ import { expect, it, vi } from "vitest";
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useRpc: () => ({}), useBbContext: () => ({}) }));
 vi.mock("../kit/app/nav", () => ({ openAppPath: vi.fn() }));
 vi.mock("../talk/ui/call-view", () => ({ openCallPicker: vi.fn() }));
-vi.mock("../voice/meeting/ui/store", () => ({ startMeeting: vi.fn() }));
 
 const { entryFor } = await import("./new-menu");
 

@@ -10,7 +10,7 @@ it("lists BB's commands under Commands and its settings pages under Settings, wi
     command("app:thread.search", "Search", "Threads", "⌘K"),
     command("app:window.new", "New window", "Window and layout", "⇧⌘N"),
     command("settings:general", "General settings", "Settings"),
-    command("plugin:studio/meeting", "Studio: Start a meeting agent", "Plugins"),
+    command("plugin:studio/handsfree", "Studio: Hands-free voice", "Plugins"),
     command("server:home", "Switch to Home server", "Servers"),
   ];
   const ran: string[] = [];
@@ -18,7 +18,7 @@ it("lists BB's commands under Commands and its settings pages under Settings, wi
   expect(entries.map((each) => [each.title, each.section, each.detail, each.shortcut])).toEqual([
     ["New window", "commands", "Window and layout", "⇧⌘N"],
     ["General settings", "settings", "Settings", undefined],
-    ["Studio: Start a meeting agent", "commands", "Plugins", undefined],
+    ["Studio: Hands-free voice", "commands", "Plugins", undefined],
     ["Switch to Home server", "commands", "Servers", undefined],
   ]);
   await entries[0]!.run();

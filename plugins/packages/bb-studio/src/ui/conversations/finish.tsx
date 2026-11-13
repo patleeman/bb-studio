@@ -1,8 +1,8 @@
 // Finishing a conversation on screen (src/bot-finish.ts; mockup 6d):
-// - "Finish conversation" in a conversation's thread menus (finish-action.tsx).
+// - Archiving a conversation writes its summary (src/bot-finish.ts).
 // - A finished conversation opens read-only: where its composer goes, "✓
-//   Finished on <date>. Read-only." and Reopen (ReadOnlyComposer.tsx).
-// - The card in Main, `::finished{thread="thr_…"}`: "✓ Finished: <title>",
+//   Archived on <date>. Read-only." and Reopen (ReadOnlyComposer.tsx).
+// - The card in Main, `::finished{thread="thr_…"}`: "✓ Archived: <title>",
 //   its dates, the summary's sections, and links back to the conversation
 //   and to Memory.
 import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
@@ -14,11 +14,6 @@ import { errorMessage } from "../../kit/format";
 import { useCall, useLive } from "../live";
 import { summarySections } from "./model";
 
-
-/** Whether a conversation offers Finish: a conversation, not Main, not archived or finished. */
-export function canFinish(info: Pick<BotThreadInfo, "kind" | "isMain" | "archivedAt"> | null | undefined): boolean {
-  return !!info && info.kind === "conversation" && !info.isMain && info.archivedAt === null;
-}
 
 /** Whether a thread is a finished conversation (read-only, with Reopen). */
 export function isFinished(info: Pick<BotThreadInfo, "kind" | "archivedAt" | "finishedSummary"> | null | undefined): boolean {
@@ -44,7 +39,7 @@ export function FinishedBox({ info }: { info: BotThreadInfo }) {
   return (
     <div data-testid="finished-box" className="flex min-w-0 items-center gap-2 rounded-[10px] border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
       <Icon name="CircleCheck" className="size-4 shrink-0 text-success" />
-      <span className="min-w-0 flex-1 truncate">{error ? <span role="alert" className="text-destructive">{error}</span> : `Finished on ${shortDate(info.archivedAt!)}. Read-only.`}</span>
+      <span className="min-w-0 flex-1 truncate">{error ? <span role="alert" className="text-destructive">{error}</span> : `Archived on ${shortDate(info.archivedAt!)}. Read-only.`}</span>
       <button type="button" data-testid="finished-reopen" disabled={busy} onClick={() => void reopen()}
         className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-state-hover disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">Reopen</button>
     </div>
@@ -57,13 +52,13 @@ export function FinishedCard({ attributes }: PluginMessageDirectiveProps) {
   const live = useLive("bot_finished", { threadId }, { enabled: /^[\w-]{3,200}$/.test(threadId), pollMs: 0 });
   const navigate = useBbNavigate();
   const finished: FinishedConversation | null = live.data?.finished ?? null;
-  if (!finished) return live.loading ? null : <p data-testid="finished-card-missing" className="text-xs text-muted-foreground">Finished conversation</p>;
+  if (!finished) return live.loading ? null : <p data-testid="finished-card-missing" className="text-xs text-muted-foreground">Archived conversation</p>;
   const sections = summarySections(finished.summary);
   return (
-    <section data-testid="finished-card" aria-label={`Finished: ${finished.title}`} className="studio-root my-2 flex max-w-xl flex-col gap-2 rounded-xl border border-border bg-background px-4 py-3 text-sm">
+    <section data-testid="finished-card" aria-label={`Archived: ${finished.title}`} className="studio-root my-2 flex max-w-xl flex-col gap-2 rounded-xl border border-border bg-background px-4 py-3 text-sm">
       <header className="flex items-center gap-2">
         <Icon name="CircleCheck" className="size-4 shrink-0 text-success" />
-        <h3 className="min-w-0 flex-1 truncate font-semibold text-foreground">Finished: {finished.title}</h3>
+        <h3 className="min-w-0 flex-1 truncate font-semibold text-foreground">Archived: {finished.title}</h3>
       </header>
       <p className="text-xs text-muted-foreground">{shortDate(finished.startedAt)}{shortDate(finished.startedAt) === shortDate(finished.finishedAt) ? "" : ` – ${shortDate(finished.finishedAt)}`}</p>
       {sections.map((section, index) => (

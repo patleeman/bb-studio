@@ -9,7 +9,6 @@ import { createStudioItem } from "../kit/app/create-item";
 import { errorMessage } from "../kit/format";
 import { openAppPath } from "../kit/app/nav";
 import { openCallPicker } from "../talk/ui/call-view";
-import { startMeeting } from "../voice/meeting/ui/store";
 import { appliedKinds } from "./kinds-snapshot";
 import { parseQuery, resolveValue } from "../query";
 import { KIND_ORDER } from "./studio-sidebar-model";
@@ -21,7 +20,6 @@ export type CreateEntry =
   | { type: "kind"; key: string; label: string; icon: string; pluginId: string; addOn: string; kind: ProviderKind }
   | { type: "whiteboard"; key: "excalidraw:whiteboard"; label: string; icon: string }
   | { type: "call"; key: "talk:call"; label: string; icon: string }
-  | { type: "meeting"; key: "voice:meeting"; label: string; icon: string }
   | { type: "template"; key: string; label: string; icon: string; template: TemplateRef };
 
 /** Every New menu's entries, from the providers that are ready and the kinds that are on. */
@@ -44,9 +42,7 @@ export function createEntries(providers: readonly ProviderView[], { off = new Se
     ? [{ type: "call", key: "talk:call", label: "Record a call", icon: "studio/call" } as const]
     : [];
   const fromTemplates = templates.map((template): CreateEntry => ({ type: "template", key: `template:${template.pluginId}:${template.id}`, label: `From template: ${template.title || "Untitled"}`, icon: "Copy", template }));
-  // The meeting agent (src/voice/meeting), for an in-person meeting: offered with Record a call.
-  const meeting = calls.length ? [{ type: "meeting", key: "voice:meeting", label: "Start a meeting agent", icon: "studio/handsfree" } as const] : [];
-  return [...kinds, ...calls, ...meeting, ...fromTemplates];
+  return [...kinds, ...calls, ...fromTemplates];
 }
 
 /** Whether a menu draws a separator before entry `index`: between the kinds and the rest. */
@@ -97,7 +93,6 @@ export interface RunCreateOptions {
 /** Does what a picked entry says. Reports failures as toasts. */
 export async function runCreateEntry(entry: CreateEntry, { rpc, projectId, createKind, onCreated, open = (href) => openAppPath(href) }: RunCreateOptions): Promise<void> {
   if (entry.type === "call") return openCallPicker();
-  if (entry.type === "meeting") return startMeeting();
   if (entry.type === "whiteboard") {
     try {
       const { page } = await rpc.call("drawings.newWhiteboardPage", { projectId }) as { page: { href: string } };

@@ -8,7 +8,6 @@ const ctx = { threadId: "thr_1", projectId: "proj_a" };
 const DESIGN = "dsn_0123456789abcdef";
 const BOARD = "drw_0123456789abcdef";
 const MINI = "mini_0123456789abcdef";
-const DASHBOARD = "dsh_0123456789abcdef";
 const ARTIFACT = "art_0123456789abcdef";
 
 /** The parameters each type's own tool takes today (their server.ts), with a handler that says who ran. */
@@ -25,9 +24,6 @@ const ORIGINALS: Record<string, z.ZodType> = {
   minis_list: z.object({}),
   minis_read: z.object({ miniId: z.string().min(1) }),
   minis_create: z.object({ name: z.string().min(1), files: z.record(z.string(), z.string()).optional() }),
-  dashboard_list: z.object({}),
-  dashboard_read: z.object({ dashboardId: z.string().min(1) }),
-  dashboard_create: z.object({ name: z.string().min(1), widgets: z.array(z.unknown()).optional() }),
   artifacts_list: z.object({ thisThread: z.boolean().optional(), query: z.string().optional() }),
   artifacts_read: z.object({ artifactId: z.string().min(1) }),
   artifacts_save: z.object({ path: z.string().optional(), content: z.string().optional(), name: z.string().optional(), title: z.string().min(1) }),
@@ -45,7 +41,6 @@ function setup(off: ItemType[] = []) {
   }
   const indexed: IndexedItem[] = [
     { pluginId: "minis", id: MINI, family: "app", type: "mini", title: "Tracker", projectId: null, parentId: null, createdAt: 1, updatedAt: 3, archived: false, template: false },
-    { pluginId: "dashboards", id: DASHBOARD, family: "app", type: "dashboard", title: "Ops board", projectId: "proj_a", parentId: null, createdAt: 1, updatedAt: 2, archived: false, template: false },
     { pluginId: "artifacts", id: ARTIFACT, family: "app", type: "artifact", title: "Report", projectId: null, parentId: null, createdAt: 1, updatedAt: 1, archived: false, template: false },
   ];
   const index = { list: ({ type }: { type?: ItemType }) => indexed.filter((item) => !type || item.type === type), get: (id: string) => indexed.find((item) => item.id === id) ?? null };
@@ -70,7 +65,7 @@ describe("every type's own tool", () => {
   it("says which family tool does the same", () => {
     const { registered } = setup();
     for (const type of ["design", "whiteboard"] as const) for (const action of ["list", "read", "create"] as const) expect(registered.get(TYPE_TOOLS[type][action])!.description).toMatch(/Original .+ type of page: pages_(list|read|create)/);
-    for (const type of ["mini", "dashboard", "artifact"] as const) for (const action of ["list", "read", "create"] as const) expect(registered.get(TYPE_TOOLS[type][action])!.description).toMatch(/Original .+ type of app: apps_(list|read|create)/);
+    for (const type of ["mini", "artifact"] as const) for (const action of ["list", "read", "create"] as const) expect(registered.get(TYPE_TOOLS[type][action])!.description).toMatch(/Original .+ type of app: apps_(list|read|create)/);
   });
 });
 
@@ -124,18 +119,17 @@ describe("apps_*", () => {
   it("lists every app from the index, with its type, id and family link", async () => {
     const { call, handlers } = setup();
     const listed = await call("apps_list", {}) as string;
-    expect(listed.split("\n")).toHaveLength(3);
-    expect(listed).toContain(`Ops board — Dashboard (id ${DASHBOARD}), project`);
+    expect(listed.split("\n")).toHaveLength(2);
+    expect(listed).toContain(`Tracker — App (id ${MINI})`);
     expect(listed).toContain(`link /plugins/studio/studio/apps/${ARTIFACT}`);
-    expect(await call("apps_list", { query: "ops" })).toContain(DASHBOARD);
-    expect(await call("apps_list", { query: "ops" })).not.toContain(MINI);
-    for (const name of ["minis_list", "dashboard_list", "artifacts_list"]) expect(handlers[name]).not.toHaveBeenCalled();
+    expect(await call("apps_list", { query: "track" })).toContain(MINI);
+    expect(await call("apps_list", { query: "track" })).not.toContain(ARTIFACT);
+    for (const name of ["minis_list", "artifacts_list"]) expect(handlers[name]).not.toHaveBeenCalled();
   });
 
   it("lists one type through that type's own handler", async () => {
     const { call } = setup();
     expect(await call("apps_list", { type: "mini" })).toBe("ran minis_list");
-    expect(await call("apps_list", { type: "dashboard" })).toBe("ran dashboard_list");
     expect(await call("apps_list", { type: "artifact" })).toBe("ran artifacts_list");
   });
 
@@ -143,12 +137,10 @@ describe("apps_*", () => {
     const { call, handlers } = setup();
     expect(await call("apps_read", { id: MINI })).toBe("ran minis_read");
     expect(handlers.minis_read).toHaveBeenLastCalledWith({ miniId: MINI }, ctx);
-    expect(await call("apps_read", { id: DASHBOARD })).toBe("ran dashboard_read");
-    expect(handlers.dashboard_read).toHaveBeenLastCalledWith({ dashboardId: DASHBOARD }, ctx);
     expect(await call("apps_read", { id: ARTIFACT })).toBe("ran artifacts_read");
     expect(handlers.artifacts_read).toHaveBeenLastCalledWith({ artifactId: ARTIFACT }, ctx);
     // An app the index hasn't seen yet is found by its id's prefix; a page is not an app.
-    expect(await call("apps_read", { id: "dsh_ffffffffffffffff" })).toBe("ran dashboard_read");
+    expect(await call("apps_read", { id: "mini_ffffffffffffffff" })).toBe("ran minis_read");
     expect(await call("apps_read", { id: DESIGN })).toMatchObject({ isError: true });
   });
 
@@ -156,17 +148,16 @@ describe("apps_*", () => {
     const { call, handlers } = setup();
     expect(await call("apps_create", { type: "mini", input: { name: "Tracker", files: { "index.html": "<p>hi</p>" } } })).toBe("ran minis_create");
     expect(handlers.minis_create).toHaveBeenLastCalledWith({ name: "Tracker", files: { "index.html": "<p>hi</p>" } }, ctx);
-    expect(await call("apps_create", { type: "dashboard", input: { name: "Ops" } })).toBe("ran dashboard_create");
     expect(await call("apps_create", { type: "artifact", input: { title: "Report", content: "# R", name: "r.md" } })).toBe("ran artifacts_save");
     expect(handlers.artifacts_save).toHaveBeenLastCalledWith({ title: "Report", content: "# R", name: "r.md" }, ctx);
-    expect(await call("apps_create", { type: "dashboard", input: {} })).toMatchObject({ isError: true });
-    expect(handlers.dashboard_create).toHaveBeenCalledTimes(1);
+    expect(await call("apps_create", { type: "mini", input: {} })).toMatchObject({ isError: true });
+    expect(handlers.minis_create).toHaveBeenCalledTimes(1);
   });
 
   it("leaves out and refuses a type that is turned off", async () => {
-    const { call, handlers } = setup(["dashboard"]);
-    expect(await call("apps_list", {})).not.toContain(DASHBOARD);
-    expect(await call("apps_read", { id: DASHBOARD })).toMatchObject({ isError: true });
-    expect(handlers.dashboard_read).not.toHaveBeenCalled();
+    const { call, handlers } = setup(["mini"]);
+    expect(await call("apps_list", {})).not.toContain(MINI);
+    expect(await call("apps_read", { id: MINI })).toMatchObject({ isError: true });
+    expect(handlers.minis_read).not.toHaveBeenCalled();
   });
 });

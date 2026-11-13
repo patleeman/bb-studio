@@ -65,7 +65,7 @@ it("is its own labelled button that opens the shared New menu, walks it with the
   trigger().focus();
   await key(trigger(), "ArrowDown");
   await settle();
-  expect(items().map((each) => each.textContent?.trim())).toEqual(["Page", "Recording", "Design", "Record a call", "Start a meeting agent"]);
+  expect(items().map((each) => each.textContent?.trim())).toEqual(["Page", "Recording", "Design", "Record a call"]);
   expect(document.activeElement).toBe(items()[0]);
   // Radix moves focus a task later.
   await key(items()[0]!, "ArrowDown");

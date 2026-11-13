@@ -1,10 +1,8 @@
-// A thread's open note, or a page's note, kept current; and opening one
-// beside its thread. Light: the composer loads it on every thread.
+// A page's note, kept current.
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { pagePath, REALTIME_CHANNEL, type RealtimeEvent } from "../../constants";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { REALTIME_CHANNEL, type RealtimeEvent } from "../../constants";
 import type { NoteView, rpcContract } from "../../notes-contract";
-import { useStudioOpen } from "../../../ui/studio-open";
 
 export type NotesRpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
@@ -35,15 +33,6 @@ function useNote(key: string | null, read: (rpc: NotesRpc, key: string) => Promi
 const touches = (event: RealtimeEvent, note: NoteView | null | undefined) =>
   !!note && ((event.type === "deleted" && event.pageIds.includes(note.pageId)) || (event.type === "tree"));
 
-/** The thread's open note. */
-export function useThreadNote(threadId: string | null) {
-  return useNote(
-    threadId,
-    async (rpc, id) => (await rpc.call("notes.forThread", { threadId: id })).note,
-    (event, note, id) => (event.type === "note" && event.threadId === id) || touches(event, note),
-  );
-}
-
 /** The note this page is (open, sent or kept), or null for an ordinary page. */
 export function usePageNote(pageId: string | null) {
   return useNote(
@@ -52,25 +41,3 @@ export function usePageNote(pageId: string | null) {
     (event, note, id) => (event.type === "note" && event.pageId === id) || touches(event, note),
   );
 }
-
-/**
- * Opens a note's page in its thread's side panel, beside the chat, by
- * Studio's rule (src/ui/studio-open.tsx). `anchor` is kept for callers; it
- * renders nothing now.
- */
-export function useOpenNote(): { openNote(note: NoteView): void; anchor: ReactNode } {
-  const open = useStudioOpen("route");
-  const openNote = useCallback((note: NoteView) => open({ href: pagePath(note.pageId), title: note.title }), [open]);
-  return { openNote, anchor: null };
-}
-
-/** The title without its "Notes · " prefix, for a chip that already says Notes. */
-export const shortNoteTitle = (title: string) => title.replace(/^Notes · /, "") || title;
-
-export const localTimeZone = () => {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
-  } catch {
-    return undefined;
-  }
-};

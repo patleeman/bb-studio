@@ -53,7 +53,7 @@ the item is deleted. `bb studio starred` lists them.
 ### The Studio tab in a thread
 
 A thread's side panel has a **Studio** tab (**+ → Studio**) for every
-kind: pages, drawings, designs, dashboards, artifacts, recordings and
+kind: pages, drawings, designs, artifacts, recordings and
 dictations, and each kind an add-on registers with Studio. Each item opened
 from the thread gets its own tab beside the others. It opens on Studio's
 library, the same component as the Studio app's new tab, with the same
@@ -70,7 +70,7 @@ the library, and the tab stays on the collection; a new add-on kind appears
 with its own chip without any change to Studio. **New** offers each kind that can be made and opened here,
 makes the item in the thread's project and links it to the thread. The
 save icon opens Artifacts' save picker for the latest reply's files. Reply
-cards, **Expand to page**, and links inside an open item (a page mention, an
+cards and links inside an open item (a page mention, an
 embed's arrow, a link in a page's text) open a Studio tab on their item
 (`{ kind, id }` params), so you never leave the thread; **Open in Pages** and
 ⌘-click take an item to the Studio app instead. Kinds turned off in **Setup → Kinds** don't appear.
@@ -78,7 +78,7 @@ The tab remembers where you left it, per thread and per tab: switch to
 another side-panel tab, reload Studio or restart BB, and it comes back on
 the same item (or the collection, with its kind chip) scrolled where it was.
 A card that opens the tab again on its item shows that item.
-The old per-kind tabs (Pages, Drawings, Design, Dashboards, Artifacts) are
+The old per-kind tabs (Pages, Drawings, Design, Artifacts) are
 gone; one of them still open from before shows as unavailable, so close it
 and open Studio.
 Double-click a tab, or press F2 on it, to rename its item. The tab row shows
@@ -92,13 +92,13 @@ in place of its thread list (thread list provider `studio/studio-items`,
 "Studio (Studio)" in Settings → Appearance; it switches to the Bot's list
 on leaving, see Bot). **+** at the top is Studio's New menu. Below
 it, **All items** and each enabled kind (Setup → Kinds) with its item count,
-then **Saved views**, **Tags** (with their colors and counts), **Pinned**
-(pinned tabs) and **Recent** (the 15 most recently edited items). A kind,
-view or tag opens the new tab page filtered by it; an item opens as a tab.
+then **Tags** (with their colors and counts), **Pinned**
+(pinned tabs) and **Recent** (the 15 most recently edited items). A kind
+or tag opens the new tab page filtered by it; an item opens as a tab.
 The row for the current filter or tab is highlighted, and each group
 collapses from its heading.
 
-![The Studio sidebar on the Studio page: kinds with counts (Pages selected and filtering the new tab page), a saved view, a colored tag and recent items](assets/studio-sidebar.png)
+![The Studio sidebar on the Studio page: kinds with counts (Pages selected and filtering the new tab page), a colored tag and recent items](assets/studio-sidebar.png)
 
 Conversation-side item views continue to work independently. At phone widths, a
 pane picker shows one pane at a time while preserving the desktop arrangement.
@@ -143,16 +143,14 @@ threads use red, and idle threads use a neutral ring.
 
 Selected filters appear below search, each with a remove button and an explicit
 Include/Exclude menu. Clearing search keeps the filters; **Clear filters** keeps
-the search text. **Save view** remembers the query, and **Views** appears once a
-view exists. Query syntax such as `kind:page` still completes in search.
+the search text. Query syntax such as `kind:page` still completes in search.
 
 **Group by**, in the display menu beside the item count, groups the list by
 Thread (the default), Project, Kind or Tag, or None for one flat table. Thread
 is the thread that made the item (its first `created` link); items no thread
 made go under **No thread**. Groups with the latest activity come first, the
 table's sort applies inside each, and each heading collapses. An item with two
-tags shows under both. The choice is kept per device; saved views keep only
-the query. A **Tags** column shows each item's tag chips, with **+N** for the
+tags shows under both. The choice is kept per device. A **Tags** column shows each item's tag chips, with **+N** for the
 rest. All items leaves out Dictations; their sidebar entry, the Kind filter
 and search still show them. Studio's create tools ask agents to reuse an
 existing tag, and their result lists the tags there are.
@@ -301,7 +299,7 @@ or `forked_from_turn_id` (the last turn a BB fork copied, from the fork's
 conversation: the one whose thread spawned it, else Main); `title` (one
 given in Studio, else BB's); `archived_at` (out of the sidebar, still
 searchable); `finished_summary` (what a finished conversation decided, see
-Finishing a conversation);
+Archiving a conversation);
 `needs_you_reason`, `needs_you_at`, `needs_you_source` (why a conversation
 needs you, and who raised it); `latest`, `latest_at` (the latest reply's
 first line); `source` (`backfill`, `created`, `reconciled` or `user`). Table
@@ -451,37 +449,38 @@ conversations and workers are doing. Nothing shows on screen for it.
   conversation's summary, its latest reply and its last 8 tool calls (read
   from BB's events with a 2.5 s limit). Another Bot's thread is refused.
 
-### Finishing a conversation
+### Archiving a conversation
 
-**Finish conversation** is in a conversation's thread menus: its sidebar
-row's right-click menu and the ··· menu of its header (not Main, not a
-worker, and not while it is working). It (`src/bot-finish.ts`):
+Archiving a conversation (BB's **Archive** anywhere: its sidebar row, its
+header's ··· menu, or the iOS app) keeps its summary. There is no separate
+Finish item. Studio (`src/bot-finish.ts`):
 
-1. sends one last turn into the conversation, "Finish this conversation.",
+1. sends one last turn into the conversation, "Archive this conversation.",
    with agent-only steps: write a summary (**Decisions**, **Left open**,
    **Made**), save it with `memory_add` (topic: the conversation's title;
    source `{ kind: "conversation", id, title }`), then call
-   `bot_finish_done { summary }`. The menu reads "Finishing…" meanwhile.
-2. When `bot_finish_done` arrives, the conversation is archived
-   (`bot_threads.archived_at`, `finished_summary`; BB's own archive follows
-   once its turn is over), and Main gets the summary from the conversation,
-   with an agent-only note that has the Bot reply with the card
-   `::finished{thread="thr_…"}`: "✓ Finished: <title>", its dates, the
+   `bot_finish_done { summary }`.
+2. When `bot_finish_done` arrives, the conversation is marked finished
+   (`bot_threads.archived_at`, `finished_summary`; BB archives it again if
+   the turn brought it back), and Main gets the summary from the
+   conversation, with an agent-only note that has the Bot reply with the card
+   `::finished{thread="thr_…"}`: "✓ Archived: <title>", its dates, the
    summary's sections, **Open the conversation** and **See in Memory**, and
-   how many memory records cite it. Main's row reads "Finished “<title>” ·
-   summary saved".
-3. If the turn ends or fails without `bot_finish_done`, or nothing happens
-   for 10 minutes, Studio finishes it with a summary made of the last three
-   replies, and saves that to memory unless the Bot already saved a record
-   from this conversation.
+   how many memory records cite it. Main's row reads "Archived “<title>” ·
+   summary saved". Older `::finished` cards in transcripts render the same
+   card.
+3. If the conversation can't take the turn, the turn ends or fails without
+   `bot_finish_done`, or nothing happens for 10 minutes, Studio writes a
+   summary from the last three replies, saves it to memory unless the Bot
+   already saved a record from this conversation, and posts it to Main.
 
-You can also ask in the conversation ("finish it"): the Bot saves the summary
-and calls `bot_finish_done` itself. A finished conversation leaves the
-sidebar; Search and the Library still find it, and the older list has it
-under Finished. It opens read-only: "✓ Finished on <date>. Read-only." with
-**Reopen** where the composer goes (back in the sidebar, unarchived in BB;
-the summary stays). Finished conversations are kept indefinitely: nothing
-cleans them up (the plan's open question, decided as "keep").
+Main, workers, a Bot's earlier Main threads and the threads Maintenance
+archives on its own get no summary step. You can also ask in the
+conversation ("finish it"): the Bot saves the summary and calls
+`bot_finish_done` itself. An archived conversation with a summary opens
+read-only: "✓ Archived on <date>. Read-only." with **Reopen** where the
+composer goes (back in the sidebar, unarchived in BB; the summary stays).
+These conversations are kept indefinitely: nothing cleans them up.
 
 ### The Bot sidebar
 
@@ -1036,7 +1035,7 @@ never taken over or promoted. A conversation whose composer is replaced (Main mi
 bb, a finished conversation) keeps its workers line above the box. The
 "What next?" quick replies aren't drawn on a thread you can't write in (a
 worker, a mirror, a finished conversation). A **finished**
-conversation is read-only too, with "Finished on <date>" and **Reopen**. On the fork this is
+conversation is read-only too, with "Archived on <date>" and **Reopen**. On the fork this is
 `experimental_replace` on a composer customization; on a BB without it the
 same box is a composer banner and a style hides the composer's own input and
 buttons.
@@ -1103,7 +1102,7 @@ Search page of its own.
 
 **Tab kinds.** Everything that can be a tab beside a conversation is one
 registry, `src/tab-kinds.ts`: Conversation, Worker, Bot; Page, Whiteboard,
-Design, App, Dashboard, Artifact, Recording; Visual Chat board; Memory,
+Design, App, Artifact, Recording; Visual Chat board; Memory,
 Library, Automations, Todos, Archive; VS Code; and bb's own File, Diff,
 Browser, Terminal and Workflow run. Each kind has its name, icon, the tab that
 shows it, its address, where its recent rows come from and whether it has a
@@ -1127,7 +1126,7 @@ Visual Chat's board tab.
 
 The page's Actions are Studio's action tabs under two headings
 (`experimental_newTabGroup`), titled by the kind's name. **New**:
-Conversation, Page, Whiteboard, Design, App, Dashboard (a conversation starts
+Conversation, Page, Whiteboard, Design, App (a conversation starts
 in the main view on the Bot's + New page; the rest open as a tab). **Open**:
 Conversation (a picker for any thread, Bot or item), Page (the item list),
 Memory, Library, Automations, Todos, Archive and VS Code. Each tooltip says
@@ -1183,7 +1182,7 @@ claim within 1.5 seconds and the tool says the conversation isn't on screen.
 | Tool | Input | Does |
 | --- | --- | --- |
 | `workbench_list` | none | The tabs with their keys, the selected one, which the agent opened, the layout, and what the user closed or changed |
-| `workbench_open` | `type`: every kind of the registry the agent may open (conversation, worker, bot, page, whiteboard, design, app, dashboard, artifact, recording, board, memory, library, automations, todos, archive, automation, todo, record, vscode, file, diff, url, workflow); `id`, `path` (file, diff), `line`/`endLine` (file), `url`; or `link` instead of type and id (`bb://page/pg_…`, a bb address, `::page{id="…"}`, `file:///…`, an http(s) URL); `pane` (1, 2, "new" or "window"), `index`; `focus` (default true); `force` | Opens it as a tab, or selects it if open, in that pane and place; with "window", in a window of its own. URLs need the desktop app's in-app browser |
+| `workbench_open` | `type`: every kind of the registry the agent may open (conversation, worker, bot, page, whiteboard, design, app, artifact, recording, board, memory, library, automations, todos, archive, automation, todo, record, vscode, file, diff, url, workflow); `id`, `path` (file, diff), `line`/`endLine` (file), `url`; or `link` instead of type and id (`bb://page/pg_…`, a bb address, `::page{id="…"}`, `file:///…`, an http(s) URL); `pane` (1, 2, "new" or "window"), `index`; `focus` (default true); `force` | Opens it as a tab, or selects it if open, in that pane and place; with "window", in a window of its own. URLs need the desktop app's in-app browser |
 | `workbench_close` | `key`, `force` | Closes a tab |
 | `workbench_focus` | `key`, `force` | Selects a tab and shows the panel |
 | `workbench_pop_out` | `key`, `force` | Opens an open tab in a window of its own, out of the workbench |
@@ -1259,10 +1258,7 @@ thread's own **VS Code** tab.
 
 Main tabs, the Explorer and the Activity panel are gone, and so are their
 rail icons. Studio closes the fixed Bot tabs main tabs kept in every
-workbench, once (`src/ui/bot/retire-fixed-tabs.tsx`). The Explorer's folders
-and automatic filing stay underneath (`src/explorer`, tables `folders` and
-`filing`), with no view; `explorer_list` and `explorer_file` are registered
-but no longer given to agents.
+workbench, once (`src/ui/bot/retire-fixed-tabs.tsx`).
 
 ### Drag and drop
 
@@ -1406,8 +1402,9 @@ once, since signals sent while the socket was down are lost.
 - `bot_needs_you_set({ threadId, reason })` → `{ ok }`: marks a
   conversation as needing you with a reason, or clears it (null).
 - `bot_finish({ threadId })` → `{ state: "finishing" | "finished" |
-  "reopened" }`: starts Finish (see Finishing a conversation). Refused for
-  Main, a worker, an archived conversation and one that is working.
+  "reopened" }`: starts the summary step without archiving first (see
+  Archiving a conversation); the iOS app uses it. Refused for Main, a worker,
+  an archived conversation and one that is working.
 - `bot_reopen({ threadId })` → `{ ok }`: a finished conversation back in the
   sidebar, unarchived in BB; its summary stays.
 - `bot_finished({ threadId })` → `{ finished: { threadId, botId, title,
@@ -1458,7 +1455,7 @@ Results come in groups, the group with the best match first:
   conversation of that Bot with it, on the Bot's default model.
 - **Conversations and files** (**Recent** with nothing typed): every kind in
   the tab kinds registry (conversations, workers, pages, whiteboards,
-  designs, apps, dashboards, artifacts, recordings, boards, Bots, Bot pages,
+  designs, apps, artifacts, recordings, boards, Bots, Bot pages,
   VS Code), found by title and by Studio's search. They open as the registry
   says: a conversation in the main view, an item beside the conversation on
   screen; **⌘Enter** in a split. The launcher opens them in the main window.
@@ -1527,15 +1524,8 @@ collection. If you still have the old plugin, see
 A seeded "Offline mode launch" page, opened from its old
 `/plugins/pages/pages/<id>` address, lands as a Studio tab: a tip callout, a
 stats block, a stacked bar chart of weekly active teams and a launch
-checklist, with Dictate, Version history, Comments and the page menu in the
+checklist, with Dictate, Version history and the page menu in the
 tab's row. Captured in a staged BB (stable BB 0.46.0). Recapture with `BB_CAPTURE_ONLY=pages`.
-
-![Page comments with dictation in the reply box](assets/pages-comments.png)
-
-An anchored comment and a reply, both dictated through Talk into the comment
-drafts and saved explicitly; the page body is unchanged. The microphone also
-fits the [phone comment sheet](assets/pages-comments-mobile.png). Recapture
-with `BB_CAPTURE_ONLY=pages-comments`.
 
 ![The compact page header](assets/pages-compact-header.png)
 
@@ -1593,9 +1583,9 @@ The compact page header at 390 pixels, with **Item actions** open.
   write.
 - **Mentions.** Type `@` to mention another page, a BB thread, a
   Studio item, or a date. Page and thread mentions open where they point.
-- **Comments.** Select text to comment on it. Threads show in a floating
-  card where you can reply, react, edit, and resolve. Agents can read, start,
-  reply to, and resolve threads. Clients without the editor, like the BB
+- **Comments.** Agents can read, start, reply to, and resolve comment
+  threads on a page. The desktop editor has no comment UI: text a thread is
+  anchored to reads as plain text. Clients without the editor, like the BB
   Studio phone app, use Studio's `pages.comments`, `pages.commentBlocks`,
   `pages.commentCreate`, `pages.commentReply` and `pages.commentResolve` RPCs,
   which write as you.
@@ -1641,34 +1631,12 @@ of that thread at the end of the item, labelled with the thread's state:
 open the thread. Check the item off yourself after reviewing; the agent is
 told not to.
 
-### Notes from the composer
+### Notes
 
-When a message grows into meeting notes, **Expand to page** in a thread's
-composer (the ⤢ button beside the microphone) moves the draft into a temp
-page and opens it in the thread's Studio tab, beside the chat.
-
-![Meeting notes typed into a thread's composer, with the Expand to page tooltip](assets/notes-expand.png)
-
-Notes typed in the composer of a staged "Weekly launch sync" thread, with the
-pointer on **Expand to page**.
-
-- **Where it goes.** The page is tagged **Notes** in Studio, in the thread's
-  project, titled like "Notes · Oct 13, 2:05 PM · Weekly launch sync" (the
-  time in your time zone). Studio records the thread it came from, and lists
-  the page with that thread.
-- **The draft moves.** Once the page holds the text, the composer is cleared,
-  so there's only one copy and nothing is sent by accident. Each typed line
-  stays its own paragraph and `- ` lines stay one list. Attachments stay in
-  the composer. With a note already open, Expand adds the draft to the end
-  of it instead of starting another.
-- **Nothing is lost.** The page is saved to BB as it's made, and typing in it
-  autosaves like any page. When you come back to the thread, a **Notes in
-  progress** chip above the composer reopens it.
-
-![The temp note open beside its thread, with the Notes in progress chip above the empty composer](assets/notes-beside-thread.png)
-
-After Expand: the note open in the side panel with the draft's lines, the
-composer empty, and the **Notes in progress** chip above it.
+The iOS app turns a draft into a note: a temp page tagged **Notes** in
+Studio, in the thread's project, titled like "Notes · Oct 13, 2:05 PM ·
+Weekly launch sync". Studio records the thread it came from, and lists the
+page with that thread.
 
 While the page is a temp note, its header (in the side panel and in Pages)
 has three done actions:
@@ -1680,16 +1648,11 @@ has three done actions:
 - **Discard** asks first, then deletes the page.
 
 A sent or kept note stays tagged Notes as an ordinary page, so your meeting
-notes collect in one place; it's no longer a temp note, and the chip goes.
+notes collect in one place; it's no longer a temp note.
 
 ![The note's done actions: Send to thread with its two ways open, Keep and Discard](assets/notes-done-actions.png)
 
-The note reopened from the chip after a reload, with Send's menu open: the
-notes as the message (the default for this length), or a link and a request
-to summarize. Captured in a staged BB (stable BB 0.46.0). Recapture with
-`BB_CAPTURE_ONLY=pages-notes`.
-
-The iOS app can do the same over Studio's `notes.*` RPC methods:
+The iOS app uses Studio's `notes.*` RPC methods:
 `notes.create` (text and a thread; adds to the open note), `notes.forThread`,
 `notes.forPage`, `notes.send` (`auto`, `content` or `summarize`),
 `notes.keep` and `notes.discard`.
@@ -1762,7 +1725,7 @@ With **Explore: End replies with a Next row** on (the default), agents end a rep
 
 - **Reply**: quick answers to this message, when it asks you something. Turn them off with **Explore: Offer quick replies**; the agent prefers the ones in **Explore: Preferred quick replies** when they fit. Clicking a reply or a request drafts it for you to send.
 - **Ask for**: things the agent offers to do next, such as "📄 Write this up as a page" or "🧵 Start a thread to fix the retry bug".
-- **By the way**: what the agent noticed along the way, told back to you in plain sentences: "I noticed the new endpoint retries without waiting between tries. If the server is down, it will get hammered." Each has **Tell me more**, which drafts "💬 Tell me more: <note>" so the agent explains it right there in the thread. Notes marked 🐛 also have **Fix this**, which drafts a request to fix it.
+- **By the way**: what the agent noticed along the way, told back to you in plain sentences: "I noticed the new endpoint retries without waiting between tries. If the server is down, it will get hammered." Notes marked 🐛 have **Fix this**, which drafts a request to fix it.
 
 The agent writes it as one line, and any group can be left out:
 
@@ -1770,7 +1733,7 @@ The agent writes it as one line, and any group can be left out:
 ::next{reply="👍 Ship it|🧪 Add tests first" btw="🐛 I noticed the new endpoint retries without waiting. If the server is down, it will get hammered." do="📄 Write up the plan as a page"}
 ```
 
-Studio logs each suggestion once when it's shown and counts its clicks. The log keeps the last 180 days (at most 50,000 suggestions). `bb studio pages explore stats [--days 30]` prints how often each kind (reply, do, fix, more for Tell me more; older logs also have explore, for the removed Visual explainer) is clicked and the most-clicked labels, so the instructions can be tuned from real use. Older replies with `::explore` or `::reactions` lines, or `explore` items in `::next`, still render.
+Studio logs each suggestion once when it's shown and counts its clicks. The log keeps the last 180 days (at most 50,000 suggestions). `bb studio pages explore stats [--days 30]` prints how often each kind (reply, do, fix; older logs also have more, for the removed Tell me more, and explore, for the removed Visual explainer) is clicked and the most-clicked labels, so the instructions can be tuned from real use. Older replies with `::explore` or `::reactions` lines, or `explore` items in `::next`, still render.
 
 ## Artifacts
 
@@ -1953,7 +1916,7 @@ the old plugin, see [docs/upgrade-unified-studio.md](../../docs/upgrade-unified-
 
 The seeded "Orbit onboarding" design: one round, "Welcome screen", with two
 live options side by side, `1a` (desktop) and `1b` (phone), and the floating
-pills for Reload, **Select** / **Edit text** / **Comment**, Present and zoom.
+pills for Reload, **Select** / **Edit text**, Present and zoom.
 Recapture with `BB_CAPTURE_ONLY=design`, which opens it from its old
 `/plugins/design/designs/<id>` address and checks that it lands as a Studio
 tab; the prototype and deck captures do the same.
@@ -1990,10 +1953,10 @@ The same deck presented with Play and moved on with →: "Why it matters",
   as one `slide` screen whose steps are its slides. **Play** presents it
   (←/→, Space, Page Up/Down, Home, End, **Full screen**, **Export PDF**,
   **Download HTML**).
-- **Edit text and comments.** In **Edit text** mode, click text on a screen
-  and type over it; the change is written into the screen's HTML. In
-  **Comment** mode, pin a note to an element; **Send to agent** posts it, with
-  the element's selector and markup, to the design's thread.
+- **Edit text.** In **Edit text** mode, click text on a screen and type over
+  it; the change is written into the screen's HTML. The canvas has no comment
+  mode; agents read and resolve a design's existing comments with
+  `design_comments` and `design_resolve_comments`.
 - **Card in the agent's reply** (`::design{id="…"}`) with the newest round's
   first screens. It opens the design in the thread's **Studio** tab beside
   the chat; back from it, the tab lists the thread's items, designs among them.
@@ -2004,7 +1967,7 @@ The same deck presented with Play and moved on with →: "Why it matters",
   beside the design's own. It loads each screen at its size with Browser
   Automation, checks layout, errors and the design rules, and reports back
   only when something needs work, in the design's thread. After 3 such
-  reviews in a row, automatic review pauses until you edit, comment or ask.
+  reviews in a row, automatic review pauses until you edit or ask.
 - **Agent tools and skill.** `design_list`, `design_create`, `design_rename`,
   `design_read`, `design_ask`, `design_ready`, `design_write_screen`,
   `design_edit_screen`, `design_comments`, `design_resolve_comments`,
@@ -2020,146 +1983,6 @@ SQLite database. Frames load from
 sandbox CSP, so a screen gets an opaque origin with no access to BB.
 `bb studio backup` includes each design with its rounds, screens and
 comments; saved styles aren't in backups yet.
-
-## Dashboards
-
-Dashboards are built into Studio: live tiles, charts, tables and feeds on a
-responsive grid, which you and your agents build together. Items are
-`dashboards:<id>` and open at `/plugins/studio/studio/dashboards/<id>`.
-
-![Live BB screenshot of a dashboard open as a Studio tab](assets/dashboards-preview.png)
-
-The seeded "Launch metrics" dashboard as a Studio tab in a staged BB, in
-view mode: four stat tiles with deltas and sparklines (churn and incidents
-count down as good, so the extra incident is red), "Active users" pushed a
-moment ago, an area chart of weekly signups and trials, a custom gauge
-widget running in its sandboxed frame, a table and a changelog feed.
-
-![The same dashboard in BB's light theme](assets/dashboards-light.png)
-
-The same dashboard in BB's light theme.
-
-![A dashboard of tiles that have nothing to show yet](assets/dashboards-states.png)
-
-Tiles with nothing to show yet: a push tile waiting for an agent's data, a
-script waiting for approval (its command, and **Review command…**), a URL
-that couldn't be reached (the reason, and **Try again**), and an empty note,
-next to a working stat. A new dashboard offers **Add widget**:
-
-![A new dashboard with no widgets](assets/dashboards-empty.png)
-
-![Edit mode with the widget picker open](assets/dashboards-edit.png)
-
-Edit mode: dashed tiles with a drag handle, settings and remove in each
-header and a resize corner, over a faint dot grid, with the widget picker
-grouped into numbers, charts, lists and content.
-
-![The script approval dialog](assets/dashboards-approval.png)
-
-The approval dialog for a proposed script (the BB host's name is blurred
-for this README). Recapture all six with
-`BB_CAPTURE_ONLY=dashboards,dashboards-light,dashboards-empty,dashboards-states,dashboards-edit,dashboards-approval`;
-the captures check every tile and its state, the chart, the custom widget's
-sandbox, the edit-mode handles and picker groups, and that the dialog shows
-the full wrapped command with Deny focused, after a forged approve is
-refused.
-
-- **In the library.** Dashboards list next to pages and drawings, with
-  search over their names, widget titles and notes, tags, Move to,
-  archive, duplicate, templates and **Export → Dashboard JSON**.
-  `/plugins/studio/studio/dashboards` opens the library filtered to them.
-  **Setup → Kinds** turns them off (their data stays; nothing refreshes).
-- **In a thread.** The thread's **Studio** tab lists the dashboards made or
-  edited in that thread with its other items, then recent ones; search finds
-  any, and the **Dashboards** chip shows only dashboards. One opens beside the conversation with its toolbar and grid, sized to
-  the panel (so a narrow panel gets the 8- or 4-column layout). An open tab
-  counts as viewing: widgets refresh and scripts can be approved there.
-- **The grid.** [react-grid-layout](https://github.com/react-grid-layout/react-grid-layout)
-  2.3.0 (MIT), 12 columns wide, 8 below 1100 px and 4 below 700 px. **Edit**
-  lets you drag tiles by their header, resize them from the corner, **Add
-  widget** (each starts with sample data) and open each widget's settings:
-  title, type, options and data source. **Done** goes back to viewing. In
-  view mode each tile's header shows when it updated (or that it failed or
-  waits for approval), and its **⋯** menu refreshes it, opens its settings,
-  reviews or revokes its script, or removes it.
-  Layouts save per breakpoint. The clock button lists the last 20 versions;
-  restoring one keeps the current one in history.
-- **Widgets.** Stat (value, delta and sparkline), line, bar, area and pie
-  charts (Pages' chart colors), table, list or feed, ticker, Markdown note,
-  embed (a Studio item, a thread, or a web page in a sandboxed frame),
-  clock or countdown, image, progress bar or gauge, and custom widgets. All
-  follow BB's light and dark themes.
-- **Data.** Each widget reads one source:
-  - *Static*: JSON stored on the widget (256 KB).
-  - *URL*: JSON or RSS/Atom, fetched by Studio's server (so no CORS):
-    http and https only, at most 5 redirects, 2 MB, 15 s. Private and
-    localhost addresses work: it's your machine.
-  - *Script*: a shell command on the BB host that prints JSON or text. It
-    runs only after you approve its exact command and folder in the
-    dashboard; the approval is pinned to their SHA-256, so any change needs a
-    new approval. One approval covers every widget on that dashboard that
-    runs the same command and folder (say, one script whose output several
-    widgets `select` from), and revoking it stops all of them; another
-    dashboard asks again. Agents can propose a script but can't approve one. 30 s
-    and 1 MB per run. See [Script approval](#script-approval).
-  - *Push*: an agent sends data with `widget_set_data`, or a script with
-    `bb studio dashboards set-data <id> <widget> '<json>'`. Never polled.
-
-  URL widgets refresh at most every 60 s and scripts every 5 minutes, and
-  only while a dashboard is open in a BB window (each sends a heartbeat every
-  30 s); otherwise every 30 minutes. **Refresh** fetches now, at most every
-  10 s per widget. Studio keeps the last good value with its time and the
-  last error, so a tile shows "Updated 2m ago" or what went wrong, still
-  with its last data.
-- **Custom widgets.** HTML, CSS and JavaScript in an iframe with
-  `sandbox="allow-scripts"` (no same-origin) and a CSP with
-  `connect-src 'none'`, like Pages' HTML blocks. Studio posts
-  `{data, options, theme, size}` to it (also `window.bbWidget` and the
-  `bbwidget` event); it may post back `{height}`. Agents save reusable types
-  to your library with `widget_define`, or give one widget its own HTML.
-- **Agent tools and skill.** `dashboard_create` (with widgets in one call),
-  `dashboard_list`, `dashboard_read` (a readable summary with ids, sources,
-  values and errors), `dashboard_edit` (`add`, `move`, `resize`, `remove`,
-  `update`; all or nothing), `widget_define` and `widget_set_data`, all
-  checked with zod and capped in size, and the `dashboards` skill.
-  `@dashboard` mentions give the agent the summary.
-- **Commands.** `bb studio dashboards list`, `show <id>` and
-  `set-data <id> <widget-id> <json>`.
-- **Backup.** `bb studio backup` saves dashboards, their layouts, pushed
-  data and your widget library. Fetched data is fetched again, and script
-  approvals are never restored: a restored script waits for you.
-
-### Script approval
-
-**Review command…** on a waiting script opens the approval dialog: the exact
-command in full, the folder it runs in, the BB host's machine name, the
-schedule ("Every 15 minutes while the dashboard is open; every 30 minutes
-otherwise"), the 30 s and 1 MB limits, and who proposed it (you, or an agent
-and its thread). **Deny** has the focus. An approved script shows a quiet
-"Approved" line with **Revoke** in its settings.
-
-BB's plugin RPC can't tell the app from the `bb` CLI or a request from an
-agent's shell, so approval is a handshake the dialog makes. Opening it asks
-Studio for a one-time nonce (`dashboards.requestApproval`), which Studio
-issues only while a BB window shows the dashboard. **Approve** sends it back
-with the command's SHA-256 (`dashboards.approveScript`). A nonce approves
-that one command on that one widget, once; it isn't accepted in the dialog's
-first 0.75 s, expires after 5 minutes, and dies with Deny, a newer dialog,
-a restart, or any change to the dashboard while the dialog is open. Other
-plugins are refused, and agents have no tool for either step.
-
-This stops an agent that calls `approveScript` directly, replays an old
-approval, or changes the command after you've seen it. It doesn't stop a
-process with shell access that deliberately scripts both steps the way the
-dialog does: on your machine that process already runs as you. Keep agents
-you don't trust out of a full-access shell.
-
-Dashboards live in Studio's SQLite database: `dashboards`,
-`dashboard_widgets`, `dashboard_layouts` (one per breakpoint),
-`dashboard_widget_types` (the library), `dashboard_data` (value, fetched
-time, error), `dashboard_script_approvals`, `dashboard_script_proposals`
-(who wrote each command) and `dashboard_versions`. A dashboard holds at most
-60 widgets.
 
 ## Mini apps
 
@@ -2260,8 +2083,6 @@ secrets aren't backed up, so a restored app asks again.
 - **Artifacts:** an HTML artifact's menu has **Convert to mini app**: its page
   becomes the app's `index.html` and its live state carries over. Agents do
   the same with `minis_create` and `fromArtifactId`.
-- **Dashboards:** an Embed tile whose link is a mini app runs the app itself,
-  live, sharing its data.
 
 ### Agents
 
@@ -3053,7 +2874,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   you pick a shape; the emoji stays for older clients.
 - **Image avatars** are retired: the generator, the upload, the avatar route
   and the `bot_avatar_*` RPCs are gone. Old rows stay in `bots`
-  (`avatar_image_id`, `avatar_image_prev`) and `bot_avatar_images`, unread.
+  (`avatar_image_id`, `avatar_image_prev`), unread.
   Old `avatarImage` rows in **Profile changes** show as text ("an image" or
   "drawn") with no **Revert**.
 - **Self-managed profile**: a Bot can change its own name, description
@@ -3941,7 +3762,6 @@ Studio makes two kinds of thing. Each item has a **family** and, within it, a **
 | | `design` | UI screens or a slide deck | `dsn_…` | `design` | `design` |
 | | `whiteboard` | A whiteboard, shown in a page | `drw_…` or a UUID | `excalidraw` | `drawing` |
 | `app` (things that run) | `mini` | A mini app | `mini_…` | `minis` | `mini` |
-| | `dashboard` | A dashboard | `dsh_…` | `dashboards` | `dashboard` |
 | | `artifact` | A saved file or live HTML | `art_…` | `artifacts` | `artifact` |
 
 Recordings, dictations, VS Code workspaces and other plugins' items belong to neither family.
@@ -3969,8 +3789,8 @@ rows and moved or deleted nothing.
 | Address | Opens |
 | --- | --- |
 | `/plugins/studio/studio/pages/<id>` | Any page type: a doc, a design or a whiteboard |
-| `/plugins/studio/studio/apps/<id>` | Any app type: a mini app, a dashboard or an artifact |
-| `/plugins/studio/studio/designs/<id>`, `…/drawings/<id>`, `…/minis/<id>`, `…/dashboards/<id>`, `…/artifacts/<id>` | That type, as before |
+| `/plugins/studio/studio/apps/<id>` | Any app type: a mini app or an artifact |
+| `/plugins/studio/studio/designs/<id>`, `…/drawings/<id>`, `…/minis/<id>`, `…/artifacts/<id>` | That type, as before |
 | `/plugins/design/designs/<id>` and the other add-on addresses | That type, as before |
 
 Write the family address in new links. An item's `href` is still its type's
@@ -3996,14 +3816,14 @@ parameters and its handler; the family tools run those same handlers.
 | `pages_list` | Docs; with `type: "design"` or `"whiteboard"`, that type (as `design_list`, `whiteboard_list`) |
 | `pages_read` | A doc; given a `dsn_…` or `drw_…` id, that item (as `design_read`, `whiteboard_get`) |
 | `pages_create` | A doc; with `type: "design"` or `"whiteboard"`, one of those (as `design_create`, `whiteboard_create`) |
-| `apps_list` | Every app from the index; with `type`, that type's own list (as `minis_list`, `dashboard_list`, `artifacts_list`) |
-| `apps_read` | Any app by id (as `minis_read`, `dashboard_read`, `artifacts_read`) |
-| `apps_create` | `{ type, input }`, where `input` is the fields of `minis_create`, `dashboard_create` or `artifacts_save` |
+| `apps_list` | Every app from the index; with `type`, that type's own list (as `minis_list`, `artifacts_list`) |
+| `apps_read` | Any app by id (as `minis_read`, `artifacts_read`) |
+| `apps_create` | `{ type, input }`, where `input` is the fields of `minis_create` or `artifacts_save` |
 
 `type` on `pages_list` and `pages_create` is new and optional; every input
 those tools took before means the same. Editing stays with each type's tools
 (`pages_edit`, `design_write_screen`, `whiteboard_update`, `minis_update`,
-`dashboard_edit`, `artifacts_save`). A type turned off in **Setup → Kinds** is
+`artifacts_save`). A type turned off in **Setup → Kinds** is
 left out of `apps_list` and refused by the family tools.
 
 **Backups** carry no index: restored items index themselves, and the check runs
@@ -4027,7 +3847,7 @@ after a restore. A backup made before the index restores the same way.
   relays that over realtime and the open collection refetches.
 - A stopped or failing add-on shows up as unavailable instead of breaking the
   collection.
-- Studio stores tags, open tabs, saved views and project leads itself, keyed by
+- Studio stores tags, open tabs and project leads itself, keyed by
   `<plugin id>:<item id>` where items are involved, so add-ons don't need to
   know about them. Tags on items an add-on no longer lists are
   dropped. Each add-on owns its data, editors, tools, CLI and mentions.
@@ -4061,7 +3881,7 @@ commands left to run; `--json` prints the whole summary.
 ## Kinds
 
 **Setup → Kinds** lists the kinds built into Studio: pages, whiteboards,
-recordings and dictation, artifacts, designs and dashboards.
+recordings and dictation, artifacts and designs.
 
 ![Live BB screenshot of the Kinds section in Studio's Setup page](assets/kinds.png)
 
@@ -4098,7 +3918,7 @@ transcribing finish on the server.
 
 A Studio provider (`studio_describe` version 2) may declare that one of its
 kinds stands in for a built-in kind with `replaces`, set to `page`,
-`drawing`, `recording`, `artifact`, `design` or `dashboard`:
+`drawing`, `recording`, `artifact` or `design`:
 
 ```ts
 studio_describe: () => ({
@@ -4131,40 +3951,11 @@ small floating pill stays over every page until End. Each session keeps its
 record in a voice thread under the Bot. The design, the eyes-free rules,
 measured latency and cost are in [docs/voice/spike.md](../../docs/voice/spike.md).
 
-### Meeting agent
-
-A voice participant for an in-person meeting, called Iris by default. Start
-her from the New menu (**Start a meeting agent**) or the command palette
-(**Studio: Start a meeting agent**). She hears the room through the laptop's
-mic and answers through its speakers. The whole window becomes her stage,
-sized for people reading the laptop or a shared screen from across the table:
-her name and state, large captions, what she looked up, and the notes.
-
-- **She's quiet until addressed.** Say her name ("Iris, what's checkout's
-  p99 this week?"). For about 25 seconds after she speaks, follow-ups count
-  without the name. With **When the meeting agent answers** set to “When named, or when it’s clear”,
-  she also answers when the room clearly wants her without saying her name.
-  GPT-Live has no listen-only setting, so Studio also mutes her audio when
-  nobody addressed her. The room never hears an answer it didn't ask for.
-- **Ask** opens her for the next thing said. **Quiet** silences her
-  completely. **Minimize** (or Esc) shrinks the stage to a pill. **End
-  meeting** ends it.
-- **Lookups:** each question goes to its own read-only back-office thread
-  under the Bot. That thread can use the team's tools (Datadog, Slack, Jira,
-  docs, code). When it answers, the answer appears on the stage and she says
-  it.
-- **Notes:** she adds decisions, action items and notes when asked. They're
-  shown on the stage.
-- She can't send, file or change anything yet.
-- It uses gpt-live-1, with the voice, backend model and monthly cap from
-  hands-free voice's settings (Settings ▸ Voice); meetings count toward that cap. Her name is
-  **Meeting agent’s name**. The code is in `src/voice/meeting`.
-
 ## Backup and restore
 
 `bb studio backup [--out <file|folder>]` saves every Studio item into one
 `.zip`. That covers pages, recordings with their audio, drawings, artifacts,
-designs, and Studio's tags, project leads, views, links, comments and
+designs, and Studio's tags, project leads, links, comments and
 versions. `bb studio restore <file>` shows what would change, and `--yes`
 restores it. Restore matches each item by its original id, so running it
 again changes nothing, and it never overwrites a copy that is newer here.

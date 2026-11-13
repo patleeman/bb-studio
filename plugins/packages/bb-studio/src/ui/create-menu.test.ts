@@ -17,10 +17,10 @@ const labels = (entries: ReturnType<typeof createEntries>) => entries.map((entry
 
 afterEach(() => vi.restoreAllMocks());
 
-it("lists the kinds Studio can make in Studio's order, then Record a call and the meeting agent, then templates", () => {
+it("lists the kinds Studio can make in Studio's order, then Record a call, then templates", () => {
   const entries = createEntries(providers, { templates: [{ pluginId: "pages", id: "pg_t", title: "Weekly" }] });
-  expect(labels(entries)).toEqual(["Page", "Drawing", "Recording", "Design", "Record a call", "Start a meeting agent", "From template: Weekly"]);
-  expect(entries.map((_, index) => startsGroup(entries, index))).toEqual([false, false, false, false, true, false, false]);
+  expect(labels(entries)).toEqual(["Page", "Drawing", "Recording", "Design", "Record a call", "From template: Weekly"]);
+  expect(entries.map((_, index) => startsGroup(entries, index))).toEqual([false, false, false, false, true, false]);
 });
 
 it("offers a whiteboard after Page, made as a page holding one, not as a bare drawing", () => {
@@ -52,7 +52,6 @@ it("opens what it made through the caller's opener, so a thread's Studio tab kee
 it("drops what Setup → Kinds turned off, and Record a call with recordings", () => {
   expect(labels(createEntries(providers, { off: new Set(["recording", "design", "drawing"]) }))).toEqual(["Page"]);
   expect(labels(createEntries(providers.filter((each) => each.pluginId !== "talk")))).not.toContain("Record a call");
-  expect(labels(createEntries(providers.filter((each) => each.pluginId !== "talk")))).not.toContain("Start a meeting agent");
 });
 
 it("Record a call opens the call picker", async () => {

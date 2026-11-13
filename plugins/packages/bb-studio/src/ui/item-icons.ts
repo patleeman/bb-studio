@@ -2,7 +2,7 @@
 export const THREAD_KIND = "thread";
 
 /** BB icon names for kinds, for surfaces BB draws itself (its search palette). */
-const HOST_GLYPH: Record<string, string> = { thread: "MessageSquare", page: "FileText", drawing: "Edit", mini: "AppWindow", dashboard: "ChartColumn", design: "Palette" };
+const HOST_GLYPH: Record<string, string> = { thread: "MessageSquare", page: "FileText", drawing: "Edit", mini: "AppWindow", design: "Palette" };
 
 /** The icon BB should draw for a kind: an emoji when the item has one, else a BB icon name. */
 export function hostIcon(kind: string, emoji?: string | null): string {

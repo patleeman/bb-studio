@@ -57,7 +57,7 @@ describe("query", () => {
   it("keeps Talk's dictations out of All items, but not out of their sidebar entry, kind filter or search", () => {
     const kinds = RECORDING_KINDS.map((kind) => ({ ...kind }));
     const real = { ...vocabulary, kinds };
-    const entry = studioSidebarModel({ providers: [{ pluginId: "talk", name: "Talk", state: "ready", kinds } as never], items: [], tags: [], views: [] }, []).kinds.find((kind) => kind.label === "Dictations")!;
+    const entry = studioSidebarModel({ providers: [{ pluginId: "talk", name: "Talk", state: "ready", kinds } as never], items: [], tags: [] }, []).kinds.find((kind) => kind.label === "Dictations")!;
     expect(compileQuery(parseQuery(""), real).test(dictation)).toBe(false);
     expect(compileQuery(parseQuery("project:bb-studio"), real).test({ ...dictation, projectId: "proj_a" })).toBe(false);
     expect(compileQuery(parseQuery(entry.query), real).test(dictation)).toBe(true);
@@ -102,26 +102,26 @@ describe("pages and apps in the query", () => {
     ...vocabulary,
     kinds: [
       { id: "page", label: "Page", plural: "Pages" }, { id: "drawing", label: "Whiteboard", plural: "Whiteboards" }, { id: "design", label: "Design", plural: "Designs" },
-      { id: "mini", label: "App", plural: "Apps" }, { id: "dashboard", label: "Dashboard", plural: "Dashboards" }, { id: "artifact", label: "Artifact", plural: "Artifacts" },
+      { id: "mini", label: "App", plural: "Apps" }, { id: "artifact", label: "Artifact", plural: "Artifacts" },
       { id: "recording", label: "Recording", plural: "Recordings" },
     ],
   };
   const make = (kind: string, family?: string, type?: string) => ({ kind, family, type, projectId: null, archived: false });
-  const items = [make("page", "page", "doc"), make("drawing", "page", "whiteboard"), make("design", "page", "design"), make("mini", "app", "mini"), make("dashboard", "app", "dashboard"), make("artifact", "app", "artifact"), make("recording")];
+  const items = [make("page", "page", "doc"), make("drawing", "page", "whiteboard"), make("design", "page", "design"), make("mini", "app", "mini"), make("artifact", "app", "artifact"), make("recording")];
   const matching = (text: string) => { const compiled = compileQuery(parseQuery(text), kinds); expect(compiled.unknown).toEqual([]); return items.filter((item) => compiled.test(item)).map((item) => item.kind); };
 
   it("filters by family and by type", () => {
     expect(matching("family:page")).toEqual(["page", "drawing", "design"]);
-    expect(matching("family:apps")).toEqual(["mini", "dashboard", "artifact"]);
-    expect(matching("type:design type:dashboard")).toEqual(["design", "dashboard"]);
-    expect(matching("family:app -type:artifact")).toEqual(["mini", "dashboard"]);
+    expect(matching("family:apps")).toEqual(["mini", "artifact"]);
+    expect(matching("type:design type:mini")).toEqual(["design", "mini"]);
+    expect(matching("family:app -type:artifact")).toEqual(["mini"]);
     expect(matching("type:doc")).toEqual(["page"]);
     expect(compileQuery(parseQuery("family:files"), kinds).unknown).toEqual([{ field: "family", value: "files" }]);
   });
 
   it("keeps a filter saved with an older kind name showing what it showed", () => {
-    for (const kind of ["design", "dashboard", "artifact", "mini", "drawing", "page"]) expect(matching(`kind:${kind}`)).toEqual([kind]);
-    expect(matching("kind:Designs kind:Dashboards")).toEqual(["design", "dashboard"]);
+    for (const kind of ["design", "artifact", "mini", "drawing", "page"]) expect(matching(`kind:${kind}`)).toEqual([kind]);
+    expect(matching("kind:Designs kind:Artifacts")).toEqual(["design", "artifact"]);
     // The older names read as types too.
     expect(matching("type:drawing")).toEqual(["drawing"]);
     expect(matching("type:page")).toEqual(["page"]);

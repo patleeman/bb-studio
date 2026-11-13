@@ -44,13 +44,10 @@ it("knows which item paths the workbench can show, old add-on addresses too", ()
 
 it("shows the same item from its family address, its own address and a page: reference", () => {
   const design = "dsn_0123456789abcdef";
-  const dashboard = "dsh_0123456789abcdef";
   const artifact = "art_3f6f5166257e0457";
   expect(workbenchItem(`/plugins/studio/studio/pages/${design}`)).toEqual({ kind: "design", id: design });
   expect(workbenchItem(`/plugins/studio/studio/designs/${design}`)).toEqual({ kind: "design", id: design });
   expect(workbenchItem(`/plugins/design/designs/${design}`)).toEqual({ kind: "design", id: design });
-  expect(workbenchItem(`/plugins/studio/studio/apps/${dashboard}`)).toEqual({ kind: "dashboard", id: dashboard });
-  expect(workbenchItem(`/plugins/studio/studio/dashboards/${dashboard}`)).toEqual({ kind: "dashboard", id: dashboard });
   expect(workbenchItem(`/plugins/studio/studio/apps/${artifact}`)).toEqual({ kind: "artifact", id: artifact });
   expect(workbenchItem(`/plugins/studio/studio/apps/${design}`)).toBeNull();
   // `page:<id>` names any page type; in a thread it opens the same workbench tab as the design's own link.

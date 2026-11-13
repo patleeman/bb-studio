@@ -5,7 +5,7 @@ import { WhiteboardExpandHost } from "./whiteboard-expand";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { Icon } from "../../kit/ui/index";
 import { hasGlobalWorkbench } from "../../kit/app/host-sdk";
-import type { BotView, PageMetaView, rpcContract } from "../contract";
+import type { PageMetaView, rpcContract } from "../contract";
 export { usePanelPage } from "./use-panel-page";
 import { PagesUiContext } from "./context";
 import { PageEditor } from "./PageEditor";
@@ -39,14 +39,14 @@ export function PanelShell({ page, titleSave, header }: { page: PageMetaView; ti
       <div className="pages-doc pages-panel-tab relative flex h-full min-h-0 flex-col bg-background text-foreground">
         <WhiteboardExpandHost>
           {header}
-          <PanelEditor key={page.id} page={page} titleSave={titleSave} pages={pages ?? []} bots={bots.bots} />
+          <PanelEditor key={page.id} page={page} titleSave={titleSave} pages={pages ?? []} />
         </WhiteboardExpandHost>
       </div>
     </PagesUiContext.Provider>
   );
 }
 
-function PanelEditor({ page, titleSave, pages, bots }: { page: PageMetaView; titleSave: ReturnType<typeof usePageTitle>; pages: PageMetaView[]; bots: BotView[] }) {
+function PanelEditor({ page, titleSave, pages }: { page: PageMetaView; titleSave: ReturnType<typeof usePageTitle>; pages: PageMetaView[] }) {
   const rpc = useRpc<typeof rpcContract>();
   const { connection, status, ready } = useConnection(page.id);
   return (
@@ -58,7 +58,7 @@ function PanelEditor({ page, titleSave, pages, bots }: { page: PageMetaView; tit
         <PageHeading page={page} rpc={rpc} titleSave={titleSave} />
         <PageBody missing={status === "missing"}>
           {connection && ready && status !== "missing" ? (
-            <PageEditor connection={connection} page={page} bots={bots} pages={pages} sidePanel={null} onCloseSidePanel={() => {}} />
+            <PageEditor connection={connection} page={page} pages={pages} />
           ) : null}
         </PageBody>
       </PageColumn>
