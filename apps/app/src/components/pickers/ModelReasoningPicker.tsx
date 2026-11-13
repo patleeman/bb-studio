@@ -1,3 +1,5 @@
+import { usePromptBoxModelPreference } from "@/hooks/thread-creation-options/persisted-selection-fields";
+import { SignedOutTabMark, useSignedOutProviderIds } from "./signedOutProviders.fork";
 import { previewPick, type ProviderModelPickHandler } from "./previewPick.fork";
 import { forkModelPickerGate } from "@/components/fork/ForkModelPickerGate";
 import { formatUnknownModelLabel, triggerReasoningLabel as forkTriggerReasoningLabel } from "./unknownModelLabel.fork";
@@ -389,6 +391,7 @@ export function ModelReasoningPicker({
     (previewProvider === undefined ||
       (requireVerifiedProviderPreview && !previewCatalogIsVerified));
 
+  const rememberedPreviewModel = usePromptBoxModelPreference(previewProviderId ?? "").value;
   const previewSelection = useMemo(
     () =>
       isPreviewing
@@ -397,7 +400,7 @@ export function ModelReasoningPicker({
             selectedOnlyModels: previewProvider
               ? (previewQuery.data?.selectedOnlyModels ?? [])
               : [],
-            selectedModel: "",
+            selectedModel: previewCatalogIsVerified ? rememberedPreviewModel : "",
             preferredReasoningLevel: reasoningValue,
             provider: previewProvider,
             catalogIsVerified: previewCatalogIsVerified,
@@ -412,6 +415,7 @@ export function ModelReasoningPicker({
       previewQuery.data?.models,
       previewQuery.data?.selectedOnlyModels,
       reasoningValue,
+      rememberedPreviewModel,
     ],
   );
   const previewModelOptions = previewSelection?.modelOptions ?? modelOptions;
@@ -455,6 +459,7 @@ export function ModelReasoningPicker({
     (handoffMode || canSwitchProviders) &&
     providerOptions.length > 1 &&
     (!isShowingModelError || activeModelErrorIsProviderSpecific);
+  const signedOutProviders = useSignedOutProviderIds(providerRouting, showProviderTabs);
 
   const activeBrandPrefix = activeProvider?.brandPrefix;
   const filteredModelOptions = useMemo(() => {
@@ -1130,6 +1135,7 @@ export function ModelReasoningPicker({
                       {provider.label.charAt(0)}
                     </span>
                   )}
+                  <SignedOutTabMark signedOut={signedOutProviders.has(provider.value)} />
                 </button>
               );
             })}
