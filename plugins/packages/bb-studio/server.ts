@@ -629,6 +629,7 @@ export default async function plugin(bb: BbPluginApi) {
       retitle: (pageId, from, to) => pages.retitle(pageId, from, to),
     },
     userSkillsDir: join(bb.server.experimental_dataDir, "skills"),
+    providerStates: async () => { const { primaryHostId } = await bb.sdk.system.config(); return (await bb.sdk.system.providerStates(primaryHostId ? { hostId: primaryHostId } : undefined)).providers; },
     // Side threads show as their reply's row, not as work the Bot started.
     hiddenThreads: () => new Set([...learning.reviewThreads(), ...sideThreads.threadIds()]),
     ownedThreads: (botId) => ownedThreads.owned(botId),

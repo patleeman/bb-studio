@@ -39,6 +39,7 @@ import { EXTERNAL_PROVIDERS, externalName, externalNote } from "./external-provi
 export { EXTERNAL_AGENTS_PLUGIN_ID, EXTERNAL_PROVIDERS, externalNote } from "./external-providers";
 import { BOT_RUN_PREFIX, heartbeatCron, PERSONAL_PROJECT_ID, type ProjectLeads } from "./project-lead";
 import { BOT_SHAPES } from "./bot-shapes";
+import { readyProvider, type OnboardingProviderState } from "./onboarding";
 import { rpcErrorStatus } from "./kit/server/index";
 import { turnStartedAt } from "./turn-started";
 import { botAttention, pendingInteractions, threadWaitingFor, type BotAttention } from "./bot-attention";
@@ -383,6 +384,7 @@ export interface BotDeps {
   ownedThreads?(botId: string): ReadonlySet<string>;
   /** A Bot got a thread (made, set or handed off): its chain leaves BB's thread list (src/bot-owned.ts). */
   claimChains?(): Promise<unknown>;
+  providerStates?(): Promise<readonly OnboardingProviderState[]>;
   /** Check-ins, reminders and watchers (src/automations.ts): Pause and Stop turn them off, Resume back on. */
   automations?: {
     pauseAll(botId: string, onPaused?: (id: string) => void): Promise<string[]>;
@@ -703,6 +705,7 @@ export class Bots {
           environment: { type: "project-default" },
           pluginMetadata: { bot: id },
           // Studio Agents' providers take no reasoning levels; the permission is the bot's (accept edits by default).
+          ...(external ? {} : await this.signedInModel()),
           ...(external ? { providerId: external.providerId, model: external.model, reasoningLevel: "none", permissionMode: external.permissionMode, executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit", permissionMode: "explicit" } } : {}),
           // Its instructions come from agents.configure (botInstructions), so the first message is the user's.
           input: input.prompt === undefined && input.setup !== undefined ? setupInput(input.setup) : [{ type: "text", text: input.prompt ?? `Hi ${input.name}. Introduce yourself in a sentence and ask what I'd like you to keep an eye on.`, mentions: [] }],
@@ -718,6 +721,21 @@ export class Bots {
     await this.claimChains();
     this.deps.changed();
     return this.get(id);
+  }
+
+  async signedInModel(): Promise<Record<string, unknown>> {
+    let states: readonly OnboardingProviderState[] = [];
+    try { states = (await this.deps.providerStates?.()) ?? []; } catch { return {}; }
+    const ready = new Set(states.filter((state) => state.status === "ready" && botKind(state.providerId) === "studio").map((state) => state.providerId));
+    if (!ready.size) return {};
+    const primaryId = this.primaryId();
+    const primary = primaryId ? this.row(primaryId) : null;
+    const preset = primary ? storedDefault(primary) : null;
+    if (preset && ready.has(preset.providerId)) {
+      return { providerId: preset.providerId, model: preset.model, ...(preset.reasoning ? { reasoningLevel: preset.reasoning } : {}), executionInputSources: { providerId: "explicit", model: "explicit", ...(preset.reasoning ? { reasoningLevel: "explicit" } : {}) } };
+    }
+    const providerId = primary?.provider_id && ready.has(primary.provider_id) ? primary.provider_id : readyProvider(states);
+    return providerId && ready.has(providerId) ? { providerId, executionInputSources: { providerId: "explicit" } } : {};
   }
 
   async seedStarter(input: { name: string; avatar: string }): Promise<{ id: string; threadId: string }> {

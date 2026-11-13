@@ -1017,3 +1017,25 @@ it("leaves the harnesses' own skill folders alone while a Bot writes, searches, 
     vi.unstubAllEnvs();
   }
 });
+
+it("starts a new Bot on a signed-in model: the primary's default model, else the primary's provider, else any signed-in one, else BB's default", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  x.db.prepare("UPDATE bots SET provider_id = 'codex', default_provider_id = 'claude-code', default_model = 'opus', default_reasoning = 'medium' WHERE id = ?").run(BOT_ID);
+  let states: { providerId: string; status: string; loginCommand?: string | null }[] = [{ providerId: "claude-code", status: "ready", loginCommand: "claude login" }, { providerId: "codex", status: "unauthenticated", loginCommand: "codex login" }];
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, providerStates: async () => states });
+  const spawned = () => x.spawn.mock.calls.at(-1)![0] as Record<string, unknown>;
+  await bots.create({ name: "Scout", avatar: "🛰️" });
+  expect(spawned()).toMatchObject({ providerId: "claude-code", model: "opus", reasoningLevel: "medium", executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit" } });
+  states = [{ providerId: "claude-code", status: "unauthenticated", loginCommand: "claude login" }, { providerId: "codex", status: "ready", loginCommand: "codex login" }];
+  await bots.create({ name: "Ledger", avatar: "📒" });
+  expect(spawned()).toMatchObject({ providerId: "codex", executionInputSources: { providerId: "explicit" } });
+  expect(spawned()).not.toHaveProperty("model");
+  x.db.prepare("UPDATE bots SET provider_id = 'opencode', default_provider_id = NULL, default_model = NULL WHERE id = ?").run(BOT_ID);
+  states = [{ providerId: "opencode", status: "unauthenticated", loginCommand: null }, { providerId: "codex", status: "unauthenticated", loginCommand: "codex login" }, { providerId: "claude-code", status: "ready", loginCommand: "claude login" }];
+  await bots.create({ name: "Atlas", avatar: "🗺️" });
+  expect(spawned()).toMatchObject({ providerId: "claude-code" });
+  states = [{ providerId: "codex", status: "unauthenticated", loginCommand: "codex login" }];
+  await bots.create({ name: "Echo", avatar: "🔔" });
+  expect(spawned()).not.toHaveProperty("providerId");
+});
