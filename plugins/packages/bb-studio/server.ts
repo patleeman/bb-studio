@@ -1,4 +1,5 @@
 import { registerWorkCards, WORK_TOOLS } from "./src/work/register";
+import { CONTINUE_TOOL, registerContinueNew } from "./src/continue-new";
 import { runWorkCli } from "./src/work/cli";
 import { registerLoops, LOOP_TOOLS, loopPushActions } from './src/loops/register';
 import { reminderLoopId, scheduledContract, scheduledItems } from "./src/loops/scheduled";
@@ -379,7 +380,7 @@ export default async function plugin(bb: BbPluginApi) {
    * side thread ("Reply in thread") is a conversation now, with the Bot's
    * full tools: the old read-only side-thread rule is gone.
    */
-  const CONVERSATION_TOOLS = ["bot_conversations", "bot_needs_you", "bot_activity_lookup", "bot_finish_done"] as const;
+  const CONVERSATION_TOOLS = ["bot_conversations", "bot_needs_you", "bot_activity_lookup", "bot_finish_done", CONTINUE_TOOL] as const;
   for (const tool of appTools({ ...familyDeps, index: itemIndex })) bb.agents.registerTool(tool as never);
   /** Only a runner's thread gets this (src/runners.ts). */
   const RUNNER_TOOLS = ["runner_report"] as const;
@@ -1024,6 +1025,18 @@ export default async function plugin(bb: BbPluginApi) {
     sideThreads,
     seeds: threadSeeds,
     defaultModel: (botId) => bots.defaultModel(botId),
+  });
+  registerContinueNew(bb, {
+    conversation: (threadId) => { const rec = botThreads.store.get(threadId); return rec ? { botId: rec.botId, kind: rec.kind } : null; },
+    thread: async (threadId) => await bb.sdk.threads.get({ threadId }).catch(() => null) as { projectId?: string | null; environmentId?: string | null } | null,
+    timeline: async (threadId) => ((await bb.sdk.threads.timeline({ threadId, segmentLimit: 40 } as never)) as unknown as { rows?: { kind?: string; role?: string; messageSeq?: number; initiator?: string }[] }).rows ?? [],
+    defaultModel: (botId) => bots.defaultModel(botId),
+    spawn: async (request) => await bb.sdk.threads.spawn(request as never) as { id: string; projectId?: string | null },
+    recordConversation: (threadId, botId) => { botThreads.store.recordConversation(threadId, botId); },
+    focus: (botId) => botThreads.store.setFocus(botId),
+    card: (id) => work.store.find(id),
+    moveCard: (id, threadId) => work.store.move(id, threadId),
+    changed: (threadId) => botThreads.threadChanged(threadId),
   });
   const onboarding = registerOnboarding(bb, { db, bots, errorText });
   // Awareness (src/live-activity.ts): what each conversation and worker is

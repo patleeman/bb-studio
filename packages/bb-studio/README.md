@@ -1429,7 +1429,30 @@ the same (it listed side threads, which are conversations now);
 (null clears; a worker is refused); `bot_activity_lookup({ threadId })` gives
 one conversation or worker in detail (see Awareness); `bot_finish_done({
 summary })` finishes the conversation it runs in (refused in Main and in a
-worker).
+worker); `conversation_continue_new({ title, handoff, workCards?,
+openingMessage? })` continues a topic in a new conversation (below).
+
+### Continuing a topic in a new conversation
+
+When a conversation drifts, the Bot proposes moving the topic and calls
+`conversation_continue_new` only when you agree or ask (`src/continue-new.ts`).
+Studio starts a conversation of the same Bot, in the source's project and
+environment, on the Bot's default model, as **+ New** does. Its first message
+is the Bot's short handoff, starting
+"Continued from @thread:<source>#msg=<your last message>". Nothing is forked
+and no transcript is copied. The listed work cards move: their `threadId`
+becomes the new conversation and their message anchor is cleared, so they
+leave the source's In flight list and appear in the new one. The new
+conversation's first reply re-posts each `::work{id}` line, which re-anchors
+it. The old card in the source message still redraws live.
+
+The Bot answers in the source with the tool's `post` text:
+`::continued{to="thr_…" title="…"}` and, on the next line,
+`[Continued in <title> →](/threads/thr_…)`. The desktop draws the
+**Continued in** card (`src/ui/conversations/ContinuedCard.tsx`) and hides
+that exact link line under it. The iOS app drops directives it doesn't know
+and shows the link, which it already opens (desktop Markdown drops `bb://`
+hrefs, so the link is an app path).
 
 ## Windows
 

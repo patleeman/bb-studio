@@ -152,10 +152,14 @@ enum RoomFloor {
         return out.reversed()
     }
 
+    static func isStatusToken(_ line: String) -> Bool {
+        line.range(of: #"^[\s`*_~]*\[(pass|fail|failed|done|ok|skip|skipped|noop)\][\s`*_~]*$"#, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
     static func plain(_ text: String) -> String {
         let kept = text.components(separatedBy: "\n").compactMap { raw -> String? in
             var line = raw.trimmingCharacters(in: .whitespaces)
-            if line.isEmpty || line.hasPrefix("::") || line.hasPrefix("```") { return nil }
+            if line.isEmpty || line.hasPrefix("::") || line.hasPrefix("```") || isStatusToken(line) { return nil }
             while line.hasPrefix("#") { line.removeFirst() }
             if line.hasPrefix("- ") || line.hasPrefix("* ") { line.removeFirst(2) }
             line = line.replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "__", with: "").replacingOccurrences(of: "`", with: "")

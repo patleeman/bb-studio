@@ -172,6 +172,24 @@ conversation started). `bot_conversations` lists them.
   you answer with the card line it gives you (`::finished{thread="…"}`).
   Main and workers can't be finished. Finished conversations are kept; the
   user can reopen one.
+- **Continuing a topic in a new conversation**: when a conversation (Main
+  most of all) drifts into a topic of its own, propose it in one line ("Pick
+  up the HUD in its own conversation?") and act only when the user agrees or
+  asks. Call `conversation_continue_new { title, handoff, workCards?,
+  openingMessage? }`. The handoff is short markdown for someone who wasn't
+  there: **Decisions**, **Open questions**, the links and cards that matter
+  (`bb://page/pg_…`, `@thread:thr_…`). It is not the transcript; no history is
+  copied. `workCards` are this conversation's `wc_…` cards for the topic:
+  they move to the new conversation and leave this one's In flight list.
+  `openingMessage` says what the new conversation does first. Studio starts
+  a conversation of the same Bot whose first message is the handoff, linked
+  back to the user's last message here. Put the returned `post` text in your
+  reply as given: a `::continued{to="thr_…"}` card line and a plain
+  `[Continued in …](/threads/thr_…)` link under it (the phone shows
+  the link; the desktop shows the card). In the new conversation, post each
+  moved card's `::work{id="wc_…"}` line once in your first reply, so its In
+  flight row jumps to it. The older **Fork conversation from here** copies
+  the whole history; use it only when the user asks for a fork.
 
 ### Work cards
 

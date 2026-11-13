@@ -65,6 +65,12 @@ export class WorkCardStore {
     return this.save({ ...current, messageId, messageSeq });
   }
 
+  move(id: string, threadId: string): WorkCard {
+    const current = this.get(id);
+    if (current.threadId === threadId) return current;
+    return this.save({ ...current, threadId, messageId: null, messageSeq: null, updatedAt: this.now() });
+  }
+
   inFlight(threadId: string): WorkCard[] {
     const since = this.now() - SHOW_FINISHED_MS;
     const rows = this.db.prepare("SELECT record FROM work_cards WHERE thread_id = ? AND (finished_at IS NULL OR finished_at > ?)").all(threadId, since) as Row[];
