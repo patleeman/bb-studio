@@ -11,7 +11,7 @@ it("registers the Bot pages and the New … actions beside a conversation, named
     ["memory", "Memory", "thread", "undefined"],
     ["bot-skills", "Skills", "thread", "undefined"],
     ["library", "Library", "thread", "undefined"],
-    ["bot-automations", "Automations", "thread", "undefined"],
+    ["bot-automations", "Scheduled", "thread", "undefined"],
     ["archive", "Archive", "thread", "undefined"],
     ["automation", "Automation", "thread", "undefined"],
     ["todo", "Todo", "thread", "undefined"],

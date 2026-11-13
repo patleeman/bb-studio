@@ -27,7 +27,7 @@ export function AutomationsPanel() {
     );
   }
   return (
-    <BotPageLayout testId="automations-panel" title="Automations">
+    <BotPageLayout testId="automations-panel" title="Todos">
       {bots.data ? (
         <div className="flex flex-col items-center gap-3" data-testid="automations-empty">
           <BotPageEmpty>No Bots</BotPageEmpty>

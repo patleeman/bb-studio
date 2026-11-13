@@ -72,7 +72,7 @@ export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
 }) {
   // Each row drags as its page (src/tab-kinds.ts), for the workbench: a drop opens that page as a tab.
   const row = (id: SpacePage, label: string, glyph: ReactNode, extra?: ReactNode) => (
-    <button key={id} type="button" data-testid={`space-page-${id}`} aria-current={page === id ? "page" : undefined} onClick={() => onPage(id)} className={PAGE_ROW}
+    <button key={id} type="button" data-testid={`space-page-${id}`} aria-current={page === id || (id === "todos" && page === "automations") ? "page" : undefined} onClick={() => onPage(id)} className={PAGE_ROW}
       {...dragSourceProps(bot ? refDragItem({ kind: id satisfies TabKindId, id: bot.id }, label) : null)}>
       <span aria-hidden className="flex w-4 shrink-0 justify-center text-muted-foreground">{glyph}</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -104,8 +104,9 @@ export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
         {row("memory", "Memory", <span className="text-sm leading-none">◈</span>)}
         {row("skills", "Skills", <Icon name="BookOpen" className="size-4" />)}
         {row("library", "Library", <Icon name="studio/library" className="size-4" />)}
-        {row("automations", "Automations", <Icon name="Clock" className="size-4" />)}
-        {todos !== null ? row("todos", "Todos", <Icon name="ListTodo" className="size-4" />, todos > 0 ? <span data-testid="space-todos-count" className="shrink-0 text-xs tabular-nums text-warning">{todos}</span> : null) : null}
+        {todos !== null
+          ? row("todos", "Todos", <Icon name="ListTodo" className="size-4" />, todos > 0 ? <span data-testid="space-todos-count" className="shrink-0 text-xs tabular-nums text-warning">{todos}</span> : null)
+          : row("automations", "Todos", <Icon name="ListTodo" className="size-4" />)}
       </nav>
     </header>
   );

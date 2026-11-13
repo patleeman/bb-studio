@@ -1,4 +1,4 @@
-// The thread panel's "Automations" tab and the context row's count: what is
+// The thread panel's "Scheduled" tab and the context row's count: what is
 // scheduled for this thread, from Studio's one read model (loops.scheduled,
 // src/loops/scheduled.ts): its todos with a time and the Bot automations
 // that wake it.
@@ -80,7 +80,7 @@ export function ThreadAutomationsSummary({ threadId }: { threadId: string; proje
       type="button"
       title={label}
       aria-label={label}
-      onClick={() => openTab({ actionId: AUTOMATIONS_TAB, title: "Automations" })}
+      onClick={() => openTab({ actionId: AUTOMATIONS_TAB, title: "Scheduled" })}
       className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-3.5"
     >
       <Icon name="Clock" aria-hidden />

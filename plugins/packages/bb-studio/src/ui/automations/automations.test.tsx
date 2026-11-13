@@ -117,6 +117,6 @@ describe("ThreadAutomationsSummary", () => {
     const button = document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
     expect(button.textContent).toBe("2 scheduled");
     fireEvent.click(button);
-    expect(headerForTest.openThreadPanel).toHaveBeenCalledWith({ actionId: "thread-automations", title: "Automations" });
+    expect(headerForTest.openThreadPanel).toHaveBeenCalledWith({ actionId: "thread-automations", title: "Scheduled" });
   });
 });

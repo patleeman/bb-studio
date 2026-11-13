@@ -189,7 +189,15 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
   botPage("memory", "Memory", "Brain", TAB_IDS.memory),
   botPage("skills", "Skills", "BookOpen", TAB_IDS.skills, "added"),
   botPage("library", "Library", "studio/library", TAB_IDS.library),
-  botPage("automations", "Automations", "Clock", TAB_IDS.automations),
+  {
+    ...botPage("automations", "Scheduled", "ListTodo", TAB_IDS.automations),
+    actions: [], recents: null,
+    surfaces: {
+      newTab: { na: "The Todos page is the one entry; this address opens it at Scheduled." },
+      recent: { na: "Recent lists the Todos page once, under Todos." },
+      sidebarDrag: "added", workbenchOpen: "added", chatLink: "had",
+    },
+  },
   botPage("todos", "Todos", "ListTodo", TAB_IDS.todos),
   botPage("archive", "Archive", "Archive", TAB_IDS.archive),
   pageRow("automation", "Automation", "Automations", "Clock", TAB_IDS.automation, "Automations page"),
