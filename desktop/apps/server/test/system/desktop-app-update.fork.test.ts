@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -14,9 +14,10 @@ import { testLogger } from "../helpers/test-app.js";
 const roots: string[] = [];
 const services: AppUpdateService[] = [];
 
-function channelWith(info: DesktopAppUpdateInfo): DesktopUpdateChannel {
+function channelWith(info: DesktopAppUpdateInfo | null): DesktopUpdateChannel {
   return {
     async request(_action: DesktopAppUpdateRequest["action"]) {
+      if (info === null) throw new Error("The desktop app did not respond.");
       return info;
     },
     subscribe() {
@@ -27,7 +28,7 @@ function channelWith(info: DesktopAppUpdateInfo): DesktopUpdateChannel {
 }
 
 async function serviceFor(
-  info: DesktopAppUpdateInfo,
+  info: DesktopAppUpdateInfo | null,
   serverVersion: string,
   pending: { from: string; to: string } | null = null,
 ) {
@@ -155,7 +156,7 @@ describe("desktop-owned server update status in BB Studio", () => {
     expect(status.lastResult).toMatchObject({
       outcome: "failed",
       phase: "startup",
-      message: "bb started 1.0.1 instead of 1.0.2.",
+      message: "BB Studio started 1.0.1 instead of 1.0.2.",
     });
   });
 
@@ -183,5 +184,19 @@ describe("desktop-owned server update status in BB Studio", () => {
         to: { version: "1.0.2" },
       }),
     );
+  });
+
+  it("keeps the update pending when the desktop does not say what it runs", async () => {
+    const service = await serviceFor(null, "0.49.0", {
+      from: "1.0.1",
+      to: "1.0.2",
+    });
+    const status = await service.getStatus({ forceRefresh: false });
+    expect(status.lastResult).toBeNull();
+    const dataDir = roots.at(-1) ?? "";
+    const stored = JSON.parse(
+      await readFile(join(dataDir, "bb-desktop-app-update.json"), "utf8"),
+    ) as { pending: { to: { version: string } } | null };
+    expect(stored.pending?.to.version).toBe("1.0.2");
   });
 });

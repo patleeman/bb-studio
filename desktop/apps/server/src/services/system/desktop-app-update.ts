@@ -67,7 +67,7 @@ export function createDesktopAppUpdateService(args: {
     path,
     read: readState,
     mutate: (state) => {
-      if (state.pending === null) return state;
+      if (state.pending === null || running === null) return state;
       const updated = state.pending.to.version === args.currentVersion || state.pending.to.version === running;
       return {
         ...state,
@@ -77,7 +77,7 @@ export function createDesktopAppUpdateService(args: {
           finishedAt: new Date().toISOString(),
           message: updated
             ? null
-            : `bb started ${running ?? args.currentVersion} instead of ${state.pending.to.version}.`,
+            : `BB Studio started ${running} instead of ${state.pending.to.version}.`,
           outcome: updated ? ("updated" as const) : ("failed" as const),
           phase: updated ? null : ("startup" as const),
         },

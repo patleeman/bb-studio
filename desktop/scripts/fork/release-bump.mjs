@@ -36,6 +36,8 @@ export function foldVersion({
       [
         "-c",
         "rerere.enabled=false",
+        "-c",
+        "rebase.updateRefs=false",
         "rebase",
         "--quiet",
         "--autosquash",

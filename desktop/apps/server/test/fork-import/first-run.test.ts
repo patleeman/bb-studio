@@ -373,4 +373,106 @@ describe("first-run import from another bb data dir", () => {
       { id: "studio", enabled: 1, root_dir: "/new/studio" },
     ]);
   });
+
+  it("leaves out bb's Community catalog and keeps the plugins installed from it as direct installs", async () => {
+    const root = await makeSource();
+    const source = join(root, "source");
+    const target = join(root, "target");
+    const seed = new Database(join(source, "bb.db"));
+    const insertRow = (table: string, values: Record<string, unknown>) => {
+      const row: Record<string, unknown> = {};
+      for (const column of seed
+        .prepare<
+          [],
+          {
+            name: string;
+            notnull: number;
+            dflt_value: string | null;
+            type: string;
+          }
+        >(
+          `SELECT name, "notnull", dflt_value, type FROM pragma_table_info('${table}')`,
+        )
+        .all()) {
+        if (column.notnull === 1 && column.dflt_value === null) {
+          row[column.name] = /INT/i.test(column.type) ? 1 : "x";
+        }
+      }
+      Object.assign(row, values);
+      const names = Object.keys(row);
+      seed
+        .prepare(
+          `INSERT INTO ${table} (${names.join(", ")}) VALUES (${names.map((name) => `@${name}`).join(", ")})`,
+        )
+        .run(row);
+    };
+    for (const name of ["bb-community", "acme"]) {
+      insertRow("plugin_marketplaces", {
+        name,
+        source_kind: "https",
+        manifest_url: `https://${name}.test/marketplace.json`,
+        manifest_json: JSON.stringify({ schemaVersion: 1, name, plugins: [] }),
+      });
+      insertRow("plugin_marketplace_icons", { marketplace_name: name });
+    }
+    insertRow("plugins", {
+      id: "hover-cards",
+      enabled: 1,
+      provenance: "catalog",
+      catalog_entry_id: "hover-cards",
+      catalog_marketplace_name: "bb-community",
+      source_kind: "git",
+    });
+    insertRow("plugins", {
+      id: "acme-notes",
+      enabled: 1,
+      provenance: "catalog",
+      catalog_entry_id: "notes",
+      catalog_marketplace_name: "acme",
+      source_kind: "git",
+    });
+    seed.close();
+
+    await runForkFirstRunImport({
+      dataDir: target,
+      env: { BB_STUDIO_IMPORT_FROM: source },
+      logger,
+      now: 1000,
+      appVersion: "1.0.0",
+    });
+
+    const db = new Database(join(target, "bb.db"), { readonly: true });
+    const marketplaces = db
+      .prepare("SELECT name FROM plugin_marketplaces ORDER BY name")
+      .all();
+    const icons = db
+      .prepare(
+        "SELECT marketplace_name FROM plugin_marketplace_icons ORDER BY marketplace_name",
+      )
+      .all();
+    const plugins = db
+      .prepare(
+        "SELECT id, enabled, provenance, catalog_entry_id, catalog_marketplace_name FROM plugins WHERE id IN ('hover-cards', 'acme-notes') ORDER BY id",
+      )
+      .all();
+    db.close();
+    expect(marketplaces).toEqual([{ name: "acme" }]);
+    expect(icons).toEqual([{ marketplace_name: "acme" }]);
+    expect(plugins).toEqual([
+      {
+        id: "acme-notes",
+        enabled: 1,
+        provenance: "catalog",
+        catalog_entry_id: "notes",
+        catalog_marketplace_name: "acme",
+      },
+      {
+        id: "hover-cards",
+        enabled: 1,
+        provenance: "direct",
+        catalog_entry_id: null,
+        catalog_marketplace_name: null,
+      },
+    ]);
+  });
 });

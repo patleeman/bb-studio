@@ -443,13 +443,13 @@
     },
     "apps/server/src/services/plugin-catalog/plugin-catalog-service.ts": {
       "seam": "studio-marketplaces",
-      "intent": "With an empty marketplace URL (BB Studio's default, set by identity.mjs) bb's Community catalog is not seeded: BB Studio's own catalog is added once instead (seedStudioMarketplace), the periodic refresh is timed from the latest attempt (refreshAnchor), and bb-community can be added and removed by hand (isShippedMarketplace); its URLs fall back to getbb's v2 and v1 (curatedSourceUrl). The helpers are in studio-marketplaces.fork.ts, imported at the top of the file. With a URL, bb's behavior is unchanged.",
-      "budget": 16
+      "intent": "With an empty marketplace URL (BB Studio's default, set by identity.mjs) bb's Community catalog is not seeded: BB Studio's own catalog is added once instead (seedStudioMarketplace), the periodic refresh is timed from the latest attempt (refreshAnchor), and bb-community can be added and removed by hand (isShippedMarketplace); its URLs fall back to getbb's v2 and v1 (curatedSourceUrl). Every fetched or added catalog loses entries whose id is a fork built-in (withoutForkBuiltins around materializeMarketplace). The helpers are in studio-marketplaces.fork.ts, imported at the top of the file. With a URL, bb's behavior is unchanged.",
+      "budget": 22
     },
     "apps/server/src/services/system/desktop-app-update.ts": {
       "seam": "studio-release",
-      "intent": "A desktop-owned server reports the hosting desktop's version (info.version, the Studio version) as current, falling back to its own; bb's desktop and server versions are the same, BB Studio's are not. An update records the desktop's version as its start, and at startup a pending update counts as done when its target is the server's version or the desktop's (desktopVersionIfPending), so a Studio update is not reported as failed. The fetch-failed message is STUDIO_NO_RELEASE_MESSAGE (desktop-app-update.fork.ts), imported at the top of the file.",
-      "budget": 15
+      "intent": "A desktop-owned server reports the hosting desktop's version (info.version, the Studio version) as current, falling back to its own; bb's desktop and server versions are the same, BB Studio's are not. An update records the desktop's version as its start, and at startup a pending update counts as done when its target is the server's version or the desktop's (desktopVersionIfPending), so a Studio update is not reported as failed; when the desktop does not answer, the update stays pending. The failure message names BB Studio. The fetch-failed message is STUDIO_NO_RELEASE_MESSAGE (desktop-app-update.fork.ts), imported at the top of the file.",
+      "budget": 17
     },
     "apps/app/src/components/onboarding/OnboardingGate.tsx": {
       "seam": "first-run",
