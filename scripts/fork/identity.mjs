@@ -3,6 +3,10 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  appTelemetryFiles,
+  telemetrySwitchProblems,
+} from "./identity-absent.mjs";
+import {
   findIdentityOverlaps,
   formatIdentityTable,
   readCommitIdentity,
@@ -25,6 +29,67 @@ const edits = [
       [
         "export const DEFAULT_BB_TELEMETRY = true;",
         "export const DEFAULT_BB_TELEMETRY = false;",
+      ],
+      [
+        'export const DEFAULT_BB_MARKETPLACE_URL =\n  "https://getbb.app/marketplace/v2/marketplace.json";',
+        'export const DEFAULT_BB_MARKETPLACE_URL = "";',
+      ],
+    ],
+  ],
+  [
+    "apps/server/src/services/plugins/builtin-registry.ts",
+    [
+      [
+        '    name: "bb-account",\n    pluginId: "bb-account",\n    defaultEnabled: true,',
+        '    name: "bb-account",\n    pluginId: "bb-account",\n    defaultEnabled: false,',
+      ],
+      [
+        '    name: "connect",\n    pluginId: "connect",\n    defaultEnabled: true,',
+        '    name: "connect",\n    pluginId: "connect",\n    defaultEnabled: false,',
+      ],
+    ],
+  ],
+  [
+    "packages/domain/src/feature-flags.ts",
+    [
+      [
+        "initiatorTelemetry: z.boolean().default(true),",
+        "initiatorTelemetry: z.boolean().default(false),",
+      ],
+      [
+        "  initiatorTelemetry: true,\n  timelineWindowEventBudget",
+        "  initiatorTelemetry: false,\n  timelineWindowEventBudget",
+      ],
+    ],
+  ],
+  [
+    "apps/app/src/lib/system-config-atoms.ts",
+    [
+      [
+        "    initiatorTelemetry: true,\n    timelineWindowEventBudget",
+        "    initiatorTelemetry: false,\n    timelineWindowEventBudget",
+      ],
+    ],
+  ],
+  [
+    "apps/app/src/views/SettingsView.tsx",
+    [
+      [
+        '        <SettingsWithControl\n          label="Share anonymous usage data"\n          description="Send anonymous usage data, such as app starts, setup progress and feature use, to help improve bb. Turning this off takes effect immediately for this server."\n        >\n          <Switch\n            checked={telemetryEnabled}\n            disabled={disabled}\n            onCheckedChange={onTelemetryEnabledChange}\n            aria-label="Share anonymous usage data"\n          />\n        </SettingsWithControl>\n\n',
+        "",
+      ],
+      [
+        "  onStreamerModeChange,\n  telemetryEnabled,\n  onTelemetryEnabledChange,\n}: PrivacySettingsSectionProps) {",
+        "  onStreamerModeChange,\n}: PrivacySettingsSectionProps) {",
+      ],
+    ],
+  ],
+  [
+    "apps/app/src/components/settings/settings-search.ts",
+    [
+      [
+        '      {\n        title: "Share anonymous usage data",\n        keywords: ["privacy", "telemetry", "analytics"],\n      },\n',
+        "",
       ],
     ],
   ],
@@ -188,8 +253,9 @@ for (const [file, pairs] of edits) {
   const target = join(root, file);
   let text = readFileSync(target, "utf8");
   for (const [from, to] of pairs) {
-    if (text.includes(to)) continue;
-    const found = from instanceof RegExp ? from.test(text) : text.includes(from);
+    const found =
+      from instanceof RegExp ? from.test(text) : text.includes(from);
+    if (to === "" ? !found : text.includes(to)) continue;
     if (!found) {
       console.error(`NOT FOUND ${file}: ${from}`);
       failed = true;
@@ -201,6 +267,11 @@ for (const [file, pairs] of edits) {
         : text.replaceAll(from, to);
   }
   writeFileSync(target, text);
+}
+
+for (const problem of telemetrySwitchProblems(appTelemetryFiles(root))) {
+  console.error(`STILL PRESENT ${problem}`);
+  failed = true;
 }
 
 const KNOWN_TELEMETRY_FILES = new Set([
@@ -286,5 +357,5 @@ for (const key of overlaps) {
 
 if (failed) process.exitCode = 1;
 console.log(
-  `identity applied: BB Studio, nyc.plee.bbstudio, ~/.bb-studio, ports 38986 and 38987, updates from ${studioIdentity.updateFeed}, no usage telemetry, based on bb ${upstreamVersion} @ ${upstreamBase.slice(0, 7)}`,
+  `identity applied: BB Studio, nyc.plee.bbstudio, ~/.bb-studio, ports 38986 and 38987, updates from ${studioIdentity.updateFeed}, no usage telemetry, no bb Community catalog, bb account and connect off, based on bb ${upstreamVersion} @ ${upstreamBase.slice(0, 7)}`,
 );
