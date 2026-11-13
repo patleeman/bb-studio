@@ -23,6 +23,7 @@ import { Welcome } from "./Onboarding";
 import { useOpenThread } from "./workspace";
 import { botLanding, readLastBotThread, threadLocator } from "./threadListSwitch";
 import { BOT_PATH, botPath, forBot, rememberBot, useBotSelection } from "./selection";
+import { formatModelName } from "../../model-names";
 
 export { BOT_PATH };
 /** The Bot page's path under the Studio panel. */
@@ -468,6 +469,10 @@ function SkillHistory({ botId, onRevert }: { botId: string; onRevert(): void }) 
 
 const LEARN_INTERVALS = [5, 10, 20, 30, 50];
 
+export function modelLabel(value: Pick<BotLearningView, "modelNames">, model: string): string {
+  return value.modelNames?.[model] ?? formatModelName(model);
+}
+
 /** Learn from work: the background review's switch, interval and model and the last result. */
 function LearnSettings({ value, busy, run }: { value: BotLearningView; busy: boolean; run<M extends Extract<Method, `bot_${string}`>>(method: M, input?: RpcInput<M>): Promise<unknown> }) {
   const intervals = LEARN_INTERVALS.includes(value.interval) ? LEARN_INTERVALS : [...LEARN_INTERVALS, value.interval].sort((a, b) => a - b);
@@ -492,8 +497,8 @@ function LearnSettings({ value, busy, run }: { value: BotLearningView; busy: boo
           </span>
           <label className="flex items-center gap-2 text-muted-foreground">Review model
             <select aria-label="Review model" className="min-w-0 flex-1 rounded border border-border bg-transparent px-1" value={value.reviewModel ?? ""} disabled={busy} onChange={(event) => void run("bot_learning_set", { reviewModel: event.target.value || null })}>
-              <option value="">Cheapest{value.defaultModel ? ` (${value.defaultModel})` : ""}</option>
-              {value.models.map((model) => <option key={model} value={model}>{model}</option>)}
+              <option value="">Cheapest{value.defaultModel ? ` (${modelLabel(value, value.defaultModel)})` : ""}</option>
+              {value.models.map((model) => <option key={model} value={model}>{modelLabel(value, model)}</option>)}
             </select>
           </label>
         </>

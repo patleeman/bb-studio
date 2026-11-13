@@ -14227,6 +14227,7 @@ public enum Studio {
     public var reviewModel: String?
     public var defaultModel: String?
     public var models: [String]?
+    public var modelNames: [String: String]?
     public var consolidate: Bool?
     public var toolTurns: Double?
     public var userTurns: Double?
@@ -14234,12 +14235,13 @@ public enum Studio {
     public var lastReview: BotLearningOutputLastReview?
     public var lastCurator: BotLearningOutputLastCurator?
 
-    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningOutputLastReview? = nil, lastCurator: BotLearningOutputLastCurator? = nil) {
+    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, modelNames: [String: String]? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningOutputLastReview? = nil, lastCurator: BotLearningOutputLastCurator? = nil) {
       self.enabled = enabled
       self.interval = interval
       self.reviewModel = reviewModel
       self.defaultModel = defaultModel
       self.models = models
+      self.modelNames = modelNames
       self.consolidate = consolidate
       self.toolTurns = toolTurns
       self.userTurns = userTurns
@@ -14291,6 +14293,7 @@ public enum Studio {
     public var reviewModel: String?
     public var defaultModel: String?
     public var models: [String]?
+    public var modelNames: [String: String]?
     public var consolidate: Bool?
     public var toolTurns: Double?
     public var userTurns: Double?
@@ -14298,12 +14301,13 @@ public enum Studio {
     public var lastReview: BotLearningSetOutputLastReview?
     public var lastCurator: BotLearningSetOutputLastCurator?
 
-    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningSetOutputLastReview? = nil, lastCurator: BotLearningSetOutputLastCurator? = nil) {
+    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, modelNames: [String: String]? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningSetOutputLastReview? = nil, lastCurator: BotLearningSetOutputLastCurator? = nil) {
       self.enabled = enabled
       self.interval = interval
       self.reviewModel = reviewModel
       self.defaultModel = defaultModel
       self.models = models
+      self.modelNames = modelNames
       self.consolidate = consolidate
       self.toolTurns = toolTurns
       self.userTurns = userTurns

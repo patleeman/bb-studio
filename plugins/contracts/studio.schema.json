@@ -16227,6 +16227,15 @@
               "type": "string"
             }
           },
+          "modelNames": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
           "consolidate": {
             "type": "boolean"
           },
@@ -16361,6 +16370,15 @@
           "models": {
             "type": "array",
             "items": {
+              "type": "string"
+            }
+          },
+          "modelNames": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
               "type": "string"
             }
           },

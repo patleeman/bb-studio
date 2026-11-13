@@ -11,6 +11,7 @@ import { experimental_ProviderModelPicker as ProviderModelPicker, experimental_u
 import { useState } from "react";
 import { useCall } from "../live";
 import { toReasoningLevel, type ReasoningLevel } from "../../kit/reasoning";
+import { formatModelName } from "../../model-names";
 
 type Reasoning = ReasoningLevel;
 export type ModelChoice = { providerId: string; model: string; reasoningLevel: Reasoning };
@@ -23,10 +24,10 @@ export function modelChangeKind(current: { providerId: string | null; model: str
 
 /** The status line while a switch runs. */
 export function pendingLabel(kind: "in-place" | "handoff", providerName: string, model: string): string {
-  return kind === "handoff" ? `Handing off to ${providerName}…` : `Switching to ${model}…`;
+  return kind === "handoff" ? `Handing off to ${providerName}…` : `Switching to ${formatModelName(model)}…`;
 }
 
-export function SwitchModelDialog({ threadId, providerId, model, onClose, onSwitched }: { threadId: string; providerId: string; model: string; onClose(): void; onSwitched(threadId: string): void }) {
+export function SwitchModelDialog({ threadId, providerId, model, modelName, onClose, onSwitched }: { threadId: string; providerId: string; model: string; modelName?: string | null; onClose(): void; onSwitched(threadId: string): void }) {
   const call = useCall();
   const { providers } = useProviders();
   const [value, setValue] = useState<ModelChoice>({ providerId, model, reasoningLevel: "medium" });
@@ -53,7 +54,7 @@ export function SwitchModelDialog({ threadId, providerId, model, onClose, onSwit
       <DialogContent className="sm:max-w-md" data-testid="switch-model">
         <DialogHeader>
           <DialogTitle>Switch model</DialogTitle>
-          <DialogDescription>Now on {name(providerId)} · {model}</DialogDescription>
+          <DialogDescription>Now on {name(providerId)} · {modelName || formatModelName(model)}</DialogDescription>
         </DialogHeader>
         <ProviderModelPicker value={value} disabled={!!pending} onChange={(next) => setValue({ providerId: next.providerId, model: next.model, reasoningLevel: toReasoningLevel(next.reasoningLevel) })} />
         {pending ? <p role="status" className="text-sm text-muted-foreground" data-testid="switch-model-pending">{pending}</p> : null}
