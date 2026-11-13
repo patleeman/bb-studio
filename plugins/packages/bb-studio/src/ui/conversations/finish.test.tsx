@@ -65,7 +65,7 @@ it("draws Main's card in the shared card shell: the title, dates, the summary's 
   expect([...card.querySelectorAll("h4")].map((each) => each.textContent)).toEqual(["Decisions", "Left open", "Made"]);
   expect([...card.querySelectorAll("li")].map((each) => each.textContent)).toEqual(["One 45-minute mock a day.", "Mock boards go next to their Breakdown page.", "Book a paid mock before Nov 20?"]);
   expect($('[data-testid="finished-memory"]')!.tagName).toBe("BUTTON");
-  expect($('[data-testid="finished-memory"]')!.textContent).toBe("In Memory · 3 memory records");
+  expect($('[data-testid="finished-memory"]')!.textContent).toBe("In Memory · 3 records");
   expect(card.textContent).not.toContain("Saved to Memory as");
   await act(async () => { $('[data-testid="finished-open"]')!.click(); });
   expect(state.navigate.toThread).toHaveBeenCalledWith("prep");

@@ -57,7 +57,7 @@ export function FinishedCard({ attributes }: PluginMessageDirectiveProps) {
   if (!finished) return live.loading ? <div className={CHAT_CARD_SKELETON} /> : <p data-testid="finished-card-missing" className="text-xs text-muted-foreground">Archived conversation</p>;
   const sections = summarySections(finished.summary);
   const memory = () => navigate.toPluginPanel("studio", { subPath: `${MEMORY_SUBPATH}/${encodeURIComponent(finished.botId)}` });
-  const records = finished.records ? `${finished.records} memory record${finished.records === 1 ? "" : "s"}` : null;
+  const records = finished.records ? `${finished.records} record${finished.records === 1 ? "" : "s"}` : null;
   const dates = `${shortDate(finished.startedAt)}${shortDate(finished.startedAt) === shortDate(finished.finishedAt) ? "" : ` – ${shortDate(finished.finishedAt)}`}`;
   return (
     <ChatCard data-testid="finished-card" aria-label={`Archived: ${finished.title}`}>
