@@ -87,10 +87,21 @@ export function foldRows(rows: readonly LibraryRow[], open: boolean): { shown: L
   return { shown: rows.slice(0, GROUP_FOLD), more: rows.length - GROUP_FOLD };
 }
 
-/** Where a file came from, in words: "made in Launch prep", "by Fable lead", "made by Dot", "made by you". */
-export function provenance(item: Pick<LibraryItem, "madeIn" | "byBot">, botName = "Bot"): string {
+const sameTitle = (a: string, b: string) => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
+
+const byWorker = (item: Pick<LibraryItem, "madeIn" | "title">): boolean => item.madeIn?.kind === "worker" && !sameTitle(item.madeIn.title, item.title);
+
+/** Where a file came from, in words: "made in Launch prep", "by Fable lead", "made by Dot", "made by you"; a worker named after the file gives its conversation instead. */
+export function provenance(item: Pick<LibraryItem, "madeIn" | "byBot" | "title">, botName = "Bot"): string {
   if (!item.madeIn) return item.byBot ? `made by ${botName}` : "made by you";
-  return item.madeIn.kind === "worker" ? `by ${item.madeIn.title}` : `made in ${item.madeIn.title}`;
+  if (byWorker(item)) return `by ${item.madeIn.title}`;
+  if (item.madeIn.kind === "worker") return item.madeIn.conversationTitle ? `made in ${item.madeIn.conversationTitle}` : "";
+  return `made in ${item.madeIn.title}`;
+}
+
+export function libraryMeta(item: LibraryItem, groupBy: LibraryGroupBy, botName?: string): string[] {
+  const where = groupBy === "conversation" && item.madeIn && !byWorker(item) ? "" : provenance(item, botName);
+  return [groupBy === "kind" ? "" : kindLabel(item.kind), where].filter(Boolean);
 }
 
 /** Whether a file passes the search (its title, or where it was made), the filter (Starred or a kind) and, for apps, the type. */

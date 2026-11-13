@@ -69,6 +69,12 @@ it("is the Library on the Bot-page template: its header, Kind pills, conversatio
   expect([...container.querySelectorAll("[data-testid=library-row] [data-testid=bot-page-row-title]")].map((each) => each.textContent)).toEqual(["Grid sketch"]);
 });
 
+it("leaves out a worker's name when it is the file's own title", () => {
+  state.items = [item("art_email", "Millers Flour discount email", "artifact", 1, { ...lead, title: "Millers Flour discount email" })];
+  act(() => root.render(<LibraryPage />));
+  expect(container.querySelector("[data-testid=library-row] [data-testid=bot-page-row-meta]")?.textContent).toBe("App · 1h");
+});
+
 it("files the Bot's core profile under the Bot", () => {
   state.items = [{ ...item("pg_profile", "Chief of Staff's core profile", "page", 1), byBot: true }, item("pg_mine", "Groceries", "page", 3)];
   act(() => root.render(<LibraryPage />));

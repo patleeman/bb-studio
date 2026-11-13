@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { LibraryItem } from "../../bot-threads-contract";
-import { dateGroup, foldRows, GROUP_FOLD, LIBRARY_APP_TYPES, LIBRARY_KINDS, libraryGroups, libraryPasses, libraryRows, provenance, titleStem } from "./library-model";
+import { dateGroup, foldRows, GROUP_FOLD, LIBRARY_APP_TYPES, LIBRARY_KINDS, libraryGroups, libraryMeta, libraryPasses, libraryRows, provenance, titleStem } from "./library-model";
 
 const DAY = 24 * 60 * 60_000;
 const NOW = new Date(2026, 10, 11, 15, 0).getTime();
@@ -79,6 +79,16 @@ it("says where a file came from", () => {
   expect(provenance(files[0]!)).toBe("made in Launch prep");
   expect(provenance(files[2]!)).toBe("by Fable: Breakdown pages");
   expect(provenance(files[4]!)).toBe("made by you");
+});
+
+it("never says a file is by a worker named after the file", () => {
+  const email = item({ id: "email", title: "Millers Flour discount email", kind: "artifact", type: "artifact", madeIn: byWorker("w_email", "Millers Flour discount email", "main", "Main") });
+  expect(provenance(email)).toBe("made in Main");
+  expect(libraryMeta(email, "conversation")).toEqual(["App"]);
+  expect(libraryMeta(email, "date")).toEqual(["App", "made in Main"]);
+  expect(libraryMeta(files[2]!, "conversation")).toEqual(["Page", "by Fable: Breakdown pages"]);
+  expect(libraryMeta(files[0]!, "conversation")).toEqual(["Page"]);
+  expect(libraryMeta(files[0]!, "kind")).toEqual(["made in Launch prep"]);
 });
 
 it("folds near-identical files from one source into one row with a count, the newest showing; never across sources or kinds", () => {

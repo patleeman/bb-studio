@@ -17,7 +17,7 @@ import { ItemIcon } from "../item-row";
 import { shortAge } from "../conversations/model";
 import { useLive } from "../live";
 import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, useRowOpen } from "../bot-page";
-import { foldRows, kindLabel, LIBRARY_APP_TYPES, LIBRARY_GROUPS, LIBRARY_KINDS, libraryGroups, provenance, type LibraryAppType, type LibraryGroupBy, type LibraryKindFilter } from "./library-model";
+import { foldRows, LIBRARY_APP_TYPES, LIBRARY_GROUPS, LIBRARY_KINDS, libraryGroups, libraryMeta, type LibraryAppType, type LibraryGroupBy, type LibraryKindFilter } from "./library-model";
 
 const GROUP_KEY = "studio.library.group";
 
@@ -66,7 +66,7 @@ export function LibraryPage() {
               <BotPageRow key={key} testId="library-row" data={{ "data-count": String(count) }} icon={<ItemIcon kind={iconKind(item)} />}
                 title={count > 1 ? <>{item.title} <span data-testid="library-count" aria-label={`${count} like it`} className="text-xs tabular-nums text-muted-foreground">×{count}</span></> : item.title}
                 titleText={count > 1 ? `${item.title} (the newest of ${count} like it)` : item.title}
-                meta={[groupBy === "kind" ? null : kindLabel(item.kind), groupBy === "conversation" && item.madeIn && item.madeIn.kind !== "worker" ? null : provenance(item, botName), shortAge(item.updatedAt, now)].filter(Boolean).join(" · ")}
+                meta={[...libraryMeta(item, groupBy, botName), shortAge(item.updatedAt, now)].join(" · ")}
                 disabled={!item.href} {...(item.href ? rowOpen(item.href, item.title) : {})} />
             ))}
             {more ? (
