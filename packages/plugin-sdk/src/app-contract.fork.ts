@@ -932,6 +932,19 @@ export interface ExperimentalModelLoadNoticeRegistration {
 }
 
 /**
+ * Registration for `slots.experimental_newConversation`: bb's "New thread"
+ * command (Mod+N) and the sidebar's New thread row call `run` first. When it
+ * returns true the plugin started the new conversation itself and bb does
+ * nothing more; false (or a throw) falls back to bb's new-thread page. The
+ * first registration in plugin-id order is asked first. Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalNewConversationRegistration {
+  id: string;
+  run(): boolean;
+}
+
+/**
  * Props for a `slots.experimental_firstRun` component. `finish()` marks bb's
  * first run done (the same setting bb's own setup screens set) and shows the
  * app. Experimental: see docs/api_to_audit.fork.md.
@@ -1032,6 +1045,14 @@ export interface ForkPluginAppSlots {
    * docs/api_to_audit.fork.md.
    */
   experimental_firstRun(registration: ExperimentalFirstRunRegistration): void;
+  /**
+   * Start new conversations the plugin's way (see
+   * {@link ExperimentalNewConversationRegistration}). Experimental: see
+   * docs/api_to_audit.fork.md.
+   */
+  experimental_newConversation(
+    registration: ExperimentalNewConversationRegistration,
+  ): void;
   /**
    * Stand in for bb's model picker (see
    * {@link ExperimentalModelPickerGateRegistration}). Experimental: see
