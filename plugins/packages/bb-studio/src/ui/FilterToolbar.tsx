@@ -1,10 +1,10 @@
 // Filter choices live above the collection, leaving its full width for items.
-import { cn, Icon, TagDot } from "../kit/app/index";
+import { Icon, TagDot } from "../kit/app/index";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, Popover, PopoverContent, PopoverTrigger } from "../kit/ui/index";
 import { useState, type ReactNode } from "react";
 import { useSearchEscape } from "../kit/ui/search-escape";
-import type { SavedViewView, TagView } from "../contract";
-import { fieldValues, formatQuery, parseQuery, resolveValue, toggleFilter, UNTAGGED, type FacetCounts, type FieldValue, type FilterField, type Query, type QueryVocabulary } from "../query";
+import type { TagView } from "../contract";
+import { fieldValues, resolveValue, toggleFilter, UNTAGGED, type FacetCounts, type FieldValue, type FilterField, type Query, type QueryVocabulary } from "../query";
 
 const BUTTON = "flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring";
 
@@ -69,19 +69,14 @@ function FilterPicker(props: ChoicesProps) {
   );
 }
 
-export function FilterToolbar({ query, vocabulary, counts, onChange, views, tags, onSaveView, onDeleteView }: {
+export function FilterToolbar({ query, vocabulary, counts, onChange, tags }: {
   query: Query;
   vocabulary: QueryVocabulary;
   counts: FacetCounts;
   onChange(query: Query): void;
-  views: readonly SavedViewView[];
   tags: readonly TagView[];
-  onSaveView(): void;
-  onDeleteView(view: SavedViewView): void;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const [viewsOpen, setViewsOpen] = useState(false);
-  const current = formatQuery(query);
   const shared = { query, vocabulary, onChange };
   const idOf = (value: FieldValue) => resolveValue(value, vocabulary);
   const tagColor = new Map(tags.map((tag) => [tag.name.toLowerCase(), tag.color]));
@@ -90,22 +85,6 @@ export function FilterToolbar({ query, vocabulary, counts, onChange, views, tags
       <FilterPicker {...shared} field="project" label="Project" countOf={(value) => counts.project.get(idOf(value) ?? "") ?? 0} />
       <FilterPicker {...shared} field="kind" label="Kind" countOf={(value) => counts.kind.get(idOf(value) ?? "") ?? 0} />
       <button type="button" aria-haspopup="dialog" className={BUTTON} onClick={() => setMoreOpen(true)}><Icon name="SlidersHorizontal" className="size-3.5" />More filters</button>
-      {views.length ? (
-        <Popover open={viewsOpen} onOpenChange={setViewsOpen}>
-          <PopoverTrigger asChild><button type="button" className={BUTTON}><Icon name="studio/bookmark" className="size-3.5" />Views<Icon name="ChevronDown" className="size-3.5" /></button></PopoverTrigger>
-          <PopoverContent aria-label="Saved views" className="w-64">
-            {views.map((view) => (
-              <div key={view.id} className="flex items-center gap-1">
-                <button type="button" aria-pressed={view.query === current} className="flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded px-2 text-left text-sm hover:bg-state-hover focus-visible:outline-2 focus-visible:outline-ring" onClick={() => { onChange(parseQuery(view.query)); setViewsOpen(false); }}>
-                  <span className="min-w-0 flex-1 truncate">{view.name}</span>{view.query === current ? <Icon name="Check" className="size-3.5" /> : null}
-                </button>
-                <button type="button" aria-label={`Delete ${view.name}`} className="flex size-8 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring" onClick={() => onDeleteView(view)}><Icon name="Trash2" className="size-3.5" /></button>
-              </div>
-            ))}
-          </PopoverContent>
-        </Popover>
-      ) : null}
-      {current ? <button type="button" aria-label="Save view" title="Save view" className={cn(BUTTON, "px-2")} onClick={onSaveView}><Icon name="studio/bookmark" className="size-3.5" /><span className="@max-3xl/page:sr-only">Save view</span></button> : null}
       <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>More filters</DialogTitle></DialogHeader>

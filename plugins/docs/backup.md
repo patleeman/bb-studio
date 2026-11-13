@@ -1,8 +1,8 @@
 # Backup and restore
 
 One file holds every Studio item: pages, Talk recordings, drawings,
-artifacts and designs, plus Studio's own data (tags, project leads, saved
-views, item links, comments and versions). Restoring it on another BB adds
+artifacts and designs, plus Studio's own data (tags, project leads,
+item links, comments and versions). Restoring it on another BB adds
 what's missing. A second restore changes nothing, and work that is newer on
 the BB you restore to is never overwritten.
 
@@ -30,7 +30,7 @@ use the CLI.
 | `artifacts/` | Studio (built-in Artifacts) | Each artifact with every version's bytes. Studio writes this section itself, under the old plugin's id, so backups from before the merge restore into it. |
 | `design/` | Studio (built-in designs) | Each design with its rounds, screens (as HTML files) and comments. Studio writes this section itself, under the old Design plugin's id, so backups from before the merge restore into it. Saved styles aren't included. |
 | `dashboards/` | Studio (built-in dashboards) | Each dashboard's widgets, layouts and pushed data, and the custom widget library. Fetched URL and script data is fetched again; script approvals are never restored, so a restored script waits for the user's approval. |
-| `studio/` | Studio | Tags and which items have them, saved views, project leads (the personal project's lead is the user's Bot) and their Heartbeat settings, the Bot (name, avatar, state, Memory page id) and its own skills, including state, pinning, last use and saved lint warnings (restored only when this BB has no Bot), item links, item chats, comments, versions and activity. |
+| `studio/` | Studio | Tags and which items have them, project leads (the personal project's lead is the user's Bot) and their Heartbeat settings, the Bot (name, avatar, state, Memory page id) and its own skills, including state, pinning, last use and saved lint warnings (restored only when this BB has no Bot), item links, item chats, comments, versions and activity. |
 
 ## What isn't
 
@@ -92,7 +92,7 @@ Section layouts:
 - `artifacts/`: `items/<id>.json`, `files/<id>/<version id>`.
 - `design/`: `items/<id>.json`, `files/<id>/screens/<screen id>.html`.
 - `dashboards/`: `items/<id>.json`, `types/<id>.json`.
-- `studio/`: `tags.json`, `item-tags.json`, `stars.json`, `views.json`, `project-leads.json`, `links.json`, `item-chats.json`, `comments.json`, `versions.json`, `activity.json`, `blobs/<sha256>`.
+- `studio/`: `tags.json`, `item-tags.json`, `stars.json`, `project-leads.json`, `links.json`, `item-chats.json`, `comments.json`, `versions.json`, `activity.json`, `blobs/<sha256>`.
 
 ## How it works
 
@@ -142,7 +142,8 @@ Restore runs in this order:
    exception: a real run's add-ons record links and activity for the items
    they restore, so Studio then finds a few rows already here that the dry
    run counted as new.
-5. **Studio's data.** Tags and saved views are matched by id, then by name.
+5. **Studio's data.** Tags are matched by id, then by name. A `views.json`
+   from an older backup is ignored.
    Item chats and leads are restored only when their BB thread exists here,
    and leads only for projects on this BB. A lead, including the Chief of
    Staff (the personal project's lead), is restored only into a project that

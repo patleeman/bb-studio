@@ -147,8 +147,6 @@ public enum Studio {
     public static let bot_automation_delete = "bot_automation_delete"
     public static let bot_automation_runs = "bot_automation_runs"
     public static let thread_handoff = "thread_handoff"
-    public static let saveView = "saveView"
-    public static let deleteView = "deleteView"
     public static let studio_changed = "studio_changed"
     public static let sidebar = "sidebar"
     public static let tabs = "tabs"
@@ -172,13 +170,6 @@ public enum Studio {
     public static let versions = "versions"
     public static let versionCreate = "versionCreate"
     public static let versionRead = "versionRead"
-    public static let explorer_tree = "explorer_tree"
-    public static let explorer_folder_create = "explorer_folder_create"
-    public static let explorer_folder_rename = "explorer_folder_rename"
-    public static let explorer_folder_move = "explorer_folder_move"
-    public static let explorer_folder_delete = "explorer_folder_delete"
-    public static let explorer_file = "explorer_file"
-    public static let explorer_unfile = "explorer_unfile"
     public static let bot_spaces = "bot_spaces"
     public static let bot_threads_view = "bot_threads_view"
     public static let bot_threads_older = "bot_threads_older"
@@ -711,10 +702,6 @@ public enum Studio {
 
   public typealias ThreadHandoff = ThreadHandoffOutput
 
-  public typealias SaveView = SaveViewOutput
-
-  public typealias DeleteView = DeleteViewOutput
-
   public typealias StudioChanged = StudioChangedOutput
 
   public typealias SidebarInput = StudioJSONValue
@@ -766,20 +753,6 @@ public enum Studio {
   public typealias VersionCreate = VersionCreateOutput
 
   public typealias VersionRead = VersionReadOutput
-
-  public typealias ExplorerTree = ExplorerTreeOutput
-
-  public typealias ExplorerFolderCreate = ExplorerFolderCreateOutput
-
-  public typealias ExplorerFolderRename = ExplorerFolderRenameOutput
-
-  public typealias ExplorerFolderMove = ExplorerFolderMoveOutput
-
-  public typealias ExplorerFolderDelete = ExplorerFolderDeleteOutput
-
-  public typealias ExplorerFile = ExplorerFileOutput
-
-  public typealias ExplorerUnfile = ExplorerUnfileOutput
 
   public typealias BotSpaces = BotSpacesOutput
 
@@ -5431,29 +5404,15 @@ public enum Studio {
     }
   }
 
-  public struct OverviewOutputViewsItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-    public var query: String?
-
-    public init(id: String? = nil, name: String? = nil, query: String? = nil) {
-      self.id = id
-      self.name = name
-      self.query = query
-    }
-  }
-
   public struct OverviewOutput: Sendable, Hashable, Codable {
     public var providers: [OverviewOutputProvidersItem]?
     public var items: [OverviewOutputItemsItem]?
     public var tags: [OverviewOutputTagsItem]?
-    public var views: [OverviewOutputViewsItem]?
 
-    public init(providers: [OverviewOutputProvidersItem]? = nil, items: [OverviewOutputItemsItem]? = nil, tags: [OverviewOutputTagsItem]? = nil, views: [OverviewOutputViewsItem]? = nil) {
+    public init(providers: [OverviewOutputProvidersItem]? = nil, items: [OverviewOutputItemsItem]? = nil, tags: [OverviewOutputTagsItem]? = nil) {
       self.providers = providers
       self.items = items
       self.tags = tags
-      self.views = views
     }
   }
 
@@ -17448,52 +17407,6 @@ public enum Studio {
     }
   }
 
-  public struct SaveViewInput: Sendable, Hashable, Codable {
-    public var name: String?
-    public var query: String?
-
-    public init(name: String? = nil, query: String? = nil) {
-      self.name = name
-      self.query = query
-    }
-  }
-
-  public struct SaveViewOutputView: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-    public var query: String?
-
-    public init(id: String? = nil, name: String? = nil, query: String? = nil) {
-      self.id = id
-      self.name = name
-      self.query = query
-    }
-  }
-
-  public struct SaveViewOutput: Sendable, Hashable, Codable {
-    public var view: SaveViewOutputView?
-
-    public init(view: SaveViewOutputView? = nil) {
-      self.view = view
-    }
-  }
-
-  public struct DeleteViewInput: Sendable, Hashable, Codable {
-    public var id: String?
-
-    public init(id: String? = nil) {
-      self.id = id
-    }
-  }
-
-  public struct DeleteViewOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-
-    public init(ok: Bool? = nil) {
-      self.ok = ok
-    }
-  }
-
   public struct StudioChangedInput: Sendable, Hashable, Codable {
     public var pluginId: String?
     public var ids: [String]?
@@ -19217,349 +19130,6 @@ public enum Studio {
 
     public init(bytes: String? = nil) {
       self.bytes = bytes
-    }
-  }
-
-  public struct ExplorerTreeInput: Sendable, Hashable, Codable {
-
-
-    public init() {}
-  }
-
-  public struct ExplorerTreeOutputFoldersItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var projectId: String?
-    public var parentId: String?
-    public var name: String?
-    public var createdAt: Double?
-    public var sort: Double?
-
-    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, name: String? = nil, createdAt: Double? = nil, sort: Double? = nil) {
-      self.id = id
-      self.projectId = projectId
-      self.parentId = parentId
-      self.name = name
-      self.createdAt = createdAt
-      self.sort = sort
-    }
-  }
-
-  public enum ExplorerTreeOutputFilingItemKind: Sendable, Hashable, Codable {
-    case thread
-    case item
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "thread": self = .thread
-      case "item": self = .item
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .thread: try container.encode("thread")
-      case .item: try container.encode("item")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum ExplorerTreeOutputFilingItemFiledBy: Sendable, Hashable, Codable {
-    case user
-    case agent
-    case auto
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "user": self = .user
-      case "agent": self = .agent
-      case "auto": self = .auto
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .user: try container.encode("user")
-      case .agent: try container.encode("agent")
-      case .auto: try container.encode("auto")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct ExplorerTreeOutputFilingItem: Sendable, Hashable, Codable {
-    public var kind: ExplorerTreeOutputFilingItemKind?
-    public var id: String?
-    public var folderId: String?
-    public var filedBy: ExplorerTreeOutputFilingItemFiledBy?
-    public var filedAt: Double?
-
-    public init(kind: ExplorerTreeOutputFilingItemKind? = nil, id: String? = nil, folderId: String? = nil, filedBy: ExplorerTreeOutputFilingItemFiledBy? = nil, filedAt: Double? = nil) {
-      self.kind = kind
-      self.id = id
-      self.folderId = folderId
-      self.filedBy = filedBy
-      self.filedAt = filedAt
-    }
-  }
-
-  public struct ExplorerTreeOutputSideThreadsItem: Sendable, Hashable, Codable {
-    public var threadId: String?
-    public var parentThreadId: String?
-
-    public init(threadId: String? = nil, parentThreadId: String? = nil) {
-      self.threadId = threadId
-      self.parentThreadId = parentThreadId
-    }
-  }
-
-  public struct ExplorerTreeOutput: Sendable, Hashable, Codable {
-    public var folders: [ExplorerTreeOutputFoldersItem]?
-    public var filing: [ExplorerTreeOutputFilingItem]?
-    public var sideThreads: [ExplorerTreeOutputSideThreadsItem]?
-    public var runnerThreadIds: [String]?
-
-    public init(folders: [ExplorerTreeOutputFoldersItem]? = nil, filing: [ExplorerTreeOutputFilingItem]? = nil, sideThreads: [ExplorerTreeOutputSideThreadsItem]? = nil, runnerThreadIds: [String]? = nil) {
-      self.folders = folders
-      self.filing = filing
-      self.sideThreads = sideThreads
-      self.runnerThreadIds = runnerThreadIds
-    }
-  }
-
-  public struct ExplorerFolderCreateInput: Sendable, Hashable, Codable {
-    public var projectId: String?
-    public var parentId: String?
-    public var name: String?
-
-    public init(projectId: String? = nil, parentId: String? = nil, name: String? = nil) {
-      self.projectId = projectId
-      self.parentId = parentId
-      self.name = name
-    }
-  }
-
-  public struct ExplorerFolderCreateOutputFolder: Sendable, Hashable, Codable {
-    public var id: String?
-    public var projectId: String?
-    public var parentId: String?
-    public var name: String?
-    public var createdAt: Double?
-    public var sort: Double?
-
-    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, name: String? = nil, createdAt: Double? = nil, sort: Double? = nil) {
-      self.id = id
-      self.projectId = projectId
-      self.parentId = parentId
-      self.name = name
-      self.createdAt = createdAt
-      self.sort = sort
-    }
-  }
-
-  public struct ExplorerFolderCreateOutput: Sendable, Hashable, Codable {
-    public var folder: ExplorerFolderCreateOutputFolder?
-
-    public init(folder: ExplorerFolderCreateOutputFolder? = nil) {
-      self.folder = folder
-    }
-  }
-
-  public struct ExplorerFolderRenameInput: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-
-    public init(id: String? = nil, name: String? = nil) {
-      self.id = id
-      self.name = name
-    }
-  }
-
-  public struct ExplorerFolderRenameOutputFolder: Sendable, Hashable, Codable {
-    public var id: String?
-    public var projectId: String?
-    public var parentId: String?
-    public var name: String?
-    public var createdAt: Double?
-    public var sort: Double?
-
-    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, name: String? = nil, createdAt: Double? = nil, sort: Double? = nil) {
-      self.id = id
-      self.projectId = projectId
-      self.parentId = parentId
-      self.name = name
-      self.createdAt = createdAt
-      self.sort = sort
-    }
-  }
-
-  public struct ExplorerFolderRenameOutput: Sendable, Hashable, Codable {
-    public var folder: ExplorerFolderRenameOutputFolder?
-
-    public init(folder: ExplorerFolderRenameOutputFolder? = nil) {
-      self.folder = folder
-    }
-  }
-
-  public struct ExplorerFolderMoveInput: Sendable, Hashable, Codable {
-    public var id: String?
-    public var parentId: String?
-
-    public init(id: String? = nil, parentId: String? = nil) {
-      self.id = id
-      self.parentId = parentId
-    }
-  }
-
-  public struct ExplorerFolderMoveOutputFolder: Sendable, Hashable, Codable {
-    public var id: String?
-    public var projectId: String?
-    public var parentId: String?
-    public var name: String?
-    public var createdAt: Double?
-    public var sort: Double?
-
-    public init(id: String? = nil, projectId: String? = nil, parentId: String? = nil, name: String? = nil, createdAt: Double? = nil, sort: Double? = nil) {
-      self.id = id
-      self.projectId = projectId
-      self.parentId = parentId
-      self.name = name
-      self.createdAt = createdAt
-      self.sort = sort
-    }
-  }
-
-  public struct ExplorerFolderMoveOutput: Sendable, Hashable, Codable {
-    public var folder: ExplorerFolderMoveOutputFolder?
-
-    public init(folder: ExplorerFolderMoveOutputFolder? = nil) {
-      self.folder = folder
-    }
-  }
-
-  public struct ExplorerFolderDeleteInput: Sendable, Hashable, Codable {
-    public var id: String?
-
-    public init(id: String? = nil) {
-      self.id = id
-    }
-  }
-
-  public struct ExplorerFolderDeleteOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-
-    public init(ok: Bool? = nil) {
-      self.ok = ok
-    }
-  }
-
-  public enum ExplorerFileInputTargetsItemKind: Sendable, Hashable, Codable {
-    case thread
-    case item
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "thread": self = .thread
-      case "item": self = .item
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .thread: try container.encode("thread")
-      case .item: try container.encode("item")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct ExplorerFileInputTargetsItem: Sendable, Hashable, Codable {
-    public var kind: ExplorerFileInputTargetsItemKind?
-    public var id: String?
-
-    public init(kind: ExplorerFileInputTargetsItemKind? = nil, id: String? = nil) {
-      self.kind = kind
-      self.id = id
-    }
-  }
-
-  public struct ExplorerFileInput: Sendable, Hashable, Codable {
-    public var targets: [ExplorerFileInputTargetsItem]?
-    public var folderId: String?
-
-    public init(targets: [ExplorerFileInputTargetsItem]? = nil, folderId: String? = nil) {
-      self.targets = targets
-      self.folderId = folderId
-    }
-  }
-
-  public struct ExplorerFileOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-
-    public init(ok: Bool? = nil) {
-      self.ok = ok
-    }
-  }
-
-  public enum ExplorerUnfileInputTargetsItemKind: Sendable, Hashable, Codable {
-    case thread
-    case item
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "thread": self = .thread
-      case "item": self = .item
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .thread: try container.encode("thread")
-      case .item: try container.encode("item")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct ExplorerUnfileInputTargetsItem: Sendable, Hashable, Codable {
-    public var kind: ExplorerUnfileInputTargetsItemKind?
-    public var id: String?
-
-    public init(kind: ExplorerUnfileInputTargetsItemKind? = nil, id: String? = nil) {
-      self.kind = kind
-      self.id = id
-    }
-  }
-
-  public struct ExplorerUnfileInput: Sendable, Hashable, Codable {
-    public var targets: [ExplorerUnfileInputTargetsItem]?
-
-    public init(targets: [ExplorerUnfileInputTargetsItem]? = nil) {
-      self.targets = targets
-    }
-  }
-
-  public struct ExplorerUnfileOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-
-    public init(ok: Bool? = nil) {
-      self.ok = ok
     }
   }
 

@@ -1,6 +1,6 @@
 import { readAvailable } from "../kit/server/read-available";
 // Studio's own section of a backup (docs/backup.md): tags and which items
-// have them, starred items, saved views, project leads and their heartbeat settings (the
+// have them, starred items, project leads and their heartbeat settings (the
 // personal project's lead is the Chief of Staff), and the item services
 // (links, item chats, comments, versions, activity). Older backups' Spaces
 // are ignored. Items keep their add-on ids across a restore, so these
@@ -27,7 +27,6 @@ const nullable = <T extends z.ZodType>(schema: T) => schema.nullable();
 const tagRow = z.object({ id, name: z.string().min(1).max(100), color: z.string().max(50), created_at: time });
 const itemTagRow = z.object({ plugin_id: id, item_id: id, tag_id: id, created_at: time });
 const starRow = z.object({ plugin_id: id, item_id: id, starred_at: time });
-const viewRow = z.object({ id, name: z.string().min(1).max(60), query: z.string().max(500), position: z.number(), created_at: time });
 const runRow = z.object({ cadence: z.string().max(50), time: z.string().max(50), cron: nullable(z.string().max(200)) });
 const leadRow = z.object({ project_id: id, lead_thread_id: nullable(id), created_at: time, updated_at: time, run: nullable(runRow) });
 const chiefRow = z.object({ thread_id: id, origin_space_id: nullable(id), updated_at: time, run: nullable(runRow) });
@@ -45,7 +44,6 @@ const FILES = {
   itemTags: ["item-tags.json", z.array(itemTagRow)],
   /** Starred items; older backups have none. */
   stars: ["stars.json", z.array(starRow)],
-  views: ["views.json", z.array(viewRow)],
   leads: ["project-leads.json", z.array(leadRow)],
   /** Each Bot's conversation, provider identity and own skills. */
   bots: ["bots.json", z.array(botRow).max(10)],
@@ -89,7 +87,6 @@ export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): B
           tags: all("SELECT id, name, color, created_at FROM tags ORDER BY created_at, id"),
           itemTags: all("SELECT plugin_id, item_id, tag_id, created_at FROM item_tags ORDER BY plugin_id, item_id, tag_id"),
           stars: all("SELECT plugin_id, item_id, starred_at FROM stars ORDER BY starred_at, plugin_id, item_id"),
-          views: all("SELECT id, name, query, position, created_at FROM views ORDER BY position, id"),
           leads: all<{ project_id: string; lead_thread_id: string | null; created_at: number; updated_at: number }>("SELECT project_id, lead_thread_id, created_at, updated_at FROM project_leads ORDER BY project_id")
             .map((lead) => ({ ...lead, run: (db.prepare("SELECT cadence, time, cron FROM project_runs WHERE project_id = ?").get(lead.project_id) as Data["leads"][number]["run"] | undefined) ?? null })),
           bots: all("SELECT id, name, avatar, state, thread_id, provider_id, memory_page_id, shape, color, role, created_at, updated_at FROM bots ORDER BY created_at, id"),
@@ -108,7 +105,7 @@ export function studioDataBackup(db: Database.Database, deps: StudioDataDeps): B
       for (const key of Object.keys(FILES) as (keyof Data)[]) await writer.json(FILES[key][0], data[key]);
       for (const { sha256, bytes } of blobs) await writer.bytesAt(`blobs/${sha256}`, bytes);
       return {
-        counts: { tags: data.tags.length, taggings: data.itemTags.length, stars: data.stars.length, views: data.views.length, leads: data.leads.length, bots: data.bots.length, botSkills: data.botSkills.length, links: data.links.length, itemChats: data.threads.length, comments: data.comments.length, versions: data.versions.length, activity: data.activity.length },
+        counts: { tags: data.tags.length, taggings: data.itemTags.length, stars: data.stars.length, leads: data.leads.length, bots: data.bots.length, botSkills: data.botSkills.length, links: data.links.length, itemChats: data.threads.length, comments: data.comments.length, versions: data.versions.length, activity: data.activity.length },
         notes: STUDIO_EXCLUDED,
       };
     },
@@ -193,16 +190,6 @@ function apply(
   // A star already here keeps when it was starred.
   const star = db.prepare("INSERT OR IGNORE INTO stars (plugin_id, item_id, starred_at) VALUES (?, ?, ?)");
   for (const row of data.stars) counted(star.run(row.plugin_id, row.item_id, row.starred_at).changes);
-
-  for (const view of data.views) {
-    if (db.prepare("SELECT 1 FROM views WHERE id = ? OR name = ? COLLATE NOCASE").get(view.id, view.name)) {
-      tally.record("unchanged");
-      continue;
-    }
-    const position = (db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS next FROM views").get() as { next: number }).next;
-    db.prepare("INSERT INTO views (id, name, query, position, created_at) VALUES (?, ?, ?, ?, ?)").run(view.id, view.name, view.query, position, view.created_at);
-    tally.record("created");
-  }
 
   // Leads go only into an empty slot, and a thread leads one project. An older
   // backup's Chief of Staff goes first, as the personal project's lead.

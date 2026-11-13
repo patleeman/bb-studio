@@ -57,7 +57,7 @@ describe("query", () => {
   it("keeps Talk's dictations out of All items, but not out of their sidebar entry, kind filter or search", () => {
     const kinds = RECORDING_KINDS.map((kind) => ({ ...kind }));
     const real = { ...vocabulary, kinds };
-    const entry = studioSidebarModel({ providers: [{ pluginId: "talk", name: "Talk", state: "ready", kinds } as never], items: [], tags: [], views: [] }, []).kinds.find((kind) => kind.label === "Dictations")!;
+    const entry = studioSidebarModel({ providers: [{ pluginId: "talk", name: "Talk", state: "ready", kinds } as never], items: [], tags: [] }, []).kinds.find((kind) => kind.label === "Dictations")!;
     expect(compileQuery(parseQuery(""), real).test(dictation)).toBe(false);
     expect(compileQuery(parseQuery("project:bb-studio"), real).test({ ...dictation, projectId: "proj_a" })).toBe(false);
     expect(compileQuery(parseQuery(entry.query), real).test(dictation)).toBe(true);

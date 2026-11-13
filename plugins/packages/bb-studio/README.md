@@ -92,13 +92,13 @@ in place of its thread list (thread list provider `studio/studio-items`,
 "Studio (Studio)" in Settings → Appearance; it switches to the Bot's list
 on leaving, see Bot). **+** at the top is Studio's New menu. Below
 it, **All items** and each enabled kind (Setup → Kinds) with its item count,
-then **Saved views**, **Tags** (with their colors and counts), **Pinned**
-(pinned tabs) and **Recent** (the 15 most recently edited items). A kind,
-view or tag opens the new tab page filtered by it; an item opens as a tab.
+then **Tags** (with their colors and counts), **Pinned**
+(pinned tabs) and **Recent** (the 15 most recently edited items). A kind
+or tag opens the new tab page filtered by it; an item opens as a tab.
 The row for the current filter or tab is highlighted, and each group
 collapses from its heading.
 
-![The Studio sidebar on the Studio page: kinds with counts (Pages selected and filtering the new tab page), a saved view, a colored tag and recent items](assets/studio-sidebar.png)
+![The Studio sidebar on the Studio page: kinds with counts (Pages selected and filtering the new tab page), a colored tag and recent items](assets/studio-sidebar.png)
 
 Conversation-side item views continue to work independently. At phone widths, a
 pane picker shows one pane at a time while preserving the desktop arrangement.
@@ -143,16 +143,14 @@ threads use red, and idle threads use a neutral ring.
 
 Selected filters appear below search, each with a remove button and an explicit
 Include/Exclude menu. Clearing search keeps the filters; **Clear filters** keeps
-the search text. **Save view** remembers the query, and **Views** appears once a
-view exists. Query syntax such as `kind:page` still completes in search.
+the search text. Query syntax such as `kind:page` still completes in search.
 
 **Group by**, in the display menu beside the item count, groups the list by
 Thread (the default), Project, Kind or Tag, or None for one flat table. Thread
 is the thread that made the item (its first `created` link); items no thread
 made go under **No thread**. Groups with the latest activity come first, the
 table's sort applies inside each, and each heading collapses. An item with two
-tags shows under both. The choice is kept per device; saved views keep only
-the query. A **Tags** column shows each item's tag chips, with **+N** for the
+tags shows under both. The choice is kept per device. A **Tags** column shows each item's tag chips, with **+N** for the
 rest. All items leaves out Dictations; their sidebar entry, the Kind filter
 and search still show them. Studio's create tools ask agents to reuse an
 existing tag, and their result lists the tags there are.
@@ -1259,10 +1257,7 @@ thread's own **VS Code** tab.
 
 Main tabs, the Explorer and the Activity panel are gone, and so are their
 rail icons. Studio closes the fixed Bot tabs main tabs kept in every
-workbench, once (`src/ui/bot/retire-fixed-tabs.tsx`). The Explorer's folders
-and automatic filing stay underneath (`src/explorer`, tables `folders` and
-`filing`), with no view; `explorer_list` and `explorer_file` are registered
-but no longer given to agents.
+workbench, once (`src/ui/bot/retire-fixed-tabs.tsx`).
 
 ### Drag and drop
 
@@ -3884,7 +3879,7 @@ after a restore. A backup made before the index restores the same way.
   relays that over realtime and the open collection refetches.
 - A stopped or failing add-on shows up as unavailable instead of breaking the
   collection.
-- Studio stores tags, open tabs, saved views and project leads itself, keyed by
+- Studio stores tags, open tabs and project leads itself, keyed by
   `<plugin id>:<item id>` where items are involved, so add-ons don't need to
   know about them. Tags on items an add-on no longer lists are
   dropped. Each add-on owns its data, editors, tools, CLI and mentions.
@@ -3992,7 +3987,7 @@ measured latency and cost are in [docs/voice/spike.md](../../docs/voice/spike.md
 
 `bb studio backup [--out <file|folder>]` saves every Studio item into one
 `.zip`. That covers pages, recordings with their audio, drawings, artifacts,
-designs, and Studio's tags, project leads, views, links, comments and
+designs, and Studio's tags, project leads, links, comments and
 versions. `bb studio restore <file>` shows what would change, and `--yes`
 restores it. Restore matches each item by its original id, so running it
 again changes nothing, and it never overwrites a copy that is newer here.

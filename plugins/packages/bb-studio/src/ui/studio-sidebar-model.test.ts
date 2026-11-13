@@ -20,7 +20,7 @@ describe("studioSidebarModel", () => {
     item("studio", "design", "d1", 20, { tags: ["t1"] }),
     item("gone", "thing", "x1", 99),
   ];
-  const data = { providers, items: items as never, tags: [{ id: "t1", name: "Launch plan", color: "blue" }], views: [{ id: "v1", name: "Mine", query: "kind:page" }] };
+  const data = { providers, items: items as never, tags: [{ id: "t1", name: "Launch plan", color: "blue" }] };
   const tabs = [{ pluginId: "studio", id: "p2", title: "p2", icon: "📌", kindIcon: "icon-page", href: "/plugins/studio/page/p2", pinned: true }];
 
   it("orders the built-in kinds first, counts live items, and skips off kinds and offline add-ons", () => {
@@ -38,7 +38,6 @@ describe("studioSidebarModel", () => {
     const model = studioSidebarModel(data, tabs);
     expect(model.pinned.map((each) => each.key)).toEqual(["studio:p2"]);
     expect(model.recent.map((each) => each.key)).toEqual(["studio:p1", "studio:d1"]);
-    expect(model.views).toEqual(data.views);
   });
   it("keeps recents short", () => {
     const many = Array.from({ length: 30 }, (_, n) => item("studio", "page", `p${n}`, n));

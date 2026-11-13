@@ -57,14 +57,12 @@ import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // - Studio keeps tags, which group items across add-ons (src/tags.ts).
 // - Each BB project can have a lead thread with a heartbeat; the personal
 //   project's lead is the user's Bot (src/project-lead.ts, src/bot.ts).
-// - Studio keeps saved views, named collection queries (src/views.ts). The
-//   query language (src/query.ts) drives the agent tool and CLI too.
+// - The query language (src/query.ts) drives the Library, the agent tool and CLI.
 // - Studio keeps the sidebar's tabs, one per opened item (src/tabs.ts).
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { STUDIO_PLUGIN_ID, STUDIO_PROVIDER_CALL_METHOD, STUDIO_REALTIME_CHANNEL } from "./src/kit/contract";
-import { registerExplorer } from "./src/explorer/server";
 import { relativeTime, untitled } from "./src/kit/format";
 import { z } from "zod";
 import { rpcContract, schemas, TABS_CHANNEL, type SidebarView, type StarredItemView, type ThreadOptionView, type TabView } from "./src/contract";
@@ -135,7 +133,6 @@ import { TagStore, type ItemRef, type Tag } from "./src/tags";
 import { StarStore } from "./src/stars";
 import { planMove } from "./src/move-items";
 import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
-import { ViewStore } from "./src/views";
 import { ThreadTitles } from "./src/thread-titles";
 import { withTagHint } from "./src/create-tag-hint";
 import { excerpt, SearchIndex, tokens, type SearchHit } from "./src/search-index";
@@ -216,20 +213,6 @@ export default async function plugin(bb: BbPluginApi) {
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
     return id;
   };
-  // The former Explorer's folders and filing (src/explorer), kept underneath
-  // with no view of their own: what an agent's tool makes is filed beside the
-  // thread that made it, a child thread beside its parent.
-  const explorer = registerExplorer(bb, db, {
-    index: itemIndex,
-    thread: (threadId) => bb.sdk.threads.get({ threadId }).then((thread) => { const { projectId, parentThreadId } = thread as { projectId?: string | null; parentThreadId?: string | null }; return { projectId: projectId ?? null, parentThreadId: parentThreadId ?? null }; }, () => null),
-    projects: async () => ((await bb.sdk.projects.list({ includePersonal: true })) as { id: string; name: string }[]).map((project) => ({ id: project.id, name: project.name })),
-    changed: () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }),
-    // Both are made further down; the tree is only read once everything is.
-    sideThreads: () => sideThreads.parents(),
-    runnerThreads: () => [...runners.threadIds()],
-  });
-  const linkCreated = services.created.bind(services);
-  services.created = (ref, threadId) => { linkCreated(ref, threadId); try { explorer.itemCreated(ref.id, threadId); } catch { /* filing is a convenience */ } };
   // Create tools nudge agents to tag what they make (src/create-tag-hint.ts).
   const tagNames = new TagStore(db);
   // Tools by family (src/family-tools.ts): each type's tools keep their names
@@ -410,8 +393,6 @@ export default async function plugin(bb: BbPluginApi) {
     const tools = BUILTIN_KINDS.filter((each) => !off.has(each.kind)).flatMap((each) => [...(KIND_TOOLS[each.kind] ?? [])]);
     // The apps family's tools, while any app type is on.
     if (ITEM_TYPES.some((each) => each.family === "app" && !off.has(each.kind))) tools.push(...APP_TOOLS);
-    // The Explorer's tools (explorer_list, explorer_file) stay registered but
-    // aren't given out: the Explorer is gone, and its filing only runs underneath.
     tools.push(...CODE_TOOLS, ...WORKBENCH_TOOLS);
     // A skill review fork (src/skill-learning.ts) gets the skill tools and the Memory page's, nothing else of Studio's.
     if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") return { tools: [...REVIEW_TOOLS, ...CODE_TOOLS], skills: ["studio-code"], instructions: "" };
@@ -459,7 +440,6 @@ export default async function plugin(bb: BbPluginApi) {
   const tags = new TagStore(db);
   const stars = new StarStore(db);
   const tabs = new TabStore(db);
-  const views = new ViewStore(db);
   const threadTitles = new ThreadTitles(async (threadId) => ((await bb.sdk.threads.get({ threadId })) as { title?: string | null }).title ?? "");
   /** Adds each item's tag ids, when it was starred, and the thread that made it. */
   const listed = async <T extends { pluginId: string; id: string }>(items: readonly T[]) => {
@@ -480,7 +460,6 @@ export default async function plugin(bb: BbPluginApi) {
   async function studioChanged({ pluginId, ids, removed }: { pluginId: string; ids?: string[]; removed?: string[] }) {
     await searchIndex.changed(pluginId, ids, removed);
     await recordProviderChanges(hub, services, changes, pluginId, ids, removed);
-    try { explorer.itemsChanged(ids, removed); } catch { /* filing is a convenience */ }
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId, ids, removed });
     return { ok: true };
   }
@@ -600,7 +579,6 @@ export default async function plugin(bb: BbPluginApi) {
       providers: result.providers,
       items: await listed(result.items),
       tags: tags.list(),
-      views: views.list(),
     };
   };
 
@@ -1264,7 +1242,6 @@ export default async function plugin(bb: BbPluginApi) {
   // Set once hands-free voice is wired, further down.
   let voiceSearch: ((query: string, limit: number) => SearchHit[]) | null = null;
   bb.rpc.register(rpcContract, {
-    ...explorer.rpc,
     overview: () => overview(),
     search: ({ query }) => contentSearch(query),
     searchStatus: () => searchIndex.status(),
@@ -1483,16 +1460,6 @@ export default async function plugin(bb: BbPluginApi) {
       // An additional Bot's thread isn't a lead: it follows the handoff here.
       await bots.handedOff(threadId, result.threadId);
       return result;
-    },
-    saveView: ({ name, query }) => {
-      const view = views.save(name, query);
-      tagsChanged();
-      return { view };
-    },
-    deleteView: ({ id }) => {
-      views.remove(id);
-      tagsChanged();
-      return { ok: true };
     },
     recentThreads: async () => ({ threads: await recentThreads() }),
     studio_changed: studioChanged,

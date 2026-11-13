@@ -88,23 +88,6 @@ A page takes its sub-pages with it. There's no undo, so delete only what the use
 to remove, and confirm first when the request is vague, like "clean up old
 stuff".
 
-## Filing in the Explorer
-
-The Explorer is Studio's sidebar tree: each project is a folder, with the
-user's own folders inside, and threads and items as rows. What you create is
-filed beside your thread already. File or move something only when the user
-asks, or to keep related work together.
-
-- `explorer_list` shows every project and its folders, nested, with folder
-  ids.
-- `explorer_file` with `target` (`{ kind: "thread" | "item", id }`, an item
-  by its id such as `pg_…`) and either `folder` (an id) or `path`
-  (`"Project/Sub/Folder"`; the first part is the project's name or
-  `No project`, and missing folders are created). A path that is only the
-  project puts the thing back at the project's root.
-- A folder holds only its own project's things. Move an item to the project
-  first with `studio_move_items`; a thread can't change project.
-
 ## Moving items and project leads
 
 - `studio_move_items` with `items` and `project` (a name, an id, or
