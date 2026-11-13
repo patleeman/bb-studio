@@ -75,6 +75,30 @@ it("hands a footer under each reply with threads to the indicator, and takes the
   controller.abort();
 });
 
+it("puts a fork made from your own message under that message, at its end, and keeps replies under the Bot's", async () => {
+  document.body.innerHTML = `
+    <div data-timeline-row-id="thr_bot:user:u1"><div class="w-full" data-message-column=""><div class="group/message ml-auto flex w-fit max-w-[70%] flex-col items-end"><p>Plan the launch</p></div></div></div>
+    <div data-timeline-row-id="thr_bot:assistant:a1"><div class="group/message w-full text-sm" data-message-column=""></div></div>
+    <div data-timeline-row-id="thr_bot:op:thread-provisioning:3"></div>`;
+  history.replaceState(null, "", "/threads/thr_bot");
+  const controller = new AbortController();
+  const threads = [
+    thread({ messageId: "thr_bot:user:u1", threadId: "fork_u", kind: "fork", replies: 0 }),
+    thread({ messageId: "thr_bot:user:u1", threadId: "reply_u", kind: "reply" }),
+    thread({ messageId: "thr_bot:op:thread-provisioning:3", threadId: "fork_op", kind: "fork", replies: 0 }),
+    thread({ messageId: "thr_bot:assistant:a1", threadId: "fork_a", kind: "fork", replies: 0 }),
+  ];
+  let footers: readonly ThreadFooter[] = [];
+  mountSideThreadRows(controller.signal, async (threadId) => ({ chat: threadId === "thr_bot", threads: threadId === "thr_bot" ? threads : [] }), (next) => { footers = next; });
+  await settle();
+  expect(footers.map((each) => [each.key, each.threads.map((one) => one.threadId)])).toEqual([["thr_bot:user:u1", ["fork_u"]], ["thr_bot:assistant:a1", ["fork_a"]]]);
+  const mine = footers[0]!.host;
+  expect(mine.closest("[data-timeline-row-id]")?.getAttribute("data-timeline-row-id")).toBe("thr_bot:user:u1");
+  expect(mine.style.justifyContent).toBe("flex-end");
+  expect(footers[1]!.host.style.justifyContent).toBe("");
+  controller.abort();
+});
+
 it("hides bb's Provisioned thread row and keeps the conversation's own rows", async () => {
   const { readFileSync } = await import("node:fs");
   const { join } = await import("node:path");

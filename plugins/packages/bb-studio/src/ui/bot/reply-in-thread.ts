@@ -41,10 +41,17 @@ export function isChatReply(row: HTMLElement, threadId: string): boolean {
   return !!columnOf(row)?.classList.contains("group/message");
 }
 
-function makeFooter(): HTMLDivElement {
+export function isOwnMessage(row: HTMLElement, threadId: string): boolean {
+  const id = row.getAttribute("data-timeline-row-id") ?? "";
+  if (!id.startsWith(`${threadId}:`) || isChatReply(row, threadId)) return false;
+  return [...row.querySelectorAll<HTMLElement>(".group\\/message")].some((each) => each.closest("[data-timeline-row-id]") === row);
+}
+
+function makeFooter(end: boolean): HTMLDivElement {
   const footer = document.createElement("div");
   footer.setAttribute(FOOTER, "");
   Object.assign(footer.style, { display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: "12px", rowGap: "2px", margin: "2px 0 0" } satisfies Partial<CSSStyleDeclaration>);
+  if (end) footer.style.justifyContent = "flex-end";
   return footer;
 }
 
@@ -87,12 +94,14 @@ export function mountSideThreadRows(
     for (const message of document.querySelectorAll<HTMLElement>("[data-timeline-row-id]")) {
       const host = [...message.querySelectorAll<HTMLElement>(`[${FOOTER}]`)].find((each) => each.closest("[data-timeline-row-id]") === message);
       const messageId = message.getAttribute("data-timeline-row-id") ?? "";
-      const threads = chat && threadId && isChatReply(message, threadId) ? byMessage.get(messageId) : undefined;
+      const own = !!chat && !!threadId && isOwnMessage(message, threadId);
+      const threads = chat && threadId && isChatReply(message, threadId) ? byMessage.get(messageId)
+        : own ? byMessage.get(messageId)?.filter((thread) => thread.kind === "fork") : undefined;
       if (!threads?.length || !threadId) {
         if (host) { footers.delete(host); host.remove(); }
         continue;
       }
-      const footer = host ?? makeFooter();
+      const footer = host ?? makeFooter(own);
       if (!host) (columnOf(message) ?? message).appendChild(footer);
       footers.set(footer, { key: messageId, host: footer, sourceThreadId: threadId, threads });
     }
