@@ -1,12 +1,10 @@
 import { ForkAppBackdropHost } from "./ForkAppBackdrop";
 import { ForkApprovalHost } from "./ForkApprovalHost";
 import { ForkItemDropHost } from "./ForkItemDropHost";
-import { ForkMainHeader } from "./ForkMainHeader";
 import { ForkOverlayScrollbarHost } from "./ForkOverlayScrollbar";
 import { ForkTabReturnHost } from "./ForkTabReturnHost";
-import { ForkSidebarStyleHost } from "@/components/sidebar/ForkSidebarStyle";
 import { useNarrowWindowSidebar } from "@/components/layout/useNarrowWindowSidebar.fork";
-import { useWorkbenchForkCommands } from "@/components/secondary-panel/workbenchFork";
+import { useForkTooltipDismiss } from "@/lib/fork-tooltip-dismiss";
 
 export { isBareWindow } from "@/lib/fork-bare-window";
 
@@ -15,18 +13,16 @@ export function useForkLayoutBridge([storedOpen, setStoredOpen]: readonly [
   (open: boolean) => void,
 ]): [boolean, (open: boolean) => void] {
   const { open, setOpen } = useNarrowWindowSidebar(storedOpen, setStoredOpen);
-  useWorkbenchForkCommands();
   return [open, setOpen];
 }
 
 export function ForkLayoutHosts() {
+  useForkTooltipDismiss();
   return (
     <>
       <ForkAppBackdropHost />
-      <ForkMainHeader />
       <ForkApprovalHost />
       <ForkItemDropHost />
-      <ForkSidebarStyleHost />
       <ForkTabReturnHost />
       <ForkOverlayScrollbarHost />
     </>
