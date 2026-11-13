@@ -1,5 +1,6 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { desktopHudEnabled } from "./gate";
 import { decodePinMention, PIN_MENTION_PROVIDER, pinMentionContext } from "./pins";
 
 function member(source: object, name: string): unknown {
@@ -155,4 +156,12 @@ export function registerDesktopTools(bb: BbPluginApi, agentName: (threadId: stri
     execute: (input, ctx) => run(ctx.threadId, "request_control", input),
   });
   return true;
+}
+
+export function registerDesktopToolsIfEnabled(
+  bb: BbPluginApi,
+  env: Readonly<Record<string, string | undefined>>,
+  agentName: (threadId: string) => Promise<string>,
+): boolean {
+  return desktopHudEnabled(env) && registerDesktopTools(bb, agentName);
 }

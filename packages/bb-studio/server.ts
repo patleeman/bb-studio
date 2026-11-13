@@ -171,7 +171,7 @@ import { studioDataBackup } from "./src/backup/studio-data";
 import { backupFileName, registerBackup } from "./src/backup/register";
 import { readFile as readTextFile, stat as statPath } from "node:fs/promises";
 import { isAbsolute, resolve as resolvePath } from "node:path";
-import { registerDesktopTools } from "./src/desktop/server";
+import { registerDesktopToolsIfEnabled } from "./src/desktop/server";
 
 /** How often Studio re-checks plugin health on its own. */
 const HEALTH_INTERVAL_MS = 3 * 60_000;
@@ -1703,7 +1703,7 @@ export default async function plugin(bb: BbPluginApi) {
     creator: async (threadId) => { const bot = themeBot(undefined, await selfBot(threadId)); return typeof bot === "string" ? { name: "Agent", botId: null } : { name: bot.name, botId: bot.id }; },
     resolveBot: async (ref, threadId) => themeBot(ref, await selfBot(threadId)),
   })) bb.agents.registerTool(tool as never);
-  registerDesktopTools(bb, async (threadId) => { const bot = themeBot(undefined, await selfBot(threadId)); return typeof bot === "string" ? "Agent" : bot.name; });
+  registerDesktopToolsIfEnabled(bb, process.env, async (threadId) => { const bot = themeBot(undefined, await selfBot(threadId)); return typeof bot === "string" ? "Agent" : bot.name; });
   // Pause and stop only from the Bot's own chat (botControlRefusal); no Bot resumes itself.
   bb.agents.registerTool({ name: "bot_get", description: "Show the user's Bot (their always-on agent, formerly the Chief of Staff): name, avatar, state (active, paused, stopped), its thread and check-ins. In a Bot's own thread, that Bot.", parameters: z.object({}), execute: async (_input, ctx) => describeBot(await bots.get(await selfBot(ctx.threadId))) });
   bb.agents.registerTool({

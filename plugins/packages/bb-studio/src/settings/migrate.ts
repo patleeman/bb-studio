@@ -12,7 +12,7 @@
 // logged or compared outside this file.
 import type { PluginSettingDescriptor } from "@get-bb/plugin-sdk";
 import { LEGACY_OPENAI_KEY_SETTING, openaiKeyMigration, OPENAI_KEY_SETTING } from "../openai-key";
-import { checkSetting, STUDIO_SETTINGS, STUDIO_SETTING_KEYS, type SettingValue, type StudioSetting } from "./schema";
+import { checkSetting, STUDIO_SETTINGS, VISIBLE_SETTING_KEYS, type SettingValue, type StudioSetting } from "./schema";
 import type { SettingsKv, StudioSettingsStore } from "./store";
 
 export const SETTINGS_MIGRATED_KEY = "settings:migrated";
@@ -43,7 +43,7 @@ function legacyDescriptor(key: string, setting: StudioSetting): PluginSettingDes
  * types, options and defaults. Declared only on the migrating load.
  */
 export const LEGACY_SETTINGS: Record<string, PluginSettingDescriptor> = {
-  ...Object.fromEntries(STUDIO_SETTING_KEYS.map((key) => [key, legacyDescriptor(key, STUDIO_SETTINGS[key])])),
+  ...Object.fromEntries(VISIBLE_SETTING_KEYS.map((key) => [key, legacyDescriptor(key, STUDIO_SETTINGS[key])])),
   ...RETIRED_SETTINGS,
   [LEGACY_OPENAI_KEY_SETTING]: { type: "string", label: "Old Bot avatars OpenAI key", description: MOVING, secret: true, default: "" },
 };
@@ -81,7 +81,7 @@ export async function migrateSettings(deps: MigrationDeps): Promise<MigrationRep
   const old = await deps.legacy.get();
   const already = deps.store.explicit();
   const patch: Record<string, SettingValue> = {};
-  for (const key of STUDIO_SETTING_KEYS) {
+  for (const key of VISIBLE_SETTING_KEYS) {
     if (!Object.hasOwn(old, key) || Object.hasOwn(already, key)) continue;
     const value = old[key];
     if (value === undefined || value === STUDIO_SETTINGS[key].default) continue;

@@ -1535,7 +1535,12 @@ Visual Chat, when installed, also opens in a window of its own there
 
 ### The desktop HUD (BB Studio on macOS)
 
-The HUD is the conversation outside BB: **⌥⇧Space** (Settings ▸ Windows), or
+Off unless BB Studio runs with `BB_STUDIO_DESKTOP_HUD=1` (only the HUD test
+app sets it): off, Studio offers no `desktop_*` tools, no HUD button, window or
+permissions sheet, and no desktop settings. Studio reads the switch once when
+it loads; its UI sees it as the hidden, read-only `desktopControl` value.
+
+The HUD is the conversation outside BB: **⌥⇧Space**, or
 the window button in a thread's composer, hides BB's main window and floats a
 small panel over every app and Space, with the conversation and its real
 composer. Esc or the arrow button goes back to BB. Code: `src/desktop`; the
@@ -1550,8 +1555,8 @@ the desktop fork).
 - **Pointing.** The pin button in the HUD shows a crosshair. Hovering
   outlines the element under the pointer; a click drops a numbered pin there
   and puts a chip in the HUD composer (pin number, app, element, page), with a
-  screenshot of the window attached. Holding the talk key (**fn**, Settings ▸
-  Windows ▸ Desktop talk key) drops a pin where the pointer is and dictates
+  screenshot of the window attached. Holding the talk key (**fn**; the sheet's
+  Talk key row picks another, kept on this device) drops a pin where the pointer is and dictates
   through Talk; letting go places the pin and the words follow the chip. Pins
   stay on screen while the HUD is up and go when it closes.
 - **Agents on the desktop.** `desktop_status`, `desktop_pins`,

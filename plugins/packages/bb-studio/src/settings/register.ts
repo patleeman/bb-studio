@@ -10,7 +10,8 @@ import { combineSettings, type StudioSettingsHandle } from "./handle";
 import { STUDIO_KEY_SETTINGS } from "./keys";
 import { describeMigration, LEGACY_SETTINGS, migrateSettings, needsSettingsMigration } from "./migrate";
 import { StudioSettingsStore } from "./store";
-import { SETTINGS_CHANNEL } from "./schema";
+import { isHiddenSetting, SETTINGS_CHANNEL } from "./schema";
+import { desktopHudEnabled } from "../desktop/gate";
 import { loopTimeZone } from "./constants";
 
 const MOBILE_PLUGIN_ID = "mobile";
@@ -55,7 +56,8 @@ export async function registerSettings(bb: BbPluginApi, pluginId: string): Promi
   );
   store.onChange(() => void bb.realtime.publish(SETTINGS_CHANNEL, {}));
 
-  const answer = () => ({ values: { ...store.current() }, changed: Object.keys(store.explicit()) });
+  const desktopControl = desktopHudEnabled(process.env);
+  const answer = () => ({ values: { ...store.current(), desktopControl }, changed: Object.keys(store.explicit()).filter((key) => !isHiddenSetting(key)) });
   const mobile = async <T>(method: string, outputSchema: z.ZodType<T>): Promise<T | null> => {
     const { plugins } = await bb.sdk.plugins.list();
     const plugin = plugins.find((each) => each.id === MOBILE_PLUGIN_ID) as { id: string; enabled?: boolean } | undefined;
@@ -67,7 +69,7 @@ export async function registerSettings(bb: BbPluginApi, pluginId: string): Promi
   bb.rpc.register(settingsContract, {
     "settings.get": async () => ({ ...answer(), timeZone: loopTimeZone() }),
     "settings.set": async ({ values }) => {
-      await store.set(values);
+      await store.set(Object.fromEntries(Object.entries(values).filter(([key]) => !isHiddenSetting(key))));
       return answer();
     },
     "mobile.push.status": async () => {

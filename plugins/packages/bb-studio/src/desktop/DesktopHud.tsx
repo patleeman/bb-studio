@@ -14,9 +14,9 @@ import {
   useDesktopControl,
   type DesktopControl,
   type DesktopPin,
-  type DesktopTalkKey,
 } from "./host";
-import { PermissionsSheet, usePermissionPolling } from "./PermissionsSheet";
+import { PermissionsSheet, readTalkKey, usePermissionPolling } from "./PermissionsSheet";
+import { desktopHudOn } from "./gate";
 import { encodePinMention, pinChipLabel, pinFacts, PIN_MENTION_PROVIDER } from "./pins";
 
 
@@ -62,10 +62,17 @@ function useThreadHostId(threadId: string | null): string | null {
   return hostId;
 }
 
+export const DESKTOP_HUD_HOTKEY = "Alt+Shift+Space";
+
 export function DesktopHudWindow() {
+  const { values } = useStudioSettings();
+  if (!desktopHudOn(values)) return null;
+  return <DesktopHudPanel />;
+}
+
+function DesktopHudPanel() {
   const threadId = windowParams().thread ?? null;
   const control = useDesktopControl();
-  const { values } = useStudioSettings();
   const title = useThreadTitle(threadId);
   const [sheet, setSheet] = useState(false);
   const state = control.state;
@@ -76,10 +83,9 @@ export function DesktopHudWindow() {
     void control.request({ op: "hud", shown: true, threadId });
   }, [control, threadId]);
 
-  const talkKey = values?.desktopTalkKey;
   useEffect(() => {
-    if (typeof talkKey === "string") void control.request({ op: "talkKey", key: talkKey as DesktopTalkKey });
-  }, [control, talkKey]);
+    void control.request({ op: "talkKey", key: readTalkKey() });
+  }, [control]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -171,7 +177,8 @@ function attachImage(composer: PluginComposerApi, pin: DesktopPin, hostId: strin
 }
 
 export function DesktopComposerBridge() {
-  if (hostWindowId() !== DESKTOP_HUD_WINDOW_ID) return null;
+  const { values } = useStudioSettings();
+  if (hostWindowId() !== DESKTOP_HUD_WINDOW_ID || !desktopHudOn(values)) return null;
   return <DesktopHudBridge />;
 }
 
@@ -277,15 +284,20 @@ function DesktopRows({ control, threadId }: { control: DesktopControl; threadId:
 }
 
 export function DesktopHudButton() {
+  const { values } = useStudioSettings();
+  if (!desktopHudOn(values)) return null;
+  return <DesktopHudOpenButton />;
+}
+
+function DesktopHudOpenButton() {
   const composer = useComposer();
   const control = useDesktopControl();
   const windows = useHostWindows();
-  const { values } = useStudioSettings();
   const [sheet, setSheet] = useState(false);
   if (!control.native || !control.state?.supported || hostWindowId() !== null) return null;
   const threadId = composer.scope.kind === "thread" ? composer.scope.threadId : null;
   if (threadId === null) return null;
-  const hotkey = typeof values?.desktopHudHotkey === "string" ? values.desktopHudHotkey : "";
+  const hotkey = DESKTOP_HUD_HOTKEY;
   const open = (pointing: boolean) => {
     void windows.open(DESKTOP_HUD_WINDOW_ID, desktopHudWindowOptions(threadId, hotkey, browserScreen())).then(() => {
       if (pointing) setTimeout(() => void control.request({ op: "pointing", on: true }), 600);
@@ -331,7 +343,7 @@ export function DesktopHudHotkey() {
   const { values } = useStudioSettings();
   const route = useRoute();
   const threadId = route === null ? null : threadIdFromPath(route.pathname);
-  const hotkey = typeof values?.desktopHudHotkey === "string" ? values.desktopHudHotkey : null;
+  const hotkey = desktopHudOn(values) ? DESKTOP_HUD_HOTKEY : null;
   const last = useRef<string | null>(null);
   useEffect(() => {
     if (!control.native || hotkey === null || hostWindowId() !== null || !control.state?.supported) return;
