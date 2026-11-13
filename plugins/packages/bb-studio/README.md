@@ -70,7 +70,7 @@ the library, and the tab stays on the collection; a new add-on kind appears
 with its own chip without any change to Studio. **New** offers each kind that can be made and opened here,
 makes the item in the thread's project and links it to the thread. The
 save icon opens Artifacts' save picker for the latest reply's files. Reply
-cards, **Expand to page**, and links inside an open item (a page mention, an
+cards and links inside an open item (a page mention, an
 embed's arrow, a link in a page's text) open a Studio tab on their item
 (`{ kind, id }` params), so you never leave the thread; **Open in Pages** and
 ⌘-click take an item to the Studio app instead. Kinds turned off in **Setup → Kinds** don't appear.
@@ -1629,34 +1629,12 @@ of that thread at the end of the item, labelled with the thread's state:
 open the thread. Check the item off yourself after reviewing; the agent is
 told not to.
 
-### Notes from the composer
+### Notes
 
-When a message grows into meeting notes, **Expand to page** in a thread's
-composer (the ⤢ button beside the microphone) moves the draft into a temp
-page and opens it in the thread's Studio tab, beside the chat.
-
-![Meeting notes typed into a thread's composer, with the Expand to page tooltip](assets/notes-expand.png)
-
-Notes typed in the composer of a staged "Weekly launch sync" thread, with the
-pointer on **Expand to page**.
-
-- **Where it goes.** The page is tagged **Notes** in Studio, in the thread's
-  project, titled like "Notes · Oct 13, 2:05 PM · Weekly launch sync" (the
-  time in your time zone). Studio records the thread it came from, and lists
-  the page with that thread.
-- **The draft moves.** Once the page holds the text, the composer is cleared,
-  so there's only one copy and nothing is sent by accident. Each typed line
-  stays its own paragraph and `- ` lines stay one list. Attachments stay in
-  the composer. With a note already open, Expand adds the draft to the end
-  of it instead of starting another.
-- **Nothing is lost.** The page is saved to BB as it's made, and typing in it
-  autosaves like any page. When you come back to the thread, a **Notes in
-  progress** chip above the composer reopens it.
-
-![The temp note open beside its thread, with the Notes in progress chip above the empty composer](assets/notes-beside-thread.png)
-
-After Expand: the note open in the side panel with the draft's lines, the
-composer empty, and the **Notes in progress** chip above it.
+The iOS app turns a draft into a note: a temp page tagged **Notes** in
+Studio, in the thread's project, titled like "Notes · Oct 13, 2:05 PM ·
+Weekly launch sync". Studio records the thread it came from, and lists the
+page with that thread.
 
 While the page is a temp note, its header (in the side panel and in Pages)
 has three done actions:
@@ -1668,16 +1646,11 @@ has three done actions:
 - **Discard** asks first, then deletes the page.
 
 A sent or kept note stays tagged Notes as an ordinary page, so your meeting
-notes collect in one place; it's no longer a temp note, and the chip goes.
+notes collect in one place; it's no longer a temp note.
 
 ![The note's done actions: Send to thread with its two ways open, Keep and Discard](assets/notes-done-actions.png)
 
-The note reopened from the chip after a reload, with Send's menu open: the
-notes as the message (the default for this length), or a link and a request
-to summarize. Captured in a staged BB (stable BB 0.46.0). Recapture with
-`BB_CAPTURE_ONLY=pages-notes`.
-
-The iOS app can do the same over Studio's `notes.*` RPC methods:
+The iOS app uses Studio's `notes.*` RPC methods:
 `notes.create` (text and a thread; adds to the open note), `notes.forThread`,
 `notes.forPage`, `notes.send` (`auto`, `content` or `summarize`),
 `notes.keep` and `notes.discard`.

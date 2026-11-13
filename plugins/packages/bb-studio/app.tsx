@@ -84,7 +84,6 @@ import { isRecordingId, UNSENT_PATH } from "./src/talk/shared/format";
 import { registerTalkApp } from "./src/talk/ui/register";
 import { isPageId, PageCard } from "./src/pages/ui/PageCard";
 import { enabledKinds, STUDIO_TAB, STUDIO_TAB_ICON } from "./src/ui/studio-tab/model";
-import { ExpandToPage, NotesInProgress } from "./src/pages/ui/notes/composer";
 import { TalkBridge } from "./src/pages/ui/talk-bridge";
 import { registerExploreApp } from "./src/explore/app";
 import { registerReactionsApp } from "./src/reactions/app";
@@ -388,7 +387,7 @@ export default definePluginApp((app) => {
   // The Bot's other pages as tabs (Memory, Library, Automations, the Archive) and the New Tab page's "New …" actions (src/tab-kinds.ts).
   registerTabKindTabs(app);
   // Hands-free voice (src/voice/live/ui): a session is its own thread. Its
-  // composer button is registered below, after Notes' Expand; its pill floats
+  // composer button is registered below; its pill floats
   // over every page and thread until End.
   app.slots.experimental_appOverlay({ id: "handsfree", component: HandsFreePill });
   registerThreadTab(app, { id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel, ...OFF_NEW_TAB });
@@ -447,19 +446,10 @@ export default definePluginApp((app) => {
   // thread was started from, and opening a page Talk dictated into.
   if (on("page")) {
     app.slots.experimental_appOverlay({ id: "talk-bridge", component: TalkBridge });
-    // Notes (src/pages/notes.ts): the composer's Expand to page, which moves
-    // the draft into a temp page beside the thread, and the "Notes in
-    // progress" chip that reopens it.
-    app.composer.customize({
-      id: "notes",
-      scopes: ["thread"],
-      actions: [{ id: "expand", component: ExpandToPage }],
-      banners: [{ id: "in-progress", chrome: "bare", component: NotesInProgress }],
-    });
   }
   // The waveform button. BB puts a plugin's composer actions just before its
   // mic, in registration order (no order or priority field, SDK 0.6.37 or
-  // 0.6.104), so it's Studio's last action: Expand, waveform, mic, send. It
+  // 0.6.104), so it's Studio's last action: waveform, mic, send. It
   // starts a session; right-click for its quick settings.
   app.composer.customize({ id: "handsfree", scopes: ["thread"], actions: [{ id: "handsfree", component: HandsFreeComposerButton }] });
   app.slots.messageDirective({ id: "page", component: whenOn(kinds, "page", PageCard) });
