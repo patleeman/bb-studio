@@ -246,3 +246,14 @@ final class BotShellModel: ObservableObject {
         }
     }
 }
+
+extension BotShellModel {
+    /// Follows a pending link, then a pending route, once the Bots are loaded.
+    /// Returns which were used, for the caller to clear.
+    func consume(link: BotShellLink?, route: BotRoute?, store: BotSpacesStore) -> (link: Bool, route: Bool) {
+        guard store.spaces != nil else { return (false, false) }
+        if let link { follow(link, store: store) }
+        if let route { open(route, store: store) }
+        return (link != nil, route != nil)
+    }
+}

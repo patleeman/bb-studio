@@ -20,19 +20,19 @@ struct BotSpacesRoot: View {
         .lookRoot(bot: BotShell.shownBot(store.spaces, chosen: shell.shownBotId))
         .task(id: store.spaces) { await LookExport.run(store: store, client: app.client) }
         .onChange(of: shell.selection) { _, _ in shell.detailPath = shell.takePendingPush() }
-        .onAppear { shell.land(store) }
-        .onChange(of: store.spaces) { _, _ in shell.land(store) }
+        .onAppear { shell.land(store); consumeLinks() }
+        .onChange(of: store.spaces) { _, _ in shell.land(store); consumeLinks() }
         .onChange(of: store.views) { _, _ in shell.land(store) }
-        .onChange(of: app.shellLink, initial: true) { _, link in
-            guard let link, store.spaces != nil else { return }
-            app.shellLink = nil
-            shell.follow(link, store: store)
-        }
-        .onChange(of: app.botRoute, initial: true) { _, route in
-            guard let route, store.spaces != nil else { return }
-            app.botRoute = nil
-            shell.open(route, store: store)
-        }
+        .onChange(of: app.shellLink, initial: true) { _, _ in consumeLinks() }
+        .onChange(of: app.botRoute, initial: true) { _, _ in consumeLinks() }
+    }
+
+    /// A link or route that came before the Bots loaded waits for them; once
+    /// followed it is cleared, so the same link works again.
+    private func consumeLinks() {
+        let used = shell.consume(link: app.shellLink, route: app.botRoute, store: store)
+        if used.link { app.shellLink = nil }
+        if used.route { app.botRoute = nil }
     }
 
     private var context: BotConversationContext? {

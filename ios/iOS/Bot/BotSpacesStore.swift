@@ -51,6 +51,17 @@ final class BotSpacesStore: ObservableObject {
 
     func view(for botId: String) -> BotThreadsView? { views[botId] }
 
+    /// Whether a thread is one of the Bots' conversations or workers: nil while
+    /// nothing is loaded to tell.
+    func knows(threadId: String) -> Bool? {
+        guard spaces != nil || !views.isEmpty else { return nil }
+        if spaces?.bots.contains(where: { $0.mainThreadId == threadId }) == true { return true }
+        if views.values.contains(where: { view in
+            view.conversations.contains { $0.threadId == threadId } || view.workers.contains { $0.threadId == threadId }
+        }) { return true }
+        return views.isEmpty ? nil : false
+    }
+
     func watch(_ botId: String, fetch: Bool = true) {
         let added = watched.insert(botId).inserted
         if views[botId] == nil, let cached = BotSpacesCache.loadView(botId, serverURL: serverURL) {

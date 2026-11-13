@@ -307,7 +307,8 @@ final class AppModel: ObservableObject {
     func follow(_ destination: LinkDestination, push: ((Route) -> Void)? = nil) {
         switch destination {
         case .thread(let id, let worker):
-            if inSpaces {
+            // A plain bb thread (not a Bot's conversation or worker) opens as a thread.
+            if inSpaces, worker || BotSpacesStore.shared.knows(threadId: id) != false {
                 tab = .bot
                 shellLink = .thread(id, worker: worker || BotSpacesStore.shared.views.values.contains { $0.workers.contains { $0.threadId == id } })
             } else {
