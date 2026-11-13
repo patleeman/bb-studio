@@ -1,3 +1,4 @@
+import { signInErrorDisplay } from "./sign-in-error-display.fork.js";
 import type { ProviderErrorCategory } from "@bb/domain";
 import type { EventProjectionErrorMessage } from "./event-projection-types.js";
 
@@ -52,7 +53,10 @@ function reconnectDisplay(
 
 export function buildTimelineErrorDisplay(
   message: EventProjectionErrorMessage,
+  providerDisplayName?: string,
 ): TimelineErrorDisplay {
+  const signIn = signInErrorDisplay(message, providerDisplayName);
+  if (signIn) return signIn;
   const reconnect = reconnectDisplay(message);
   if (reconnect) {
     return { title: reconnect.progress, detail: reconnect.cause };
