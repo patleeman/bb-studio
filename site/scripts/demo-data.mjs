@@ -100,9 +100,10 @@ export const threads = [
   },
   {
     key: "atlas-bookclub",
-    title: "Book club: Thursday",
+    title: "Main · thread",
     bot: "atlas",
     forkOf: "atlas-main",
+    sideKind: "reply",
     ago: 70 * MIN,
     turns: [
       [
@@ -114,6 +115,20 @@ export const threads = [
           "2. What does the trip to Cornwall change, if anything?",
           "3. Which choice of his would you defend?",
         ].join("\n"),
+      ],
+    ],
+  },
+  {
+    key: "atlas-fork",
+    title: "Main · fork",
+    bot: "atlas",
+    forkOf: "atlas-main",
+    sideKind: "fork",
+    ago: 40 * MIN,
+    turns: [
+      [
+        "Take the morning summary and turn it into a short customer post about 2.4 instead.",
+        "Here is a first pass: *orbit-web 2.4 brings offline sync for notes and much faster search on large workspaces. It reaches everyone on Thursday.*",
       ],
     ],
   },

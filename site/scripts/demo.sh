@@ -19,14 +19,19 @@ mkdir -p "$SCRATCH/src"
 git -C "$REPO" archive HEAD plugins | tar -x -C "$SCRATCH/src"
 (cd "$SCRATCH/src/plugins" && pnpm install --frozen-lockfile --prefer-offline >/dev/null)
 (cd "$SCRATCH/src/plugins/packages/bb-studio" && "$S" bb plugin build . >/dev/null)
-(cd "$SCRATCH/src/plugins/packages/bb-studio-visual-chat" && "$S" bb plugin build . >/dev/null)
 
 # Studio's first run would make its own "Assistant" as the primary Bot; mark it done.
 mkdir -p "$SCRATCH/data/plugins/studio"
 printf '{"version":1,"state":"done","reason":"bots","at":0,"botId":null,"welcomeThreadId":null,"opened":true}\n' > "$SCRATCH/data/plugins/studio/onboarding.json"
 "$S" start
+# An app build that bundles Studio and Visual Chat installs them as built-ins on
+# the first start. Mark both removed so the path install of this checkout's
+# Studio takes the id, and Visual Chat (an experiment) stays off.
+"$S" stop
+sleep 2
+sqlite3 "$SCRATCH/data/bb.db" "UPDATE plugins SET removed_at = CAST(strftime('%s','now') AS INTEGER) * 1000, enabled = 0 WHERE id IN ('studio', 'studio-visual-chat') AND source_kind = 'builtin';"
+"$S" start
 "$S" bb plugin install "$SCRATCH/src/plugins/packages/bb-studio" --yes >/dev/null
-"$S" bb plugin install "$SCRATCH/src/plugins/packages/bb-studio-visual-chat" --yes >/dev/null
 "$S" stop
 sleep 2
 
@@ -38,5 +43,5 @@ node "$HERE/fixups.mjs" "$SCRATCH/ids.json"
 "$S" bb plugin reload studio >/dev/null
 sleep 12
 node "$HERE/fixups.mjs" "$SCRATCH/ids.json"
-# Pages, a whiteboard, a design, a dashboard, a mini app, artifacts, a recording and a Visual Chat board.
+# Pages, a whiteboard, a design, a dashboard, a mini app, artifacts, a recording and a code workspace.
 node "$HERE/seed-features.mjs" "$SCRATCH/ids.json"

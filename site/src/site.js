@@ -33,7 +33,7 @@
       if (!release || release.draft || release.prerelease || typeof release.html_url !== "string" || !release.html_url.startsWith(RELEASES)) return;
       const dmg = (release.assets || []).find((asset) => /\.dmg$/i.test(asset.name || "") && typeof asset.browser_download_url === "string" && asset.browser_download_url.startsWith(RELEASES + "download/"));
       const href = dmg ? dmg.browser_download_url : release.html_url;
-      const name = `BB Studio ${release.name || release.tag_name}`;
+      const name = /^BB Studio\b/.test(release.name || "") ? release.name : `BB Studio ${(release.tag_name || "").replace(/^v/, "")}`;
       const anchor = document.createElement("a");
       anchor.className = "button";
       anchor.href = href;

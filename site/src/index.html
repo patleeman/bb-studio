@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BB Studio</title>
-<meta name="description" content="BB Studio is a desktop app for working with AI agents: pages, designs, dashboards, mini apps, whiteboards, recordings, Visual Chat and VS Code, around conversations with your Bots. A very opinionated fork of bb.">
+<meta name="description" content="BB Studio is a desktop app for working with AI agents: pages, designs, apps, whiteboards, recordings and VS Code, beside the conversations that made them. A very opinionated fork of bb.">
 <meta name="color-scheme" content="dark">
 <meta property="og:title" content="BB Studio">
 <meta property="og:description" content="A desktop app for working with AI agents. A very opinionated fork of bb.">
@@ -22,8 +22,8 @@
     <a class="brand" href="#main"><img src="icon.png" alt="" width="28" height="28"> BB Studio</a>
     <ul>
       <li><a href="#pages">Pages</a></li>
-      <li><a href="#design">Design</a></li>
-      <li><a href="#visual-chat">Visual Chat</a></li>
+      <li><a href="#designs">Designs</a></li>
+      <li><a href="#apps">Apps</a></li>
       <li><a href="#spaces">Spaces</a></li>
       <li><a href="#themes">Themes</a></li>
       <li><a href="#iphone">iPhone</a></li>
@@ -38,7 +38,7 @@
   <div class="hero-text">
     <h1>BB Studio</h1>
     <p class="lead">A desktop app where you and your AI agents make things together.</p>
-    <p>You work through Bots. Each one keeps its own conversations, workers, memory and files, and around them sits a full studio: pages, designs, dashboards, mini apps, whiteboards, recordings, Visual Chat and VS Code, all open beside the conversation they came from.</p>
+    <p>You work through Bots. Each one keeps its own conversations, workers, memory and files, and around them sits a full studio: pages, designs, dashboards, mini apps, whiteboards, recordings and VS Code, all open beside the conversation they came from.</p>
     <p class="fork-line">A very opinionated fork of the excellent <a href="https://getbb.app/">bb</a></p>
     <div class="actions">
       <span class="button disabled" data-release-button aria-disabled="true">Download <span class="soon">Coming soon</span></span>
@@ -46,7 +46,7 @@
     </div>
   </div>
   <figure class="shot hero-shot">
-    {{pic workbench "BB Studio in the Miami 1985 theme: the conversation Main with Atlas on the left, and the workbench on the right in two panes, the page orbit-web 2.4: launch plan and the dashboard orbit-web health." "(min-width: 1180px) 1100px, 94vw" eager}}
+    {{pic workbench "BB Studio in the Event Horizon theme: the conversation Main with Atlas on the left, and the workbench on the right in two panes, the page orbit-web 2.4: launch plan and the dashboard orbit-web health." "(min-width: 1180px) 1100px, 94vw" eager}}
   </figure>
 </section>
 
@@ -64,9 +64,9 @@
   </figure>
 </section>
 
-<section id="design" class="feature">
+<section id="designs" class="feature">
   <div class="feature-text">
-    <h2>Design</h2>
+    <h2>Designs</h2>
     <p>Ask for a screen and the agent draws it. A design is a set of rounds, and each round holds a few options, each a live HTML screen for a desktop or a phone. Point at any element to comment on it or edit its text, play a screen full size, and send your comments back for the next round. Designs can be clickable prototypes or slide decks.</p>
   </div>
   <figure class="shot wide">
@@ -74,33 +74,29 @@
   </figure>
 </section>
 
-<section id="visual-chat" class="feature">
+<section id="apps" class="feature">
   <div class="feature-text">
-    <h2>Visual Chat</h2>
-    <p>Visual Chat is a conversation where the agent answers on a board instead of in a transcript. Each turn, it rearranges the board to show what matters now: numbers, charts, tables and short text. The changes animate, so you can see what moved, and earlier versions stay one click away.</p>
-  </div>
-  <figure class="shot wide">
-    {{pic item-canvas "A Visual Chat board titled Lisbon in March: four stat cards (highs 18°C, lows 10°C, 8 of 31 rainy days, €1,150 for four days), a bar breakdown of costs, and a plan for the four days. The agent's short reply and the composer are at the bottom." "(min-width: 1180px) 1100px, 94vw"}}
-  </figure>
-</section>
-
-<section id="dashboards" class="feature">
-  <div class="feature-text">
-    <h2>Dashboards and mini apps</h2>
-    <p>A dashboard is a grid of live widgets: stats with sparklines, charts, tables, feeds, notes, gauges and custom HTML. Each widget gets its data from a stored value, a web address, a script you approve, or the agent itself.</p>
-    <p>A mini app is a small interactive app an agent builds for you, such as a tracker, a form or a calculator. It keeps its own data, runs in a sandbox, and shows the same live copy in a conversation, in a page and in its own tab.</p>
+    <h2>Apps</h2>
+    <p>Apps are the things that run. A mini app is a small interactive app an agent builds for you, such as a tracker, a form or a calculator; it keeps its own data, runs in a sandbox, and shows the same live copy in a conversation, in a page and in its own tab. A dashboard is a grid of live widgets: stats with sparklines, charts, tables, feeds, notes, gauges and custom HTML, each fed by a stored value, a web address, a script you approve, or the agent itself. An artifact is a file an agent saved, such as an image, HTML that runs in a sandbox, a PDF, code or text; a reply shows it inline, with a button to open it beside the chat.</p>
   </div>
   <figure class="shot wide">
     {{pic item-dashboard "The dashboard orbit-web health: stat tiles for weekly active teams, sync conflicts and p95 search with sparklines, a gauge for the 2.4 checklist, a line chart of errors per thousand sessions, a bar chart of beta teams by plan, a table of open beta issues and a note for this week." "(min-width: 1180px) 1100px, 94vw"}}
   </figure>
-  <figure class="shot wide">
-    {{pic item-mini "The mini app Beta feedback in its own tab: five feedback items with vote buttons, an area label and a status (planned, fixed or new), and a field to add feedback." "(min-width: 1180px) 1100px, 94vw"}}
-  </figure>
+  <div class="grid two">
+    <figure class="shot">
+      {{pic item-mini "The mini app Beta feedback in its own tab: five feedback items with vote buttons, an area label and a status (planned, fixed or new), and a field to add feedback." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>A mini app</strong></figcaption>
+    </figure>
+    <figure class="shot">
+      {{pic item-artifact "The artifact 2.4 release timeline open in a tab: four milestones on a line, from Beta opens on Oct 30 to 2.4 for everyone on Nov 14." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>An artifact</strong></figcaption>
+    </figure>
+  </div>
 </section>
 
 <section id="workbench" class="feature">
   <div class="feature-text">
-    <h2>The workbench</h2>
+    <h2>Workbench</h2>
     <p>Everything opens beside the conversation, in tabs. Drag a tab to the edge to split the panel into two panes, as in the picture at the top of this page. Links, cards in replies and search results all open there.</p>
     <p>Cmd+K is one palette for conversations, files, apps, commands and settings. Type a sentence and it goes to the agent. Option+Space opens the same palette over any app.</p>
   </div>
@@ -109,9 +105,32 @@
   </figure>
 </section>
 
+<section id="spaces" class="feature">
+  <div class="feature-text">
+    <h2>Spaces</h2>
+    <p>Each space has a Main conversation, where reports and alerts arrive, and as many other conversations as you need, each with its own model. They share one memory, one set of skills and one todo list, and each knows what the others are doing. A conversation that is waiting on you is outlined in amber, with the reason under its title.</p>
+    <p>Reply threads and forks stay with the message they came from and get no row of their own in the sidebar. Under the message, a quiet line reads "2 replies · Last reply …" or "Forked here", and either one opens in the side panel beside the conversation.</p>
+  </div>
+  <figure class="shot wide">
+    {{pic replies-open "Main on the left, with the lines 2 replies · Last reply and Forked here under the morning summary, and the reply thread open in the side panel on the right: a question about the book club and three discussion questions in reply." "(min-width: 1180px) 1100px, 94vw"}}
+  </figure>
+  <div class="feature-text">
+    <h3>Workers and approvals</h3>
+    <p>Longer jobs go to workers, listed under the conversations. A worker opens read-only, with its state in the header and one box in place of a composer: Ask about this worker. When a worker needs an approval, the card shows in the conversation that owns it, with the command and its folder. Deny, approve once, or approve for that worker.</p>
+  </div>
+  <div class="split">
+    <figure class="shot side">
+      {{pic sidebar "The sidebar for Atlas: Memory, Skills, Library, Automations and Todos, then the conversations Main, Kitchen renovation budget (outlined in amber: needs you, pick a countertop) and Lisbon trip in March, then the workers with their repository chips." "290px"}}
+    </figure>
+    <figure class="shot">
+      {{pic approval "An approval card at the top of Main: Refactor the settings form asks for your approval. Adds a dependency for the new toggle rows. Command: pnpm add @radix-ui/react-switch. Buttons: Deny, Approve for this worker, Approve." "(min-width: 900px) 780px, 94vw"}}
+    </figure>
+  </div>
+</section>
+
 <section id="code" class="feature">
   <div class="feature-text">
-    <h2>Studio Code</h2>
+    <h2>VS Code</h2>
     <p>VS Code is built in. Open it beside a conversation and it shows that conversation's folder; conversations on the same folder share one editor. The agent can point you at the lines it means, and your selection and open files are context it can read.</p>
   </div>
   <figure class="shot wide">
@@ -119,70 +138,58 @@
   </figure>
 </section>
 
-<section class="grid-two-features">
-  <div class="feature" id="whiteboards">
-    <div class="feature-text">
-      <h2>Whiteboards</h2>
-      <p>Whiteboards are Excalidraw scenes that live inside pages. Sketch on one right in the page, or open it full size. The agent edits the same scene, and both sets of changes merge.</p>
-    </div>
+<section id="whiteboards" class="feature">
+  <div class="feature-text">
+    <h2>Whiteboards</h2>
+    <p>Whiteboards are Excalidraw scenes that live inside pages. Sketch on one right in the page, or open it full size. The agent edits the same scene, and both sets of changes merge.</p>
+  </div>
+  <figure class="shot wide">
+    {{pic item-whiteboard "The whiteboard 2.4 rollout: three boxes joined by arrows, Beta: 212 teams, 10% of teams and Everyone, Thu, a Roll back box below, and two handwritten notes." "(min-width: 1180px) 1100px, 94vw"}}
+  </figure>
+</section>
+
+<section id="voice" class="feature">
+  <div class="feature-text">
+    <h2>Voice</h2>
+    <p>Dictation, recordings and voice conversations all run through Talk.</p>
+    <p><strong>Dictation.</strong> The composer's mic, or holding Right Option, dictates into whatever you are writing: a message, a page, a comment. Text appears while you are still talking, because each piece of about 25 seconds is transcribed as soon as it is saved. Transcription goes to the voice service set in Settings, which by default is OpenAI through your ChatGPT subscription in Codex. Talk can drop filler words before inserting, and keeps the raw transcript.</p>
+    <p><strong>Saved as you go.</strong> Audio is saved every few seconds, first in the window and then on disk, so a reload, a crash or a quit loses at most the last few seconds. Offline, it keeps recording and uploads when the connection returns. A piece that fails to transcribe is retried, never dropped, and nothing is inserted with a gap in it.</p>
+    <p><strong>From the mic to the page.</strong> While you dictate, the controls sit in place of the mic; expand them to read the transcript as it arrives. Every dictation also has a page of its own, and a long one can be kept as a recording.</p>
+    <p><strong>Recordings and meetings.</strong> Record a meeting, a call or a voice note. Talk titles and summarizes it and turns it into a notes page with decisions and to-dos; click a line of the transcript to play from there. Zoom, Meet and FaceTime calls can be transcribed on this Mac with WhisperKit, so their audio never leaves it.</p>
+    <p><strong>Voice conversations.</strong> The waveform button beside the mic starts a hands-free voice conversation with the agent, using OpenAI's realtime voice. In a meeting room, a meeting agent listens, answers when it is addressed by name, and keeps the notes.</p>
+  </div>
+  <figure class="shot wide">
+    {{pic item-recording "The recording Kitchen walkthrough with the contractor: 8 minutes and 149 words, a Summary toggle, Open notes and Update notes, the player, and the transcript with a timestamp on each line." "(min-width: 1180px) 1100px, 94vw"}}
+  </figure>
+  <div class="grid two">
     <figure class="shot">
-      {{pic item-whiteboard "The whiteboard 2.4 rollout: three boxes joined by arrows, Beta: 212 teams, 10% of teams and Everyone, Thu, a Roll back box below, and two handwritten notes." "(min-width: 900px) 540px, 94vw"}}
+      {{pic item-notes "The notes page made from the walkthrough: Decisions (quartz counters, keep the cabinet boxes, the sink stays), To do (pick a countertop slab by Friday, confirm the start date, ask for the electrical quote) and a table of numbers." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>Notes from a recording</strong></figcaption>
+    </figure>
+    <figure class="shot">
+      {{pic item-dictation "A dictation's own page: the title Reply to the contractor, its length and word count, Keep as a recording, the player and the dictated text." "(min-width: 900px) 540px, 94vw"}}
+      <figcaption><strong>A dictation's page</strong></figcaption>
     </figure>
   </div>
-  <div class="feature" id="talk">
-    <div class="feature-text">
-      <h2>Talk: recordings and notes</h2>
-      <p>Record a meeting, a call or a voice note. Talk transcribes it as you go, writes a summary, and turns it into a notes page with decisions and to-dos. Click a line of the transcript to play from there.</p>
-    </div>
-    <figure class="shot">
-      {{pic item-recording "The recording Kitchen walkthrough with the contractor: 8 minutes and 149 words, a Summary toggle, Open notes and Update notes, the player, and the transcript with a timestamp on each line." "(min-width: 900px) 540px, 94vw"}}
-    </figure>
-  </div>
+  <figure class="shot inline-wide">
+    {{pic composer "The composer under Main: the worker chips above it, the field Ask for a follow-up, and at the bottom the model picker, the hands-free voice button, the dictation mic and the send button." "(min-width: 900px) 750px, 94vw"}}
+  </figure>
 </section>
 
 <section id="library" class="feature">
   <div class="feature-text">
-    <h2>Artifacts and the Library</h2>
-    <p>Files the agents make are saved as artifacts: images, HTML that runs in a sandbox, PDFs, code and text. A reply shows each one inline, with a button to open it beside the chat. The Library holds everything in one collection, with search over titles and content, filters by kind, tags and stars.</p>
-  </div>
-  <div class="grid two">
-    <figure class="shot">
-      {{pic item-collection "The Library for Atlas: a search field, kind filters (All, Page, Whiteboard, Design, App, Artifact) and a list of items made by you: notes from the kitchen walkthrough, the 2.4 rollout whiteboard, the launch plan page, the orbit-web health dashboard, the Beta feedback app and three artifacts." "(min-width: 900px) 540px, 94vw"}}
-    </figure>
-    <figure class="shot">
-      {{pic item-artifact "The artifact Search latency report open in a tab: a bar chart of p95 search time by workspace size, 2.3 against the 2.4 beta." "(min-width: 900px) 540px, 94vw"}}
-    </figure>
-  </div>
-</section>
-
-<section id="spaces" class="feature">
-  <div class="feature-text">
-    <h2>Spaces</h2>
-    <p>Each space has a Main conversation, where reports and alerts arrive, and as many other conversations as you need, each with its own model. They share one memory, one set of skills and one todo list, and each knows what the others are doing. A conversation that is waiting on you is outlined in amber, with the reason under its title.</p>
-  </div>
-  <div class="band">
-    <figure class="shot side">
-      {{pic sidebar "The sidebar for Atlas: Memory, Library, Automations and Todos, then the conversations Main, Kitchen renovation budget (outlined in amber: needs you, pick a countertop), Book club: Thursday, forked from Main, and Lisbon trip in March, then the workers with their repository chips." "290px"}}
-    </figure>
-    <div class="text">
-      <h3>Workers and approvals</h3>
-      <p>Longer jobs go to workers. A worker opens read-only, with its state in the header and one box in place of a composer: Ask about this worker. When a worker needs an approval, the card shows in the conversation that owns it, with the command and its folder. Deny, approve once, or approve for that worker.</p>
-      <figure class="shot inline">
-        {{pic approval "An approval card at the top of Main: Refactor the settings form asks for your approval. Adds a dependency for the new toggle rows. Command: pnpm add @radix-ui/react-switch. Buttons: Deny, Approve for this worker, Approve." "(min-width: 900px) 520px, 94vw"}}
-      </figure>
-      <h3>Reply in thread</h3>
-      <p>Point at a reply and choose Reply in thread. The thread opens in the side panel, and a row under the message counts its replies. A fork of a message becomes a conversation of its own, with a link back to where it came from.</p>
-    </div>
+    <h2>Library</h2>
+    <p>The Library is where files live: every page, design, whiteboard and app in one collection, with search over titles and content, filters by kind, tags and stars. A row opens its item beside the conversation.</p>
   </div>
   <figure class="shot wide">
-    {{pic replies-open "Main on the left, with the replies row under the morning summary, and the thread open in the side panel on the right: a question about the book club and three discussion questions in reply." "(min-width: 1180px) 1100px, 94vw"}}
+    {{pic item-collection "The Library for Atlas: a search field, kind filters (All, Page, Whiteboard, Design, App, Artifact) and the items made by you: notes from the kitchen walkthrough, the 2.4 rollout whiteboard, the launch plan page, the orbit-web health dashboard, the Beta feedback app and two artifacts." "(min-width: 1180px) 1100px, 94vw"}}
   </figure>
 </section>
 
 <section id="memory" class="feature">
   <div class="feature-text">
-    <h2>Memory, Todos and Automations</h2>
-    <p>Memory holds a core profile and dated records the agent saves and searches; a finished conversation leaves its summary there. Todos are things to do, decide or read, each with a trigger: a time, an event or a place. Automations wake the agent on a schedule, as check-ins, one-time reminders, watchers that run a script and speak up only when it prints something, and long-running runners. Skills are procedures the agent learns from its own work and keeps current; pin one to keep it, or share it with every agent.</p>
+    <h2>Memory, Todos, Automations and Skills</h2>
+    <p>Memory holds a core profile and dated records the agent saves and searches; a finished conversation leaves its summary there. Todos are things to do, decide or read, each with a trigger: a time, an event or a place. Automations wake the agent on a schedule, as check-ins, one-time reminders, watchers that run a script and speak up only when it prints something, and long-running runners. Skills are procedures the agent learns from its own work and keeps current; each Skills page shows every version with its diff, and a skill can be shared with every agent.</p>
   </div>
   <div class="grid two">
     <figure class="shot">
@@ -198,24 +205,14 @@
       <figcaption><strong>Automations</strong></figcaption>
     </figure>
     <figure class="shot">
-      {{pic page-skills "The Skills settings: Learn from work every 10 turns, and four saved skills, link-check, release-notes (pinned), trip-planning and weekly-review, each with Share and Delete." "(min-width: 900px) 540px, 94vw"}}
+      {{pic page-skills "The Skills page for Atlas: four saved skills, link-check, release-notes (pinned), trip-planning and weekly-review, each with when it was last used." "(min-width: 900px) 540px, 94vw"}}
       <figcaption><strong>Skills</strong></figcaption>
     </figure>
   </div>
 </section>
 
-<section id="voice" class="feature">
+<section id="accounts" class="feature">
   <div class="feature-text">
-    <h2>Voice and dictation</h2>
-    <p>The mic in the composer starts a dictation. Press it again and the transcript is typed into the field, with the recording attached to the message. Pages, comments and other fields take dictation the same way. The waveform button beside it starts a hands-free voice session with the agent, and a small pill stays on screen until you end it. For meetings in a room, a meeting agent listens, answers when it is addressed by name, and keeps the notes.</p>
-  </div>
-  <figure class="shot inline-wide">
-    {{pic composer "The composer under Main: the worker chips above it, the field Ask for a follow-up, and at the bottom the model picker, the hands-free voice button, the dictation mic and the send button." "(min-width: 900px) 750px, 94vw"}}
-  </figure>
-</section>
-
-<section id="accounts" class="band">
-  <div class="text">
     <h2>Accounts</h2>
     <p>Accounts, in the sidebar footer, lists every sign-in your agents run on. BB Studio can pool several accounts of one provider and route work to the one with room.</p>
     <ul class="facts">
@@ -226,14 +223,16 @@
     </ul>
     <p>When an account signs out or a window passes 90%, a small card says so, with one button: Sign in, Use other account or Switch model. Tokens stay with the account pooler and never show in the app.</p>
   </div>
-  <figure class="shot side accounts">
+  <figure class="shot accounts">
     {{pic accounts "Accounts open from the sidebar footer: two Claude accounts and one Codex account, each with its status, its 5-hour and 7-day windows as bars with reset times, and the threads that used it." "(min-width: 900px) 460px, 94vw"}}
   </figure>
 </section>
 
-<section id="themes" class="stack">
-  <h2>Themes and presence</h2>
-  <p class="intro">Each space has its own theme. There are nine scene themes, each a live WebGL scene behind frosted glass, and eight Classic themes with solid palettes. Workers, finished runs and things that need you show up in the scene. Each space also has a presence: a live form in its theme's colors that breathes when idle, shimmers while thinking, gains a satellite for each running worker, and turns amber when it needs you.</p>
+<section id="themes" class="feature">
+  <div class="feature-text">
+    <h2>Themes and presence</h2>
+    <p>Each space has its own theme. There are nine scene themes, each a live WebGL scene behind frosted glass, and eight Classic themes with solid palettes. Workers, finished runs and things that need you show up in the scene. Each space also has a presence: a live form in its theme's colors that breathes when idle, shimmers while thinking, gains a satellite for each running worker, and turns amber when it needs you.</p>
+  </div>
   <div class="grid themes">
     {{theme theme-miami-1985 "Miami 1985" "A striped sun, palms, wireframe hills and a neon grid. Workers are chrome gliders."}}
     {{theme theme-event-horizon "Event Horizon" "A ray-traced black hole with a lensed disk. Workers are orbiting particles."}}
@@ -252,23 +251,28 @@
     {{clip clip-aurora-fjord "Aurora Fjord in motion: the aurora curtains move over the fjord."}}
   </div>
   <h3>Classic</h3>
-  <p>bb Default, One Dark, Dracula, Solarized Light, GitHub Light, GitHub Dark, Nord and Catppuccin Mocha.</p>
-  <div class="grid two">
+  <div class="grid themes">
+    {{theme theme-bb-default "bb Default" ""}}
+    {{theme theme-one-dark "One Dark" ""}}
+    {{theme theme-dracula "Dracula" ""}}
+    {{theme theme-solarized-light "Solarized Light" ""}}
     {{theme theme-github-light "GitHub Light" ""}}
+    {{theme theme-github-dark "GitHub Dark" ""}}
+    {{theme theme-nord "Nord" ""}}
     {{theme theme-catppuccin-mocha "Catppuccin Mocha" ""}}
   </div>
   <h3>Presence</h3>
-  <div class="band">
-    <div class="text">
-      <p>There are eight forms: orb, tesseract, torus knot, particle swarm, Möbius ribbon, polyhedron, Lorenz attractor and Klein bottle. An agent can also write a form of its own, which runs in a sandbox with no network. Edit space sets the name, presence, theme and default model in one view, with live previews.</p>
-    </div>
-    <figure class="shot side sheet">
+  <div class="feature-text">
+    <p>There are eight forms: orb, tesseract, torus knot, particle swarm, Möbius ribbon, polyhedron, Lorenz attractor and Klein bottle. An agent can also write a form of its own, which runs in a sandbox with no network. Edit space sets the name, presence, theme and default model in one view, with live previews.</p>
+  </div>
+  <div class="split">
+    <figure class="shot sheet">
       {{pic presence-sheet "A sheet of the eight presence forms in four states: idle, thinking, working and needs you, each at a large size and at 36 and 24 pixels. The needs-you column is amber." "(min-width: 900px) 460px, 94vw"}}
     </figure>
+    <figure class="shot">
+      {{pic edit-space "Edit space for Atlas: the name field, the presence preview with its state switch and the eight form tiles, the color and motion controls, and the scene theme cards." "(min-width: 900px) 610px, 94vw"}}
+    </figure>
   </div>
-  <figure class="shot wide">
-    {{pic edit-space "Edit space for Atlas: the name field, the presence preview with its state switch and the eight form tiles, the color and motion controls, and the scene theme cards." "(min-width: 1180px) 1100px, 94vw"}}
-  </figure>
   <p class="note">Every theme passes contrast and frame-time checks before it is saved. The scene pauses when the window is not in front, holds still under reduced motion, and renders smaller on battery.</p>
 </section>
 
@@ -294,7 +298,7 @@
   <div class="feature-text">
     <h2>The philosophy</h2>
     <p><a href="https://getbb.app/">bb</a> is an excellent agentic IDE: it runs agent threads from Claude Code, Codex, Pi and other providers on your own machines, and every surface, from the desktop app to the CLI and the API, can drive it.</p>
-    <p>BB Studio is a very opinionated fork of it. Where bb leaves the shape of the work open, BB Studio settles it: you work with a small number of agents that each keep their own conversations, memory and files, and the things you make together, from pages and designs to dashboards and recordings, live in the app beside the conversations that made them. The goal is a collaboration you can see into at any moment, not a list of threads to manage.</p>
+    <p>BB Studio is a very opinionated fork of it. Where bb leaves the shape of the work open, BB Studio settles it: you work with a small number of agents that each keep their own conversations, memory and files, and the things you make together, from pages and designs to apps and recordings, live in the app beside the conversations that made them. The goal is a collaboration you can see into at any moment, not a list of threads to manage.</p>
     <p>The fork itself stays thin. It keeps bb's core and its license, and replays its own changes onto bb's latest code as bb moves on.</p>
   </div>
 </section>
@@ -302,7 +306,7 @@
 <section id="download" class="feature download">
   <div class="feature-text">
     <h2>Download</h2>
-    <p>BB Studio is a desktop app for macOS. Releases will be published on <a href="https://github.com/patleeman/bb-studio/releases">GitHub</a>.</p>
+    <p>BB Studio is a desktop app for macOS. Releases are on <a href="https://github.com/patleeman/bb-studio/releases">GitHub</a>.</p>
     <p data-release-status><strong>Coming soon.</strong></p>
     <p data-release-link hidden><a class="button" href="https://github.com/patleeman/bb-studio/releases/latest">Download <span data-release-name>the latest release</span></a></p>
   </div>

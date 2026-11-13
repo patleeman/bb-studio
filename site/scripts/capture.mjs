@@ -41,6 +41,23 @@ function setTheme(botName, themeId) {
     appearance: { themeId, intensity: theme.defaults.intensity, glass: theme.defaults.glass, motion: theme.defaults.motion, effects: { workers: true, finished: true, needsYou: true, error: true } },
   });
 }
+// Each feature shot gets its own look: Classic (solid) themes where the
+// content should read clearly, scenes elsewhere. Miami 1985 appears once.
+const LOOKS = {
+  workbench: "event-horizon", "item-page": "github-light", "item-page-embeds": "solarized-light", "item-design": "nord",
+  "item-dashboard": "catppuccin-mocha", "item-mini": "dracula", "item-code": "one-dark", "item-whiteboard": "bb-default",
+  "item-recording": "kyoto-garden", "item-notes": "github-dark", "item-dictation": "aurora-fjord", "item-collection": "aurora-fjord", "item-artifact": "forest", cmdk: "data-city",
+  sidebar: "tonights-sky", approval: "grid", replies: "tonights-sky", "page-memory": "github-dark", "page-todos": "nord",
+  "page-automations": "solarized-light", "page-skills": "forest", composer: "deep-sea", accounts: "data-city", "edit-space": "miami-1985",
+};
+function look(name) {
+  const id = LOOKS[name] ?? "event-horizon";
+  // Tonight's Sky at night; Kyoto Garden by day.
+  if (id === "tonights-sky") bb("studio", "theme", "sky", "--date", "2026-11-12T21:30");
+  else bb("studio", "theme", "sky", "--clear");
+  if (id === "kyoto-garden") bb("studio", "theme", "preview", "--date", "2026-11-12T10:30");
+  setTheme("Atlas", id);
+}
 // Close every workbench tab on Atlas's Main (BB keeps them on the server).
 function resetTabs() {
   const id = ids["atlas-main"];
@@ -102,7 +119,7 @@ const want = (name) => only.length === 0 || only.some((o) => name.startsWith(o))
 
 // ---- Every scene theme, and two classic ones, on Atlas's Main ------------
 const SCENES = ["miami-1985", "event-horizon", "grid", "kyoto-garden", "forest", "aurora-fjord", "tonights-sky", "data-city", "deep-sea"];
-const CLASSIC = ["github-light", "catppuccin-mocha"];
+const CLASSIC = ["bb-default", "one-dark", "dracula", "solarized-light", "github-light", "github-dark", "nord", "catppuccin-mocha"];
 if ([...SCENES, ...CLASSIC].some((id) => want(`theme-${id}`))) {
   approval(false);
   for (const id of [...SCENES, ...CLASSIC]) {
@@ -121,8 +138,8 @@ if ([...SCENES, ...CLASSIC].some((id) => want(`theme-${id}`))) {
 }
 
 // ---- The approval card and the workers line, Miami 1985 -----------------
-setTheme("Atlas", "miami-1985");
 if (want("approval")) {
+  look("approval");
   approval(true);
   await go(main());
   await shot("approval", { x: 560, y: 40, width: 820, height: 178 });
@@ -131,12 +148,14 @@ if (want("approval")) {
 
 // ---- Conversations and workers: the sidebar, and a worker thread --------
 if (want("sidebar")) {
+  look("sidebar");
   await go(main());
   await page.getByText(/\d+ done/).first().click().catch(() => {});
   await wait(800);
   await shot("sidebar", { x: 40, y: 40, width: 290, height: 950 });
 }
 if (want("worker")) {
+  look("worker");
   await go(`/threads/${ids["w-links"]}`);
   await shot("worker");
 }
@@ -150,6 +169,7 @@ const PAGES = {
 };
 for (const [name, path] of Object.entries(PAGES)) {
   if (!want(name)) continue;
+  look(name);
   await go(path);
   await shot(name);
 }
@@ -165,12 +185,14 @@ if (features) {
     "item-mini": `/plugins/studio/studio/minis/${features.mini}`,
     "item-artifact": `/plugins/studio/studio/artifacts/${features.artifacts["release-timeline.svg"]}`,
     "item-recording": `/plugins/studio/studio/recordings/${features.recording}`,
+    "item-notes": `/plugins/studio/studio/pages/${features.notes}`,
+    "item-dictation": `/plugins/studio/studio/recordings/${features.dictation}`,
     "item-collection": `/plugins/studio/studio`,
-    "item-canvas": `/plugins/studio-visual-chat/canvas/${features.canvasThread}`,
     "item-code": `/plugins/studio/studio/workspaces/${features.workspace}`,
   };
   for (const [name, path] of Object.entries(ITEMS)) {
     if (!want(name)) continue;
+    look(name);
     await go(path, name === "item-code" ? 15000 : 9000);
     if (name === "item-design") {
       // Zoom out until the round's three screens fit.
@@ -186,6 +208,7 @@ if (features) {
   }
   // The page, scrolled to its whiteboard and the mini app embedded in it.
   if (want("item-page-embeds")) {
+  look("item-page-embeds");
     await go(`/plugins/studio/studio/pages/${features.page}`, 9000);
     await page.getByText("Rollout", { exact: true }).first().scrollIntoViewIfNeeded().catch(() => {});
     await page.getByText("Rollout", { exact: true }).first().evaluate((el) => el.scrollIntoView({ block: "start" })).catch(() => {});
@@ -197,13 +220,15 @@ if (features) {
 
 // ---- Skills, in the Bot's controls ----------------------------------------
 if (want("page-skills")) {
-  await go(`/plugins/studio/studio/bot/${bots.Atlas}/controls#skills`);
+  look("page-skills");
+  await go(`/plugins/studio/studio/skills/${bots.Atlas}`);
   await page.mouse.move(1590, 990);
   await shot("page-skills");
 }
 
 // ---- Accounts, opened from the sidebar footer ----------------------------
 if (want("accounts")) {
+  look("accounts");
   // A taller window, so the panel shows all three accounts.
   await page.setViewportSize({ width: 1600, height: 1700 });
   await go(main());
@@ -226,6 +251,7 @@ if (want("accounts")) {
 
 // ---- Cmd+K ---------------------------------------------------------------
 if (want("cmdk")) {
+  look("cmdk");
   approval(false);
   await go(main());
   await page.keyboard.press("Meta+k");
@@ -238,6 +264,7 @@ if (want("cmdk")) {
 
 // ---- Edit space, with the presence forms and the theme picker ------------
 if (want("edit-space")) {
+  look("edit-space");
   await go(main());
   // The ··· at the right of the Bot's header in the sidebar.
   await page.mouse.click(293, 77);
@@ -249,6 +276,7 @@ if (want("edit-space")) {
 
 // ---- The composer: dictation and hands-free voice -----------------------
 if (want("composer")) {
+  look("composer");
   approval(false);
   await go(main());
   await page.mouse.move(1590, 990);
@@ -258,6 +286,7 @@ if (want("composer")) {
 
 // ---- The workbench beside Main, split in two panes -----------------------
 if (want("workbench")) {
+  look("workbench");
   approval(false);
   resetTabs();
   await go(main());
@@ -281,6 +310,7 @@ if (want("workbench")) {
 
 // ---- Reply in thread: the hover icon, the replies row, the thread beside --
 if (want("replies")) {
+  look("replies");
   approval(false);
   resetTabs();
   await go(main());
@@ -319,7 +349,6 @@ if (CLIPS.some((id) => want(`clip-${id}`))) {
     execFileSync("cp", [await video.path(), join(outDir, `clip-${id}.webm`)]);
     console.log("clip", id);
   }
-  setTheme("Atlas", "miami-1985");
   approval(true);
 }
 

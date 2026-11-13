@@ -239,33 +239,16 @@ export const recording = {
   ].join("\n"),
 };
 
-// ---- The Visual Chat board ------------------------------------------------------------
-export const board = {
-  prompt: "Lisbon in March: what's the weather like, what will four days cost, and what should each day be?",
-  title: "Lisbon in March",
-  caption: "Mild and a little rainy. About €1,150 for two for four days without flights. Day plans are below.",
-  page: `<!doctype html><html><head><meta charset="utf-8"><style>
-:root{--ink:#f1eff8;--muted:#b9b4cc;--line:rgba(255,255,255,.12);--card:rgba(20,16,40,.72);--accent:#ff8a3d}
-body{margin:0;padding:36px;font:15px/1.5 Georgia,serif;color:var(--ink);background:transparent}
-h1{font-size:40px;margin:0 0 6px;font-weight:600}p.lede{color:var(--muted);margin:0 0 28px;font-size:17px}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
-.k{font:12px -apple-system,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}.v{font-size:30px;margin-top:4px}
-.two{display:grid;grid-template-columns:1.2fr 1fr;gap:16px}
-.bars div{display:grid;grid-template-columns:110px 1fr 60px;gap:10px;align-items:center;margin:8px 0;font:14px -apple-system,sans-serif}
-.bars i{display:block;height:12px;border-radius:6px;background:var(--accent)}
-ol{margin:0;padding-left:20px}li{margin:8px 0}li b{font-family:-apple-system,sans-serif}
-</style></head><body>
-<h1 data-cv-id="title">Lisbon in March</h1><p class="lede" data-cv-id="lede">Mild days, cool evenings, a few rainy afternoons. Four days for two, without flights.</p>
-<div class="grid" data-cv-id="stats"><div class="card"><div class="k">Highs</div><div class="v">18°C</div></div><div class="card"><div class="k">Lows</div><div class="v">10°C</div></div><div class="card"><div class="k">Rainy days</div><div class="v">8 of 31</div></div><div class="card"><div class="k">Four days</div><div class="v">€1,150</div></div></div>
-<div class="two"><div class="card" data-cv-id="costs"><div class="k">Where the money goes</div><div class="bars">
-<div><span>Hotel, 4 nights</span><i style="width:100%"></i><span>€560</span></div><div><span>Food</span><i style="width:57%"></i><span>€320</span></div>
-<div><span>Sintra day</span><i style="width:21%"></i><span>€120</span></div><div><span>Transit</span><i style="width:11%"></i><span>€60</span></div><div><span>Museums</span><i style="width:16%"></i><span>€90</span></div></div></div>
-<div class="card" data-cv-id="days"><div class="k">The four days</div><ol><li><b>Alfama.</b> The castle, the tram 28 loop, fado at night.</li><li><b>Belém.</b> The monastery, the tower, pastéis.</li><li><b>Sintra.</b> Pena Palace by train; back for dinner.</li><li><b>Baixa and LX Factory.</b> Shops, the river, an easy last day.</li></ol></div></div>
-</body></html>`,
+// ---- A dictation (it has its own page) -------------------------------------------
+export const dictation = {
+  title: "Reply to the contractor",
+  lines: [
+    "Thanks for walking the kitchen with us today. We'd like to go with quartz, and we'll pick between the two slabs by Friday.",
+    "Please keep the cabinet boxes and refinish the doors as you suggested. Could you send the electrical quote in writing? If the slab is picked by Friday, starting on the 2nd works for us.",
+  ],
 };
 
-// ---- The code folder Studio Code opens ---------------------------------------------------
+// ---- The code folder VS Code opens ---------------------------------------------------
 export const codeFolder = {
   "package.json": JSON.stringify({ name: "orbit-web", version: "2.4.0", private: true, scripts: { dev: "vite", test: "vitest" } }, null, 2) + "\n",
   "README.md": "# orbit-web\n\nNotes for teams, online and offline.\n",
