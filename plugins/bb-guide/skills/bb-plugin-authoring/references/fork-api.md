@@ -17,8 +17,6 @@ each member before using it. The types are in the SDK file
 - `useBbNavigate().experimental_closeFixedTab({ tab: { id }, params? })` →
   closes one of your fixed tabs everywhere; nothing else closes it. Returns
   false when you have no such fixed tab.
-- An action tab with `experimental_compactWhenFixed: true` is drawn as its
-  icon alone while fixed; its title is the tooltip.
 - `experimental_useAppTheme()` → `{ mode, epoch }`: resolved `"light"` or
   `"dark"`, and a counter that changes when theme CSS variables may have;
   key an effect on both to copy colors into a canvas or iframe.
@@ -55,11 +53,6 @@ Names: `ExperimentalComposerReplace`, `ExperimentalComposerReplaceProps`.
 - An action tab may give `experimental_instanceIcon(params)` → a bb icon
   name for one open instance (null keeps the registration's `icon`). Keep it
   pure and cheap; it runs while the tab strip renders.
-- `app.slots.experimental_sidebarNewItem({ id, title, icon, group?, run })` →
-  a row in a New menu that a plugin draws (bb's own sidebar header has only
-  New thread); rows sharing a `group` sit under one divider. `run` creates
-  the thing and shows it. The plugin that draws the menu reads every row
-  with `experimental_useSidebarNewItems()`.
 - A palette search result may add `icon` (a bb icon name or an emoji),
   `experimental_onModSelect()` (what Mod+Enter or a Mod-click does instead
   of opening `path`) and `experimental_modSelectLabel` to name it. Rows
@@ -121,15 +114,6 @@ Names: `ExperimentalCommandPaletteRegistration`,
   by registration and `params`, as `openTab` matches it. Call it when the
   thing the tab shows is renamed.
 
-## The project menu
-
-- `<experimental_ProjectActionsMenu projectId className? />` → bb's own
-  project menu (rename, add a local path, settings, delete) behind a "more"
-  button, for a plugin that draws project rows.
-- `<experimental_ProjectActionsContextMenu projectId>{row}</…>` → the same
-  menu on a right-click of its one child. Both render nothing extra for an
-  unknown project.
-
 ## File openers
 
 - A `fileOpener` registration may add `experimental_handleOpen({ path,
@@ -148,14 +132,7 @@ source, lineRange })`. bb calls it before it opens a tab for that opener;
   `alt`, and `click` is left out when bb opens a URL without a click. Return
   true when you opened it, false to pass. Synchronous.
 
-## A row above the main view
-
-- `app.slots.experimental_mainHeader({ id, component })` → a row bb draws
-  above the main view, across the view and its side panel (a tab strip).
-  The component sets its own height and returns null to take no room. Read
-  where the user is with `experimental_useAppRoute()`.
-
-Names: `ExperimentalMainHeaderRegistration`.
+## A row under each thread's header
 
 - `app.slots.experimental_threadBanner({ id, component })` → a row bb draws
   in every thread view, under the thread's header and above its transcript.
@@ -210,24 +187,6 @@ experimental_hideSidebarHeader: true })` → while this list is the
   (in the desktop app's title bar layout they already sit there). Draw your
   own create control in the list.
 
-## A tinted sidebar
-
-- `app.slots.experimental_threadList({ id, title, component,
-experimental_useSidebarStyle })` → while this list is the sidebar's, bb
-  runs `experimental_useSidebarStyle()` in your plugin's scope and paints
-  the returned `{ background?, accent? }` on its sidebar. `background` is any
-  CSS background (a color or a gradient) for the sidebar's body, the thread
-  list area and the footer under it; the rail keeps bb's. `accent` is a CSS
-  color that becomes `--fork-sidebar-accent` and bb's `--sidebar-accent` in
-  that body, so bb's selected and hovered rows use it; read
-  `var(--fork-sidebar-accent)` for your own selected row. bb changes no text
-  color: pick colors that keep text readable in light and dark
-  (`experimental_useAppTheme()` says which). Return null, or leave a field
-  out, for bb's own; a throw counts as null, and a value the browser cannot
-  parse is dropped.
-
-Names: `ExperimentalSidebarStyle`.
-
 ## A backdrop behind the app
 
 - `app.slots.experimental_appBackdrop({ id, component, useAppearance? })` →
@@ -250,8 +209,7 @@ Names: `ExperimentalSidebarStyle`.
     each `{ background?, backdropFilter?, edge? }`: a CSS background, a CSS
     backdrop-filter and the color of the surface's border lines. A surface
     left out is fully see-through. Surfaces nest: the header, side panel
-    and composer sit on `main`. A thread list's `experimental_useSidebarStyle`
-    still paints over the sidebar's. Inside the main view and side panel,
+    and composer sit on `main`. Inside the main view and side panel,
     `panel?` (default `--canvas` 32%) paints cards, sections, page roots
     and fields, and `code?` (default `--canvas` 58%, `blur(8px)`) code
     blocks, sticky headers and floating bars; bb's fill tokens there turn
@@ -276,38 +234,14 @@ Names: `ExperimentalSidebarStyle`.
 Names: `ExperimentalAppBackdropRegistration`, `ExperimentalAppAppearance`,
 `ExperimentalAppSurface`, `ExperimentalAppSurfaceStyle`.
 
-## Skills on bb's Skills page
+## The skill registry
 
-- `app.slots.experimental_skillSource({ id, label, useSkills })` → bb's
-  Skills page lists the source's skills under its own, under a `label`
-  heading, and its filter menu gets a Source group with one option per
-  source. `useSkills()` is a React hook bb runs in your plugin's scope while
-  the page is open; it returns `{ id, name, description?, path?, onOpen? }[]`
-  (keep the array stable while nothing changes). Opening a row calls
-  `onOpen()`, or opens `path` in the person's editor when there is no
-  `onOpen`. The page's search matches name, description and label. Choosing
-  sources lists only their skills, plus bb's own that match when bb's Type
-  or Provider filter is also set; bb's filters alone list no source. A throw
-  hides that source's rows.
-
-Names: `ExperimentalSkillSourceRegistration`, `ExperimentalSkillsRegistryCaller`, `ExperimentalSkillsRegistryDecision`, `ExperimentalSkillsRegistryOperation`, `ExperimentalSkillsRegistryPolicy`, `ExperimentalSourceSkill`.
-
-## Items in a side panel tab's menu
-
-- `app.slots.experimental_panelTabAction({ id, title, icon?, isAvailable?,
-run })` → an item in the right-click menu of plugin action tabs in the
-  side panel's tab strip (any plugin's tab, never bb's file, diff or
-  terminal tabs). `isAvailable(tab)` and `run(tab)` get `{ pluginId, tabId,
-params, title, threadId }`; `threadId` is null on a plugin page. Keep
-  `isAvailable` synchronous and cheap; it runs while the menu renders.
-
-bb's own "Open in new window" item is in the same menu for every tab
-`experimental_workbench(...).popOut` can pop out.
-
-Names: `ExperimentalPanelTabActionRegistration`,
-`ExperimentalPanelTabActionTab`.
+Names: `ExperimentalSkillsRegistryCaller`, `ExperimentalSkillsRegistryDecision`, `ExperimentalSkillsRegistryOperation`, `ExperimentalSkillsRegistryPolicy`.
 
 ## A conversation's workbench
+
+bb's own "Open in new window" item is in the side panel tab menu for every tab
+`experimental_workbench(...).popOut` can pop out.
 
 - `useBbNavigate().experimental_workbench(threadId?)` → the side panel of a
   thread view on screen in this window, for code outside that view (an agent
@@ -485,11 +419,11 @@ Names: `ExperimentalDragItem`, `ExperimentalItemDropTarget`,
   popover from the plugin's own control (a chip in the composer footer).
   `available` is false while the thread has no context ring.
 
-Windows, launcher items, popping out a route, approvals, the close command, bb's first run, quiet turns and the backend hooks are in fork-api-host.md.
+Windows, launcher items, popping out a route, approvals, bb's first run, quiet turns and the backend hooks are in fork-api-host.md.
 
 ## Names
 
-`ExperimentalAppAppearance`, `ExperimentalAppBackdropRegistration`, `ExperimentalAppCommand`, `ExperimentalAppPane`, `ExperimentalAppPanes`, `ExperimentalAppRoute`, `ExperimentalAppSurface`, `ExperimentalAppSurfaceStyle`, `ExperimentalAppTheme`, `ExperimentalApprovalDecision`, `ExperimentalApprovalRequest`, `ExperimentalBeforeThreadDeleteHandler`, `ExperimentalCommandPaletteProps`, `ExperimentalCommandPaletteRegistration`, `ExperimentalCompletedTurn`, `ExperimentalComposerReplace`, `ExperimentalComposerReplaceProps`, `ExperimentalDropMention`, `ExperimentalFirstRunProps`, `ExperimentalFirstRunRegistration`, `ExperimentalHideHostEntriesRegistration`, `ExperimentalHostPage`, `ExperimentalHostSetting`, `ExperimentalHostSettingsSection`, `ExperimentalModelPickerGateProps`, `ExperimentalModelPickerGateRegistration`, `ExperimentalThreadForkPoint`, `ExperimentalTurnContextProvider`, `ExperimentalContextCard`, `ExperimentalContextCardRow`, `ExperimentalContextCardRowRegistration`, `ExperimentalGlobalTab`, `ExperimentalPaletteSearchRegistration`, `ExperimentalPaletteSearchResult`, `ExperimentalLinkHandlerRegistration`, `ExperimentalLinkClick`, `ExperimentalMessageActionMessage`, `ExperimentalMessageActionRegistration`, `ExperimentalNewTabItem`, `ExperimentalNewTabItemsRegistration`, `PluginFileOpenerOpenArgs`, `ExperimentalProjectActionsContextMenuProps`, `ExperimentalProjectActionsMenuProps`, `ExperimentalReplyClassification`, `ExperimentalThreadFileChange`, `ExperimentalReplyClassifierRegistration`, `ExperimentalSidebarNewItemRegistration`, `ExperimentalSidebarNewItem`, `ExperimentalSidebarSectionProps`, `ExperimentalSidebarSectionRegistration`, `ExperimentalSidebarStyle`, `ExperimentalSkillSourceRegistration`, `ExperimentalSourceSkill`, `ExperimentalTurnClassification`, `ExperimentalWindowOptions`, `ExperimentalWindowRegistration`, `ExperimentalWindows`, `ExperimentalWorkbench`, `ExperimentalWorkbenchArrangement`, `ExperimentalWorkbenchLayout`, `ExperimentalWorkbenchOpenOptions`, `ExperimentalWorkbenchOpenSpec`, `ExperimentalWorkbenchPane`, `ExperimentalTurnInterruptedReason`, `FORK_PLUGIN_EVENT_NAMES`, `ExperimentalTurnClassifier`, `experimental_useAppCommands`, `experimental_useAppPanes`, `experimental_useAppRoute`, `experimental_useAppTheme`, `experimental_useGlobalTabs`, `ForkBbNavigate`, `ForkPluginEventPayloads`, `ForkPluginHooks`, `ForkThreadIdlePayload`, `ForkComposerCustomization`, `ForkFileOpenerFields`, `ForkPluginAppSlots`, `ForkPluginSdkApp`, `ForkTabFields`, `ForkThreadListFields`.
+`ExperimentalAppAppearance`, `ExperimentalAppBackdropRegistration`, `ExperimentalAppCommand`, `ExperimentalAppPane`, `ExperimentalAppPanes`, `ExperimentalAppRoute`, `ExperimentalAppSurface`, `ExperimentalAppSurfaceStyle`, `ExperimentalAppTheme`, `ExperimentalApprovalDecision`, `ExperimentalApprovalRequest`, `ExperimentalBeforeThreadDeleteHandler`, `ExperimentalCommandPaletteProps`, `ExperimentalCommandPaletteRegistration`, `ExperimentalCompletedTurn`, `ExperimentalComposerReplace`, `ExperimentalComposerReplaceProps`, `ExperimentalDropMention`, `ExperimentalFirstRunProps`, `ExperimentalFirstRunRegistration`, `ExperimentalHideHostEntriesRegistration`, `ExperimentalHostPage`, `ExperimentalHostSetting`, `ExperimentalHostSettingsSection`, `ExperimentalModelPickerGateProps`, `ExperimentalModelPickerGateRegistration`, `ExperimentalThreadForkPoint`, `ExperimentalTurnContextProvider`, `ExperimentalContextCard`, `ExperimentalContextCardRow`, `ExperimentalContextCardRowRegistration`, `ExperimentalGlobalTab`, `ExperimentalPaletteSearchRegistration`, `ExperimentalPaletteSearchResult`, `ExperimentalLinkHandlerRegistration`, `ExperimentalLinkClick`, `ExperimentalMessageActionMessage`, `ExperimentalMessageActionRegistration`, `ExperimentalNewTabItem`, `ExperimentalNewTabItemsRegistration`, `PluginFileOpenerOpenArgs`, `ExperimentalReplyClassification`, `ExperimentalThreadFileChange`, `ExperimentalReplyClassifierRegistration`, `ExperimentalSidebarSectionProps`, `ExperimentalSidebarSectionRegistration`, `ExperimentalTurnClassification`, `ExperimentalWindowOptions`, `ExperimentalWindowRegistration`, `ExperimentalWindows`, `ExperimentalWorkbench`, `ExperimentalWorkbenchArrangement`, `ExperimentalWorkbenchLayout`, `ExperimentalWorkbenchOpenOptions`, `ExperimentalWorkbenchOpenSpec`, `ExperimentalWorkbenchPane`, `ExperimentalTurnInterruptedReason`, `FORK_PLUGIN_EVENT_NAMES`, `ExperimentalTurnClassifier`, `experimental_useAppCommands`, `experimental_useAppPanes`, `experimental_useAppRoute`, `experimental_useAppTheme`, `experimental_useGlobalTabs`, `ForkBbNavigate`, `ForkPluginEventPayloads`, `ForkPluginHooks`, `ForkThreadIdlePayload`, `ForkComposerCustomization`, `ForkFileOpenerFields`, `ForkPluginAppSlots`, `ForkPluginSdkApp`, `ForkTabFields`, `ForkThreadListFields`.
 
 The contract's own interfaces take the fork's members from these helper
 interfaces; plugins never name them:
