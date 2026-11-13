@@ -225,17 +225,9 @@ private struct DesignPlayer: View {
 
     var body: some View {
         NavigationStack {
-            GeometryReader { proxy in
-                let size = screen.size
-                let scale = fill ? proxy.size.width / size.width : min(1, proxy.size.width / size.width, proxy.size.height / size.height)
-                DesignFrame(url: operation.client.designScreenURL(designId, screen, step: step), interactive: true)
-                    .id(step)
-                    .frame(width: size.width, height: fill ? proxy.size.height / scale : size.height)
-                    .scaleEffect(scale, anchor: .topLeading)
-                    .frame(width: size.width * scale, height: fill ? proxy.size.height : size.height * scale, alignment: .topLeading)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .background(Color(.secondarySystemBackground))
+            // Pinch to zoom and pan over the screen in Fit and Fill; taps still play the prototype.
+            Zoomable { player }
+                .background(Color(.secondarySystemBackground))
             .navigationTitle([screen.id, screen.title?.isEmpty == false ? screen.title : screen.caption].compactMap { $0 }.joined(separator: " · "))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -256,6 +248,19 @@ private struct DesignPlayer: View {
                     .accessibilityLabel(fill ? "Fit" : "Fill")
                 }
             }
+        }
+    }
+
+    private var player: some View {
+        GeometryReader { proxy in
+            let size = screen.size
+            let scale = fill ? proxy.size.width / size.width : min(1, proxy.size.width / size.width, proxy.size.height / size.height)
+            DesignFrame(url: operation.client.designScreenURL(designId, screen, step: step), interactive: true)
+                .id(step)
+                .frame(width: size.width, height: fill ? proxy.size.height / scale : size.height)
+                .scaleEffect(scale, anchor: .topLeading)
+                .frame(width: size.width * scale, height: fill ? proxy.size.height : size.height * scale, alignment: .topLeading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }

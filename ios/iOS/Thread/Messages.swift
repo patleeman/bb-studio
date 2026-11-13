@@ -322,16 +322,14 @@ final class AttachmentImages {
 struct ImageViewer: View {
     let url: URL
     @Environment(\.dismiss) private var dismiss
-    @State private var scale: CGFloat = 1
 
     var body: some View {
         NavigationStack {
             AsyncImage(url: url) { image in
-                image.resizable().scaledToFit()
-                    .scaleEffect(scale)
-                    .gesture(MagnifyGesture().onChanged { scale = max(1, $0.magnification) }.onEnded { _ in
-                        withAnimation { scale = 1 }
-                    })
+                // Pinch to zoom and stay zoomed, drag to pan, double-tap for 2.5×.
+                Zoomable(maximum: 8) {
+                    image.resizable().scaledToFit().frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             } placeholder: {
                 ProgressView()
             }

@@ -10,7 +10,10 @@ struct ArtifactWebPreview: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.allowsInlineMediaPlayback = true
+        // Pinch to zoom even when the page's viewport forbids it.
+        WebZoom.enable(configuration)
         let view = WKWebView(frame: .zero, configuration: configuration)
+        WebZoom.enable(view)
         view.allowsBackForwardNavigationGestures = true
         view.navigationDelegate = context.coordinator
         context.coordinator.load(url, in: view)
