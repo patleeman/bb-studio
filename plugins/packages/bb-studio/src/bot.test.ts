@@ -837,7 +837,7 @@ it("migrates pending writes and deletes as approved once, preserving prior and a
   expect(x.bots.skill("retired")).toBeNull();
   expect(x.bots.skillHistory().find((v) => v.name === "deploy")?.diff).toBe("- old\n+ new");
   expect(x.bots.skillHistory().filter((v) => v.name === "retired").map((v) => v.body)).toEqual([null, "keep in history"]);
-  expect(x.db.prepare("SELECT * FROM bot_skill_pending").all()).toEqual([]);
+  expect(x.db.prepare("SELECT name FROM sqlite_master WHERE name = 'bot_skill_pending'").get()).toBeUndefined();
   expect(x.db.prepare("SELECT approval FROM bot_learning").get()).toEqual({ approval: 0 });
   x.bb.storage.migrate(x.db, MIGRATIONS);
   expect(x.bots.skillHistory()).toHaveLength(5);

@@ -2872,7 +2872,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   you pick a shape; the emoji stays for older clients.
 - **Image avatars** are retired: the generator, the upload, the avatar route
   and the `bot_avatar_*` RPCs are gone. Old rows stay in `bots`
-  (`avatar_image_id`, `avatar_image_prev`) and `bot_avatar_images`, unread.
+  (`avatar_image_id`, `avatar_image_prev`), unread.
   Old `avatarImage` rows in **Profile changes** show as text ("an image" or
   "drawn") with no **Revert**.
 - **Self-managed profile**: a Bot can change its own name, description

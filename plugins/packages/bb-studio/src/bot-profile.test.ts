@@ -71,7 +71,6 @@ it("bot_profile_update edits the calling Bot from its own thread only, and its s
 
 it("still reads a Bot with an old image avatar and its old avatarImage change, which can't be reverted", async () => {
   const { harness, bots, db } = await withTools();
-  db.prepare("INSERT INTO bot_avatar_images (id, bot_id, mime, data, source, prompt, provider, created_at) VALUES ('bai_1', ?, 'image/png', x'89504e47', 'generated', 'an owl', 'openai/gpt-image-1', 1)").run(BOT_ID);
   db.prepare("UPDATE bots SET avatar_image_id = 'bai_1', avatar_image_prev = '' WHERE id = ?").run(BOT_ID);
   db.prepare("INSERT INTO bot_profile_changes (bot_id, actor_bot_id, thread_id, field, old_value, new_value, reverts, at) VALUES (?, ?, 'thr_main', 'avatarImage', '', 'bai_1', NULL, 1)").run(BOT_ID, BOT_ID);
   expect(bots.stored()).toMatchObject({ id: BOT_ID, name: "Dot" });
