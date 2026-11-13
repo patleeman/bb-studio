@@ -62,6 +62,18 @@ written), and only `PATH`, `USER`, `LOGNAME`, `SHELL`, `TMPDIR`, `LANG` and
 `LC_*` from the app's environment. `apps/desktop/test/fork-desktop-control.test.ts`
 asserts this env and that no update or skills command is ever run.
 
+## The switch
+
+Desktop control is off unless the app runs with `BB_STUDIO_DESKTOP_HUD=1`
+(exactly `1`), the same switch the Studio plugin reads. Only the HUD test
+app's launcher sets it; an app opened from Finder never has it. Off,
+`registerDesktopControl` registers one handler that answers
+`supported: false` and starts nothing: no controller, no helper or driver
+process, no permission probe, no overlay or HUD window, no Esc shortcut and no
+agent socket, so the server has no endpoint and `experimental_desktopControl`
+answers that it needs the desktop app. `apps/desktop/test/fork-desktop-hud-off.test.ts`
+checks it.
+
 ## Building
 
 `node scripts/fork/desktop-control.mjs` (macOS) downloads the pinned release
@@ -71,8 +83,8 @@ tag (`--no-cosign` only for a local test), builds the helper for arm64 and
 x86_64 with `swiftc`, and stages `cua-driver`, the helper, `NOTICE.md` and
 `driver.json` in `apps/desktop/release/desktop-control`. When that folder
 exists, `applyStudioBuilderConfig` adds it to the mac `extraResources` (outside
-the asar). Without it the app builds as before and desktop control reports
-`supported: false`. `release-desktop.mjs` removes `apps/desktop/release` before
+the asar). Without it the app builds as before. `release-desktop.mjs` fails a
+release whose app has `Contents/Resources/desktop-control`. `release-desktop.mjs` removes `apps/desktop/release` before
 electron-builder, so a release must stage after that step. For a dev run
 without packaging, `BB_STUDIO_DESKTOP_CONTROL_DIR` points at a staged folder.
 
