@@ -69,6 +69,14 @@ it("is the Library on the Bot-page template: its header, Kind pills, conversatio
   expect([...container.querySelectorAll("[data-testid=library-row] [data-testid=bot-page-row-title]")].map((each) => each.textContent)).toEqual(["Grid sketch"]);
 });
 
+it("files the Bot's core profile under the Bot", () => {
+  state.items = [{ ...item("pg_profile", "Chief of Staff's core profile", "page", 1), byBot: true }, item("pg_mine", "Groceries", "page", 3)];
+  act(() => root.render(<LibraryPage />));
+  const groups = [...container.querySelectorAll<HTMLElement>("[data-testid=library-group-section]")];
+  expect(groups.map((each) => each.getAttribute("aria-label"))).toEqual(["Chief of Staff", "Made by you"]);
+  expect(groups[0]!.querySelector("[data-testid=bot-page-row-meta]")?.textContent).toBe("Page · made by Chief of Staff · 1h");
+});
+
 it("shows the starred files under Starred", () => {
   state.items = [{ ...item("pg_star", "Starred plan", "page", 1), starred: true }, item("pg_mine", "Groceries", "page", 3), { ...item("mini_star", "Starred timer", "app", 4), starred: true }];
   act(() => root.render(<LibraryPage />));

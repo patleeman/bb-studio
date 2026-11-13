@@ -44,7 +44,8 @@ export function LibraryPage() {
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(timer); }, []);
   useEffect(() => { try { localStorage.setItem(GROUP_KEY, groupBy); } catch { /* private mode */ } }, [groupBy]);
   const items = library.data?.items ?? NO_ITEMS;
-  const groups = useMemo(() => libraryGroups(items, { query, kind, appType, groupBy }, now), [items, query, kind, appType, groupBy, now]);
+  const botName = bot?.name;
+  const groups = useMemo(() => libraryGroups(items, { query, kind, appType, groupBy, botName }, now), [items, query, kind, appType, groupBy, botName, now]);
   const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(() => new Set());
 
   return (
@@ -65,7 +66,7 @@ export function LibraryPage() {
               <BotPageRow key={key} testId="library-row" data={{ "data-count": String(count) }} icon={<ItemIcon kind={iconKind(item)} />}
                 title={count > 1 ? <>{item.title} <span data-testid="library-count" aria-label={`${count} like it`} className="text-xs tabular-nums text-muted-foreground">×{count}</span></> : item.title}
                 titleText={count > 1 ? `${item.title} (the newest of ${count} like it)` : item.title}
-                meta={[groupBy === "kind" ? null : kindLabel(item.kind), groupBy === "conversation" && item.madeIn && item.madeIn.kind !== "worker" ? null : provenance(item), shortAge(item.updatedAt, now)].filter(Boolean).join(" · ")}
+                meta={[groupBy === "kind" ? null : kindLabel(item.kind), groupBy === "conversation" && item.madeIn && item.madeIn.kind !== "worker" ? null : provenance(item, botName), shortAge(item.updatedAt, now)].filter(Boolean).join(" · ")}
                 disabled={!item.href} {...(item.href ? rowOpen(item.href, item.title) : {})} />
             ))}
             {more ? (

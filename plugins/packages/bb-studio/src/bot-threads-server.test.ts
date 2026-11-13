@@ -183,6 +183,18 @@ it("lists the Bot's files: what its conversations and workers made, and for the 
   expect(starred.map((each) => [each.id, each.starred])).toEqual([["art_diff", false], ["pg_plan", false], ["pg_mine", true]]);
 });
 
+it("files what a Bot made outside its threads (its core profile) under that Bot, and what its Main made without a thread link under Main", () => {
+  const records = new Map([
+    ["thr_main", { botId: "dot", kind: "conversation" as const, threadId: "thr_main", ownerConversationId: null }],
+    ["thr_home", { botId: "home", kind: "conversation" as const, threadId: "thr_home", ownerConversationId: null }],
+  ]);
+  const items = [indexed({ id: "pg_dot_profile", updatedAt: 9 }), indexed({ id: "pg_home_profile", updatedAt: 8 }), indexed({ id: "pg_by_main", updatedAt: 7 }), indexed({ id: "pg_mine", updatedAt: 6 })];
+  const botItems = new Map([["pages:pg_dot_profile", "dot"], ["pages:pg_home_profile", "home"]]);
+  const list = (botId: string) => libraryItems({ botId, primaryId: "dot", items, origins: new Map(), creators: new Map([["pages:pg_by_main", "thr_main"]]), botItems, record: (id) => (records.get(id) as never) ?? null, title: (id) => (id === "thr_main" ? "Main" : id) });
+  expect(list("dot").map((each) => [each.id, each.byBot, each.madeIn?.title ?? null])).toEqual([["pg_dot_profile", true, null], ["pg_by_main", false, "Main"], ["pg_mine", false, null]]);
+  expect(list("home").map((each) => [each.id, each.byBot])).toEqual([["pg_home_profile", true]]);
+});
+
 it("lists Talk recordings, not dictations, as the user's recordings that open at their own address", () => {
   const sources = recordingFiles([
     { id: "rec_1", kind: "recording", title: "Supplier call", createdAt: 2, updatedAt: 4, archived: false },

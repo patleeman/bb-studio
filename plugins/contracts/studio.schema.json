@@ -26465,6 +26465,9 @@
                 },
                 "starred": {
                   "type": "boolean"
+                },
+                "byBot": {
+                  "type": "boolean"
                 }
               },
               "required": [

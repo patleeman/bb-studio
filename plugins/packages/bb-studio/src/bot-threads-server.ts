@@ -49,6 +49,7 @@ export interface BotThreadsServerDeps {
   /** The agent thread each item's first activity names, by `<plugin>:<id>` (a worker that made it through Main). */
   creatorThreads?(): ReadonlyMap<string, string>;
   starred?(): ReadonlySet<string>;
+  botItems?(): ReadonlyMap<string, string>;
   /** Tells every window something changed (Studio's realtime channel), and the phone which Bots' threads did. */
   changed(changes: readonly BotChange[]): void;
   log(message: string): void;
@@ -102,11 +103,12 @@ export function recordingFiles(recordings: readonly Pick<Recording, "id" | "kind
  * Where a file came from: the thread that made it; but when that is a
  * conversation (Main, mostly) and the agent its first activity names is a
  * worker of the same Bot, the worker (UX review 3, item 7): it made it.
+ * With no thread recorded, the Bot's thread its first activity names.
  */
 export function fileOrigin(key: string, origins: ReadonlyMap<string, string>, creators: ReadonlyMap<string, string> | null, record: (threadId: string) => BotThreadRecord | null): string | null {
   const origin = origins.get(key) ?? null;
   const creator = creators?.get(key) ?? null;
-  if (!origin || !creator || creator === origin) return origin ?? (creator && record(creator)?.kind === "worker" ? creator : null);
+  if (!origin || !creator || creator === origin) return origin ?? (creator && record(creator) ? creator : null);
   const made = record(origin);
   const worker = record(creator);
   return made?.kind === "conversation" && worker?.kind === "worker" && worker.botId === made.botId ? creator : origin;
@@ -125,6 +127,7 @@ export function libraryItems(input: {
   /** The agent thread each item's first activity names; a worker there gets the credit over Main. */
   creators?: ReadonlyMap<string, string>;
   starred?: ReadonlySet<string>;
+  botItems?: ReadonlyMap<string, string>;
   record(threadId: string): BotThreadRecord | null;
   title(threadId: string): string;
 }): LibraryItem[] {
@@ -134,7 +137,8 @@ export function libraryItems(input: {
     const key = `${item.pluginId}:${item.id}`;
     const origin = fileOrigin(key, input.origins, input.creators ?? null, input.record);
     const rec = origin ? input.record(origin) : null;
-    const owner = rec?.botId ?? input.primaryId;
+    const maker = origin ? null : input.botItems?.get(key) ?? null;
+    const owner = rec?.botId ?? maker ?? input.primaryId;
     if (owner !== input.botId) continue;
     const conversationId = rec ? (rec.kind === "conversation" ? rec.threadId : rec.ownerConversationId) : null;
     const info = itemType(item.type);
@@ -143,6 +147,7 @@ export function libraryItems(input: {
       href: item.href ?? (info ? familyHref(info.family, item.id) : null), updatedAt: item.updatedAt, createdAt: item.createdAt || null,
       madeIn: origin ? { threadId: origin, title: input.title(origin), kind: rec?.kind ?? "conversation", conversationId, conversationTitle: conversationId ? input.title(conversationId) : null } : null,
       starred: input.starred?.has(key) ?? false,
+      byBot: !!maker,
     });
   }
   return result.sort((a, b) => b.updatedAt - a.updatedAt);
@@ -469,7 +474,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     const records = new Map(threadIds.flatMap((threadId) => { const rec = store.get(threadId); return rec ? [[threadId, rec] as const] : []; }));
     const owners = [...records.values()].flatMap((rec) => rec.ownerConversationId ? [rec.ownerConversationId] : []);
     const threads = await facts([...threadIds, ...owners]);
-    return { botId: id, items: libraryItems({ botId: id, primaryId: deps.bots()[0]?.id ?? null, items, origins, creators, starred: deps.starred?.() ?? new Set(), record: (threadId) => records.get(threadId) ?? store.get(threadId), title: titleFrom(threads) }) };
+    return { botId: id, items: libraryItems({ botId: id, primaryId: deps.bots()[0]?.id ?? null, items, origins, creators, starred: deps.starred?.() ?? new Set(), botItems: deps.botItems?.() ?? new Map(), record: (threadId) => records.get(threadId) ?? store.get(threadId), title: titleFrom(threads) }) };
   };
 
   const rpc = {

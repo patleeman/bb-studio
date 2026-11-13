@@ -87,19 +87,19 @@ export function foldRows(rows: readonly LibraryRow[], open: boolean): { shown: L
   return { shown: rows.slice(0, GROUP_FOLD), more: rows.length - GROUP_FOLD };
 }
 
-/** Where a file came from, in words: "made in Launch prep", "by Fable lead", "made by you". */
-export function provenance(item: Pick<LibraryItem, "madeIn">): string {
-  if (!item.madeIn) return "made by you";
+/** Where a file came from, in words: "made in Launch prep", "by Fable lead", "made by Dot", "made by you". */
+export function provenance(item: Pick<LibraryItem, "madeIn" | "byBot">, botName = "Bot"): string {
+  if (!item.madeIn) return item.byBot ? `made by ${botName}` : "made by you";
   return item.madeIn.kind === "worker" ? `by ${item.madeIn.title}` : `made in ${item.madeIn.title}`;
 }
 
 /** Whether a file passes the search (its title, or where it was made), the filter (Starred or a kind) and, for apps, the type. */
-export function libraryPasses(item: LibraryItem, query: string, kind: LibraryKindFilter, appType: LibraryAppType = "all"): boolean {
+export function libraryPasses(item: LibraryItem, query: string, kind: LibraryKindFilter, appType: LibraryAppType = "all", botName?: string): boolean {
   if (kind === "starred" ? !item.starred : kind !== "all" && listedKind(item.kind) !== kind) return false;
   if (kind === "app" && appType !== "all" && item.kind !== (appType === "saved" ? "artifact" : "app")) return false;
   const words = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   if (!words.length) return true;
-  const text = `${item.title} ${provenance(item)} ${item.madeIn?.conversationTitle ?? ""}`.toLocaleLowerCase();
+  const text = `${item.title} ${provenance(item, botName)} ${item.madeIn?.conversationTitle ?? ""}`.toLocaleLowerCase();
   return words.every((word) => text.includes(word));
 }
 
@@ -120,8 +120,8 @@ export function dateGroup(at: number, now: number): { key: string; title: string
 const KIND_ORDER: readonly LibraryKind[] = ["page", "whiteboard", "design", "app", "recording", "other"];
 
 /** The files that pass, in groups; each group newest first, the groups by their newest file (kinds and dates in their own order). */
-export function libraryGroups(items: readonly LibraryItem[], options: { query: string; kind: LibraryKindFilter; appType?: LibraryAppType; groupBy: LibraryGroupBy }, now: number): LibraryGroup[] {
-  const shown = items.filter((item) => libraryPasses(item, options.query, options.kind, options.appType)).sort((a, b) => b.updatedAt - a.updatedAt);
+export function libraryGroups(items: readonly LibraryItem[], options: { query: string; kind: LibraryKindFilter; appType?: LibraryAppType; groupBy: LibraryGroupBy; botName?: string }, now: number): LibraryGroup[] {
+  const shown = items.filter((item) => libraryPasses(item, options.query, options.kind, options.appType, options.botName)).sort((a, b) => b.updatedAt - a.updatedAt);
   const groups = new Map<string, LibraryGroup & { order: number }>();
   for (const item of shown) {
     let key: string;
@@ -135,8 +135,8 @@ export function libraryGroups(items: readonly LibraryItem[], options: { query: s
       key = group.key; title = group.title; order = group.order;
     } else {
       threadId = item.madeIn ? item.madeIn.conversationId ?? item.madeIn.threadId : null;
-      key = threadId ?? "you";
-      title = item.madeIn ? item.madeIn.conversationTitle ?? item.madeIn.title : "Made by you";
+      key = threadId ?? (item.byBot ? "bot" : "you");
+      title = item.madeIn ? item.madeIn.conversationTitle ?? item.madeIn.title : item.byBot ? options.botName ?? "Bot" : "Made by you";
     }
     const group = groups.get(key) ?? { key, title, threadId, items: [], rows: [], order };
     group.items.push(item);

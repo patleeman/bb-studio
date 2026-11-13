@@ -66,6 +66,15 @@ it("shows only starred files under Starred, whatever their kind", () => {
   expect(libraryPasses(files[0]!, "", "starred")).toBe(false);
 });
 
+it("files what the Bot made outside its conversations under the Bot, not under Made by you", () => {
+  const withProfile = [...files, item({ id: "profile", title: "Dot's core profile", byBot: true, updatedAt: NOW - 50 * DAY })];
+  expect(libraryGroups(withProfile, { query: "", kind: "all", groupBy: "conversation", botName: "Dot" }, NOW).map((group) => [group.title, group.items.map((each) => each.id)])).toEqual([
+    ["Fork redesign", ["kind"]], ["Launch prep", ["timer", "outline", "chess"]], ["Made by you", ["house"]], ["Dot", ["profile"]],
+  ]);
+  expect(provenance(withProfile[5]!, "Dot")).toBe("made by Dot");
+  expect(libraryPasses(withProfile[5]!, "made by dot", "all", "all", "Dot")).toBe(true);
+});
+
 it("says where a file came from", () => {
   expect(provenance(files[0]!)).toBe("made in Launch prep");
   expect(provenance(files[2]!)).toBe("by Fable: Breakdown pages");
