@@ -54,7 +54,7 @@ struct MessageBubble: View {
                 if !next.isEmpty {
                     NextCard(next: next, react: react)
                 }
-                if let replyInThread {
+                if let replyInThread, ConversationReplyRow.shows(thread, forks: openSideThread != nil) {
                     ConversationReplyRow(messageId: row.id, thread: thread, look: replier, open: replyInThread, openFork: openSideThread)
                 }
             }

@@ -173,6 +173,7 @@ final class BotShellModel: ObservableObject {
     @Published var compactColumn: NavigationSplitViewColumn = .sidebar
     @Published var detailPath: [Route] = []
     @Published var roomOpen: BotPage?
+    @Published var themeOverride: [String: String] = [:]
     private(set) var landed = false
 
     func openConversation(_ threadId: String) {

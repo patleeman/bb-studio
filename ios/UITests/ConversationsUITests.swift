@@ -35,14 +35,21 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["Send"].exists == false, "dictation is the action while it's empty")
         let existing = app.buttons["replies-m3"]
         for _ in 0..<6 where !existing.exists { app.collectionViews.firstMatch.swipeDown() }
-        XCTAssertTrue(app.otherElements["quietCheck"].exists || app.staticTexts["Quiet check"].exists, "[PASS] reads Quiet check")
+        XCTAssertFalse(app.otherElements["quietCheck"].exists || app.staticTexts["Quiet check"].exists, "the room's Main hides a bare [PASS]")
         XCTAssertTrue(existing.waitForExistence(timeout: 15), "a reply with a thread shows its replies row")
         XCTAssertTrue(existing.label.contains("2 replies"), existing.label)
         shot("conversation")
 
-        let reply = app.buttons["reply-in-thread-m5"]
-        for _ in 0..<6 where !reply.isHittable { app.collectionViews.firstMatch.swipeUp() }
-        XCTAssertTrue(reply.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'reply-in-thread-'")).firstMatch.exists,
+                       "no reply button under every message")
+        let message = app.collectionViews.firstMatch.staticTexts.matching(NSPredicate(format: "label CONTAINS 'draft the approval note' OR label CONTAINS 'like your OK before I push'")).firstMatch
+        for _ in 0..<6 where !message.isHittable { app.collectionViews.firstMatch.swipeUp() }
+        XCTAssertTrue(message.waitForExistence(timeout: 10))
+        let reply = app.buttons["Reply in thread"]
+        for _ in 0..<2 where !reply.exists {
+            message.press(forDuration: 1)
+            _ = reply.waitForExistence(timeout: 4)
+        }
         reply.tap()
         let field = app.textViews["Reply…"]
         XCTAssertTrue(field.waitForExistence(timeout: 15), "the thread opens as a sheet")

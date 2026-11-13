@@ -81,25 +81,6 @@ final class RoomTests: XCTestCase {
         return try! JSONDecoder().decode(TimelineRow.self, from: JSONSerialization.data(withJSONObject: json))
     }
 
-    func testTheFloorShowsTheLastSixTextMessages() {
-        var rows = (1...9).map { row("m\($0)", $0 % 2 == 0 ? "user" : "assistant", "Message \($0)") }
-        rows.insert(row("t1", "assistant", "", kind: "work"), at: 8)
-        rows.append(row("sys", "user", "Worker finished", initiator: "system"))
-        rows.append(row("card", "assistant", "::loop{id=\"loop_a\"}"))
-        let lines = RoomFloor.lines(rows)
-        XCTAssertEqual(lines.map(\.id), ["m4", "m5", "m6", "m7", "m8", "m9"])
-        XCTAssertEqual(lines.first?.who, .me)
-        XCTAssertEqual(lines.last?.who, .bot)
-    }
-
-    func testTheFloorSkipsTheMorningCardAndReadsMarkdownPlain() {
-        let morning = row("mc", "assistant", "## Friday, Nov 13\n**On today's list**\n::loop{id=\"loop_a\" row=\"1\"}")
-        let rich = row("r", "assistant", "**Yes**, a little.\n\n- Rain mixed with `snow`\n::next{reply=\"ok\"}")
-        let lines = RoomFloor.lines([rich, morning])
-        XCTAssertEqual(lines.map(\.id), ["r"])
-        XCTAssertEqual(lines.first?.text, "Yes, a little. Rain mixed with snow")
-    }
-
     func testTheDayLineTakesGoodToKnowFromTodaysMorningCard() {
         let now = Date(timeIntervalSince1970: 1_794_600_000)
         let card = "## Friday, Nov 13\n**On today's list**\n::loop{id=\"loop_a\" row=\"1\"}\n**Good to know**\n- Light snow near 6, roads wet.\n- Second note."
@@ -115,10 +96,14 @@ final class RoomTests: XCTestCase {
     }
 
     func testShortScreensShowFewerCardsAndASmallerPresence() {
-        XCTAssertEqual(RoomDayView.fit(height: 720).cards, 5)
-        XCTAssertEqual(RoomDayView.fit(height: 640).cards, 3)
-        XCTAssertEqual(RoomDayView.fit(height: 540).cards, 2)
-        XCTAssertLessThan(RoomDayView.fit(height: 540).presence, RoomDayView.fit(height: 720).presence)
+        let phone = RoomDayView.fit(CGSize(width: 402, height: 708))
+        let large = RoomDayView.fit(CGSize(width: 440, height: 800))
+        let outer = RoomDayView.fit(CGSize(width: 466, height: 540))
+        XCTAssertEqual(phone.cards, 5)
+        XCTAssertEqual(RoomDayView.fit(CGSize(width: 402, height: 640)).cards, 3)
+        XCTAssertEqual(outer.cards, 2)
+        XCTAssertLessThan(outer.presence, phone.presence, "smaller on the Duo's outer screen")
+        XCTAssertGreaterThan(large.presence, phone.presence, "bigger on a large phone")
     }
 
     func testAPlaceOpenedFromALinkOrACardClosesToTheRoom() {
@@ -134,7 +119,7 @@ final class RoomTests: XCTestCase {
         XCTAssertEqual(room.mode, .menu, "one opened from the menu closes to the menu")
     }
 
-    func testTheFloorHidesBareStatusTokens() {
+    func testTheRoomChatHidesBareStatusTokens() {
         let rows = [
             row("a", "assistant", "Checked the inbox. Nothing new."),
             row("p", "assistant", "[PASS]"),
@@ -142,13 +127,52 @@ final class RoomTests: XCTestCase {
             row("c", "assistant", "Done with the sweep.\n\n[DONE]"),
             row("d", "assistant", "[fail]\n"),
             row("e", "assistant", "Tests: [PASS] on all three"),
-            row("u", "user", "[OK]"),
+            row("w", "assistant", "", kind: "work"),
         ]
-        let lines = RoomFloor.lines(rows)
-        XCTAssertEqual(lines.map(\.id), ["a", "c", "e"])
-        XCTAssertEqual(lines.first { $0.id == "c" }?.text, "Done with the sweep.")
-        XCTAssertEqual(lines.first { $0.id == "e" }?.text, "Tests: [PASS] on all three", "a token inside a sentence stays")
+        let items = RoomFloor.clean(rows.map(TimelineItem.message))
+        XCTAssertEqual(items.map(\.id), ["a", "c", "e", "w"])
+        XCTAssertEqual(items.first { $0.id == "c" }?.rows.first?.text, "Done with the sweep.")
+        XCTAssertEqual(items.first { $0.id == "e" }?.rows.first?.text, "Tests: [PASS] on all three", "a token inside a sentence stays")
         XCTAssertTrue(RoomFloor.isStatusToken(" `[SKIPPED]` "))
         XCTAssertFalse(RoomFloor.isStatusToken("[PASS] and more"))
     }
+
+    func testAQuietThoughtIsHidden() {
+        func thought(_ id: String, detail: String?, ms: Double, status: String = "completed") -> TimelineRow {
+            var json: [String: Any] = ["id": id, "kind": "system", "systemKind": "operation", "operationKind": "reasoning",
+                                       "status": status, "startedAt": 1_000_000, "createdAt": 1_000_000 + ms, "title": "Thought"]
+            if let detail { json["detail"] = detail }
+            return try! JSONDecoder().decode(TimelineRow.self, from: JSONSerialization.data(withJSONObject: json))
+        }
+        XCTAssertTrue(thought("a", detail: nil, ms: 9_000).isQuietThought, "nothing in it")
+        XCTAssertTrue(thought("b", detail: "Hmm.", ms: 6).isQuietThought, "6 ms")
+        XCTAssertFalse(thought("c", detail: "Weighing the two options…", ms: 4_000).isQuietThought)
+        XCTAssertFalse(thought("d", detail: nil, ms: 0, status: "pending").isQuietThought, "still thinking")
+    }
+
+    func testChoosingAThemeSetsTheBotsAppearanceAndKeepsTheRest() async throws {
+        let client = BBClient(baseURL: URL(string: "https://theme.invalid")!)
+        let sent = LockedBox<[String: Any]>([:])
+        client.transport = { _, path, body in
+            guard path.hasSuffix("/rpc/bot_set_appearance") else { return (404, Data()) }
+            sent.set((try? JSONSerialization.jsonObject(with: body ?? Data()) as? [String: Any]) ?? [:])
+            return (200, Data(#"{"ok":true,"result":{"bot":{"id":"bot_main"}}}"#.utf8))
+        }
+        let current = Studio.BotSpacesOutputBotsItemAppearance(themeId: "forest", intensity: 0.6, glass: 0.4, motion: 1)
+        try await client.setBotTheme(botId: "bot_main", themeId: "aurora-fjord", keeping: current)
+        let input = sent.get()
+        XCTAssertEqual(input["botId"] as? String, "bot_main")
+        let appearance = try XCTUnwrap(input["appearance"] as? [String: Any])
+        XCTAssertEqual(appearance["themeId"] as? String, "aurora-fjord", "the Bot's appearance, which desktop and the room read")
+        XCTAssertEqual(appearance["intensity"] as? Double, 0.6, "its other settings stay")
+        XCTAssertEqual(appearance["glass"] as? Double, 0.4)
+    }
+}
+
+final class LockedBox<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Value
+    init(_ value: Value) { self.value = value }
+    func get() -> Value { lock.withLock { value } }
+    func set(_ next: Value) { lock.withLock { value = next } }
 }

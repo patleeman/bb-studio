@@ -67,20 +67,9 @@ struct ConversationReplyRow: View {
     let open: () -> Void
     /// Opens a fork made at this message; its "Forked here" line shows when set.
     var openFork: ((String) -> Void)? = nil
-    @ScaledMetric(relativeTo: .caption) private var iconSize: CGFloat = 13
 
     var body: some View {
         HStack(spacing: 2) {
-            Button(action: open) {
-                Image(systemName: "bubble.left.and.bubble.right")
-                    .font(.system(size: iconSize))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 32, height: 32)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(ConversationReplies.replyTitle)
-            .accessibilityIdentifier("reply-in-thread-\(messageId)")
             if let thread, ConversationReplies.indicator(thread) != nil {
                 Button(action: open) {
                     TimelineView(.periodic(from: .now, by: 60)) { context in
@@ -92,9 +81,12 @@ struct ConversationReplyRow: View {
                                 .monospacedDigit()
                         }
                     }
-                    .padding(.horizontal, 6)
-                    .frame(minHeight: 32)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 28)
+                    .background(Color.accentColor.opacity(0.12), in: .capsule)
+                    .frame(minHeight: 44)
                     .contentShape(Rectangle())
+                    .padding(.vertical, -8)
                 }
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .ignore)
@@ -115,7 +107,11 @@ struct ConversationReplyRow: View {
                 .accessibilityIdentifier("forked-\(messageId)")
             }
         }
-        .padding(.leading, -8)
+    }
+
+    static func shows(_ thread: BotSideThread?, forks: Bool) -> Bool {
+        guard let thread else { return false }
+        return ConversationReplies.indicator(thread) != nil || (forks && ConversationReplies.forkIndicator(thread) != nil)
     }
 
     @ViewBuilder private func replier(_ thread: BotSideThread) -> some View {

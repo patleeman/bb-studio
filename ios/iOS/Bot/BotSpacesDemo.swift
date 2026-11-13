@@ -42,10 +42,11 @@ enum BotSpacesDemo {
         }
     }
 
-    static func themed(_ json: String) -> String {
+    static func themed(_ json: String, chosen: String? = nil) -> String {
         let arguments = ProcessInfo.processInfo.arguments
-        guard let at = arguments.firstIndex(of: "-qaRoomTheme"), arguments.indices.contains(at + 1), arguments[at + 1] != "none" else { return json }
-        return json.replacingOccurrences(of: #""id":"bot_juniper","#, with: #""id":"bot_juniper","appearance":{"themeId":"\#(arguments[at + 1])"},"#)
+        let given = arguments.firstIndex(of: "-qaRoomTheme").flatMap { arguments.indices.contains($0 + 1) && arguments[$0 + 1] != "none" ? arguments[$0 + 1] : nil }
+        guard let theme = chosen ?? given else { return json }
+        return json.replacingOccurrences(of: #""id":"bot_juniper","#, with: #""id":"bot_juniper","appearance":{"themeId":"\#(theme)"},"#)
     }
 
     final class PageQA: @unchecked Sendable {
@@ -209,8 +210,11 @@ enum BotSpacesDemo {
                   {"id":"bot_research","name":"Research","avatar":"🔭","shape":"hexagon","color":"#5b6ee1","primary":false,"mainThreadId":"thr_research_main","needsYou":false,"activity":{"turn":false,"workers":0}}
                 ],"currentBotId":"bot_juniper"}
                 """#
-            return Data(BotSpacesDemo.themed(json).utf8)
+            return Data(BotSpacesDemo.themed(json, chosen: lock.withLock { chosenTheme }).utf8)
         }
+
+        private var chosenTheme: String?
+        private(set) var appearanceCalls: [[String: Any]] = []
 
         func viewJSON(_ botId: String) -> Data {
             lock.withLock {
@@ -265,6 +269,13 @@ enum BotSpacesDemo {
             switch name {
             case "bot_spaces":
                 return envelope(raw: spacesJSON())
+            case "bot_set_appearance":
+                let appearance = input["appearance"] as? [String: Any] ?? [:]
+                lock.withLock {
+                    chosenTheme = appearance["themeId"] as? String
+                    appearanceCalls.append(input)
+                }
+                return ok(["bot": ["id": input["botId"] ?? "bot_juniper", "name": "Juniper"]])
             case "bot_threads_view":
                 return envelope(raw: viewJSON(input["botId"] as? String ?? "bot_juniper"))
             case "bot_side_threads":

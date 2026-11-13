@@ -24,7 +24,7 @@ struct BotSpacesRoot: View {
             if compact, let bot = shownBot, let main = shownMain {
                 RoomView(store: store, shell: shell, bot: bot, mainThreadId: main)
                     .id(main)
-                    .lookRoot(bot: bot, theme: RoomTheme.resolve(botThemeId: bot.appearance?.themeId, phoneThemeId: looks.themeId, catalog: looks.catalog))
+                    .lookRoot(bot: bot, theme: RoomTheme.resolve(botThemeId: shell.themeOverride[bot.id] ?? bot.appearance?.themeId, phoneThemeId: looks.themeId, catalog: looks.catalog))
             } else {
                 split.lookRoot(bot: shownBot)
             }

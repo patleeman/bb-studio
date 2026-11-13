@@ -15,3 +15,12 @@ extension TimelineRow {
     /// The assistant's `[PASS]`: it had nothing to say.
     public var isPassReply: Bool { isConversation && !isUser && !hasAttachments && SilentOutput.isPass(text) }
 }
+
+extension TimelineRow {
+    public var isQuietThought: Bool {
+        guard systemKind == "operation", operationKind == "reasoning", status != "pending" else { return false }
+        if (detail ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        if let startedAt, let createdAt, createdAt - startedAt < 1000 { return true }
+        return false
+    }
+}
