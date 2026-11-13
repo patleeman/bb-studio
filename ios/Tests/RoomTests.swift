@@ -166,6 +166,40 @@ final class RoomTests: XCTestCase {
         XCTAssertEqual(same, [false, false, true, true, false])
     }
 
+    func testTheDuoUnfoldedHasTwoPagesAndOnlyThere() {
+        XCTAssertEqual(DuoPages(window: CGSize(width: 951, height: 669), phone: true), .sideBySide)
+        XCTAssertEqual(DuoPages(window: CGSize(width: 669, height: 951), phone: true), .stacked)
+        XCTAssertNil(DuoPages(window: CGSize(width: 466, height: 678), phone: true), "folded")
+        XCTAssertNil(DuoPages(window: CGSize(width: 678, height: 466), phone: true), "folded, landscape")
+        XCTAssertNil(DuoPages(window: CGSize(width: 468, height: 669), phone: true), "beside another app")
+        XCTAssertNil(DuoPages(window: CGSize(width: 956, height: 440), phone: true), "a large iPhone in landscape")
+        XCTAssertNil(DuoPages(window: CGSize(width: 1180, height: 820), phone: false), "an iPad keeps the split view")
+    }
+
+    @MainActor func testTheWorkbenchOpensEachThingOnceAndClosingPicksTheNeighbour() {
+        let defaults = UserDefaults(suiteName: "room-workbench-tests")!
+        defaults.removePersistentDomain(forName: "room-workbench-tests")
+        let bench = Workbench(defaults: defaults, keys: [])
+        XCTAssertTrue(bench.tabs.isEmpty)
+        bench.open(.place(.library))
+        bench.open(.thread("thr_a"))
+        bench.open(.place(.library))
+        XCTAssertEqual(bench.tabs.count, 2, "opened again, Library is selected, not added")
+        XCTAssertEqual(bench.current?.item, .place(.library))
+        bench.open(routes: [.thread(id: "thr_a"), .page(id: "pg_1")])
+        XCTAssertEqual(bench.current?.item, .thread("thr_a"))
+        XCTAssertEqual(bench.current?.path, [.page(id: "pg_1")], "the rest of the path is pushed inside the tab")
+        bench.open(routes: [.design(id: "dsn_1")])
+        XCTAssertEqual(bench.tabs.count, 3)
+        bench.close(bench.tabs[1].id)
+        XCTAssertEqual(bench.current?.item, .route(.design(id: "dsn_1")), "closing the selected tab selects the next")
+        XCTAssertEqual(defaults.stringArray(forKey: Workbench.key), ["place:library"], "tabs that can come back are kept")
+        let again = Workbench(defaults: defaults)
+        XCTAssertEqual(again.tabs.map(\.item), [.place(.library)])
+        XCTAssertEqual(WorkbenchItem(key: "thread:thr_b"), .thread("thr_b"))
+        XCTAssertNil(WorkbenchItem(key: "place:nowhere"))
+    }
+
     func testAQuietThoughtIsHidden() {
         func thought(_ id: String, detail: String?, ms: Double, status: String = "completed") -> TimelineRow {
             var json: [String: Any] = ["id": id, "kind": "system", "systemKind": "operation", "operationKind": "reasoning",

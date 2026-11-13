@@ -69,19 +69,25 @@ struct RoomView: View {
     @State private var morning: LoopMorning?
     @State private var dragLast: CGFloat = 0
     @State private var floorTop: CGFloat = 0
+    @State private var inheritedTrailing: CGFloat = 0
     @Environment(\.look) private var look
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.scenePhase) private var phase
+    @Environment(\.duoPage) private var duoPage
 
-    init(store: BotSpacesStore, shell: BotShellModel, bot: BotSpace, mainThreadId: String) {
+    var workbench: Workbench?
+
+    init(store: BotSpacesStore, shell: BotShellModel, bot: BotSpace, mainThreadId: String, workbench: Workbench? = nil) {
         self.store = store
         self.shell = shell
         self.bot = bot
         self.mainThreadId = mainThreadId
+        self.workbench = workbench
         _pager = StateObject(wrappedValue: RoomSessions(main: mainThreadId))
     }
 
     private var session: RoomSession { pager.current }
+    private var columnHeader: Bool { FoldedChrome.columnHeader || duoPage }
     private var order: [String] { RoomPager.order(main: mainThreadId, conversations: view?.conversations ?? []) }
     private var shownConversation: BotConversation? {
         pager.shown == mainThreadId ? nil : view?.conversations.first { $0.threadId == pager.shown }
@@ -93,11 +99,17 @@ struct RoomView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            NavigationStack(path: $shell.detailPath) {
+            NavigationStack(path: workbench == nil ? $shell.detailPath : .constant([])) {
                 stage(proxy)
-                    .toolbar(room.standing && !FoldedChrome.columnHeader ? .automatic : .hidden, for: .navigationBar)
+                    .safeAreaPadding(.trailing, duoPage ? max(0, FoldedChrome.column - inheritedTrailing) : 0)
+                    .background {
+                        GeometryReader { box in
+                            Color.clear.onChange(of: box.safeAreaInsets.trailing, initial: true) { _, inset in inheritedTrailing = inset }
+                        }
+                    }
+                    .toolbar(room.standing && !columnHeader ? .automatic : .hidden, for: .navigationBar)
                     .toolbar {
-                        if room.standing && !FoldedChrome.columnHeader {
+                        if room.standing && !columnHeader {
                             ToolbarItem(placement: .topBarLeading) {
                                 Button { layDown() } label: { Image(systemName: "chevron.down") }
                                     .accessibilityLabel("Back to the room")
@@ -122,6 +134,22 @@ struct RoomView: View {
             RoomTalkWatcher(talk: session.talk) { state in
                 withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .snappy) { room.sync(talk: state) }
             } failed: { app.flash($0) }
+        }
+        .onChange(of: shell.detailPath, initial: true) { _, _ in moveToWorkbench() }
+        .onChange(of: workbench != nil) { _, _ in moveToWorkbench() }
+        .onChange(of: room.place) { _, place in
+            guard let workbench, let place else { return }
+            workbench.open(.place(place))
+            room.show(.rest)
+        }
+        .onChange(of: duoPage) { _, _ in
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
+        .onChange(of: shell.roomStandUp) { _, stand in
+            guard stand else { return }
+            shell.roomStandUp = false
+            room.show(.rest)
+            room.handle(.tapFloor)
         }
         .onChange(of: shell.roomOpen, initial: true) { _, page in
             guard let page else { return }
@@ -245,7 +273,7 @@ struct RoomView: View {
                             switchBot: switchBot, nudge: nudge, canSwitch: (store.spaces?.bots.count ?? 1) > 1)
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: -40)).combined(with: .scale(scale: 0.97, anchor: .top)))
             }
-            if room.showsDay && FoldedChrome.columnHeader {
+            if room.showsDay && columnHeader {
                 FoldedColumn {
                     Button(action: openMenu) { Label("Everything else", systemImage: "line.3.horizontal") }
                         .accessibilityIdentifier("roomMenuButton")
@@ -255,7 +283,7 @@ struct RoomView: View {
             if room.showsMenu {
                 RoomMenu(bot: bot, store: store, view: view, todayCount: todayCount, close: closeMenu,
                          openPlace: { room.handle(.open($0)) }, openWorker: { openItem(.worker($0)) },
-                         theme: { room.handle(.open(.theme)) }, settings: { app.tab = .settings },
+                         theme: { room.handle(.open(.theme)) }, settings: openSettings,
                          switchBot: { shell.show($0, store: store, compact: false) })
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97)))
             }
@@ -361,7 +389,22 @@ struct RoomView: View {
     }
 
     private var placeBinding: Binding<RoomPlace?> {
-        Binding(get: { room.place }, set: { value in if value == nil { room.handle(.closePlace) } })
+        Binding(get: { workbench == nil ? room.place : nil }, set: { value in if value == nil { room.handle(.closePlace) } })
+    }
+
+    private func moveToWorkbench() {
+        guard let workbench, !shell.detailPath.isEmpty else { return }
+        workbench.open(routes: shell.detailPath)
+        shell.detailPath = []
+    }
+
+    private func openSettings() {
+        guard let workbench else {
+            app.tab = .settings
+            return
+        }
+        workbench.open(.settings)
+        closeMenu()
     }
 
     private func stand() {
@@ -409,6 +452,10 @@ struct RoomView: View {
     }
 
     private func chooseTheme(_ themeId: String) {
+        Self.chooseTheme(themeId, bot: bot, shell: shell, store: store, app: app)
+    }
+
+    static func chooseTheme(_ themeId: String, bot: BotSpace, shell: BotShellModel, store: BotSpacesStore, app: AppModel) {
         let previous = shell.themeOverride[bot.id]
         shell.themeOverride[bot.id] = themeId
         Task {
@@ -446,7 +493,7 @@ struct RoomView: View {
     }
 
     private func context(_ threadId: String, kind: BotConversationContext.Kind) -> BotConversationContext {
-        BotShell.context(threadId: threadId, kind: kind, bot: bot, view: view, splitsThreads: false,
+        BotShell.context(threadId: threadId, kind: kind, bot: bot, view: view, splitsThreads: workbench != nil,
                          push: { [shell] route in shell.detailPath.append(route) },
                          openConversation: { id in openItem(.conversation(id)) },
                          showList: { [shell] in
@@ -500,6 +547,7 @@ struct RoomDayView: View {
     let bot: BotSpace
     let view: BotThreadsView?
     @ObservedObject var model: ThreadModel
+    @Environment(\.duoPage) private var duoPage
     let morning: LoopMorning?
     var conversation: BotConversation? = nil
     var openMenu: () -> Void
@@ -543,7 +591,7 @@ struct RoomDayView: View {
                     .foregroundStyle(.white.opacity(0.72))
                     .lookHalo(look)
                 Spacer()
-                if !FoldedChrome.columnHeader {
+                if !(FoldedChrome.columnHeader || duoPage) {
                     Button(action: openMenu) {
                         Image(systemName: "line.3.horizontal").font(.body.weight(.semibold)).frame(width: 44, height: 44)
                     }

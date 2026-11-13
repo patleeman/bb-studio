@@ -54,6 +54,7 @@ struct ThreadView: View {
     @State private var resizeAnchor = TranscriptResizeAnchor()
     @State private var resizeRestore: Task<Void, Never>?
     @Environment(\.duoLayout) private var duoLayout
+    @Environment(\.duoPage) private var duoPage
     @State private var pickingSendTime = false
     @State private var showingFiles = false
     @State private var showingHistory = false
@@ -2034,7 +2035,7 @@ extension ThreadView {
     }
 
     /// The folded Duo's header: its buttons in the right column and a one-line title (`FoldedChrome`).
-    fileprivate var compactHeader: Bool { FoldedChrome.columnHeader && !duoLayout.twoPages }
+    fileprivate var compactHeader: Bool { (FoldedChrome.columnHeader || duoPage) && !duoLayout.twoPages }
 
     @ViewBuilder fileprivate var compactActions: some View {
         // The Bot's chat has its buttons from the Bot tab (`BotTab`). A

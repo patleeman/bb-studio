@@ -6,8 +6,14 @@ struct BotSpacesRoot: View {
     @StateObject private var shell = BotShellModel()
     @ObservedObject private var looks = LookStore.shared
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.duoLayout) private var layout
+    @State private var workbench = Workbench()
 
     private var compact: Bool { sizeClass != .regular && !Self.qaSplit }
+    private var pages: DuoPages? {
+        Self.qaSplit ? nil : DuoPages(window: layout.windowSize, phone: UIDevice.current.userInterfaceIdiom == .phone)
+    }
+    private var inRoom: Bool { compact || pages != nil }
 
     static var qaSplit: Bool {
         #if DEBUG
@@ -21,21 +27,27 @@ struct BotSpacesRoot: View {
 
     var body: some View {
         Group {
-            if compact, let bot = shownBot, let main = shownMain {
-                RoomView(store: store, shell: shell, bot: bot, mainThreadId: main)
-                    .id(main)
-                    .transition(.opacity)
-                    .lookRoot(bot: bot, theme: RoomTheme.resolve(botThemeId: shell.themeOverride[bot.id] ?? bot.appearance?.themeId, phoneThemeId: looks.themeId, catalog: looks.catalog))
+            if inRoom, let bot = shownBot, let main = shownMain {
+                RoomPages(pages: pages, layout: layout) {
+                    RoomView(store: store, shell: shell, bot: bot, mainThreadId: main, workbench: pages == nil ? nil : workbench)
+                        .id(main)
+                } bench: {
+                    RoomWorkbench(workbench: workbench, bot: bot, store: store, mainThreadId: main,
+                                  openMain: { [shell] in shell.roomStandUp = true },
+                                  chooseTheme: { RoomView.chooseTheme($0, bot: bot, shell: shell, store: store, app: app) })
+                }
+                .transition(.opacity)
+                .lookRoot(bot: bot, theme: RoomTheme.resolve(botThemeId: shell.themeOverride[bot.id] ?? bot.appearance?.themeId, phoneThemeId: looks.themeId, catalog: looks.catalog))
             } else {
                 split.lookRoot(bot: shownBot)
             }
         }
         .task(id: store.spaces) { await LookExport.run(store: store, client: app.client) }
         .onChange(of: shell.selection) { _, item in
-            if compact { routeRoom(item) } else { shell.detailPath = shell.takePendingPush() }
+            if inRoom { routeRoom(item) } else { shell.detailPath = shell.takePendingPush() }
         }
-        .onChange(of: compact) { _, compact in
-            if !compact, shell.selection == nil, let main = shownMain { shell.openConversation(main) }
+        .onChange(of: inRoom) { _, inRoom in
+            if !inRoom, shell.selection == nil, let main = shownMain { shell.openConversation(main) }
         }
         .onAppear { shell.land(store); consumeLinks() }
         .onChange(of: store.spaces) { _, _ in shell.land(store); consumeLinks() }

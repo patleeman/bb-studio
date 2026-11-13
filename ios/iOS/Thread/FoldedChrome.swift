@@ -11,8 +11,11 @@ enum FoldedChrome {
     /// The folded Duo: an iPhone on its 466 × 678 outer screen.
     @MainActor static var foldedDuo: Bool {
         guard UIDevice.current.userInterfaceIdiom == .phone,
-              let screen = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first?.screen.bounds.size
+              var screen = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first?.screen.bounds.size
         else { return false }
+        #if DEBUG
+        if let size = DuoDemo.screenSize { screen = size }
+        #endif
         return abs(screen.width - 466) < 1 && abs(screen.height - 678) < 1
     }
 
@@ -26,6 +29,7 @@ enum FoldedChrome {
     static let spacing: CGFloat = 13
     static let top: CGFloat = 170
     static let centreFromEdge: CGFloat = 48
+    static let column: CGFloat = 84
 }
 
 /// The name and status in one line, for the folded Duo's top band.
@@ -132,5 +136,16 @@ struct FoldedBackButton: View {
     var body: some View {
         Button { dismiss() } label: { Label("Back", systemImage: "chevron.backward") }
             .accessibilityIdentifier("folded-back")
+    }
+}
+
+private struct DuoPageKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var duoPage: Bool {
+        get { self[DuoPageKey.self] }
+        set { self[DuoPageKey.self] = newValue }
     }
 }
