@@ -39,9 +39,12 @@ export function TodoDetail({ loop, people, places, owner, refresh }: { loop: Loo
   const thread = ownerThread(loop.owner, people.botThreadId, owner);
   const sourceThread = loop.source?.kind === "thread" ? loop.source.ref : null;
   const by = loop.closedBy === "patrick" ? "You" : loop.closedBy === "cos" ? people.botName : loop.closedBy;
+  const due = loop.due !== null ? fullWhen(loop.due) : null;
+  const whenIsDue = !!trigger && trigger.text === due;
+  const withPush = (text: string) => <span className="inline-flex items-center gap-1.5">{text}{loop.push ? <Icon name="Smartphone" aria-label="Sends to iPhone" className="size-3.5 text-muted-foreground" /> : null}</span>;
   const facts: BotPageFact[] = [
-    ...(loop.due !== null ? [{ label: "Due", value: fullWhen(loop.due) }] : []),
-    ...(trigger ? [{ label: "When", value: <span className="inline-flex items-center gap-1.5">{trigger.text}{loop.push ? <Icon name="Smartphone" aria-label="Sends to iPhone" className="size-3.5 text-muted-foreground" /> : null}</span> }] : []),
+    ...(due !== null ? [{ label: "Due", value: whenIsDue ? withPush(due) : due }] : []),
+    ...(trigger && !whenIsDue ? [{ label: "When", value: withPush(trigger.text) }] : []),
     ...(loop.area ? [{ label: "Area", value: loop.area }] : []),
     { label: "Owner", value: ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owner) },
     ...(source ? [{ label: "Source", value: url ? <a href={url} target="_blank" rel="noreferrer" className="text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground">{source}</a>

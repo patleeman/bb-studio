@@ -163,6 +163,15 @@ it("a row opens the todo through the link router, and the todo tab shows its des
   expect(state.openLink).toHaveBeenLastCalledWith("bb://todo/loop_w", { source: "botPage", title: "Signed lease addendum", modifiers: { meta: false, ctrl: false, shift: true } });
 });
 
+it("the todo tab shows one Due row when the todo comes back at its due time", async () => {
+  (state.groups as typeof empty).comingUp.push(loop("loop_m", "Call Millers Flour", { status: "queued", push: true, due: NOW + DAY - 6 * 3_600_000, trigger: { type: "time", at: NOW + DAY - 6 * 3_600_000 } }));
+  await render();
+  await openRow("Call Millers Flour");
+  const facts = [...detail()!.querySelectorAll("dt")].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
+  expect(facts).toEqual([["Due", "Tomorrow 9:00 AM"], ["Owner", "You"]]);
+  expect(detail()!.querySelector("dd [data-icon=Smartphone]")).not.toBeNull();
+});
+
 it("a deleted todo's tab says Not found, with its link", async () => {
   await openTab("loop_gone");
   expect(detail()).toBeNull();
