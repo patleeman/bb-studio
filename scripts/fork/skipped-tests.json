@@ -703,6 +703,34 @@
     {
       "file": "apps/server/test/public/public-thread-data.test.ts",
       "title": "creates and deletes thread queued messages"
+    },
+    {
+      "file": "apps/app/src/components/pickers/ModelReasoningPicker.test.tsx",
+      "title": "commits a provider tab immediately and keeps its models selectable"
+    },
+    {
+      "file": "apps/app/src/views/ToolsView.plugin-detail.test.tsx",
+      "title": "keeps catalog provenance and release management in the unified detail taxonomy"
+    },
+    {
+      "file": "apps/server/test/threads/generated-thread-titles.test.ts",
+      "title": "falls through to the next Automatic service for provider-path titles"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/useThreadUnreadDividerState.test.ts",
+      "title": "does not auto-scroll to a divider from a reply that lands after the thread settled"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/thread-opening.model.test.tsx",
+      "title": "keeps a read thread at the end when a live reply adds NEW above the view"
+    },
+    {
+      "file": "apps/app/src/components/pickers/ModelReasoningPicker.test.tsx",
+      "title": "keeps search focused and clears it when switching providers"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/useThreadUnreadDividerState.test.ts",
+      "title": "keeps the opening divider when the thread is marked read, and drops it after a watched reply"
     }
   ],
   "removeLines": [
