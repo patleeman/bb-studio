@@ -134,6 +134,11 @@ it("links back to the user's latest message, and starts without a model or an en
   expect((spawned[0]!.input as { text: string }[])[1]!.text.startsWith("Continued from @thread:thr_main\n\n")).toBe(true);
 });
 
+it("without a Bot default model, starts on the provider and model the source conversation uses, not the project's default", async () => {
+  await continueInNew(deps({ defaultModel: () => null, thread: async () => ({ projectId: "proj_1", environmentId: null, providerId: "claude-code", model: "opus" }) }), "thr_main", { title: "T", handoff: "H" });
+  expect(spawned[0]).toMatchObject({ providerId: "claude-code", model: "opus", executionInputSources: { providerId: "explicit", model: "explicit" } });
+});
+
 it("registers the tool, which answers with the post line and reports failures as text", async () => {
   const tools = new Map<string, { execute: (input: unknown, ctx: { threadId?: string }) => Promise<string> }>();
   registerContinueNew({ agents: { registerTool: (tool: { name: string; execute: never }) => { tools.set(tool.name, tool); } } } as never, deps());

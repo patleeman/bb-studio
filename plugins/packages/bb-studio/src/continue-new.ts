@@ -51,7 +51,7 @@ export function sourceSeqOf(rows: readonly TimelineRow[]): number | null {
 
 export interface ContinueDeps {
   conversation(threadId: string): { botId: string; kind: "conversation" | "worker"; isMain?: boolean; title?: string | null } | null;
-  thread(threadId: string): Promise<{ projectId?: string | null; environmentId?: string | null } | null>;
+  thread(threadId: string): Promise<{ projectId?: string | null; environmentId?: string | null; providerId?: string | null; model?: string | null } | null>;
   timeline(threadId: string): Promise<readonly TimelineRow[]>;
   defaultModel(botId: string): { providerId: string; model: string; reasoning?: string | null } | null;
   spawn(request: Record<string, unknown>): Promise<{ id: string; projectId?: string | null }>;
@@ -86,6 +86,9 @@ export async function continueInNew(deps: ContinueDeps, sourceThreadId: string, 
   const model = preset ? {
     providerId: preset.providerId, model: preset.model, ...(preset.reasoning ? { reasoningLevel: preset.reasoning } : {}),
     executionInputSources: { providerId: "explicit", model: "explicit", ...(preset.reasoning ? { reasoningLevel: "explicit" } : {}) },
+  } : thread.providerId ? {
+    providerId: thread.providerId, ...(thread.model ? { model: thread.model } : {}),
+    executionInputSources: { providerId: "explicit", ...(thread.model ? { model: "explicit" } : {}) },
   } : {};
   const text = handoffText({ sourceThreadId, sourceSeq, handoff: input.handoff, moved: movable, openingMessage: input.openingMessage });
   deps.focus(source.botId);

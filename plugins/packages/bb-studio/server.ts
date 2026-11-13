@@ -1032,7 +1032,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
   registerContinueNew(bb, {
     conversation: (threadId) => { const rec = botThreads.store.get(threadId); return rec ? { botId: rec.botId, kind: rec.kind, isMain: rec.isMain, title: rec.title } : null; },
-    thread: async (threadId) => await bb.sdk.threads.get({ threadId }).catch(() => null) as { projectId?: string | null; environmentId?: string | null } | null,
+    thread: async (threadId) => await bb.sdk.threads.get({ threadId }).catch(() => null) as { projectId?: string | null; environmentId?: string | null; providerId?: string | null; model?: string | null } | null,
     timeline: async (threadId) => ((await bb.sdk.threads.timeline({ threadId, segmentLimit: 40 } as never)) as unknown as { rows?: { kind?: string; role?: string; messageSeq?: number; initiator?: string }[] }).rows ?? [],
     defaultModel: (botId) => bots.defaultModel(botId),
     spawn: async (request) => await bb.sdk.threads.spawn(request as never) as { id: string; projectId?: string | null },
