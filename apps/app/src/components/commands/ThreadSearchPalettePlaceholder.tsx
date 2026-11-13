@@ -8,13 +8,13 @@ import { PALETTE_INPUT_CLASS, PaletteInputBand } from "./PaletteInputBand";
 
 export const THREAD_SEARCH_INPUT = {
   label: "Search threads",
-  placeholder: "Search title, project, or message…",
+  placeholder: "Search threads, pages and items…",
 };
 
 export function threadSearchModeChip(onExit: () => void, isCompact: boolean) {
   return {
     icon: "Search" as const,
-    label: "Threads",
+    label: "Search",
     clearLabel: "Return to commands",
     onClear: onExit,
     hideShortcut: isCompact,
