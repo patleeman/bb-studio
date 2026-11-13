@@ -1,3 +1,4 @@
+import { SHOW_HOST_SETUP_GUIDE_ROW } from "./settings-rows.fork";
 import { ApplicationLinkApprovalsSettings } from "@/components/settings/ApplicationLinkApprovalsSettings";
 import { useOpenNewThread } from "@/hooks/useOpenNewThread";
 import { MobileAppSection } from "@/components/settings/MobileAppSection";
@@ -1030,6 +1031,7 @@ export function GeneralSettingsSection({
             />
           </SettingsWithControl>
 
+          {SHOW_HOST_SETUP_GUIDE_ROW ? (
           <SettingsWithControl
             label="Setup guide"
             description="Walk through connecting an agent, adding projects, plugins, and devices again."
@@ -1044,6 +1046,7 @@ export function GeneralSettingsSection({
               Show setup guide
             </Button>
           </SettingsWithControl>
+          ) : null}
         </div>
       </SettingsSection>
       <SettingsSection title="Links">
