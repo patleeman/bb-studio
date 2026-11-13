@@ -1,3 +1,4 @@
+import { parentRowIcon, parentRowLabel } from "@/components/promptbox/banner/parentRelationship.fork";
 import { useNavigate } from "react-router-dom";
 import {
   experimental_THREAD_INFO_ROW_GROUPS,
@@ -26,8 +27,8 @@ function ParentRow({ threadId }: ExperimentalThreadContextCardProps) {
   if (parent === null) return null;
   return (
     <ThreadContextCardRow
-      icon={parent.relationship === "fork" ? "Fork" : "UserRound"}
-      label={`${parent.relationship === "fork" ? "Forked from" : "Parent"}: ${parent.parentThreadTitle}`}
+      icon={parentRowIcon(parent.relationship)}
+      label={`${parentRowLabel(parent.relationship)}: ${parent.parentThreadTitle}`}
       title={parent.parentThreadTitle}
       onClick={() => void navigate(parent.href)}
     />

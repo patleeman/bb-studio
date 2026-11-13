@@ -1,3 +1,4 @@
+import { childCompletedPreviewStart } from "./childCompletedPreview.fork";
 import {
   memo,
   useCallback,
@@ -593,8 +594,9 @@ export const GeneratedConversationMessage = memo(
       attachmentItems.filePaths.length > 0 ||
       attachmentItems.imageItems.length > 0 ||
       bodyRequestLabel !== null;
+    const previewStart = childCompletedPreviewStart(systemMessageKind, messageText);
     const collapsedPreviewSource =
-      generatedConversationCollapsedPreview(messageText);
+      generatedConversationCollapsedPreview(messageText.slice(previewStart));
     const collapsedPreviewTextRef = useRef<HTMLElement | null>(null);
     const setCollapsedPreviewTextRef = useCallback(
       (element: HTMLElement | null) => {
@@ -617,7 +619,7 @@ export const GeneratedConversationMessage = memo(
     const hideManualContinuation = collapsedPreviewOverflows;
     const collapsedPreviewBody = clipMentionTextToVisibleRange({
       mentions: messageMentions,
-      rangeStart: 0,
+      rangeStart: previewStart,
       text: collapsedPreviewSource.text,
     });
     const collapsedPreviewMarkdown =
