@@ -41,7 +41,8 @@ afterEach(() => { act(() => root.unmount()); container.remove(); vi.useRealTimer
 it("is the Library on the Bot-page template: its header, Kind pills, conversation groups and one line per file", () => {
   act(() => root.render(<LibraryPage />));
   expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Library·Chief of Staff");
-  expect([...container.querySelectorAll("[data-testid=bot-page-pill]")].map((each) => each.textContent)).toEqual(["All", "Page", "Whiteboard", "Design", "App", "Artifact"]);
+  expect([...container.querySelectorAll("[data-testid=bot-page-pill]")].map((each) => each.textContent)).toEqual(["All", "Page", "Whiteboard", "Design", "App"]);
+  expect(container.querySelector("[data-testid=bot-page-subpills]")).toBeNull();
   const groups = [...container.querySelectorAll<HTMLElement>("[data-testid=library-group-section]")];
   expect(groups.map((each) => each.getAttribute("aria-label"))).toEqual(["Launch prep", "Made by you"]);
   const rows = [...groups[0]!.querySelectorAll<HTMLElement>("[data-testid=library-row]")];
@@ -65,4 +66,21 @@ it("is the Library on the Bot-page template: its header, Kind pills, conversatio
   expect(state.openLink).toHaveBeenCalledTimes(3);
   act(() => [...container.querySelectorAll<HTMLButtonElement>("[data-testid=bot-page-pill]")].find((each) => each.textContent === "Whiteboard")!.click());
   expect([...container.querySelectorAll("[data-testid=library-row] [data-testid=bot-page-row-title]")].map((each) => each.textContent)).toEqual(["Grid sketch"]);
+});
+
+it("narrows App to Interactive or Saved with a second row of pills", () => {
+  state.items = [item("art_report", "Q3 report", "artifact", 1), item("mini_timer", "Round timer", "app", 2), item("pg_mine", "Groceries", "page", 3)];
+  act(() => root.render(<LibraryPage />));
+  const pill = (testId: string, label: string) => [...container.querySelectorAll<HTMLButtonElement>(`[data-testid=${testId}]`)].find((each) => each.textContent === label)!;
+  const titles = () => [...container.querySelectorAll("[data-testid=library-row] [data-testid=bot-page-row-title]")].map((each) => each.textContent);
+  act(() => pill("bot-page-pill", "App").click());
+  expect([...container.querySelectorAll("[data-testid=bot-page-subpill]")].map((each) => each.textContent)).toEqual(["All apps", "Interactive", "Saved"]);
+  expect(titles()).toEqual(["Q3 report", "Round timer"]);
+  act(() => pill("bot-page-subpill", "Saved").click());
+  expect(titles()).toEqual(["Q3 report"]);
+  act(() => pill("bot-page-subpill", "Interactive").click());
+  expect(titles()).toEqual(["Round timer"]);
+  act(() => pill("bot-page-pill", "All").click());
+  expect(container.querySelector("[data-testid=bot-page-subpills]")).toBeNull();
+  expect(titles()).toEqual(["Q3 report", "Round timer", "Groceries"]);
 });

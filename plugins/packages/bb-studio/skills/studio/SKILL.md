@@ -14,7 +14,7 @@ the core: one collection that lists every item from every installed add-on.
 | Pages (built into Studio) | `pages` | Pages | the `pages` skill, `pages_*` tools and `bb studio pages` |
 | Studio Talk | `talk` | Recordings, dictations | the `talk` skill and `bb talk` |
 | Whiteboards (built into Studio, live in pages) | `excalidraw` | Whiteboards (kind `drawing`) | the `whiteboards` skill, `whiteboard_*` tools and `bb studio whiteboards` |
-| Studio Artifacts | `artifacts` | Artifacts: saved images, HTML, reports, files | the `artifacts` skill and `artifacts_*` tools |
+| Apps (built into Studio) | `artifacts`, `minis` | Saved apps (artifacts: images, HTML, reports, files) and interactive apps (mini apps) | the `artifacts` and `minis` skills and `apps_*` tools |
 
 Items belong to a BB project or are global. Every item has a link
 (`/plugins/<plugin id>/<panel>/<item id>`); put it in replies as
@@ -41,7 +41,8 @@ Not found tab.
   `family:app` every app (mini apps, artifacts); `type:design`
   lists one type.
 - Apps have their own tools: `apps_list`, `apps_read` (any app by id) and
-  `apps_create`. Pages, designs and whiteboards share `pages_list`,
+  `apps_create`; `artifacts_list|read|save` and `minis_list|read|create` are
+  aliases of them. Pages, designs and whiteboards share `pages_list`,
   `pages_read` and `pages_create`. The older per-type tools still work.
   Fields are `kind:`, `project:` (a name, or `global`), `tag:` (a name, or
   `none`) and `is:archived` / `is:template`; `-` excludes, a repeated
@@ -378,21 +379,33 @@ threads with `pages_comment` on the text you are discussing.
 When you create or change a page, put its card on its own line in your
 reply, `::page{id="pg_…"}`, so the user can open it beside the chat.
 
-### Mini apps
+### Apps
 
-Mini apps are small interactive apps built into Studio. Write React (JSX)
-with Studio Kit components and Tailwind classes; records, state and approved
-network come from `window.playground` (Kit hooks wrap them). The `minis`
-skill has the full reference.
+An app is a saved output or an interactive tool with its own data. Studio
+shows both as one kind, Apps; each keeps its own id prefix and tools.
+
+- A saved app (an artifact, `art_…`) is a finished file the user keeps: an
+  image, an HTML page, a report, a data file. Save one with `apps_create`
+  (type `"artifact"`); the `artifacts` skill has the details.
+- An interactive app (a mini app, `mini_…`) is React (JSX) with Studio Kit
+  components and Tailwind classes; records, state and approved network come
+  from `window.playground` (Kit hooks wrap them). The `minis` skill has the
+  full reference.
 
 When the user wants something to interact with (a tracker, board,
 calculator, form, poll, small tool or a visualization to play with), or data
-they'll come back to, make a Studio mini app with `minis_create` and show it
-with `::mini{id="mini_…"}` on its own line in your reply, rather than a
-playground or a one-off HTML file. Embed one in a page with an embed block
-`{"kind":"mini","target":"mini_…"}`. Change it with minis_update (it
-compiles before saving), its data with `minis_data`, and drive an open copy
-with `minis_live`.
+they'll come back to, make an interactive app with `apps_create` (type
+`"mini"`), rather than a playground or a one-off HTML file. Find apps with
+`apps_list` and read any one with `apps_read`. Change an interactive app with
+`minis_update` (it compiles before saving), its data with `minis_data`, and
+drive an open copy with `minis_live`.
+
+Show an app with the card line the tool's result gives, on its own line in
+your reply: `::mini{id="mini_…"}` for an interactive app and
+`::artifact{id="art_…"}` for a saved one. When your instructions say
+`::app{id="…"}` (Studio's App cards setting is on), write that for both.
+Embed one in a page with an embed block `{"kind":"mini","target":"mini_…"}`
+or `{"kind":"artifact","target":"art_…"}`.
 
 ### The Next row
 

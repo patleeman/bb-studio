@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { LibraryItem } from "../../bot-threads-contract";
-import { dateGroup, foldRows, GROUP_FOLD, libraryGroups, libraryPasses, libraryRows, provenance, titleStem } from "./library-model";
+import { dateGroup, foldRows, GROUP_FOLD, LIBRARY_APP_TYPES, LIBRARY_KINDS, libraryGroups, libraryPasses, libraryRows, provenance, titleStem } from "./library-model";
 
 const DAY = 24 * 60 * 60_000;
 const NOW = new Date(2026, 10, 11, 15, 0).getTime();
@@ -39,6 +39,17 @@ it("filters by kind and searches titles and where a file came from", () => {
   expect(libraryPasses(files[2]!, "launch", "all")).toBe(true);
   expect(libraryPasses(files[2]!, "launch", "design")).toBe(false);
   expect(libraryGroups(files, { query: "nothing like it", kind: "all", groupBy: "kind" }, NOW)).toEqual([]);
+});
+
+it("lists saved apps (artifacts) under App, with Interactive and Saved narrowing it", () => {
+  const withSaved = [...files, item({ id: "report", title: "Q3 report", kind: "artifact", type: "artifact", madeIn: inConversation("prep", "Launch prep"), updatedAt: NOW - 30 * 60_000 })];
+  const ids = (appType: "all" | "interactive" | "saved") => libraryGroups(withSaved, { query: "", kind: "app", appType, groupBy: "date" }, NOW).flatMap((group) => group.items.map((each) => each.id));
+  expect(ids("all")).toEqual(["report", "timer"]);
+  expect(ids("interactive")).toEqual(["timer"]);
+  expect(ids("saved")).toEqual(["report"]);
+  expect(libraryGroups(withSaved, { query: "", kind: "all", groupBy: "kind" }, NOW).map((group) => [group.title, group.items.length])).toEqual([["Pages", 3], ["Designs", 1], ["Apps", 2]]);
+  expect(LIBRARY_KINDS.map((each) => each.label)).toEqual(["All", "Page", "Whiteboard", "Design", "App"]);
+  expect(LIBRARY_APP_TYPES.map((each) => each.label)).toEqual(["All apps", "Interactive", "Saved"]);
 });
 
 it("says where a file came from", () => {

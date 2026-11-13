@@ -2422,6 +2422,117 @@
         "additionalProperties": false
       }
     },
+    "loops.scheduled": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "todo",
+                    "automation"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "botId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "botName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "todo",
+                    "checkin",
+                    "reminder",
+                    "watcher",
+                    "runner",
+                    "schedule",
+                    "bb"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "nextAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "paused"
+                  ]
+                },
+                "scheduleText": {
+                  "type": "string"
+                },
+                "threadId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "link": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "source",
+                "id",
+                "botId",
+                "botName",
+                "kind",
+                "title",
+                "nextAt",
+                "state",
+                "scheduleText",
+                "threadId",
+                "link"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
     "code.get": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

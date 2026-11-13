@@ -13,6 +13,7 @@ public enum Studio {
     public static let loops_setPlaces = "loops.setPlaces"
     public static let loops_places = "loops.places"
     public static let loops_morning = "loops.morning"
+    public static let loops_scheduled = "loops.scheduled"
     public static let code_get = "code.get"
     public static let code_update = "code.update"
     public static let code_open = "code.open"
@@ -388,6 +389,8 @@ public enum Studio {
   public typealias LoopsPlaces = LoopsPlacesOutput
 
   public typealias LoopsMorning = LoopsMorningOutput
+
+  public typealias LoopsScheduled = LoopsScheduledOutput
 
   public typealias CodeGet = CodeGetOutput
 
@@ -4098,6 +4101,139 @@ public enum Studio {
       self.items = items
       self.more = more
       self.lowPriority = lowPriority
+    }
+  }
+
+  public struct LoopsScheduledInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public enum LoopsScheduledOutputItemsItemSource: Sendable, Hashable, Codable {
+    case todo
+    case automation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "todo": self = .todo
+      case "automation": self = .automation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .todo: try container.encode("todo")
+      case .automation: try container.encode("automation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsScheduledOutputItemsItemKind: Sendable, Hashable, Codable {
+    case todo
+    case checkin
+    case reminder
+    case watcher
+    case runner
+    case schedule
+    case bb
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "todo": self = .todo
+      case "checkin": self = .checkin
+      case "reminder": self = .reminder
+      case "watcher": self = .watcher
+      case "runner": self = .runner
+      case "schedule": self = .schedule
+      case "bb": self = .bb
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .todo: try container.encode("todo")
+      case .checkin: try container.encode("checkin")
+      case .reminder: try container.encode("reminder")
+      case .watcher: try container.encode("watcher")
+      case .runner: try container.encode("runner")
+      case .schedule: try container.encode("schedule")
+      case .bb: try container.encode("bb")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum LoopsScheduledOutputItemsItemState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LoopsScheduledOutputItemsItem: Sendable, Hashable, Codable {
+    public var key: String?
+    public var source: LoopsScheduledOutputItemsItemSource?
+    public var id: String?
+    public var botId: String?
+    public var botName: String?
+    public var kind: LoopsScheduledOutputItemsItemKind?
+    public var title: String?
+    public var nextAt: Double?
+    public var state: LoopsScheduledOutputItemsItemState?
+    public var scheduleText: String?
+    public var threadId: String?
+    public var link: String?
+
+    public init(key: String? = nil, source: LoopsScheduledOutputItemsItemSource? = nil, id: String? = nil, botId: String? = nil, botName: String? = nil, kind: LoopsScheduledOutputItemsItemKind? = nil, title: String? = nil, nextAt: Double? = nil, state: LoopsScheduledOutputItemsItemState? = nil, scheduleText: String? = nil, threadId: String? = nil, link: String? = nil) {
+      self.key = key
+      self.source = source
+      self.id = id
+      self.botId = botId
+      self.botName = botName
+      self.kind = kind
+      self.title = title
+      self.nextAt = nextAt
+      self.state = state
+      self.scheduleText = scheduleText
+      self.threadId = threadId
+      self.link = link
+    }
+  }
+
+  public struct LoopsScheduledOutput: Sendable, Hashable, Codable {
+    public var items: [LoopsScheduledOutputItemsItem]?
+
+    public init(items: [LoopsScheduledOutputItemsItem]? = nil) {
+      self.items = items
     }
   }
 

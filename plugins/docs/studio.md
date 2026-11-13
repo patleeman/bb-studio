@@ -35,13 +35,17 @@ Tag schemas live in the kit's `studioTagSchemas`. A kind's `mentionProviderId` i
 ## Replacing a built-in kind
 
 Studio's built-in kinds are `page`, `drawing`, `recording` (with dictation),
-`artifact` and `design`. A provider kind may add `replaces: "<built-in kind
+`artifact`, `design` and `mini`. A provider kind may add `replaces: "<built-in kind
 id>"` to its `studio_describe` entry (optional; the kit's `StudioKind` and
 schema have it). The hub discovers it over RPC like any provider.
 
 Setup → Kinds (`src/kinds.ts`, RPCs `kinds.state` and `kinds.update` in
 `src/kinds-contract.ts`) stores, in Studio's KV (`kinds:settings`), which
 built-in kinds are off and an "Open and create with" choice per kind.
+Setup shows `artifact` and `mini` as one Apps row (`KIND_ROWS`, row id
+`app`): it is on when either kind is, and `kinds.update` with `kind: "app"`
+sets both. `kinds.update` still takes `artifact` or `mini` alone, and the
+stored settings keep the two kinds apart.
 
 - **Precedence.** The user's choice (`studio` or a ready provider's plugin
   id) wins, then a single ready replacing provider, then the built-in. A

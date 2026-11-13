@@ -128,6 +128,11 @@ describe("pages and apps in the query", () => {
     expect(matching("type:Whiteboards")).toEqual(["drawing"]);
   });
 
+  it("counts kinds beside a family or type filter without it, so the Kind choices keep their counts", () => {
+    const counts = facetCounts(items, compileQuery(parseQuery("family:app type:mini"), kinds));
+    expect(counts.kind).toEqual(new Map([["page", 1], ["drawing", 1], ["design", 1], ["mini", 1], ["artifact", 1], ["recording", 1]]));
+  });
+
   it("describes and suggests the new fields", () => {
     expect(describeFilter({ field: "family", value: "apps" }, kinds)).toEqual({ field: "Family", value: "Apps" });
     expect(describeFilter({ field: "type", value: "drawing" }, kinds)).toEqual({ field: "Type", value: "Whiteboards" });

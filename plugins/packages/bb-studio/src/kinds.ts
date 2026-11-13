@@ -35,6 +35,25 @@ export const BUILTIN_KINDS: readonly BuiltinKind[] = [
   { kind: "mini", pluginId: "minis", label: "Mini apps", covers: "Mini apps, their agent tools, ::mini cards in replies and mini app blocks in pages." },
 ];
 
+export interface KindRow {
+  id: string;
+  label: string;
+  covers: string;
+  kinds: readonly string[];
+}
+
+export const APP_ROW = "app";
+
+export const KIND_ROWS: readonly KindRow[] = BUILTIN_KINDS.flatMap((each): KindRow[] => {
+  if (each.kind === "mini") return [];
+  if (each.kind === "artifact") return [{ id: APP_ROW, label: "Apps", covers: "Apps, saved and interactive: apps and the save picker in the thread's Studio tab, their agent tools, app cards in replies and app blocks in pages.", kinds: ["artifact", "mini"] }];
+  return [{ id: each.kind, label: each.label, covers: each.covers, kinds: [each.kind] }];
+});
+
+export function rowKinds(id: string): readonly string[] {
+  return KIND_ROWS.find((row) => row.id === id)?.kinds ?? (BUILTIN_KINDS.some((each) => each.kind === id) ? [id] : []);
+}
+
 const BY_KIND = new Map(BUILTIN_KINDS.map((each) => [each.kind, each]));
 const BY_PLUGIN = new Map(BUILTIN_KINDS.map((each) => [each.pluginId, each]));
 
@@ -96,16 +115,19 @@ export class KindSettingsStore {
     return () => this.listeners.delete(listener);
   }
 
-  /** Turn a built-in kind on or off, or choose its provider (null: automatic). */
+  /** Turn a built-in kind or a Setup row (every kind it covers) on or off, or choose its provider (null: automatic). */
   async update(kind: string, change: { on?: boolean; use?: string | null }): Promise<KindSettings> {
-    if (!BY_KIND.has(kind)) throw new Error(`${kind} isn't a kind built into Studio.`);
+    const kinds = rowKinds(kind);
+    if (!kinds.length) throw new Error(`${kind} isn't a kind built into Studio.`);
     const previous = this.value;
     const off = new Set(previous.off);
-    if (change.on === true) off.delete(kind);
-    if (change.on === false) off.add(kind);
     const use = { ...previous.use };
-    if (change.use === null) delete use[kind];
-    else if (typeof change.use === "string") use[kind] = change.use;
+    for (const each of kinds) {
+      if (change.on === true) off.delete(each);
+      if (change.on === false) off.add(each);
+      if (change.use === null) delete use[each];
+      else if (typeof change.use === "string") use[each] = change.use;
+    }
     const next = parseKindSettings({ off: [...off], use });
     await this.kv.set(KINDS_KV_KEY, next);
     this.value = next;
@@ -162,6 +184,35 @@ export function resolveKind(kind: string, providers: readonly ProviderView[], se
 
 export function resolveKinds(providers: readonly ProviderView[], settings: KindSettings): KindRoute[] {
   return BUILTIN_KINDS.map((each) => resolveKind(each.kind, providers, settings));
+}
+
+export interface KindRowView {
+  kind: string;
+  label: string;
+  covers: string;
+  on: boolean;
+  choice: string | null;
+  active: KindCandidate;
+  reason: KindReason;
+  alternatives: KindCandidate[];
+}
+
+export function kindRowViews(routes: readonly KindRoute[], settings: KindSettings): KindRowView[] {
+  return KIND_ROWS.map((row) => {
+    const members = row.kinds.map((kind) => routes.find((route) => route.kind === kind)!);
+    const routed = members.find((route) => route.active.pluginId !== BY_KIND.get(route.kind)!.pluginId) ?? members[0]!;
+    const alternatives = [...new Map(members.flatMap((route) => route.alternatives).map((each) => [`${each.pluginId}:${each.kindId}`, each])).values()];
+    return {
+      kind: row.id,
+      label: row.label,
+      covers: row.covers,
+      on: row.kinds.some((kind) => !settings.off.includes(kind)),
+      choice: members.find((route) => route.choice !== null)?.choice ?? null,
+      active: routed.active,
+      reason: routed.reason,
+      alternatives,
+    };
+  });
 }
 
 /**

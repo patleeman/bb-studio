@@ -185,8 +185,9 @@ export function compileQuery(query: Query, vocabulary: QueryVocabulary): Compile
       if (except !== "is" && item.archived !== archived) return false;
       if (except !== "kind" && !askedForKind && !text && background.has(item.kind)) return false;
       if (resolved.some((filter) => filter.negate && hasValue(filter.field, filter.id, item))) return false;
+      const skipped = (field: FilterField) => field === except || (except === "kind" && (field === "family" || field === "type"));
       return fields.every(
-        (field) => field === except || resolved.some((filter) => filter.field === field && !filter.negate && hasValue(field, filter.id, item)),
+        (field) => skipped(field) || resolved.some((filter) => filter.field === field && !filter.negate && hasValue(field, filter.id, item)),
       );
     },
   };

@@ -1,9 +1,10 @@
 // A mini app full size: the app, its data, its source and its settings.
 // The Studio page (/plugins/studio/studio/minis/<id>) and the thread's
 // Studio tab both show it; page blocks and chat cards show MiniEmbed.
+import { AppTitle } from "../../ui/app-title";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { BarTitle, ICON_BUTTON, ItemHeader, PRIMARY_BUTTON, cn } from "../../kit/app/index";
+import { ICON_BUTTON, ItemHeader, PRIMARY_BUTTON, cn } from "../../kit/app/index";
 import { useStudioOpen } from "../../ui/studio-open";
 import { errorMessage, relativeTime } from "../../kit/format";
 import { Icon } from "../../kit/ui/icon";
@@ -111,7 +112,7 @@ export function MiniPage({ miniId, backLabel, onBack }: { miniId: string; backLa
       threadId={null}
       header={(mini, rename) => {
         const item = { title: displayName(mini), href: miniHref(miniId) };
-        return <ItemHeader thread={item} item={item} backLabel={backLabel} onBack={() => onBack()} leading={<BarTitle key={`${miniId}:${mini?.name ?? ""}`} title={mini?.name ?? ""} label="Mini app name" placeholder="Untitled mini app" disabled={!mini} onRename={rename} />} />;
+        return <ItemHeader thread={item} item={item} backLabel={backLabel} onBack={() => onBack()} leading={<AppTitle key={`${miniId}:${mini?.name ?? ""}`} type="interactive" title={mini?.name ?? ""} disabled={!mini} onRename={rename} />} />;
       }}
     />
   );
@@ -129,8 +130,8 @@ export function TabMini({ miniId, threadId, backLabel, onBack }: { miniId: strin
           <button type="button" aria-label={`Back to ${backLabel}`} title={`Back to ${backLabel}`} className={ICON_BUTTON} onClick={onBack}>
             <Icon name="ArrowLeft" className="size-4" />
           </button>
-          <div className="max-w-56 min-w-0">
-            <BarTitle key={`${miniId}:${mini?.name ?? ""}`} title={mini?.name ?? ""} label="Mini app name" placeholder="Untitled mini app" disabled={!mini} onRename={rename} />
+          <div className="flex max-w-56 min-w-0 items-center gap-1.5">
+            <AppTitle key={`${miniId}:${mini?.name ?? ""}`} type="interactive" title={mini?.name ?? ""} disabled={!mini} onRename={rename} />
           </div>
           <button type="button" className={cn(ICON_BUTTON, "ml-auto")} title="Open in Studio" aria-label="Open in Studio" onClick={() => open({ href: miniHref(miniId) }, { alternate: true })}>
             <Icon name="ArrowUpRight" className="size-4" />

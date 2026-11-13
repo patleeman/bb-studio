@@ -1,6 +1,7 @@
 import { registerWorkCards, WORK_TOOLS } from "./src/work/register";
 import { runWorkCli } from "./src/work/cli";
 import { registerLoops, LOOP_TOOLS, loopPushActions } from './src/loops/register';
+import { reminderLoopId, scheduledContract, scheduledItems } from "./src/loops/scheduled";
 import { automationTable, bbFromFile, bbFromOverview, readImportedAt, readStudioEntries, readThreadOwners } from "./src/automation-table";
 import { arrangeRailOnce } from "./src/rail-arrangement";
 import { arrangeFooterOnce } from "./src/footer-arrangement";
@@ -30,7 +31,7 @@ import { registerExploreBuiltin } from "./src/explore/server";
 import { importReactionsSettings, REACTIONS_PLUGIN_ID, REACTIONS_SETTINGS_IMPORTED } from "./src/reactions/server";
 import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
 import { builtinProviderContract } from "./src/builtin-provider";
-import { BUILTIN_KINDS, builtinOn, frontendState, KindSettingsStore, resolveKinds, routeProviders, routingInstructions, type KindRoute } from "./src/kinds";
+import { BUILTIN_KINDS, builtinOn, frontendState, kindRowViews, KindSettingsStore, resolveKinds, routeProviders, routingInstructions, rowKinds, type KindRoute } from "./src/kinds";
 import { kindsContract, type KindsState } from "./src/kinds-contract";
 import { openaiKey } from "./src/openai-key";
 import { registerSettings } from "./src/settings/register";
@@ -228,7 +229,8 @@ export default async function plugin(bb: BbPluginApi) {
     return registerTool(named as never);
   }) as typeof bb.agents.registerTool;
   // Kinds built into Studio (docs/merging-add-ons.md); the hub calls them in-process.
-  const artifacts = registerArtifacts(bb, db, services, notifyBuiltin);
+  let appCards = false;
+  const artifacts = registerArtifacts(bb, db, services, notifyBuiltin, () => appCards);
   bb.onDispose(() => artifacts.dispose());
   const drawings = registerDraw(bb, db, services, notifyBuiltin);
   bb.onDispose(() => drawings.dispose());
@@ -238,6 +240,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => dashboards.dispose());
   // Mini apps' `playground.bb.studio.list` reads the collection through the hub, made below.
   const minis = registerMinis(bb, db, services, notifyBuiltin, {
+    appCards: () => appCards,
     artifactSource: (id) => {
       const artifact = artifacts.store.get(id);
       if (!artifact) return null;
@@ -277,9 +280,11 @@ export default async function plugin(bb: BbPluginApi) {
   let runnerDispatch: (context: { thread: { id: string } }) => Promise<{ action: "reject"; message: string } | null> = async () => null;
   const decisions = await registerDecisions(bb, settings, (context) => runnerDispatch(context));
   let settingValues: Record<string, unknown> = await settings.get();
+  appCards = settingValues.appCards === true;
   const explore = registerExploreBuiltin(bb, db, settingValues);
   settings.onChange((next) => {
     settingValues = next;
+    appCards = next.appCards === true;
     explore.update(next);
   });
   registerThreadExportHook(bb, () => ({ enabled: settingValues.exportDeletedThreads === true, folder: typeof settingValues.exportDeletedThreadsFolder === "string" ? settingValues.exportDeletedThreadsFolder : "" }));
@@ -417,7 +422,7 @@ export default async function plugin(bb: BbPluginApi) {
     // Short pointers for Pages, mini apps and the Next row; their long guidance is in the studio skill (src/agent-instructions.ts).
     const instructions = studioInstructions({
       bot: bot ? bots.instructions(bot) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
-      pages: !off.has("page"), minis: !off.has("mini"), work: true, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
+      pages: !off.has("page"), minis: !off.has("mini"), appCards, work: true, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
     });
     return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
   }));
@@ -709,6 +714,7 @@ export default async function plugin(bb: BbPluginApi) {
   const automationBot = (botId?: string) => { const bot = bots.stored(botId); return bot ? { id: bot.id, name: bot.name, threadId: bot.threadId, state: bot.state, primary: bot.primary !== false, kind: bot.kind ?? "studio" } : null; };
   const automations: Automations = new Automations({
     db, sdk: bb.sdk, scheduler, changed: tagsChanged,
+    copiedReminder: (id) => loops.enabled() && !!db.prepare("SELECT 1 FROM bot_loops WHERE id = ?").get(reminderLoopId(id)),
     bot: automationBot,
     // With bb's automations plugin off (a BB Studio copy), watchers run here and bb's rows are read from its data file (src/automation-table.ts).
     bbFile: () => bbFromFile(join(bb.server.experimental_dataDir, "plugins", "automations", "data.db")),
@@ -734,6 +740,15 @@ export default async function plugin(bb: BbPluginApi) {
       setPaused: async (botId, paused) => { await maintenance.set(botId, { enabled: !paused }); },
       run: async (botId) => { await maintenance.run(botId); },
     },
+  });
+  bb.rpc.register(scheduledContract, {
+    "loops.scheduled": async ({ threadId }) => ({
+      items: scheduledItems({
+        loops: loops.store.all(),
+        bots: await Promise.all(bots.list().map(async (bot) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, primary: bot.primary !== false, automations: await automations.list(bot.id).catch(() => []), table: (await automationTableFor(bot.id).catch(() => null))?.rows ?? [] }))),
+        threadId,
+      }),
+    }),
   });
   // BB automations (watchers', adopted runners') BB turned off after a
   // transient failure come back on (src/auto-resume.ts; Studio's own schedules
@@ -2037,9 +2052,18 @@ export default async function plugin(bb: BbPluginApi) {
   });
   runnerTool("automation_list", "List your automations: check-ins, reminders, watchers and runners, with schedule, state, next run and last outcome.", z.object({}),
     async (_input: unknown, botId) => (await automations.list(botId)).map(describeAutomation).join("\n") || "No automations yet.");
-  runnerTool("automation_create", "Schedule something for yourself. kind checkin: wakes your thread on a schedule with an instruction. reminder: once, with schedule.at or schedule.in (\"tomorrow 9:00 remind me…\", \"in 2h check the deploy\"). watcher: a script on a schedule that wakes you only when it prints something (zero tokens otherwise). runner: a recurring job in its own thread.",
+  runnerTool("automation_create", "Schedule something for yourself. kind checkin: wakes your thread on a schedule with an instruction. reminder: once, with schedule.at or schedule.in (\"tomorrow 9:00 remind me…\", \"in 2h check the deploy\"); with Todos on it becomes a todo you own with that time, listed on the Todos page. watcher: a script on a schedule that wakes you only when it prints something (zero tokens otherwise). runner: a recurring job in its own thread.",
     z.object({ kind: z.enum(["checkin", "reminder", "watcher", "runner"]), name: z.string().trim().min(1).max(60), ...automationFields, schedule: toolSchedule }),
-    async (input: AutomationToolInput & { kind: "checkin" | "reminder" | "watcher" | "runner"; name: string }, botId) => `Made:\n${describeAutomation(await automations.create({ kind: input.kind, name: input.name, schedule: toSchedule(input.schedule!), ...automationChanges(input) } as never, botId))}`);
+    async (input: AutomationToolInput & { kind: "checkin" | "reminder" | "watcher" | "runner"; name: string }, botId) => {
+      const schedule = toSchedule(input.schedule!);
+      if (input.kind === "reminder" && schedule.type === "once" && loops.enabled()) {
+        const bot = bots.stored(botId);
+        const owner = !bot || bot.primary !== false || !bot.threadId ? "cos" : `thread:${bot.threadId}`;
+        const todo = loops.store.add({ title: input.name, why: input.instruction?.trim() ?? "", owner, kind: "do", trigger: { type: "time", at: schedule.at } });
+        return `Made a todo (a reminder is a todo you own): ${todo.title}, due ${new Date(schedule.at).toISOString()}, id ${todo.id}. Change it with todos_update.`;
+      }
+      return `Made:\n${describeAutomation(await automations.create({ kind: input.kind, name: input.name, schedule, ...automationChanges(input) } as never, botId))}`;
+    });
   runnerTool("automation_update", "Change an automation's name, instruction, schedule, model or script.",
     z.object({ id: z.string().min(1).describe("Automation id or name"), name: z.string().trim().min(1).max(60).optional(), ...automationFields }),
     async (input: AutomationToolInput & { id: string }, botId) => describeAutomation(await automations.update({ id: input.id, ...automationChanges(input) } as never, botId)));
@@ -2323,24 +2347,21 @@ export default async function plugin(bb: BbPluginApi) {
     const routes = await refreshRoutes();
     const settings = kindSettings.current;
     return {
-      kinds: BUILTIN_KINDS.map((each) => {
-        const route = routes.find((entry) => entry.kind === each.kind)!;
-        return { kind: each.kind, label: each.label, covers: each.covers, on: !settings.off.includes(each.kind), choice: route.choice, active: route.active, reason: route.reason, alternatives: route.alternatives };
-      }),
+      kinds: kindRowViews(routes, settings),
       frontend: frontendState(routes, settings),
     };
   };
   bb.rpc.register(kindsContract, {
     "kinds.state": () => kindsState(),
     "kinds.update": async ({ kind, on, use }) => {
-      const before = builtinOn(kindSettings.current, BUILTIN_KINDS.find((each) => each.kind === kind)?.pluginId ?? "");
+      const pluginIds = rowKinds(kind).map((each) => BUILTIN_KINDS.find((builtin) => builtin.kind === each)!.pluginId);
+      const before = pluginIds.map((pluginId) => builtinOn(kindSettings.current, pluginId));
       await kindSettings.update(kind, { on, use });
-      const pluginId = BUILTIN_KINDS.find((each) => each.kind === kind)!.pluginId;
-      bb.log.info(`Studio kind ${kind}: ${kindSettings.current.off.includes(kind) ? "off" : "on"}, open and create with ${kindSettings.current.use[kind] ?? "automatic"}.`);
+      for (const member of rowKinds(kind)) bb.log.info(`Studio kind ${member}: ${kindSettings.current.off.includes(member) ? "off" : "on"}, open and create with ${kindSettings.current.use[member] ?? "automatic"}.`);
       // Search drops an off kind's hits and indexes it again when it's back on.
-      if (before !== builtinOn(kindSettings.current, pluginId)) void searchIndex.changed(pluginId).catch(() => {});
+      pluginIds.forEach((pluginId, index) => { if (before[index] !== builtinOn(kindSettings.current, pluginId)) void searchIndex.changed(pluginId).catch(() => {}); });
       changes.append(null);
-      bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId });
+      for (const pluginId of pluginIds) bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId });
       return kindsState();
     },
   });

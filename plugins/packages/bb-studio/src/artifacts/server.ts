@@ -1,3 +1,4 @@
+import { appCardLine } from "../app-cards";
 import type { StudioChanged } from "../kit/server/core";
 import type { StudioServices } from "../services";
 // Artifacts, built into Studio: keep the files agents make.
@@ -98,10 +99,6 @@ function toDto(artifact: ArtifactWithVersion): ArtifactDto {
   };
 }
 
-/** The line an agent puts in its reply to show a saved artifact as a card. */
-function directive(id: string): string {
-  return `::artifact{id="${id}"}`;
-}
 
 export const ARTIFACT_TOOLS = ["artifacts_save", "artifacts_list", "artifacts_read", ...LIVE_TOOLS];
 
@@ -121,7 +118,8 @@ export interface BuiltinArtifacts {
 }
 
 /** Registers artifacts' RPC, HTTP route, agent tools and mention provider on Studio. Studio has run the migrations. */
-export function registerArtifacts(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created">, notify: StudioChanged): BuiltinArtifacts {
+export function registerArtifacts(bb: BbPluginApi, db: Database.Database, services: Pick<StudioServices, "created">, notify: StudioChanged, appCards: () => boolean = () => false): BuiltinArtifacts {
+  const directive = (id: string) => appCardLine(id, appCards());
   const store = new ArtifactStore(db);
   const liveStore = new LiveStore(db);
   const liveServer = registerLive(bb, liveStore, store);

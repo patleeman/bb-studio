@@ -10,8 +10,8 @@ vi.mock("../../kit/app/index", () => ({
   PageColumn: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   StudioBar: ({ children }: { children: ReactNode }) => <div data-testid="studio-bar">{children}</div>,
 }));
-vi.mock("./AutomationsTable", () => ({
-  AutomationsTable: (props: { botId: string; botName: string; disabled: boolean; external: boolean }) => <section data-testid="bot-automations" data-bot={props.botId} data-name={props.botName} data-disabled={String(props.disabled)} data-external={String(props.external)} />,
+vi.mock("../../loops/ui/TodosPage", () => ({
+  TodosPage: (props: { view: { bot: { id: string; name: string; state: string; kind?: string } }; focus?: string }) => <section data-testid="bot-automations" data-bot={props.view.bot.id} data-name={props.view.bot.name} data-disabled={String(props.view.bot.state !== "active")} data-external={String(props.view.bot.kind === "external")} data-focus={props.focus} />,
 }));
 vi.mock("../../kit/ui/icon", () => ({ Icon: () => null }));
 vi.mock("../bot/BotAvatar", () => ({ BotAvatar: () => null, botProvider: () => null }));
@@ -35,10 +35,10 @@ it("shows the picked Bot, else the primary, else the first", () => {
   expect(shownBot([], null)).toBeNull();
 });
 
-it("with one Bot, is that Bot's Automations view full-page, with no switcher", async () => {
+it("with one Bot, is that Bot's Todos page opened at Scheduled, full-page, with no switcher", async () => {
   state.bots = [{ id: "bot_main", name: "Chief of Staff", avatar: "🤖", state: "active", primary: true }];
   await act(async () => root.render(<AutomationsPanel />));
-  expect(section()?.dataset).toMatchObject({ bot: "bot_main", disabled: "false", external: "false" });
+  expect(section()?.dataset).toMatchObject({ bot: "bot_main", disabled: "false", external: "false", focus: "scheduled" });
   expect(tabs()).toHaveLength(0);
 });
 

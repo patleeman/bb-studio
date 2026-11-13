@@ -4,7 +4,9 @@
 // handlers:
 // - pages_list, pages_read and pages_create also take a design or a
 //   whiteboard: `type` on list and create, the item's id on read.
-// - apps_list, apps_read and apps_create cover mini apps and artifacts.
+// - apps_list, apps_read and apps_create cover mini apps and artifacts, and
+//   are the documented ones; minis_* and artifacts_* list, read and create
+//   are their aliases, still registered and given to sessions.
 // Each older tool's description says which family tool does the same.
 import { z } from "zod";
 import type { IndexedItem, IndexListOptions } from "./item-index";
@@ -62,12 +64,12 @@ const POINTERS: Record<string, string> = {
   whiteboard_list: 'A whiteboard is a type of page: pages_list with type "whiteboard" gives this same list.',
   whiteboard_get: "A whiteboard is a type of page: pages_read with the whiteboard's id reads it the same way.",
   whiteboard_create: 'A whiteboard is a type of page: pages_create with type "whiteboard" makes a page holding one.',
-  minis_list: 'A mini app is a type of app: apps_list lists every app, and with type "mini" gives this same list.',
-  minis_read: "A mini app is a type of app: apps_read with its id reads it the same way.",
-  minis_create: 'A mini app is a type of app: apps_create with type "mini" makes one the same way.',
-  artifacts_list: 'An artifact is a type of app: apps_list lists every app, and with type "artifact" gives this same list.',
-  artifacts_read: "An artifact is a type of app: apps_read with its id reads it the same way.",
-  artifacts_save: 'An artifact is a type of app: apps_create with type "artifact" saves one the same way.',
+  minis_list: 'A mini app is a type of app (an interactive one), and this is an alias of apps_list with type "mini": the same handler and list. Prefer apps_list.',
+  minis_read: "A mini app is a type of app (an interactive one), and this is an alias of apps_read with its id: the same handler. Prefer apps_read.",
+  minis_create: 'A mini app is a type of app (an interactive one), and this is an alias of apps_create with type "mini" and these fields as its input: the same handler. Prefer apps_create.',
+  artifacts_list: 'An artifact is a type of app (a saved one), and this is an alias of apps_list with type "artifact": the same handler and list. Prefer apps_list.',
+  artifacts_read: "An artifact is a type of app (a saved one), and this is an alias of apps_read with its id: the same handler. Prefer apps_read.",
+  artifacts_save: 'An artifact is a type of app (a saved one), and this is an alias of apps_create with type "artifact" and these fields as its input (artifactId too): the same handler. Prefer apps_create.',
 };
 
 export interface FamilyToolDeps {
@@ -134,7 +136,7 @@ export function appTools(deps: AppToolDeps): AgentTool[] {
   return [
     {
       name: "apps_list",
-      description: 'List the user\'s Studio apps, the things that run: mini apps and artifacts (saved files and live HTML). Each line has the type, id and link. Pass type for one type\'s own, fuller list, or query to match titles. Read one with apps_read; make one with apps_create.',
+      description: 'List the user\'s Studio apps: interactive apps (type "mini", mini apps with their own data) and saved apps (type "artifact": files and live HTML). Each line has the type, id and link. Pass type for one type\'s own, fuller list, or query to match titles. Read one with apps_read; make one with apps_create.',
       parameters: z.object({ type: typeParam.optional(), query: z.string().max(200).optional().describe("Words a title must contain") }),
       execute: (async ({ type, query }: { type?: (typeof APP_TYPES)[number]; query?: string }, ctx: ToolContext) => {
         const needle = query?.trim().toLowerCase();
@@ -147,7 +149,7 @@ export function appTools(deps: AppToolDeps): AgentTool[] {
     },
     {
       name: "apps_read",
-      description: "Read a Studio app by its id, whatever its type: a mini app's source, state and records summary (mini_…), or an artifact's details and text (art_…). The same as minis_read and artifacts_read. Edit with the type's own tool: minis_update, or artifacts_save with artifactId.",
+      description: "Read a Studio app by its id, whatever its type: an interactive app's source, state and records summary (mini_…), or a saved app's details and text (art_…). Change an interactive app with minis_update and its data with minis_data; save a new version of a saved app with apps_create (type \"artifact\", artifactId in input).",
       parameters: z.object({ id: z.string().min(1).max(200).describe("The app's id, from apps_list or its link") }),
       execute: (async ({ id }: { id: string }, ctx: ToolContext) => {
         // The index knows every app; an id it doesn't have yet is read from its prefix.
@@ -158,7 +160,7 @@ export function appTools(deps: AppToolDeps): AgentTool[] {
     },
     {
       name: "apps_create",
-      description: 'Make a Studio app. type "mini": a small interactive app with its own data (input as minis_create: name, files). type "artifact": save a finished file (input as artifacts_save: title, and path or content with name). `input` takes exactly the fields of that tool, whose description has the details; the result is the same.',
+      description: 'Make a Studio app. type "mini": an interactive app with its own data (input as minis_create: name, files). type "artifact": a saved app, a finished file (input as artifacts_save: title, and path or content with name; artifactId adds a version). `input` takes exactly the fields of that tool, whose description has the details; the result is the same, with the card line to show.',
       parameters: z.object({ type: typeParam, input: z.record(z.string(), z.unknown()).describe("The fields of minis_create or artifacts_save, by type") }),
       execute: (async ({ type, input }: { type: (typeof APP_TYPES)[number]; input: Record<string, unknown> }, ctx: ToolContext) =>
         deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type].create, input, ctx) : offMessage(type)) as never,

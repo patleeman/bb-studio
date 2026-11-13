@@ -60,6 +60,7 @@ export const STUDIO_SETTINGS = {
   explore_next: { group: "replies", type: "boolean", label: "Next row", description: "Applies to sessions started after the change.", default: true },
   explore_explore: { group: "replies", type: "boolean", label: "Things to explore", default: true },
   explore_quickReplies: { group: "replies", type: "boolean", label: "Quick replies", default: true },
+  appCards: { group: "replies", type: "boolean", label: "App cards", description: "Agents show saved and interactive apps with ::app instead of ::artifact and ::mini. Applies to sessions started after the change.", default: false },
   explore_replyItems: { group: "replies", type: "string", label: "Your usual quick replies", description: "Emoji and label pairs, such as “👍 Looks good”, separated by commas or lines.", default: DEFAULT_REPLIES.join(", "), maxLength: 10_000 },
   emojiItems: { group: "replies", type: "string", label: "Reactions", description: "Up to eight emoji and label pairs, separated by commas or lines. Empty hides them.", default: DEFAULT_EMOJI_ITEMS, maxLength: 2000, multiline: true },
   showInSelectionMenu: { group: "replies", type: "boolean", label: "Show reactions when you select text", description: "In the menu that opens when you select text, and the right-click menu.", default: true },

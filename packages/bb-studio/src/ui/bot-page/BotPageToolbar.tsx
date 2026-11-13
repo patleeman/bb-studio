@@ -1,5 +1,6 @@
 // The toolbar every Bot page has, under its header: a search field, the
-// page's filter pills (bb's segmented ToggleGroup), its menus (a sort, a
+// page's filter pills (bb's segmented ToggleGroup) and an optional second row
+// narrowing them, its menus (a sort, a
 // grouping) and "New" on the right. Pills show when there is more than one.
 import { forwardRef, type ReactNode, type Ref } from "react";
 import { Button, type ButtonProps } from "../../kit/ui/button";
@@ -36,9 +37,25 @@ export const BotPageNewButton = forwardRef<HTMLButtonElement, ButtonProps>(({ ch
 ));
 BotPageNewButton.displayName = "BotPageNewButton";
 
-export function BotPageToolbar<T extends string>({ search, filter, menus, onNew, newLabel, newAction }: {
+function Pills<T extends string>({ pills, testId }: { pills: BotPageFilter<T>; testId: string }) {
+  return (
+    <ToggleGroup type="single" aria-label={pills.label} data-testid={testId} value={pills.value} onValueChange={(value) => { if (value) pills.onChange(value as T); }}
+      className="flex-wrap justify-start gap-1">
+      {pills.options.map((pill) => (
+        <ToggleGroupItem key={pill.id} value={pill.id} data-testid={testId.replace(/s$/, "")} data-studio-pill="" data-value={pill.id}
+          className="h-7 min-w-0 gap-1.5 px-2.5 text-sm font-normal text-muted-foreground hover:bg-state-hover hover:text-foreground data-[state=on]:bg-state-active data-[state=on]:text-foreground">
+          {pill.label}
+          {pill.count !== undefined ? <span className="text-xs tabular-nums text-muted-foreground">{pill.count}</span> : null}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
+  );
+}
+
+export function BotPageToolbar<T extends string, S extends string = string>({ search, filter, subFilter, menus, onNew, newLabel, newAction }: {
   search?: BotPageSearch;
   filter?: BotPageFilter<T>;
+  subFilter?: BotPageFilter<S> | null;
   /** Menus beside the search: a sort, a grouping. */
   menus?: ReactNode;
   /** Shows "New" (or `newLabel`) and runs this. */
@@ -63,18 +80,8 @@ export function BotPageToolbar<T extends string>({ search, filter, menus, onNew,
         {menus}
         {newAction ?? (onNew ? <BotPageNewButton onClick={onNew}>{newLabel ?? "New"}</BotPageNewButton> : null)}
       </div>
-      {pills ? (
-        <ToggleGroup type="single" aria-label={pills.label} data-testid="bot-page-pills" value={pills.value} onValueChange={(value) => { if (value) pills.onChange(value as T); }}
-          className="flex-wrap justify-start gap-1">
-          {pills.options.map((pill) => (
-            <ToggleGroupItem key={pill.id} value={pill.id} data-testid="bot-page-pill" data-studio-pill="" data-value={pill.id}
-              className="h-7 min-w-0 gap-1.5 px-2.5 text-sm font-normal text-muted-foreground hover:bg-state-hover hover:text-foreground data-[state=on]:bg-state-active data-[state=on]:text-foreground">
-              {pill.label}
-              {pill.count !== undefined ? <span className="text-xs tabular-nums text-muted-foreground">{pill.count}</span> : null}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      ) : null}
+      {pills ? <Pills pills={pills} testId="bot-page-pills" /> : null}
+      {pills && subFilter && subFilter.options.length > 1 ? <Pills pills={subFilter} testId="bot-page-subpills" /> : null}
     </div>
   );
 }

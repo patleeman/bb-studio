@@ -18,6 +18,7 @@ const state = vi.hoisted(() => ({
   attention: null as unknown,
   chatOpen: false,
   composer: { insert: vi.fn(), focus: vi.fn() },
+  scheduled: [] as unknown[],
 }));
 vi.mock("../../kit/composer", () => ({ threadComposer: (threadId: string) => state.chatOpen && threadId === "thr_bot" ? state.composer : null }));
 vi.mock("../../links/open", () => ({ openLinkFromAnywhere: state.openLink, clickModifiers: (event?: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean }) => ({ meta: !!event?.metaKey, ctrl: !!event?.ctrlKey, shift: !!event?.shiftKey }) }));
@@ -32,6 +33,7 @@ vi.mock("../../ui/live", () => ({
     if (method === "loops.get" && state.getError) return { data: null, loading: false, error: state.getError, refresh: () => {} };
     if (method === "loops.get") return { data: found ? { loop: found, history: [] } : null, loading: false, error: found ? null : "Todo not found", refresh: () => {} };
     const data = method === "loops.list" ? state.groups
+      : method === "loops.scheduled" ? { items: state.scheduled }
       : method === "bot_get" ? { bot: { id: "bot_1", name: "Chief of Staff", threadId: "thr_bot" } }
         : method === "project_leads" ? { leads: [{ projectId: "proj_k", leadThreadId: "thr_lead", run: null }] }
           : method === "loops.places" ? { names: ["Home", "Office", "Mom’s"] }
@@ -41,7 +43,7 @@ vi.mock("../../ui/live", () => ({
 }));
 vi.mock("../../kit/ui/index", async () => (await import("./test-kit")).kitUi);
 vi.mock("../../kit/ui/icon", () => ({ Icon: ({ name }: { name: string }) => <i data-icon={name} /> }));
-vi.mock("../../kit/app/index", () => ({ openAppPath: vi.fn(), StudioBar: ({ children }: { children?: ReactNode }) => <div>{children}</div> }));
+vi.mock("../../kit/app/index", () => ({ GHOST_BUTTON: "", PRIMARY_BUTTON: "", DANGER_BUTTON: "", openAppPath: vi.fn(), StudioBar: ({ children }: { children?: ReactNode }) => <div>{children}</div> }));
 
 const { TodosPage } = await import("./TodosPage");
 const { TodoTab } = await import("./TodoTab");
@@ -97,7 +99,7 @@ const type = async (input: HTMLInputElement, value: string) => {
 it("names itself in the header, and lists one line per todo in Today, This week, Later and Waiting on others", async () => {
   await render();
   expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Todos·Chief of Staff");
-  expect([...container.querySelectorAll("section")].map((each) => each.getAttribute("aria-label"))).toEqual(["Today", "This week", "Later", "Waiting on others", "Done"]);
+  expect([...container.querySelectorAll("section")].map((each) => each.getAttribute("aria-label"))).toEqual(["Today", "This week", "Later", "Waiting on others", "Scheduled", "Done"]);
   // Out now, and overdue, are Today; a snooze two days out is this week; no date or ten days out is later.
   expect(titles(group("Today"))).toEqual(["Pay the Con Edison bill", "Reply to Sam about the Q3 planning doc", "Choose the deck contractor"]);
   expect(titles(group("This week"))).toEqual(["Send the October expense report"]);
@@ -240,4 +242,20 @@ it("says No todos when nothing is open, with Done still there", async () => {
   await render();
   expect(container.querySelector("[data-testid=todos-empty]")?.textContent).toBe("No todos");
   expect(group("Done")?.textContent).toContain("Done1");
+});
+
+it("lists the Bot's check-ins, reminders, watchers and runners under Scheduled, each opening its automation", async () => {
+  state.groups = { ...empty };
+  const item = (key: string, over: Record<string, unknown>) => ({ key, source: "automation", id: key, botId: "bot_1", botName: "Chief of Staff", kind: "checkin", title: key, nextAt: null, state: "active", scheduleText: "Daily 8:00", threadId: "thr_bot", link: `bb://automation/bot_1%3A${key}`, ...over });
+  state.scheduled = [
+    item("Morning brief", { nextAt: NOW + 3_600_000 }),
+    item("Inbox watch", { kind: "watcher", state: "paused" }),
+    item("Other Bot's", { botId: "bot_2" }),
+    item("A timed todo", { source: "todo", link: "bb://todo/loop_t" }),
+  ];
+  await render();
+  const rows = [...container.querySelectorAll("[data-testid=todos-scheduled] [data-testid=scheduled-row]")];
+  expect(rows.map((each) => each.textContent)).toEqual(["Morning brief4:00 PM", "Inbox watchPaused"]);
+  expect(rows[0]!.getAttribute("data-row-link")).toBe("bb://automation/bot_1%3AMorning%20brief");
+  state.scheduled = [];
 });

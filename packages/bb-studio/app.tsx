@@ -78,6 +78,7 @@ import { isDesignId, QUESTIONS_RENDERER } from "./src/design/shared";
 import { DesignCard } from "./src/design/ui/design-card";
 import { isMiniId } from "./src/minis/shared";
 import { MiniCard } from "./src/minis/ui/mini-card";
+import { registerAppCards } from "./src/ui/app-card";
 import { QuestionFormView } from "./src/design/ui/question-form";
 import { isRecordingId, UNSENT_PATH } from "./src/talk/shared/format";
 import { registerTalkApp } from "./src/talk/ui/register";
@@ -452,11 +453,11 @@ export default definePluginApp((app) => {
   app.slots.messageDirective({ id: "page", component: whenOn(kinds, "page", PageCard) });
   // Explore (built in, as it was in Pages): the Next row and "along the way" findings.
   registerExploreApp(app);
-  // Artifacts (built in; docs/merging-add-ons.md): in the Studio tab, and its
-  // save picker for a reply's files; and the `::artifact{id="art_…"}` card in replies.
-  app.slots.messageDirective({ id: "artifact", component: whenOn(kinds, "artifact", ArtifactCard) });
-  // Mini apps (built in): `::mini{id="mini_…"}` in a reply is the app itself, live.
-  app.slots.messageDirective({ id: "mini", component: whenOn(kinds, "mini", MiniCard) });
+  // Apps (built in): `::app{id="…"}`, and the older `::artifact{…}` and
+  // `::mini{…}`, are one card in replies (src/ui/app-card.tsx). A saved app
+  // (art_…) is the artifact card; an interactive one (mini_…) is the mini app
+  // itself, live.
+  registerAppCards(app, { saved: whenOn(kinds, "artifact", ArtifactCard), interactive: whenOn(kinds, "mini", MiniCard) });
   // Whiteboards (drawings, built in): the read-only `::drawing{id="…"}` card
   // older replies carry. New replies link the page the whiteboard is in.
   app.slots.messageDirective({ id: "drawing", component: whenOn(kinds, "drawing", DrawingDirective) });

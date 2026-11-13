@@ -1,11 +1,13 @@
 // The Bot's Todos page (bot/<botId>/loops), on the Bot-page template
 // (src/ui/bot-page): one line per todo, its title on the left and one small
 // due date or "when" on the right, in four groups: Today, This week, Later
-// and Waiting on others (rules in todos-model.ts), then Done, folded. The
+// and Waiting on others (rules in todos-model.ts), then Scheduled (the Bot's
+// check-ins, reminders, watchers and runners, src/loops/scheduled.ts), then
+// Done, folded. The
 // Bot chat's pending questions and unread replies lead Today. Search and the
 // area pills filter it; New hands a typed line to the Bot to fill in. A row
 // opens the todo as a tab in the workbench beside the page (TodoTab.tsx).
-import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { errorMessage } from "../../kit/format";
 import { Button } from "../../kit/ui/button";
 import { Input } from "../../kit/ui/input";
@@ -13,17 +15,23 @@ import type { BotView } from "../../contract";
 import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, useRowOpen } from "../../ui/bot-page";
 import { useCall, useLive } from "../../ui/live";
 import type { Loop } from "../contract";
+import { SCHEDULED_ICON, scheduledMeta } from "./scheduled-model";
+import { NewAutomationMenu, newKinds, useAutomationEditor, useAutomations } from "../../ui/bot/Automations";
 import { useNeedsYou } from "./LoopsTab";
 import { KIND, ownerName, shortWhen } from "./model";
 import { useLoopPeople } from "./hooks";
 import { ALL_AREAS, areaPills, groupTodos, openTodos, TODO_GROUPS, todoWhen } from "./todos-model";
 
-export function TodosPage({ view }: { view: BotView }) {
+export function TodosPage({ view, focus }: { view: BotView; focus?: "scheduled" }) {
   const bot = view.bot!;
   const call = useCall();
   const people = useLoopPeople();
   const rowOpen = useRowOpen();
   const list = useLive("loops.list", {}, { pollMs: 60_000 });
+  const scheduledList = useLive("loops.scheduled", {}, { pollMs: 60_000 });
+  const automationList = useAutomations(bot.id);
+  const editor = useAutomationEditor(bot.id, automationList.data?.automations ?? [], () => { automationList.refresh(); scheduledList.refresh(); });
+  const scheduledRef = useRef<HTMLDivElement>(null);
   const { pending, unread } = useNeedsYou(people.botId, people.botThreadId, list.data?.needsYouNow);
   const [query, setQuery] = useState("");
   const [area, setArea] = useState(ALL_AREAS);
@@ -37,6 +45,9 @@ export function TodosPage({ view }: { view: BotView }) {
   const done = useMemo(() => [...(data?.done ?? [])].filter((loop) => area === ALL_AREAS || loop.area === area).filter((loop) => !query.trim() || loop.title.toLowerCase().includes(query.trim().toLowerCase()))
     .sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0)), [data?.done, area, query]);
   const showChat = area === ALL_AREAS && !query.trim();
+  const scheduledShown = !!data && !!scheduledList.data;
+  useEffect(() => { if (focus === "scheduled" && scheduledShown) scheduledRef.current?.scrollIntoView?.({ block: "start" }); }, [focus, scheduledShown]);
+  const scheduled = useMemo(() => (scheduledList.data?.items ?? []).filter((item) => item.source === "automation" && item.botId === bot.id && (!query.trim() || item.title.toLowerCase().includes(query.trim().toLowerCase())) && area === ALL_AREAS), [scheduledList.data, bot.id, query, area]);
   const chatRows = showChat ? pending.length + (unread ? 1 : 0) : 0;
   const nameOf = (loop: Loop) => ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owners.get(loop.owner));
   const total = TODO_GROUPS.reduce((sum, group) => sum + groups[group.id].length, 0) + chatRows;
@@ -75,6 +86,19 @@ export function TodosPage({ view }: { view: BotView }) {
           </BotPageGroup>
         );
       })}
+      {data ? (
+        <div ref={scheduledRef}>
+        <BotPageGroup title="Scheduled" count={scheduled.length} testId="todos-scheduled"
+          aside={<NewAutomationMenu kinds={newKinds(bot.kind === "external")} disabled={bot.state !== "active"} onPick={editor.openNew} />}>
+          {editor.error ? <p role="alert" className="pb-2 text-xs text-destructive">{editor.error}</p> : null}
+          {scheduled.map((item) => (
+            <BotPageRow key={item.key} testId="scheduled-row" data={{ "data-scheduled": item.key }} icon={SCHEDULED_ICON[item.kind]} muted={item.state === "paused"}
+              title={item.title} titleText={item.title} meta={scheduledMeta(item, now)} {...rowOpen(item.link, item.title)} />
+          ))}
+        </BotPageGroup>
+        </div>
+      ) : null}
+      {editor.dialogs}
       {data && done.length ? (
         <BotPageGroup title="Done" count={done.length} collapsible defaultOpen={false} testId="todos-done">
           {done.map((loop) => (

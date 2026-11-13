@@ -8,7 +8,7 @@ import { AutomationDetail, useAutomationEditor, useAutomations } from "../bot/Au
 import { useOpenThread } from "../bot/workspace";
 import { BotItemDetail, BotItemError } from "../bot-page/BotItemDetail";
 import { useLive } from "../live";
-import { bbDetailPath, KIND_LABEL, lastRunText, statusText } from "./AutomationsTable";
+import { bbDetailPath, KIND_LABEL, lastRunText, statusText } from "./automation-text";
 
 const refId = (params: JsonValue | null): string | null => {
   if (typeof params !== "object" || params === null || Array.isArray(params)) return null;

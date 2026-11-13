@@ -65,7 +65,7 @@ describe("every type's own tool", () => {
   it("says which family tool does the same", () => {
     const { registered } = setup();
     for (const type of ["design", "whiteboard"] as const) for (const action of ["list", "read", "create"] as const) expect(registered.get(TYPE_TOOLS[type][action])!.description).toMatch(/Original .+ type of page: pages_(list|read|create)/);
-    for (const type of ["mini", "artifact"] as const) for (const action of ["list", "read", "create"] as const) expect(registered.get(TYPE_TOOLS[type][action])!.description).toMatch(/Original .+ type of app: apps_(list|read|create)/);
+    for (const type of ["mini", "artifact"] as const) for (const action of ["list", "read", "create"] as const) expect(registered.get(TYPE_TOOLS[type][action])!.description).toMatch(/Original .+ type of app \((an interactive|a saved) one\), and this is an alias of apps_(list|read|create)\b.*Prefer apps_(list|read|create)\.$/);
   });
 });
 

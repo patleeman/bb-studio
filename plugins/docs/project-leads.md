@@ -60,7 +60,9 @@ README's **Bot → Runners**.
 ### Automations
 
 Besides its heartbeat, a Bot has automations (`packages/bb-studio/src/automations.ts`,
-table `bot_automations`): check-ins on its thread, one-shot reminders, and
+table `bot_automations`): check-ins on its thread, one-shot reminders (with
+Todos on, a new reminder is a todo, and older ones were copied into the
+todos; see the Studio README's Todos section), and
 watchers (BB script automations whose stdout Studio posts to the Bot's
 thread; it polls their runs each minute). Each is one or more BB
 automations, since `src/schedule.ts` compiles a schedule (times, intervals

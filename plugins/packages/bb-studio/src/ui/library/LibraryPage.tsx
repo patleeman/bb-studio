@@ -3,7 +3,7 @@
 // its workers made, newest first, one line each with its kind, where it came
 // from ("made in Launch prep", "by Fable lead") and its age. Grouped by
 // conversation (default; the group's title opens it), kind or date; a
-// search field, Kind pills and a Group by menu. A group shows 8 rows, then "N more"; near-identical files from one
+// search field, Kind pills (App with Interactive and Saved under it) and a Group by menu. A group shows 8 rows, then "N more"; near-identical files from one
 // source are one row with a count. A file opens as a tab in the workbench
 // beside the page; a kind with no workbench view opens at its own address.
 // Rules in library-model.ts; data from bot_library.
@@ -17,7 +17,7 @@ import { ItemIcon } from "../item-row";
 import { shortAge } from "../conversations/model";
 import { useLive } from "../live";
 import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, useRowOpen } from "../bot-page";
-import { foldRows, kindLabel, LIBRARY_GROUPS, LIBRARY_KINDS, libraryGroups, provenance, type LibraryGroupBy, type LibraryKindFilter } from "./library-model";
+import { foldRows, kindLabel, LIBRARY_APP_TYPES, LIBRARY_GROUPS, LIBRARY_KINDS, libraryGroups, provenance, type LibraryAppType, type LibraryGroupBy, type LibraryKindFilter } from "./library-model";
 
 const GROUP_KEY = "studio.library.group";
 
@@ -38,18 +38,20 @@ export function LibraryPage() {
   const library = useLive("bot_library", botId ? { botId } : {}, { pollMs: 120_000 });
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<LibraryKindFilter>("all");
+  const [appType, setAppType] = useState<LibraryAppType>("all");
   const [groupBy, setGroupBy] = useState<LibraryGroupBy>(readGroup);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(timer); }, []);
   useEffect(() => { try { localStorage.setItem(GROUP_KEY, groupBy); } catch { /* private mode */ } }, [groupBy]);
   const items = library.data?.items ?? NO_ITEMS;
-  const groups = useMemo(() => libraryGroups(items, { query, kind, groupBy }, now), [items, query, kind, groupBy, now]);
+  const groups = useMemo(() => libraryGroups(items, { query, kind, appType, groupBy }, now), [items, query, kind, appType, groupBy, now]);
   const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(() => new Set());
 
   return (
     <BotPageLayout testId="library" title="Library" bot={bot?.name} botId={bot?.id}
-      toolbar={<BotPageToolbar<LibraryKindFilter> search={{ value: query, onChange: setQuery, placeholder: "Search files" }}
-        filter={{ label: "Kind", value: kind, options: LIBRARY_KINDS, onChange: setKind }}
+      toolbar={<BotPageToolbar<LibraryKindFilter, LibraryAppType> search={{ value: query, onChange: setQuery, placeholder: "Search files" }}
+        filter={{ label: "Kind", value: kind, options: LIBRARY_KINDS, onChange: (next) => { setKind(next); setAppType("all"); } }}
+        subFilter={kind === "app" ? { label: "App type", value: appType, options: LIBRARY_APP_TYPES, onChange: setAppType } : null}
         menus={<MenuSelect<LibraryGroupBy> testId="library-group" label="Group by" value={groupBy} choices={LIBRARY_GROUPS} onChange={setGroupBy} className="h-8 text-sm" />} />}>
       <NoDragStyle />
       {groups.map((group) => {

@@ -39,6 +39,19 @@ describe("studioSidebarModel", () => {
     expect(model.pinned.map((each) => each.key)).toEqual(["studio:p2"]);
     expect(model.recent.map((each) => each.key)).toEqual(["studio:p1", "studio:d1"]);
   });
+  it("lists artifacts and mini apps as one Apps row that filters by family", () => {
+    const withApps = [
+      ...providers,
+      { pluginId: "artifacts", name: "Studio", state: "ready" as const, detail: null, panel: null, kinds: [kind("artifact", "Artifacts")] },
+      { pluginId: "minis", name: "Studio", state: "ready" as const, detail: null, panel: null, kinds: [kind("mini", "Apps")] },
+    ];
+    const apps = [item("artifacts", "artifact", "art_1", 5), item("artifacts", "artifact", "art_2", 6), item("minis", "mini", "mini_1", 7)];
+    const model = studioSidebarModel({ ...data, providers: withApps, items: [...items, ...apps] as never }, []);
+    expect(model.kinds.map((each) => [each.label, each.count])).toEqual([["Pages", 2], ["Recordings", 0], ["Apps", 3], ["Designs", 1], ["Boards", 0]]);
+    expect(model.kinds.find((each) => each.label === "Apps")!.query).toBe("family:app");
+    expect(model.recent.map((each) => each.key)).toContain("minis:mini_1");
+    expect(studioSidebarModel({ ...data, providers: withApps }, [], new Set(["artifact"])).kinds.filter((each) => each.label === "Apps")).toHaveLength(1);
+  });
   it("keeps recents short", () => {
     const many = Array.from({ length: 30 }, (_, n) => item("studio", "page", `p${n}`, n));
     expect(studioSidebarModel({ ...data, items: many as never }, []).recent).toHaveLength(RECENT_LIMIT);

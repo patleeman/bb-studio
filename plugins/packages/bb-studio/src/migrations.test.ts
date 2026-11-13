@@ -141,3 +141,33 @@ describe("the empty-table cleanup", () => {
     db.exec(MIGRATIONS[drop]!);
   });
 });
+
+describe("reminders become todos", () => {
+  it("copies each reminder into the todos once, keeps the old rows, and runs again safely", async () => {
+    const { default: Database } = await import("better-sqlite3");
+    const { LoopStore } = await import("./loops/store");
+    const db = new Database(":memory:");
+    const copy = MIGRATIONS.findIndex((sql) => sql.includes("'loop_reminder_' || a.id"));
+    expect(copy).toBeGreaterThan(0);
+    for (const sql of MIGRATIONS.slice(0, copy)) db.exec(sql);
+    db.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, created_at, updated_at) VALUES ('bot_main', 'Dot', 'D', 'active', 'thr_main', 1, 1), ('bot_ops', 'Ops', 'O', 'active', 'thr_ops', 2, 2)").run();
+    const reminder = db.prepare("INSERT INTO bot_automations (id, bot_id, kind, name, instruction, schedule_json, state, project_id, target_thread_id, last_fired_at, created_at, updated_at) VALUES (?, ?, ?, ?, 'Check the deploy.', ?, ?, 'proj_personal', ?, ?, 10, 20)");
+    reminder.run("aut_live", "bot_main", "reminder", "Deploy", JSON.stringify({ type: "once", at: 5_000 }), "active", "thr_main", null);
+    reminder.run("aut_paused", "bot_main", "reminder", "Paused one", JSON.stringify({ type: "once", at: 6_000 }), "paused", null, null);
+    reminder.run("aut_done", "bot_ops", "reminder", "Ops check", JSON.stringify({ type: "once", at: 7_000 }), "done", null, 7_100);
+    reminder.run("aut_thread", "bot_main", "reminder", "Thread one", JSON.stringify({ type: "once", at: 8_000 }), "active", "thr_side", null);
+    reminder.run("aut_checkin", "bot_main", "checkin", "Morning", JSON.stringify({ type: "times", days: [1], times: ["08:00"] }), "active", null, null);
+    const before = db.prepare("SELECT * FROM bot_automations ORDER BY id").all();
+    db.exec(MIGRATIONS[copy]!);
+    db.exec(MIGRATIONS[copy]!);
+    const todos = new LoopStore(db).all().sort((a, b) => a.id.localeCompare(b.id));
+    expect(todos.map((todo) => [todo.id, todo.title, todo.owner, todo.status, todo.trigger, todo.closedAt, todo.source])).toEqual([
+      ["loop_reminder_aut_done", "Ops check", "thread:thr_ops", "done", { type: "time", at: 7_000 }, 7_100, { kind: "automation", ref: "aut_done" }],
+      ["loop_reminder_aut_live", "Deploy", "cos", "queued", { type: "time", at: 5_000 }, null, { kind: "automation", ref: "aut_live" }],
+      ["loop_reminder_aut_paused", "Paused one", "cos", "dropped", { type: "time", at: 6_000 }, 20, { kind: "automation", ref: "aut_paused" }],
+      ["loop_reminder_aut_thread", "Thread one", "thread:thr_side", "queued", { type: "time", at: 8_000 }, null, { kind: "automation", ref: "aut_thread" }],
+    ]);
+    expect(todos[1]).toMatchObject({ why: "Check the deploy.", kind: "do", priority: "normal", push: false, createdAt: 10, updatedAt: 20 });
+    expect(db.prepare("SELECT * FROM bot_automations ORDER BY id").all()).toEqual(before);
+  });
+});

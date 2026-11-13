@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
-import { endOfReplyPointer, MINI_POINTER, PAGE_POINTER, studioInstructions, WORK_POINTER } from "./agent-instructions";
+import { APP_POINTER, endOfReplyPointer, MINI_POINTER, PAGE_POINTER, studioInstructions, WORK_POINTER } from "./agent-instructions";
 import { botInstructions } from "./bot";
 import { conversationInstructions } from "./bot-threads";
 import { DEFAULT_REPLIES } from "./explore/prompt";
@@ -8,6 +8,7 @@ import { BUILTIN_KINDS, resolveKinds, routingInstructions } from "./kinds";
 import { withMemory } from "./memory/service";
 import { INSTRUCTIONS_LIMIT } from "./memory/shared";
 import { memoryHost } from "./memory/test-fixture";
+import { STUDIO_SETTINGS } from "./settings/schema";
 
 /** A Bot like Chief of Staff: a role in the user's words and eight skills. */
 function realisticBot(): string {
@@ -26,7 +27,7 @@ it("keeps a typical conversation's instructions within 4,096 characters, the Bot
   const routing = routingInstructions(resolveKinds([], settings), settings);
   const inner = () => ({
     tools: [], skills: ["studio-code", "studio"],
-    instructions: studioInstructions({ bot, conversation: note, runner: "", pages: true, minis: true, work: true, endOfReply: endOfReplyPointer({ next: true, explore: true, replies: DEFAULT_REPLIES }), routing }),
+    instructions: studioInstructions({ bot, conversation: note, runner: "", pages: true, minis: true, appCards: false, work: true, endOfReply: endOfReplyPointer({ next: true, explore: true, replies: DEFAULT_REPLIES }), routing }),
   });
   const { instructions } = withMemory(() => x.memory, () => false, inner)({ thread: { id: "thr_main", parentThreadId: null, sourceThreadId: null }, pluginMetadata: {} });
   expect(instructions.length).toBeLessThanOrEqual(INSTRUCTIONS_LIMIT);
@@ -46,7 +47,7 @@ it("keeps a typical conversation's instructions within 4,096 characters, the Bot
 });
 
 it("keeps each pointer to one or two lines and says which end-of-reply attributes are on", () => {
-  const pointers = [PAGE_POINTER, MINI_POINTER, WORK_POINTER, endOfReplyPointer({ next: true, explore: true, replies: DEFAULT_REPLIES })!, endOfReplyPointer({ next: false, explore: true, replies: null })!];
+  const pointers = [PAGE_POINTER, MINI_POINTER, APP_POINTER, WORK_POINTER, endOfReplyPointer({ next: true, explore: true, replies: DEFAULT_REPLIES })!, endOfReplyPointer({ next: false, explore: true, replies: null })!];
   for (const pointer of pointers) {
     expect(pointer).not.toContain("\n");
     expect(pointer.length).toBeLessThanOrEqual(320);
@@ -54,14 +55,28 @@ it("keeps each pointer to one or two lines and says which end-of-reply attribute
   expect(endOfReplyPointer({ next: true, explore: false, replies: null })).toBe('When a reply has next steps, end it with one ::next{do="…"} line; load the studio skill ("The Next row") for its rules before you write one. No reply= (quick replies are off).');
   expect(endOfReplyPointer({ next: false, explore: true, replies: [] })).toContain("::explore{items=");
   expect(endOfReplyPointer({ next: false, explore: false, replies: [] })).toBeNull();
-  expect(studioInstructions({ bot: "", conversation: "", runner: "", pages: false, minis: false, work: false, endOfReply: null, routing: "" })).toBe("\u0000studio-memory\u0000");
+  expect(studioInstructions({ bot: "", conversation: "", runner: "", pages: false, minis: false, appCards: false, work: false, endOfReply: null, routing: "" })).toBe("\u0000studio-memory\u0000");
   expect(BUILTIN_KINDS.length).toBeGreaterThan(0);
+});
+
+it("describes apps, and says ::mini by default and ::app with the App cards setting on", () => {
+  const parts = { bot: "", conversation: "", runner: "", pages: false, minis: true, work: false, endOfReply: null, routing: "" };
+  const off = studioInstructions({ ...parts, appCards: false });
+  expect(off).toContain(MINI_POINTER);
+  expect(off).toContain('::mini{id="mini_…"}');
+  expect(off).not.toContain("::app{");
+  const on = studioInstructions({ ...parts, appCards: true });
+  expect(on).toContain(APP_POINTER);
+  expect(on).toContain('::app{id="…"}');
+  expect(on).not.toContain("::mini{");
+  for (const pointer of [MINI_POINTER, APP_POINTER]) expect(pointer).toContain("An app is a saved output");
+  expect(STUDIO_SETTINGS.appCards).toMatchObject({ type: "boolean", default: false, label: "App cards" });
 });
 
 it("moves the long guidance into the studio skill, which the pointers name", () => {
   const skill = readFileSync(new URL("../skills/studio/SKILL.md", import.meta.url), "utf8");
   expect(skill).toMatch(/^---\nname: studio\n/);
-  for (const heading of ["## Agent guide", "### Pages", "### Mini apps", "### The Next row", "### Explore", "### Kinds"]) expect(skill).toContain(heading);
+  for (const heading of ["## Agent guide", "### Pages", "### Apps", "### The Next row", "### Explore", "### Kinds"]) expect(skill).toContain(heading);
   // The rules that were in every session's instructions.
   for (const rule of ["```chart", "replace_all only when asked", "sandboxed iframe", "pages_comment_reply", "minis_update", "one stray \" breaks the whole line", "“curly” quotes", "Don't also write ::reactions or ::explore lines", "1 to 4 items separated by |"]) expect(skill).toContain(rule);
 });

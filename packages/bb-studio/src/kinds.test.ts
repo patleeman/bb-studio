@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { StudioProviderHandlers } from "./kit/server/index";
 import type { ProviderView } from "./contract";
 import { StudioHub, type HubSdk } from "./hub";
-import { builtinOn, frontendState, KINDS_KV_KEY, KindSettingsStore, parseKindSettings, replacements, resolveKind, resolveKinds, routeProviders, routingInstructions, type KindSettings } from "./kinds";
+import { builtinOn, frontendState, KIND_ROWS, kindRowViews, KINDS_KV_KEY, KindSettingsStore, parseKindSettings, replacements, resolveKind, resolveKinds, routeProviders, routingInstructions, rowKinds, type KindSettings } from "./kinds";
 import { MIGRATIONS } from "./migrations";
 import { SearchIndex } from "./search-index";
 
@@ -46,6 +46,38 @@ describe("kind settings", () => {
     expect(parseKindSettings(null)).toEqual({ off: [], use: {} });
     expect(builtinOn(settings({ off: ["page"] }), "pages")).toBe(false);
     expect(builtinOn(settings({ off: ["page"] }), "notion")).toBe(true);
+  });
+});
+
+describe("the Apps row", () => {
+  it("covers artifacts and mini apps in one Setup row, where Artifacts stood", () => {
+    expect(KIND_ROWS.map((row) => row.id)).toEqual(["page", "drawing", "recording", "app", "design"]);
+    expect(rowKinds("app")).toEqual(["artifact", "mini"]);
+    expect(rowKinds("mini")).toEqual(["mini"]);
+    expect(rowKinds("table")).toEqual([]);
+  });
+
+  it("is on when either kind is on, and turning it off or on turns both", async () => {
+    const kv = memoryKv();
+    kv.map.set(KINDS_KV_KEY, { off: ["mini"], use: {} });
+    const store = new KindSettingsStore(kv);
+    await store.load();
+    const row = () => kindRowViews(resolveKinds([], store.current), store.current).find((each) => each.kind === "app")!;
+    expect(row()).toMatchObject({ label: "Apps", on: true });
+    await store.update("app", { on: false });
+    expect(store.current.off.sort()).toEqual(["artifact", "mini"]);
+    expect(row().on).toBe(false);
+    await store.update("app", { on: true });
+    expect(store.current.off).toEqual([]);
+    await store.update("artifact", { on: false });
+    expect(store.current.off).toEqual(["artifact"]);
+    expect(row().on).toBe(true);
+  });
+
+  it("shows a provider that replaces either kind", () => {
+    const external = view("ext", [kind("ext-app", { replaces: "mini" })]);
+    const [app] = kindRowViews(resolveKinds([external], settings()), settings()).filter((each) => each.kind === "app");
+    expect(app).toMatchObject({ active: { pluginId: "ext" }, reason: "only-replacement", alternatives: [{ pluginId: "ext", kindId: "ext-app" }] });
   });
 });
 

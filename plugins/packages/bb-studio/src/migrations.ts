@@ -1102,4 +1102,28 @@ export const MIGRATIONS = [
    DROP TABLE IF EXISTS filing;
    DROP TABLE IF EXISTS folders;
    DROP TABLE IF EXISTS views;`,
+  `INSERT OR IGNORE INTO bot_loops (id, record)
+   SELECT 'loop_reminder_' || a.id, json_object(
+       'id', 'loop_reminder_' || a.id,
+       'title', substr(trim(a.name), 1, 500),
+       'why', a.instruction,
+       'source', json_object('kind', 'automation', 'ref', a.id),
+       'kind', 'do',
+       'options', json('[]'),
+       'owner', CASE
+         WHEN a.target_thread_id IS NOT NULL AND a.target_thread_id IS NOT (SELECT thread_id FROM bots ORDER BY (id = 'bot_main') DESC, created_at, id LIMIT 1) THEN 'thread:' || a.target_thread_id
+         WHEN a.target_thread_id IS NULL AND b.thread_id IS NOT NULL AND b.id <> (SELECT id FROM bots ORDER BY (id = 'bot_main') DESC, created_at, id LIMIT 1) THEN 'thread:' || b.thread_id
+         ELSE 'cos' END,
+       'trigger', json_object('type', 'time', 'at', COALESCE(json_extract(a.schedule_json, '$.at'), a.created_at)),
+       'priority', 'normal',
+       'push', json('false'),
+       'status', CASE a.state WHEN 'active' THEN 'queued' WHEN 'paused' THEN 'dropped' ELSE 'done' END,
+       'due', NULL,
+       'area', NULL,
+       'createdAt', a.created_at,
+       'updatedAt', a.updated_at,
+       'closedAt', CASE a.state WHEN 'active' THEN NULL ELSE COALESCE(a.last_fired_at, a.updated_at) END,
+       'closedBy', CASE a.state WHEN 'active' THEN NULL ELSE 'cos' END)
+   FROM bot_automations a LEFT JOIN bots b ON b.id = a.bot_id
+   WHERE a.kind = 'reminder' AND trim(a.name) <> '';`,
 ];
