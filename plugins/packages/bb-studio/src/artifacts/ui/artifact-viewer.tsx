@@ -1,6 +1,7 @@
 // One artifact: its contents by type under Studio's item header, with its
 // versions, the thread it came from, and Save as page for text. Selected text
 // or an image area can go to the artifact's thread (artifact-quote.tsx).
+import { AppTitle } from "../../ui/app-title";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -12,7 +13,6 @@ import {
   DropdownMenuSubTrigger,
   GHOST_BUTTON,
   Icon,
-  BarTitle,
   ItemHeader,
   ItemDeleteConfirm,
   ItemMenu,
@@ -269,11 +269,7 @@ export function ArtifactViewer({
         backLabel={backLabel}
         onBack={() => onBack()}
         item={thread}
-        leading={
-          <>
-            <BarTitle title={artifact.title} label="Artifact title" onRename={rename} />
-          </>
-        }
+        leading={<AppTitle type="saved" title={artifact.title} onRename={rename} />}
         thread={confirmDelete ? undefined : thread}
         trailing={trailing}
       />
