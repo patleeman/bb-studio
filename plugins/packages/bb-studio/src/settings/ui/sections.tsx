@@ -194,11 +194,11 @@ function JevSection() {
         <SettingRow k="decisions_jevProvider" />
         <JevConnection bare />
         <FallbackModel bare />
-        <Disclosure label="Your own Jev endpoint" testId="settings-jev-endpoint">
+        <Disclosure label="Your own endpoint" testId="settings-jev-endpoint">
           <SettingRow k="decisions_customJevEndpoint" />
           <SettingRow k="decisions_customJevModel" />
           <SettingRow k="decisions_customJevHeaders" />
-          <SettingRow k="decisions_customJevApiKeyCommand" description={<>{STUDIO_SETTINGS.decisions_customJevApiKeyCommand.description} Or set its key in the API keys above (Your own Jev endpoint: key).</>} />
+          <SettingRow k="decisions_customJevApiKeyCommand" description={<>{STUDIO_SETTINGS.decisions_customJevApiKeyCommand.description} Or set its key in the API keys above (Your own endpoint's API key).</>} />
         </Disclosure>
       </Card>
     </SectionState>

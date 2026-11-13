@@ -54,7 +54,7 @@ describe("the settings schema", () => {
   });
 
   it("puts every setting in a section, in the planned order, with plain labels", () => {
-    expect(SETTINGS_GROUPS.map((group) => group.title)).toEqual(["Voice", "Recordings and calls", "Agent replies", "Threads", "Windows", "Jev", "Advanced"]);
+    expect(SETTINGS_GROUPS.map((group) => group.title)).toEqual(["Voice", "Recordings and calls", "Agent replies", "Threads", "Windows", "Smart Queue model", "Advanced"]);
     const groups = new Set([...SETTINGS_GROUPS.map((group) => group.id), "attention"]);
     for (const key of STUDIO_SETTING_KEYS) {
       expect(groups.has(STUDIO_SETTINGS[key].group)).toBe(true);
@@ -65,6 +65,14 @@ describe("the settings schema", () => {
     expect(STUDIO_SETTINGS.decisions_batchConfidence).toMatchObject({ group: "advanced", type: "number" });
     expect(["loopDailyBudget", "loopQuietStart", "loopQuietEnd"].map((key) => STUDIO_SETTINGS[key as keyof typeof STUDIO_SETTINGS].group)).toEqual(["attention", "attention", "attention"]);
     expect(STUDIO_SETTINGS.loopsEnabled.group).toBe("threads");
+  });
+
+  it("says what each API key is for, and no label says Jev", () => {
+    for (const [key, setting] of Object.entries(STUDIO_KEY_SETTINGS)) {
+      expect(setting.description).toMatch(key === "openaiApiKey" ? /^Hands-free voice\./ : /^Smart Queue\b/);
+      expect(setting.label).not.toMatch(/Jev/);
+    }
+    expect(STUDIO_SETTINGS.decisions_jevProvider.label).toBe("Provider");
   });
 
   it("checks values against type and range, and parses command-line text", () => {
@@ -291,7 +299,7 @@ describe("bb studio settings", () => {
     const out = await settingsCli([], await storeWith({ autoTitle: false }));
     expect(out.exitCode).toBe(0);
     const text = out.stdout!;
-    for (const title of ["Voice", "Recordings and calls", "Agent replies", "Threads", "Jev", "Advanced", "Attention (Bot ▸ Controls)"]) expect(text).toContain(`${title}\n`);
+    for (const title of ["Voice", "Recordings and calls", "Agent replies", "Threads", "Smart Queue model", "Advanced", "Attention (Bot ▸ Controls)"]) expect(text).toContain(`${title}\n`);
     expect(text).toMatch(/ {2}autoTitle +false\n/);
     expect(text).toMatch(/ {2}autoMeetingNotes +false {2}\(default\)\n/);
     expect(text).toContain("API keys are BB's secret fields: bb plugin config studio");

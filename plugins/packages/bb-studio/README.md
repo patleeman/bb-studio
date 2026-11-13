@@ -226,14 +226,16 @@ is a quiet line (one per morning message).
 ## Settings
 
 **Settings → Plugins → Studio** starts with Studio's API keys, which BB keeps
-in its secret files: OpenAI, OpenRouter, xAI, TypeSafe, Vercel AI Gateway,
-OpenCode Zen and your own Jev endpoint's key. Every other setting is Studio's
+in its secret files: OpenAI (hands-free voice), xAI, and the keys Smart Queue's
+model (Jev) runs on: TypeSafe, Vercel AI Gateway, OpenRouter, OpenCode Zen and
+your own endpoint's. Every other setting is Studio's
 own, in grouped sections below them: **Voice** (dictation and hands-free:
 model, voice, backend model and monthly limit), **Recordings and calls**,
 **Agent replies** (the Next row, reactions and App cards), **Threads** (Smart Queue,
 resume after a restart, Todos and page history), **Windows** (the launcher's
-shortcut; only in a BB with plugin windows, see [Windows](#windows)), **Jev** (the
-provider, its connection test, the fallback model and your own endpoint) and
+shortcut; only in a BB with plugin windows, see [Windows](#windows)), **Smart
+Queue model** (Jev's provider, its connection test, the fallback model and your
+own endpoint) and
 **Advanced** (Smart Queue batch confidence). Last, **Phone notifications**
 shows Studio Mobile's push status and **Send a test push**. The Attention
 Router's daily budget and quiet hours are on the Bot page, under **Controls →

@@ -45,7 +45,7 @@ export default ({ bbCli }) => [
         await client.navigate("/settings/plugins/studio");
         await client.waitForText("Studio");
         // Studio's Jev section (src/settings/ui/sections.tsx).
-        await client.waitForText("Jev provider");
+        await client.waitForText("Smart Queue model");
         await client.waitForText("jev-local");
         await client.waitForText("If Jev doesn’t answer, use");
         await client.clickButtonText("Test");
