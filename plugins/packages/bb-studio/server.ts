@@ -443,7 +443,7 @@ export default async function plugin(bb: BbPluginApi) {
     // Short pointers for Pages, mini apps and the Next row; their long guidance is in the studio skill (src/agent-instructions.ts).
     const instructions = studioInstructions({
       bot: bot ? bots.instructions(bot) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
-      pages: !off.has("page"), minis: !off.has("mini"), endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
+      pages: !off.has("page"), minis: !off.has("mini"), work: true, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
     });
     return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
   }));
