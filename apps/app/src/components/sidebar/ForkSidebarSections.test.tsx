@@ -10,6 +10,10 @@ import {
   setPluginSlotRegistrations,
 } from "@/lib/plugin-slots";
 import { makePluginRegistrationSet } from "@/test/fixtures/plugins";
+import {
+  collectPluginAppRegistrations,
+  definePluginApp,
+} from "@/lib/plugin-app-definition";
 import { PluginSidebarSections } from "./ForkSidebarSections";
 
 function Bots({ activeThreadId, onNavigate }: ExperimentalSidebarSectionProps) {
@@ -24,11 +28,18 @@ function Broken(): never {
   throw new Error("section failed");
 }
 
-function renderSections(onNavigate: () => void) {
+function Notice({ placement }: ExperimentalSidebarSectionProps) {
+  return <p>Notice in {placement}</p>;
+}
+
+function renderSections(
+  onNavigate: () => void,
+  placement?: "list" | "footer",
+) {
   return render(
     <MemoryRouter initialEntries={["/projects/proj_1/threads/thr_1"]}>
       <SidebarProvider>
-        <PluginSidebarSections onNavigate={onNavigate} />
+        <PluginSidebarSections onNavigate={onNavigate} placement={placement} />
       </SidebarProvider>
     </MemoryRouter>,
   );
@@ -58,6 +69,69 @@ describe("plugin sidebar sections", () => {
     expect(screen.getByRole("region", { name: "Bots" })).toBeTruthy();
     fireEvent.click(screen.getByText("Bots for thr_1"));
     expect(onNavigate).toHaveBeenCalledTimes(1);
+  });
+
+  it("draws a footer section only where the footer sections go, and tells it so", () => {
+    setPluginSlotRegistrations(
+      "alpha",
+      makePluginRegistrationSet({
+        sidebarSections: [
+          { id: "bots", title: "Bots", component: Bots },
+          {
+            id: "notice",
+            title: "Notice",
+            placement: "footer",
+            component: Notice,
+          },
+        ],
+      }),
+    );
+    const list = renderSections(() => {});
+    expect(screen.getByText("Bots for thr_1")).toBeTruthy();
+    expect(screen.queryByText(/Notice in/)).toBeNull();
+    list.unmount();
+    renderSections(() => {}, "footer");
+    expect(screen.getByText("Notice in footer")).toBeTruthy();
+    expect(screen.queryByText("Bots for thr_1")).toBeNull();
+  });
+
+  it("collects a section's placement and refuses an unknown one", () => {
+    const collected = collectPluginAppRegistrations(
+      definePluginApp((app) => {
+        app.slots.experimental_sidebarSection({
+          id: "notice",
+          title: "Notice",
+          placement: "footer",
+          component: Notice,
+        });
+        app.slots.experimental_sidebarSection({
+          id: "bots",
+          title: "Bots",
+          component: Bots,
+        });
+      }),
+    );
+    expect(
+      collected.sidebarSections?.map((section) => [
+        section.id,
+        section.placement,
+      ]),
+    ).toEqual([
+      ["notice", "footer"],
+      ["bots", undefined],
+    ]);
+    expect(() =>
+      collectPluginAppRegistrations(
+        definePluginApp((app) => {
+          app.slots.experimental_sidebarSection({
+            id: "odd",
+            title: "Odd",
+            placement: "header" as "footer",
+            component: Notice,
+          });
+        }),
+      ),
+    ).toThrow('placement must be "list" or "footer"');
   });
 
   it("keeps the other sections when one crashes", () => {
