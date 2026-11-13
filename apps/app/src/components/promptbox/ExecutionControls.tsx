@@ -1,3 +1,4 @@
+import type { ProviderModelPickHandler } from "@/components/pickers/previewPick.fork";
 import { memo } from "react";
 import type {
   PermissionMode,
@@ -28,6 +29,7 @@ interface ExecutionProviderConfig {
   options?: readonly ProviderPickerOption[];
   selectedId?: string;
   onChange?: (value: string) => void;
+  onProviderModelChange?: ProviderModelPickHandler;
   hasMultiple?: boolean;
 }
 
@@ -114,6 +116,7 @@ export const ExecutionControls = memo(function ExecutionControls({
           providerRouting={providerRouting}
           selectedProviderId={selectedProviderId}
           onSelectedProviderChange={provider.onChange}
+          onProviderModelChange={provider.onProviderModelChange}
           hasMultipleProviders={provider.hasMultiple ?? false}
           modelValue={model.active?.model ?? model.selected}
           modelOptions={model.options}
