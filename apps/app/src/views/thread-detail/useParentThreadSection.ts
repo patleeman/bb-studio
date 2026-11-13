@@ -1,3 +1,4 @@
+import { parentRelationship } from "@/components/promptbox/banner/parentRelationship.fork";
 import { useMemo } from "react";
 import type { ThreadResponse } from "@bb/server-contract";
 import type { ThreadPromptParentThreadSection } from "@/components/promptbox/banner/ThreadPromptContextBanner";
@@ -22,7 +23,7 @@ export function useParentThreadSection(
     const relatedThreadId =
       threadOriginKind !== null ? threadSourceThreadId : thread.parentThreadId;
     if (!enabled || !relatedThreadId) return null;
-    const relationship = threadOriginKind === "fork" ? "fork" : "parent";
+    const relationship = parentRelationship(threadOriginKind, thread.originPluginId);
     const relatedThread =
       relationship === "parent" ? parentThread : sourceThread;
     const href = getThreadRoutePath({
@@ -54,6 +55,7 @@ export function useParentThreadSection(
     parentThread,
     sourceThread,
     thread.parentThreadId,
+    thread.originPluginId,
     thread.projectId,
     threadOriginKind,
     threadSourceThreadId,
