@@ -343,8 +343,8 @@ export function ThreadActionsProvider({
       if (destination !== null) viewedRouteRef.current = destination;
       appToast.success(
         singleThread !== null || archivedThreadIds.length === 1
-          ? "Thread archived"
-          : "Threads archived",
+          ? "Conversation archived"
+          : "Conversations archived",
         {
           description: singleThread ? (
             <ArchivedThreadToastDescription
