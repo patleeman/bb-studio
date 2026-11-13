@@ -62,6 +62,7 @@ it("titles the window by the Bot's page, and leaves the Library's own title alon
   expect(botPageTitle("bot/bot_main/loops")).toEqual({ title: "Todos", windowTitle: "Todos" });
   expect(botPageTitle("/bot/bot_main/loops/")).toEqual({ title: "Todos", windowTitle: "Todos" });
   expect(botPageTitle("bot/bot_main")).toBeNull();
+  expect(botPageTitle("bot/new")).toEqual({ title: "New Bot", windowTitle: "New Bot" });
   expect(botPageTitle("")).toBeNull();
   expect(botPageTitle("pages/pg_1")).toBeNull();
   expect(botPageTitle("automation/auto_1")).toEqual({ title: "Automation", windowTitle: "Automation" });
@@ -83,7 +84,7 @@ it("titles a Bot's Info page with the Bot's name once its page tells it", async 
   await act(async () => { noteBotName("bot_t10", "Chief of Staff"); });
   expect(seen.at(-1)).toBe("Chief of Staff");
   await act(async () => { probeRoot.render(<Probe subPath="bot/new" />); });
-  expect(seen.at(-1)).toBeNull();
+  expect(seen.at(-1)).toBe("New Bot");
   await act(async () => { probeRoot.render(<Probe subPath="memory/bot_t10" />); });
   expect(seen.at(-1)).toBe("Memory");
   await act(async () => { probeRoot.unmount(); });

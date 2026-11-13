@@ -12,7 +12,7 @@ import { useState } from "react";
 import { Icon } from "../../kit/app/index";
 import { Button } from "../../kit/ui/button";
 import { errorMessage } from "../../kit/format";
-import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, useRowOpen, type BotPageTone } from "../bot-page";
+import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, noMatch, useBotPageQuery, useRowOpen, type BotPageTone } from "../bot-page";
 import { useCall, useLive } from "../live";
 import { shortDate } from "./finish";
 import { shortAge, staleFailure } from "./model";
@@ -33,6 +33,8 @@ const WORKER_STATUS: Record<string, { label: string; tone: BotPageTone }> = {
   failed: { label: "Failed", tone: "danger" },
 };
 
+const ARCHIVE_PLURAL: Record<ArchiveFilter, string> = { all: "archived items", conversations: "archived conversations", workers: "archived workers", failed: "failed workers" };
+
 const matches = (query: string, ...texts: (string | null | undefined)[]) => {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const text = texts.filter(Boolean).join(" ").toLowerCase();
@@ -47,7 +49,7 @@ export default function OlderPage({ botId }: { botId: string | null }) {
   const spaces = useLive("bot_spaces", {}, { pollMs: 120_000 });
   const bot = spaces.data?.bots?.find((each) => each.id === (botId ?? live.data?.botId)) ?? null;
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useBotPageQuery();
   const [filter, setFilter] = useState<ArchiveFilter>("all");
   const now = Date.now();
   const data = live.data;
@@ -74,7 +76,10 @@ export default function OlderPage({ botId }: { botId: string | null }) {
           { id: "failed", label: "Failed", count: failed },
         ] }} />}>
       {error || live.error ? <p role="alert" className="text-sm text-destructive">{error ?? live.error}</p> : null}
-      {data && !conversations.length && !workers.length ? <BotPageEmpty testId="older-empty">{query.trim() || filter !== "all" ? "Nothing matches" : "Nothing archived"}</BotPageEmpty> : null}
+      {data && !conversations.length && !workers.length ? <BotPageEmpty testId="older-empty" {...(query.trim()
+        ? { title: noMatch(ARCHIVE_PLURAL[filter], query), action: { label: "Clear search", onClick: () => setQuery("") } }
+        : filter !== "all" ? { title: `No ${ARCHIVE_PLURAL[filter]}`, action: { label: "Show all", onClick: () => setFilter("all") } }
+        : { title: "Nothing archived yet", hint: "Archive a conversation from its ⋯ menu." })} /> : null}
       {conversations.length ? (
         <BotPageGroup title="Conversations" count={conversations.length}>
           {conversations.map((entry) => entry.kind === "older" ? (

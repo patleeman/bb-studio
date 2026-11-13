@@ -2,7 +2,8 @@
 // page's filter pills (bb's segmented ToggleGroup) and an optional second row
 // narrowing them, its menus (a sort, a
 // grouping) and "New" on the right. Pills show when there is more than one.
-import { forwardRef, type ReactNode, type Ref } from "react";
+import { forwardRef, useEffect, useState, type ReactNode, type Ref } from "react";
+import { useRetainedReturns } from "../../kit/app/retained";
 import { Button, type ButtonProps } from "../../kit/ui/button";
 import { Icon } from "../../kit/ui/icon";
 import { Input } from "../../kit/ui/input";
@@ -84,4 +85,11 @@ export function BotPageToolbar<T extends string, S extends string = string>({ se
       {pills && subFilter && subFilter.options.length > 1 ? <Pills pills={subFilter} testId="bot-page-subpills" /> : null}
     </div>
   );
+}
+
+export function useBotPageQuery(): [string, (value: string) => void] {
+  const [query, setQuery] = useState("");
+  const returns = useRetainedReturns();
+  useEffect(() => { if (returns) setQuery(""); }, [returns]);
+  return [query, setQuery];
 }

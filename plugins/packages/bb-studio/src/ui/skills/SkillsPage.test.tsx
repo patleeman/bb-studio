@@ -100,7 +100,7 @@ it("deletes a skill, shows the delete in History, and brings it back with Revert
   await click(container.querySelector("[data-testid=skill-delete]"));
   expect(bots.skill("inbox-sweep", "bot_main")).toBeNull();
   expect(names()).toEqual([]);
-  expect(container.querySelector("[data-testid=skills-empty]")?.textContent).toBe("No skills");
+  expect(container.querySelector("[data-testid=skills-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("No skills yet");
   await click(pill("history"));
   const history = qa("[data-testid=skills-history] [data-testid=skill-version]");
   expect(history.map((row) => row.querySelector("[data-testid=bot-page-row-status]")?.textContent ?? "")).toEqual(["Deleted", ""]);

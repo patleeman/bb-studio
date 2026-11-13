@@ -751,14 +751,14 @@ test("several Bots: the selected one (from the route) is expanded and scoped; a 
   expect(state.call).toHaveBeenCalledWith("bot_pause", { botId: "bot_scout" });
 });
 
-test("New bot: the welcome makes a second one, then opens its chat", async () => {
+test("New Bot: the welcome makes a second one, then opens its chat", async () => {
   state.pathname = "/plugins/studio/studio/bot/new";
   state.data = { bot_get: { bot: dot, run: null } };
   state.call.mockImplementation((async (method: string) => method === "bot_create" ? { bot: scout, run: null } : {}) as never);
   await show(<BotPanel />);
   expect(container.textContent).toContain("Make another Bot");
   await act(async () => button("Create Bot").click());
-  expect(state.call).toHaveBeenCalledWith("bot_create", expect.objectContaining({ name: "New bot", avatar: "🤖", setup: "Watch my PRs" }));
+  expect(state.call).toHaveBeenCalledWith("bot_create", expect.objectContaining({ name: "New Bot", avatar: "🤖", setup: "Watch my PRs" }));
   // Its chat opens as a BB thread.
   expect(state.toThread).toHaveBeenCalledWith("thr_scout");
   state.call.mockImplementation(async () => ({}));

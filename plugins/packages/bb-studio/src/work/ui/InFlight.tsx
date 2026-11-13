@@ -8,6 +8,7 @@ import { useLive } from "../../ui/live";
 import type { WorkCard } from "../contract";
 import { inFlightRows, needsYouCount, openCount, rowDetail } from "./in-flight-model";
 import { STATE } from "./model";
+import { useCardsOnScreen } from "./on-screen";
 import { revealCard } from "./reveal";
 import { StateGlyph } from "./WorkCard";
 
@@ -31,8 +32,9 @@ export function InFlight({ threadId }: { threadId: string }) {
   const navigate = useBbNavigate();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(readCollapsed);
+  const onScreen = useCardsOnScreen();
   const cards = live.data?.cards ?? [];
-  const rows = inFlightRows(cards);
+  const rows = inFlightRows(cards.filter((card) => !onScreen.has(card.id)));
   if (!rows.length) return null;
   const open = openCount(rows);
   const needs = needsYouCount(rows);

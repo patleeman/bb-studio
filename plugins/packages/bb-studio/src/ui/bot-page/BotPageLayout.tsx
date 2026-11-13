@@ -56,7 +56,25 @@ export function BotPageLayout({ title, bot, botId, actions, toolbar, testId, chi
   );
 }
 
-/** The quiet line a page or group shows when it has nothing: "No todos", "No files match". */
-export function BotPageEmpty({ children, testId }: { children: ReactNode; testId?: string }) {
-  return <p data-testid={testId} className="px-2 py-8 text-center text-sm text-muted-foreground">{children}</p>;
+export interface BotPageEmptyAction {
+  label: string;
+  onClick(): void;
+}
+
+/** What a page or group shows when it has nothing: "No files yet", "No files match “q”", with at most one next step and one action. */
+export function BotPageEmpty({ title, children, hint, action, testId }: { title?: ReactNode; children?: ReactNode; hint?: ReactNode; action?: BotPageEmptyAction | null; testId?: string }) {
+  return (
+    <div data-testid={testId} className="flex flex-col items-center gap-1.5 px-2 py-10 text-center">
+      <p data-testid="bot-page-empty-title" className="text-sm text-foreground">{title ?? children}</p>
+      {hint ? <p data-testid="bot-page-empty-hint" className="max-w-sm text-sm text-muted-foreground">{hint}</p> : null}
+      {action ? (
+        <button type="button" data-testid="bot-page-empty-action" onClick={action.onClick}
+          className="mt-1.5 h-7 rounded-md border border-border px-2.5 text-xs text-foreground hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">{action.label}</button>
+      ) : null}
+    </div>
+  );
+}
+
+export function noMatch(plural: string, query: string): string {
+  return `No ${plural} match “${query.trim()}”`;
 }

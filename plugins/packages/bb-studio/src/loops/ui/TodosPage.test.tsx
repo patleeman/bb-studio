@@ -35,6 +35,7 @@ vi.mock("../../ui/live", () => ({
     const data = method === "loops.list" ? state.groups
       : method === "loops.scheduled" ? { items: state.scheduled }
       : method === "bot_get" ? { bot: { id: "bot_1", name: "Chief of Staff", threadId: "thr_bot" } }
+      : method === "bot_list" ? { bots: [{ id: "bot_1", name: "Chief of Staff", threadId: "thr_bot", primary: true, state: "active" }] }
         : method === "project_leads" ? { leads: [{ projectId: "proj_k", leadThreadId: "thr_lead", run: null }] }
           : method === "loops.places" ? { names: ["Home", "Office", "Mom’s"] }
             : method === "bot_attention" ? { attention: state.attention } : null;
@@ -142,7 +143,11 @@ it("filters by area pills and search; area lives only in the filter bar", async 
   await type(container.querySelector<HTMLInputElement>("[data-testid=bot-page-search]")!, "onboarding sign");
   expect(titles(container)).toEqual(["Review the onboarding flow"]);
   await type(container.querySelector<HTMLInputElement>("[data-testid=bot-page-search]")!, "nothing like it");
-  expect(container.querySelector("[data-testid=todos-empty]")?.textContent).toBe("No todos match");
+  expect(container.querySelector("[data-testid=todos-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("No todos match “nothing like it”");
+  expect(container.querySelector("[data-testid=scheduled-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("No scheduled items match “nothing like it”");
+  await act(async () => container.querySelector<HTMLButtonElement>("[data-testid=todos-empty] [data-testid=bot-page-empty-action]")!.click());
+  expect(container.querySelector<HTMLInputElement>("[data-testid=bot-page-search]")!.value).toBe("");
+  expect(titles(container).length).toBeGreaterThan(1);
 });
 
 it("a row opens the todo through the link router, and the todo tab shows its description, due date, when, area, owner and source with the plan's link", async () => {
@@ -253,23 +258,26 @@ it("New hands a typed line to the Bot", async () => {
   expect(container.querySelector("[data-testid=todo-add]")).toBeNull();
 });
 
-it("leads Today with the Bot chat's pending questions (a tracked one once) and unread replies, which open the chat", async () => {
+it("leads Today with the Bot chat's pending questions (a tracked one once), which open the chat; an unread reply is no todo", async () => {
   state.interactions = [{ id: "int_1", status: "pending", createdAt: NOW, payload: { kind: "approval" } }, { id: "int_2", status: "pending", createdAt: NOW, payload: { kind: "user_question", questions: [{ question: "Which day works for the call?" }] } }, { id: "int_3", status: "resolved" }];
   (state.groups as typeof empty).needsYouNow.push(loop("loop_q", "Approve the invoice", { source: { kind: "interaction", ref: "int_1" } }));
   state.attention = { reason: "1", count: 1, since: NOW, unread: 1 };
   await render();
   await act(async () => { await Promise.resolve(); });
   const today = group("Today")!;
-  expect(titles(today).slice(0, 2)).toEqual(["Which day works for the call?", "A reply from Chief of Staff"]);
-  expect(today.querySelector("[data-testid=bot-page-group-count]")?.textContent).toBe("6");
+  expect(titles(today).slice(0, 2)).toEqual(["Which day works for the call?", "Pay the Con Edison bill"]);
+  expect(today.querySelector("[data-testid=bot-page-group-count]")?.textContent).toBe("5");
+  expect(container.textContent).not.toContain("A reply from");
+  expect(container.textContent).not.toContain("Unread");
   await act(async () => today.querySelector<HTMLButtonElement>("[data-testid=todo-chat] [data-testid=bot-page-row-open]")!.click());
   expect(state.openLink).toHaveBeenLastCalledWith("bb://conversation/thr_bot", { source: "botPage", title: "Chief of Staff", modifiers: { meta: false, ctrl: false, shift: false } });
 });
 
-it("says No todos when nothing is open, with Done still there", async () => {
+it("says No todos yet when nothing is open, with New todo, and Done still there", async () => {
   state.groups = { ...empty, done: [loop("loop_v", "Cancel the hosting Pro trial", { status: "done", closedAt: NOW, closedBy: "patrick" })] };
   await render();
-  expect(container.querySelector("[data-testid=todos-empty]")?.textContent).toBe("No todos");
+  expect(container.querySelector("[data-testid=todos-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("No todos yet");
+  expect(container.querySelector("[data-testid=todos-empty] [data-testid=bot-page-empty-action]")?.textContent).toBe("New todo");
   expect(group("Done")?.textContent).toContain("Done1");
 });
 
@@ -286,5 +294,47 @@ it("lists the Bot's check-ins, reminders, watchers and runners under Scheduled, 
   const rows = [...container.querySelectorAll("[data-testid=todos-scheduled] [data-testid=scheduled-row]")];
   expect(rows.map((each) => each.textContent)).toEqual(["Morning brief4:00 PM", "Inbox watchPaused"]);
   expect(rows[0]!.getAttribute("data-row-link")).toBe("bb://automation/bot_1%3AMorning%20brief");
+  state.scheduled = [];
+});
+
+it("opens at the top, also as studio/automations: nothing scrolls the page to Scheduled", async () => {
+  const scrolled = vi.fn();
+  Element.prototype.scrollIntoView = scrolled;
+  state.scheduled = [{ key: "Morning brief", source: "automation", id: "Morning brief", botId: "bot_1", botName: "Chief of Staff", kind: "checkin", title: "Morning brief", nextAt: null, state: "active", scheduleText: "Daily 8:00", threadId: "thr_bot", link: "bb://automation/bot_1%3AMorning%20brief" }];
+  const { AutomationsPanel } = await import("../../ui/automations/AutomationsPanel");
+  await act(async () => root.render(<AutomationsPanel />));
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  expect(container.querySelector("[data-testid=scheduled-row]")).not.toBeNull();
+  expect(scrolled).not.toHaveBeenCalled();
+  delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  state.scheduled = [];
+});
+
+it("shows 8 rows of a long group, then \"N more in Later\", so Scheduled stays near the top", async () => {
+  state.groups = { ...empty, comingUp: Array.from({ length: 20 }, (_, n) => loop(`loop_l${n}`, `Later ${String(n).padStart(2, "0")}`, { status: "queued" })) };
+  state.scheduled = [{ key: "Morning brief", source: "automation", id: "Morning brief", botId: "bot_1", botName: "Chief of Staff", kind: "checkin", title: "Morning brief", nextAt: null, state: "active", scheduleText: "Daily 8:00", threadId: "thr_bot", link: "bb://automation/bot_1%3AMorning%20brief" }];
+  await render();
+  const later = group("Later")!;
+  expect(later.querySelector("[data-testid=bot-page-group-count]")?.textContent).toBe("20");
+  expect(titles(later)).toHaveLength(8);
+  expect(later.querySelector("[data-testid=todos-more]")?.textContent).toBe("12 more in Later");
+  expect(container.querySelectorAll("[data-testid=bot-page-row-title]")).toHaveLength(9);
+  await act(async () => later.querySelector<HTMLButtonElement>("[data-testid=todos-more]")!.click());
+  expect(titles(group("Later"))).toHaveLength(20);
+  expect(group("Later")!.querySelector("[data-testid=todos-more]")).toBeNull();
+  state.scheduled = [];
+});
+
+it("under a Bot that isn't the primary, is that Bot's Scheduled alone, titled Scheduled: the todos are the primary's", async () => {
+  const item = (key: string, botId: string) => ({ key, source: "automation", id: key, botId, botName: botId, kind: "reminder", title: key, nextAt: null, state: "active", scheduleText: "Once", threadId: null, link: `bb://automation/${botId}%3A${encodeURIComponent(key)}` });
+  state.scheduled = [item("Water the plants", "bot_1"), item("Ship notes", "bot_2")];
+  await act(async () => root.render(<TodosPage view={{ bot: { id: "bot_2", name: "New bot", threadId: "thr_two", primary: false, state: "active" } } as never} />));
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Scheduled·New bot");
+  expect([...container.querySelectorAll("section")].map((each) => each.getAttribute("aria-label"))).toEqual(["Scheduled"]);
+  expect(titles(container)).toEqual(["Ship notes"]);
+  expect(container.querySelector<HTMLInputElement>("[data-testid=bot-page-search]")?.placeholder).toBe("Search scheduled");
+  expect(container.querySelector("[data-testid=todos-empty]")).toBeNull();
+  expect(container.textContent).not.toContain("Pay the Con Edison bill");
   state.scheduled = [];
 });

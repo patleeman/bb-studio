@@ -11,10 +11,12 @@ const state = vi.hoisted(() => ({
   navigate: { toThread: vi.fn(), toCompose: vi.fn(), toPluginPanel: vi.fn() },
   windows: false,
   loopsOn: false,
+  gone: new Set<string>(),
 }));
 vi.mock("../../kit/app/windows", () => ({ get hasHostWindows() { return state.windows; } }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => state.navigate,
+  useSdk: () => ({ threads: { get: async ({ threadId }: { threadId: string }) => { if (state.gone.has(threadId)) throw Object.assign(new Error("Not found"), { status: 404 }); return { id: threadId, projectId: "proj_personal" }; } } }),
   experimental_useSidebarThreads: () => ({ threads: state.sidebarThreads, projects: [] }),
   experimental_ThreadActionsContextMenu: ({ children }: { children: ReactNode }) => children,
 }));
@@ -74,6 +76,7 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
   state.call.mockClear();
+  state.gone.clear();
   for (const fn of Object.values(state.navigate)) fn.mockClear();
   state.sidebarThreads = [{ id: "fork", status: "active", runtimeStatus: "active", updatedAt: NOW, projectId: "p", parentThreadId: null, parentNotifications: "auto", archivedAt: null, pinnedAt: null, sectionId: null, isUnread: false, environment: null }];
   state.live = {
@@ -143,6 +146,20 @@ it("switches Bots with a dot or Studio: Show Bot <n>, landing on that Bot's last
   act(() => root.unmount());
   expect(canShowBot(1)).toBe(false);
   root = createRoot(host);
+});
+
+it("skips a deleted last conversation or Main when it switches Bots, and opens the Bot's page when both are gone", async () => {
+  await mount();
+  rememberConversation("home", "home_old");
+  state.gone.add("home_old");
+  await act(async () => { $$('[data-testid="space-dot"]')[1]!.click(); });
+  expect(state.navigate.toThread).toHaveBeenLastCalledWith("home_main");
+  await act(async () => { $$('[data-testid="space-dot"]')[0]!.click(); });
+  state.navigate.toThread.mockClear();
+  state.gone.add("home_main");
+  await act(async () => { $$('[data-testid="space-dot"]')[1]!.click(); });
+  expect(state.navigate.toThread).not.toHaveBeenCalled();
+  expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "bot/home" });
 });
 
 it("stays on the Bot it switched to while another Bot's thread is still on screen, and follows a thread opened after", async () => {
@@ -407,6 +424,16 @@ describe("the Bot's space (round 7)", () => {
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
     expect($('[data-testid="space-page-memory"]')?.getAttribute("aria-current")).toBe("page");
     expect($('[data-testid="space-page-library"]')?.getAttribute("aria-current")).toBeNull();
+  });
+
+  it("names another Bot's page row Scheduled: the Todos list is the primary Bot's", async () => {
+    state.loopsOn = true;
+    state.live.bot_spaces = { bots: [space("cos", "Chief of Staff", false, "main"), space("home", "Home", false, "home_main")], currentBotId: "home" };
+    await mount();
+    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Scheduled"]);
+    expect($('[data-testid="space-page-todos"]')).toBeNull();
+    await act(async () => { $('[data-testid="space-page-automations"]')!.click(); });
+    expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("automations");
   });
 
   it("adds Todos with what needs Patrick now, for the primary Bot with Todos on", async () => {

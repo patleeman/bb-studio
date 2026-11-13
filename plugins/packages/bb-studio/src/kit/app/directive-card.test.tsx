@@ -35,6 +35,14 @@ it("shows the body inline and opens the item from its header", () => {
   expect(onOpen).toHaveBeenCalledTimes(1);
 });
 
+it("puts the open icon last in the header, after the show and hide toggle", () => {
+  render();
+  const head = host.querySelector<HTMLElement>("[data-studio-card-head]")!;
+  const buttons = [...head.querySelectorAll(":scope > button")];
+  expect(buttons.at(-1)!.getAttribute("data-testid")).toBe("directive-open-full");
+  expect(buttons.at(-2)!.getAttribute("aria-label")).toBe("Hide Plan");
+});
+
 it("collapses the body and remembers the choice", () => {
   render();
   act(() => button("Hide Plan").click());

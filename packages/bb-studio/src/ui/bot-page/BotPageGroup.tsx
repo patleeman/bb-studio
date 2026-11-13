@@ -39,3 +39,10 @@ export function BotPageGroup({ title, label, count, aside, collapsible = false, 
     </section>
   );
 }
+
+export function BotPageMore({ count, group, onOpen, testId }: { count: number; group: string; onOpen(): void; testId?: string }) {
+  return (
+    <button type="button" data-testid={testId ?? "bot-page-more"} onClick={onOpen}
+      className="flex h-8 items-center rounded-md px-2 text-left text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none">{count} more in {group}</button>
+  );
+}

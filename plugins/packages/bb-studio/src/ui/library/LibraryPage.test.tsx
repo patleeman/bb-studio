@@ -112,3 +112,25 @@ it("narrows App to Interactive or Saved with a second row of pills", () => {
   expect(container.querySelector("[data-testid=bot-page-subpills]")).toBeNull();
   expect(titles()).toEqual(["Q3 report", "Round timer", "Groceries"]);
 });
+
+it("says what is empty and offers one way on: Clear search for a query, Show all files for an empty kind, a hint for Starred and a new Library", () => {
+  act(() => root.render(<LibraryPage />));
+  const search = container.querySelector<HTMLInputElement>("[data-testid=bot-page-search]")!;
+  const type = (value: string) => act(() => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(search, value); search.dispatchEvent(new Event("input", { bubbles: true })); });
+  const empty = () => [container.querySelector("[data-testid=bot-page-empty-title]")?.textContent ?? null, container.querySelector("[data-testid=bot-page-empty-hint]")?.textContent ?? null, container.querySelector("[data-testid=bot-page-empty-action]")?.textContent ?? null];
+  const pill = (label: string) => act(() => [...container.querySelectorAll<HTMLButtonElement>("[data-testid=bot-page-pill]")].find((each) => each.textContent === label)!.click());
+  type("zzzz");
+  expect(empty()).toEqual(["No files match “zzzz”", null, "Clear search"]);
+  act(() => container.querySelector<HTMLButtonElement>("[data-testid=bot-page-empty-action]")!.click());
+  expect(search.value).toBe("");
+  expect(container.querySelectorAll("[data-testid=library-row]").length).toBe(3);
+  pill("Starred");
+  expect(empty()).toEqual(["No starred files", "Open a file and press Star in its header.", null]);
+  pill("Recording");
+  expect(empty()).toEqual(["No recordings", null, "Show all files"]);
+  act(() => container.querySelector<HTMLButtonElement>("[data-testid=bot-page-empty-action]")!.click());
+  expect(container.querySelectorAll("[data-testid=library-row]").length).toBe(3);
+  state.items = [];
+  act(() => root.render(<LibraryPage key="fresh" />));
+  expect(empty()).toEqual(["No files yet", "Ask in a conversation for a page, a design or an app.", null]);
+});

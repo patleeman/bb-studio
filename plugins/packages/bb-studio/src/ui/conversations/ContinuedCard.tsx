@@ -43,9 +43,9 @@ export function ContinuedCard({ attributes }: PluginMessageDirectiveProps) {
       className={cn(CHAT_CARD, "group cursor-pointer transition-colors hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none")}>
       <span data-studio-card-head="" className={cn(CHAT_CARD_HEAD, "w-full pr-3")}>
         <Icon name="MessageSquare" className="size-4 shrink-0 text-muted-foreground" />
-        <span data-testid="continued-title" data-studio-card-title="" className="min-w-0 truncate text-sm font-medium text-foreground">{title}</span>
-        <span data-studio-card-meta="" className="min-w-0 flex-1 truncate text-xs text-muted-foreground">Continued in{status ? ` · ${status}` : ""}</span>
-        <Icon name="ArrowRight" className="size-3.5 shrink-0 text-muted-foreground group-hover:text-foreground" />
+        <span data-studio-card-title="" className="min-w-0 truncate text-sm font-medium text-foreground">Continued in <span data-testid="continued-title">{title}</span></span>
+        <span data-studio-card-meta="" className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{status}</span>
+        <Icon name="ArrowUpRight" className="size-3.5 shrink-0 text-muted-foreground group-hover:text-foreground" />
       </span>
     </button>
   );

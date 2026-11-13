@@ -16,8 +16,8 @@ import { MenuSelect } from "../menu-select";
 import { ItemIcon } from "../item-row";
 import { shortAge } from "../conversations/model";
 import { useLive } from "../live";
-import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, useRowOpen } from "../bot-page";
-import { foldRows, LIBRARY_APP_TYPES, LIBRARY_GROUPS, LIBRARY_KINDS, libraryGroups, libraryMeta, type LibraryAppType, type LibraryGroupBy, type LibraryKindFilter } from "./library-model";
+import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, useBotPageQuery, useRowOpen } from "../bot-page";
+import { foldRows, LIBRARY_APP_TYPES, LIBRARY_GROUPS, LIBRARY_KINDS, libraryEmpty, libraryGroups, libraryMeta, type LibraryAppType, type LibraryEmpty, type LibraryGroupBy, type LibraryKindFilter } from "./library-model";
 
 const GROUP_KEY = "studio.library.group";
 
@@ -36,7 +36,7 @@ export function LibraryPage() {
   const botId = chosen ?? spaces.data?.currentBotId ?? undefined;
   const bot = spaces.data?.bots.find((each) => each.id === botId) ?? spaces.data?.bots[0] ?? null;
   const library = useLive("bot_library", botId ? { botId } : {}, { pollMs: 120_000 });
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useBotPageQuery();
   const [kind, setKind] = useState<LibraryKindFilter>("all");
   const [appType, setAppType] = useState<LibraryAppType>("all");
   const [groupBy, setGroupBy] = useState<LibraryGroupBy>(readGroup);
@@ -76,10 +76,16 @@ export function LibraryPage() {
           </BotPageGroup>
         );
       })}
-      {library.data && !groups.length ? <BotPageEmpty testId="library-empty">{items.length ? "No files match" : "No files"}</BotPageEmpty> : null}
+      {library.data && !groups.length ? <LibraryEmptyState empty={libraryEmpty({ query, kind, appType, total: items.length })}
+        onClear={() => setQuery("")} onAll={() => { setKind("all"); setAppType("all"); }} /> : null}
       {!library.data && library.error ? <p role="alert" className="px-2 py-6 text-sm text-destructive">{library.error}</p> : null}
     </BotPageLayout>
   );
 }
 
 const NO_ITEMS: LibraryItem[] = [];
+
+function LibraryEmptyState({ empty, onClear, onAll }: { empty: LibraryEmpty; onClear(): void; onAll(): void }) {
+  const action = empty.action === "clear" ? { label: "Clear search", onClick: onClear } : empty.action === "all" ? { label: "Show all files", onClick: onAll } : null;
+  return <BotPageEmpty testId="library-empty" title={empty.title} hint={empty.hint} action={action} />;
+}

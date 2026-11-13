@@ -2,7 +2,7 @@ import { Fragment, useState } from "react";
 import { Icon } from "../../kit/app/index";
 import { Button } from "../../kit/ui/button";
 import { errorMessage, relativeTime } from "../../kit/format";
-import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar } from "../bot-page";
+import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, noMatch, useBotPageQuery } from "../bot-page";
 import { useCall, useLive } from "../live";
 import { matchesSkill, type SkillsFilter } from "./paths";
 
@@ -78,7 +78,7 @@ export default function SkillsPage({ botId: routeBot }: { botId: string | null }
   const botId = routeBot ?? spaces.data?.currentBotId ?? null;
   const bot = spaces.data?.bots?.find((each) => each.id === botId) ?? null;
   const skills = useLive("bot_skills", botId ? { botId } : {}, { enabled: !!botId, pollMs: 30_000 });
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useBotPageQuery();
   const [filter, setFilter] = useState<SkillsFilter>("skills");
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -117,7 +117,9 @@ export default function SkillsPage({ botId: routeBot }: { botId: string | null }
       {filter === "history" ? (
         botId ? <BotPageGroup title="History" testId="skills-history"><Versions key={revision} botId={botId} busy={busy} revert={revert} /></BotPageGroup> : null
       ) : skills.data && !shown.length ? (
-        <BotPageEmpty testId="skills-empty">{query.trim() ? "No skills match" : filter === "archived" ? "No archived skills" : "No skills"}</BotPageEmpty>
+        <BotPageEmpty testId="skills-empty" {...(query.trim()
+          ? { title: noMatch(filter === "archived" ? "archived skills" : "skills", query), action: { label: "Clear search", onClick: () => setQuery("") } }
+          : filter === "archived" ? { title: "No archived skills" } : { title: "No skills yet", hint: "Ask the Bot to save a way of working as a skill." })} />
       ) : shown.length ? (
         <BotPageGroup title={filter === "archived" ? "Archived" : "Skills"} count={shown.length}>
           {shown.map((skill) => (

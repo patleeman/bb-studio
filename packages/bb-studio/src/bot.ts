@@ -5,7 +5,7 @@ import { LoopStore } from './loops/store';
 // project's lead (src/project-lead.ts), so a handoff rotates it and the
 // project's heartbeat is the Bot's check-in. That is the primary Bot (BOT_ID).
 //
-// The user can make more Bots ("New bot"). Each has its own thread (stored on
+// The user can make more Bots ("New Bot"). Each has its own thread (stored on
 // its row, not a project lead; a handoff moves it, handedOff), Memory page,
 // skills, runners and check-in. An additional Bot's check-in is its own
 // schedule, kept by ProjectRuns under the key `bot:<id>` (BOT_RUN_PREFIX).
@@ -39,6 +39,8 @@ import { EXTERNAL_PROVIDERS, externalName, externalNote } from "./external-provi
 export { EXTERNAL_AGENTS_PLUGIN_ID, EXTERNAL_PROVIDERS, externalNote } from "./external-providers";
 import { BOT_RUN_PREFIX, heartbeatCron, PERSONAL_PROJECT_ID, type ProjectLeads } from "./project-lead";
 import { BOT_SHAPES } from "./bot-shapes";
+import { readyProvider, type OnboardingProviderState } from "./onboarding";
+import { rpcErrorStatus } from "./kit/server/index";
 import { turnStartedAt } from "./turn-started";
 import { botAttention, pendingInteractions, threadWaitingFor, type BotAttention } from "./bot-attention";
 import { lineDiff, lintSkill } from "./skill-learning";
@@ -195,17 +197,20 @@ export function modelChange(current: ThreadExecution, next: ThreadExecution): "u
 }
 /**
  * A new Bot's first message from the first-time flow (bot_create's `setup`,
- * what the user wants help with; empty when they didn't say). The Bot
- * introduces itself, asks a couple of questions, and then names and
- * describes itself and picks its look with bot_profile_update.
+ * what the user wants help with; empty when they didn't say): a short hello
+ * the user sees, and an agent-only note that has the Bot introduce itself,
+ * ask a couple of questions, and then name, describe and pick its look with
+ * bot_profile_update.
  */
-export function setupPrompt(goal: string): string {
+export function setupInput(goal: string): { type: "text"; text: string; mentions: never[]; visibility?: "agent-only" }[] {
   const want = goal.trim();
   return [
-    want ? `Hi! You're my new Bot. I'd like help with: ${want}` : "Hi! You're my new Bot. I haven't decided what you should help with yet.",
-    "",
-    `Start by introducing yourself in a sentence, then ask me ${want ? "one or two short questions about what I need" : "what I'd like help with"}. Once I've answered, pick a name, a one-line description and a look that fit the job, set them with bot_profile_update, and offer a check-in if one would help.`,
-  ].join("\n");
+    { type: "text", text: want ? `Hi! You're my new Bot. I'd like help with: ${want}` : "Hi! You're my new Bot.", mentions: [] },
+    {
+      type: "text", mentions: [], visibility: "agent-only",
+      text: `${want ? "" : "The user hasn't said what they want help with yet. "}Start by introducing yourself in a sentence, then ask ${want ? "one or two short questions about what they need" : "what they'd like help with"}. Once they've answered, pick a name, a one-line description and a look that fit the job, set them with bot_profile_update, and offer a check-in if one would help.`,
+    },
+  ];
 }
 
 /**
@@ -379,6 +384,7 @@ export interface BotDeps {
   ownedThreads?(botId: string): ReadonlySet<string>;
   /** A Bot got a thread (made, set or handed off): its chain leaves BB's thread list (src/bot-owned.ts). */
   claimChains?(): Promise<unknown>;
+  providerStates?(): Promise<readonly OnboardingProviderState[]>;
   /** Check-ins, reminders and watchers (src/automations.ts): Pause and Stop turn them off, Resume back on. */
   automations?: {
     pauseAll(botId: string, onPaused?: (id: string) => void): Promise<string[]>;
@@ -699,9 +705,10 @@ export class Bots {
           environment: { type: "project-default" },
           pluginMetadata: { bot: id },
           // Studio Agents' providers take no reasoning levels; the permission is the bot's (accept edits by default).
+          ...(external ? {} : await this.signedInModel()),
           ...(external ? { providerId: external.providerId, model: external.model, reasoningLevel: "none", permissionMode: external.permissionMode, executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit", permissionMode: "explicit" } } : {}),
           // Its instructions come from agents.configure (botInstructions), so the first message is the user's.
-          input: [{ type: "text", text: input.prompt ?? (input.setup !== undefined ? setupPrompt(input.setup) : `Hi ${input.name}. Introduce yourself in a sentence and ask what I'd like you to keep an eye on.`), mentions: [] }],
+          input: input.prompt === undefined && input.setup !== undefined ? setupInput(input.setup) : [{ type: "text", text: input.prompt ?? `Hi ${input.name}. Introduce yourself in a sentence and ask what I'd like you to keep an eye on.`, mentions: [] }],
         } as never);
         threadId = thread.id;
       }
@@ -714,6 +721,21 @@ export class Bots {
     await this.claimChains();
     this.deps.changed();
     return this.get(id);
+  }
+
+  async signedInModel(): Promise<Record<string, unknown>> {
+    let states: readonly OnboardingProviderState[] = [];
+    try { states = (await this.deps.providerStates?.()) ?? []; } catch { return {}; }
+    const ready = new Set(states.filter((state) => state.status === "ready" && botKind(state.providerId) === "studio").map((state) => state.providerId));
+    if (!ready.size) return {};
+    const primaryId = this.primaryId();
+    const primary = primaryId ? this.row(primaryId) : null;
+    const preset = primary ? storedDefault(primary) : null;
+    if (preset && ready.has(preset.providerId)) {
+      return { providerId: preset.providerId, model: preset.model, ...(preset.reasoning ? { reasoningLevel: preset.reasoning } : {}), executionInputSources: { providerId: "explicit", model: "explicit", ...(preset.reasoning ? { reasoningLevel: "explicit" } : {}) } };
+    }
+    const providerId = primary?.provider_id && ready.has(primary.provider_id) ? primary.provider_id : readyProvider(states);
+    return providerId && ready.has(providerId) ? { providerId, executionInputSources: { providerId: "explicit" } } : {};
   }
 
   async seedStarter(input: { name: string; avatar: string }): Promise<{ id: string; threadId: string }> {
@@ -746,6 +768,58 @@ export class Bots {
     await this.claimChains();
     this.deps.changed();
     return next.id;
+  }
+
+  private readonly restoring = new Map<string, Promise<string | null>>();
+
+  restoreMain(botId: string, goneThreadId?: string): Promise<string | null> {
+    const pending = this.restoring.get(botId);
+    if (pending) return pending;
+    const run = this.replaceMain(botId, goneThreadId).finally(() => this.restoring.delete(botId));
+    this.restoring.set(botId, run);
+    return run;
+  }
+
+  async restoreMains(): Promise<string[]> {
+    const made: string[] = [];
+    for (const row of this.rows()) {
+      const threadId = await this.restoreMain(row.id).catch(() => null);
+      if (threadId) made.push(threadId);
+    }
+    return made;
+  }
+
+  private async replaceMain(botId: string, goneThreadId?: string): Promise<string | null> {
+    const row = this.row(botId);
+    if (!row || this.inBb(row)) return null;
+    const current = this.view(row).threadId;
+    const lost = goneThreadId ?? current;
+    if (!lost || (current !== lost && !(current === null && this.isPrimary(row)))) return null;
+    if (!(await this.threadGone(lost))) return null;
+    const preset = storedDefault(row);
+    const model = preset
+      ? { providerId: preset.providerId, model: preset.model, ...(preset.reasoning ? { reasoningLevel: preset.reasoning } : {}), executionInputSources: { providerId: "explicit", model: "explicit", ...(preset.reasoning ? { reasoningLevel: "explicit" } : {}) } }
+      : row.provider_id ? { providerId: row.provider_id } : {};
+    const thread = await this.deps.sdk.threads.spawn({ projectId: PERSONAL_PROJECT_ID, title: row.name, environment: { type: "project-default" }, pluginMetadata: { bot: row.id }, ...model, input: [] } as never);
+    if (this.isPrimary(row)) await this.deps.leads.setLead(PERSONAL_PROJECT_ID, thread.id);
+    else {
+      this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(thread.id, Date.now(), row.id);
+      const run = this.deps.leads.runs.get(this.runKey(row));
+      if (run?.enabled) await this.deps.leads.runs.set(this.runKey(row), thread.id, run);
+    }
+    await this.deps.automations?.follow(row.id).catch(() => {});
+    await this.claimChains();
+    this.deps.changed();
+    return thread.id;
+  }
+
+  private async threadGone(threadId: string): Promise<boolean> {
+    try {
+      const thread = await this.deps.sdk.threads.get({ threadId }) as { deletedAt?: number | null } | null;
+      return !thread || thread.deletedAt != null;
+    } catch (error) {
+      return rpcErrorStatus(error) === 404;
+    }
   }
 
   async set(input: { botId?: string; name?: string; avatar?: string; shape?: string | null; color?: string; role?: string }): Promise<BotView> {

@@ -1,13 +1,14 @@
 import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useRef } from "react";
 import { remember } from "../../kit/app/directive-card";
-import { CHAT_CARD_BODY, CHAT_CARD_SKELETON, ChatCard, ChatCardAction, ChatCardFooter, ChatCardHeader } from "../../kit/app/chat-card";
+import { CHAT_CARD_BODY, CHAT_CARD_SKELETON, ChatCard, ChatCardHeader, ChatCardIconButton } from "../../kit/app/chat-card";
 import { relativeTime } from "../../kit/format";
 import { Icon, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import type { WorkCard } from "../contract";
 import { WORK_ID, type WorkState } from "../shared";
-import { KIND, STATE } from "./model";
+import { KIND, shownStep, STATE } from "./model";
+import { useCardOnScreen } from "./on-screen";
 
 export function StateGlyph({ state, className }: { state: WorkState; className?: string }) {
   if (state === "running") return <span role="img" aria-label={STATE.running} className={cn("size-2 shrink-0 animate-spin rounded-full border-[1.5px] border-success border-r-transparent motion-reduce:animate-none", className)} />;
@@ -43,11 +44,18 @@ function LiveWorkCard({ id, threadId, messageId }: { id: string; threadId: strin
 export function WorkCardView({ card, now = Date.now() }: { card: WorkCard; now?: number }) {
   const navigate = useBbNavigate();
   const kind = KIND[card.kind];
+  const worker = card.workerThreadId;
+  const open = worker ? () => navigate.toThread(worker) : undefined;
+  const step = shownStep(card);
+  const onScreen = useCardOnScreen(card.id);
   return (
-    <ChatCard data-testid="work-card" data-work-card-id={card.id} data-state={card.state} className="studio-work-card">
-      <ChatCardHeader icon={kind.icon} title={card.title}
-        meta={<>{kind.label}{card.step ? <> · <span data-testid="work-step">{card.step}</span></> : null}</>}
-        actions={<span className="shrink-0 pr-1.5 text-xs text-muted-foreground" title={new Date(card.updatedAt).toLocaleString()}>{relativeTime(card.updatedAt, now)}</span>} />
+    <ChatCard ref={onScreen} data-testid="work-card" data-work-card-id={card.id} data-state={card.state} className="studio-work-card">
+      <ChatCardHeader icon={kind.icon} title={card.title} onOpen={open}
+        meta={<>{kind.label}{step ? <> · <span data-testid="work-step">{step}</span></> : null}</>}
+        actions={<>
+          <span className={cn("shrink-0 text-xs text-muted-foreground", !open && "pr-1.5")} title={new Date(card.updatedAt).toLocaleString()}>{relativeTime(card.updatedAt, now)}</span>
+          {open ? <ChatCardIconButton icon="ArrowUpRight" label={`Open ${card.kind === "lead" ? "lead" : "worker"}`} data-testid="work-open" onClick={open} /> : null}
+        </>} />
       <div className={cn(CHAT_CARD_BODY, "flex flex-col gap-2 pt-0")}>
         <div className="flex min-w-0 items-center gap-2 text-sm">
           <StateGlyph state={card.state} />
@@ -58,11 +66,6 @@ export function WorkCardView({ card, now = Date.now() }: { card: WorkCard; now?:
           <div data-testid="work-needs" className="rounded-md border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-warning/5 px-2.5 py-1.5 text-sm text-foreground">{card.needs}</div>
         ) : null}
       </div>
-      {card.workerThreadId ? (
-        <ChatCardFooter>
-          <ChatCardAction icon="ArrowUpRight" data-testid="work-open" onClick={() => navigate.toThread(card.workerThreadId!)}>Open {card.kind === "lead" ? "lead" : "worker"}</ChatCardAction>
-        </ChatCardFooter>
-      ) : null}
     </ChatCard>
   );
 }

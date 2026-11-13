@@ -17,19 +17,24 @@ const { rememberConversation, resetSidebarState, setCurrentBot } = await import(
 
 const PAGE = "/plugins/studio/studio/pages/pg_b";
 const spaces = async () => ({ bots: [{ id: "cos", mainThreadId: "main" }], currentBotId: "cos" });
+const gone = new Set<string>();
+const land = async ({ last }: { botId: string; last: string | null }) => ({ threadId: [last, "main"].find((id) => !!id && !gone.has(id)) ?? null });
 
 beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); state.openTab.mockClear(); state.insert.mockClear(); resetSidebarState(); });
 afterEach(() => { resetThreadTabRequests(); resetSidebarState(); vi.unstubAllGlobals(); });
 
 it("asks the Bot in the conversation the file is beside, else in the Bot's last conversation, else Main, with the file mentioned", async () => {
-  expect(await askTarget({ kind: "thread", threadId: "beside" }, spaces)).toEqual({ threadId: "beside", opens: false });
-  expect(await askTarget(null, spaces)).toEqual({ threadId: "main", opens: true });
+  expect(await askTarget({ kind: "thread", threadId: "beside" }, spaces, land)).toEqual({ threadId: "beside", opens: false });
+  expect(await askTarget(null, spaces, land)).toEqual({ threadId: "main", opens: true });
   setCurrentBot("cos");
   rememberConversation("cos", "prep");
-  expect(await askTarget({ kind: "studio" }, spaces)).toEqual({ threadId: "prep", opens: true });
+  expect(await askTarget({ kind: "studio" }, spaces, land)).toEqual({ threadId: "prep", opens: true });
+  gone.add("prep");
+  expect(await askTarget({ kind: "studio" }, spaces, land)).toEqual({ threadId: "main", opens: true });
+  gone.clear();
   const open = vi.fn();
   const mention = vi.fn(async () => true);
-  expect(await askBotAboutItem({ item: { title: "Plan", href: PAGE }, itemRef: { pluginId: "pages", id: "pg_b" }, container: null }, { spaces, open, mention })).toBe(true);
+  expect(await askBotAboutItem({ item: { title: "Plan", href: PAGE }, itemRef: { pluginId: "pages", id: "pg_b" }, container: null }, { spaces, land, open, mention })).toBe(true);
   expect(open).toHaveBeenCalledWith("prep");
   expect(mention).toHaveBeenCalledWith("prep", { provider: "page", id: "pg_b", label: "Plan" });
 });

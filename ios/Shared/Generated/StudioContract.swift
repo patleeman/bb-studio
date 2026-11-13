@@ -172,6 +172,7 @@ public enum Studio {
     public static let bot_threads_view = "bot_threads_view"
     public static let bot_threads_older = "bot_threads_older"
     public static let bot_thread_info = "bot_thread_info"
+    public static let bot_landing = "bot_landing"
     public static let bot_focus = "bot_focus"
     public static let bot_worker_ask = "bot_worker_ask"
     public static let bot_thread_update = "bot_thread_update"
@@ -755,6 +756,8 @@ public enum Studio {
   public typealias BotThreadsOlder = BotThreadsOlderOutput
 
   public typealias BotThreadInfo = BotThreadInfoOutput
+
+  public typealias BotLanding = BotLandingOutput
 
   public typealias BotFocus = BotFocusOutput
 
@@ -19559,6 +19562,24 @@ public enum Studio {
 
     public init(info: BotThreadInfoOutputInfo? = nil) {
       self.info = info
+    }
+  }
+
+  public struct BotLandingInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var last: String?
+
+    public init(botId: String? = nil, last: String? = nil) {
+      self.botId = botId
+      self.last = last
+    }
+  }
+
+  public struct BotLandingOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
     }
   }
 

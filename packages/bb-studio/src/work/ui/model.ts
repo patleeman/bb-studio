@@ -1,4 +1,4 @@
-import type { WorkKind, WorkState } from "../shared";
+import { isFinished, type WorkKind, type WorkState } from "../shared";
 
 export const KIND: Record<WorkKind, { label: string; icon: string }> = {
   worker: { label: "Worker", icon: "Bot" },
@@ -15,3 +15,7 @@ export const STATE: Record<WorkState, string> = {
   done: "Done",
   failed: "Failed",
 };
+
+export function shownStep(card: { state: WorkState; step: string | null }): string | null {
+  return isFinished(card) ? null : card.step;
+}

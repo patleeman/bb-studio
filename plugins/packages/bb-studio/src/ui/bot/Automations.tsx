@@ -173,11 +173,16 @@ function AutomationRow({ botId, automation, expanded, busy, disabled, onToggle, 
   );
 }
 
-/** An automation opened: what it does, its actions (Pause or Resume, Run now, Edit, Delete) and its recent runs. */
-export function AutomationDetail({ botId, automation, busy, disabled, onOpen, onAction, onEdit, onDelete }: {
-  botId: string; automation: BotAutomationView; busy: boolean; disabled: boolean;
+export interface AutomationActionProps {
+  automation: BotAutomationView; busy: boolean; disabled: boolean;
   onOpen(threadId: string): void; onAction(method: DetailAction): void; onEdit(): void; onDelete(): void;
-}) {
+}
+
+export const instructionLabel = (kind: Kind): string => kind === "runner" ? "Job" : kind === "reminder" ? "Remind it to" : kind === "watcher" ? "With the output" : "Instruction";
+
+/** An automation opened: what it does, its actions (Pause or Resume, Run now, Edit, Delete) and its recent runs. */
+export function AutomationDetail({ botId, ...props }: AutomationActionProps & { botId: string }) {
+  const { automation, onOpen } = props;
   return (
     <div className="flex flex-col gap-2">
       {automation.kind === "watcher" && automation.script
@@ -185,26 +190,33 @@ export function AutomationDetail({ botId, automation, busy, disabled, onOpen, on
         : <p className="text-xs whitespace-pre-wrap">{automation.instruction}</p>}
       {automation.kind === "watcher" && automation.instruction ? <p className="text-xs text-muted-foreground">With its output: {automation.instruction}</p> : null}
       {automation.model?.model ? <p className="text-xs text-muted-foreground">Runs on {automation.model.model}{automation.model.reasoning ? ` · ${automation.model.reasoning}` : ""}</p> : null}
-      <div className="flex flex-wrap gap-1">
-        {automation.state === "active"
-          ? <button type="button" className={GHOST_BUTTON} disabled={busy} onClick={() => onAction("bot_automation_pause")}><Icon name="Pause" />Pause</button>
-          : automation.state === "paused" ? <button type="button" className={GHOST_BUTTON} disabled={busy || disabled} onClick={() => onAction("bot_automation_resume")}><Icon name="Play" />Resume</button> : null}
-        {automation.state !== "done" ? <button type="button" className={GHOST_BUTTON} disabled={busy || disabled} onClick={() => onAction("bot_automation_run_now")}><Icon name="Zap" />Run now</button> : null}
-        {automation.id === "maintenance" ? <button type="button" className={GHOST_BUTTON} disabled={busy || disabled} onClick={() => onAction("bot_maintenance_dry_run")} >Dry run</button> : null}
-        {automation.id !== "maintenance" ? <><button type="button" className={GHOST_BUTTON} disabled={busy} onClick={onEdit}><Icon name="Edit" />Edit</button>
-        <button type="button" className={GHOST_BUTTON} disabled={busy} onClick={onDelete}><Icon name="Trash2" />{automation.original ? "Turn off" : "Delete"}</button></> : null}
-        {automation.kind === "runner" && automation.threadId ? <button type="button" className={GHOST_BUTTON} onClick={() => onOpen(automation.threadId!)}><Icon name="MessageSquare" />Thread</button> : null}
-      </div>
+      <div className="flex flex-wrap gap-1"><AutomationActions {...props} /></div>
       <RecentRuns botId={botId} id={automation.id} onOpen={onOpen} />
     </div>
   );
 }
 
-function RecentRuns({ botId, id, onOpen }: { botId: string; id: string; onOpen(threadId: string): void }) {
+export function AutomationActions({ automation, busy, disabled, onOpen, onAction, onEdit, onDelete, buttonClass = GHOST_BUTTON }: AutomationActionProps & { buttonClass?: string }) {
+  return <>
+    {automation.state === "active"
+      ? <button type="button" className={buttonClass} disabled={busy} onClick={() => onAction("bot_automation_pause")}><Icon name="Pause" />Pause</button>
+      : automation.state === "paused" ? <button type="button" className={buttonClass} disabled={busy || disabled} onClick={() => onAction("bot_automation_resume")}><Icon name="Play" />Resume</button> : null}
+    {automation.state !== "done" ? <button type="button" className={buttonClass} disabled={busy || disabled} onClick={() => onAction("bot_automation_run_now")}><Icon name="Zap" />Run now</button> : null}
+    {automation.id === "maintenance" ? <button type="button" className={buttonClass} disabled={busy || disabled} onClick={() => onAction("bot_maintenance_dry_run")} >Dry run</button> : null}
+    {automation.id !== "maintenance" ? <><button type="button" className={buttonClass} disabled={busy} onClick={onEdit}><Icon name="Edit" />Edit</button>
+    <button type="button" className={buttonClass} disabled={busy} onClick={onDelete}><Icon name="Trash2" />{automation.original ? "Turn off" : "Delete"}</button></> : null}
+    {automation.kind === "runner" && automation.threadId ? <button type="button" className={buttonClass} onClick={() => onOpen(automation.threadId!)}><Icon name="MessageSquare" />Thread</button> : null}
+  </>;
+}
+
+export function RecentRuns({ botId, id, onOpen, title, empty }: { botId: string; id: string; onOpen(threadId: string): void; title?: string; empty?: string | null }) {
   const runs = useLive("bot_automation_runs", { botId, id, limit: RUNS_LIMIT }, { pollMs: 30_000 });
   const list = runs.data?.runs.slice(0, 6) ?? [];
-  if (!list.length) return <p className="text-xs text-muted-foreground">{runs.loading ? "Loading runs…" : "No runs yet."}</p>;
-  return (
+  if (!list.length) {
+    const text = runs.loading ? "Loading runs…" : empty === undefined ? "No runs yet." : empty;
+    return text ? <p className="text-xs text-muted-foreground">{text}</p> : null;
+  }
+  const ol = (
     <ol aria-label="Recent runs" className="flex flex-col gap-0.5 text-xs">
       {list.map((run) => (
         <li key={run.id} className="flex min-w-0 items-baseline gap-2">
@@ -215,6 +227,7 @@ function RecentRuns({ botId, id, onOpen }: { botId: string; id: string; onOpen(t
       ))}
     </ol>
   );
+  return title ? <div className="flex flex-col gap-1.5"><h3 className="text-xs font-semibold text-muted-foreground">{title}</h3>{ol}</div> : ol;
 }
 
 const DEFAULT_SCHEDULE: Record<Kind, () => Schedule> = {
@@ -289,7 +302,7 @@ function AutomationDialog({ type, automation, runners, busy, error, onClose, onS
             </>
           ) : !original ? (
             <label className="block space-y-1">
-              <span className="font-medium">{type === "runner" ? "Job" : type === "reminder" ? "Remind it to" : "Instruction"}</span>
+              <span className="font-medium">{instructionLabel(type)}</span>
               <textarea aria-label="Instruction" value={instruction} maxLength={2000} rows={3} onChange={(event) => setInstruction(event.target.value)}
                 placeholder={type === "reminder" ? "Check whether the deploy finished and tell me." : type === "runner" ? "Check my inbox for replies from Dana; tell me when one arrives." : "Brief me on today: meetings, what needs me, what finished overnight."}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm" />

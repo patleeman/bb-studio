@@ -1,10 +1,10 @@
-// The Bot page before a Bot exists (and New bot): a centered welcome with one
+// The Bot page before a Bot exists (and New Bot): a centered welcome with one
 // question, what the Bot should help with. Create makes the Bot with that as
 // its setup (bot_create's `setup`): its first message has it introduce
 // itself, ask a couple of questions and then pick its own name, description
 // and look with bot_profile_update. Its chat then opens as BB's thread page.
 import { Icon } from "../../kit/ui/index";
-import { StudioBar } from "../../kit/app/index";
+import { PageBar } from "../page-bar";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { TALK_FIELD_ATTR, TALK_FIELD_LABEL_ATTR, TALK_INSERT_EVENT, toggleTalk, useTalk } from "../../pages/ui/talk";
 import { BOT_STYLES } from "./BotAvatar";
@@ -69,7 +69,7 @@ export function Welcome({ first, look, busy, error, onCreate }: { first: boolean
   return (
     <div className="studio-root flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground" data-testid="bot-welcome">
       <style>{BOT_STYLES}</style>
-      <StudioBar slotOnly><span data-testid="bot-welcome-bar" hidden /></StudioBar>
+      <PageBar title="New Bot" />
       <div className="m-auto w-full max-w-[36rem] px-6 py-12">
         <div className="bb-bot-in flex flex-col items-center text-center">
           <span className="relative flex size-[88px] items-center justify-center">

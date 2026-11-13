@@ -67,6 +67,8 @@ it("draws Main's card in the shared card shell: the title, dates, the summary's 
   expect($('[data-testid="finished-memory"]')!.tagName).toBe("BUTTON");
   expect($('[data-testid="finished-memory"]')!.textContent).toBe("In Memory · 3 records");
   expect(card.textContent).not.toContain("Saved to Memory as");
+  expect(card.querySelector("[data-studio-card-head]")!.lastElementChild).toBe($('[data-testid="finished-open"]'));
+  expect([...card.querySelectorAll("[data-studio-card-foot] button")].map((each) => each.getAttribute("data-testid"))).toEqual(["finished-memory"]);
   await act(async () => { $('[data-testid="finished-open"]')!.click(); });
   expect(state.navigate.toThread).toHaveBeenCalledWith("prep");
   await act(async () => { $('[data-testid="finished-memory"]')!.click(); });

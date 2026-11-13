@@ -46,6 +46,20 @@ export function recordDate(at: number, now = Date.now()): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
 }
 
+export function recordLine(text: string): string {
+  return text.split("\n")
+    .map((line) => line
+      .replace(/^\s{0,3}(?:#{1,6}\s+|>\s?|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)/, "")
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/(\*\*|__)(.+?)\1/g, "$2")
+      .replace(/(^|[^\w*])[*_]([^*_\s][^*_]*?)[*_](?=[^\w*]|$)/g, "$1$2")
+      .replace(/`([^`]*)`/g, "$1")
+      .replace(/~~(.+?)~~/g, "$1")
+      .replace(/\s+/g, " ").trim())
+    .filter((line) => line && !/^[-*_]{3,}$/.test(line))
+    .join(" · ");
+}
+
 /** A record's text cut to one short line, for "replaces “…”". */
 export function snippet(text: string, max = 60): string {
   const line = text.replace(/\s+/g, " ").trim();

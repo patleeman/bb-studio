@@ -194,10 +194,10 @@ The Todos page (`/plugins/studio/studio/bot/<botId>/loops`) is on the Bot
 pages' template: one line per todo, its title on the left and one small due
 date or "when" on the right ("Overdue", "Due Fri", "When you get home",
 "Since Sun", or who has it), in **Today** (out now, overdue or due today,
-led by the Bot chat's pending questions and unread replies), **This week**
-(the next six days), **Later** (past that, or no date) and **Waiting on
-others** (a waiting todo, or one a lead or the Bot has), then **Done**,
-folded. Area is a filter pill, never on a row. A row opens the todo as a tab in
+led by the Bot chat's pending questions; a reply not read yet is no todo),
+**This week** (the next six days), **Later** (past that, or no date) and
+**Waiting on others** (a waiting todo, or one a lead or the Bot has), then
+**Scheduled** and **Done**, folded. A group shows 8 rows, then "N more". Area is a filter pill, never on a row. A row opens the todo as a tab in
 the workbench beside the page (`bb://todo/loop_…`): the description, due
 date, when, area, owner and source (a plan's
 link), with the actions that fit it (Done, an option, Got it, Surface now,
@@ -1105,7 +1105,7 @@ Search page of its own.
 **Tab kinds.** Everything that can be a tab beside a conversation is one
 registry, `src/tab-kinds.ts`: Conversation, Worker, Bot; Page, Whiteboard,
 Design, App, Artifact, Recording; Visual Chat board; Memory,
-Library, Scheduled (the Todos page at Scheduled), Todos, Archive; VS Code; and bb's own File, Diff,
+Library, Scheduled (the Todos page), Todos, Archive; VS Code; and bb's own File, Diff,
 Browser, Terminal and Workflow run. Each kind has its name, icon, the tab that
 shows it, its address, where its recent rows come from and whether it has a
 sidebar row. The New Tab page, Recent, drag and drop, the agent's
@@ -1219,7 +1219,7 @@ Plugins, Settings. Studio adds nothing to it. Its pages are nav panels with
 BB's `experimental_hideFromNavigation: true`: a route, and no rail icon,
 More entry, Customize row or command palette entry. They are the Library and the Bot's pages
 under it (`studio/studio`: Memory, Bot info, Controls, Todos, Archive),
-the Todos page at Scheduled (`studio/automations`, titled Todos) and VS Code (`studio/vscode`); Visual
+the Todos page (`studio/automations`, titled Todos) and VS Code (`studio/vscode`); Visual
 Chat's page is off the rail too. The Bot sidebar's page rows open them. Only
 the BB Studio fork gets the field: stock BB refuses a nav panel with an
 `experimental_` field it doesn't know, which drops the plugin's whole
@@ -1237,14 +1237,18 @@ start of the main view's header and the toggle stays.
 
 **Scheduled**, on the sidebar Bot's **Todos** page, is the one place for what
 runs when; `bb://automations` and a thread's Scheduled tab open it there.
-The Bot sidebar has one row for it, **Todos**. Scheduled lists every automation
+The Bot sidebar has one row for it, **Todos**. Todos are one list, the
+primary Bot's, so under any other Bot the row and the page are **Scheduled**:
+that Bot's automations alone. Scheduled lists every automation
 that belongs to the Bot (check-ins, reminders, watchers, runners, bb's own
 automations and maintenance), each with its next run or Paused, and has
 **New** (check-in, reminder, watcher, runner). Timed todos stay in Today,
 This week and Later. A row opens the automation as a tab in the workbench
-beside the page (`bb://automation/<botId>:<row id>`): a Studio automation
-shows its detail (Pause or Resume, Run now, Edit, Delete, recent runs); a bb
-automation shows what it does, with **Open in Automations** for its page in
+beside the page (`bb://automation/<botId>:<row id>`), laid out as a todo's:
+its facts (kind, status, when, last run, and what the Bot is told, under the
+editor's own label), then its actions; a Studio automation's are Pause or
+Resume, Run now, Edit and Delete, with its recent runs under them; a bb
+automation has **Open in Automations** for its page in
 BB's Automations plugin while that plugin is on. One that is in bb, and any whose
 detail Studio can't load, is read-only: what it does and its thread.
 
@@ -2825,7 +2829,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   of BB's own **Info** tab. Its chat isn't
   embedded: it opens as BB's normal thread page, so it has everything a
   thread has, plugin message actions (Studio's reactions) and **Reply in
-  side chat** included. With no bot yet, or on **New bot**, the page is the
+  side chat** included. With no bot yet, or on **New Bot**, the page is the
   create flow, and the first message opens the new bot's chat.
 - **Sidebar**: on a BB with sidebar sections (the BB Studio fork) the
   sidebar is the Bot sidebar (One Bot, many conversations, above); what
@@ -2872,10 +2876,10 @@ of Staff", with the same thread and check-ins; rename it from its page.
   list remembers your own choice (in this device's storage). With several
   windows, the window you use decides: a window re-applies its mode when
   its route changes or it gains focus.
-- **New bot**: **+** next to **Bots** makes a new bot (BB's own **New
-  thread** row stays above the list; BB always shows it). **New bot** opens
+- **New Bot**: **+** next to **Bots** makes a new bot (BB's own **New
+  thread** row stays above the list; BB always shows it). **New Bot** opens
   `/plugins/studio/studio/bot/new`: the same welcome as a first bot (Make another
-  Bot), and **Create Bot** makes it as "New bot" and opens its chat, where it
+  Bot), and **Create Bot** makes it as "New Bot" and opens its chat, where it
   sets itself up.
 - **Several bots**: the first bot is the **primary**: the personal project's
   lead (the Chief of Staff before it), the one the iOS app shows, and the one
@@ -3470,9 +3474,10 @@ of Staff", with the same thread and check-ins; rename it from its page.
   **Create Bot** (or Enter) makes it as "Chief of Staff", a drawn blob,
   starts its chat in your personal project and opens that as BB's thread
   page with the Bots list. Its first message is the setup (`bot_create`'s
-  `setup`, `setupPrompt` in `src/bot.ts`): what you asked for, and to
-  introduce itself, ask a couple of questions, then pick its own name,
-  description and look with `bot_profile_update`, and offer a check-in.
+  `setup`, `setupInput` in `src/bot.ts`): a short hello with what you asked
+  for, and an agent-only note to introduce itself, ask a couple of
+  questions, then pick its own name, description and look with
+  `bot_profile_update`, and offer a check-in.
   Leaving the question empty is fine: it asks. The Bots sidebar shows a
   **Your first bot** row until it exists, and the iOS app has the same
   flow. Its

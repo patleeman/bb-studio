@@ -93,9 +93,6 @@ export function ItemDirectiveCard({
             <span data-studio-card-title="" className="truncate text-sm font-medium">{title}</span>
             <span data-studio-card-meta="" className="truncate text-xs text-muted-foreground">{details}</span>
           </button>
-          <button type="button" data-testid="directive-open-full" onClick={() => (onOpenFull ?? onOpen)?.()} aria-label={`Open ${title ?? kind}`} title={`Open ${kind}`} className={CHAT_CARD_ICON_BUTTON}>
-            <Icon name="ArrowUpRight" aria-hidden className="size-3.5" />
-          </button>
           {alwaysShown ? null : <button
             type="button"
             onClick={toggle}
@@ -106,6 +103,9 @@ export function ItemDirectiveCard({
           >
             <Icon name={collapsed ? "ChevronRight" : "ChevronDown"} aria-hidden className="size-3.5" />
           </button>}
+          <button type="button" data-testid="directive-open-full" onClick={() => (onOpenFull ?? onOpen)?.()} aria-label={`Open ${title ?? kind}`} title={`Open ${kind}`} className={CHAT_CARD_ICON_BUTTON}>
+            <Icon name="ArrowUpRight" aria-hidden className="size-3.5" />
+          </button>
         </div>
         {alwaysShown
           ? <div aria-hidden data-testid="directive-preview" onClick={onOpen} className="cursor-pointer">{body}</div>

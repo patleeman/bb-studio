@@ -49,14 +49,27 @@ afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlo
 const renderTab = (rowId: string) => act(() => root.render(<AutomationTab params={{ id: `bot_main:${rowId}` }} />));
 const buttons = () => [...container.querySelectorAll("button")].map((button) => button.textContent);
 
-it("the automation tab shows a Studio automation's own detail, with its actions", () => {
+const facts = () => Object.fromEntries([...container.querySelectorAll("[data-testid=bot-item-facts] dt")].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]));
+
+it("the automation tab is laid out as a todo's: title, facts, then its actions under them", () => {
   state.table = table([row({ id: "aut_3k8tydwuck", kind: "watcher", name: "Morning card" })]);
   state.views = [view("aut_3k8tydwuck", "checkin", "Morning card")];
   renderTab("aut_3k8tydwuck");
-  expect(container.querySelector("[data-testid=automation-tab] [data-testid=automation-detail]")?.textContent).toContain("Write today's card.");
   expect(container.querySelector("[data-testid=bot-item-title]")?.textContent).toBe("Morning card");
-  expect(Object.fromEntries([...container.querySelectorAll("[data-testid=bot-item-facts] dt")].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]))).toMatchObject({ Kind: "Watcher", Status: "Paused", When: "Daily 09:00" });
-  expect(buttons()).toEqual(expect.arrayContaining(["Resume", "Run now", "Edit", "Delete"]));
+  expect(container.querySelector("[data-testid=bot-item-facts]")?.previousElementSibling).toBeNull();
+  expect(facts()).toEqual({ Kind: "Watcher", Status: "Paused", When: "Daily 09:00", "Last run": "2h ago", Instruction: "Write today's card." });
+  const actions = [...container.querySelectorAll("[data-testid=bot-item-actions] button")].map((button) => button.textContent);
+  expect(actions).toEqual(["Resume", "Run now", "Edit", "Delete"]);
+  expect(container.textContent).not.toContain("No runs yet.");
+  state.views = [];
+});
+
+it("a reminder's tab shows what the Bot is told only as a labelled fact, never as its body", () => {
+  state.table = table([row({ id: "aut_water", kind: "reminder", name: "Water the plants", when: "Once, Nov 13, 5:00 PM", lastRunAt: null, status: "active" })]);
+  state.views = [{ ...view("aut_water", "reminder", "Water the plants"), instruction: "Remind Sam: water the plants.", state: "active" }];
+  renderTab("aut_water");
+  expect(container.querySelector("[data-testid=bot-item-facts]")?.previousElementSibling).toBeNull();
+  expect(facts()).toEqual({ Kind: "Reminder", Status: "Active", When: "Once, Nov 13, 5:00 PM", "Last run": "Never", "Remind it to": "Remind Sam: water the plants." });
   state.views = [];
 });
 
@@ -67,12 +80,12 @@ it("on a mirrored install, the tab of what runs in bb is read-only", () => {
   ], { mirrored: true, bbPlugin: "off" });
   state.views = [view("aut_3k8tydwuck", "watcher", "Morning card")];
   renderTab("aut_3k8tydwuck");
-  expect(container.querySelector("[data-testid=automation-read-only]")?.textContent).toContain("./card.sh");
+  expect(facts().Script).toBe("./card.sh");
   expect(buttons().filter((text) => ["Resume", "Pause", "Run now", "Edit", "Delete", "Take over", "Open in Automations"].includes(text ?? ""))).toEqual([]);
   act(() => [...container.querySelectorAll("button")].find((button) => button.textContent === "Thread")!.click());
   expect(state.openThread).toHaveBeenCalledWith("thr_demo000022");
   renderTab("auto_x1kt5kijizw");
-  expect(container.querySelector("[data-testid=automation-read-only]")?.textContent).toContain("Watch the issue.");
+  expect(facts().Instruction).toBe("Watch the issue.");
   state.views = [];
 });
 

@@ -69,11 +69,29 @@ it("redraws in place when the card changes, and shows what Patrick needs to do",
   expect(q('[data-testid="work-needs"]')).toBeNull();
 });
 
-it("opens the worker doing the work", async () => {
+it("says Done once: a finished card drops its last step from the header", async () => {
+  state.get = card({ kind: "worker", state: "done", step: "Done", line: "Saved page", finishedAt: NOW });
+  await renderCard();
+  expect(q('[data-testid="work-step"]')).toBeNull();
+  expect(q("[data-studio-card-meta]")!.textContent).toBe("Worker");
+  expect(text().match(/Done/g)).toHaveLength(1);
+  state.get = card({ state: "failed", step: "4/5 Upload", finishedAt: NOW });
+  await renderCard();
+  expect(q('[data-testid="work-step"]')).toBeNull();
+});
+
+it("opens the worker doing the work from the open icon at the end of its header, with no footer link", async () => {
   state.get = card({ kind: "worker", workerThreadId: "thr_worker" });
   await renderCard();
+  const head = q("[data-studio-card-head]")!;
+  expect(head.lastElementChild).toBe(q('[data-testid="work-open"]'));
+  expect(q('[data-testid="work-open"]')!.getAttribute("aria-label")).toBe("Open worker");
+  expect(q("[data-studio-card-foot]")).toBeNull();
   await act(async () => q('[data-testid="work-open"]')!.click());
   expect(state.toThread).toHaveBeenCalledWith("thr_worker");
+  state.get = card({ workerThreadId: null });
+  await renderCard();
+  expect(q('[data-testid="work-open"]')).toBeNull();
 });
 
 it("reports the message it sits in once, while its place is unknown", async () => {

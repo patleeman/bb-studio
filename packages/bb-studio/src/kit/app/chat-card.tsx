@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ComponentProps, ReactNode } from "react";
 import { Icon, cn } from "../ui/index";
 
 export const CHAT_CARD = "studio-root studio-card my-2 flex w-full min-w-0 flex-col overflow-hidden rounded-lg border border-border/70 bg-background text-left text-sm text-foreground";
@@ -9,7 +9,7 @@ export const CHAT_CARD_FOOT = "flex flex-wrap items-center gap-1 border-t border
 export const CHAT_CARD_ACTION = "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 [&_svg]:size-3.5";
 export const CHAT_CARD_SKELETON = "my-2 h-14 w-full animate-pulse rounded-lg border border-border/70 bg-muted/40 motion-reduce:animate-none";
 
-export function ChatCard({ className, children, ...rest }: HTMLAttributes<HTMLElement>) {
+export function ChatCard({ className, children, ...rest }: ComponentProps<"section">) {
   return <section data-studio-card="" className={cn(CHAT_CARD, className)} {...rest}>{children}</section>;
 }
 

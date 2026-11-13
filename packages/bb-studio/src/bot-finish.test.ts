@@ -1,6 +1,6 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
-import { archiveQuietly, fallbackSummary, FINISH_TIMEOUT_MS, finishInstruction, mainCard, registerBotFinish } from "./bot-finish";
+import { archiveQuietly, fallbackSummary, FINISH_TIMEOUT_MS, finishInstruction, finishRecordText, mainCard, registerBotFinish } from "./bot-finish";
 import { BotThreads, type Signals, type ThreadFacts } from "./bot-threads";
 import { MIGRATIONS } from "./migrations";
 
@@ -56,7 +56,7 @@ it("sends the finishing turn into the conversation as agent-only steps, with no 
   expect(input.input).toHaveLength(1);
   expect(input.input.every((part) => part.visibility === "agent-only")).toBe(true);
   expect(input.input[0]).toMatchObject({ visibility: "agent-only", text: finishInstruction({ threadId: "prep", title: "Launch prep" }) });
-  expect(input.input[0]!.text).toContain('memory_add: topic "Launch prep", the summary as text, source {"kind":"conversation","id":"prep","title":"Launch prep"}');
+  expect(input.input[0]!.text).toContain('memory_add: topic "Conversations", source {"kind":"conversation","id":"prep","title":"Launch prep"}, and as text one plain line (no markdown) naming what the conversation was about');
   expect(input.input[0]!.text).toContain("bot_finish_done");
   // Pressing it again while it finishes sends nothing more.
   expect(await x.finish.rpc.bot_finish({ threadId: "prep" })).toEqual({ state: "finishing" });
@@ -117,7 +117,7 @@ it("finishes with a summary from the last replies when the turn ends without bot
   expect(summary).toBe(fallbackSummary(["Here's the summary: one mock a day.\n::next{do=\"x\"}", "Deep dives at minute 24."], null));
   expect(summary).toContain("> Here's the summary: one mock a day.");
   expect(summary).not.toContain("::next");
-  expect(x.records).toMatchObject([{ botId: "dot", topic: "Launch prep", threadId: "prep", title: "Launch prep", text: summary }]);
+  expect(x.records).toMatchObject([{ botId: "dot", topic: "Conversations", threadId: "prep", title: "Launch prep", text: `Launch prep\n\n${summary}` }]);
   await vi.waitFor(() => expect(x.archive).toHaveBeenCalledWith({ threadId: "prep" }));
   expect((x.send.mock.calls.at(-1)![0] as { threadId: string }).threadId).toBe("thr_main");
 });
@@ -187,7 +187,7 @@ it("an archived conversation that can't take the turn gets Studio's summary, sav
   x.send.mockRejectedValueOnce(new Error("archived"));
   await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never });
   await vi.waitFor(() => expect(x.store.get("prep")!.finishedSummary).toMatch(/^\*\*Last replies\*\*/));
-  expect(x.records).toMatchObject([{ threadId: "prep", topic: "Launch prep" }]);
+  expect(x.records).toMatchObject([{ threadId: "prep", topic: "Conversations" }]);
   expect((x.send.mock.calls.at(-1)![0] as { threadId: string }).threadId).toBe("thr_main");
 });
 
@@ -205,4 +205,12 @@ it("reopens a finished conversation: back in the sidebar and unarchived in BB, t
   await x.harness.callAgentTool("bot_finish_done", { summary: "**Decisions**\n- Done." }, { threadId: "prep" });
   expect(x.store.get("prep")).toMatchObject({ finishedSummary: "**Decisions**\n- Done." });
   expect(x.store.get("prep")!.archivedAt).not.toBeNull();
+});
+
+it("a summary's record leads with the conversation's name on one plain line, cut short when the name is a whole sentence", () => {
+  expect(finishRecordText("Launch prep", "**Decisions**\n- Ship Friday")).toBe("Launch prep\n\n**Decisions**\n- Ship Friday");
+  const long = finishRecordText(`Help me plan a 3-day trip to Lisbon in March. ${"Keep it short and practical, please. ".repeat(3)}`, "x");
+  expect(long.split("\n")[0]!.length).toBeLessThanOrEqual(80);
+  expect(long.split("\n")[0]).toMatch(/…$/);
+  expect(finishRecordText("  ", "x")).toBe("x");
 });

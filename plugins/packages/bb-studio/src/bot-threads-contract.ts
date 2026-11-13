@@ -167,6 +167,8 @@ export const botThreadsSchemas = {
   },
   /** One thread's place; null for a thread no Bot has (yet). */
   bot_thread_info: { input: z.object({ threadId }), output: z.object({ info: threadInfo.nullable() }) },
+  /** Where switching to a Bot lands: `last` while it still exists, else the Bot's Main, else null. */
+  bot_landing: { input: z.object({ botId, last: threadId.nullable() }), output: z.object({ threadId: z.string().nullable() }) },
   /** The Bot the sidebar shows: the thread Patrick starts next is its conversation. */
   bot_focus: { input: z.object({ botId }), output: z.object({ ok: z.boolean() }) },
   /**

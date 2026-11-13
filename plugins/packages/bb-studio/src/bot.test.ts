@@ -8,7 +8,7 @@ import { testScheduler } from "./test/scheduler-fixture";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { botHeartbeat, botInstructions, BOT_ID, Bots, CHECKIN_PRESETS, classifyActivity, descendants, MEMORY_TEMPLATE, setupPrompt, spawnedBy, startedBy } from "./bot";
+import { botHeartbeat, botInstructions, BOT_ID, Bots, CHECKIN_PRESETS, classifyActivity, descendants, MEMORY_TEMPLATE, setupInput, spawnedBy, startedBy } from "./bot";
 import { PERSONAL_PROJECT_ID, ProjectLeads } from "./project-lead";
 
 const dispose: (() => Promise<void>)[] = [];
@@ -90,7 +90,7 @@ async function setup(migrations = MIGRATIONS) {
   const userSkillsDir = await mkdtemp(join(tmpdir(), "bot-skills-"));
   const memory = { exists: (id: string) => pages.has(id), create: (page: { title: string; markdown: string }) => { const id = `pg${++made}`; pages.set(id, page); return id; } };
   bots.current = new Bots({ db, sdk: bb.sdk, leads, changed: () => {}, presenceChanged: () => {}, memory, userSkillsDir });
-  return { send, clock, engine, scheduler, bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir, update, list, pending, replies };
+  return { send, clock, engine, scheduler, bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir, update, list, pending, replies, get };
 }
 
 /** What each check-in on Studio's scheduler sends when it runs: its key, the thread it wakes and the prompt after the marker. */
@@ -157,13 +157,18 @@ it("reads the primary thread from project leads without writing the Bot row", as
   expect(x.db.prepare("SELECT thread_id, updated_at FROM bots WHERE id = ?").get(BOT_ID)).toEqual(before);
 });
 
-it("the first-time flow's setup becomes a first message that has the Bot set its own profile", async () => {
+it("the first-time flow's setup becomes a short hello the user sees and an agent-only note that has the Bot set its own profile", async () => {
   const x = await setup();
   await x.bots.create({ name: "Chief of Staff", avatar: "🤖", setup: "Watch my PRs" });
-  const text = (x.spawn.mock.calls.at(-1)![0] as unknown as { input: { text: string }[] }).input[0]!.text;
-  expect(text).toContain("I'd like help with: Watch my PRs");
-  expect(text).toContain("bot_profile_update");
-  expect(setupPrompt("  ")).toContain("haven't decided");
+  const input = (x.spawn.mock.calls.at(-1)![0] as unknown as { input: { text: string; visibility?: string }[] }).input;
+  expect(input).toHaveLength(2);
+  expect(input[0]).toEqual({ type: "text", text: "Hi! You're my new Bot. I'd like help with: Watch my PRs", mentions: [] });
+  expect(input[1]!.visibility).toBe("agent-only");
+  expect(input[1]!.text).toContain("bot_profile_update");
+  const blank = setupInput("  ");
+  expect(blank[0]!.text).toBe("Hi! You're my new Bot.");
+  expect(blank[1]!.text).toContain("hasn't said what they want help with");
+  expect(blank.filter((part) => part.visibility !== "agent-only").map((part) => part.text).join(" ")).not.toMatch(/bot_profile_update|_/);
   // A prompt still wins.
   await x.bots.create({ name: "Scout", avatar: "🛰️", prompt: "Hi", setup: "ignored" });
   expect((x.spawn.mock.calls.at(-1)![0] as unknown as { input: { text: string }[] }).input[0]!.text).toBe("Hi");
@@ -211,6 +216,42 @@ it("makes a second Bot with its own thread, check-in, memory, skills and handoff
   expect((await checkins(x)).map((each) => each.threadId)).toEqual([threadId]);
   expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("t1");
   await expect(x.bots.setThread(threadId)).rejects.toThrow(/Scout/);
+});
+
+it("gives a Bot whose Main was deleted a new, empty Main that its check-in follows, and leaves a Main that is there alone", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const id = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!.id;
+  await x.bots.setRun({ botId: id, enabled: true, cadence: "daily", time: "07:30" });
+  const spawned = x.spawn.mock.calls.length;
+  expect(await x.bots.restoreMains()).toEqual([]);
+  expect(x.spawn.mock.calls.length).toBe(spawned);
+
+  x.threads.delete("t2");
+  x.get.mockRejectedValueOnce(new Error("socket hang up"));
+  expect(await x.bots.restoreMain(id, "t2")).toBeNull();
+  expect(x.bots.stored(id)?.threadId).toBe("t2");
+
+  const [made] = await Promise.all([x.bots.restoreMain(id, "t2"), x.bots.restoreMains()]);
+  expect(x.spawn.mock.calls.length).toBe(spawned + 1);
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: PERSONAL_PROJECT_ID, title: "Scout", pluginMetadata: { bot: id }, input: [] }));
+  expect(x.bots.stored(id)?.threadId).toBe(made);
+  expect(x.bots.forThread(made!)?.id).toBe(id);
+  expect(await checkins(x)).toEqual([{ key: `bot:${id}`, threadId: made, prompt: botHeartbeat("Scout") }]);
+  expect(await x.bots.restoreMain(id, "t2")).toBeNull();
+
+  x.threads.set("t1", { ...x.threads.get("t1")!, deletedAt: 9 });
+  expect((await x.bots.get()).bot?.threadId).toBeNull();
+  const primary = await x.bots.restoreMain(BOT_ID, "t1");
+  expect(primary).toBeTruthy();
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe(primary);
+  expect(x.bots.list().map((bot) => bot.name)).toEqual(["Dot", "Scout"]);
+
+  await x.bots.pause(id);
+  x.threads.delete(made!);
+  const copy = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, importedAt: () => Date.now() });
+  expect(await copy.restoreMain(id, made!)).toBeNull();
+  expect(x.bots.stored(id)?.threadId).toBe(made);
 });
 
 it("keeps a drawn avatar and a role it's told, with the emoji as a fallback", async () => {
@@ -975,4 +1016,26 @@ it("leaves the harnesses' own skill folders alone while a Bot writes, searches, 
   } finally {
     vi.unstubAllEnvs();
   }
+});
+
+it("starts a new Bot on a signed-in model: the primary's default model, else the primary's provider, else any signed-in one, else BB's default", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  x.db.prepare("UPDATE bots SET provider_id = 'codex', default_provider_id = 'claude-code', default_model = 'opus', default_reasoning = 'medium' WHERE id = ?").run(BOT_ID);
+  let states: { providerId: string; status: string; loginCommand?: string | null }[] = [{ providerId: "claude-code", status: "ready", loginCommand: "claude login" }, { providerId: "codex", status: "unauthenticated", loginCommand: "codex login" }];
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, providerStates: async () => states });
+  const spawned = () => x.spawn.mock.calls.at(-1)![0] as Record<string, unknown>;
+  await bots.create({ name: "Scout", avatar: "🛰️" });
+  expect(spawned()).toMatchObject({ providerId: "claude-code", model: "opus", reasoningLevel: "medium", executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit" } });
+  states = [{ providerId: "claude-code", status: "unauthenticated", loginCommand: "claude login" }, { providerId: "codex", status: "ready", loginCommand: "codex login" }];
+  await bots.create({ name: "Ledger", avatar: "📒" });
+  expect(spawned()).toMatchObject({ providerId: "codex", executionInputSources: { providerId: "explicit" } });
+  expect(spawned()).not.toHaveProperty("model");
+  x.db.prepare("UPDATE bots SET provider_id = 'opencode', default_provider_id = NULL, default_model = NULL WHERE id = ?").run(BOT_ID);
+  states = [{ providerId: "opencode", status: "unauthenticated", loginCommand: null }, { providerId: "codex", status: "unauthenticated", loginCommand: "codex login" }, { providerId: "claude-code", status: "ready", loginCommand: "claude login" }];
+  await bots.create({ name: "Atlas", avatar: "🗺️" });
+  expect(spawned()).toMatchObject({ providerId: "claude-code" });
+  states = [{ providerId: "codex", status: "unauthenticated", loginCommand: "codex login" }];
+  await bots.create({ name: "Echo", avatar: "🔔" });
+  expect(spawned()).not.toHaveProperty("providerId");
 });

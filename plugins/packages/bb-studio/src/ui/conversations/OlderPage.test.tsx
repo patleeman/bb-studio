@@ -73,7 +73,10 @@ it("narrows to Conversations, Workers or Failed, and by search", async () => {
   act(() => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(search, "homelab"); search.dispatchEvent(new Event("input", { bubbles: true })); });
   expect(titles()).toEqual(["Staff sweep"]);
   act(() => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(search, "nothing"); search.dispatchEvent(new Event("input", { bubbles: true })); });
-  expect(container.querySelector("[data-testid=older-empty]")?.textContent).toBe("Nothing matches");
+  expect(container.querySelector("[data-testid=older-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("No archived items match “nothing”");
+  act(() => container.querySelector<HTMLButtonElement>("[data-testid=older-empty] [data-testid=bot-page-empty-action]")!.click());
+  expect(search.value).toBe("");
+  expect(titles().length).toBeGreaterThan(1);
 });
 
 it("opens a row's thread through the link router as a conversation tab, and reopens a finished conversation", async () => {
@@ -94,8 +97,9 @@ it("opens a row's thread through the link router as a conversation tab, and reop
   expect(state.toThread).not.toHaveBeenCalled();
 });
 
-it("says Nothing archived when there is nothing", () => {
+it("says Nothing archived yet when there is nothing, with where archiving is", () => {
   state.older = { botId: "bot_main", conversations: [], finished: [], workers: [] };
   render();
-  expect(container.querySelector("[data-testid=older-empty]")?.textContent).toBe("Nothing archived");
+  expect(container.querySelector("[data-testid=older-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("Nothing archived yet");
+  expect(container.querySelector("[data-testid=older-empty] [data-testid=bot-page-empty-hint]")?.textContent).toBe("Archive a conversation from its ⋯ menu.");
 });

@@ -3,16 +3,19 @@
 // due date or "when" on the right, in four groups: Today, This week, Later
 // and Waiting on others (rules in todos-model.ts), then Scheduled (the Bot's
 // check-ins, reminders, watchers and runners, src/loops/scheduled.ts), then
-// Done, folded. The
-// Bot chat's pending questions and unread replies lead Today. Search and the
+// Done, folded. A group shows 8 rows, then "N more", as the Library's do. The
+// Bot chat's pending questions lead Today; a reply not read yet is the
+// chat's unread state, not a todo. Search and the
 // area pills filter it; New hands a typed line to the Bot to fill in. A row
 // opens the todo as a tab in the workbench beside the page (TodoTab.tsx).
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+// Todos are one list, the primary Bot's: under another Bot the page is that
+// Bot's Scheduled alone, titled Scheduled.
+import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import { errorMessage } from "../../kit/format";
 import { Button } from "../../kit/ui/button";
 import { Input } from "../../kit/ui/input";
 import type { BotView } from "../../contract";
-import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, useRowOpen } from "../../ui/bot-page";
+import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageMore, BotPageRow, BotPageToolbar, foldRows, noMatch, useBotPageQuery, useRowOpen } from "../../ui/bot-page";
 import { useCall, useLive } from "../../ui/live";
 import type { Loop } from "../contract";
 import { SCHEDULED_ICON, scheduledMeta } from "./scheduled-model";
@@ -22,36 +25,40 @@ import { KIND, ownerName, shortWhen } from "./model";
 import { useLoopPeople } from "./hooks";
 import { ALL_AREAS, areaPills, groupTodos, openTodos, TODO_GROUPS, todoWhen } from "./todos-model";
 
-export function TodosPage({ view, focus }: { view: BotView; focus?: "scheduled" }) {
+export function TodosPage({ view }: { view: BotView }) {
   const bot = view.bot!;
   const call = useCall();
   const people = useLoopPeople();
   const rowOpen = useRowOpen();
-  const list = useLive("loops.list", {}, { pollMs: 60_000 });
+  const ownsTodos = bot.primary !== false;
+  const list = useLive("loops.list", {}, { enabled: ownsTodos, pollMs: 60_000 });
   const scheduledList = useLive("loops.scheduled", {}, { pollMs: 60_000 });
   const automationList = useAutomations(bot.id);
   const editor = useAutomationEditor(bot.id, automationList.data?.automations ?? [], () => { automationList.refresh(); scheduledList.refresh(); });
-  const scheduledRef = useRef<HTMLDivElement>(null);
-  const { pending, unread } = useNeedsYou(people.botId, people.botThreadId, list.data?.needsYouNow);
-  const [query, setQuery] = useState("");
+  const { pending } = useNeedsYou(ownsTodos ? people.botThreadId : null, list.data?.needsYouNow);
+  const [query, setQuery] = useBotPageQuery();
   const [area, setArea] = useState(ALL_AREAS);
   const [adding, setAdding] = useState(false);
+  const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(() => new Set());
+  const fold = <T,>(id: string, rows: readonly T[]) => foldRows(rows, unfolded.has(id));
+  const moreLine = (id: string, title: string, count: number) => count ? <BotPageMore count={count} group={title} testId="todos-more" onOpen={() => setUnfolded((open) => new Set([...open, id]))} /> : null;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(timer); }, []);
-  const data = list.data;
+  const data = ownsTodos ? list.data : undefined;
+  const ready = ownsTodos ? !!data : !!scheduledList.data;
   const open = useMemo(() => data ? openTodos(data) : [], [data]);
   const groups = useMemo(() => groupTodos(open, { area, query }, now), [open, area, query, now]);
   const owners = useMemo(() => new Map((data?.owners ?? []).map((each) => [each.owner, each] as const)), [data?.owners]);
   const done = useMemo(() => [...(data?.done ?? [])].filter((loop) => area === ALL_AREAS || loop.area === area).filter((loop) => !query.trim() || loop.title.toLowerCase().includes(query.trim().toLowerCase()))
     .sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0)), [data?.done, area, query]);
   const showChat = area === ALL_AREAS && !query.trim();
-  const scheduledShown = !!data && !!scheduledList.data;
-  useEffect(() => { if (focus === "scheduled" && scheduledShown) scheduledRef.current?.scrollIntoView?.({ block: "start" }); }, [focus, scheduledShown]);
   const scheduled = useMemo(() => (scheduledList.data?.items ?? []).filter((item) => item.source === "automation" && item.botId === bot.id && (!query.trim() || item.title.toLowerCase().includes(query.trim().toLowerCase())) && area === ALL_AREAS), [scheduledList.data, bot.id, query, area]);
-  const chatRows = showChat ? pending.length + (unread ? 1 : 0) : 0;
+  const chatRows = showChat ? pending.length : 0;
   const nameOf = (loop: Loop) => ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owners.get(loop.owner));
   const total = TODO_GROUPS.reduce((sum, group) => sum + groups[group.id].length, 0) + chatRows;
   const add = (text: string) => call("loops.add", { text }).then(() => list.refresh());
+  const scheduledRows = fold("scheduled", scheduled);
+  const doneRows = fold("done", done);
   const botChat = people.botThreadId ? rowOpen({ kind: "conversation", id: people.botThreadId }, people.botName) : null;
 
   const row = (loop: Loop) => {
@@ -64,15 +71,20 @@ export function TodosPage({ view, focus }: { view: BotView; focus?: "scheduled" 
   };
 
   return (
-    <BotPageLayout testId="todos-page" title="Todos" bot={bot.name} botId={bot.id}
-      toolbar={<BotPageToolbar search={{ value: query, onChange: setQuery, placeholder: "Search todos" }}
-        filter={{ label: "Area", value: area, options: areaPills(open), onChange: setArea }} onNew={() => setAdding(true)} />}>
+    <BotPageLayout testId="todos-page" title={ownsTodos ? "Todos" : "Scheduled"} bot={bot.name} botId={bot.id}
+      toolbar={ownsTodos ? <BotPageToolbar search={{ value: query, onChange: setQuery, placeholder: "Search todos" }}
+        filter={{ label: "Area", value: area, options: areaPills(open), onChange: setArea }} onNew={() => setAdding(true)} />
+        : <BotPageToolbar search={{ value: query, onChange: setQuery, placeholder: "Search scheduled" }} />}>
       {adding ? <AddTodo onAdd={add} onClose={() => setAdding(false)} /> : null}
-      {list.error ? <p role="alert" className="text-sm text-destructive">{list.error}</p> : null}
-      {!data ? null : total === 0 ? <BotPageEmpty testId="todos-empty">{area !== ALL_AREAS || query.trim() ? "No todos match" : "No todos"}</BotPageEmpty> : TODO_GROUPS.map((group) => {
+      {ownsTodos && list.error ? <p role="alert" className="text-sm text-destructive">{list.error}</p> : null}
+      {!data ? null : total === 0 ? <BotPageEmpty testId="todos-empty" {...(query.trim()
+        ? { title: noMatch("todos", query), action: { label: "Clear search", onClick: () => setQuery("") } }
+        : area !== ALL_AREAS ? { title: `No todos in ${area}`, action: { label: "Show all", onClick: () => setArea(ALL_AREAS) } }
+        : { title: "No todos yet", hint: "Ask the Bot to keep track of something, or add a todo.", action: adding ? null : { label: "New todo", onClick: () => setAdding(true) } })} /> : TODO_GROUPS.map((group) => {
         const loops = groups[group.id];
         const chat = group.id === "today" ? chatRows : 0;
         if (!loops.length && !chat) return null;
+        const { shown, more } = fold(group.id, loops);
         return (
           <BotPageGroup key={group.id} title={group.title} count={loops.length + chat} testId={`todos-${group.id}`}>
             {group.id === "today" && showChat ? <>
@@ -80,31 +92,32 @@ export function TodosPage({ view, focus }: { view: BotView; focus?: "scheduled" 
                 <BotPageRow key={question.id} testId="todo-chat" icon="MessageQuestion" title={question.text ?? question.reason} titleText={question.text ?? question.reason}
                   meta={shortWhen(question.createdAt, now)} onOpen={botChat?.onOpen} disabled={!botChat} />
               ))}
-              {unread ? <BotPageRow testId="todo-unread" icon="MessageSquare" title={unread === 1 ? `A reply from ${people.botName}` : `${unread} replies from ${people.botName}`} meta="Unread" onOpen={botChat?.onOpen} disabled={!botChat} /> : null}
             </> : null}
-            {loops.map(row)}
+            {shown.map(row)}
+            {moreLine(group.id, group.title, more)}
           </BotPageGroup>
         );
       })}
-      {data ? (
-        <div ref={scheduledRef}>
+      {ready ? (
         <BotPageGroup title="Scheduled" count={scheduled.length} testId="todos-scheduled"
           aside={<NewAutomationMenu kinds={newKinds(bot.kind === "external")} disabled={bot.state !== "active"} onPick={editor.openNew} />}>
           {editor.error ? <p role="alert" className="pb-2 text-xs text-destructive">{editor.error}</p> : null}
-          {scheduled.map((item) => (
+          {scheduledRows.shown.map((item) => (
             <BotPageRow key={item.key} testId="scheduled-row" data={{ "data-scheduled": item.key }} icon={SCHEDULED_ICON[item.kind]} muted={item.state === "paused"}
               title={item.title} titleText={item.title} meta={scheduledMeta(item, now)} {...rowOpen(item.link, item.title)} />
           ))}
+          {!scheduled.length ? <BotPageEmpty testId="scheduled-empty" {...(query.trim() ? { title: noMatch("scheduled items", query) } : { title: "Nothing scheduled yet", hint: "Add a reminder or a check-in with New." })} /> : null}
+          {moreLine("scheduled", "Scheduled", scheduledRows.more)}
         </BotPageGroup>
-        </div>
       ) : null}
       {editor.dialogs}
       {data && done.length ? (
         <BotPageGroup title="Done" count={done.length} collapsible defaultOpen={false} testId="todos-done">
-          {done.map((loop) => (
+          {doneRows.shown.map((loop) => (
             <BotPageRow key={loop.id} testId="todo-done" data={{ "data-loop": loop.id }} muted icon={loop.status === "dropped" ? "X" : "CircleCheck"} iconClassName={loop.status === "dropped" ? undefined : "text-success"}
               title={loop.title} titleText={loop.title} meta={loop.closedAt ? shortWhen(loop.closedAt, now) : undefined} {...rowOpen({ kind: "todo", id: loop.id }, loop.title)} />
           ))}
+          {moreLine("done", "Done", doneRows.more)}
         </BotPageGroup>
       ) : null}
     </BotPageLayout>

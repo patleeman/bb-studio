@@ -1,4 +1,5 @@
 import { registerWorkCards, WORK_TOOLS } from "./src/work/register";
+import { withToolLabel } from "./src/tool-labels";
 import { CONTINUE_TOOL, registerContinueNew } from "./src/continue-new";
 import { runWorkCli } from "./src/work/cli";
 import { registerLoops, LOOP_TOOLS, loopPushActions } from './src/loops/register';
@@ -84,6 +85,7 @@ import { registerBotProfileTools } from "./src/bot-profile-tools";
 import { MemoryStore } from "./src/memory/store";
 import { MemoryService, setBotMemoryPage, withMemory } from "./src/memory/service";
 import { registerMemory } from "./src/memory/register";
+import { recordLine } from "./src/memory/shared";
 import { BotPageState, registerGroupTool } from "./src/bot-page-state";
 import { BotCacheWarmer } from "./src/bot-cache";
 import { botControlRefusal, Bots, SKILL_NAME } from "./src/bot";
@@ -228,7 +230,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool = ((tool: Parameters<typeof registerTool>[0]) => {
     const named = familyTool(withTagHint(tool as never, () => tagNames.list().map((tag) => tag.name)) as AgentTool, familyDeps);
     toolBook.add(named);
-    return registerTool(named as never);
+    return registerTool(withToolLabel(named) as never);
   }) as typeof bb.agents.registerTool;
   // Kinds built into Studio (docs/merging-add-ons.md); the hub calls them in-process.
   let appCards = false;
@@ -627,6 +629,7 @@ export default async function plugin(bb: BbPluginApi) {
       retitle: (pageId, from, to) => pages.retitle(pageId, from, to),
     },
     userSkillsDir: join(bb.server.experimental_dataDir, "skills"),
+    providerStates: async () => { const { primaryHostId } = await bb.sdk.system.config(); return (await bb.sdk.system.providerStates(primaryHostId ? { hostId: primaryHostId } : undefined)).providers; },
     // Side threads show as their reply's row, not as work the Bot started.
     hiddenThreads: () => new Set([...learning.reviewThreads(), ...sideThreads.threadIds()]),
     ownedThreads: (botId) => ownedThreads.owned(botId),
@@ -743,6 +746,12 @@ export default async function plugin(bb: BbPluginApi) {
       run: async (botId) => { await maintenance.run(botId); },
     },
   });
+  const restoreMainFailed = (error: unknown) => bb.log.warn(`Couldn't start a new Main: ${errorText(error)}`);
+  bb.events.on("thread.deleted", ({ thread }) => {
+    const bot = bots.list().find((each) => each.threadId === thread.id);
+    if (bot) void bots.restoreMain(bot.id, thread.id).catch(restoreMainFailed);
+  });
+  void bots.restoreMains().catch(restoreMainFailed);
   bb.rpc.register(scheduledContract, {
     "loops.scheduled": async ({ threadId }) => ({
       items: scheduledItems({
@@ -1236,7 +1245,7 @@ export default async function plugin(bb: BbPluginApi) {
     const tables = await Promise.all(all.map((bot) => automationTableFor(bot.id).catch(() => null)));
     const rows = tables.flatMap((table) => (table?.rows ?? []).map((row): EntryRow => ({ kind: "automation", id: automationRefId(table!.botId, row.id), title: row.name, updatedAt: row.lastRunAt ?? 0 })));
     const found = await Promise.all(all.map((bot) => memoryService.list({ botId: bot.id, query, limit, includeReplaced: false }).catch(() => ({ records: [] }))));
-    const records = found.flatMap((each) => each.records.map((record): EntryRow => ({ kind: "record", id: record.id, title: `${record.topic}: ${record.text.replace(/\s+/g, " ").slice(0, 120)}`, updatedAt: record.updatedAt })));
+    const records = found.flatMap((each) => each.records.map((record): EntryRow => ({ kind: "record", id: record.id, title: `${record.topic}: ${recordLine(record.text).slice(0, 120)}`, updatedAt: record.updatedAt })));
     return [...todos, ...rows, ...records];
   };
   const newTabSources: NewTabSources = {

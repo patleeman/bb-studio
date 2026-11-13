@@ -49,7 +49,7 @@ as it).
 
 [1] The Library lists no recordings; drag one from the New Tab page's Recent or search, or Talk's Recordings page.
 [2] Boards have no row in Studio's sidebar; drag one from the New Tab page's Recent or search.
-[3] The Todos page is the one entry; this address opens it at Scheduled.
+[3] The Todos page is the one entry; this address opens it.
 [4] Recent lists the Todos page once, under Todos.
 [5] Automations change on their own and would crowd Recent; the New Tab search finds one.
 [6] Todos change on their own and would crowd Recent; the New Tab search finds one.

@@ -6,6 +6,7 @@
 // shows 8 rows, then "N more" (UX review 3, item 7).
 import { TYPE_LABELS, type ArtifactType } from "../../artifacts/shared";
 import type { LibraryItem, LibraryKind } from "../../bot-threads-contract";
+export { GROUP_FOLD, foldRows } from "../bot-page/fold";
 
 export type LibraryGroupBy = "conversation" | "kind" | "date";
 export type LibraryKindFilter = "all" | "starred" | Exclude<LibraryKind, "other" | "artifact">;
@@ -56,8 +57,6 @@ export interface LibraryGroup {
   rows: LibraryRow[];
 }
 
-/** A group shows this many rows, then "N more". */
-export const GROUP_FOLD = 8;
 
 /**
  * What near-identical titles share: the part before a colon when that part
@@ -84,11 +83,6 @@ export function libraryRows(items: readonly LibraryItem[]): LibraryRow[] {
   return [...rows.values()];
 }
 
-/** The rows a group shows: all when open, else the first GROUP_FOLD; and how many it leaves out. */
-export function foldRows(rows: readonly LibraryRow[], open: boolean): { shown: LibraryRow[]; more: number } {
-  if (open || rows.length <= GROUP_FOLD) return { shown: [...rows], more: 0 };
-  return { shown: rows.slice(0, GROUP_FOLD), more: rows.length - GROUP_FOLD };
-}
 
 const sameTitle = (a: string, b: string) => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
 
@@ -160,4 +154,16 @@ export function libraryGroups(items: readonly LibraryItem[], options: { query: s
   // By conversation: the group whose newest file is newest first (the map keeps first-seen order, which is that).
   if (options.groupBy !== "conversation") list.sort((a, b) => a.order - b.order);
   return list.map(({ order: _order, ...group }) => ({ ...group, rows: libraryRows(group.items) }));
+}
+
+const KIND_PLURALS: Record<Exclude<LibraryKindFilter, "all" | "starred">, string> = { page: "pages", whiteboard: "whiteboards", design: "designs", app: "apps", recording: "recordings" };
+
+export interface LibraryEmpty { title: string; hint?: string; action?: "clear" | "all" }
+
+export function libraryEmpty({ query, kind, appType, total }: { query: string; kind: LibraryKindFilter; appType: LibraryAppType; total: number }): LibraryEmpty {
+  const plural = kind === "all" || kind === "starred" ? "files" : kind === "app" && appType !== "all" ? `${appType} apps` : KIND_PLURALS[kind];
+  if (query.trim()) return { title: `No ${kind === "starred" ? "starred files" : plural} match “${query.trim()}”`, action: "clear" };
+  if (!total) return { title: "No files yet", hint: "Ask in a conversation for a page, a design or an app." };
+  if (kind === "starred") return { title: "No starred files", hint: "Open a file and press Star in its header." };
+  return { title: `No ${plural}`, action: "all" };
 }

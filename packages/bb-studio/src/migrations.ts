@@ -1121,4 +1121,8 @@ export const MIGRATIONS = [
        'closedBy', CASE a.state WHEN 'active' THEN NULL ELSE 'cos' END)
    FROM bot_automations a LEFT JOIN bots b ON b.id = a.bot_id
    WHERE a.kind = 'reminder' AND trim(a.name) <> '';`,
+  `UPDATE memory_records SET topic = 'Conversations'
+   WHERE source_kind = 'conversation' AND topic <> 'Conversations'
+     AND source_id IN (SELECT thread_id FROM bot_finishes)
+     AND length(topic) > 0 AND substr(trim(source_title), 1, length(topic)) = topic;`,
 ];

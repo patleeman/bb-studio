@@ -149,7 +149,7 @@ const bot = z.object({
   color: z.string().nullable().optional(),
   /** A sentence or two on its role, given to it ("You are my chief of staff."). */
   role: z.string().nullable().optional(),
-  /** The primary Bot: the personal project's lead. Additional Bots ("New bot") have their own thread. */
+  /** The primary Bot: the personal project's lead. Additional Bots ("New Bot") have their own thread. */
   primary: z.boolean().optional(),
   /** From its current thread's provider: "external" runs on an external agent provider (Studio Agents), with that provider's memory and tools; "studio" runs BB's tools (Memory, skills, runners). */
   kind: z.enum(["studio", "external"]).optional(),

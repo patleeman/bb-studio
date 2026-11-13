@@ -171,3 +171,29 @@ describe("reminders become todos", () => {
     expect(db.prepare("SELECT * FROM bot_automations ORDER BY id").all()).toEqual(before);
   });
 });
+
+describe("archive summaries share one memory topic", () => {
+  it("moves each archived conversation's summary to Conversations and leaves every other record alone", async () => {
+    const { default: Database } = await import("better-sqlite3");
+    const db = new Database(":memory:");
+    const move = MIGRATIONS.findIndex((sql) => sql.includes("SET topic = 'Conversations'"));
+    expect(move).toBeGreaterThan(0);
+    for (const sql of MIGRATIONS.slice(0, move)) db.exec(sql);
+    db.prepare("INSERT INTO bot_finishes (thread_id, bot_id, title, state, requested_at, deadline_at) VALUES ('thr_trip', 'bot_main', 't', 'finished', 1, 2)").run();
+    const add = db.prepare("INSERT INTO memory_records (id, bot_id, topic, text, created_at, updated_at, source_kind, source_id, source_title) VALUES (?, 'bot_main', ?, 'x', 1, 1, ?, ?, ?)");
+    const trip = "Help me plan a 3-day trip to Lisbon in March. Keep it short and practical please";
+    add.run("mem_trip", trip.slice(0, 60).trim(), "conversation", "thr_trip", trip);
+    add.run("mem_fact", "People", "conversation", "thr_trip", trip);
+    add.run("mem_open", "Launch prep", "conversation", "thr_open", "Launch prep");
+    add.run("mem_main", "Main", "conversation", "thr_main", "Main");
+    db.exec(MIGRATIONS[move]!);
+    db.exec(MIGRATIONS[move]!);
+    expect(db.prepare("SELECT id, topic FROM memory_records ORDER BY id").all()).toEqual([
+      { id: "mem_fact", topic: "People" },
+      { id: "mem_main", topic: "Main" },
+      { id: "mem_open", topic: "Launch prep" },
+      { id: "mem_trip", topic: "Conversations" },
+    ]);
+    expect(db.prepare("SELECT r.id FROM memory_records_fts f JOIN memory_records r ON r.rowid = f.rowid WHERE memory_records_fts MATCH 'topic:Conversations'").all()).toEqual([{ id: "mem_trip" }]);
+  });
+});

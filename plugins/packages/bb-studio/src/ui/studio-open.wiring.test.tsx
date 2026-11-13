@@ -136,7 +136,7 @@ describe("page content (mentions, embeds, links in the text)", () => {
 describe("reply cards", () => {
   const message = { id: "m1", threadId: "thr_a", turnId: null, projectId: null };
   const arrow = (label: string) => element.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
-  const header = (label: string) => arrow(label).previousElementSibling as HTMLButtonElement;
+  const header = (label: string) => arrow(label).parentElement!.querySelector<HTMLButtonElement>(":scope > button")!;
   const openCard = async (label: string) => {
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
     await act(async () => header(label).click());

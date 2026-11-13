@@ -206,13 +206,14 @@ it("edits a record in place as a new replacing record, archives one, and adds on
   expect(container.querySelector("[data-testid=memory-add]")).toBeNull();
 });
 
-it("shows only the profile and the records, with no split preview, and says No records when there are none", async () => {
+it("shows only the profile and the records, with no split preview, and says No records yet, with New record, when there are none", async () => {
   state.overview = overview({ split: { state: "done", legacyPageId: "pg_old", legacyTitle: "Chief of Staff's Memory", splitAt: day(10) }, counts: { current: 0, replaced: 0, archived: 0 }, topics: [] });
   state.records = [];
   await render();
   await unfold("memory-profile");
   expect(container.querySelector("[data-testid=profile-pane]")).not.toBeNull();
-  expect(container.querySelector("[data-testid=memory-empty]")?.textContent?.trim()).toBe("No records");
+  expect(container.querySelector("[data-testid=memory-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("No records yet");
+  expect(container.querySelector("[data-testid=memory-empty] [data-testid=bot-page-empty-action]")?.textContent).toBe("New record");
   expect(container.querySelector("[data-testid^=memory-split]")).toBeNull();
   expect(container.textContent).not.toMatch(/split/i);
   expect(state.calls.map(([method]) => method).filter((method) => !["memory.overview", "memory.list"].includes(method))).toEqual([]);

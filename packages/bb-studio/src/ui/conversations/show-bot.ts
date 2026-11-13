@@ -2,8 +2,8 @@
 // (where Studio's thread list shows the Bot), and the main view on the
 // current Bot's last-open conversation, its Main when there is none.
 import { openAppPath } from "../../kit/app/nav";
-import { landingThread } from "./model";
-import { currentBot, expandHostSidebar, lastConversation, markLanded, openThreadVia } from "./state";
+import { botPath } from "../bot/selection";
+import { currentBot, expandHostSidebar, landingFor, markLanded, openThreadVia, type Land } from "./state";
 
 type Spaces = () => Promise<{ bots: readonly { id: string; mainThreadId: string | null }[]; currentBotId: string | null } | null>;
 
@@ -12,12 +12,13 @@ type Spaces = () => Promise<{ bots: readonly { id: string; mainThreadId: string 
  * Main), never BB's empty new-thread page. The thread opens with the
  * sidebar's BB navigation when it is mounted.
  */
-export async function showBot(spaces: Spaces, open: (threadId: string) => void = openThreadVia((threadId) => openAppPath(`/threads/${encodeURIComponent(threadId)}`))): Promise<void> {
+export async function showBot(spaces: Spaces, land: Land, open: (threadId: string) => void = openThreadVia((threadId) => openAppPath(`/threads/${encodeURIComponent(threadId)}`))): Promise<void> {
   markLanded();
   expandHostSidebar();
   const known = await spaces().catch(() => null);
   const botId = currentBot() ?? known?.currentBotId ?? known?.bots[0]?.id ?? null;
-  const space = known?.bots.find((bot) => bot.id === botId) ?? null;
-  const target = botId ? landingThread(space, lastConversation(botId), null) : null;
+  if (!botId) return;
+  const target = await landingFor(botId, land);
   if (target) open(target);
+  else openAppPath(botPath(botId));
 }

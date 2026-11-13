@@ -51,7 +51,9 @@ it("shows the new conversation's live title and opens it", () => {
   const { mount } = message("");
   render(mount, { to: "thr_hud", title: "HUD redesign" });
   const card = host.querySelector<HTMLButtonElement>('[data-testid="continued-card"]')!;
-  expect(card.textContent).toContain("Continued in");
+  expect(card.querySelector("[data-studio-card-title]")!.textContent).toBe("Continued in HUD redesign v2");
+  expect(card.querySelector("[data-studio-card-meta]")!.textContent).toBe("");
+  expect(card.querySelector("[data-studio-card-head]")!.lastElementChild!.getAttribute("data-icon")).toBe("ArrowUpRight");
   expect(host.querySelector('[data-testid="continued-title"]')!.textContent).toBe("HUD redesign v2");
   expect(state.asked).toContainEqual(["bot_thread_info", { threadId: "thr_hud" }]);
   act(() => card.click());

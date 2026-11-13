@@ -989,16 +989,14 @@ export function CollectionPage({
             ) : items !== null && !shown.length ? (
               <p className="py-16 text-center text-sm text-muted-foreground">
                 {archived
-                  ? "Nothing archived."
+                  ? "Nothing archived yet"
                   : query.trim()
-                    ? search.loading ? "" : "Nothing matches."
+                    ? search.loading ? "" : `No ${(activeKind?.plural ?? "items").toLowerCase()} match “${query.trim()}”`
                     : tagging && activeTag
-                      ? `Nothing tagged ${activeTag.name}${activeKind ? ` among ${activeKind.plural.toLowerCase()}` : ""}.`
+                      ? `No ${(activeKind?.plural ?? "items").toLowerCase()} tagged ${activeTag.name}`
                       : tagging && tagFilter === UNTAGGED
-                        ? "Everything here is tagged."
-                        : activeKind
-                          ? `No ${activeKind.plural.toLowerCase()} here.`
-                          : "Nothing here."}
+                        ? `No untagged ${(activeKind?.plural ?? "items").toLowerCase()}`
+                        : `No ${(activeKind?.plural ?? "items").toLowerCase()} yet`}
               </p>
             ) : null}
 

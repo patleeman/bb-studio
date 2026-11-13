@@ -276,3 +276,11 @@ it("drags a row as its ::loop line and title, as plain text", async () => {
   await act(async () => { dragged.dispatchEvent(new Event("dragend", { bubbles: true })); });
   expect(dragged.hasAttribute("data-dragging")).toBe(false);
 });
+
+it("lists no unread reply from the Bot as something that needs you", async () => {
+  state.attention = { reason: "1", count: 1, since: NOW, unread: 2 };
+  await render("thr_other");
+  expect(container.querySelector("header")!.textContent).toBe("Todos2");
+  expect(container.textContent).not.toContain("replies from");
+  expect(container.textContent).not.toContain("not read yet");
+});

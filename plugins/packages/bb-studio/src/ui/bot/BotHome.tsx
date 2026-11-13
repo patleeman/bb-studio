@@ -5,7 +5,7 @@
 // Info only when there's neither. A Bot's chat isn't embedded here: it opens as BB's own
 // thread page, from the Bots list or Info's Open chat. With no Bot yet, the
 // page is a welcome that asks what the Bot should help with; Create makes it
-// and opens its chat, where it sets itself up. "New bot"
+// and opens its chat, where it sets itself up. "New Bot"
 // (/plugins/studio/studio/bot/new) does the same for another Bot.
 // The route picks the Bot (selection.ts).
 import { errorMessage, relativeTime } from "../../kit/format";
@@ -21,7 +21,7 @@ import { BOT_COLORS, BOT_SHAPES, botProvider, colorForName, DEFAULT_SHAPE, isBot
 import { BotFace } from "../../presence/ui/BotFace";
 import { Welcome } from "./Onboarding";
 import { useOpenThread } from "./workspace";
-import { botLanding, readLastBotThread, threadRoute } from "./threadListSwitch";
+import { botLanding, readLastBotThread, threadLocator } from "./threadListSwitch";
 import { BOT_PATH, botPath, forBot, rememberBot, useBotSelection } from "./selection";
 
 export { BOT_PATH };
@@ -84,7 +84,7 @@ export function BotHome({ Info }: { Info: ComponentType<{ view: BotView; refresh
   return <Info key={bot.id} view={view.data!} refresh={view.refresh} />;
 }
 
-/** The bare Bot page, where the rail's Bot item goes (not a Bot's Info by id, nor New bot). */
+/** The bare Bot page, where the rail's Bot item goes (not a Bot's Info by id, nor New Bot). */
 export const isBareBotPath = (pathname: string) => pathname.replace(/\/+$/, "") === BOT_PATH;
 
 /**
@@ -104,13 +104,7 @@ function useBotLanding(bare: boolean, view: BotView | undefined): boolean {
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
-    const locate = async (threadId: string) => {
-      try {
-        const thread = await sdk.threads.get({ threadId }) as { id: string; projectId: string; deletedAt?: number | null };
-        return thread && !thread.deletedAt ? threadRoute(thread.id, thread.projectId) : null;
-      } catch { return null; }
-    };
-    void botLanding(readLastBotThread(), chatId, locate).then((target) => {
+    void botLanding(readLastBotThread(), chatId, threadLocator(sdk)).then((target) => {
       if (cancelled) return;
       if (!target) { setSettled(true); return; }
       window.history.replaceState(window.history.state, "", target.path);
@@ -126,10 +120,10 @@ export type Profile = { name: string; shape: Exclude<RpcInput<"bot_set">["shape"
 
 /** The first Bot's name until it picks its own; a further Bot's. */
 export const FIRST_BOT_NAME = "Chief of Staff";
-export const NEXT_BOT_NAME = "New bot";
+export const NEXT_BOT_NAME = "New Bot";
 
 /**
- * No Bot yet, or New bot: the welcome (Onboarding.tsx). Create makes the Bot
+ * No Bot yet, or New Bot: the welcome (Onboarding.tsx). Create makes the Bot
  * with a default name and drawn avatar, its first message the setup (it asks
  * a couple of questions, then names and draws itself), and opens its chat.
  */

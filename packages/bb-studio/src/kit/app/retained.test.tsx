@@ -2,7 +2,7 @@
 import React, { act, useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { RetainedPanels, retainPanel } from "./retained";
+import { RetainedPanels, retainPanel, useRetainedReturns } from "./retained";
 
 vi.mock("@get-bb/plugin-sdk/app", () => ({ experimental_usePluginId: () => "pages" }));
 let roots: Root[];
@@ -84,6 +84,22 @@ it("returns the same editor, state and scroll when an ordinary route leaves and 
   expect(main.host.querySelector<HTMLElement>("[data-scroll]")!.scrollTop).toBe(240);
   expect(mounts).toBe(1);
   expect(document.querySelectorAll("textarea")).toHaveLength(1);
+});
+it("counts the view's returns from parking, not its first showing or a pane split", async () => {
+  function Page() { return <output data-returns="">{useRetainedReturns()}</output>; }
+  const Main = retainPanel("pages", Page);
+  mount(<RetainedPanels path="pages" render={() => <Page />} />);
+  const main = mount(<Main key="single" subPath="one" />);
+  const returns = () => main.host.querySelector("[data-returns]")?.textContent;
+  expect(returns()).toBe("0");
+  await act(() => main.root.render(<Main key="split" subPath="one" />));
+  expect(returns()).toBe("0");
+  await act(() => main.root.render(<p>A thread</p>));
+  await act(() => main.root.render(<Main subPath="one" />));
+  expect(returns()).toBe("1");
+  await act(() => main.root.render(<p>A thread</p>));
+  await act(() => main.root.render(<Main subPath="one" />));
+  expect(returns()).toBe("2");
 });
 it("keeps only the most recent left views and disposes older ones", async () => {
   const disposed: string[] = [];

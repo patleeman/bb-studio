@@ -9,9 +9,9 @@ import { lazy, Suspense, useDeferredValue, useEffect, useRef, useState } from "r
 import { cn } from "../../kit/ui/index";
 import { isTypingTarget } from "../../ui/typing-target";
 import { lastBot } from "../../ui/bot/selection";
-import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, useRowOpen } from "../../ui/bot-page";
+import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, noMatch, useBotPageQuery, useRowOpen } from "../../ui/bot-page";
 import type { MemoryRecordView } from "../contract";
-import { recordDate } from "../shared";
+import { recordDate, recordLine } from "../shared";
 import { useMemory, useMemoryCall, type MemoryResult } from "./hooks";
 import { MenuSelect } from "../../ui/menu-select";
 import { searchPlaceholder, SORTS, topicPills, type Sort } from "./model";
@@ -41,7 +41,7 @@ function MemoryPage({ data }: { data: MemoryResult<"memory.overview"> }) {
   const botId = data.bot.id;
   const topics = data.topics;
   const count = data.counts.current + data.counts.replaced;
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useBotPageQuery();
   const [topic, setTopic] = useState<string | null>(null);
   const [sort, setSort] = useState<Sort>("newest");
   const [adding, setAdding] = useState(false);
@@ -64,7 +64,7 @@ function MemoryPage({ data }: { data: MemoryResult<"memory.overview"> }) {
   const current = records.filter((record) => !record.replacedById);
   const replaced = records.filter((record) => record.replacedById);
   const row = (record: MemoryRecordView) => (
-    <BotPageRow key={record.id} testId="memory-record" data={{ "data-record-id": record.id }} icon="Brain" title={record.text} titleText={record.text}
+    <BotPageRow key={record.id} testId="memory-record" data={{ "data-record-id": record.id }} icon="Brain" title={recordLine(record.text)} titleText={recordLine(record.text)}
       muted={!!record.replacedById || record.archived} status={record.archived ? { label: "Archived" } : null}
       meta={`${record.topic} · ${recordDate(record.createdAt)}`} {...rowOpen({ kind: "record", id: record.id }, record.topic)} />
   );
@@ -88,7 +88,10 @@ function MemoryPage({ data }: { data: MemoryResult<"memory.overview"> }) {
         </article>
       </BotPageGroup>
       {list.error && !list.data ? <p role="alert" className="text-sm text-destructive">{list.error}</p> : null}
-      {list.data && !records.length ? <BotPageEmpty testId="memory-empty">{search || topic ? "No records match" : "No records"}</BotPageEmpty> : null}
+      {list.data && !records.length ? <BotPageEmpty testId="memory-empty" {...(search
+        ? { title: noMatch(topic ? `records in ${topic}` : "records", search), action: { label: "Clear search", onClick: () => setQuery("") } }
+        : topic ? { title: `No records in ${topic}`, action: { label: "Show all", onClick: () => setTopic(null) } }
+        : { title: "No records yet", hint: "Tell the Bot something to remember, or add a record.", action: adding ? null : { label: "New record", onClick: () => setAdding(true) } })} /> : null}
       {current.length ? <BotPageGroup title="Records" count={current.length} testId="memory-records">{current.map(row)}</BotPageGroup> : null}
       {replaced.length ? <BotPageGroup title="Replaced" count={replaced.length} collapsible defaultOpen={false} testId="memory-replaced">{replaced.map(row)}</BotPageGroup> : null}
       {list.data && list.data.total > records.length ? <p className="px-2 text-xs text-muted-foreground">Showing {records.length} of {list.data.total}</p> : null}

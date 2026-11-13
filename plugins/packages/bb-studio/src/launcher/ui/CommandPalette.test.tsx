@@ -86,11 +86,12 @@ beforeEach(() => {
   state.items = [];
   registerLauncherItems({ experimental_launcherItem: (item: (typeof STUDIO_LAUNCHER_ITEMS)[number]) => { state.items.push({ ...item, keywords: [...(item.keywords ?? [])], key: `studio/${item.id}`, pluginId: "studio" }); } });
   state.commands = [{ id: "plugin-page:roadmaps/board", title: "Roadmap board", group: "Plugin pages", run: vi.fn() }, { id: "app:window.new", title: "New window", group: "Window and layout", shortcut: "⇧⌘N", run: vi.fn() }];
-  state.rpc.mockReset().mockImplementation(async (method: string) => {
+  state.rpc.mockReset().mockImplementation(async (method: string, body?: unknown) => {
     if (method === "newtab_recents") return { entries: [{ id: "page:pg_1", title: "Roadmap", kind: "Page", icon: "FileText", updatedAt: 25, ref: { kind: "page", id: "pg_1" } }, { id: "conversation:thr_2", title: "Plan the offsite", kind: "Conversation", icon: "MessageSquare", updatedAt: 20, ref: { kind: "conversation", id: "thr_2" } }] };
     if (method === "newtab_search") return { entries: [] };
     if (method === "searchAll") return [];
     if (method === "bot_thread_info") return { info: { threadId: "thr_cur", botId: "bot_1", botName: "Chief of Staff", kind: "conversation" } };
+    if (method === "bot_landing") { const { botId, last } = (body ?? {}) as { botId: string; last: string | null }; return { threadId: last && last !== "thr_gone" ? last : ({ bot_1: "thr_main", bot_2: "thr_home" } as Record<string, string>)[botId] ?? null }; }
     if (method === "bot_spaces") return { bots: [{ id: "bot_1", name: "Chief of Staff", mainThreadId: "thr_main" }, { id: "bot_2", name: "Home", mainThreadId: "thr_home" }], currentBotId: "bot_1" };
     if (method === "bot_ask") return { threadId: (state.rpc.mock.lastCall?.[1] as { to: { kind: string; threadId?: string } }).to.kind === "new" ? "thr_new" : (state.rpc.mock.lastCall?.[1] as { to: { threadId: string } }).to.threadId, projectId: null };
     return { ok: true };

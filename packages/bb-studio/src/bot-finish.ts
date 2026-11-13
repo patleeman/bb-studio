@@ -5,7 +5,7 @@
 // 1. Archiving a conversation (BB's Archive anywhere, iOS, or `bot_finish`)
 //    sends one last agent-only turn INTO the conversation (no user bubble): write a summary of the
 //    decisions, what was left open and what was made; save it with
-//    memory_add (topic: the conversation, source: the conversation); call
+//    memory_add (topic "Conversations", a first line naming the conversation, source: the conversation); call
 //    bot_finish_done with it. Main and workers can't be finished; a
 //    conversation that is working can't either (finish it when it's done).
 // 2. bot_finish_done (also when the user asks for it in the chat) archives
@@ -65,9 +65,12 @@ export function isFinishing(db: Database.Database, threadId: string): boolean {
   return !!db.prepare("SELECT 1 FROM bot_finishes WHERE thread_id = ? AND state = 'finishing'").get(threadId);
 }
 
-/** The topic a conversation's summary is saved under: its title. */
-export function finishTopic(title: string): string {
-  return title.replace(/\s+/g, " ").trim().slice(0, 60).trim() || "Conversation";
+/** The one topic every conversation's summary is saved under. */
+export const FINISH_TOPIC = "Conversations";
+
+export function finishRecordText(title: string, summary: string): string {
+  const name = title.replace(/\s+/g, " ").trim();
+  return name ? `${name.length > 80 ? `${name.slice(0, 79).trimEnd()}…` : name}\n\n${summary.trim()}` : summary.trim();
 }
 
 /** The agent-only part of the finishing turn. */
@@ -76,7 +79,7 @@ export function finishInstruction(input: { threadId: string; title: string }): s
   return [
     `Studio: the user archived this conversation (${JSON.stringify(input.title)}, ${input.threadId}). Do this now, in this turn:`,
     `1. Write its summary for someone who wasn't here, in short markdown: "**Decisions**" with one bullet per decision, "**Left open**" with what is still undecided, "**Made**" with the pages, designs, apps or code it produced. Leave out an empty section.`,
-    `2. Save it with memory_add: topic ${JSON.stringify(finishTopic(input.title))}, the summary as text, source ${source}.`,
+    `2. Save it with memory_add: topic ${JSON.stringify(FINISH_TOPIC)}, source ${source}, and as text one plain line (no markdown) naming what the conversation was about, a blank line, then the summary.`,
     "3. Call bot_finish_done with the same summary.",
     "Then reply with one short line. Studio archives the conversation and posts the summary to Main.",
   ].join("\n");
@@ -268,7 +271,7 @@ export class BotFinish {
     const replies = events.flatMap((event) => event.data?.item?.type === "agentMessage" && event.data.item.text?.trim() ? [event.data.item.text] : []);
     const summary = fallbackSummary(replies, rec.latest?.text ?? null);
     if (!this.deps.memory.count(rec.botId, threadId, row.requested_at)) {
-      try { this.deps.memory.add({ botId: rec.botId, topic: finishTopic(row.title), text: summary, threadId, title: row.title }); } catch (error) { this.deps.log(`Finish: saving the summary to memory failed: ${error instanceof Error ? error.message : String(error)}`); }
+      try { this.deps.memory.add({ botId: rec.botId, topic: FINISH_TOPIC, text: finishRecordText(row.title, summary), threadId, title: row.title }); } catch (error) { this.deps.log(`Finish: saving the summary to memory failed: ${error instanceof Error ? error.message : String(error)}`); }
     }
     return this.done(threadId, summary, "fallback");
   }
