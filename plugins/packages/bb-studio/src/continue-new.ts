@@ -33,6 +33,12 @@ export function handoffText(input: {
   return parts.join("\n\n");
 }
 
+export function continuedFromLine(source: { isMain?: boolean; title?: string | null }): string {
+  if (source.isMain) return "Continued from Main";
+  const title = source.title?.replace(/\s+/g, " ").trim();
+  return title ? `Continued from “${title}”` : "Continued from another conversation";
+}
+
 type TimelineRow = { kind?: string; role?: string; messageSeq?: number; initiator?: string };
 
 export function sourceSeqOf(rows: readonly TimelineRow[]): number | null {
@@ -44,7 +50,7 @@ export function sourceSeqOf(rows: readonly TimelineRow[]): number | null {
 }
 
 export interface ContinueDeps {
-  conversation(threadId: string): { botId: string; kind: "conversation" | "worker" } | null;
+  conversation(threadId: string): { botId: string; kind: "conversation" | "worker"; isMain?: boolean; title?: string | null } | null;
   thread(threadId: string): Promise<{ projectId?: string | null; environmentId?: string | null } | null>;
   timeline(threadId: string): Promise<readonly TimelineRow[]>;
   defaultModel(botId: string): { providerId: string; model: string; reasoning?: string | null } | null;
@@ -86,7 +92,7 @@ export async function continueInNew(deps: ContinueDeps, sourceThreadId: string, 
   const made = await deps.spawn({
     projectId: thread.projectId, title: input.title, visibility: "visible",
     environment: thread.environmentId ? { type: "reuse", environmentId: thread.environmentId } : { type: "project-default" },
-    input: [{ type: "text", text, mentions: [] }],
+    input: [{ type: "text", text: continuedFromLine(source), mentions: [] }, { type: "text", text, mentions: [], visibility: "agent-only" }],
     pluginMetadata: { botConversation: source.botId, continuedFrom: { threadId: sourceThreadId, messageSeq: sourceSeq } },
     ...model,
   });
