@@ -1294,8 +1294,13 @@ sidebar toggle as pills two pixels tighter than the cards
 column and as tall as the scroll area, which becomes a size container;
 the thread window itself paints nothing, so the scene stays sharp on both
 sides) with the composer box inside it (`composer`) over
-`--fork-cards-composer-backing`, a fade to 84% `--canvas` under the
-sticky footer that keeps the transcript from showing through, and the side panel
+a frosted fade under the sticky footer (an 18px blur, masked in over
+`--fork-cards-fade`, that blurs the transcript scrolled under it; its tint,
+`--fork-cards-composer-backing`, defaults to `none`, so the scene shows
+through at the column card's density, not as a dark band), the composer's
+stack cards (queue, banners: `--surface-raised-solid` inside a
+`[data-scroll-footer]`) on the composer's surface
+(`--fork-surface-composer-background`), and the side panel
 `aside` (`secondary-panel`), plus any `[data-fork-card="<surface>"]`
 element outside the sidebar, the hook plugin content uses; inside the
 sidebar such an element paints nothing, so the sidebar stays one card. The
