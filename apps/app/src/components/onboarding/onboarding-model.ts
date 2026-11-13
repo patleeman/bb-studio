@@ -28,8 +28,6 @@ export const ONBOARDING_PLUGIN_MARKETPLACE = "bb-official";
 export const ONBOARDING_PLUGIN_ENTRY_IDS: readonly string[] = [
   "browser-automation",
   "workflows",
-  "monaco-editor",
-  "prompt-library",
   "agent-annotations",
   "ask-user-question",
 ];
