@@ -65,26 +65,6 @@
   }
 }
 
-[data-sidebar="panel"][data-fork-sidebar-background]
-  [data-sidebar="collapsible-body"] {
-  background: var(--fork-sidebar-background);
-}
-
-[data-sidebar="panel"][data-fork-sidebar-background]
-  [data-sidebar="collapsible-body"]
-  :is(
-    [data-sidebar="content"],
-    [data-sidebar="header"],
-    [data-sidebar="footer"]
-  ) {
-  background: transparent;
-}
-
-[data-sidebar="panel"][data-fork-sidebar-accent]
-  [data-sidebar="collapsible-body"] {
-  --sidebar-accent: var(--fork-sidebar-accent);
-}
-
 html[data-fork-backdrop] {
   --fork-panel: var(
     --fork-surface-panel-background,

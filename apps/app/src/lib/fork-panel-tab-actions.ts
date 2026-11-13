@@ -1,13 +1,19 @@
-import type { ExperimentalPanelTabActionTab } from "@get-bb/plugin-sdk";
 import type { FixedPanelTab } from "./fixed-panel-tabs-state";
-import type { PluginPanelTabActionSlot } from "./fork-slots";
 import { threadIdOfPanelState } from "./fork-global-panel-tabs";
 import { parsePersistedPluginPanelParams } from "./plugin-json-value";
+
+export interface PanelTabTarget {
+  pluginId: string;
+  tabId: string;
+  params: Record<string, unknown> | undefined;
+  title: string;
+  threadId: string | null;
+}
 
 export function panelTabActionTarget(
   tab: FixedPanelTab,
   panelStateId: string | null,
-): ExperimentalPanelTabActionTab | null {
+): PanelTabTarget | null {
   if (tab.kind !== "plugin-panel" || tab.fileOpenerOwner !== undefined) {
     return null;
   }
@@ -22,43 +28,4 @@ export function panelTabActionTarget(
     title: tab.title,
     threadId: panelStateId === null ? null : threadIdOfPanelState(panelStateId),
   };
-}
-
-export function availablePanelTabActions(
-  actions: readonly PluginPanelTabActionSlot[],
-  target: ExperimentalPanelTabActionTab,
-): PluginPanelTabActionSlot[] {
-  return actions
-    .filter((action) => {
-      if (action.isAvailable === undefined) return true;
-      try {
-        return action.isAvailable(target) === true;
-      } catch (error) {
-        console.warn(
-          `[plugin:${action.pluginId}] panel tab action "${action.id}" isAvailable failed`,
-          error,
-        );
-        return false;
-      }
-    })
-    .sort(
-      (a, b) =>
-        a.pluginId.localeCompare(b.pluginId) || a.id.localeCompare(b.id),
-    );
-}
-
-export function runPanelTabAction(
-  action: PluginPanelTabActionSlot,
-  target: ExperimentalPanelTabActionTab,
-): void {
-  const report = (error: unknown) =>
-    console.warn(
-      `[plugin:${action.pluginId}] panel tab action "${action.id}" failed`,
-      error,
-    );
-  try {
-    void Promise.resolve(action.run(target)).catch(report);
-  } catch (error) {
-    report(error);
-  }
 }

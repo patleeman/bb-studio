@@ -564,9 +564,8 @@ function SortablePanelTab({
         <div
           ref={setTabRef}
           style={style}
-          title={fixed.compact ? tab.label : undefined}
           className={cn(
-            fixed.compact ? "shrink-0" : "min-w-[5.5rem] shrink",
+            "min-w-[5.5rem] shrink",
             (nativeDrag !== null || !dragDisabled) && "cursor-grab active:cursor-grabbing",
             isDragging && "opacity-40",
             noDragClass,
@@ -659,11 +658,9 @@ function PanelTab({
 }) {
   const title =
     tab.statusLabel === null ? tab.label : `${tab.label} (${tab.statusLabel})`;
-  const iconOnly = useFixedPanelTabDisplay(tab).compact;
   return (
     <TabPill
       label={tab.label}
-      {...(iconOnly ? { iconOnly, ariaLabel: title } : {})}
       leadingVisual={tab.leadingVisual}
       secondaryLabel={tab.statusLabel === null ? null : `(${tab.statusLabel})`}
       title={title}

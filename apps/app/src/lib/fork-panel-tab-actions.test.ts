@@ -3,24 +3,7 @@ import {
   createPluginPanelFixedPanelTab,
   createTerminalFixedPanelTab,
 } from "./fixed-panel-tabs-state";
-import type { PluginPanelTabActionSlot } from "./fork-slots";
-import {
-  availablePanelTabActions,
-  panelTabActionTarget,
-  runPanelTabAction,
-} from "./fork-panel-tab-actions";
-
-function action(
-  overrides: Partial<PluginPanelTabActionSlot> & { pluginId: string },
-): PluginPanelTabActionSlot {
-  return {
-    id: "open",
-    title: "Open as main tab",
-    generation: 1,
-    run: () => {},
-    ...overrides,
-  };
-}
+import { panelTabActionTarget } from "./fork-panel-tab-actions";
 
 const page = createPluginPanelFixedPanelTab({
   pluginId: "studio",
@@ -33,7 +16,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("the tab a panel tab action is given", () => {
+describe("the plugin tab a side panel tab carries", () => {
   it("describes a plugin action tab and the thread whose panel holds it", () => {
     expect(panelTabActionTarget(page, "thr_1")).toEqual({
       pluginId: "studio",
@@ -93,61 +76,5 @@ describe("the tab a panel tab action is given", () => {
         "thr_1",
       ),
     ).toBeNull();
-  });
-});
-
-describe("which panel tab actions a tab offers", () => {
-  const target = panelTabActionTarget(page, "thr_1")!;
-
-  it("lists actions in plugin order and leaves out the ones that say no or throw", () => {
-    vi.spyOn(console, "warn").mockImplementation(() => {});
-    const offered = availablePanelTabActions(
-      [
-        action({ pluginId: "zeta" }),
-        action({ pluginId: "beta", id: "never", isAvailable: () => false }),
-        action({
-          pluginId: "beta",
-          id: "broken",
-          isAvailable: () => {
-            throw new Error("boom");
-          },
-        }),
-        action({
-          pluginId: "alpha",
-          id: "own",
-          isAvailable: (tab) => tab.pluginId === "studio",
-        }),
-      ],
-      target,
-    );
-    expect(offered.map((each) => `${each.pluginId}/${each.id}`)).toEqual([
-      "alpha/own",
-      "zeta/open",
-    ]);
-    expect(console.warn).toHaveBeenCalledTimes(1);
-  });
-
-  it("runs an action with the tab and contains a throw and a rejection", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const run = vi.fn();
-    runPanelTabAction(action({ pluginId: "alpha", run }), target);
-    expect(run).toHaveBeenCalledWith(target);
-
-    runPanelTabAction(
-      action({
-        pluginId: "alpha",
-        run: () => {
-          throw new Error("sync");
-        },
-      }),
-      target,
-    );
-    runPanelTabAction(
-      action({ pluginId: "alpha", run: () => Promise.reject(new Error("no")) }),
-      target,
-    );
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(warn).toHaveBeenCalledTimes(2);
   });
 });

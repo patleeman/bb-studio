@@ -1,4 +1,4 @@
-# Fork API (BB Studio): windows, approvals, the close command and backend hooks
+# Fork API (BB Studio): windows, approvals and backend hooks
 
 The rest of the fork-only API, with the same rules as fork-api.md: every member is experimental, and a plugin that also runs on stock bb checks each one exists before using it. The names are listed in fork-api.md.
 
@@ -8,22 +8,15 @@ The rest of the fork-only API, with the same rules as fork-api.md: every member 
   bb can show in a window of its own, with no bb chrome around it.
 - `experimental_useWindows()` → `{ native, register, open, toggle, close }`.
   `open(windowId, { width, height, x, y, transparent, frame, alwaysOnTop,
-clickThrough, resizable, hotkey, menuBarTitle, params })`. `hotkey` is a
-  system-wide shortcut that shows or hides the window; `menuBarTitle` adds a
-  menu bar entry; `register` sets both up without showing the window.
+resizable, hotkey, params })`. `hotkey` is a
+  system-wide shortcut that shows or hides the window; `register` sets it up without showing the window.
   `params` reach the component as the page's query string. In a browser
   `native` is false and `open` opens a plain popup. `hotkeyRegistered(windowId)`
   says whether the system took the window's hotkey; another app may hold it.
   Also `minWidth`, `minHeight`, `titleBar: "hiddenInset"` (traffic lights
   inside the content) and `rememberBounds` (reopen at the last place and size,
-  per display). `setClickThrough(windowId, on)` switches click-through on an
-  open window; while on, the hotkey and menu bar entry turn it off instead of
-  hiding the window, and the page gets a `bb-fork-window-click-through` event.
-  `setClickThrough(windowId, false, { hold: true })` pauses it (a modifier
-  held over the window) without turning it off. `center` opens it mid-screen; `hideOnBlur` closes it when it loses focus.
-  `vibrancy: "hud" | "under-window"` with `transparent` puts macOS's blurred
-  material behind the component, active even unfocused; other systems
-  ignore it. Opening a window that is already open with other `params`
+  per display). `center` opens it mid-screen; `hideOnBlur` closes it when it loses focus.
+  Opening a window that is already open with other `params`
   loads the new address in the same window, which keeps its place and size.
 
 ## Launcher items
@@ -121,17 +114,6 @@ Names: `ExperimentalTurnContextProvider`.
   once the fork has started (its history is copied right after creation).
 
 Names: `ExperimentalThreadForkPoint`.
-
-## The close command
-
-- `app.slots.experimental_closeFallback({ id, close() })` → what Mod+W
-  closes when it is not closing a side panel tab: bb asks when keyboard
-  focus is outside the side panel, or the panel has no closable selected
-  tab. Return true when you closed something; bb then does nothing else.
-  Return false to leave bb's own behavior (in the desktop app that can
-  close the window).
-
-Names: `ExperimentalCloseFallbackRegistration`.
 
 ## Quiet turns
 
