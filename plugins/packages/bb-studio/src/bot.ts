@@ -196,17 +196,20 @@ export function modelChange(current: ThreadExecution, next: ThreadExecution): "u
 }
 /**
  * A new Bot's first message from the first-time flow (bot_create's `setup`,
- * what the user wants help with; empty when they didn't say). The Bot
- * introduces itself, asks a couple of questions, and then names and
- * describes itself and picks its look with bot_profile_update.
+ * what the user wants help with; empty when they didn't say): a short hello
+ * the user sees, and an agent-only note that has the Bot introduce itself,
+ * ask a couple of questions, and then name, describe and pick its look with
+ * bot_profile_update.
  */
-export function setupPrompt(goal: string): string {
+export function setupInput(goal: string): { type: "text"; text: string; mentions: never[]; visibility?: "agent-only" }[] {
   const want = goal.trim();
   return [
-    want ? `Hi! You're my new Bot. I'd like help with: ${want}` : "Hi! You're my new Bot. I haven't decided what you should help with yet.",
-    "",
-    `Start by introducing yourself in a sentence, then ask me ${want ? "one or two short questions about what I need" : "what I'd like help with"}. Once I've answered, pick a name, a one-line description and a look that fit the job, set them with bot_profile_update, and offer a check-in if one would help.`,
-  ].join("\n");
+    { type: "text", text: want ? `Hi! You're my new Bot. I'd like help with: ${want}` : "Hi! You're my new Bot.", mentions: [] },
+    {
+      type: "text", mentions: [], visibility: "agent-only",
+      text: `${want ? "" : "The user hasn't said what they want help with yet. "}Start by introducing yourself in a sentence, then ask ${want ? "one or two short questions about what they need" : "what they'd like help with"}. Once they've answered, pick a name, a one-line description and a look that fit the job, set them with bot_profile_update, and offer a check-in if one would help.`,
+    },
+  ];
 }
 
 /**
@@ -702,7 +705,7 @@ export class Bots {
           // Studio Agents' providers take no reasoning levels; the permission is the bot's (accept edits by default).
           ...(external ? { providerId: external.providerId, model: external.model, reasoningLevel: "none", permissionMode: external.permissionMode, executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit", permissionMode: "explicit" } } : {}),
           // Its instructions come from agents.configure (botInstructions), so the first message is the user's.
-          input: [{ type: "text", text: input.prompt ?? (input.setup !== undefined ? setupPrompt(input.setup) : `Hi ${input.name}. Introduce yourself in a sentence and ask what I'd like you to keep an eye on.`), mentions: [] }],
+          input: input.prompt === undefined && input.setup !== undefined ? setupInput(input.setup) : [{ type: "text", text: input.prompt ?? `Hi ${input.name}. Introduce yourself in a sentence and ask what I'd like you to keep an eye on.`, mentions: [] }],
         } as never);
         threadId = thread.id;
       }

@@ -8,7 +8,7 @@ import { testScheduler } from "./test/scheduler-fixture";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { botHeartbeat, botInstructions, BOT_ID, Bots, CHECKIN_PRESETS, classifyActivity, descendants, MEMORY_TEMPLATE, setupPrompt, spawnedBy, startedBy } from "./bot";
+import { botHeartbeat, botInstructions, BOT_ID, Bots, CHECKIN_PRESETS, classifyActivity, descendants, MEMORY_TEMPLATE, setupInput, spawnedBy, startedBy } from "./bot";
 import { PERSONAL_PROJECT_ID, ProjectLeads } from "./project-lead";
 
 const dispose: (() => Promise<void>)[] = [];
@@ -157,13 +157,18 @@ it("reads the primary thread from project leads without writing the Bot row", as
   expect(x.db.prepare("SELECT thread_id, updated_at FROM bots WHERE id = ?").get(BOT_ID)).toEqual(before);
 });
 
-it("the first-time flow's setup becomes a first message that has the Bot set its own profile", async () => {
+it("the first-time flow's setup becomes a short hello the user sees and an agent-only note that has the Bot set its own profile", async () => {
   const x = await setup();
   await x.bots.create({ name: "Chief of Staff", avatar: "🤖", setup: "Watch my PRs" });
-  const text = (x.spawn.mock.calls.at(-1)![0] as unknown as { input: { text: string }[] }).input[0]!.text;
-  expect(text).toContain("I'd like help with: Watch my PRs");
-  expect(text).toContain("bot_profile_update");
-  expect(setupPrompt("  ")).toContain("haven't decided");
+  const input = (x.spawn.mock.calls.at(-1)![0] as unknown as { input: { text: string; visibility?: string }[] }).input;
+  expect(input).toHaveLength(2);
+  expect(input[0]).toEqual({ type: "text", text: "Hi! You're my new Bot. I'd like help with: Watch my PRs", mentions: [] });
+  expect(input[1]!.visibility).toBe("agent-only");
+  expect(input[1]!.text).toContain("bot_profile_update");
+  const blank = setupInput("  ");
+  expect(blank[0]!.text).toBe("Hi! You're my new Bot.");
+  expect(blank[1]!.text).toContain("hasn't said what they want help with");
+  expect(blank.filter((part) => part.visibility !== "agent-only").map((part) => part.text).join(" ")).not.toMatch(/bot_profile_update|_/);
   // A prompt still wins.
   await x.bots.create({ name: "Scout", avatar: "🛰️", prompt: "Hi", setup: "ignored" });
   expect((x.spawn.mock.calls.at(-1)![0] as unknown as { input: { text: string }[] }).input[0]!.text).toBe("Hi");

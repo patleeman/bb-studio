@@ -3474,9 +3474,10 @@ of Staff", with the same thread and check-ins; rename it from its page.
   **Create Bot** (or Enter) makes it as "Chief of Staff", a drawn blob,
   starts its chat in your personal project and opens that as BB's thread
   page with the Bots list. Its first message is the setup (`bot_create`'s
-  `setup`, `setupPrompt` in `src/bot.ts`): what you asked for, and to
-  introduce itself, ask a couple of questions, then pick its own name,
-  description and look with `bot_profile_update`, and offer a check-in.
+  `setup`, `setupInput` in `src/bot.ts`): a short hello with what you asked
+  for, and an agent-only note to introduce itself, ask a couple of
+  questions, then pick its own name, description and look with
+  `bot_profile_update`, and offer a check-in.
   Leaving the question empty is fine: it asks. The Bots sidebar shows a
   **Your first bot** row until it exists, and the iOS app has the same
   flow. Its
