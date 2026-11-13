@@ -52,7 +52,7 @@ export { useLibraryQuery } from "./library-query";
 const EMPTY_QUERY: Query = { filters: [], text: "" };
 /** The workbench's query, apart from the Studio app's so the sidebar doesn't move it. */
 const THREAD_QUERY_KEY = `${QUERY_KEY}:thread`;
-export const STARRED_EMPTY = "Nothing starred";
+export const STARRED_EMPTY = "No starred items";
 const PILL = "flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground aria-pressed:bg-state-active aria-pressed:text-foreground focus-visible:outline-2 focus-visible:outline-ring";
 /** The leading group's id in a thread's workbench. */
 export const THIS_THREAD = "this-thread";
@@ -420,11 +420,11 @@ export function StudioLibrary({ thread }: { thread?: LibraryThreadHost } = {}) {
     : compiled.unknown.length
     ? `Nothing is called ${compiled.unknown.map((filter) => `${filter.field}:${filter.value}`).join(", ")}.`
     : compiled.archived
-      ? "Nothing archived matches."
+      ? searchText ? `No archived items match “${searchText}”` : "No archived items match"
       : searchText || query.filters.length
           // A content search still running may yet find something.
-          ? contentSearch.loading ? "" : "Nothing matches."
-          : "No items yet.";
+          ? contentSearch.loading ? "" : searchText ? `No items match “${searchText}”` : "No items match"
+          : "No items yet";
 
   return (
     <>

@@ -370,7 +370,7 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
               ? older.error ? <p role="alert" className="px-2 py-1 text-xs text-destructive">{older.error}</p>
                 : !older.data ? <p className="px-2 py-1 text-xs text-muted-foreground">Loading…</p>
                   : older.data.threads.length ? older.data.threads.map((thread) => <Row botName={bot.name} key={thread.id} thread={thread} depth={0} active={active === thread.id} onOpen={onOpen} providers={providers} />)
-                    : <p className="px-2 py-1 text-xs text-muted-foreground">Nothing archived.</p>
+                    : <p className="px-2 py-1 text-xs text-muted-foreground">Nothing archived yet</p>
               : null}
           </div>
         ) : null}

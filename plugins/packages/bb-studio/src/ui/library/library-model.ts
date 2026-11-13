@@ -161,3 +161,15 @@ export function libraryGroups(items: readonly LibraryItem[], options: { query: s
   if (options.groupBy !== "conversation") list.sort((a, b) => a.order - b.order);
   return list.map(({ order: _order, ...group }) => ({ ...group, rows: libraryRows(group.items) }));
 }
+
+const KIND_PLURALS: Record<Exclude<LibraryKindFilter, "all" | "starred">, string> = { page: "pages", whiteboard: "whiteboards", design: "designs", app: "apps", recording: "recordings" };
+
+export interface LibraryEmpty { title: string; hint?: string; action?: "clear" | "all" }
+
+export function libraryEmpty({ query, kind, appType, total }: { query: string; kind: LibraryKindFilter; appType: LibraryAppType; total: number }): LibraryEmpty {
+  const plural = kind === "all" || kind === "starred" ? "files" : kind === "app" && appType !== "all" ? `${appType} apps` : KIND_PLURALS[kind];
+  if (query.trim()) return { title: `No ${kind === "starred" ? "starred files" : plural} match “${query.trim()}”`, action: "clear" };
+  if (!total) return { title: "No files yet", hint: "Ask in a conversation for a page, a design or an app." };
+  if (kind === "starred") return { title: "No starred files", hint: "Open a file and press Star in its header." };
+  return { title: `No ${plural}`, action: "all" };
+}

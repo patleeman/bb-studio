@@ -374,7 +374,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
             className={cn(buttonVariants({ variant: "ghost", size: "sm" }), NEW_BUTTON)}>+ New</button>
         </div>
         {conversations.map((row) => <ConversationRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} />)}
-        {data && !conversations.length ? <Note>No conversations yet.</Note> : null}
+        {data && !conversations.length ? <Note>No conversations yet</Note> : null}
         {data && olderLabel(data.olderConversations, "conversation") ? <OlderRow testId="older-conversations" open={olderOpen} label={olderLabel(data.olderConversations, "conversation")!} onOpen={() => toPanel(olderPath(bot?.id ?? null))} botId={bot?.id ?? null} /> : null}
         {!data && view.error ? <Note>{view.error}</Note> : null}
       </section>
@@ -388,7 +388,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
           </button>
         ) : null}
         {doneOpen ? split.done.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} />) : null}
-        {data && !workers.length ? <Note>No workers</Note> : null}
+        {data && !workers.length ? <Note>No workers yet</Note> : null}
       </section>
       </>}
       <div className="flex-1" />
