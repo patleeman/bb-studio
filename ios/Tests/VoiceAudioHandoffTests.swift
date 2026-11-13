@@ -420,11 +420,17 @@ final class FakeCaptureEngine: CaptureEngine {
     let hz: Double
     var isRunning = false
     var tapped = false
+    var tapFormats: [AVAudioFormat?] = []
+    var doubleTaps = 0
     init(hz: Double) { self.hz = hz }
     func inputFormat() -> AVAudioFormat? {
         hz > 0 ? AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: hz, channels: 1, interleaved: false) : nil
     }
-    func installTap(bufferSize: AVAudioFrameCount, format: AVAudioFormat, block: @escaping AVAudioNodeTapBlock) { tapped = true }
+    func installTap(bufferSize: AVAudioFrameCount, format: AVAudioFormat?, block: @escaping AVAudioNodeTapBlock) {
+        if tapped { doubleTaps += 1 }
+        tapFormats.append(format)
+        tapped = true
+    }
     func removeTap() { tapped = false }
     func prepare() {}
     func start() throws { isRunning = true }
@@ -492,5 +498,93 @@ final class TalkMicRecoveryTests: XCTestCase {
         XCTAssertEqual(made, 5, "the first engine and one per failed try")
         XCTAssertEqual(session.calls.filter { $0 == "setActive(true)" }.count, 4)
         XCTAssertFalse(capture.isCapturing)
+    }
+
+    func testTheTapTakesTheInputsOwnFormatOnAnEngineMadeAtStart() async throws {
+        let session = FakeAudioSession()
+        var engines: [FakeCaptureEngine] = []
+        let capture = SegmentCapture(makeEngine: {
+            let engine = FakeCaptureEngine(hz: 24_000)
+            engines.append(engine)
+            return engine
+        }, audioSession: session)
+        XCTAssertTrue(engines.isEmpty, "no engine before the session is set up: its input format would be stale")
+        let (journal, recording) = try journal()
+        try await capture.start(journal: journal, session: recording, onError: { _ in }, onLevel: { _ in }, onSegment: { _ in })
+        XCTAssertEqual(engines.count, 1)
+        XCTAssertEqual(engines[0].tapFormats.count, 1)
+        XCTAssertNil(engines[0].tapFormats[0] as AVAudioFormat?, "the input node's own format, so it always matches the hardware")
+        XCTAssertEqual(engines[0].doubleTaps, 0)
+        _ = capture.stop()
+    }
+
+    func testASecondStartUsesAFreshEngineAndNeverTapsTwice() async throws {
+        let session = FakeAudioSession()
+        var engines: [FakeCaptureEngine] = []
+        let capture = SegmentCapture(makeEngine: {
+            let engine = FakeCaptureEngine(hz: engines.isEmpty ? 48_000 : 16_000)
+            engines.append(engine)
+            return engine
+        }, audioSession: session)
+        let (journal, recording) = try journal()
+        try await capture.start(journal: journal, session: recording, onError: { _ in }, onLevel: { _ in }, onSegment: { _ in })
+        _ = capture.stop()
+        let second = TalkCaptureJournal.Session(recordingId: "rec_b", sessionId: "session_b", serverURL: URL(string: "https://a.invalid")!)
+        try journal.begin(second)
+        try await capture.start(journal: journal, session: second, onError: { _ in }, onLevel: { _ in }, onSegment: { _ in })
+        XCTAssertEqual(engines.count, 2, "a headset's 16 kHz after the built-in mic's 48 kHz: a new engine reads it")
+        XCTAssertTrue(engines[1].isRunning && engines[1].tapped)
+        XCTAssertFalse(engines[0].isRunning || engines[0].tapped, "the first engine let go of its tap")
+        XCTAssertEqual(engines.map(\.doubleTaps), [0, 0])
+        _ = capture.stop()
+    }
+
+    func testARestartAfterARouteChangeNeverTapsTwice() async throws {
+        let session = FakeAudioSession()
+        var engines: [FakeCaptureEngine] = []
+        let capture = SegmentCapture(makeEngine: {
+            let engine = FakeCaptureEngine(hz: 48_000)
+            engines.append(engine)
+            return engine
+        }, audioSession: session)
+        capture.retryDelays = [0, 5]
+        let (journal, recording) = try journal()
+        try await capture.start(journal: journal, session: recording, onError: { _ in }, onLevel: { _ in }, onSegment: { _ in })
+        engines[0].isRunning = false
+        capture.restart()
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertTrue(engines.last!.isRunning)
+        XCTAssertEqual(engines.map(\.doubleTaps), Array(repeating: 0, count: engines.count))
+        _ = capture.stop()
+    }
+
+    func testADeniedMicrophoneSaysSoAndNeverStartsCapture() async throws {
+        var made = 0
+        let capture = SegmentCapture(makeEngine: { made += 1; return FakeCaptureEngine(hz: 48_000) }, audioSession: FakeAudioSession())
+        let recorder = TalkRecorder(client: BBClient(baseURL: URL(string: "https://mic-denied.invalid")!), capture: capture, permission: { false })
+        await recorder.start(kind: "dictation")
+        XCTAssertEqual(recorder.phase, .failed("Microphone access is off. Enable it in Settings."))
+        XCTAssertFalse(capture.isCapturing)
+        XCTAssertEqual(made, 0, "no engine and no tap without the microphone")
+    }
+
+    func testTheRealEngineRecordsTwiceInARowWithoutAborting() async throws {
+        guard ProcessInfo.processInfo.environment["REAL_MIC"] != nil else { throw XCTSkip("needs microphone access granted to the test host") }
+        let session = AVAudioSession.sharedInstance()
+        try VoiceAudioConfig.dictation(echoCancelling: false).apply(to: session)
+        try session.setActive(true)
+        let capture = SegmentCapture()
+        let (journal, first) = try journal()
+        try await capture.start(journal: journal, session: first, onError: { _ in }, onLevel: { _ in }, onSegment: { _ in })
+        try await Task.sleep(for: .milliseconds(500))
+        _ = capture.stop()
+        try VoiceAudioConfig.dictation(echoCancelling: true).apply(to: session)
+        let second = TalkCaptureJournal.Session(recordingId: "rec_real", sessionId: "session_real", serverURL: URL(string: "https://a.invalid")!)
+        try journal.begin(second)
+        try await capture.start(journal: journal, session: second, onError: { _ in }, onLevel: { _ in }, onSegment: { _ in })
+        try await Task.sleep(for: .milliseconds(500))
+        XCTAssertTrue(capture.isCapturing)
+        _ = capture.stop()
+        try? session.setActive(false)
     }
 }

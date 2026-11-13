@@ -36,15 +36,19 @@ final class TalkRecorder: ObservableObject {
 
     private let client: BBClient
     private let outbox = TalkOutbox.shared
-    private let capture = SegmentCapture()
+    private let capture: SegmentCapture
+    private let permission: () async -> Bool
     private var heartbeatTask: Task<Void, Never>?
     private var handoff: TalkHandoff?
     private var stoppedSegments: Int?
     private var completing = false
     private var captureSession: TalkCaptureJournal.Session?
 
-    init(client: BBClient) {
+    init(client: BBClient, capture: SegmentCapture = SegmentCapture(),
+         permission: @escaping () async -> Bool = { await AVAudioApplication.requestRecordPermission() }) {
         self.client = client
+        self.capture = capture
+        self.permission = permission
         outbox.kick()
     }
 
@@ -90,7 +94,7 @@ final class TalkRecorder: ObservableObject {
         captureSession = nil
         stoppedSegments = nil
         do {
-            guard await AVAudioApplication.requestRecordPermission() else {
+            guard await permission() else {
                 phase = .failed("Microphone access is off. Enable it in Settings.")
                 return
             }
@@ -361,7 +365,7 @@ protocol CaptureEngine: AnyObject {
     /// The input's format, or nil when it reads 0 Hz or no channels: no mic yet.
     func inputFormat() -> AVAudioFormat?
     var isRunning: Bool { get }
-    func installTap(bufferSize: AVAudioFrameCount, format: AVAudioFormat, block: @escaping AVAudioNodeTapBlock)
+    func installTap(bufferSize: AVAudioFrameCount, format: AVAudioFormat?, block: @escaping AVAudioNodeTapBlock)
     func removeTap()
     func prepare()
     func start() throws
@@ -379,7 +383,7 @@ final class SystemCaptureEngine: CaptureEngine {
         return format.sampleRate > 0 && format.channelCount > 0 ? format : nil
     }
     var isRunning: Bool { engine.isRunning }
-    func installTap(bufferSize: AVAudioFrameCount, format: AVAudioFormat, block: @escaping AVAudioNodeTapBlock) {
+    func installTap(bufferSize: AVAudioFrameCount, format: AVAudioFormat?, block: @escaping AVAudioNodeTapBlock) {
         engine.inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: format, block: block)
     }
     func removeTap() { engine.inputNode.removeTap(onBus: 0) }
@@ -394,7 +398,7 @@ final class SegmentCapture: @unchecked Sendable {
     static let noMicrophone = "No microphone is available."
 
     private let makeEngine: () -> CaptureEngine
-    private var engine: CaptureEngine
+    private var engine: CaptureEngine!
     private let audioSession: AudioSessionControl
     /// The recorder's session config, set again when the input reads 0 Hz.
     var sessionConfig: VoiceAudioConfig?
@@ -428,7 +432,6 @@ final class SegmentCapture: @unchecked Sendable {
 
     init(makeEngine: @escaping () -> CaptureEngine = { SystemCaptureEngine() }, audioSession: AudioSessionControl = AVAudioSession.sharedInstance()) {
         self.makeEngine = makeEngine
-        self.engine = makeEngine()
         self.audioSession = audioSession
     }
 
@@ -445,6 +448,9 @@ final class SegmentCapture: @unchecked Sendable {
             lastAudioAt = Date()
             try openSegment()
         }
+        engine?.removeTap()
+        engine?.stop()
+        engine = makeEngine()
         capturing = true
         do {
             try await startEngineRecovering()
@@ -547,7 +553,8 @@ final class SegmentCapture: @unchecked Sendable {
         }
         let converter = AVAudioConverter(from: inputFormat, to: format)
         queue.sync { self.converter = converter }
-        engine.installTap(bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
+        engine.removeTap()
+        engine.installTap(bufferSize: 4096, format: nil) { [weak self] buffer, _ in
             guard let self else { return }
             self.queue.sync {
                 guard let converted = self.convert(buffer) else { return }
@@ -577,6 +584,7 @@ final class SegmentCapture: @unchecked Sendable {
     }
 
     private func convert(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
+        if converter?.inputFormat != buffer.format { converter = AVAudioConverter(from: buffer.format, to: format) }
         guard let converter else { return nil }
         let ratio = format.sampleRate / buffer.format.sampleRate
         let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 32
