@@ -50,6 +50,7 @@ function windowIpc() {
     handle: (channel: string, listener: typeof handler) => {
       if (channel === BB_DESKTOP_FORK_WINDOW_CHANNEL) handler = listener;
     },
+    on: () => {},
   } as unknown as IpcMain);
   const sender = {
     senderFrame: { url: "http://127.0.0.1:38986/threads/thr_1" },
