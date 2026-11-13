@@ -98,8 +98,7 @@ ids remain for data compatibility.
   built-in kind: Studio has no such RPC, only `provider.call`. Built-in
   providers use `ProviderCall`; `ItemMenu` takes `onMove`, which goes through
   `provider.call` with `studio_move`.
-- Version history (`provider-history.ts`) and backup (`BackupService`
-  `builtins`) read the kind in-process. The backup section keeps the old
+- Backup (`BackupService` `builtins`) reads the kind in-process. The backup section keeps the old
   plugin id, so old backups restore into Studio.
 
 ### 3. Copy the data

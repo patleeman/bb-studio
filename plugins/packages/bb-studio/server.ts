@@ -138,7 +138,6 @@ import { withTagHint } from "./src/create-tag-hint";
 import { excerpt, SearchIndex, tokens, type SearchHit } from "./src/search-index";
 import { externalResults } from "./src/search-external";
 import { StudioServices } from "./src/services";
-import { ProviderHistory } from "./src/provider-history";
 import { ProviderComments } from "./src/provider-comments";
 import { firstThreadItemRefs, firstThreadMentionPlugins, mentionProviderLookup } from "./src/thread-item-refs";
 import { zipFiles } from "./src/export-zip";
@@ -459,7 +458,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => searchIndex.dispose());
   async function studioChanged({ pluginId, ids, removed }: { pluginId: string; ids?: string[]; removed?: string[] }) {
     await searchIndex.changed(pluginId, ids, removed);
-    await recordProviderChanges(hub, services, changes, pluginId, ids, removed);
+    await recordProviderChanges(hub, changes, pluginId, ids, removed);
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId, ids, removed });
     return { ok: true };
   }
@@ -472,15 +471,6 @@ export default async function plugin(bb: BbPluginApi) {
       snippets: Object.fromEntries(indexed.map((hit) => [`${hit.ref.pluginId}:${hit.ref.id}`, hit.snippet.text])),
     };
   };
-  const providerHistory = new ProviderHistory(bb.sdk, {
-    artifacts: {
-      versions: (id) => artifacts.store.versions(id).map((version) => ({ id: version.id, name: version.name, createdAt: version.created_at })),
-      bytes: (id, versionId) => {
-        const version = artifacts.store.version(id, versionId);
-        return version ? artifacts.store.bytes(version.sha256) : null;
-      },
-    },
-  });
   const providerComments = new ProviderComments(bb.sdk);
   const pendingThreadChecks = new Set(services.activeThreads().map((thread) => thread.threadId));
   let reconcilingThreads: Promise<void> | null = null;
@@ -598,12 +588,11 @@ export default async function plugin(bb: BbPluginApi) {
     changes.append(null);
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   };
-  /** Deletes an add-on's items and forgets their tags, stars, tabs and versions. */
+  /** Deletes an add-on's items and forgets their tags, stars and tabs. */
   const deleteItems = async (pluginId: string, ids: string[]) => {
     const result = await hub.call(pluginId, "studio_delete", { ids });
     tags.forget(pluginId, result.done);
     stars.forget(pluginId, result.done);
-    services.forgetVersions(pluginId, result.done);
     if (tabs.forget(pluginId, result.done)) tabsChanged();
     return result;
   };
@@ -1565,9 +1554,6 @@ export default async function plugin(bb: BbPluginApi) {
       if (ok) { changes.append(null); bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }); }
       return { ok };
     },
-    versions: async ({ ref }) => ({ versions: (await providerHistory.versions(ref)) ?? services.versions(ref) }),
-    versionCreate: ({ ref, bytes, label, actor }) => ({ version: services.addVersion(ref, Buffer.from(bytes, "base64"), label, actor) }),
-    versionRead: async ({ ref, id }) => { const bytes = (await providerHistory.read(ref, id)) ?? services.versionBytes(ref, id); return { bytes: bytes ? Buffer.from(bytes).toString("base64") : null }; },
   });
 
   // Agents --------------------------------------------------------------------

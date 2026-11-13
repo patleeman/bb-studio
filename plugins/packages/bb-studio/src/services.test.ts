@@ -47,17 +47,15 @@ describe("Studio services", () => {
 
   it("keeps live item inserts independent of table column order", () => {
     const { db, services } = setup();
-    for (const table of ["item_links", "item_threads", "item_comments", "item_blobs", "item_versions"]) {
+    for (const table of ["item_links", "item_threads", "item_comments"]) {
       db.exec(`ALTER TABLE ${table} ADD COLUMN future TEXT NOT NULL DEFAULT ''`);
     }
     services.replaceLinks(page, "pages", [{ from: page, to: task, kind: "mention", source: "pages" }]);
     services.linkThread({ threadId: "thr_1", ref: page, role: "created", state: "idle", createdAt: 1, updatedAt: 1, metadata: {} });
     services.addComment({ ref: page, parentId: null, anchor: null, actor, body: "Comment" });
-    services.addVersion(page, Buffer.from("version"), "Snapshot", actor);
     expect(services.links(page).outgoing).toHaveLength(1);
     expect(services.threads(page)).toHaveLength(1);
     expect(services.comments(page)).toHaveLength(1);
-    expect(services.versions(page)).toHaveLength(1);
   });
 
   it("tracks threads and filters activity by item and cursor", () => {
@@ -73,30 +71,13 @@ describe("Studio services", () => {
     expect(services.activity(null, first, 10).map((event) => event.summary)).toEqual(["Two"]);
   });
 
-  it("keeps comments on their item and deduplicates version bytes", () => {
-    const { db, services } = setup();
+  it("keeps comments on their item", () => {
+    const { services } = setup();
     const root = services.addComment({ ref: page, parentId: null, anchor: "block-1", actor, body: "Review this" });
     services.addComment({ ref: page, parentId: root.id, anchor: null, actor, body: "Done" });
     expect(() => services.addComment({ ref: task, parentId: root.id, anchor: null, actor, body: "Wrong item" })).toThrow();
     expect(services.resolveComment(page, root.id, true)).toBe(true);
     expect(services.comments(page)[0]?.resolvedAt).toBeTypeOf("number");
-    const bytes = Buffer.from("snapshot");
-    const first = services.addVersion(page, bytes, "First", actor);
-    services.addVersion(task, bytes, "Copy", actor);
-    expect(services.versionBytes(page, first.id)).toEqual(bytes);
-    expect(db.prepare("SELECT COUNT(*) AS count FROM item_blobs").get()).toEqual({ count: 1 });
-  });
-
-  it("forgets a deleted item's versions and the blobs only it used", () => {
-    const { db, services } = setup();
-    const shared = new Uint8Array([1, 2, 3]);
-    services.addVersion(page, shared, "Shared", actor);
-    services.addVersion(page, new Uint8Array([4]), "Own", actor);
-    services.addVersion(task, shared, "Copy", actor);
-    services.forgetVersions(page.pluginId, [page.id]);
-    expect(services.versions(page)).toEqual([]);
-    expect(services.versions(task)).toHaveLength(1);
-    expect(db.prepare("SELECT COUNT(*) AS count FROM item_blobs").get()).toEqual({ count: 1 });
   });
 });
 

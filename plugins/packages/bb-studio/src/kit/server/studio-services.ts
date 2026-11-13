@@ -29,8 +29,5 @@ export function studioServices(sdk: Sdk) {
     comments: (item: StudioRef) => call("comments", { ref: item }),
     commentCreate: (input: { ref: StudioRef; parentId: string | null; anchor: string | null; actor: Actor; body: string }) => call("commentCreate", input),
     commentResolve: (item: StudioRef, id: string, resolved: boolean) => call("commentResolve", { ref: item, id, resolved }),
-    versions: (item: StudioRef) => call("versions", { ref: item }),
-    versionCreate: (input: { ref: StudioRef; bytes: string; label: string; actor: Actor }) => call("versionCreate", input),
-    versionRead: (item: StudioRef, id: string) => call("versionRead", { ref: item, id }),
   };
 }

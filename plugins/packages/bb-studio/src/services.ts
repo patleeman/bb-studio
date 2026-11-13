@@ -1,11 +1,10 @@
 import { readAvailable } from "./kit/server/read-available";
-import { createHash } from "node:crypto";
 import { newId } from "./kit/ids";
 import type { Actor } from "./kit/server/index";
 import type Database from "better-sqlite3";
 
-export type { Ref, ItemLink, ItemActivity, ItemThread, ItemComment, ItemVersion } from "./kit/item-services-contract";
-import type { Ref, ItemLink, ItemActivity, ItemThread, ItemComment, ItemVersion } from "./kit/item-services-contract";
+export type { Ref, ItemLink, ItemActivity, ItemThread, ItemComment } from "./kit/item-services-contract";
+import type { Ref, ItemLink, ItemActivity, ItemThread, ItemComment } from "./kit/item-services-contract";
 
 const readActor = (raw: string): Actor => JSON.parse(raw) as Actor;
 const readRef = (pluginId: string, id: string): Ref => ({ pluginId, id });
@@ -158,42 +157,5 @@ export class StudioServices {
   resolveComment(ref: Ref, id: string, resolved: boolean): boolean {
     return this.db.prepare("UPDATE item_comments SET resolved_at = ? WHERE id = ? AND plugin_id = ? AND item_id = ?")
       .run(resolved ? Date.now() : null, id, ref.pluginId, ref.id).changes > 0;
-  }
-
-  addVersion(ref: Ref, bytes: Uint8Array, label: string, actor: Actor): ItemVersion {
-    const sha256 = createHash("sha256").update(bytes).digest("hex");
-    const latest = this.db.prepare("SELECT id, sha256, label, actor, created_at FROM item_versions WHERE plugin_id = ? AND item_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1")
-      .get(ref.pluginId, ref.id) as { id: string; sha256: string; label: string; actor: string; created_at: number } | undefined;
-    if (latest?.sha256 === sha256) return { id: latest.id, ref, sha256, label: latest.label, actor: readActor(latest.actor), createdAt: latest.created_at };
-    const version: ItemVersion = { id: newId("version"), ref, sha256, label, actor, createdAt: Date.now() };
-    this.db.transaction(() => {
-      this.db.prepare("INSERT OR IGNORE INTO item_blobs (sha256, bytes) VALUES (?, ?)").run(sha256, Buffer.from(bytes));
-      this.db.prepare("INSERT INTO item_versions (id, plugin_id, item_id, sha256, label, actor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .run(version.id, ref.pluginId, ref.id, sha256, label, JSON.stringify(actor), version.createdAt);
-    })();
-    return version;
-  }
-
-  versions(ref: Ref): ItemVersion[] {
-    type Row = { id: string; sha256: string; label: string; actor: string; created_at: number };
-    return (this.db.prepare("SELECT * FROM item_versions WHERE plugin_id = ? AND item_id = ? ORDER BY created_at DESC, rowid DESC").all(ref.pluginId, ref.id) as Row[])
-      .map((row) => ({ id: row.id, ref, sha256: row.sha256, label: row.label, actor: readActor(row.actor), createdAt: row.created_at }));
-  }
-
-  /** Drops deleted items' versions, and any blob no version uses any more. */
-  forgetVersions(pluginId: string, ids: readonly string[]): void {
-    if (!ids.length) return;
-    this.db.transaction(() => {
-      const remove = this.db.prepare("DELETE FROM item_versions WHERE plugin_id = ? AND item_id = ?");
-      let removed = 0;
-      for (const id of ids) removed += remove.run(pluginId, id).changes;
-      if (removed) this.db.prepare("DELETE FROM item_blobs WHERE sha256 NOT IN (SELECT sha256 FROM item_versions)").run();
-    })();
-  }
-
-  versionBytes(ref: Ref, id: string): Uint8Array | null {
-    const row = this.db.prepare(`SELECT bytes FROM item_versions JOIN item_blobs USING (sha256)
-      WHERE id = ? AND plugin_id = ? AND item_id = ?`).get(id, ref.pluginId, ref.id) as { bytes: Buffer } | undefined;
-    return row?.bytes ?? null;
   }
 }
