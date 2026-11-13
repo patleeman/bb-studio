@@ -3,10 +3,12 @@ import type { AuthEntry, PoolAccount, ProviderState } from "./contract";
 const TURN_AUTH_ERROR = /failed to authenticate|oauth (?:session|token) (?:has )?expired|could not be refreshed|refresh[_ ]token|not logged in|please (?:run )?\/?login|sign(?:ed)? ?in again|invalid (?:api key|authentication|bearer token)|authentication_error|unauthori[sz]ed/i;
 const PROVIDER_NAMES: Record<string, string> = { claude: "Claude", codex: "Codex" };
 const ALIASES: Record<string, string> = { claude: "claude", "claude-code": "claude", codex: "codex" };
+const DISPLAY_NAMES: Record<string, string> = { "acp-opencode": "OpenCode" };
 
 export const poolEntryId = (accountId: string) => `pool:${accountId}`;
 export const providerEntryId = (providerId: string) => `provider:${providerId}`;
 export const providerFamily = (providerId: string) => ALIASES[providerId] ?? providerId;
+export const providerDisplayName = (state: Pick<ProviderState, "providerId" | "displayName">) => DISPLAY_NAMES[state.providerId] ?? state.displayName;
 export const isProxied = (state: Pick<ProviderState, "status" | "planLabel">) => state.status === "ready" && state.planLabel === "Proxied";
 
 export function isAuthError(error: string | null | undefined): boolean {
@@ -46,7 +48,7 @@ export function providerEntries(states: readonly ProviderState[], signals: Provi
       id: providerEntryId(state.providerId),
       source: "provider",
       provider: providerFamily(state.providerId),
-      name: state.displayName,
+      name: providerDisplayName(state),
       detail: state.accountEmail ?? null,
       signedOut: reason !== null,
       reason,
