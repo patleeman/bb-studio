@@ -16,6 +16,8 @@ struct DesignView: View {
     @State private var showingRelated = false
     @State private var chatting = false
     @State private var showingWeb = false
+    @State private var renaming = false
+    @State private var newName = ""
     @State private var listener: UUID?
     /// Each signal starts a load; only the newest one may show its answer.
     @State private var loads = 0
@@ -42,12 +44,23 @@ struct DesignView: View {
                     Button { app.push(.thread(id: threadId)) } label: { Label("Open Thread", systemImage: Symbols.thread) }
                 }
                 StudioChatMenuButton(isPresented: $chatting)
+                Button {
+                    newName = design?.name ?? ""
+                    renaming = true
+                } label: { Label("Rename", systemImage: "pencil") }
+                .disabled(design == nil)
                 Button { showingRelated = true } label: { Label("Related", systemImage: "link") }
                 Button { showingWeb = true } label: { Label("Comment in BB Web", systemImage: "safari") }
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
             .accessibilityLabel("Design options")
+        }
+        .alert("Rename design", isPresented: $renaming) {
+            TextField("Name", text: $newName)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") { act { try await client.renameDesign(id, name: newName.trimmingCharacters(in: .whitespacesAndNewlines)) } }
+                .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "design", itemId: id) }
         .sheet(isPresented: $showingWeb) {
@@ -186,10 +199,36 @@ struct DesignView: View {
                     }
                     Text(comment.body ?? "").font(.subheadline)
                 }
+                .contextMenu { commentActions(comment) }
+                .accessibilityAction(named: "Resolve") { if let id = comment.id { act { try await client.resolveDesignComment(id) } } }
             }
-            Text("Pin new comments to a screen's elements in BB web.").font(.caption).foregroundStyle(.secondary)
+            Text("Touch and hold a comment to send it to the agent, resolve or delete it. Pin new comments to a screen's elements in BB web.")
+                .font(.caption).foregroundStyle(.secondary)
         }
         .padding(.horizontal)
+    }
+
+    @ViewBuilder
+    private func commentActions(_ comment: Studio.DesignsGetDesignOutputDesignCommentsItem) -> some View {
+        if let commentId = comment.id {
+            if comment.sent != true {
+                Button { act { try await client.sendDesignComment(commentId) } } label: { Label("Send to Agent", systemImage: "paperplane") }
+            }
+            Button { act { try await client.resolveDesignComment(commentId) } } label: { Label("Resolve", systemImage: "checkmark.circle") }
+            Button(role: .destructive) { act { try await client.deleteDesignComment(commentId) } } label: { Label("Delete", systemImage: "trash") }
+        }
+    }
+
+    /// Runs a change, then reloads (the design signal also reloads); a failure shows over the page.
+    private func act(_ change: @escaping () async throws -> Void) {
+        Task {
+            do {
+                try await change()
+                await load()
+            } catch {
+                app.flash(BBClient.describe(error, plugin: "Studio", server: client.baseURL))
+            }
+        }
     }
 
     private func load() async {

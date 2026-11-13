@@ -548,6 +548,30 @@
       "coverage": "generated method"
     },
     {
+      "file": "ios/Shared/Designs.swift",
+      "plugin": "studio",
+      "method": "designs.renameDesign",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Designs.swift",
+      "plugin": "studio",
+      "method": "designs.resolveComment",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Designs.swift",
+      "plugin": "studio",
+      "method": "designs.deleteComment",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Designs.swift",
+      "plugin": "studio",
+      "method": "designs.sendComment",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/Shared/Drawings.swift",
       "plugin": "studio",
       "method": "drawings.listDrawings",
@@ -1001,6 +1025,12 @@
       "file": "ios/iOS/Loops/Loops.swift",
       "plugin": "studio",
       "method": "loops.morning",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Studio/MiniAppView.swift",
+      "plugin": "studio",
+      "method": "minis.rename",
       "coverage": "generated method"
     },
     {

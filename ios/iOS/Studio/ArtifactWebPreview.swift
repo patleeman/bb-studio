@@ -60,6 +60,26 @@ struct ArtifactWebPreview: UIViewRepresentable {
             }
         }
 
+        /// A tapped link leaves the preview: `bb://` and BB's own addresses open in
+        /// the app, as on desktop; other pages open in Safari. The file itself and its
+        /// own subframes load as before.
+        func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
+                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            guard !retired else { return decisionHandler(.cancel) }
+            guard let url = action.request.url, action.navigationType == .linkActivated || url.scheme == "bb" else {
+                return decisionHandler(.allow)
+            }
+            decisionHandler(.cancel)
+            let origin = loaded
+            DispatchQueue.main.async {
+                if let target = Links.parse(url.absoluteString, origin: origin) {
+                    AppModel.shared.openLink(target)
+                } else if ["http", "https", "mailto", "tel"].contains(url.scheme?.lowercased() ?? "") {
+                    UIApplication.shared.open(url)
+                }
+            }
+        }
+
         func webView(_ webView: WKWebView, decidePolicyFor response: WKNavigationResponse,
                      decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
             guard !retired, response.isForMainFrame else {

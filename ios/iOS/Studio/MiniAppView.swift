@@ -15,6 +15,8 @@ struct MiniAppView: View {
     @State private var session: MiniSession?
     @State private var showingWeb = false
     @State private var showingRelated = false
+    @State private var renaming = false
+    @State private var newName = ""
 
     var body: some View {
         Group {
@@ -34,12 +36,23 @@ struct MiniAppView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             Menu {
+                Button {
+                    newName = session?.mini?.displayName ?? ""
+                    renaming = true
+                } label: { Label("Rename", systemImage: "pencil") }
+                .disabled(session?.mini == nil)
                 Button { showingWeb = true } label: { Label("Edit on Desktop or BB Web", systemImage: "safari") }
                 Button { showingRelated = true } label: { Label("Related", systemImage: "link") }
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
             .accessibilityLabel("Mini app options")
+        }
+        .alert("Rename mini app", isPresented: $renaming) {
+            TextField("Name", text: $newName)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") { rename(newName.trimmingCharacters(in: .whitespacesAndNewlines)) }
+                .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "minis", itemId: id) }
         .sheet(isPresented: $showingWeb) {
@@ -58,6 +71,17 @@ struct MiniAppView: View {
         }
         .onDisappear { session?.stop() }
         .accessibilityIdentifier("miniAppView")
+    }
+
+    private func rename(_ name: String) {
+        Task {
+            do {
+                let _: JSONValue = try await client.rpc("studio", Studio.Method.minis_rename, ["id": .string(id), "name": .string(name)])
+                await session?.load()
+            } catch {
+                app.flash(BBClient.describe(error, plugin: "Studio", server: client.baseURL))
+            }
+        }
     }
 
     @ViewBuilder

@@ -36,6 +36,16 @@ struct RelatedSection: View {
                 ForEach(Array(thread.enumerated()), id: \.offset) { _, comment in commentRow(comment) }
                 if let parentId = reply.parentId, thread.contains(where: { $0.id == parentId }) { replyRow }
             }
+            // A new top-level comment (parentId "" while it's being written).
+            if reply.parentId == RelatedReply.newComment {
+                replyRow
+            } else if comments != nil {
+                Button { reply.text = ""; reply.parentId = RelatedReply.newComment } label: {
+                    Label("Add Comment", systemImage: "text.bubble")
+                }
+                .disabled(reply.posting)
+                .accessibilityIdentifier("relatedAddComment")
+            }
             if let error { Text(error).font(.footnote).foregroundStyle(.red) }
             if links == nil, threads == nil, comments == nil, error == nil { ProgressView() }
             if links != nil, threads != nil, comments != nil,
@@ -110,7 +120,7 @@ struct RelatedSection: View {
                 .foregroundStyle(.red)
             }
             HStack(alignment: .bottom) {
-                TextField("Reply", text: $reply.text, axis: .vertical)
+                TextField(reply.parentId == RelatedReply.newComment ? "Comment" : "Reply", text: $reply.text, axis: .vertical)
                     .lineLimit(1...6)
                     .focused($replyFocused)
                 Button { Task { await sendReply() } } label: {
@@ -196,6 +206,8 @@ struct RelatedView: View {
 
 @MainActor
 final class RelatedReply: ObservableObject {
+    /// `parentId` while writing a new top-level comment.
+    static let newComment = ""
     @Published var parentId: String?
     @Published var text = ""
     @Published private(set) var posting = false
@@ -210,7 +222,8 @@ final class RelatedReply: ObservableObject {
         error = nil
         defer { posting = false }
         do {
-            try await client.replyToStudioComment(pluginId: pluginId, id: itemId, parentId: parentId, body: body)
+            try await client.replyToStudioComment(pluginId: pluginId, id: itemId,
+                                                  parentId: parentId == Self.newComment ? nil : parentId, body: body)
             if text == submitted, self.parentId == parentId {
                 text = ""
                 self.parentId = nil
