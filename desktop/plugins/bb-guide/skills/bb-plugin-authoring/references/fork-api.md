@@ -236,7 +236,7 @@ Names: `ExperimentalAppBackdropRegistration`, `ExperimentalAppAppearance`,
 
 ## The skill registry
 
-Names: `ExperimentalSkillsRegistryDecision`, `ExperimentalSkillsRegistryOperation`, `ExperimentalSkillsRegistryPolicy`.
+Names: `ExperimentalSkillsRegistryCaller`, `ExperimentalSkillsRegistryDecision`, `ExperimentalSkillsRegistryOperation`, `ExperimentalSkillsRegistryPolicy`.
 
 ## A conversation's workbench
 

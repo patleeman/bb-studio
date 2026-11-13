@@ -77,7 +77,7 @@ export function forkPluginHooks(args: {
         throw new Error("experimental_skillsRegistryPolicy expects a function");
       }
       args.disposeHooks.push(
-        registerSkillsRegistryPolicy(args.pluginId, policy),
+        registerSkillsRegistryPolicy(args.pluginId, policy, args.db),
       );
     },
     experimental_turnContext(provider) {

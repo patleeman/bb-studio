@@ -1,6 +1,12 @@
+import {
+  deleteInstalledPlugin,
+  upsertInstalledPlugin,
+  type DbConnection,
+} from "@bb/db";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   registerSkillsRegistryPolicy,
+  skillsRegistryCaller,
   skillsRegistryOperation,
 } from "../../src/services/skills/registry-policy.fork.js";
 import { withTestHarness } from "../helpers/test-app.js";
@@ -133,6 +139,82 @@ describe("skills registry policy", () => {
       );
 
       expect(list.status).not.toBe(403);
+    });
+  });
+});
+
+function seedInstalledPlugin(db: DbConnection, id: string) {
+  upsertInstalledPlugin(db, {
+    id,
+    source: `path:/tmp/${id}`,
+    provenance: { kind: "direct" },
+    sourceIntent: { kind: "path", path: `/tmp/${id}` },
+    exactResolution: { kind: "path" },
+    updateState: {
+      lastCheckAt: null,
+      availableCompatibleVersion: null,
+      newestIncompatibleVersion: null,
+      statusDetail: null,
+    },
+    activeArtifactId: null,
+    rootDir: `/tmp/${id}`,
+    version: "1.0.0",
+    enabled: true,
+    enabledFollowsDefault: false,
+  } as never);
+}
+
+describe("skills registry policy owners", () => {
+  it("refuses while a plugin that owns a policy is enabled but not running, and lets a removed owner go", async () => {
+    await withTestHarness(async (harness) => {
+      seedInstalledPlugin(harness.db, "studio");
+      const dispose = registerSkillsRegistryPolicy(
+        "studio",
+        () => ({ allowed: true }),
+        harness.db,
+      );
+      const served = await harness.app.request("/api/v1/skills-registry/entry");
+      expect(served.status).toBe(400);
+
+      dispose();
+      const refused = await harness.app.request(
+        "/api/v1/skills-registry/entry",
+      );
+      expect(refused.status).toBe(403);
+      expect(await message(refused)).toBe(
+        "The studio plugin decides skill registry requests and is not running. Try again once it has started.",
+      );
+
+      deleteInstalledPlugin(harness.db, "studio");
+      const released = await harness.app.request(
+        "/api/v1/skills-registry/entry",
+      );
+      expect(released.status).toBe(400);
+    });
+  });
+
+  it("tells the policy who the request says is asking", async () => {
+    await withTestHarness(async (harness) => {
+      const callers: unknown[] = [];
+      disposers.push(
+        registerSkillsRegistryPolicy("studio", ({ caller }) => {
+          callers.push(caller);
+          return { allowed: false, message: OFF };
+        }),
+      );
+      await harness.app.request("/api/v1/skills-registry?q=x");
+      await harness.app.request("/api/v1/skills-registry?q=x", {
+        headers: { "x-bb-cli": "1" },
+      });
+      await harness.app.request("/api/v1/skills-registry?q=x", {
+        headers: { "x-bb-cli": "1", "x-bb-caller-thread": "thr_agent" },
+      });
+      expect(callers).toEqual([
+        { kind: "app" },
+        { kind: "cli" },
+        { kind: "agent", threadId: "thr_agent" },
+      ]);
+      expect(skillsRegistryCaller(() => undefined)).toEqual({ kind: "app" });
     });
   });
 });

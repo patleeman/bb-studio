@@ -962,7 +962,7 @@ export function createApp(
     pluginUpdateJobs,
     upgradeWebSocket,
   );
-  registerSkillsRegistryGate(publicApi);
+  registerSkillsRegistryGate(publicApi, deps.db);
   registerSkillsRegistryRoutes(publicApi, deps);
   registerServerMoveRoutes(publicApi, deps, serverMove);
   registerForkImportRoutes(publicApi, deps);
