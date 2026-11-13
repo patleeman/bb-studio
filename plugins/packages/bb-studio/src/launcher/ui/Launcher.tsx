@@ -11,8 +11,7 @@ import type { windowsContract } from "../../windows/contract";
 import { useHostWindows } from "../../kit/app/windows";
 import { useStudioSettings } from "../../settings/ui/use-settings";
 import { STUDIO_SETTINGS_PATH } from "../../settings/ui/voice-anchor";
-import { landingThread } from "../../ui/conversations/model";
-import { lastConversation } from "../../ui/conversations/state";
+import { landingFor } from "../../ui/conversations/state";
 import { appCommandEntries, studioCommandEntries } from "../commands";
 import { openInMain, setLauncherRuntime } from "../items";
 import { LinksBridge, useOpenLink } from "../../links/open";
@@ -45,7 +44,7 @@ export function LauncherWindow() {
       ...items.map(launcherEntry),
       ...studioCommandEntries({ bots: spaces.bots, currentBotId: spaces.currentBotId, settings: values, windows: true }, {
         switchBot: async (botId) => {
-          const target = landingThread(spaces.bots.find((each) => each.id === botId), lastConversation(botId), null);
+          const target = await landingFor(botId, (input) => rpc.call("bot_landing", input));
           if (!target) throw new Error("That Bot has no conversation yet.");
           await rpc.call("bot_focus", { botId });
           await openInMain(threadPath(target));

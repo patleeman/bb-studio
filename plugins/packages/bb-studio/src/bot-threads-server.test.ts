@@ -366,3 +366,13 @@ it("a fork from a message starts on the Bot's default model on the fork's provid
   await server.rpc.bot_fork_conversation({ threadId: "redesign", messageId: "msg_2", turnId: null, sourceSeqEnd: 5 });
   expect(update).toHaveBeenCalledTimes(1);
 });
+
+it("lands on a Bot's last conversation while it exists, else its Main, else nowhere", async () => {
+  const { server, threads } = await setup();
+  expect(await server.rpc.bot_landing({ botId: "dot", last: "redesign" })).toEqual({ threadId: "redesign" });
+  threads.delete("redesign");
+  expect(await server.rpc.bot_landing({ botId: "dot", last: "redesign" })).toEqual({ threadId: "thr_main" });
+  threads.set("thr_main", { ...threads.get("thr_main")!, deletedAt: 5 } as never);
+  expect(await server.rpc.bot_landing({ botId: "dot", last: "redesign" })).toEqual({ threadId: null });
+  expect(await server.rpc.bot_landing({ botId: "home", last: null })).toEqual({ threadId: "thr_home" });
+});

@@ -484,6 +484,15 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     bot_threads_view: ({ botId }: { botId?: string }) => view(botId),
     bot_threads_older: ({ botId }: { botId?: string }) => older(botId),
     bot_thread_info: async ({ threadId }: { threadId: string }) => ({ info: await info(threadId) }),
+    bot_landing: async ({ botId, last }: { botId: string; last: string | null }) => {
+      const main = deps.bots().find((bot) => bot.id === botId)?.threadId ?? null;
+      for (const candidate of [...new Set([last, main])]) {
+        if (!candidate) continue;
+        const thread = await bb.sdk.threads.get({ threadId: candidate }).catch(() => null) as { deletedAt?: number | null } | null;
+        if (thread && !thread.deletedAt) return { threadId: candidate };
+      }
+      return { threadId: null };
+    },
     bot_focus: ({ botId }: { botId: string }) => {
       if (!deps.bots().some((bot) => bot.id === botId)) throw new Error(`No Bot "${botId}".`);
       store.setFocus(botId);

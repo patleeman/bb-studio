@@ -333,7 +333,7 @@ export default definePluginApp((app) => {
   if (sidebarSections) {
     const spaces = async () => (await post("bot_spaces", {})) as { bots: { id: string; mainThreadId: string | null }[]; currentBotId: string | null };
     // A file's header asks the Bot in the current conversation about it, not a new thread (src/ui/ask-about-item.ts).
-    setAskAboutItem(askAboutItemHandler(spaces));
+    setAskAboutItem(askAboutItemHandler(spaces, async (input) => (await post("bot_landing", input)) as { threadId: string | null }));
     // The Bot header is the top of the sidebar: the fork's experimental_hideSidebarHeader drops BB's "New conversation"
     // row (the Bot's + New is beside Conversations). In the desktop app's title bar layout the traffic lights, back,
     // forward and the sidebar toggle stay in the title bar; in the browser layout back and forward move to the start
@@ -503,6 +503,6 @@ export default definePluginApp((app) => {
     app.commands.register({ id: `show-bot-${index}`, title: `Studio: Show Bot ${index}`, defaultShortcut: { key: String(index), control: true, alt: true }, isAvailable: () => canShowBot(index), run: () => { showBotNumber(index); } });
   }
   // The Bot's last conversation, with BB's sidebar unfolded (src/ui/conversations/show-bot.ts).
-  if (sidebarSections) app.commands.register({ id: "show-bot", title: "Studio: Show the Bot", defaultShortcut: { key: "0", control: true }, run: () => showBot(async () => (await post("bot_spaces", {})) as { bots: { id: string; mainThreadId: string | null }[]; currentBotId: string | null }) });
+  if (sidebarSections) app.commands.register({ id: "show-bot", title: "Studio: Show the Bot", defaultShortcut: { key: "0", control: true }, run: () => showBot(async () => (await post("bot_spaces", {})) as { bots: { id: string; mainThreadId: string | null }[]; currentBotId: string | null }, async (input) => (await post("bot_landing", input)) as { threadId: string | null }) });
   app.commands.register({ id: "handsfree", title: "Studio: Hands-free voice", run: () => startHandsFree() });
 });

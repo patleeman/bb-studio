@@ -11,8 +11,7 @@ import { STUDIO_PLUGIN_ID } from "../../kit/contract";
 import { errorMessage } from "../../kit/format";
 import { useStudioSettings } from "../../settings/ui/use-settings";
 import { requestVoiceSection, STUDIO_SETTINGS_PATH } from "../../settings/ui/voice-anchor";
-import { landingThread } from "../../ui/conversations/model";
-import { currentBot, lastConversation, setCurrentBot, showBotNumber } from "../../ui/conversations/state";
+import { currentBot, landingFor, setCurrentBot, showBotNumber } from "../../ui/conversations/state";
 import { useOpenLink } from "../../links/open";
 import { linkFor } from "../../links/router";
 import { appCommandEntries, studioCommandEntries } from "../commands";
@@ -67,8 +66,10 @@ export function StudioCommandPalette({ initialMode, close, experimental_onEscape
           const index = spaces.bots.findIndex((bot) => bot.id === botId) + 1;
           if (showBotNumber(index)) return;
           setCurrentBot(botId);
-          const target = landingThread(spaces.bots.find((bot) => bot.id === botId), lastConversation(botId), null);
-          if (target) navigate.toThread(target);
+          void landingFor(botId, (input) => rpc.call("bot_landing", input)).then((target) => {
+            if (target) navigate.toThread(target);
+            else navigate.toPluginPanel("studio", { subPath: `bot/${encodeURIComponent(botId)}` });
+          });
         },
         openSettings: (group) => { if (group === "voice") requestVoiceSection(); openAppPath(STUDIO_SETTINGS_PATH); },
         setSetting: (key, value) => set({ [key]: value }),
@@ -82,8 +83,7 @@ export function StudioCommandPalette({ initialMode, close, experimental_onEscape
 
   const ask = async (text: string, fresh: boolean): Promise<string> => {
     if (fresh) return (await rpc.call("bot_ask", { text, to: { kind: "new", botId: askBot?.id ?? null } })).threadId;
-    const space = spaces.bots.find((bot) => bot.id === askBot?.id);
-    const target = threadId ?? landingThread(space, space ? lastConversation(space.id) : null, null);
+    const target = threadId ?? (askBot ? await landingFor(askBot.id, (input) => rpc.call("bot_landing", input)) : null);
     if (!target) throw new Error("Make your Bot first.");
     return (await rpc.call("bot_ask", { text, to: { kind: "thread", threadId: target } })).threadId;
   };

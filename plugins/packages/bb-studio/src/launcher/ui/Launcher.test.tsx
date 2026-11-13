@@ -81,6 +81,7 @@ beforeEach(() => {
     if (method === "newtab_search") return { entries: [] };
     if (method === "bot_ask") return { threadId: (body as { to: { kind: string } }).to.kind === "new" ? "thr_new" : "thr_home", projectId: "proj_personal" };
     if (method === "overview") return { providers: [] };
+    if (method === "bot_landing") { const { botId, last } = (body ?? {}) as { botId: string; last: string | null }; return { threadId: last && last !== "thr_gone" ? last : ({ bot_1: "thr_main", bot_2: "thr_home" } as Record<string, string>)[botId] ?? null }; }
     if (method === "bot_spaces") return { bots: [{ id: "bot_1", name: "Dot", mainThreadId: "thr_main" }, { id: "bot_2", name: "Home", mainThreadId: "thr_home" }], currentBotId: "bot_2" };
     if (method === "searchAll") {
       const { query } = body as { query: string };
@@ -228,4 +229,15 @@ it("registers nothing on a BB without the launcher slot, and Studio's apps and a
   const ids: string[] = [];
   expect(registerLauncherItems({ experimental_launcherItem: (item: { id: string }) => { ids.push(item.id); } })).toBe(true);
   expect(ids).toEqual(["studio", "vscode", "new-conversation", "ask-bot", "new-page"]);
+});
+
+it("switching to a Bot skips its deleted last conversation and opens its Main", async () => {
+  const { rememberConversation, resetSidebarState } = await import("../../ui/conversations/state");
+  rememberConversation("bot_1", "thr_gone");
+  await mount();
+  await press("7", { metaKey: true });
+  await act(async () => {});
+  expect(calls("bot_landing")).toEqual([{ botId: "bot_1", last: "thr_gone" }]);
+  expect(calls("window.openInMain").at(-1)).toEqual({ path: "/threads/thr_main" });
+  resetSidebarState();
 });

@@ -140,6 +140,12 @@ export function lastConversation(botId: string): string | null {
   return lastMap()[botId] ?? null;
 }
 
+export type Land = (input: { botId: string; last: string | null }) => Promise<{ threadId: string | null }>;
+
+export async function landingFor(botId: string, land: Land): Promise<string | null> {
+  return (await land({ botId, last: lastConversation(botId) }).catch(() => null))?.threadId ?? null;
+}
+
 export function rememberConversation(botId: string, threadId: string): void {
   const map = lastMap();
   if (map[botId] === threadId) return;
