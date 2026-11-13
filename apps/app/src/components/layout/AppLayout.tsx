@@ -1,3 +1,4 @@
+import { useForkNewConversation } from "@/components/fork/ForkNewConversation";
 import { ForkLayoutHosts, isBareWindow, useForkLayoutBridge } from "@/components/fork/ForkLayout";
 import { useCorePageTitle } from "./core-page-title";
 import { type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
@@ -529,7 +530,9 @@ function AppLayoutContent({ children }: AppLayoutProps) {
     [isCompactViewport, navigate, store],
   );
   const openNewThread = useOpenNewThread();
+  const forkNewConversation = useForkNewConversation();
   useAppCommandHandler("thread.new", () => {
+    if (forkNewConversation()) return true;
     openNewThread({
       ...(projectId !== undefined ? { projectId } : {}),
       focusPrompt: true,

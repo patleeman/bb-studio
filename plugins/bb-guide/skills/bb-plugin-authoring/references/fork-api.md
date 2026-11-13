@@ -150,6 +150,12 @@ Names: `ExperimentalThreadBannerRegistration`, `ExperimentalThreadBannerProps`.
 
 Names: `ExperimentalModelLoadNoticeRegistration`, `ExperimentalModelLoadNoticeProps`.
 
+- `app.slots.experimental_newConversation({ id, run })` → bb's New thread
+  (Mod+N, the sidebar row) calls `run()` first; return true when the plugin
+  opened the new conversation, false to let bb open its new-thread page.
+
+Names: `ExperimentalNewConversationRegistration`.
+
 - `app.slots.experimental_threadHeader({ id, useDecoration })` → changes
   each thread's header row. `useDecoration({ threadId })` is a hook bb calls
   in the main thread view and in every split pane; return `{ title?, after?

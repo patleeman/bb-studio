@@ -10,6 +10,7 @@ import type {
   ExperimentalMessageActionRegistration,
   ExperimentalModelLoadNoticeRegistration,
   ExperimentalFirstRunRegistration,
+  ExperimentalNewConversationRegistration,
   ExperimentalModelPickerGateRegistration,
   ExperimentalHideHostEntriesRegistration,
   ExperimentalThreadBannerRegistration,
@@ -40,6 +41,7 @@ export interface ForkSlotRegistrations {
   threadBanners: ExperimentalThreadBannerRegistration[];
   modelLoadNotices: ExperimentalModelLoadNoticeRegistration[];
   firstRuns: ExperimentalFirstRunRegistration[];
+  newConversations: ExperimentalNewConversationRegistration[];
   modelPickerGates: ExperimentalModelPickerGateRegistration[];
   hiddenHostEntries: ExperimentalHideHostEntriesRegistration[];
   threadHeaders: ExperimentalThreadHeaderRegistration[];
@@ -61,6 +63,7 @@ export const FORK_SLOT_KINDS = [
   "threadBanners",
   "modelLoadNotices",
   "firstRuns",
+  "newConversations",
   "modelPickerGates",
   "hiddenHostEntries",
   "threadHeaders",
@@ -83,6 +86,7 @@ export function emptyForkSlots(): ForkSlotRegistrations {
     threadBanners: [],
     modelLoadNotices: [],
     firstRuns: [],
+    newConversations: [],
     modelPickerGates: [],
     hiddenHostEntries: [],
     threadHeaders: [],
@@ -108,6 +112,7 @@ export function forkSlotMethods(
     threadBanner: new Set<string>(),
     modelLoadNotice: new Set<string>(),
     firstRun: new Set<string>(),
+    newConversation: new Set<string>(),
     modelPickerGate: new Set<string>(),
     hiddenHostEntries: new Set<string>(),
     threadHeader: new Set<string>(),
@@ -261,6 +266,15 @@ export function forkSlotMethods(
         id,
         component: requireComponent(kind, registration.component),
       });
+    },
+    experimental_newConversation(registration) {
+      const kind = "slots.experimental_newConversation";
+      const id = requireSlotId(kind, registration?.id);
+      requireUniqueId(kind, seenIds.newConversation, id);
+      if (typeof registration.run !== "function") {
+        throw new TypeError(`${kind} "${id}" needs a run function`);
+      }
+      collected.newConversations.push({ id, run: registration.run });
     },
     experimental_firstRun(registration) {
       const kind = "slots.experimental_firstRun";
