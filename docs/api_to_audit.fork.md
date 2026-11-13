@@ -152,30 +152,6 @@ Docs: `frontend-renderer-slots.md`.
 4. The thread view menu's lifecycle and sort controls do not apply to plugin
    groups.
 
-## Sidebar New menu (`experimental_sidebarNewItem`, `experimental_useSidebarNewItems`)
-
-`slots.experimental_sidebarNewItem({ id, title, icon, group?, run })` adds a
-row to a New menu that a plugin draws. Rows keep registration order;
-neighbours with the same `group` share one divider.
-`experimental_useSidebarNewItems()` returns every plugin's rows as
-`{ key, pluginId, id, title, icon, group, run }` for the plugin that draws
-the menu.
-
-**Core callers.** None: since the rail is upstream's again, bb's rail header
-is its own New thread button and draws no New menu. The host side is
-`lib/fork-sidebar-new-items.ts`; a plugin that draws its own sidebar header
-(`experimental_hideSidebarHeader`) reads the rows. bb's own New thread row
-is not a registered row.
-
-Docs: `frontend-renderer-slots.md`.
-
-**Audit before stabilizing.**
-
-1. Decide whether New thread should be a registered row, so one list drives
-   the menu.
-2. A row has no disabled state, shortcut or project context; add them only
-   with a caller that needs them.
-
 ## Palette row Mod action (`ExperimentalPaletteSearchResult.experimental_onModSelect`)
 
 A plugin palette row may carry `experimental_onModSelect()`. Mod+Enter or a
@@ -247,7 +223,7 @@ push-notifications' `sender.ts` returns early on the flag. On the client,
    is synchronous because turn completion is; decide whether it should join
    the hook registry.
 
-## Fixed workbench tabs (`experimental_global`, `experimental_useGlobalTabs`, `experimental_closeFixedTab`, `experimental_compactWhenFixed`)
+## Fixed workbench tabs (`experimental_global`, `experimental_useGlobalTabs`, `experimental_closeFixedTab`)
 
 Each side panel keeps its own tabs. A fixed tab is one more plugin action
 tab, synced as the preference `workbench.globalTabs`, that every side panel
@@ -263,8 +239,7 @@ as a fixed tab. `experimental_useGlobalTabs()` returns the fixed tabs as `{
 pluginId, tabId, title, params }`.
 `useBbNavigate().experimental_closeFixedTab({ tab: { id }, params? })`
 closes one of the calling plugin's fixed tabs everywhere; nothing else
-does. A registration with `experimental_compactWhenFixed: true` is drawn as
-its icon alone while fixed, with the title as tooltip and accessible name.
+does.
 
 **Core callers.** The merge is in `lib/fixed-panel-tabs.ts`: the tab state
 every surface reads is the applicable fixed tabs plus its own stored state,
@@ -290,31 +265,6 @@ Docs: `fork-api.md`.
    "fixed" when the API is stabilized.
 5. A thread that already holds its own copy of the tab hides the copy while
    the fixed tab exists and shows it again after the plugin closes it.
-
-## Items in a side panel tab's menu (`slots.experimental_panelTabAction`)
-
-A plugin adds an item to the right-click menu of plugin action tabs in the
-side panel's tab strip: `{ id, title, icon?, isAvailable?(tab), run(tab) }`.
-`tab` is `{ pluginId, tabId, params, title, threadId }`; `threadId` is the
-thread whose side panel holds the tab and null on a plugin page. Items show
-on any plugin's action tab, in plugin-id order, before bb's Close items.
-bb's own file, diff, terminal and browser tabs, and file opener tabs, get
-none. Studio's "Open as main tab" is the caller.
-
-**Core callers.** `PanelTabActionMenuItems` in
-`components/secondary-panel/workbenchFork.tsx`, one line in the tab's
-context menu in `SecondaryPanelTabStrip.tsx`; the rules are in
-`lib/fork-panel-tab-actions.ts`. Core's own Close items are not
-registered through the slot.
-
-**Audit before stabilizing.**
-
-1. The menu is a context menu, which compact viewports turn off; the mobile
-   tab pager has no place for these items.
-2. `isAvailable` runs for every registered action each time a menu renders.
-3. Decide whether bb's own tabs (files, terminals) should take items too,
-   with a tab description that covers them.
-4. Core's Close items should move onto the same registry if this ships.
 
 ## App theme (`experimental_useAppTheme`)
 
@@ -402,23 +352,6 @@ no caller, because core tabs take their titles from their own data.
    browser's storage until the tab is opened again there.
 2. Consider deriving a tab's title at render time from the plugin (as
    `experimental_instanceIcon` does for icons) instead of storing it.
-
-## The project menu (`experimental_ProjectActionsMenu`, `experimental_ProjectActionsContextMenu`)
-
-Two host components that give a plugin bb's own project menu, as a "more"
-button and as a context menu, for a plugin that draws its own project rows.
-
-**Core callers.** Both render core's `ProjectActionsMenu` and
-`ProjectActionsMenuItems` (`components/project/ProjectActionsMenu.tsx`), the
-same components the app header and the stock sidebar use, so the actions and
-their dialogs are core's.
-
-**Audit before stabilizing.**
-
-1. Match the shape of `experimental_ThreadActionsContextMenu` (trigger
-   props, extra actions) before these are made stable.
-2. The project is looked up in the sidebar navigation query; a project that
-   query does not list renders no menu.
 
 ## Link handlers (`slots.experimental_linkHandler`)
 
@@ -512,28 +445,24 @@ desktop main process, `components/fork/ForkApprovalHost.tsx` in the app.
 
 A plugin registers a component bb can show in its own window, and opens,
 toggles, closes and styles that window: size and position, transparent,
-frameless, always on top, click-through, a system-wide hotkey and a menu bar
-entry. The window loads the bare route `/fork-window/<plugin>/<window>`,
+frameless, always on top and a system-wide hotkey. The window loads the bare route `/fork-window/<plugin>/<window>`,
 which renders only the plugin's component.
 
 **Core callers.** `apps/desktop/src/fork-windows.ts` (main process: creates
-the window, hotkey and menu bar entry; only loads the window route on the
+the window and hotkey; only loads the window route on the
 calling page's own origin), `lib/fork-windows.ts` and
 `components/fork/ForkWindowView.tsx` in the app. Core has no window of its
 own on this path yet.
 
 **Audit before stabilizing.**
 
-1. Hotkeys and menu bar entries live until the app quits or the plugin
+1. Hotkeys live until the app quits or the plugin
    unregisters; nothing removes them when a plugin is disabled.
 2. A hotkey another app holds is not registered, and the caller is not told.
 3. Windows are not restored after the app restarts; the plugin registers
    them again when its frontend loads in the main window.
 4. In a browser only a plain popup is possible.
-5. `vibrancy` (`"hud"`, `"under-window"`) applies only to transparent
-   windows on macOS, with `visualEffectState: "active"`; it is fixed when the
-   window is made, so a window already open keeps its material.
-6. Opening a window that is open with other `params` loads the new address
+5. Opening a window that is open with other `params` loads the new address
    in the same window (a page load, not an in-page navigation); the window
    keeps its bounds and nothing closes.
 
@@ -597,21 +526,6 @@ to the command palette, it must read them through the same hook.
    main window.
 2. Overlap with palette commands: decide whether a launcher item should
    just be a command with a flag.
-
-## A row above the main view (`slots.experimental_mainHeader`)
-
-A plugin draws a row above the main view, across the view and its side
-panel. Studio's main tab strip is the caller. bb only stacks the rows; what
-a tab is, which are open and where they are stored is the plugin's.
-
-**Core callers.** `components/fork/ForkMainHeader.tsx`, the first child of
-the content shell in `AppLayout.tsx`.
-
-**Audit before stabilizing.**
-
-1. The row is above bb's own header, so on macOS with the sidebar folded it
-   shares the line with the traffic lights; the plugin has no inset to read.
-2. Split panes share one row; decide whether a row belongs to each pane.
 
 ## A row under each thread's header (`slots.experimental_threadBanner`)
 
@@ -877,8 +791,7 @@ same-origin path only when it is a plugin window path or carries
 Sizes are clamped to 360 by 240 at least. A window loaded with
 `bbBare=1` is bare for its whole life (`isBareWindow` in
 `lib/fork-bare-window.ts`): `AppLayout` skips the sidebar (and with it the
-rail), the sidebar trigger and bb's page header, `ForkMainHeader` draws no
-plugin rows, the sidebar stays closed, and the opener's split layout is
+rail), the sidebar trigger and bb's page header, the sidebar stays closed, and the opener's split layout is
 dropped from the copied session storage. Every provider stays mounted, so a
 thread, a plugin panel or settings work as in the main window.
 
@@ -892,35 +805,6 @@ Core's own "open in new window" does not exist.
 2. Decide whether bare should be a route-level layout rather than a query
    flag read once per window.
 3. Desktop windows opened this way never unregister until the app quits.
-
-## The close command's fallback (`slots.experimental_closeFallback`)
-
-`{ id, close(): boolean }`. On the close command (Mod+W), when keyboard
-focus is outside the side panel or the panel has no closable selected tab,
-bb asks the handlers in plugin-id order; the first that returns true wins
-and bb does nothing else. Otherwise, and when none takes it, bb behaves as
-before. Studio closes its main tab with it.
-
-**Core callers.** `closeFallbackHandled` in `lib/fork-close-fallback.ts`.
-`useWorkbenchForkCommands` registers it ahead of bb's `panel.close`
-handlers and as a desktop close-window listener (for routes where bb has
-none). The desktop menu accelerator calls every close-window listener, so
-bb's own listeners consult it too: `getBbDesktopInfo` (`lib/bb-desktop.ts`)
-hands out the desktop API through `withForkCloseGuard`
-(`lib/bb-desktop.fork.ts`), which wraps every `onCloseWindowRequest`
-listener so it runs only when the fallback did not take the close. The
-answer is kept for the rest of the tick, so plugins are asked once per key
-press.
-
-**Audit before stabilizing.**
-
-1. Focus and the closable selected tab are read from the DOM (`aside`,
-   `[data-tab-pill]`, `aria-pressed`, `[data-tab-pill-close]`); pass the
-   panel state instead.
-2. Clicking a side panel tab focuses it, so Mod+W right after still closes
-   the side tab; clicking in the thread moves Mod+W to the plugin. Decide
-   whether that is what people expect.
-3. A new upstream close-window listener would not consult the fallback.
 
 ## Items in a chat message's ··· menu (`slots.experimental_messageAction`)
 
@@ -984,58 +868,6 @@ passes the flag through `withForkThreadListFields`.
 2. Decide whether the flag belongs on the thread list or on the navigation
    provider, which owns the header's contents.
 3. Settings and other section sidebars follow the thread list's choice too.
-
-## A tinted sidebar (`PluginThreadListRegistration.experimental_useSidebarStyle`)
-
-While the sidebar's thread list is one that sets
-`experimental_useSidebarStyle`, bb runs the hook in the plugin's scope and
-puts the result on its sidebar panel as `--fork-sidebar-background` and
-`--fork-sidebar-accent`, each with a `data-fork-sidebar-*` attribute.
-`fork.css` paints the background on the sidebar's collapsible bodies (the
-thread list area and, with the rail, the footer body; the rail keeps bb's)
-and sets bb's `--sidebar-accent` to the accent inside them, so bb's own
-selected and hovered rows use it. bb applies nothing else, text colors
-included; the plugin chooses readable colors. A value `CSS.supports` rejects
-is dropped, and a throwing hook applies nothing. Studio's Bot space sidebar
-is the caller.
-
-**Core callers.** `AppSidebar.tsx` spreads `useForkSidebarStyle()` onto
-bb's `Sidebar`; `ForkSidebarStyleHost`, mounted by `ForkLayoutHosts`, runs
-the hook. Both are in `components/sidebar/ForkSidebarStyle.tsx`. The
-registration collector passes the hook through `withForkThreadListFields`.
-
-**Audit before stabilizing.**
-
-1. With the rail, a gradient is drawn twice: once on the thread list body
-   and once on the footer body.
-2. Section sidebars (Settings, a page's `experimental_sidebar`) share the
-   body, so they are tinted too.
-3. Decide whether the style belongs on the thread list or on a separate
-   sidebar slot, and whether bb should derive a readable foreground.
-
-## Skills on bb's Skills page (`slots.experimental_skillSource`)
-
-Each source's skills are listed under bb's own on the Skills page's library
-view, one section per source with its `label` as the heading, in plugin-id
-order. The filter menu gets a Source group with one option per source.
-Sources join bb's Type and Provider filters as a union: choosing sources
-lists only theirs unless bb's filters are also set, which adds bb's matching
-skills; bb's filters alone list no source. The search matches name,
-description and label. A row opens with the skill's `onOpen`, or opens
-`path` in the preferred editor. Studio lists each Bot's own skills.
-
-**Core callers.** `SkillsOverview` in `SkillsCollection.tsx` calls
-`useForkSkillSources` (`components/tools/ForkSkillSources.tsx`) for the
-filter group and wraps its list body with it. Rows use bb's `ResourceRow`.
-
-**Audit before stabilizing.**
-
-1. Plugin skills do not take part in bb's sort, pagination or skill detail
-   page.
-2. Decide whether sources should be options of bb's Type group instead of a
-   group of their own.
-3. bb's built-in skills have no source, so they cannot be chosen alongside
-   a source except through bb's Type filter.
 
 ## A conversation's workbench (`BbNavigate.experimental_workbench`)
 
@@ -1406,8 +1238,7 @@ terminal renderers, and `bg-black` media stages.
 fails on one that is neither translucent, remapped, ruled nor listed as an
 exception; `ForkAppBackdrop.layout.test.tsx` mounts a settings section, a skill page's markdown with a
 code block, the new-thread home, a plugin page and a popover in the real
-`AppLayout`. Values go through the same `CSS.supports` check as
-`experimental_useSidebarStyle`. Studio's theme engine is the caller: its
+`AppLayout`. Values go through a `CSS.supports` check. Studio's theme engine is the caller: its
 WebGL scene is the component and its theme's colors are the appearance.
 
 **Core callers.** bb's own light and dark goes through the same path: the
