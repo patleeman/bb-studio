@@ -32,7 +32,7 @@ export async function runWorkCli(argv: readonly string[], work: Work, ctx: { thr
         const id = positional[0];
         if (!id) return usage(WORK_USAGE);
         const patch = changes.parse({ title: values.title || undefined, kind: values.kind || undefined, state: values.state || undefined, step: blank("step"), line: blank("line"), needs: blank("needs") });
-        const card = work.store.update(id, patch);
+        const card = work.update(id, patch);
         return out(card, workLine(card));
       }
       case "show": {

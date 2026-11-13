@@ -105,7 +105,7 @@ function fakeBb() {
     realtime: { publish: vi.fn() }, log: { warn: vi.fn() },
     agents: { registerTool: (tool: { name: string; execute(input: unknown, ctx: unknown): Promise<string> }) => { tools[tool.name] = tool; } },
     rpc: { register: (_contract: unknown, map: typeof handlers) => Object.assign(handlers, map) },
-    sdk: { threads: { timeline: vi.fn() } },
+    sdk: { threads: { timeline: vi.fn(), update: vi.fn(async (_input: unknown) => ({})) } },
   };
   return { bb, handlers, tools };
 }
@@ -142,6 +142,36 @@ it("gives agents tools that create in the caller's thread and update in place", 
   const updated = JSON.parse(await tools.work_card_update!.execute({ id: made.id, step: "2/4", line: "Fixing the flaky one" }, { threadId: "thr_worker" })) as WorkCard;
   expect(updated).toMatchObject({ step: "2/4", line: "Fixing the flaky one", threadId: "thr_lead" });
   expect(JSON.parse(await tools.work_card_get!.execute({ id: made.id }, {}))).toMatchObject({ id: made.id });
+});
+
+it("gives a worker's thread its card's title, so the card, the sidebar and the chips use one name", async () => {
+  const { bb, tools } = fakeBb();
+  registerWorkCards(bb as never, db, { read: async () => page([]) });
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+  const made = JSON.parse(await tools.work_card_create!.execute({ title: "Research: 3 note-taking methods", kind: "worker" }, { threadId: "thr_main" })) as { id: string };
+  await flush();
+  expect(bb.sdk.threads.update).not.toHaveBeenCalled();
+  await tools.work_card_update!.execute({ id: made.id, workerThreadId: "thr_worker" }, {});
+  await flush();
+  expect(bb.sdk.threads.update).toHaveBeenLastCalledWith({ threadId: "thr_worker", title: "Research: 3 note-taking methods" });
+  await tools.work_card_update!.execute({ id: made.id, step: "2/3 Comparing" }, {});
+  await flush();
+  expect(bb.sdk.threads.update).toHaveBeenCalledTimes(1);
+  await tools.work_card_update!.execute({ id: made.id, title: "Research: note-taking" }, {});
+  await flush();
+  expect(bb.sdk.threads.update).toHaveBeenLastCalledWith({ threadId: "thr_worker", title: "Research: note-taking" });
+  await tools.work_card_create!.execute({ title: "Worker: lint", kind: "worker", workerThreadId: "thr_lint" }, { threadId: "thr_main" });
+  await tools.work_card_create!.execute({ title: "Lead: v2", kind: "lead", workerThreadId: "thr_lead" }, { threadId: "thr_main" });
+  await flush();
+  expect(bb.sdk.threads.update.mock.calls.map(([input]) => input)).toEqual([
+    { threadId: "thr_worker", title: "Research: 3 note-taking methods" },
+    { threadId: "thr_worker", title: "Research: note-taking" },
+    { threadId: "thr_lint", title: "Worker: lint" },
+  ]);
+  bb.sdk.threads.update.mockRejectedValueOnce(new Error("gone"));
+  await tools.work_card_update!.execute({ id: made.id, title: "Research" }, {});
+  await flush();
+  expect(bb.log.warn).toHaveBeenCalledWith(expect.stringContaining("gone"));
 });
 
 it("runs bb studio work create, update, show and list", async () => {

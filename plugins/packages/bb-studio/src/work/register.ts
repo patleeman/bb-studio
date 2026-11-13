@@ -2,7 +2,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
-import { changes, createInput, directiveFor, rpcContract, WORK_ID, type CreateInput, type WorkCard } from "./contract";
+import { changes, createInput, directiveFor, rpcContract, WORK_ID, type CreateInput, type WorkCard, type WorkChanges } from "./contract";
 import { WorkCardStore } from "./store";
 
 type TimelineRow = { id: string; kind?: string; role?: string; text?: string; messageSeq?: number };
@@ -28,7 +28,7 @@ export async function findCardMessage(read: TimelineReader, card: Pick<WorkCard,
 
 export const WORK_TOOLS = ["work_card_create", "work_card_update", "work_card_get"];
 
-export const CREATE_DESCRIPTION = "Start a live work card for one piece of work (a worker's or lead's job, a release, a todo in progress). It returns a ::work{id=\"…\"} line: post it ONCE, on its own line, in the conversation where Patrick follows the work. The card stays put and redraws in place; it also shows in that conversation's In flight list above the composer. From then on report progress with work_card_update instead of posting status messages. Pass the card id to a worker you start so it can update the card itself.";
+export const CREATE_DESCRIPTION = "Start a live work card for one piece of work (a worker's or lead's job, a release, a todo in progress). It returns a ::work{id=\"…\"} line: post it ONCE, on its own line, in the conversation where Patrick follows the work. The card stays put and redraws in place; it also shows in that conversation's In flight list above the composer. From then on report progress with work_card_update instead of posting status messages. Pass the card id to a worker you start so it can update the card itself. A worker card with workerThreadId gives that thread the card's title, so both carry one name.";
 export const UPDATE_DESCRIPTION = "Change a work card in place: state (running, waiting, needs-you, done, failed), step (e.g. \"3/5 Tests\"), line (the latest one-liner) and needs (what Patrick must do; with state needs-you). Use it for progress instead of posting a new message. A finished card (done or failed) leaves the In flight list after a day.";
 
 export function registerWorkCards(bb: BbPluginApi, db: Database.Database, options: { read?: TimelineReader } = {}) {
@@ -45,9 +45,22 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     tried.delete(card.id);
     return store.placed(card.id, found.messageId, found.messageSeq);
   };
+  const name = (card: WorkCard, before: WorkCard | null) => {
+    if (card.kind !== "worker" || !card.workerThreadId) return;
+    if (before && before.kind === card.kind && before.workerThreadId === card.workerThreadId && before.title === card.title) return;
+    void Promise.resolve().then(() => bb.sdk.threads.update({ threadId: card.workerThreadId!, title: card.title } as never))
+      .catch((error: unknown) => { bb.log.warn(`Work card ${card.id}: ${error instanceof Error ? error.message : String(error)}`); });
+  };
   const create = (input: CreateInput & { threadId: string }) => {
     const card = store.create(input);
+    name(card, null);
     return { card, directive: directiveFor(card.id) };
+  };
+  const update = (id: string, changes: WorkChanges) => {
+    const before = store.find(id);
+    const card = store.update(id, changes);
+    name(card, before);
+    return card;
   };
   const list = async (threadId: string) => ({ cards: await Promise.all(store.inFlight(threadId).map(place)) });
   const placeAll = async (threadId: string) => {
@@ -59,7 +72,7 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     "work.get": ({ id }) => store.get(id),
     "work.list": ({ threadId }) => list(threadId),
     "work.create": (input) => create(input),
-    "work.update": ({ id, ...rest }) => store.update(id, rest),
+    "work.update": ({ id, ...rest }) => update(id, rest),
     "work.anchor": async ({ id, threadId, messageId }) => await place(store.anchor(id, threadId, messageId)),
   });
 
@@ -78,7 +91,7 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     name: "work_card_update",
     description: UPDATE_DESCRIPTION,
     parameters: changes.extend({ id: z.string().regex(WORK_ID) }),
-    execute: async ({ id, ...rest }) => JSON.stringify(store.update(id, rest)),
+    execute: async ({ id, ...rest }) => JSON.stringify(update(id, rest)),
   });
   bb.agents.registerTool({
     name: "work_card_get",
@@ -87,5 +100,5 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     execute: async ({ id }) => JSON.stringify(store.get(id)),
   });
 
-  return { store, create, list, place, placeAll };
+  return { store, create, update, list, place, placeAll };
 }
