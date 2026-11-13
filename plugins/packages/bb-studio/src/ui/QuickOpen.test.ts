@@ -45,3 +45,19 @@ it("retains modal focus when a host control stops bubbling focus events", async 
   await act(async () => { origin.focus(); await Promise.resolve(); });
   expect(document.activeElement).toBe(input);
 });
+
+it("lists mini apps and saved files under one Apps heading", async () => {
+  const hit = (pluginId: string, id: string, kind: string, score: number) => ({ ref: { pluginId, id }, kind, title: id, snippet: { text: "", ranges: [] }, href: `/x/${id}`, projectId: null, updatedAt: 1, score });
+  const results = [hit("artifacts", "art_report", "artifact", 3), hit("pages", "pg_plan", "page", 2), hit("minis", "mini_timer", "mini", 5)];
+  state.rpc.call.mockImplementation(async (method: string) => method === "overview" ? { providers: [] } : method === "searchAll" ? results as never : []);
+  const input = document.querySelector<HTMLInputElement>('[role="combobox"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "plan");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 200));
+  });
+  state.rpc.call.mockImplementation(async (method: string) => method === "overview" ? { providers: [] } : []);
+  const headings = [...document.querySelectorAll("#studio-quick-open-list > div > p")].map((each) => each.textContent);
+  expect(headings).toEqual(["Apps", "page"]);
+  expect([...document.querySelectorAll('[role="option"]')].slice(0, 3).map((each) => each.textContent?.slice(0, 10))).toEqual(["mini_timer", "art_report", "pg_planpag"]);
+});
