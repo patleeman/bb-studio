@@ -6,7 +6,8 @@
 // menu (Edit space…, Default model: what its new conversations start on,
 // Archive: the older page, New Bot); then the Bot's pages as rows: Memory, Skills,
 // Library and Todos (with the Todos list on, the primary Bot's Todos page and
-// what needs Patrick now; else the Todos page at studio/automations). The row of the page
+// what needs Patrick now; else the Todos page at studio/automations; for any
+// other Bot, Scheduled, its automations, as todos are the primary's). The row of the page
 // on screen is selected.
 import type { ReactNode } from "react";
 import type { BotSpace } from "../../bot-threads-contract";
@@ -107,7 +108,8 @@ export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
         {row("library", "Library", <Icon name="studio/library" className="size-4" />)}
         {todos !== null
           ? row("todos", "Todos", <Icon name="ListTodo" className="size-4" />, todos > 0 ? <span data-testid="space-todos-count" className="shrink-0 text-xs tabular-nums text-warning">{todos}</span> : null)
-          : row("automations", "Todos", <Icon name="ListTodo" className="size-4" />)}
+          : bot && !bot.primary ? row("automations", "Scheduled", <Icon name="Clock" className="size-4" />)
+            : row("automations", "Todos", <Icon name="ListTodo" className="size-4" />)}
       </nav>
     </header>
   );

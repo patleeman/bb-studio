@@ -319,3 +319,17 @@ it("shows 8 rows of a long group, then \"N more in Later\", so Scheduled stays n
   expect(group("Later")!.querySelector("[data-testid=todos-more]")).toBeNull();
   state.scheduled = [];
 });
+
+it("under a Bot that isn't the primary, is that Bot's Scheduled alone, titled Scheduled: the todos are the primary's", async () => {
+  const item = (key: string, botId: string) => ({ key, source: "automation", id: key, botId, botName: botId, kind: "reminder", title: key, nextAt: null, state: "active", scheduleText: "Once", threadId: null, link: `bb://automation/${botId}%3A${encodeURIComponent(key)}` });
+  state.scheduled = [item("Water the plants", "bot_1"), item("Ship notes", "bot_2")];
+  await act(async () => root.render(<TodosPage view={{ bot: { id: "bot_2", name: "New bot", threadId: "thr_two", primary: false, state: "active" } } as never} />));
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Scheduled·New bot");
+  expect([...container.querySelectorAll("section")].map((each) => each.getAttribute("aria-label"))).toEqual(["Scheduled"]);
+  expect(titles(container)).toEqual(["Ship notes"]);
+  expect(container.querySelector<HTMLInputElement>("[data-testid=bot-page-search]")?.placeholder).toBe("Search scheduled");
+  expect(container.querySelector("[data-testid=todos-empty]")).toBeNull();
+  expect(container.textContent).not.toContain("Pay the Con Edison bill");
+  state.scheduled = [];
+});

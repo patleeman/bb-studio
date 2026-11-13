@@ -426,6 +426,16 @@ describe("the Bot's space (round 7)", () => {
     expect($('[data-testid="space-page-library"]')?.getAttribute("aria-current")).toBeNull();
   });
 
+  it("names another Bot's page row Scheduled: the Todos list is the primary Bot's", async () => {
+    state.loopsOn = true;
+    state.live.bot_spaces = { bots: [space("cos", "Chief of Staff", false, "main"), space("home", "Home", false, "home_main")], currentBotId: "home" };
+    await mount();
+    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Scheduled"]);
+    expect($('[data-testid="space-page-todos"]')).toBeNull();
+    await act(async () => { $('[data-testid="space-page-automations"]')!.click(); });
+    expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("automations");
+  });
+
   it("adds Todos with what needs Patrick now, for the primary Bot with Todos on", async () => {
     state.loopsOn = true;
     state.live["loops.list"] = { needsYouNow: [{}, {}, {}], comingUp: [], agentsOnIt: [], waitingOnOthers: [], done: [] };

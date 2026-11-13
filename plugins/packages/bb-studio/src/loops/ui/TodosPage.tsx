@@ -8,6 +8,8 @@
 // chat's unread state, not a todo. Search and the
 // area pills filter it; New hands a typed line to the Bot to fill in. A row
 // opens the todo as a tab in the workbench beside the page (TodoTab.tsx).
+// Todos are one list, the primary Bot's: under another Bot the page is that
+// Bot's Scheduled alone, titled Scheduled.
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import { errorMessage } from "../../kit/format";
 import { Button } from "../../kit/ui/button";
@@ -28,11 +30,12 @@ export function TodosPage({ view }: { view: BotView }) {
   const call = useCall();
   const people = useLoopPeople();
   const rowOpen = useRowOpen();
-  const list = useLive("loops.list", {}, { pollMs: 60_000 });
+  const ownsTodos = bot.primary !== false;
+  const list = useLive("loops.list", {}, { enabled: ownsTodos, pollMs: 60_000 });
   const scheduledList = useLive("loops.scheduled", {}, { pollMs: 60_000 });
   const automationList = useAutomations(bot.id);
   const editor = useAutomationEditor(bot.id, automationList.data?.automations ?? [], () => { automationList.refresh(); scheduledList.refresh(); });
-  const { pending } = useNeedsYou(people.botThreadId, list.data?.needsYouNow);
+  const { pending } = useNeedsYou(ownsTodos ? people.botThreadId : null, list.data?.needsYouNow);
   const [query, setQuery] = useState("");
   const [area, setArea] = useState(ALL_AREAS);
   const [adding, setAdding] = useState(false);
@@ -41,7 +44,8 @@ export function TodosPage({ view }: { view: BotView }) {
   const moreLine = (id: string, title: string, count: number) => count ? <BotPageMore count={count} group={title} testId="todos-more" onOpen={() => setUnfolded((open) => new Set([...open, id]))} /> : null;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(timer); }, []);
-  const data = list.data;
+  const data = ownsTodos ? list.data : undefined;
+  const ready = ownsTodos ? !!data : !!scheduledList.data;
   const open = useMemo(() => data ? openTodos(data) : [], [data]);
   const groups = useMemo(() => groupTodos(open, { area, query }, now), [open, area, query, now]);
   const owners = useMemo(() => new Map((data?.owners ?? []).map((each) => [each.owner, each] as const)), [data?.owners]);
@@ -67,11 +71,12 @@ export function TodosPage({ view }: { view: BotView }) {
   };
 
   return (
-    <BotPageLayout testId="todos-page" title="Todos" bot={bot.name} botId={bot.id}
-      toolbar={<BotPageToolbar search={{ value: query, onChange: setQuery, placeholder: "Search todos" }}
-        filter={{ label: "Area", value: area, options: areaPills(open), onChange: setArea }} onNew={() => setAdding(true)} />}>
+    <BotPageLayout testId="todos-page" title={ownsTodos ? "Todos" : "Scheduled"} bot={bot.name} botId={bot.id}
+      toolbar={ownsTodos ? <BotPageToolbar search={{ value: query, onChange: setQuery, placeholder: "Search todos" }}
+        filter={{ label: "Area", value: area, options: areaPills(open), onChange: setArea }} onNew={() => setAdding(true)} />
+        : <BotPageToolbar search={{ value: query, onChange: setQuery, placeholder: "Search scheduled" }} />}>
       {adding ? <AddTodo onAdd={add} onClose={() => setAdding(false)} /> : null}
-      {list.error ? <p role="alert" className="text-sm text-destructive">{list.error}</p> : null}
+      {ownsTodos && list.error ? <p role="alert" className="text-sm text-destructive">{list.error}</p> : null}
       {!data ? null : total === 0 ? <BotPageEmpty testId="todos-empty">{area !== ALL_AREAS || query.trim() ? "No todos match" : "No todos"}</BotPageEmpty> : TODO_GROUPS.map((group) => {
         const loops = groups[group.id];
         const chat = group.id === "today" ? chatRows : 0;
@@ -90,7 +95,7 @@ export function TodosPage({ view }: { view: BotView }) {
           </BotPageGroup>
         );
       })}
-      {data ? (
+      {ready ? (
         <BotPageGroup title="Scheduled" count={scheduled.length} testId="todos-scheduled"
           aside={<NewAutomationMenu kinds={newKinds(bot.kind === "external")} disabled={bot.state !== "active"} onPick={editor.openNew} />}>
           {editor.error ? <p role="alert" className="pb-2 text-xs text-destructive">{editor.error}</p> : null}

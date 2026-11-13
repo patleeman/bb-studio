@@ -1237,7 +1237,9 @@ start of the main view's header and the toggle stays.
 
 **Scheduled**, on the sidebar Bot's **Todos** page, is the one place for what
 runs when; `bb://automations` and a thread's Scheduled tab open it there.
-The Bot sidebar has one row for it, **Todos**. Scheduled lists every automation
+The Bot sidebar has one row for it, **Todos**. Todos are one list, the
+primary Bot's, so under any other Bot the row and the page are **Scheduled**:
+that Bot's automations alone. Scheduled lists every automation
 that belongs to the Bot (check-ins, reminders, watchers, runners, bb's own
 automations and maintenance), each with its next run or Paused, and has
 **New** (check-in, reminder, watcher, runner). Timed todos stay in Today,
