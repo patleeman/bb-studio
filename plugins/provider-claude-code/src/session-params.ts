@@ -109,6 +109,7 @@ function buildInternalSessionParams(
     name: t.name,
     description: t.description,
     inputSchema: jsonValueSchema.parse(t.inputSchema),
+    ...(t.presentation === undefined ? {} : { presentation: t.presentation }),
   }));
   const permissionPolicy = args.options;
   const additionalWorkspaceWriteRootsParams =
