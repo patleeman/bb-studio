@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { decodePinMention, encodePinMention, pinChipLabel, pinFacts, pinMentionContext, type PinLike } from "./pins";
-import { desktopCallerOf, registerDesktopTools, toolResult } from "./server";
+import { desktopCallerOf, registerDesktopTools, registerDesktopToolsIfEnabled, toolResult } from "./server";
+import { desktopHudEnabled, desktopHudOn, DESKTOP_HUD_ENV } from "./gate";
+import { readTalkKey } from "./PermissionsSheet";
+import { STUDIO_SETTINGS, VISIBLE_SETTING_KEYS, isHiddenSetting, effectiveSettings } from "../settings/schema";
 import { allGranted, threadIdFromPath, type DesktopPin, type DesktopState } from "./host";
 
 
@@ -169,5 +172,56 @@ describe("desktop tools", () => {
   it("formats results", () => {
     expect(toolResult({ ok: false })).toEqual({ content: [{ type: "text", text: "Desktop control refused." }], isError: true });
     expect(toolResult({ ok: true })).toEqual({ content: [{ type: "text", text: "Done." }] });
+  });
+});
+
+describe("the desktop HUD switch", () => {
+  const fakeBb = () => {
+    const tools: string[] = [];
+    const mentions: string[] = [];
+    return {
+      tools,
+      mentions,
+      bb: {
+        experimental_hooks: { experimental_desktopControl: async () => ({ ok: true }) },
+        ui: { registerMentionProvider: (provider: { id: string }) => mentions.push(provider.id) },
+        agents: { registerTool: (tool: { name: string }) => tools.push(tool.name) },
+      },
+    };
+  };
+
+  it("is off unless BB_STUDIO_DESKTOP_HUD is exactly 1", () => {
+    expect(DESKTOP_HUD_ENV).toBe("BB_STUDIO_DESKTOP_HUD");
+    expect(desktopHudEnabled({})).toBe(false);
+    expect(desktopHudEnabled({ BB_STUDIO_DESKTOP_HUD: "0" })).toBe(false);
+    expect(desktopHudEnabled({ BB_STUDIO_DESKTOP_HUD: "true" })).toBe(false);
+    expect(desktopHudEnabled({ BB_STUDIO_DESKTOP_HUD: "1" })).toBe(true);
+  });
+
+  it("offers agents no desktop tools and no pin mentions when off, even on a host with desktop control", () => {
+    const off = fakeBb();
+    expect(registerDesktopToolsIfEnabled(off.bb as never, {}, async () => "Bot")).toBe(false);
+    expect(off.tools).toEqual([]);
+    expect(off.mentions).toEqual([]);
+    const on = fakeBb();
+    expect(registerDesktopToolsIfEnabled(on.bb as never, { BB_STUDIO_DESKTOP_HUD: "1" }, async () => "Bot")).toBe(true);
+    expect(on.tools.filter((name) => name.startsWith("desktop_"))).toHaveLength(11);
+    expect(on.mentions).toEqual(["desktop-pins"]);
+  });
+
+  it("shows no desktop setting: the switch is hidden, off by default and not a user setting", () => {
+    expect(STUDIO_SETTINGS.desktopControl.default).toBe(false);
+    expect(isHiddenSetting("desktopControl")).toBe(true);
+    expect(VISIBLE_SETTING_KEYS.some((key) => key.startsWith("desktop"))).toBe(false);
+    expect(Object.keys(STUDIO_SETTINGS).filter((key) => key.toLowerCase().includes("desktop"))).toEqual(["desktopControl"]);
+    expect(desktopHudOn(effectiveSettings({}))).toBe(false);
+    expect(desktopHudOn(effectiveSettings({ desktopControl: true }))).toBe(true);
+    expect(desktopHudOn(null)).toBe(false);
+  });
+
+  it("keeps the talk key on this device, fn by default", () => {
+    expect(readTalkKey(null)).toBe("fn");
+    expect(readTalkKey({ getItem: () => "AltRight" })).toBe("AltRight");
+    expect(readTalkKey({ getItem: () => "bogus" })).toBe("fn");
   });
 });

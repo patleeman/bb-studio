@@ -1,6 +1,37 @@
 import { useEffect } from "react";
 import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../kit/ui/index";
-import { allGranted, DESKTOP_PERMISSIONS, type DesktopControl, type DesktopPermission } from "./host";
+import { allGranted, DESKTOP_PERMISSIONS, TALK_KEY_LABELS, type DesktopControl, type DesktopPermission, type DesktopTalkKey } from "./host";
+
+const TALK_KEY_STORAGE = "studio.desktop.talkKey";
+const TALK_KEYS = Object.keys(TALK_KEY_LABELS) as DesktopTalkKey[];
+
+export function readTalkKey(storage: Pick<Storage, "getItem"> | null = typeof localStorage === "undefined" ? null : localStorage): DesktopTalkKey {
+  const stored = storage?.getItem(TALK_KEY_STORAGE) ?? null;
+  return TALK_KEYS.find((key) => key === stored) ?? "fn";
+}
+
+function TalkKeyRow({ control }: { control: DesktopControl }) {
+  const current = (TALK_KEYS.find((key) => key === control.state?.talkKey) ?? readTalkKey());
+  return (
+    <div className="flex items-center gap-3.5 border-t border-border py-3.5">
+      <div className="min-w-0 flex-1 text-sm font-semibold">Talk key</div>
+      <select
+        className="h-8 rounded-md border border-input bg-transparent px-2 text-xs"
+        value={current}
+        data-desktop-talk-key=""
+        onChange={(event) => {
+          const key = TALK_KEYS.find((candidate) => candidate === event.target.value) ?? "fn";
+          localStorage.setItem(TALK_KEY_STORAGE, key);
+          void control.request({ op: "talkKey", key });
+        }}
+      >
+        {TALK_KEYS.map((key) => (
+          <option key={key} value={key}>{TALK_KEY_LABELS[key]}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 export function permissionRows(control: DesktopControl) {
   const state = control.state;
@@ -76,6 +107,7 @@ export function PermissionsSheet({
           <DialogTitle>Let BB Studio work outside its window</DialogTitle>
         </DialogHeader>
         <PermissionsList control={control} />
+        <TalkKeyRow control={control} />
         <DialogFooter className="flex items-center gap-2.5 sm:justify-between">
           <span className="flex-1 text-xs text-muted-foreground">
             {restart ? "Screen Recording takes effect after a relaunch." : "macOS may ask you to quit and reopen BB Studio after Screen Recording."}

@@ -18,7 +18,7 @@ export const SETTINGS_CHANNEL = "studio-settings";
 /** Where a setting shows. `attention` is on the Bot page (Controls ▸ Attention), not the settings page. */
 export type SettingGroup = "voice" | "recordings" | "replies" | "threads" | "windows" | "jev" | "advanced" | "attention";
 
-interface Base { label: string; description?: string; group: SettingGroup }
+interface Base { label: string; description?: string; group: SettingGroup; hidden?: true }
 export type StudioSetting = Base & (
   | { type: "boolean"; default: boolean }
   | { type: "number"; default: number; min: number; max: number; integer?: boolean }
@@ -79,8 +79,7 @@ export const STUDIO_SETTINGS = {
 
   // Windows (only a BB with plugin windows uses them; src/launcher)
   launcherHotkey: { group: "windows", type: "string", label: "Launcher shortcut", description: "Written like Alt+Space or Control+Shift+L. Empty for none.", default: "Alt+Space", maxLength: 40 },
-  desktopHudHotkey: { group: "windows", type: "string", label: "Desktop HUD shortcut", description: "Written like Alt+Shift+Space. Empty for none.", default: "Alt+Shift+Space", maxLength: 40 },
-  desktopTalkKey: { group: "windows", type: "select", label: "Desktop talk key", options: ["fn", "AltRight", "MetaRight", "ControlRight"], optionLabels: { fn: "fn", AltRight: "Right Option", MetaRight: "Right Command", ControlRight: "Right Control" }, default: "fn" },
+  desktopControl: { group: "windows", type: "boolean", label: "Desktop control", default: false, hidden: true },
 
   // Jev
   decisions_jevProvider: { group: "jev", type: "select", label: "Jev provider", options: jevProviderChoices, optionLabels: { auto: "Auto", typesafe: "TypeSafe", vercel: "Vercel AI Gateway", openrouter: "OpenRouter", "opencode-zen": "OpenCode Zen", custom: "Your own endpoint" }, default: "auto" },
@@ -103,6 +102,10 @@ type ValueOf<D> = D extends { type: "boolean" } ? boolean : D extends { type: "n
 export type StudioSettingValues = { [K in StudioSettingKey]: ValueOf<(typeof STUDIO_SETTINGS)[K]> };
 
 export const STUDIO_SETTING_KEYS = Object.keys(STUDIO_SETTINGS) as StudioSettingKey[];
+export const VISIBLE_SETTING_KEYS = STUDIO_SETTING_KEYS.filter((key) => (STUDIO_SETTINGS[key] as StudioSetting).hidden !== true);
+export function isHiddenSetting(key: string): boolean {
+  return Object.hasOwn(STUDIO_SETTINGS, key) && (STUDIO_SETTINGS[key as StudioSettingKey] as StudioSetting).hidden === true;
+}
 
 /** Some settings' definitions, for the module that reads them. */
 export function pickSettings<K extends StudioSettingKey>(keys: readonly K[]): { [P in K]: (typeof STUDIO_SETTINGS)[P] } {
