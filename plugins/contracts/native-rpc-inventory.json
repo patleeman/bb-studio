@@ -206,12 +206,6 @@
       "coverage": "generated method"
     },
     {
-      "file": "ios/Shared/BBClient+Push.swift",
-      "plugin": "mobile",
-      "method": "live_activity_unregister",
-      "coverage": "generated method"
-    },
-    {
       "file": "ios/Shared/BBClient.swift",
       "plugin": "thread-list",
       "method": "listPreferences",
@@ -1019,12 +1013,6 @@
       "file": "ios/iOS/Loops/Loops.swift",
       "plugin": "studio",
       "method": "loops.setPlaces",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Loops/Loops.swift",
-      "plugin": "studio",
-      "method": "loops.morning",
       "coverage": "generated method"
     },
     {
