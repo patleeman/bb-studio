@@ -1,3 +1,4 @@
+import { isAuthFailure } from "./auth-failure.fork.js";
 import type { RetryAvailability } from "./retry-contract.js";
 import type { PluginTurnFailedEvent } from "@get-bb/plugin-sdk";
 
@@ -95,6 +96,7 @@ export function isRateLimitFailure(failure: PluginTurnFailedEvent): boolean {
 
 export function decideRetry(input: RetryPolicyInput): RetryDecision {
   const { failure } = input;
+  if (isAuthFailure(failure)) return { kind: "decline", reason: "not-retryable" };
   if (failure.attemptNumber >= MAX_RETRY_ATTEMPTS) {
     return { kind: "decline", reason: "attempts-exhausted" };
   }
