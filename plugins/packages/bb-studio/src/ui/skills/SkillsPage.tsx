@@ -2,7 +2,7 @@ import { Fragment, useState } from "react";
 import { Icon } from "../../kit/app/index";
 import { Button } from "../../kit/ui/button";
 import { errorMessage, relativeTime } from "../../kit/format";
-import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, noMatch } from "../bot-page";
+import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, noMatch, useBotPageQuery } from "../bot-page";
 import { useCall, useLive } from "../live";
 import { matchesSkill, type SkillsFilter } from "./paths";
 
@@ -78,7 +78,7 @@ export default function SkillsPage({ botId: routeBot }: { botId: string | null }
   const botId = routeBot ?? spaces.data?.currentBotId ?? null;
   const bot = spaces.data?.bots?.find((each) => each.id === botId) ?? null;
   const skills = useLive("bot_skills", botId ? { botId } : {}, { enabled: !!botId, pollMs: 30_000 });
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useBotPageQuery();
   const [filter, setFilter] = useState<SkillsFilter>("skills");
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

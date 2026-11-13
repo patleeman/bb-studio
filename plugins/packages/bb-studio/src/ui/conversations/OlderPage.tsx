@@ -12,7 +12,7 @@ import { useState } from "react";
 import { Icon } from "../../kit/app/index";
 import { Button } from "../../kit/ui/button";
 import { errorMessage } from "../../kit/format";
-import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, noMatch, useRowOpen, type BotPageTone } from "../bot-page";
+import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, noMatch, useBotPageQuery, useRowOpen, type BotPageTone } from "../bot-page";
 import { useCall, useLive } from "../live";
 import { shortDate } from "./finish";
 import { shortAge, staleFailure } from "./model";
@@ -49,7 +49,7 @@ export default function OlderPage({ botId }: { botId: string | null }) {
   const spaces = useLive("bot_spaces", {}, { pollMs: 120_000 });
   const bot = spaces.data?.bots?.find((each) => each.id === (botId ?? live.data?.botId)) ?? null;
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useBotPageQuery();
   const [filter, setFilter] = useState<ArchiveFilter>("all");
   const now = Date.now();
   const data = live.data;

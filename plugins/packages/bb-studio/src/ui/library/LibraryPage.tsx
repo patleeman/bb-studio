@@ -16,7 +16,7 @@ import { MenuSelect } from "../menu-select";
 import { ItemIcon } from "../item-row";
 import { shortAge } from "../conversations/model";
 import { useLive } from "../live";
-import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, useRowOpen } from "../bot-page";
+import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, useBotPageQuery, useRowOpen } from "../bot-page";
 import { foldRows, LIBRARY_APP_TYPES, LIBRARY_GROUPS, LIBRARY_KINDS, libraryEmpty, libraryGroups, libraryMeta, type LibraryAppType, type LibraryEmpty, type LibraryGroupBy, type LibraryKindFilter } from "./library-model";
 
 const GROUP_KEY = "studio.library.group";
@@ -36,7 +36,7 @@ export function LibraryPage() {
   const botId = chosen ?? spaces.data?.currentBotId ?? undefined;
   const bot = spaces.data?.bots.find((each) => each.id === botId) ?? spaces.data?.bots[0] ?? null;
   const library = useLive("bot_library", botId ? { botId } : {}, { pollMs: 120_000 });
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useBotPageQuery();
   const [kind, setKind] = useState<LibraryKindFilter>("all");
   const [appType, setAppType] = useState<LibraryAppType>("all");
   const [groupBy, setGroupBy] = useState<LibraryGroupBy>(readGroup);

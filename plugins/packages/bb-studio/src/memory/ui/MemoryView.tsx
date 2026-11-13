@@ -9,7 +9,7 @@ import { lazy, Suspense, useDeferredValue, useEffect, useRef, useState } from "r
 import { cn } from "../../kit/ui/index";
 import { isTypingTarget } from "../../ui/typing-target";
 import { lastBot } from "../../ui/bot/selection";
-import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, noMatch, useRowOpen } from "../../ui/bot-page";
+import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, noMatch, useBotPageQuery, useRowOpen } from "../../ui/bot-page";
 import type { MemoryRecordView } from "../contract";
 import { recordDate, recordLine } from "../shared";
 import { useMemory, useMemoryCall, type MemoryResult } from "./hooks";
@@ -41,7 +41,7 @@ function MemoryPage({ data }: { data: MemoryResult<"memory.overview"> }) {
   const botId = data.bot.id;
   const topics = data.topics;
   const count = data.counts.current + data.counts.replaced;
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useBotPageQuery();
   const [topic, setTopic] = useState<string | null>(null);
   const [sort, setSort] = useState<Sort>("newest");
   const [adding, setAdding] = useState(false);

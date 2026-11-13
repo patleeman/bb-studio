@@ -5,7 +5,7 @@
 // remounts the pane, or a trip to a thread and back, returns the same editor
 // with its state, focus, selection and scroll instead of loading it again.
 import { experimental_usePluginId } from "@get-bb/plugin-sdk/app";
-import { useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode, type RefObject } from "react";
+import { createContext, useContext, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { panelHref } from "./nav";
 import { registerWorkspaceProvider, subscribeWorkspace, workspaceRevision, workspaceAnchors } from "./workspace";
@@ -61,6 +61,13 @@ function publishMain(anchor: MainAnchor): () => void {
       changed();
     });
   };
+}
+
+const ReturnsContext = createContext(0);
+
+/** How many times this retained view came back from parking: 0 until the user leaves its route and returns. */
+export function useRetainedReturns(): number {
+  return useContext(ReturnsContext);
 }
 
 /** Wrap a nav panel so its view outlives its route; render <RetainedPanels> for the same path. */
@@ -138,6 +145,7 @@ function RetainedPanel({ view, pluginId, parking, children }: { view: PanelView;
   const [element] = useState(() => document.createElement("div"));
   // Scroll resets inside the hidden parking spot, so it's read before parking.
   const parkedScroll = useRef<ScrollPosition[] | null>(null);
+  const [returns, setReturns] = useState(0);
   useLayoutEffect(() => {
     const park = () => {
       if (!parking.current || element.parentElement !== view.element) return;
@@ -164,8 +172,14 @@ function RetainedPanel({ view, pluginId, parking, children }: { view: PanelView;
     if (focused instanceof HTMLElement) focused.focus({ preventScroll: true });
     if (range && selection) selection.setBaseAndExtent(range.anchor, range.anchorOffset, range.focus, range.focusOffset);
   }, [element, parking, pluginId, view.element]);
+  const parked = view.parkedAt !== undefined;
+  const wasParked = useRef(parked);
+  useLayoutEffect(() => {
+    if (wasParked.current && !parked) setReturns((count) => count + 1);
+    wasParked.current = parked;
+  }, [parked]);
   useLayoutEffect(() => () => element.remove(), [element]);
-  return createPortal(children, element, view.id);
+  return createPortal(<ReturnsContext.Provider value={returns}>{children}</ReturnsContext.Provider>, element, view.id);
 }
 
 /** Owns this plugin's retained views of the panel at `path`, from its persistent overlay. */
