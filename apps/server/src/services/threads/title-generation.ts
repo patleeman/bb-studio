@@ -296,6 +296,7 @@ export async function generateThreadMetadataWithOutcome(
     label: "Thread title generation",
     logContext: { threadId: args.threadId },
     prompt,
+    preferServiceId: getThread(deps.db, args.threadId)?.providerId,
   });
   if (!outcome.ok) {
     return complete(
@@ -409,6 +410,7 @@ export async function regenerateThreadTitle(
     label: "Thread title regeneration",
     logContext: { threadId: args.thread.id },
     prompt,
+    preferServiceId: args.thread.providerId,
   });
   if (!outcome.ok) {
     throw titleRegenerationError(outcome.reason, outcome.message);
