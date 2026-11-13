@@ -109,14 +109,14 @@ it("names itself in the header, and lists one line per todo in Today, This week,
   const meta = (title: string) => row(title).querySelector("[data-testid=bot-page-row-meta]");
   expect(meta("Pay the Con Edison bill")?.textContent).toBe("Overdue");
   expect(meta("Pay the Con Edison bill")?.className).toContain("text-warning");
-  expect(meta("Reply to Sam about the Q3 planning doc")?.textContent).toBe("Due Fri");
+  expect(meta("Reply to Sam about the Q3 planning doc")?.textContent).toBe("Due Fri, 3:00 PM");
   expect(meta("Send the October expense report")?.textContent).toBe("Wed");
   expect(meta("Call the plumber about the slow drain")?.textContent).toBe("When you get home");
   expect(meta("Draft the Larkspur Q4 lead summary")?.textContent).toBe("Larkspur lead");
   expect(meta("Signed lease addendum")?.textContent).toBe("Since Sun");
   expect(meta("Choose the deck contractor")).toBeNull();
   const prep = row("Review the onboarding flow");
-  expect(prep.textContent).toBe("Review the onboarding flowDue Nov 12");
+  expect(prep.textContent).toBe("Review the onboarding flowDue Nov 12, 3:00 PM");
   expect(container.textContent).not.toContain("q3-planning-notes");
   expect(container.textContent).not.toContain("Tomorrow morning card");
   // Done is folded.

@@ -57,7 +57,12 @@ it("lists every open todo once, and offers the areas in use, the most used first
 it("words the one small when on a row", () => {
   const when = (extra: Partial<Loop>) => todoWhen(loop("x", extra), "Larkspur lead", NOW);
   expect(when({ due: at("2026-11-01T09:00:00") })).toEqual({ text: "Overdue", urgent: true });
-  expect(when({ due: at("2026-11-03T09:00:00") })).toEqual({ text: "Due tomorrow", urgent: false });
+  expect(when({ due: at("2026-11-03T09:00:00") })).toEqual({ text: "Due tomorrow, 9:00 AM", urgent: false });
+  expect(when({ due: at("2026-11-02T17:30:00") })).toEqual({ text: "Due today, 5:30 PM", urgent: true });
+  expect(when({ due: at("2026-11-05T14:00:00") })?.text).toBe("Due Thu, 2:00 PM");
+  expect(when({ due: at("2026-11-20T09:00:00") })?.text).toBe("Due Nov 20, 9:00 AM");
+  expect(when({ due: at("2026-11-03T00:00:00") })?.text).toBe("Due tomorrow");
+  expect(when({ due: at("2026-11-20T23:59:00") })?.text).toBe("Due Nov 20");
   expect(when({ trigger: { type: "time", at: at("2026-11-02T18:00:00") } })?.text).toBe("6:00 PM");
   expect(when({ trigger: { type: "event", event: "reply:sam" } })?.text).toBe("When Sam replies");
   expect(when({ kind: "waiting" })?.text).toBe("Since Sun");
