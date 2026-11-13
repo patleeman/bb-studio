@@ -1,3 +1,4 @@
+import { forkDesktopControlApi } from "./fork-desktop-control-preload.js";
 import {
   bbDesktopServerChoicesSchema,
   MACOS_TRAFFIC_LIGHT_INSET_PX,
@@ -537,6 +538,7 @@ const bbDesktopApi: BbDesktopApi = {
     ipcRenderer.invoke(BB_DESKTOP_FORK_WINDOW_CHANNEL, request),
   experimental_studioBuild: STUDIO_BUILD,
   ...forkLaunchThemeApi(ipcRenderer),
+  ...forkDesktopControlApi(ipcRenderer),
   async openServerDaemonLogs(): Promise<void> {
     await ipcRenderer.invoke(BB_DESKTOP_OPEN_SERVER_DAEMON_LOGS_CHANNEL);
   },

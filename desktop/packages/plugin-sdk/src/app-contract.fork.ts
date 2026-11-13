@@ -688,6 +688,131 @@ export interface ExperimentalWindowOptions {
   params?: Readonly<Record<string, string>>;
 }
 
+/** A macOS permission desktop control needs. Experimental: see docs/api_to_audit.fork.md. */
+export type ExperimentalDesktopPermission =
+  | "accessibility"
+  | "screenRecording"
+  | "inputMonitoring";
+
+/** A screen rectangle in points, top-left origin. */
+export interface ExperimentalDesktopRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * A spot the person pointed at with the HUD: the app, window, element and
+ * page under it, a screenshot of the window, and its number on screen.
+ */
+export interface ExperimentalDesktopPin {
+  id: string;
+  number: number;
+  threadId: string | null;
+  createdAt: number;
+  x: number;
+  y: number;
+  app: string | null;
+  bundleId: string | null;
+  pid: number | null;
+  windowId: number | null;
+  windowTitle: string | null;
+  windowBounds: ExperimentalDesktopRect | null;
+  url: string | null;
+  role: string | null;
+  label: string | null;
+  elementFrame: ExperimentalDesktopRect | null;
+  secure: boolean;
+  /** Absolute path of the PNG on this machine, or null without Screen Recording. */
+  imagePath: string | null;
+  /** A small data URL of the screenshot. */
+  thumbnail: string | null;
+  /** False while the talk key is still held. */
+  placed: boolean;
+  /** A composer has taken it (`pinsTaken`). */
+  taken: boolean;
+}
+
+/** What an agent is doing on the desktop right now. */
+export interface ExperimentalDesktopActivity {
+  threadId: string;
+  agent: string;
+  caption: string;
+  app: string | null;
+  phase: "acting" | "paused" | "stopped";
+  x: number | null;
+  y: number | null;
+  clickAt: number | null;
+  /** The action uses the person's real cursor or keyboard. */
+  foreground: boolean;
+  updatedAt: number;
+}
+
+/** An agent asking for the person's cursor and keyboard. */
+export interface ExperimentalDesktopAsk {
+  id: string;
+  threadId: string;
+  agent: string;
+  reason: string;
+  app: string | null;
+}
+
+/** Desktop control's state, the same in every window. */
+export interface ExperimentalDesktopControlState {
+  supported: boolean;
+  driver: {
+    status: "unavailable" | "stopped" | "starting" | "ready" | "failed";
+    version: string | null;
+    error: string | null;
+  };
+  helper: boolean;
+  permissions: Record<ExperimentalDesktopPermission, boolean> & { checked: boolean };
+  /** Screen Recording was allowed after launch; macOS may need a relaunch. */
+  restartAdvised: boolean;
+  hud: { shown: boolean; threadId: string | null };
+  pointing: boolean;
+  talkKey: string;
+  talking: boolean;
+  hover: ExperimentalDesktopPin | null;
+  pins: readonly ExperimentalDesktopPin[];
+  activity: ExperimentalDesktopActivity | null;
+  grant: { kind: "none" | "once" | "session"; threadId: string | null };
+  ask: ExperimentalDesktopAsk | null;
+}
+
+/** A request to desktop control. */
+export type ExperimentalDesktopControlRequest =
+  | { op: "state" }
+  | { op: "refreshPermissions" }
+  | { op: "requestPermission"; permission: ExperimentalDesktopPermission }
+  | { op: "openSettings"; permission: ExperimentalDesktopPermission }
+  | { op: "relaunch" }
+  | { op: "hud"; shown: boolean; threadId?: string | null }
+  | { op: "pointing"; on: boolean }
+  | { op: "talkKey"; key: "fn" | "AltRight" | "MetaRight" | "ControlRight" }
+  | { op: "talk"; down: boolean }
+  | { op: "pinsTaken"; ids: readonly string[] }
+  | { op: "clearPins" }
+  | { op: "answer"; id: string; answer: "session" | "once" | "no" }
+  | { op: "stop" }
+  | { op: "resume" };
+
+/**
+ * `experimental_useDesktopControl()`: the desktop app's control of other
+ * apps (permissions, the HUD, pointing and pins, an agent's activity and
+ * the cursor grant). `native` is false outside the desktop app on macOS,
+ * where `state` stays null and `request` resolves null. Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalDesktopControl {
+  native: boolean;
+  state: ExperimentalDesktopControlState | null;
+  request(
+    request: ExperimentalDesktopControlRequest,
+  ): Promise<ExperimentalDesktopControlState | null>;
+}
+
 /**
  * `experimental_useWindows()`. `native` is true in the desktop app, where
  * every option applies. In a browser `open` opens a plain popup and the
@@ -1423,6 +1548,11 @@ export interface ForkPluginSdkApp {
    * docs/api_to_audit.fork.md.
    */
   experimental_useWindows(): ExperimentalWindows;
+  /**
+   * The desktop app's control of other apps. Experimental: see
+   * docs/api_to_audit.fork.md.
+   */
+  experimental_useDesktopControl(): ExperimentalDesktopControl;
   /**
    * Put an item on a drag as the shared payload, under the MIME type
    * `application/x-bb-item`. Call it in `dragstart`; it leaves the drag's
