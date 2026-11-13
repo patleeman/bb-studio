@@ -1,6 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { existsSync } from "node:fs";
 import type { BotThreadRecord, ForkedFrom } from "./bot-threads";
+import { PERSONAL_PROJECT_ID } from "./project-lead";
 import type { SideKind, SideThreads, TimelineRow } from "./bot-side-threads";
 import type { ReasoningLevel } from "./kit/reasoning";
 import type { ThreadSeeds } from "./thread-seeds";
@@ -22,13 +23,20 @@ export interface MessageThread {
 
 export type SeedEnvironment =
   | { type: "reuse"; environmentId: string }
-  | { type: "host"; hostId: string; workspace: { type: "unmanaged"; path: string } | { type: "personal" } }
+  | { type: "host"; hostId: string; workspace: { type: "unmanaged"; path: string | null } | { type: "personal" } | { type: "managed-worktree"; baseBranch: { kind: "default" } } }
   | { type: "project-default" };
+
+export interface Placement {
+  projectId?: string;
+  environment: SeedEnvironment | null;
+}
+
+const GIT_WORKTREE = "git-worktree";
 
 export interface MessageThreadDeps {
   sdk: Sdk;
   sides: Pick<SideThreads, "newest" | "record" | "message" | "transcript">;
-  source(threadId: string): Promise<Pick<BotThreadRecord, "botId"> | null>;
+  source(threadId: string): Promise<Pick<BotThreadRecord, "botId" | "kind"> | null>;
   title(threadId: string): Promise<string>;
   recordFork(threadId: string, botId: string, from: ForkedFrom): void;
   defaultModel(botId: string): { providerId: string; model: string; reasoning: ReasoningLevel | null } | null;
@@ -69,13 +77,15 @@ export class MessageThreads {
     if (!source) throw new Error("That thread isn't one of a Bot's conversations.");
     const sourceSeqEnd = ref.sourceSeqEnd ?? (await this.deps.sides.message(ref.threadId, ref.messageId))?.sourceSeqEnd;
     if (sourceSeqEnd === undefined || sourceSeqEnd === null) throw new Error("Couldn't find that message in the conversation.");
-    const environment = await this.seedEnvironment(ref.threadId);
+    const place = await this.placement(ref.threadId, source.kind !== "worker");
     const title = `${await this.deps.title(ref.threadId)} · ${kind === "fork" ? "fork" : "thread"}`;
-    const fork = await this.deps.sdk.threads.fork({ sourceThreadId: ref.threadId, sourceSeqEnd, visibility: "visible", title, ...(environment ? { environment } : {}) } as never)
-      .catch(async (error: unknown) => {
-        this.deps.log(`Forking at ${ref.messageId} failed, starting from the transcript: ${error instanceof Error ? error.message : String(error)}`);
-        return await this.fromTranscript(ref.threadId, sourceSeqEnd, title, environment);
-      }) as { id: string; projectId?: string | null; providerId?: string | null };
+    const fork = (place.projectId
+      ? await this.fromTranscript(ref.threadId, sourceSeqEnd, title, place)
+      : await this.deps.sdk.threads.fork({ sourceThreadId: ref.threadId, sourceSeqEnd, visibility: "visible", title, ...(place.environment ? { environment: place.environment } : {}) } as never)
+        .catch(async (error: unknown) => {
+          this.deps.log(`Forking at ${ref.messageId} failed, starting from the transcript: ${error instanceof Error ? error.message : String(error)}`);
+          return await this.fromTranscript(ref.threadId, sourceSeqEnd, title, place);
+        })) as { id: string; projectId?: string | null; providerId?: string | null };
     this.deps.recordFork(fork.id, source.botId, { threadId: ref.threadId, messageId: ref.messageId, turnId: ref.turnId ?? null });
     this.deps.sides.record(fork.id, source.botId, ref.threadId, ref.messageId, Date.now(), kind);
     const preset = this.deps.defaultModel(source.botId);
@@ -88,18 +98,18 @@ export class MessageThreads {
     return { threadId: fork.id, projectId: fork.projectId ?? null, created: true };
   }
 
-  private async fromTranscript(threadId: string, upToSeq: number, title: string, environment: SeedEnvironment | null): Promise<{ id: string; projectId?: string | null; providerId?: string | null }> {
+  private async fromTranscript(threadId: string, upToSeq: number, title: string, place: Placement): Promise<{ id: string; projectId?: string | null; providerId?: string | null }> {
     const { sdk, seeds } = this.deps;
     if (!seeds?.ready()) {
       this.deps.log("This BB can't give an idle thread the transcript as context, so no thread was started.");
       throw new Error("Couldn't start a thread from that message.");
     }
     const parent = await sdk.threads.get({ threadId }) as { projectId: string; providerId?: string | null; environmentId?: string | null; model?: string | null };
-    const where = environment ?? (parent.environmentId ? { type: "reuse", environmentId: parent.environmentId } : { type: "project-default" });
+    const where = place.environment ?? (parent.environmentId ? { type: "reuse", environmentId: parent.environmentId } : { type: "project-default" });
     const seed = transcriptSeed(await this.deps.sides.transcript(threadId, upToSeq), SEED_CONTEXT_MAX);
     try {
       const made = await sdk.threads.spawn({
-        projectId: parent.projectId, ...(parent.providerId ? { providerId: parent.providerId } : {}), ...(parent.model ? { model: parent.model } : {}),
+        projectId: place.projectId ?? parent.projectId, ...(parent.providerId ? { providerId: parent.providerId } : {}), ...(parent.model ? { model: parent.model } : {}),
         title, visibility: "visible", environment: where, input: [],
       } as never) as { id: string; projectId?: string | null; providerId?: string | null };
       seeds.put(made.id, seed);
@@ -110,25 +120,38 @@ export class MessageThreads {
     }
   }
 
-  async seedEnvironment(threadId: string): Promise<SeedEnvironment | null> {
+  async placement(threadId: string, chat: boolean): Promise<Placement> {
     const { sdk } = this.deps;
-    const thread = await sdk.threads.get({ threadId }).catch(() => null) as { projectId?: string; environmentId?: string | null } | null;
-    if (!thread?.environmentId || !thread.projectId) return null;
-    const environment = await sdk.environments.get({ environmentId: thread.environmentId }).catch(() => null) as { hostId?: string | null; path?: string | null; environmentProviderId?: string | null } | null;
-    if (!environment?.hostId) return null;
-    const hosts = await sdk.hosts.list().catch(() => []) as { id: string; status?: string }[];
-    if (hosts.find((host) => host.id === environment.hostId)?.status === "connected") return null;
-    const hostId = (await sdk.system.config().catch(() => null))?.primaryHostId ?? null;
-    if (!hostId || hostId === environment.hostId) return null;
-    if (environment.path) {
-      const twins = await sdk.environments.list({ projectId: thread.projectId, hostId, path: environment.path } as never).catch(() => []) as { id: string; status?: string }[];
+    const thread = await settle(() => sdk.threads.get({ threadId }), null) as { projectId?: string; environmentId?: string | null } | null;
+    if (!thread?.projectId) return { environment: null };
+    const environment = thread.environmentId
+      ? await settle(() => sdk.environments.get({ environmentId: thread.environmentId! }), null) as { hostId?: string | null; path?: string | null; status?: string; environmentProviderId?: string | null } | null
+      : null;
+    const hosts = await settle(() => sdk.hosts.list(), []) as { id: string; status?: string }[];
+    const connected = (hostId: string | null | undefined) => !!hostId && hosts.find((host) => host.id === hostId)?.status === "connected";
+    if (environment && connected(environment.hostId) && (environment.status ?? "ready") === "ready") return { environment: null };
+    const hostId = (await settle(() => sdk.system.config(), null))?.primaryHostId ?? null;
+    if (!hostId || !connected(hostId)) return { environment: null };
+    if (environment?.path) {
+      const twins = await settle(() => sdk.environments.list({ projectId: thread.projectId, hostId, path: environment.path } as never), []) as { id: string; status?: string }[];
       const twin = twins.find((each) => each.status === "ready");
-      if (twin) return { type: "reuse", environmentId: twin.id };
+      if (twin) return { environment: { type: "reuse", environmentId: twin.id } };
     }
-    const project = await sdk.projects.get({ projectId: thread.projectId } as never).catch(() => null) as { kind?: string } | null;
-    if (project?.kind === "personal") return { type: "host", hostId, workspace: { type: "personal" } };
-    if (!environment.environmentProviderId && environment.path && existsSync(environment.path)) return { type: "host", hostId, workspace: { type: "unmanaged", path: environment.path } };
-    return { type: "project-default" };
+    const personal: SeedEnvironment = { type: "host", hostId, workspace: { type: "personal" } };
+    const project = await settle(() => sdk.projects.get({ projectId: thread.projectId } as never), null) as { kind?: string } | null;
+    if (project?.kind === "personal") return { environment: personal };
+    if (chat) return { projectId: PERSONAL_PROJECT_ID, environment: personal };
+    if (environment?.environmentProviderId === GIT_WORKTREE) return { environment: { type: "host", hostId, workspace: { type: "managed-worktree", baseBranch: { kind: "default" } } } };
+    if (environment?.path && existsSync(environment.path)) return { environment: { type: "host", hostId, workspace: { type: "unmanaged", path: environment.path } } };
+    return { environment: { type: "host", hostId, workspace: { type: "unmanaged", path: null } } };
+  }
+}
+
+async function settle<T, F>(run: () => Promise<T>, fallback: F): Promise<T | F> {
+  try {
+    return await run();
+  } catch {
+    return fallback;
   }
 }
 
