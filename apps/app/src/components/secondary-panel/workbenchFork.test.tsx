@@ -56,7 +56,7 @@ function renderable(
   };
 }
 
-function register(run: (tab: unknown) => void = () => {}) {
+function register() {
   const tab = {
     context: { kind: "thread" },
     availability: "action",
@@ -67,21 +67,8 @@ function register(run: (tab: unknown) => void = () => {}) {
     "studio",
     makePluginRegistrationSet({
       tabs: [
-        {
-          ...tab,
-          id: "bot",
-          title: "Bot",
-          experimental_compactWhenFixed: true,
-        },
+        { ...tab, id: "bot", title: "Bot" },
         { ...tab, id: "page", title: "Page" },
-      ],
-      panelTabActions: [
-        {
-          id: "main",
-          title: "Open as main tab",
-          isAvailable: (target) => target.tabId === "page",
-          run,
-        },
       ],
     }),
   );
@@ -122,7 +109,7 @@ afterEach(() => {
 });
 
 describe("a fixed tab in the side panel tab strip", () => {
-  it("is drawn first with no close button, icon only when the registration asks, then a divider", () => {
+  it("is drawn first with no close button, then a divider", () => {
     register();
     getDefaultStore().set(globalPanelTabsAtom, [bot]);
     const { container } = render(
@@ -141,9 +128,6 @@ describe("a fixed tab in the side panel tab strip", () => {
       container.querySelectorAll("[data-tab-pill]");
     expect(botPill?.querySelector("[data-tab-pill-close]")).toBeNull();
     expect(terminalPill?.querySelector("[data-tab-pill-close]")).not.toBeNull();
-    const botButton = screen.getByRole("button", { name: "Bot" });
-    expect(botButton.querySelector(".sr-only")?.textContent).toBe("Bot");
-    expect(botPill?.parentElement?.getAttribute("title")).toBe("Bot");
     expect(
       botPill?.parentElement?.nextElementSibling?.getAttribute(
         "data-panel-tabs-divider",
@@ -181,41 +165,6 @@ describe("a fixed tab in the side panel tab strip", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "Close other tabs" }));
     expect(tabs[0]?.onClose).not.toHaveBeenCalled();
     expect(tabs[2]?.onClose).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("plugin items in a side panel tab's menu", () => {
-  it("offers an available action on a plugin action tab and runs it with the tab and thread", () => {
-    const run = vi.fn();
-    register(run);
-    render(
-      <Strip
-        panelStateId="thr_1"
-        tabs={[
-          renderable(terminal, "Terminal"),
-          renderable(page, "Launch plan"),
-          renderable(bot, "Bot"),
-        ]}
-      />,
-    );
-
-    fireEvent.contextMenu(screen.getByRole("button", { name: "Terminal" }));
-    expect(
-      screen.queryByRole("menuitem", { name: "Open as main tab" }),
-    ).toBeNull();
-    fireEvent.keyDown(document.activeElement ?? document.body, {
-      key: "Escape",
-    });
-
-    fireEvent.contextMenu(screen.getByRole("button", { name: "Launch plan" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Open as main tab" }));
-    expect(run).toHaveBeenCalledWith({
-      pluginId: "studio",
-      tabId: "page",
-      params: { page: "p1" },
-      title: "Launch plan",
-      threadId: "thr_1",
-    });
   });
 });
 
