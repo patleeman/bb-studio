@@ -123,6 +123,14 @@ it("names itself in the header, and lists one line per todo in Today, This week,
   expect(group("Done")?.querySelectorAll("[data-testid=todo-done]")).toHaveLength(0);
 });
 
+it("draws an open todo with an empty circle and a done one with a check", async () => {
+  await render();
+  expect(row("Pay the Con Edison bill").querySelector("[data-icon]")?.getAttribute("data-icon")).toBe("Circle");
+  expect(container.querySelector("[data-testid=todo-row] [data-icon=CircleCheck]")).toBeNull();
+  await act(async () => group("Done")!.querySelector<HTMLButtonElement>("button[aria-expanded]")!.click());
+  expect(row("Closed 1").querySelector("[data-icon]")?.getAttribute("data-icon")).toBe("CircleCheck");
+});
+
 it("filters by area pills and search; area lives only in the filter bar", async () => {
   await render();
   const pills = () => [...container.querySelectorAll<HTMLButtonElement>("[data-testid=bot-page-pill]")];

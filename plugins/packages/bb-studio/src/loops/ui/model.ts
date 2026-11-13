@@ -9,7 +9,7 @@ export type Trigger = Loop["trigger"];
 export type SnoozePreset = "later_today" | "tonight" | "tomorrow_morning" | "this_weekend" | "home";
 
 export const KIND: Record<LoopKind, { label: string; icon: string }> = {
-  do: { label: "Do", icon: "CircleCheck" },
+  do: { label: "Do", icon: "Circle" },
   decide: { label: "Decide", icon: "Fork" },
   read: { label: "Read", icon: "FileText" },
   waiting: { label: "Waiting on others", icon: "TimeSchedule" },
