@@ -61,3 +61,10 @@ test("has the title row of the other Studio pages, New Bot, above its heading", 
   expect(container.querySelector('[data-testid="page-bar"]')?.textContent).toBe("New Bot");
   expect([...container.querySelectorAll("h1")].map((h1) => h1.textContent)).toEqual(["New Bot", "Make another Bot"]);
 });
+
+test("suggests what Studio does, not thread triage", () => {
+  act(() => root.render(<Welcome first look={look} busy={false} error={null} onCreate={async () => true} />));
+  const labels = [...container.querySelectorAll("button[aria-pressed]")].map((each) => each.textContent);
+  expect(labels).toEqual(["Watch my projects", "Morning brief", "Plan my week", "Track my todos"]);
+  expect(IDEAS.map((idea) => `${idea.label} ${idea.text}`).join(" ")).not.toMatch(/\b(triage|threads?)\b/i);
+});
