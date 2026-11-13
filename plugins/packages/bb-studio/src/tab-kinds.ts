@@ -179,7 +179,7 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
   item("whiteboard", "Whiteboard", "Whiteboards", "Edit", {}, true),
   item("design", "Design", "Designs", "Palette", {}, true),
   item("app", "App", "Apps", "AppWindow", { newTab: "added", recent: "added", workbenchOpen: "added" }, true),
-  item("artifact", "Artifact", "Artifacts", "studio/artifact", { newTab: "added", recent: "added", workbenchOpen: "added" }, false),
+  item("artifact", "Artifact", "Apps", "studio/artifact", { newTab: "added", recent: "added", workbenchOpen: "added" }, false),
   item("recording", "Recording", "Recordings", "Mic", { newTab: "added", recent: "added", workbenchOpen: "added", sidebarDrag: { na: "The Library lists no recordings; drag one from the New Tab page's Recent or search, or Talk's Recordings page." } }, false),
   {
     id: "board", name: "Visual Chat board", plural: "Visual Chat boards", icon: "AppWindow", owner: "visual-chat", ref: "thread", open: { via: "plugin", pluginId: VISUAL_CHAT_PLUGIN, tabId: TAB_IDS.board },
