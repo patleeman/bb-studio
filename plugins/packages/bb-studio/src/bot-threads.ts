@@ -327,7 +327,7 @@ export function repoTag(thread: Pick<ThreadFacts, "environmentName" | "environme
 
 /** The first line of a reply, short, for a conversation's second line; null for a quiet "[PASS]". */
 export function latestLine(text: string | null | undefined): string | null {
-  const clean = (text ?? "").replace(/::[a-z-]+\{[^}]*\}/g, "").replace(/[*_`#>]+/g, "").split("\n").map((line) => line.trim()).find((line) => line.length > 0) ?? "";
+  const clean = (text ?? "").replace(/::[a-z-]+\{[^}]*\}/g, "").replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[*_`#>]+/g, "").split("\n").map((line) => line.trim()).find((line) => line.length > 0) ?? "";
   if (!clean || /^\[PASS\]$/i.test(clean)) return null;
   return clean.length > LATEST_MAX ? `${clean.slice(0, LATEST_MAX - 1)}…` : clean;
 }
