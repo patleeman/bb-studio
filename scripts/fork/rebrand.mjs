@@ -122,6 +122,51 @@ const replacements = [
     'label: "Threads",\n    clearLabel: "Return to commands",',
     'label: "Search",\n    clearLabel: "Return to commands",',
   ],
+  [
+    "apps/app/src/components/thread/ThreadActionsProvider.tsx",
+    '? "Thread archived"\n          : "Threads archived",',
+    '? "Conversation archived"\n          : "Conversations archived",',
+  ],
+  [
+    "apps/app/src/views/SettingsView.tsx",
+    'description="Open web links inside bb."',
+    `description="Open web links inside ${NAME}."`,
+  ],
+  [
+    "apps/app/src/components/tools/PluginDetail.tsx",
+    '? "Updates with bb"',
+    `? "Updates with ${NAME}"`,
+  ],
+  [
+    "apps/app/src/components/settings/AiServicesSettingsSection.tsx",
+    '"Nothing bb ships is ready right now."',
+    `"Nothing ${NAME} ships is ready right now."`,
+  ],
+  [
+    "apps/app/src/components/settings/AiServicesSettingsSection.tsx",
+    '" Nothing is ready, so bb falls back."',
+    `" Nothing is ready, so ${NAME} falls back."`,
+  ],
+  [
+    "apps/app/src/components/settings/AiServicesSettingsSection.tsx",
+    "Automatic prefers bb cloud, then other available services.",
+    "Automatic tries the conversation's own provider first, then other signed-in services.",
+  ],
+  [
+    "apps/app/src/components/promptbox/follow-up-placeholder.ts",
+    '"Ask for a follow-up. @ to mention files, folders, sections, or threads"',
+    '"Ask for a follow-up. @ to mention files, folders, sections, or conversations"',
+  ],
+  [
+    "apps/app/src/components/thread/ThreadActionsProvider.test.tsx",
+    'source === "single" ? "Thread archived" : "Threads archived",',
+    'source === "single" ? "Conversation archived" : "Conversations archived",',
+  ],
+  [
+    "apps/app/src/components/thread/ThreadActionsProvider.test.tsx",
+    'calls[0]?.[0]).toBe(\n      "Thread archived",',
+    'calls[0]?.[0]).toBe(\n      "Conversation archived",',
+  ],
 ];
 for (const [file, from, to] of replacements) {
   const target = join(root, file);
