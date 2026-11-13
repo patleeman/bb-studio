@@ -926,6 +926,18 @@
       "coverage": "generated method"
     },
     {
+      "file": "ios/iOS/Look/LookWebView.swift",
+      "plugin": "method",
+      "method": "body",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/iOS/Look/Presence.swift",
+      "plugin": "studio",
+      "method": "presences_list",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/iOS/Loops/Loops.swift",
       "plugin": "studio",
       "method": "loops.list",
