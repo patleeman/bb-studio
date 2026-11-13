@@ -1047,7 +1047,7 @@ result open the document in the workbench beside the conversation.
 
 ### Library
 
-A Bot's pages (Todos, Memory, Library, Automations and the Archive) share
+A Bot's pages (Todos, Memory, Library and the Archive) share
 one template (`src/ui/bot-page`): one header row, "<Page> · <Bot>", in BB's
 title bar in place of the panel's "Library" label (`src/ui/page-bar.tsx`),
 where the Bot's name opens the Bot's page; then one column of the same width
@@ -1105,7 +1105,7 @@ Search page of its own.
 **Tab kinds.** Everything that can be a tab beside a conversation is one
 registry, `src/tab-kinds.ts`: Conversation, Worker, Bot; Page, Whiteboard,
 Design, App, Artifact, Recording; Visual Chat board; Memory,
-Library, Automations, Todos, Archive; VS Code; and bb's own File, Diff,
+Library, Scheduled (the Todos page at Scheduled), Todos, Archive; VS Code; and bb's own File, Diff,
 Browser, Terminal and Workflow run. Each kind has its name, icon, the tab that
 shows it, its address, where its recent rows come from and whether it has a
 sidebar row. The New Tab page, Recent, drag and drop, the agent's
@@ -1131,14 +1131,14 @@ The page's Actions are Studio's action tabs under two headings
 Conversation, Page, Whiteboard, Design, App (a conversation starts
 in the main view on the Bot's + New page; the rest open as a tab). **Open**:
 Conversation (a picker for any thread, Bot or item), Page (the item list),
-Memory, Library, Automations, Todos, Archive and VS Code. Each tooltip says
+Memory, Library, Todos, Archive and VS Code. Each tooltip says
 "New page" or "Open page", for bb's action search, which lists matches under
 its own Actions heading. Bot, Side thread, New thread and the thread's
-own Automations tab stay off the list (`experimental_showInNewTab: false`);
+own Scheduled tab stay off the list (`experimental_showInNewTab: false`);
 other controls open them.
 
 **Drag and drop into the workbench.** Conversation and worker rows, the Bot
-page rows (Memory, Library, Automations, Todos, and the Archive's "older"
+page rows (Memory, Library, Todos, and the Archive's "older"
 row), the Bot switcher's icons, Library rows and links in replies carry the
 shared drag payload, and so does every New Tab Recent and search row
 (`experimental_dragItem`, which bb writes). Dropped on a pane's tab strip, the thing opens as a tab
@@ -1219,7 +1219,7 @@ Plugins, Settings. Studio adds nothing to it. Its pages are nav panels with
 BB's `experimental_hideFromNavigation: true`: a route, and no rail icon,
 More entry, Customize row or command palette entry. They are the Library and the Bot's pages
 under it (`studio/studio`: Memory, Bot info, Controls, Todos, Archive),
-Automations (`studio/automations`) and VS Code (`studio/vscode`); Visual
+the Todos page at Scheduled (`studio/automations`, titled Todos) and VS Code (`studio/vscode`); Visual
 Chat's page is off the rail too. The Bot sidebar's page rows open them. Only
 the BB Studio fork gets the field: stock BB refuses a nav panel with an
 `experimental_` field it doesn't know, which drops the plugin's whole
@@ -1236,8 +1236,8 @@ stay where BB has them; in the browser layout back and forward move to the
 start of the main view's header and the toggle stays.
 
 **Scheduled**, on the sidebar Bot's **Todos** page, is the one place for what
-runs when; `bb://automations` and a thread's Automations tab open it there.
-Studio has no Automations page of its own. Scheduled lists every automation
+runs when; `bb://automations` and a thread's Scheduled tab open it there.
+The Bot sidebar has one row for it, **Todos**. Scheduled lists every automation
 that belongs to the Bot (check-ins, reminders, watchers, runners, bb's own
 automations and maintenance), each with its next run or Paused, and has
 **New** (check-in, reminder, watcher, runner). Timed todos stay in Today,
@@ -2708,14 +2708,14 @@ so it's as you left it when you come back.
   Default or still set to it (BB already shows Default for the missing
   palette; the write replaces the stored id), so no teal step shows at
   launch (`src/theme/legacy-theme.ts`).
-- **Automations tab.** In a thread's side panel, **+ → Automations** lists
+- **Scheduled tab.** In a thread's side panel, the **Scheduled** tab lists
   what is scheduled for that thread, from `loops.scheduled`: its todos with a
   time and the Bot automations that wake it, each with its kind and next run
   (or Paused). A row opens its todo or automation. It refreshes every 30
   seconds while it's visible.
-- **Automations badge.** A regular thread with something scheduled shows a
+- **Scheduled badge.** A regular thread with something scheduled shows a
   clock with the count ("2 scheduled") in its header; click it to open the
-  Automations tab. Bot threads show a **Bot info** button beside the cache
+  Scheduled tab. Bot threads show a **Bot info** button beside the cache
   dot instead.
 
 ![A regular staged thread without a workspace: its header shows the Automations count and no VS Code button.](assets/thread-header-automations.png)

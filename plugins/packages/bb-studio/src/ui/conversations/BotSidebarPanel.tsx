@@ -2,7 +2,7 @@
 // - Top, sticky: the Bot's space header (SpaceHeader.tsx): avatar, name, its
 //   status (running count, Paused), a ··· menu (Edit space…, Default model
 //   with bb's model picker, Archive: the older page, New Bot), and
-//   its pages as rows (Memory, Library, Automations, Todos). Edit space
+//   its pages as rows (Memory, Skills, Library, Todos). Edit space
 //   (EditSpace.tsx) covers the main view, or takes the lists' place where
 //   BB has none.
 // - Conversations, with "+ New" (BB's ghost button; BB's new-thread composer on

@@ -4,9 +4,10 @@
 // its name, a status line ("2 running", "Paused", "Paused · in bb" for a
 // Bot a BB Studio copy imported and doesn't run, or nothing), and a ···
 // menu (Edit space…, Default model: what its new conversations start on,
-// Archive: the older page, New Bot); then the Bot's pages as rows: Memory, Library,
-// Automations and Todos (the primary Bot's, with Todos on; the count is what
-// needs Patrick now). The row of the page on screen is selected.
+// Archive: the older page, New Bot); then the Bot's pages as rows: Memory, Skills,
+// Library and Todos (with the Todos list on, the primary Bot's Todos page and
+// what needs Patrick now; else the Todos page at Scheduled). The row of the page
+// on screen is selected.
 import type { ReactNode } from "react";
 import type { BotSpace } from "../../bot-threads-contract";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "../../kit/app/index";
