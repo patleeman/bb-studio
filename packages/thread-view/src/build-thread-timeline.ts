@@ -188,6 +188,7 @@ interface BuildTimelineRowsOptions {
   rowIdPrefix: string;
   summarizeShellCommands: boolean;
   workspaceRoot: string | null;
+  providerDisplayName?: string | undefined;
 }
 
 interface BuildGenericOperationSystemRowArgs {
@@ -761,6 +762,7 @@ function convertMessage(
         rowIdPrefix: `${base.id}:child:`,
         summarizeShellCommands: options.summarizeShellCommands,
         workspaceRoot: options.workspaceRoot,
+        providerDisplayName: options.providerDisplayName,
       };
       const omitChildRows =
         options.omitSettledDelegationChildRows &&
@@ -871,7 +873,7 @@ function convertMessage(
       ];
     }
     case "error": {
-      const errorDisplay = buildTimelineErrorDisplay(message);
+      const errorDisplay = buildTimelineErrorDisplay(message, options.providerDisplayName);
       const isReconnect = message.willRetry === true;
       return [
         {
@@ -1235,6 +1237,7 @@ export function buildThreadTimelineFromProjection(
       rowIdPrefix: ROOT_TIMELINE_ROW_ID_PREFIX,
       summarizeShellCommands: args.options.summarizeShellCommands,
       workspaceRoot: args.options.workspaceRoot,
+      providerDisplayName: args.options.providerDisplayName,
     },
     steerRows.filter((row) => row.turnRequest.status !== "pending"),
   );
@@ -1338,6 +1341,7 @@ export function buildThreadTimelineTurnDetailsFromEvents(
     rowIdPrefix: ROOT_TIMELINE_ROW_ID_PREFIX,
     summarizeShellCommands: args.options.summarizeShellCommands,
     workspaceRoot: args.options.workspaceRoot,
+    providerDisplayName: args.options.providerDisplayName,
   };
   const plan = planTimelineRows(
     projection,
