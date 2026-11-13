@@ -266,6 +266,8 @@ describe("the first-chat prompt", () => {
     expect(prompt).toContain("by your name (Assistant), never \"your Bot\"");
     expect(prompt).toContain("start other conversations for bigger jobs");
     expect(prompt).not.toContain("start threads");
+    expect(prompt).toContain('::next{reply="👍 Let’s do it|⏭ Skip for now"}');
+    expect(prompt).toContain("Never put a choice in btw or do");
   });
 });
 

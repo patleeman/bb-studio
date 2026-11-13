@@ -33,7 +33,7 @@ describe("the ::next directive", () => {
     expect(parseNextItems({ btw: `🔗 ${"word ".repeat(80)}` }).btw[0].text.length).toBeLessThanOrEqual(MAX_NOTE_LENGTH);
     // Without an emoji it gets the default one and keeps all its words.
     expect(parseNextItems({ btw: "I noticed a thing." }).btw[0]).toMatchObject({ emoji: "🔎", text: "I noticed a thing." });
-    expect(parseNextItems({ btw: "🐛 One|🐛 one|🏗️ Two|🔗 Three|🕐 Four" }).btw).toHaveLength(NEXT_LIMITS.btw);
+    expect(parseNextItems({ btw: "🐛 I noticed one.|🐛 I noticed one.|🏗️ I noticed two.|🔗 I noticed three.|🕐 I noticed four." }).btw).toHaveLength(NEXT_LIMITS.btw);
   });
 
   it("shows older explore items as notes", () => {
@@ -42,6 +42,12 @@ describe("the ::next directive", () => {
       { emoji: "🐛", label: "Backoff disagrees", text: "Backoff disagrees — your retry fix depends on it" },
       { emoji: "🕐", label: "Re-entrant lock-free queue", text: "Re-entrant lock-free queue" },
     ]);
+  });
+
+  it("draws short btw items that answer the question as quick replies, and keeps real notes as notes", () => {
+    const items = parseNextItems({ reply: "👍 Let’s do it", btw: "⏭ Skip for now|🔎 Call you Sam?|💡 I noticed the reminder fires in UTC. It will ring three hours early.|🐛 Retry has no wait" });
+    expect(items.reply.map((item) => `${item.emoji} ${item.label}`)).toEqual(["👍 Let’s do it", "⏭ Skip for now", "🔎 Call you Sam?"]);
+    expect(items.btw.map((note) => note.emoji)).toEqual(["💡", "🐛"]);
   });
 
   it("has nothing for missing attributes", () => {
