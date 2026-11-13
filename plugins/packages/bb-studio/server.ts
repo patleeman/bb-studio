@@ -1,6 +1,7 @@
 import { registerWorkCards, WORK_TOOLS } from "./src/work/register";
 import { runWorkCli } from "./src/work/cli";
 import { registerLoops, LOOP_TOOLS, loopPushActions } from './src/loops/register';
+import { scheduledContract, scheduledItems } from "./src/loops/scheduled";
 import { automationTable, bbFromFile, bbFromOverview, readImportedAt, readStudioEntries, readThreadOwners } from "./src/automation-table";
 import { arrangeRailOnce } from "./src/rail-arrangement";
 import { arrangeFooterOnce } from "./src/footer-arrangement";
@@ -734,6 +735,15 @@ export default async function plugin(bb: BbPluginApi) {
       setPaused: async (botId, paused) => { await maintenance.set(botId, { enabled: !paused }); },
       run: async (botId) => { await maintenance.run(botId); },
     },
+  });
+  bb.rpc.register(scheduledContract, {
+    "loops.scheduled": async ({ threadId }) => ({
+      items: scheduledItems({
+        loops: loops.store.all(),
+        bots: await Promise.all(bots.list().map(async (bot) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, primary: bot.primary !== false, automations: await automations.list(bot.id).catch(() => []) }))),
+        threadId,
+      }),
+    }),
   });
   // BB automations (watchers', adopted runners') BB turned off after a
   // transient failure come back on (src/auto-resume.ts; Studio's own schedules

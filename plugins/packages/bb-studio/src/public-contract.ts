@@ -1,4 +1,5 @@
 import { rpcContract as loops } from './loops/contract';
+import { scheduledContract as scheduled } from './loops/scheduled';
 import { rpcContract as code } from "./code/contract";
 import { rpcContract as decisions } from "./decisions/contract";
 import { defineRpcContract } from "@get-bb/plugin-sdk";
@@ -16,6 +17,6 @@ import { voiceLiveContract as voiceLive } from "./voice/live/contract";
 import { settingsContract as settings } from "./settings/contract";
 import { memoryRpcContract as memory } from "./memory/contract";
 import { linksContract as links } from "./links/contract";
-export const contractParts = { loops, code, decisions, studio, chat, artifacts, drawings, designs, recordings, pages, notes, dashboards, minis, voiceLive, settings, memory, links };
-export const rpcContract = defineRpcContract({ ...loops, ...code, ...decisions, ...studio, ...chat, ...artifacts, ...drawings, ...designs, ...recordings, ...pages, ...notes, ...dashboards, ...minis, ...voiceLive, ...settings, ...memory, ...links });
+export const contractParts = { loops, scheduled, code, decisions, studio, chat, artifacts, drawings, designs, recordings, pages, notes, dashboards, minis, voiceLive, settings, memory, links };
+export const rpcContract = defineRpcContract({ ...loops, ...scheduled, ...code, ...decisions, ...studio, ...chat, ...artifacts, ...drawings, ...designs, ...recordings, ...pages, ...notes, ...dashboards, ...minis, ...voiceLive, ...settings, ...memory, ...links });
 export { botThreadsEvents as realtimeEvents } from "./bot-threads-contract";
