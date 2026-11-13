@@ -9,6 +9,7 @@ import {
 import { PluginSlotMount } from "@/components/plugin/PluginSlotMount";
 import { useUpdateGeneralSettings } from "@/hooks/mutations/settings-mutations";
 import { pluginListQueryKey } from "@/hooks/queries/query-keys";
+import { pluginListQueryOptions } from "@/hooks/queries/plugin-settings-queries";
 import type { PluginFirstRunSlot } from "@/lib/fork-slots";
 import { usePluginFrontendsSettled } from "@/lib/plugin-frontend-boot-state";
 import { usePluginSlots } from "@/lib/plugin-slots";
@@ -43,9 +44,16 @@ export function useForkFirstRun(active: boolean): ForkFirstRunState {
   const plugins = useSyncExternalStore(subscribe, () =>
     client?.getQueryState<PluginListEntry[]>(pluginListQueryKey(true)),
   );
+  const unfetched = active && owner === null && plugins === undefined;
+  useEffect(() => {
+    if (unfetched && client)
+      void client
+        .prefetchQuery(pluginListQueryOptions({ enabled: true }))
+        .catch(() => {});
+  }, [unfetched, client]);
   if (!active) return null;
   if (owner !== null) return owner;
-  if (plugins === undefined) return settled ? null : "wait";
+  if (plugins === undefined) return client && !settled ? "wait" : null;
   if (plugins.status === "pending") return "wait";
   const hasApps =
     plugins.data?.some(
