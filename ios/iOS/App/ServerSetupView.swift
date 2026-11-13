@@ -16,26 +16,35 @@ struct ServerSetupView: View {
     @EnvironmentObject private var model: AppModel
     @State private var serverURL = ""
     @State private var status: String?
+    @State private var checking = false
+    /// The address that didn't answer, offered with Use Anyway.
+    @State private var unreachable: URL?
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("https://machine.tailnet.ts.net", text: $serverURL, axis: .vertical)
-                        .accessibilityLabel("BB server URL")
+                    TextField("studio.tailnet.ts.net", text: $serverURL, axis: .vertical)
+                        .accessibilityLabel("BB Studio server address")
                         .accessibilityIdentifier("setupServerURL")
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
                         .onSubmit(connect)
-                    Button("Connect", action: connect)
-                        .accessibilityIdentifier("setupConnect")
-                        .disabled(serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button(action: connect) {
+                        if checking { ProgressView() } else { Text("Connect") }
+                    }
+                    .accessibilityIdentifier("setupConnect")
+                    .disabled(checking || serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     if let status { Text(status).font(.footnote).foregroundStyle(.red) }
+                    if let unreachable {
+                        Button("Use Anyway") { model.setServerURL(unreachable) }
+                            .accessibilityIdentifier("setupUseAnyway")
+                    }
                 } header: {
-                    Text("BB server").foregroundStyle(Color.primary.opacity(0.75))
+                    Text("BB Studio server").foregroundStyle(Color.primary.opacity(0.75))
                 } footer: {
-                    Text("Reached over Tailscale Serve. BB has no client auth, so the tailnet is the boundary. You can change it later in Settings.")
+                    Text("BB Studio's Tailscale Serve address, such as studio.tailnet.ts.net (https:// is added). BB has no client auth, so the tailnet is the boundary. You can change it later in Settings.")
                         .foregroundStyle(Color.primary.opacity(0.75))
                 }
             }
@@ -44,11 +53,24 @@ struct ServerSetupView: View {
     }
 
     private func connect() {
-        let text = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: text), let scheme = url.scheme, ["http", "https"].contains(scheme), url.host() != nil else {
-            status = "Not a valid URL"
+        guard let url = ServerAddress.parse(serverURL) else {
+            status = "Not a valid address"
+            unreachable = nil
             return
         }
-        model.setServerURL(url)
+        serverURL = url.absoluteString
+        checking = true
+        status = nil
+        unreachable = nil
+        Task {
+            let problem = await ServerAddress.check(url)
+            checking = false
+            if let problem {
+                status = problem
+                unreachable = url
+            } else {
+                model.setServerURL(url)
+            }
+        }
     }
 }

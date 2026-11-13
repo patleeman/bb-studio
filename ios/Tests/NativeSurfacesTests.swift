@@ -209,3 +209,20 @@ private final class Recorder: @unchecked Sendable {
     var calls: [(String, JSONValue)] { lock.withLock { stored } }
     func record(_ path: String, _ input: JSONValue) { lock.withLock { stored.append((path, input)) } }
 }
+
+final class ServerAddressTests: XCTestCase {
+    func testBareTailscaleNameGetsHTTPS() {
+        XCTAssertEqual(ServerAddress.parse("  Studio.Tailnet.ts.net/ ")?.absoluteString, "https://studio.tailnet.ts.net")
+    }
+
+    func testFullURLsKeepSchemeAndPath() {
+        XCTAssertEqual(ServerAddress.parse("HTTP://Studio.invalid")?.absoluteString, "http://studio.invalid")
+        XCTAssertEqual(ServerAddress.parse("https://host.ts.net/bb/?x=1#y")?.absoluteString, "https://host.ts.net/bb")
+    }
+
+    func testRejectsWhatIsNotAnAddress() {
+        XCTAssertNil(ServerAddress.parse(""))
+        XCTAssertNil(ServerAddress.parse("ftp://host"))
+        XCTAssertNil(ServerAddress.parse("two words"))
+    }
+}
