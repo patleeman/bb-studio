@@ -1533,6 +1533,38 @@ window open in BB's main window. In a browser the window is a plain popup.
 Visual Chat, when installed, also opens in a window of its own there
 (**⌥⇧V**); see its README.
 
+### The desktop HUD (BB Studio on macOS)
+
+The HUD is the conversation outside BB: **⌥⇧Space** (Settings ▸ Windows), or
+the window button in a thread's composer, hides BB's main window and floats a
+small panel over every app and Space, with the conversation and its real
+composer. Esc or the arrow button goes back to BB. Code: `src/desktop`; the
+host side is BB Studio's desktop control (`docs/desktop-control.fork.md` in
+the desktop fork).
+
+- **Permissions.** Pointing needs Accessibility, Screen Recording and Input
+  Monitoring, all granted to BB Studio itself (the bundled driver and helper
+  run inside it). The sheet shows each one live with an Open Settings link,
+  re-checks when BB comes back to the front, and keeps **Start pointing** off
+  until all three are on.
+- **Pointing.** The pin button in the HUD shows a crosshair. Hovering
+  outlines the element under the pointer; a click drops a numbered pin there
+  and puts a chip in the HUD composer (pin number, app, element, page), with a
+  screenshot of the window attached. Holding the talk key (**fn**, Settings ▸
+  Windows ▸ Desktop talk key) drops a pin where the pointer is and dictates
+  through Talk; letting go places the pin and the words follow the chip. Pins
+  stay on screen while the HUD is up and go when it closes.
+- **Agents on the desktop.** `desktop_status`, `desktop_pins`,
+  `desktop_windows`, `desktop_look`, `desktop_click`, `desktop_type`,
+  `desktop_key`, `desktop_hotkey`, `desktop_scroll`, `desktop_set_value` and
+  `desktop_request_control` work only for the conversation open in the HUD.
+  They act in the background (no real cursor), with a ghost cursor, a
+  caption and a click ripple on screen. Moving the mouse in that window
+  pauses the agent; Esc or Stop halts it until you send a message or press
+  Resume. The real cursor and keyboard need your answer in the HUD (this
+  session, just once, or no), and moving the mouse takes them back. Password
+  fields are refused. The desktop app enforces all of it, not the prompt.
+
 ## Pages
 
 Pages are built into Studio: collaborative documents you write together with

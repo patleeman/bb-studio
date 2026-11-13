@@ -79,6 +79,8 @@ export const STUDIO_SETTINGS = {
 
   // Windows (only a BB with plugin windows uses them; src/launcher)
   launcherHotkey: { group: "windows", type: "string", label: "Launcher shortcut", description: "Written like Alt+Space or Control+Shift+L. Empty for none.", default: "Alt+Space", maxLength: 40 },
+  desktopHudHotkey: { group: "windows", type: "string", label: "Desktop HUD shortcut", description: "Written like Alt+Shift+Space. Empty for none.", default: "Alt+Shift+Space", maxLength: 40 },
+  desktopTalkKey: { group: "windows", type: "select", label: "Desktop talk key", options: ["fn", "AltRight", "MetaRight", "ControlRight"], optionLabels: { fn: "fn", AltRight: "Right Option", MetaRight: "Right Command", ControlRight: "Right Control" }, default: "fn" },
 
   // Jev
   decisions_jevProvider: { group: "jev", type: "select", label: "Jev provider", options: jevProviderChoices, optionLabels: { auto: "Auto", typesafe: "TypeSafe", vercel: "Vercel AI Gateway", openrouter: "OpenRouter", "opencode-zen": "OpenCode Zen", custom: "Your own endpoint" }, default: "auto" },
