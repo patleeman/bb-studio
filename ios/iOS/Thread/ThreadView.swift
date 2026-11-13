@@ -73,6 +73,8 @@ struct ThreadView: View {
     @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
     @Environment(\.botConversation) private var shell
     @State private var sideThreads: [String: BotSideThread] = [:]
+    /// Forks made here this session, kept on their message until Studio lists them.
+    @State private var madeForks: [String: String] = [:]
     @State private var replyThread: ReplyThreadSheet?
     @State private var conversationModel: ConversationModel?
     @State private var finishing = false
@@ -880,7 +882,8 @@ struct ThreadView: View {
                         saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil,
                         thread: sideThreads[row.id], replier: conversation?.look,
                         replyInThread: conversation != nil && ConversationReplies.canThread(row) ? { replyInThread(row) } : nil,
-                        fork: conversation != nil && ConversationReplies.canFork(row) ? { forkConversation(row) } : nil)
+                        fork: conversation != nil && ConversationReplies.canFork(row) ? { forkConversation(row) } : nil,
+                        openSideThread: conversation != nil ? { showThread($0) } : nil)
                 case .activity(let rows):
                     ActivityGroup(rows: rows)
                 }
@@ -1440,7 +1443,11 @@ struct ThreadView: View {
         Task {
             do {
                 let id = try await client.forkConversation(threadId: threadId, messageId: row.id, sourceSeqEnd: seq)
+                // The fork stays reachable from its message after its sheet closes.
+                madeForks[row.id] = id
+                sideThreads = BotSideThread.adding(fork: id, at: row.id, to: sideThreads)
                 showThread(id)
+                shell?.refresh()
             } catch {
                 model.error = BBClient.describe(error, plugin: "Studio", server: client.baseURL)
             }
@@ -1448,7 +1455,11 @@ struct ThreadView: View {
     }
 
     private func loadSideThreads() async {
-        guard conversation != nil, let next = try? await client.botSideThreads(threadId: model.threadId), next != sideThreads else { return }
+        guard conversation != nil, var next = try? await client.botSideThreads(threadId: model.threadId) else { return }
+        for (messageId, threadId) in madeForks where next[messageId]?.fork == nil {
+            next = BotSideThread.adding(fork: threadId, at: messageId, to: next)
+        }
+        guard next != sideThreads else { return }
         sideThreads = next
     }
 
@@ -2137,6 +2148,7 @@ extension ThreadView {
             openThread: { botChrome?.openThread($0) }, replyInThread: { botChrome?.replyInThread($0) },
             messageThread: inConversation ? { replyInThread($0) } : nil,
             forkConversation: inConversation ? { forkConversation($0) } : nil,
+            openSideThread: inConversation ? { showThread($0) } : nil,
             replier: conversation?.look,
             resolve: { await model.resolve($0, $1) }, cancel: { await model.cancel($0) }, openWeb: { showingWeb = true })
     }

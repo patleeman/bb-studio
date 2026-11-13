@@ -99,13 +99,13 @@ final class BotConversationsTests: XCTestCase {
         let answer = try XCTUnwrap(state.respond("POST", "/api/v1/plugins/studio/rpc/bot_fork_conversation", body))
         let fork = try XCTUnwrap(((try JSONSerialization.jsonObject(with: answer.1) as? [String: Any])?["result"] as? [String: Any])?["threadId"] as? String)
         let view = BotThreadsView(try JSONDecoder().decode(Studio.BotThreadsViewOutput.self, from: state.viewJSON("bot_juniper")))
-        let parent = try XCTUnwrap(view.conversations.first { $0.threadId == fork }?.forkedFrom)
-        XCTAssertEqual(parent.threadId, BotDemo.threadId)
-        XCTAssertEqual(parent.messageId, "m1")
-        XCTAssertTrue(view.threads(of: BotDemo.threadId).contains { $0.threadId == fork }, "it lists under its parent")
+        XCTAssertFalse(view.conversations.contains { $0.threadId == fork }, "as in Studio, a fork has no row of its own")
         let sides = try JSONSerialization.data(withJSONObject: ["threadId": BotDemo.threadId])
         let listed = try XCTUnwrap(state.respond("POST", "/api/v1/plugins/studio/rpc/bot_side_threads", sides))
-        XCTAssertTrue(String(decoding: listed.1, as: UTF8.self).contains(fork), "the replies row shows under the message too")
+        struct Output: Decodable { var result: Result; struct Result: Decodable { var threads: [BotSideThread] } }
+        let threads = BotSideThread.byMessage(try JSONDecoder().decode(Output.self, from: listed.1).result.threads)
+        XCTAssertEqual(threads["m1"]?.fork?.threadId, fork, "it is reached from its message")
+        XCTAssertEqual(ConversationReplies.forkIndicator(threads["m1"]), "Forked here · 1 conversation")
     }
 
     func testModelChip() async throws {

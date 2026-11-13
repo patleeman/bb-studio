@@ -51,3 +51,49 @@ final class ReviewFixesTests: XCTestCase {
         XCTAssertTrue(asked.matches(query: "old", topic: nil, sort: "newest"))
     }
 }
+
+/// Review M9: forks show under their message and stay reachable.
+final class ForkLineTests: XCTestCase {
+    private func side(_ message: String, _ thread: String, kind: String?, replies: Int = 0, conversations: Int? = nil) -> BotSideThread {
+        BotSideThread(messageId: message, threadId: thread, replies: replies, lastReplyAt: nil, working: false, kind: kind, conversations: conversations)
+    }
+
+    func testAForkOnlyMessageShowsForkedHereAndNoRepliesLine() {
+        let threads = BotSideThread.byMessage([side("m1", "fork1", kind: "fork", conversations: 1)])
+        XCTAssertEqual(ConversationReplies.forkIndicator(threads["m1"]), "Forked here · 1 conversation")
+        XCTAssertNil(ConversationReplies.indicator(threads["m1"]), "no replies line for a fork")
+        XCTAssertNil(ConversationReplies.existing(threads, messageId: "m1"), "Reply in thread never continues a fork")
+        XCTAssertEqual(threads["m1"]?.fork?.threadId, "fork1")
+    }
+
+    func testAReplyThreadAndForksAtOneMessageShowBothLines() {
+        let threads = BotSideThread.byMessage([
+            side("m1", "fork1", kind: "fork", conversations: 3),
+            side("m1", "reply1", kind: "reply", replies: 2),
+        ])
+        XCTAssertEqual(ConversationReplies.indicator(threads["m1"]), "2 replies")
+        XCTAssertEqual(ConversationReplies.existing(threads, messageId: "m1"), "reply1")
+        XCTAssertEqual(ConversationReplies.forkIndicator(threads["m1"]), "Forked here · 3 conversations")
+        XCTAssertEqual(threads["m1"]?.fork?.threadId, "fork1")
+    }
+
+    func testOlderStudiosWithoutKindAreReplies() {
+        let threads = BotSideThread.byMessage([side("m1", "t1", kind: nil, replies: 1)])
+        XCTAssertEqual(ConversationReplies.indicator(threads["m1"]), "1 reply")
+        XCTAssertNil(ConversationReplies.forkIndicator(threads["m1"]))
+    }
+
+    func testAForkJustMadeShowsBeforeStudioListsIt() {
+        var threads = BotSideThread.adding(fork: "fork9", at: "m2", to: [:])
+        XCTAssertEqual(ConversationReplies.forkIndicator(threads["m2"]), "Forked here · 1 conversation")
+        threads = BotSideThread.adding(fork: "fork9", at: "m3", to: BotSideThread.byMessage([side("m3", "reply3", kind: "reply", replies: 1)]))
+        XCTAssertEqual(ConversationReplies.existing(threads, messageId: "m3"), "reply3")
+        XCTAssertEqual(threads["m3"]?.fork?.threadId, "fork9")
+    }
+
+    func testTheSideThreadsWireCarriesKindAndConversations() throws {
+        let json = #"[{"messageId":"m1","threadId":"f","replies":0,"working":false,"kind":"fork","conversations":2}]"#
+        let decoded = try JSONDecoder().decode([BotSideThread].self, from: Data(json.utf8))
+        XCTAssertEqual(ConversationReplies.forkIndicator(BotSideThread.byMessage(decoded)["m1"]), "Forked here · 2 conversations")
+    }
+}

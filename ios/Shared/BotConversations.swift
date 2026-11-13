@@ -33,7 +33,7 @@ public enum ConversationReplies {
 
     /// "2 replies · Last reply 4:13 PM", "Replying…" while it works; nothing for an empty or failed thread.
     public static func indicator(_ thread: BotSideThread?, now: Date = .now) -> String? {
-        guard let thread else { return nil }
+        guard let thread, !thread.isFork else { return nil }
         if thread.working { return "Replying…" }
         guard thread.replies > 0 else { return nil }
         let count = thread.replies == 1 ? "1 reply" : "\(thread.replies) replies"
@@ -54,8 +54,16 @@ public enum ConversationReplies {
         }
     }
 
+    /// The message's reply thread; never a fork (Reply in thread doesn't continue a fork).
     public static func existing(_ threads: [String: BotSideThread], messageId: String) -> String? {
-        threads[messageId]?.threadId
+        guard let thread = threads[messageId], !thread.isFork else { return nil }
+        return thread.threadId
+    }
+
+    /// "Forked here · 1 conversation", as desktop's line under the message.
+    public static func forkIndicator(_ thread: BotSideThread?) -> String? {
+        guard let fork = thread?.fork else { return nil }
+        return "Forked here · " + (fork.conversations == 1 ? "1 conversation" : "\(fork.conversations) conversations")
     }
 }
 

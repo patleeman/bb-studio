@@ -16,6 +16,8 @@ struct MessageBubble: View {
     var replier: BotLook? = nil
     var replyInThread: (() -> Void)? = nil
     var fork: (() -> Void)? = nil
+    /// Opens an existing side thread (a fork made at this message).
+    var openSideThread: ((String) -> Void)? = nil
     @EnvironmentObject private var app: AppModel
 
     private var text: String { row.text ?? "" }
@@ -53,7 +55,7 @@ struct MessageBubble: View {
                     NextCard(next: next, react: react)
                 }
                 if let replyInThread {
-                    ConversationReplyRow(messageId: row.id, thread: thread, look: replier, open: replyInThread)
+                    ConversationReplyRow(messageId: row.id, thread: thread, look: replier, open: replyInThread, openFork: openSideThread)
                 }
             }
         }

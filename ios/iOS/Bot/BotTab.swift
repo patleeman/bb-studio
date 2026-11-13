@@ -472,7 +472,7 @@ struct BotTab: View {
     /// Opens a reply's side thread; the first time, Studio forks the chat at that reply.
     private func replyInThread(threadId: String?, messageId: String) {
         guard let threadId else { return }
-        if let side = sideThreads[messageId] { path.append(.thread(id: side.threadId)); return }
+        if let side = sideThreads[messageId], !side.isFork { path.append(.thread(id: side.threadId)); return }
         Task {
             do {
                 let side = try await model.client.openBotSideThread(threadId: threadId, messageId: messageId)
