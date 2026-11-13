@@ -84,6 +84,7 @@ import { registerBotProfileTools } from "./src/bot-profile-tools";
 import { MemoryStore } from "./src/memory/store";
 import { MemoryService, setBotMemoryPage, withMemory } from "./src/memory/service";
 import { registerMemory } from "./src/memory/register";
+import { recordLine } from "./src/memory/shared";
 import { BotPageState, registerGroupTool } from "./src/bot-page-state";
 import { BotCacheWarmer } from "./src/bot-cache";
 import { botControlRefusal, Bots, SKILL_NAME } from "./src/bot";
@@ -1236,7 +1237,7 @@ export default async function plugin(bb: BbPluginApi) {
     const tables = await Promise.all(all.map((bot) => automationTableFor(bot.id).catch(() => null)));
     const rows = tables.flatMap((table) => (table?.rows ?? []).map((row): EntryRow => ({ kind: "automation", id: automationRefId(table!.botId, row.id), title: row.name, updatedAt: row.lastRunAt ?? 0 })));
     const found = await Promise.all(all.map((bot) => memoryService.list({ botId: bot.id, query, limit, includeReplaced: false }).catch(() => ({ records: [] }))));
-    const records = found.flatMap((each) => each.records.map((record): EntryRow => ({ kind: "record", id: record.id, title: `${record.topic}: ${record.text.replace(/\s+/g, " ").slice(0, 120)}`, updatedAt: record.updatedAt })));
+    const records = found.flatMap((each) => each.records.map((record): EntryRow => ({ kind: "record", id: record.id, title: `${record.topic}: ${recordLine(record.text).slice(0, 120)}`, updatedAt: record.updatedAt })));
     return [...todos, ...rows, ...records];
   };
   const newTabSources: NewTabSources = {

@@ -11,7 +11,7 @@ import { isTypingTarget } from "../../ui/typing-target";
 import { lastBot } from "../../ui/bot/selection";
 import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, useRowOpen } from "../../ui/bot-page";
 import type { MemoryRecordView } from "../contract";
-import { recordDate } from "../shared";
+import { recordDate, recordLine } from "../shared";
 import { useMemory, useMemoryCall, type MemoryResult } from "./hooks";
 import { MenuSelect } from "../../ui/menu-select";
 import { searchPlaceholder, SORTS, topicPills, type Sort } from "./model";
@@ -64,7 +64,7 @@ function MemoryPage({ data }: { data: MemoryResult<"memory.overview"> }) {
   const current = records.filter((record) => !record.replacedById);
   const replaced = records.filter((record) => record.replacedById);
   const row = (record: MemoryRecordView) => (
-    <BotPageRow key={record.id} testId="memory-record" data={{ "data-record-id": record.id }} icon="Brain" title={record.text} titleText={record.text}
+    <BotPageRow key={record.id} testId="memory-record" data={{ "data-record-id": record.id }} icon="Brain" title={recordLine(record.text)} titleText={recordLine(record.text)}
       muted={!!record.replacedById || record.archived} status={record.archived ? { label: "Archived" } : null}
       meta={`${record.topic} · ${recordDate(record.createdAt)}`} {...rowOpen({ kind: "record", id: record.id }, record.topic)} />
   );

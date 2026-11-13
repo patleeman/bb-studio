@@ -167,7 +167,8 @@ conversation started). `bot_conversations` lists them.
   then asks you to in that conversation) or asks you to finish it, write its summary for someone who wasn't
   there, in short markdown: **Decisions** (one bullet each), **Left open**,
   **Made** (pages, designs, apps, code); leave out an empty section. Save it
-  with `memory_add` (topic: the conversation's title, source `{ kind:
+  with `memory_add` (topic `Conversations`, the text a plain first line naming
+  the conversation and then the summary, source `{ kind:
   "conversation", id: <this thread id>, title }`), then call
   `bot_finish_done { summary }`. Studio archives the conversation, keeps it
   findable in Search and the Library, and posts the summary to Main, where
