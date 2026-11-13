@@ -20,6 +20,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { existsSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 
 /** The tables the mirror skips (plugin-sync SKIPPED_TABLES.studio) plus the Bot's memory and todos. */
 export const BOT_TABLE = /^(bots|bot_.+|memory_records|memory_profiles|loop_events|loop_scheduler|automation_.+|runner_.+|space_retired_automations)$/u;
@@ -42,11 +43,16 @@ function refuseCredentials(path) {
   if (/account-pool|secrets|auth\.json|auth-secret/u.test(path)) throw new Error(`Refusing a credentials path: ${path}`);
 }
 
+/** Refuses a database another process has open (its server is running). Falls back to the WAL when lsof is missing. */
 function refuseRunning(path) {
-  const wal = `${path}-wal`;
-  if (existsSync(wal) && statSync(wal).size > 0) {
-    throw new Error(`${path} has a write-ahead log: its server looks like it is running. Stop it first (or checkpoint the copy).`);
+  const lsof = spawnSync("lsof", ["-t", "--", path], { encoding: "utf8" });
+  if (lsof.error) {
+    const wal = `${path}-wal`;
+    if (existsSync(wal) && statSync(wal).size > 0) throw new Error(`${path} has a write-ahead log: its server looks like it is running. Stop it first.`);
+    return;
   }
+  const holders = lsof.stdout.split("\n").filter((pid) => pid && pid !== String(process.pid));
+  if (holders.length) throw new Error(`${path} is open in process ${holders.join(", ")}: its server looks like it is running. Stop it first.`);
 }
 
 /** Copies one table's rows by policy. Returns { policy, before, after }. */
@@ -143,6 +149,8 @@ function withAttached(targetPath, sourcePath, dryRun, work) {
     try {
       const result = work(db);
       db.exec(dryRun ? "ROLLBACK" : "COMMIT");
+      // Leave no write-ahead log behind, so the folder looks like a cleanly stopped server's.
+      if (!dryRun) db.exec("PRAGMA main.wal_checkpoint(TRUNCATE)");
       return result;
     } catch (error) {
       db.exec("ROLLBACK");

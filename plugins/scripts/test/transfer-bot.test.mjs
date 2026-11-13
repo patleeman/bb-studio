@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, realpathSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, realpathSync, existsSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { transferBot } from "../swap/transfer-bot.mjs";
 
 const SCHEMA = `
@@ -145,11 +145,17 @@ test("a dry run writes nothing", (t) => {
   assert.deepEqual(read(to, "SELECT id FROM automations", "automations"), [{ id: "auto_old" }]);
 });
 
-test("refuses a running target and the same folder, and leaves the source untouched", (t) => {
+test("refuses a running target and the same folder, and leaves the source untouched", async (t) => {
   const { from, to } = setup(t);
-  writeFileSync(join(to, "plugins/studio/data.db-wal"), "x");
-  assert.throws(() => transferBot({ from, to }), /write-ahead log/);
-  rmSync(join(to, "plugins/studio/data.db-wal"));
+  const holder = spawnSync("sh", ["-c", "command -v lsof"], { encoding: "utf8" });
+  if (holder.status === 0) {
+    const script = `const { DatabaseSync } = require("node:sqlite"); const db = new DatabaseSync(${JSON.stringify(join(to, "plugins/studio/data.db"))}); process.stdout.write("open\\n"); setTimeout(() => db.close(), 5000);`;
+    const child = spawn(process.execPath, ["--no-warnings", "-e", script], { stdio: ["ignore", "pipe", "ignore"] });
+    await new Promise((done) => child.stdout.once("data", done));
+    assert.throws(() => transferBot({ from, to }), /is open in process/);
+    child.kill();
+    await new Promise((done) => child.once("exit", done));
+  }
   const script = new URL("../swap/transfer-bot.mjs", import.meta.url).pathname;
   const same = spawnSync(process.execPath, [script, "--from", from, "--to", from], { encoding: "utf8" });
   assert.equal(same.status, 1);
@@ -159,4 +165,15 @@ test("refuses a running target and the same folder, and leaves the source untouc
   assert.equal(cli.status, 0, cli.stderr);
   assert.match(cli.stdout, /Paused: bots 1, runners 1, Bot automations 1/);
   assert.equal(JSON.stringify(read(from, "SELECT * FROM bots")), before);
+});
+
+test("leaves no write-ahead log behind", (t) => {
+  const { from, to } = setup(t);
+  const db = new DatabaseSync(join(to, "plugins/studio/data.db"));
+  db.exec("PRAGMA journal_mode = WAL");
+  db.close();
+  transferBot({ from, to });
+  const wal = join(to, "plugins/studio/data.db-wal");
+  assert.ok(!existsSync(wal) || statSync(wal).size === 0);
+  transferBot({ from, to });
 });
