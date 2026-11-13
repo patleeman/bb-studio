@@ -153,7 +153,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         shot("slow-memory-loading")
         XCTAssertTrue(any("memoryProfile").waitForExistence(timeout: 20), "Memory loads after the Bot's id changes under it")
         XCTAssertTrue(app.buttons["memory-record-mem_3"].waitForExistence(timeout: 20), "and its records")
-        XCTAssertFalse(app.activityIndicators.firstMatch.exists, "no spinner left")
+        XCTAssertFalse(any("memoryLoading").exists, "no spinner left")
         shot("slow-memory-loaded")
         app.closeRoomSheet()
         openPage("library")
@@ -163,7 +163,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         shot("slow-library-loading")
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'library-row-'")).firstMatch
             .waitForExistence(timeout: 20), "the Library loads")
-        XCTAssertFalse(app.activityIndicators.firstMatch.exists, "no spinner left")
+        XCTAssertFalse(any("libraryLoading").exists, "no spinner left")
         shot("slow-library-loaded")
     }
 

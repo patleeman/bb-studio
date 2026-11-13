@@ -167,6 +167,22 @@ final class RoomTests: XCTestCase {
         XCTAssertEqual(appearance["intensity"] as? Double, 0.6, "its other settings stay")
         XCTAssertEqual(appearance["glass"] as? Double, 0.4)
     }
+
+    func testThePagerGoesMainFirstThenByRecentActivityAndLocksAnAxis() {
+        func conversation(_ id: String, _ at: Double, main: Bool = false) -> BotConversation {
+            let json: [String: Any] = ["threadId": id, "title": id, "isMain": main, "updatedAt": at, "running": false, "mirrored": false]
+            return try! JSONDecoder().decode(BotConversation.self, from: JSONSerialization.data(withJSONObject: json))
+        }
+        let order = RoomPager.order(main: "main", conversations: [conversation("old", 10), conversation("main", 5, main: true), conversation("new", 30)])
+        XCTAssertEqual(order, ["main", "new", "old"])
+        XCTAssertEqual(RoomPager.step(order, from: "main", by: 1), "new")
+        XCTAssertNil(RoomPager.step(order, from: "main", by: -1), "nothing before Main")
+        XCTAssertNil(RoomPager.axis(CGSize(width: 4, height: 3)), "too short to tell")
+        XCTAssertEqual(RoomPager.axis(CGSize(width: 40, height: 10)), .horizontal)
+        XCTAssertEqual(RoomPager.axis(CGSize(width: 12, height: 40)), .vertical, "a scroll stays a scroll")
+        XCTAssertEqual(RoomPager.page(after: CGSize(width: -80, height: 0), predicted: CGSize(width: -90, height: 0)), 1)
+        XCTAssertEqual(RoomPager.page(after: CGSize(width: 20, height: 0), predicted: CGSize(width: 30, height: 0)), 0, "a short drag springs back")
+    }
 }
 
 final class LockedBox<Value>: @unchecked Sendable {

@@ -217,3 +217,56 @@ extension EnvironmentValues {
         set { self[RoomChatKey.self] = newValue }
     }
 }
+
+enum RoomPager {
+    static let swipe: CGFloat = 60
+
+    static func order(main: String, conversations: [BotConversation]) -> [String] {
+        var seen: Set<String> = [main]
+        let others = conversations.filter { !$0.isMain && $0.forkedFrom == nil }.sorted { $0.updatedAt > $1.updatedAt }
+        return [main] + others.compactMap { seen.insert($0.threadId).inserted ? $0.threadId : nil }
+    }
+
+    static func step(_ order: [String], from current: String, by step: Int) -> String? {
+        guard let at = order.firstIndex(of: current), order.indices.contains(at + step) else { return nil }
+        return order[at + step]
+    }
+
+    enum Axis: Equatable { case vertical, horizontal }
+
+    static func axis(_ translation: CGSize) -> Axis? {
+        guard max(abs(translation.width), abs(translation.height)) > 10 else { return nil }
+        return abs(translation.width) > abs(translation.height) * 1.2 ? .horizontal : .vertical
+    }
+
+    static func page(after translation: CGSize, predicted: CGSize) -> Int {
+        let distance = abs(predicted.width) > abs(translation.width) ? predicted.width : translation.width
+        guard abs(distance) > swipe else { return 0 }
+        return distance < 0 ? 1 : -1
+    }
+}
+
+@MainActor
+final class RoomSessions: ObservableObject {
+    @Published private(set) var shown: String
+    private var sessions: [String: RoomSession] = [:]
+
+    init(main: String) { shown = main }
+
+    var current: RoomSession { session(for: shown) }
+
+    func session(for threadId: String) -> RoomSession {
+        if let session = sessions[threadId] { return session }
+        let session = RoomSession(threadId: threadId)
+        sessions[threadId] = session
+        return session
+    }
+
+    func show(_ threadId: String) {
+        guard threadId != shown else { return }
+        let leaving = current
+        leaving.talk.end()
+        leaving.stop()
+        shown = threadId
+    }
+}
