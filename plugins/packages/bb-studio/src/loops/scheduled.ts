@@ -1,5 +1,6 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import type { AutomationTableRow } from "../automation-table-contract";
 import type { BotAutomationView } from "../contract";
 import type { Loop } from "./contract";
 
@@ -12,7 +13,7 @@ export const scheduledItem = z.object({
   id: z.string(),
   botId: z.string().nullable(),
   botName: z.string().nullable(),
-  kind: z.enum(["todo", "checkin", "reminder", "watcher", "runner"]),
+  kind: z.enum(["todo", "checkin", "reminder", "watcher", "runner", "schedule", "bb"]),
   title: z.string(),
   nextAt: z.number().nullable(),
   state: z.enum(["active", "paused"]),
@@ -35,6 +36,7 @@ export interface ScheduledBot {
   threadId: string | null;
   primary: boolean;
   automations: readonly BotAutomationView[];
+  table?: readonly AutomationTableRow[];
 }
 
 const ownerThread = (owner: string, primaryThread: string | null): string | null =>
@@ -60,6 +62,15 @@ export function scheduledItems(input: { loops: readonly Loop[]; bots: readonly S
         key: `automation:${bot.id}:${view.id}`, source: "automation", id: view.id, botId: bot.id, botName: bot.name, kind: view.kind,
         title: view.name, nextAt: view.state === "active" ? view.nextRunAt : null, state: view.state, scheduleText: view.scheduleText,
         threadId: view.threadId ?? (view.target === "main" ? bot.threadId : null), link: `bb://automation/${encodeURIComponent(`${bot.id}:${view.id}`)}`,
+      });
+    }
+    const listed = new Set(bot.automations.map((view) => view.id));
+    for (const row of bot.table ?? []) {
+      if (listed.has(row.id) || row.status === "off") continue;
+      if (row.kind === "reminder" && loopIds.has(reminderLoopId(row.id))) continue;
+      items.push({
+        key: `automation:${bot.id}:${row.id}`, source: "automation", id: row.id, botId: bot.id, botName: bot.name, kind: row.kind,
+        title: row.name, nextAt: null, state: row.status, scheduleText: row.when, threadId: row.threadId, link: `bb://automation/${encodeURIComponent(`${bot.id}:${row.id}`)}`,
       });
     }
   }

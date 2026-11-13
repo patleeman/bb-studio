@@ -2,7 +2,7 @@ import type { ScheduledItem } from "../../loops/scheduled";
 
 export const AUTOMATIONS_TAB = "thread-automations";
 
-export const KIND_LABEL: Record<ScheduledItem["kind"], string> = { todo: "Todo", checkin: "Check-in", reminder: "Reminder", watcher: "Watcher", runner: "Runner" };
+export const KIND_LABEL: Record<ScheduledItem["kind"], string> = { todo: "Todo", checkin: "Check-in", reminder: "Reminder", watcher: "Watcher", runner: "Runner", schedule: "Schedule", bb: "bb automation" };
 
 export function wakeLabel(items: readonly Pick<ScheduledItem, "state">[]): string {
   const active = items.filter((item) => item.state === "active").length;

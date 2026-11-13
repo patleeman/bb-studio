@@ -4142,6 +4142,8 @@ public enum Studio {
     case reminder
     case watcher
     case runner
+    case schedule
+    case bb
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
@@ -4152,6 +4154,8 @@ public enum Studio {
       case "reminder": self = .reminder
       case "watcher": self = .watcher
       case "runner": self = .runner
+      case "schedule": self = .schedule
+      case "bb": self = .bb
       default: self = .unknown(value)
       }
     }
@@ -4164,6 +4168,8 @@ public enum Studio {
       case .reminder: try container.encode("reminder")
       case .watcher: try container.encode("watcher")
       case .runner: try container.encode("runner")
+      case .schedule: try container.encode("schedule")
+      case .bb: try container.encode("bb")
       case .unknown(let value): try container.encode(value)
       }
     }

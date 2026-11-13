@@ -2475,7 +2475,9 @@
                     "checkin",
                     "reminder",
                     "watcher",
-                    "runner"
+                    "runner",
+                    "schedule",
+                    "bb"
                   ]
                 },
                 "title": {

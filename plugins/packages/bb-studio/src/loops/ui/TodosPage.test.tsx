@@ -43,7 +43,7 @@ vi.mock("../../ui/live", () => ({
 }));
 vi.mock("../../kit/ui/index", async () => (await import("./test-kit")).kitUi);
 vi.mock("../../kit/ui/icon", () => ({ Icon: ({ name }: { name: string }) => <i data-icon={name} /> }));
-vi.mock("../../kit/app/index", () => ({ openAppPath: vi.fn(), StudioBar: ({ children }: { children?: ReactNode }) => <div>{children}</div> }));
+vi.mock("../../kit/app/index", () => ({ GHOST_BUTTON: "", PRIMARY_BUTTON: "", DANGER_BUTTON: "", openAppPath: vi.fn(), StudioBar: ({ children }: { children?: ReactNode }) => <div>{children}</div> }));
 
 const { TodosPage } = await import("./TodosPage");
 const { TodoTab } = await import("./TodoTab");
@@ -99,7 +99,7 @@ const type = async (input: HTMLInputElement, value: string) => {
 it("names itself in the header, and lists one line per todo in Today, This week, Later and Waiting on others", async () => {
   await render();
   expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Todos·Chief of Staff");
-  expect([...container.querySelectorAll("section")].map((each) => each.getAttribute("aria-label"))).toEqual(["Today", "This week", "Later", "Waiting on others", "Done"]);
+  expect([...container.querySelectorAll("section")].map((each) => each.getAttribute("aria-label"))).toEqual(["Today", "This week", "Later", "Waiting on others", "Scheduled", "Done"]);
   // Out now, and overdue, are Today; a snooze two days out is this week; no date or ten days out is later.
   expect(titles(group("Today"))).toEqual(["Pay the Con Edison bill", "Reply to Sam about the Q3 planning doc", "Choose the deck contractor"]);
   expect(titles(group("This week"))).toEqual(["Send the October expense report"]);

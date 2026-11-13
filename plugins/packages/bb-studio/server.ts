@@ -740,7 +740,7 @@ export default async function plugin(bb: BbPluginApi) {
     "loops.scheduled": async ({ threadId }) => ({
       items: scheduledItems({
         loops: loops.store.all(),
-        bots: await Promise.all(bots.list().map(async (bot) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, primary: bot.primary !== false, automations: await automations.list(bot.id).catch(() => []) }))),
+        bots: await Promise.all(bots.list().map(async (bot) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, primary: bot.primary !== false, automations: await automations.list(bot.id).catch(() => []), table: (await automationTableFor(bot.id).catch(() => null))?.rows ?? [] }))),
         threadId,
       }),
     }),

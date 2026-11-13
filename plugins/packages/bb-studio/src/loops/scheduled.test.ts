@@ -47,3 +47,16 @@ it("filters to one thread: a thread's todos, and automations that wake it", () =
   });
   expect(items.map((item) => item.key)).toEqual(["automation:bot_main:aut_1", "todo:loop_1"]);
 });
+
+it("adds the Automations page's other rows (bb's own, maintenance), once each, leaving out what is off", () => {
+  const row = (id: string, over: Record<string, unknown>) => ({ id, kind: "bb", name: id, when: "Daily 07:00", lastRunAt: null, lastRun: null, status: "active", inBb: false, readOnly: false, bb: null, threadId: "thr_x", instruction: null, script: null, via: "primary", ...over }) as never;
+  const items = scheduledItems({
+    loops: [],
+    bots: [{ ...dot([automation({})]), table: [row("aut_1", { kind: "checkin" }), row("auto_bb", {}), row("maintenance", { kind: "schedule", status: "paused" }), row("auto_old", { status: "off" })] }],
+  });
+  expect(items.map((item) => [item.key, item.kind, item.state, item.scheduleText])).toEqual([
+    ["automation:bot_main:aut_1", "checkin", "active", "Daily 8:00"],
+    ["automation:bot_main:auto_bb", "bb", "active", "Daily 07:00"],
+    ["automation:bot_main:maintenance", "schedule", "paused", "Daily 07:00"],
+  ]);
+});

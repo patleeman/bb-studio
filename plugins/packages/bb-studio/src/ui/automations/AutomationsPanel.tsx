@@ -1,14 +1,12 @@
-// The Bot's Automations page (`studio/automations`, round 7, 7b): opened
-// from the Automations row in the Bot sidebar's space header, it shows the
-// sidebar's Bot: every automation that belongs to it, bb's own included, on
-// the Bot-page template (AutomationsTable.tsx). Switching Bots in the sidebar
-// switches the page. It isn't on BB's rail (src/rail-arrangement.ts).
-// One title row: the page's own, in BB's title bar (src/ui/page-bar.tsx).
+// The Bot's Automations page (`studio/automations`) and its tab: what runs
+// when now lives on the Bot's Todos page, under Scheduled
+// (src/loops/ui/TodosPage.tsx), so this shows that page opened there.
+// Switching Bots in the sidebar switches the page.
 import { Icon, openAppPath } from "../../kit/app/index";
 import { Button } from "../../kit/ui/button";
 import { NEW_BOT_PATH } from "../bot/selection";
 import { useLive } from "../live";
-import { AutomationsTable } from "./AutomationsTable";
+import { TodosPage } from "../../loops/ui/TodosPage";
 import { BotPageEmpty, BotPageLayout } from "../bot-page";
 import { useCurrentBot } from "../conversations/state";
 
@@ -25,7 +23,7 @@ export function AutomationsPanel() {
   const bot = shownBot(list, useCurrentBot());
   if (bot) {
     return (
-      <AutomationsTable key={bot.id} botId={bot.id} botName={bot.name} disabled={bot.state !== "active"} external={bot.kind === "external"} />
+      <TodosPage key={bot.id} view={{ bot, run: null }} focus="scheduled" />
     );
   }
   return (
