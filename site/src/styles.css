@@ -188,3 +188,8 @@ figcaption strong { color: #fff; }
   .split { grid-template-columns: 1fr; }
   .split .shot img, .split .shot.sheet img, .shot.accounts img { width: 100%; }
 }
+
+.hero h1 { font-size: clamp(2.3rem, 5vw, 3.6rem); max-width: 22ch; }
+.hero .lead { max-width: var(--text); }
+.fine { color: var(--muted); font-size: 0.88rem; }
+.feature-text h2 { margin-bottom: 0.45em; }
