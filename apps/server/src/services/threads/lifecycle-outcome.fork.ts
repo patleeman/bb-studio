@@ -10,6 +10,7 @@ import type { ThreadStatus } from "@bb/domain";
 import { eq } from "drizzle-orm";
 import { announceTurnInterrupted } from "../plugins/fork-plugin-events.js";
 import { isQuietTurn } from "./quiet-turn.fork.js";
+import { scheduleQueuedTitleRetry } from "./title-retry-queue.fork.js";
 
 export interface ForkLifecycleBefore {
   quietAttentionAt: number;
@@ -50,4 +51,7 @@ export function forkAfterLifecycle(
       .run();
   }
   announceTurnInterrupted(args, outcome, previousStatus);
+  if (args.event.type === "run.succeeded" && outcome.applied) {
+    scheduleQueuedTitleRetry(args.threadId);
+  }
 }
