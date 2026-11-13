@@ -1,3 +1,4 @@
+import { useProviderModelPick, useSignedInProviderDefault } from "@/hooks/useSignedInProviderDefault.fork";
 import { createCoreComposerActions } from "@/lib/plugin-composer-handle";
 import {
   readPendingAttachmentUploads,
@@ -1979,6 +1980,7 @@ export function NewThreadComposer({
     setSelectedProviderId,
     snapshotDraftBeforeOptionChange,
   );
+  const handleProviderModelPick = useProviderModelPick(setProviderModelReasoning, snapshotDraftBeforeOptionChange);
   const handleModelChange = useDraftPreservingOptionChange(
     selectedModel,
     setSelectedModel,
@@ -2010,6 +2012,7 @@ export function NewThreadComposer({
   }, [changeEnvironment]);
 
   const pickerLocksRef = useRef<NewThreadComposerLocks>({});
+  useSignedInProviderDefault({ providerId: selectedProviderId, setProviderId: setSelectedProviderId, locked: () => pickerLocksRef.current.provider === true });
   const selectionState =
     useCommittedComposerState<NewThreadComposerSelectionState>((version) => ({
       version,
@@ -2266,6 +2269,7 @@ export function NewThreadComposer({
               options: providerOptions,
               selectedId: selectedProviderId,
               onChange: locks.provider ? undefined : handleProviderChange,
+              onProviderModelChange: locks.provider ? undefined : handleProviderModelPick,
               hasMultiple: hasMultipleProviders,
             },
             model: {
@@ -2317,6 +2321,7 @@ export function NewThreadComposer({
       handlePermissionChange,
       handleProjectChange,
       handleProviderChange,
+      handleProviderModelPick,
       handleReasoningChange,
       handleSelectProvider,
       handleSelectHost,
