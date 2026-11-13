@@ -1,3 +1,4 @@
+import { curatedSourceUrl, isShippedMarketplace, refreshAnchor, seedStudioMarketplace, shipsCuratedMarketplace } from "./studio-marketplaces.fork.js";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
@@ -179,7 +180,7 @@ export function createPluginCatalogService(deps: {
   const bundledPlugins =
     deps.bundledPlugins ?? listBundledPluginRegistrations();
   const curatedManifestUrls = curatedMarketplaceManifestUrls(
-    deps.marketplaceUrl,
+    curatedSourceUrl(deps.marketplaceUrl),
   );
   const fetchMarketplace = deps.fetch ?? publicMarketplaceFetch;
   const stagingDir = join(deps.dataDir, "marketplaces", "staging");
@@ -197,7 +198,8 @@ export function createPluginCatalogService(deps: {
   }
 
   seedBundledMarketplace(Date.now());
-  seedCuratedMarketplace();
+  if (shipsCuratedMarketplace(deps.marketplaceUrl)) seedCuratedMarketplace();
+  else seedStudioMarketplace(deps);
   let reservedCollections = buildReservedCollectionIndex();
 
   const withLock = createKeyedLock<string>();
@@ -730,9 +732,7 @@ export function createPluginCatalogService(deps: {
   function scheduleNextPeriodicRefresh(): void {
     if (periodicStopped) return;
     cancelPeriodic?.();
-    const lastAttempt = requireRow(
-      CURATED_PLUGIN_MARKETPLACE_NAME,
-    ).lastAttemptedRefreshAt;
+    const lastAttempt = refreshAnchor(deps.db);
     const delay =
       lastAttempt === null
         ? 0
@@ -1038,7 +1038,7 @@ export function createPluginCatalogService(deps: {
         });
         try {
           const name = materialized.catalog.name;
-          if (isReservedMarketplace(name)) {
+          if (isShippedMarketplace(name, deps.marketplaceUrl)) {
             throw new Error(
               `marketplace name "${name}" is reserved for a marketplace that ships with bb`,
             );
@@ -1081,7 +1081,7 @@ export function createPluginCatalogService(deps: {
 
     async removeMarketplace(name) {
       return withLock(name, async () => {
-        if (isReservedMarketplace(name)) {
+        if (isShippedMarketplace(name, deps.marketplaceUrl)) {
           throw new Error(`marketplace "${name}" cannot be removed`);
         }
         requireRow(name);

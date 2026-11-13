@@ -59,8 +59,8 @@ const DATABASE_SCRUB_STATEMENTS = [
   "DELETE FROM terminal_sessions",
   "DELETE FROM ui_preferences WHERE key IN ('sidebar.pluginPanelOrder', 'sidebar.visiblePluginPanels', 'sidebar.hiddenFooterItems', 'sidebar.footerOrder')",
   "UPDATE plugin_settings SET value = 'false' WHERE plugin_id = 'studio' AND key = 'loopsEnabled'",
-  "UPDATE plugins SET enabled = 0 WHERE id IN ('mobile', 'push-notifications', 'automations', 'storage-retention', 'bb--storage-retention')",
-  "UPDATE plugins SET enabled_follows_default = 0 WHERE id IN ('mobile', 'push-notifications', 'automations', 'storage-retention', 'bb--storage-retention')",
+  "UPDATE plugins SET enabled = 0 WHERE id IN ('mobile', 'push-notifications', 'automations', 'storage-retention', 'bb--storage-retention', 'bb-account', 'connect')",
+  "UPDATE plugins SET enabled_follows_default = 0 WHERE id IN ('mobile', 'push-notifications', 'automations', 'storage-retention', 'bb--storage-retention', 'bb-account', 'connect')",
   "UPDATE threads SET status = 'idle' WHERE status IN ('starting', 'active', 'stopping')",
 ];
 
