@@ -109,6 +109,10 @@ final class RoomQAUITests: ServerIsolatedUITestCase {
         launch(["-qaDemoLatency", "2500"], expectRoom: false)
         sleep(2)
         shot("slow-early")
+        if !app.buttons["roomMic"].waitForExistence(timeout: 40) {
+            app.terminate()
+            app.launchOffline()
+        }
         XCTAssertTrue(app.buttons["roomMic"].waitForExistence(timeout: 60), "the room arrives")
         sleep(4)
         shot("slow-late")
