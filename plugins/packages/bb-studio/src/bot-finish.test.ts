@@ -151,6 +151,25 @@ it("archiving a conversation in BB starts the same summary step; Main, a worker 
   expect(x.send).toHaveBeenCalledTimes(2);
 });
 
+it("BB refuses a turn in an archived thread, so archiving unarchives the conversation for its summary turn and archives it again once it's done", async () => {
+  const x = await setup();
+  x.send.mockImplementation(async (args: unknown) => {
+    const { threadId } = args as { threadId: string };
+    if (x.threads.get(threadId)?.archivedAt) throw new Error("HTTP 409: Thread is archived");
+    return { ok: true };
+  });
+  x.threads.set("prep", { ...x.threads.get("prep")!, archivedAt: 9 });
+  await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never });
+  await vi.waitFor(() => expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ threadId: "prep" })));
+  expect(x.unarchive).toHaveBeenCalledWith({ threadId: "prep" });
+  expect((x.send.mock.calls[0]![0] as { input: { text: string }[] }).input[0]).toMatchObject({ text: "Archive this conversation." });
+  await x.harness.callAgentTool("bot_finish_done", { summary: SUMMARY }, { threadId: "prep" });
+  expect(x.store.get("prep")!.finishedSummary).toBe(SUMMARY);
+  expect(x.records).toEqual([]);
+  expect(x.archive).toHaveBeenCalledWith({ threadId: "prep" });
+  expect(x.threads.get("prep")!.archivedAt).toBe(9);
+});
+
 it("a quiet archive, or a Bot's own thread it handed off from, gets no summary step", async () => {
   const x = await setup();
   await archiveQuietly("prep", async () => { await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never }); });

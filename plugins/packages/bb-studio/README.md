@@ -455,14 +455,15 @@ Archiving a conversation (BB's **Archive** anywhere: its sidebar row, its
 header's ··· menu, or the iOS app) keeps its summary. There is no separate
 Finish item. Studio (`src/bot-finish.ts`):
 
-1. sends one last turn into the conversation, "Archive this conversation.",
+1. unarchives it for a moment (BB takes no turn in an archived thread) and
+   sends one last turn into the conversation, "Archive this conversation.",
    with agent-only steps: write a summary (**Decisions**, **Left open**,
    **Made**), save it with `memory_add` (topic: the conversation's title;
    source `{ kind: "conversation", id, title }`), then call
    `bot_finish_done { summary }`.
 2. When `bot_finish_done` arrives, the conversation is marked finished
-   (`bot_threads.archived_at`, `finished_summary`; BB archives it again if
-   the turn brought it back), and Main gets the summary from the
+   (`bot_threads.archived_at`, `finished_summary`; BB archives it again
+   once the turn is over), and Main gets the summary from the
    conversation, with an agent-only note that has the Bot reply with the card
    `::finished{thread="thr_…"}`: "✓ Archived: <title>", its dates, the
    summary's sections, **Open the conversation** and **See in Memory**, and

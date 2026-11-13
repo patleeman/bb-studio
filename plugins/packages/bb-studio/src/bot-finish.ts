@@ -179,6 +179,8 @@ export class BotFinish {
     const state = this.state(threadId);
     if (state === "finishing" || state === "finished") return;
     try {
+      const thread = await this.deps.sdk.threads.get({ threadId }).catch(() => null) as ThreadFacts | null;
+      if (thread?.archivedAt) await this.deps.sdk.threads.unarchive({ threadId });
       await this.begin(threadId, rec.botId);
     } catch (error) {
       this.deps.log(`Finish: the archived conversation ${threadId} couldn't write its summary (${error instanceof Error ? error.message : String(error)}); Studio writes it.`);
