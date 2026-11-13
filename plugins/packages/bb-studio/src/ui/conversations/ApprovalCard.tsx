@@ -85,7 +85,7 @@ export function ApprovalPanel({ worker, approval, state, busy = null, error = nu
   const settled = settledLabel(state);
   return (
     <section data-testid={testId} data-state={state} aria-label={`Approval for ${worker.title}`}
-      data-studio-card="" className={cn(CHAT_CARD, CHAT_CARD_BODY, "gap-2", !settled && "border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-warning/5")}>
+      data-studio-card="" data-studio-card-tone={settled ? undefined : "warning"} className={cn(CHAT_CARD, CHAT_CARD_BODY, "gap-2", !settled && "border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-warning/5")}>
       <header className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
         {settled ? null : <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-warning" />}
         <button type="button" data-testid="approval-worker" onClick={() => navigate.toThread(worker.threadId)} title="Open the worker"
