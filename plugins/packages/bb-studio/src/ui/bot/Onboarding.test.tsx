@@ -30,7 +30,8 @@ const type = (text: string) => act(() => {
 test("one question; an idea fills it, and Create sends what's written, trimmed", async () => {
   const onCreate = vi.fn(async () => true);
   act(() => root.render(<Welcome first look={look} busy={false} error={null} onCreate={onCreate} />));
-  expect(container.querySelector("h1")?.textContent).toBe("Meet your Bot");
+  expect(container.querySelector('[data-testid="page-bar-title"]')?.textContent).toBe("New Bot");
+  expect(container.querySelector('[data-testid="bot-welcome"] h1:not([data-testid])')?.textContent).toBe("Meet your Bot");
   expect(container.querySelector('label[for="bot-welcome-goal"]')?.textContent).toBe("What should your Bot help with?");
   expect(container.querySelector<HTMLElement>('[data-testid="bot-welcome-presence"]')?.dataset).toMatchObject({ form: "tesseract", state: "idle" });
   act(() => button(IDEAS[1]!.label).click());
@@ -44,7 +45,7 @@ test("one question; an idea fills it, and Create sends what's written, trimmed",
 test("Enter creates (empty is fine: the Bot asks); Shift+Enter doesn't; busy shows Creating… and blocks it", async () => {
   const onCreate = vi.fn(async () => true);
   act(() => root.render(<Welcome first={false} look={look} busy={false} error="Nope" onCreate={onCreate} />));
-  expect(container.querySelector("h1")?.textContent).toBe("Make another Bot");
+  expect(container.querySelector('[data-testid="bot-welcome"] h1:not([data-testid])')?.textContent).toBe("Make another Bot");
   expect(container.querySelector('[role="alert"]')?.textContent).toBe("Nope");
   await act(async () => field().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", shiftKey: true, bubbles: true })));
   expect(onCreate).not.toHaveBeenCalled();
@@ -55,8 +56,8 @@ test("Enter creates (empty is fine: the Bot asks); Shift+Enter doesn't; busy sho
   expect(field().disabled).toBe(true);
 });
 
-test("draws no bar of its own: the page's heading is its title, and bb's bar stays empty", async () => {
+test("has the title row of the other Studio pages, New Bot, above its heading", async () => {
   await act(async () => { root.render(<Welcome first={false} look={look} busy={false} error={null} onCreate={async () => true} />); });
-  expect(container.querySelector("[data-studio-bar]")).toBeNull();
-  expect(container.querySelectorAll("h1")).toHaveLength(1);
+  expect(container.querySelector('[data-testid="page-bar"]')?.textContent).toBe("New Bot");
+  expect([...container.querySelectorAll("h1")].map((h1) => h1.textContent)).toEqual(["New Bot", "Make another Bot"]);
 });

@@ -148,14 +148,14 @@ export function BotsList({ onNavigate, activeThreadId, threadId }: { onNavigate(
       <style>{BOT_STYLES}</style>
       <div className="flex h-7 items-center gap-1 pl-2 text-[11px] font-medium text-muted-foreground">
         <span className="min-w-0 flex-1">Bots</span>
-        <button type="button" aria-label="New bot" title="New bot" data-testid="bot-new" onClick={() => { openAppPath(NEW_BOT_PATH); onNavigate(); }}
+        <button type="button" aria-label="New Bot" title="New Bot" data-testid="bot-new" onClick={() => { openAppPath(NEW_BOT_PATH); onNavigate(); }}
           className="flex size-6 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground"><Icon name="Plus" className="size-3.5" /></button>
       </div>
       {(creating && bots.length) || none ? (
         <button type="button" aria-current={creating || !threadId ? "page" : undefined} data-testid="bot-new-row" onClick={() => { openAppPath(NEW_BOT_PATH); onNavigate(); }}
           className="flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm hover:bg-state-hover aria-[current=page]:bg-state-active">
           <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-dashed border-muted-foreground/50"><Icon name="Plus" className="size-3" /></span>
-          <span className="min-w-0 flex-1 truncate">{none ? "Your first bot" : "New bot"}</span>
+          <span className="min-w-0 flex-1 truncate">{none ? "Your first Bot" : "New Bot"}</span>
         </button>
       ) : null}
       {bots.length ? bots.map((bot) => bot.id === selected?.id

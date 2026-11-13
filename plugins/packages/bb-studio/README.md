@@ -2825,7 +2825,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   of BB's own **Info** tab. Its chat isn't
   embedded: it opens as BB's normal thread page, so it has everything a
   thread has, plugin message actions (Studio's reactions) and **Reply in
-  side chat** included. With no bot yet, or on **New bot**, the page is the
+  side chat** included. With no bot yet, or on **New Bot**, the page is the
   create flow, and the first message opens the new bot's chat.
 - **Sidebar**: on a BB with sidebar sections (the BB Studio fork) the
   sidebar is the Bot sidebar (One Bot, many conversations, above); what
@@ -2872,10 +2872,10 @@ of Staff", with the same thread and check-ins; rename it from its page.
   list remembers your own choice (in this device's storage). With several
   windows, the window you use decides: a window re-applies its mode when
   its route changes or it gains focus.
-- **New bot**: **+** next to **Bots** makes a new bot (BB's own **New
-  thread** row stays above the list; BB always shows it). **New bot** opens
+- **New Bot**: **+** next to **Bots** makes a new bot (BB's own **New
+  thread** row stays above the list; BB always shows it). **New Bot** opens
   `/plugins/studio/studio/bot/new`: the same welcome as a first bot (Make another
-  Bot), and **Create Bot** makes it as "New bot" and opens its chat, where it
+  Bot), and **Create Bot** makes it as "New Bot" and opens its chat, where it
   sets itself up.
 - **Several bots**: the first bot is the **primary**: the personal project's
   lead (the Chief of Staff before it), the one the iOS app shows, and the one

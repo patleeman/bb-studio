@@ -5,7 +5,7 @@ import { LoopStore } from './loops/store';
 // project's lead (src/project-lead.ts), so a handoff rotates it and the
 // project's heartbeat is the Bot's check-in. That is the primary Bot (BOT_ID).
 //
-// The user can make more Bots ("New bot"). Each has its own thread (stored on
+// The user can make more Bots ("New Bot"). Each has its own thread (stored on
 // its row, not a project lead; a handoff moves it, handedOff), Memory page,
 // skills, runners and check-in. An additional Bot's check-in is its own
 // schedule, kept by ProjectRuns under the key `bot:<id>` (BOT_RUN_PREFIX).

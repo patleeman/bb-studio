@@ -2,7 +2,7 @@
 // /plugins/studio/studio/bot is the primary Bot (when it doesn't open the last
 // Bot thread, BotHome), /plugins/studio/studio/bot/<botId> any Bot's Info,
 // /plugins/studio/studio/bot/new
-// the create flow ("New bot"). Every bot_* call on the page, its sidebar and
+// the create flow ("New Bot"). Every bot_* call on the page, its sidebar and
 // its tabs carries the selected Bot's id (none for the primary).
 import { usePathname } from "../../kit/app/index";
 import { useMemo } from "react";
@@ -20,7 +20,7 @@ export const botPath = (botId?: string | null) => botId ? `${BOT_PATH}/${encodeU
 export interface BotSelection {
   /** The selected Bot; undefined for the primary. */
   botId?: string;
-  /** The create flow ("New bot"). */
+  /** The create flow ("New Bot"). */
   creating: boolean;
 }
 
