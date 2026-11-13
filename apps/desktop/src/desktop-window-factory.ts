@@ -1,3 +1,4 @@
+import { forkWindowBackground } from "./fork-launch-theme-file.js";
 import { nextZoomFactor } from "./desktop-zoom.js";
 import type { BbDesktopZoomCommand } from "@bb/desktop-contract";
 import type { BrowserWindowConstructorOptions, Event } from "electron";
@@ -331,7 +332,10 @@ export function createDesktopWindowFactory(
       });
       const browserWindow = args.browserWindowCreator.create(
         createWindowOptions({
-          backgroundColor: args.shouldUseDarkColors() ? "#151515" : "#ffffff",
+          backgroundColor: forkWindowBackground(
+            args.userDataPath,
+            args.shouldUseDarkColors() ? "#151515" : "#ffffff",
+          ),
           bounds: restoredState.bounds,
           icon: args.icon,
           isLinuxTransparent: args.isLinuxTransparent,
