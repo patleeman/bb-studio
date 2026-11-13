@@ -492,7 +492,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
 
   bb.agents.registerTool({
     name: "design_comments",
-    description: "List the comments the user pinned to elements of a design's screens: each comment's id, screen, the element's selector and markup, and the note. Open comments only unless includeResolved is set.",
+    description: "List a design's comments on elements of its screens (the canvas has no comment mode; these are older ones or ones added through Studio's designs.addComment RPC): each comment's id, screen, the element's selector and markup, and the note. Open comments only unless includeResolved is set.",
     presentation: { label: { pending: "Reading comments", completed: "Read comments" } },
     parameters: z.object({ designId: z.string().min(1), includeResolved: z.boolean().optional() }),
     execute({ designId, includeResolved }) {
@@ -506,7 +506,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
 
   bb.agents.registerTool({
     name: "design_resolve_comments",
-    description: "Mark comments resolved once you've made the change they asked for. Their pins leave the canvas.",
+    description: "Mark a design's comments resolved once you've made the change they asked for. design_comments then leaves them out unless includeResolved is set.",
     presentation: { label: { pending: "Resolving comments", completed: "Resolved comments" } },
     parameters: z.object({ designId: z.string().min(1), commentIds: z.array(z.string().min(1)).min(1).max(100) }),
     execute({ designId, commentIds }) {
