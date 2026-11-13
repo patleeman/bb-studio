@@ -7,7 +7,7 @@ export function BotItemError({ message }: { message: string }) {
   return <p role="alert" data-testid="bot-item-error" className="p-5 text-sm text-destructive">{message}</p>;
 }
 
-export function BotItemDetail({ title, facts, actions, testId, children }: { title: ReactNode; facts?: readonly BotPageFact[]; actions?: ReactNode; testId?: string; children?: ReactNode }) {
+export function BotItemDetail({ title, facts, actions, after, testId, children }: { title: ReactNode; facts?: readonly BotPageFact[]; actions?: ReactNode; after?: ReactNode; testId?: string; children?: ReactNode }) {
   const tabWindow = useHostTabWindow();
   return (
     <div data-testid={testId} data-bot-item-detail="" className="studio-root flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground">
@@ -26,6 +26,7 @@ export function BotItemDetail({ title, facts, actions, testId, children }: { tit
             </dl>
           ) : null}
           {actions ? <div data-testid="bot-item-actions" className="flex flex-wrap items-center gap-2 border-t border-border pt-4">{actions}</div> : null}
+          {after}
         </div>
       </div>
     </div>

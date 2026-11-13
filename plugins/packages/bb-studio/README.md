@@ -1244,9 +1244,11 @@ that belongs to the Bot (check-ins, reminders, watchers, runners, bb's own
 automations and maintenance), each with its next run or Paused, and has
 **New** (check-in, reminder, watcher, runner). Timed todos stay in Today,
 This week and Later. A row opens the automation as a tab in the workbench
-beside the page (`bb://automation/<botId>:<row id>`): a Studio automation
-shows its detail (Pause or Resume, Run now, Edit, Delete, recent runs); a bb
-automation shows what it does, with **Open in Automations** for its page in
+beside the page (`bb://automation/<botId>:<row id>`), laid out as a todo's:
+its facts (kind, status, when, last run, and what the Bot is told, under the
+editor's own label), then its actions; a Studio automation's are Pause or
+Resume, Run now, Edit and Delete, with its recent runs under them; a bb
+automation has **Open in Automations** for its page in
 BB's Automations plugin while that plugin is on. One that is in bb, and any whose
 detail Studio can't load, is read-only: what it does and its thread.
 
