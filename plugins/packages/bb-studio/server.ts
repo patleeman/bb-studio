@@ -122,6 +122,8 @@ import { readMirroredSince, readMirrorLive } from "./src/mirror-live";
 import { registerLiveActivity } from "./src/live-activity";
 import { ThreadSeeds } from "./src/thread-seeds";
 import { registerBotFinish } from "./src/bot-finish";
+import { askModel } from "./src/kit/decisions";
+import type { ModelSelection } from "./src/decisions/contract";
 import { studioInstructions } from "./src/agent-instructions";
 import { activityOf, conversationInstructions } from "./src/bot-threads";
 import { newTabRecents, newTabSearch, VISUAL_CHAT_PLUGIN_ID, type EntryRow, type NewTabSearchSources, type NewTabSources } from "./src/newtab";
@@ -1065,6 +1067,19 @@ export default async function plugin(bb: BbPluginApi) {
     },
     changed: botThreadsChanged,
     log: (message) => bb.log.warn(message),
+    providerReady: async (providerId) => {
+      const { primaryHostId } = await bb.sdk.system.config();
+      const state = (await bb.sdk.system.providerStates(primaryHostId ? { hostId: primaryHostId } : undefined)).providers.find((each) => each.providerId === providerId);
+      return !state || state.status === "ready";
+    },
+    summarize: async ({ threadId, prompt }) => {
+      const pick = await bots.signedInModel() as { providerId?: string; model?: string; reasoningLevel?: string };
+      const { primaryHostId } = await bb.sdk.system.config();
+      if (!pick.providerId || !primaryHostId) return null;
+      const modelSelection = pick.model ? { providerId: pick.providerId, model: pick.model, reasoningLevel: (pick.reasoningLevel ?? null) as ModelSelection["reasoningLevel"] } : undefined;
+      const result = await askModel(bb, { caller: "finish", requestId: threadId, hostId: primaryHostId, providerId: pick.providerId, prompt, ...(modelSelection ? { modelSelection } : {}) }, AbortSignal.timeout(120_000));
+      return result.text;
+    },
   });
   const botThreadsStart = setTimeout(() => void botThreads.start().then(() => liveActivity.start()).catch((error) => bb.log.warn(`Conversations and workers start: ${errorText(error)}`)), 5_000);
   bb.onDispose(() => clearTimeout(botThreadsStart));

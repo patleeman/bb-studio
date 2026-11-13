@@ -1,6 +1,6 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
-import { archiveQuietly, fallbackSummary, FINISH_TIMEOUT_MS, finishInstruction, finishRecordText, mainCard, registerBotFinish } from "./bot-finish";
+import { archiveQuietly, fallbackSummary, FINISH_TIMEOUT_MS, finishInstruction, finishRecordText, finishSummaryPrompt, mainCard, NO_REPLIES_SUMMARY, registerBotFinish } from "./bot-finish";
 import { BotThreads, type Signals, type ThreadFacts } from "./bot-threads";
 import { MIGRATIONS } from "./migrations";
 
@@ -10,7 +10,7 @@ afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 const SUMMARY = "**Decisions**\n- One 45-minute mock a day.\n\n**Left open**\n- Book a paid mock before Nov 20?";
 
 /** Dot (Main thr_main) with the conversation "prep" (Launch prep) and its worker "review". */
-async function setup(options: { isBotThread?: (threadId: string) => boolean } = {}) {
+async function setup(options: { isBotThread?: (threadId: string) => boolean; providerReady?: (providerId: string) => Promise<boolean>; summarize?: (input: { threadId: string; title: string; prompt: string }) => Promise<string | null> } = {}) {
   const threads = new Map<string, ThreadFacts>([
     ["thr_main", { id: "thr_main", title: "Chief of Staff", createdAt: 1, status: "idle" }],
     ["prep", { id: "prep", title: "Launch prep", createdAt: 2, status: "idle" }],
@@ -19,7 +19,7 @@ async function setup(options: { isBotThread?: (threadId: string) => boolean } = 
   const send = vi.fn(async (_args: unknown) => ({ ok: true }));
   const archive = vi.fn(async ({ threadId }: { threadId: string }) => { threads.set(threadId, { ...threads.get(threadId)!, archivedAt: 9 }); return {}; });
   const unarchive = vi.fn(async ({ threadId }: { threadId: string }) => { threads.set(threadId, { ...threads.get(threadId)!, archivedAt: null }); return {}; });
-  const events = vi.fn(async (_args: unknown): Promise<unknown[]> => []);
+  const events = vi.fn(async (_args: unknown): Promise<unknown[]> => [{ data: { item: { type: "agentMessage", text: "One mock a day." } } }]);
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: {
       list: (async (args: { threadIds?: string[] }) => [...threads.values()].filter((thread) => !args.threadIds || args.threadIds.includes(thread.id))) as never,
@@ -42,7 +42,7 @@ async function setup(options: { isBotThread?: (threadId: string) => boolean } = 
       add: (input) => { records.push({ ...input, at: now }); },
       count: (botId, threadId, since) => records.filter((each) => each.botId === botId && each.threadId === threadId && each.at >= (since ?? 0)).length,
     },
-    changed: () => {}, log: () => {}, now: () => now,
+    changed: () => {}, log: () => {}, now: () => now, providerReady: options.providerReady, summarize: options.summarize,
   });
   return { bb, harness, db, store, finish, threads, send, archive, unarchive, events, records, tick: (ms: number) => { now += ms; } };
 }
@@ -189,6 +189,47 @@ it("an archived conversation that can't take the turn gets Studio's summary, sav
   await vi.waitFor(() => expect(x.store.get("prep")!.finishedSummary).toMatch(/^\*\*Last replies\*\*/));
   expect(x.records).toMatchObject([{ threadId: "prep", topic: "Conversations" }]);
   expect((x.send.mock.calls.at(-1)![0] as { threadId: string }).threadId).toBe("thr_main");
+});
+
+it("asks for the summary in the second person", () => {
+  expect(finishInstruction({ threadId: "prep", title: "Launch prep" })).toContain('to the user, as "you" (never "the user")');
+  const prompt = finishSummaryPrompt("Launch prep", [{ role: "user", text: "Plan the launch" }, { role: "assistant", text: "Ship Friday.\n::next{reply=\"x\"}" }]);
+  expect(prompt).toContain('as "you" (never "the user")');
+  expect(prompt).toContain("You: Plan the launch\n\nAssistant: Ship Friday.");
+  expect(prompt).not.toContain("::next");
+});
+
+it("archives a conversation with no replies quietly: no turn, nothing in Main, no memory record", async () => {
+  const x = await setup();
+  x.events.mockResolvedValue([{ data: { item: { type: "userMessage", content: [{ type: "text", text: "Say hello." }] } } }]);
+  await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never });
+  await vi.waitFor(() => expect(x.store.get("prep")!.finishedSummary).toBe(NO_REPLIES_SUMMARY));
+  expect(x.send).not.toHaveBeenCalled();
+  expect(x.records).toEqual([]);
+  expect(x.store.get("thr_main")!.latest?.text ?? "").not.toMatch(/Archived/);
+  await vi.waitFor(() => expect(x.archive).toHaveBeenCalledWith({ threadId: "prep" }));
+});
+
+it("writes the summary on a signed-in model when the conversation's own provider is signed out", async () => {
+  const summarize = vi.fn(async (_input: { threadId: string; title: string; prompt: string }) => SUMMARY);
+  const x = await setup({ providerReady: async (providerId) => providerId !== "codex", summarize });
+  x.threads.set("prep", { ...x.threads.get("prep")!, providerId: "codex" } as never);
+  x.events.mockResolvedValue([
+    { data: { item: { type: "agentMessage", text: "Kobo for the dark mode." } } },
+    { data: { item: { type: "userMessage", content: [{ type: "text", text: "Kindle or Kobo for bed?" }] } } },
+  ]);
+  await x.finish.rpc.bot_finish({ threadId: "prep" });
+  expect(summarize).toHaveBeenCalledTimes(1);
+  expect(summarize.mock.calls[0]![0].prompt).toContain("You: Kindle or Kobo for bed?\n\nAssistant: Kobo for the dark mode.");
+  expect(x.send.mock.calls.map((call) => (call[0] as { threadId: string }).threadId)).toEqual(["thr_main"]);
+  expect(x.store.get("prep")!.finishedSummary).toBe(SUMMARY);
+  expect(x.records).toMatchObject([{ threadId: "prep", topic: "Conversations", text: `Launch prep\n\n${SUMMARY}` }]);
+
+  const y = await setup({ providerReady: async () => false, summarize: async () => null });
+  y.threads.set("prep", { ...y.threads.get("prep")!, providerId: "codex" } as never);
+  await y.finish.rpc.bot_finish({ threadId: "prep" });
+  expect(y.store.get("prep")!.finishedSummary).toMatch(/^\*\*Last replies\*\*/);
+  expect(y.send.mock.calls.map((call) => (call[0] as { threadId: string }).threadId)).toEqual(["thr_main"]);
 });
 
 it("reopens a finished conversation: back in the sidebar and unarchived in BB, the summary kept", async () => {
