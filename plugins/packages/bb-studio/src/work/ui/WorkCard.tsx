@@ -1,7 +1,7 @@
 import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useRef } from "react";
 import { remember } from "../../kit/app/directive-card";
-import { CHAT_CARD_BODY, CHAT_CARD_SKELETON, ChatCard, ChatCardAction, ChatCardFooter, ChatCardHeader } from "../../kit/app/chat-card";
+import { CHAT_CARD_BODY, CHAT_CARD_SKELETON, ChatCard, ChatCardHeader, ChatCardIconButton } from "../../kit/app/chat-card";
 import { relativeTime } from "../../kit/format";
 import { Icon, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
@@ -43,11 +43,16 @@ function LiveWorkCard({ id, threadId, messageId }: { id: string; threadId: strin
 export function WorkCardView({ card, now = Date.now() }: { card: WorkCard; now?: number }) {
   const navigate = useBbNavigate();
   const kind = KIND[card.kind];
+  const worker = card.workerThreadId;
+  const open = worker ? () => navigate.toThread(worker) : undefined;
   return (
     <ChatCard data-testid="work-card" data-work-card-id={card.id} data-state={card.state} className="studio-work-card">
-      <ChatCardHeader icon={kind.icon} title={card.title}
+      <ChatCardHeader icon={kind.icon} title={card.title} onOpen={open}
         meta={<>{kind.label}{card.step ? <> · <span data-testid="work-step">{card.step}</span></> : null}</>}
-        actions={<span className="shrink-0 pr-1.5 text-xs text-muted-foreground" title={new Date(card.updatedAt).toLocaleString()}>{relativeTime(card.updatedAt, now)}</span>} />
+        actions={<>
+          <span className={cn("shrink-0 text-xs text-muted-foreground", !open && "pr-1.5")} title={new Date(card.updatedAt).toLocaleString()}>{relativeTime(card.updatedAt, now)}</span>
+          {open ? <ChatCardIconButton icon="ArrowUpRight" label={`Open ${card.kind === "lead" ? "lead" : "worker"}`} data-testid="work-open" onClick={open} /> : null}
+        </>} />
       <div className={cn(CHAT_CARD_BODY, "flex flex-col gap-2 pt-0")}>
         <div className="flex min-w-0 items-center gap-2 text-sm">
           <StateGlyph state={card.state} />
@@ -58,11 +63,6 @@ export function WorkCardView({ card, now = Date.now() }: { card: WorkCard; now?:
           <div data-testid="work-needs" className="rounded-md border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-warning/5 px-2.5 py-1.5 text-sm text-foreground">{card.needs}</div>
         ) : null}
       </div>
-      {card.workerThreadId ? (
-        <ChatCardFooter>
-          <ChatCardAction icon="ArrowUpRight" data-testid="work-open" onClick={() => navigate.toThread(card.workerThreadId!)}>Open {card.kind === "lead" ? "lead" : "worker"}</ChatCardAction>
-        </ChatCardFooter>
-      ) : null}
     </ChatCard>
   );
 }

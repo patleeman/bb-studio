@@ -3,8 +3,7 @@
 // - A finished conversation opens read-only: where its composer goes, "✓
 //   Archived on <date>. Read-only." and Reopen (ReadOnlyComposer.tsx).
 // - The card in Main, `::finished{thread="thr_…"}`: "✓ Archived: <title>",
-//   its dates, the summary's sections, and links back to the conversation
-//   and to Memory.
+//   its dates, the summary's sections, the open icon, and a link to Memory.
 import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useState } from "react";
 import type { BotThreadInfo, FinishedConversation } from "../../bot-threads-contract";
@@ -59,11 +58,12 @@ export function FinishedCard({ attributes }: PluginMessageDirectiveProps) {
   const memory = () => navigate.toPluginPanel("studio", { subPath: `${MEMORY_SUBPATH}/${encodeURIComponent(finished.botId)}` });
   const records = finished.records ? `${finished.records} record${finished.records === 1 ? "" : "s"}` : null;
   const dates = `${shortDate(finished.startedAt)}${shortDate(finished.startedAt) === shortDate(finished.finishedAt) ? "" : ` – ${shortDate(finished.finishedAt)}`}`;
+  const open = () => navigate.toThread(finished.threadId);
   return (
     <ChatCard data-testid="finished-card" aria-label={`Archived: ${finished.title}`}>
-      <ChatCardHeader icon="CircleCheck" iconClassName="text-success" title={`Archived: ${finished.title}`}
+      <ChatCardHeader icon="CircleCheck" iconClassName="text-success" title={`Archived: ${finished.title}`} onOpen={open}
         meta={<span data-testid="finished-dates">{dates}{finished.archived ? "" : " · reopened"}</span>}
-        actions={<ChatCardIconButton icon="ArrowUpRight" label="Open the conversation" onClick={() => navigate.toThread(finished.threadId)} />} />
+        actions={<ChatCardIconButton icon="ArrowUpRight" label="Open the conversation" data-testid="finished-open" onClick={open} />} />
       <div className={cn(CHAT_CARD_BODY, "flex flex-col gap-2 pt-0")}>
         {sections.map((section, index) => (
           <div key={`${section.heading}-${index}`} className="flex flex-col gap-0.5">
@@ -75,7 +75,6 @@ export function FinishedCard({ attributes }: PluginMessageDirectiveProps) {
         ))}
       </div>
       <ChatCardFooter>
-        <ChatCardAction icon="MessageSquare" data-testid="finished-open" onClick={() => navigate.toThread(finished.threadId)}>Open the conversation</ChatCardAction>
         <ChatCardAction icon="Brain" data-testid="finished-memory" onClick={memory}>{records ? `In Memory · ${records}` : "Memory"}</ChatCardAction>
       </ChatCardFooter>
     </ChatCard>
