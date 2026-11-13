@@ -1,6 +1,7 @@
+import { launchAppearanceMode } from "./fork-launch-appearance";
 export type ForkThemeMode = "light" | "dark";
 
-let override: ForkThemeMode | null = null;
+let override: ForkThemeMode | null = launchAppearanceMode();
 const listeners = new Set<() => void>();
 
 export function forkThemeModeOverride(): ForkThemeMode | null {

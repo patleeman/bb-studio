@@ -6,6 +6,7 @@ import {
 } from "@bb/desktop-contract";
 import { BB_DESKTOP_FORK_ANSWER_APPROVAL_CHANNEL } from "./fork-approvals-ipc.js";
 import { STUDIO_BUILD } from "./studio-release.fork.js";
+import { forkLaunchThemeApi } from "./fork-launch-theme-preload.js";
 import {
   BB_DESKTOP_FORK_WINDOW_CHANNEL,
   type ForkWindowRequest,
@@ -535,6 +536,7 @@ const bbDesktopApi: BbDesktopApi = {
   experimental_window: (request: ForkWindowRequest) =>
     ipcRenderer.invoke(BB_DESKTOP_FORK_WINDOW_CHANNEL, request),
   experimental_studioBuild: STUDIO_BUILD,
+  ...forkLaunchThemeApi(ipcRenderer),
   async openServerDaemonLogs(): Promise<void> {
     await ipcRenderer.invoke(BB_DESKTOP_OPEN_SERVER_DAEMON_LOGS_CHANNEL);
   },
