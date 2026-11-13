@@ -262,7 +262,7 @@ const ALLOWED = new Set([
   "src/ui/health/HealthViews.tsx", "src/ui/thread-header.tsx", "src/ui/thread-context.tsx", "src/ui/studio-tab/StudioTab.tsx",
   "src/ui/bot/workspace.ts", "src/ui/bot/BotPage.tsx", "src/ui/bot/BotAttention.tsx", "src/ui/bot/BotHome.tsx", "src/ui/bot/BotTabs.tsx", "src/ui/bot/BotControls.tsx", "src/ui/bot/BotSidebar.tsx",
   "src/ui/automations/ThreadAutomations.tsx", "src/ui/automations/AutomationsPanel.tsx", "src/settings/ui/sections.tsx", "src/settings/ui/PushSection.tsx",
-  "src/design/ui/route.tsx", "src/artifacts/ui/route.tsx", "src/minis/ui/route.tsx", "src/dashboards/ui/route.tsx", "src/draw/ui/route.tsx",
+  "src/design/ui/route.tsx", "src/artifacts/ui/route.tsx", "src/minis/ui/route.tsx", "src/draw/ui/route.tsx",
   "src/voice/live/ui/QuickSettings.tsx", "src/loops/ui/hooks.ts", "src/pages/ui/PagesPanel.tsx", "src/talk/ui/recordings-panel.tsx", "src/talk/ui/call-ui.tsx", "src/talk/ui/controller.ts",
   "src/chat/ui/ChatOverlay.tsx", "src/code/file-opener.tsx",
   // The link router's own fallback to the main view.

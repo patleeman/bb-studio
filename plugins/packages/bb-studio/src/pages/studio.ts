@@ -19,7 +19,7 @@ export const PAGE_KIND: StudioKind = {
   actions: [{ id: "copy-markdown", label: "Copy as Markdown", icon: "Copy", result: "copy" }],
   create: { mode: "rpc" },
   canArchive: true,
-  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: true, export: true, comments: true, versions: true, links: true, templates: true },
+  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: true, export: true, comments: false, versions: true, links: true, templates: true },
   mentionProviderId: "page",
 
   blurb: "Documents.",

@@ -445,9 +445,7 @@ function SettingsSection({ mini, rpc }: { mini: Mini; rpc: MiniRpc }) {
   );
 }
 
-// ---- Embedded: dashboard tiles, page blocks and chat cards --------------------------------------
-
-/** The app filling a box, as a dashboard tile: no chrome, the access banner when it waits. */
+/** The app filling a box, as a widget: no chrome, the access banner when it waits. */
 export function MiniTile({ miniId }: { miniId: string }) {
   const { mini, rpc } = useMini(miniId);
   if (mini === null) return <p className="p-3 text-xs text-muted-foreground">This mini app was deleted.</p>;
