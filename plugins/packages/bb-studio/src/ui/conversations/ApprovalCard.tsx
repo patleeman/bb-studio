@@ -18,6 +18,8 @@
 import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useState, useSyncExternalStore } from "react";
 import { Icon } from "../../kit/app/index";
+import { CHAT_CARD, CHAT_CARD_BODY } from "../../kit/app/chat-card";
+import { cn } from "../../kit/ui/index";
 import { errorMessage } from "../../kit/format";
 import type { ApprovalDecision, ApprovalState, ApprovalView } from "../../worker-approvals";
 import { useCall, useLive } from "../live";
@@ -83,7 +85,7 @@ export function ApprovalPanel({ worker, approval, state, busy = null, error = nu
   const settled = settledLabel(state);
   return (
     <section data-testid={testId} data-state={state} aria-label={`Approval for ${worker.title}`}
-      className={`studio-root flex max-w-xl flex-col gap-2 rounded-xl border px-4 py-3 text-sm ${settled ? "border-border bg-background" : "border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-warning/5"}`}>
+      data-studio-card="" className={cn(CHAT_CARD, CHAT_CARD_BODY, "gap-2", !settled && "border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-warning/5")}>
       <header className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
         {settled ? null : <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-warning" />}
         <button type="button" data-testid="approval-worker" onClick={() => navigate.toThread(worker.threadId)} title="Open the worker"

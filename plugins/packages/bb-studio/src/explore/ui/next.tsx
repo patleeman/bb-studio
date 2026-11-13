@@ -9,6 +9,7 @@ import type { PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Icon } from "../../kit/ui/index";
+import { CHAT_CARD_ICON_BUTTON, ChatCard, ChatCardHeader } from "../../kit/app/chat-card";
 import { useExploreRpc } from "../client";
 import { PLUGIN_ID } from "../constants";
 import { BUG_EMOJI, nextItemCount, parseNextItems, type BtwNote, type NextKind } from "../next";
@@ -75,18 +76,9 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
   );
 
   return (
-    <section aria-label="What next?" className="my-3 w-full overflow-hidden rounded-lg border border-border/70 bg-background py-1">
-      <header className="flex h-6 items-center gap-1.5 px-3 text-[11px] font-medium text-muted-foreground">
-        What next?
-        <a
-          href={SETTINGS_HREF}
-          aria-label="What next settings"
-          title="Settings"
-          className="ml-auto flex size-5 items-center justify-center rounded text-muted-foreground/50 hover:bg-state-hover hover:text-foreground"
-        >
-          <Icon name="Settings" fallback="MoreHorizontal" className="size-3.5" />
-        </a>
-      </header>
+    <ChatCard aria-label="What next?" className="pb-1.5">
+      <ChatCardHeader icon="Explore" title="What next?"
+        actions={<a href={SETTINGS_HREF} aria-label="What next settings" title="Settings" className={CHAT_CARD_ICON_BUTTON}><Icon name="Settings" fallback="MoreHorizontal" className="size-3.5" /></a>} />
       {items.reply.length ? (
         <NextSection label="Reply">
           <div className="flex flex-wrap gap-1.5">{items.reply.map((item) => chip("reply", item))}</div>
@@ -105,7 +97,7 @@ export function NextDirective({ attributes, message }: PluginMessageDirectivePro
           />
         </NextSection>
       ) : null}
-    </section>
+    </ChatCard>
   );
 }
 

@@ -4,7 +4,7 @@
 import { AppTitle } from "../../ui/app-title";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { ICON_BUTTON, ItemHeader, PRIMARY_BUTTON, cn } from "../../kit/app/index";
+import { CHAT_CARD, CHAT_CARD_SKELETON, ChatCardHeader, ChatCardIconButton, ICON_BUTTON, ItemHeader, PRIMARY_BUTTON, cn } from "../../kit/app/index";
 import { useStudioOpen } from "../../ui/studio-open";
 import { errorMessage, relativeTime } from "../../kit/format";
 import { Icon } from "../../kit/ui/icon";
@@ -459,16 +459,14 @@ export function MiniTile({ miniId }: { miniId: string }) {
 export function MiniEmbed({ miniId, threadId, onOpen, chrome = true }: { miniId: string; threadId: string | null; onOpen?(event?: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean }): void; chrome?: boolean }) {
   const open = useStudioOpen(threadId ? { kind: "thread", threadId } : null);
   const { mini, rpc } = useMini(miniId);
-  if (mini === null) return <div className="flex items-center gap-2 rounded-lg border border-border/70 px-3 py-2 text-sm text-muted-foreground"><Icon name="AppWindow" className="size-4" /> This mini app was deleted.</div>;
-  if (!mini) return <div className="h-24 animate-pulse rounded-lg border border-border/70 bg-muted/40 motion-reduce:animate-none" />;
+  if (mini === null) return <div data-studio-card="" className={cn(CHAT_CARD, "my-0 flex-row items-center gap-2 px-3 py-2 text-muted-foreground")}><Icon name="AppWindow" className="size-4" /> This app was deleted.</div>;
+  if (!mini) return <div className={cn(CHAT_CARD_SKELETON, "my-0 h-24")} />;
+  const openMini = onOpen ?? (() => open({ href: miniHref(miniId) }));
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-background" data-mini-embed={miniId}>
+    <div data-studio-card={chrome ? "" : undefined} className={chrome ? cn(CHAT_CARD, "my-0") : "overflow-hidden rounded-lg border border-border bg-background"} data-mini-embed={miniId}>
       {chrome ? (
-        <div className="flex h-8 items-center gap-1.5 border-b border-border bg-card/50 px-2.5 text-xs text-muted-foreground">
-          <Icon name="AppWindow" className="size-3.5" />
-          <span className="min-w-0 flex-1 truncate font-medium text-foreground">{displayName(mini)}</span>
-          <button type="button" className="rounded px-1.5 py-0.5 hover:bg-state-hover hover:text-foreground" onClick={onOpen ?? (() => open({ href: miniHref(miniId) }))}>Open</button>
-        </div>
+        <ChatCardHeader icon="AppWindow" title={displayName(mini)} meta="App" onOpen={openMini} divided
+          actions={<ChatCardIconButton icon="ArrowUpRight" label={`Open ${displayName(mini)}`} data-testid="mini-open" onClick={() => openMini()} />} />
       ) : null}
       <MiniApp mini={mini} rpc={rpc} threadId={threadId} fit />
     </div>

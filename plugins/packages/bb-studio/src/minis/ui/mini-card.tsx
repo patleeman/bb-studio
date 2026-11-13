@@ -4,6 +4,7 @@
 import { type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { lazy, Suspense } from "react";
 import { useOpenCard } from "../../links/open";
+import { CHAT_CARD_SKELETON, cn } from "../../kit/app/index";
 import { isMiniId, miniHref } from "../shared";
 
 const MiniEmbed = lazy(() => import("./mini-view").then((module) => ({ default: module.MiniEmbed })));
@@ -13,10 +14,10 @@ export function MiniCard({ attributes, message }: PluginMessageDirectiveProps) {
   // In its thread's workbench, by the link router's rule (src/links/router.ts).
   const openCard = useOpenCard(message.threadId);
   if (!isMiniId(id)) return null;
-  const open = openCard(miniHref(id), "Mini app");
+  const open = openCard(miniHref(id), "App");
   return (
     <div className="my-2">
-      <Suspense fallback={<div className="h-24 animate-pulse rounded-lg border border-border/70 bg-muted/40" />}>
+      <Suspense fallback={<div className={cn(CHAT_CARD_SKELETON, "my-0 h-24")} />}>
         <MiniEmbed miniId={id} threadId={message.threadId} onOpen={open} />
       </Suspense>
     </div>

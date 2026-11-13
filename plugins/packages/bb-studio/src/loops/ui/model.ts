@@ -146,13 +146,13 @@ export function ownerThread(owner: string, botThreadId: string | null, resolved?
 type History = { type: string; at: number; data: string }[];
 const parse = (data: string): Record<string, unknown> => { try { return JSON.parse(data) as Record<string, unknown>; } catch { return {}; } };
 
-/** How a closed todo ended: "Done", "Got it", "Dropped", or the option chosen. */
+/** How a closed todo ended: "Done", "Got it", "Dismissed", or the option chosen. */
 export function closedVerb(loop: Loop, history: History): string {
   const closed = [...history].reverse().find((each) => each.type === "closed");
   const data = closed ? parse(closed.data) : {};
   if (data.action === "choose" && typeof data.option === "string") return optionParts(data.option).label;
   if (data.action === "got_it") return "Got it";
-  if (loop.status === "dropped" || data.action === "drop") return "Dropped";
+  if (loop.status === "dropped" || data.action === "drop") return "Dismissed";
   return "Done";
 }
 

@@ -17,6 +17,7 @@ vi.mock("../live", () => ({
 }));
 vi.mock("../thread-header", () => ({ useThreadLookup: () => new Map() }));
 vi.mock("../../kit/app/index", () => ({ Icon: () => null }));
+vi.mock("../../kit/ui/index", async () => (await import("../../loops/ui/test-kit")).kitUi);
 
 import { FinishedCard, isFinished } from "./finish";
 
@@ -48,7 +49,7 @@ it("tells a finished conversation from one that was only archived", () => {
   expect(isFinished(info({}))).toBe(false);
 });
 
-it("draws Main's card: the title, dates, the summary's sections and links back", async () => {
+it("draws Main's card in the shared card shell: the title, dates, the summary's sections, and actions back to the conversation and to Memory", async () => {
   const year = new Date().getFullYear();
   const finished: FinishedConversation = {
     threadId: "prep", botId: "dot", title: "Launch prep", startedAt: new Date(year, 10, 3).getTime(), finishedAt: new Date(year, 10, 10).getTime(),
@@ -58,11 +59,14 @@ it("draws Main's card: the title, dates, the summary's sections and links back",
   state.finished = finished;
   await act(async () => { root.render(<FinishedCard {...directive("prep")} />); });
   const card = $('[data-testid="finished-card"]')!;
-  expect(card.querySelector("h3")?.textContent).toBe("Archived: Launch prep");
+  expect(card.hasAttribute("data-studio-card")).toBe(true);
+  expect(card.querySelector("[data-studio-card-title]")?.textContent).toBe("Archived: Launch prep");
   expect(card.textContent).toContain("Nov 3 – Nov 10");
   expect([...card.querySelectorAll("h4")].map((each) => each.textContent)).toEqual(["Decisions", "Left open", "Made"]);
   expect([...card.querySelectorAll("li")].map((each) => each.textContent)).toEqual(["One 45-minute mock a day.", "Mock boards go next to their Breakdown page.", "Book a paid mock before Nov 20?"]);
-  expect(card.textContent).toContain("Saved to Memory as 3 records");
+  expect($('[data-testid="finished-memory"]')!.tagName).toBe("BUTTON");
+  expect($('[data-testid="finished-memory"]')!.textContent).toBe("In Memory · 3 memory records");
+  expect(card.textContent).not.toContain("Saved to Memory as");
   await act(async () => { $('[data-testid="finished-open"]')!.click(); });
   expect(state.navigate.toThread).toHaveBeenCalledWith("prep");
   await act(async () => { $('[data-testid="finished-memory"]')!.click(); });
