@@ -1259,7 +1259,7 @@ describe("bb's layout as cards over an app backdrop", () => {
     bubble.remove();
   });
 
-  it("backs the composer area with a fade to a dense canvas inside the column card, so the transcript does not show through", async () => {
+  it("frosts the composer area inside the column card with a masked blur and no tint of its own, so the scene shows through at the column card's density", async () => {
     await renderThreadInLayout();
     const footer = one('[data-sidebar="inset"] [data-scroll-footer] > div');
     expect(footer.contains(one("[data-promptbox]"))).toBe(true);
@@ -1290,11 +1290,33 @@ describe("bb's layout as cards over an app backdrop", () => {
     expect(paint("pointer-events")).toBe("none");
     expect(
       forkCascade(document.documentElement, "--fork-cards-composer-backing"),
-    ).toBe(
-      "linear-gradient( to bottom, transparent, color-mix(in oklab, var(--canvas) 84%, transparent) var(--fork-cards-fade) )",
-    );
+    ).toBe("none");
     expect(footer.className).toContain("relative");
     expect(footer.parentElement?.className).toContain("sticky");
+  });
+
+  it("puts the composer's stack cards (queue, banners) on the composer's surface under cards, and leaves them alone otherwise", async () => {
+    await renderThreadInLayout();
+    const dock = one('[data-sidebar="inset"] [data-scroll-footer]');
+    const token = () => forkCascade(dock, "--surface-raised-solid");
+    expect(token()).toBeNull();
+    expect(forkCascade(inset(), "--surface-raised-solid")).toBe(
+      "var(--surface-raised)",
+    );
+    setCards(true);
+    expect(token()).toBe(
+      "var( --fork-surface-composer-background, var(--surface-raised) )",
+    );
+    const panel = document.createElement("aside");
+    panel.setAttribute("data-surface-tone", "sidebar");
+    const panelDock = document.createElement("div");
+    panelDock.setAttribute("data-scroll-footer", "");
+    panel.append(panelDock);
+    document.body.append(panel);
+    expect(forkCascade(panelDock, "--surface-raised-solid")).toBe(token());
+    panel.remove();
+    setCards(false);
+    expect(token()).toBeNull();
   });
 
   it("hides the sidebar list's idle scrollbar thumb, which read as a seam beside the main card", async () => {
