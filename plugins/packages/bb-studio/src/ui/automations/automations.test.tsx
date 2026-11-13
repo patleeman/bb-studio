@@ -3,30 +3,26 @@ import { act, StrictMode, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { installTestPluginRuntime } from "@get-bb/plugin-sdk/testing/app";
-import {
-  automationsForThread,
-  editPath,
-  lastRunLabel,
-  nextRunLabel,
-  relativeTime,
-  scheduleSummary,
-  type ThreadAutomation,
-} from "./model";
-import { AutomationsView } from "./ThreadAutomations";
+import type { ScheduledItem } from "../../loops/scheduled";
+import { wakeLabel } from "./model";
+import { ScheduledView } from "./ThreadAutomations";
 
-const sdkForTest = vi.hoisted(() => ({ current: {} as unknown }));
-const headerForTest = vi.hoisted(() => ({ owner: { data: null as unknown, loading: false }, openThreadPanel: vi.fn() }));
+const headerForTest = vi.hoisted(() => ({ owner: { data: null as unknown, loading: false }, scheduled: [] as unknown[], calls: [] as unknown[], openThreadPanel: vi.fn(), openLink: vi.fn(async () => ({ via: "workbench" })) }));
 vi.mock("@get-bb/plugin-sdk/app", async (original) => ({
   ...(await original<Record<string, unknown>>()),
-  useSdk: () => sdkForTest.current,
   experimental_useAppPanel: () => ({ openTab: ({ tab, ...rest }: { tab: { id: string } }) => (headerForTest.openThreadPanel)({ actionId: tab.id, ...rest }) }),
 }));
-vi.mock("../live", () => ({ useLive: () => headerForTest.owner }));
+vi.mock("../live", () => ({
+  useLive: (method: string, input: unknown, options?: { enabled?: boolean }) => {
+    if (method === "bot_thread_owner") return headerForTest.owner;
+    headerForTest.calls.push({ method, input, enabled: options?.enabled ?? true });
+    return { data: options?.enabled === false ? null : { items: headerForTest.scheduled }, loading: false, error: null };
+  },
+}));
+vi.mock("../../links/open", () => ({ openLinkFromAnywhere: headerForTest.openLink }));
 
 installTestPluginRuntime();
 
-// Moved from Studio Sidebar with its tests; Studio has no Testing Library, so
-// these few helpers stand in for render, screen, renderHook and waitFor.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const roots: Root[] = [];
 function mount(node: ReactNode): Root {
@@ -72,198 +68,42 @@ async function waitFor(check: () => void, timeout = 1000) {
 
 const NOW = Date.UTC(2026, 9, 8, 12, 0);
 
-function automation(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "aut_1", projectId: "proj_1", name: "Check inbox", enabled: true,
-    trigger: { triggerType: "schedule", cron: "*/30 * * * *", timezone: "UTC" },
-    execution: { mode: "agent", prompt: "go", providerId: "p", model: "m", permissionMode: "auto", environment: { type: "project-default" }, targetThreadId: "thr_1" },
-    origin: "human", createdByThreadId: null, nextRunAt: NOW + 5 * 60_000, lastRunAt: NOW - 2 * 3_600_000,
-    runCount: 3, lastRunStatus: "succeeded", lastRunThreadId: null, lastError: null, createdAt: 0, updatedAt: 0,
-    futureField: "kept",
-    ...overrides,
-  };
-}
+const item = (over: Partial<ScheduledItem> = {}): ScheduledItem => ({
+  key: "automation:bot_main:aut_1", source: "automation", id: "aut_1", botId: "bot_main", botName: "Dot", kind: "checkin", title: "Check inbox",
+  nextAt: NOW + 5 * 60_000, state: "active", scheduleText: "Every 30 min", threadId: "thr_1", link: "bb://automation/bot_main%3Aaut_1", ...over,
+});
 
 afterEach(cleanup);
 
-describe("automationsForThread", () => {
-  it("keeps only automations targeting the thread and drops unparseable rows", () => {
-    const rows = automationsForThread([
-      automation(),
-      automation({ id: "aut_other", execution: { mode: "agent", targetThreadId: "thr_2" } }),
-      automation({ id: "aut_script", execution: { mode: "script", script: "echo" } }),
-      { id: "aut_broken", problem: "unreadable" },
-      "nonsense",
-    ], "thr_1");
-    expect(rows.map(r => r.id)).toEqual(["aut_1"]);
-    expect((rows[0] as Record<string, unknown>).futureField).toBe("kept");
-  });
-
-  it("returns nothing for non-array responses", () => {
-    expect(automationsForThread({ error: "x" }, "thr_1")).toEqual([]);
-  });
-
-  it("lists enabled automations first, soonest next run first", () => {
-    const rows = automationsForThread([
-      automation({ id: "paused", enabled: false, nextRunAt: null }),
-      automation({ id: "later", nextRunAt: NOW + 3_600_000 }),
-      automation({ id: "soon", nextRunAt: NOW + 60_000 }),
-    ], "thr_1");
-    expect(rows.map(r => r.id)).toEqual(["soon", "later", "paused"]);
-  });
-});
-
-describe("scheduleSummary", () => {
-  const cron = (c: string) => scheduleSummary({ triggerType: "schedule", cron: c }, NOW);
-  it.each([
-    ["*/30 * * * *", "Every 30 min"],
-    ["* * * * *", "Every minute"],
-    ["0 * * * *", "Hourly"],
-    ["15 * * * *", "Hourly at :15"],
-    ["0 */2 * * *", "Every 2 hours"],
-    ["0 9 * * *", "Daily 9:00"],
-    ["30 9 * * 1-5", "Weekdays 9:30"],
-    ["0 10 * * 0,6", "Weekends 10:00"],
-    ["0 8 * * 1", "Mon 8:00"],
-    ["0 8 * * 1,3,5", "Mon, Wed, Fri 8:00"],
-    ["0 9,17 * * *", "Daily 9:00, 17:00"],
-    ["0 9 1 * *", "0 9 1 * *"],
-    ["@daily", "@daily"],
-  ])("%s -> %s", (input, expected) => expect(cron(input)).toBe(expected));
-
-  it("describes one-shot triggers", () => {
-    expect(scheduleSummary({ triggerType: "once", runAt: NOW + 3_600_000 }, NOW)).toMatch(/^Once, /);
-  });
-});
-
-describe("labels", () => {
-  it("formats relative times", () => {
-    expect(relativeTime(NOW + 5 * 60_000, NOW)).toBe("in 5 min");
-    expect(relativeTime(NOW - 2 * 3_600_000, NOW)).toBe("2 h ago");
-    expect(relativeTime(NOW + 10_000, NOW)).toBe("now");
-  });
-  it("describes next and last runs", () => {
-    const [row] = automationsForThread([automation()], "thr_1") as [ThreadAutomation];
-    expect(nextRunLabel(row, NOW)).toBe("Next in 5 min");
-    expect(nextRunLabel({ ...row, enabled: false }, NOW)).toBe("Paused");
-    expect(lastRunLabel(row, NOW)).toBe("Last ok 2 h ago");
-    expect(lastRunLabel({ ...row, lastRunAt: null, lastRunStatus: null }, NOW)).toBeNull();
-    expect(editPath(row)).toBe("/plugins/automations/automations/proj_1/aut_1/edit");
-  });
-});
-
-describe("AutomationsView", () => {
+describe("ScheduledView", () => {
   it("shows the empty state", () => {
-    render(<AutomationsView state={{ kind: "ready", rows: [] }} onToggle={() => {}} now={NOW} />);
-    expect(screen.getByText("No automations")).toBeTruthy();
+    render(<ScheduledView items={[]} error={null} now={NOW} />);
+    expect(screen.getByText("Nothing scheduled")).toBeTruthy();
   });
 
-  it("shows a degraded state when the automations plugin is unreachable", () => {
-    render(<AutomationsView state={{ kind: "absent" }} onToggle={() => {}} now={NOW} />);
-    expect(screen.getByRole("status").textContent).toMatch(/The Automations plugin is off/);
+  it("shows why it couldn't load", () => {
+    render(<ScheduledView items={null} error="Studio is offline" now={NOW} />);
+    expect(screen.getByRole("status").textContent).toContain("Studio is offline");
   });
 
-  it("renders rows with schedule, next run, failure and a switch", () => {
-    const rows = automationsForThread([
-      automation(),
-      automation({ id: "aut_2", name: "Nightly report", trigger: { triggerType: "schedule", cron: "0 9 * * 1-5", timezone: "UTC" }, lastRunStatus: "failed", lastError: "provider timed out" }),
-    ], "thr_1");
-    const onToggle = vi.fn();
-    render(<AutomationsView state={{ kind: "ready", rows }} onToggle={onToggle} now={NOW} />);
-    expect(screen.getByText("Every 30 min")).toBeTruthy();
-    expect(screen.getByText("Weekdays 9:00")).toBeTruthy();
-    expect(screen.getAllByText("Next in 5 min")).toHaveLength(2);
-    expect(screen.getByText("provider timed out")).toBeTruthy();
-    const toggle = screen.getByRole("switch", { name: "Pause Check inbox" });
-    expect(toggle.getAttribute("aria-checked")).toBe("true");
-    fireEvent.click(toggle);
-    expect(onToggle).toHaveBeenCalledWith(expect.objectContaining({ id: "aut_1" }), false);
-    expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(2);
-  });
-});
-
-describe("useThreadAutomations", () => {
-  async function setup(strict: boolean) {
-    const reads: Array<(value: unknown) => void> = [];
-    const callRpc = vi.fn(() => new Promise((resolve) => { reads.push(resolve); }));
-    sdkForTest.current = {
-      plugins: { callRpc, list: async () => ({ plugins: [{ id: "automations", enabled: true }] }) },
-      threads: { get: vi.fn() },
-      subscribe: () => () => {},
-    };
-    const { useThreadAutomations } = await import("./ThreadAutomations");
-    const hook = renderHook(({ id }) => useThreadAutomations(id, "proj_1"), {
-      ...(strict ? { wrapper: StrictMode } : {}),
-      initialProps: { id: "thr_1" },
-    });
-    return { ...hook, reads };
-  }
-
-  it("loads under React strict mode", async () => {
-    const { result, reads } = await setup(true);
-    await waitFor(() => expect(reads.length).toBeGreaterThan(0));
-    reads.splice(0).forEach((resolve) => resolve([automation()]));
-    await waitFor(() => expect(result.current.state.kind).toBe("ready"));
-  });
-
-  it("drops a read that belongs to the previous thread", async () => {
-    const { result, rerender, reads } = await setup(false);
-    await waitFor(() => expect(reads.length).toBe(1));
-    const [stale] = reads.splice(0);
-    rerender({ id: "thr_2" });
-    await waitFor(() => expect(reads.length).toBe(1));
-    reads.splice(0)[0]!([]);
-    await waitFor(() => expect(result.current.state).toEqual({ kind: "ready", rows: [] }));
-    stale!([automation()]);
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(result.current.state).toEqual({ kind: "ready", rows: [] });
-  });
-
-  it("shows the plugin as absent once, stops polling, and rechecks when plugins change", async () => {
-    let installed = false;
-    let onChange: ((event: { changes: string[] }) => void) | undefined;
-    const callRpc = vi.fn(async () => [automation()]);
-    sdkForTest.current = {
-      plugins: { callRpc, list: async () => ({ plugins: installed ? [{ id: "automations", enabled: true }] : [] }) },
-      threads: { get: vi.fn() },
-      subscribe: ({ callback }: { callback: (event: { changes: string[] }) => void }) => { onChange = callback; return () => {}; },
-    };
-    const { useThreadAutomations } = await import("./ThreadAutomations");
-    const { result } = renderHook(() => useThreadAutomations("thr_1", "proj_1"));
-    await waitFor(() => expect(result.current.state.kind).toBe("absent"));
-    expect(callRpc).not.toHaveBeenCalled();
-    installed = true;
-    act(() => onChange!({ changes: ["plugins-changed"] }));
-    await waitFor(() => expect(result.current.state.kind).toBe("ready"));
-    expect(callRpc).toHaveBeenCalled();
-  });
-
-  it("says so when the thread has no project instead of loading forever", async () => {
-    sdkForTest.current = {
-      plugins: { callRpc: vi.fn(), list: async () => ({ plugins: [{ id: "automations", enabled: true }] }) },
-      threads: { get: async () => ({ projectId: null }) },
-      subscribe: () => () => {},
-    };
-    const { useThreadAutomations } = await import("./ThreadAutomations");
-    const { result } = renderHook(() => useThreadAutomations("thr_1", null));
-    await waitFor(() => expect(result.current.state.kind).toBe("unavailable"));
+  it("lists each item with its kind and next run, and opens its link", () => {
+    render(<ScheduledView items={[item(), item({ key: "todo:loop_1", source: "todo", kind: "todo", title: "Pay the bill", link: "bb://todo/loop_1", nextAt: null, state: "paused" })]} error={null} now={NOW} />);
+    const rows = [...document.querySelectorAll<HTMLButtonElement>("[data-scheduled]")];
+    expect(rows.map((row) => row.textContent)).toEqual([expect.stringMatching(/^Check inboxCheck-in · /), "Pay the billTodo · Paused"]);
+    fireEvent.click(rows[1]!);
+    expect(headerForTest.openLink).toHaveBeenCalledWith("bb://todo/loop_1", { source: "botPage", title: "Pay the bill" });
   });
 });
 
 describe("ThreadAutomationsSummary", () => {
-  it("counts a regular thread's automations in its context row, opening the tab, and hides for Bot-owned threads", async () => {
-    const callRpc = vi.fn(async () => [automation()]);
-    sdkForTest.current = {
-      plugins: { callRpc, list: async () => ({ plugins: [{ id: "automations", enabled: true }] }) },
-      threads: { get: vi.fn() },
-      subscribe: () => () => {},
-    };
+  it("counts a regular thread's scheduled items in its context row, opening the tab, and hides for Bot-owned threads", async () => {
+    headerForTest.scheduled = [item(), item({ key: "b", state: "paused" })];
     const { ThreadAutomationsSummary, useThreadAutomationsVisible } = await import("./ThreadAutomations");
 
     headerForTest.owner = { data: { botId: "bot_1" }, loading: false };
     const bot = renderHook(() => useThreadAutomationsVisible("thr_1", "proj_1"));
-    await waitFor(() => expect(callRpc).toHaveBeenCalled());
     expect(bot.result.current).toBe(false);
+    expect(headerForTest.calls.at(-1)).toEqual({ method: "loops.scheduled", input: { threadId: "thr_1" }, enabled: false });
     cleanup();
 
     headerForTest.owner = { data: { botId: null }, loading: false };
@@ -272,8 +112,11 @@ describe("ThreadAutomationsSummary", () => {
     cleanup();
 
     render(<ThreadAutomationsSummary threadId="thr_1" projectId="proj_1" />);
-    await waitFor(() => expect(document.querySelector('button[aria-label="1 automation wake this thread"]')?.textContent).toBe("1 automation"));
-    fireEvent.click(document.querySelector('button[aria-label="1 automation wake this thread"]')!);
+    const label = wakeLabel(headerForTest.scheduled as ScheduledItem[]);
+    expect(label).toBe("2 scheduled items for this thread (1 on)");
+    const button = document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)!;
+    expect(button.textContent).toBe("2 scheduled");
+    fireEvent.click(button);
     expect(headerForTest.openThreadPanel).toHaveBeenCalledWith({ actionId: "thread-automations", title: "Automations" });
   });
 });
