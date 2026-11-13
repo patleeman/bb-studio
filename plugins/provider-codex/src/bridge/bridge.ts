@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { failFastOnAuthError } from "./auth-fail-fast.fork.js";
 
 import { experimental_selectedSkillMentions as selectedSkillMentions } from "@get-bb/plugin-sdk/provider-bridge";
 import { createHash } from "node:crypto";
@@ -736,9 +737,10 @@ async function handleChildNotification(
       markResponseOpenedTurnNativelyStarted(session, parsed.data.turn.id);
     }
   }
-  const deltas = session.translator.translateEvent(
+  const { deltas, interruptTurnId } = failFastOnAuthError(session, session.translator.translateEvent(
     toProviderRuntimeEvent(method, params),
-  );
+  ));
+  if (interruptTurnId !== null && session.codexThreadId !== null) void requestCodexTurnInterrupt(session, session.codexThreadId, interruptTurnId);
   const quotaFailure = deltas.some(
     (delta) =>
       delta.kind === "provider.error" &&
