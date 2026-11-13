@@ -139,7 +139,7 @@ function ThreadsSection() {
       <Card>
         <SettingRow k="decisions_enabled" />
         <SettingRow k="autoResumeThreads" />
-        <SettingRow k="loopsEnabled" description={<>The daily budget and quiet hours are on{" "}
+        <SettingRow k="loopsEnabled" description={<>{STUDIO_SETTINGS.loopsEnabled.description} The daily budget and quiet hours are on{" "}
           {attention ? <button type="button" className="underline hover:text-foreground" onClick={() => openAppPath(attention)}>Bot ▸ Controls ▸ Attention</button> : "Bot ▸ Controls ▸ Attention"}.</>} />
         <SettingRow k="snapshotsPerPage" />
       </Card>

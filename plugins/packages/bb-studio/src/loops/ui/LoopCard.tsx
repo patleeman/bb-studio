@@ -7,9 +7,6 @@
 // The morning card's rows are `::loop{id row="1"}`, a compact line that opens
 // the full card, and `::loops{more="3"}`, a link to the Todos list. The Bot
 // posts `::loops{open="pane"}` to offer the Todos list beside the chat.
-//
-// With Todos off (the loopsEnabled setting), every card is a
-// quiet placeholder.
 import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import { Icon, cn } from "../../kit/ui/index";
@@ -19,21 +16,12 @@ import { useLive } from "../../ui/live";
 import type { Loop } from "../contract";
 import { CARD_BUTTON, CARD_GHOST, CARD_PRIMARY, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu } from "./LoopMenus";
 import { closedVerb, dueLabel, elapsed, INLINE_OPTIONS, KIND, lastEvent, ownerName, ownerThread, releaseLabel, safeUrl, shortWhen, sourceText, type OwnerInfo } from "./model";
-import { useLoopActions, useLoopPeople, useLoopsEnabled, useOpenLoopsPane, type LoopPeople } from "./hooks";
+import { useLoopActions, useLoopPeople, useOpenLoopsPane, type LoopPeople } from "./hooks";
 
 export const isLoopId = (id: string) => /^loop_[A-Za-z0-9-]{1,80}$/.test(id);
 
 type History = { type: string; at: number; data: string }[];
 type LoopView = { loop: Loop; history: History; owner?: OwnerInfo };
-
-/** A quiet line in place of a card while Todos are off. */
-export function LoopsOff() {
-  return (
-    <div data-testid="loop-off" className="my-1 flex items-center gap-2 text-xs text-muted-foreground">
-      <Icon name="Unavailable" className="size-3.5" />Todos are off
-    </div>
-  );
-}
 
 /** The ticking "now", once a minute, for live elapsed times. */
 function useNow(): number {
@@ -42,19 +30,10 @@ function useNow(): number {
   return now;
 }
 
-/** While off, a morning card shows one placeholder: its first row's. Message id → that row's todo id. */
-const offRows = new Map<string, string>();
-
-export function LoopDirective({ attributes, message }: PluginMessageDirectiveProps) {
-  const enabled = useLoopsEnabled();
+export function LoopDirective({ attributes }: PluginMessageDirectiveProps) {
   const id = attributes.id ?? "";
   const row = attributes.row === "1" || attributes.row === "true";
   if (!isLoopId(id)) return null;
-  if (!enabled) {
-    if (!row) return <LoopsOff />;
-    if (!offRows.has(message.id)) offRows.set(message.id, id);
-    return offRows.get(message.id) === id ? <LoopsOff /> : null;
-  }
   return <LiveLoop id={id} row={row} />;
 }
 
@@ -258,10 +237,7 @@ export function LoopRow({ view, people, refresh }: { view: LoopView; people: Loo
  * no side panel.
  */
 export function LoopsDirective({ attributes }: PluginMessageDirectiveProps) {
-  const enabled = useLoopsEnabled();
-  // Off, the morning card's first row already says so; a lone card says it itself.
-  if (attributes.open !== undefined) return enabled ? <LoopsOpenCard /> : <LoopsOff />;
-  if (!enabled) return null;
+  if (attributes.open !== undefined) return <LoopsOpenCard />;
   const more = Number.parseInt(attributes.more ?? "", 10);
   if (!Number.isFinite(more) || more <= 0) return null;
   return <LoopsMore more={more} />;

@@ -63,11 +63,11 @@ const button = (text: string) => {
 };
 const click = (text: string) => act(async () => button(text).click());
 
-it("is a quiet placeholder while Todos are off, without fetching the todo", async () => {
+it("draws the todo while Todo reminders are off: the switch holds reminders, not the todo", async () => {
   state.enabled = false;
   await render();
-  expect(container.textContent).toBe("Todos are off");
-  expect(state.live).not.toContain("loops.get");
+  expect(container.textContent).toContain(base.title);
+  expect(container.textContent).not.toContain("are off");
 });
 
 it("draws nothing for a malformed id", async () => {
@@ -184,10 +184,9 @@ it("posts ::loops{open=pane} as a card that opens Todos beside the chat", async 
   state.openPanel.mockReturnValue(false);
   await click("Open Todos");
   expect(state.open).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_1/loops");
-  // Off, the card is the quiet line.
   state.enabled = false;
   await act(async () => root.render(<LoopsDirective attributes={{ open: "pane" }} source="" message={message} openWorkspaceFile={null} />));
-  expect(container.querySelector("[data-testid=loop-off]")).not.toBeNull();
+  expect(container.textContent).toContain("Open Todos");
 });
 
 it("summarizes todos for the card", () => {
@@ -212,15 +211,15 @@ it("offers Keep or Drop on a todo with no update in three days (the weekly revie
   expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_1", action: "keep" });
 });
 
-it("shows one placeholder per morning card while off: its first row, not every row or the more link", async () => {
+it("draws every morning row and the more link while Todo reminders are off", async () => {
   state.enabled = false;
   const rows = ["loop_a", "loop_b", "loop_c"];
   await act(async () => root.render(<>
     {rows.map((id) => <LoopDirective key={id} attributes={{ id, row: "1" }} source="" message={{ ...message, id: "m_morning" }} openWorkspaceFile={null} />)}
     <LoopsDirective attributes={{ more: "3" }} source="" message={{ ...message, id: "m_morning" }} openWorkspaceFile={null} />
   </>));
-  expect(container.querySelectorAll("[data-testid=loop-off]")).toHaveLength(1);
-  expect(container.querySelector("[data-testid=loops-more]")).toBeNull();
+  expect(container.querySelectorAll("[data-testid=loop-row]")).toHaveLength(3);
+  expect(container.querySelector("[data-testid=loops-more]")).not.toBeNull();
 });
 
 it("names a thread owner by the thread's title and links it", async () => {

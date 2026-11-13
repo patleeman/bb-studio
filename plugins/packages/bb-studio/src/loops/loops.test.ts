@@ -117,7 +117,7 @@ it('releases the user\'s own Surface now at once, past the morning hold and the 
  expect((db.prepare("SELECT count(*) n FROM loop_events WHERE type='surfaced'").get() as {n:number}).n).toBe(0);
  const cos=loops.store.add({title:'CoS job',owner:'cos'});await expect(handlers['loops.update']!({id:cos.id,surfaceNow:true})).rejects.toThrow('Only your own todos');
  loops.store.act({id:low.id,action:'done'},()=>({type:'none'}));await expect(handlers['loops.update']!({id:low.id,surfaceNow:true})).rejects.toThrow('already closed');
- onChange({loopsEnabled:false});await expect(handlers['loops.update']!({id:later.id,surfaceNow:true})).rejects.toThrow('Todos are off');
+ onChange({loopsEnabled:false});await expect(handlers['loops.update']!({id:later.id,surfaceNow:true})).rejects.toThrow('Todo reminders are off');
  // The Bot's own surfaceNow keeps the policy: queued, trigger none, held for the morning.
  const botLow=loops.store.add({title:'Bot low',priority:'low',trigger:{type:'time',at:Date.now()+3600000}});const tool=(bb.agents.registerTool as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0]).find((t:{name:string})=>t.name==='loops_update');
  expect(JSON.parse(await tool.execute({id:botLow.id,surfaceNow:true}))).toMatchObject({status:'queued',trigger:{type:'none'}});});

@@ -1,8 +1,8 @@
 // Bot ▸ Controls ▸ Attention: how often the Chief of Staff may interrupt
 // with Todos. Its daily budget and quiet hours are Studio settings
 // (loopDailyBudget, loopQuietStart, loopQuietEnd; src/settings/schema.ts);
-// the time zone is this Mac's. The Todos switch is in
-// Studio's settings, under Threads.
+// the time zone is this Mac's. Todo reminders (loopsEnabled) is the switch
+// for all of it; the Todos list works either way.
 import { useState } from "react";
 import { errorMessage } from "../../kit/format";
 import { cn, Icon, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../kit/ui/index";
@@ -46,9 +46,10 @@ export function BotAttention(_props: { botName: string }) {
       <div className="divide-y divide-border rounded-lg border border-border">
         <div className="flex items-center justify-between gap-4 px-4 py-3">
           <div className="min-w-0">
-            <div className="text-sm font-medium">Todos</div>
+            <div className="text-sm font-medium">{STUDIO_SETTINGS.loopsEnabled.label}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{STUDIO_SETTINGS.loopsEnabled.description}</div>
           </div>
-          <Switch checked={values.loopsEnabled} label="Todos" onChange={(next) => save({ loopsEnabled: next })} />
+          <Switch checked={values.loopsEnabled} label={STUDIO_SETTINGS.loopsEnabled.label} onChange={(next) => save({ loopsEnabled: next })} />
         </div>
         <div className="flex items-center justify-between gap-4 px-4 py-3" data-testid="attention-budget">
           <div className="min-w-0">

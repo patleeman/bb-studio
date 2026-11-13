@@ -21,7 +21,7 @@ import type { Loop } from "../contract";
 import { PickTime, TriggerForm } from "./LoopMenus";
 import { AddLoop, AreaChip, OwnerMenu, useLoopsBoard, type RowProps } from "./LoopsTab";
 import { areaChips, dueLabel, elapsed, fullWhen, KIND, optionParts, ownerName, ownerThread, shortWhen, SNOOZE, snoozeHint, sourceText, triggerLabel } from "./model";
-import { focusDiscussed, LOOPS_PANE, loopDragProps, openLoops, useDiscussLoop, useLoopActions, useLoopsEnabled } from "./hooks";
+import { focusDiscussed, LOOPS_PANE, loopDragProps, openLoops, useDiscussLoop, useLoopActions } from "./hooks";
 
 export { LOOPS_PANE };
 
@@ -30,18 +30,11 @@ const MENU_BUTTON = "inline-flex size-7 shrink-0 items-center justify-center rou
 
 /** The "Todos" thread panel tab. `threadId` is the chat it's beside. */
 export function LoopsPane({ threadId }: ThreadTabProps) {
-  const enabled = useLoopsEnabled();
   const navigate = useBbNavigate();
   useEffect(() => { renameTabOf(navigate)?.({ tab: { id: LOOPS_PANE }, title: "Todos" }); }, [navigate]);
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground" data-testid="loops-pane">
-      {enabled ? <Board threadId={threadId} /> : (
-        <div className="flex flex-col items-center gap-1.5 px-6 py-10 text-center">
-          <Icon name="Unavailable" className="size-5 text-muted-foreground" />
-          <div className="text-sm font-medium">Todos are off</div>
-          <p className="text-sm text-muted-foreground">Turn on in Studio’s settings.</p>
-        </div>
-      )}
+      <Board threadId={threadId} />
     </div>
   );
 }

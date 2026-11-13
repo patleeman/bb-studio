@@ -43,7 +43,7 @@ export class LoopScheduler {
   * when it can't, so the button never silently does nothing.
   */
  async surfaceNow(id:string){const l=this.store.get(id);
- if(!this.settings().enabled)throw Error('Todos are off. Turn them on in Studio settings to surface todos.');
+ if(!this.settings().enabled)throw Error('Todo reminders are off. Turn them on in Bot settings ▸ Attention.');
  if(l.closedAt)throw Error('This todo is already closed.');
  if(l.owner!=='patrick')throw Error('Only your own todos can be surfaced. Take it back first.');
  if(l.status!=='surfaced')await this.post(`Please post this card in your chat exactly once: ::loop{id="${l.id}"}`);

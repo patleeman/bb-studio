@@ -257,9 +257,12 @@ describe("Bot ▸ Controls ▸ Attention", () => {
     expect(state.set).toHaveBeenCalledWith({ loopsEnabled: false });
   });
 
-  it("shows Todos off", async () => {
+  it("names the switch for what it holds: Todo reminders, off by default", async () => {
     await act(async () => { root.render(<BotAttention botName="Chief of Staff" />); });
-    expect(host.querySelector('[role="switch"]')!.getAttribute("aria-checked")).toBe("false");
+    const toggle = host.querySelector('[role="switch"]')!;
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    expect(toggle.getAttribute("aria-label")).toBe("Todo reminders");
+    expect(text()).toContain("Posts each due todo in the Bot’s chat");
   });
 
   it("formats hours and finds quiet ones across midnight", () => {

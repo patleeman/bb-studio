@@ -180,14 +180,14 @@ it("in a window of its own, leaves the title to the window's bar: the count and 
   state.tabWindow = null;
 });
 
-it("opens the full page from its header, and says when Todos are off", async () => {
+it("opens the full page from its header, and lists todos while Todo reminders are off", async () => {
   await render();
   await act(async () => (container.querySelector("[aria-label='Open the full Todos page']") as HTMLButtonElement).click());
   expect(state.open).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_1/loops");
   state.enabled = false;
   await render();
-  expect(container.textContent).toContain("Todos are off");
-  expect(container.querySelector("section")).toBeNull();
+  expect(container.textContent).not.toContain("are off");
+  expect(container.querySelector("section")).not.toBeNull();
 });
 
 it("opens the pane when the sidebar asks the Bot chat, now or once the chat opens, once, and reports whether it opened", async () => {
