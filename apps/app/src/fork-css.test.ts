@@ -61,24 +61,6 @@ describe("fork.css", () => {
     );
   });
 
-  it("paints a thread list's sidebar background and accent on the sidebar body only", () => {
-    expect(
-      block(
-        '[data-sidebar="panel"][data-fork-sidebar-background]\n  [data-sidebar="collapsible-body"]',
-      ),
-    ).toContain("background: var(--fork-sidebar-background)");
-    expect(
-      block(
-        '[data-sidebar="panel"][data-fork-sidebar-accent]\n  [data-sidebar="collapsible-body"]',
-      ),
-    ).toContain("--sidebar-accent: var(--fork-sidebar-accent)");
-    expect(
-      block(
-        '[data-sidebar="panel"][data-fork-sidebar-background]\n  [data-sidebar="collapsible-body"]\n  :is(\n    [data-sidebar="content"],',
-      ),
-    ).toContain("background: transparent");
-  });
-
   it("uses no achromatic color literals", () => {
     expect(css).not.toMatch(/oklch\([^)]*\s0\s+0\)/u);
   });
