@@ -42,7 +42,7 @@ Plugins stay out of desktop's pnpm workspace because desktop's `pnpm-workspace.y
 3. On `main`: `node scripts/import-desktop.mjs`.
 4. `git push origin main && git push --force-with-lease origin desktop`.
 
-**Desktop release.** BB Studio has its own version line (1.0.0 and up, in `apps/desktop/studio-release.fork.json` on `desktop`), and About and Updates show it with the bb base ("based on bb 0.49.0 @ 030b1b7"). In the desktop worktree, with `CSC_NAME` set and the `bbstudio-notary` notarytool profile in the keychain:
+**Desktop release.** BB Studio has its own version line (1.0.0 and up, in `apps/desktop/studio-release.fork.json` on `desktop`), and About and Updates show it with the bb base ("based on bb 0.49.0 @ 030b1b7"). In the desktop worktree, with `CSC_NAME` set and an App Store Connect API key for notarization (`BB_STUDIO_NOTARY_KEY_PATH`, `_KEY_ID`, `_ISSUER`, else the `ASC_*` values in `~/.config/bbgo/testflight.env`; with neither, the `bbstudio-notary` keychain profile). It runs on a locked Mac: it holds `caffeinate -i` for the whole run and stops before the build if the login keychain is locked or `CSC_NAME` is not a listed identity. `ios/scripts/testflight.sh` does the same.
 
 1. `node scripts/fork/release-desktop.mjs --bump patch` writes the next version into `desktop-candidate` and prints the promote, import and push commands. Run them.
 2. `node scripts/fork/release-desktop.mjs --no-bump --notes-only` drafts the notes from the commits since the last `v*` Studio tag; edit the file it names.

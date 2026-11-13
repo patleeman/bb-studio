@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   existsSync,
@@ -18,6 +18,14 @@ import {
   parseStudioRelease,
   STUDIO_UPDATE_TEST_ENV,
 } from "../../apps/desktop/scripts/studio-release.fork.mjs";
+import {
+  caffeinateArgs,
+  keychainProblem,
+  maskArgs,
+  NOTARY_ENV_FILE,
+  notaryApiKey,
+  notaryArgs,
+} from "./release-unattended.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const args = process.argv.slice(2);
@@ -66,11 +74,18 @@ monorepo's origin/main, installed with pnpm and built with the release
 worktree's CLI into bb-app's builtin-plugins before electron-builder runs.
 
 It builds in <work>/release-v<version> (BB_STUDIO_SYNC_DIR, default
-../.bb-studio-fork-sync), signs with CSC_NAME, notarizes with the notarytool
-keychain profile BB_STUDIO_NOTARY_PROFILE (default bbstudio-notary), tags
+../.bb-studio-fork-sync), signs with CSC_NAME, notarizes with the App Store
+Connect API key (BB_STUDIO_NOTARY_KEY_PATH, BB_STUDIO_NOTARY_KEY_ID and
+BB_STUDIO_NOTARY_ISSUER, else ASC_KEY_PATH, ASC_KEY_ID and ASC_ISSUER_ID in
+${NOTARY_ENV_FILE}; the values are never printed) or, with no key, the
+notarytool keychain profile BB_STUDIO_NOTARY_PROFILE (default bbstudio-notary), tags
 v<version> on the monorepo's main and pushes the tag to --repo, and creates or
 updates a DRAFT release there with the notes, the DMG, the zip, both blockmaps,
-latest-mac.yml and desktop-version.json. It never publishes the release.`;
+latest-mac.yml and desktop-version.json. It never publishes the release.
+
+It runs unattended on a locked Mac: caffeinate -i holds off sleep until it
+exits, and before the build it fails if the login keychain is locked, CSC_NAME
+is not a listed signing identity or the notary key file is missing.`;
 
 if (flag("--help")) {
   console.log(HELP);
@@ -83,6 +98,7 @@ const BUILD_ONLY = flag("--build-only");
 const STEPS = ["build", "sign", "publish"];
 const FROM = option("--from", "build");
 const PROFILE = process.env.BB_STUDIO_NOTARY_PROFILE ?? "bbstudio-notary";
+const NOTARY_KEY = notaryApiKey();
 const syncRoot =
   process.env.BB_STUDIO_SYNC_DIR ?? resolve(root, "..", ".bb-studio-fork-sync");
 const monorepo = resolve(
@@ -97,6 +113,16 @@ function fail(message) {
 }
 
 if (!STEPS.includes(FROM)) fail(`--from must be one of ${STEPS.join(", ")}`);
+
+if (DRY) {
+  step("Keep awake");
+  plan(`caffeinate ${caffeinateArgs("<pid>").join(" ")} (detached, ends with this run)`);
+} else {
+  spawn("caffeinate", caffeinateArgs(process.pid), {
+    detached: true,
+    stdio: "ignore",
+  }).unref();
+}
 
 const run = (cwd, command, argv, options = {}) => {
   if (argv.some((arg) => /^--draft=false$/i.test(arg))) {
@@ -339,16 +365,37 @@ function preflight() {
     !BUILD_ONLY &&
     option("--version", null) === null &&
     option("--bump", null) === null;
+  if (signs && DRY) {
+    plan("security show-keychain-info login.keychain-db (fail if locked)");
+    plan("security find-identity -v -p codesigning (fail if CSC_NAME is not listed)");
+    plan(
+      NOTARY_KEY === null
+        ? `no notary API key: notarytool keychain profile ${PROFILE}`
+        : `notary API key from ${NOTARY_KEY.source}: check the key file exists`,
+    );
+  }
   if (!DRY && signs) {
-    const name = process.env.CSC_NAME?.trim() ?? "";
-    if (name.length === 0) fail("set CSC_NAME to the Developer ID Application identity");
+    const keychain = run(
+      root,
+      "security",
+      ["show-keychain-info", "login.keychain-db"],
+      { capture: true, allowFailure: true },
+    );
     const identities = run(
       root,
       "security",
       ["find-identity", "-v", "-p", "codesigning"],
-      { capture: true },
-    ).stdout;
-    if (!identities.includes(name)) fail("CSC_NAME is not a valid signing identity in the keychain");
+      { capture: true, allowFailure: true },
+    ).stdout ?? "";
+    const problem = keychainProblem({
+      keychainStatus: keychain.status,
+      identities,
+      cscName: process.env.CSC_NAME?.trim() ?? "",
+    });
+    if (problem !== null) fail(problem);
+    if (NOTARY_KEY !== null && !existsSync(NOTARY_KEY.keyPath)) {
+      fail(`the notary API key file from ${NOTARY_KEY.source} does not exist`);
+    }
   }
   const auth = run(root, "gh", ["auth", "status"], {
     capture: true,
@@ -539,7 +586,11 @@ function sign(files, version) {
   step("Sign, notarize and staple");
   if (DRY) {
     plan("codesign the DMG with CSC_NAME");
-    plan(`xcrun notarytool submit <dmg> --keychain-profile ${PROFILE} --wait`);
+    plan(
+      `xcrun ${maskArgs(notaryArgs("<dmg>", NOTARY_KEY, PROFILE), NOTARY_KEY).join(" ")}${
+        NOTARY_KEY === null ? "" : ` (API key from ${NOTARY_KEY.source})`
+      }`,
+    );
     plan("xcrun stapler staple <dmg> and BB Studio.app; ditto the stapled app into the zip");
     plan("rebuild both blockmaps, latest-mac.yml and desktop-version.json");
     return;
@@ -555,22 +606,18 @@ function sign(files, version) {
   if (stapled.status !== 0) {
     const name = process.env.CSC_NAME.trim();
     run(root, "codesign", ["--force", "--sign", name, "--timestamp", files.dmg]);
-    const submit = run(
-      root,
-      "xcrun",
-      [
-        "notarytool",
-        "submit",
-        files.dmg,
-        "--keychain-profile",
-        PROFILE,
-        "--wait",
-      ],
-      { capture: true, allowFailure: true },
-    );
-    process.stdout.write(submit.stdout ?? "");
+    const submit = run(root, "xcrun", notaryArgs(files.dmg, NOTARY_KEY, PROFILE), {
+      capture: true,
+      allowFailure: true,
+    });
+    process.stdout.write(maskArgs([submit.stdout ?? ""], NOTARY_KEY)[0]);
     if (submit.status !== 0 || !/status: Accepted/.test(submit.stdout ?? "")) {
-      fail("notarization was not accepted (if the keychain profile could not be read, the Mac may be locked)");
+      process.stderr.write(maskArgs([submit.stderr ?? ""], NOTARY_KEY)[0]);
+      fail(
+        NOTARY_KEY === null
+          ? "notarization was not accepted (if the keychain profile could not be read, the Mac may be locked)"
+          : "notarization was not accepted",
+      );
     }
     run(root, "xcrun", ["stapler", "staple", files.dmg]);
   }
