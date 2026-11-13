@@ -185,6 +185,15 @@ describe("records", () => {
 });
 
 describe("mini apps on Studio", () => {
+  it("gives the ::app line for a new mini app with the App cards setting on", async () => {
+    await withHost(async (host) => {
+      const created = text(await tool(host, "minis_create", { name: "Board", files: APP }, { threadId: "thr_1", projectId: null }));
+      const id = /id (mini_[0-9a-f]{16})/.exec(created)![1]!;
+      expect(created).toContain(`::app{id="${id}"}`);
+      expect(created).not.toContain("::mini{");
+    }, { appCards: () => true });
+  });
+
   it("creates a mini app with a tool, compiles it, and serves its frame with the shelf", async () => {
     await withHost(async (host) => {
       const created = text(await tool(host, "minis_create", { name: "Board", files: APP }, { threadId: "thr_1", projectId: null }));

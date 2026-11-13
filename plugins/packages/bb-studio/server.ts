@@ -229,7 +229,8 @@ export default async function plugin(bb: BbPluginApi) {
     return registerTool(named as never);
   }) as typeof bb.agents.registerTool;
   // Kinds built into Studio (docs/merging-add-ons.md); the hub calls them in-process.
-  const artifacts = registerArtifacts(bb, db, services, notifyBuiltin);
+  let appCards = false;
+  const artifacts = registerArtifacts(bb, db, services, notifyBuiltin, () => appCards);
   bb.onDispose(() => artifacts.dispose());
   const drawings = registerDraw(bb, db, services, notifyBuiltin);
   bb.onDispose(() => drawings.dispose());
@@ -239,6 +240,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => dashboards.dispose());
   // Mini apps' `playground.bb.studio.list` reads the collection through the hub, made below.
   const minis = registerMinis(bb, db, services, notifyBuiltin, {
+    appCards: () => appCards,
     artifactSource: (id) => {
       const artifact = artifacts.store.get(id);
       if (!artifact) return null;
@@ -278,9 +280,11 @@ export default async function plugin(bb: BbPluginApi) {
   let runnerDispatch: (context: { thread: { id: string } }) => Promise<{ action: "reject"; message: string } | null> = async () => null;
   const decisions = await registerDecisions(bb, settings, (context) => runnerDispatch(context));
   let settingValues: Record<string, unknown> = await settings.get();
+  appCards = settingValues.appCards === true;
   const explore = registerExploreBuiltin(bb, db, settingValues);
   settings.onChange((next) => {
     settingValues = next;
+    appCards = next.appCards === true;
     explore.update(next);
   });
   registerThreadExportHook(bb, () => ({ enabled: settingValues.exportDeletedThreads === true, folder: typeof settingValues.exportDeletedThreadsFolder === "string" ? settingValues.exportDeletedThreadsFolder : "" }));
@@ -418,7 +422,7 @@ export default async function plugin(bb: BbPluginApi) {
     // Short pointers for Pages, mini apps and the Next row; their long guidance is in the studio skill (src/agent-instructions.ts).
     const instructions = studioInstructions({
       bot: bot ? bots.instructions(bot) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
-      pages: !off.has("page"), minis: !off.has("mini"), work: true, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
+      pages: !off.has("page"), minis: !off.has("mini"), appCards, work: true, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
     });
     return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
   }));

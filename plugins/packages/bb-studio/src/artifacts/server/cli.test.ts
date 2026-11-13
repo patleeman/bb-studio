@@ -23,6 +23,19 @@ it("artifacts_save refuses inline content named . or ..", async () => {
   expect((await host.artifacts.cli(["list"], {} as never)).stdout).toBe("No artifacts yet.\n");
 });
 
+it("artifacts_save gives the ::artifact line, or ::app with the App cards setting on", async () => {
+  let appCards = false;
+  const host = artifactsHost(() => appCards);
+  hosts.push(host);
+  const first = String(await host.harness.behavior.callAgentTool("artifacts_save", { content: "# Notes", name: "notes.md", title: "Notes" }));
+  const id = /art_[0-9a-z]{16}/.exec(first)![0];
+  expect(first).toContain(`::artifact{id="${id}"}`);
+  appCards = true;
+  const second = String(await host.harness.behavior.callAgentTool("artifacts_save", { content: "# Notes 2", name: "notes.md", title: "Notes", artifactId: id }));
+  expect(second).toContain(`::app{id="${id}"}`);
+  expect(second).not.toContain("::artifact{");
+});
+
 it("bb studio artifacts save refuses a file the host reports as over 25 MB before decoding it", async () => {
   const host = artifactsHost();
   hosts.push(host);

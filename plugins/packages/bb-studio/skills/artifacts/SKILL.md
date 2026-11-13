@@ -6,7 +6,8 @@ description: >-
 
 # Studio Artifacts
 
-Artifacts are built into Studio. They are copies of the files agents make, kept in BB so they outlive the
+Artifacts are Studio's saved apps: one of its two app types (the other is the
+interactive mini app, the `minis` skill). They are copies of the files agents make, kept in BB so they outlive the
 thread's workspace. Saving copies the file's bytes at that moment. Saving the
 same file from the same thread again adds a new version (unchanged bytes are
 skipped), so the user can step back through versions.
@@ -39,9 +40,11 @@ Give each artifact a short, human title ("Q3 revenue chart", not
 | `artifacts_list` | List saved artifacts with ids and links; `thisThread` limits it to this thread. |
 | `artifacts_read` | Read an artifact's details and, for text types, its contents. |
 
-`artifacts_save` returns a line like `::artifact{id="art_…"}`. Put it on its
-own line in your reply and the user sees the artifact previewed inline, with
-a button that opens it in a tab beside the chat.
+`artifacts_save` returns the card line to show: `::artifact{id="art_…"}`, or
+`::app{id="art_…"}` when your instructions say to write `::app` (Studio's App
+cards setting). Put it on its own line in your reply and the user sees the
+artifact previewed inline, with a button that opens it in a tab beside the
+chat.
 
 ## CLI (works in every agent session)
 

@@ -1,3 +1,4 @@
+import { appCardLine } from "../app-cards";
 import type { StudioChanged } from "../kit/server/core";
 import { grantAfterHostApproval, hostApproval } from "../kit/host-approval";
 import { describeCapability } from "./capabilities";
@@ -126,6 +127,7 @@ export function registerMinis(
     studioList?: (input: { query?: string; kind?: string; limit: number }) => Promise<{ id: string; kind: string; title: string; href: string | null; updatedAt: number | null }[]>;
     /** An HTML artifact's page and live state, to make a mini app from it. */
     artifactSource?: (id: string) => { title: string; html: string; state: unknown; projectId: string | null } | null;
+    appCards?: () => boolean;
   } = {},
 ): BuiltinMinis {
   const now = options.now ?? Date.now;
@@ -619,7 +621,7 @@ export function registerMinis(
 
   const fail = (text: string) => ({ content: [{ type: "text" as const, text }], isError: true });
   const link = (row: MiniRow) => `[${displayName(row).replace(/[[\]]/g, "")}](${miniHref(row.id)})`;
-  const card = (row: MiniRow) => `Show it in your reply on its own line: ::mini{id="${row.id}"}`;
+  const card = (row: MiniRow) => `Show it in your reply on its own line: ${appCardLine(row.id, options.appCards?.() ?? false)}`;
   const pendingNote = (id: string) => {
     const waiting = view(mustGet(id)).pending;
     return waiting.length ? `Waiting for the user's approval: ${waiting.join(", ")}. Calls that need them fail until then; tell the user what each is for. You can't approve them.` : "";
@@ -628,7 +630,7 @@ export function registerMinis(
 
   bb.agents.registerTool({
     name: "minis_create",
-    description: `Create a Studio mini app: a small interactive app with its own data that shows live in chat (::mini{id="…"}), in pages and in its own tab. Use it instead of a playground or an HTML artifact whenever the user wants something to interact with, keep data in, or come back to.\n${API_HELP}`,
+    description: `Create a Studio mini app: a small interactive app with its own data that shows live in chat (as the card line the result gives), in pages and in its own tab. Use it instead of a playground or an HTML artifact whenever the user wants something to interact with, keep data in, or come back to.\n${API_HELP}`,
     parameters: z.object({
       name: z.string().trim().min(1).max(LIMITS.name),
       files: filesParam.optional(),

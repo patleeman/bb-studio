@@ -1,21 +1,25 @@
 ---
 name: minis
 description: >-
-  Use when the user wants something interactive they can use, keep data in or come back to — a tracker, board, calculator, form, poll, checklist, small tool, or a chart or visualization to play with — or refers to a Studio mini app: a ::mini card, a /plugins/studio/studio/minis/<id> link, an @mini mention, "my mini app". Prefer a mini app over a playground or a one-off HTML file.
+  Use when the user wants something interactive they can use, keep data in or come back to — a tracker, board, calculator, form, poll, checklist, small tool, or a chart or visualization to play with — or refers to a Studio mini app: a ::mini or ::app card, a /plugins/studio/studio/minis/<id> link, an @mini mention, "my mini app". Prefer a mini app over a playground or a one-off HTML file.
 ---
 
 # Mini apps
 
-A mini app is a small interactive app built into Studio: React source, a
-manifest, and its own data. It shows live in chat, in pages and in its own
+A mini app is Studio's interactive app, one of its two app types (the other
+is a saved artifact, the `artifacts` skill): React source, a manifest, and
+its own data. It shows live in chat, in pages and in its own
 tab, and every place shares the same data. The user's open copies update when
 you change its source or records.
 
-Show one in a reply with the card on its own line:
+Show one in a reply with the card line `minis_create` gives, on its own line:
 
 ```
 ::mini{id="mini_0123456789abcdef"}
 ```
+
+When your instructions say to write `::app` (Studio's App cards setting),
+the line is `::app{id="mini_0123456789abcdef"}`.
 
 Embed one in a page with an embed block `{"kind":"mini","target":"mini_…"}`.
 Link to one as `[Name](/plugins/studio/studio/minis/<id>)`.
