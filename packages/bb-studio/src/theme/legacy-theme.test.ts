@@ -19,6 +19,12 @@ describe("the old BB Studio palette", () => {
     expect(store.set).toHaveBeenCalledTimes(1);
   });
 
+  it("writes Default once over a Default BB shows because the teal palette is gone, so the stored choice is Default too", async () => {
+    const store = deps(DEFAULT_THEME_ID);
+    await expect(retireLegacyThemeOnce(store)).resolves.toBe(true);
+    expect(store.set).toHaveBeenCalledWith(DEFAULT_THEME_ID);
+  });
+
   it("leaves any other choice alone", async () => {
     const store = deps("nord");
     await expect(retireLegacyThemeOnce(store)).resolves.toBe(false);

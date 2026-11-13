@@ -2771,9 +2771,10 @@ so it's as you left it when you come back.
   saved Studio tabs resolve inside Studio, keeping their workspace IDs.
 - **No BB theme of its own.** The old teal "BB Studio" palette
   (`plugin:studio:bb-studio`) is gone: Studio's scenes theme the app. Once
-  per install Studio moves a BB appearance still set to it back to BB's
-  Default (`src/theme/legacy-theme.ts`), so no teal step shows between BB's
-  colors and the scene at launch.
+  per install Studio writes BB's Default over an appearance that is
+  Default or still set to it (BB already shows Default for the missing
+  palette; the write replaces the stored id), so no teal step shows at
+  launch (`src/theme/legacy-theme.ts`).
 - **Automations tab.** In a thread's side panel, **+ → Automations** lists the
   automations that wake that thread: the name, the schedule in words (such as
   "Every 30 min" or "Weekdays 9:00"; other crons show as written), when it

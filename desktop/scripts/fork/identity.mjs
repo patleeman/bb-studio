@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +15,19 @@ const UPDATE_BASE = "https://updates.invalid/bb-studio/";
 const UPSTREAM_UPDATE_BASE = "https://github.com/get-bb/bb/releases/download/";
 
 const edits = [
+  [
+    "packages/config/src/env-vars.ts",
+    [
+      [
+        /export const DEFAULT_BB_POSTHOG_API_KEY =\s*"phc_[A-Za-z0-9]+";/,
+        'export const DEFAULT_BB_POSTHOG_API_KEY = "";',
+      ],
+      [
+        "export const DEFAULT_BB_TELEMETRY = true;",
+        "export const DEFAULT_BB_TELEMETRY = false;",
+      ],
+    ],
+  ],
   [
     "packages/config/src/runtime.ts",
     [
@@ -176,14 +189,49 @@ for (const [file, pairs] of edits) {
   let text = readFileSync(target, "utf8");
   for (const [from, to] of pairs) {
     if (text.includes(to)) continue;
-    if (!text.includes(from)) {
+    const found = from instanceof RegExp ? from.test(text) : text.includes(from);
+    if (!found) {
       console.error(`NOT FOUND ${file}: ${from}`);
       failed = true;
       continue;
     }
-    text = text.replaceAll(from, to);
+    text =
+      from instanceof RegExp
+        ? text.replace(from, to)
+        : text.replaceAll(from, to);
   }
   writeFileSync(target, text);
+}
+
+const KNOWN_TELEMETRY_FILES = new Set([
+  "apps/server/src/services/system/telemetry.ts",
+  "apps/server/src/services/system/setup-guide-experiment.ts",
+]);
+const telemetryGrep = spawnSync(
+  "git",
+  [
+    "grep",
+    "-l",
+    "-E",
+    "https?://[a-z0-9.-]*(posthog|sentry|segment|amplitude|mixpanel)\\.(com|io)",
+    "--",
+    "apps/app/src",
+    "apps/desktop/src",
+    "apps/server/src",
+    "apps/host-daemon/src",
+    "packages/*/src",
+    "plugins",
+    ":!*.test.*",
+    ":!*.stories.*",
+  ],
+  { cwd: root, encoding: "utf8" },
+);
+for (const file of telemetryGrep.stdout.split("\n").filter(Boolean)) {
+  if (KNOWN_TELEMETRY_FILES.has(file)) continue;
+  console.error(
+    `TELEMETRY HOST in ${file}: check that BB Studio does not send to it, then add the file to KNOWN_TELEMETRY_FILES`,
+  );
+  failed = true;
 }
 
 const assets = join(root, "apps/desktop/assets");
@@ -238,5 +286,5 @@ for (const key of overlaps) {
 
 if (failed) process.exitCode = 1;
 console.log(
-  `identity applied: BB Studio, nyc.plee.bbstudio, ~/.bb-studio, ports 38986 and 38987, updates from ${studioIdentity.updateFeed}, based on bb ${upstreamVersion} @ ${upstreamBase.slice(0, 7)}`,
+  `identity applied: BB Studio, nyc.plee.bbstudio, ~/.bb-studio, ports 38986 and 38987, updates from ${studioIdentity.updateFeed}, no usage telemetry, based on bb ${upstreamVersion} @ ${upstreamBase.slice(0, 7)}`,
 );

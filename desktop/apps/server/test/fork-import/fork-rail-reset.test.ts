@@ -54,6 +54,25 @@ describe("fork rail reset", () => {
     expect(existsSync(join(dir, "fork-rail-reset.json"))).toBe(true);
   });
 
+  it("marks a new data dir as reset, so a fresh install keeps the footer and rail it sets on its first run", () => {
+    const dir = mkdtempSync(join(tmpdir(), "fork-rail-reset-"));
+    dirs.push(dir);
+    resetForkRailPreferences(dir, 5);
+    expect(existsSync(join(dir, "fork-rail-reset.json"))).toBe(true);
+    const database = new Database(join(dir, "bb.db"));
+    database.exec(
+      "CREATE TABLE ui_preferences (key TEXT PRIMARY KEY, value_json TEXT NOT NULL, revision INTEGER NOT NULL, updated_at INTEGER NOT NULL)",
+    );
+    database
+      .prepare(
+        "INSERT INTO ui_preferences VALUES ('sidebar.hiddenFooterItems', '[]', 1, 0)",
+      )
+      .run();
+    database.close();
+    resetForkRailPreferences(dir, 9);
+    expect(storedKeys(dir)).toEqual(["sidebar.hiddenFooterItems"]);
+  });
+
   it("does nothing once the reset has run", () => {
     const dir = dataDirWith([]);
     resetForkRailPreferences(dir, 5);

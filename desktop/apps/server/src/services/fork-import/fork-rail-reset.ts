@@ -12,7 +12,11 @@ const RESET_KEYS = [
 export function resetForkRailPreferences(dataDir: string, now: number): void {
   const databasePath = join(dataDir, "bb.db");
   const markerPath = join(dataDir, MARKER_FILE_NAME);
-  if (!existsSync(databasePath) || existsSync(markerPath)) return;
+  if (existsSync(markerPath)) return;
+  if (!existsSync(databasePath)) {
+    writeFileSync(markerPath, `${JSON.stringify({ resetAt: now })}\n`);
+    return;
+  }
   const database = new Database(databasePath, { fileMustExist: true });
   try {
     const hasTable = database

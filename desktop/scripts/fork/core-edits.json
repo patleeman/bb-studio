@@ -93,7 +93,7 @@
     },
     "apps/app/src/components/sidebar/AppSidebar.tsx": {
       "seam": "sidebar",
-      "intent": "Renders PluginSidebarSections (ForkSidebarSections.tsx, imported at the top of the file) under the thread list. Nothing else: the rail and the sidebar footer are upstream's.",
+      "intent": "Renders PluginSidebarSections (ForkSidebarSections.tsx, imported at the top of the file) under the thread list, and once more with placement=\"footer\" right before the footer. Nothing else: the rail and the sidebar footer are upstream's.",
       "budget": 5
     },
     "apps/app/src/components/thread/timeline/ThreadTimelineRows.tsx": {
@@ -327,9 +327,9 @@
       "budget": 7
     },
     "apps/desktop/src/preload.ts": {
-      "seam": "approvals, windows, studio-release",
-      "intent": "Exposes experimental_answerApproval and experimental_window on window.bbDesktop; each invokes the main process. It also exposes experimental_studioBuild (the Studio version and its bb base, from studio-release.fork.ts).",
-      "budget": 11
+      "seam": "approvals, windows, studio-release, launch-theme",
+      "intent": "Exposes experimental_answerApproval and experimental_window on window.bbDesktop; each invokes the main process. It also exposes experimental_studioBuild (the Studio version and its bb base, from studio-release.fork.ts). It spreads forkLaunchThemeApi(ipcRenderer) (fork-launch-theme-preload.ts) into the API: that paints the main window from the cached backdrop appearance before the page runs and adds experimental_launchAppearance and experimental_saveLaunchAppearance.",
+      "budget": 13
     },
     "packages/desktop-contract/src/info.ts": {
       "seam": "approvals, windows",
@@ -475,6 +475,21 @@
       "seam": "host-entries",
       "intent": "One fork import at the top; the cliSkills condition is met unless a plugin hides the \"cli-skills\" settings section (useForkHostSettingHidden), listed with the other conditions and in the memo's dependencies.",
       "budget": 4
+    },
+    "apps/app/src/components/settings/settings-nav.tsx": {
+      "seam": "host-entries",
+      "intent": "One fork import at the top; useSettingsNavSections passes its list through useForkVisibleSettingsSections, so a Settings page a plugin hides leaves the list, the command palette and settings search; useSettingsNavState reports a hidden page's address as unknown, which SettingsView sends to General.",
+      "budget": 8
+    },
+    "apps/app/src/components/sidebar/sidebarFooterPreferences.ts": {
+      "seam": "host-entries",
+      "intent": "One fork import at the top; useSidebarFooterPreferences passes its item list through useForkVisibleFooterItems, so a footer item a plugin hides (by key) leaves the footer, More and Customize.",
+      "budget": 5
+    },
+    "apps/desktop/src/desktop-window-factory.ts": {
+      "seam": "launch-theme",
+      "intent": "One fork import at the top; a new window's backgroundColor is the cached launch background (forkWindowBackground in fork-launch-theme-file.ts), falling back to bb's #151515 or #ffffff, so the first frame already has the theme's color.",
+      "budget": 6
     }
   }
 }

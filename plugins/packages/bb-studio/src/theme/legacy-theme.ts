@@ -11,7 +11,7 @@ export interface LegacyThemeDeps {
 export async function retireLegacyThemeOnce(deps: LegacyThemeDeps): Promise<boolean> {
   if (await deps.kv.get(LEGACY_THEME_KV_KEY)) return false;
   const { themeId } = await deps.get();
-  const moved = themeId === LEGACY_THEME_ID;
+  const moved = themeId === LEGACY_THEME_ID || themeId === DEFAULT_THEME_ID;
   if (moved) await deps.set(DEFAULT_THEME_ID);
   await deps.kv.set(LEGACY_THEME_KV_KEY, true);
   return moved;

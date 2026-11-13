@@ -20,12 +20,16 @@ export interface ExperimentalSidebarSectionProps {
   isCompactViewport: boolean;
   /** Call after the user opens something. It closes the mobile sidebar drawer. */
   onNavigate: () => void;
+  placement: ExperimentalSidebarSectionPlacement;
 }
+
+export type ExperimentalSidebarSectionPlacement = "list" | "footer";
 
 /**
  * Registration for `slots.experimental_sidebarSection`: a section of the
  * plugin's own rows in the sidebar, below the thread list and scrolling with
- * it. The component draws its own heading and rows. Experimental: see
+ * it, or with `placement: "footer"` above the sidebar footer, outside the
+ * scroll. The component draws its own heading and rows. Experimental: see
  * docs/api_to_audit.md.
  */
 export interface ExperimentalSidebarSectionRegistration {
@@ -33,6 +37,7 @@ export interface ExperimentalSidebarSectionRegistration {
   id: string;
   /** Names the section for assistive technology and crash messages. */
   title: string;
+  placement?: ExperimentalSidebarSectionPlacement;
   component: ComponentType<ExperimentalSidebarSectionProps>;
 }
 
@@ -851,11 +856,15 @@ export type ExperimentalHostPage = "skills";
 
 export type ExperimentalHostSetting = "cli-skills";
 
+export type ExperimentalHostSettingsSection = "mobile";
+
 export interface ExperimentalHideHostEntriesRegistration {
   id: string;
   navigation?: readonly string[];
   pages?: readonly ExperimentalHostPage[];
   settings?: readonly ExperimentalHostSetting[];
+  settingsSections?: readonly ExperimentalHostSettingsSection[];
+  footer?: readonly string[];
 }
 
 /**
