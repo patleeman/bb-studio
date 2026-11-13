@@ -1,3 +1,4 @@
+import { noteTitleOutcome } from "./title-retry.fork.js";
 import type { PromptInput, ProvisioningTranscriptEntry } from "@bb/domain";
 import type { LoggedWorkSessionDeps } from "../../types.js";
 import { appendThreadProvisioningEvent } from "./thread-events.js";
@@ -71,6 +72,7 @@ export async function inferThreadMetadata(
     input: args.input,
     threadId: args.threadId,
   });
+  noteTitleOutcome(deps, args, outcome);
 
   if (args.writeTranscript) {
     appendThreadProvisioningEvent(deps, {
