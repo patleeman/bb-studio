@@ -17,6 +17,7 @@ export const LIBRARY_KINDS: readonly { id: LibraryKindFilter; label: string }[] 
   { id: "whiteboard", label: "Whiteboard" },
   { id: "design", label: "Design" },
   { id: "app", label: "App" },
+  { id: "recording", label: "Recording" },
 ];
 export const LIBRARY_APP_TYPES: readonly { id: LibraryAppType; label: string }[] = [
   { id: "all", label: "All apps" },
@@ -29,7 +30,7 @@ export const LIBRARY_GROUPS: readonly { id: LibraryGroupBy; label: string }[] = 
   { id: "date", label: "Date" },
 ];
 
-const KIND_LABEL: Record<LibraryKind, string> = { page: "Page", whiteboard: "Whiteboard", design: "Design", app: "App", artifact: "App", other: "Other" };
+const KIND_LABEL: Record<LibraryKind, string> = { page: "Page", whiteboard: "Whiteboard", design: "Design", app: "App", artifact: "App", recording: "Recording", other: "Other" };
 export const kindLabel = (kind: LibraryKind): string => KIND_LABEL[kind];
 const listedKind = (kind: LibraryKind): LibraryKind => kind === "artifact" ? "app" : kind;
 
@@ -116,7 +117,7 @@ export function dateGroup(at: number, now: number): { key: string; title: string
   return { key: "older", title: "Older", order: 4 };
 }
 
-const KIND_ORDER: readonly LibraryKind[] = ["page", "whiteboard", "design", "app", "other"];
+const KIND_ORDER: readonly LibraryKind[] = ["page", "whiteboard", "design", "app", "recording", "other"];
 
 /** The files that pass, in groups; each group newest first, the groups by their newest file (kinds and dates in their own order). */
 export function libraryGroups(items: readonly LibraryItem[], options: { query: string; kind: LibraryKindFilter; appType?: LibraryAppType; groupBy: LibraryGroupBy }, now: number): LibraryGroup[] {

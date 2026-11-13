@@ -113,7 +113,7 @@ const STOPPED_NOTE = "Studio notice: something you own stopped after failing. Yo
 import { AutoResume, type ResumeTarget } from "./src/auto-resume";
 import { ThreadResume, type ThreadOwner } from "./src/thread-resume";
 import { BotOwnedThreads } from "./src/bot-owned";
-import { registerBotThreads } from "./src/bot-threads-server";
+import { recordingFiles, registerBotThreads } from "./src/bot-threads-server";
 import { BotSignal, type BotChange } from "./src/bot-signal";
 import { BOT_THREADS_CHANNEL } from "./src/bot-threads-contract";
 import { readMirroredSince, readMirrorLive } from "./src/mirror-live";
@@ -1011,7 +1011,7 @@ export default async function plugin(bb: BbPluginApi) {
       internal: learning.reviewThreads(),
       managedBot: (threadId) => ownedThreads.ownerOf(threadId),
     }),
-    items: () => itemIndex.list({ limit: 2000 }),
+    items: () => [...itemIndex.list({ limit: 2000 }), ...(builtinOn(kindSettings.current, "talk") ? recordingFiles(recordings.store.list({ limit: 500 })) : [])],
     originThreads: () => services.originThreads(),
     creatorThreads: () => services.creatorThreads(),
     starred: () => new Set(stars.map().keys()),

@@ -103,7 +103,7 @@ const threadInfo = z.object({
   workers: z.array(z.object({ threadId: z.string(), title: z.string(), status: workerStatus })),
 });
 
-const libraryKind = z.enum(["page", "whiteboard", "design", "app", "artifact", "other"]);
+const libraryKind = z.enum(["page", "whiteboard", "design", "app", "artifact", "recording", "other"]);
 const libraryItem = z.object({
   pluginId: z.string(),
   id: z.string(),

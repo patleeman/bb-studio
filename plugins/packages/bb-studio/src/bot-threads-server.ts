@@ -28,6 +28,8 @@ import type { BotSpace, BotThreadInfo, LibraryItem, LibraryKind, NewConversation
 import type { ReasoningLevel } from "./kit/reasoning";
 import type { IndexedItem } from "./item-index";
 import { familyHref, itemType } from "./item-model";
+import type { Recording } from "./kit/talk-contract";
+import { PLUGIN_ID as TALK_PLUGIN_ID, recordingHref } from "./talk/shared/format";
 
 type Bb = Pick<BbPluginApi, "events" | "sdk" | "agents">;
 
@@ -41,7 +43,7 @@ export interface BotThreadsServerDeps {
   /** Studio's facts (src/bot-threads.ts Signals), without the current Bot, which the store keeps. */
   signals(): Omit<Signals, "focusedBotId">;
   /** Studio's items, newest first, for the Library. */
-  items(): readonly IndexedItem[];
+  items(): readonly LibrarySource[];
   /** The thread that made each item, by `<plugin>:<id>`. */
   originThreads(): ReadonlyMap<string, string>;
   /** The agent thread each item's first activity names, by `<plugin>:<id>` (a worker that made it through Main). */
@@ -84,7 +86,16 @@ export function libraryKind(type: string | null | undefined): LibraryKind {
   if (type === "design") return "design";
   if (type === "mini") return "app";
   if (type === "artifact") return "artifact";
+  if (type === "recording") return "recording";
   return "other";
+}
+
+export type LibrarySource = Pick<IndexedItem, "pluginId" | "id" | "title" | "createdAt" | "updatedAt" | "archived" | "template"> & { type: string; href?: string };
+
+export function recordingFiles(recordings: readonly Pick<Recording, "id" | "kind" | "title" | "createdAt" | "updatedAt" | "archived">[]): LibrarySource[] {
+  return recordings.filter((each) => each.kind === "recording").map((each) => ({
+    pluginId: TALK_PLUGIN_ID, id: each.id, type: "recording", title: each.title, createdAt: each.createdAt, updatedAt: each.updatedAt, archived: each.archived, template: false, href: recordingHref(each.id),
+  }));
 }
 
 /**
@@ -109,7 +120,7 @@ export function fileOrigin(key: string, origins: ReadonlyMap<string, string>, cr
 export function libraryItems(input: {
   botId: string;
   primaryId: string | null;
-  items: readonly IndexedItem[];
+  items: readonly LibrarySource[];
   origins: ReadonlyMap<string, string>;
   /** The agent thread each item's first activity names; a worker there gets the credit over Main. */
   creators?: ReadonlyMap<string, string>;
@@ -129,7 +140,7 @@ export function libraryItems(input: {
     const info = itemType(item.type);
     result.push({
       pluginId: item.pluginId, id: item.id, title: item.title.trim() || "Untitled", kind: libraryKind(item.type), type: item.type,
-      href: info ? familyHref(info.family, item.id) : null, updatedAt: item.updatedAt, createdAt: item.createdAt || null,
+      href: item.href ?? (info ? familyHref(info.family, item.id) : null), updatedAt: item.updatedAt, createdAt: item.createdAt || null,
       madeIn: origin ? { threadId: origin, title: input.title(origin), kind: rec?.kind ?? "conversation", conversationId, conversationTitle: conversationId ? input.title(conversationId) : null } : null,
       starred: input.starred?.has(key) ?? false,
     });

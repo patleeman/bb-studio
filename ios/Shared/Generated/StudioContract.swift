@@ -20070,6 +20070,7 @@ public enum Studio {
     case design
     case app
     case artifact
+    case recording
     case other
     case unknown(String)
 
@@ -20081,6 +20082,7 @@ public enum Studio {
       case "design": self = .design
       case "app": self = .app
       case "artifact": self = .artifact
+      case "recording": self = .recording
       case "other": self = .other
       default: self = .unknown(value)
       }
@@ -20094,6 +20096,7 @@ public enum Studio {
       case .design: try container.encode("design")
       case .app: try container.encode("app")
       case .artifact: try container.encode("artifact")
+      case .recording: try container.encode("recording")
       case .other: try container.encode("other")
       case .unknown(let value): try container.encode(value)
       }

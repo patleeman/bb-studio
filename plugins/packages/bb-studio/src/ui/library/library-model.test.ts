@@ -48,8 +48,14 @@ it("lists saved apps (artifacts) under App, with Interactive and Saved narrowing
   expect(ids("interactive")).toEqual(["timer"]);
   expect(ids("saved")).toEqual(["report"]);
   expect(libraryGroups(withSaved, { query: "", kind: "all", groupBy: "kind" }, NOW).map((group) => [group.title, group.items.length])).toEqual([["Pages", 3], ["Designs", 1], ["Apps", 2]]);
-  expect(LIBRARY_KINDS.map((each) => each.label)).toEqual(["All", "Starred", "Page", "Whiteboard", "Design", "App"]);
+  expect(LIBRARY_KINDS.map((each) => each.label)).toEqual(["All", "Starred", "Page", "Whiteboard", "Design", "App", "Recording"]);
   expect(LIBRARY_APP_TYPES.map((each) => each.label)).toEqual(["All apps", "Interactive", "Saved"]);
+});
+
+it("lists recordings under Recording, and as a Recordings group after Apps", () => {
+  const withRecording = [...files, item({ id: "rec_call", pluginId: "talk", title: "Supplier call", kind: "recording", type: "recording", updatedAt: NOW - 3 * 60_000 })];
+  expect(libraryGroups(withRecording, { query: "", kind: "recording", groupBy: "date" }, NOW).flatMap((group) => group.items.map((each) => each.id))).toEqual(["rec_call"]);
+  expect(libraryGroups(withRecording, { query: "", kind: "all", groupBy: "kind" }, NOW).map((group) => group.title)).toEqual(["Pages", "Designs", "Apps", "Recordings"]);
 });
 
 it("shows only starred files under Starred, whatever their kind", () => {
