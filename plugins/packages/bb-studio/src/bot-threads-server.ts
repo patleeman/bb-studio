@@ -278,9 +278,13 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     if (!id) return { botId: null, conversations: [], workers: [], finished: [] };
     const { records, threads } = await botRows(id);
     const rest = olderView(id, records, threads, Date.now());
-    const finished = records.filter((rec) => rec.botId === id && rec.kind === "conversation" && rec.archivedAt !== null && rec.finishedSummary !== null)
-      .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0)).slice(0, 200)
-      .map((rec) => ({ threadId: rec.threadId, title: rec.title?.trim() || "Untitled conversation", finishedAt: rec.archivedAt!, summary: rec.finishedSummary! }));
+    const done = records.filter((rec) => rec.botId === id && rec.kind === "conversation" && rec.archivedAt !== null && rec.finishedSummary !== null)
+      .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0)).slice(0, 200);
+    const archived = done.length
+      ? await bb.sdk.threads.list({ threadIds: done.map((rec) => rec.threadId), archived: true, includeHidden: true, limit: 200 } as never).catch(() => []) as ThreadFacts[]
+      : [];
+    const bbTitles = new Map(archived.map((thread) => [thread.id, thread.title?.trim() || thread.titleFallback?.trim() || null]));
+    const finished = done.map((rec) => ({ threadId: rec.threadId, title: rec.title?.trim() || bbTitles.get(rec.threadId) || "Untitled conversation", finishedAt: rec.archivedAt!, summary: rec.finishedSummary! }));
     return { ...rest, finished };
   };
 
