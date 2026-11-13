@@ -67,6 +67,7 @@ it("shows nothing with no open work, finished cards included", async () => {
   state.list = [card({ id: "wc_open" }), card({ state: "done", finishedAt: NOW - 1_000 })];
   await renderList();
   expect(rows().map((row) => row.dataset.state)).toEqual(["running", "done"]);
+  expect(rows()[1]!.textContent).not.toContain("2/5 Sign");
   expect(q('[data-testid="in-flight-count"]')!.textContent).toBe("1");
   state.composerThread = null;
   await renderList();

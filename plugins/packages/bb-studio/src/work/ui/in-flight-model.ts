@@ -1,5 +1,6 @@
 import type { WorkCard } from "../contract";
 import { isFinished } from "../shared";
+import { shownStep } from "./model";
 
 export function inFlightRows(cards: readonly WorkCard[]): WorkCard[] {
   return cards.some((card) => !isFinished(card)) ? [...cards] : [];
@@ -15,7 +16,7 @@ export function needsYouCount(cards: readonly WorkCard[]): number {
 
 export function rowDetail(card: Pick<WorkCard, "state" | "step" | "line" | "needs">): string | null {
   if (card.state === "needs-you" && card.needs) return card.needs;
-  return [card.step, card.line].filter(Boolean).join(" · ") || null;
+  return [shownStep(card), card.line].filter(Boolean).join(" · ") || null;
 }
 
 export function messageLinkPath(pathname: string, threadId: string, seq: number): string | null {

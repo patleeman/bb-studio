@@ -7,7 +7,7 @@ import { Icon, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import type { WorkCard } from "../contract";
 import { WORK_ID, type WorkState } from "../shared";
-import { KIND, STATE } from "./model";
+import { KIND, shownStep, STATE } from "./model";
 
 export function StateGlyph({ state, className }: { state: WorkState; className?: string }) {
   if (state === "running") return <span role="img" aria-label={STATE.running} className={cn("size-2 shrink-0 animate-spin rounded-full border-[1.5px] border-success border-r-transparent motion-reduce:animate-none", className)} />;
@@ -45,10 +45,11 @@ export function WorkCardView({ card, now = Date.now() }: { card: WorkCard; now?:
   const kind = KIND[card.kind];
   const worker = card.workerThreadId;
   const open = worker ? () => navigate.toThread(worker) : undefined;
+  const step = shownStep(card);
   return (
     <ChatCard data-testid="work-card" data-work-card-id={card.id} data-state={card.state} className="studio-work-card">
       <ChatCardHeader icon={kind.icon} title={card.title} onOpen={open}
-        meta={<>{kind.label}{card.step ? <> · <span data-testid="work-step">{card.step}</span></> : null}</>}
+        meta={<>{kind.label}{step ? <> · <span data-testid="work-step">{step}</span></> : null}</>}
         actions={<>
           <span className={cn("shrink-0 text-xs text-muted-foreground", !open && "pr-1.5")} title={new Date(card.updatedAt).toLocaleString()}>{relativeTime(card.updatedAt, now)}</span>
           {open ? <ChatCardIconButton icon="ArrowUpRight" label={`Open ${card.kind === "lead" ? "lead" : "worker"}`} data-testid="work-open" onClick={open} /> : null}

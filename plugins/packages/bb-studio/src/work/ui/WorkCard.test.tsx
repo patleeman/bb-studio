@@ -69,6 +69,17 @@ it("redraws in place when the card changes, and shows what Patrick needs to do",
   expect(q('[data-testid="work-needs"]')).toBeNull();
 });
 
+it("says Done once: a finished card drops its last step from the header", async () => {
+  state.get = card({ kind: "worker", state: "done", step: "Done", line: "Saved page", finishedAt: NOW });
+  await renderCard();
+  expect(q('[data-testid="work-step"]')).toBeNull();
+  expect(q("[data-studio-card-meta]")!.textContent).toBe("Worker");
+  expect(text().match(/Done/g)).toHaveLength(1);
+  state.get = card({ state: "failed", step: "4/5 Upload", finishedAt: NOW });
+  await renderCard();
+  expect(q('[data-testid="work-step"]')).toBeNull();
+});
+
 it("opens the worker doing the work from the open icon at the end of its header, with no footer link", async () => {
   state.get = card({ kind: "worker", workerThreadId: "thr_worker" });
   await renderCard();
