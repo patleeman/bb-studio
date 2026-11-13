@@ -1522,15 +1522,8 @@ collection. If you still have the old plugin, see
 A seeded "Offline mode launch" page, opened from its old
 `/plugins/pages/pages/<id>` address, lands as a Studio tab: a tip callout, a
 stats block, a stacked bar chart of weekly active teams and a launch
-checklist, with Dictate, Version history, Comments and the page menu in the
+checklist, with Dictate, Version history and the page menu in the
 tab's row. Captured in a staged BB (stable BB 0.46.0). Recapture with `BB_CAPTURE_ONLY=pages`.
-
-![Page comments with dictation in the reply box](assets/pages-comments.png)
-
-An anchored comment and a reply, both dictated through Talk into the comment
-drafts and saved explicitly; the page body is unchanged. The microphone also
-fits the [phone comment sheet](assets/pages-comments-mobile.png). Recapture
-with `BB_CAPTURE_ONLY=pages-comments`.
 
 ![The compact page header](assets/pages-compact-header.png)
 
@@ -1588,9 +1581,9 @@ The compact page header at 390 pixels, with **Item actions** open.
   write.
 - **Mentions.** Type `@` to mention another page, a BB thread, a
   Studio item, or a date. Page and thread mentions open where they point.
-- **Comments.** Select text to comment on it. Threads show in a floating
-  card where you can reply, react, edit, and resolve. Agents can read, start,
-  reply to, and resolve threads. Clients without the editor, like the BB
+- **Comments.** Agents can read, start, reply to, and resolve comment
+  threads on a page. The desktop editor has no comment UI: text a thread is
+  anchored to reads as plain text. Clients without the editor, like the BB
   Studio phone app, use Studio's `pages.comments`, `pages.commentBlocks`,
   `pages.commentCreate`, `pages.commentReply` and `pages.commentResolve` RPCs,
   which write as you.
@@ -1948,7 +1941,7 @@ the old plugin, see [docs/upgrade-unified-studio.md](../../docs/upgrade-unified-
 
 The seeded "Orbit onboarding" design: one round, "Welcome screen", with two
 live options side by side, `1a` (desktop) and `1b` (phone), and the floating
-pills for Reload, **Select** / **Edit text** / **Comment**, Present and zoom.
+pills for Reload, **Select** / **Edit text**, Present and zoom.
 Recapture with `BB_CAPTURE_ONLY=design`, which opens it from its old
 `/plugins/design/designs/<id>` address and checks that it lands as a Studio
 tab; the prototype and deck captures do the same.
@@ -1985,10 +1978,10 @@ The same deck presented with Play and moved on with →: "Why it matters",
   as one `slide` screen whose steps are its slides. **Play** presents it
   (←/→, Space, Page Up/Down, Home, End, **Full screen**, **Export PDF**,
   **Download HTML**).
-- **Edit text and comments.** In **Edit text** mode, click text on a screen
-  and type over it; the change is written into the screen's HTML. In
-  **Comment** mode, pin a note to an element; **Send to agent** posts it, with
-  the element's selector and markup, to the design's thread.
+- **Edit text.** In **Edit text** mode, click text on a screen and type over
+  it; the change is written into the screen's HTML. The canvas has no comment
+  mode; agents read and resolve a design's existing comments with
+  `design_comments` and `design_resolve_comments`.
 - **Card in the agent's reply** (`::design{id="…"}`) with the newest round's
   first screens. It opens the design in the thread's **Studio** tab beside
   the chat; back from it, the tab lists the thread's items, designs among them.
@@ -1999,7 +1992,7 @@ The same deck presented with Play and moved on with →: "Why it matters",
   beside the design's own. It loads each screen at its size with Browser
   Automation, checks layout, errors and the design rules, and reports back
   only when something needs work, in the design's thread. After 3 such
-  reviews in a row, automatic review pauses until you edit, comment or ask.
+  reviews in a row, automatic review pauses until you edit or ask.
 - **Agent tools and skill.** `design_list`, `design_create`, `design_rename`,
   `design_read`, `design_ask`, `design_ready`, `design_write_screen`,
   `design_edit_screen`, `design_comments`, `design_resolve_comments`,

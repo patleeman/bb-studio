@@ -1,6 +1,5 @@
 /* BlockNote ships its own greys and font. Point them at BB's theme so pages
-   follow whichever theme is active. Comment composers are nested editors
-   with their own color scheme, hence the second selector. */
+   follow whichever theme is active. */
 .pages-editor.bn-root[data-color-scheme],
 .pages-editor .bn-root[data-color-scheme] {
   --bn-font-family: var(--font-sans);
@@ -104,18 +103,16 @@
 .pages-editor .ProseMirror .column-resize-handle {
   background-color: var(--primary);
 }
-.pages-editor .bn-thread-mark:not([data-orphan="true"]) {
-  background: color-mix(in oklch, #facc15 22%, transparent);
-}
+.pages-editor .bn-thread-mark:not([data-orphan="true"]),
 .pages-editor .bn-thread-mark .bn-thread-mark-selected {
-  background: color-mix(in oklch, #facc15 38%, transparent);
+  background: none;
+  cursor: inherit;
 }
 /* Empty-block hints read like BB's input placeholders. */
 .pages-editor .bn-block-content:has(.ProseMirror-trailingBreak:only-child)::after {
   font-style: normal;
   color: var(--muted-foreground);
 }
-/* Only the page body: comment composers are nested BlockNote editors. */
 .pages-main > .bn-editor {
   background: transparent;
   padding-inline: 54px;
@@ -123,11 +120,6 @@
 }
 .pages-main > .bn-editor:focus {
   outline: none;
-}
-/* Leave room for the comment microphone without covering the draft text. */
-.pages-comment-dictation .bn-comment-editor .bn-editor {
-  padding-right: 44px;
-  min-height: 40px;
 }
 /* Slash and @ menus: single-line rows sized like BB's own menus. */
 .pages-editor .bn-suggestion-menu {
@@ -177,50 +169,6 @@
 .pages-editor .pages-embed svg:not([class*="size-"]) {
   width: revert-layer;
   height: revert-layer;
-}
-/* Comment threads: a compact card that matches BB's popovers rather than
-   BlockNote's roomier default. */
-.pages-editor .bn-thread {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--card);
-  box-shadow: 0 6px 24px rgb(0 0 0 / 0.18);
-}
-.pages-editor .bn-thread > * {
-  padding-inline: 0;
-}
-/* The quoted text the thread is anchored to. */
-.pages-editor .bn-thread > :first-child:not(.bn-thread-comments) {
-  padding: 0;
-  font-size: 12px;
-  font-style: normal;
-  color: var(--muted-foreground);
-}
-.pages-editor .bn-thread-comments {
-  padding-block: 0;
-  gap: 14px;
-}
-.pages-editor .bn-thread-comments:last-child {
-  border-bottom: 0;
-}
-.pages-editor .bn-thread-comments:not(:last-child) {
-  padding-bottom: 12px;
-}
-.pages-editor .bn-comment-editor .bn-editor {
-  font-size: 14px;
-}
-.pages-comments .bn-thread {
-  box-shadow: none;
-  width: 100%;
-}
-.pages-comments .bn-threads-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 /* Phones: the side menu's drag handles need hover, so the body text can use

@@ -1,9 +1,7 @@
 // The script the screen route adds to every screen. Screens run sandboxed
 // with an opaque origin, so the canvas can't look inside them; this script
-// answers it over postMessage instead. In comment mode it outlines the
-// element under the pointer and reports the one clicked; on request it
-// reports where pinned elements are, so the canvas can place their pins.
-// Messages carry `bbDesign` so the screen's own messages pass untouched.
+// answers it over postMessage instead. Messages carry `bbDesign` so the
+// screen's own messages pass untouched.
 // Bump SCREEN_SCRIPT_VERSION (src/shared.ts) whenever this script changes.
 
 /**
@@ -12,29 +10,10 @@
  */
 const SCREEN_AGENT = String.raw`(() => {
   const MARK = "data-bb-design-ui";
-  let commenting = false;
   /** Edit mode: click an element's text to type over it. */
   let editing = false;
   let outline = null;
   const post = (message) => window.parent.postMessage(Object.assign({ bbDesign: true }, message), "*");
-
-  // Its id when unique, else a tag path from the nearest unique id or the body.
-  function selectorFor(element) {
-    const parts = [];
-    let node = element;
-    while (node && node !== document.body && node !== document.documentElement) {
-      if (node.id && document.querySelectorAll("#" + CSS.escape(node.id)).length === 1) {
-        parts.unshift("#" + CSS.escape(node.id));
-        return parts.join(" > ");
-      }
-      const tag = node.tagName.toLowerCase();
-      const parent = node.parentElement;
-      const siblings = parent ? Array.from(parent.children).filter((child) => child.tagName === node.tagName) : [];
-      parts.unshift(siblings.length > 1 ? tag + ":nth-of-type(" + (siblings.indexOf(node) + 1) + ")" : tag);
-      node = parent;
-    }
-    return parts.length ? "body > " + parts.join(" > ") : "body";
-  }
 
   function rectOf(element) {
     const rect = element.getBoundingClientRect();
@@ -58,7 +37,7 @@ const SCREEN_AGENT = String.raw`(() => {
     Object.assign(outline.style, { display: "block", left: (rect.x - 2) + "px", top: (rect.y - 2) + "px", width: (rect.width + 4) + "px", height: (rect.height + 4) + "px" });
   }
 
-  // Text with simple inline formatting can be edited in place; anything else takes a comment.
+  // Text with simple inline formatting can be edited in place.
   // Keep INLINE in step with INLINE_TAGS in src/server/text-edit.ts.
   const INLINE = /^(BR|EM|STRONG|B|I|U|S|SPAN|A|SMALL|MARK|CODE|SUB|SUP)$/;
   const inlineOnly = (element) => Array.from(element.querySelectorAll("*")).every((child) => INLINE.test(child.tagName));
@@ -101,32 +80,16 @@ const SCREEN_AGENT = String.raw`(() => {
   }
 
   document.addEventListener("mouseover", (event) => {
-    if (commenting) showOutline(target(event));
-    else if (editing && !document.activeElement?.isContentEditable) showOutline(editable(target(event)));
+    if (editing && !document.activeElement?.isContentEditable) showOutline(editable(target(event)));
   }, true);
   document.addEventListener("click", (event) => {
-    if (editing) {
-      const element = editable(target(event));
-      if (element?.isContentEditable) return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (element) startEdit(element, event);
-      else post({ type: "not-editable" });
-      return;
-    }
-    if (!commenting) return;
-    const element = target(event);
-    if (!element) return;
+    if (!editing) return;
+    const element = editable(target(event));
+    if (element?.isContentEditable) return;
     event.preventDefault();
     event.stopPropagation();
-    const html = element.outerHTML;
-    post({
-      type: "pick",
-      selector: selectorFor(element),
-      html: html.length > 4000 ? html.slice(0, 4000) + "…" : html,
-      text: (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim().slice(0, 300),
-      rect: rectOf(element),
-    });
+    if (element) startEdit(element, event);
+    else post({ type: "not-editable" });
   }, true);
 
   window.addEventListener("message", (event) => {
@@ -134,19 +97,9 @@ const SCREEN_AGENT = String.raw`(() => {
     const data = event.data;
     if (!data || !data.bbDesign) return;
     if (data.type === "mode") {
-      commenting = Boolean(data.on);
-      editing = !commenting && Boolean(data.edit);
-      document.documentElement.style.cursor = commenting ? "crosshair" : editing ? "text" : "";
-      if (!commenting && !editing) showOutline(null);
-    }
-    if (data.type === "locate") {
-      const rects = {};
-      for (const selector of data.selectors || []) {
-        let found = null;
-        try { found = document.querySelector(selector); } catch (error) { /* A stale selector finds nothing. */ }
-        rects[selector] = found ? rectOf(found) : null;
-      }
-      post({ type: "rects", rects });
+      editing = Boolean(data.edit);
+      document.documentElement.style.cursor = editing ? "text" : "";
+      if (!editing) showOutline(null);
     }
   });
 

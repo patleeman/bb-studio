@@ -53,7 +53,7 @@ describe("frontend bundle", () => {
   });
 
   it("loads the design canvas only when a design opens", () => {
-    expect(importersOf(join(packageDir, "app.tsx"), (spec) => /(^|\/)(design-view|canvas|play-view|comments)$/.test(spec))).toEqual([]);
+    expect(importersOf(join(packageDir, "app.tsx"), (spec) => /(^|\/)(design-view|canvas|play-view|screen-frames)$/.test(spec))).toEqual([]);
   });
 
   it("loads a recording's page only when one opens", () => {

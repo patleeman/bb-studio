@@ -173,7 +173,7 @@ passes its message's thread, and global surfaces (search, Talk, recording
 mentions in chat, the Talk "Go back" bridge) pass `"route"`, the container the
 main view shows. Code outside React uses `openPathIn` (a header action, with
 its panel) or `openPathFromRoute` (a content script). Links in a page's text
-and in its comments go through `PagesUi.openLink`, never a new window.
+go through `PagesUi.openLink`, never a new window.
 `studio-open.wiring.test.tsx` fails when a new file calls `openAppPath`,
 `useOpenMain`, `useOpenThreadTab` or `openWorkspaceItem` directly; Studio
 routes that aren't items (settings, the Bot pages, Loops, Setup), old-address

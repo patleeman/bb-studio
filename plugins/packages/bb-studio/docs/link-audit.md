@@ -147,8 +147,8 @@ the rule above; **n/a** says why it can't.
 
 - Links inside a design's screens: the screens render in sandboxed frames
   (`allow-popups`, no `allow-same-origin`), so a click in one can't be seen
-  from outside; it opens as the frame's popup. The design card in chat, the
-  design's header and its comments go through the router.
+  from outside; it opens as the frame's popup. The design card in chat and the
+  design's header go through the router.
 - A plain click on a bb route inside a transcript reaches the router only on
   a bb with the link-handlers seam's click capture (the fork patch in
   `/tmp/sn-link-router-fork`); on an older fork, bb navigates the main view
