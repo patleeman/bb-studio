@@ -230,7 +230,7 @@ in its secret files: OpenAI, OpenRouter, xAI, TypeSafe, Vercel AI Gateway,
 OpenCode Zen and your own Jev endpoint's key. Every other setting is Studio's
 own, in grouped sections below them: **Voice** (dictation and hands-free:
 model, voice, backend model and monthly limit), **Recordings and calls**,
-**Agent replies** (the Next row and reactions), **Threads** (Smart Queue,
+**Agent replies** (the Next row, reactions and App cards), **Threads** (Smart Queue,
 resume after a restart, Todos and page history), **Windows** (the launcher's
 shortcut; only in a BB with plugin windows, see [Windows](#windows)), **Jev** (the
 provider, its connection test, the fallback model and your own endpoint) and
@@ -1739,7 +1739,50 @@ The agent writes it as one line, and any group can be left out:
 
 Studio logs each suggestion once when it's shown and counts its clicks. The log keeps the last 180 days (at most 50,000 suggestions). `bb studio pages explore stats [--days 30]` prints how often each kind (reply, do, fix; older logs also have more, for the removed Tell me more, and explore, for the removed Visual explainer) is clicked and the most-clicked labels, so the instructions can be tuned from real use. Older replies with `::explore` or `::reactions` lines, or `explore` items in `::next`, still render.
 
-## Artifacts
+## Apps
+
+An app is either a saved output or an interactive tool with its own data.
+Studio shows both as one kind, **Apps**:
+
+- **Saved apps** are artifacts (`art_…`): images, HTML pages, reports and
+  files your agents make, kept with every version.
+- **Interactive apps** are mini apps (`mini_…`): React source and a manifest,
+  with their own records and state.
+
+The merge is on screen only. Each type keeps its id, its store and tables,
+its versions and its addresses, and every older address still opens it:
+`/plugins/studio/studio/apps/<id>`, `…/artifacts/<id>`, `…/minis/<id>`,
+`/plugins/artifacts/artifacts/<id>`, `bb://app/…` and `bb://artifact/…`.
+
+- **Library.** One Apps entry: the sidebar's Apps row (`family:app`), the
+  Apps choice in the Kind filter and the Bot Library's App pill. Under it,
+  **Interactive** and **Saved** narrow the list (`type:mini`,
+  `type:artifact`). Saved queries such as `kind:artifact`, `kind:mini` and
+  `type:artifact` show what they showed before.
+- **Setup → Kinds.** One Apps row. It is on when either type is on, and
+  turning it off or on sets both.
+- **Cards.** `::app{id="…"}` in a reply is one card for both types: the id's
+  prefix picks the saved app's card (`art_…`) or the live interactive app
+  (`mini_…`). The older `::artifact{…}` and `::mini{…}` lines render the same
+  card, so older replies keep working, and page embeds of kind `artifact` and
+  `mini` are unchanged. Each renderer follows its own type's Kinds switch, and
+  a mini app's grants, secrets and network never apply to an artifact.
+- **App cards** (Settings → Agent replies, `appCards`, off by default). Off,
+  agents write `::artifact` and `::mini` as before. On, their instructions and
+  the tools' results give `::app{id="…"}` for both, from each thread's next
+  session.
+- **Item header.** Both views show the app's title and a **Saved** or
+  **Interactive** badge; the artifact viewer and the mini app host underneath
+  are separate.
+- **Agent tools.** `apps_list`, `apps_read` and `apps_create` (type
+  `"artifact"` or `"mini"`) are the documented tools. `artifacts_list`,
+  `artifacts_read`, `artifacts_save`, `minis_list`, `minis_read` and
+  `minis_create` are their aliases with the same handlers, still registered
+  and given to every session. Changing an interactive app stays with
+  `minis_update`, `minis_data` and `minis_live`, and a live HTML artifact with
+  `artifacts_live`.
+
+### Saved apps (artifacts)
 
 Artifacts are built into Studio: the images, pages, reports and files your
 agents make, kept with every version. They used to be the separate Studio
@@ -1765,9 +1808,9 @@ with `BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=artifacts-compact-header`.
 
 - **In the library.** Artifacts list next to pages, recordings and drawings,
   with type, size and version columns, image thumbnails, projects, archive,
-  move and delete. Artifacts have no collection page of their own:
-  `/plugins/studio/studio/artifacts` opens the library filtered to the
-  Artifact kind. Studio search matches titles, descriptions and the text of
+  move and delete, under the Apps kind with **Saved** selected. Artifacts have
+  no collection page of their own: `/plugins/studio/studio/artifacts` opens
+  the library filtered to the Artifact kind. Studio search matches titles, descriptions and the text of
   text files up to 1 MB (HTML by its words). Studio can't create an artifact;
   they come from threads.
 - **Viewer** (`/plugins/studio/studio/artifacts/<id>`, loaded the first time
@@ -1775,7 +1818,7 @@ with `BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=artifacts-compact-header`.
   in a sandboxed frame, PDFs open in the browser's viewer, and audio and video
   play with seeking. Markdown renders as a document. Code and text use BB's
   source viewer (first 2 MB). Other files offer a download. The header has an
-  editable title, the artifact's chat, Copy, Download, and a menu with Open
+  editable title with a **Saved** badge, the artifact's chat, Copy, Download, and a menu with Open
   source thread, Save as page, Versions, Move to and Delete. Select text or
   drag over an image to **Send to thread**.
 - **Live HTML.** An HTML artifact's page gets `window.playground`, the same
@@ -1788,10 +1831,12 @@ with `BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=artifacts-compact-header`.
 - **Save from a thread.** The save icon in the thread's **Studio** tab lists the
   files the latest reply created, changed or generated, the thread's storage
   files, and what the thread already saved. Nothing is saved automatically.
-- **Agent tools and skill.** `artifacts_save`, `artifacts_list` and
-  `artifacts_read`, and the `artifacts` skill. A saved artifact comes back as
-  `::artifact{id="art_…"}`, a card with an inline preview that opens the
-  viewer beside the chat. `@artifact` mentions give the agent the artifact's
+- **Agent tools and skill.** `apps_create` (type `"artifact"`), `apps_list`
+  and `apps_read`, with `artifacts_save`, `artifacts_list` and
+  `artifacts_read` as their aliases, and the `artifacts` skill. A saved
+  artifact comes back as `::artifact{id="art_…"}` (`::app{id="art_…"}` with
+  **App cards** on), a card with an inline preview that opens the viewer
+  beside the chat. `@artifact` mentions give the agent the artifact's
   details and, for text up to 1 MB, its contents.
 - **Commands.** `bb studio artifacts save <path> [--title <title>]
   [--description <text>]`, `list [--thread]`, `show <id>`,
@@ -1805,6 +1850,115 @@ Files are stored as BLOBs in Studio's SQLite database. Contents come from
 `GET /api/v1/plugins/studio/http/artifacts/content`. Every response except a
 real PDF carries a `sandbox allow-scripts` CSP, so HTML gets an opaque origin
 and can't call BB's API with your session.
+
+### Interactive apps (mini apps)
+
+Mini apps are built into Studio: small interactive apps with their own data,
+which you and your agents build together. A mini app is React source and a
+manifest; it runs live in a reply (`::mini{id="mini_…"}`, or
+`::app{id="mini_…"}`), in a page (an
+embed block, or `/mini` in the slash menu), and in its own tab, and every
+place shares the same data. Items are `minis:<id>` and open at
+`/plugins/studio/studio/minis/<id>`.
+
+Agents are told to make a mini app, rather than a playground or a one-off
+HTML file, whenever you want something to use or come back to: a tracker, a
+board, a calculator, a form, a poll, a chart to play with.
+
+![Live BB screenshot of a mini app open as a Studio tab](assets/minis-preview.png)
+
+The seeded "Deal pipeline" mini app as a Studio tab in a staged BB, in dark
+mode: Kit's badges, tabs, data table, fields, select and button, stat tiles
+from `@studio/kit/charts`, a Lucide icon and Tailwind classes, over five
+records. The tabs above it switch to its records, source and settings.
+
+![The same mini app embedded in a page](assets/minis-page.png)
+
+The same app embedded in a page, in light mode. During the capture a record
+is added through the server, as an agent's `minis_data` would, and the page
+block shows "Stark · renewal" and the new total without a reload.
+
+![The access approval dialog](assets/minis-approval.png)
+
+An app that asks to reach an API with a stored secret: the banner over the
+app, and the approval dialog. Recapture all three with
+`BB_CAPTURE_ONLY=minis,minis-page,minis-approval`; the captures read the
+text inside each sandboxed frame, check the frame isn't same-origin, and
+check that an approval with a made-up nonce is refused.
+
+#### What a mini app is
+
+- **Source and manifest.** Files keyed by path: JSX, TSX, JS, TS, CSS, JSON,
+  HTML. `mini.json` names the entry, the shelf libraries, the record
+  collections, the access it asks for, and its size in a page or card. Studio
+  compiles the source when it's saved (JSX and imports, with Sucrase) and
+  refuses source that doesn't compile, so the last good version keeps running.
+  The last 50 versions are kept; restore one in Settings.
+- **Records.** Collections of JSON records, with per-record revisions so two
+  people editing at once don't overwrite each other, live updates in every
+  open copy, and filters and ordering on any field (fields listed under
+  `indexes` get a database index). Up to 64 KB a record and 50 MB an app.
+- **Shared state.** A small JSON value for UI state, as playgrounds and live
+  artifacts have.
+- **Actions and takes.** The app can expose actions an agent runs in the copy
+  you last touched, and send data to the thread's composer for you to send.
+
+#### The shelf: libraries without a dependency mess
+
+Mini apps never install anything: no npm, no build step, no `node_modules`.
+An app imports only its own files and the shelf: libraries Studio ships at
+pinned versions, built into `shelf/` by `node scripts/build-shelf.mjs` and
+served from Studio. One copy serves every app, major versions sit side by
+side, and nothing loads from the internet.
+
+| Lib | Modules | Loaded |
+| --- | --- | --- |
+| `react@19` | `react`, `react-dom/client` | always |
+| `tailwind@4` | Tailwind in the browser, with BB's colors as theme tokens | always |
+| `kit@1` | `@studio/kit`: Studio's own components (Button, Input, Select, Dialog, DropdownMenu, …), Badge, Tabs, DataTable, Field, EmptyState, and hooks for records, state and actions | always |
+| `charts@1` | `@studio/kit/charts` (`<Chart>` in the Pages chart format, `<Stats>`), `recharts` | when listed |
+| `icons@1` | `lucide-react` | when listed |
+| `markdown@1` | `marked` | when listed |
+| `dates@4` | `date-fns` | when listed |
+
+Anything else goes into the app as its own file.
+
+#### Security
+
+A mini app's frame runs in an opaque origin with a CSP that allows scripts
+only from Studio and blocks every connection. It reaches Studio only through
+its host component, which checks each message came from its own frame; the
+server checks collections, capabilities and rate limits again.
+
+- `playground.fetch` goes through Studio's server, only to hosts the manifest
+  lists as `fetch:<host>` and you approve, never to this machine or a private
+  network, with redirects checked hop by hop and cookies dropped. Every
+  request is in the app's network log.
+- A `secret:<name>` you store in the app's Settings is added as a request
+  header by the server. The app and agents never see the value.
+- `bb.threads.read`, `bb.studio.read` and `bb.open` let the app list your
+  thread titles, search Studio item titles, and open threads and items.
+- You approve access in the app (a banner, then a dialog). The dialog takes a
+  one-time nonce from the server and waits a moment before Approve works, so
+  an agent can't approve its own app through RPC or the CLI. Revoke in
+  Settings.
+
+Backups keep each app's current source, state and records; approvals and
+secrets aren't backed up, so a restored app asks again.
+
+#### Elsewhere in Studio
+
+- **Artifacts:** an HTML artifact's menu has **Convert to mini app**: its page
+  becomes the app's `index.html` and its live state carries over. Agents do
+  the same with `minis_create` and `fromArtifactId`.
+
+#### Agents
+
+`apps_create` (type `"mini"`), `apps_read` and `apps_list` (with
+`minis_create`, `minis_read` and `minis_list` as their aliases),
+`minis_update`, `minis_data` and `minis_live`, the `minis` skill, and
+`bb studio minis list|show|data|state|watch|actions|do`. What an app returns
+to an agent is wrapped as data, never instructions.
 
 ## Whiteboards
 
@@ -1987,113 +2141,6 @@ SQLite database. Frames load from
 sandbox CSP, so a screen gets an opaque origin with no access to BB.
 `bb studio backup` includes each design with its rounds, screens and
 comments; saved styles aren't in backups yet.
-
-## Mini apps
-
-Mini apps are built into Studio: small interactive apps with their own data,
-which you and your agents build together. A mini app is React source and a
-manifest; it runs live in a reply (`::mini{id="mini_…"}`), in a page (an
-embed block, or `/mini` in the slash menu), and in its own tab, and every
-place shares the same data. Items are `minis:<id>` and open at
-`/plugins/studio/studio/minis/<id>`.
-
-Agents are told to make a mini app, rather than a playground or a one-off
-HTML file, whenever you want something to use or come back to: a tracker, a
-board, a calculator, a form, a poll, a chart to play with.
-
-![Live BB screenshot of a mini app open as a Studio tab](assets/minis-preview.png)
-
-The seeded "Deal pipeline" mini app as a Studio tab in a staged BB, in dark
-mode: Kit's badges, tabs, data table, fields, select and button, stat tiles
-from `@studio/kit/charts`, a Lucide icon and Tailwind classes, over five
-records. The tabs above it switch to its records, source and settings.
-
-![The same mini app embedded in a page](assets/minis-page.png)
-
-The same app embedded in a page, in light mode. During the capture a record
-is added through the server, as an agent's `minis_data` would, and the page
-block shows "Stark · renewal" and the new total without a reload.
-
-![The access approval dialog](assets/minis-approval.png)
-
-An app that asks to reach an API with a stored secret: the banner over the
-app, and the approval dialog. Recapture all three with
-`BB_CAPTURE_ONLY=minis,minis-page,minis-approval`; the captures read the
-text inside each sandboxed frame, check the frame isn't same-origin, and
-check that an approval with a made-up nonce is refused.
-
-### What a mini app is
-
-- **Source and manifest.** Files keyed by path: JSX, TSX, JS, TS, CSS, JSON,
-  HTML. `mini.json` names the entry, the shelf libraries, the record
-  collections, the access it asks for, and its size in a page or card. Studio
-  compiles the source when it's saved (JSX and imports, with Sucrase) and
-  refuses source that doesn't compile, so the last good version keeps running.
-  The last 50 versions are kept; restore one in Settings.
-- **Records.** Collections of JSON records, with per-record revisions so two
-  people editing at once don't overwrite each other, live updates in every
-  open copy, and filters and ordering on any field (fields listed under
-  `indexes` get a database index). Up to 64 KB a record and 50 MB an app.
-- **Shared state.** A small JSON value for UI state, as playgrounds and live
-  artifacts have.
-- **Actions and takes.** The app can expose actions an agent runs in the copy
-  you last touched, and send data to the thread's composer for you to send.
-
-### The shelf: libraries without a dependency mess
-
-Mini apps never install anything: no npm, no build step, no `node_modules`.
-An app imports only its own files and the shelf: libraries Studio ships at
-pinned versions, built into `shelf/` by `node scripts/build-shelf.mjs` and
-served from Studio. One copy serves every app, major versions sit side by
-side, and nothing loads from the internet.
-
-| Lib | Modules | Loaded |
-| --- | --- | --- |
-| `react@19` | `react`, `react-dom/client` | always |
-| `tailwind@4` | Tailwind in the browser, with BB's colors as theme tokens | always |
-| `kit@1` | `@studio/kit`: Studio's own components (Button, Input, Select, Dialog, DropdownMenu, …), Badge, Tabs, DataTable, Field, EmptyState, and hooks for records, state and actions | always |
-| `charts@1` | `@studio/kit/charts` (`<Chart>` in the Pages chart format, `<Stats>`), `recharts` | when listed |
-| `icons@1` | `lucide-react` | when listed |
-| `markdown@1` | `marked` | when listed |
-| `dates@4` | `date-fns` | when listed |
-
-Anything else goes into the app as its own file.
-
-### Security
-
-A mini app's frame runs in an opaque origin with a CSP that allows scripts
-only from Studio and blocks every connection. It reaches Studio only through
-its host component, which checks each message came from its own frame; the
-server checks collections, capabilities and rate limits again.
-
-- `playground.fetch` goes through Studio's server, only to hosts the manifest
-  lists as `fetch:<host>` and you approve, never to this machine or a private
-  network, with redirects checked hop by hop and cookies dropped. Every
-  request is in the app's network log.
-- A `secret:<name>` you store in the app's Settings is added as a request
-  header by the server. The app and agents never see the value.
-- `bb.threads.read`, `bb.studio.read` and `bb.open` let the app list your
-  thread titles, search Studio item titles, and open threads and items.
-- You approve access in the app (a banner, then a dialog). The dialog takes a
-  one-time nonce from the server and waits a moment before Approve works, so
-  an agent can't approve its own app through RPC or the CLI. Revoke in
-  Settings.
-
-Backups keep each app's current source, state and records; approvals and
-secrets aren't backed up, so a restored app asks again.
-
-### Elsewhere in Studio
-
-- **Artifacts:** an HTML artifact's menu has **Convert to mini app**: its page
-  becomes the app's `index.html` and its live state carries over. Agents do
-  the same with `minis_create` and `fromArtifactId`.
-
-### Agents
-
-`minis_create`, `minis_update`, `minis_read`, `minis_list`, `minis_data`
-and `minis_live`, the `minis` skill, and
-`bb studio minis list|show|data|state|watch|actions|do`. What an app returns
-to an agent is wrapped as data, never instructions.
 
 ## Recordings
 
@@ -3772,8 +3819,8 @@ Studio makes two kinds of thing. Each item has a **family** and, within it, a **
 | `page` (documents) | `doc` | A page you write | `pg_…` | `pages` | `page` |
 | | `design` | UI screens or a slide deck | `dsn_…` | `design` | `design` |
 | | `whiteboard` | A whiteboard, shown in a page | `drw_…` or a UUID | `excalidraw` | `drawing` |
-| `app` (things that run) | `mini` | A mini app | `mini_…` | `minis` | `mini` |
-| | `artifact` | A saved file or live HTML | `art_…` | `artifacts` | `artifact` |
+| `app` (things that run) | `mini` | An interactive app (a mini app) | `mini_…` | `minis` | `mini` |
+| | `artifact` | A saved app: a file or live HTML | `art_…` | `artifacts` | `artifact` |
 
 Recordings, dictations, VS Code workspaces and other plugins' items belong to neither family.
 
@@ -3811,7 +3858,7 @@ A tab opens with `{ kind, id }`, where `kind` is a family (`page`, `app`), a
 type, or the older kind name: `{ kind: "page", id: "dsn_…" }` and
 `{ kind: "design", id: "dsn_…" }` open the same design. `page:<id>` links take
 any page type's id. Reply cards (`::page`, `::design`, `::mini`, `::artifact`)
-are unchanged.
+are unchanged, and `::app{id="…"}` shows either app type (see [Apps](#apps)).
 
 **Filters.** `family:page` and `family:app` filter by family and `type:design`
 by type, in the filter bar, `bb studio list` and `studio_list_items`. `kind:`
@@ -3830,6 +3877,9 @@ parameters and its handler; the family tools run those same handlers.
 | `apps_list` | Every app from the index; with `type`, that type's own list (as `minis_list`, `artifacts_list`) |
 | `apps_read` | Any app by id (as `minis_read`, `artifacts_read`) |
 | `apps_create` | `{ type, input }`, where `input` is the fields of `minis_create` or `artifacts_save` |
+
+The app tools are the documented ones: `minis_list|read|create` and
+`artifacts_list|read|save` say in their descriptions that they are aliases.
 
 `type` on `pages_list` and `pages_create` is new and optional; every input
 those tools took before means the same. Editing stays with each type's tools
@@ -3892,7 +3942,8 @@ commands left to run; `--json` prints the whole summary.
 ## Kinds
 
 **Setup → Kinds** lists the kinds built into Studio: pages, whiteboards,
-recordings and dictation, artifacts and designs.
+recordings and dictation, apps (artifacts and mini apps, one row) and
+designs.
 
 ![Live BB screenshot of the Kinds section in Studio's Setup page](assets/kinds.png)
 
@@ -3929,7 +3980,7 @@ transcribing finish on the server.
 
 A Studio provider (`studio_describe` version 2) may declare that one of its
 kinds stands in for a built-in kind with `replaces`, set to `page`,
-`drawing`, `recording`, `artifact` or `design`:
+`drawing`, `recording`, `artifact`, `mini` or `design`:
 
 ```ts
 studio_describe: () => ({
