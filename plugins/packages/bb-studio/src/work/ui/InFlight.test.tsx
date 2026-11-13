@@ -25,6 +25,7 @@ vi.mock("../../kit/app/route", () => ({ usePathname: () => state.pathname }));
 vi.mock("../../kit/composer", () => ({ useComposerThread: () => state.composerThread }));
 
 const { InFlightBanner } = await import("./InFlight");
+const { WorkCardView } = await import("./WorkCard");
 const { FLASH_CLASS } = await import("./reveal");
 
 let root: Root, container: HTMLDivElement;
@@ -146,4 +147,25 @@ it("builds bb's message link only for the thread on screen", async () => {
   expect(messageLinkPath("/projects/proj_1/threads/thr_main/", "thr_main", 0)).toBe("/projects/proj_1/threads/thr_main#msg=0");
   expect(messageLinkPath("/threads/thr_other", "thr_main", 7)).toBeNull();
   expect(messageLinkPath("/plugins/studio/studio", "thr_main", 7)).toBeNull();
+});
+
+it("leaves out a card that is on screen, and lists it again once it scrolls away", async () => {
+  const observers: { callback: (entries: Partial<IntersectionObserverEntry>[]) => void; disconnect: () => void }[] = [];
+  vi.stubGlobal("IntersectionObserver", class {
+    callback: (entries: Partial<IntersectionObserverEntry>[]) => void;
+    constructor(callback: (entries: Partial<IntersectionObserverEntry>[]) => void) { this.callback = callback; observers.push(this); }
+    observe() {}
+    disconnect() {}
+  });
+  state.list = [card({ id: "wc_a", title: "Research" }), card({ id: "wc_b", title: "Release" })];
+  await act(async () => root.render(<><WorkCardView card={state.list[0]!} now={NOW} /><InFlightBanner /></>));
+  expect(rows().map((row) => row.textContent)).toEqual([expect.stringContaining("Research"), expect.stringContaining("Release")]);
+  await act(async () => observers[0]!.callback([{ isIntersecting: true, intersectionRatio: 1 }]));
+  expect(rows().map((row) => row.title)).toEqual(["Release"]);
+  state.list = [state.list[0]!];
+  await act(async () => root.render(<><WorkCardView card={state.list[0]!} now={NOW} /><InFlightBanner /></>));
+  expect(q('[data-testid="in-flight"]')).toBeNull();
+  await act(async () => observers.at(-1)!.callback([{ isIntersecting: false, intersectionRatio: 0 }]));
+  expect(rows().map((row) => row.title)).toEqual(["Research"]);
+  vi.unstubAllGlobals();
 });

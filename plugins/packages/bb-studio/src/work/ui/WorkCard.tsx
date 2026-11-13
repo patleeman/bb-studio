@@ -8,6 +8,7 @@ import { useCall, useLive } from "../../ui/live";
 import type { WorkCard } from "../contract";
 import { WORK_ID, type WorkState } from "../shared";
 import { KIND, shownStep, STATE } from "./model";
+import { useCardOnScreen } from "./on-screen";
 
 export function StateGlyph({ state, className }: { state: WorkState; className?: string }) {
   if (state === "running") return <span role="img" aria-label={STATE.running} className={cn("size-2 shrink-0 animate-spin rounded-full border-[1.5px] border-success border-r-transparent motion-reduce:animate-none", className)} />;
@@ -46,8 +47,9 @@ export function WorkCardView({ card, now = Date.now() }: { card: WorkCard; now?:
   const worker = card.workerThreadId;
   const open = worker ? () => navigate.toThread(worker) : undefined;
   const step = shownStep(card);
+  const onScreen = useCardOnScreen(card.id);
   return (
-    <ChatCard data-testid="work-card" data-work-card-id={card.id} data-state={card.state} className="studio-work-card">
+    <ChatCard ref={onScreen} data-testid="work-card" data-work-card-id={card.id} data-state={card.state} className="studio-work-card">
       <ChatCardHeader icon={kind.icon} title={card.title} onOpen={open}
         meta={<>{kind.label}{step ? <> · <span data-testid="work-step">{step}</span></> : null}</>}
         actions={<>

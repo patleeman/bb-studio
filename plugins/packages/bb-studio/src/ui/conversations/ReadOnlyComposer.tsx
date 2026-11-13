@@ -329,7 +329,8 @@ function WorkerGlyph({ status }: { status: BotThreadInfo["workers"][number]["sta
 
 /**
  * A conversation's workers above its composer: a chip for each one running
- * or needing Patrick (its full title up to 240px), and the rest folded into
+ * or needing Patrick (its full title up to 240px) that has no work card in
+ * the conversation (the card and In flight show that one), and the rest folded into
  * one "N done" chip whose menu lists them. Nothing without workers. A banner
  * of BB's composer, and, where the composer is replaced (Main mirrored from
  * bb, a finished conversation), part of the box that replaces it, since BB
@@ -340,8 +341,13 @@ export function ConversationWorkersLine({ threadId: given }: { threadId?: string
   const threadId = given ?? composerThread;
   const navigate = useBbNavigate();
   const info = useThreadInfo(threadId ?? null);
+  const cards = useLive("work.list", { threadId: threadId ?? "" }, { enabled: !!threadId, pollMs: 60_000 }).data?.cards ?? [];
   if (!info || info.kind !== "conversation" || !info.workers.length) return null;
-  const { active, done } = splitWorkers(info.workers);
+  const carded = new Set(cards.map((card) => card.workerThreadId));
+  const split = splitWorkers(info.workers);
+  const active = split.active.filter((worker) => !carded.has(worker.threadId));
+  const done = split.done;
+  if (!active.length && !done.length) return null;
   return (
     <div data-testid="conversation-workers" aria-label="Workers" className="flex min-w-0 flex-wrap items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground">
       {active.map((worker) => (

@@ -7,6 +7,7 @@ import type { BotThreadInfo } from "../../bot-threads-contract";
 const state = vi.hoisted(() => ({
   threadId: "w1" as string | null,
   infos: {} as Record<string, unknown>,
+  cards: [] as { workerThreadId: string | null }[],
   mirror: null as { mirrored: boolean; readOnly?: boolean } | null,
   call: vi.fn(async (_method: string, _input: unknown): Promise<unknown> => ({ conversationId: "conv", projectId: null })),
   toThread: vi.fn(),
@@ -18,7 +19,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_DetailRow: ({ label, children }: { label: string; children: React.ReactNode }) => <div data-testid="detail-row" data-label={label}>{children}</div>,
 }));
 vi.mock("../live", () => ({
-  useLive: (_method: string, input: { threadId: string }, options: { enabled?: boolean }) => ({ data: options.enabled === false ? null : { info: state.infos[input.threadId] ?? null }, error: null, loading: false, refresh: () => {} }),
+  useLive: (method: string, input: { threadId: string }, options: { enabled?: boolean }) => ({ data: options.enabled === false ? null : method === "work.list" ? { cards: state.cards } : { info: state.infos[input.threadId] ?? null }, error: null, loading: false, refresh: () => {} }),
   useCall: () => state.call,
 }));
 vi.mock("../mirror-banner", () => ({
@@ -64,6 +65,7 @@ beforeEach(() => {
   state.threadId = "w1";
   state.infos = { w1: worker, conv: conversation };
   state.mirror = null;
+  state.cards = [];
   state.call.mockClear();
   state.toThread.mockClear();
   setWorkerStatusOnTop(false);
@@ -148,6 +150,17 @@ it("shows a conversation's active workers as chips, the one that needs Patrick f
   expect(state.toThread).toHaveBeenLastCalledWith("w2");
   // A worker has no such line.
   state.threadId = "w1";
+  await act(async () => { root.render(<ConversationWorkersLine />); });
+  expect(host.innerHTML).toBe("");
+});
+
+it("leaves out the chip of a worker that has a work card in the conversation: the card and In flight show it", async () => {
+  state.threadId = "conv";
+  state.cards = [{ workerThreadId: "w1" }, { workerThreadId: null }];
+  await act(async () => { root.render(<ConversationWorkersLine />); });
+  expect([...host.querySelectorAll<HTMLElement>('[data-testid="conversation-worker"]')].map((chip) => chip.textContent)).toEqual(["Codex"]);
+  expect($('[data-testid="conversation-workers-done"]')?.textContent).toBe("1 done");
+  state.infos = { ...state.infos, conv: { ...conversation, workers: [{ threadId: "w1", title: "Fable lead", status: "running" }] } };
   await act(async () => { root.render(<ConversationWorkersLine />); });
   expect(host.innerHTML).toBe("");
 });
