@@ -1,3 +1,4 @@
+import { unreadDividerTurnStart } from "./unreadDividerTurnStart.fork";
 import {
   createContext,
   memo,
@@ -1996,7 +1997,7 @@ function findUnreadDividerIndex({
       isNewRowAfterCutoff(row, cutoffAt) &&
       isReadingResumeRow({ index, row, settledTurnReplyIndexes }),
   );
-  return resumeIndex === -1 ? firstNewIndex : resumeIndex;
+  return unreadDividerTurnStart(rows, resumeIndex === -1 ? firstNewIndex : resumeIndex, cutoffAt);
 }
 
 function isUserAuthoredConversationRow(row: ThreadTimelineViewRow): boolean {
