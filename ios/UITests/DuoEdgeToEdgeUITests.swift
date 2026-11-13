@@ -70,11 +70,11 @@ final class DuoEdgeToEdgeUITests: ServerIsolatedUITestCase {
         // Form cards keep a margin inside the status column, like the header.
         command("layout")
         let settings = try JSONDecoder().decode(Geometry.self, from: Data(try XCTUnwrap(app.windows.firstMatch.value as? String).utf8))
-        let toggle = app.switches.firstMatch
-        XCTAssertTrue(toggle.exists)
-        XCTAssertLessThanOrEqual(toggle.frame.maxX, settings.width - settings.safeRight + 1)
-        XCTAssertLessThanOrEqual(app.textFields["settingsServerURL"].frame.maxX, settings.width - settings.safeRight + 1)
-        XCTAssertLessThanOrEqual(toggle.frame.maxX, settings.width - settings.safeRight - 20 + 1, "Cards keep their margin inside the safe edge")
+        // Settings' first page has no switch any more (they moved into its pages);
+        // the server field sits in a card the same way.
+        let field = app.textFields["settingsServerURL"]
+        XCTAssertLessThanOrEqual(field.frame.maxX, settings.width - settings.safeRight + 1)
+        XCTAssertLessThanOrEqual(field.frame.maxX, settings.width - settings.safeRight - 20 + 1, "Cards keep their margin inside the safe edge")
         try capture(prefix + "settings-" + device)
     }
 

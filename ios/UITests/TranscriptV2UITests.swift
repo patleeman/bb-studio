@@ -367,14 +367,21 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     private func menu(on element: XCUIElement, _ item: String, _ step: String) {
         // The last menu's dismissal can still be animating: once more if the
         // first long-press doesn't open it.
-        let button = app.buttons[item].firstMatch
-        for _ in 0..<2 where !button.exists {
+        // Rows have their own buttons with the same labels (a Bot reply's Copy
+        // icon), so wait for the menu's: one more than before the press, the
+        // newest in the tree.
+        let matching = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != 'bot-reply-copy'", item))
+        let before = matching.count
+        var opened = false
+        for _ in 0..<2 where !opened {
             let until = Date().addingTimeInterval(5)
             while !(element.exists && element.isHittable), Date() < until { Thread.sleep(forTimeInterval: 0.25) }
             element.press(forDuration: 1)
-            _ = button.waitForExistence(timeout: 4)
+            let deadline = Date().addingTimeInterval(4)
+            while matching.count <= before, Date() < deadline { Thread.sleep(forTimeInterval: 0.2) }
+            opened = matching.count > before
         }
-        if button.exists { button.tap() } else { failures.append("\(step): no \(item) in the menu") }
+        if opened { matching.element(boundBy: matching.count - 1).tap() } else { failures.append("\(step): no \(item) in the menu") }
         Thread.sleep(forTimeInterval: 0.8)
     }
 

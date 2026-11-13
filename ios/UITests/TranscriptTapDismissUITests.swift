@@ -94,7 +94,8 @@ final class TranscriptTapDismissUITests: ServerIsolatedUITestCase {
     func testLinksAndButtonsStillWorkWithTheKeyboardUp() {
         open()
         // The demo has older code blocks; the new one is the lowest Copy.
-        let copies = app.buttons.matching(NSPredicate(format: "label == 'Copy'"))
+        // The code block's Copy, not a Bot reply's own Copy icon under it.
+        let copies = app.buttons.matching(NSPredicate(format: "label == 'Copy' AND identifier != 'bot-reply-copy'"))
         let web = app.links["Release brief"].firstMatch
         for _ in 0..<3 where !web.exists {
             command("say?See%20%5BRelease%20brief%5D(https%3A%2F%2Fexample.com%2Fbrief)%20and%20%5BReview%20open%20PRs%5D(bbstudio%3A%2F%2Fthread%2Fthr_reviewprs1).%0A%0A%60%60%60sh%0Amake%20release%0A%60%60%60")
