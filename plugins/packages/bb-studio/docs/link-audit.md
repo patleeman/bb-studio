@@ -21,7 +21,7 @@ has a canonical link that parses back to itself and opens through the router.
   (system browser, or the in-app browser), whatever the modifier.
 - With no conversation on screen, a thread opens in the main view; an item
   opens beside the Studio page, or in the main view elsewhere.
-- A Bot page (Memory, Library, Automations, Todos, Archive) is a list: a row
+- A Bot page (Memory, Library, Todos, Archive) is a list: a row
   opens its item as a tab in the workbench beside the page, a thread
   included (a conversation tab), and the page stays. Every row calls
   `useRowOpen()` (`src/ui/bot-page/open-row.ts`), which hands the row's

@@ -501,9 +501,9 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   Controls are on the Info tab's Bot block (Pause, Resume and Stop in its
   icon group). Under it, the Bot's pages as rows:
   **Memory** (`/plugins/studio/studio/memory/<botId>`), **Library**
-  (`/plugins/studio/studio`), **Automations** (`/plugins/studio/automations`)
-  and, for the primary Bot with Todos on, **Todos**
-  (`/plugins/studio/studio/bot/<botId>/loops`) with what needs you now. The
+  (`/plugins/studio/studio`) and, for the primary Bot with Todos on, **Todos**
+  (`/plugins/studio/studio/bot/<botId>/loops`) with what needs you now and,
+  under **Scheduled**, what runs when. The
   row of the page on screen is selected. The header is clickable in the
   desktop app (no window drag).
 - **Conversations**, with **+ New** (BB's own new-thread composer,
@@ -515,8 +515,8 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   the ink at 55%), with a spinner while
   it works. The conversation that needs you is outlined in amber, with
   "Needs you: <reason>" on its second line. The row on screen is
-  highlighted; right-click for BB's thread menu (with **Finish
-  conversation**). Listed: Main always, and the others active in the last
+  highlighted; right-click for BB's thread menu (**Archive** keeps a summary;
+  see Archiving a conversation). Listed: Main always, and the others active in the last
   14 days, working, or needing you; the rest are counted in a quiet last row,
   "N older conversations".
 - **Workers**: the running ones and those waiting on you (up to 30), one
@@ -1225,8 +1225,8 @@ the BB Studio fork gets the field: stock BB refuses a nav panel with an
 `experimental_` field it doesn't know, which drops the plugin's whole
 frontend, so there Studio leaves it out and its pages show on the rail
 (`src/stock-bb.test.ts`). Once per install Studio also hides
-BB's Automations (built in and its plugin's page: the Bot's Automations page
-lists what runs) and shows BB's Search, with BB's own rail preference
+BB's Automations (built in and its plugin's page: Scheduled on the Bot's
+Todos page lists what runs) and shows BB's Search, with BB's own rail preference
 (`src/rail-arrangement.ts`); the user can change either back in Customize.
 The Bot list asks for the fork's `experimental_hideSidebarHeader`, so the
 Bot header is the top of the sidebar and BB's "New conversation" row is
@@ -1235,17 +1235,17 @@ title bar layout the traffic lights, back, forward and the sidebar toggle
 stay where BB has them; in the browser layout back and forward move to the
 start of the main view's header and the toggle stays.
 
-**Automations** (`studio/automations`, `bb://automations`, and the Bot's
-Automations tab) opens the sidebar Bot's **Todos** page at **Scheduled**:
-there is one place for what runs when. Scheduled lists every automation
+**Scheduled**, on the sidebar Bot's **Todos** page, is the one place for what
+runs when; `bb://automations` and a thread's Automations tab open it there.
+Studio has no Automations page of its own. Scheduled lists every automation
 that belongs to the Bot (check-ins, reminders, watchers, runners, bb's own
 automations and maintenance), each with its next run or Paused, and has
 **New** (check-in, reminder, watcher, runner). Timed todos stay in Today,
 This week and Later. A row opens the automation as a tab in the workbench
 beside the page (`bb://automation/<botId>:<row id>`): a Studio automation
 shows its detail (Pause or Resume, Run now, Edit, Delete, recent runs); a bb
-automation shows what it does, with **Open in bb** for bb's own automation
-page while bb's automations plugin is on. One that is in bb, and any whose
+automation shows what it does, with **Open in Automations** for its page in
+BB's Automations plugin while that plugin is on. One that is in bb, and any whose
 detail Studio can't load, is read-only: what it does and its thread.
 
 All of these read one model, `loops.scheduled` (`src/loops/scheduled.ts`):
@@ -1575,7 +1575,7 @@ the desktop fork).
 
 Pages are built into Studio: collaborative documents you write together with
 your agents, in a Notion-style block editor with live multiplayer editing,
-comments, charts, embeds, version history and ordinary agent chats. They used
+charts, embeds, version history and ordinary agent chats. They used
 to be the separate Studio Pages plugin (`pages`). Pages keep that id as their
 namespace (`pages:<id>`), so tags, tabs, links, chats and backups carry over.
 A page opens as a Studio tab at `/plugins/studio/studio/pages/<id>`; links to
@@ -3953,7 +3953,8 @@ after a restore. A backup made before the index restores the same way.
 
 ## How it works
 
-- Some kinds are built into Studio (Artifacts so far; see
+- Studio's own kinds are built in (pages, whiteboards, recordings, designs
+  and apps; see
   [`docs/merging-add-ons.md`](../../docs/merging-add-ons.md)). They implement
   the same provider contract in-process, keep the plugin id they had as add-ons,
   and open under Studio's one panel. Other add-ons reach them through Studio's
