@@ -679,6 +679,30 @@
     {
       "file": "apps/app/src/components/settings/useSettingsSearchConditions.test.tsx",
       "title": "meets the conditions the server, the address, and plugins satisfy"
+    },
+    {
+      "file": "packages/config/test/config.test.ts",
+      "title": "builds server config from explicit runtime env"
+    },
+    {
+      "file": "apps/app/src/components/settings/settings-search.test.ts",
+      "title": "finds a setting by a word people remember instead of its title"
+    },
+    {
+      "file": "apps/server/test/threads/telemetry-initiator.test.ts",
+      "title": "sends the fixed value by default"
+    },
+    {
+      "file": "apps/server/test/threads/thread-send-dispatch.test.ts",
+      "title": "captures direct user sends"
+    },
+    {
+      "file": "apps/server/test/services/plugin-catalog/bb-official-generator.test.ts",
+      "title": "generates one valid v2 entry for every bundled plugin"
+    },
+    {
+      "file": "apps/server/test/public/public-thread-data.test.ts",
+      "title": "creates and deletes thread queued messages"
     }
   ],
   "removeLines": [

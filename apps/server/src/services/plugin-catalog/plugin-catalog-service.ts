@@ -1,3 +1,4 @@
+import { configureShippedMarketplaces, curatedSourceUrl, isShippedMarketplace, seedStudioMarketplace, shipsCuratedMarketplace, withoutForkBuiltins } from "./studio-marketplaces.fork.js";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
@@ -185,7 +186,7 @@ export function createPluginCatalogService(deps: {
   const bundledPlugins =
     deps.bundledPlugins ?? listBundledPluginRegistrations();
   const curatedManifestUrls = curatedMarketplaceManifestUrls(
-    deps.marketplaceUrl,
+    curatedSourceUrl(deps.marketplaceUrl),
   );
   const fetchMarketplace = deps.fetch ?? publicMarketplaceFetch;
   const stagingDir = join(deps.dataDir, "marketplaces", "staging");
@@ -202,8 +203,10 @@ export function createPluginCatalogService(deps: {
     return stagingReady;
   }
 
+  configureShippedMarketplaces(deps.marketplaceUrl);
   seedBundledMarketplace(Date.now());
-  seedCuratedMarketplace();
+  if (shipsCuratedMarketplace(deps.marketplaceUrl)) seedCuratedMarketplace();
+  else seedStudioMarketplace(deps);
   let reservedCollections = buildReservedCollectionIndex();
 
   const withLock = createKeyedLock<string>();
@@ -643,7 +646,7 @@ export function createPluginCatalogService(deps: {
     let collisionError: string | null = null;
     const source = marketplaceSourceFromRow(row);
     if (source.kind === "git") await prepareMarketplaceStaging();
-    const materialized = await materializeMarketplace({
+    const materialized = withoutForkBuiltins(await materializeMarketplace({
       source,
       cached: {
         manifestJson: row.manifestJson,
@@ -659,7 +662,7 @@ export function createPluginCatalogService(deps: {
       curatedManifestUrls.fallback !== null
         ? { fallbackManifestUrl: curatedManifestUrls.fallback }
         : {}),
-    });
+    }));
     try {
       if (materialized.catalog.name !== row.name) {
         throw new Error(
@@ -1075,13 +1078,13 @@ export function createPluginCatalogService(deps: {
       return withLock(ADD_LOCK_KEY, async () => {
         const source = parseMarketplaceSource(input.source, input.subdirectory);
         if (source.kind === "git") await prepareMarketplaceStaging();
-        const materialized = await materializeMarketplace({
+        const materialized = withoutForkBuiltins(await materializeMarketplace({
           source,
           cached: null,
           stagingDir,
           fetch: fetchMarketplace,
           ...(deps.warn === undefined ? {} : { warn: deps.warn }),
-        });
+        }));
         try {
           const name = materialized.catalog.name;
           if (isReservedMarketplace(name)) {
@@ -1518,10 +1521,7 @@ function catalogEntryKey(marketplace: string, entryId: string): string {
 }
 
 function isReservedMarketplace(name: string): boolean {
-  return (
-    name === BUNDLED_MARKETPLACE_NAME ||
-    name === CURATED_PLUGIN_MARKETPLACE_NAME
-  );
+  return isShippedMarketplace(name);
 }
 
 function marketplaceRank(name: string): number {
