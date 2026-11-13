@@ -98,6 +98,39 @@ export type ExperimentalSkillsRegistryPolicy = (request: {
   | ExperimentalSkillsRegistryDecision
   | Promise<ExperimentalSkillsRegistryDecision>;
 
+/** A desktop control tool an agent asks for. Experimental: see docs/api_to_audit.fork.md. */
+export type ExperimentalDesktopTool =
+  | "status"
+  | "pins"
+  | "windows"
+  | "look"
+  | "click"
+  | "type"
+  | "key"
+  | "hotkey"
+  | "scroll"
+  | "set_value"
+  | "request_control";
+
+/** One desktop control call, made for an agent's thread. */
+export interface ExperimentalDesktopControlCall {
+  threadId: string;
+  /** Who acts, as the person sees it on the ghost cursor and in the HUD. */
+  agent: string;
+  tool: ExperimentalDesktopTool;
+  args?: Record<string, unknown>;
+  /** What the action does, in a few words, for the ghost cursor's caption. */
+  caption?: string;
+}
+
+/** The answer to a desktop control call. */
+export interface ExperimentalDesktopControlResult {
+  ok: boolean;
+  text?: string;
+  images?: { data: string; mimeType: string }[];
+  error?: string;
+}
+
 /** Hooks the fork adds to `bb.experimental_hooks`. */
 export interface ForkPluginHooks {
   /**
@@ -153,6 +186,17 @@ export interface ForkPluginHooks {
   experimental_threadForkPoint(
     threadId: string,
   ): Promise<ExperimentalThreadForkPoint | null>;
+  /**
+   * Act on the desktop for an agent, through the desktop app that runs this
+   * server. The desktop app decides: it acts only for the thread open in its
+   * HUD, in the background unless the person granted their cursor and
+   * keyboard, never in password fields, and it pauses or stops when the
+   * person takes over. Resolves `{ ok: false, error }` when there is no
+   * desktop app or it refuses. Experimental: see docs/api_to_audit.fork.md.
+   */
+  experimental_desktopControl(
+    call: ExperimentalDesktopControlCall,
+  ): Promise<ExperimentalDesktopControlResult>;
 }
 
 /**
