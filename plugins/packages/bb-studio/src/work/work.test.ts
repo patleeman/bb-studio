@@ -1,7 +1,10 @@
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { z } from "zod";
 import { MIGRATIONS } from "../migrations";
-import { SHOW_FINISHED_MS, type WorkCard } from "./contract";
+import { runWorkCli } from "./cli";
+import { rpcContract, SHOW_FINISHED_MS, type WorkCard } from "./contract";
+import { findCardMessage, registerWorkCards, WORK_TOOLS, type TimelineReader } from "./register";
 import { inFlightOrder, WorkCardStore } from "./store";
 
 const NOW = new Date("2026-11-13T15:00:00Z").getTime();
@@ -78,4 +81,97 @@ it("tells listeners after every saved change", () => {
   const card = live.create({ title: "Job", threadId: "thr_main" });
   live.update(card.id, { line: "Halfway" });
   expect(changed).toHaveBeenCalledTimes(2);
+});
+
+const page = (rows: { id: string; text?: string; messageSeq?: number; kind?: string }[], older: { anchorSeq: number; anchorId: string } | null = null) => ({ rows: rows.map((row) => ({ kind: "conversation", role: "assistant", ...row })), timelinePage: { olderCursor: older } });
+
+it("finds the message a card sits in, by id or by its directive, across older pages", async () => {
+  const id = "wc_abc";
+  const reads: unknown[] = [];
+  const read: TimelineReader = async (_threadId, cursor) => {
+    reads.push(cursor);
+    return cursor ? page([{ id: "m_card", text: `Started.\n\n::work{id="${id}"}`, messageSeq: 7 }]) : page([{ id: "m_late", text: "Other", messageSeq: 20 }], { anchorSeq: 15, anchorId: "a" });
+  };
+  expect(await findCardMessage(read, { id, threadId: "thr_main", messageId: null })).toEqual({ messageId: "m_card", messageSeq: 7 });
+  expect(reads).toHaveLength(2);
+  expect(await findCardMessage(async () => page([{ id: "m_given", text: "no directive", messageSeq: 3 }]), { id, threadId: "thr_main", messageId: "m_given" })).toEqual({ messageId: "m_given", messageSeq: 3 });
+  expect(await findCardMessage(async () => page([{ id: "m_other", text: '::work{id="wc_abcdef"}', messageSeq: 3 }]), { id, threadId: "thr_main", messageId: null })).toBeNull();
+});
+
+function fakeBb() {
+  const handlers: Record<string, (input: never) => unknown> = {};
+  const tools: Record<string, { execute(input: unknown, ctx: { threadId?: string | null }): Promise<string> }> = {};
+  const bb = {
+    realtime: { publish: vi.fn() }, log: { warn: vi.fn() },
+    agents: { registerTool: (tool: { name: string; execute(input: unknown, ctx: unknown): Promise<string> }) => { tools[tool.name] = tool; } },
+    rpc: { register: (_contract: unknown, map: typeof handlers) => Object.assign(handlers, map) },
+    sdk: { threads: { timeline: vi.fn() } },
+  };
+  return { bb, handlers, tools };
+}
+
+it("serves the RPC: create, update, list with the placed message, anchor", async () => {
+  const { bb, handlers } = fakeBb();
+  let text = "Working on it.";
+  const read: TimelineReader = async () => page([{ id: "m_9", text, messageSeq: 9 }]);
+  registerWorkCards(bb as never, db, { read });
+  const call = async <M extends keyof typeof rpcContract>(method: M, input: unknown): Promise<z.infer<(typeof rpcContract)[M]["output"]>> => rpcContract[method].output.parse(await handlers[method]!(rpcContract[method].input.parse(input) as never)) as z.infer<(typeof rpcContract)[M]["output"]>;
+  const { card, directive } = await call("work.create", { title: "Release", kind: "release", threadId: "thr_main" });
+  expect(directive).toBe(`::work{id="${card.id}"}`);
+  expect(bb.realtime.publish).toHaveBeenCalled();
+  expect((await call("work.list", { threadId: "thr_main" })).cards[0]!.messageSeq).toBeNull();
+  text = `Release started.\n\n${directive}`;
+  expect((await call("work.list", { threadId: "thr_main" })).cards[0]!.messageSeq).toBeNull();
+  vi.setSystemTime(NOW + 20_000);
+  expect((await call("work.list", { threadId: "thr_main" })).cards[0]).toMatchObject({ messageId: "m_9", messageSeq: 9 });
+  expect(await call("work.update", { id: card.id, state: "needs-you", needs: "Sign the build" })).toMatchObject({ state: "needs-you", needs: "Sign the build" });
+  const other = (await call("work.create", { title: "Other", threadId: "thr_main" })).card;
+  text = `x ::work{id="${other.id}"}`;
+  expect(await call("work.anchor", { id: other.id, threadId: "thr_main", messageId: "m_9" })).toMatchObject({ messageSeq: 9 });
+  expect(() => rpcContract["work.update"].input.parse({ id: card.id, state: "paused" })).toThrow();
+});
+
+it("gives agents tools that create in the caller's thread and update in place", async () => {
+  const { bb, tools } = fakeBb();
+  registerWorkCards(bb as never, db, { read: async () => page([]) });
+  expect(Object.keys(tools).sort()).toEqual([...WORK_TOOLS].sort());
+  const made = JSON.parse(await tools.work_card_create!.execute({ title: "Worker: fix tests", kind: "worker" }, { threadId: "thr_lead" })) as { id: string; directive: string };
+  expect(made.directive).toBe(`::work{id="${made.id}"}`);
+  expect(store.get(made.id)).toMatchObject({ threadId: "thr_lead", kind: "worker", state: "running" });
+  expect(await tools.work_card_create!.execute({ title: "Nowhere" }, { threadId: null })).toMatch(/threadId/);
+  const updated = JSON.parse(await tools.work_card_update!.execute({ id: made.id, step: "2/4", line: "Fixing the flaky one" }, { threadId: "thr_worker" })) as WorkCard;
+  expect(updated).toMatchObject({ step: "2/4", line: "Fixing the flaky one", threadId: "thr_lead" });
+  expect(JSON.parse(await tools.work_card_get!.execute({ id: made.id }, {}))).toMatchObject({ id: made.id });
+});
+
+it("runs bb studio work create, update, show and list", async () => {
+  const { bb } = fakeBb();
+  const work = registerWorkCards(bb as never, db, { read: async () => page([]) });
+  const created = await runWorkCli(["create", "--title", "Nightly", "--kind", "release", "--json"], work, { threadId: "thr_main" });
+  expect(created.exitCode).toBe(0);
+  const { card, directive } = JSON.parse(created.stdout!) as { card: WorkCard; directive: string };
+  expect(directive).toContain(card.id);
+  const updated = await runWorkCli(["update", card.id, "--state", "needs-you", "--needs", "Pick a version"], work, {});
+  expect(updated).toMatchObject({ exitCode: 0 });
+  expect(updated.stdout).toContain("needs-you\tNightly");
+  expect(updated.stdout).toContain("Pick a version");
+  expect((await runWorkCli(["show", card.id], work, {})).stdout).toContain(card.id);
+  expect((await runWorkCli(["list", "--thread", "thr_main"], work, {})).stdout).toContain("Nightly");
+  expect((await runWorkCli(["list"], work, { threadId: "thr_empty" })).stdout).toBe("No work in flight.\n");
+  expect((await runWorkCli(["update", card.id, "--state", "paused"], work, {})).exitCode).toBe(1);
+  expect((await runWorkCli(["create"], work, { threadId: "thr_main" })).exitCode).toBe(1);
+  expect((await runWorkCli(["create", "--title", "x"], work, {})).exitCode).toBe(1);
+});
+
+it("places a thread's new cards when its turn ends", async () => {
+  const { bb } = fakeBb();
+  let idle: ((event: { thread: { id: string } }) => void) | null = null;
+  const events = { on: (name: string, handler: typeof idle) => { if (name === "thread.idle") idle = handler; } };
+  let text = "";
+  const work = registerWorkCards({ ...bb, events } as never, db, { read: async () => page([{ id: "m_3", text, messageSeq: 3 }]) });
+  const { card, directive } = work.create({ title: "Job", threadId: "thr_main" });
+  await work.list("thr_main");
+  text = directive;
+  idle!({ thread: { id: "thr_main" } });
+  await vi.waitFor(() => expect(store.get(card.id).messageSeq).toBe(3));
 });

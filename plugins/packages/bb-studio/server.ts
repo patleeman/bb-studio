@@ -1,3 +1,5 @@
+import { registerWorkCards, WORK_TOOLS } from "./src/work/register";
+import { runWorkCli } from "./src/work/cli";
 import { registerLoops, LOOP_TOOLS, loopPushActions } from './src/loops/register';
 import { automationTable, bbFromFile, bbFromOverview, readImportedAt, readStudioEntries, readThreadOwners } from "./src/automation-table";
 import { arrangeRailOnce } from "./src/rail-arrangement";
@@ -443,7 +445,7 @@ export default async function plugin(bb: BbPluginApi) {
       bot: bot ? bots.instructions(bot) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
       pages: !off.has("page"), minis: !off.has("mini"), endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
     });
-    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
+    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
   }));
   /** Which conversation a Bot's session is in (src/bot-threads.ts conversationInstructions); "" before Studio has placed it. */
   const conversationNote = (threadId: string): string => {
@@ -706,6 +708,7 @@ export default async function plugin(bb: BbPluginApi) {
     await bb.sdk.plugins.callRpc({pluginId:'mobile',method:'notify',outputSchema:z.unknown(),input:{title:loop.title,body:loop.why,kind:'turn-finished',threadId:bot.threadId,botId:bot.id,conversationId:bot.threadId,projectId:PERSONAL_PROJECT_ID,category:'BB_LOOP',loopId:loop.id,loopKind:loop.kind,actions:loopPushActions(loop.kind),...(loop.kind==='decide'&&loop.options.length?{options:loop.options.slice(0,4).map(o=>o.slice(0,120))}:{}),coalesceKey:loop.id} as never});
   }, settings, loopTimeZone, (name, everyMs, work) => triggers.every(name, everyMs, work));
   loopsEnabled = loops.enabled;
+  const work = registerWorkCards(bb, db);
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
   const runners: Runners = new Runners({
     db, sdk: bb.sdk, scheduler, changed: tagsChanged,
@@ -2473,6 +2476,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "minis", summary: "List mini apps, read their records and state, and run their actions", usage: "bb studio minis <list|show|data|state|watch|actions|do> …" },
       { name: "theme", summary: "List, show, check, create, update, apply and delete Bot themes", usage: "bb studio theme <list|show|create|update|apply|check|delete|template> …" },
       { name: "presence", summary: "List, show, check, create, update, apply and delete Bot presences", usage: "bb studio presence <list|show|create|update|apply|check|delete|template> …" },
+      { name: "work", summary: "Live work cards: create one, update it in place, show and list a conversation's In flight cards", usage: "bb studio work <create|update|show|list> …" },
     ],
     async run(argv, ctx) {
       // Built-in kinds' commands (`bb artifacts …` before the merge).
@@ -2489,6 +2493,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (argv[0] === "recordings") return recordings.cli(argv.slice(1));
       if (argv[0] === "presence") return runPresenceCli(argv.slice(1), { service: presenceService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)) });
       if (argv[0] === "theme") return runThemeCli(argv.slice(1), { service: themeService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)), weather: { sky: () => forestWeather.sky(Intl.DateTimeFormat().resolvedOptions().timeZone ?? null), setCity: (city) => forestWeather.setCity(city) }, sky: { place: () => forestWeather.place(Intl.DateTimeFormat().resolvedOptions().timeZone ?? null), preview: () => readPreview(bb.storage.kv), setPreview: (at) => writePreview(bb.storage.kv, at), view: () => readView(bb.storage.kv), setView: (view) => writeView(bb.storage.kv, view), now: () => Date.now(), zoneOffsetMinutes: () => -new Date().getTimezoneOffset() } });
+      if (argv[0] === "work") return runWorkCli(argv.slice(1), work, ctx);
       if (argv[0] === "pages") return argv[1] === "explore" ? explore.cli(argv.slice(2), ctx) : pages.cli(argv.slice(1), ctx);
       const { command, rest: raw } = subcommand(argv);
       const USAGE: Record<string, string> = {
@@ -2587,7 +2592,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|starred|move|providers|health|setup|reindex|backup|restore|pages|artifacts|whiteboards|designs|recordings|dashboards|minis|theme|presence|decisions> …");
+            return usage("bb studio <list|tags|starred|move|providers|health|setup|reindex|backup|restore|pages|artifacts|whiteboards|designs|recordings|dashboards|minis|theme|presence|decisions|work> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };
