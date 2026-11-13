@@ -8,6 +8,8 @@ import { z } from "zod";
 export const automationTableKind = z.enum(["watcher", "checkin", "schedule", "reminder", "runner", "bb"]);
 export type AutomationTableKind = z.infer<typeof automationTableKind>;
 
+export const MAINTENANCE_ID = "maintenance";
+
 export const automationTableRow = z.object({
   /** The row's id: the Studio automation's (`aut_…`, `heartbeat`, `maintenance`), the runner's (`run_…`), or the bb automation's (`auto_…`) for kind "bb". */
   id: z.string(),
