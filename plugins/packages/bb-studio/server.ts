@@ -1420,7 +1420,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_side_threads_for_bot: async ({ botId }) => { const bot = bots.stored(botId); return { threads: bot ? await sideThreads.forBot(bot.id) : [] }; },
     bot_listed_threads: () => ({ threadIds: [...new Set([...ownedThreads.all(), ...sideThreads.threadIds()])] }),
     bot_side_thread_open: async ({ threadId, messageId }) => { const opened = await botThreads.messageThreads.reply({ threadId, messageId }); return { threadId: opened.threadId, created: opened.created }; },
-    bot_thread_owner: ({ threadId }) => ({ botId: ownedThreads.ownerOf(threadId) ?? runners.forThread(threadId)?.bot_id ?? botThreads.store.get(threadId)?.botId ?? null }),
+    bot_thread_owner: async ({ threadId }) => ({ botId: ownedThreads.ownerOf(threadId) ?? runners.forThread(threadId)?.bot_id ?? await botThreads.owner(threadId) }),
     bot_thread_release: ({ threadId }) => ownedThreads.release(threadId),
     bot_welcome: onboarding.bot_welcome,
     bot_welcome_opened: onboarding.bot_welcome_opened,

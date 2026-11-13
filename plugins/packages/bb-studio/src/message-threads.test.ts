@@ -145,6 +145,15 @@ it("Reply in thread on a conversation mirrored from bb finds an older reply and 
   expect(fork).toHaveBeenCalledWith(expect.objectContaining({ sourceThreadId: "thr_main", sourceSeqEnd: 9, environment: { type: "host", hostId: STUDIO_HOST, workspace: { type: "personal" } } }));
 });
 
+it("a conversation Studio hasn't placed yet is its Bot's on the first owner lookup, so its menu offers Studio's fork from the start", async () => {
+  const { server, threads } = await setup();
+  threads.set("thr_trip", { id: "thr_trip", title: "Trip", projectId: "proj_personal", createdAt: 30, status: "idle" });
+  expect(server.store.get("thr_trip")).toBeNull();
+  expect(await server.owner("thr_trip")).toBe("dot");
+  expect(server.store.get("thr_trip")).toMatchObject({ kind: "conversation", botId: "dot" });
+  expect(await server.owner("thr_missing")).toBeNull();
+});
+
 it("a conversation on a machine that is connected forks where it is", async () => {
   const { server, fork } = await setup();
   await server.rpc.bot_thread_reply({ threadId: "thr_main", messageId: "thr_main:assistant:4" });
