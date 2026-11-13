@@ -176,7 +176,7 @@ struct ThreadView: View {
             if let error { app.flash(error) }
         }
         .onChange(of: roomChat?.focusRequests, initial: true) { _, requests in
-            if let requests, requests > 0 { composerFocused = true }
+            if let requests, requests > 0, roomChat?.lying == false { composerFocused = true }
         }
     }
 

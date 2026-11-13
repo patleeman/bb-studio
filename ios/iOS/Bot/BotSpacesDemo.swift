@@ -203,13 +203,17 @@ enum BotSpacesDemo {
         }
 
         func spacesJSON() -> Data {
-            let json = #"""
+            let all = #"""
                 {"bots":[
                   {"id":"bot_juniper","name":"Juniper","avatar":"🌿","shape":"blob","color":"#2ba59a","primary":true,"mainThreadId":"\#(BotDemo.threadId)","needsYou":\#(lock.withLock { approvalPending }),"activity":{"turn":false,"workers":1}},
                   {"id":"bot_home","name":"Home","avatar":"🏠","shape":"star","color":"#e0803a","primary":false,"mainThreadId":"thr_home_main","needsYou":true,"activity":{"turn":false,"workers":0}},
                   {"id":"bot_research","name":"Research","avatar":"🔭","shape":"hexagon","color":"#5b6ee1","primary":false,"mainThreadId":"thr_research_main","needsYou":false,"activity":{"turn":false,"workers":0}}
                 ],"currentBotId":"bot_juniper"}
                 """#
+            let json = ProcessInfo.processInfo.arguments.contains("-qaOneBot")
+                ? all.split(separator: "\n").filter { !$0.contains("\"bot_home\"") && !$0.contains("\"bot_research\"") }.joined(separator: "\n")
+                    .replacingOccurrences(of: #",\s*\]"#, with: "]", options: .regularExpression)
+                : all
             return Data(BotSpacesDemo.themed(json, chosen: lock.withLock { chosenTheme }).utf8)
         }
 
