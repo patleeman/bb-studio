@@ -1233,20 +1233,23 @@ title bar layout the traffic lights, back, forward and the sidebar toggle
 stay where BB has them; in the browser layout back and forward move to the
 start of the main view's header and the toggle stays.
 
-**Automations** is the sidebar Bot's page (7b), on the Bot pages'
-template: one list of every automation that belongs to the Bot
-(`bot_automation_table`, see **Automations table** below), with search,
-kind pills and **New**; switching Bots switches it. Each row is one line:
-its name with Active, Paused, Paused · in bb or Off, then its Kind, When
-and Last run columns under one header row. Paused, disabled and finished
-ones stay listed; active ones come first, then by name. A row opens the
-automation as a tab in the workbench beside the page
-(`bb://automation/<botId>:<row id>`): a Studio automation shows its detail
-(Pause or Resume, Run now, Edit, Delete, recent runs); a bb automation
-shows what it does, with **Open in bb** for bb's own automation page while
-bb's automations plugin is on. One that is in bb, and any whose detail
-Studio can't load, is read-only: what it does and its thread.
-The Bot page keeps the week.
+**Automations** (`studio/automations`, `bb://automations`, and the Bot's
+Automations tab) opens the sidebar Bot's **Todos** page at **Scheduled**:
+there is one place for what runs when. Scheduled lists every automation
+that belongs to the Bot (check-ins, reminders, watchers, runners, bb's own
+automations and maintenance), each with its next run or Paused, and has
+**New** (check-in, reminder, watcher, runner). Timed todos stay in Today,
+This week and Later. A row opens the automation as a tab in the workbench
+beside the page (`bb://automation/<botId>:<row id>`): a Studio automation
+shows its detail (Pause or Resume, Run now, Edit, Delete, recent runs); a bb
+automation shows what it does, with **Open in bb** for bb's own automation
+page while bb's automations plugin is on. One that is in bb, and any whose
+detail Studio can't load, is read-only: what it does and its thread.
+
+All of these read one model, `loops.scheduled` (`src/loops/scheduled.ts`):
+open todos with a time, and every Bot's active or paused automation with
+its next run (`{ threadId }` narrows it to one thread). A reminder already
+copied into the todos is listed once, as its todo.
 
 **VS Code** opens the workspace you used last, as a page titled "VS Code ·
 <its name>" (`/plugins/studio/vscode/<id>`); with none whose folder is still
@@ -2596,17 +2599,15 @@ so it's as you left it when you come back.
   Default or still set to it (BB already shows Default for the missing
   palette; the write replaces the stored id), so no teal step shows at
   launch (`src/theme/legacy-theme.ts`).
-- **Automations tab.** In a thread's side panel, **+ → Automations** lists the
-  automations that wake that thread: the name, the schedule in words (such as
-  "Every 30 min" or "Weekdays 9:00"; other crons show as written), when it
-  runs next, and the last run's result or error. A switch pauses or resumes
-  one, and **Edit** opens it in Automations. The tab refreshes when it opens
-  and every 30 seconds while it's visible. If BB's Automations plugin is off
-  or doesn't answer, the tab says Automations are unavailable.
-- **Automations badge.** A regular thread that automations wake shows a clock
-  with their count in its header; click it to open the Automations tab. Bot
-  threads show a **Bot info** button beside the cache dot instead. Automations
-  for that Bot are already listed in Bot info.
+- **Automations tab.** In a thread's side panel, **+ → Automations** lists
+  what is scheduled for that thread, from `loops.scheduled`: its todos with a
+  time and the Bot automations that wake it, each with its kind and next run
+  (or Paused). A row opens its todo or automation. It refreshes every 30
+  seconds while it's visible.
+- **Automations badge.** A regular thread with something scheduled shows a
+  clock with the count ("2 scheduled") in its header; click it to open the
+  Automations tab. Bot threads show a **Bot info** button beside the cache
+  dot instead.
 
 ![A regular staged thread without a workspace: its header shows the Automations count and no VS Code button.](assets/thread-header-automations.png)
 - **For agents**: the `studio_list_items`,
@@ -2952,8 +2953,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
   list, as before.
 
   **Automations table** (`bot_automation_table`, `src/automation-table.ts`,
-  types in `src/automation-table-contract.ts`; the Automations page, and
-  for iOS). Input `{ botId? }` (the primary Bot without one). Output
+  types in `src/automation-table-contract.ts`; the Scheduled list, the
+  automation tab, and iOS). Input `{ botId? }` (the primary Bot without one). Output
   `{ botId, mirrored, bbPlugin: "on" | "off", rows }`, each row
   `{ id, kind, name, when, lastRunAt, lastRun, status, inBb, readOnly, bb,
   threadId, instruction, script, via }`:
@@ -3751,6 +3752,15 @@ thread gets only its read-only Bot tools, so it has no `todos_*` tools, and a
 paused or stopped Bot's chat has none either. Todos are not in the
 instructions: the Bot reads them with `todos_list` when it needs them, and
 due todos are posted to the primary Bot's chat.
+
+**Reminders are todos.** A one-time reminder is a todo the Bot owns with a
+time. With Todos on, `automation_create` with kind `reminder` makes one. A
+copy-first migration copied every older reminder into the todos as
+`loop_reminder_<automation id>` (active → queued, paused → dropped, done →
+done; owner `cos`, or the thread it targeted) and kept the reminder rows.
+While Todos are on, a reminder that has its todo no longer wakes the Bot as
+an automation; the todo carries it. Reminders made over the RPC (the iOS
+app, the New menu) are still automations until they move too.
 
 ## Pages and Apps
 
