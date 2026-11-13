@@ -709,14 +709,6 @@
       "title": "commits a provider tab immediately and keeps its models selectable"
     },
     {
-      "file": "apps/app/src/components/pickers/ModelReasoningPicker.test.tsx",
-      "title": "keeps search focused and clears it when switching providers"
-    },
-    {
-      "file": "apps/app/src/components/thread/ThreadActionsProvider.test.tsx",
-      "title": "shows one archive toast whose Undo restores the parent and children"
-    },
-    {
       "file": "apps/app/src/views/ToolsView.plugin-detail.test.tsx",
       "title": "keeps catalog provenance and release management in the unified detail taxonomy"
     },
@@ -731,6 +723,14 @@
     {
       "file": "apps/app/src/views/thread-detail/thread-opening.model.test.tsx",
       "title": "keeps a read thread at the end when a live reply adds NEW above the view"
+    },
+    {
+      "file": "apps/app/src/components/pickers/ModelReasoningPicker.test.tsx",
+      "title": "keeps search focused and clears it when switching providers"
+    },
+    {
+      "file": "apps/app/src/views/thread-detail/useThreadUnreadDividerState.test.ts",
+      "title": "keeps the opening divider when the thread is marked read, and drops it after a watched reply"
     }
   ],
   "removeLines": [
@@ -783,10 +783,6 @@
     {
       "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
       "title": "shows shortcut keycaps only on desktop, including filtered plugin results (compact: %s)"
-    },
-    {
-      "file": "apps/app/src/components/thread/ThreadActionsProvider.test.tsx",
-      "title": "restores parents before descendants when undoing a %s archive"
     }
   ]
 }

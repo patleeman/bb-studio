@@ -157,6 +157,16 @@ const replacements = [
     '"Ask for a follow-up. @ to mention files, folders, sections, or threads"',
     '"Ask for a follow-up. @ to mention files, folders, sections, or conversations"',
   ],
+  [
+    "apps/app/src/components/thread/ThreadActionsProvider.test.tsx",
+    'source === "single" ? "Thread archived" : "Threads archived",',
+    'source === "single" ? "Conversation archived" : "Conversations archived",',
+  ],
+  [
+    "apps/app/src/components/thread/ThreadActionsProvider.test.tsx",
+    'calls[0]?.[0]).toBe(\n      "Thread archived",',
+    'calls[0]?.[0]).toBe(\n      "Conversation archived",',
+  ],
 ];
 for (const [file, from, to] of replacements) {
   const target = join(root, file);

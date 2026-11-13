@@ -1,10 +1,19 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   claudeTextArgs,
   claudeTextStatus,
+  completeWithCommand,
+  MAX_CONCURRENT_TEXT_RUNS,
+  textRunsInFlight,
   parseClaudeAuthStatus,
   readClaudeAuthState,
   resetClaudeTextStatusCache,
@@ -30,13 +39,16 @@ afterEach(() => {
 });
 
 describe("Claude Code text service", () => {
-  it("runs one print turn that saves no session and loads no tools, settings or MCP servers", () => {
+  it("runs one print turn that saves no session, loads no tools, hooks or MCP servers, and keeps the user's auth settings", () => {
     const args = claudeTextArgs();
     expect(args).toContain("-p");
     expect(args).toContain("--no-session-persistence");
     expect(args).toContain("--strict-mcp-config");
     expect(args[args.indexOf("--tools") + 1]).toBe("");
-    expect(args[args.indexOf("--setting-sources") + 1]).toBe("");
+    expect(args[args.indexOf("--setting-sources") + 1]).toBe("user");
+    expect(JSON.parse(args[args.indexOf("--settings") + 1] ?? "")).toEqual({
+      disableAllHooks: true,
+    });
     expect(args[args.indexOf("--model") + 1]).toBe("haiku");
   });
 
@@ -78,7 +90,7 @@ describe("Claude Code text service", () => {
     ).resolves.toEqual({ ok: false, message: "Timed out after 100ms" });
   });
 
-  it("is ready only while Claude Code is signed in, and caches the answer", async () => {
+  it("is ready only while Claude Code is signed in, and checks again while it is not", async () => {
     let calls = 0;
     let clock = 0;
     const signedOut = async () => {
@@ -90,13 +102,19 @@ describe("Claude Code text service", () => {
       message: "Run `claude` on the primary machine to sign in",
     });
     await claudeTextStatus(signedOut, () => clock);
-    expect(calls).toBe(1);
+    expect(calls).toBe(2);
 
-    resetClaudeTextStatusCache();
     clock += 1;
-    await expect(
-      claudeTextStatus(async () => "signed-in" as const, () => clock),
-    ).resolves.toEqual({ ready: true });
+    let signedInCalls = 0;
+    const signedIn = async () => {
+      signedInCalls += 1;
+      return "signed-in" as const;
+    };
+    await expect(claudeTextStatus(signedIn, () => clock)).resolves.toEqual({
+      ready: true,
+    });
+    await claudeTextStatus(signedIn, () => clock);
+    expect(signedInCalls).toBe(1);
   });
 
   it("reads the sign-in state from `claude auth status`", async () => {
@@ -107,5 +125,32 @@ describe("Claude Code text service", () => {
     await expect(readClaudeAuthState(command)).resolves.toBe("signed-in");
     await expect(readClaudeAuthState(path.join(dir, "missing"))).resolves.toBe("not-installed");
     await expect(readClaudeAuthState(null)).resolves.toBe("not-installed");
+  });
+
+  it("runs at most two at once and turns off non-essential traffic", async () => {
+    const log = path.join(dir, "runs.log");
+    const command = fakeClaude(
+      `cat >/dev/null; echo "start $CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC" >> "${log}"; sleep 0.3; echo end >> "${log}"; echo ok`,
+    );
+    const signal = new AbortController().signal;
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        completeWithCommand(command, { prompt: "x", timeoutMs: 5_000 }, signal),
+      ),
+    );
+    expect(results.every((result) => result.ok)).toBe(true);
+    let running = 0;
+    let peak = 0;
+    for (const line of readFileSync(log, "utf8").trim().split("\n")) {
+      if (line.startsWith("start")) {
+        expect(line).toBe("start 1");
+        running += 1;
+        peak = Math.max(peak, running);
+      } else {
+        running -= 1;
+      }
+    }
+    expect(peak).toBe(MAX_CONCURRENT_TEXT_RUNS);
+    expect(textRunsInFlight()).toBe(0);
   });
 });

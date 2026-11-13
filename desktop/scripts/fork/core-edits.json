@@ -38,8 +38,8 @@
     },
     "apps/app/src/components/pickers/ModelReasoningPicker.tsx": {
       "seam": "composer-labels, model-picker-gate, picker-browse",
-      "intent": "An unknown model id shows a readable label (formatUnknownModelLabel, unknownModelLabel.fork.ts, imported at the top of the file) instead of the raw id, and the trigger's reasoning half comes from triggerReasoningLabel (same file): a model the catalog lacks still shows its stored level, so a thread reads \"Opus 5.5 Medium\" like the new-thread page. ModelReasoningPicker returns forkModelPickerGate(<Popover…>, { hasSelectedModel }) (components/fork/ForkModelPickerGate.tsx, imported at the top of the file), so a plugin's slots.experimental_modelPickerGate can stand in for the picker (Studio's \"Sign in\" while no provider is ready). A provider tab click only browses: handleProviderSelect takes commit (default true) and the tab's onClick passes false, so onSelectedProviderChange is not called and the tab shows that provider's models as a preview; picking a model or a reasoning level while previewing first calls onSelectedProviderChange(activeProviderId), then commits the model. The provider cycle chord still commits.",
-      "budget": 24
+      "intent": "An unknown model id shows a readable label (formatUnknownModelLabel, unknownModelLabel.fork.ts, imported at the top of the file) instead of the raw id, and the trigger's reasoning half comes from triggerReasoningLabel (same file): a model the catalog lacks still shows its stored level, so a thread reads \"Opus 5.5 Medium\" like the new-thread page. ModelReasoningPicker returns forkModelPickerGate(<Popover…>, { hasSelectedModel }) (components/fork/ForkModelPickerGate.tsx, imported at the top of the file), so a plugin's slots.experimental_modelPickerGate can stand in for the picker (Studio's \"Sign in\" while no provider is ready). A provider tab click only browses: handleProviderSelect takes commit (default true) and the tab's onClick passes false, so onSelectedProviderChange is not called and the tab shows that provider's models as a preview; picking a model or a reasoning level while previewing sends one onProviderModelChange(previewPick(...)) (previewPick.fork.ts, imported at the top of the file) with the provider, model and level together, so the composer never stores a model under the old provider; without that prop it falls back to onSelectedProviderChange then onModelChange. The provider cycle chord still commits.",
+      "budget": 41
     },
     "apps/app/src/components/secondary-panel/NewTabFileSearch.tsx": {
       "seam": "new-tab-items",
@@ -498,8 +498,8 @@
     },
     "apps/server/src/services/ai/ai-tasks.ts": {
       "seam": "title-service",
-      "intent": "runAiTask and runTextAiTask take preferServiceId; runAiTask orders the task's services with preferAiService (ai-service-preference.fork.ts, imported at the top of the file), so the service whose id is the conversation's provider is asked first. Everything else (skipping services that are not ready, the timeout, the fallthrough) is upstream's.",
-      "budget": 6
+      "intent": "runAiTask and runTextAiTask take preferServiceId; runAiTask orders the task's services with preferAiService (ai-service-preference.fork.ts, imported at the top of the file), so the service whose id is the conversation's provider is asked first. Everything else (skipping services that are not ready, the timeout, the fallthrough) is upstream's. orderedAiServices passes upstream's sorted list through forkAiServiceOrder (same fork file), which moves text-only services (no transcribe, such as Claude Code's) after the others without naming a provider, so Automatic keeps upstream's order for every task and Claude Code is the fallback; only titles name a preferred service.",
+      "budget": 10
     },
     "apps/server/src/services/threads/title-generation.ts": {
       "seam": "title-service",
@@ -538,8 +538,8 @@
     },
     "apps/app/src/components/promptbox/NewThreadComposer.tsx": {
       "seam": "picker-browse",
-      "intent": "One call of useSignedInProviderDefault (hooks/useSignedInProviderDefault.fork.ts, imported at the top of the file) after pickerLocksRef: when the composer opens with a remembered provider that is signed out or not installed and another provider is ready, it switches to the ready one once; a provider a plugin locked is left alone.",
-      "budget": 2
+      "intent": "One call of useSignedInProviderDefault (hooks/useSignedInProviderDefault.fork.ts, imported at the top of the file) after pickerLocksRef: when the composer opens with a remembered provider that is signed out or not installed and another provider is ready, it switches to the ready one once; a provider a plugin locked is left alone. handleProviderModelPick = useProviderModelPick(setProviderModelReasoning, snapshotDraftBeforeOptionChange) (same file) is the provider config's onProviderModelChange (undefined while the provider is locked) and is in renderPromptBox's dependencies.",
+      "budget": 5
     },
     "apps/app/src/components/promptbox/banner/ThreadPromptContextBanner.tsx": {
       "seam": "host-copy",
@@ -578,8 +578,13 @@
     },
     "apps/app/src/views/thread-detail/useThreadUnreadDividerState.ts": {
       "seam": "unread-divider",
-      "intent": "nextThreadUnreadDividerSnapshot returns keepDividerWhileReading(currentSnapshot, thread) (unreadDividerOpenOnly.fork.ts, imported at the top of the file) when the open thread's attention changes: the NEW divider is placed only when a thread is opened, and a reply that lands while you read it drops the divider instead of placing a new one.",
+      "intent": "nextThreadUnreadDividerSnapshot returns keepDividerWhileReading(currentSnapshot, thread) (unreadDividerOpenOnly.fork.ts, imported at the top of the file) when the open thread's attention changes: the NEW divider is placed only when a thread is opened and keeps that placement; a reply that lands while you read never places it again.",
       "budget": 4
+    },
+    "apps/app/src/components/promptbox/ExecutionControls.tsx": {
+      "seam": "picker-browse",
+      "intent": "ExecutionProviderConfig carries onProviderModelChange (ProviderModelPickHandler, previewPick.fork.ts, imported at the top of the file) and passes it to ModelReasoningPicker, so a pick from another provider's tab reaches the composer as one change.",
+      "budget": 3
     }
   }
 }

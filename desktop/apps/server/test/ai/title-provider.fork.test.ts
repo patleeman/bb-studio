@@ -12,7 +12,9 @@ import {
   scheduleQueuedTitleRetry,
 } from "../../src/services/threads/title-retry-queue.fork.js";
 import { registerFakeAiService } from "../helpers/ai-services.js";
+import { waitForQueuedCommand } from "../helpers/commands.js";
 import {
+  seedEnvironment,
   seedHostSession,
   seedProjectWithSource,
   seedThread,
@@ -26,12 +28,25 @@ const INPUT = [
   }),
 ];
 
-function seedUntitledThread(harness: TestAppHarness, providerId: string) {
+function seedUntitledThread(
+  harness: TestAppHarness,
+  providerId: string,
+  withEnvironment = false,
+) {
   const { host } = seedHostSession(harness.deps, { id: "host-title" });
   const { project } = seedProjectWithSource(harness.deps, { hostId: host.id });
+  const environment = withEnvironment
+    ? seedEnvironment(harness.deps, {
+        hostId: host.id,
+        projectId: project.id,
+        path: "/tmp/title-retry-workspace",
+        status: "ready",
+      })
+    : null;
   const thread = seedThread(harness.deps, {
     projectId: project.id,
     providerId,
+    environmentId: environment?.id ?? null,
     titleFallback: "Help me plan a three day trip to Lisbon in March please.",
   });
   updateThread(harness.deps.db, harness.deps.hub, thread.id, { title: null });
@@ -62,6 +77,7 @@ function registerClaudeCode(
     pluginId: "provider-claude-code",
     builtin: true,
     complete: async () => args.title ?? "Lisbon Trip in March",
+    transcribe: null,
     status: async () =>
       args.ready()
         ? { ready: true }
@@ -223,6 +239,81 @@ describe("conversation titles pick a signed-in provider", () => {
         outcome,
       );
       expect(hasTitleRetry(thread.id)).toBe(false);
+    });
+  });
+
+  it("puts a text-only service like Claude Code after Codex for tasks that name no provider", async () => {
+    await withTestHarness({}, async (harness) => {
+      const codex = registerFakeAiService(harness.deps.aiServices, {
+        id: "codex",
+        pluginId: "provider-codex",
+        builtin: true,
+        complete: async () => "From Codex",
+      });
+      const claude = registerClaudeCode(harness, { ready: () => true });
+      await expect(
+        runTextAiTask(harness.deps, {
+          task: "commit-message",
+          label: "test",
+          prompt: "message",
+        }),
+      ).resolves.toMatchObject({ ok: true, value: "From Codex" });
+      expect(codex.completeCalls).toHaveLength(1);
+      expect(claude.completeCalls).toEqual([]);
+    });
+  });
+
+  it("falls through to the next service when the conversation's own provider throws", async () => {
+    await withTestHarness({}, async (harness) => {
+      registerFakeAiService(harness.deps.aiServices, {
+        id: "codex",
+        pluginId: "provider-codex",
+        builtin: true,
+        complete: async () => {
+          throw new Error("Codex is overloaded");
+        },
+      });
+      const claude = registerClaudeCode(harness, { ready: () => true });
+      const thread = seedUntitledThread(harness, "codex");
+      const outcome = await generateThreadMetadataWithOutcome(harness.deps, {
+        input: INPUT,
+        threadId: thread.id,
+      });
+      expect(outcome.metadata).toEqual({ title: "Lisbon Trip in March" });
+      expect(claude.completeCalls).toHaveLength(1);
+    });
+  });
+
+  it("renames the provider thread when a retried title lands", async () => {
+    await withTestHarness({}, async (harness) => {
+      let clock = 0;
+      let signedIn = false;
+      const deps = {
+        ...harness.deps,
+        aiServices: createAiServiceRegistry({ now: () => clock }),
+      };
+      const scoped = { ...harness, deps } as TestAppHarness;
+      registerClaudeCode(scoped, { ready: () => signedIn });
+      const thread = seedUntitledThread(scoped, "codex", true);
+      const first = await generateThreadMetadataWithOutcome(deps, {
+        input: INPUT,
+        threadId: thread.id,
+      });
+      noteTitleOutcome(deps, { threadId: thread.id, input: INPUT }, first);
+      signedIn = true;
+      clock += 10_001;
+      await runQueuedTitleRetry(thread.id);
+
+      const rename = await waitForQueuedCommand(
+        harness,
+        ({ command }) =>
+          command.type === "thread.rename" && command.threadId === thread.id,
+      );
+      expect(rename.command).toMatchObject({
+        type: "thread.rename",
+        threadId: thread.id,
+        title: "Lisbon Trip in March",
+      });
     });
   });
 });

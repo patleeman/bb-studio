@@ -1,12 +1,16 @@
-import { getThread } from "@bb/db";
+import { getEnvironment, getThread } from "@bb/db";
 import type { PromptInput } from "@bb/domain";
-import type { LoggedWorkSessionDeps } from "../../types.js";
+import type {
+  LoggedPendingInteractionWorkSessionDeps,
+  LoggedWorkSessionDeps,
+} from "../../types.js";
 import { runtimeErrorLogFields } from "../lib/error-log-fields.js";
 import {
   applyGeneratedThreadTitle,
   generateThreadMetadataWithOutcome,
   type ThreadMetadataGenerationOutcome,
 } from "./title-generation.js";
+import { dispatchThreadRenameCommand } from "./thread-commands.js";
 import {
   dropTitleRetry,
   queueTitleRetry,
@@ -22,6 +26,37 @@ function retriable(outcome: ThreadMetadataGenerationOutcome): boolean {
   );
 }
 
+function canDispatchCommands(
+  deps: LoggedWorkSessionDeps,
+): deps is LoggedPendingInteractionWorkSessionDeps {
+  return "pendingInteractions" in deps && "terminalSessions" in deps;
+}
+
+function renameInProvider(
+  deps: LoggedWorkSessionDeps,
+  threadId: string,
+  title: string,
+): void {
+  if (!canDispatchCommands(deps)) return;
+  const thread = getThread(deps.db, threadId);
+  const environment = thread?.environmentId
+    ? getEnvironment(deps.db, thread.environmentId)
+    : null;
+  if (
+    !thread ||
+    !environment ||
+    (thread.status !== "active" && thread.status !== "idle")
+  ) {
+    return;
+  }
+  dispatchThreadRenameCommand(deps, {
+    environment: { id: environment.id, hostId: environment.hostId },
+    providerId: thread.providerId,
+    threadId: thread.id,
+    title,
+  });
+}
+
 async function retryTitle(
   deps: LoggedWorkSessionDeps,
   args: { threadId: string; input: PromptInput[] },
@@ -32,7 +67,9 @@ async function retryTitle(
     const outcome = await generateThreadMetadataWithOutcome(deps, args);
     const title = outcome.metadata?.title;
     if (title) {
-      applyGeneratedThreadTitle(deps, { threadId: args.threadId, title });
+      if (applyGeneratedThreadTitle(deps, { threadId: args.threadId, title })) {
+        renameInProvider(deps, args.threadId, title);
+      }
       return "done";
     }
     return retriable(outcome) ? "again" : "done";

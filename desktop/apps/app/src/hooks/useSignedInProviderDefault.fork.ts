@@ -1,4 +1,5 @@
-import { useContext, useEffect, useRef } from "react";
+import { useCallback, useContext, useEffect, useRef } from "react";
+import type { ProviderModelPick } from "@/components/pickers/previewPick.fork";
 import { UNSAFE_LocationContext } from "react-router-dom";
 import type { SystemProviderState } from "@bb/server-contract";
 import { useSystemProviderStates } from "./queries/system-queries";
@@ -49,4 +50,17 @@ export function useSignedInProviderDefault(args: {
     const next = signedInProviderFor(providerId, providers);
     if (next !== null) setProviderId(next);
   }, [locked, providerId, providers, setProviderId, visit]);
+}
+
+export function useProviderModelPick(
+  setProviderModelReasoning: (pick: ProviderModelPick) => void,
+  snapshot: () => void,
+): (pick: ProviderModelPick) => void {
+  return useCallback(
+    (pick: ProviderModelPick) => {
+      snapshot();
+      setProviderModelReasoning(pick);
+    },
+    [setProviderModelReasoning, snapshot],
+  );
 }

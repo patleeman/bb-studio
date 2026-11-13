@@ -14,6 +14,5 @@ export function keepDividerWhileReading<TPlacement>(
     ...current,
     attentionAt: thread.latestAttentionAt,
     autoScroll: false,
-    placement: null,
   };
 }

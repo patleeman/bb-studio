@@ -12,6 +12,56 @@ const SYSTEM_PROMPT =
   "You answer with exactly the requested text and nothing else.";
 const STATUS_TTL_MS = 60_000;
 const MAX_OUTPUT_CHARS = 4_000;
+export const MAX_CONCURRENT_TEXT_RUNS = 2;
+
+export function claudeTextEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  return { ...env, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" };
+}
+
+let runningTextRuns = 0;
+const waitingTextRuns: Array<() => void> = [];
+
+async function withTextRunSlot<T>(
+  signal: AbortSignal,
+  run: () => Promise<T>,
+  cancelled: () => T,
+): Promise<T> {
+  if (runningTextRuns >= MAX_CONCURRENT_TEXT_RUNS) {
+    const admitted = await new Promise<boolean>((resolve) => {
+      const onAbort = (): void => {
+        const index = waitingTextRuns.indexOf(admit);
+        if (index !== -1) waitingTextRuns.splice(index, 1);
+        resolve(false);
+      };
+      const admit = (): void => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(true);
+      };
+      if (signal.aborted) {
+        resolve(false);
+        return;
+      }
+      signal.addEventListener("abort", onAbort, { once: true });
+      waitingTextRuns.push(admit);
+    });
+    if (!admitted) return cancelled();
+  } else {
+    runningTextRuns += 1;
+  }
+  try {
+    return await run();
+  } finally {
+    const next = waitingTextRuns.shift();
+    if (next === undefined) runningTextRuns -= 1;
+    else next();
+  }
+}
+
+export function textRunsInFlight(): number {
+  return runningTextRuns;
+}
 
 export function claudeTextArgs(): string[] {
   return [
@@ -23,7 +73,9 @@ export function claudeTextArgs(): string[] {
     "",
     "--strict-mcp-config",
     "--setting-sources",
-    "",
+    "user",
+    "--settings",
+    JSON.stringify({ disableAllHooks: true }),
     "--system-prompt",
     SYSTEM_PROMPT,
     "--output-format",
@@ -63,7 +115,7 @@ export function runClaudeText(
     };
     const child = spawn(args.command, claudeTextArgs(), {
       cwd: os.tmpdir(),
-      env: args.env ?? process.env,
+      env: args.env ?? claudeTextEnv(),
       stdio: ["pipe", "pipe", "pipe"],
     });
     const stop = (message: string): void => {
@@ -119,7 +171,19 @@ export function completeClaudeText(
       message: error instanceof Error ? error.message : String(error),
     });
   }
-  return runClaudeText({ command, input, signal });
+  return completeWithCommand(command, input, signal);
+}
+
+export function completeWithCommand(
+  command: string,
+  input: ClaudeAiCompleteInput,
+  signal: AbortSignal,
+): Promise<ClaudeAiTextResult> {
+  return withTextRunSlot(
+    signal,
+    () => runClaudeText({ command, input, signal }),
+    () => ({ ok: false, message: "Cancelled" }),
+  );
 }
 
 export type ClaudeAuthState = "signed-in" | "signed-out" | "not-installed";
@@ -142,7 +206,7 @@ export function parseClaudeAuthStatus(stdout: string): ClaudeAuthState {
 
 export function readClaudeAuthState(
   command: string | null = claudeCommand(),
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = claudeTextEnv(),
 ): Promise<ClaudeAuthState> {
   if (command === null) return Promise.resolve("not-installed");
   return new Promise((resolve) => {
@@ -225,7 +289,9 @@ export async function claudeTextStatus(
   readAuth: () => Promise<ClaudeAuthState> = () => readClaudeAuthState(),
   now: () => number = Date.now,
 ): Promise<ClaudeAiStatus> {
-  if (cachedStatus === null) return refreshStatus(readAuth, now);
+  if (cachedStatus === null || !cachedStatus.status.ready) {
+    return refreshStatus(readAuth, now);
+  }
   if (now() - cachedStatus.at >= STATUS_TTL_MS) {
     void refreshStatus(readAuth, now);
   }

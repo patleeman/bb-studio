@@ -53,4 +53,21 @@ describe("NEW stays out of the thread you are reading", () => {
       placement: { cutoffAt: 250 },
     });
   });
+
+  it("keeps the opening divider where it was when a reply lands", () => {
+    const view = render({ id: "thr_a", lastReadAt: 100, latestAttentionAt: 200 });
+    view.rerender({
+      thread: { id: "thr_a", lastReadAt: 250, latestAttentionAt: 200 },
+      hasFreshThread: true,
+    });
+    view.rerender({
+      thread: { id: "thr_a", lastReadAt: 250, latestAttentionAt: 400 },
+      hasFreshThread: true,
+    });
+    expect(view.result.current).toEqual({
+      ready: true,
+      autoScroll: false,
+      placement: { cutoffAt: 100 },
+    });
+  });
 });
