@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { registerForkLaunchThemeIpc } from "./fork-launch-theme.js";
+import { registerForkDesktopControlIpc } from "./fork-desktop-control.js";
 import {
   app,
   BrowserWindow,
@@ -279,4 +280,5 @@ function handle(event: IpcMainInvokeEvent, request: unknown): boolean {
 export function registerForkWindowIpc(ipcMain: IpcMain): void {
   ipcMain.handle(BB_DESKTOP_FORK_WINDOW_CHANNEL, handle);
   registerForkLaunchThemeIpc(ipcMain);
+  registerForkDesktopControlIpc(ipcMain);
 }
