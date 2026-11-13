@@ -20,7 +20,7 @@ export const MINI_STUDIO_KIND: StudioKind = {
   agentHint: "Read it with minis_read, change its source with minis_update, its records with minis_data, and drive it with minis_live.",
 };
 
-export const displayName = (row: Pick<MiniRow, "name">) => row.name.trim() || "Untitled mini app";
+export const displayName = (row: Pick<MiniRow, "name">) => row.name.trim() || "Untitled app";
 
 /** What search and `studio_read` see: the name, description, files and collections. */
 export function miniText(store: MiniStore, row: MiniRow): string {
@@ -66,7 +66,7 @@ export function miniProvider(deps: {
   removed(id: string): void;
 }): StudioProviderHandlers {
   const { store } = deps;
-  const mustGet = (id: string) => requireItem((key) => store.get(key), id, "Mini app not found.");
+  const mustGet = (id: string) => requireItem((key) => store.get(key), id, "App not found.");
 
   return {
     studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: null, kinds: [MINI_STUDIO_KIND] }),
@@ -86,12 +86,12 @@ export function miniProvider(deps: {
     studio_template: ({ id, template }) => { mustGet(id); store.setTemplate(id, template); deps.changed(id); return { item: toStudioItem(store, mustGet(id)) }; },
     studio_instantiate: ({ id, projectId, variables }) => {
       const row = mustGet(id);
-      if (!row.template) throw new Error("Mini app is not a template.");
+      if (!row.template) throw new Error("App is not a template.");
       return { item: toStudioItem(store, deps.duplicate(id, { name: fillTemplate(row.name, variables ?? {}), projectId, withData: false })) };
     },
     studio_export: ({ id, format }) => {
       mustGet(id);
-      if (format !== "zip") throw new Error(`Unsupported mini app format: ${format}`);
+      if (format !== "zip") throw new Error(`Unsupported app format: ${format}`);
       const file = deps.exportZip(id);
       return { files: [{ name: file.name, mime: "application/zip", data: file.data.toString("base64") }] };
     },

@@ -37,7 +37,7 @@ export function ApprovalBanner({ mini, rpc }: { mini: MiniView; rpc: MiniRpc }) 
     <>
       <div className="flex items-center gap-2 border-b border-border bg-warning/10 px-3 py-1.5 text-xs text-foreground" data-mini-approval>
         <Icon name="SecurityCheck" className="size-3.5 shrink-0 text-warning-text" />
-        <span className="min-w-0 flex-1 truncate">This mini app asks for access: {mini.pending.map(describeCapability).join("; ")}.</span>
+        <span className="min-w-0 flex-1 truncate">This app asks for access: {mini.pending.map(describeCapability).join("; ")}.</span>
         <button type="button" className="shrink-0 rounded px-2 py-0.5 font-medium text-foreground hover:bg-state-hover" onClick={review}>Review</button>
       </div>
       {prompt ? <ApprovalDialog key={prompt.nonce} mini={mini} rpc={rpc} prompt={prompt} onClose={() => setPrompt(null)} /> : null}
@@ -73,7 +73,7 @@ function ApprovalDialog({ mini, rpc, prompt, onClose }: { mini: MiniView; rpc: M
     <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent aria-describedby={undefined} className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Allow “{mini.name.trim() || "Untitled mini app"}” to…</DialogTitle>
+          <DialogTitle>Allow “{mini.name.trim() || "Untitled app"}” to…</DialogTitle>
         </DialogHeader>
         <ul className="flex flex-col gap-2 py-1">
           {prompt.capabilities.map((capability) => (

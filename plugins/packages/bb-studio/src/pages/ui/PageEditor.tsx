@@ -51,7 +51,7 @@ const STUDIO_EMBED_SUBTEXT: Record<StudioEmbedKind, string> = {
   drawing: "Embed a whiteboard",
   artifact: "Embed an artifact: image, HTML, PDF or text",
   recording: "Embed a Talk recording",
-  mini: "Embed a mini app",
+  mini: "Embed an app",
 };
 const STUDIO_EMBED_ICONS: Record<StudioEmbedKind, string> = { drawing: "Palette", artifact: "File", recording: "Mic", mini: "AppWindow" };
 /** Slash items that make a new item in another add-on and embed it. */
@@ -280,7 +280,7 @@ export function PageEditor({
       ...STUDIO_NEW.map(({ kind, aliases }) => ({
         // A new drawing is a whiteboard to sketch on in place.
         title: kind === "drawing" ? "Whiteboard" : `New ${STUDIO_EMBEDS[kind].label.toLowerCase()}`,
-        subtext: kind === "drawing" ? "Sketch in the page" : `Make a ${STUDIO_EMBEDS[kind].label.toLowerCase()} and embed it here`,
+        subtext: kind === "drawing" ? "Sketch in the page" : `Make ${/^[aeiou]/i.test(STUDIO_EMBEDS[kind].label) ? "an" : "a"} ${STUDIO_EMBEDS[kind].label.toLowerCase()} and embed it here`,
         aliases: [...aliases, "new", "create", "studio"],
         group: "Studio",
         icon: <Icon name={STUDIO_EMBED_ICONS[kind]} className="size-4" />,

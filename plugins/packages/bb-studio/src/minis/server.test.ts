@@ -248,7 +248,7 @@ describe("mini apps on Studio", () => {
       expect(created).toContain("Waiting for the user's approval: fetch:api.example.com");
       const id = /id (mini_[0-9a-f]{16})/.exec(created)![1]!;
       await expect(call(host, "minis.fetch", { id, url: "https://api.example.com/x", method: "GET", headers: {}, body: null, auth: null })).rejects.toThrow(/needs approval/);
-      await expect(call(host, "minis.requestApproval", { id })).rejects.toThrow(/Open the mini app/);
+      await expect(call(host, "minis.requestApproval", { id })).rejects.toThrow(/Open the app in BB/);
       await call(host, "minis.live.open", { id, clientId: CLIENT, actions: [] });
       const prompt = await call(host, "minis.requestApproval", { id });
       expect(prompt.capabilities).toEqual(["fetch:api.example.com"]);

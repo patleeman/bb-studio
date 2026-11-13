@@ -150,7 +150,7 @@ export function registerMinis(
 
   const mustGet = (id: string): MiniRow => {
     const row = store.get(id);
-    if (!row) throw new Error(`Mini app ${id} not found.`);
+    if (!row) throw new Error(`App ${id} not found.`);
     return row;
   };
   const manifestOf = (id: string) => store.current(id)?.manifest ?? null;
@@ -165,7 +165,7 @@ export function registerMinis(
   /** Collections the manifest declares; records in any other are refused. */
   const checkCollection = (id: string, collection: string) => {
     const manifest = manifestOf(id);
-    if (!manifest) throw new Error("This mini app has no source yet.");
+    if (!manifest) throw new Error("This app has no source yet.");
     if (!(collection in manifest.collections)) throw new Error(`No collection "${collection}" in mini.json. Declare it under "collections" (${Object.keys(manifest.collections).join(", ") || "none yet"}).`);
   };
 
@@ -487,7 +487,7 @@ export function registerMinis(
       // Only the approval dialog: plugins can't, and it needs the mini app open in BB.
       if (fromPlugin(context)) throw new Error("Only the user can approve a mini app's access.");
       const row = mustGet(id);
-      if (open(id).size === 0) throw new Error("Open the mini app in BB to approve its access.");
+      if (open(id).size === 0) throw new Error("Open the app in BB to approve its access.");
       // On a BB with its own approval dialog there is one dialog, BB's: it shows the same details and only a
       // person can answer it. Studio's dialog and its one-time nonce are for a BB without one.
       const askHost = hostApproval(bb);
@@ -495,12 +495,12 @@ export function registerMinis(
         const asked = view(row).pending;
         const versionId = row.version_id ?? "";
         grantAfterHostApproval(askHost, {
-          title: `Let “${row.name || "this mini app"}” have this access?`,
-          message: asked.length === 1 ? "This mini app asks for one thing." : `This mini app asks for ${asked.length} things.`,
+          title: `Let “${row.name || "this app"}” have this access?`,
+          message: asked.length === 1 ? "This app asks for one thing." : `This app asks for ${asked.length} things.`,
           items: asked.map((cap) => ({ id: cap, label: describeCapability(cap) })),
           confirmLabel: "Allow",
         }, (picked) => {
-          if (versionId !== (mustGet(id).version_id ?? "")) throw new Error("The mini app changed before the approval was answered. Ask again.");
+          if (versionId !== (mustGet(id).version_id ?? "")) throw new Error("The app changed before the approval was answered. Ask again.");
           store.grant(id, picked.filter((cap) => asked.includes(cap)));
           publish({ type: "grants", miniId: id });
           changed(id);
@@ -523,7 +523,7 @@ export function registerMinis(
       if (!issued || issued.miniId !== id) throw new Error("This approval expired. Open it again.");
       const at = now();
       if (at < issued.issuedAt + APPROVAL_NOT_BEFORE || at > issued.issuedAt + APPROVAL_TTL) throw new Error("This approval expired. Open it again.");
-      if (issued.versionId !== (row.version_id ?? "")) throw new Error("The mini app changed while the dialog was open. Review it again.");
+      if (issued.versionId !== (row.version_id ?? "")) throw new Error("The app changed while the dialog was open. Review it again.");
       const allowed = capabilities.filter((cap) => issued.capabilities.includes(cap));
       store.grant(id, allowed);
       publish({ type: "grants", miniId: id });

@@ -160,7 +160,7 @@ export function MiniFrame({
     async function sendTake(label: string, data: unknown) {
       const composer = threadId ? composerFor(threadId) : null;
       if (!composer) {
-        toast.error("Open this mini app's thread to send it to the agent.");
+        toast.error("Open this app's conversation to send it to the agent.");
         return;
       }
       try {
