@@ -471,6 +471,33 @@ own on this path yet.
    in the same window (a page load, not an in-page navigation); the window
    keeps its bounds and nothing closes.
 
+## Desktop control (`experimental_useDesktopControl`, `experimental_hooks.experimental_desktopControl`)
+
+The macOS desktop app's control of other apps: permissions, the HUD,
+pointing and pins, an agent's activity and the cursor grant (frontend), and
+agent actions through the bundled Cua Driver (backend). See
+`docs/desktop-control.fork.md`.
+
+**Core callers.** `apps/desktop/src/fork-desktop-control.ts` (main process:
+driver, helper, overlay, grants, agent socket), `lib/fork-desktop-control.ts`
+and `components/fork/ForkDesktopOverlay.tsx` in the app (the overlay window
+reads the same state), `apps/server/src/services/fork-desktop-control.ts`
+(the backend hook). Studio is the only plugin caller.
+
+**Audit before stabilizing.**
+
+1. The agent socket's endpoint reaches the server through the environment;
+   the server deletes it from its own, but processes the desktop app starts
+   before that (the host daemon) still inherit it. The desktop app checks
+   every request anyway (HUD thread, background only, no secure fields).
+2. Agents run as children of the app, so once the person grants BB Studio
+   Accessibility, an agent's own shell inherits it too; the grant model only
+   covers the desktop tools.
+3. One ask at a time; a second thread's ask is refused as busy.
+4. `state` carries pins' screenshot paths; a browser has no desktop control.
+5. The overlay is one window per display at launch of the HUD; displays
+   added while it is up get none until it is shown again.
+
 ## `PluginFileOpenerRegistration.experimental_handleOpen` (`@get-bb/plugin-sdk/app`)
 
 Lets a file opener claim an open without a file tab. Before BB opens a tab

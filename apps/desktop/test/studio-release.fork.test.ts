@@ -8,6 +8,7 @@ import {
   createStudioBuild,
   parseStudioRelease,
   readStudioUpdateTest,
+  applyDesktopControlResources,
   studioBuildDefines,
   type StudioBuildInfo,
 } from "../scripts/studio-release.fork.mjs";
@@ -168,6 +169,34 @@ describe("Studio update feed", () => {
     });
     expect(userData).toBe("/tmp/bbs-update-e2e/user-data");
     expect(switches).toEqual(["remote-debugging-port=9339"]);
+  });
+
+  it("names a labeled test build as its own app", () => {
+    const test = readStudioUpdateTest({
+      BB_STUDIO_UPDATE_TEST: JSON.stringify({
+        root: "/tmp/bbs-hud",
+        feedUrl: "http://127.0.0.1:9/",
+        label: "HUD Test",
+      }),
+    });
+    const config = applyStudioBuilderConfig({}, createStudioBuild({ release, upstream, test }));
+    expect(config.appId).toBe("nyc.plee.bbstudio.hudtest");
+    expect(config.productName).toBe("BB Studio HUD Test");
+    expect(config.extraMetadata.name).toBe("bb-studio-hudtest");
+    expect(() =>
+      readStudioUpdateTest({
+        BB_STUDIO_UPDATE_TEST: JSON.stringify({ root: "/tmp/x", feedUrl: "github", label: "../x" }),
+      }),
+    ).toThrow(/label/);
+  });
+
+  it("bundles staged desktop control as an extra resource, and nothing when it is not staged", () => {
+    const staged = applyDesktopControlResources({ mac: { extraResources: ["x"] } }, "/stage", () => true);
+    expect(staged.mac?.extraResources).toEqual([
+      "x",
+      { from: "/stage", to: "desktop-control", filter: ["cua-driver", "bb-studio-desktop-helper", "NOTICE.md", "driver.json"] },
+    ]);
+    expect(applyDesktopControlResources({}, "/stage", () => false)).toEqual({});
   });
 
   it("keeps the real GitHub feed in a test build when asked", () => {
