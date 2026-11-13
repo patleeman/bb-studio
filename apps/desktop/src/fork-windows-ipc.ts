@@ -13,17 +13,14 @@ export interface ForkWindowOptions {
   transparent?: boolean;
   frame?: boolean;
   alwaysOnTop?: boolean;
-  clickThrough?: boolean;
   resizable?: boolean;
   hotkey?: string;
-  menuBarTitle?: string;
   minWidth?: number;
   minHeight?: number;
   titleBar?: "hiddenInset";
   rememberBounds?: boolean;
   center?: boolean;
   hideOnBlur?: boolean;
-  vibrancy?: "hud" | "under-window";
 }
 
 export interface ForkWindowRequest {
@@ -33,13 +30,8 @@ export interface ForkWindowRequest {
     | "close"
     | "toggle"
     | "unregister"
-    | "hotkey"
-    | "clickThrough";
+    | "hotkey";
   key: string;
   path: string;
   options: ForkWindowOptions;
-  on?: boolean;
-  hold?: boolean;
 }
-
-export const FORK_WINDOW_CLICK_THROUGH_EVENT = "bb-fork-window-click-through";

@@ -19,7 +19,7 @@ export function forkWindowPath(
   return `${FORK_WINDOW_PATH_PREFIX}${encodeURIComponent(pluginId)}/${encodeURIComponent(windowId)}${suffix.length > 0 ? `?${suffix}` : ""}`;
 }
 
-type Op = "register" | "open" | "close" | "toggle" | "hotkey" | "clickThrough";
+type Op = "register" | "open" | "close" | "toggle" | "hotkey";
 
 export function createPluginWindows(pluginId: string): ExperimentalWindows {
   const desktop = getBbDesktopInfo()?.experimental_window;
@@ -28,18 +28,16 @@ export function createPluginWindows(pluginId: string): ExperimentalWindows {
     op: Op,
     windowId: string,
     options: ExperimentalWindowOptions = {},
-    on?: boolean,
-    hold?: boolean,
   ): Promise<boolean> => {
     const key = `${pluginId}/${windowId}`;
     const path = forkWindowPath(pluginId, windowId, options);
     if (desktop !== undefined) {
       const { params: _params, ...native } = options;
-      return desktop({ op, key, path, options: native, on, hold });
+      return desktop({ op, key, path, options: native });
     }
     const open = popups.get(key);
     const isOpen = open !== undefined && !open.closed;
-    if (op === "register" || op === "hotkey" || op === "clickThrough") {
+    if (op === "register" || op === "hotkey") {
       return false;
     }
     if (op === "close" || (op === "toggle" && isOpen)) {
@@ -67,8 +65,6 @@ export function createPluginWindows(pluginId: string): ExperimentalWindows {
     toggle: (windowId, options) => call("toggle", windowId, options),
     close: (windowId) => call("close", windowId),
     hotkeyRegistered: (windowId) => call("hotkey", windowId),
-    setClickThrough: (windowId, on, how) =>
-      call("clickThrough", windowId, {}, on, how?.hold === true),
   };
 }
 

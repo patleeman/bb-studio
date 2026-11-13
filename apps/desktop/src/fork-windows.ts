@@ -3,9 +3,7 @@ import {
   app,
   BrowserWindow,
   globalShortcut,
-  nativeImage,
   screen,
-  Tray,
   type BrowserWindowConstructorOptions,
   type IpcMain,
   type IpcMainInvokeEvent,
@@ -20,7 +18,6 @@ import {
 import {
   BB_DESKTOP_FORK_WINDOW_CHANNEL,
   FORK_BARE_QUERY_KEY,
-  FORK_WINDOW_CLICK_THROUGH_EVENT,
   FORK_WINDOW_PATH_PREFIX,
   type ForkWindowOptions,
   type ForkWindowRequest,
@@ -33,8 +30,6 @@ interface Registered {
   options: ForkWindowOptions;
   window: BrowserWindow | null;
   hotkey: string | null;
-  tray: Tray | null;
-  clickThrough: boolean;
 }
 
 const MIN_SIZE = 120;
@@ -47,21 +42,9 @@ function size(value: unknown, fallback: number): number {
     : fallback;
 }
 
-function forkVibrancy(
-  options: ForkWindowOptions,
-  platform: NodeJS.Platform,
-): Pick<BrowserWindowConstructorOptions, "vibrancy" | "visualEffectState"> {
-  return options.transparent === true &&
-    platform === "darwin" &&
-    (options.vibrancy === "hud" || options.vibrancy === "under-window")
-    ? { vibrancy: options.vibrancy, visualEffectState: "active" }
-    : {};
-}
-
 export function forkWindowOptions(
   options: ForkWindowOptions,
   preload: string | undefined,
-  platform: NodeJS.Platform = process.platform,
 ): BrowserWindowConstructorOptions {
   const transparent = options.transparent === true;
   const position =
@@ -85,7 +68,6 @@ export function forkWindowOptions(
       ? { titleBarStyle: "hiddenInset" as const }
       : {}),
     ...(options.center === true ? { center: true } : {}),
-    ...forkVibrancy(options, platform),
     skipTaskbar: transparent || options.hideOnBlur === true,
     show: false,
     webPreferences: {
@@ -136,18 +118,6 @@ function rememberBounds(key: string, window: BrowserWindow): void {
     displayId: screen.getDisplayMatching(bounds).id,
   };
   writeForkWindowBounds(boundsFilePath(), allStoredBounds());
-}
-
-function setClickThrough(entry: Registered, on: boolean): void {
-  entry.clickThrough = on;
-  const window = entry.window;
-  if (window === null || window.isDestroyed()) return;
-  window.setIgnoreMouseEvents(on, { forward: true });
-  void window.webContents
-    .executeJavaScript(
-      `window.dispatchEvent(new CustomEvent(${JSON.stringify(FORK_WINDOW_CLICK_THROUGH_EVENT)},{detail:{on:${on ? "true" : "false"}}}))`,
-    )
-    .catch(() => undefined);
 }
 
 function show(entry: Registered, key: string): void {
@@ -202,10 +172,6 @@ function show(entry: Registered, key: string): void {
       if (entry.window === window) hide(entry);
     });
   }
-  entry.clickThrough = entry.options.clickThrough === true;
-  if (entry.clickThrough) {
-    window.setIgnoreMouseEvents(true, { forward: true });
-  }
   window.once("ready-to-show", () => window.show());
   window.on("closed", () => {
     if (entry.window === window) entry.window = null;
@@ -237,20 +203,9 @@ function toggle(entry: Registered, key: string): void {
   }
 }
 
-function summon(entry: Registered, key: string): void {
-  if (isShown(entry) && entry.clickThrough) {
-    setClickThrough(entry, false);
-    entry.window?.focus();
-    return;
-  }
-  toggle(entry, key);
-}
-
 function release(entry: Registered): void {
   if (entry.hotkey !== null) globalShortcut.unregister(entry.hotkey);
-  entry.tray?.destroy();
   entry.hotkey = null;
-  entry.tray = null;
 }
 
 function register(
@@ -268,33 +223,15 @@ function register(
     options,
     window: existing?.window ?? null,
     hotkey: null,
-    tray: null,
-    clickThrough: existing?.clickThrough ?? false,
   };
   if (typeof options.hotkey === "string" && options.hotkey.length > 0) {
     try {
-      if (globalShortcut.register(options.hotkey, () => summon(entry, key))) {
+      if (globalShortcut.register(options.hotkey, () => toggle(entry, key))) {
         entry.hotkey = options.hotkey;
       }
     } catch {
       entry.hotkey = null;
     }
-  }
-  if (
-    typeof options.menuBarTitle === "string" &&
-    options.menuBarTitle.length > 0
-  ) {
-    const tray = new Tray(nativeImage.createEmpty());
-    tray.setTitle(options.menuBarTitle.slice(0, 12));
-    tray.setToolTip(
-      typeof options.hotkey === "string" &&
-        options.hotkey.length > 0 &&
-        entry.hotkey === null
-        ? `${options.title ?? options.menuBarTitle}: the shortcut ${options.hotkey} is taken by another app`
-        : (options.title ?? options.menuBarTitle),
-    );
-    tray.on("click", () => summon(entry, key));
-    entry.tray = tray;
   }
   registered.set(key, entry);
   return entry;
@@ -302,25 +239,13 @@ function register(
 
 function handle(event: IpcMainInvokeEvent, request: unknown): boolean {
   if (typeof request !== "object" || request === null) return false;
-  const { op, key, path, options, on, hold } =
-    request as Partial<ForkWindowRequest>;
+  const { op, key, path, options } = request as Partial<ForkWindowRequest>;
   if (typeof key !== "string" || key.length === 0 || key.length > 200) {
     return false;
   }
   if (op === "hotkey") {
     const entry = registered.get(key);
     return entry !== undefined && entry.hotkey !== null;
-  }
-  if (op === "clickThrough") {
-    const entry = registered.get(key);
-    if (entry === undefined || !isShown(entry)) return false;
-    if (hold === true) {
-      if (!entry.clickThrough) return false;
-      entry.window?.setIgnoreMouseEvents(on === true, { forward: true });
-      return true;
-    }
-    setClickThrough(entry, on === true);
-    return true;
   }
   if (op === "close") {
     const entry = registered.get(key);
