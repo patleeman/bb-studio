@@ -308,6 +308,10 @@ export class Automations {
     if (this.rowInBb(id, botId)) throw new Error("It runs in bb; this copy shows it read-only.");
   }
 
+  guardRunner(id: string, botId?: string): void {
+    this.guardInBb(id, this.bot(botId).id);
+  }
+
   /** Runs a Studio-run watcher's script and wakes its target with what it finds. Null when the watcher is gone. */
   private async runWatcher(id: string): Promise<{ status: "succeeded" | "failed"; output: string | null; error: string | null } | null> {
     const row = this.deps.db.prepare("SELECT * FROM bot_automations WHERE id = ? AND kind = 'watcher'").get(id) as Row | undefined;

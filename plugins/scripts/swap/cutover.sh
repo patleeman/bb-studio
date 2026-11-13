@@ -46,13 +46,16 @@ LOG="$LOG_DIR/cutover-$(date +%Y%m%d-%H%M%S)$([ $DRY = 1 ] && echo -dry || true)
 exec > >(tee -a "$LOG") 2>&1
 B="$(cat "$STATE/backup-dir" 2>/dev/null || echo "$ARCHIVE_ROOT/cutover-$(date +%Y%m%d-%H%M%S)")"
 
+UNMARK="node -e 'const fs=require(\"fs\"),p=process.argv[1],j=JSON.parse(fs.readFileSync(p,\"utf8\"));delete j.cutoverAt;fs.writeFileSync(p,JSON.stringify(j,null,2)+\"\\n\")' '$STUDIO_DIR/fork-import.json'   # and resume the mirror: curl -X POST $API/fork/import/resume"
 STEP="0 (pre-checks)"
 rollback() {
   echo; echo "!!! STOPPED at step $STEP. Rollback for this point:"
   case "$STEP" in
     0*|1*) echo "    Nothing has changed. Fix the problem and run the script again." ;;
-    2*|3*|4*|5*) echo "    BB Studio's Bot data is unchanged. Start live bb again:  $START_LIVE_HINT" ;;
+    2*|3*) echo "    BB Studio's Bot data is unchanged. Start live bb again:  $START_LIVE_HINT" ;;
+    4*|5*) echo "    BB Studio's Bot data is unchanged. Start live bb again:  $START_LIVE_HINT"; echo "    $UNMARK" ;;
     *) cat <<EOF
+    $UNMARK
     $STOP_STUDIO
     while lsof -nP -iTCP:$STUDIO_PORT -sTCP:LISTEN >/dev/null 2>&1; do sleep 1; done
     for f in bb.db fork-import.db plugins/studio/data.db plugins/automations/data.db; do rm -f "$STUDIO_DIR/\$f-wal" "$STUDIO_DIR/\$f-shm"; cp -p "$B/bb-studio/\$f" "$STUDIO_DIR/\$f"; done
@@ -132,6 +135,11 @@ else
     [ "$(curl -sf -X POST "$API/fork/import/pause" | json 'o.paused')" = "true" ] && ok "mirror paused" || fail "mirror did not pause"
   fi
   mark 3
+fi
+if [ $DRY = 1 ]; then echo "  WOULD RUN: set cutoverAt in $STUDIO_DIR/fork-import.json (BB Studio owns every Bot, runner and automation from then on)"
+else
+  node -e 'const fs=require("fs");const p=process.argv[1];const j=JSON.parse(fs.readFileSync(p,"utf8"));if(typeof j.cutoverAt!=="number"){j.cutoverAt=Date.now();fs.writeFileSync(p+".tmp",JSON.stringify(j,null,2)+"\n");fs.renameSync(p+".tmp",p)}' "$STUDIO_DIR/fork-import.json"
+  ok "cutoverAt $(node -e 'console.log(require(process.argv[1]).cutoverAt)' "$STUDIO_DIR/fork-import.json") in fork-import.json"
 fi
 
 say "4  Quit BB Studio and back up"
