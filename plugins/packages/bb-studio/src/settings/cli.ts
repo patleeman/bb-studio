@@ -1,5 +1,5 @@
-// `bb studio settings`: Studio's own settings from the command line, since
-// `bb plugin config studio` lists only the API keys now.
+// `bb studio settings`: Studio's own settings from the command line. API keys
+// are set on Studio's settings page (API keys) or by environment variable.
 //
 //   bb studio settings [list] [--json]       every setting by section
 //   bb studio settings get <key> [--json]
@@ -48,7 +48,7 @@ export async function settingsCli(argv: string[], store: StudioSettingsStore): P
         }
         lines.push("");
       }
-      lines.push("API keys are BB's secret fields: bb plugin config studio");
+      lines.push("API keys: Settings ▸ Studio ▸ API keys, or their environment variables.");
       return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
     }
     case "get": {

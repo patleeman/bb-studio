@@ -1,5 +1,5 @@
-// Studio Decisions' settings. Its API keys are BB secret fields (keys stay in
-// BB's 0600 secret files); every other Decisions setting is a Studio setting
+// Studio Decisions' settings. Its API keys are Studio's API keys (BB's 0600
+// secret files, src/settings/key-store.ts); every other Decisions setting is a Studio setting
 // (src/settings/schema.ts, keys `decisions_*`). The TypeSafe model, the Jev
 // timeout and the steer threshold are constants, which a BB host can still
 // override with an environment variable.
@@ -11,31 +11,31 @@ export const DECISIONS_KEY_SETTINGS = {
     type: "string",
     label: "TypeSafe API key",
     secret: true,
-    description: "Smart Queue: decides whether a message to a busy thread steers it or waits. Tried first. Create a key at https://console.typesafe.ai/keys. Falls back to TYPESAFE_API_KEY on the BB host.",
+    description: "Smart Queue’s decision model, through TypeSafe. Tried first. Create a key at https://console.typesafe.ai/keys. If empty, Studio uses the TYPESAFE_API_KEY environment variable.",
   },
   decisions_vercelApiKey: {
     type: "string",
     label: "Vercel AI Gateway API key",
     secret: true,
-    description: "Smart Queue, through Vercel AI Gateway. Falls back to AI_GATEWAY_API_KEY on the BB host.",
+    description: "Smart Queue’s decision model, through Vercel AI Gateway. If empty, Studio uses the AI_GATEWAY_API_KEY environment variable.",
   },
   decisions_openRouterApiKey: {
     type: "string",
     label: "OpenRouter API key",
     secret: true,
-    description: "Smart Queue, through OpenRouter. Falls back to OPENROUTER_API_KEY on the BB host.",
+    description: "Smart Queue’s decision model, through OpenRouter. If empty, Studio uses the OPENROUTER_API_KEY environment variable.",
   },
   decisions_zenApiKey: {
     type: "string",
     label: "OpenCode Zen API key",
     secret: true,
-    description: "Smart Queue, through OpenCode Zen. Tried last. Falls back to OPENCODE_API_KEY on the BB host.",
+    description: "Smart Queue’s decision model, through OpenCode Zen. Tried last. If empty, Studio uses the OPENCODE_API_KEY environment variable.",
   },
   decisions_customJevApiKey: {
     type: "string",
     label: "Your own endpoint's API key",
     secret: true,
-    description: "Smart Queue. Sent as a bearer token to the endpoint in Smart Queue model ▸ Your own endpoint. Leave empty if it needs none.",
+    description: "Smart Queue’s decision model, through your own endpoint (Smart Queue model ▸ Your own endpoint), as a bearer token. Leave empty if it needs none.",
   },
 } as const satisfies Record<string, PluginSettingDescriptor>;
 

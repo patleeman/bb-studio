@@ -352,6 +352,8 @@ public enum Studio {
     public static let voiceLive_end = "voiceLive.end"
     public static let settings_get = "settings.get"
     public static let settings_set = "settings.set"
+    public static let settings_keys_get = "settings.keys.get"
+    public static let settings_keys_set = "settings.keys.set"
     public static let mobile_push_status = "mobile.push.status"
     public static let mobile_push_test = "mobile.push.test"
     public static let memory_get = "memory.get"
@@ -1135,6 +1137,12 @@ public enum Studio {
   public typealias SettingsGet = SettingsGetOutput
 
   public typealias SettingsSet = SettingsSetOutput
+
+  public typealias SettingsKeysGetInput = StudioJSONValue
+
+  public typealias SettingsKeysGet = SettingsKeysGetOutput
+
+  public typealias SettingsKeysSet = SettingsKeysSetOutput
 
   public typealias MobilePushStatusInput = StudioJSONValue
 
@@ -31783,6 +31791,58 @@ public enum Studio {
     public init(values: [String: StudioJSONValue]? = nil, changed: [String]? = nil) {
       self.values = values
       self.changed = changed
+    }
+  }
+
+  public struct SettingsKeysGetOutputKeysItem: Sendable, Hashable, Codable {
+    public var key: String?
+    public var label: String?
+    public var description: String?
+    public var set: Bool?
+
+    public init(key: String? = nil, label: String? = nil, description: String? = nil, set: Bool? = nil) {
+      self.key = key
+      self.label = label
+      self.description = description
+      self.set = set
+    }
+  }
+
+  public struct SettingsKeysGetOutput: Sendable, Hashable, Codable {
+    public var keys: [SettingsKeysGetOutputKeysItem]?
+
+    public init(keys: [SettingsKeysGetOutputKeysItem]? = nil) {
+      self.keys = keys
+    }
+  }
+
+  public struct SettingsKeysSetInput: Sendable, Hashable, Codable {
+    public var values: [String: String]?
+
+    public init(values: [String: String]? = nil) {
+      self.values = values
+    }
+  }
+
+  public struct SettingsKeysSetOutputKeysItem: Sendable, Hashable, Codable {
+    public var key: String?
+    public var label: String?
+    public var description: String?
+    public var set: Bool?
+
+    public init(key: String? = nil, label: String? = nil, description: String? = nil, set: Bool? = nil) {
+      self.key = key
+      self.label = label
+      self.description = description
+      self.set = set
+    }
+  }
+
+  public struct SettingsKeysSetOutput: Sendable, Hashable, Codable {
+    public var keys: [SettingsKeysSetOutputKeysItem]?
+
+    public init(keys: [SettingsKeysSetOutputKeysItem]? = nil) {
+      self.keys = keys
     }
   }
 

@@ -1,11 +1,12 @@
-// Studio's settings page, after BB's API key fields: one section per group
+// Studio's settings page: one section per group
 // (schema.ts SETTINGS_GROUPS), in order. Fields show only when they apply
 // (the home server's URL only for Home server). The Attention settings are
 // on the Bot page (BotAttention.tsx). Last, Phone notifications: Studio
 // Mobile's push status and test push (PushSection.tsx). BB's Mobile page
 // would be the natural home, but stable BB (0.48.1) draws `experimental_page:
 // "mobile"` sections only for the machine-access plugin picked under
-// "Accessing bb from your phone", so it stays here.
+// "Accessing bb from your phone", so it stays here. API keys come last
+// (ApiKeysSection.tsx).
 import { useRpc, type PluginAppBuilder } from "@get-bb/plugin-sdk/app";
 import { useEffect, useRef, useState } from "react";
 import { openAppPath } from "../../kit/app/nav";
@@ -21,6 +22,7 @@ import { useLive } from "../../ui/live";
 import { botPath } from "../../ui/bot/selection";
 import { SETTINGS_GROUPS, STUDIO_SETTINGS } from "../schema";
 import { Card, Disclosure, Row, SectionState, Segmented, SettingControl, SettingRow, SubHeading } from "./controls";
+import { ApiKeysSection } from "./ApiKeysSection";
 import { PushSection } from "./PushSection";
 import { SkillsRegistrySection } from "./SkillsRegistrySection";
 import { useStudioSettings } from "./use-settings";
@@ -37,8 +39,8 @@ function VoiceSection() {
   const [voice, setVoice] = useState<VoiceLiveState | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { void loadVoiceState(rpc).then(setVoice, () => {}); }, [rpc, values?.voiceLiveMonthlyCapUsd]);
-  // Asked for by "Voice settings…": BB's key fields above load after this
-  // mounts and push it down, so scroll again as the page settles.
+  // Asked for by "Voice settings…": sections above load after this mounts
+  // and push it down, so scroll again as the page settles.
   useEffect(() => {
     if (!takeVoiceSectionRequest()) return;
     const timers = [0, 300, 800, 1600].map((ms) => setTimeout(() => ref.current?.scrollIntoView({ block: "start" }), ms));
@@ -87,7 +89,7 @@ function RecordingsSection() {
         <Disclosure label="Transcription models" testId="settings-transcription-models">
           {local ? <SettingRow k="callLocalModel" /> : null}
           {home ? <SettingRow k="callServerModel" /> : null}
-          {!local && !home ? <Row label="BB voice service" description="It uses the model chosen in Settings ▸ AI services." /> : null}
+          {!local && !home ? <Row label="AI services" description="Uses the model chosen in Settings ▸ AI services." /> : null}
         </Disclosure>
         <Disclosure label="Models for titles, summaries and cleanup" testId="settings-talk-models">
           <div className="px-4 py-3"><ModelSettings /></div>
@@ -198,7 +200,7 @@ function JevSection() {
           <SettingRow k="decisions_customJevEndpoint" />
           <SettingRow k="decisions_customJevModel" />
           <SettingRow k="decisions_customJevHeaders" />
-          <SettingRow k="decisions_customJevApiKeyCommand" description={<>{STUDIO_SETTINGS.decisions_customJevApiKeyCommand.description} Or set its key in the API keys above (Your own endpoint's API key).</>} />
+          <SettingRow k="decisions_customJevApiKeyCommand" description={<>{STUDIO_SETTINGS.decisions_customJevApiKeyCommand.description} Or set Your own endpoint's API key under API keys.</>} />
         </Disclosure>
       </Card>
     </SectionState>
@@ -220,7 +222,7 @@ function AdvancedSection() {
 const SECTIONS = { voice: VoiceSection, recordings: RecordingsSection, replies: RepliesSection, threads: ThreadsSection, windows: WindowsSection, jev: JevSection, advanced: AdvancedSection };
 
 /**
- * Studio's settings sections, in order; BB draws them after the API key fields. Phone notifications comes last.
+ * Studio's settings sections, in order; then Skill registry, Phone notifications and API keys.
  * Windows shows only on a BB that can open plugin windows.
  */
 export function registerSettingsApp(app: PluginAppBuilder, windows: boolean = hasHostWindows): void {
@@ -230,4 +232,5 @@ export function registerSettingsApp(app: PluginAppBuilder, windows: boolean = ha
   }
   app.slots.settingsSection({ id: "skills-registry", title: "Skill registry", component: SkillsRegistrySection });
   app.slots.settingsSection({ id: "mobile-push", title: "Phone notifications", component: PushSection });
+  app.slots.settingsSection({ id: "api-keys", title: "API keys", component: ApiKeysSection });
 }

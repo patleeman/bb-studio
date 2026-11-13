@@ -1,6 +1,6 @@
-// The only settings BB still draws for Studio: API keys, which must stay in
-// BB's secret files (0600, never sent to a browser). In this order on the
-// settings page; Studio's own sections (ui/sections.tsx) follow them.
+// Studio's API keys, kept in BB's secret files (0600, never sent to a
+// browser) by key-store.ts. Studio's "API keys" section, last on its
+// settings page, draws them in this order.
 import { DECISIONS_KEY_SETTINGS } from "../decisions/settings";
 import { OPENAI_KEY_SETTINGS } from "../openai-key";
 

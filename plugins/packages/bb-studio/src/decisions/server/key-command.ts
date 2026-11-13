@@ -37,7 +37,7 @@ function runKeyCommand(command: string, timeoutMs: number): Promise<string> {
       (error, stdout) => {
         const token = stdout.trim();
         // Never echo the output: on failure it may still hold a credential.
-        if (error || !token || /\s/.test(token)) reject(new Error("The custom Jev key command did not print a token."));
+        if (error || !token || /\s/.test(token)) reject(new Error("The key command for your own endpoint did not print a token."));
         else resolve(token);
       },
     );

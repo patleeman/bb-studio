@@ -263,7 +263,7 @@ export class VoiceLive {
 
   private problem(): string | null {
     if (!this.deps.cos()) return "Make your Bot first: Studio → Bot. Hands-free voice relays to it.";
-    if (!this.deps.mockUrl?.() && !this.deps.key()) return "Hands-free voice needs an OpenAI API key: add one in Studio's settings (OpenAI API key), or set OPENAI_API_KEY on the BB host.";
+    if (!this.deps.mockUrl?.() && !this.deps.key()) return "Hands-free voice needs an OpenAI API key: add one under Settings ▸ Studio ▸ API keys, or set the OPENAI_API_KEY environment variable.";
     return this.capProblem();
   }
 

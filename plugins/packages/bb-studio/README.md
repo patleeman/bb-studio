@@ -251,7 +251,8 @@ replies), which the migration carried over. Bot → Controls → Attention:
 
 ![Bot Controls, Attention](assets/settings/bot-controls-dark.png)
 
-`bb plugin config studio` lists only the API keys. The rest are scriptable
+API keys are in the **API keys** section at the bottom of Studio's settings
+page, kept in BB's secret files. The rest are scriptable
 with `bb studio settings`:
 
 ```sh

@@ -1,6 +1,10 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { mkdtempSync, mkdirSync, readFileSync, statSync, writeFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { pluginSecretsDir, StudioKeyStore } from "./key-store";
 import { settingsCli } from "./cli";
 import { combineSettings } from "./handle";
 import { STUDIO_KEY_SETTINGS } from "./keys";
@@ -220,18 +224,43 @@ describe("the one-time migration", () => {
   });
 });
 
+describe("Studio's API key files", () => {
+  it("reads and writes BB's secret files, 0600, one key per file, and refuses keys it doesn't have", async () => {
+    const dir = pluginSecretsDir(mkdtempSync(join(tmpdir(), "studio-keys-")), "studio");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "openaiApiKey"), "sk-saved");
+    const keys = new StudioKeyStore(dir, ["openaiApiKey", "decisions_zenApiKey"]);
+    expect(await keys.get()).toEqual({ openaiApiKey: "sk-saved", decisions_zenApiKey: "" });
+    const changes = vi.fn();
+    keys.onChange(changes);
+    await keys.experimental_set({ decisions_zenApiKey: "  zen-key  " });
+    expect(readFileSync(join(dir, "decisions_zenApiKey"), "utf8")).toBe("zen-key");
+    expect(statSync(join(dir, "decisions_zenApiKey")).mode & 0o777).toBe(0o600);
+    expect(await keys.status()).toEqual({ openaiApiKey: true, decisions_zenApiKey: true });
+    await keys.experimental_set({ openaiApiKey: null, decisions_zenApiKey: "" });
+    expect(existsSync(join(dir, "openaiApiKey"))).toBe(false);
+    expect(existsSync(join(dir, "decisions_zenApiKey"))).toBe(false);
+    expect(changes).toHaveBeenCalledTimes(2);
+    await expect(keys.experimental_set({ autoTitle: "x" })).rejects.toThrow("There's no Studio API key called autoTitle.");
+  });
+});
+
 describe("registerSettings on a host", () => {
   const plugin = (sdk: object = {}) => {
     const reload = vi.fn(async () => ({}));
+    const dataDir = mkdtempSync(join(tmpdir(), "studio-settings-"));
+    mkdirSync(pluginSecretsDir(dataDir, "studio"), { recursive: true });
+    writeFileSync(join(pluginSecretsDir(dataDir, "studio"), "openaiApiKey"), "sk-new");
     const host = createFakePluginHost({
       pluginId: "studio",
-      settings: { autoTitle: false, loopQuietEnd: 6, emojiItems: "👍 Yes", botAvatarOpenaiApiKey: "sk-old", openaiApiKey: "sk-new" },
+      dataDir,
+      settings: { autoTitle: false, loopQuietEnd: 6, emojiItems: "👍 Yes", botAvatarOpenaiApiKey: "sk-old" },
       sdk: { plugins: { reload, list: async () => ({ plugins: [] }) } as never, ...sdk },
     });
-    return { host, reload };
+    return { host, reload, dataDir };
   };
 
-  it("migrates on the first load, reloads itself once, then declares only the API keys", async () => {
+  it("migrates on the first load, reloads itself once, then declares no BB settings", async () => {
     vi.useFakeTimers();
     const { host, reload } = plugin();
     const { settings } = await registerSettings(host.bb, "studio");
@@ -265,6 +294,25 @@ describe("registerSettings on a host", () => {
     expect(set.values).toMatchObject({ loopDailyBudget: 2, autoTitle: true });
     expect(host.harness.inspection.realtimeSignals.slice(before)).toEqual([expect.objectContaining({ channel: "studio-settings" })]);
     await expect(host.harness.behavior.callRpc("settings.set", { values: { openaiApiKey: "sk" } })).rejects.toThrow();
+    await host.harness.lifecycle.dispose();
+  });
+
+  it("serves the API keys' labels and whether each is set, never a key, and saves them in BB's secret files", async () => {
+    const { host, dataDir } = plugin();
+    await host.bb.storage.kv.set(SETTINGS_MIGRATED_KEY, { at: 1 });
+    const { settings } = await registerSettings(host.bb, "studio");
+    const got = await host.harness.behavior.callRpc("settings.keys.get", null) as { keys: { key: string; label: string; set: boolean }[] };
+    expect(got.keys.map((entry) => entry.key)).toEqual(Object.keys(STUDIO_KEY_SETTINGS));
+    expect(got.keys.find((entry) => entry.key === "openaiApiKey")).toMatchObject({ label: "OpenAI API key", set: true });
+    expect(JSON.stringify(got)).not.toContain("sk-new");
+    const before = host.harness.inspection.realtimeSignals.length;
+    const set = await host.harness.behavior.callRpc("settings.keys.set", { values: { decisions_typesafeApiKey: "ts-key" } }) as { keys: { key: string; set: boolean }[] };
+    expect(set.keys.find((entry) => entry.key === "decisions_typesafeApiKey")?.set).toBe(true);
+    expect(JSON.stringify(set)).not.toContain("ts-key");
+    expect(readFileSync(join(pluginSecretsDir(dataDir, "studio"), "decisions_typesafeApiKey"), "utf8")).toBe("ts-key");
+    expect(settings.current()).toMatchObject({ decisions_typesafeApiKey: "ts-key", openaiApiKey: "sk-new" });
+    expect(host.harness.inspection.realtimeSignals.slice(before)).toEqual([expect.objectContaining({ channel: "studio-settings" })]);
+    await expect(host.harness.behavior.callRpc("settings.keys.set", { values: { autoTitle: "x" } })).rejects.toThrow();
     await host.harness.lifecycle.dispose();
   });
 
@@ -302,7 +350,7 @@ describe("bb studio settings", () => {
     for (const title of ["Voice", "Recordings and calls", "Agent replies", "Threads", "Smart Queue model", "Advanced", "Attention (Bot ▸ Controls)"]) expect(text).toContain(`${title}\n`);
     expect(text).toMatch(/ {2}autoTitle +false\n/);
     expect(text).toMatch(/ {2}autoMeetingNotes +false {2}\(default\)\n/);
-    expect(text).toContain("API keys are BB's secret fields: bb plugin config studio");
+    expect(text).toContain("API keys: Settings ▸ Studio ▸ API keys, or their environment variables.");
     expect(text.indexOf("Voice\n")).toBeLessThan(text.indexOf("Recordings and calls\n"));
     for (const key of VISIBLE_SETTING_KEYS) expect(text).toContain(`  ${key} `);
     expect(text).not.toContain("desktopControl");

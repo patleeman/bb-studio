@@ -67,8 +67,9 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("Studio's settings sections", () => {
-  it("registers Voice, Recordings and calls, Agent replies, Threads, Jev and Advanced in order, then Skill registry and Phone notifications", () => {
-    expect(order).toEqual(["settings-voice", "settings-recordings", "settings-replies", "settings-threads", "settings-jev", "settings-advanced", "skills-registry", "mobile-push"]);
+  it("registers Voice, Recordings and calls, Agent replies, Threads, Smart Queue model and Advanced in order, then Skill registry, Phone notifications and API keys last", () => {
+    expect(order).toEqual(["settings-voice", "settings-recordings", "settings-replies", "settings-threads", "settings-jev", "settings-advanced", "skills-registry", "mobile-push", "api-keys"]);
+    expect(sections.get("api-keys")).toMatchObject({ title: "API keys" });
     expect([...sections.values()].slice(0, 6).map((section) => section.title)).toEqual(["Voice", "Recordings and calls", "Agent replies", "Threads", "Smart Queue model", "Advanced"]);
     // Stable BB draws experimental_page "mobile" sections only for the machine-access plugin, so it's on Studio's page.
     expect(sections.get("mobile-push")).toMatchObject({ title: "Phone notifications" });
@@ -176,14 +177,47 @@ describe("Studio's settings sections", () => {
     expect(state.open).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_cos/controls#attention");
   });
 
-  it("Jev: the provider, its order and check, the fallback model, and your own endpoint behind a disclosure", async () => {
+  it("Smart Queue model: the provider, its order and check, the fallback model, and your own endpoint behind a disclosure, with no Jev in the text", async () => {
     await render("settings-jev");
     expect($("setting-decisions_jevProvider")).not.toBeNull();
     expect(text()).toContain("TypeSafe");
-    expect(text()).toContain("If Jev doesn’t answer, use");
+    expect(text()).toContain("If the decision model doesn’t answer, use");
+    expect(text()).not.toMatch(/\bJev\b/);
     expect($("setting-decisions_customJevEndpoint")).toBeNull();
     await click($("settings-jev-endpoint")!.querySelector("button"));
     for (const key of ["decisions_customJevEndpoint", "decisions_customJevModel", "decisions_customJevHeaders", "decisions_customJevApiKeyCommand"]) expect($(`setting-${key}`)).not.toBeNull();
+  });
+
+  it("API keys: says which are set, saves a typed key, removes one, and never shows a key", async () => {
+    let keys = [
+      { key: "openaiApiKey", label: "OpenAI API key", description: "Hands-free voice.", set: true },
+      { key: "decisions_typesafeApiKey", label: "TypeSafe API key", description: "Smart Queue’s decision model.", set: false },
+    ];
+    state.rpc.mockImplementation(async (method: string, input: unknown) => {
+      if (method === "settings.keys.set") {
+        const values = (input as { values: Record<string, string | null> }).values;
+        keys = keys.map((entry) => Object.hasOwn(values, entry.key) ? { ...entry, set: !!values[entry.key] } : entry);
+      }
+      return { keys };
+    });
+    await render("api-keys");
+    const openai = $("api-key-openaiApiKey")!.querySelector("input")!;
+    const typesafe = $("api-key-decisions_typesafeApiKey")!.querySelector("input")!;
+    expect(openai.type).toBe("password");
+    expect(openai.placeholder).toBe("Set");
+    expect(typesafe.placeholder).toBe("Not set");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(typesafe, " ts-key ");
+      typesafe.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => { typesafe.dispatchEvent(new FocusEvent("focusout", { bubbles: true })); });
+    expect(state.rpc).toHaveBeenCalledWith("settings.keys.set", { values: { decisions_typesafeApiKey: " ts-key " } });
+    expect(typesafe.value).toBe("");
+    expect(typesafe.placeholder).toBe("Set");
+    await click($("api-key-openaiApiKey")!.querySelector("button"));
+    expect(state.rpc).toHaveBeenCalledWith("settings.keys.set", { values: { openaiApiKey: null } });
+    expect(openai.placeholder).toBe("Not set");
+    expect(text()).not.toContain("ts-key");
   });
 
   it("Advanced: Smart Queue batch confidence is a number field", async () => {

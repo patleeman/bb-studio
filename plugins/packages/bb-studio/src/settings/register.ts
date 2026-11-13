@@ -1,4 +1,4 @@
-// Studio's settings on the server: BB's key fields (keys.ts), Studio's own
+// Studio's settings on the server: the API keys (keys.ts, key-store.ts), Studio's own
 // store (store.ts), the one-time migration (migrate.ts), the RPCs the
 // settings sections and the iOS app use (contract.ts), and the push status
 // Studio shows for the Mobile plugin.
@@ -8,6 +8,7 @@ import { errorMessage } from "../kit/format";
 import { settingsContract, pushStatusSchema, pushTestSchema, type PushStatus } from "./contract";
 import { combineSettings, type StudioSettingsHandle } from "./handle";
 import { STUDIO_KEY_SETTINGS } from "./keys";
+import { pluginSecretsDir, StudioKeyStore } from "./key-store";
 import { describeMigration, LEGACY_SETTINGS, migrateSettings, needsSettingsMigration } from "./migrate";
 import { StudioSettingsStore } from "./store";
 import { isHiddenSetting, SETTINGS_CHANNEL } from "./schema";
@@ -24,7 +25,8 @@ export interface StudioSettings {
 }
 
 export async function registerSettings(bb: BbPluginApi, pluginId: string): Promise<StudioSettings> {
-  const keys = bb.settings.define(STUDIO_KEY_SETTINGS);
+  const keys = new StudioKeyStore(pluginSecretsDir(bb.server.experimental_dataDir, pluginId), Object.keys(STUDIO_KEY_SETTINGS));
+  await keys.get();
   const store = new StudioSettingsStore(bb.storage.kv);
   await store.load();
   if (await needsSettingsMigration(bb.storage.kv)) {
@@ -50,13 +52,15 @@ export async function registerSettings(bb: BbPluginApi, pluginId: string): Promi
       bb.log.warn(`Couldn't move Studio's settings into its own storage; trying again next load: ${errorMessage(error)}`);
     }
   }
-  const settings = await combineSettings(
-    { get: () => keys.get(), experimental_set: (values) => keys.experimental_set(values as never), onChange: (listener) => keys.onChange(listener) },
-    store,
-  );
+  const settings = await combineSettings(keys, store);
   store.onChange(() => void bb.realtime.publish(SETTINGS_CHANNEL, {}));
+  keys.onChange(() => void bb.realtime.publish(SETTINGS_CHANNEL, {}));
 
   const desktopControl = desktopHudEnabled(process.env);
+  const apiKeys = async () => {
+    const set = await keys.status();
+    return { keys: Object.entries(STUDIO_KEY_SETTINGS).map(([key, setting]) => ({ key, label: setting.label, description: setting.description, set: set[key] === true })) };
+  };
   const answer = () => ({ values: { ...store.current(), desktopControl }, changed: Object.keys(store.explicit()).filter((key) => !isHiddenSetting(key)) });
   const mobile = async <T>(method: string, outputSchema: z.ZodType<T>): Promise<T | null> => {
     const { plugins } = await bb.sdk.plugins.list();
@@ -71,6 +75,11 @@ export async function registerSettings(bb: BbPluginApi, pluginId: string): Promi
     "settings.set": async ({ values }) => {
       await store.set(Object.fromEntries(Object.entries(values).filter(([key]) => !isHiddenSetting(key))));
       return answer();
+    },
+    "settings.keys.get": () => apiKeys(),
+    "settings.keys.set": async ({ values }) => {
+      await keys.experimental_set(values);
+      return apiKeys();
     },
     "mobile.push.status": async () => {
       try {

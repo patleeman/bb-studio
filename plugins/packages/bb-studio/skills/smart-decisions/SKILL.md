@@ -43,7 +43,7 @@ bb studio decisions fallback [thread | off | <provider-id> <model> [<reasoning-l
 
 ## Settings
 
-Change settings with `bb studio settings set decisions_<key> <value>` (`bb studio settings list` shows them). The provider keys are BB secret fields: `bb plugin config studio`.
+Change settings with `bb studio settings set decisions_<key> <value>` (`bb studio settings list` shows them). The provider keys are under **API keys** on Studio's settings page, or in their environment variables.
 
 - `jevProvider`: `auto` (default), `typesafe`, `vercel`, `openrouter`,
   `opencode-zen`, or `custom`. `auto` tries each configured provider in that
