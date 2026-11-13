@@ -94,4 +94,39 @@ describe("a finished worker's line", () => {
     );
     expect(container.textContent).toContain("completed:");
   });
+
+  it("skips a Markdown table and heading to the first line of prose", () => {
+    const { container } = renderChildCompleted(
+      [
+        "[bb system]",
+        "",
+        "@thread:thr_child completed:",
+        "",
+        "## Comparison",
+        "",
+        "| | Zettelkasten | PARA | Cornell |",
+        "|---|---|---|---|",
+        "| Core idea | Linked notes | Actionability | Cues |",
+        "",
+        "PARA fits you best.",
+      ].join("\n"),
+    );
+    expect(screen.getByText("PARA fits you best.", { exact: false })).not.toBeNull();
+    expect(container.textContent).not.toContain("| Zettelkasten |");
+    expect(container.textContent).not.toContain("Comparison");
+  });
+
+  it("falls back to the result's start when it is only a table", () => {
+    const { container } = renderChildCompleted(
+      [
+        "[bb system]",
+        "",
+        "@thread:thr_child completed:",
+        "",
+        "| a | b |",
+        "|---|---|",
+      ].join("\n"),
+    );
+    expect(container.textContent).not.toContain("completed:");
+  });
 });
