@@ -3,7 +3,6 @@ import type { ForkPluginSdkApp } from "./app-contract.fork.js";
 interface ForkRuntimeHost {
   __bbPluginRuntime?: {
     pluginSdkApp?: unknown;
-    react?: { createElement(type: unknown, props: unknown): unknown };
   };
 }
 
@@ -42,27 +41,8 @@ function runtimeFunction<Name extends ForkFunctionName>(
   return forward as ForkPluginSdkApp[Name];
 }
 
-function runtimeComponent<Name extends keyof ForkPluginSdkApp>(
-  name: Name,
-): ForkPluginSdkApp[Name] {
-  function RuntimeComponent(props: object): unknown {
-    const react = runtimeHost()?.react;
-    if (react === undefined) {
-      throw new Error(
-        `@get-bb/plugin-sdk/app: ${name} needs React on the bb plugin runtime. In tests, call installTestPluginRuntime() from @get-bb/plugin-sdk/testing/app first.`,
-      );
-    }
-    return react.createElement(runtimeMember(name), props);
-  }
-  RuntimeComponent.displayName = name;
-  return RuntimeComponent as unknown as ForkPluginSdkApp[Name];
-}
-
 export const experimental_useAppRoute = runtimeFunction(
   "experimental_useAppRoute",
-);
-export const experimental_useSidebarNewItems = runtimeFunction(
-  "experimental_useSidebarNewItems",
 );
 export const experimental_useGlobalTabs = runtimeFunction(
   "experimental_useGlobalTabs",
@@ -87,12 +67,6 @@ export const experimental_useContextCard = runtimeFunction(
 );
 export const experimental_useWindows = runtimeFunction(
   "experimental_useWindows",
-);
-export const experimental_ProjectActionsMenu = runtimeComponent(
-  "experimental_ProjectActionsMenu",
-);
-export const experimental_ProjectActionsContextMenu = runtimeComponent(
-  "experimental_ProjectActionsContextMenu",
 );
 export const experimental_useAppCommands = runtimeFunction(
   "experimental_useAppCommands",
