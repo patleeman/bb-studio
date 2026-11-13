@@ -137,11 +137,6 @@ final class LoopsModel {
     var handOffTargets: [(owner: String, name: String)] {
         [("cos", botName)] + leads.map { ("thread:\($0.id)", $0.title) }
     }
-
-    #if DEBUG
-    /// Fixtures set the answer without a server.
-    func setEnabledForDemo(_ on: Bool) { enabled = on }
-    #endif
 }
 
 extension LoopDetail {

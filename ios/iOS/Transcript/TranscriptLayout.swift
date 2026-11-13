@@ -104,7 +104,6 @@ final class TranscriptListLayout: UICollectionViewLayout {
 
     func index(of id: AnyHashable) -> Int? { indices[id] }
     func frame(of id: AnyHashable) -> CGRect? { indices[id].map { frames[$0] } }
-    func isMeasured(_ id: AnyHashable) -> Bool { heights[id] != nil && !stale.contains(id) }
 
     /// A row that became another (an optimistic row confirmed under the
     /// server's id) keeps its height, so the swap doesn't move anything.

@@ -9,6 +9,8 @@ final class BotSpacesStore: ObservableObject {
     @Published private(set) var spaces: BotSpaces?
     @Published private(set) var views: [String: BotThreadsView] = [:]
     @Published private(set) var error: String?
+    /// The Bot the shell shows; "Talk to Bot" and the Live Activity follow it.
+    var shownBotId: String?
 
     var coalesceDelay: Duration = .milliseconds(300)
 
@@ -50,6 +52,17 @@ final class BotSpacesStore: ObservableObject {
     }
 
     func view(for botId: String) -> BotThreadsView? { views[botId] }
+
+    /// Whether a thread is one of the Bots' conversations or workers: nil while
+    /// nothing is loaded to tell.
+    func knows(threadId: String) -> Bool? {
+        guard spaces != nil || !views.isEmpty else { return nil }
+        if spaces?.bots.contains(where: { $0.mainThreadId == threadId }) == true { return true }
+        if views.values.contains(where: { view in
+            view.conversations.contains { $0.threadId == threadId } || view.workers.contains { $0.threadId == threadId }
+        }) { return true }
+        return views.isEmpty ? nil : false
+    }
 
     func watch(_ botId: String, fetch: Bool = true) {
         let added = watched.insert(botId).inserted

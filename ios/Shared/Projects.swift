@@ -121,10 +121,6 @@ public enum ProjectPath {
 // MARK: API
 
 extension BBClient {
-    public func hosts() async throws -> [BBHost] {
-        try await get("/api/v1/hosts")
-    }
-
     /// The folder at `path` on a machine, or its home folder when `path` is nil.
     public func hostDirectory(hostId: String, path: String? = nil) async throws -> HostDirectoryListing {
         var components = URLComponents()

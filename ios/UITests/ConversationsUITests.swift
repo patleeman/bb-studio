@@ -75,6 +75,13 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         fork.tap()
         XCTAssertTrue(app.staticTexts["Main · fork"].waitForExistence(timeout: 15), "the fork opens in a sheet over its conversation")
         app.buttons["replyThreadDone"].tap()
+        // Review M9: the fork stays reachable from its message.
+        let forked = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'forked-'")).firstMatch
+        XCTAssertTrue(forked.waitForExistence(timeout: 15), "the message shows its Forked here line")
+        XCTAssertTrue(forked.label.contains("Forked here · 1 conversation"), forked.label)
+        forked.tap()
+        XCTAssertTrue(app.staticTexts["Main · fork"].waitForExistence(timeout: 15), "the line reopens the fork")
+        app.buttons["replyThreadDone"].tap()
         back()
         XCTAssertTrue(app.collectionViews["BotSpaceList"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.collectionViews["BotSpaceList"].buttons["conversation-thr_demo_fork1"].exists, "a fork has no row of its own")

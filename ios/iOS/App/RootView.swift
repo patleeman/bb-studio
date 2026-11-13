@@ -53,6 +53,7 @@ struct RootView: View {
         }
         .environment(\.duoLayout, layout)
         .environment(pane)
+        .lookRoot(bot: spaces.spaces?.current)
         .background(WindowGeometry { size, leading, trailing, inner in
             windowSize = size
             windowLeadingInset = leading

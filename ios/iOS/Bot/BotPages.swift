@@ -209,6 +209,7 @@ struct MemoryPageView: View {
 
     private func reload() async {
         await loadOverview()
+        listTask?.cancel()
         await loadRecords()
     }
 
@@ -221,8 +222,11 @@ struct MemoryPageView: View {
     }
 
     private func loadRecords() async {
+        let asked = MemoryQuery(query: query, topic: topic, sort: sort)
         do {
             let result = try await app.client.memoryRecords(botId: botId, query: query, topic: topic, sort: sort)
+            // An older search that finishes late never replaces the current one's results.
+            guard asked.matches(query: query, topic: topic, sort: sort) else { return }
             records = result.records
             total = result.total
             error = nil
@@ -680,5 +684,22 @@ struct MemoryRecordLoader: View {
             do { record = try await app.client.memoryRecord(id: id) } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
             loaded = true
         }
+    }
+}
+
+/// The search a Memory list load was made for.
+struct MemoryQuery: Equatable {
+    var query: String
+    var topic: String?
+    var sort: String
+
+    init(query: String, topic: String?, sort: some Hashable) {
+        self.query = query
+        self.topic = topic
+        self.sort = String(describing: sort)
+    }
+
+    func matches(query: String, topic: String?, sort: some Hashable) -> Bool {
+        self == MemoryQuery(query: query, topic: topic, sort: sort)
     }
 }

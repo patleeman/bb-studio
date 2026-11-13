@@ -58,6 +58,7 @@ struct ThreadTranscriptActions {
     var replyInThread: (String) -> Void
     var messageThread: ((TimelineRow) -> Void)? = nil
     var forkConversation: ((TimelineRow) -> Void)? = nil
+    var openSideThread: ((String) -> Void)? = nil
     var replier: BotLook? = nil
     var resolve: (PendingInteraction, JSONValue) async -> Bool
     var cancel: (PendingInteraction) async -> Void
@@ -189,7 +190,8 @@ struct ThreadTranscriptRowView: View {
                             edit: state.editable ? actions.edit : nil,
                             saveFiles: actions.saveFiles, thread: state.sideThread, replier: actions.replier,
                             replyInThread: actions.messageThread.flatMap { open in ConversationReplies.canThread(row) ? { open(row) } : nil },
-                            fork: actions.forkConversation.flatMap { fork in ConversationReplies.canFork(row) ? { fork(row) } : nil })
+                            fork: actions.forkConversation.flatMap { fork in ConversationReplies.canFork(row) ? { fork(row) } : nil },
+                            openSideThread: actions.openSideThread)
                     case .activity(let rows):
                         ActivityGroup(rows: rows)
                     }

@@ -1,0 +1,1352 @@
+{
+ "format": 1,
+ "defaultTheme": "on-air",
+ "scenes": [
+  "miami-1985",
+  "event-horizon",
+  "grid",
+  "kyoto-garden",
+  "forest",
+  "aurora-fjord",
+  "tonights-sky",
+  "data-city",
+  "deep-sea"
+ ],
+ "themes": [
+  {
+   "id": "on-air",
+   "name": "On Air",
+   "kind": "classic",
+   "palette": [
+    "#111316",
+    "#9db8ff",
+    "#f2b04a",
+    "#63c98b"
+   ],
+   "modes": {
+    "dark": {
+     "canvas": "#111316",
+     "ink": "#f2f3f5",
+     "sidebar": "#16181c",
+     "accent": "#9db8ff",
+     "accentInk": "#0c0d0f",
+     "selection": "#9db8ff",
+     "error": "#ff6b6b",
+     "warning": "#f2b04a",
+     "success": "#63c98b",
+     "worker": "#63c98b",
+     "needsYou": "#f2b04a",
+     "finished": "#63c98b",
+     "ripple": "#ff6b6b",
+     "sceneTone": "#111316",
+     "muted": "#abadaf",
+     "subtle": "#98999c",
+     "errorText": "#ff6b6b",
+     "warningText": "#f2b04a",
+     "successText": "#63c98b",
+     "accentText": "#9db8ff",
+     "selectionAlpha": 0.32,
+     "alpha": {
+      "sidebar": 1,
+      "main": 1,
+      "transcript": 1,
+      "composer": 1,
+      "hud": 1
+     },
+     "blur": {
+      "sidebar": 0,
+      "main": 0,
+      "transcript": 0,
+      "composer": 0,
+      "hud": 0
+     },
+     "saturate": 1,
+     "edge": null,
+     "halo": 0,
+     "radius": 12,
+     "presence": {
+      "palette": [
+       "#9db8ff",
+       "#33faff",
+       "#f2b04a"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": null
+  },
+  {
+   "id": "miami-1985",
+   "name": "Miami 1985",
+   "kind": "scene",
+   "palette": [
+    "#0e0626",
+    "#ff4fd8",
+    "#4ff0ff",
+    "#ffab45"
+   ],
+   "modes": {
+    "dark": {
+     "canvas": "#120830",
+     "ink": "#f6efff",
+     "sidebar": "#160936",
+     "accent": "#ff4fd8",
+     "accentInk": "#1a0630",
+     "selection": "#4ff0ff",
+     "error": "#ff5c7a",
+     "warning": "#ffab45",
+     "success": "#5dffc0",
+     "worker": "#4ff0ff",
+     "needsYou": "#ff7ab8",
+     "finished": "#8cfaff",
+     "ripple": "#ff5c7a",
+     "sceneTone": "#2f1635",
+     "muted": "#c8c0d6",
+     "subtle": "#c8c0d6",
+     "errorText": "#f7aee1",
+     "warningText": "#ffb092",
+     "successText": "#5dffc0",
+     "accentText": "#fd62e1",
+     "selectionAlpha": 0.24,
+     "alpha": {
+      "sidebar": 0.14,
+      "main": 0.03,
+      "transcript": 0.16,
+      "composer": 0.46,
+      "hud": 0.74
+     },
+     "blur": {
+      "sidebar": 6,
+      "main": 0,
+      "transcript": 6,
+      "composer": 10,
+      "hud": 24
+     },
+     "saturate": 1.4,
+     "edge": "#ff4fd8",
+     "halo": 0.546,
+     "radius": 6,
+     "presence": {
+      "palette": [
+       "#ff4fd8",
+       "#8806ff",
+       "#4ff0ff"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": {
+    "still": 8,
+    "fallback": "#1a0838",
+    "fallbackImage": false,
+    "driver": false,
+    "motion": 1
+   }
+  },
+  {
+   "id": "event-horizon",
+   "name": "Event Horizon",
+   "kind": "scene",
+   "palette": [
+    "#020308",
+    "#ffb54d",
+    "#a9dcff",
+    "#ffd58a"
+   ],
+   "modes": {
+    "dark": {
+     "canvas": "#06070e",
+     "ink": "#eef0f6",
+     "sidebar": "#070810",
+     "accent": "#ffb54d",
+     "accentInk": "#1a0e00",
+     "selection": "#a9dcff",
+     "error": "#ff6b5e",
+     "warning": "#ffb54d",
+     "success": "#7fe0a8",
+     "worker": "#a9dcff",
+     "needsYou": "#ffb54d",
+     "finished": "#ffe2aa",
+     "ripple": "#ff6b5e",
+     "sceneTone": "#241d11",
+     "muted": "#c0c2c9",
+     "subtle": "#c0c2c9",
+     "errorText": "#edafe4",
+     "warningText": "#ffb54d",
+     "successText": "#7fe0a8",
+     "accentText": "#ffb54d",
+     "selectionAlpha": 0.22,
+     "alpha": {
+      "sidebar": 0.14,
+      "main": 0.03,
+      "transcript": 0.16,
+      "composer": 0.48,
+      "hud": 0.72
+     },
+     "blur": {
+      "sidebar": 6,
+      "main": 0,
+      "transcript": 6,
+      "composer": 10,
+      "hud": 26
+     },
+     "saturate": 1.25,
+     "edge": "#ffb54d",
+     "halo": 0.546,
+     "radius": 6,
+     "presence": {
+      "palette": [
+       "#ffb54d",
+       "#ff0421",
+       "#a9dcff"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": {
+    "still": 20,
+    "fallback": "#020308",
+    "fallbackImage": false,
+    "driver": false,
+    "motion": 1
+   }
+  },
+  {
+   "id": "grid",
+   "name": "Grid",
+   "kind": "scene",
+   "palette": [
+    "#010305",
+    "#5ff6ff",
+    "#e9feff",
+    "#ff9a2e"
+   ],
+   "modes": {
+    "dark": {
+     "canvas": "#010609",
+     "ink": "#e4fbff",
+     "sidebar": "#020a0e",
+     "accent": "#5ff6ff",
+     "accentInk": "#001014",
+     "selection": "#5ff6ff",
+     "error": "#ff4d6d",
+     "warning": "#ff9a2e",
+     "success": "#6dffb3",
+     "worker": "#e9feff",
+     "needsYou": "#ff9a2e",
+     "finished": "#b8fbff",
+     "ripple": "#ff4d6d",
+     "sceneTone": "#1b2325",
+     "muted": "#b6cbcf",
+     "subtle": "#b6cbcf",
+     "errorText": "#c0c3ff",
+     "warningText": "#dac85e",
+     "successText": "#6dffb3",
+     "accentText": "#5ff6ff",
+     "selectionAlpha": 0.2,
+     "alpha": {
+      "sidebar": 0.14,
+      "main": 0.03,
+      "transcript": 0.16,
+      "composer": 0.48,
+      "hud": 0.72
+     },
+     "blur": {
+      "sidebar": 6,
+      "main": 0,
+      "transcript": 6,
+      "composer": 10,
+      "hud": 20
+     },
+     "saturate": 1.2,
+     "edge": "#5ff6ff",
+     "halo": 0.546,
+     "radius": 2,
+     "presence": {
+      "palette": [
+       "#5ff6ff",
+       "#12ff66",
+       "#e9feff"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": {
+    "still": 12,
+    "fallback": "#010305",
+    "fallbackImage": false,
+    "driver": true,
+    "motion": 1
+   }
+  },
+  {
+   "id": "kyoto-garden",
+   "name": "Kyoto Garden",
+   "kind": "scene",
+   "palette": [
+    "#e9e4d6",
+    "#6c675e",
+    "#55702f",
+    "#b0402a"
+   ],
+   "modes": {
+    "light": {
+     "canvas": "#fbf8f1",
+     "ink": "#2a2620",
+     "sidebar": "#f6f1e7",
+     "accent": "#55702f",
+     "accentInk": "#ffffff",
+     "selection": "#8fa35f",
+     "error": "#a8321f",
+     "warning": "#8a5a10",
+     "success": "#4c6a28",
+     "worker": "#ffb45c",
+     "needsYou": "#ff8a3c",
+     "finished": "#fff3d2",
+     "ripple": "#e0442e",
+     "sceneTone": "#bfbfbf",
+     "muted": "#54504a",
+     "subtle": "#54504a",
+     "errorText": "#9a3415",
+     "warningText": "#734f1a",
+     "successText": "#4c6a28",
+     "accentText": "#55702f",
+     "selectionAlpha": 0.32,
+     "alpha": {
+      "sidebar": 0.56,
+      "main": 0.03,
+      "transcript": 0.7,
+      "composer": 0.86,
+      "hud": 0.82
+     },
+     "blur": {
+      "sidebar": 14,
+      "main": 0,
+      "transcript": 14,
+      "composer": 16,
+      "hud": 20
+     },
+     "saturate": 1.1,
+     "edge": null,
+     "halo": 0.546,
+     "radius": 6,
+     "presence": {
+      "palette": [
+       "#55702f",
+       "#43411c",
+       "#2a652b"
+      ],
+      "light": true
+     }
+    },
+    "dark": {
+     "canvas": "#10141c",
+     "ink": "#f0ece2",
+     "sidebar": "#0e1219",
+     "accent": "#e8a860",
+     "accentInk": "#1c1206",
+     "selection": "#e8a860",
+     "error": "#ff7a6b",
+     "warning": "#f2b25a",
+     "success": "#a8d672",
+     "worker": "#ffb45c",
+     "needsYou": "#ff8a3c",
+     "finished": "#fff3d2",
+     "ripple": "#e0442e",
+     "sceneTone": "#24262b",
+     "muted": "#bcbfb5",
+     "subtle": "#bcbfb5",
+     "errorText": "#faad81",
+     "warningText": "#f2b25a",
+     "successText": "#a8d672",
+     "accentText": "#e8a860",
+     "selectionAlpha": 0.28,
+     "alpha": {
+      "sidebar": 0.2,
+      "main": 0.03,
+      "transcript": 0.22,
+      "composer": 0.59,
+      "hud": 0.82
+     },
+     "blur": {
+      "sidebar": 6,
+      "main": 0,
+      "transcript": 6,
+      "composer": 10,
+      "hud": 20
+     },
+     "saturate": 1.1,
+     "edge": null,
+     "halo": 0.546,
+     "radius": 6,
+     "presence": {
+      "palette": [
+       "#e8a860",
+       "#df2141",
+       "#55702f"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": {
+    "still": 30,
+    "fallback": "#e9e4d6",
+    "fallbackImage": false,
+    "driver": true,
+    "motion": 1
+   }
+  },
+  {
+   "id": "forest",
+   "name": "Forest",
+   "kind": "scene",
+   "palette": [
+    "#141a22",
+    "#1f272e",
+    "#e4f27c",
+    "#f2a65a"
+   ],
+   "modes": {
+    "dark": {
+     "canvas": "#0f1418",
+     "ink": "#eef1ea",
+     "sidebar": "#0e1317",
+     "accent": "#e4f27c",
+     "accentInk": "#1a1f08",
+     "selection": "#b9c79a",
+     "error": "#ff7a6b",
+     "warning": "#f2a65a",
+     "success": "#a8d672",
+     "worker": "#e4f27c",
+     "needsYou": "#f2a65a",
+     "finished": "#ecf896",
+     "ripple": "#ff7a6b",
+     "sceneTone": "#2f3738",
+     "muted": "#bfc5bf",
+     "subtle": "#bfc5bf",
+     "errorText": "#f1b87a",
+     "warningText": "#ebbb73",
+     "successText": "#a8d672",
+     "accentText": "#e4f27c",
+     "selectionAlpha": 0.24,
+     "alpha": {
+      "sidebar": 0.28,
+      "main": 0.03,
+      "transcript": 0.28,
+      "composer": 0.63,
+      "hud": 0.74
+     },
+     "blur": {
+      "sidebar": 6,
+      "main": 0,
+      "transcript": 6,
+      "composer": 10,
+      "hud": 22
+     },
+     "saturate": 1.2,
+     "edge": null,
+     "halo": 0.546,
+     "radius": 6,
+     "presence": {
+      "palette": [
+       "#e4f27c",
+       "#eb8033",
+       "#a7f8a0"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": {
+    "still": 14,
+    "fallback": "#141a22",
+    "fallbackImage": false,
+    "driver": true,
+    "motion": 1
+   }
+  },
+  {
+   "id": "aurora-fjord",
+   "name": "Aurora Fjord",
+   "kind": "scene",
+   "palette": [
+    "#050914",
+    "#4dffa6",
+    "#9b7bff",
+    "#ffb060"
+   ],
+   "modes": {
+    "dark": {
+     "canvas": "#070c16",
+     "ink": "#eef3f4",
+     "sidebar": "#080d18",
+     "accent": "#5fe8a5",
+     "accentInk": "#04140c",
+     "selection": "#5fe8a5",
+     "error": "#ff6b6b",
+     "warning": "#ffb060",
+     "success": "#7ce6a0",
+     "worker": "#ffc878",
+     "needsYou": "#ffb060",
+     "finished": "#9dffd0",
+     "ripple": "#ff6b6b",
+     "sceneTone": "#142627",
+     "muted": "#c0c7c9",
+     "subtle": "#c0c7c9",
+     "errorText": "#d1bafe",
+     "warningText": "#fab662",
+     "successText": "#7ce6a0",
+     "accentText": "#5fe8a5",
+     "selectionAlpha": 0.22,
+     "alpha": {
+      "sidebar": 0.14,
+      "main": 0.03,
+      "transcript": 0.16,
+      "composer": 0.51,
+      "hud": 0.74
+     },
+     "blur": {
+      "sidebar": 6,
+      "main": 0,
+      "transcript": 6,
+      "composer": 10,
+      "hud": 22
+     },
+     "saturate": 1.2,
+     "edge": null,
+     "halo": 0.546,
+     "radius": 6,
+     "presence": {
+      "palette": [
+       "#5fe8a5",
+       "#44df20",
+       "#4dffa6"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": {
+    "still": 140,
+    "fallback": "#050914",
+    "fallbackImage": false,
+    "driver": false,
+    "motion": 1
+   }
+  },
+  {
+   "id": "tonights-sky",
+   "name": "Tonight's Sky",
+   "kind": "scene",
+   "palette": [
+    "#040712",
+    "#8fb0ff",
+    "#e9e6d8",
+    "#c98a52"
+   ],
+   "modes": {
+    "light": {
+     "canvas": "#f5f8fc",
+     "ink": "#131a2a",
+     "sidebar": "#edf2f8",
+     "accent": "#2453c4",
+     "accentInk": "#ffffff",
+     "selection": "#6f9bf2",
+     "error": "#b3261e",
+     "warning": "#8a5a10",
+     "success": "#1f6b45",
+     "worker": "#7fe8d0",
+     "needsYou": "#ffc266",
+     "finished": "#cfe4ff",
+     "ripple": "#ff6b6b",
+     "sceneTone": "#a4a4a6",
+     "muted": "#3e4655",
+     "subtle": "#3e4655",
+     "errorText": "#832352",
+     "warningText": "#6f373c",
+     "successText": "#1f6b45",
+     "accentText": "#2453c4",
+     "selectionAlpha": 0.32,
+     "alpha": {
+      "sidebar": 0.6,
+      "main": 0.03,
+      "transcript": 0.7,
+      "composer": 0.86,
+      "hud": 0.74
+     },
+     "blur": {
+      "sidebar": 14,
+      "main": 0,
+      "transcript": 14,
+      "composer": 16,
+      "hud": 22
+     },
+     "saturate": 1.15,
+     "edge": null,
+     "halo": 0.546,
+     "radius": 6,
+     "presence": {
+      "palette": [
+       "#2453c4",
+       "#165f76",
+       "#8fb0ff"
+      ],
+      "light": true
+     }
+    },
+    "dark": {
+     "canvas": "#060a16",
+     "ink": "#eaeef8",
+     "sidebar": "#070b18",
+     "accent": "#8fb0ff",
+     "accentInk": "#060a16",
+     "selection": "#8fb0ff",
+     "error": "#ff6b6b",
+     "warning": "#ffc266",
+     "success": "#7fe8b0",
+     "worker": "#7fe8d0",
+     "needsYou": "#ffc266",
+     "finished": "#cfe4ff",
+     "ripple": "#ff6b6b",
+     "sceneTone": "#161921",
+     "muted": "#b5bac5",
+     "subtle": "#b5bac5",
+     "errorText": "#f1a0d7",
+     "warningText": "#ffc266",
+     "successText": "#7fe8b0",
+     "accentText": "#8fb0ff",
+     "selectionAlpha": 0.32,
+     "alpha": {
+      "sidebar": 0.14,
+      "main": 0.03,
+      "transcript": 0.16,
+      "composer": 0.42,
+      "hud": 0.74
+     },
+     "blur": {
+      "sidebar": 6,
+      "main": 0,
+      "transcript": 6,
+      "composer": 10,
+      "hud": 22
+     },
+     "saturate": 1.15,
+     "edge": null,
+     "halo": 0.546,
+     "radius": 6,
+     "presence": {
+      "palette": [
+       "#8fb0ff",
+       "#33feff",
+       "#e9e6d8"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": {
+    "still": 50,
+    "fallback": "#040712",
+    "fallbackImage": false,
+    "driver": true,
+    "motion": 1
+   }
+  },
+  {
+   "id": "data-city",
+   "name": "Data City",
+   "kind": "scene",
+   "palette": [
+    "#01030a",
+    "#3fd8ff",
+    "#a6ff3d",
+    "#ffb422"
+   ],
+   "modes": {
+    "dark": {
+     "canvas": "#030712",
+     "ink": "#e6f6ff",
+     "sidebar": "#040917",
+     "accent": "#3fd8ff",
+     "accentInk": "#00121a",
+     "selection": "#3fd8ff",
+     "error": "#ff4d5e",
+     "warning": "#ffb422",
+     "success": "#a6ff3d",
+     "worker": "#a6ff3d",
+     "needsYou": "#ffb422",
+     "finished": "#b8f4ff",
+     "ripple": "#ff4d5e",
+     "sceneTone": "#1a1f29",
+     "muted": "#bbcad4",
+     "subtle": "#bbcad4",
+     "errorText": "#d1bbff",
+     "warningText": "#f3bf33",
+     "successText": "#a6ff3d",
+     "accentText": "#3fd8ff",
+     "selectionAlpha": 0.24,
+     "alpha": {
+      "sidebar": 0.14,
+      "main": 0.03,
+      "transcript": 0.16,
+      "composer": 0.44,
+      "hud": 0.72
+     },
+     "blur": {
+      "sidebar": 6,
+      "main": 0,
+      "transcript": 6,
+      "composer": 10,
+      "hud": 20
+     },
+     "saturate": 1.2,
+     "edge": "#3fd8ff",
+     "halo": 0.546,
+     "radius": 3,
+     "presence": {
+      "palette": [
+       "#3fd8ff",
+       "#00f87d",
+       "#a6ff3d"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": {
+    "still": 14,
+    "fallback": "#01030a",
+    "fallbackImage": false,
+    "driver": true,
+    "motion": 1
+   }
+  },
+  {
+   "id": "deep-sea",
+   "name": "Deep Sea",
+   "kind": "scene",
+   "palette": [
+    "#02101a",
+    "#1fb7c9",
+    "#bff6ff",
+    "#ff9ec7"
+   ],
+   "modes": {
+    "dark": {
+     "canvas": "#04131d",
+     "ink": "#e6f7fb",
+     "sidebar": "#061923",
+     "accent": "#3cc8d8",
+     "accentInk": "#021014",
+     "selection": "#3cc8d8",
+     "error": "#ff6b7d",
+     "warning": "#ffbf5e",
+     "success": "#63e6b0",
+     "worker": "#ff9ec7",
+     "needsYou": "#ffbf5e",
+     "finished": "#7fe9f5",
+     "ripple": "#ff6b7d",
+     "sceneTone": "#1a2f38",
+     "muted": "#b7c9ce",
+     "subtle": "#b7c9ce",
+     "errorText": "#d0bbff",
+     "warningText": "#ffbf5e",
+     "successText": "#63e6b0",
+     "accentText": "#3cc8d8",
+     "selectionAlpha": 0.3,
+     "alpha": {
+      "sidebar": 0.15,
+      "main": 0.03,
+      "transcript": 0.16,
+      "composer": 0.55,
+      "hud": 0.73
+     },
+     "blur": {
+      "sidebar": 6,
+      "main": 0,
+      "transcript": 6,
+      "composer": 10,
+      "hud": 22
+     },
+     "saturate": 1.2,
+     "edge": "#3cc8d8",
+     "halo": 0.546,
+     "radius": 6,
+     "presence": {
+      "palette": [
+       "#3cc8d8",
+       "#24b35e",
+       "#1fb7c9"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": {
+    "still": 14,
+    "fallback": "#02101a",
+    "fallbackImage": false,
+    "driver": true,
+    "motion": 1
+   }
+  },
+  {
+   "id": "bb-default",
+   "name": "bb Default",
+   "kind": "classic",
+   "palette": [
+    "#ffffff",
+    "#262626",
+    "#151515",
+    "#3bb974"
+   ],
+   "modes": {
+    "light": {
+     "canvas": "#ffffff",
+     "ink": "#333333",
+     "sidebar": "#fafafa",
+     "accent": "#262626",
+     "accentInk": "#ffffff",
+     "selection": "#262626",
+     "error": "#a5000f",
+     "warning": "#eb7c33",
+     "success": "#3bb974",
+     "worker": "#3bb974",
+     "needsYou": "#fc8c45",
+     "finished": "#4bc680",
+     "ripple": "#cc323d",
+     "sceneTone": "#ffffff",
+     "muted": "#666666",
+     "subtle": "#727272",
+     "errorText": "#a5000f",
+     "warningText": "#a5623b",
+     "successText": "#40a269",
+     "accentText": "#262626",
+     "selectionAlpha": 0.32,
+     "alpha": {
+      "sidebar": 1,
+      "main": 1,
+      "transcript": 1,
+      "composer": 1,
+      "hud": 1
+     },
+     "blur": {
+      "sidebar": 0,
+      "main": 0,
+      "transcript": 0,
+      "composer": 0,
+      "hud": 0
+     },
+     "saturate": 1,
+     "edge": null,
+     "halo": 0,
+     "radius": 8,
+     "presence": {
+      "palette": [
+       "#7c3aed",
+       "#312e81",
+       "#db2777"
+      ],
+      "light": true
+     }
+    },
+    "dark": {
+     "canvas": "#151515",
+     "ink": "#c1c1c1",
+     "sidebar": "#1b1b1b",
+     "accent": "#c4c4c4",
+     "accentInk": "#1a1a1a",
+     "selection": "#c4c4c4",
+     "error": "#cc323d",
+     "warning": "#fc8c45",
+     "success": "#4bc680",
+     "worker": "#3bb974",
+     "needsYou": "#fc8c45",
+     "finished": "#4bc680",
+     "ripple": "#cc323d",
+     "sceneTone": "#151515",
+     "muted": "#8c8c8c",
+     "subtle": "#828282",
+     "errorText": "#cf6060",
+     "warningText": "#fc8c45",
+     "successText": "#4bc680",
+     "accentText": "#c4c4c4",
+     "selectionAlpha": 0.3,
+     "alpha": {
+      "sidebar": 1,
+      "main": 1,
+      "transcript": 1,
+      "composer": 1,
+      "hud": 1
+     },
+     "blur": {
+      "sidebar": 0,
+      "main": 0,
+      "transcript": 0,
+      "composer": 0,
+      "hud": 0
+     },
+     "saturate": 1,
+     "edge": null,
+     "halo": 0,
+     "radius": 8,
+     "presence": {
+      "palette": [
+       "#ff4fd8",
+       "#7b2ff7",
+       "#4ff0ff"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": null
+  },
+  {
+   "id": "one-dark",
+   "name": "One Dark",
+   "kind": "classic",
+   "palette": [
+    "#282c34",
+    "#61afef",
+    "#c678dd",
+    "#98c379"
+   ],
+   "modes": {
+    "dark": {
+     "canvas": "#282c34",
+     "ink": "#abb2bf",
+     "sidebar": "#21252b",
+     "accent": "#61afef",
+     "accentInk": "#282c34",
+     "selection": "#61afef",
+     "error": "#e06c75",
+     "warning": "#e5c07b",
+     "success": "#98c379",
+     "worker": "#98c379",
+     "needsYou": "#e5c07b",
+     "finished": "#98c379",
+     "ripple": "#e06c75",
+     "sceneTone": "#282c34",
+     "muted": "#8d939f",
+     "subtle": "#8d939f",
+     "errorText": "#dc7188",
+     "warningText": "#e5c07b",
+     "successText": "#98c379",
+     "accentText": "#61afef",
+     "selectionAlpha": 0.2,
+     "alpha": {
+      "sidebar": 1,
+      "main": 1,
+      "transcript": 1,
+      "composer": 1,
+      "hud": 1
+     },
+     "blur": {
+      "sidebar": 0,
+      "main": 0,
+      "transcript": 0,
+      "composer": 0,
+      "hud": 0
+     },
+     "saturate": 1,
+     "edge": null,
+     "halo": 0,
+     "radius": 8,
+     "presence": {
+      "palette": [
+       "#61afef",
+       "#1ee8b6",
+       "#c678dd"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": null
+  },
+  {
+   "id": "dracula",
+   "name": "Dracula",
+   "kind": "classic",
+   "palette": [
+    "#282a36",
+    "#bd93f9",
+    "#ff79c6",
+    "#8be9fd"
+   ],
+   "modes": {
+    "dark": {
+     "canvas": "#282a36",
+     "ink": "#f8f8f2",
+     "sidebar": "#21222c",
+     "accent": "#bd93f9",
+     "accentInk": "#282a36",
+     "selection": "#bd93f9",
+     "error": "#ff5555",
+     "warning": "#ffb86c",
+     "success": "#50fa7b",
+     "worker": "#8be9fd",
+     "needsYou": "#ffb86c",
+     "finished": "#50fa7b",
+     "ripple": "#ff5555",
+     "sceneTone": "#282a36",
+     "muted": "#b3bbb5",
+     "subtle": "#a0aaa6",
+     "errorText": "#ff5555",
+     "warningText": "#ffb86c",
+     "successText": "#50fa7b",
+     "accentText": "#bd93f9",
+     "selectionAlpha": 0.32,
+     "alpha": {
+      "sidebar": 1,
+      "main": 1,
+      "transcript": 1,
+      "composer": 1,
+      "hud": 1
+     },
+     "blur": {
+      "sidebar": 0,
+      "main": 0,
+      "transcript": 0,
+      "composer": 0,
+      "hud": 0
+     },
+     "saturate": 1,
+     "edge": null,
+     "halo": 0,
+     "radius": 8,
+     "presence": {
+      "palette": [
+       "#bd93f9",
+       "#3e72f4",
+       "#ff79c6"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": null
+  },
+  {
+   "id": "solarized-light",
+   "name": "Solarized Light",
+   "kind": "classic",
+   "palette": [
+    "#fdf6e3",
+    "#268bd2",
+    "#2aa198",
+    "#d33682"
+   ],
+   "modes": {
+    "light": {
+     "canvas": "#fdf6e3",
+     "ink": "#586e75",
+     "sidebar": "#fdf6e3",
+     "accent": "#268bd2",
+     "accentInk": "#000000",
+     "selection": "#268bd2",
+     "error": "#dc322f",
+     "warning": "#b58900",
+     "success": "#859900",
+     "worker": "#d33682",
+     "needsYou": "#b58900",
+     "finished": "#859900",
+     "ripple": "#dc322f",
+     "sceneTone": "#fdf6e3",
+     "muted": "#5e757a",
+     "subtle": "#5e757a",
+     "errorText": "#b8478a",
+     "warningText": "#507879",
+     "successText": "#7c991e",
+     "accentText": "#268bd2",
+     "selectionAlpha": 0.08,
+     "alpha": {
+      "sidebar": 1,
+      "main": 1,
+      "transcript": 1,
+      "composer": 1,
+      "hud": 1
+     },
+     "blur": {
+      "sidebar": 0,
+      "main": 0,
+      "transcript": 0,
+      "composer": 0,
+      "hud": 0
+     },
+     "saturate": 1,
+     "edge": null,
+     "halo": 0,
+     "radius": 8,
+     "presence": {
+      "palette": [
+       "#268bd2",
+       "#177e78",
+       "#2aa198"
+      ],
+      "light": true
+     }
+    }
+   },
+   "scene": null
+  },
+  {
+   "id": "github-light",
+   "name": "GitHub Light",
+   "kind": "classic",
+   "palette": [
+    "#ffffff",
+    "#0969da",
+    "#9a6700",
+    "#1a7f37"
+   ],
+   "modes": {
+    "light": {
+     "canvas": "#ffffff",
+     "ink": "#1f2328",
+     "sidebar": "#f6f8fa",
+     "accent": "#0969da",
+     "accentInk": "#ffffff",
+     "selection": "#0969da",
+     "error": "#cf222e",
+     "warning": "#9a6700",
+     "success": "#1a7f37",
+     "worker": "#1a7f37",
+     "needsYou": "#9a6700",
+     "finished": "#1a7f37",
+     "ripple": "#cf222e",
+     "sceneTone": "#ffffff",
+     "muted": "#56595d",
+     "subtle": "#676a6e",
+     "errorText": "#cf222e",
+     "warningText": "#9a6700",
+     "successText": "#1a7f37",
+     "accentText": "#0969da",
+     "selectionAlpha": 0.32,
+     "alpha": {
+      "sidebar": 1,
+      "main": 1,
+      "transcript": 1,
+      "composer": 1,
+      "hud": 1
+     },
+     "blur": {
+      "sidebar": 0,
+      "main": 0,
+      "transcript": 0,
+      "composer": 0,
+      "hud": 0
+     },
+     "saturate": 1,
+     "edge": null,
+     "halo": 0,
+     "radius": 8,
+     "presence": {
+      "palette": [
+       "#0969da",
+       "#057a83",
+       "#9a6700"
+      ],
+      "light": true
+     }
+    }
+   },
+   "scene": null
+  },
+  {
+   "id": "github-dark",
+   "name": "GitHub Dark",
+   "kind": "classic",
+   "palette": [
+    "#0d1117",
+    "#2f81f7",
+    "#d29922",
+    "#3fb950"
+   ],
+   "modes": {
+    "dark": {
+     "canvas": "#0d1117",
+     "ink": "#e6edf3",
+     "sidebar": "#010409",
+     "accent": "#2f81f7",
+     "accentInk": "#0d1117",
+     "selection": "#2f81f7",
+     "error": "#f85149",
+     "warning": "#d29922",
+     "success": "#3fb950",
+     "worker": "#3fb950",
+     "needsYou": "#d29922",
+     "finished": "#3fb950",
+     "ripple": "#f85149",
+     "sceneTone": "#0d1117",
+     "muted": "#a1a8ae",
+     "subtle": "#8f959c",
+     "errorText": "#f85149",
+     "warningText": "#d29922",
+     "successText": "#3fb950",
+     "accentText": "#2f81f7",
+     "selectionAlpha": 0.32,
+     "alpha": {
+      "sidebar": 1,
+      "main": 1,
+      "transcript": 1,
+      "composer": 1,
+      "hud": 1
+     },
+     "blur": {
+      "sidebar": 0,
+      "main": 0,
+      "transcript": 0,
+      "composer": 0,
+      "hud": 0
+     },
+     "saturate": 1,
+     "edge": null,
+     "halo": 0,
+     "radius": 8,
+     "presence": {
+      "palette": [
+       "#2f81f7",
+       "#08ddc5",
+       "#d29922"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": null
+  },
+  {
+   "id": "nord",
+   "name": "Nord",
+   "kind": "classic",
+   "palette": [
+    "#2e3440",
+    "#88c0d0",
+    "#b48ead",
+    "#a3be8c"
+   ],
+   "modes": {
+    "dark": {
+     "canvas": "#2e3440",
+     "ink": "#d8dee9",
+     "sidebar": "#3b4252",
+     "accent": "#88c0d0",
+     "accentInk": "#2e3440",
+     "selection": "#88c0d0",
+     "error": "#bf616a",
+     "warning": "#ebcb8b",
+     "success": "#a3be8c",
+     "worker": "#a3be8c",
+     "needsYou": "#ebcb8b",
+     "finished": "#a3be8c",
+     "ripple": "#bf616a",
+     "sceneTone": "#2e3440",
+     "muted": "#a8aeba",
+     "subtle": "#a8aeba",
+     "errorText": "#c2a4cd",
+     "warningText": "#ebcb8b",
+     "successText": "#a3be8c",
+     "accentText": "#88c0d0",
+     "selectionAlpha": 0.26,
+     "alpha": {
+      "sidebar": 1,
+      "main": 1,
+      "transcript": 1,
+      "composer": 1,
+      "hud": 1
+     },
+     "blur": {
+      "sidebar": 0,
+      "main": 0,
+      "transcript": 0,
+      "composer": 0,
+      "hud": 0
+     },
+     "saturate": 1,
+     "edge": null,
+     "halo": 0,
+     "radius": 8,
+     "presence": {
+      "palette": [
+       "#88c0d0",
+       "#52bb88",
+       "#b48ead"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": null
+  },
+  {
+   "id": "catppuccin-mocha",
+   "name": "Catppuccin Mocha",
+   "kind": "classic",
+   "palette": [
+    "#1e1e2e",
+    "#cba6f7",
+    "#89b4fa",
+    "#a6e3a1"
+   ],
+   "modes": {
+    "dark": {
+     "canvas": "#1e1e2e",
+     "ink": "#cdd6f4",
+     "sidebar": "#181825",
+     "accent": "#cba6f7",
+     "accentInk": "#1e1e2e",
+     "selection": "#9399b2",
+     "error": "#f38ba8",
+     "warning": "#f9e2af",
+     "success": "#a6e3a1",
+     "worker": "#a6e3a1",
+     "needsYou": "#f9e2af",
+     "finished": "#a6e3a1",
+     "ripple": "#f38ba8",
+     "sceneTone": "#1e1e2e",
+     "muted": "#979db8",
+     "subtle": "#898ea7",
+     "errorText": "#f38ba8",
+     "warningText": "#f9e2af",
+     "successText": "#a6e3a1",
+     "accentText": "#cba6f7",
+     "selectionAlpha": 0.32,
+     "alpha": {
+      "sidebar": 1,
+      "main": 1,
+      "transcript": 1,
+      "composer": 1,
+      "hud": 1
+     },
+     "blur": {
+      "sidebar": 0,
+      "main": 0,
+      "transcript": 0,
+      "composer": 0,
+      "hud": 0
+     },
+     "saturate": 1,
+     "edge": null,
+     "halo": 0,
+     "radius": 8,
+     "presence": {
+      "palette": [
+       "#cba6f7",
+       "#446dee",
+       "#89b4fa"
+      ],
+      "light": false
+     }
+    }
+   },
+   "scene": null
+  }
+ ]
+}

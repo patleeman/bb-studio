@@ -844,7 +844,6 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     var composerFrame: CGRect { composerHost.view.frame }
     var isAnimating: Bool { animating }
-    var pillFrame: CGRect { pillHost.view.frame }
 }
 
 /// A row's id as the diffable data source holds it. Swift 6 requires the

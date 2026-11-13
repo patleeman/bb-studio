@@ -33,7 +33,7 @@ public enum ConversationReplies {
 
     /// "2 replies · Last reply 4:13 PM", "Replying…" while it works; nothing for an empty or failed thread.
     public static func indicator(_ thread: BotSideThread?, now: Date = .now) -> String? {
-        guard let thread else { return nil }
+        guard let thread, !thread.isFork else { return nil }
         if thread.working { return "Replying…" }
         guard thread.replies > 0 else { return nil }
         let count = thread.replies == 1 ? "1 reply" : "\(thread.replies) replies"
@@ -54,8 +54,16 @@ public enum ConversationReplies {
         }
     }
 
+    /// The message's reply thread; never a fork (Reply in thread doesn't continue a fork).
     public static func existing(_ threads: [String: BotSideThread], messageId: String) -> String? {
-        threads[messageId]?.threadId
+        guard let thread = threads[messageId], !thread.isFork else { return nil }
+        return thread.threadId
+    }
+
+    /// "Forked here · 1 conversation", as desktop's line under the message.
+    public static func forkIndicator(_ thread: BotSideThread?) -> String? {
+        guard let fork = thread?.fork else { return nil }
+        return "Forked here · " + (fork.conversations == 1 ? "1 conversation" : "\(fork.conversations) conversations")
     }
 }
 
@@ -129,19 +137,24 @@ extension BBClient {
         return output.bot?.defaultModel.map { ExecutionChoice(providerId: $0.providerId, model: $0.model, reasoningLevel: $0.reasoningLevel) }
     }
 
-    public func startConversation(botId: String, projectId: String, text: String, choice: ExecutionChoice) async throws -> String {
-        let request = Self.studioExecutionRequest(projectId: projectId, text: text, mentions: [], choice: choice)
+    public func startConversation(botId: String, projectId: String, text: String, choice: ExecutionChoice,
+                                  attachments: [JSONValue] = []) async throws -> String {
+        var request = Self.studioExecutionRequest(projectId: projectId, text: text, mentions: [], choice: choice)
+        if !attachments.isEmpty, case .object(var fields) = request {
+            fields["input"] = Self.input(text, attachments)
+            request = .object(fields)
+        }
         let output: Studio.BotConversationStartOutput = try await rpc("studio", Studio.Method.bot_conversation_start,
                                                                       ["botId": .string(botId), "request": request])
         guard let id = output.threadId, !id.isEmpty else { throw BBError(status: 200, message: "Studio didn't start the conversation.") }
         return id
     }
 
-    public func startConversation(botId: String, projectId: String, text: String) async throws -> String {
+    public func startConversation(botId: String, projectId: String, text: String, attachments: [JSONValue] = []) async throws -> String {
         let preset = try? await botDefaultModel(botId: botId)
         let defaults = preset == nil ? (try? await projectDefaults(projectId)) ?? nil : nil
         var choice = preset ?? defaults ?? ExecutionChoice()
         if choice.permissionMode == nil { choice.permissionMode = defaults?.permissionMode }
-        return try await startConversation(botId: botId, projectId: projectId, text: text, choice: choice)
+        return try await startConversation(botId: botId, projectId: projectId, text: text, choice: choice, attachments: attachments)
     }
 }

@@ -83,3 +83,44 @@ extension ThreadEntry {
                            hasPendingInteraction: pending)
     }
 }
+
+/// The Bot a widget shows, from Bot spaces: who, its presence and workers.
+struct WidgetBot: Hashable {
+    var id: String
+    var name: String
+    var state: BotPresenceState
+    var workers: Int
+    var look: BotLook
+    /// Other Bots that need you.
+    var othersNeedingYou: Int
+
+    init(id: String, name: String, state: BotPresenceState, workers: Int, look: BotLook, othersNeedingYou: Int = 0) {
+        self.id = id
+        self.name = name
+        self.state = state
+        self.workers = workers
+        self.look = look
+        self.othersNeedingYou = othersNeedingYou
+    }
+
+    init(_ facts: BotWidgetFacts) {
+        self.init(id: facts.botId, name: facts.bot?.name ?? BotInfo.defaultName, state: facts.presence,
+                  workers: facts.view?.workers.filter { $0.status == .running }.count ?? facts.bot?.activity.workers ?? 0,
+                  look: facts.look, othersNeedingYou: facts.othersNeedingYou.count)
+    }
+
+    func link(serverURL: URL) -> URL { WidgetText.link("bot/\(id)", serverURL: serverURL) }
+}
+
+/// The Bot's presence and name, for a widget's header.
+struct WidgetBotBadge: View {
+    let bot: WidgetBot
+    var size: CGFloat = 22
+
+    var body: some View {
+        HStack(spacing: 5) {
+            WidgetPresence(botId: bot.id, state: bot.state, look: bot.look, size: size)
+            Text(bot.name).font(.caption.weight(.semibold)).lineLimit(1)
+        }
+    }
+}

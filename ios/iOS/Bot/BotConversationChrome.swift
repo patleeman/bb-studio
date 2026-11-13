@@ -65,6 +65,8 @@ struct ConversationReplyRow: View {
     let thread: BotSideThread?
     let look: BotLook?
     let open: () -> Void
+    /// Opens a fork made at this message; its "Forked here" line shows when set.
+    var openFork: ((String) -> Void)? = nil
     @ScaledMetric(relativeTo: .caption) private var iconSize: CGFloat = 13
 
     var body: some View {
@@ -99,6 +101,18 @@ struct ConversationReplyRow: View {
                 .accessibilityLabel(ConversationReplies.indicator(thread) ?? "")
                 .accessibilityAddTraits(.isButton)
                 .accessibilityIdentifier("replies-\(messageId)")
+            }
+            if let openFork, let fork = thread?.fork, let label = ConversationReplies.forkIndicator(thread) {
+                Button { openFork(fork.threadId) } label: {
+                    Text(label)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, 6)
+                        .frame(minHeight: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("forked-\(messageId)")
             }
         }
         .padding(.leading, -8)

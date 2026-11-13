@@ -6,6 +6,7 @@ import WidgetKit
 struct BBStudioWidgets: WidgetBundle {
     var body: some Widget {
         RecordingLiveActivity()
+        BotLiveActivity()
         StatusWidget()
         BotWidget()
         WorkWidget()

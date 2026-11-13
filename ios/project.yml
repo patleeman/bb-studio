@@ -18,7 +18,7 @@ settings:
     DEVELOPMENT_TEAM: 3753DAN98U
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "0.2.0"
     CURRENT_PROJECT_VERSION: "1"
 targets:
   BBStudio:
@@ -30,6 +30,11 @@ targets:
         basedOnDependencyAnalysis: false
     sources:
       - path: iOS
+        excludes:
+          - "Look/Resources/**"
+      # Desktop's look runtime, built by scripts/build-look.mjs.
+      - path: iOS/Look/Resources
+        buildPhase: resources
       - path: Shared
       - path: LiveActivity
       # Attention Router push buttons, shared with the notification extension.
@@ -39,6 +44,8 @@ targets:
       - path: Widgets/BotWidget.swift
       - path: Widgets/WorkWidget.swift
       - path: Widgets/WidgetParts.swift
+      - path: Widgets/BotWidgetIntents.swift
+      - path: Widgets/BotLiveActivity.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo

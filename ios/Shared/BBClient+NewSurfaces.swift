@@ -37,10 +37,11 @@ extension BBClient {
         try await rpc("studio", Studio.Method.comments, ["ref": ["pluginId": .string(pluginId), "id": .string(id)]])
     }
 
-    public func replyToStudioComment(pluginId: String, id: String, parentId: String, body: String) async throws {
+    /// A reply under `parentId`, or a new top-level comment when it's nil.
+    public func replyToStudioComment(pluginId: String, id: String, parentId: String?, body: String) async throws {
         let _: Studio.CommentCreateOutput = try await rpc("studio", Studio.Method.commentCreate, [
             "ref": ["pluginId": .string(pluginId), "id": .string(id)],
-            "parentId": .string(parentId), "anchor": .null,
+            "parentId": parentId.map(JSONValue.string) ?? .null, "anchor": .null,
             "actor": ["kind": .string("user")], "body": .string(body),
         ])
     }

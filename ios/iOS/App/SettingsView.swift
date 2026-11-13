@@ -14,7 +14,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                TextField("https://machine.tailnet.ts.net", text: $serverURL, axis: .vertical)
+                TextField("studio.tailnet.ts.net", text: $serverURL, axis: .vertical)
                     .accessibilityLabel("BB server URL")
                     .accessibilityIdentifier("settingsServerURL")
                     .textInputAutocapitalization(.never)
@@ -103,6 +103,16 @@ struct SettingsView: View {
                     }
                 }
             }
+            Section {
+                NavigationLink { LookSettingsView() } label: {
+                    LabeledContent {
+                        Text(LookStore.shared.theme(for: nil).name)
+                    } label: {
+                        Label("Look", systemImage: "paintpalette")
+                    }
+                }
+                .accessibilityIdentifier("SettingsLook")
+            }
             ScrollLogSection()
             Section("Action button") {
                 Text(
@@ -139,10 +149,11 @@ struct SettingsView: View {
     }
 
     private func save() async {
-        guard let url = URL(string: serverURL.trimmingCharacters(in: .whitespaces)), url.scheme != nil else {
-            status = "Not a valid URL"
+        guard let url = ServerAddress.parse(serverURL) else {
+            status = "Not a valid address"
             return
         }
+        serverURL = url.absoluteString
         app.setServerURL(url)
         do {
             let threads = try await app.client.threads()

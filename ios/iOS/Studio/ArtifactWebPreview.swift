@@ -10,7 +10,10 @@ struct ArtifactWebPreview: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.allowsInlineMediaPlayback = true
+        // Pinch to zoom even when the page's viewport forbids it.
+        WebZoom.enable(configuration)
         let view = WKWebView(frame: .zero, configuration: configuration)
+        WebZoom.enable(view)
         view.allowsBackForwardNavigationGestures = true
         view.navigationDelegate = context.coordinator
         context.coordinator.load(url, in: view)
@@ -54,6 +57,26 @@ struct ArtifactWebPreview: UIViewRepresentable {
             DispatchQueue.main.async { [weak self] in
                 guard let self, !self.retired, self.generation == request else { return }
                 self.onFailure(message)
+            }
+        }
+
+        /// A tapped link leaves the preview: `bb://` and BB's own addresses open in
+        /// the app, as on desktop; other pages open in Safari. The file itself and its
+        /// own subframes load as before.
+        func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
+                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            guard !retired else { return decisionHandler(.cancel) }
+            guard let url = action.request.url, action.navigationType == .linkActivated || url.scheme == "bb" else {
+                return decisionHandler(.allow)
+            }
+            decisionHandler(.cancel)
+            let origin = loaded
+            DispatchQueue.main.async {
+                if let target = Links.parse(url.absoluteString, origin: origin) {
+                    AppModel.shared.openLink(target)
+                } else if ["http", "https", "mailto", "tel"].contains(url.scheme?.lowercased() ?? "") {
+                    UIApplication.shared.open(url)
+                }
             }
         }
 

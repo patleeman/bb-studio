@@ -200,6 +200,12 @@
       "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
+      "file": "ios/Shared/BBClient+Push.swift",
+      "plugin": "mobile",
+      "method": "live_activity_register",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/Shared/BBClient.swift",
       "plugin": "thread-list",
       "method": "listPreferences",
@@ -533,6 +539,30 @@
       "file": "ios/Shared/Designs.swift",
       "plugin": "studio",
       "method": "designs.getDesign",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Designs.swift",
+      "plugin": "studio",
+      "method": "designs.renameDesign",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Designs.swift",
+      "plugin": "studio",
+      "method": "designs.resolveComment",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Designs.swift",
+      "plugin": "studio",
+      "method": "designs.deleteComment",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Designs.swift",
+      "plugin": "studio",
+      "method": "designs.sendComment",
       "coverage": "generated method"
     },
     {
@@ -926,6 +956,18 @@
       "coverage": "generated method"
     },
     {
+      "file": "ios/iOS/Look/LookWebView.swift",
+      "plugin": "method",
+      "method": "body",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/iOS/Look/Presence.swift",
+      "plugin": "studio",
+      "method": "presences_list",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/iOS/Loops/Loops.swift",
       "plugin": "studio",
       "method": "loops.list",
@@ -974,9 +1016,9 @@
       "coverage": "generated method"
     },
     {
-      "file": "ios/iOS/Loops/Loops.swift",
+      "file": "ios/iOS/Studio/MiniAppView.swift",
       "plugin": "studio",
-      "method": "loops.morning",
+      "method": "minis.rename",
       "coverage": "generated method"
     },
     {

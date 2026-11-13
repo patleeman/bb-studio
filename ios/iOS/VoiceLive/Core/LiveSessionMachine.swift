@@ -203,9 +203,16 @@ struct LiveSessionMachine: Sendable {
 
     mutating func start(now: TimeInterval) -> [LiveEffect] {
         guard !isLive else { return [] }
-        let background = background
+        // A new session starts clean, but keeps how it was tuned (B20): the
+        // barge-in gate, its confirm window and the line pauses.
+        let (background, gate, confirmWindow, userPause, agentPause) = (background, gate, confirmWindow, userPause, agentPause)
         self = LiveSessionMachine(endsLinesOnPause: endsLinesOnPause)
         self.background = background
+        self.gate = gate
+        self.gate.reset()
+        self.confirmWindow = confirmWindow
+        self.userPause = userPause
+        self.agentPause = agentPause
         phase = .connecting
         sessionStart = now
         return [.earcon(.start), .connect]

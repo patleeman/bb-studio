@@ -124,13 +124,11 @@ struct ArtifactView: View {
         case "image":
             AsyncImage(url: url) { phase in
                 if let image = phase.image {
-                    ScrollView([.horizontal, .vertical]) {
-                        image.resizable().scaledToFit().frame(maxWidth: 900)
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityAddTraits(.isImage)
-                            .accessibilityLabel(version.name)
-                            .accessibilityIdentifier("artifactPreviewImage")
+                    // Pinch to zoom, drag to pan, double-tap for 2.5×.
+                    Zoomable(maximum: 8) {
+                        image.resizable().scaledToFit()
                             .padding()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     .accessibilityElement(children: .ignore)
                     .accessibilityAddTraits(.isImage)

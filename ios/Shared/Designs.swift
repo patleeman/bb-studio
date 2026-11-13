@@ -67,5 +67,23 @@ extension BBClient {
         return components.url!
     }
 
+    public func renameDesign(_ id: String, name: String) async throws {
+        let _: JSONValue = try await rpc("studio", Studio.Method.designs_renameDesign, ["id": .string(id), "name": .string(name)])
+    }
+
+    /// Resolving hides the comment, as on desktop.
+    public func resolveDesignComment(_ id: String) async throws {
+        let _: JSONValue = try await rpc("studio", Studio.Method.designs_resolveComment, ["id": .string(id), "resolved": true])
+    }
+
+    public func deleteDesignComment(_ id: String) async throws {
+        let _: JSONValue = try await rpc("studio", Studio.Method.designs_deleteComment, ["id": .string(id)])
+    }
+
+    /// Sends the comment to the design's conversation for the agent to act on.
+    public func sendDesignComment(_ id: String) async throws {
+        let _: JSONValue = try await rpc("studio", Studio.Method.designs_sendComment, ["id": .string(id)])
+    }
+
     public static func isDesignId(_ value: String) -> Bool { value.wholeMatch(of: /dsn_[0-9a-f]{16}/) != nil }
 }

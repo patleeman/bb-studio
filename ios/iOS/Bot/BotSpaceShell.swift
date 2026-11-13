@@ -17,20 +17,22 @@ struct BotSpacesRoot: View {
             .environment(\.botConversation, context)
             .id(shell.selection)
         }
+        .lookRoot(bot: BotShell.shownBot(store.spaces, chosen: shell.shownBotId))
+        .task(id: store.spaces) { await LookExport.run(store: store, client: app.client) }
         .onChange(of: shell.selection) { _, _ in shell.detailPath = shell.takePendingPush() }
-        .onAppear { shell.land(store) }
-        .onChange(of: store.spaces) { _, _ in shell.land(store) }
+        .onAppear { shell.land(store); consumeLinks() }
+        .onChange(of: store.spaces) { _, _ in shell.land(store); consumeLinks() }
         .onChange(of: store.views) { _, _ in shell.land(store) }
-        .onChange(of: app.shellLink, initial: true) { _, link in
-            guard let link, store.spaces != nil else { return }
-            app.shellLink = nil
-            shell.follow(link, store: store)
-        }
-        .onChange(of: app.botRoute, initial: true) { _, route in
-            guard let route, store.spaces != nil else { return }
-            app.botRoute = nil
-            shell.open(route, store: store)
-        }
+        .onChange(of: app.shellLink, initial: true) { _, _ in consumeLinks() }
+        .onChange(of: app.botRoute, initial: true) { _, _ in consumeLinks() }
+    }
+
+    /// A link or route that came before the Bots loaded waits for them; once
+    /// followed it is cleared, so the same link works again.
+    private func consumeLinks() {
+        let used = shell.consume(link: app.shellLink, route: app.botRoute, store: store)
+        if used.link { app.shellLink = nil }
+        if used.route { app.botRoute = nil }
     }
 
     private var context: BotConversationContext? {
@@ -80,6 +82,7 @@ struct BotSpaceList: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var showsDone = false
     @State private var startingConversation = false
+    @Environment(\.look) private var look
 
     private var bot: BotSpace? { BotShell.shownBot(store.spaces, chosen: shell.shownBotId) }
     private var view: BotThreadsView? { bot.flatMap { store.view(for: $0.id) } }
@@ -97,7 +100,10 @@ struct BotSpaceList: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background { backdrop }
         .accessibilityIdentifier("BotSpaceList")
+        .accessibilityValue(look.showsScene ? "Scene \(look.theme.name)" : look.theme.name)
         .overlay {
             if store.spaces == nil {
                 if let error = store.error {
@@ -121,24 +127,40 @@ struct BotSpaceList: View {
         }
     }
 
+    /// A scene theme's still (or live scene) behind the list; a classic theme's canvas.
+    @ViewBuilder private var backdrop: some View {
+        if look.showsScene {
+            SceneBackdrop(theme: look.theme, botId: bot?.id, view: view)
+        } else {
+            RadialGradient(colors: [look.sidebar, look.canvas], center: .top, startRadius: 0, endRadius: 520).ignoresSafeArea()
+        }
+    }
+
+    /// Rows sit on the theme's glass over a scene, and on its sidebar color otherwise.
+    @ViewBuilder private func rowBackground(needsYou: Bool = false) -> some View {
+        let fill = needsYou ? look.needsYou.opacity(0.14) : Color.clear
+        if look.showsScene {
+            Rectangle().fill(fill).glassEffect(.regular.tint(look.glassTint(\.sidebar)), in: .rect)
+        } else {
+            Rectangle().fill(look.sidebar).overlay(fill)
+        }
+    }
+
     private func header(_ bot: BotSpace) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
-                BotAvatar(BotLook(shape: bot.shape, color: bot.color, emoji: bot.avatar), size: 36)
-                    .overlay {
-                        if BotShell.needsYou(bot, view: view) {
-                            Circle().strokeBorder(.orange, lineWidth: 2).padding(-3)
-                        }
-                    }
+                PresenceView(bot: bot, state: bot.presenceState(live: view),
+                             workers: view?.workers.filter { $0.status == .running }.count ?? bot.activity.workers, size: 36)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(bot.name).font(.title2.bold()).lineLimit(1)
                     Text(BotShell.status(bot, view: view))
                         .font(.subheadline)
-                        .foregroundStyle(BotShell.needsYou(bot, view: view) ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(BotShell.needsYou(bot, view: view) ? AnyShapeStyle(look.needsYou) : AnyShapeStyle(look.muted))
                         .lineLimit(1)
                 }
                 Spacer(minLength: 0)
             }
+            .lookHalo(look)
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("BotSpaceHeader")
             HStack {
@@ -147,7 +169,7 @@ struct BotSpaceList: View {
                         Image(systemName: page.symbol).font(.body.weight(.medium)).frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
-                    .glassEffect(.regular.interactive(), in: .circle)
+                    .lookGlass(look, \.hud, in: .circle, interactive: true)
                     .accessibilityLabel(page.title)
                     .accessibilityIdentifier("BotPage-\(page.rawValue)")
                     if page != BotPage.allCases.last { Spacer(minLength: 4) }
@@ -170,12 +192,12 @@ struct BotSpaceList: View {
                 NavigationLink(value: BotShellItem.conversation(line.threadId)) {
                     BotConversationRow(line: line)
                 }
-                .listRowBackground(line.tone == .needsYou ? Color.orange.opacity(0.14) : nil)
+                .listRowBackground(rowBackground(needsYou: line.tone == .needsYou))
                 .accessibilityIdentifier("conversation-\(line.threadId)")
             }
         } header: {
             HStack {
-                Text("Conversations").font(.title3.bold()).foregroundStyle(.primary).textCase(nil)
+                Text("Conversations").font(.title3.bold()).foregroundStyle(.primary).textCase(nil).lookHalo(look)
                 Spacer()
                 Button { startingConversation = true } label: {
                     Image(systemName: "plus").font(.body.weight(.semibold)).frame(width: 32, height: 32)
@@ -220,10 +242,11 @@ struct BotSpaceList: View {
                             .foregroundStyle(.secondary)
                         }
                         .selectionDisabled()
+                        .listRowBackground(rowBackground())
                     }
                 }
             } header: {
-                Text("Workers").font(.title3.bold()).foregroundStyle(.primary).textCase(nil)
+                Text("Workers").font(.title3.bold()).foregroundStyle(.primary).textCase(nil).lookHalo(look)
             }
         }
     }
@@ -239,6 +262,7 @@ struct BotSpaceList: View {
                 }
             }
         }
+        .listRowBackground(rowBackground())
         .accessibilityIdentifier("worker-\(worker.threadId)")
     }
 
@@ -248,7 +272,7 @@ struct BotSpaceList: View {
                 Image(systemName: "gearshape").font(.body.weight(.medium)).frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
-            .glassEffect(.regular.interactive(), in: .circle)
+            .lookGlass(look, \.hud, in: .circle, interactive: true)
             .accessibilityLabel("Settings")
             .accessibilityIdentifier("BotSpaceSettings")
             Spacer()
@@ -265,7 +289,7 @@ struct BotSpaceList: View {
             } label: {
                 Image(systemName: "ellipsis").font(.body.weight(.medium)).frame(width: 44, height: 44)
             }
-            .glassEffect(.regular.interactive(), in: .circle)
+            .lookGlass(look, \.hud, in: .circle, interactive: true)
             .accessibilityLabel("More")
             .accessibilityIdentifier("BotSpaceMore")
         }
@@ -281,6 +305,7 @@ struct BotSpaceList: View {
 
 struct BotConversationRow: View {
     let line: BotConversationLine
+    @Environment(\.look) private var look
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -295,19 +320,19 @@ struct BotConversationRow: View {
                 Spacer(minLength: 4)
                 Text(BotShell.shortAge(line.updatedAt))
                     .font(.subheadline).monospacedDigit()
-                    .foregroundStyle(line.tone == .needsYou ? AnyShapeStyle(.orange) : AnyShapeStyle(.tertiary))
+                    .foregroundStyle(line.tone == .needsYou ? AnyShapeStyle(look.needsYou) : AnyShapeStyle(look.subtle))
             }
             if !line.text.isEmpty {
                 HStack(spacing: 7) {
                     switch line.tone {
-                    case .needsYou: Circle().fill(.orange).frame(width: 8, height: 8)
+                    case .needsYou: Circle().fill(look.needsYou).frame(width: 8, height: 8)
                     case .running: ProgressView().controlSize(.mini)
                     case .quiet: EmptyView()
                     }
                     Text(line.text).lineLimit(1)
                 }
                 .font(.subheadline)
-                .foregroundStyle(line.tone == .needsYou ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                .foregroundStyle(line.tone == .needsYou ? AnyShapeStyle(look.needsYou) : AnyShapeStyle(look.muted))
             }
         }
         .padding(.leading, CGFloat(line.depth) * 14)
@@ -318,17 +343,18 @@ struct BotConversationRow: View {
 
 struct BotWorkerGlyph: View {
     let status: BotWorker.Status
+    @Environment(\.look) private var look
 
     var body: some View {
         switch status {
         case .running:
-            ProgressView().controlSize(.mini).tint(.green).accessibilityLabel("Running")
+            ProgressView().controlSize(.mini).tint(look.success).accessibilityLabel("Running")
         case .needsYou:
-            Circle().fill(.orange).frame(width: 8, height: 8).accessibilityLabel("Needs you")
+            Circle().fill(look.needsYou).frame(width: 8, height: 8).accessibilityLabel("Needs you")
         case .failed:
-            Image(systemName: "xmark.circle.fill").foregroundStyle(.red).accessibilityLabel("Failed")
+            Image(systemName: "xmark.circle.fill").foregroundStyle(look.error).accessibilityLabel("Failed")
         case .done, .other:
-            Image(systemName: "checkmark").font(.footnote.weight(.semibold)).foregroundStyle(.green).accessibilityLabel("Done")
+            Image(systemName: "checkmark").font(.footnote.weight(.semibold)).foregroundStyle(look.success).accessibilityLabel("Done")
         }
     }
 }
@@ -336,13 +362,14 @@ struct BotWorkerGlyph: View {
 struct BotSpaceDots: View {
     let dots: [BotSpaceDot]
     let select: (String) -> Void
+    @Environment(\.look) private var look
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(dots) { dot in
                 Button { select(dot.id) } label: {
                     Capsule()
-                        .fill(dot.amber ? AnyShapeStyle(.orange) : dot.active ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                        .fill(dot.amber ? AnyShapeStyle(look.needsYou) : dot.active ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
                         .frame(width: dot.active ? 18 : 8, height: 8)
                         .frame(width: dot.active ? 32 : 22, height: 44)
                         .contentShape(.rect)
@@ -354,7 +381,7 @@ struct BotSpaceDots: View {
             }
         }
         .padding(.horizontal, 8)
-        .glassEffect(.regular, in: .capsule)
+        .lookGlass(look, \.hud, in: .capsule)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("BotSpaceDots")
     }

@@ -105,6 +105,7 @@ struct StateDemoSheets: ViewModifier {
 ///   asked you a question, two threads wait on you and one failed, and six run.
 /// - `widgets-bot`: the Bot small, medium and large: a long reply, its chat and the threads it's on.
 /// - `widgets-work`: BB work medium and large.
+/// - `widgets-live`: the Bot Live Activity: lock screen, compact and expanded island (design 10e).
 /// On an iPad, every variant shows all three widgets extra large.
 /// `-qaWidgetState empty` draws them with nothing to show; `placeholder`, as
 /// WidgetKit's redacted placeholder.
@@ -114,15 +115,29 @@ private struct WidgetsDemo: View {
     private let state = UserDefaults.standard.string(forKey: "qaWidgetState")
     private var pad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
 
-    private var status: StatusEntry { state == "empty" ? .placeholder : .sample }
+    private var space: WidgetBot { WidgetBot(id: "bot_juniper", name: "Juniper", state: .needs, workers: 2, look: look) }
+    private var status: StatusEntry {
+        guard state != "empty" else { return .placeholder }
+        var entry = StatusEntry.sample
+        entry.space = space
+        return entry
+    }
     private var bot: BotEntry {
         if state == "empty" { return BotEntry(date: .now, threadId: "thr_bot", title: "Juniper", look: look) }
         var entry = BotEntry.sample
         entry.title = "Juniper"
         entry.look = look
+        entry.botId = "bot_juniper"
+        entry.presence = .working
+        entry.workers = 2
         return entry
     }
-    private var work: WorkEntry { state == "empty" ? .placeholder : .sample }
+    private var work: WorkEntry {
+        guard state != "empty" else { return .placeholder }
+        var entry = WorkEntry.sample
+        entry.space = space
+        return entry
+    }
     private var look: BotLook { BotLook(shape: BotShape.default.rawValue, color: "#2ba59a", emoji: "🌿") }
 
     var body: some View {
@@ -136,6 +151,8 @@ private struct WidgetsDemo: View {
                     tile("bot", .systemSmall) { BotWidgetView(entry: bot, family: .systemSmall) }
                     tile("bot", .systemMedium) { BotWidgetView(entry: bot, family: .systemMedium) }
                     tile("bot", .systemLarge) { BotWidgetView(entry: bot, family: .systemLarge) }
+                } else if kind == "live" {
+                    LiveActivityDemo()
                 } else if kind == "work" {
                     tile("work", .systemMedium) { WorkWidgetView(entry: work, family: .systemMedium) }
                     tile("work", .systemLarge) { WorkWidgetView(entry: work, family: .systemLarge) }
@@ -157,6 +174,55 @@ private struct WidgetsDemo: View {
         .background(LinearGradient(colors: colorScheme == .dark ? [Color(red: 0.12, green: 0.14, blue: 0.24), .black]
                                                                  : [Color(red: 0.78, green: 0.84, blue: 0.95), Color(red: 0.95, green: 0.93, blue: 0.9)],
                                    startPoint: .top, endPoint: .bottom))
+    }
+
+    /// The Bot Live Activity's views as the lock screen and the island draw them.
+    private struct LiveActivityDemo: View {
+        private let attributes = BotActivityAttributes(botId: "bot_juniper", botName: "Juniper", server: "demo")
+        private var state: BotActivityAttributes.ContentState {
+            BotActivityAttributes.ContentState(
+                state: "needs", workers: 2, conversationId: "thr_main", conversationTitle: "Main",
+                line: "Fable moved the bridge onto the Studio contract.", needsYou: "Push bb-studio-native to origin?",
+                approval: .init(workerThreadId: "thr_w", interactionId: "int_1", summary: "git push origin bb-studio-native"),
+                updatedAt: Date.now.timeIntervalSince1970)
+        }
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 24) {
+                BotActivityLockView(attributes: attributes, state: state)
+                    .padding(.horizontal, 16).padding(.vertical, 14)
+                    .frame(width: 370)
+                    .background(Color.black.opacity(0.45), in: .rect(cornerRadius: 26))
+                    .accessibilityIdentifier("live-lock")
+                HStack(spacing: 0) {
+                    BotActivityGlyph(botId: attributes.botId, state: state.presence, size: 22)
+                    Spacer(minLength: 126)
+                    Text("\(state.workers)").font(.callout.weight(.semibold)).foregroundStyle(BotActivityStyle.amber)
+                }
+                .padding(.horizontal, 12)
+                .frame(width: 250, height: 37)
+                .background(.black, in: .capsule)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("live-compact")
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        BotActivityGlyph(botId: attributes.botId, state: state.presence, size: 28)
+                        Text(attributes.botName).font(.headline)
+                        Spacer()
+                        BotActivityWorkers(count: state.workers)
+                    }
+                    BotActivityLine(state: state)
+                    if let needs = state.needsYou { BotActivityNeeds(text: needs) }
+                    if let approval = state.approval { BotActivityDecisions(attributes: attributes, state: state, approval: approval) }
+                }
+                .foregroundStyle(.white)
+                .padding(20)
+                .frame(width: 370)
+                .background(.black, in: .rect(cornerRadius: 44))
+                .accessibilityIdentifier("live-expanded")
+            }
+            .environment(\.colorScheme, .dark)
+        }
     }
 
     /// The home screen's sizes: iPhone 17 Pro for the phone, the 13-inch iPad for extra large.

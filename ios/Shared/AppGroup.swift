@@ -43,7 +43,6 @@ public enum ServerScope {
         (AppGroup.defaults.string(forKey: "serverURL") ?? UserDefaults.standard.string(forKey: "serverURL"))
             .flatMap(URL.init(string:)) ?? defaultURL
     }
-    public static var isConfigured: Bool { selectedURL != unconfiguredURL }
     public static func namespace(_ serverURL: URL) -> String {
         SHA256.hash(data: Data(serverURL.absoluteString.utf8)).map { String(format: "%02x", $0) }.joined()
     }
@@ -72,7 +71,6 @@ public enum DiskCache {
     }
     // Durable outboxes contain their own per-item origins; preserve the legacy file.
     public static func saveUnscoped<T: Encodable>(_ value: T, as key: String) { write(value, to: url(key, serverURL: nil)) }
-    public static func loadUnscoped<T: Decodable>(_ type: T.Type, key: String) -> T? { read(type, from: url(key, serverURL: nil)) }
     private static func write<T: Encodable>(_ value: T, to url: URL) {
         guard let data = try? JSONEncoder().encode(value) else { return }
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

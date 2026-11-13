@@ -205,7 +205,7 @@ extension BBClient {
         struct Output: Decodable { var threads: [BotSideThread] }
         do {
             let output: Output = try await rpc("studio", Studio.Method.bot_side_threads, ["threadId": .string(threadId)])
-            return Dictionary(output.threads.filter { $0.kind != "fork" }.map { ($0.messageId, $0) }, uniquingKeysWith: { first, _ in first })
+            return BotSideThread.byMessage(output.threads)
         } catch where Self.isMissingRPC(error) {
             return [:]
         }
@@ -695,7 +695,16 @@ public struct BotReplyActions: Equatable, Sendable {
     }
 
     /// The link's words after the icons, when the reply has side threads.
-    public func repliesLabel(now: Date = .now) -> String? { thread?.compactLabel(now: now) }
+    public func repliesLabel(now: Date = .now) -> String? {
+        guard let thread, !thread.isFork else { return nil }
+        return thread.compactLabel(now: now)
+    }
+}
+
+/// The forks made at a message: the newest, and how many.
+public struct BotForkLine: Codable, Hashable, Sendable {
+    public var threadId: String
+    public var conversations: Int
 }
 
 /// A side thread on one of the Bot's replies: a fork of its chat at that reply.
@@ -710,6 +719,46 @@ public struct BotSideThread: Codable, Hashable, Sendable {
     public var botId: String? = nil
     /// "reply" (Reply in thread) or "fork" (Fork conversation); absent from older Studios.
     public var kind: String? = nil
+    /// How many forks were made at the message (fork entries only).
+    public var conversations: Int? = nil
+    /// The message's forks, when it also has a reply thread (or this entry is the fork).
+    public var fork: BotForkLine? = nil
+
+    public var isFork: Bool { kind == "fork" }
+
+    /// One entry per message: its reply thread, with the message's forks
+    /// attached; a message with only forks gets the fork entry itself.
+    public static func byMessage(_ threads: [BotSideThread]) -> [String: BotSideThread] {
+        var out: [String: BotSideThread] = [:]
+        for thread in threads where !thread.isFork {
+            guard out[thread.messageId] == nil else { continue }
+            out[thread.messageId] = thread
+        }
+        for thread in threads where thread.isFork {
+            let line = BotForkLine(threadId: thread.threadId, conversations: max(1, thread.conversations ?? 1))
+            if out[thread.messageId] != nil {
+                if out[thread.messageId]?.fork == nil { out[thread.messageId]?.fork = line }
+            } else {
+                var entry = thread
+                entry.fork = line
+                out[thread.messageId] = entry
+            }
+        }
+        return out
+    }
+
+    /// Adds a fork just made at a message, so its line shows before Studio lists it.
+    public static func adding(fork threadId: String, at messageId: String, to threads: [String: BotSideThread]) -> [String: BotSideThread] {
+        var out = threads
+        if var entry = out[messageId] {
+            if entry.fork == nil { entry.fork = BotForkLine(threadId: threadId, conversations: 1) }
+            out[messageId] = entry
+        } else {
+            out[messageId] = BotSideThread(messageId: messageId, threadId: threadId, replies: 0, lastReplyAt: nil, working: false,
+                                           kind: "fork", conversations: 1, fork: BotForkLine(threadId: threadId, conversations: 1))
+        }
+        return out
+    }
 
     /// "2 replies · 5m ago", "Working…", "Thread".
     public func label(now: Date = .now) -> String {

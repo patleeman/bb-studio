@@ -133,19 +133,35 @@ final class HeaderTapUITests: ServerIsolatedUITestCase {
             reach(button)
             if keepsTranscript { scrollUp() }
             let before = transcript()
+            let row = keepsTranscript ? anchor() : nil
             let frame = button.frame
             tap(button, top: top)
             let did = waitFor(4, opened)
             let during = transcript()
+            let rowDuring = row.flatMap { onScreen($0.label) }
             close()
             Thread.sleep(forTimeInterval: 2)
             if app.otherElements["PopoverDismissRegion"].exists { failures.append("\(name) \(place): a menu is open after closing") }
             let after = transcript()
+            let rowAfter = row.flatMap { onScreen($0.label) }
             if !did { add(XCTAttachment(screenshot: XCUIScreen.main.screenshot())) }
             note(String(format: "%@ %@ (button %.0f,%.0f-%.0f): opened %@, first visible %.0f -> %.0f -> %.0f", name, place, frame.minX - app.frame.minX, frame.minY, frame.maxY,
                         did ? "yes" : "no", before?.firstVisible ?? .nan, during?.firstVisible ?? .nan, after?.firstVisible ?? .nan))
             if !did { failures.append("\(name) \(place): didn't open") }
             guard keepsTranscript, let before else { continue }
+            // B16: what counts is the text on screen. The content offset changes
+            // while rows above measure in, with nothing moving where you look.
+            if let row {
+                for (when, y) in [("while open", rowDuring), ("after", rowAfter)] {
+                    // A find bar pushes the top down by its height at most; a scroll moves the row far more.
+                    if let y, abs(y - row.y) > 60 {
+                        failures.append(String(format: "%@ %@: the transcript moved %@ (\"%@\" %.0f -> %.0f)", name, place, when, row.label, row.y, y))
+                    } else if y == nil, when == "after" {
+                        failures.append("\(name) \(place): the transcript moved after (\"\(row.label)\" left the screen)")
+                    }
+                }
+                continue
+            }
             for (when, scroll) in [("while open", during), ("after", after)] {
                 // A find bar's inset rounds by a point; a scroll moves far more.
                 if let scroll, abs(scroll.firstVisible - before.firstVisible) > 2 {
@@ -287,6 +303,24 @@ final class HeaderTapUITests: ServerIsolatedUITestCase {
     private func pane() -> String { geometry()?.pane ?? "?" }
 
     /// The transcript: the tall scroll view with the most content.
+    /// A message's text in the middle of the screen, to see whether the transcript scrolled.
+    private func anchor() -> (label: String, y: CGFloat)? {
+        let screen = app.frame
+        for text in app.staticTexts.allElementsBoundByIndex.prefix(80) where text.exists {
+            let frame = text.frame
+            let label = text.label
+            guard label.count > 12, frame.minY > screen.minY + 160, frame.maxY < screen.maxY - 200,
+                  app.staticTexts.matching(NSPredicate(format: "label == %@", label)).count == 1 else { continue }
+            return (label, frame.minY)
+        }
+        return nil
+    }
+
+    private func onScreen(_ label: String) -> CGFloat? {
+        let text = app.staticTexts.matching(NSPredicate(format: "label == %@", label)).firstMatch
+        return text.exists ? text.frame.minY : nil
+    }
+
     private func transcript() -> Scroll? {
         geometry()?.scrolls.filter { $0.height > 200 }.max { $0.contentHeight < $1.contentHeight }
     }

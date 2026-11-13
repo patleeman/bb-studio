@@ -142,7 +142,9 @@ enum BotShell {
 
 @MainActor
 final class BotShellModel: ObservableObject {
-    @Published var shownBotId: String?
+    @Published var shownBotId: String? {
+        didSet { BotSpacesStore.shared.shownBotId = shownBotId }
+    }
     @Published var selection: BotShellItem?
     @Published var compactColumn: NavigationSplitViewColumn = .sidebar
     @Published var detailPath: [Route] = []
@@ -244,5 +246,16 @@ final class BotShellModel: ObservableObject {
             selection = BotShell.mainThreadId(bot, view: store.view(for: bot.id)).map(BotShellItem.conversation)
             compactColumn = .detail
         }
+    }
+}
+
+extension BotShellModel {
+    /// Follows a pending link, then a pending route, once the Bots are loaded.
+    /// Returns which were used, for the caller to clear.
+    func consume(link: BotShellLink?, route: BotRoute?, store: BotSpacesStore) -> (link: Bool, route: Bool) {
+        guard store.spaces != nil else { return (false, false) }
+        if let link { follow(link, store: store) }
+        if let route { open(route, store: store) }
+        return (link != nil, route != nil)
     }
 }
