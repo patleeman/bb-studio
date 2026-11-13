@@ -3,8 +3,8 @@
 // no band, as the sidebar is one glass card) with its avatar (36px),
 // its name, a status line ("2 running", "Paused", "Paused · in bb" for a
 // Bot a BB Studio copy imported and doesn't run, or nothing), and a ···
-// menu (Edit space…, Default model: what its new conversations start on,
-// Archive: the older page, New Bot); then the Bot's pages as rows: Memory, Skills,
+// menu (Edit <name>…, Bot settings…: its Controls page, Default model: what
+// its new conversations start on, Archive: the older page, New Bot); then the Bot's pages as rows: Memory, Skills,
 // Library and Todos (with the Todos list on, the primary Bot's Todos page and
 // what needs the user now; else the Todos page at studio/automations; for any
 // other Bot, Scheduled, its automations, as todos are the primary's). The row of the page
@@ -55,6 +55,7 @@ const MENU_BUTTON = "inline-flex size-7 shrink-0 items-center justify-center rou
 
 export interface SpaceMenu {
   editSpace(): void;
+  botSettings(): void;
   defaultModel(): void;
   /** The Bot's older and finished conversations and workers (the older page). */
   archive(): void;
@@ -94,7 +95,8 @@ export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
             <button type="button" data-testid="bot-menu" className={MENU_BUTTON} aria-label="Bot menu"><Icon name="MoreHorizontal" className="size-4" /></button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem disabled={!bot} onSelect={menu.editSpace}>Edit space…</DropdownMenuItem>
+            <DropdownMenuItem disabled={!bot} onSelect={menu.editSpace}>{bot ? `Edit ${bot.name}…` : "Edit…"}</DropdownMenuItem>
+            <DropdownMenuItem disabled={!bot} onSelect={menu.botSettings}>Bot settings…</DropdownMenuItem>
             <DropdownMenuItem disabled={!bot} onSelect={menu.defaultModel}>Default model</DropdownMenuItem>
             <DropdownMenuItem disabled={!bot} onSelect={menu.archive}>Archive</DropdownMenuItem>
             <DropdownMenuSeparator />

@@ -1,6 +1,6 @@
 // The Bot sidebar (round 7, "the Bot as a space"): one Bot per sidebar.
 // - Top, sticky: the Bot's space header (SpaceHeader.tsx): avatar, name, its
-//   status (running count, Paused), a ··· menu (Edit space…, Default model
+//   status (running count, Paused), a ··· menu (Edit <name>…, Bot settings…, Default model
 //   with bb's model picker, Archive: the older page, New Bot), and
 //   its pages as rows (Memory, Skills, Library, Todos). Edit space
 //   (EditSpace.tsx) covers the main view, or takes the lists' place where
@@ -153,7 +153,7 @@ export function SpaceDots({ bots, current, onSwitch, onNew, onEdit, accents, the
                 </button>
               </ContextMenuTrigger>
               <ContextMenuContent>
-                <ContextMenuItem onSelect={() => onEdit(dot.id)}>Edit space…</ContextMenuItem>
+                <ContextMenuItem onSelect={() => onEdit(dot.id)}>Edit {dot.name}…</ContextMenuItem>
                 {themes?.length && onTheme ? (
                   <ContextMenuSub>
                     <ContextMenuSubTrigger data-testid="space-dot-theme">Theme<span aria-hidden className="ml-auto pl-3 text-muted-foreground">›</span></ContextMenuSubTrigger>
@@ -367,6 +367,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
       <SpaceHeader bot={bot} line={spaceLine(botRow, running)} glass={glass} page={page} todos={todos} onPage={openPage}
         menu={{
           editSpace: () => { if (bot) setEditing(bot.id); },
+          botSettings: () => { if (bot) toPanel(`bot/${encodeURIComponent(bot.id)}/controls`); },
           defaultModel: () => { if (bot) setPickingModel(bot.id); },
           archive: () => { if (bot) toPanel(olderPath(bot.id)); },
           newBot: () => toPanel("bot/new"),

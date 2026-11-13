@@ -293,7 +293,7 @@ it("draws titles at 13px/500 with the second line and time at 55% ink; a row wit
 it("keeps the Bot header at the top while the list scrolls, and its menu lists the Bot's actions", async () => {
   await mount();
   expect($('[data-testid="bot-sidebar-header"]')?.className.split(" ")).toEqual(expect.arrayContaining(["sticky", "top-0"]));
-  expect($$('[data-testid="menu"] [role="menuitem"]').map((item) => item.textContent)).toEqual(["Edit space…", "Default model", "Archive", "New Bot"]);
+  expect($$('[data-testid="menu"] [role="menuitem"]').map((item) => item.textContent)).toEqual(["Edit Chief of Staff…", "Bot settings…", "Default model", "Archive", "New Bot"]);
 });
 
 it("draws + New as BB's ghost button, named New conversation", async () => {
@@ -316,7 +316,7 @@ it("has the same Bot menu where BB has plugin windows", async () => {
   try {
     await mount();
     const items = $$('[data-testid="menu"] [role="menuitem"]');
-    expect(items.map((item) => item.textContent)).toEqual(["Edit space…", "Default model", "Archive", "New Bot"]);
+    expect(items.map((item) => item.textContent)).toEqual(["Edit Chief of Staff…", "Bot settings…", "Default model", "Archive", "New Bot"]);
   } finally { state.windows = false; }
 });
 
@@ -401,6 +401,12 @@ describe("the Bot's space (round 7)", () => {
     expect($('[data-testid="bot-sidebar-line"]')).toBeNull();
   });
 
+  it("opens the shown Bot's Controls from Bot settings… in its menu", async () => {
+    await mount();
+    await act(async () => { $$('[data-testid="menu"] [role="menuitem"]').find((item) => item.textContent === "Bot settings…")!.click(); });
+    expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "bot/cos/controls" });
+  });
+
   it("opens the Default model picker for the shown Bot from its menu", async () => {
     await mount();
     expect($('[data-testid="default-model-dialog"]')).toBeNull();
@@ -449,7 +455,7 @@ describe("the Bot's space (round 7)", () => {
 
   it("opens Edit space in the sidebar from the menu or a right-click on a Bot, in place of the lists", async () => {
     await mount();
-    await act(async () => { $$('[data-testid="menu"] [role="menuitem"]').find((item) => item.textContent === "Edit space…")!.click(); });
+    await act(async () => { $$('[data-testid="menu"] [role="menuitem"]').find((item) => item.textContent === "Edit Chief of Staff…")!.click(); });
     expect($('[data-testid="edit-space"]')?.dataset.botId).toBe("cos");
     expect($('[data-testid="conversations"]')).toBeNull();
     await act(async () => { $('[data-testid="edit-space-cancel"]')!.click(); });
@@ -462,7 +468,7 @@ describe("the Bot's space (round 7)", () => {
   it("leaves out the Bot switcher while Edit space is in the sidebar, so nothing covers its Cancel and Save", async () => {
     await mount();
     expect($('[data-testid="space-dots"]')).not.toBeNull();
-    await act(async () => { $$('[data-testid="menu"] [role="menuitem"]').find((item) => item.textContent === "Edit space…")!.click(); });
+    await act(async () => { $$('[data-testid="menu"] [role="menuitem"]').find((item) => item.textContent === "Edit Chief of Staff…")!.click(); });
     expect($('[data-testid="edit-space"]')!.dataset.stage).toBe("");
     expect($('[data-testid="space-dots"]')).toBeNull();
     expect($('[data-testid="bot-sidebar"]')!.querySelector("footer")).toBeNull();
@@ -477,7 +483,7 @@ describe("the Bot's space (round 7)", () => {
     document.body.append(main);
     try {
       await mount();
-      await act(async () => { $$('[data-testid="menu"] [role="menuitem"]').find((item) => item.textContent === "Edit space…")!.click(); });
+      await act(async () => { $$('[data-testid="menu"] [role="menuitem"]').find((item) => item.textContent === "Edit Chief of Staff…")!.click(); });
       expect($('[data-testid="edit-space"]')!.dataset.stage).toBe("300");
       expect($('[data-testid="conversations"]')).not.toBeNull();
       expect($('[data-testid="space-dots"]')).not.toBeNull();

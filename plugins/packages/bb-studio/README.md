@@ -495,7 +495,8 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   status line with no model (each conversation has its own): "2 running",
   "Paused", "Stopped", "Paused · in bb" on a BB Studio copy for a Bot its
   import stopped (the Info tab's and the automations table's rule), or
-  nothing; and **···**: **Edit space…**, **Default model** (bb's provider
+  nothing; and **···**: **Edit <name>…**, **Bot settings…** (the Bot's
+  Controls page), **Default model** (bb's provider
   and model picker in a small dialog, see Default model below),
   **Archive** (the older page, `/plugins/studio/studio/conversations/<botId>`),
   then New Bot. Bot info and
@@ -549,7 +550,7 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   (**Studio: Show Bot 1…9**, BB commands you can rebind in Settings →
   Keyboard; BB keeps Ctrl+1…9 for its own "Open thread"); the whole sidebar
   switches, and the main view goes to that Bot's last-open
-  conversation (else its Main). Right-click an icon for **Edit space…** and
+  conversation (else its Main). Right-click an icon for **Edit <name>…** and
   **Theme ›**, every theme with that Bot's checked; picking one applies it
   to that Bot.
   Opening another Bot's conversation from a link shows that Bot.
