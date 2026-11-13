@@ -201,8 +201,6 @@ public enum Studio {
     public static let chat_subject = "chat.subject"
     public static let chat_start = "chat.start"
     public static let chat_home = "chat.home"
-    public static let chat_link = "chat.link"
-    public static let chat_unlink = "chat.unlink"
     public static let chat_send = "chat.send"
     public static let artifacts_get = "artifacts.get"
     public static let artifacts_versionBytes = "artifacts.versionBytes"
@@ -320,7 +318,6 @@ public enum Studio {
     public static let minis_save = "minis.save"
     public static let minis_restoreVersion = "minis.restoreVersion"
     public static let minis_rename = "minis.rename"
-    public static let minis_fromArtifact = "minis.fromArtifact"
     public static let minis_duplicate = "minis.duplicate"
     public static let minis_live_save = "minis.live.save"
     public static let minis_live_emit = "minis.live.emit"
@@ -815,10 +812,6 @@ public enum Studio {
 
   public typealias ChatHome = ChatHomeOutput
 
-  public typealias ChatLink = ChatLinkOutput
-
-  public typealias ChatUnlink = ChatUnlinkOutput
-
   public typealias ChatSend = ChatSendOutput
 
   public typealias ArtifactsGet = ArtifactsGetOutput
@@ -1072,8 +1065,6 @@ public enum Studio {
   public typealias MinisRestoreVersion = MinisRestoreVersionOutput
 
   public typealias MinisRename = MinisRenameOutput
-
-  public typealias MinisFromArtifact = MinisFromArtifactOutput
 
   public typealias MinisDuplicate = MinisDuplicateOutput
 
@@ -21711,80 +21702,6 @@ public enum Studio {
     }
   }
 
-  public struct ChatLinkInput: Sendable, Hashable, Codable {
-    public var pluginId: String?
-    public var id: String?
-    public var threadId: String?
-
-    public init(pluginId: String? = nil, id: String? = nil, threadId: String? = nil) {
-      self.pluginId = pluginId
-      self.id = id
-      self.threadId = threadId
-    }
-  }
-
-  public enum ChatLinkOutputThreadOrigin: Sendable, Hashable, Codable {
-    case chosen
-    case created
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "chosen": self = .chosen
-      case "created": self = .created
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .chosen: try container.encode("chosen")
-      case .created: try container.encode("created")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct ChatLinkOutputThread: Sendable, Hashable, Codable {
-    public var threadId: String?
-    public var title: String?
-    public var origin: ChatLinkOutputThreadOrigin?
-
-    public init(threadId: String? = nil, title: String? = nil, origin: ChatLinkOutputThreadOrigin? = nil) {
-      self.threadId = threadId
-      self.title = title
-      self.origin = origin
-    }
-  }
-
-  public struct ChatLinkOutput: Sendable, Hashable, Codable {
-    public var thread: ChatLinkOutputThread?
-
-    public init(thread: ChatLinkOutputThread? = nil) {
-      self.thread = thread
-    }
-  }
-
-  public struct ChatUnlinkInput: Sendable, Hashable, Codable {
-    public var pluginId: String?
-    public var id: String?
-
-    public init(pluginId: String? = nil, id: String? = nil) {
-      self.pluginId = pluginId
-      self.id = id
-    }
-  }
-
-  public struct ChatUnlinkOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-
-    public init(ok: Bool? = nil) {
-      self.ok = ok
-    }
-  }
-
   public struct ChatSendInputItem: Sendable, Hashable, Codable {
     public var pluginId: String?
     public var id: String?
@@ -30447,40 +30364,6 @@ public enum Studio {
 
     public init(ok: Bool? = nil) {
       self.ok = ok
-    }
-  }
-
-  public struct MinisFromArtifactInput: Sendable, Hashable, Codable {
-    public var artifactId: String?
-
-    public init(artifactId: String? = nil) {
-      self.artifactId = artifactId
-    }
-  }
-
-  public struct MinisFromArtifactOutputMini: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-    public var projectId: String?
-    public var versionId: String?
-    public var updatedAt: Double?
-    public var archived: Bool?
-
-    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, versionId: String? = nil, updatedAt: Double? = nil, archived: Bool? = nil) {
-      self.id = id
-      self.name = name
-      self.projectId = projectId
-      self.versionId = versionId
-      self.updatedAt = updatedAt
-      self.archived = archived
-    }
-  }
-
-  public struct MinisFromArtifactOutput: Sendable, Hashable, Codable {
-    public var mini: MinisFromArtifactOutputMini?
-
-    public init(mini: MinisFromArtifactOutputMini? = nil) {
-      self.mini = mini
     }
   }
 

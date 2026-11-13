@@ -13,7 +13,7 @@ import type { PageMetaView, rpcContract, StudioEmbedItem } from "../contract";
 import { PagesUiContext, type PagesUi } from "./context";
 import { PageView } from "./PageView";
 import { MissingPageRecovery } from "./MissingPageRecovery";
-import { useProjects, type BotsState, type Rpc } from "./shared";
+import type { BotsState, Rpc } from "./shared";
 
 export function usePagesData(rpc: Rpc) {
   const [pages, setPages] = useState<PageMetaView[] | null>(null);
@@ -101,7 +101,6 @@ export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: Bo
  */
 export function PagesPanel({ subPath }: { subPath: string }) {
   const rpc = useRpc<typeof rpcContract>();
-  const projects = useProjects();
   // `<page id>/chat/<thread id>` opens the page with that chat's card showing.
   const [pageId = null, section, chatThreadId = null] = subPath.split("/").filter(Boolean);
   const { pages, bots, refetch } = usePagesData(rpc);
@@ -133,7 +132,6 @@ export function PagesPanel({ subPath }: { subPath: string }) {
           page={pageMeta}
           pages={pages ?? []}
           bots={bots}
-          projects={projects}
           rpc={rpc}
           requestsVersion={requestsVersion}
           chatThreadId={section === "chat" ? chatThreadId : null}

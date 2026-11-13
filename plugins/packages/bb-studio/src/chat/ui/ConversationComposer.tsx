@@ -1,6 +1,6 @@
-// The Chat panel: a new conversation about an item, or the thread picker,
-// laid out like BB's own new-thread screen. Studio opens it in a split
-// beside the item; sending or picking turns the pane into that thread.
+// The Chat panel: a new conversation about an item, laid out like BB's own
+// new-thread screen. Studio opens it in a split beside the item; sending
+// turns the pane into that thread.
 import { experimental_NewThreadComposer as NewThreadComposer, useBbNavigate, useRpc, type JsonValue, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { Icon, OUTLINE_BUTTON, StudioBar } from "../../kit/app/index";
 import { errorMessage, quoteMessage, untitled, type ItemQuote } from "../../kit/format";
@@ -9,7 +9,6 @@ import type { rpcContract, Viewed } from "../contract";
 import { itemKey } from "../context";
 import { ref as itemRefSchema } from "../schemas";
 import { CHAT_ICON, CONVERSATION_STARTED, draftRoute, quoteDrafts } from "./conversation-drafts";
-import { ThreadPicker } from "./ThreadPicker";
 import { toReasoningLevel } from "../../kit/reasoning";
 
 interface Loaded {
@@ -17,7 +16,6 @@ interface Loaded {
   quote?: ItemQuote;
   quoteId?: string;
   draftKey: string;
-  choose?: { homeThreadId: string | null };
 }
 
 /** The pane's title bar and BB's new-thread column: centered, below a gap. */
@@ -53,10 +51,6 @@ export function ConversationPage({ subPath }: Pick<PluginNavPanelProps, "subPath
     const ref = route.kind === "quote" ? saved!.item : route.item;
     const { item } = await rpc.call("chat.subject", { pluginId: ref.pluginId, id: ref.id });
     if (!item) throw new Error("That Studio item is archived or gone.");
-    if (route.kind === "choose") {
-      const { thread } = await rpc.call("chat.home", { pluginId: item.pluginId, id: item.id }).catch(() => ({ thread: null }));
-      return { item, draftKey: `studio-chat:${itemKey(item)}:choose`, choose: { homeThreadId: thread?.threadId ?? null } };
-    }
     return {
       item,
       draftKey: saved ? `studio-chat:${itemKey(item)}:quote:${saved.id}` : `studio-chat:${itemKey(item)}`,
@@ -80,18 +74,7 @@ export function ConversationPage({ subPath }: Pick<PluginNavPanelProps, "subPath
       : <p className="text-sm text-muted-foreground">Loading…</p>}
   </Pane>;
 
-  const { item, quote, quoteId, draftKey, choose } = loaded;
-  if (choose && item) return <Pane title="Choose conversation">
-    <ItemChip item={item} />
-    {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
-    <section aria-label={`Choose this ${item.kindLabel.toLowerCase()}'s conversation`} className="studio-chat-picker flex min-h-0 flex-col overflow-hidden rounded-lg border border-border">
-      <ThreadPicker homeThreadId={choose.homeThreadId} onPick={threadId => {
-        setError(null);
-        rpc.call("chat.link", { pluginId: item.pluginId, id: item.id, threadId }).then(() => started(item, threadId), cause => setError(errorMessage(cause)));
-      }} />
-    </section>
-  </Pane>;
-
+  const { item, quote, quoteId, draftKey } = loaded;
   return <Pane title="New thread">
     <ItemComposer item={item} draftKey={draftKey} {...(quote ? { quote } : {})} onStarted={(threadId) => {
       if (quoteId) void quoteDrafts.remove(quoteId).catch(() => {});

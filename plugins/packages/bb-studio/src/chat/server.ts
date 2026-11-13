@@ -149,16 +149,6 @@ export async function registerChat(bb: BbPluginApi) {
       return { threadId: thread.id };
     },
     "chat.home": async (ref) => ({ thread: await home(ref) }),
-    "chat.link": async ({ threadId, ...ref }) => {
-      const title = await liveThread(threadId);
-      if (!title) throw new Error("That thread is archived or gone.");
-      await setLink(ref, threadId);
-      return { thread: { threadId, title, origin: "chosen" as const } };
-    },
-    "chat.unlink": async (ref) => {
-      await bb.storage.kv.set(linkKey(ref), { threadId: null, at: Date.now() } satisfies Link);
-      return { ok: true };
-    },
     "chat.send": async ({ item: ref, quote }) => {
       const thread = await home(ref);
       if (!thread) return { threadId: null };

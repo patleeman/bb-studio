@@ -6,9 +6,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "../../kit/ui/index";
 import { Icon } from "../../kit/ui/index";
@@ -16,9 +13,7 @@ import { pagePath } from "../constants";
 import type { BotView, PageMetaView, rpcContract } from "../contract";
 
 export type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
-export { useProjects } from "../../kit/app/index";
-export type { Project } from "../../kit/app/index";
-import { CopyReferenceMenuItem, LinkedThreadMenuItems, OpenInWindowMenuItem, type Project } from "../../kit/app/index";
+import { CopyReferenceMenuItem, LinkedThreadMenuItems, OpenInWindowMenuItem } from "../../kit/app/index";
 import { toast } from "sonner";
 export type BotsState = { available: boolean; reason: string | null; bots: BotView[] };
 
@@ -37,7 +32,6 @@ export function actorName(key: string, bots: BotView[]): string {
 export function PageMenu({
   page,
   rpc,
-  projects,
   onChanged,
   onDeleted,
   triggerClassName,
@@ -45,7 +39,6 @@ export function PageMenu({
 }: {
   page: PageMetaView;
   rpc: Rpc;
-  projects: Project[];
   onChanged(): void;
   onDeleted?(): void;
   triggerClassName?: string;
@@ -68,7 +61,7 @@ export function PageMenu({
       setPending(false);
     }
   };
-  const update = async (patch: { parentId?: string | null; projectId?: string | null; archived?: boolean }) => {
+  const update = async (patch: { parentId?: string | null; archived?: boolean }) => {
     await mutate(() => rpc.call("pages.update", { id: page.id, ...patch }), onChanged, "Couldn't update the page");
   };
   return (
@@ -94,24 +87,6 @@ export function PageMenu({
             <Icon name="ChevronLeft" className="size-4" /> Move to top level
           </DropdownMenuItem>
         ) : null}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger disabled={pending}>
-            <Icon name="MoveTo" className="size-4" /> Move to project
-            <Icon name="ChevronRight" className="ml-auto size-3.5 text-muted-foreground" />
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="max-h-80 w-52 overflow-auto">
-            <DropdownMenuItem disabled={pending} onSelect={() => void update({ projectId: null, parentId: null })}>
-              Global
-              {!page.projectId ? <Icon name="Check" className="ml-auto size-3.5" /> : null}
-            </DropdownMenuItem>
-            {projects.map((project) => (
-              <DropdownMenuItem key={project.id} disabled={pending} onSelect={() => void update({ projectId: project.id, parentId: null })}>
-                <span className="truncate">{project.name}</span>
-                {project.id === page.projectId ? <Icon name="Check" className="ml-auto size-3.5" /> : null}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
         <DropdownMenuItem disabled={pending} onSelect={() => void update({ archived: !page.archived })}>
           <Icon name={page.archived ? "ArchiveRestore" : "Archive"} className="size-4" /> {page.archived ? "Restore from archive" : "Archive"}
         </DropdownMenuItem>

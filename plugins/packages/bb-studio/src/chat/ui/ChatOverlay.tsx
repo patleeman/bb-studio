@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import type { rpcContract, Viewed } from "../contract";
 import { ref as itemRefSchema } from "../schemas";
 import { itemKey } from "../context";
-import { CHAT_ICON, CONVERSATION_STARTED, chooseThreadPath, itemDraftPath, quoteDraftPath, quoteDrafts } from "./conversation-drafts";
+import { CHAT_ICON, CONVERSATION_STARTED, itemDraftPath, quoteDraftPath, quoteDrafts } from "./conversation-drafts";
 
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
@@ -47,7 +47,7 @@ type HomeCache = Map<string, HomeThread | null>;
 function useHomeThreads(
   rpc: Rpc,
   viewed: Viewed | null,
-  actions: { show(threadId: string): void; choose(ref: ItemChatRef): void; compose(ref: ItemChatRef, quote?: ItemQuote): void },
+  actions: { show(threadId: string): void; compose(ref: ItemChatRef, quote?: ItemQuote): void },
 ): { cache: HomeCache; put(key: string, thread: HomeThread | null): void; load(ref: ItemChatRef): void } {
   const [cache, setCache] = useState<HomeCache>(() => new Map());
   const cacheRef = useRef(cache);
@@ -103,15 +103,6 @@ function useHomeThreads(
         else actionsRef.current.compose(ref);
       },
       start: (ref) => actionsRef.current.compose(ref),
-      choose: (ref) => actionsRef.current.choose(ref),
-      unlink: async (ref) => {
-        try {
-          await rpc.call("chat.unlink", { pluginId: ref.pluginId, id: ref.id });
-          put(itemKey(ref), null);
-        } catch (cause) {
-          toast.error(errorMessage(cause));
-        }
-      },
       send: async (ref, quote) => {
         const { threadId } = await rpc.call("chat.send", { item: { pluginId: ref.pluginId, id: ref.id }, quote });
         if (!threadId) {
@@ -138,8 +129,7 @@ function useHomeThreads(
 
 /**
  * Studio Chat as the item-chat host. It draws nothing of its own: an item's
- * thread, a new conversation about it, or the thread picker opens in a split
- * beside the item.
+ * thread or a new conversation about it opens in a split beside the item.
  */
 export function ChatOverlay() {
   const rpc = useRpc<typeof rpcContract>();
@@ -150,7 +140,6 @@ export function ChatOverlay() {
   const reportError = useCallback((cause: unknown) => toast.error(errorMessage(cause)), []);
   useHomeThreads(rpc, viewed, {
     show: (threadId) => open({ kind: "thread", threadId }, "split"),
-    choose: (ref) => open({ kind: "path", path: chooseThreadPath(ref), title: "Choose conversation", icon: CHAT_ICON }, "split"),
     compose: (ref, quote) => {
       const title = "New conversation";
       if (!quote) return open({ kind: "path", path: itemDraftPath(ref), title, icon: CHAT_ICON }, "split");

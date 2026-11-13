@@ -20,7 +20,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
 vi.mock("../../kit/app/index", () => ({
   openAppPath: vi.fn(), studioPath: vi.fn(),
 }));
-vi.mock("./shared", () => ({ useProjects: () => [] }));
+vi.mock("./shared", () => ({}));
 vi.mock("./PageView", () => ({ PageView: () => <div>Live editor</div> }));
 vi.mock("./MissingPageRecovery", () => ({ MissingPageRecovery: ({ pageId, onRetryPage }: { pageId: string; onRetryPage(): void }) => <div>Recovery for {pageId}<button onClick={onRetryPage}>Retry loading page</button></div> }));
 

@@ -381,8 +381,8 @@ export function ItemHeader({
         {leading}
       </nav>
       {tools ? <div className="flex shrink-0 items-center gap-0.5">
+        {relatedRef ? <StarButton item={relatedRef} /> : null}
         <ItemActions compact={compact}>
-          {relatedRef ? <StarButton item={relatedRef} /> : null}
           {!inWorkspace && relatedRef && chatItem ? (askAbout ? <AskBotButton item={chatItem} itemRef={relatedRef} /> : <NewThreadButton item={chatItem} itemRef={relatedRef} />) : null}
           {splitHere ? <OpenInSplitButton item={splitHere} /> : null}
           {trailing && splitHere && !compact ? <span aria-hidden className="mx-1 h-4 w-px bg-border" /> : null}

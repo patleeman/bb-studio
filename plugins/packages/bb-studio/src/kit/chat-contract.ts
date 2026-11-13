@@ -60,16 +60,6 @@ const chatMethods = defineRpcContract({
     input: ref,
     output: z.object({ thread: homeThread.nullable() }),
   },
-  /** Makes `threadId` the item's home thread. */
-  link: {
-    input: ref.extend({ threadId: z.string().min(1).max(200) }),
-    output: z.object({ thread: homeThread.nullable() }),
-  },
-  /** Leaves the item without a home thread, until one is started or picked. */
-  unlink: {
-    input: ref,
-    output: z.object({ ok: z.boolean() }),
-  },
   /** Sends a quote to the item's home thread; null when it has none. */
   send: {
     input: z.object({ item: ref, quote }),
@@ -83,7 +73,5 @@ export const rpcContract = defineRpcContract({
   "chat.subject": chatMethods.subject,
   "chat.start": chatMethods.start,
   "chat.home": chatMethods.home,
-  "chat.link": chatMethods.link,
-  "chat.unlink": chatMethods.unlink,
   "chat.send": chatMethods.send,
 });

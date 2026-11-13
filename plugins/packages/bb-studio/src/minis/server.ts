@@ -380,9 +380,6 @@ export function registerMinis(
       changed(id);
       return { ok: true };
     },
-    "minis.fromArtifact"({ artifactId }) {
-      return { mini: meta(fromArtifact(artifactId, { by: "user" })) };
-    },
     "minis.duplicate"({ id, withData }) {
       const row = mustGet(id);
       return { mini: meta(duplicate(id, { name: `${displayName(row)} copy`, projectId: row.project_id, withData })) };

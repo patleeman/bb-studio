@@ -1664,11 +1664,11 @@ The compact page header at 390 pixels, with **Item actions** open.
   **Display**. **New → Page** opens a blank page as a Studio tab.
 - **Projects and nesting.** Pages belong to a project or are global, and
   nest to any depth, with a breadcrumb back up. Give a page an emoji icon,
-  move it, archive it, or delete it from its ⋯ menu.
+  move it to the top level, archive it, or delete it from its ⋯ menu.
 - **Threads about a page.** The header's new-thread button opens a composer
   beside the page with the page as context; sending starts an agent thread in
-  the page's project. The page's ⋯ menu opens its linked thread, links
-  another, or unlinks it (see Item threads).
+  the page's project. The page's ⋯ menu has **Open conversation** for its
+  linked thread (see Item threads).
 - **Version history.** Pages saves a version before an agent's first
   edit in a while. You can save one yourself and restore any version, and the
   current page is saved before a restore.
@@ -1884,7 +1884,7 @@ with `BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=artifacts-compact-header`.
   play with seeking. Markdown renders as a document. Code and text use BB's
   source viewer (first 2 MB). Other files offer a download. The header has an
   editable title with a **Saved** badge, the artifact's chat, Copy, Download, and a menu with Open
-  source thread, Save as page, Versions, Move to and Delete. Select text or
+  conversation, Save as page, Versions and Delete. Select text or
   drag over an image to **Send to thread**.
 - **Live HTML.** An HTML artifact's page gets `window.playground`, the same
   API as BB playgrounds: shared state that persists per artifact and syncs to
@@ -2013,9 +2013,9 @@ secrets aren't backed up, so a restored app asks again.
 
 #### Elsewhere in Studio
 
-- **Artifacts:** an HTML artifact's menu has **Convert to mini app**: its page
-  becomes the app's `index.html` and its live state carries over. Agents do
-  the same with `minis_create` and `fromArtifactId`.
+- **Artifacts:** agents turn a live HTML artifact into a mini app with
+  `minis_create` and `fromArtifactId`: its page becomes the app's
+  `index.html` and its live state carries over.
 
 #### Agents
 
@@ -2083,7 +2083,7 @@ open. Recapture with
 - **Editor** (`/plugins/studio/studio/drawings/<id>`). Excalidraw loads the
   first time a whiteboard opens full size, not with Studio. It autosaves as
   you work. The header has an editable name, sync status, the item's chat,
-  copy image, and a menu with **Download PNG**, Move to and Delete. **Back**
+  copy image, and a menu with **Download PNG** and Delete. **Back**
   returns to the whiteboard's page. The editor follows BB's active theme. In
   a thread, **Attach** adds the whiteboard to the conversation as an image.
 - **Card in the agent's reply.** When an agent adds or changes a whiteboard,
@@ -4277,8 +4277,8 @@ The hub offers `duplicate`, `setTemplate`, `instantiateTemplate`, `templates`, `
 
 ## Item threads
 
-An item has no thread of its own until you start or link one. Studio owns the
-new-thread button, the linked thread and quotes for every kind.
+An item has no thread of its own until one starts about it or makes it. Studio
+owns the new-thread button, the linked thread and quotes for every kind.
 
 - **New thread** (the header's icon) opens a composer in the workbench beside
   the item, with the item as its context. Nothing is created until you send;
@@ -4286,8 +4286,10 @@ new-thread button, the linked thread and quotes for every kind.
   first message, and that thread is linked to the item. Beside a Studio page
   this needs a BB where the page has a workbench (the BB Studio fork); on
   stable BB the composer opens in a split, as before.
-- The item's **⋯** menu has **Open “<thread>”** for a linked thread,
-  **Link a thread…** (a thread picker) and **Unlink thread**.
+- The item's **⋯** menu has **Open conversation** for a linked thread: the
+  one started about the item, else the one that made it.
+- The header's **Star** stays visible when the header is narrow; the other
+  tools fold into its **⋯**.
 - A quote goes to the linked thread, or opens the composer with the quote
   when there is none.
 
