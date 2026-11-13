@@ -4,7 +4,8 @@
 // and Waiting on others (rules in todos-model.ts), then Scheduled (the Bot's
 // check-ins, reminders, watchers and runners, src/loops/scheduled.ts), then
 // Done, folded. A group shows 8 rows, then "N more", as the Library's do. The
-// Bot chat's pending questions and unread replies lead Today. Search and the
+// Bot chat's pending questions lead Today; a reply not read yet is the
+// chat's unread state, not a todo. Search and the
 // area pills filter it; New hands a typed line to the Bot to fill in. A row
 // opens the todo as a tab in the workbench beside the page (TodoTab.tsx).
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
@@ -31,7 +32,7 @@ export function TodosPage({ view }: { view: BotView }) {
   const scheduledList = useLive("loops.scheduled", {}, { pollMs: 60_000 });
   const automationList = useAutomations(bot.id);
   const editor = useAutomationEditor(bot.id, automationList.data?.automations ?? [], () => { automationList.refresh(); scheduledList.refresh(); });
-  const { pending, unread } = useNeedsYou(people.botId, people.botThreadId, list.data?.needsYouNow);
+  const { pending } = useNeedsYou(people.botThreadId, list.data?.needsYouNow);
   const [query, setQuery] = useState("");
   const [area, setArea] = useState(ALL_AREAS);
   const [adding, setAdding] = useState(false);
@@ -48,7 +49,7 @@ export function TodosPage({ view }: { view: BotView }) {
     .sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0)), [data?.done, area, query]);
   const showChat = area === ALL_AREAS && !query.trim();
   const scheduled = useMemo(() => (scheduledList.data?.items ?? []).filter((item) => item.source === "automation" && item.botId === bot.id && (!query.trim() || item.title.toLowerCase().includes(query.trim().toLowerCase())) && area === ALL_AREAS), [scheduledList.data, bot.id, query, area]);
-  const chatRows = showChat ? pending.length + (unread ? 1 : 0) : 0;
+  const chatRows = showChat ? pending.length : 0;
   const nameOf = (loop: Loop) => ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owners.get(loop.owner));
   const total = TODO_GROUPS.reduce((sum, group) => sum + groups[group.id].length, 0) + chatRows;
   const add = (text: string) => call("loops.add", { text }).then(() => list.refresh());
@@ -83,7 +84,6 @@ export function TodosPage({ view }: { view: BotView }) {
                 <BotPageRow key={question.id} testId="todo-chat" icon="MessageQuestion" title={question.text ?? question.reason} titleText={question.text ?? question.reason}
                   meta={shortWhen(question.createdAt, now)} onOpen={botChat?.onOpen} disabled={!botChat} />
               ))}
-              {unread ? <BotPageRow testId="todo-unread" icon="MessageSquare" title={unread === 1 ? `A reply from ${people.botName}` : `${unread} replies from ${people.botName}`} meta="Unread" onOpen={botChat?.onOpen} disabled={!botChat} /> : null}
             </> : null}
             {shown.map(row)}
             {moreLine(group.id, group.title, more)}

@@ -254,15 +254,17 @@ it("New hands a typed line to the Bot", async () => {
   expect(container.querySelector("[data-testid=todo-add]")).toBeNull();
 });
 
-it("leads Today with the Bot chat's pending questions (a tracked one once) and unread replies, which open the chat", async () => {
+it("leads Today with the Bot chat's pending questions (a tracked one once), which open the chat; an unread reply is no todo", async () => {
   state.interactions = [{ id: "int_1", status: "pending", createdAt: NOW, payload: { kind: "approval" } }, { id: "int_2", status: "pending", createdAt: NOW, payload: { kind: "user_question", questions: [{ question: "Which day works for the call?" }] } }, { id: "int_3", status: "resolved" }];
   (state.groups as typeof empty).needsYouNow.push(loop("loop_q", "Approve the invoice", { source: { kind: "interaction", ref: "int_1" } }));
   state.attention = { reason: "1", count: 1, since: NOW, unread: 1 };
   await render();
   await act(async () => { await Promise.resolve(); });
   const today = group("Today")!;
-  expect(titles(today).slice(0, 2)).toEqual(["Which day works for the call?", "A reply from Chief of Staff"]);
-  expect(today.querySelector("[data-testid=bot-page-group-count]")?.textContent).toBe("6");
+  expect(titles(today).slice(0, 2)).toEqual(["Which day works for the call?", "Pay the Con Edison bill"]);
+  expect(today.querySelector("[data-testid=bot-page-group-count]")?.textContent).toBe("5");
+  expect(container.textContent).not.toContain("A reply from");
+  expect(container.textContent).not.toContain("Unread");
   await act(async () => today.querySelector<HTMLButtonElement>("[data-testid=todo-chat] [data-testid=bot-page-row-open]")!.click());
   expect(state.openLink).toHaveBeenLastCalledWith("bb://conversation/thr_bot", { source: "botPage", title: "Chief of Staff", modifiers: { meta: false, ctrl: false, shift: false } });
 });

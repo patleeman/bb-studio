@@ -194,10 +194,10 @@ The Todos page (`/plugins/studio/studio/bot/<botId>/loops`) is on the Bot
 pages' template: one line per todo, its title on the left and one small due
 date or "when" on the right ("Overdue", "Due Fri", "When you get home",
 "Since Sun", or who has it), in **Today** (out now, overdue or due today,
-led by the Bot chat's pending questions and unread replies), **This week**
-(the next six days), **Later** (past that, or no date) and **Waiting on
-others** (a waiting todo, or one a lead or the Bot has), then **Done**,
-folded. Area is a filter pill, never on a row. A row opens the todo as a tab in
+led by the Bot chat's pending questions; a reply not read yet is no todo),
+**This week** (the next six days), **Later** (past that, or no date) and
+**Waiting on others** (a waiting todo, or one a lead or the Bot has), then
+**Scheduled** and **Done**, folded. A group shows 8 rows, then "N more". Area is a filter pill, never on a row. A row opens the todo as a tab in
 the workbench beside the page (`bb://todo/loop_…`): the description, due
 date, when, area, owner and source (a plan's
 link), with the actions that fit it (Done, an option, Got it, Surface now,

@@ -49,7 +49,7 @@ export function LoopsPane({ threadId }: ThreadTabProps) {
 function Board({ threadId }: { threadId: string }) {
   const navigate = useBbNavigate();
   const [showAllDone, setShowAllDone] = useState(false);
-  const { people, area, setArea, owner, setOwner, ownerLabel, list, groups, pending, unread, open, chat, needs, nextAt, row, add, filtered } = useLoopsBoard();
+  const { people, area, setArea, owner, setOwner, ownerLabel, list, groups, pending, open, chat, needs, nextAt, row, add, filtered } = useLoopsBoard();
   // Todos closed from their circle stay where they were, done with Undo,
   // until the pane closes; the refetch has moved them to Done by then.
   const [closed, setClosed] = useState<ReadonlyMap<string, Closed>>(new Map());
@@ -113,10 +113,6 @@ function Board({ threadId }: { threadId: string }) {
                 <PaneRow key={question.id} testId="loop-pending" icon="MessageQuestion" title={question.reason}
                   meta={<span>{where} · {shortWhen(question.createdAt)}</span>} trailing={openChat} />
               ))}
-              {unread ? (
-                <PaneRow testId="loop-unread" icon="MessageSquare" title={unread === 1 ? `A reply from ${people.botName}` : `${unread} replies from ${people.botName}`}
-                  meta={<span>{where} · not read yet</span>} trailing={openChat} />
-              ) : null}
               {lines(groups.needsYouNow, "needs")}
             </PaneSection>
           ) : null}

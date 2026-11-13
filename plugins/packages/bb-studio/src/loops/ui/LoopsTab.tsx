@@ -39,15 +39,14 @@ export function usePendingQuestions(threadId: string | null): Pending[] {
 }
 
 /**
- * What needs Patrick now, as the Bot row's badge counts it: released todos,
- * the Bot chat's pending questions (a tracked question once, as its todo)
- * and the Bot's replies he hasn't read.
+ * What needs Patrick now on the Todos page and pane: released todos and the
+ * Bot chat's pending questions (a tracked question once, as its todo). A
+ * reply he hasn't read is the chat's unread state, not a todo.
  */
-export function useNeedsYou(botId: string | null, botThreadId: string | null, needsYouNow: readonly Loop[] | undefined) {
+export function useNeedsYou(botThreadId: string | null, needsYouNow: readonly Loop[] | undefined) {
   const pending = usePendingQuestions(botThreadId)
     .filter((question) => !(needsYouNow ?? []).some((loop) => loop.source?.kind === "interaction" && loop.source.ref === question.id));
-  const unread = useLive("bot_attention", botId ? { botId } : {}, { enabled: !!botThreadId, pollMs: 30_000 }).data?.attention?.unread ?? 0;
-  return { pending, unread, count: (needsYouNow?.length ?? 0) + pending.length + unread };
+  return { pending, count: (needsYouNow?.length ?? 0) + pending.length };
 }
 
 /**
@@ -62,11 +61,11 @@ export function useLoopsBoard() {
   const filters = { ...(area ? { area } : {}), ...(owner ? { owner } : {}) };
   const list = useLive("loops.list", filters, { pollMs: 60_000 });
   const places = usePlaceNames(true);
-  const { pending, unread } = useNeedsYou(people.botId, people.botThreadId, list.data?.needsYouNow);
+  const { pending } = useNeedsYou(people.botThreadId, list.data?.needsYouNow);
   const showPending = !owner || owner === "patrick";
   const groups = list.data;
   const open = groups ? groups.needsYouNow.length + groups.comingUp.length + groups.agentsOnIt.length + groups.waitingOnOthers.length : 0;
-  const chat = showPending ? pending.length + unread : 0;
+  const chat = showPending ? pending.length : 0;
   const needs = (groups?.needsYouNow.length ?? 0) + chat;
   const held = new Map((groups?.held ?? []).map((each) => [each.id, each.reason] as const));
   const owners = new Map((groups?.owners ?? []).map((each) => [each.owner, each] as const));
@@ -74,7 +73,7 @@ export function useLoopsBoard() {
   const ownerLabel = owner === null ? "Anyone" : owner === "patrick" ? "Me" : ownerName(owner, { bot: people.botName, leads: people.leads }, owners.get(owner));
   const row: Omit<RowProps, "loop"> = { people, places, refresh: list.refresh, held, owners };
   const add = (text: string) => call("loops.add", { text }).then(() => list.refresh());
-  return { people, area, setArea, owner, setOwner, ownerLabel, list, groups, pending: showPending ? pending : [], unread: showPending ? unread : 0, open, chat, needs, nextAt, row, add, filtered: !!(area || owner) };
+  return { people, area, setArea, owner, setOwner, ownerLabel, list, groups, pending: showPending ? pending : [], open, chat, needs, nextAt, row, add, filtered: !!(area || owner) };
 }
 
 /** The Owner filter's menu: Anyone, Me, the Bot, then each project's lead. */
