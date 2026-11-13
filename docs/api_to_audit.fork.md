@@ -1246,6 +1246,11 @@ code block, the new-thread home, a plugin page and a popover in the real
 `AppLayout`. Values go through a `CSS.supports` check. Studio's theme engine is the caller: its
 WebGL scene is the component and its theme's colors are the appearance.
 
+In the desktop app the last applied appearance is saved and painted on the
+next launch before bb's scripts run (the window background too), then
+replaced by the live one in a single layout effect; see `launch-theme` in
+STUDIO_FORK.md. A plugin does nothing for this.
+
 **Core callers.** bb's own light and dark goes through the same path: the
 override sits inside `getPreferredTheme` in `hooks/useTheme.ts`, so the
 `.dark` class, `usePreferredTheme` (code, diff and terminal themes) and
