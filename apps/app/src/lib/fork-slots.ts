@@ -8,6 +8,7 @@ import type {
   ExperimentalMessageActionRegistration,
   ExperimentalModelLoadNoticeRegistration,
   ExperimentalFirstRunRegistration,
+  ExperimentalNewConversationRegistration,
   ExperimentalModelPickerGateRegistration,
   ExperimentalHideHostEntriesRegistration,
   ExperimentalNewTabItemsRegistration,
@@ -50,6 +51,9 @@ export interface PluginModelLoadNoticeSlot
 export interface PluginFirstRunSlot
   extends ExperimentalFirstRunRegistration, ForkSlotBase {}
 
+export interface PluginNewConversationSlot
+  extends ExperimentalNewConversationRegistration, ForkSlotBase {}
+
 export interface PluginModelPickerGateSlot
   extends ExperimentalModelPickerGateRegistration, ForkSlotBase {}
 
@@ -86,6 +90,7 @@ export interface ForkRegistrationSet {
   threadBanners?: readonly ExperimentalThreadBannerRegistration[];
   modelLoadNotices?: readonly ExperimentalModelLoadNoticeRegistration[];
   firstRuns?: readonly ExperimentalFirstRunRegistration[];
+  newConversations?: readonly ExperimentalNewConversationRegistration[];
   modelPickerGates?: readonly ExperimentalModelPickerGateRegistration[];
   hiddenHostEntries?: readonly ExperimentalHideHostEntriesRegistration[];
   threadHeaders?: readonly ExperimentalThreadHeaderRegistration[];
@@ -107,6 +112,7 @@ export interface ForkSlotSnapshot {
   threadBanners: readonly PluginThreadBannerSlot[];
   modelLoadNotices: readonly PluginModelLoadNoticeSlot[];
   firstRuns: readonly PluginFirstRunSlot[];
+  newConversations: readonly PluginNewConversationSlot[];
   modelPickerGates: readonly PluginModelPickerGateSlot[];
   hiddenHostEntries: readonly PluginHiddenHostEntriesSlot[];
   threadHeaders: readonly PluginThreadHeaderSlot[];
@@ -128,6 +134,7 @@ export const EMPTY_FORK_SLOTS: ForkSlotSnapshot = {
   threadBanners: [],
   modelLoadNotices: [],
   firstRuns: [],
+  newConversations: [],
   modelPickerGates: [],
   hiddenHostEntries: [],
   threadHeaders: [],
@@ -150,6 +157,7 @@ export const FORK_SLOT_KINDS = [
   "threadBanners",
   "modelLoadNotices",
   "firstRuns",
+  "newConversations",
   "modelPickerGates",
   "hiddenHostEntries",
   "threadHeaders",
@@ -177,6 +185,7 @@ export function stampForkSlots(
     threadBanners: stamp(set.threadBanners),
     modelLoadNotices: stamp(set.modelLoadNotices),
     firstRuns: stamp(set.firstRuns),
+    newConversations: stamp(set.newConversations),
     modelPickerGates: stamp(set.modelPickerGates),
     hiddenHostEntries: stamp(set.hiddenHostEntries),
     threadHeaders: stamp(set.threadHeaders),
