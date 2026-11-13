@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useMemo } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import type {
   ExperimentalAppAppearance,
@@ -12,6 +12,12 @@ import {
   type ForkThemeMode,
 } from "@/lib/fork-theme-mode";
 import { usePluginSlots } from "@/lib/plugin-slots";
+import {
+  clearLaunchAppearance,
+  hasLaunchAppearance,
+  saveLaunchAppearance,
+  snapshotLaunchAppearance,
+} from "@/lib/fork-launch-appearance";
 import { FORK_TITLE_ROWS_ATTRIBUTE } from "./ForkTitleHost";
 
 export const FORK_BACKDROP_ATTRIBUTE = "data-fork-backdrop";
@@ -38,6 +44,13 @@ const SURFACE_FIELDS = [
 ] as const;
 
 const NO_BACKDROPS: readonly PluginAppBackdropSlot[] = [];
+const LAUNCH_ATTRIBUTES = [
+  FORK_BACKDROP_ATTRIBUTE,
+  FORK_SURFACE_EDGE_ATTRIBUTE,
+  FORK_CARDS_ATTRIBUTE,
+  FORK_TITLE_ROWS_ATTRIBUTE,
+] as const;
+const LAUNCH_APPEARANCE_WAIT_MS = 60_000;
 const TOKEN_NAME = /^--[A-Za-z0-9_-]+$/u;
 const MAX_TOKENS = 500;
 const MAX_CARDS_GAP = 24;
@@ -131,15 +144,36 @@ function appearanceKey(appearance: ForkAppearance): string {
   ]);
 }
 
+function appearanceProperties(
+  appearance: ForkAppearance,
+): Map<string, string> {
+  const properties = new Map(appearance.properties);
+  if (appearance.cards !== null) {
+    properties.set(FORK_CARDS_GAP_PROPERTY, `${appearance.cards.gap}px`);
+    properties.set(FORK_CARDS_RADIUS_PROPERTY, `${appearance.cards.radius}px`);
+  }
+  return properties;
+}
+
+function useLaunchAppearanceTimeout() {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!hasLaunchAppearance()) return;
+      clearLaunchAppearance();
+      setForkThemeModeOverride(null);
+      saveLaunchAppearance(null);
+    }, LAUNCH_APPEARANCE_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+}
+
 export function applyAppearance(
   root: HTMLElement,
   appearance: ForkAppearance,
 ): () => void {
   const previous = new Map<string, [string, string]>();
-  const properties = new Map(appearance.properties);
+  const properties = appearanceProperties(appearance);
   if (appearance.cards !== null) {
-    properties.set(FORK_CARDS_GAP_PROPERTY, `${appearance.cards.gap}px`);
-    properties.set(FORK_CARDS_RADIUS_PROPERTY, `${appearance.cards.radius}px`);
     root.setAttribute(FORK_CARDS_ATTRIBUTE, "");
     if (appearance.cards.titleRow) {
       root.setAttribute(FORK_TITLE_ROWS_ATTRIBUTE, "");
@@ -187,11 +221,30 @@ const AppearanceProbe = memo(function AppearanceProbe({
   const raw = useAppearance();
   const active = raw !== null && raw !== undefined;
   const key = appearanceKey(cleanAppearance(raw));
+  useLayoutEffect(() => {
+    if (active) clearLaunchAppearance();
+  }, [active]);
   useBackdropAttribute(slot, active);
-  useLayoutEffect(
-    () => applyAppearance(document.documentElement, readAppearanceKey(key)),
-    [key],
-  );
+  useLayoutEffect(() => {
+    if (!active && hasLaunchAppearance()) return;
+    return applyAppearance(document.documentElement, readAppearanceKey(key));
+  }, [key, active]);
+  useEffect(() => {
+    if (!active) return;
+    const appearance = readAppearanceKey(key);
+    const frame = requestAnimationFrame(() => {
+      const root = document.documentElement;
+      saveLaunchAppearance(
+        snapshotLaunchAppearance(
+          root,
+          appearance.mode,
+          appearanceProperties(appearance),
+          LAUNCH_ATTRIBUTES,
+        ),
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [key, active]);
   return null;
 });
 
@@ -244,6 +297,7 @@ function firstBackdrop(
 export function ForkAppBackdropHost() {
   const backdrops = usePluginSlots().appBackdrops ?? NO_BACKDROPS;
   const slot = useMemo(() => firstBackdrop(backdrops), [backdrops]);
+  useLaunchAppearanceTimeout();
   if (slot === null || isBareWindow()) return null;
   return (
     <PluginSlotMount
