@@ -1,3 +1,4 @@
+import { noteTitleOutcome } from "./title-retry.fork.js";
 import { getEnvironment, getThread } from "@bb/db";
 import type { PromptInput } from "@bb/domain";
 import type { LoggedPendingInteractionWorkSessionDeps } from "../../types.js";
@@ -16,6 +17,7 @@ async function inferThreadTitle(
   args: { input: PromptInput[]; threadId: string },
 ): Promise<void> {
   const outcome = await generateThreadMetadataWithOutcome(deps, args);
+  noteTitleOutcome(deps, args, outcome);
   const title = outcome.metadata?.title;
   if (!title || !applyGeneratedThreadTitle(deps, { ...args, title })) return;
   const thread = getThread(deps.db, args.threadId);
