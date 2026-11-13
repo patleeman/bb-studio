@@ -12,6 +12,7 @@ vi.mock("../../ui/live", () => ({ useCall: () => async () => ({}), useLive: () =
 const { AccountsPanel, needsSignIn, signInLabel } = await import("./AccountsPanel");
 const { WarningList, actionLabel, freshWarnings, warningsWindowOptions } = await import("./Warnings");
 const { pooledFamily, signedOutPoolAccount } = await import("./notices");
+const { AccountsNotice, AccountsNoticePill, attentionWarnings, noticeText } = await import("./AccountsNotice");
 const { accountNeeds } = await import("../../auth/ui/needs");
 const { openAccounts, setAccountsFooter, useSigningIn } = await import("./store");
 const { closeRelogin, useReloginTarget } = await import("../../auth/ui/relogin-store");
@@ -56,10 +57,9 @@ afterEach(() => { if (root) act(() => root?.unmount()); root = null; document.bo
 const api = { start: vi.fn(async () => { throw new Error("no"); }), poll: vi.fn(), complete: vi.fn(), cancel: vi.fn(async () => ({})) };
 
 describe("Accounts panel", () => {
-  it("shows each source, state, quota with reset times and pinned threads, and labels the bb sign-in", async () => {
+  it("shows each source, state and quota with reset times, no thread list and no scroller of its own, and labels the bb sign-in", async () => {
     const onSignIn = vi.fn();
-    const onOpenThread = vi.fn();
-    await render(<AccountsPanel status={STATUS} error={null} signingIn={null} onSignIn={onSignIn} onSignInDone={() => {}} onOpenThread={onOpenThread} onRefresh={() => {}} onClose={() => {}} api={api} now={NOW} />);
+    await render(<AccountsPanel status={STATUS} error={null} signingIn={null} onSignIn={onSignIn} onSignInDone={() => {}} onRefresh={() => {}} onClose={() => {}} api={api} now={NOW} />);
     const root = container();
     expect([...root.querySelectorAll("[data-accounts-source]")].map((node) => node.getAttribute("data-accounts-source"))).toEqual(["studio", "bb", "local"]);
     const studio = root.querySelector('[data-account="studio:a"]')!;
@@ -69,8 +69,8 @@ describe("Accounts panel", () => {
     expect(studio.textContent).toContain("rejected");
     expect(studio.textContent).toMatch(/resets Nov 16/);
     expect(studio.textContent).toContain("Refresh refused");
-    await act(async () => { (studio.querySelector("li button") as HTMLButtonElement).click(); });
-    expect(onOpenThread).toHaveBeenCalledWith("thr_1");
+    expect(studio.textContent).not.toContain("Fix the sync");
+    expect(root.querySelector('[data-testid="accounts"]')?.className).not.toMatch(/overflow|max-h/);
     await act(async () => { (studio.querySelector('[data-testid="account-sign-in"]') as HTMLButtonElement).click(); });
     expect(onSignIn).toHaveBeenCalledWith(expect.objectContaining({ key: "studio:a" }));
     expect(root.querySelector('[data-account="bb:c"] [data-testid="account-sign-in"]')?.textContent).toBe("Sign in to bb");
@@ -79,7 +79,7 @@ describe("Accounts panel", () => {
   });
 
   it("runs the sign-in inline in the account's row", async () => {
-    await render(<AccountsPanel status={STATUS} error={null} signingIn="studio:a" onSignIn={() => {}} onSignInDone={() => {}} onOpenThread={() => {}} onRefresh={() => {}} onClose={() => {}} api={api} now={NOW} />);
+    await render(<AccountsPanel status={STATUS} error={null} signingIn="studio:a" onSignIn={() => {}} onSignInDone={() => {}} onRefresh={() => {}} onClose={() => {}} api={api} now={NOW} />);
     await act(async () => { await Promise.resolve(); });
     expect(api.start).toHaveBeenCalledWith("pool:a");
     expect(container().querySelector('[data-account="studio:a"] [data-testid="relogin"]')).not.toBeNull();
@@ -135,6 +135,39 @@ describe("warnings", () => {
     expect(run).toHaveBeenCalledOnce();
     expect(dismiss).toHaveBeenCalledOnce();
     expect(open).toHaveBeenCalledOnce();
+  });
+});
+
+describe("footer notice", () => {
+  const codex = account({ key: "local:codex", provider: "codex", name: "Codex", state: "signed_out" });
+  const signedOut = warning({ id: "local:codex:signed_out", accountKey: "local:codex", source: "local", title: "Codex signed out" });
+  const full = warning({ id: "studio:a:window:secondary:rejected", kind: "window", title: "Claude 7d at 100%", action: "switch_model" });
+  const high = warning({ id: "studio:a:window:primary:high", kind: "window", title: "Claude 5h at 92%", action: "use_other" });
+
+  it("says nothing while every account works or is only close to a limit", () => {
+    expect(noticeText({ accounts: STATUS.accounts, warnings: [] })).toBeNull();
+    expect(noticeText({ accounts: STATUS.accounts, warnings: [high] })).toBeNull();
+    expect(noticeText(null)).toBeNull();
+  });
+
+  it("names a provider that needs sign-in, an exhausted quota, and how many more", () => {
+    const accounts = [...STATUS.accounts, codex];
+    expect(noticeText({ accounts, warnings: [signedOut] })).toBe("Codex needs sign-in");
+    expect(noticeText({ accounts, warnings: [full] })).toBe("Claude 7d at 100%");
+    expect(noticeText({ accounts, warnings: [high, signedOut, full] })).toBe("Codex needs sign-in · +1");
+    expect(attentionWarnings({ warnings: [high, full] }).map((each) => each.id)).toEqual([full.id]);
+    expect(noticeText({ accounts, warnings: [warning({ id: "providers:none", accountKey: "providers:none", title: "No provider signed in", source: "local" })] })).toBe("No provider signed in");
+  });
+
+  it("opens Accounts from the pill, and draws nothing outside the footer", async () => {
+    const onOpen = vi.fn();
+    await render(<AccountsNoticePill text="Codex needs sign-in" severe onOpen={onOpen} />);
+    const pill = container().querySelector('[data-testid="accounts-notice"]') as HTMLButtonElement;
+    expect(pill.textContent).toBe("Codex needs sign-in");
+    await act(async () => { pill.click(); });
+    expect(onOpen).toHaveBeenCalledOnce();
+    await render(<AccountsNotice activeThreadId={null} activeProjectId={null} isCompactViewport={false} onNavigate={() => {}} />);
+    expect(container().childElementCount).toBe(0);
   });
 });
 

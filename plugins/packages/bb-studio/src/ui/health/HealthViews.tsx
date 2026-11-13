@@ -91,7 +91,7 @@ export function HealthFooter({ dismiss }: { dismiss(): void }) {
   const hidden = (summary?.problems.length ?? 0) - visible.length;
   const openSetup = () => { dismiss(); openAppPath(studioPath(SETUP_SUBPATH)); };
   return (
-    <div className="flex max-h-[60vh] w-full flex-col gap-2 overflow-y-auto p-2">
+    <div className="flex w-full flex-col gap-2 p-2">
       <div className="flex items-center gap-2 px-0.5">
         <Icon name={visible.length ? "AlertTriangle" : "CircleCheck"} className="size-4 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 text-sm font-medium text-foreground">

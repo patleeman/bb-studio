@@ -126,7 +126,40 @@ export function poolAccountView(summary: PoolSummary, source: Exclude<AccountSou
 
 const SIGN_IN_STATES = new Set(["unauthenticated", "expired"]);
 
-export function localAccountViews(states: readonly ProviderState[], signedOut: ReadonlySet<string>, family: (providerId: string) => string, offerSignIn = false): AccountView[] {
+export interface LocalUsageWindow {
+  label: string;
+  usedPercent: number;
+  resetsAt: string | null;
+}
+
+export type LocalUsage = Readonly<Record<string, { status: string; windows?: readonly LocalUsageWindow[] }>>;
+
+export function localWindowLabel(label: string): string {
+  const hours = /^(\d+) hour window$/i.exec(label.trim());
+  if (!hours) return label;
+  const count = Number(hours[1]);
+  return count % 24 === 0 ? `${count / 24}d` : `${count}h`;
+}
+
+export function localUsageWindows(usage: LocalUsage): Record<string, QuotaWindow[]> {
+  const out: Record<string, QuotaWindow[]> = {};
+  for (const [providerId, entry] of Object.entries(usage)) {
+    if (entry.status !== "ok" || !entry.windows?.length) continue;
+    out[providerId] = entry.windows.map((window) => {
+      const resetAt = window.resetsAt ? Date.parse(window.resetsAt) : NaN;
+      return {
+        id: window.label,
+        label: localWindowLabel(window.label),
+        percent: Math.round(window.usedPercent),
+        resetAt: Number.isFinite(resetAt) ? resetAt : null,
+        rejected: window.usedPercent >= 100,
+      };
+    });
+  }
+  return out;
+}
+
+export function localAccountViews(states: readonly ProviderState[], signedOut: ReadonlySet<string>, family: (providerId: string) => string, offerSignIn = false, usage: Readonly<Record<string, QuotaWindow[]>> = {}): AccountView[] {
   const offered = (state: ProviderState) => offerSignIn && !!state.loginCommand && SIGN_IN_STATES.has(state.status);
   return states.filter((state) => state.status === "ready" || signedOut.has(state.providerId) || offered(state)).map((state) => {
     const proxied = state.status === "ready" && state.planLabel === "Proxied";
@@ -140,7 +173,7 @@ export function localAccountViews(states: readonly ProviderState[], signedOut: R
       label: proxied ? "Account Pooler" : [state.accountEmail, state.planLabel].filter(Boolean).join(" · ") || null,
       state: out || state.status !== "ready" ? "signed_out" as const : "ready" as const,
       message: null,
-      windows: [],
+      windows: proxied || out ? [] : [...(usage[state.providerId] ?? [])],
       models: [],
       pinned: [],
       signIn: state.loginCommand ? `provider:${state.providerId}` : null,

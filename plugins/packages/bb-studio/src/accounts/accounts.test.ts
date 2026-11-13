@@ -11,7 +11,7 @@ import { accountsCli } from "./cli";
 import { LiveBbPool, liveBbUrl, loopbackUrl } from "./bb-source";
 import type { AccountView } from "./contract";
 import { readPins, readPoolSignals } from "./local-data";
-import { localAccountViews, modelWindows, poolAccountView, poolState, quotaWindows, type PoolSummary } from "./pool-view";
+import { localAccountViews, localUsageWindows, localWindowLabel, modelWindows, poolAccountView, poolState, quotaWindows, type PoolSummary } from "./pool-view";
 import { createLiveBbPool, registerAccounts } from "./register";
 import { AccountsService, WarningStore, type AccountsDeps } from "./service";
 import { computeWarnings, NO_PROVIDER_WARNING } from "./warnings";
@@ -94,6 +94,29 @@ describe("status mapping", () => {
       ["local:claude-code", "ready", "Account Pooler", "provider:claude-code"],
       ["local:codex", "signed_out", "me@example.test", "provider:codex"],
     ]);
+  });
+
+  it("shows a local login's own usage windows, not a pooled one's, and a full window as rejected", () => {
+    const usage = localUsageWindows({
+      codex: { status: "ok", windows: [{ label: "5 hour window", usedPercent: 41.6, resetsAt: "2026-11-12T20:00:00.000Z" }, { label: "168 hour window", usedPercent: 100, resetsAt: null }] },
+      "claude-code": { status: "ok", windows: [{ label: "5 hour window", usedPercent: 10, resetsAt: null }] },
+      gemini: { status: "unauthenticated" },
+    });
+    expect(usage.codex).toEqual([
+      { id: "5 hour window", label: "5h", percent: 42, resetAt: Date.parse("2026-11-12T20:00:00.000Z"), rejected: false },
+      { id: "168 hour window", label: "7d", percent: 100, resetAt: null, rejected: true },
+    ]);
+    expect(usage.gemini).toBeUndefined();
+    expect(localWindowLabel("Tokens this month")).toBe("Tokens this month");
+    const views = localAccountViews([
+      { providerId: "claude-code", displayName: "Claude Code", status: "ready", planLabel: "Proxied", accountEmail: null, loginCommand: "claude auth login" },
+      { providerId: "codex", displayName: "Codex", status: "ready", planLabel: "Pro", accountEmail: null, loginCommand: "codex login --device-auth" },
+    ], new Set(), (id) => (id === "claude-code" ? "claude" : id), false, usage);
+    expect(views.map((view) => [view.key, view.windows.map((window) => window.label)])).toEqual([
+      ["local:claude-code", []],
+      ["local:codex", ["5h", "7d"]],
+    ]);
+    expect(computeWarnings(views, NOW, "UTC").map((warning) => warning.id)).toEqual(["local:codex:window:168 hour window:rejected"]);
   });
 
   it("offers every local login that can sign in while nothing is connected", () => {

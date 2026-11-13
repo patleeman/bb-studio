@@ -7,7 +7,7 @@ import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { LiveBbPool, liveBbUrl } from "./bb-source";
 import { ACCOUNTS_CHANNEL, accountsContract } from "./contract";
 import { isMirrored, readPins, readPoolSignals, sourceDataDir } from "./local-data";
-import { poolStatusSchema } from "./pool-view";
+import { localUsageWindows, poolStatusSchema, type LocalUsage } from "./pool-view";
 import { AccountsService, WarningStore } from "./service";
 
 export interface AccountsRuntime {
@@ -37,6 +37,11 @@ export function registerAccounts(bb: BbPluginApi, db: Database.Database, auth: A
       return providers.map((state) => ({ providerId: state.providerId, displayName: state.displayName, status: state.status, planLabel: state.planLabel, accountEmail: state.accountEmail, loginCommand: state.loginCommand ?? null }));
     },
     auth: () => auth.status(),
+    usage: async () => {
+      const { primaryHostId } = await bb.sdk.system.config();
+      const usage = await bb.sdk.system.usageLimits({ ...(primaryHostId ? { hostId: primaryHostId } : {}), signal: AbortSignal.timeout(15_000) });
+      return localUsageWindows(usage as LocalUsage);
+    },
     reorder: async (provider, accountIds) => {
       await bb.sdk.plugins.callRpc({ pluginId: POOL_PLUGIN_ID, method: "account.reorder", input: { provider, accountIds }, outputSchema: z.null() });
     },

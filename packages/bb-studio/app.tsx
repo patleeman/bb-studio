@@ -27,6 +27,8 @@ import { NewMenuBridge } from "./src/ui/new-menu";
 import { BotSidebarList } from "./src/ui/conversations/BotSidebarList";
 import { showBot } from "./src/ui/conversations/show-bot";
 import { hideBbSkills } from "./src/ui/skills/hide-bb-skills";
+import { hideBbChrome } from "./src/ui/footer/hide-bb-chrome";
+import { openBugReport, REPORT_BUG_FOOTER_ID } from "./src/ui/footer/report-bug";
 import { askAboutItemHandler } from "./src/ui/ask-about-item";
 import { setAskAboutItem } from "./src/kit/app/item-header";
 import { registerReadOnlyComposer } from "./src/ui/conversations/ReadOnlyComposer";
@@ -268,6 +270,7 @@ export default definePluginApp((app) => {
   // order after BB's API key fields; and push status on BB's Mobile page.
   registerSettingsApp(app);
   hideBbSkills(app.slots);
+  hideBbChrome(app.slots);
   registerCodeApp(app);
   // First, so the overlays below read BB's own route from their first render.
   registerQuietReplyClassifier(app.slots);
@@ -488,6 +491,7 @@ export default definePluginApp((app) => {
   // Plugin health: a footer item that opens itself when a plugin needs setup or breaks.
   setHealthFooter(app.experimental_sidebarFooter.register({ kind: "disclosure", id: "health", label: "Plugin health", icon: "ElectricPlugs", component: HealthFooter }));
   app.slots.experimental_appOverlay({ id: "health-watch", component: HealthWatch });
+  app.experimental_sidebarFooter.register({ kind: "action", id: REPORT_BUG_FOOTER_ID, label: "Report a bug", icon: "Bug", onActivate: () => { void openBugReport(); } });
   // The Studio list replaces BB's thread list on the Studio page, the Bots list (Bots, then every thread) everywhere else (src/ui/bot/threadListSwitch.ts).
   if (!sidebarSections) {
   app.slots.experimental_threadList({ id: STUDIO_LIST_ID, title: "Studio (Studio)", component: StudioThreadList });

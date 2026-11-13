@@ -1,11 +1,11 @@
 // Seeds the Studio items the site shows, on the RUNNING scratch server: a
 // rich page with a chart, stats and embeds, a whiteboard, a design with
 // screens, a dashboard, a mini app with records, artifacts, a recording with
-// its transcript and notes, a Visual Chat board and a demo code folder.
-// Everything is made up. Items go in through Studio's CLI and RPCs where
-// those exist without an agent turn; designs, the recording's transcript and
-// the board's finished page are written to the stores directly, because only
-// an agent (or a microphone and a speech model) makes those.
+// its transcript and notes, and a demo code folder. Everything is made up.
+// Items go in through Studio's CLI and RPCs where those exist without an
+// agent turn; the design and the recording's transcript are written to the
+// stores directly, because only an agent (or a microphone and a speech
+// model) makes those.
 //
 //   node seed-features.mjs <ids.json>
 import { execFileSync } from "node:child_process";
@@ -13,7 +13,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { design, dashboardWidgets, mini, artifacts, recording, board, codeFolder, launchPage, flow } from "./demo-features.mjs";
+import { design, dashboardWidgets, mini, artifacts, recording, dictation, codeFolder, launchPage, flow } from "./demo-features.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const scratch = join(here, "scratch.sh");
@@ -95,6 +95,15 @@ recording.lines.forEach((line, i) => {
 });
 sql(studioDb, recSql);
 out.recording = recId;
+// A finished dictation, kept as a dictation (it has its own page).
+const dicId = "rec_seeddictation1";
+const dicAt = now - 3 * 3_600_000;
+let dicSql = `INSERT INTO recordings (id, title, title_source, title_chars, kind, status, project_id, thread_id, created_at, updated_at, ended_at, heartbeat_at) VALUES (${q(dicId)}, ${q(dictation.title)}, 'user', 0, 'dictation', 'done', NULL, NULL, ${dicAt}, ${dicAt + 50_000}, ${dicAt + 50_000}, ${dicAt + 50_000});\n`;
+dictation.lines.forEach((line, i) => {
+  dicSql += `INSERT INTO segments (recording_id, id, session_id, idx, started_at, duration_ms, mime_type, bytes, file, status, text, created_at, speaker) VALUES (${q(dicId)}, ${q(`seed-${i}`)}, 'seed', ${i}, ${dicAt + i * 25_000}, 25000, 'audio/wav', 0, '', 'done', ${q(line)}, ${dicAt + i * 25_000}, NULL);\n`;
+});
+sql(studioDb, dicSql);
+out.dictation = dicId;
 
 // ---- The launch page, its whiteboard and its embeds -----------------------
 const pageLine = bb("studio", "pages", "create", launchPage.title, "--global", "--markdown", launchPage.body({ mini: out.mini, recording: recId, artifact: out.artifacts["search-latency.html"], dashboard: dash.id }));
@@ -111,17 +120,6 @@ const notesLine = bb("studio", "pages", "create", `Notes: ${recording.title}`, "
 const notesId = /pg_[a-f0-9]+/.exec(notesLine)?.[0] ?? bb("studio", "pages", "list").split("\n").find((l) => l.includes(`Notes: ${recording.title}`)).split("\t")[0];
 sql(studioDb, `UPDATE recordings SET notes_page_id = ${q(notesId)} WHERE id = ${q(recId)};`);
 out.notes = notesId;
-
-// ---- The Visual Chat board ------------------------------------------------
-const vc = rpc("studio-visual-chat", "canvas.create", { text: board.prompt });
-const vcDb = join(data, "plugins/studio-visual-chat/data.db");
-await new Promise((done) => setTimeout(done, 3000));
-sql(vcDb, `UPDATE canvases SET page = ${q(board.page)}, title = ${q(board.title)}, title_source = 'agent', caption = ${q(board.caption)}, status = 'idle', rev = 1, turn = 1, updated_at = ${now - 600_000} WHERE id = ${q(vc.canvasId)};
-DELETE FROM canvas_turns WHERE canvas_id = ${q(vc.canvasId)};
-INSERT INTO canvas_turns (canvas_id, role, text, at) VALUES (${q(vc.canvasId)}, 'user', ${q(board.prompt)}, ${now - 700_000}), (${q(vc.canvasId)}, 'assistant', ${q(board.caption)}, ${now - 600_000});
-INSERT OR REPLACE INTO canvas_versions (canvas_id, n, page, title, prompt, caption, rev, at) VALUES (${q(vc.canvasId)}, 1, ${q(board.page)}, ${q(board.title)}, ${q(board.prompt)}, ${q(board.caption)}, 1, ${now - 600_000});`);
-out.canvas = vc.canvasId;
-out.canvasThread = vc.threadId;
 
 writeFileSync(join(SCRATCH, "features.json"), JSON.stringify(out, null, 2));
 console.log(JSON.stringify(out));

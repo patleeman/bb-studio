@@ -1,0 +1,42 @@
+name: Bug report
+description: Something in BB Studio doesn't work.
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you saw, and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+  - type: input
+    id: version
+    attributes:
+      label: BB Studio version
+      placeholder: "1.0.1"
+    validations:
+      required: true
+  - type: input
+    id: base
+    attributes:
+      label: bb base
+      placeholder: "bb 0.49.0 @ 7794941"
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: "macOS 26.0.1 arm"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Optional. Remove tokens, paths and anything personal before you paste.

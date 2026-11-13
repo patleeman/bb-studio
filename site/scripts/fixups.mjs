@@ -45,7 +45,8 @@ for (const spec of threads.filter((t) => t.forkOf)) {
   const message = `${source}:assistant:kind:assistant|turn:turn_${spec.forkOf}_0|parent:root|item:${messageIds[spec.forkOf][0]}`;
   const replies = spec.turns.length * 2;
   studioSql += `UPDATE bot_threads SET forked_from_thread_id = '${source}', forked_from_message_id = '${message}' WHERE thread_id = '${ids[spec.key]}';\n`;
-  studioSql += `UPDATE bot_side_threads SET message_id = '${message}', replies = ${replies}, last_reply_role = 'assistant' WHERE thread_id = '${ids[spec.key]}';\n`;
+  const kind = spec.sideKind ?? "reply";
+  studioSql += `UPDATE bot_side_threads SET message_id = '${message}', replies = ${kind === "reply" ? replies : 0}, last_reply_role = 'assistant', kind = '${kind}', kind_checked = 1 WHERE thread_id = '${ids[spec.key]}';\n`;
 }
 for (const spec of threads.filter((t) => t.status === "active")) {
   studioSql += `UPDATE live_activity SET state = 'running' WHERE thread_id = '${ids[spec.key]}';\n`;

@@ -1,7 +1,7 @@
 import type Database from "better-sqlite3";
 import type { AuthStatus, ProviderState } from "../auth/contract";
 import { isProxied, providerFamily } from "../auth/detect";
-import type { AccountView, AccountsStatus, PinnedThread, SourceStatus, ThreadAccount } from "./contract";
+import type { AccountView, AccountsStatus, PinnedThread, QuotaWindow, SourceStatus, ThreadAccount } from "./contract";
 import { localAccountViews, poolAccountView, type PoolSignals, type PoolStatusView } from "./pool-view";
 import { accountOfWarning, computeWarnings } from "./warnings";
 
@@ -32,6 +32,7 @@ export interface AccountsDeps {
   studioSignals(accountIds: readonly string[]): PoolSignals;
   pins(source: "studio" | "bb"): Map<string, PinnedThread[]>;
   providers(): Promise<ProviderState[]>;
+  usage?(): Promise<Record<string, QuotaWindow[]>>;
   auth(): Promise<Pick<AuthStatus, "entries">>;
   reorder(provider: string, accountIds: string[]): Promise<void>;
   thread(threadId: string): Promise<{ providerId: string | null; mirrored: boolean } | null>;
@@ -61,11 +62,12 @@ export class AccountsService {
   private async check(): Promise<AccountsStatus> {
     const now = this.now();
     const bb = this.deps.bbPool;
-    const [studio, live, providers, auth] = await Promise.all([
+    const [studio, live, providers, auth, usage] = await Promise.all([
       this.deps.studioPool().catch(() => null),
       bb?.available() ? bb.status().then((value) => ({ ok: true as const, value }), () => ({ ok: false as const })) : Promise.resolve(null),
       this.deps.providers().catch(() => [] as ProviderState[]),
       this.deps.auth().catch(() => ({ entries: [] })),
+      this.deps.usage ? this.deps.usage().catch(() => ({})) : Promise.resolve({}),
     ]);
     this.providerStates = providers;
     const sources: SourceStatus[] = [
@@ -85,7 +87,7 @@ export class AccountsService {
     }
     const signedOut = new Set(auth.entries.filter((entry) => entry.source === "provider" && entry.signedOut).map((entry) => entry.id.slice("provider:".length)));
     const connected = accounts.some((account) => account.state === "ready" || account.state === "limited") || providers.some((state) => state.status === "ready" && !!state.loginCommand);
-    accounts.push(...localAccountViews(providers, signedOut, providerFamily, !connected));
+    accounts.push(...localAccountViews(providers, signedOut, providerFamily, !connected, usage));
     const all = computeWarnings(accounts, now, this.deps.timeZone);
     const settled = new Set(accounts.filter((account) => sources.find((source) => source.source === account.source)?.state === "on").map((account) => account.key));
     this.deps.store.keepOnly(new Set(all.map((warning) => warning.id)), settled);

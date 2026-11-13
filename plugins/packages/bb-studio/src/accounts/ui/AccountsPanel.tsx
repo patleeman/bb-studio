@@ -1,4 +1,3 @@
-import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import { ICON_BUTTON, OUTLINE_BUTTON } from "../../kit/app/index";
 import { cn, Icon } from "../../kit/ui/index";
@@ -56,12 +55,11 @@ export interface AccountRowProps {
   signingIn: boolean;
   onSignIn(account: AccountView): void;
   onSignInDone(): void;
-  onOpenThread(threadId: string): void;
   api: ReloginApi;
   env?: ReloginEnv;
 }
 
-export function AccountRow({ account, now, signingIn, onSignIn, onSignInDone, onOpenThread, api, env }: AccountRowProps) {
+export function AccountRow({ account, now, signingIn, onSignIn, onSignInDone, api, env }: AccountRowProps) {
   const quota = [...account.windows, ...account.models];
   return (
     <li data-account={account.key} data-account-state={account.state} className="flex flex-col gap-2 rounded-md border border-border/70 bg-foreground/[0.025] p-2.5">
@@ -74,18 +72,6 @@ export function AccountRow({ account, now, signingIn, onSignIn, onSignInDone, on
       </div>
       {account.message ? <p className="truncate text-xs text-muted-foreground" title={account.message}>{account.message}</p> : null}
       {quota.length ? <ul className="flex flex-col gap-1.5">{quota.map((window) => <Meter key={`${window.id}:${window.label}`} window={window} now={now} />)}</ul> : null}
-      {account.pinned.length ? (
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <span className="text-[11px] text-muted-foreground">{account.pinned.length === 1 ? "1 thread" : `${account.pinned.length} threads`}</span>
-          <ul className="flex flex-col">
-            {account.pinned.slice(0, 6).map((thread) => (
-              <li key={thread.threadId} className="min-w-0">
-                <button type="button" className="w-full truncate text-left text-xs text-foreground/85 hover:text-foreground hover:underline" onClick={() => onOpenThread(thread.threadId)}>{thread.title}</button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
       {signingIn && account.signIn ? (
         <div className="rounded-md border border-border/70 bg-background/40 p-2">
           <ReloginFlow key={account.signIn} compact target={reloginTarget(account)} api={api} onClose={onSignInDone} {...(env ? { env } : {})} />
@@ -108,7 +94,6 @@ export interface AccountsPanelProps {
   signingIn: string | null;
   onSignIn(account: AccountView): void;
   onSignInDone(): void;
-  onOpenThread(threadId: string): void;
   onRefresh(): void;
   onClose(): void;
   api: ReloginApi;
@@ -116,10 +101,10 @@ export interface AccountsPanelProps {
   now?: number;
 }
 
-export function AccountsPanel({ status, error, signingIn, onSignIn, onSignInDone, onOpenThread, onRefresh, onClose, api, env, now = Date.now() }: AccountsPanelProps) {
+export function AccountsPanel({ status, error, signingIn, onSignIn, onSignInDone, onRefresh, onClose, api, env, now = Date.now() }: AccountsPanelProps) {
   const sources = status?.sources.filter((source) => source.state !== "off" || status.accounts.some((account) => account.source === source.source)) ?? [];
   return (
-    <div data-testid="accounts" className="studio-root flex max-h-[70vh] w-full flex-col gap-3 overflow-y-auto p-2">
+    <div data-testid="accounts" className="studio-root flex w-full flex-col gap-3 p-2">
       <div className="flex items-center gap-2 px-0.5">
         <Icon name="UserRound" className="size-4 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 text-sm font-medium text-foreground">Accounts</span>
@@ -139,7 +124,7 @@ export function AccountsPanel({ status, error, signingIn, onSignIn, onSignInDone
             {accounts.length ? (
               <ul className="flex flex-col gap-1.5">
                 {accounts.map((account) => (
-                  <AccountRow key={account.key} account={account} now={now} signingIn={signingIn === account.key} onSignIn={onSignIn} onSignInDone={onSignInDone} onOpenThread={onOpenThread} api={api} {...(env ? { env } : {})} />
+                  <AccountRow key={account.key} account={account} now={now} signingIn={signingIn === account.key} onSignIn={onSignIn} onSignInDone={onSignInDone} api={api} {...(env ? { env } : {})} />
                 ))}
               </ul>
             ) : <p className="px-0.5 text-xs text-muted-foreground">No accounts</p>}
@@ -154,7 +139,6 @@ export function AccountsFooter({ dismiss }: { dismiss(): void }) {
   const live = useLive("accounts.status", {}, { pollMs: 30_000 });
   const call = useCall();
   const signingIn = useSigningIn();
-  const navigate = useBbNavigate();
   const api = useReloginApi();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { setNow(Date.now()); }, [live.data]);
@@ -166,7 +150,6 @@ export function AccountsFooter({ dismiss }: { dismiss(): void }) {
       signingIn={signingIn}
       onSignIn={(account) => setSigningIn(account.key)}
       onSignInDone={() => { setSigningIn(null); live.refresh(); }}
-      onOpenThread={(threadId) => { dismiss(); navigate.toThread(threadId); }}
       onRefresh={() => { void call("accounts.status", { refresh: true }).then(live.refresh, live.refresh); }}
       onClose={dismiss}
       api={api}
