@@ -41,6 +41,7 @@ afterEach(() => { act(() => root.unmount()); container.remove(); vi.useRealTimer
 it("is the Library on the Bot-page template: its header, Kind pills, conversation groups and one line per file", () => {
   act(() => root.render(<LibraryPage />));
   expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Library·Chief of Staff");
+  expect(container.querySelector<HTMLInputElement>("[data-testid=bot-page-search]")?.placeholder).toBe("Search Library");
   expect([...container.querySelectorAll("[data-testid=bot-page-pill]")].map((each) => each.textContent)).toEqual(["All", "Page", "Whiteboard", "Design", "App"]);
   expect(container.querySelector("[data-testid=bot-page-subpills]")).toBeNull();
   const groups = [...container.querySelectorAll<HTMLElement>("[data-testid=library-group-section]")];

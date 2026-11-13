@@ -49,7 +49,7 @@ export function LibraryPage() {
 
   return (
     <BotPageLayout testId="library" title="Library" bot={bot?.name} botId={bot?.id}
-      toolbar={<BotPageToolbar<LibraryKindFilter, LibraryAppType> search={{ value: query, onChange: setQuery, placeholder: "Search files" }}
+      toolbar={<BotPageToolbar<LibraryKindFilter, LibraryAppType> search={{ value: query, onChange: setQuery, placeholder: "Search Library" }}
         filter={{ label: "Kind", value: kind, options: LIBRARY_KINDS, onChange: (next) => { setKind(next); setAppType("all"); } }}
         subFilter={kind === "app" ? { label: "App type", value: appType, options: LIBRARY_APP_TYPES, onChange: setAppType } : null}
         menus={<MenuSelect<LibraryGroupBy> testId="library-group" label="Group by" value={groupBy} choices={LIBRARY_GROUPS} onChange={setGroupBy} className="h-8 text-sm" />} />}>
