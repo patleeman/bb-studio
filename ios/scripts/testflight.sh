@@ -26,6 +26,8 @@ case "${1:-}" in
   *) echo "usage: $0 [--dry-run | --archive-only]" >&2; exit 2 ;;
 esac
 
+if ! $dry_run; then caffeinate -i -w $$ & fi
+
 team_id=3753DAN98U
 out=build/testflight
 build_number="${BUILD_NUMBER:-$(date -u +%Y%m%d.%H%M)}"
@@ -44,6 +46,11 @@ if [[ -f "$env_file" ]]; then
   source "$env_file"
   auth=(-authenticationKeyPath "${ASC_KEY_PATH/#\~/$HOME}" -authenticationKeyID "$ASC_KEY_ID"
     -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+fi
+
+if ! $dry_run && ! security show-keychain-info login.keychain-db >/dev/null 2>&1; then
+  echo "The login keychain is locked: unlock the Mac once (log in) and run again." >&2
+  exit 1
 fi
 
 signing=(-allowProvisioningUpdates "${auth[@]}")
