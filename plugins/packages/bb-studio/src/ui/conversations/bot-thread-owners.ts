@@ -22,6 +22,10 @@ export function isBotThread(threadId: string): boolean {
   return owned.get(threadId) === true;
 }
 
+export function mayBeBotThread(threadId: string): boolean {
+  return owned.get(threadId) !== false;
+}
+
 export function resetBotThreadsForTest(): void {
   owned.clear();
 }

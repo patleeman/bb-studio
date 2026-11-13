@@ -46,7 +46,7 @@ export function ReplyInThreadAction({ message }: ExperimentalMessageMetadataProp
       await openThreadBeside(message.threadId, opened.threadId, (threadId) => navigate.toThread(threadId));
     } catch (cause) {
       console.warn("Reply in thread failed", errorMessage(cause));
-      toast.error("Couldn't open the thread.");
+      toast.error("Couldn't open the thread.", { description: errorMessage(cause) });
     } finally {
       setBusy(false);
     }

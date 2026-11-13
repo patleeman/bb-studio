@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 import { registerMessageAction, type MessageActionMessage } from "../../kit/app/host-sdk";
 import { errorMessage } from "../../kit/format";
-import { isBotThread } from "./bot-thread-owners";
+import { mayBeBotThread } from "./bot-thread-owners";
 
 export const FORK_FROM_HERE = "Fork conversation from here";
 
@@ -17,7 +17,7 @@ export async function forkFromHere(message: MessageActionMessage, deps: ForkDeps
     return threadId;
   } catch (cause) {
     console.warn("Fork conversation failed", errorMessage(cause));
-    toast.error("Couldn't fork the conversation.");
+    toast.error("Couldn't fork the conversation.", { description: errorMessage(cause) });
     return null;
   }
 }
@@ -27,7 +27,7 @@ export function registerForkFromHere(slots: object, deps: ForkDeps): boolean {
     id: "fork-conversation",
     title: FORK_FROM_HERE,
     icon: "GitFork",
-    isAvailable: (message) => Number.isFinite(message.sourceSeqEnd) && message.sourceSeqEnd >= 0 && isBotThread(message.threadId),
+    isAvailable: (message) => Number.isFinite(message.sourceSeqEnd) && message.sourceSeqEnd >= 0 && mayBeBotThread(message.threadId),
     experimental_replaces: "thread.fork",
     run: (message) => { void forkFromHere(message, deps); },
   });

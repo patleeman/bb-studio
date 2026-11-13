@@ -19,10 +19,10 @@ export function AutomationTab({ params }: { params: JsonValue | null }) {
   const id = refId(params);
   const ref = parseAutomationRefId(id);
   if (!id || !ref) return <NotFoundTab params={{ kind: "automation", id, link: id ? linkFor({ kind: "automation", id }) : "bb://automation" }} />;
-  return <AutomationItem key={id} id={id} botId={ref.botId} rowId={ref.rowId} />;
+  return <AutomationItem key={id} botId={ref.botId} rowId={ref.rowId} />;
 }
 
-function AutomationItem({ id, botId, rowId }: { id: string; botId: string; rowId: string }) {
+function AutomationItem({ botId, rowId }: { botId: string; rowId: string }) {
   const table = useLive("bot_automation_table", { botId }, { pollMs: 30_000 });
   const views = useAutomations(botId);
   const bots = useLive("bot_list", {}, { pollMs: 60_000 });
@@ -30,7 +30,7 @@ function AutomationItem({ id, botId, rowId }: { id: string; botId: string; rowId
   const openThread = useOpenThread();
   const row = table.data?.rows.find((each) => each.id === rowId) ?? null;
   if (table.error && !table.data) return <BotItemError message={table.error} />;
-  if (table.data && !row) return <NotFoundTab params={{ kind: "automation", id, link: linkFor({ kind: "automation", id }) }} />;
+  if (table.data && !row) return <AutomationDeleted />;
   if (!row) return null;
   const bot = bots.data?.bots.find((each) => each.id === botId) ?? null;
   const view = views.data?.automations.find((each) => each.id === row.id) ?? null;
@@ -51,6 +51,17 @@ function AutomationItem({ id, botId, rowId }: { id: string; botId: string; rowId
       </div>
       {editor.dialogs}
     </BotItemDetail>
+  );
+}
+
+export const AUTOMATION_DELETED = "Automation deleted";
+
+export function AutomationDeleted() {
+  return (
+    <div data-testid="automation-deleted" className="studio-root flex h-full flex-col items-center justify-center gap-3 bg-background p-6 text-center text-foreground">
+      <Icon name="Clock" className="size-8 text-muted-foreground" />
+      <div className="text-base font-medium">{AUTOMATION_DELETED}</div>
+    </div>
   );
 }
 

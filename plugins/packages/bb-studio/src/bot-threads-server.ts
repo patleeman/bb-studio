@@ -276,13 +276,16 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     };
   };
 
+  const placed = async (threadId: string): Promise<BotThreadRecord | null> => {
+    const known = store.get(threadId);
+    if (known) return known;
+    // A thread Studio hasn't seen (made before it ran, or brought back): place it now.
+    const thread = await bb.sdk.threads.get({ threadId }).catch(() => null) as ThreadFacts | null;
+    return thread && !thread.archivedAt ? await store.classify(thread, "created") : null;
+  };
+  const owner = async (threadId: string): Promise<string | null> => (await placed(threadId))?.botId ?? null;
   const info = async (threadId: string): Promise<BotThreadInfo | null> => {
-    let rec = store.get(threadId);
-    if (!rec) {
-      // A thread Studio hasn't seen (made before it ran, or brought back): place it now.
-      const thread = await bb.sdk.threads.get({ threadId }).catch(() => null) as ThreadFacts | null;
-      if (thread && !thread.archivedAt) rec = await store.classify(thread, "created");
-    }
+    const rec = await placed(threadId);
     if (!rec) return null;
     const bot = deps.bots().find((each) => each.id === rec!.botId);
     const workers = rec.kind === "conversation" ? store.workersOf(rec.threadId) : [];
@@ -567,5 +570,5 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     return { classified, linked: linked.length };
   };
 
-  return { store, rpc, start, reconcile, threadChanged, catchUp, messageThreads, pushIds, approvalPush, tools: ["bot_conversations", "bot_threads_list", "bot_needs_you"] as const };
+  return { store, rpc, start, reconcile, threadChanged, catchUp, messageThreads, owner, pushIds, approvalPush, tools: ["bot_conversations", "bot_threads_list", "bot_needs_you"] as const };
 }

@@ -115,6 +115,19 @@ it("recounts a thread's replies from its timeline and shows the last replier und
   expect(side.forThread("t1")).toBeNull();
 });
 
+it("shows no Replying… while a new reply thread only starts, and shows it once a turn runs", async () => {
+  const { side, forkRows, fork, threads } = setup();
+  fork("t1", "r1");
+  threads.get("t1")!.status = "starting";
+  expect(await side.list("bot1")).toEqual([]);
+  threads.get("t1")!.status = "active";
+  expect(await side.list("bot1")).toEqual([expect.objectContaining({ threadId: "t1", replies: 0, working: true })]);
+  forkRows.set("t1", [{ id: "u1", kind: "conversation", role: "user", initiator: "user", text: "Why?", turnId: "a", createdAt: 5 }]);
+  await side.recount("t1");
+  threads.get("t1")!.status = "starting";
+  expect(await side.list("bot1")).toEqual([expect.objectContaining({ threadId: "t1", replies: 1, working: true })]);
+});
+
 it("sums a message's threads, and its newest one is what the row and Reply in thread open", async () => {
   const { side, forkRows, fork, threads } = setup();
   fork("t1", "r1");

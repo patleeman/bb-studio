@@ -144,11 +144,12 @@ it("a bb automation's tab opens bb's own automation page while bb's automations 
   expect(state.open).toHaveBeenCalledWith("/plugins/automations/automations/proj_y6wu7yah45/auto_x1kt5kijizw");
 });
 
-it("a deleted automation's tab says Not found, with its link", () => {
+it("a deleted automation's tab says Automation deleted, with no raw id or link; a malformed link still says Not found", () => {
   state.table = table([]);
   renderTab("aut_gone");
-  expect(container.querySelector("[data-testid=link-not-found]")?.textContent).toContain("bb://automation/bot_main%3Aaut_gone");
-  expect(container.querySelector("[data-testid=link-not-found]")?.textContent).toContain("Automation");
+  expect(container.querySelector("[data-testid=automation-deleted]")?.textContent).toBe("Automation deleted");
+  expect(container.querySelector("[data-testid=link-not-found]")).toBeNull();
+  expect(container.textContent).not.toContain("bb://automation");
   act(() => root.render(<AutomationTab params={{ id: "no-bot" }} />));
   expect(container.querySelector("[data-testid=link-not-found]")).not.toBeNull();
 });

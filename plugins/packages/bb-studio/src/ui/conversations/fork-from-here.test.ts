@@ -6,7 +6,7 @@ import { FORK_FROM_HERE, forkFromHere, registerForkFromHere } from "./fork-from-
 
 const message = { threadId: "main", messageId: "msg_1", turnId: "turn_1", role: "assistant" as const, sourceSeqEnd: 12 };
 
-it("puts Fork conversation from here in a message's ··· menu in place of BB's own Fork, on a Bot's threads only and only where BB has message actions", () => {
+it("puts Fork conversation from here in a message's ··· menu in place of BB's own Fork, from the first render of a Bot's thread, and leaves BB's on threads known not to be a Bot's", () => {
   const deps = { call: vi.fn(), open: vi.fn() };
   expect(registerForkFromHere({}, deps)).toBe(false);
   const registered: { title: string; experimental_replaces?: string; isAvailable(m: typeof message): boolean }[] = [];
@@ -16,16 +16,17 @@ it("puts Fork conversation from here in a message's ··· menu in place of BB's
   expect(registered).toHaveLength(1);
   expect(registered[0]!.experimental_replaces).toBe("thread.fork");
   expect(isBotThread("main")).toBe(false);
-  expect(registered[0]!.isAvailable(message)).toBe(false);
+  expect(registered[0]!.isAvailable(message)).toBe(true);
   noteBotThread("main", true);
   noteBotThread("thr_plain", false);
   expect(registered[0]!.isAvailable(message)).toBe(true);
   expect(registered[0]!.isAvailable({ ...message, threadId: "thr_plain" })).toBe(false);
-  expect(registered[0]!.isAvailable({ ...message, threadId: "thr_unknown" })).toBe(false);
+  expect(registered[0]!.isAvailable({ ...message, threadId: "thr_unknown" })).toBe(true);
   expect(registered[0]!.isAvailable({ ...message, sourceSeqEnd: Number.NaN })).toBe(false);
+  expect(registered[0]!.isAvailable({ ...message, sourceSeqEnd: -1 })).toBe(false);
 });
 
-it("forks after the message and opens the fork beside its conversation; a refusal is a plain toast and opens nothing", async () => {
+it("forks after the message and opens the fork beside its conversation; a refusal is a toast with its reason and opens nothing", async () => {
   const call = vi.fn(async () => ({ threadId: "fork_1" }));
   const open = vi.fn();
   expect(await forkFromHere(message, { call, open })).toBe("fork_1");
@@ -34,5 +35,7 @@ it("forks after the message and opens the fork beside its conversation; a refusa
   open.mockClear();
   expect(await forkFromHere(message, { call: vi.fn(async () => { throw new Error("That thread isn't one of a Bot's conversations."); }), open })).toBeNull();
   expect(open).not.toHaveBeenCalled();
-  expect(toast.error).toHaveBeenCalledWith("Couldn't fork the conversation.");
+  expect(toast.error).toHaveBeenCalledWith("Couldn't fork the conversation.", { description: "That thread isn't one of a Bot's conversations." });
+  expect(await forkFromHere(message, { call: vi.fn(async () => { throw new Error("HTTP 503: Host is not connected"); }), open })).toBeNull();
+  expect(toast.error).toHaveBeenLastCalledWith("Couldn't fork the conversation.", { description: "Host is not connected" });
 });

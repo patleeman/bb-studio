@@ -56,6 +56,7 @@ export interface BuiltinPages {
   createPage(input: { projectId: string | null; title: string; icon?: string; markdown: string }): string;
   /** Adds a bullet under the page's "## Check-in" heading (made on top if missing); false when the line is already there. */
   addCheckin(pageId: string, line: string): boolean;
+  retitle(pageId: string, from: string, to: string): boolean;
   /** A page's text as Markdown, or null when there's no such page. */
   markdown(pageId: string): string | null;
   /** The pages whiteboards (drawings) live in, for Drawings' tools and editor. */
@@ -491,6 +492,14 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
         service.hub.flush(service.hub.open(pageId));
       },
       createPage: (input) => service.createPage({ ...input, parentId: null, icon: "🖍️", actor: PLUGIN_RPC_ACTOR }).id,
+    },
+    retitle(pageId, from, to) {
+      try {
+        service.updatePage(pageId, { title: to }, PLUGIN_RPC_ACTOR, from);
+        return true;
+      } catch {
+        return false;
+      }
     },
     addCheckin(pageId, line) {
       const page = service.hub.open(pageId);

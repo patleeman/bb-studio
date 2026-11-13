@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
 import { SideThreads } from "./bot-side-threads";
+import { MessageThreads } from "./message-threads";
 import type { ThreadFacts } from "./bot-threads";
 import { registerBotThreads } from "./bot-threads-server";
 import { MIGRATIONS } from "./migrations";
@@ -38,9 +39,9 @@ function mirrorDir(rows: { id: string; at: number }[]) {
 const BB_HOST = "host_bb";
 const STUDIO_HOST = "host_studio";
 
-async function setup(options: { mirror?: string; mirroredHost?: boolean; forkFails?: boolean; stock?: boolean } = {}) {
+async function setup(options: { mirror?: string; mirroredHost?: boolean; forkFails?: boolean; stock?: boolean; repo?: boolean } = {}) {
   const threads = new Map<string, ThreadFacts & { environmentId?: string }>([
-    ["thr_main", { id: "thr_main", title: "Main", projectId: "proj_personal", createdAt: 1, status: "idle", environmentId: "env_main" }],
+    ["thr_main", { id: "thr_main", title: "Main", projectId: options.repo ? "proj_repo" : "proj_personal", createdAt: 1, status: "idle", environmentId: "env_main" }],
   ]);
   const environmentHost = options.mirroredHost ? BB_HOST : STUDIO_HOST;
   const rows = new Map<string, unknown[]>([["thr_main", MAIN_ROWS]]);
@@ -77,12 +78,12 @@ async function setup(options: { mirror?: string; mirroredHost?: boolean; forkFai
       events: { list: (async () => [{ seq: 1, type: "turn/completed", createdAt: Date.now() }]) as never },
     },
     environments: {
-      get: (async ({ environmentId }: { environmentId: string }) => ({ id: environmentId, hostId: environmentHost, path: "/Users/me/chief", environmentProviderId: null })) as never,
+      get: (async ({ environmentId }: { environmentId: string }) => ({ id: environmentId, hostId: environmentHost, path: "/Users/me/chief", environmentProviderId: options.repo ? "project-checkout" : null })) as never,
       list: (async () => []) as never,
     } as never,
     hosts: { list: (async () => [{ id: BB_HOST, status: "disconnected" }, { id: STUDIO_HOST, status: "connected" }]) as never } as never,
     system: { config: (async () => ({ primaryHostId: STUDIO_HOST })) as never } as never,
-    projects: { get: (async ({ projectId }: { projectId: string }) => ({ id: projectId, kind: "personal" })) as never } as never,
+    projects: { get: (async ({ projectId }: { projectId: string }) => ({ id: projectId, kind: projectId === "proj_personal" ? "personal" : "git" })) as never } as never,
   } });
   dispose.push(() => harness.lifecycle.dispose());
   const db = bb.storage.database();
@@ -143,6 +144,56 @@ it("Reply in thread on a conversation mirrored from bb finds an older reply and 
   const { server, fork } = await setup({ mirroredHost: true });
   await server.rpc.bot_thread_reply({ threadId: "thr_main", messageId: "thr_main:assistant:2" });
   expect(fork).toHaveBeenCalledWith(expect.objectContaining({ sourceThreadId: "thr_main", sourceSeqEnd: 9, environment: { type: "host", hostId: STUDIO_HOST, workspace: { type: "personal" } } }));
+});
+
+it("Reply in thread on a mirrored chat from a repository's checkout starts in the personal workspace, seeded from the transcript, and makes no worktree", async () => {
+  const { server, fork, spawn, seeds } = await setup({ mirroredHost: true, repo: true });
+  const made = await server.rpc.bot_thread_reply({ threadId: "thr_main", messageId: "thr_main:assistant:2" });
+  expect(fork).not.toHaveBeenCalled();
+  expect(spawn).toHaveBeenCalledTimes(1);
+  expect(spawn).toHaveBeenCalledWith(expect.objectContaining({ projectId: "proj_personal", environment: { type: "host", hostId: STUDIO_HOST, workspace: { type: "personal" } }, input: [] }));
+  expect(made).toMatchObject({ projectId: "proj_personal", created: true });
+  expect(server.store.get(made.threadId)).toMatchObject({ kind: "conversation", forkedFrom: { threadId: "thr_main", messageId: "thr_main:assistant:2" } });
+  expect(turnContext(seeds.take(made.threadId), null)).toContain("Assistant: Friday.");
+});
+
+function placer(parent: { project: "personal" | "repo"; here: boolean; environmentProviderId: string | null; path?: string }) {
+  const sdk = {
+    threads: { get: async () => ({ id: "thr", projectId: parent.project === "personal" ? "proj_personal" : "proj_repo", environmentId: "env_parent" }) },
+    environments: {
+      get: async () => ({ id: "env_parent", hostId: parent.here ? STUDIO_HOST : BB_HOST, path: parent.path ?? "/nowhere/bb-studio", status: "ready", environmentProviderId: parent.environmentProviderId }),
+      list: async () => [],
+    },
+    hosts: { list: async () => [{ id: BB_HOST, status: "disconnected" }, { id: STUDIO_HOST, status: "connected" }] },
+    system: { config: async () => ({ primaryHostId: STUDIO_HOST }) },
+    projects: { get: async ({ projectId }: { projectId: string }) => ({ id: projectId, kind: projectId === "proj_personal" ? "personal" : "git" }) },
+  };
+  return new MessageThreads({ sdk: sdk as never, sides: {} as never, source: async () => null, title: async () => "", recordFork: () => {}, defaultModel: () => null, changed: () => {}, log: () => {} });
+}
+
+it("a chat's reply thread or fork never makes a git worktree: it reuses the parent's environment on this machine, else the personal workspace", async () => {
+  const personal = { type: "host", hostId: STUDIO_HOST, workspace: { type: "personal" } };
+  expect(await placer({ project: "repo", here: true, environmentProviderId: "git-worktree" }).placement("thr", true)).toEqual({ environment: null });
+  expect(await placer({ project: "repo", here: false, environmentProviderId: "project-checkout" }).placement("thr", true)).toEqual({ projectId: "proj_personal", environment: personal });
+  expect(await placer({ project: "repo", here: false, environmentProviderId: "git-worktree" }).placement("thr", true)).toEqual({ projectId: "proj_personal", environment: personal });
+  expect(await placer({ project: "repo", here: false, environmentProviderId: null, path: tmpdir() }).placement("thr", true)).toEqual({ projectId: "proj_personal", environment: personal });
+  expect(await placer({ project: "personal", here: false, environmentProviderId: "personal-workspace" }).placement("thr", true)).toEqual({ environment: personal });
+});
+
+it("a worker's fork makes a worktree only when the worker ran in one; otherwise it uses the folder it ran in, or the project's checkout", async () => {
+  expect(await placer({ project: "repo", here: false, environmentProviderId: "git-worktree" }).placement("thr", false)).toEqual({ environment: { type: "host", hostId: STUDIO_HOST, workspace: { type: "managed-worktree", baseBranch: { kind: "default" } } } });
+  expect(await placer({ project: "repo", here: false, environmentProviderId: "project-checkout", path: tmpdir() }).placement("thr", false)).toEqual({ environment: { type: "host", hostId: STUDIO_HOST, workspace: { type: "unmanaged", path: tmpdir() } } });
+  expect(await placer({ project: "repo", here: false, environmentProviderId: "project-checkout" }).placement("thr", false)).toEqual({ environment: { type: "host", hostId: STUDIO_HOST, workspace: { type: "unmanaged", path: null } } });
+  expect(await placer({ project: "repo", here: true, environmentProviderId: "git-worktree" }).placement("thr", false)).toEqual({ environment: null });
+});
+
+it("a conversation Studio hasn't placed yet is its Bot's on the first owner lookup, so its menu offers Studio's fork from the start", async () => {
+  const { server, threads } = await setup();
+  threads.set("thr_trip", { id: "thr_trip", title: "Trip", projectId: "proj_personal", createdAt: 30, status: "idle" });
+  expect(server.store.get("thr_trip")).toBeNull();
+  expect(await server.owner("thr_trip")).toBe("dot");
+  expect(server.store.get("thr_trip")).toMatchObject({ kind: "conversation", botId: "dot" });
+  expect(await server.owner("thr_missing")).toBeNull();
 });
 
 it("a conversation on a machine that is connected forks where it is", async () => {
