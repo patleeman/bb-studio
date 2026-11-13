@@ -4,16 +4,13 @@ export type ForkDesktopWindowOp =
   | "close"
   | "toggle"
   | "unregister"
-  | "hotkey"
-  | "clickThrough";
+  | "hotkey";
 
 export interface ForkDesktopWindowRequest {
   op: ForkDesktopWindowOp;
   key: string;
   path: string;
   options: Record<string, unknown>;
-  on?: boolean;
-  hold?: boolean;
 }
 
 export interface ForkStudioBuild {

@@ -33,7 +33,6 @@ import type { ProviderInfo } from "@bb/domain";
 import { ProviderIconMark } from "@/components/settings/ProviderIconMark";
 import { getProviderIconInfo } from "@/lib/provider-icon";
 import type { MarkdownLinkRouting } from "@/components/ui/markdown-link-routing";
-import { useForkSkillSources } from "@/components/tools/ForkSkillSources";
 
 type ResourceProviderFilter =
   | "owner:bb"
@@ -554,7 +553,6 @@ export function SkillsOverview({
     sortMode,
     sourceFilters,
   ]);
-  const forkSkills = useForkSkillSources(normalizedQuery, sourceFilters.length + providerFilters.length > 0, visibleSkills.length > 0 || isLoading || hasError);
   const libraryList = useResourceInfiniteItems(visibleSkills, {
     pageSize: libraryPageSize,
     resetKey: libraryResetKey,
@@ -668,7 +666,6 @@ export function SkillsOverview({
                             values.filter(isResourceProviderFilter),
                           ),
                       },
-                      ...forkSkills.filterGroups,
                     ]}
                   />
                   <ResourceSortMenu
@@ -690,7 +687,7 @@ export function SkillsOverview({
             />
           }
         >
-          {forkSkills.body(libraryBody)}
+          <div className={TOOLS_PAGE_BAND_CLASSES}>{libraryBody}</div>
         </ResourceCollectionViewport>
       )}
     </ResourceCollectionPage>

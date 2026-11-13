@@ -5,7 +5,6 @@ import type {
   ExperimentalAppSurface,
 } from "@get-bb/plugin-sdk";
 import { PluginSlotMount } from "@/components/plugin/PluginSlotMount";
-import { cleanSidebarCssValue } from "@/components/sidebar/ForkSidebarStyle";
 import { isBareWindow } from "@/lib/fork-bare-window";
 import type { PluginAppBackdropSlot } from "@/lib/fork-slots";
 import {
@@ -81,6 +80,18 @@ function cleanCards(layout: unknown): ForkCardsLayout | null {
   return { gap, radius, titleRow: layout.cards.titleRow === true };
 }
 
+const MAX_CSS_VALUE_LENGTH = 2000;
+
+function cleanCssValue(property: string, value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed === "" || trimmed.length > MAX_CSS_VALUE_LENGTH) return null;
+  if (typeof CSS !== "undefined" && typeof CSS.supports === "function") {
+    return CSS.supports(property, trimmed) ? trimmed : null;
+  }
+  return trimmed;
+}
+
 export function cleanAppearance(value: unknown): ForkAppearance {
   if (!isRecord(value)) return NO_APPEARANCE;
   const mode =
@@ -92,7 +103,7 @@ export function cleanAppearance(value: unknown): ForkAppearance {
       MAX_TOKENS,
     )) {
       if (!TOKEN_NAME.test(name)) continue;
-      const clean = cleanSidebarCssValue(name, raw);
+      const clean = cleanCssValue(name, raw);
       if (clean !== null) properties.set(name, clean);
     }
   }
@@ -102,7 +113,7 @@ export function cleanAppearance(value: unknown): ForkAppearance {
     const style = surfaces[surface];
     if (!isRecord(style)) continue;
     for (const [field, suffix, property] of SURFACE_FIELDS) {
-      const clean = cleanSidebarCssValue(property, style[field]);
+      const clean = cleanCssValue(property, style[field]);
       if (clean === null) continue;
       properties.set(`--fork-surface-${name}-${suffix}`, clean);
       if (field === "edge") edges.push(name);
