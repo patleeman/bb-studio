@@ -12,7 +12,26 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 
-device="${DEVICE:-$(xcrun devicectl list devices 2>/dev/null | awk '/physical/ && /iPhone/ && / (available|connected)( |$)/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9A-F]{8}-[0-9A-F]{16}$/) { print $i; exit } }')}"
+# devicectl's table changed between Xcode versions (B19); read its JSON instead.
+# A connected phone first, else any paired one (devicectl connects on demand).
+find_device() {
+  local json
+  json="$(mktemp)"
+  xcrun devicectl list devices --json-output "$json" >/dev/null 2>&1 || { rm -f "$json"; return 0; }
+  python3 -I - "$json" <<'PY'
+import json, sys
+devices = json.load(open(sys.argv[1])).get("result", {}).get("devices", [])
+phones = [d for d in devices
+          if d.get("hardwareProperties", {}).get("reality") == "physical"
+          and d.get("hardwareProperties", {}).get("deviceType") == "iPhone"
+          and d.get("connectionProperties", {}).get("pairingState") == "paired"]
+phones.sort(key=lambda d: d.get("connectionProperties", {}).get("tunnelState") in ("unavailable", None))
+if phones:
+    print(phones[0]["hardwareProperties"]["udid"])
+PY
+  rm -f "$json"
+}
+device="${DEVICE:-$(find_device)}"
 [ -n "$device" ] || { echo "No paired iPhone is available. Unlock it, and connect it by cable or the same Wi-Fi." >&2; exit 1; }
 
 out=build/device
