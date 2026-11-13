@@ -42,7 +42,7 @@ function AutomationItem({ botId, rowId }: { botId: string; rowId: string }) {
       { label: "Status", value: statusText(row) },
       { label: "When", value: row.when },
       { label: "Last run", value: lastRunText(row) },
-    ]} actions={bb ? <button type="button" data-testid="automation-open-bb" className={GHOST_BUTTON} onClick={() => openAppPath(bbDetailPath(bb))}><Icon name="Workflow" />Open in bb</button> : undefined}>
+    ]} actions={bb ? <button type="button" data-testid="automation-open-bb" className={GHOST_BUTTON} onClick={() => openAppPath(bbDetailPath(bb))}><Icon name="Workflow" />Open in Automations</button> : undefined}>
       <div data-testid="automation-detail">
         {editor.error ? <p role="alert" className="pb-2 text-xs text-destructive">{editor.error}</p> : null}
         {own

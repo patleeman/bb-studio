@@ -1,7 +1,7 @@
 import { relativeTime } from "../../kit/format";
 import type { AutomationTableKind, AutomationTableRow } from "../../automation-table-contract";
 
-export const KIND_LABEL: Record<AutomationTableKind, string> = { watcher: "Watcher", checkin: "Check-in", schedule: "Schedule", reminder: "Reminder", runner: "Runner", bb: "bb automation" };
+export const KIND_LABEL: Record<AutomationTableKind, string> = { watcher: "Watcher", checkin: "Check-in", schedule: "Schedule", reminder: "Reminder", runner: "Runner", bb: "Automation" };
 
 /** "Active", "Paused", "Paused · in bb" or "Off". */
 export function statusText(row: Pick<AutomationTableRow, "status" | "inBb">): string {
