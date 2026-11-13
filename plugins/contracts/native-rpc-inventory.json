@@ -200,6 +200,18 @@
       "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
+      "file": "ios/Shared/BBClient+Push.swift",
+      "plugin": "mobile",
+      "method": "live_activity_register",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/BBClient+Push.swift",
+      "plugin": "mobile",
+      "method": "live_activity_unregister",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/Shared/BBClient.swift",
       "plugin": "thread-list",
       "method": "listPreferences",
