@@ -15,7 +15,7 @@ import { errorMessage } from "../../kit/format";
 import { Button } from "../../kit/ui/button";
 import { Input } from "../../kit/ui/input";
 import type { BotView } from "../../contract";
-import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageMore, BotPageRow, BotPageToolbar, foldRows, useRowOpen } from "../../ui/bot-page";
+import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageMore, BotPageRow, BotPageToolbar, foldRows, noMatch, useBotPageQuery, useRowOpen } from "../../ui/bot-page";
 import { useCall, useLive } from "../../ui/live";
 import type { Loop } from "../contract";
 import { SCHEDULED_ICON, scheduledMeta } from "./scheduled-model";
@@ -36,7 +36,7 @@ export function TodosPage({ view }: { view: BotView }) {
   const automationList = useAutomations(bot.id);
   const editor = useAutomationEditor(bot.id, automationList.data?.automations ?? [], () => { automationList.refresh(); scheduledList.refresh(); });
   const { pending } = useNeedsYou(ownsTodos ? people.botThreadId : null, list.data?.needsYouNow);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useBotPageQuery();
   const [area, setArea] = useState(ALL_AREAS);
   const [adding, setAdding] = useState(false);
   const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(() => new Set());
@@ -77,7 +77,10 @@ export function TodosPage({ view }: { view: BotView }) {
         : <BotPageToolbar search={{ value: query, onChange: setQuery, placeholder: "Search scheduled" }} />}>
       {adding ? <AddTodo onAdd={add} onClose={() => setAdding(false)} /> : null}
       {ownsTodos && list.error ? <p role="alert" className="text-sm text-destructive">{list.error}</p> : null}
-      {!data ? null : total === 0 ? <BotPageEmpty testId="todos-empty">{area !== ALL_AREAS || query.trim() ? "No todos match" : "No todos"}</BotPageEmpty> : TODO_GROUPS.map((group) => {
+      {!data ? null : total === 0 ? <BotPageEmpty testId="todos-empty" {...(query.trim()
+        ? { title: noMatch("todos", query), action: { label: "Clear search", onClick: () => setQuery("") } }
+        : area !== ALL_AREAS ? { title: `No todos in ${area}`, action: { label: "Show all", onClick: () => setArea(ALL_AREAS) } }
+        : { title: "No todos yet", hint: "Ask the Bot to keep track of something, or add a todo.", action: adding ? null : { label: "New todo", onClick: () => setAdding(true) } })} /> : TODO_GROUPS.map((group) => {
         const loops = groups[group.id];
         const chat = group.id === "today" ? chatRows : 0;
         if (!loops.length && !chat) return null;
@@ -103,6 +106,7 @@ export function TodosPage({ view }: { view: BotView }) {
             <BotPageRow key={item.key} testId="scheduled-row" data={{ "data-scheduled": item.key }} icon={SCHEDULED_ICON[item.kind]} muted={item.state === "paused"}
               title={item.title} titleText={item.title} meta={scheduledMeta(item, now)} {...rowOpen(item.link, item.title)} />
           ))}
+          {!scheduled.length ? <BotPageEmpty testId="scheduled-empty" {...(query.trim() ? { title: noMatch("scheduled items", query) } : { title: "Nothing scheduled yet", hint: "Add a reminder or a check-in with New." })} /> : null}
           {moreLine("scheduled", "Scheduled", scheduledRows.more)}
         </BotPageGroup>
       ) : null}

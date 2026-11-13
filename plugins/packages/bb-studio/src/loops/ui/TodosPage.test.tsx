@@ -143,7 +143,11 @@ it("filters by area pills and search; area lives only in the filter bar", async 
   await type(container.querySelector<HTMLInputElement>("[data-testid=bot-page-search]")!, "onboarding sign");
   expect(titles(container)).toEqual(["Review the onboarding flow"]);
   await type(container.querySelector<HTMLInputElement>("[data-testid=bot-page-search]")!, "nothing like it");
-  expect(container.querySelector("[data-testid=todos-empty]")?.textContent).toBe("No todos match");
+  expect(container.querySelector("[data-testid=todos-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("No todos match “nothing like it”");
+  expect(container.querySelector("[data-testid=scheduled-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("No scheduled items match “nothing like it”");
+  await act(async () => container.querySelector<HTMLButtonElement>("[data-testid=todos-empty] [data-testid=bot-page-empty-action]")!.click());
+  expect(container.querySelector<HTMLInputElement>("[data-testid=bot-page-search]")!.value).toBe("");
+  expect(titles(container).length).toBeGreaterThan(1);
 });
 
 it("a row opens the todo through the link router, and the todo tab shows its description, due date, when, area, owner and source with the plan's link", async () => {
@@ -269,10 +273,11 @@ it("leads Today with the Bot chat's pending questions (a tracked one once), whic
   expect(state.openLink).toHaveBeenLastCalledWith("bb://conversation/thr_bot", { source: "botPage", title: "Chief of Staff", modifiers: { meta: false, ctrl: false, shift: false } });
 });
 
-it("says No todos when nothing is open, with Done still there", async () => {
+it("says No todos yet when nothing is open, with New todo, and Done still there", async () => {
   state.groups = { ...empty, done: [loop("loop_v", "Cancel the hosting Pro trial", { status: "done", closedAt: NOW, closedBy: "patrick" })] };
   await render();
-  expect(container.querySelector("[data-testid=todos-empty]")?.textContent).toBe("No todos");
+  expect(container.querySelector("[data-testid=todos-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("No todos yet");
+  expect(container.querySelector("[data-testid=todos-empty] [data-testid=bot-page-empty-action]")?.textContent).toBe("New todo");
   expect(group("Done")?.textContent).toContain("Done1");
 });
 
