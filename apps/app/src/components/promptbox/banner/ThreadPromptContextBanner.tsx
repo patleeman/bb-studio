@@ -1,3 +1,4 @@
+import { REPLY_SECTION_COPY, REPLY_SECTION_ICON, type ParentRelationship } from "./parentRelationship.fork";
 import {
   experimental_THREAD_CONTEXT_SEGMENT_GROUPS,
   type ExperimentalThreadContextSegmentInput,
@@ -82,7 +83,7 @@ import { SIDEBAR_WORKING_STATUS_COLOR_CLASS } from "@bb/shared-ui/sidebar-row-cl
 export interface ThreadPromptParentThreadSection {
   parentThreadTitle: string;
   href: string;
-  relationship: "parent" | "fork";
+  relationship: ParentRelationship;
 }
 
 interface ThreadPromptChildThreadItem {
@@ -191,6 +192,7 @@ const PARENT_SECTION_COPY: Record<
     bodyLead: "This thread was forked from ",
     ariaPrefix: "Forked from",
   },
+  reply: REPLY_SECTION_COPY,
 };
 
 const PARENT_SECTION_ICON: Record<
@@ -199,6 +201,7 @@ const PARENT_SECTION_ICON: Record<
 > = {
   parent: "UserRound",
   fork: "Fork",
+  reply: REPLY_SECTION_ICON,
 };
 
 function useParentSectionAriaLabel(
