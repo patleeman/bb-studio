@@ -355,7 +355,7 @@ export function ConversationWorkersLine({ threadId: given }: { threadId?: string
           <DropdownMenuTrigger asChild>
             <button type="button" data-testid="conversation-workers-done" className={CHIP}><Icon name="Check" className="size-3 shrink-0 text-success" />{doneLabel(done.length)}</button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="max-w-80">
+          <DropdownMenuContent side="top" align="start" className="max-w-80">
             {done.map((worker) => (
               <DropdownMenuItem key={worker.threadId} data-testid="conversation-worker-done" onSelect={() => navigate.toThread(worker.threadId)}>
                 <WorkerGlyph status={worker.status} /><span className="min-w-0 truncate">{worker.title}</span>
