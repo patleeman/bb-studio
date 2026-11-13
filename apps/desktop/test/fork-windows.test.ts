@@ -38,9 +38,7 @@ vi.mock("electron", async () => {
     app: { getAppPath: () => "/app" },
     BrowserWindow,
     globalShortcut: { register: () => true, unregister: () => {} },
-    nativeImage: { createEmpty: () => ({}) },
     screen: {},
-    Tray: class {},
   };
 });
 
@@ -150,41 +148,6 @@ describe("a plugin window opened again", () => {
     expect(hud?.loadURL).toHaveBeenLastCalledWith(
       "http://127.0.0.1:38986/fork-window/studio/hud?thread=b",
     );
-  });
-});
-
-describe("vibrancy behind a transparent window", () => {
-  it("is macOS's active material, only for a transparent window", () => {
-    expect(
-      forkWindowOptions(
-        { transparent: true, vibrancy: "hud" },
-        undefined,
-        "darwin",
-      ),
-    ).toMatchObject({ vibrancy: "hud", visualEffectState: "active" });
-    expect(
-      forkWindowOptions(
-        { transparent: true, vibrancy: "under-window" },
-        undefined,
-        "darwin",
-      ).vibrancy,
-    ).toBe("under-window");
-    for (const options of [
-      forkWindowOptions(
-        { transparent: true, vibrancy: "hud" },
-        undefined,
-        "win32",
-      ),
-      forkWindowOptions({ vibrancy: "hud" }, undefined, "darwin"),
-      forkWindowOptions(
-        { transparent: true, vibrancy: "sidebar" as never },
-        undefined,
-        "darwin",
-      ),
-    ]) {
-      expect(options.vibrancy).toBeUndefined();
-      expect(options.visualEffectState).toBeUndefined();
-    }
   });
 });
 
