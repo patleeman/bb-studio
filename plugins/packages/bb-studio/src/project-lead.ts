@@ -222,8 +222,8 @@ export class ProjectLeads {
         const summary = [
           `Continue the work from /threads/${encodeURIComponent(threadId)} (${threadTitle(old)}). Read that thread with bb thread if you need more context.`,
           `Latest response (excerpt):\n${(output ?? "No response yet.").slice(-12_000)}`,
-          ledProject === PERSONAL_PROJECT_ID ? "You are now the user's Bot, the lead of their personal project and above every other project. Hand work to each project's lead, steer the workers you start (read but don't steer threads the user started), and report in this thread." : "",
-          ledProject && ledProject !== PERSONAL_PROJECT_ID ? `You are now the lead of the project ${ledProject}. Steer the workers you start (read but don't steer threads the user started), and report in this thread.` : "",
+          ledProject === PERSONAL_PROJECT_ID ? "You are now the user's Bot, the lead of their personal project and above every other project. Hand work to each project's lead, steer the workers you start (read but don't steer threads the user started), and report in this thread, one work card per job (work_card_create, then work_card_update)." : "",
+          ledProject && ledProject !== PERSONAL_PROJECT_ID ? `You are now the lead of the project ${ledProject}. Steer the workers you start (read but don't steer threads the user started), and report in this thread, one work card per job (work_card_create, then work_card_update).` : "",
         ].filter(Boolean).join("\n\n");
         const next = await this.deps.sdk.threads.spawn({
           ...request,

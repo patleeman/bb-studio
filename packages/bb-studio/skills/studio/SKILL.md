@@ -190,6 +190,28 @@ conversation started). `bot_conversations` lists them.
   Main and workers can't be finished. Finished conversations are kept; the
   user can reopen one.
 
+### Work cards
+
+Progress on a piece of work (a worker's or lead's job, a release, a todo in
+progress) goes on ONE live card, not in new status messages.
+
+- `work_card_create { title, kind, state?, step?, line? }` (kind: worker,
+  lead, release, todo, task) returns a `::work{id="wc_…"}` line. Post it once,
+  on its own line, in the conversation where the user follows the work. The
+  card stays where it was posted and redraws from live state; the
+  conversation's In flight list above the composer has a row for it, and a
+  click on the row scrolls back to the card.
+- `work_card_update { id, state?, step?, line?, needs? }` changes it in place:
+  state is running, waiting, needs-you, done or failed; step is short ("3/5
+  Tests"); line is the latest one-liner; needs says what the user must do
+  (with state needs-you). Don't post a new message for progress; update the
+  card. Post a message only for a result or a question the user must read.
+- Starting a worker: create its card first (kind worker, `workerThreadId`
+  once you know it) and give the worker the card id, so it updates the card
+  itself.
+- A done or failed card leaves the In flight list a day after it finished.
+- The CLI is `bb studio work <create|update|show|list>`.
+
 ## In the app
 
 BB's sidebar groups threads by project. Each Studio item's ⋯ menu, the

@@ -17,6 +17,8 @@ export const PAGE_POINTER = 'Pages: read with pages_read, change with small page
 /** Mini apps: when to make one and its card. */
 export const MINI_POINTER = 'For something the user will interact with or come back to, make a mini app (minis_create) and show ::mini{id="mini_…"} on its own line; details are in the studio skill.';
 
+export const WORK_POINTER = 'For work that runs a while (a worker, a release, a long job), post one live work card: work_card_create gives a ::work{id="wc_…"} line to post once; report progress with work_card_update, not new status messages.';
+
 /**
  * The end-of-reply line: the Next row (with which attributes are on and the
  * preferred quick replies) or Explore's line, or nothing when both are off.
@@ -41,6 +43,7 @@ export interface InstructionParts {
   runner: string;
   pages: boolean;
   minis: boolean;
+  work: boolean;
   /** endOfReplyPointer's line, or null. */
   endOfReply: string | null;
   /** The kinds routing line (src/kinds.ts routingInstructions), or "". */
@@ -49,6 +52,6 @@ export interface InstructionParts {
 
 /** The instructions with MEMORY_SLOT where the memory block goes (src/memory/service.ts withMemory fills it). */
 export function studioInstructions(parts: InstructionParts): string {
-  return [parts.bot, parts.conversation, parts.runner, MEMORY_SLOT, parts.pages ? PAGE_POINTER : "", parts.minis ? MINI_POINTER : "", parts.endOfReply ?? "", parts.routing]
+  return [parts.bot, parts.conversation, parts.runner, MEMORY_SLOT, parts.pages ? PAGE_POINTER : "", parts.minis ? MINI_POINTER : "", parts.work ? WORK_POINTER : "", parts.endOfReply ?? "", parts.routing]
     .filter(Boolean).join("\n\n");
 }

@@ -1,0 +1,24 @@
+@keyframes studio-work-flash {
+  0%,
+  30% {
+    box-shadow:
+      0 0 0 2px var(--ring),
+      0 0 0 7px color-mix(in oklab, var(--ring) 22%, transparent);
+  }
+  100% {
+    box-shadow:
+      0 0 0 2px transparent,
+      0 0 0 7px transparent;
+  }
+}
+
+.studio-work-card.studio-work-flash {
+  animation: studio-work-flash 1.8s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-work-card.studio-work-flash {
+    animation: none;
+    box-shadow: 0 0 0 2px var(--ring);
+  }
+}

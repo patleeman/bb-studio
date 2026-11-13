@@ -119,6 +119,9 @@ import { onMainWindowPath } from "./src/launcher/main-actions";
 import { VSCODE_MAIN_PATH } from "./src/launcher/shared";
 import { readKindsSnapshot, whenOn } from "./src/ui/kinds-snapshot";
 import { LoopDirective, LoopsDirective } from "./src/loops/ui/LoopCard";
+import { WorkDirective } from "./src/work/ui/WorkCard";
+import { InFlightBanner } from "./src/work/ui/InFlight";
+import "./src/work/ui/work.css";
 import { LOOPS_PANE, LoopsPane } from "./src/loops/ui/LoopsPane";
 import { TodosTabName } from "./src/loops/ui/tab-name";
 import { OFF_NEW_TAB, onThreadTabOpen, registerThreadTab, ThreadTabReceiver } from "./src/kit/app/thread-panel";
@@ -382,6 +385,8 @@ export default definePluginApp((app) => {
   // placeholders while the loopsEnabled setting is off.
   app.slots.messageDirective({ id: "loop", component: LoopDirective });
   app.slots.messageDirective({ id: "loops", component: LoopsDirective });
+  app.slots.messageDirective({ id: "work", component: WorkDirective });
+  app.composer.customize({ id: "in-flight", scopes: ["thread"], banners: [{ id: "in-flight", component: InFlightBanner }] });
   // The Todos pane: the todo list in a tab beside the chat.
   registerThreadTab(app, { id: LOOPS_PANE, title: newTabTitle(LOOPS_PANE) ?? "Todos", icon: "ListTodo", layout: "flush", component: LoopsPane, ...newTabFields(LOOPS_PANE) });
   // The Bot's other pages as tabs (Memory, Library, Automations, the Archive) and the New Tab page's "New …" actions (src/tab-kinds.ts).
