@@ -67,7 +67,7 @@ export class AccountsService {
       bb?.available() ? bb.status().then((value) => ({ ok: true as const, value }), () => ({ ok: false as const })) : Promise.resolve(null),
       this.deps.providers().catch(() => [] as ProviderState[]),
       this.deps.auth().catch(() => ({ entries: [] })),
-      this.deps.usage ? this.deps.usage().catch(() => ({})) : Promise.resolve({}),
+      this.deps.usage ? this.deps.usage().catch(() => null) : Promise.resolve({}),
     ]);
     this.providerStates = providers;
     const sources: SourceStatus[] = [
@@ -87,9 +87,9 @@ export class AccountsService {
     }
     const signedOut = new Set(auth.entries.filter((entry) => entry.source === "provider" && entry.signedOut).map((entry) => entry.id.slice("provider:".length)));
     const connected = accounts.some((account) => account.state === "ready" || account.state === "limited") || providers.some((state) => state.status === "ready" && !!state.loginCommand);
-    accounts.push(...localAccountViews(providers, signedOut, providerFamily, !connected, usage));
+    accounts.push(...localAccountViews(providers, signedOut, providerFamily, !connected, usage ?? {}));
     const all = computeWarnings(accounts, now, this.deps.timeZone);
-    const settled = new Set(accounts.filter((account) => sources.find((source) => source.source === account.source)?.state === "on").map((account) => account.key));
+    const settled = new Set(accounts.filter((account) => sources.find((source) => source.source === account.source)?.state === "on" && (usage !== null || account.source !== "local")).map((account) => account.key));
     this.deps.store.keepOnly(new Set(all.map((warning) => warning.id)), settled);
     const dismissed = this.deps.store.list();
     const hidden = new Set(dismissed);

@@ -9,12 +9,12 @@ import { MIGRATIONS } from "../migrations";
 import { registerAuth } from "../auth/register";
 import { accountsCli } from "./cli";
 import { LiveBbPool, liveBbUrl, loopbackUrl } from "./bb-source";
-import type { AccountView } from "./contract";
+import type { AccountView, QuotaWindow } from "./contract";
 import { readPins, readPoolSignals } from "./local-data";
 import { localAccountViews, localUsageWindows, localWindowLabel, modelWindows, poolAccountView, poolState, quotaWindows, type PoolSummary } from "./pool-view";
 import { createLiveBbPool, registerAccounts } from "./register";
 import { AccountsService, WarningStore, type AccountsDeps } from "./service";
-import { computeWarnings, NO_PROVIDER_WARNING } from "./warnings";
+import { computeWarnings, NO_PROVIDER_WARNING, popsUp } from "./warnings";
 
 const CLAUDE = "56ef0dab-0b49-4ce3-aae4-70bb3e7c3eb4";
 const CODEX = "bab2726f-30d8-49bc-887f-1dbaeeeb71d9";
@@ -119,6 +119,19 @@ describe("status mapping", () => {
     expect(computeWarnings(views, NOW, "UTC").map((warning) => warning.id)).toEqual(["local:codex:window:168 hour window:rejected"]);
   });
 
+  it("pops up a local login's window only once it is used up, and a pool account's from 90%", () => {
+    const local = localAccountViews([
+      { providerId: "codex", displayName: "Codex", status: "ready", planLabel: "Pro", accountEmail: null, loginCommand: "codex login --device-auth" },
+    ], new Set(), (id) => id, false, { codex: [{ id: "5 hour window", label: "5h", percent: 93, resetAt: null, rejected: false }, { id: "168 hour window", label: "7d", percent: 100, resetAt: null, rejected: true }] });
+    const pool = poolAccountView(summary({ id: CLAUDE, limitWindows: [window("secondary", 10080, 0.95)] }), "studio", { now: NOW });
+    const warnings = computeWarnings([...local, pool], NOW, "UTC");
+    expect(warnings.map((warning) => [warning.id, popsUp(warning)])).toEqual([
+      ["local:codex:window:5 hour window:high", false],
+      ["local:codex:window:168 hour window:rejected", true],
+      [`studio:${CLAUDE}:window:secondary:high`, true],
+    ]);
+  });
+
   it("offers every local login that can sign in while nothing is connected", () => {
     const views = localAccountViews([
       { providerId: "claude-code", displayName: "Claude Code", status: "unauthenticated", planLabel: null, accountEmail: null, loginCommand: "claude auth login" },
@@ -191,7 +204,7 @@ function studioDb() {
   return db;
 }
 
-function serviceOn(db: Database.Database, pool: { accounts: PoolSummary[] }, bbUp = true): AccountsService {
+function serviceOn(db: Database.Database, pool: { accounts: PoolSummary[] }, bbUp = true, extra: Partial<AccountsDeps> = {}): AccountsService {
   const deps: AccountsDeps = {
     studioPool: async () => pool,
     bbPool: { available: () => true, status: async () => { if (!bbUp) throw new Error("down"); return { accounts: [] }; } },
@@ -205,6 +218,7 @@ function serviceOn(db: Database.Database, pool: { accounts: PoolSummary[] }, bbU
     changed: () => {},
     now: () => NOW,
     timeZone: "UTC",
+    ...extra,
   };
   return new AccountsService(deps);
 }
@@ -235,6 +249,25 @@ describe("dismissal", () => {
     store.dismiss(`bb:${CLAUDE}:signed_out`, NOW);
     await serviceOn(db, { accounts: [] }, false).status(true);
     expect(store.list()).toEqual([`bb:${CLAUDE}:signed_out`]);
+  });
+
+  it("keeps a local window's dismissal while its usage can't be read, and drops it once the window resets", async () => {
+    const db = studioDb();
+    const providers = async () => [{ providerId: "codex", displayName: "Codex", status: "ready", planLabel: "Pro", accountEmail: null, loginCommand: "codex login --device-auth" }];
+    let usage: () => Promise<Record<string, QuotaWindow[]>> = async () => ({ codex: [{ id: "5 hour window", label: "5h", percent: 100, resetAt: RESET, rejected: true }] });
+    const service = serviceOn(db, { accounts: [] }, true, { providers, usage: () => usage() });
+    const id = "local:codex:window:5 hour window:rejected";
+    expect((await service.status(true)).warnings.map((warning) => warning.id)).toEqual([id]);
+    await service.dismiss(id);
+    usage = async () => { throw new Error("timeout"); };
+    await service.status(true);
+    usage = async () => ({ codex: [{ id: "5 hour window", label: "5h", percent: 100, resetAt: RESET, rejected: true }] });
+    const restarted = serviceOn(db, { accounts: [] }, true, { providers, usage: () => usage() });
+    expect((await restarted.status(true)).warnings).toEqual([]);
+    usage = async () => ({ codex: [{ id: "5 hour window", label: "5h", percent: 3, resetAt: RESET + 5 * 3_600_000, rejected: false }] });
+    await restarted.status(true);
+    usage = async () => ({ codex: [{ id: "5 hour window", label: "5h", percent: 100, resetAt: RESET + 5 * 3_600_000, rejected: true }] });
+    expect((await restarted.status(true)).warnings.map((warning) => warning.id)).toEqual([id]);
   });
 
   it("refuses to dismiss a warning that is not open", async () => {

@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useMemo } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import type {
   ExperimentalAppAppearance,
@@ -221,8 +221,18 @@ const AppearanceProbe = memo(function AppearanceProbe({
   const raw = useAppearance();
   const active = raw !== null && raw !== undefined;
   const key = appearanceKey(cleanAppearance(raw));
+  const wasActive = useRef(false);
   useLayoutEffect(() => {
     if (active) clearLaunchAppearance();
+  }, [active]);
+  useEffect(() => {
+    if (active) {
+      wasActive.current = true;
+      return;
+    }
+    if (!wasActive.current) return;
+    wasActive.current = false;
+    saveLaunchAppearance(null);
   }, [active]);
   useBackdropAttribute(slot, active);
   useLayoutEffect(() => {

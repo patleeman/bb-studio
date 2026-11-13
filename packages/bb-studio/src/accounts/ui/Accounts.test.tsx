@@ -10,7 +10,7 @@ vi.mock("../../kit/ui/hooks/use-pointer-coarse.js", () => ({ usePointerCoarse: (
 vi.mock("../../ui/live", () => ({ useCall: () => async () => ({}), useLive: () => ({ data: null, refresh: () => {} }) }));
 
 const { AccountsPanel, needsSignIn, signInLabel } = await import("./AccountsPanel");
-const { WarningList, actionLabel, freshWarnings, warningsWindowOptions } = await import("./Warnings");
+const { WarningList, actionLabel, freshWarnings, warningsWindowOptions, watchStep } = await import("./Warnings");
 const { pooledFamily, signedOutPoolAccount } = await import("./notices");
 const { AccountsNotice, AccountsNoticePill, attentionWarnings, noticeText } = await import("./AccountsNotice");
 const { accountNeeds } = await import("../../auth/ui/needs");
@@ -121,6 +121,20 @@ describe("warnings", () => {
     expect(warningsWindowOptions(2, { availLeft: 0, availTop: 25, availWidth: 1512 })).toMatchObject({ x: 1512 - 360 - 32, y: 37, width: 376, alwaysOnTop: true, transparent: true, frame: false });
     expect(warningsWindowOptions(9, { availWidth: 1000 }).height).toBe(warningsWindowOptions(4, { availWidth: 1000 }).height);
     expect(freshWarnings([warning({ id: "a" }), warning({ id: "b" })], new Set(["a"])).map((each) => each.id)).toEqual(["b"]);
+  });
+
+  it("opens the window for a local login only when a quota is used up, and for a pool account from 90%", () => {
+    const shown = new Set<string>();
+    const localHigh = warning({ id: "local:codex:window:5 hour window:high", source: "local", accountKey: "local:codex", kind: "window", title: "Codex 5h at 92%", action: "switch_model" });
+    const localFull = warning({ id: "local:codex:window:5 hour window:rejected", source: "local", accountKey: "local:codex", kind: "window", title: "Codex 5h at 100%", action: "switch_model" });
+    const poolHigh = warning({ id: "studio:b:window:secondary:high", accountKey: "studio:b", kind: "window", title: "Claude 7d at 92%", action: "use_other" });
+    expect(watchStep([localHigh], shown, false)).toEqual({ list: [], open: false });
+    expect(watchStep([localFull], shown, false)).toEqual({ list: [localFull], open: true });
+    expect(watchStep([localFull], shown, true)).toEqual({ list: [localFull], open: true });
+    expect(watchStep([], shown, true)).toEqual({ list: [], open: false });
+    expect(watchStep([localFull], shown, false)).toEqual({ list: [localFull], open: true });
+    expect(watchStep([localFull], shown, false).open).toBe(false);
+    expect(watchStep([poolHigh], new Set(), false)).toEqual({ list: [poolHigh], open: true });
   });
 
   it("puts each warning in Needs you, with its action, dismiss and Accounts", () => {

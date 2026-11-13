@@ -112,6 +112,36 @@ describe("launch appearance", () => {
     });
   });
 
+  it("clears the cache when the backdrop's appearance goes away during a session", async () => {
+    paintLaunch();
+    const appearance = store(null);
+    setPluginSlotRegistrations(
+      "studio",
+      makePluginRegistrationSet({
+        appBackdrops: [{ id: "theme", component: () => null, useAppearance: appearance.use }],
+      }),
+    );
+    await act(async () => {
+      render(<ForkAppBackdropHost />);
+    });
+    expect(saved).toEqual([]);
+    await act(async () => {
+      appearance.set({ mode: "dark", tokens: { "--canvas": "#101820" } });
+    });
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    });
+    expect(saved.at(-1)).toMatchObject({ mode: "dark" });
+    await act(async () => {
+      appearance.set(null);
+    });
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    });
+    expect(saved.at(-1)).toBeNull();
+    expect(root.style.getPropertyValue("--canvas")).toBe("");
+  });
+
   it("drops the cached colors and the cache when no backdrop shows up", async () => {
     vi.useFakeTimers();
     paintLaunch();

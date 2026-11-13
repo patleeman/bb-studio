@@ -56,6 +56,10 @@ export function computeWarnings(accounts: readonly AccountView[], now: number, t
   return out;
 }
 
+export function popsUp(warning: Warning): boolean {
+  return !(warning.source === "local" && (warning.kind === "window" || warning.kind === "model") && warning.id.endsWith(":high"));
+}
+
 export const NO_PROVIDER_ID = "providers:none";
 
 export const NO_PROVIDER_WARNING: Warning = { id: NO_PROVIDER_ID, accountKey: NO_PROVIDER_ID, source: "local", kind: "signed_out", title: "No provider signed in", detail: "Claude or Codex", action: "sign_in", target: null };

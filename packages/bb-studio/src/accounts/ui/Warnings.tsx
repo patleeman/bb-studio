@@ -12,6 +12,7 @@ import { WindowTheme } from "../../theme/ui/ThemeLayer";
 import type { windowsContract } from "../../windows/contract";
 import type { AccountsStatus, Warning } from "../contract";
 import { ACCOUNTS_CHANNEL, WARNINGS_WINDOW_ID } from "../shared";
+import { popsUp } from "../warnings";
 import { reloginTarget, signInLabel } from "./AccountsPanel";
 import { openAccounts } from "./store";
 
@@ -77,6 +78,14 @@ export function freshWarnings(warnings: readonly Warning[], shown: ReadonlySet<s
   return warnings.filter((warning) => !shown.has(warning.id));
 }
 
+export function watchStep(warnings: readonly Warning[], shown: Set<string>, wasOpen: boolean): { list: Warning[]; open: boolean } {
+  const list = warnings.filter(popsUp);
+  const fresh = freshWarnings(list, shown);
+  for (const warning of list) shown.add(warning.id);
+  for (const id of [...shown]) if (!list.some((warning) => warning.id === id)) shown.delete(id);
+  return { list, open: list.length > 0 && (fresh.length > 0 || wasOpen) };
+}
+
 export function useWarningActions(status: AccountsStatus | null): WarningActions {
   const call = useCall();
   const commands = useAppCommandList();
@@ -129,23 +138,14 @@ function MainWatch() {
     window.focus();
   });
 
-  const warnings = status?.warnings ?? [];
+  const warnings = (status?.warnings ?? []).filter(popsUp);
   const ids = warnings.map((warning) => warning.id).join("\n");
   useEffect(() => {
     if (!native || !status) return;
-    const list = status.warnings;
-    const fresh = freshWarnings(list, shown.current);
-    for (const warning of list) shown.current.add(warning.id);
-    for (const id of [...shown.current]) if (!list.some((warning) => warning.id === id)) shown.current.delete(id);
-    if (!list.length) {
-      if (open.current) void windows.close(WARNINGS_WINDOW_ID).catch(() => false);
-      open.current = false;
-      return;
-    }
-    if (fresh.length || open.current) {
-      open.current = true;
-      void windows.open(WARNINGS_WINDOW_ID, warningsWindowOptions(list.length, window.screen)).catch(() => false);
-    }
+    const step = watchStep(status.warnings, shown.current, open.current);
+    if (step.open) void windows.open(WARNINGS_WINDOW_ID, warningsWindowOptions(step.list.length, window.screen)).catch(() => false);
+    else if (open.current) void windows.close(WARNINGS_WINDOW_ID).catch(() => false);
+    open.current = step.open;
   }, [native, ids, status, windows]);
 
   if (native || !warnings.length) return null;
@@ -157,7 +157,7 @@ export function WarningsWindow() {
   const call = useCall();
   const relay = useRpc<typeof windowsContract>();
   const windows = useHostWindows();
-  const warnings = live.data?.warnings ?? [];
+  const warnings = (live.data?.warnings ?? []).filter(popsUp);
   const empty = !!live.data && !warnings.length;
   useEffect(() => {
     if (empty) void windows.close(WARNINGS_WINDOW_ID).catch(() => false);
