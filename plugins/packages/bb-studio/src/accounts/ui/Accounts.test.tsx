@@ -85,6 +85,30 @@ describe("Accounts panel", () => {
     expect(container().querySelector('[data-account="studio:a"] [data-testid="relogin"]')).not.toBeNull();
   });
 
+  it("shows a local login that isn't signed in as Signed out with Sign in, and wraps reset times and labels instead of cutting them off", async () => {
+    const onSignIn = vi.fn();
+    const status: AccountsStatus = {
+      ...STATUS,
+      accounts: [
+        account({ key: "local:claude-code", name: "Claude Code", label: "someone-with-a-long-address@example.test · Ultra", signIn: "provider:claude-code", windows: [{ id: "weekly", label: "Weekly limit", percent: 45, resetAt: RESET, rejected: false }] }),
+        account({ key: "local:codex", provider: "codex", name: "Codex", label: null, state: "signed_out", signIn: "provider:codex" }),
+      ],
+    };
+    await render(<AccountsPanel status={status} error={null} signingIn={null} onSignIn={onSignIn} onSignInDone={() => {}} onRefresh={() => {}} onClose={() => {}} api={api} now={NOW} />);
+    const root = container();
+    expect(root.querySelectorAll(".truncate")).toHaveLength(0);
+    const reset = root.querySelector('[data-account="local:claude-code"] [data-testid="quota-reset"]')!;
+    expect(reset.textContent).toMatch(/^resets Nov 16, /);
+    expect(reset.className).toContain("whitespace-nowrap");
+    expect(reset.parentElement!.className).toContain("flex-wrap");
+    expect(root.querySelector('[data-account="local:claude-code"] [data-testid="account-label"]')!.className).toContain("break-all");
+    const codex = root.querySelector('[data-account="local:codex"]')!;
+    expect(codex.querySelector('[data-testid="account-state"]')!.textContent).toBe("Signed out");
+    expect(codex.querySelector('[data-testid="account-sign-in"]')!.textContent).toBe("Sign in");
+    await act(async () => { (codex.querySelector('[data-testid="account-sign-in"]') as HTMLButtonElement).click(); });
+    expect(onSignIn).toHaveBeenCalledWith(expect.objectContaining({ key: "local:codex" }));
+  });
+
   it("offers Sign in only for signed-out or failing accounts with a sign-in", () => {
     expect(needsSignIn(account({ key: "studio:a", state: "signed_out" }))).toBe(true);
     expect(needsSignIn(account({ key: "studio:a", state: "limited" }))).toBe(false);

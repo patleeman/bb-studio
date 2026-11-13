@@ -14,7 +14,7 @@ import { readPins, readPoolSignals } from "./local-data";
 import { localAccountViews, localUsageWindows, localWindowLabel, modelWindows, poolAccountView, poolState, quotaWindows, type PoolSummary } from "./pool-view";
 import { createLiveBbPool, registerAccounts } from "./register";
 import { AccountsService, WarningStore, type AccountsDeps } from "./service";
-import { computeWarnings, NO_PROVIDER_WARNING, popsUp } from "./warnings";
+import { computeWarnings, NO_PROVIDER_WARNING, popsUp, resetText } from "./warnings";
 
 const CLAUDE = "56ef0dab-0b49-4ce3-aae4-70bb3e7c3eb4";
 const CODEX = "bab2726f-30d8-49bc-887f-1dbaeeeb71d9";
@@ -84,15 +84,18 @@ describe("status mapping", () => {
     expect(poolAccountView(summary({ id: CLAUDE, kind: "api-key" }), "studio").signIn).toBeNull();
   });
 
-  it("lists local logins that are signed in or were signed out", () => {
+  it("lists local logins that are signed in, were signed out, or can sign in, and leaves out ones that can't", () => {
     const views = localAccountViews([
       { providerId: "claude-code", displayName: "Claude Code", status: "ready", planLabel: "Proxied", accountEmail: null, loginCommand: "claude auth login" },
       { providerId: "codex", displayName: "Codex", status: "expired", planLabel: null, accountEmail: "me@example.test", loginCommand: "codex login --device-auth" },
       { providerId: "gemini", displayName: "Gemini", status: "unauthenticated", planLabel: null, accountEmail: null, loginCommand: "gemini login" },
+      { providerId: "acp-grok", displayName: "Grok Build", status: "unauthenticated", planLabel: null, accountEmail: null, loginCommand: null },
+      { providerId: "acp-cursor", displayName: "Cursor", status: "not_installed", planLabel: null, accountEmail: null, loginCommand: "cursor login" },
     ], new Set(["codex"]), (id) => (id === "claude-code" ? "claude" : id));
     expect(views.map((view) => [view.key, view.state, view.label, view.signIn])).toEqual([
       ["local:claude-code", "ready", "Account Pooler", "provider:claude-code"],
       ["local:codex", "signed_out", "me@example.test", "provider:codex"],
+      ["local:gemini", "signed_out", null, "provider:gemini"],
     ]);
   });
 
@@ -111,7 +114,7 @@ describe("status mapping", () => {
     const views = localAccountViews([
       { providerId: "claude-code", displayName: "Claude Code", status: "ready", planLabel: "Proxied", accountEmail: null, loginCommand: "claude auth login" },
       { providerId: "codex", displayName: "Codex", status: "ready", planLabel: "Pro", accountEmail: null, loginCommand: "codex login --device-auth" },
-    ], new Set(), (id) => (id === "claude-code" ? "claude" : id), false, usage);
+    ], new Set(), (id) => (id === "claude-code" ? "claude" : id), usage);
     expect(views.map((view) => [view.key, view.windows.map((window) => window.label)])).toEqual([
       ["local:claude-code", []],
       ["local:codex", ["5h", "7d"]],
@@ -122,7 +125,7 @@ describe("status mapping", () => {
   it("pops up a local login's window only once it is used up, and a pool account's from 90%", () => {
     const local = localAccountViews([
       { providerId: "codex", displayName: "Codex", status: "ready", planLabel: "Pro", accountEmail: null, loginCommand: "codex login --device-auth" },
-    ], new Set(), (id) => id, false, { codex: [{ id: "5 hour window", label: "5h", percent: 93, resetAt: null, rejected: false }, { id: "168 hour window", label: "7d", percent: 100, resetAt: null, rejected: true }] });
+    ], new Set(), (id) => id, { codex: [{ id: "5 hour window", label: "5h", percent: 93, resetAt: null, rejected: false }, { id: "168 hour window", label: "7d", percent: 100, resetAt: null, rejected: true }] });
     const pool = poolAccountView(summary({ id: CLAUDE, limitWindows: [window("secondary", 10080, 0.95)] }), "studio", { now: NOW });
     const warnings = computeWarnings([...local, pool], NOW, "UTC");
     expect(warnings.map((warning) => [warning.id, popsUp(warning)])).toEqual([
@@ -138,19 +141,20 @@ describe("status mapping", () => {
       { providerId: "codex", displayName: "Codex", status: "expired", planLabel: null, accountEmail: null, loginCommand: "codex login --device-auth" },
       { providerId: "acp-omp", displayName: "omp", status: "unauthenticated", planLabel: null, accountEmail: null, loginCommand: null },
       { providerId: "acp-cursor", displayName: "Cursor", status: "not_installed", planLabel: null, accountEmail: null, loginCommand: "cursor login" },
-    ], new Set(), (id) => id, true);
+    ], new Set(), (id) => id);
     expect(views.map((view) => [view.key, view.state, view.signIn])).toEqual([
       ["local:claude-code", "signed_out", "provider:claude-code"],
       ["local:codex", "signed_out", "provider:codex"],
     ]);
   });
 
-  it("names OpenCode as OpenCode, whatever the provider calls itself", () => {
+  it("names OpenCode and Oh My Pi by their display names, whatever the provider calls itself", () => {
     const views = localAccountViews([
       { providerId: "claude-code", displayName: "Claude Code", status: "ready", planLabel: null, accountEmail: null, loginCommand: "claude auth login" },
       { providerId: "acp-opencode", displayName: "opencode", status: "ready", planLabel: null, accountEmail: null, loginCommand: "opencode auth login" },
+      { providerId: "acp-omp", displayName: "omp", status: "ready", planLabel: null, accountEmail: null, loginCommand: "omp login" },
     ], new Set(), (id) => id);
-    expect(views.map((view) => view.name)).toEqual(["Claude Code", "OpenCode"]);
+    expect(views.map((view) => view.name)).toEqual(["Claude Code", "OpenCode", "Oh My Pi"]);
   });
 });
 
@@ -169,7 +173,16 @@ describe("warnings", () => {
     expect(warnings.map((warning) => [warning.id, warning.title, warning.action])).toEqual([
       ["studio:a:window:secondary:high", "Claude 7d at 90%", "switch_model"],
     ]);
-    expect(warnings[0]!.detail).toBe("BB Studio · Sam · resets Nov 16, 09:00");
+    expect(warnings[0]!.detail).toBe(`BB Studio · Sam · resets Nov 16, ${new Date(RESET).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZone: "UTC" })}`);
+  });
+
+  it("writes reset times on the locale's own clock, 12- or 24-hour, with the day only when it isn't today in that time zone", () => {
+    expect(resetText(RESET, NOW, "UTC", "en-US")).toBe("resets Nov 16, 9:00 AM");
+    expect(resetText(RESET, NOW, "UTC", "en-GB")).toMatch(/^resets 16 Nov, 0?9:00$/);
+    expect(resetText(Date.UTC(2026, 10, 12, 23, 0), NOW, "UTC", "en-US")).toBe("resets 11:00 PM");
+    expect(resetText(Date.UTC(2026, 10, 12, 23, 0), NOW, "UTC", "de-DE")).toBe("resets 23:00");
+    expect(resetText(Date.UTC(2026, 10, 13, 2, 0), Date.UTC(2026, 10, 12, 23, 0), "America/New_York", "en-US")).toBe("resets 9:00 PM");
+    expect(resetText(null, NOW, "UTC", "en-US")).toBeNull();
   });
 
   it("names a rejected model with Switch model, and offers Use other account when another BB Studio account is ready", () => {
@@ -514,6 +527,29 @@ describe("live bb", () => {
     await expect((pool as unknown as { call(method: string, input: unknown, schema: unknown): Promise<unknown> }).call("account.remove", { id: CLAUDE }, null)).rejects.toThrow(/not called/);
     await expect((pool as unknown as { call(method: string, input: unknown, schema: unknown): Promise<unknown> }).call("routing.set", { provider: "claude", enabled: false }, null)).rejects.toThrow(/not called/);
     expect(w.calls).toEqual([]);
+  });
+});
+
+describe("a local login that was never signed in", () => {
+  const providers = async () => [
+    { providerId: "claude-code", displayName: "Claude Code", status: "ready", planLabel: "Max", accountEmail: null, loginCommand: "claude auth login" },
+    { providerId: "codex", displayName: "Codex", status: "unauthenticated", planLabel: null, accountEmail: null, loginCommand: "codex login --device-auth" },
+  ];
+
+  it("is listed signed out with its sign-in, and raises no warning while another login is ready", async () => {
+    const status = await serviceOn(studioDb(), { accounts: [] }, true, { providers }).status(true);
+    expect(status.accounts.map((account) => [account.key, account.state, account.signIn])).toEqual([
+      ["local:claude-code", "ready", "provider:claude-code"],
+      ["local:codex", "signed_out", "provider:codex"],
+    ]);
+    expect(status.warnings).toEqual([]);
+  });
+
+  it("raises its warning once it was signed out, or when nothing else is signed in", async () => {
+    const signedOut = { entries: [{ id: "provider:codex", source: "provider" as const, provider: "codex", name: "Codex", detail: null, signedOut: true, reason: "signed_out" as const }] };
+    expect((await serviceOn(studioDb(), { accounts: [] }, true, { providers, auth: async () => signedOut }).status(true)).warnings.map((warning) => warning.id)).toEqual(["local:codex:signed_out"]);
+    const nothing = async () => (await providers()).map((state) => ({ ...state, status: "unauthenticated" }));
+    expect((await serviceOn(studioDb(), { accounts: [] }, true, { providers: nothing }).status(true)).warnings.map((warning) => warning.id)).toEqual(["local:claude-code:signed_out", "local:codex:signed_out"]);
   });
 });
 
