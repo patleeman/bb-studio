@@ -1,6 +1,6 @@
 // The Bot's Automations page (`studio/automations`) and its tab: what runs
 // when now lives on the Bot's Todos page, under Scheduled
-// (src/loops/ui/TodosPage.tsx), so this shows that page opened there.
+// (src/loops/ui/TodosPage.tsx), so this shows that page, opened at the top.
 // Switching Bots in the sidebar switches the page.
 import { Icon, openAppPath } from "../../kit/app/index";
 import { Button } from "../../kit/ui/button";
@@ -23,7 +23,7 @@ export function AutomationsPanel() {
   const bot = shownBot(list, useCurrentBot());
   if (bot) {
     return (
-      <TodosPage key={bot.id} view={{ bot, run: null }} focus="scheduled" />
+      <TodosPage key={bot.id} view={{ bot, run: null }} />
     );
   }
   return (

@@ -361,7 +361,7 @@ export default definePluginApp((app) => {
   // Main tabs kept each Bot as a fixed workbench tab; those close once.
   app.slots.experimental_appOverlay({ id: "retire-fixed-tabs", component: RetireFixedBotTabs });
   app.slots.experimental_appOverlay({ id: "todos-tab-name", component: TodosTabName });
-  // `studio/automations`: the Bot's Todos page opened at Scheduled (src/ui/automations/AutomationsPanel.tsx).
+  // `studio/automations`: the Bot's Todos page (src/ui/automations/AutomationsPanel.tsx).
   // Its title row is the page's own, in BB's title bar (headerContent), as the Library's is: one row, not two.
   app.slots.navPanel({ id: AUTOMATIONS_PANEL, title: "Todos", icon: "ListTodo", path: AUTOMATIONS_PANEL, component: withPageTabs(AutomationsPanel, AUTOMATIONS_PANEL), headerContent: StudioBarSlot, ...OFF_RAIL });
   // VS Code, its own page in BB's rail (`studio/vscode`): the workspace used

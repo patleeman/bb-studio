@@ -35,10 +35,11 @@ it("shows the picked Bot, else the primary, else the first", () => {
   expect(shownBot([], null)).toBeNull();
 });
 
-it("with one Bot, is that Bot's Todos page opened at Scheduled, full-page, with no switcher", async () => {
+it("with one Bot, is that Bot's Todos page opened at the top, full-page, with no switcher", async () => {
   state.bots = [{ id: "bot_main", name: "Chief of Staff", avatar: "🤖", state: "active", primary: true }];
   await act(async () => root.render(<AutomationsPanel />));
-  expect(section()?.dataset).toMatchObject({ bot: "bot_main", disabled: "false", external: "false", focus: "scheduled" });
+  expect(section()?.dataset).toMatchObject({ bot: "bot_main", disabled: "false", external: "false" });
+  expect(section()?.dataset.focus).toBeUndefined();
   expect(tabs()).toHaveLength(0);
 });
 

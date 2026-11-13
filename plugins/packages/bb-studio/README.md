@@ -1105,7 +1105,7 @@ Search page of its own.
 **Tab kinds.** Everything that can be a tab beside a conversation is one
 registry, `src/tab-kinds.ts`: Conversation, Worker, Bot; Page, Whiteboard,
 Design, App, Artifact, Recording; Visual Chat board; Memory,
-Library, Scheduled (the Todos page at Scheduled), Todos, Archive; VS Code; and bb's own File, Diff,
+Library, Scheduled (the Todos page), Todos, Archive; VS Code; and bb's own File, Diff,
 Browser, Terminal and Workflow run. Each kind has its name, icon, the tab that
 shows it, its address, where its recent rows come from and whether it has a
 sidebar row. The New Tab page, Recent, drag and drop, the agent's
@@ -1219,7 +1219,7 @@ Plugins, Settings. Studio adds nothing to it. Its pages are nav panels with
 BB's `experimental_hideFromNavigation: true`: a route, and no rail icon,
 More entry, Customize row or command palette entry. They are the Library and the Bot's pages
 under it (`studio/studio`: Memory, Bot info, Controls, Todos, Archive),
-the Todos page at Scheduled (`studio/automations`, titled Todos) and VS Code (`studio/vscode`); Visual
+the Todos page (`studio/automations`, titled Todos) and VS Code (`studio/vscode`); Visual
 Chat's page is off the rail too. The Bot sidebar's page rows open them. Only
 the BB Studio fork gets the field: stock BB refuses a nav panel with an
 `experimental_` field it doesn't know, which drops the plugin's whole

@@ -193,7 +193,7 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
     ...botPage("automations", "Scheduled", "ListTodo", TAB_IDS.automations),
     actions: [], recents: null,
     surfaces: {
-      newTab: { na: "The Todos page is the one entry; this address opens it at Scheduled." },
+      newTab: { na: "The Todos page is the one entry; this address opens it." },
       recent: { na: "Recent lists the Todos page once, under Todos." },
       sidebarDrag: "added", workbenchOpen: "added", chatLink: "had",
     },

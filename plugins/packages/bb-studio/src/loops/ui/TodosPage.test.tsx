@@ -35,6 +35,7 @@ vi.mock("../../ui/live", () => ({
     const data = method === "loops.list" ? state.groups
       : method === "loops.scheduled" ? { items: state.scheduled }
       : method === "bot_get" ? { bot: { id: "bot_1", name: "Chief of Staff", threadId: "thr_bot" } }
+      : method === "bot_list" ? { bots: [{ id: "bot_1", name: "Chief of Staff", threadId: "thr_bot", primary: true, state: "active" }] }
         : method === "project_leads" ? { leads: [{ projectId: "proj_k", leadThreadId: "thr_lead", run: null }] }
           : method === "loops.places" ? { names: ["Home", "Office", "Mom’s"] }
             : method === "bot_attention" ? { attention: state.attention } : null;
@@ -286,5 +287,18 @@ it("lists the Bot's check-ins, reminders, watchers and runners under Scheduled, 
   const rows = [...container.querySelectorAll("[data-testid=todos-scheduled] [data-testid=scheduled-row]")];
   expect(rows.map((each) => each.textContent)).toEqual(["Morning brief4:00 PM", "Inbox watchPaused"]);
   expect(rows[0]!.getAttribute("data-row-link")).toBe("bb://automation/bot_1%3AMorning%20brief");
+  state.scheduled = [];
+});
+
+it("opens at the top, also as studio/automations: nothing scrolls the page to Scheduled", async () => {
+  const scrolled = vi.fn();
+  Element.prototype.scrollIntoView = scrolled;
+  state.scheduled = [{ key: "Morning brief", source: "automation", id: "Morning brief", botId: "bot_1", botName: "Chief of Staff", kind: "checkin", title: "Morning brief", nextAt: null, state: "active", scheduleText: "Daily 8:00", threadId: "thr_bot", link: "bb://automation/bot_1%3AMorning%20brief" }];
+  const { AutomationsPanel } = await import("../../ui/automations/AutomationsPanel");
+  await act(async () => root.render(<AutomationsPanel />));
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  expect(container.querySelector("[data-testid=scheduled-row]")).not.toBeNull();
+  expect(scrolled).not.toHaveBeenCalled();
+  delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
   state.scheduled = [];
 });
