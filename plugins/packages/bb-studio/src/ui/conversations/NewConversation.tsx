@@ -10,6 +10,7 @@
 import { experimental_NewThreadComposer as NewThreadComposer, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useState } from "react";
 import { StudioBar } from "../../kit/app/index";
+import { PageBar } from "../page-bar";
 import { errorMessage } from "../../kit/format";
 import { toReasoningLevel } from "../../kit/reasoning";
 import { useGlass } from "../../theme/glass";
@@ -31,7 +32,7 @@ export function NewConversationPage({ botId, projectId }: { botId: string; proje
   return (
     <div data-testid="new-conversation-page" {...{ [START_PAGE_ATTRIBUTE]: "" }} className="flex h-full min-h-0 flex-col text-foreground">
       <style>{START_PAGE_CSS}</style>
-      <StudioBar slotOnly={glass}>{glass ? <span hidden /> : <span className="truncate px-1.5 text-sm text-muted-foreground">{bot ? `New conversation · ${bot.name}` : "New conversation"}</span>}</StudioBar>
+      {glass ? <StudioBar slotOnly><span hidden /></StudioBar> : <PageBar title="New conversation" detail={bot?.name} />}
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center gap-2 px-4 pt-12 pb-[16vh]">
           {view.error && !view.data ? <p role="alert" className="text-sm text-destructive">{view.error}</p> : null}
