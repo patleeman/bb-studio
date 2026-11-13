@@ -50,6 +50,7 @@ export interface BotThreadsServerDeps {
   creatorThreads?(): ReadonlyMap<string, string>;
   starred?(): ReadonlySet<string>;
   botItems?(): ReadonlyMap<string, string>;
+  fileFormats?(): ReadonlyMap<string, string>;
   /** Tells every window something changed (Studio's realtime channel), and the phone which Bots' threads did. */
   changed(changes: readonly BotChange[]): void;
   log(message: string): void;
@@ -128,6 +129,7 @@ export function libraryItems(input: {
   creators?: ReadonlyMap<string, string>;
   starred?: ReadonlySet<string>;
   botItems?: ReadonlyMap<string, string>;
+  formats?: ReadonlyMap<string, string>;
   record(threadId: string): BotThreadRecord | null;
   title(threadId: string): string;
 }): LibraryItem[] {
@@ -143,7 +145,7 @@ export function libraryItems(input: {
     const conversationId = rec ? (rec.kind === "conversation" ? rec.threadId : rec.ownerConversationId) : null;
     const info = itemType(item.type);
     result.push({
-      pluginId: item.pluginId, id: item.id, title: item.title.trim() || "Untitled", kind: libraryKind(item.type), type: item.type,
+      pluginId: item.pluginId, id: item.id, title: item.title.trim() || "Untitled", kind: libraryKind(item.type), type: item.type, format: input.formats?.get(key) ?? null,
       href: item.href ?? (info ? familyHref(info.family, item.id) : null), updatedAt: item.updatedAt, createdAt: item.createdAt || null,
       madeIn: origin ? { threadId: origin, title: input.title(origin), kind: rec?.kind ?? "conversation", conversationId, conversationTitle: conversationId ? input.title(conversationId) : null } : null,
       starred: input.starred?.has(key) ?? false,
@@ -474,7 +476,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     const records = new Map(threadIds.flatMap((threadId) => { const rec = store.get(threadId); return rec ? [[threadId, rec] as const] : []; }));
     const owners = [...records.values()].flatMap((rec) => rec.ownerConversationId ? [rec.ownerConversationId] : []);
     const threads = await facts([...threadIds, ...owners]);
-    return { botId: id, items: libraryItems({ botId: id, primaryId: deps.bots()[0]?.id ?? null, items, origins, creators, starred: deps.starred?.() ?? new Set(), botItems: deps.botItems?.() ?? new Map(), record: (threadId) => records.get(threadId) ?? store.get(threadId), title: titleFrom(threads) }) };
+    return { botId: id, items: libraryItems({ botId: id, primaryId: deps.bots()[0]?.id ?? null, items, origins, creators, starred: deps.starred?.() ?? new Set(), botItems: deps.botItems?.() ?? new Map(), formats: deps.fileFormats?.() ?? new Map(), record: (threadId) => records.get(threadId) ?? store.get(threadId), title: titleFrom(threads) }) };
   };
 
   const rpc = {

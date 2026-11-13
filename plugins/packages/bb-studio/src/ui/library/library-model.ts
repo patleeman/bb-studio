@@ -4,6 +4,7 @@
 // conversation (default), kind or date, newest first everywhere. In a group,
 // near-identical files from one source are one row with a count, and a group
 // shows 8 rows, then "N more" (UX review 3, item 7).
+import { TYPE_LABELS, type ArtifactType } from "../../artifacts/shared";
 import type { LibraryItem, LibraryKind } from "../../bot-threads-contract";
 
 export type LibraryGroupBy = "conversation" | "kind" | "date";
@@ -32,6 +33,8 @@ export const LIBRARY_GROUPS: readonly { id: LibraryGroupBy; label: string }[] = 
 
 const KIND_LABEL: Record<LibraryKind, string> = { page: "Page", whiteboard: "Whiteboard", design: "Design", app: "App", artifact: "App", recording: "Recording", other: "Other" };
 export const kindLabel = (kind: LibraryKind): string => KIND_LABEL[kind];
+const FILE_LABEL: Record<ArtifactType, string> = { ...TYPE_LABELS, html: "App", markdown: "Document", text: "Document" };
+export const itemLabel = (item: Pick<LibraryItem, "kind" | "format">): string => (item.kind === "artifact" && item.format && item.format in FILE_LABEL ? FILE_LABEL[item.format as ArtifactType] : kindLabel(item.kind));
 const listedKind = (kind: LibraryKind): LibraryKind => kind === "artifact" ? "app" : kind;
 
 /** One row of a group: a file, or several near-identical ones from one source as one row (the newest opens). */
@@ -101,7 +104,7 @@ export function provenance(item: Pick<LibraryItem, "madeIn" | "byBot" | "title">
 
 export function libraryMeta(item: LibraryItem, groupBy: LibraryGroupBy, botName?: string): string[] {
   const where = groupBy === "conversation" && item.madeIn && !byWorker(item) ? "" : provenance(item, botName);
-  return [groupBy === "kind" ? "" : kindLabel(item.kind), where].filter(Boolean);
+  return [groupBy === "kind" ? "" : itemLabel(item), where].filter(Boolean);
 }
 
 /** Whether a file passes the search (its title, or where it was made), the filter (Starred or a kind) and, for apps, the type. */

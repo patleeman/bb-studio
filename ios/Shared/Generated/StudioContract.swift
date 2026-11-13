@@ -20149,6 +20149,7 @@ public enum Studio {
     public var title: String?
     public var kind: BotLibraryOutputItemsItemKind?
     public var type: String?
+    public var format: String?
     public var href: String?
     public var updatedAt: Double?
     public var createdAt: Double?
@@ -20156,12 +20157,13 @@ public enum Studio {
     public var starred: Bool?
     public var byBot: Bool?
 
-    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, kind: BotLibraryOutputItemsItemKind? = nil, type: String? = nil, href: String? = nil, updatedAt: Double? = nil, createdAt: Double? = nil, madeIn: BotLibraryOutputItemsItemMadeIn? = nil, starred: Bool? = nil, byBot: Bool? = nil) {
+    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, kind: BotLibraryOutputItemsItemKind? = nil, type: String? = nil, format: String? = nil, href: String? = nil, updatedAt: Double? = nil, createdAt: Double? = nil, madeIn: BotLibraryOutputItemsItemMadeIn? = nil, starred: Bool? = nil, byBot: Bool? = nil) {
       self.pluginId = pluginId
       self.id = id
       self.title = title
       self.kind = kind
       self.type = type
+      self.format = format
       self.href = href
       self.updatedAt = updatedAt
       self.createdAt = createdAt

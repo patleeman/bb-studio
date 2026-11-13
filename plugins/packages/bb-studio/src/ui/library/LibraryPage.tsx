@@ -22,7 +22,7 @@ import { foldRows, LIBRARY_APP_TYPES, LIBRARY_GROUPS, LIBRARY_KINDS, libraryGrou
 const GROUP_KEY = "studio.library.group";
 
 /** The Studio kind whose icon a file shows. */
-const iconKind = (item: LibraryItem): string => item.kind === "whiteboard" ? "drawing" : item.kind === "app" ? item.type ?? "mini" : item.kind === "other" ? item.type ?? "page" : item.kind;
+const iconKind = (item: LibraryItem): string => item.kind === "whiteboard" ? "drawing" : item.kind === "app" ? item.type ?? "mini" : item.kind === "other" ? item.type ?? "page" : item.kind === "artifact" && (item.format === "markdown" || item.format === "text") ? "page" : item.kind;
 
 function readGroup(): LibraryGroupBy {
   try { const value = localStorage.getItem(GROUP_KEY); return value === "kind" || value === "date" ? value : "conversation"; } catch { return "conversation"; }

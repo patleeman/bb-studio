@@ -26403,6 +26403,12 @@
                     "null"
                   ]
                 },
+                "format": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "href": {
                   "type": [
                     "string",

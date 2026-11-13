@@ -1015,6 +1015,7 @@ export default async function plugin(bb: BbPluginApi) {
     originThreads: () => services.originThreads(),
     creatorThreads: () => services.creatorThreads(),
     starred: () => new Set(stars.map().keys()),
+    fileFormats: () => new Map(artifacts.store.list().map((artifact) => [`artifacts:${artifact.id}`, artifactVersionType(artifact.version)] as const)),
     botItems: () => new Map(bots.list().flatMap((bot) => (bot.memoryPageId ? [[`pages:${bot.memoryPageId}`, bot.id] as const] : []))),
     // Many events in a row reload open views once.
     changed: botThreadsChanged,

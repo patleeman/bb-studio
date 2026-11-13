@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { LibraryItem } from "../../bot-threads-contract";
-import { dateGroup, foldRows, GROUP_FOLD, LIBRARY_APP_TYPES, LIBRARY_KINDS, libraryGroups, libraryMeta, libraryPasses, libraryRows, provenance, titleStem } from "./library-model";
+import { dateGroup, foldRows, GROUP_FOLD, LIBRARY_APP_TYPES, LIBRARY_KINDS, itemLabel, libraryGroups, libraryMeta, libraryPasses, libraryRows, provenance, titleStem } from "./library-model";
 
 const DAY = 24 * 60 * 60_000;
 const NOW = new Date(2026, 10, 11, 15, 0).getTime();
@@ -79,6 +79,14 @@ it("says where a file came from", () => {
   expect(provenance(files[0]!)).toBe("made in Launch prep");
   expect(provenance(files[2]!)).toBe("by Fable: Breakdown pages");
   expect(provenance(files[4]!)).toBe("made by you");
+});
+
+it("names a saved file by what it is: a Markdown file is a Document, an HTML file an App", () => {
+  const saved = (id: string, format: string | null) => item({ id, kind: "artifact", type: "artifact", format });
+  expect(["markdown", "text", "html", "image", "pdf", null].map((format) => itemLabel(saved(format ?? "none", format)))).toEqual(["Document", "Document", "App", "Image", "PDF", "App"]);
+  expect(itemLabel(item({ id: "timer", kind: "app", type: "mini" }))).toBe("App");
+  expect(libraryMeta(saved("notes", "markdown"), "conversation")).toEqual(["Document", "made by you"]);
+  expect(libraryGroups([saved("notes", "markdown")], { query: "", kind: "all", groupBy: "kind" }, NOW).map((group) => group.title)).toEqual(["Apps"]);
 });
 
 it("never says a file is by a worker named after the file", () => {
