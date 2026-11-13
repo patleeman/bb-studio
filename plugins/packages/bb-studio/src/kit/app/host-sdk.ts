@@ -132,16 +132,20 @@ export function registerPaletteSearch(slots: object, registration: PaletteSearch
   return true;
 }
 
+export type SidebarSectionPlacement = "list" | "footer";
+
 export interface SidebarSectionProps {
   activeThreadId: string | null;
   activeProjectId: string | null;
   isCompactViewport: boolean;
   onNavigate: () => void;
+  placement?: SidebarSectionPlacement;
 }
 
 export interface SidebarSectionRegistration {
   id: string;
   title: string;
+  placement?: SidebarSectionPlacement;
   component: (props: SidebarSectionProps) => ReactNode;
 }
 

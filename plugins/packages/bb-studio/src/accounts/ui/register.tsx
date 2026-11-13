@@ -1,9 +1,10 @@
 import type { PluginAppBuilder } from "@get-bb/plugin-sdk/app";
 import type { ComponentType } from "react";
-import { member, registerThreadBanner } from "../../kit/app/host-sdk";
+import { member, registerSidebarSection, registerThreadBanner } from "../../kit/app/host-sdk";
 import { registerHostWindow } from "../../kit/app/windows";
 import { WARNINGS_WINDOW_ID } from "../shared";
 import { AccountsFooter } from "./AccountsPanel";
+import { AccountsNotice } from "./AccountsNotice";
 import { ModelLoadNotice, ThreadSignedOutBanner } from "./notices";
 import { hasAccountsFooter, openAccounts, setAccountsFooter, toggleAccounts } from "./store";
 import { setLinkActionHandler } from "../../links/actions";
@@ -28,6 +29,7 @@ export function registerAccountsApp(app: PluginAppBuilder): void {
   setLinkActionHandler("accounts", () => { if (!hasAccountsFooter()) return false; openAccounts(); return true; });
   app.commands.register({ id: ACCOUNTS_COMMAND_ID, title: "Accounts", run: () => { toggleAccounts(); } });
   app.slots.experimental_appOverlay({ id: "accounts-watch", component: AccountsWatch });
+  registerSidebarSection(app.slots, { id: "accounts-notice", title: "Accounts", placement: "footer", component: AccountsNotice });
   registerThreadBanner(app.slots, { id: "signed-out", component: ThreadSignedOutBanner });
   registerModelLoadNotice(app.slots, { id: "signed-out", component: ModelLoadNotice });
   registerHostWindow(app.slots, { id: WARNINGS_WINDOW_ID, title: "Accounts", component: WarningsWindow });

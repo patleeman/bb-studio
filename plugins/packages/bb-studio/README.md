@@ -4172,6 +4172,24 @@ actions; restoring there shows the dry run and asks before it changes
 anything. [docs/backup.md](../../docs/backup.md) describes the file format,
 what's left out and how conflicts are handled.
 
+## Sidebar footer
+
+The footer holds Settings, **Theme**, **···** and BB's update button. Once per
+install Studio moves BB's Mobile apps, Report a bug and Provider usage items
+and its own Accounts, Plugin health and Report a bug items into **···**
+(`src/footer-arrangement.ts`, BB's `sidebar.hiddenFooterItems`); Customize
+footer puts any of them back, and Studio doesn't redo it. On BB Studio 1.0.1
+and later Studio also hides BB's own Mobile page (bb's TestFlight and Android
+downloads; the server address stays in Settings, Machines), BB's Mobile apps
+and Report a bug items and Provider usage's item
+(`slots.experimental_hideHostEntries`, `src/ui/footer/hide-bb-chrome.ts`).
+Usage is in Accounts.
+
+**Report a bug** opens a new issue on `patleeman/bb-studio` with the bug form
+(`.github/ISSUE_TEMPLATE/bug_report.yml`) filled with the BB Studio version,
+the bb base ("bb 0.49.0 @ 7794941") and the OS from the browser's client
+hints. Nothing else is sent; logs go in only if you paste them.
+
 ## Plugin health
 
 Studio checks every enabled plugin when it starts and every 3 minutes after
@@ -4186,7 +4204,7 @@ that. It reads two things:
   defaults to the plugin's settings page. Studio Decisions reports a missing
   or failing Jev provider and an unavailable fallback model.
 
-The **Plugin health** item in the sidebar footer lists the problems. It opens
+The **Plugin health** item in the sidebar footer's **···** menu lists the problems. It opens
 by itself when a problem you haven't seen is found twice in a row, 30 seconds
 apart, so a plugin that's only reloading doesn't open it. It closes by itself
 once those problems are fixed or hidden, or with its close button. Each problem has three
@@ -4244,19 +4262,22 @@ fails or expires); with a paste step it prints the `complete` command instead.
 
 ## Accounts
 
-**Accounts** (the sidebar footer, **Accounts** in ⌘K, or a row in the Bot
+**Accounts** (the sidebar footer's **···** menu, the notice above the footer,
+**Accounts** in ⌘K, or a row in the Bot
 page's **Needs you**) lists every sign-in BB's agents run on, in three groups:
 
 | Group | What it lists | Read from |
 | --- | --- | --- |
 | BB Studio | this app's Account Pooler accounts | the pooler's `status.get`, the pooler's refresh-rejection markers (key names only) and whether each login file exists (never its contents) |
 | bb | the Account Pooler of the bb install BB Studio imported from | bb's own server on this Mac (`status.get` on its loopback address from bb's `bb-app-runtime.json`), the same call `bb pool status` makes; no token is needed or read |
-| This Mac | each provider's own login (Claude Code, Codex and any other signed-in provider) | BB's provider readiness |
+| This Mac | each provider's own login (Claude Code, Codex and any other signed-in provider) and its usage windows | BB's provider readiness and BB's usage limits (`bb settings usage`); a login through the Account Pooler shows the pooler's windows instead |
 
 Each account shows its status (Ready, Signed out, Error, Limited, Off), its
-5h and 7d windows and per-model limits (Fable, Opus, …) with reset times, and
-the threads pinned to it (the pooler's pins used in the last 65 minutes,
-matched to threads by their provider session). An account whose refresh
+5h and 7d windows and per-model limits (Fable, Opus, …) with reset times.
+`bb studio accounts` also lists the threads pinned to each pool account (the
+pooler's pins used in the last 65 minutes, matched to threads by their
+provider session). The panel has no scroller of its own: the footer's card
+scrolls. An account whose refresh
 token was refused (`invalid_grant`), whose login file is missing, or that
 answers 401 or 403 is **Signed out**, not rate limited.
 
@@ -4286,6 +4307,16 @@ A small window in the top right of the screen shows one card per problem:
 database, `account_warnings`) and the card stays away until that account's
 state changes; it comes back if the problem returns later. Without BB Studio's
 windows the cards show in the main window's top right instead.
+
+### Footer notice
+
+While something needs you, a pill sits above the sidebar footer: "Codex needs
+sign-in" for a signed-out or failing login, the window for a quota that is
+used up ("Claude 7d at 100%"), and "· +2" when there are more. It opens
+Accounts. A window at 90% or more is a warning card, not a pill. Nothing shows
+while every account works, or once its warning is dismissed. It needs BB
+Studio 1.0.1 (footer-placed sidebar sections); older builds show only the
+cards.
 
 ```sh
 bb studio accounts [status] [--source studio|bb|local] [--json]
