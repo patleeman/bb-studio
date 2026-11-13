@@ -8,7 +8,7 @@ import {
   AGENT_TYPES, auditTable, itemKindOfId, kindsNamedBy, NEW_TAB_ACTIONS, newTabFields, newTabTitle, pathFor, refOfPath, refOfTab, SURFACES,
   TAB_IDS, TAB_KIND_REGISTRY, tabKindEntry, tabOpenFor, type TabKindId, type TabRef,
 } from "./tab-kinds";
-import { STUDIO_TAB } from "./ui/studio-tab/model";
+import { STUDIO_TAB, STUDIO_TAB_ICON } from "./ui/studio-tab/model";
 
 /** One of each kind, as a surface would name it. */
 const SAMPLE: Record<TabKindId, TabRef> = {
@@ -155,6 +155,12 @@ describe("naming", () => {
     expect(newTabFields("new-design")).toEqual({ experimental_newTabGroup: "New", tooltip: "New design" });
     expect(newTabFields("code")).toEqual({ experimental_newTabGroup: "Open", tooltip: "Open VS Code" });
     expect(newTabFields("bot")).toEqual({});
+  });
+
+  it("draws each Open action on the New Tab page with an icon of its own", () => {
+    const icons = NEW_TAB_ACTIONS.filter((action) => action.group === "Open").map((action) => (action.tabId === STUDIO_TAB ? STUDIO_TAB_ICON : tabKindEntry(action.kind).icon));
+    expect(new Set(icons).size).toBe(icons.length);
+    expect(tabKindEntry("skills").icon).toBe("Toolbox");
   });
 
   it("finds a kind by its name or plural in a search", () => {

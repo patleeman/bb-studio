@@ -187,7 +187,7 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
     surfaces: { newTab: "had", recent: "had", sidebarDrag: { na: "Boards have no row in Studio's sidebar; drag one from the New Tab page's Recent or search." }, workbenchOpen: "added", chatLink: "had" },
   },
   botPage("memory", "Memory", "Brain", TAB_IDS.memory),
-  botPage("skills", "Skills", "BookOpen", TAB_IDS.skills, "added"),
+  botPage("skills", "Skills", "Toolbox", TAB_IDS.skills, "added"),
   botPage("library", "Library", "studio/library", TAB_IDS.library),
   {
     ...botPage("automations", "Scheduled", "ListTodo", TAB_IDS.automations),

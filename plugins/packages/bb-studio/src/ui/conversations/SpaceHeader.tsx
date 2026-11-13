@@ -102,7 +102,7 @@ export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
       </div>
       <nav aria-label="Bot pages" className="mt-2 flex flex-col gap-px">
         {row("memory", "Memory", <span className="text-sm leading-none">◈</span>)}
-        {row("skills", "Skills", <Icon name="BookOpen" className="size-4" />)}
+        {row("skills", "Skills", <Icon name="Toolbox" className="size-4" />)}
         {row("library", "Library", <Icon name="studio/library" className="size-4" />)}
         {todos !== null
           ? row("todos", "Todos", <Icon name="ListTodo" className="size-4" />, todos > 0 ? <span data-testid="space-todos-count" className="shrink-0 text-xs tabular-nums text-warning">{todos}</span> : null)
