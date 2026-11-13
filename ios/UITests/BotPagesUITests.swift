@@ -146,7 +146,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
     }
 
     func testSlowMemoryAndLibraryLoadThroughTheBotFlip() {
-        launch(["-qaDemoPageLatency", "2500", "-qaDemoCachedBot"])
+        launch(["-qaDemoPageLatency", ProcessInfo.processInfo.environment["PAGE_LATENCY"] ?? "2500", "-qaDemoCachedBot"])
         openPage("memory")
         XCTAssertTrue(app.navigationBars["Memory"].waitForExistence(timeout: 5))
         XCTAssertFalse(any("memoryProfile").exists, "still loading while the answer is slow")
