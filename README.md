@@ -1,60 +1,39 @@
 # BB Studio
 
-BB Studio is a desktop app built on [bb](https://github.com/get-bb/bb), with the Studio plugins. Its history before the move to this repository is kept in a private archive.
+**Your AI doesn't just answer. It makes things.**
 
-## Layout
+BB Studio gives your agents a place to work: docs, designs, dashboards and apps that open right beside the chat, and Bots that remember what you're building.
 
-| Path | What | History |
-|---|---|---|
-| `desktop/` | The desktop app: a fork of bb with a thin set of seams, a rebrand and an app identity | A tree snapshot of the `desktop` branch, one merge commit per import |
-| `plugins/` | The Studio plugins (`packages/bb-studio`, `bb-studio-visual-chat`, `bb-studio-mobile`, `bb-studio-agents`), contracts, scripts and docs | Starts at this repository's first commit |
-| `ios/` | The BB Studio iOS app (XcodeGen `project.yml`; `Shared/Generated` comes from `plugins/`' `gen:contracts`) | Starts at this repository's first commit |
-| `scripts/` | `import-desktop.mjs`, `filter-plugins.sh`, `filter-ios.sh`, `git-hooks/pre-push` | |
-| `docs/` | `MONOREPO.md`, `REIMPORT.md` | |
+[Website](https://patleeman.github.io/bb-studio/) · [Download for macOS](https://github.com/patleeman/bb-studio/releases/latest) · A very opinionated fork of the excellent [bb](https://getbb.app/)
 
-## Branches
+![BB Studio: a conversation with Atlas on the left, and the page orbit-web 2.4: launch plan beside it, with stats and a chart of beta adoption](site/assets/img/hero-1600.webp)
 
-- `main`: the monorepo. Never rewritten.
-- `desktop`: the fork stack with bb-root-relative paths. It descends from `get-bb/bb` `main` and is rewritten by each upstream sync. `main:desktop` always equals `desktop^{tree}`.
+## What it does
 
-## Worktrees
+- **Pages.** Ask for a plan, get a real doc: charts, stats, tables and live embeds, edited by you and the agent at the same time.
+- **Designs.** Describe it, then click through it: live screens and prototypes you play, comment on, and iterate round after round.
+- **Apps.** Need a tracker? Ask. Mini apps, live dashboards and saved artifacts, built on the spot and kept for next time.
+- **Workbench.** Everything side by side: docs, apps and VS Code open in tabs beside the chat, with splits and ⌘K.
+- **Spaces.** One Bot, many conversations, one memory. Workers take the long jobs, approvals come to you, and replies thread under the message.
+- **Voice.** Talk instead of type: text appears as you speak and the audio is saved as you go. Record a meeting and turn it into notes. Transcription uses the voice service you choose.
+- **Memory, Skills and Automations.** It remembers, learns your routines, and runs them for you.
+- **Look.** Make it yours: nine living scenes, eight classic themes, and a presence for every Bot.
+- **iPhone.** Your Bots in your pocket. The app is in testing through TestFlight.
 
-```sh
-git clone git@github.com:patleeman/bb-studio.git bb-studio-app
-cd bb-studio-app
-git config core.hooksPath "$PWD/scripts/git-hooks"
-git remote add upstream git@github.com:get-bb/bb.git
-git remote set-url --push upstream DISABLED
-git config remote.upstream.fetch '+refs/heads/main:refs/remotes/upstream/main'
-git config remote.upstream.tagOpt --no-tags
-git worktree add ../bb-studio-app-desktop desktop
-```
+## Development
 
-- `bb-studio-app` (branch `main`): plugins, tooling, docs.
-- `bb-studio-app-desktop` (branch `desktop`): the desktop app. Build, sync and core edits happen here.
+| Path | What |
+|---|---|
+| `desktop/` | The desktop app: a fork of bb. On `main` it is a generated snapshot of the `desktop` branch; never edit it here. |
+| `plugins/` | The Studio plugins, with their own pnpm workspace, contracts and docs. |
+| `ios/` | The iPhone app (XcodeGen). |
+| `site/` | The website, built and deployed to GitHub Pages. |
+| `scripts/`, `docs/` | Monorepo tooling and notes. |
 
-## Scripts
+How the pieces fit, how to build and how upstream syncs work are in [docs/MONOREPO.md](docs/MONOREPO.md). Each folder has its own guide: [desktop/STUDIO_FORK.md](desktop/STUDIO_FORK.md), [plugins/AGENTS.md](plugins/AGENTS.md) and [plugins/packages/bb-studio/README.md](plugins/packages/bb-studio/README.md), [ios/README.md](ios/README.md) and [site/README.md](site/README.md).
 
-- `node scripts/import-desktop.mjs` (on `main`): bring the `desktop` branch's tree in as `desktop/`. `--check` only tests the invariant.
-- `node scripts/fork/sync.mjs --fetch` (in the desktop worktree): replay the fork onto `upstream/main`; moves only `desktop-candidate`.
-- `node scripts/fork/build-plugins.mjs` (in the desktop worktree): build the plugin bundles with this checkout's CLI.
-
-## Build
-
-```sh
-cd ../bb-studio-app-desktop
-pnpm install
-node scripts/fork/build-plugins.mjs
-pnpm build
-(cd apps/desktop && pnpm run package)
-```
-
-```sh
-cd plugins
-pnpm install --frozen-lockfile
-pnpm typecheck && pnpm test
-```
+The fork stays thin. Features live in plugins; core edits to bb are small, generic hooks, each listed in a ledger (`scripts/fork/core-edits.json`) with its intent and a line budget, and checked before every commit. The rebrand and app identity are generated by scripts, and the whole stack is replayed onto bb's latest code at each sync. The rules are in [desktop/AGENTS.fork.md](desktop/AGENTS.fork.md).
 
 ## License
 
-MIT. See `LICENSE` and `NOTICE`. `desktop/` is derived from bb, Copyright (c) 2026 Michael Yong, MIT (`desktop/LICENSE`).
+MIT. See [LICENSE](LICENSE) and [NOTICE](NOTICE). `desktop/` is derived from bb, Copyright (c) 2026 Michael Yong, MIT ([desktop/LICENSE](desktop/LICENSE)).
