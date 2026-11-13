@@ -97,10 +97,14 @@ Docs: `frontend-hooks-and-ui.md`.
 ## Sidebar section (`slots.experimental_sidebarSection`)
 
 A plugin adds a section of its own rows to the sidebar. Sections render
-after the thread list, inside the same scroll area, in plugin order. The
-component draws its own heading and rows and receives `{ activeThreadId,
-activeProjectId, isCompactViewport, onNavigate }`. A crashed section leaves
-the thread list and the other sections in place.
+after the thread list, inside the same scroll area, in plugin order. A
+section registered with `placement: "footer"` renders instead just above the
+sidebar footer, outside the scroll, under the footer's disclosure; BB Studio
+draws its account notice there ("Codex needs sign-in"), which is empty while
+every account works. The component draws its own heading and rows and
+receives `{ activeThreadId, activeProjectId, isCompactViewport, onNavigate,
+placement }`. A crashed section leaves the thread list and the other
+sections in place.
 
 Before this, a plugin with rows of its own had to replace the whole thread
 list through `experimental_threadList`, redraw threads itself, and switch
@@ -108,8 +112,9 @@ the user's `sidebar.threadListProvider` preference to make its list show.
 
 **Core callers.** None: core's own lists are the navigation and the thread
 list, both already replaceable plugins. The host is
-`components/sidebar/ForkSidebarSections.tsx`, mounted in `AppSidebar`
-next to `PluginThreadList` and given the same `closeOnMobile` callback.
+`components/sidebar/ForkSidebarSections.tsx`, mounted twice in `AppSidebar`:
+next to `PluginThreadList` and, with `placement="footer"`, right before the
+footer, each given the same `closeOnMobile` callback.
 
 Docs: `frontend-renderer-slots.md`.
 
