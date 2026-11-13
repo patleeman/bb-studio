@@ -327,9 +327,9 @@
       "budget": 7
     },
     "apps/desktop/src/preload.ts": {
-      "seam": "approvals, windows, studio-release",
-      "intent": "Exposes experimental_answerApproval and experimental_window on window.bbDesktop; each invokes the main process. It also exposes experimental_studioBuild (the Studio version and its bb base, from studio-release.fork.ts).",
-      "budget": 11
+      "seam": "approvals, windows, studio-release, launch-theme",
+      "intent": "Exposes experimental_answerApproval and experimental_window on window.bbDesktop; each invokes the main process. It also exposes experimental_studioBuild (the Studio version and its bb base, from studio-release.fork.ts). It spreads forkLaunchThemeApi(ipcRenderer) (fork-launch-theme-preload.ts) into the API: that paints the main window from the cached backdrop appearance before the page runs and adds experimental_launchAppearance and experimental_saveLaunchAppearance.",
+      "budget": 13
     },
     "packages/desktop-contract/src/info.ts": {
       "seam": "approvals, windows",
@@ -485,6 +485,11 @@
       "seam": "host-entries",
       "intent": "One fork import at the top; useSidebarFooterPreferences passes its item list through useForkVisibleFooterItems, so a footer item a plugin hides (by key) leaves the footer, More and Customize.",
       "budget": 5
+    },
+    "apps/desktop/src/desktop-window-factory.ts": {
+      "seam": "launch-theme",
+      "intent": "One fork import at the top; a new window's backgroundColor is the cached launch background (forkWindowBackground in fork-launch-theme-file.ts), falling back to bb's #151515 or #ffffff, so the first frame already has the theme's color.",
+      "budget": 6
     }
   }
 }
