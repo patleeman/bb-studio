@@ -32,15 +32,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import type { AutomationTable, AutomationTableKind, AutomationTableRow } from "./automation-table-contract";
-import { cronValues, DAY_WORDS, describeCron, fromHeartbeat, minuteOf, type Schedule } from "./schedule";
+import { at12, cronValues, DAY_WORDS, describeCron, fromHeartbeat, minuteOf, type Schedule } from "./schedule";
 
 // ---- When, in a few words ---------------------------------------------------
 
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const pad = (n: number) => String(n).padStart(2, "0");
-/** A minute of the day on a 24-hour clock: "07:45". */
-export const clock24 = (minute: number) => `${pad(Math.floor(minute / 60) % 24)}:${pad(minute % 60)}`;
 
 /** "Daily", "Weekdays", "Weekends", "Sun", "Mon, Wed". */
 export function daysText(days: readonly number[]): string {
@@ -60,8 +58,8 @@ const evenStep = (values: readonly number[]) => {
 const contiguous = (values: readonly number[]) => values.every((value, i) => i === 0 || value === values[i - 1]! + 1);
 
 /**
- * A five-field cron on a 24-hour clock: "Daily 04:30", "Sun 10:15",
- * "Daily 07:15, 12:15, 17:15, 22:15", "Every 2 h, 08:00–22:00",
+ * A five-field cron on a 12-hour clock: "Daily 4:30 AM", "Sun 10:15 AM",
+ * "Daily 7:15 AM, 12:15 PM", "Every 2 h, 8:00 AM–10:00 PM",
  * "Every 20 min", "Hourly at :15 · Weekdays". Anything else as
  * describeCron says it ("Custom: <cron>" when nothing fits).
  */
@@ -80,39 +78,39 @@ export function cronText(expr: string): string {
   const hourStep = /^\*\/(\d+)$/.exec(hourField);
   if (minutes.length === 60 && allHours) return `Every minute${onDays(day)}`;
   if (minuteStep && allHours) return `Every ${Number(minuteStep[1])} min${onDays(day)}`;
-  if (minuteStep && contiguous(hours)) return `Every ${Number(minuteStep[1])} min, ${clock24(hours[0]! * 60)}–${clock24(hours.at(-1)! * 60 + minutes.at(-1)!)}${onDays(day)}`;
+  if (minuteStep && contiguous(hours)) return `Every ${Number(minuteStep[1])} min, ${at12(hours[0]! * 60)}–${at12(hours.at(-1)! * 60 + minutes.at(-1)!)}${onDays(day)}`;
   if (minutes.length === 1) {
     const minute = minutes[0]!;
     const past = minute ? ` at :${pad(minute)}` : "";
     if (allHours) return `Hourly${past}${onDays(day)}`;
     if (hourStep) return `Every ${Number(hourStep[1])} h${past}${onDays(day)}`;
-    const times = hours.map((hour) => clock24(hour * 60 + minute));
+    const times = hours.map((hour) => at12(hour * 60 + minute));
     if (times.length <= 4) return `${day} ${times.join(", ")}`;
     const step = evenStep(hours);
     if (step) return `Every ${step} h, ${times[0]}–${times.at(-1)}${onDays(day)}`;
     return `${times.length}× ${day === "Daily" ? "daily" : day}`;
   }
-  if (hours.length === 1 && minutes.length <= 4) return `${day} ${minutes.map((minute) => clock24(hours[0]! * 60 + minute)).join(", ")}`;
+  if (hours.length === 1 && minutes.length <= 4) return `${day} ${minutes.map((minute) => at12(hours[0]! * 60 + minute)).join(", ")}`;
   return describeCron(cron);
 }
 
-/** A Studio schedule in a few words, 24-hour: "Daily 07:45", "Every 2 h, 08:00–23:00", "Hourly · quiet 03:00–05:00". */
+/** A Studio schedule in a few words, 12-hour: "Daily 7:45 AM", "Every 2 h, 8:00 AM–11:00 PM", "Hourly · quiet 3:00 AM–5:00 AM". */
 export function whenText(schedule: Schedule, now = Date.now()): string {
   if (schedule.type === "once") {
     const at = new Date(schedule.at);
     const year = at.getFullYear() === new Date(now).getFullYear() ? "" : ` ${at.getFullYear()}`;
-    return `Once, ${MONTH_SHORT[at.getMonth()]} ${at.getDate()}${year} ${clock24(at.getHours() * 60 + at.getMinutes())}`;
+    return `Once, ${MONTH_SHORT[at.getMonth()]} ${at.getDate()}${year}, ${at12(at.getHours() * 60 + at.getMinutes())}`;
   }
   let text: string;
   if (schedule.type === "cron") text = cronText(schedule.cron);
-  else if (schedule.type === "times") text = `${daysText(schedule.days)} ${[...schedule.times].sort().map((time) => clock24(minuteOf(time))).join(", ")}`;
+  else if (schedule.type === "times") text = `${daysText(schedule.days)} ${[...schedule.times].sort().map((time) => at12(minuteOf(time))).join(", ")}`;
   else {
     const every = schedule.every === 1 ? (schedule.unit === "hours" ? "Hourly" : "Every minute") : `Every ${schedule.every} ${schedule.unit === "hours" ? "h" : "min"}`;
     const from = schedule.from ?? "00:00", to = schedule.to ?? "23:59";
-    const window = from !== "00:00" || to !== "23:59" ? `, ${from}–${to}` : "";
+    const window = from !== "00:00" || to !== "23:59" ? `, ${at12(minuteOf(from))}–${at12(minuteOf(to))}` : "";
     text = `${every}${window}${onDays(daysText(schedule.days))}`;
   }
-  if (schedule.quiet) text += ` · quiet ${schedule.quiet.from}–${schedule.quiet.to}`;
+  if (schedule.quiet) text += ` · quiet ${at12(minuteOf(schedule.quiet.from))}–${at12(minuteOf(schedule.quiet.to))}`;
   if (schedule.until) text += ` · until ${schedule.until}`;
   return text;
 }
