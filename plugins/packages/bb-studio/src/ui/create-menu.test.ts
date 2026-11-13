@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProviderView } from "../contract";
+import { MINI_STUDIO_KIND } from "../minis/server/provider";
 import { NEW_CALL_EVENT } from "../talk/shared/format";
 import { createEntries, newItemProject, runCreateEntry, startsGroup } from "./create-menu";
 
@@ -21,6 +22,11 @@ it("lists the kinds Studio can make in Studio's order, then Record a call, then 
   const entries = createEntries(providers, { templates: [{ pluginId: "pages", id: "pg_t", title: "Weekly" }] });
   expect(labels(entries)).toEqual(["Page", "Drawing", "Recording", "Design", "Record a call", "From template: Weekly"]);
   expect(entries.map((_, index) => startsGroup(entries, index))).toEqual([false, false, false, false, true, false]);
+});
+
+it("offers a mini app as App", () => {
+  expect(labels(createEntries([provider("minis", [MINI_STUDIO_KIND as unknown as ReturnType<typeof kind>])]))).toEqual(["App"]);
+  expect(MINI_STUDIO_KIND.plural).toBe("Apps");
 });
 
 it("offers a whiteboard after Page, made as a page holding one, not as a bare drawing", () => {
