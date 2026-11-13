@@ -1,3 +1,4 @@
+import { parentRelationship } from "@/components/promptbox/banner/parentRelationship.fork";
 import type { ThreadPromptParentThreadSection } from "@/components/promptbox/banner/ThreadPromptContextBanner";
 import { getThreadLocationPath } from "@/lib/route-paths";
 import { useThreadState } from "@/lib/thread-state";
@@ -30,6 +31,6 @@ export function useParentThreadSection(
       projectId: related.projectId,
       threadId: relatedThreadId,
     }),
-    relationship,
+    relationship: parentRelationship(thread.originKind, thread.originPluginId),
   };
 }
