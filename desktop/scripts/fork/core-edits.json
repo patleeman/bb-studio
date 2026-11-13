@@ -37,9 +37,9 @@
       "budget": 7
     },
     "apps/app/src/components/pickers/ModelReasoningPicker.tsx": {
-      "seam": "composer-labels, model-picker-gate",
-      "intent": "An unknown model id shows a readable label (formatUnknownModelLabel, unknownModelLabel.fork.ts, imported at the top of the file) instead of the raw id, and the trigger's reasoning half comes from triggerReasoningLabel (same file): a model the catalog lacks still shows its stored level, so a thread reads \"Opus 5.5 Medium\" like the new-thread page. ModelReasoningPicker returns forkModelPickerGate(<Popover…>, { hasSelectedModel }) (components/fork/ForkModelPickerGate.tsx, imported at the top of the file), so a plugin's slots.experimental_modelPickerGate can stand in for the picker (Studio's \"Sign in\" while no provider is ready).",
-      "budget": 13
+      "seam": "composer-labels, model-picker-gate, picker-browse",
+      "intent": "An unknown model id shows a readable label (formatUnknownModelLabel, unknownModelLabel.fork.ts, imported at the top of the file) instead of the raw id, and the trigger's reasoning half comes from triggerReasoningLabel (same file): a model the catalog lacks still shows its stored level, so a thread reads \"Opus 5.5 Medium\" like the new-thread page. ModelReasoningPicker returns forkModelPickerGate(<Popover…>, { hasSelectedModel }) (components/fork/ForkModelPickerGate.tsx, imported at the top of the file), so a plugin's slots.experimental_modelPickerGate can stand in for the picker (Studio's \"Sign in\" while no provider is ready). A provider tab click only browses: handleProviderSelect takes commit (default true) and the tab's onClick passes false, so onSelectedProviderChange is not called and the tab shows that provider's models as a preview; picking a model or a reasoning level while previewing first calls onSelectedProviderChange(activeProviderId), then commits the model. The provider cycle chord still commits.",
+      "budget": 24
     },
     "apps/app/src/components/secondary-panel/NewTabFileSearch.tsx": {
       "seam": "new-tab-items",
@@ -472,9 +472,9 @@
       "budget": 2
     },
     "apps/app/src/components/settings/settings-search.ts": {
-      "seam": "host-entries",
-      "intent": "Adds the \"cliSkills\" search condition and makes the \"bb CLI skills\" entry need it, so settings search leaves it out while the section is hidden.",
-      "budget": 7
+      "seam": "host-entries, host-copy",
+      "intent": "Adds the \"cliSkills\" search condition and makes the \"bb CLI skills\" entry need it, so settings search leaves it out while the section is hidden. The General section's \"Setup guide\" entry is listed only when SHOW_HOST_SETUP_GUIDE_ROW (views/settings-rows.fork.ts, imported at the top of the file) is true, matching the hidden row.",
+      "budget": 13
     },
     "apps/app/src/components/settings/useSettingsSearchConditions.ts": {
       "seam": "host-entries",
@@ -495,6 +495,91 @@
       "seam": "launch-theme",
       "intent": "One fork import at the top; a new window's backgroundColor is the cached launch background (forkWindowBackground in fork-launch-theme-file.ts), falling back to bb's #151515 or #ffffff, so the first frame already has the theme's color.",
       "budget": 6
+    },
+    "apps/server/src/services/ai/ai-tasks.ts": {
+      "seam": "title-service",
+      "intent": "runAiTask and runTextAiTask take preferServiceId; runAiTask orders the task's services with preferAiService (ai-service-preference.fork.ts, imported at the top of the file), so the service whose id is the conversation's provider is asked first. Everything else (skipping services that are not ready, the timeout, the fallthrough) is upstream's.",
+      "budget": 6
+    },
+    "apps/server/src/services/threads/title-generation.ts": {
+      "seam": "title-service",
+      "intent": "generateThreadMetadataWithOutcome and regenerateThreadTitle pass preferServiceId: the thread's providerId, so a Claude Code conversation is titled by Claude Code and a Codex one by Codex.",
+      "budget": 2
+    },
+    "apps/server/src/services/threads/thread-metadata-inference.ts": {
+      "seam": "title-service",
+      "intent": "inferThreadMetadata calls noteTitleOutcome(deps, args, outcome) (title-retry.fork.ts, imported at the top of the file) right after the first title attempt, so a title that failed because no service was signed in, timed out or failed is tried again after the conversation's next finished turns (lifecycle-outcome.fork.ts runs it on run.succeeded, up to three times).",
+      "budget": 2
+    },
+    "plugins/provider-claude-code/server.ts": {
+      "seam": "title-service",
+      "intent": "The plugin registers Claude Code as a text AI service (registerClaudeAiService, src/ai-service.fork.ts, imported at the top of the file) next to its usage source, so thread titles and commit messages work with only Claude Code signed in.",
+      "budget": 2
+    },
+    "plugins/provider-claude-code/src/host.ts": {
+      "seam": "title-service",
+      "intent": "The host entry's contract is claudeAiHostEntry.contract(experimental_nativeRootsHostContract) and its handlers start with ...claudeAiHostEntry.handlers (src/ai/host-entry.fork.ts, imported at the top of the file): claude-code.ai.complete runs one `claude -p` with Haiku, no session saved, no tools, settings or MCP servers; claude-code.ai.status is ready while the provider health says signed in.",
+      "budget": 4
+    },
+    "plugins/provider-retry/src/retry-policy.ts": {
+      "seam": "sign-in-errors",
+      "intent": "decideRetry declines first when isAuthFailure(failure) (auth-failure.fork.ts, imported at the top of the file): an unauthorized category or HTTP 401 is final, never retried as a connection failure.",
+      "budget": 2
+    },
+    "packages/thread-view/src/error-display.ts": {
+      "seam": "sign-in-errors",
+      "intent": "buildTimelineErrorDisplay takes providerDisplayName and returns signInErrorDisplay(message, providerDisplayName) first when it matches (sign-in-error-display.fork.ts, imported at the top of the file): a 401, an unauthorized category or a not-logged-in text reads \"<Provider> isn't signed in\" / \"Sign in to <Provider>, or pick another model.\" instead of the raw error.",
+      "budget": 4
+    },
+    "packages/thread-view/src/build-thread-timeline.ts": {
+      "seam": "sign-in-errors",
+      "intent": "BuildTimelineRowsOptions carries providerDisplayName (optional); the root rows, the requested-turn rows and delegation child rows pass it on, and the error row passes it to buildTimelineErrorDisplay.",
+      "budget": 6
+    },
+    "apps/app/src/components/promptbox/NewThreadComposer.tsx": {
+      "seam": "picker-browse",
+      "intent": "One call of useSignedInProviderDefault (hooks/useSignedInProviderDefault.fork.ts, imported at the top of the file) after pickerLocksRef: when the composer opens with a remembered provider that is signed out or not installed and another provider is ready, it switches to the ready one once; a provider a plugin locked is left alone.",
+      "budget": 2
+    },
+    "apps/app/src/components/promptbox/banner/ThreadPromptContextBanner.tsx": {
+      "seam": "host-copy",
+      "intent": "The parent section's relationship is ParentRelationship (parentRelationship.fork.ts, imported at the top of the file), which adds \"reply\": a fork a plugin made reads \"Reply to <title>\" with its own icon; copy and icon come from REPLY_SECTION_COPY and REPLY_SECTION_ICON.",
+      "budget": 5
+    },
+    "apps/app/src/views/thread-detail/useParentThreadSection.ts": {
+      "seam": "host-copy",
+      "intent": "The relationship comes from parentRelationship(originKind, originPluginId) (components/promptbox/banner/parentRelationship.fork.ts, imported at the top of the file): parent, fork, or reply for a plugin-made fork.",
+      "budget": 4
+    },
+    "apps/app/src/views/thread-detail/ThreadContextCardCore.tsx": {
+      "seam": "host-copy",
+      "intent": "The Info card's parent row takes its icon and label from parentRowIcon and parentRowLabel (parentRelationship.fork.ts, imported at the top of the file), so a reply reads \"Reply to: <title>\".",
+      "budget": 5
+    },
+    "apps/app/src/components/thread/timeline/GeneratedConversationMessage.tsx": {
+      "seam": "host-copy",
+      "intent": "For a child-completed system message the collapsed preview starts after the \"<thread> completed:\" header (childCompletedPreviewStart, childCompletedPreview.fork.ts, imported at the top of the file), so a finished worker shows the first line of its result; mentions are clipped from that offset.",
+      "budget": 6
+    },
+    "apps/app/src/components/promptbox/follow-up-placeholder.ts": {
+      "seam": "host-copy",
+      "intent": "A thread with no message yet (display status pending) shows FIRST_MESSAGE_PLACEHOLDER / COMPACT_FIRST_MESSAGE_PLACEHOLDER (follow-up-placeholder.fork.ts, imported at the top of the file) instead of \"Ask for a follow-up\".",
+      "budget": 3
+    },
+    "apps/app/src/views/SettingsView.tsx": {
+      "seam": "host-copy",
+      "intent": "The General section's \"Setup guide\" row is drawn only when SHOW_HOST_SETUP_GUIDE_ROW (views/settings-rows.fork.ts, imported at the top of the file) is true; it is false, since Studio's first run replaces bb's setup guide.",
+      "budget": 3
+    },
+    "plugins/provider-claude-code/src/session-params.ts": {
+      "seam": "tool-labels",
+      "intent": "buildInternalSessionParams keeps each dynamic tool's presentation next to its name, description and inputSchema, so a plugin tool's own labels (\"Listed designs\") reach the Claude Code translator instead of \"Ran <name>\".",
+      "budget": 2
+    },
+    "apps/app/src/views/thread-detail/useThreadUnreadDividerState.ts": {
+      "seam": "unread-divider",
+      "intent": "nextThreadUnreadDividerSnapshot returns keepDividerWhileReading(currentSnapshot, thread) (unreadDividerOpenOnly.fork.ts, imported at the top of the file) when the open thread's attention changes: the NEW divider is placed only when a thread is opened, and a reply that lands while you read it drops the divider instead of placing a new one.",
+      "budget": 4
     }
   }
 }

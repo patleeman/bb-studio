@@ -1,3 +1,4 @@
+import { useSignedInProviderDefault } from "@/hooks/useSignedInProviderDefault.fork";
 import { createCoreComposerActions } from "@/lib/plugin-composer-handle";
 import {
   readPendingAttachmentUploads,
@@ -1831,6 +1832,7 @@ export function NewThreadComposer({
   }, [changeEnvironment]);
 
   const pickerLocksRef = useRef<NewThreadComposerLocks>({});
+  useSignedInProviderDefault({ providerId: selectedProviderId, setProviderId: setSelectedProviderId, locked: () => pickerLocksRef.current.provider === true });
   const selectionState =
     useCommittedComposerState<NewThreadComposerSelectionState>((version) => ({
       version,

@@ -1,3 +1,4 @@
+import { COMPACT_FIRST_MESSAGE_PLACEHOLDER, FIRST_MESSAGE_PLACEHOLDER } from "./follow-up-placeholder.fork";
 import type { ThreadRuntimeDisplayStatus } from "@bb/domain";
 import { assertNever } from "@bb/core-ui";
 
@@ -16,9 +17,10 @@ export function getFollowUpPromptPlaceholder(
     case "error":
       return "Retry by sending a follow-up message";
     case "pending":
+      return FIRST_MESSAGE_PLACEHOLDER;
     case "idle":
     case "active":
-      return "Ask for a follow-up. @ to mention files, folders, sections, or threads";
+      return "Ask for a follow-up. @ to mention files, folders, sections, or conversations";
     default:
       return assertNever(displayStatus);
   }
@@ -39,6 +41,7 @@ export function getCompactFollowUpPromptPlaceholder(
     case "error":
       return "Send a follow-up";
     case "pending":
+      return COMPACT_FIRST_MESSAGE_PLACEHOLDER;
     case "idle":
     case "active":
       return "Ask a follow-up";

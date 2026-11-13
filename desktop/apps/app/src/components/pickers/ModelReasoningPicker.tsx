@@ -597,11 +597,13 @@ export function ModelReasoningPicker({
         setMoreModelsOpenedBy(null);
         return;
       }
+      if (isPreviewing) onSelectedProviderChange?.(activeProviderId);
       onModelChange(model);
       setMoreModelsOpenedBy(null);
       setPreviewProviderId(null);
     },
     [
+      onSelectedProviderChange,
       activeProviderId,
       handoff,
       handoffMode,
@@ -629,7 +631,7 @@ export function ModelReasoningPicker({
     [selectedProviderId],
   );
   const handleProviderSelect = useCallback(
-    (providerId: string) => {
+    (providerId: string, commit = true) => {
       if (
         open &&
         handoff !== undefined &&
@@ -638,7 +640,7 @@ export function ModelReasoningPicker({
         handleHandoffProviderSelect(providerId);
         return;
       }
-      onSelectedProviderChange?.(providerId);
+      if (commit) onSelectedProviderChange?.(providerId);
       const nextPreviewProviderId =
         open && providerId !== selectedProviderId ? providerId : null;
       setPreviewProviderId(nextPreviewProviderId);
@@ -677,6 +679,7 @@ export function ModelReasoningPicker({
         return;
       }
       if (isPreviewing && previewSelection?.selectedModel) {
+        onSelectedProviderChange?.(activeProviderId);
         onModelChange(previewSelection.selectedModel);
       }
       onReasoningChange(level);
@@ -684,6 +687,8 @@ export function ModelReasoningPicker({
       setMoreModelsOpenedBy(null);
     },
     [
+      activeProviderId,
+      onSelectedProviderChange,
       handoffMode,
       isPreviewing,
       previewSelection,
@@ -1091,7 +1096,7 @@ export function ModelReasoningPicker({
                     if (provider.value === activeProviderId) {
                       return;
                     }
-                    handleProviderSelect(provider.value);
+                    handleProviderSelect(provider.value, false);
                   }}
                   className={cn(
                     "flex items-center justify-center border-b-2 focus-visible:outline-none",
