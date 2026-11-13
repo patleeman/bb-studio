@@ -1,3 +1,4 @@
+import { previewPick, type ProviderModelPickHandler } from "./previewPick.fork";
 import { forkModelPickerGate } from "@/components/fork/ForkModelPickerGate";
 import { formatUnknownModelLabel, triggerReasoningLabel as forkTriggerReasoningLabel } from "./unknownModelLabel.fork";
 import {
@@ -186,6 +187,7 @@ interface ModelReasoningPickerProps {
   selectedProviderId: string;
   onSelectedProviderChange?: (value: string) => void;
   onProviderPreviewResolved?: (value: ResolvedProviderPreview) => void;
+  onProviderModelChange?: ProviderModelPickHandler;
   requireVerifiedProviderPreview?: boolean;
   hasMultipleProviders: boolean;
   modelValue: string;
@@ -220,6 +222,7 @@ export function ModelReasoningPicker({
   selectedProviderId,
   onSelectedProviderChange,
   onProviderPreviewResolved,
+  onProviderModelChange,
   requireVerifiedProviderPreview = false,
   hasMultipleProviders,
   modelValue,
@@ -597,12 +600,15 @@ export function ModelReasoningPicker({
         setMoreModelsOpenedBy(null);
         return;
       }
-      if (isPreviewing) onSelectedProviderChange?.(activeProviderId);
-      onModelChange(model);
+      if (isPreviewing && onProviderModelChange) onProviderModelChange(previewPick({ providerId: activeProviderId, model, preferredReasoningLevel: reasoningValue, catalog: previewQuery.data }));
+      else if (isPreviewing) onSelectedProviderChange?.(activeProviderId);
+      if (!isPreviewing || !onProviderModelChange) onModelChange(model);
       setMoreModelsOpenedBy(null);
       setPreviewProviderId(null);
     },
     [
+      onProviderModelChange,
+      previewQuery.data,
       onSelectedProviderChange,
       activeProviderId,
       handoff,
@@ -678,17 +684,22 @@ export function ModelReasoningPicker({
         }
         return;
       }
-      if (isPreviewing && previewSelection?.selectedModel) {
+      if (isPreviewing && previewSelection?.selectedModel && onProviderModelChange) {
+        onProviderModelChange(previewPick({ providerId: activeProviderId, model: previewSelection.selectedModel, reasoningLevel: level, preferredReasoningLevel: reasoningValue, catalog: previewQuery.data }));
+      } else if (isPreviewing && previewSelection?.selectedModel) {
         onSelectedProviderChange?.(activeProviderId);
         onModelChange(previewSelection.selectedModel);
       }
-      onReasoningChange(level);
+      if (!isPreviewing || !onProviderModelChange) onReasoningChange(level);
       setPreviewProviderId(null);
       setMoreModelsOpenedBy(null);
     },
     [
       activeProviderId,
+      onProviderModelChange,
       onSelectedProviderChange,
+      previewQuery.data,
+      reasoningValue,
       handoffMode,
       isPreviewing,
       previewSelection,

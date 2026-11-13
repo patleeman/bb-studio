@@ -52,7 +52,14 @@ function claudeModel(value: string, label: string): AvailableModel {
   };
 }
 
-function renderPicker() {
+const MANY_CODEX_MODELS = ["gpt-5.5", "gpt-5.2", "gpt-4.1", "o3", "o4-mini", "gpt-x"].map(
+  (value) => ({ value, label: value }),
+);
+
+function renderPicker(
+  onProviderModelChange?: (pick: unknown) => void,
+  codexModels: readonly PickerOption<string>[] = [{ value: "gpt-5.5", label: "GPT-5.5" }],
+) {
   const onSelectedProviderChange = vi.fn();
   const onModelChange = vi.fn();
   const onReasoningChange = vi.fn();
@@ -68,6 +75,10 @@ function renderPicker() {
       models: [
         claudeModel("claude-opus-4-7", "Claude Opus 4.7"),
         claudeModel("claude-sonnet-4-7", "Claude Sonnet 4.7"),
+        claudeModel("claude-haiku-4-6", "Claude Haiku 4.6"),
+        claudeModel("claude-opus-4-6", "Claude Opus 4.6"),
+        claudeModel("claude-sonnet-4-6", "Claude Sonnet 4.6"),
+        claudeModel("claude-haiku-4-5", "Claude Haiku 4.5"),
       ],
       selectedOnlyModels: [],
       permissionCeiling: "full",
@@ -80,9 +91,10 @@ function renderPicker() {
         providerOptions={providerOptions}
         selectedProviderId="codex"
         onSelectedProviderChange={onSelectedProviderChange}
+        onProviderModelChange={onProviderModelChange}
         hasMultipleProviders
         modelValue="gpt-5.5"
-        modelOptions={[{ value: "gpt-5.5", label: "GPT-5.5" }]}
+        modelOptions={codexModels}
         moreModelOptions={[]}
         modelIsLoading={false}
         modelLoadError={null}
@@ -151,6 +163,53 @@ describe("provider tabs only browse", () => {
     expect(await screen.findByText("Opus 4.7")).not.toBeNull();
     fireEvent.keyDown(document, { key: "Escape" });
 
+    expect(onSelectedProviderChange).not.toHaveBeenCalled();
+    expect(onModelChange).not.toHaveBeenCalled();
+  });
+
+  it("sends a pick from another provider's tab as one provider, model and level change", async () => {
+    const onProviderModelChange = vi.fn();
+    const { onSelectedProviderChange, onModelChange, onReasoningChange } =
+      renderPicker(onProviderModelChange);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Provider, model and reasoning" }),
+    );
+    fireEvent.click(screen.getByTitle("Claude Code"));
+    fireEvent.click(await screen.findByText("Sonnet 4.7"));
+
+    expect(onProviderModelChange).toHaveBeenCalledTimes(1);
+    expect(onProviderModelChange).toHaveBeenCalledWith({
+      providerId: "claude-code",
+      model: "claude-sonnet-4-7",
+      reasoningLevel: "medium",
+    });
+    expect(onSelectedProviderChange).not.toHaveBeenCalled();
+    expect(onModelChange).not.toHaveBeenCalled();
+    expect(onReasoningChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps search focused and clears it when browsing to another tab", async () => {
+    const { onSelectedProviderChange, onModelChange } = renderPicker(
+      undefined,
+      MANY_CODEX_MODELS,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Provider, model and reasoning" }),
+    );
+    const search = screen.getByPlaceholderText("Search models");
+    search.focus();
+    fireEvent.change(search, { target: { value: "gpt" } });
+
+    const claudeTab = screen.getByTitle("Claude Code");
+    if (fireEvent.mouseDown(claudeTab)) claudeTab.focus();
+    fireEvent.click(claudeTab);
+
+    const nextSearch = screen.getByPlaceholderText(
+      "Search models",
+    ) as HTMLInputElement;
+    expect(nextSearch.value).toBe("");
+    expect(document.activeElement).toBe(nextSearch);
+    expect(await screen.findByText("Opus 4.7")).not.toBeNull();
     expect(onSelectedProviderChange).not.toHaveBeenCalled();
     expect(onModelChange).not.toHaveBeenCalled();
   });

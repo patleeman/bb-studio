@@ -1,4 +1,4 @@
-import { preferAiService } from "./ai-service-preference.fork.js";
+import { forkAiServiceOrder, preferAiService } from "./ai-service-preference.fork.js";
 import { getAiServiceSelections } from "@bb/db";
 import type {
   AiServiceSelection,
@@ -75,14 +75,14 @@ function compareIds(a: string, b: string): number {
 export function orderedAiServices(
   deps: Pick<AiTaskDeps, "aiServices">,
 ): AiServiceRegistration[] {
-  return deps.aiServices
+  return forkAiServiceOrder(deps.aiServices
     .list()
     .sort(
       (a, b) =>
         Number(b.pluginId === "bb-ai") - Number(a.pluginId === "bb-ai") ||
         compareIds(a.pluginId, b.pluginId) ||
         compareIds(a.id, b.id),
-    );
+    ));
 }
 
 export function automaticAiServices(
