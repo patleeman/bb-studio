@@ -170,10 +170,15 @@ settings? })` → takes bb's own entries out of the app: sidebar navigation
 ## The skill registry
 
 - Backend: `bb.experimental_hooks.experimental_skillsRegistryPolicy(({
-operation }) => ({ allowed: true } | { allowed: false, message }))`. bb asks
-  it before serving any skills.sh request (`search`, `read`, `install`) from
-  the app, the CLI, the SDK or an agent. A refusal, a throw or no answer in
-  5 s refuses with a 403 carrying the message. One policy per plugin.
+operation, caller }) => ({ allowed: true } | { allowed: false, message }))`.
+  bb asks it before serving any skills.sh request (`search`, `read`,
+  `install`) from the app, the CLI, the SDK or an agent. `caller` is
+  `{ kind: "agent", threadId }` when the request names a calling thread,
+  `{ kind: "cli" }` from the bb CLI otherwise, and `{ kind: "app" }` else; it
+  is what the request says, not proof of a person. A refusal, a throw or no
+  answer in 5 s refuses with a 403 carrying the message. One policy per
+  plugin. Once a plugin has registered a policy, bb refuses every registry
+  request while that plugin is enabled but not running.
 
 ## The workbench of your own page
 

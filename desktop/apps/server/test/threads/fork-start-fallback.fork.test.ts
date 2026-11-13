@@ -227,6 +227,43 @@ describe("a fork whose parent session can't be copied", () => {
     return { created, start };
   }
 
+  it("restarts a hidden fork, which has no copied history, from its source's transcript", async () => {
+    await withTestHarness(async (harness) => {
+      const { parent } = seedParent(harness);
+      const response = await harness.app.request("/api/v1/threads/fork", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sourceThreadId: parent.id,
+          visibility: "hidden",
+          input: textInput("Carry on"),
+        }),
+      });
+      expect(response.status).toBe(201);
+      const created = threadResponseSchema.parse(await readJson(response));
+      const start = await waitForQueuedCommand(
+        harness,
+        ({ command }) =>
+          command.type === "thread.start" && command.threadId === created.id,
+      );
+      await reportQueuedCommandError(harness, start, {
+        errorCode: "provider_error",
+        errorMessage: `Session ${SESSION} not found`,
+      });
+      const retry = await waitForQueuedCommand(
+        harness,
+        ({ command }) =>
+          command.type === "thread.start" &&
+          command.threadId === created.id &&
+          command !== start.command,
+      );
+      if (retry.command.type !== "thread.start")
+        throw new Error("expected thread.start");
+      expect(texts(retry.command.input)[0]).toContain("User: When do we ship?");
+      expect(texts(retry.command.input).at(-1)).toBe("Carry on");
+    });
+  });
+
   it("does not restart a fork whose start failed for another reason, and shows the failure", async () => {
     await withTestHarness(async (harness) => {
       const { parent } = seedParent(harness);

@@ -86,8 +86,14 @@ export type ExperimentalSkillsRegistryDecision =
   | { allowed: true }
   | { allowed: false; message: string };
 
+export type ExperimentalSkillsRegistryCaller =
+  | { kind: "app" }
+  | { kind: "cli" }
+  | { kind: "agent"; threadId: string };
+
 export type ExperimentalSkillsRegistryPolicy = (request: {
   operation: ExperimentalSkillsRegistryOperation;
+  caller: ExperimentalSkillsRegistryCaller;
 }) =>
   | ExperimentalSkillsRegistryDecision
   | Promise<ExperimentalSkillsRegistryDecision>;

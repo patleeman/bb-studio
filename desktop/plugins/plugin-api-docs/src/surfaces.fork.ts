@@ -85,6 +85,7 @@ const FORK_API_SYMBOLS: Readonly<Record<string, readonly string[]>> = {
     "PluginHooks.experimental_skillsRegistryPolicy",
     "ExperimentalSkillsRegistryPolicy",
     "ExperimentalSkillsRegistryOperation",
+    "ExperimentalSkillsRegistryCaller",
     "ExperimentalSkillsRegistryDecision",
   ],
   "thread-events": [

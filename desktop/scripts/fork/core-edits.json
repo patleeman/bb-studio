@@ -173,7 +173,7 @@
     },
     "apps/server/src/server.ts": {
       "seam": "import-sync, approvals, skills-registry-policy",
-      "intent": "Registers the fork's import routes (/api/v1/fork/import/*) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts).",
+      "intent": "Registers the fork's import routes (/api/v1/fork/import/*) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts).",
       "budget": 6
     },
     "apps/server/src/services/plugins/plugin-service.ts": {
@@ -188,7 +188,7 @@
     },
     "apps/server/src/services/threads/thread-lifecycle.ts": {
       "seam": "fork-transcript",
-      "intent": "settleThreadStartCommandResult's failure branch first asks restartForkFromTranscript(args) (services/threads/fork-start-fallback.fork.ts, imported at the top of the file) and returns its result when it handles a failed thread.start that carried a fork; otherwise settleThreadCommandFailure runs as upstream. A fork whose session copy fails then starts from the transcript and writes no error row.",
+      "intent": "settleThreadStartCommandResult's failure branch first asks restartForkFromTranscript(args) (services/threads/fork-start-fallback.fork.ts, imported at the top of the file) and returns its result when it handles a failed thread.start that carried a fork whose session copy failed (the error names the source session and the thread is still starting); otherwise settleThreadCommandFailure runs as upstream. A fork whose session copy fails then starts from the transcript and writes no error row.",
       "budget": 4
     },
     "apps/server/src/services/threads/thread-send.ts": {

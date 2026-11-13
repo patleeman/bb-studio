@@ -61,15 +61,38 @@ function readItem(
   }
 }
 
+export function sourceForkEndSequence(
+  db: DbTransaction,
+  sourceThreadId: string,
+  checkpointId: string | undefined,
+): number | null {
+  if (checkpointId === undefined) return null;
+  for (const row of listStoredEventRows(db as unknown as DbConnection, {
+    threadId: sourceThreadId,
+    types: ["turn/completed"],
+  })) {
+    try {
+      if (parseStoredEventPayload(row).providerCheckpointId === checkpointId) {
+        return row.sequence;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
 export function forkTranscriptSeed(
   db: DbTransaction,
   threadId: string,
+  endSequence: number | null = null,
 ): PromptInput | null {
   const lines: string[] = [];
   for (const row of listStoredEventRows(db as unknown as DbConnection, {
     threadId,
     types: ["item/completed"],
   })) {
+    if (endSequence !== null && row.sequence > endSequence) break;
     const item = readItem(row);
     if (!item || item.parentToolCallId !== undefined) continue;
     if (item.type === "userMessage" && Array.isArray(item.content)) {
@@ -156,7 +179,19 @@ export function restartForkFromTranscript(
   ) {
     return null;
   }
-  const seed = forkTranscriptSeed(db, thread.id);
+  const seed =
+    forkTranscriptSeed(db, thread.id) ??
+    (thread.sourceThreadId === null
+      ? null
+      : forkTranscriptSeed(
+          db,
+          thread.sourceThreadId,
+          sourceForkEndSequence(
+            db,
+            thread.sourceThreadId,
+            command.fork.sourceProviderCheckpointId,
+          ),
+        ));
   const contextExecution = forgetDispatchedFork(db, thread.id);
   deps.logger.warn(
     { threadId: thread.id, detail: args.report.errorMessage },

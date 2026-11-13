@@ -1463,12 +1463,23 @@ all see the same message. A throw or no answer within 5 seconds refuses too.
 BB Studio refuses all three until a person turns the registry on in Settings
 (an approval only a person can answer).
 
+The request carries `caller`: `{ kind: "agent", threadId }` when it names a
+calling thread (the CLI sends `x-bb-caller-thread` from `BB_THREAD_ID`),
+`{ kind: "cli" }` for the CLI otherwise, `{ kind: "app" }` for anything else.
+It is what the request says, not an authenticated identity.
+
+The gate fails closed: registering a policy records the plugin as a policy
+owner (`plugin_kv`, key `bb.fork.skillsRegistryPolicy`), and while an owner is
+installed and enabled but has no live policy (starting, crashed, failed to
+load) every registry request is refused. A person who disables or removes the
+owner lifts it.
+
 **Core callers.** `services/skills/registry-policy.fork.ts` is the registry
 and the middleware; `server.ts` mounts it before the registry routes.
 
 **Audit before stabilizing.**
 
-1. The policy is not told who is asking (the app, the CLI, an agent); decide
-   whether it should be.
+1. `caller` is self-reported by the request; a local agent can send the
+   app's shape. Only the fork's approval dialog proves a person.
 2. Skills installed outside bb (a harness's own installer, a shell command)
    are not covered.
