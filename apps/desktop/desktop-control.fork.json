@@ -1,0 +1,14 @@
+{
+  "driver": {
+    "name": "cua-driver",
+    "version": "0.47.24",
+    "repository": "https://github.com/trycua/cua",
+    "tag": "cua-driver-rs-v0.47.24",
+    "commit": "b168ff39fef15d993ab66facce9b0027ea556dce",
+    "asset": "cua-driver-rs-0.47.24-darwin-universal-binary.tar.gz",
+    "sha256": "032039c3701727a76458b61a6649f950a9d52ba453da00be741ef00c185a2edd",
+    "certificateIdentity": "https://github.com/trycua/cua/.github/workflows/cd-rust-cua-driver.yml@refs/tags/cua-driver-rs-v0.47.24",
+    "oidcIssuer": "https://token.actions.githubusercontent.com",
+    "license": "MIT"
+  }
+}

@@ -576,7 +576,10 @@ function verifyApp(files, version) {
   ]) {
     if (!updateConfig.includes(line)) fail(`app-update.yml lacks "${line}"`);
   }
-  console.log(`  BB Studio.app is ${version}, ${bundleId}, feed github ${feed.owner}/${feed.repo}`);
+  if (existsSync(join(files.app, "Contents/Resources/desktop-control"))) {
+    fail("the app bundles desktop control (Contents/Resources/desktop-control): the HUD does not ship yet");
+  }
+  console.log(`  BB Studio.app is ${version}, ${bundleId}, feed github ${feed.owner}/${feed.repo}, no desktop control`);
 }
 
 function sign(files, version) {
