@@ -338,12 +338,16 @@ const noRoute = () => null;
 const useRoute: () => { pathname: string } | null = useHostAppRoute ?? noRoute;
 
 export function DesktopHudHotkey() {
+  const { values } = useStudioSettings();
+  return desktopHudOn(values) ? <DesktopHudHotkeyOn /> : null;
+}
+
+function DesktopHudHotkeyOn() {
   const control = useDesktopControl();
   const windows = useHostWindows();
-  const { values } = useStudioSettings();
   const route = useRoute();
   const threadId = route === null ? null : threadIdFromPath(route.pathname);
-  const hotkey = desktopHudOn(values) ? DESKTOP_HUD_HOTKEY : null;
+  const hotkey = DESKTOP_HUD_HOTKEY;
   const last = useRef<string | null>(null);
   useEffect(() => {
     if (!control.native || hotkey === null || hostWindowId() !== null || !control.state?.supported) return;
