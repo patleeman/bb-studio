@@ -19,8 +19,8 @@ final class LinksUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.navigationBars["Archive"].waitForExistence(timeout: 30), "the Archive page")
         XCTAssertTrue(app.buttons["archive-finished-thr_demo_lisbon"].waitForExistence(timeout: 15))
         shot("archive-link")
-        app.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.collectionViews["BotSpaceList"].waitForExistence(timeout: 15), "Back shows the list")
+        app.closeRoomSheet()
+        XCTAssertTrue(app.waitForRoom(timeout: 15), "pulling down shows the room")
     }
 
     func testAWorkerLinkOpensTheWorkerReadOnly() {
@@ -36,7 +36,7 @@ final class LinksUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(any("memoryRecordText").waitForExistence(timeout: 30), "the record")
         XCTAssertTrue(any("memoryRecordText").label.contains("Friday 10:00"))
         app.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 15), "Back goes to Main")
+        XCTAssertTrue(app.waitForRoom(timeout: 15), "Back goes to the room")
     }
 
     func testAMissingConversationSaysNotFound() {

@@ -42,6 +42,12 @@ enum BotSpacesDemo {
         }
     }
 
+    static func themed(_ json: String) -> String {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let at = arguments.firstIndex(of: "-qaRoomTheme"), arguments.indices.contains(at + 1), arguments[at + 1] != "none" else { return json }
+        return json.replacingOccurrences(of: #""id":"bot_juniper","#, with: #""id":"bot_juniper","appearance":{"themeId":"\#(arguments[at + 1])"},"#)
+    }
+
     final class PageQA: @unchecked Sendable {
         static let shared = PageQA()
         let latency: Int?
@@ -203,7 +209,7 @@ enum BotSpacesDemo {
                   {"id":"bot_research","name":"Research","avatar":"🔭","shape":"hexagon","color":"#5b6ee1","primary":false,"mainThreadId":"thr_research_main","needsYou":false,"activity":{"turn":false,"workers":0}}
                 ],"currentBotId":"bot_juniper"}
                 """#
-            return Data(json.utf8)
+            return Data(BotSpacesDemo.themed(json).utf8)
         }
 
         func viewJSON(_ botId: String) -> Data {

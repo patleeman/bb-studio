@@ -4,9 +4,46 @@ struct BotSpacesRoot: View {
     @EnvironmentObject private var app: AppModel
     @ObservedObject var store: BotSpacesStore
     @StateObject private var shell = BotShellModel()
+    @ObservedObject private var looks = LookStore.shared
     @Environment(\.horizontalSizeClass) private var sizeClass
 
+    private var compact: Bool { sizeClass != .regular && !Self.qaSplit }
+
+    static var qaSplit: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-qaSplitShell")
+        #else
+        false
+        #endif
+    }
+    private var shownBot: BotSpace? { BotShell.shownBot(store.spaces, chosen: shell.shownBotId) }
+    private var shownMain: String? { shownBot.flatMap { BotShell.mainThreadId($0, view: store.view(for: $0.id)) } }
+
     var body: some View {
+        Group {
+            if compact, let bot = shownBot, let main = shownMain {
+                RoomView(store: store, shell: shell, bot: bot, mainThreadId: main)
+                    .id(main)
+                    .lookRoot(bot: bot, theme: RoomTheme.resolve(botThemeId: bot.appearance?.themeId, phoneThemeId: looks.themeId, catalog: looks.catalog))
+            } else {
+                split.lookRoot(bot: shownBot)
+            }
+        }
+        .task(id: store.spaces) { await LookExport.run(store: store, client: app.client) }
+        .onChange(of: shell.selection) { _, item in
+            if compact { routeRoom(item) } else { shell.detailPath = shell.takePendingPush() }
+        }
+        .onChange(of: compact) { _, compact in
+            if !compact, shell.selection == nil, let main = shownMain { shell.openConversation(main) }
+        }
+        .onAppear { shell.land(store); consumeLinks() }
+        .onChange(of: store.spaces) { _, _ in shell.land(store); consumeLinks() }
+        .onChange(of: store.views) { _, _ in shell.land(store) }
+        .onChange(of: app.shellLink, initial: true) { _, _ in consumeLinks() }
+        .onChange(of: app.botRoute, initial: true) { _, _ in consumeLinks() }
+    }
+
+    private var split: some View {
         NavigationSplitView(preferredCompactColumn: $shell.compactColumn) {
             BotSpaceList(store: store, shell: shell)
         } detail: {
@@ -17,14 +54,21 @@ struct BotSpacesRoot: View {
             .environment(\.botConversation, context)
             .id(shell.selection)
         }
-        .lookRoot(bot: BotShell.shownBot(store.spaces, chosen: shell.shownBotId))
-        .task(id: store.spaces) { await LookExport.run(store: store, client: app.client) }
-        .onChange(of: shell.selection) { _, _ in shell.detailPath = shell.takePendingPush() }
-        .onAppear { shell.land(store); consumeLinks() }
-        .onChange(of: store.spaces) { _, _ in shell.land(store); consumeLinks() }
-        .onChange(of: store.views) { _, _ in shell.land(store) }
-        .onChange(of: app.shellLink, initial: true) { _, _ in consumeLinks() }
-        .onChange(of: app.botRoute, initial: true) { _, _ in consumeLinks() }
+    }
+
+    private func routeRoom(_ item: BotShellItem?) {
+        guard let item else { return }
+        let pending = shell.takePendingPush()
+        switch item {
+        case .conversation(let id) where id == shownMain:
+            shell.detailPath = pending
+        case .conversation(let id), .worker(let id):
+            shell.detailPath = [.thread(id: id)] + pending
+        case .page(let page):
+            shell.detailPath = []
+            shell.roomOpen = page
+        }
+        shell.selection = nil
     }
 
     /// A link or route that came before the Bots loaded waits for them; once
@@ -44,19 +88,11 @@ struct BotSpacesRoot: View {
         case .page, nil: return nil
         }
         guard let bot = BotShell.shownBot(store.spaces, chosen: shell.shownBotId) else { return nil }
-        let view = store.view(for: bot.id)
-        return BotConversationContext(
-            threadId: threadId, kind: kind, botId: bot.id, botName: bot.name,
-            look: BotLook(shape: bot.shape, color: bot.color, emoji: bot.avatar),
-            mainThreadId: BotShell.mainThreadId(bot, view: view),
-            conversation: view?.conversations.first { $0.threadId == threadId },
-            workers: WorkersLine(conversationId: threadId, view: kind == .conversation ? view : nil),
-            allWorkers: view?.workers ?? [],
-            splitsThreads: sizeClass == .regular,
-            push: { [shell] route in shell.detailPath.append(route) },
-            openConversation: { [shell] id in shell.openConversation(id) },
-            showList: { [shell] in shell.showList() },
-            refresh: { [store] in Task { await store.refresh() } })
+        return BotShell.context(threadId: threadId, kind: kind, bot: bot, view: store.view(for: bot.id), splitsThreads: sizeClass == .regular,
+                                push: { [shell] route in shell.detailPath.append(route) },
+                                openConversation: { [shell] id in shell.openConversation(id) },
+                                showList: { [shell] in shell.showList() },
+                                refresh: { [store] in Task { await store.refresh() } })
     }
 
     @ViewBuilder private var detail: some View {
@@ -211,13 +247,7 @@ struct BotSpaceList: View {
 
     private func startConversation(_ text: String) async throws {
         guard let bot else { return }
-        let client = app.client
-        var projectId = view?.main?.projectId
-        if projectId == nil, let main = BotShell.mainThreadId(bot, view: view) {
-            projectId = try await client.thread(main).projectId
-        }
-        guard let projectId else { throw BBError(status: 0, message: "\(bot.name) has no Main conversation to start from.") }
-        let id = try await client.startConversation(botId: bot.id, projectId: projectId, text: text)
+        let id = try await BotShell.startConversation(text, bot: bot, view: view, client: app.client)
         await store.refresh()
         shell.openConversation(id)
     }

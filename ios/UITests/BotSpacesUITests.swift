@@ -7,7 +7,7 @@ final class BotSpacesUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     private func launch(_ variant: String = "needs") {
-        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", variant]
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", variant, "-qaSplitShell"]
         app.launchOffline()
     }
 

@@ -11,7 +11,9 @@ final class WorkersUITests: ServerIsolatedUITestCase {
     private func launch(_ variant: String = "needs") {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", variant]
         app.launchOffline()
-        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main opens")
+        XCTAssertTrue(app.waitForRoom(), "the app opens on the room")
+        app.standRoomChat()
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main stands up")
     }
 
     private func back() {
@@ -34,12 +36,12 @@ final class WorkersUITests: ServerIsolatedUITestCase {
 
     func testOpenFromTheListAndAsk() {
         launch()
-        back()
-        let list = app.collectionViews["BotSpaceList"]
-        let done = list.buttons.matching(NSPredicate(format: "label ENDSWITH ' done'")).firstMatch
-        XCTAssertTrue(done.waitForExistence(timeout: 15), "failed workers fold under N done, as on desktop")
-        done.tap()
-        let failed = list.buttons["worker-thr_demo_w3"]
+        app.buttons["roomLayDown"].tap()
+        app.openRoomPlace("conversations")
+        let earlier = app.buttons["roomEarlier"]
+        let failed = app.buttons["roomWorker-thr_demo_w3"]
+        XCTAssertTrue(earlier.waitForExistence(timeout: 15) || failed.exists, "older finished workers fold under N earlier")
+        if !failed.exists { earlier.tap() }
         XCTAssertTrue(failed.waitForExistence(timeout: 15))
         failed.tap()
         expectWorker("Mock question bank", status: "failed")
@@ -85,8 +87,9 @@ final class WorkersUITests: ServerIsolatedUITestCase {
 
     func testWaitingOnAnApprovalShowsItsStatusOnly() {
         launch()
-        back()
-        let waiting = app.collectionViews["BotSpaceList"].buttons["worker-thr_demo_w1"]
+        app.buttons["roomLayDown"].tap()
+        app.openRoomPlace("conversations")
+        let waiting = app.buttons["roomWorker-thr_demo_w1"]
         XCTAssertTrue(waiting.waitForExistence(timeout: 15))
         waiting.tap()
         expectWorker("Studio-native BB fork", status: "needs-you")

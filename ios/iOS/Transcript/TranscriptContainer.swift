@@ -48,6 +48,7 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
     var top: (() -> Top)?
     var pill: (TranscriptPillState, @escaping () -> Void) -> Pill
     var onNearTop: (() -> Void)?
+    var onEmptyTap: (() -> Void)?
     var onPillChange: ((TranscriptPillState) -> Void)?
     var log: ((String) -> Void)?
     var dismissKeyboard: ((UIWindow) -> Void)?
@@ -75,6 +76,7 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         let environment = context.environment
         let coordinator = context.coordinator
         controller.onNearTop = onNearTop
+        controller.onEmptyTap = onEmptyTap
         controller.onPillChange = onPillChange
         controller.log = log
         if let dismissKeyboard { controller.dismissKeyboard = dismissKeyboard }
