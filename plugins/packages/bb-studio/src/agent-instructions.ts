@@ -15,8 +15,8 @@ import { MEMORY_SLOT } from "./memory/service";
 export const PAGE_POINTER = 'Pages: read with pages_read, change with small pages_edit operations on block ids, and put ::page{id="pg_…"} on its own line after you make or change one. Page formats (charts, embeds, html, mentions): load the studio skill.';
 
 /** Apps: the two types, when to make an interactive one and its card line (::mini, or ::app with the App cards setting). */
-export const MINI_POINTER = 'An app is a saved output (artifacts_save) or an interactive tool with its own data (minis_create). For something the user will interact with or come back to, make an interactive app with minis_create and show ::mini{id="mini_…"} on its own line; details are in the studio skill.';
-export const APP_POINTER = 'An app is a saved output (artifacts_save) or an interactive tool with its own data (minis_create). For something the user will interact with or come back to, make an interactive app with minis_create; show any app with ::app{id="…"} on its own line; details are in the studio skill.';
+export const MINI_POINTER = 'An app is a saved output or an interactive tool with its own data; apps_create makes either (type "artifact" or "mini"). For something the user will interact with or come back to, make an interactive app (type "mini") and show ::mini{id="mini_…"} on its own line; details are in the studio skill.';
+export const APP_POINTER = 'An app is a saved output or an interactive tool with its own data; apps_create makes either (type "artifact" or "mini"). For something the user will interact with or come back to, make an interactive app (type "mini"); show any app with ::app{id="…"} on its own line; details are in the studio skill.';
 
 export const WORK_POINTER = 'For work that runs a while (a worker, a release, a long job), post one live work card: work_card_create gives a ::work{id="wc_…"} line to post once; report progress with work_card_update, not new status messages.';
 

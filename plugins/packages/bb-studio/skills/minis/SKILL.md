@@ -12,7 +12,7 @@ its own data. It shows live in chat, in pages and in its own
 tab, and every place shares the same data. The user's open copies update when
 you change its source or records.
 
-Show one in a reply with the card line `minis_create` gives, on its own line:
+Show one in a reply with the card line `apps_create` gives, on its own line:
 
 ```
 ::mini{id="mini_0123456789abcdef"}
@@ -28,14 +28,15 @@ Link to one as `[Name](/plugins/studio/studio/minis/<id>)`.
 
 | Tool | Use it to |
 | --- | --- |
-| `minis_create` | Create one from files. It compiles first; on an error nothing is made. |
+| `apps_create` with type `"mini"` | Create one from files (`input`: `name`, `files`). It compiles first; on an error nothing is made. |
 | `minis_update` | Add or replace files, remove paths, rename. Read it first: the user may have edited the source. |
-| `minis_read` | Read the manifest, every file, approved and pending access, collections and shared state. |
-| `minis_list` | List mini apps with ids and links. |
+| `apps_read` | Read the manifest, every file, approved and pending access, collections and shared state. |
+| `apps_list` with type `"mini"` | List mini apps with ids and links. |
 | `minis_data` | Find, get, count, insert, update, patch and remove records. Open copies update live. |
 | `minis_live` | Read or set shared state, watch events, list and run an open copy's actions. |
 
-`bb studio minis list|show|data|state|watch|actions|do` does the same from a shell.
+`minis_create`, `minis_read` and `minis_list` are aliases of the `apps_*`
+rows with the same fields. `bb studio minis list|show|data|state|watch|actions|do` does the same from a shell.
 
 ## Files
 
