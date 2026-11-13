@@ -30,13 +30,6 @@ struct BargeInGate: Equatable, Sendable {
 
     private var aboveSince: TimeInterval?
 
-    /// The same tuning with no speech in progress, for a new session.
-    func reset() -> BargeInGate {
-        var copy = self
-        copy.aboveSince = nil
-        return copy
-    }
-
     func threshold(playback: Float, voicePlaying: Bool) -> Float {
         voicePlaying ? max(playingFloor, playback * echoRatio + echoMargin) : quietThreshold
     }

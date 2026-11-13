@@ -208,7 +208,8 @@ struct LiveSessionMachine: Sendable {
         let (background, gate, confirmWindow, userPause, agentPause) = (background, gate, confirmWindow, userPause, agentPause)
         self = LiveSessionMachine(endsLinesOnPause: endsLinesOnPause)
         self.background = background
-        self.gate = gate.reset()
+        self.gate = gate
+        self.gate.reset()
         self.confirmWindow = confirmWindow
         self.userPause = userPause
         self.agentPause = agentPause
