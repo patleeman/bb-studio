@@ -412,6 +412,7 @@ struct MemoryRecordEditor: View {
 struct LibraryPageView: View {
     let botId: String?
     var open: (BotShellItem) -> Void
+    var tiles = false
     @EnvironmentObject private var app: AppModel
     @AppStorage("studio.library.group") private var groupBy: LibraryPage.GroupBy = .conversation
     @State private var load = PageLoad<[BotLibraryItem]>()
@@ -423,9 +424,93 @@ struct LibraryPageView: View {
     private var scope: String { "\(app.client.baseURL.absoluteString)|\(botId ?? "")" }
 
     var body: some View {
-        let groups = LibraryPage.groups(items ?? [], query: query, kind: kind, groupBy: groupBy)
+        let groups = LibraryPage.groups(items ?? [], query: query, kind: kind, groupBy: tiles ? .date : groupBy)
+        Group {
+            if tiles { grid(groups) } else { list(groups) }
+        }
+        .overlay {
+            if items == nil {
+                if let error = load.error {
+                    PageLoadFailed(title: "The library didn't load", message: error, id: "libraryRetry") { load.retry() }
+                } else {
+                    ProgressView().accessibilityIdentifier("libraryLoading")
+                }
+            }
+        }
+        .searchable(text: $query, prompt: "Search files")
+        .navigationTitle("Library")
+        .navigationBarTitleDisplayMode(.large)
+        .libraryOptions(groupBy: $groupBy, tiles: tiles)
+        .refreshable { await load.reload() }
+        .task(id: scope) { start() }
+        .onChange(of: botId) { _, _ in
+            query = ""
+            kind = nil
+            unfolded = []
+        }
+        .accessibilityIdentifier("library-page")
+    }
+
+    private var chips: some View {
+        BotPageChips(choices: [(BotLibraryItem.Kind?.none, "All")] + LibraryPage.filters.map { (Optional($0), LibraryPage.label($0)) }, selection: $kind)
+    }
+
+    private func grid(_ groups: [BotLibraryGroup]) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                chips.padding(.horizontal, -16)
+                if items != nil, let error = load.error {
+                    PageLoadFailed(title: "The library didn't load", message: error, id: "libraryRowRetry") { load.retry() }
+                }
+                ForEach(groups) { group in
+                    Text(group.title).font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                        .padding(.top, 18).padding(.bottom, 6)
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                        ForEach(group.rows) { tile($0) }
+                    }
+                }
+                if let items, groups.isEmpty {
+                    ContentUnavailableView(items.isEmpty ? "No files" : "No files match", systemImage: "books.vertical").padding(.top, 40)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 30)
+        }
+    }
+
+    @ViewBuilder private func tile(_ row: BotLibraryRow) -> some View {
+        let kind = StudioKind.of(row.item.studioKind)
+        let label = VStack(alignment: .leading, spacing: 0) {
+            ZStack {
+                Rectangle().fill(kind.tint.opacity(0.14))
+                Image(systemName: kind.symbol).font(.title).foregroundStyle(kind.tint)
+            }
+            .frame(height: 92)
+            HStack(spacing: 4) {
+                Text(row.item.title).font(.subheadline.weight(.medium)).lineLimit(1)
+                if row.count > 1 {
+                    Text("×\(row.count)").font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                        .accessibilityLabel("\(row.count) like it")
+                }
+            }
+            .padding(.horizontal, 10).padding(.top, 9).padding(.bottom, 2)
+            Text(LibraryPage.label(row.item.kind)).font(.caption).foregroundStyle(.secondary)
+                .padding(.horizontal, 10).padding(.bottom, 10)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background.secondary, in: .rect(cornerRadius: 8))
+        .clipShape(.rect(cornerRadius: 8))
+        .contentShape(.rect)
+        if let route = row.item.route {
+            NavigationLink(value: route) { label }.buttonStyle(.plain).accessibilityIdentifier("library-row-\(row.item.itemId)")
+        } else {
+            label.opacity(0.6).accessibilityIdentifier("library-row-\(row.item.itemId)")
+        }
+    }
+
+    private func list(_ groups: [BotLibraryGroup]) -> some View {
         List {
-            BotPageChips(choices: [(BotLibraryItem.Kind?.none, "All")] + LibraryPage.filters.map { (Optional($0), LibraryPage.label($0)) }, selection: $kind)
+            chips
             if items != nil, let error = load.error {
                 PageLoadErrorRow(message: error, id: "libraryRowRetry") { load.retry() }
             }
@@ -448,38 +533,6 @@ struct LibraryPageView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .overlay {
-            if items == nil {
-                if let error = load.error {
-                    PageLoadFailed(title: "The library didn't load", message: error, id: "libraryRetry") { load.retry() }
-                } else {
-                    ProgressView().accessibilityIdentifier("libraryLoading")
-                }
-            }
-        }
-        .searchable(text: $query, prompt: "Search files")
-        .navigationTitle("Library")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Picker("Group by", selection: $groupBy) { ForEach(LibraryPage.GroupBy.allCases) { Text($0.title).tag($0) } }
-                    Section {
-                        NavigationLink(value: Route.visualChats) { Label("Visual Chat", systemImage: "rectangle.on.rectangle") }
-                    }
-                } label: { Image(systemName: "ellipsis") }
-                .accessibilityLabel("Library options")
-                .accessibilityIdentifier("libraryOptions")
-            }
-        }
-        .refreshable { await load.reload() }
-        .task(id: scope) { start() }
-        .onChange(of: botId) { _, _ in
-            query = ""
-            kind = nil
-            unfolded = []
-        }
-        .accessibilityIdentifier("library-page")
     }
 
     @ViewBuilder private func header(_ group: BotLibraryGroup) -> some View {
@@ -795,5 +848,33 @@ struct PageLoadErrorRow: View {
                     .accessibilityIdentifier(id)
             }
         }
+    }
+}
+
+private struct LibraryOptions: ViewModifier {
+    @Binding var groupBy: LibraryPage.GroupBy
+    let tiles: Bool
+
+    func body(content: Content) -> some View {
+        content.toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    if !tiles {
+                        Picker("Group by", selection: $groupBy) { ForEach(LibraryPage.GroupBy.allCases) { Text($0.title).tag($0) } }
+                    }
+                    Section {
+                        NavigationLink(value: Route.visualChats) { Label("Visual Chat", systemImage: "rectangle.on.rectangle") }
+                    }
+                } label: { Image(systemName: "ellipsis") }
+                .accessibilityLabel("Library options")
+                .accessibilityIdentifier("libraryOptions")
+            }
+        }
+    }
+}
+
+extension View {
+    fileprivate func libraryOptions(groupBy: Binding<LibraryPage.GroupBy>, tiles: Bool) -> some View {
+        modifier(LibraryOptions(groupBy: groupBy, tiles: tiles))
     }
 }

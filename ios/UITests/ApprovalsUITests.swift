@@ -12,19 +12,22 @@ final class ApprovalsUITests: ServerIsolatedUITestCase {
     private func launch() {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "needs"]
         app.launchOffline()
-        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main opens")
+        XCTAssertTrue(app.waitForRoom(), "the app opens on the room")
+        app.standRoomChat()
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main stands up")
     }
 
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
     private func back() {
-        let bar = app.navigationBars.firstMatch
-        XCTAssertTrue(bar.waitForExistence(timeout: 20))
-        bar.buttons.element(boundBy: 0).tap()
+        let down = app.buttons["roomLayDown"]
+        XCTAssertTrue(down.waitForExistence(timeout: 20))
+        down.tap()
     }
 
     private func openWorker() {
-        let row = app.collectionViews["BotSpaceList"].buttons["worker-thr_demo_w1"]
+        app.openRoomPlace("conversations")
+        let row = app.buttons["roomWorker-thr_demo_w1"]
         XCTAssertTrue(row.waitForExistence(timeout: 15))
         row.tap()
         XCTAssertTrue(any("workerTitle").waitForExistence(timeout: 15), "the worker opens")

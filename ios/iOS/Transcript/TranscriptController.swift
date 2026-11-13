@@ -80,6 +80,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     var pillContent: (TranscriptPillState, @escaping () -> Void) -> AnyView = { _, _ in AnyView(EmptyView()) }
 
     var onNearTop: (() -> Void)?
+    var onEmptyTap: (() -> Void)?
     var onPillChange: ((TranscriptPillState) -> Void)?
     /// Scroll log lines: geometry, numbers and ids only.
     var log: ((String) -> Void)?
@@ -777,6 +778,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         // and resigning in the same pass dropped it.
         guard let window = view.window else { return }
         dismissKeyboard(window)
+        if let onEmptyTap, collectionView.indexPathForItem(at: recognizer.location(in: collectionView)) == nil { onEmptyTap() }
     }
 
     func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }

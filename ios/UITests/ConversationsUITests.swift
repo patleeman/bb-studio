@@ -11,7 +11,9 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
     private func launch(_ variant: String = "needs") {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", variant, "-qaNoDemoApprovals"]
         app.launchOffline()
-        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main opens")
+        XCTAssertTrue(app.waitForRoom(), "the app opens on the room")
+        app.standRoomChat()
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main stands up")
     }
 
     private func back() {
@@ -31,13 +33,15 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         XCTAssertFalse(app.buttons["Model & permissions"].exists, "the model picker left the input bar")
         XCTAssertFalse(app.buttons["composerExpandToPage"].exists, "no open-as-page control")
         XCTAssertTrue(app.buttons["Send"].exists == false, "dictation is the action while it's empty")
-        XCTAssertTrue(app.otherElements["quietCheck"].exists || app.staticTexts["Quiet check"].exists, "[PASS] reads Quiet check")
         let existing = app.buttons["replies-m3"]
+        for _ in 0..<6 where !existing.exists { app.collectionViews.firstMatch.swipeDown() }
+        XCTAssertTrue(app.otherElements["quietCheck"].exists || app.staticTexts["Quiet check"].exists, "[PASS] reads Quiet check")
         XCTAssertTrue(existing.waitForExistence(timeout: 15), "a reply with a thread shows its replies row")
         XCTAssertTrue(existing.label.contains("2 replies"), existing.label)
         shot("conversation")
 
         let reply = app.buttons["reply-in-thread-m5"]
+        for _ in 0..<6 where !reply.isHittable { app.collectionViews.firstMatch.swipeUp() }
         XCTAssertTrue(reply.waitForExistence(timeout: 10))
         reply.tap()
         let field = app.textViews["Reply…"]
@@ -55,6 +59,7 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(replies.label.contains("2 replies"), replies.label)
         shot("replies-indicator")
 
+        for _ in 0..<6 where !existing.isHittable { app.collectionViews.firstMatch.swipeDown() }
         existing.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'release workflow fix'")).firstMatch.waitForExistence(timeout: 15),
                       "the replies row reopens its thread")
@@ -63,8 +68,9 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
 
     func testForkOpensBesideItsConversationWithNoRow() {
         launch("list")
-        let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'draft the approval note'")).firstMatch
+        let text = app.collectionViews.firstMatch.staticTexts.matching(NSPredicate(format: "label CONTAINS 'draft the approval note'")).firstMatch
         XCTAssertTrue(text.waitForExistence(timeout: 15))
+        for _ in 0..<6 where !text.isHittable { app.collectionViews.firstMatch.swipeDown() }
         let fork = app.buttons["Fork conversation"]
         for _ in 0..<2 where !fork.exists {
             text.press(forDuration: 1)
@@ -82,9 +88,10 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         forked.tap()
         XCTAssertTrue(app.staticTexts["Main · fork"].waitForExistence(timeout: 15), "the line reopens the fork")
         app.buttons["replyThreadDone"].tap()
-        back()
-        XCTAssertTrue(app.collectionViews["BotSpaceList"].waitForExistence(timeout: 15))
-        XCTAssertFalse(app.collectionViews["BotSpaceList"].buttons["conversation-thr_demo_fork1"].exists, "a fork has no row of its own")
+        app.buttons["roomLayDown"].tap()
+        app.openRoomPlace("conversations")
+        XCTAssertTrue(app.buttons["roomNewConversation"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["roomConversation-thr_demo_fork1"].exists, "a fork has no row of its own")
     }
 
     func testMainHasNoFinish() {
@@ -96,8 +103,9 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
 
     func testNewConversation() {
         launch("list")
-        back()
-        let plus = app.buttons["BotSpaceNewConversation"]
+        app.buttons["roomLayDown"].tap()
+        app.openRoomPlace("conversations")
+        let plus = app.buttons["roomNewConversation"]
         XCTAssertTrue(plus.waitForExistence(timeout: 10))
         plus.tap()
         let field = app.textFields["newConversationField"].exists ? app.textFields["newConversationField"] : app.textViews["newConversationField"]
@@ -106,7 +114,8 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         app.buttons["newConversationStart"].tap()
         XCTAssertTrue(app.staticTexts["Plan the Lisbon dinner"].waitForExistence(timeout: 15), "the new conversation opens")
         back()
-        XCTAssertTrue(app.collectionViews["BotSpaceList"].buttons["conversation-thr_demo_new1"].waitForExistence(timeout: 15))
+        app.openRoomPlace("conversations")
+        XCTAssertTrue(app.buttons["roomConversation-thr_demo_new1"].waitForExistence(timeout: 15))
     }
 
     private func shot(_ name: String) {

@@ -1,6 +1,6 @@
 import XCTest
 
-/// The Bot's pages from the list header, offline (`-qaSpacesDemo list` with
+/// The Bot's pages from the room's menu, as sheets, offline (`-qaSpacesDemo list` with
 /// `-qaBotDemo chat`; `BotSpacesDemo.State` answers `memory.*`,
 /// `bot_library`, `bot_threads_older`, `bot_finished` and `bot_reopen`, and
 /// `-qaLoopsDemo` answers `loops.*`). `TEST_RUNNER_STEP8_OUT` keeps PNGs.
@@ -10,17 +10,19 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
     private func launch(_ extra: [String] = []) {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list"] + extra
         app.launchOffline()
-        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main opens")
-        let bar = app.navigationBars.firstMatch
-        XCTAssertTrue(bar.waitForExistence(timeout: 20))
-        bar.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.collectionViews["BotSpaceList"].waitForExistence(timeout: 15), "the list")
+        XCTAssertTrue(app.waitForRoom(), "the app opens on the room")
     }
 
     private func openPage(_ page: String) {
-        let button = app.buttons["BotPage-\(page)"]
-        XCTAssertTrue(button.waitForExistence(timeout: 15), "the \(page) button in the header")
-        button.tap()
+        switch page {
+        case "automations": app.openRoomPlace("schedules")
+        case "archive":
+            app.openRoomPlace("conversations")
+            let archive = app.buttons["roomArchive"]
+            XCTAssertTrue(archive.waitForExistence(timeout: 15), "Archive in Conversations")
+            archive.tap()
+        default: app.openRoomPlace(page)
+        }
     }
 
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
@@ -83,9 +85,8 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         openPage("library")
         XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.buttons["library-row-pg_demo_trip"].waitForExistence(timeout: 15), "files")
-        XCTAssertTrue(app.buttons["Launch prep"].exists, "grouped by conversation, the group opens it")
-        XCTAssertTrue(app.staticTexts["Made by you"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["3 like it"].firstMatch.exists, "near-identical files fold into one row")
+        XCTAssertTrue(app.staticTexts["Today"].exists, "tiles grouped by day, as in the design")
+        XCTAssertTrue(app.descendants(matching: .any)["3 like it"].firstMatch.exists, "near-identical files fold into one tile")
         shot("library")
 
         app.buttons["chip-Whiteboard"].tap()
@@ -104,19 +105,23 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(any("loops-screen").waitForExistence(timeout: 15), "the existing Todos screen")
         XCTAssertTrue(app.textFields["loops-add"].waitForExistence(timeout: 15))
         shot("todos")
-        app.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
+        app.closeRoomSheet()
 
         openPage("automations")
         XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.staticTexts["Check-in"].waitForExistence(timeout: 15), "the Bot's automations")
-        XCTAssertFalse(app.buttons["Done"].exists, "pushed, not a sheet")
+        XCTAssertFalse(app.buttons["Done"].exists, "embedded, with no Done of its own")
         shot("automations")
     }
 
     func testArchiveReopensAFinishedConversation() {
         launch()
-        XCTAssertFalse(app.collectionViews["BotSpaceList"].buttons["conversation-thr_demo_lisbon"].exists)
-        openPage("archive")
+        app.openRoomPlace("conversations")
+        XCTAssertTrue(app.buttons["roomNewConversation"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["roomConversation-thr_demo_lisbon"].exists)
+        let archive = app.buttons["roomArchive"]
+        for _ in 0..<4 where !archive.isHittable { app.swipeUp() }
+        archive.tap()
         XCTAssertTrue(app.navigationBars["Archive"].waitForExistence(timeout: 15))
         let finished = app.buttons["archive-finished-thr_demo_lisbon"]
         XCTAssertTrue(finished.waitForExistence(timeout: 15), "the finished conversation")
@@ -136,7 +141,8 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         app.buttons["archiveReopen"].tap()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 15), "the reopened conversation")
         app.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(app.collectionViews["BotSpaceList"].buttons["conversation-thr_demo_lisbon"].waitForExistence(timeout: 15), "back in the list")
+        app.openRoomPlace("conversations")
+        XCTAssertTrue(app.buttons["roomConversation-thr_demo_lisbon"].waitForExistence(timeout: 15), "back in Conversations")
     }
 
     func testSlowMemoryAndLibraryLoadThroughTheBotFlip() {
@@ -149,7 +155,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["memory-record-mem_3"].waitForExistence(timeout: 20), "and its records")
         XCTAssertFalse(app.activityIndicators.firstMatch.exists, "no spinner left")
         shot("slow-memory-loaded")
-        app.navigationBars["Memory"].buttons.element(boundBy: 0).tap()
+        app.closeRoomSheet()
         openPage("library")
         XCTAssertTrue(app.navigationBars["Library"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'library-row-'")).firstMatch.exists,
@@ -170,7 +176,7 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         shot("memory-error-retry")
         retry.tap()
         XCTAssertTrue(any("memoryProfile").waitForExistence(timeout: 15), "Retry loads Memory")
-        app.navigationBars["Memory"].buttons.element(boundBy: 0).tap()
+        app.closeRoomSheet()
         openPage("library")
         let libraryRetry = app.buttons["Retry"].firstMatch
         XCTAssertTrue(libraryRetry.waitForExistence(timeout: 15), "an error with Retry, not a spinner")

@@ -38,13 +38,12 @@ final class LaunchTabUITests: ServerIsolatedUITestCase {
     func testColdLaunchOpensMainWithSpaces() {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list"]
         app.launchOffline()
-        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main's composer shows")
+        XCTAssertTrue(app.waitForRoom(), "the app opens on Main's room")
         XCTAssertFalse(app.tabBars.firstMatch.exists, "no tab bar with spaces")
-        let list = app.collectionViews["BotSpaceList"]
-        XCTAssertFalse(list.exists && list.isHittable, "the list is under Main")
+        XCTAssertFalse(app.collectionViews["BotSpaceList"].exists, "not on the list")
         app.terminate()
         app.launchOffline()
-        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main again after the app is killed")
+        XCTAssertTrue(app.waitForRoom(), "the room again after the app is killed")
         XCTAssertFalse(app.tabBars.firstMatch.exists)
     }
 }

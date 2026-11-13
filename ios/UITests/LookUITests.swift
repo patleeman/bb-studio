@@ -8,7 +8,7 @@ final class LookUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
 
     private func launch(theme: String, live: Bool = false) {
-        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "needs", "-qaNoDemoApprovals", "-qaLookTheme", theme]
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "needs", "-qaNoDemoApprovals", "-qaLookTheme", theme, "-qaSplitShell"]
         if live { app.launchArguments.append("-qaLiveScene") }
         app.launchOffline()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 30), "Main opens")

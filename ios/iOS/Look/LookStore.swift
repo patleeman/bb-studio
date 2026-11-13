@@ -77,10 +77,11 @@ final class LookStore: ObservableObject {
 struct LookRoot: ViewModifier {
     @ObservedObject var store: LookStore
     var bot: BotSpace?
+    var theme: LookTheme?
     @Environment(\.colorScheme) private var scheme
 
     func body(content: Content) -> some View {
-        let theme = store.theme(for: bot)
+        let theme = theme ?? store.theme(for: bot)
         let chosen = store.sceneModes[theme.id].flatMap { theme.modes[$0.rawValue] != nil ? $0 : nil }
         let fixed: ColorScheme? = chosen.map { $0 == .dark ? .dark : .light } ?? theme.fixedScheme
         let look = Look(theme: theme, scheme: fixed ?? scheme, showsScene: theme.kind == .scene)
@@ -92,8 +93,8 @@ struct LookRoot: ViewModifier {
 }
 
 extension View {
-    func lookRoot(_ store: LookStore = .shared, bot: BotSpace?) -> some View {
-        modifier(LookRoot(store: store, bot: bot))
+    func lookRoot(_ store: LookStore = .shared, bot: BotSpace?, theme: LookTheme? = nil) -> some View {
+        modifier(LookRoot(store: store, bot: bot, theme: theme))
     }
 
     /// Desktop's halo for bare text over a scene: the canvas color in three soft layers.

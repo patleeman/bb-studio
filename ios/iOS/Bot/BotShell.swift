@@ -124,6 +124,30 @@ enum BotShell {
         return bots[next].id
     }
 
+    @MainActor
+    static func context(threadId: String, kind: BotConversationContext.Kind, bot: BotSpace, view: BotThreadsView?, splitsThreads: Bool,
+                        push: @escaping (Route) -> Void, openConversation: @escaping (String) -> Void,
+                        showList: @escaping () -> Void, refresh: @escaping () -> Void) -> BotConversationContext {
+        BotConversationContext(
+            threadId: threadId, kind: kind, botId: bot.id, botName: bot.name,
+            look: BotLook(shape: bot.shape, color: bot.color, emoji: bot.avatar),
+            mainThreadId: mainThreadId(bot, view: view),
+            conversation: view?.conversations.first { $0.threadId == threadId },
+            workers: WorkersLine(conversationId: threadId, view: kind == .conversation ? view : nil),
+            allWorkers: view?.workers ?? [],
+            splitsThreads: splitsThreads, push: push, openConversation: openConversation, showList: showList, refresh: refresh)
+    }
+
+    @MainActor
+    static func startConversation(_ text: String, bot: BotSpace, view: BotThreadsView?, client: BBClient) async throws -> String {
+        var projectId = view?.main?.projectId
+        if projectId == nil, let main = mainThreadId(bot, view: view) {
+            projectId = try await client.thread(main).projectId
+        }
+        guard let projectId else { throw BBError(status: 0, message: "\(bot.name) has no Main conversation to start from.") }
+        return try await client.startConversation(botId: bot.id, projectId: projectId, text: text)
+    }
+
     static func shortAge(_ at: Double, now: Date = Date()) -> String {
         WorkerInfo.age(at, now: now)
     }
@@ -148,6 +172,7 @@ final class BotShellModel: ObservableObject {
     @Published var selection: BotShellItem?
     @Published var compactColumn: NavigationSplitViewColumn = .sidebar
     @Published var detailPath: [Route] = []
+    @Published var roomOpen: BotPage?
     private(set) var landed = false
 
     func openConversation(_ threadId: String) {

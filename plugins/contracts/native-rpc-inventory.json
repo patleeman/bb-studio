@@ -1016,6 +1016,12 @@
       "coverage": "generated method"
     },
     {
+      "file": "ios/iOS/Loops/Loops.swift",
+      "plugin": "studio",
+      "method": "loops.morning",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/iOS/Studio/MiniAppView.swift",
       "plugin": "studio",
       "method": "minis.rename",

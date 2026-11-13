@@ -72,6 +72,9 @@ struct ThreadView: View {
     @State private var editing = false
     @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
     @Environment(\.botConversation) private var shell
+    @Environment(\.roomChat) private var roomEnvironment
+    private let inRoom: Bool
+    private var roomChat: RoomChat? { inRoom ? roomEnvironment : nil }
     @State private var sideThreads: [String: BotSideThread] = [:]
     /// Forks made here this session, kept on their message until Studio lists them.
     @State private var madeForks: [String: String] = [:]
@@ -108,11 +111,12 @@ struct ThreadView: View {
     /// The new chat transcript's requests, when it's on (Settings ▸ Diagnostics).
     @State private var transcriptV2 = TranscriptHandle()
 
-    init(threadId: String, hidesTabBar: Bool = true, botChrome: BotChrome? = nil) {
+    init(threadId: String, hidesTabBar: Bool = true, botChrome: BotChrome? = nil, session: RoomSession? = nil) {
         self.hidesTabBar = hidesTabBar
         self.botChrome = botChrome
-        _talk = StateObject(wrappedValue: HoldToTalk(threadId: threadId))
-        _model = StateObject(wrappedValue: ThreadModel(threadId: threadId))
+        inRoom = session != nil
+        _talk = StateObject(wrappedValue: session?.talk ?? HoldToTalk(threadId: threadId))
+        _model = StateObject(wrappedValue: session?.model ?? ThreadModel(threadId: threadId))
         _notes = StateObject(wrappedValue: ThreadNotes(threadId: threadId))
         _pendingPermission = AppStorage(ServerScope.key("permissionMode.\(threadId)"), store: AppGroup.defaults)
     }
@@ -167,6 +171,9 @@ struct ThreadView: View {
         }
         .onChange(of: talk.error) { _, error in
             if let error { app.flash(error) }
+        }
+        .onChange(of: roomChat?.focusRequests, initial: true) { _, requests in
+            if let requests, requests > 0 { composerFocused = true }
         }
     }
 
@@ -359,7 +366,7 @@ struct ThreadView: View {
             #if DEBUG
             if let demo = NotesDemo.draft { draft = demo }
             #endif
-            model.attach(app)
+            if !inRoom { model.attach(app) }
             if canUseNotes { notes.attach(app) }
             #if DEBUG
             if TalkIndicator.qaDictating {
@@ -398,7 +405,7 @@ struct ThreadView: View {
             saveDraftLocally()
             resizeRestore?.cancel()
             resizeAnchor.cancel()
-            model.detach()
+            if !inRoom { model.detach() }
             notes.detach()
         }
     }
@@ -771,6 +778,12 @@ struct ThreadView: View {
             // A tap on the transcript puts the keyboard away; rows keep their taps.
             .background(alignment: .topLeading) {
                 TranscriptTapDismissesKeyboard(active: composerFocused).frame(width: 1, height: 1)
+            }
+            .background {
+                if let roomChat {
+                    Color.clear.contentShape(.rect).onTapGesture { roomChat.layDown() }
+                        .accessibilityHidden(true)
+                }
             }
         }
         #if DEBUG
@@ -2037,6 +2050,7 @@ extension ThreadView {
             top: transcriptV2HasTop ? { transcriptV2Top } : nil,
             pill: { state, jump in transcriptV2Pill(state, jump: jump) },
             onNearTop: { transcriptV2LoadOlder() },
+            onEmptyTap: roomChat?.layDown,
             log: ScrollLog.on ? { ScrollLog.request($0) } : nil,
             // Not while the window resizes, which reloads the keyboard mid-transition (crash 3).
             dismissKeyboard: { window in
