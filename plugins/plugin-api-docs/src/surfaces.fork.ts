@@ -52,6 +52,7 @@ const FORK_API_SYMBOLS: Readonly<Record<string, readonly string[]>> = {
     "PluginAppSlots.experimental_sidebarSection",
     "ExperimentalSidebarSectionRegistration",
     "ExperimentalSidebarSectionProps",
+    "ExperimentalSidebarSectionPlacement",
   ],
   "message-actions": [
     "PluginAppSlots.experimental_messageAction",
