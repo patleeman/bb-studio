@@ -5,16 +5,39 @@ import { TooltipProvider } from "@bb/shared-ui/tooltip";
 import { usePluginSlots } from "@/lib/plugin-slots";
 import { TAB_WINDOW_ID, TAB_WINDOW_OWNER } from "@/lib/fork-tab-popout";
 import { ForkTabWindow } from "./ForkTabWindow";
+import { DESKTOP_OVERLAY_WINDOW_ID, ForkDesktopOverlay } from "./ForkDesktopOverlay";
 
 export const FORK_WINDOW_ROUTE_PATH = "/fork-window/:pluginId/:windowId";
 
 export function ForkWindowView() {
   const { pluginId, windowId } = useParams();
+  if (pluginId === TAB_WINDOW_OWNER && windowId === DESKTOP_OVERLAY_WINDOW_ID) {
+    return <DesktopOverlayWindow />;
+  }
   return pluginId === TAB_WINDOW_OWNER && windowId === TAB_WINDOW_ID ? (
     <ForkTabWindow />
   ) : (
     <PluginWindowView pluginId={pluginId} windowId={windowId} />
   );
+}
+
+function useTransparentPage(transparent: boolean) {
+  useEffect(() => {
+    if (!transparent) return;
+    const targets = [document.documentElement, document.body];
+    const previous = targets.map((target) => target.style.background);
+    for (const target of targets) target.style.background = "transparent";
+    return () => {
+      targets.forEach((target, index) => {
+        target.style.background = previous[index] ?? "";
+      });
+    };
+  }, [transparent]);
+}
+
+function DesktopOverlayWindow() {
+  useTransparentPage(true);
+  return <ForkDesktopOverlay />;
 }
 
 function PluginWindowView({
@@ -34,17 +57,7 @@ function PluginWindowView({
     if (slot !== undefined) document.title = slot.title;
   }, [slot]);
 
-  useEffect(() => {
-    if (!transparent) return;
-    const targets = [document.documentElement, document.body];
-    const previous = targets.map((target) => target.style.background);
-    for (const target of targets) target.style.background = "transparent";
-    return () => {
-      targets.forEach((target, index) => {
-        target.style.background = previous[index] ?? "";
-      });
-    };
-  }, [transparent]);
+  useTransparentPage(transparent);
 
   if (slot === undefined) return null;
   const Component = slot.component;

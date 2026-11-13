@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -96,9 +96,18 @@ export function readStudioUpdateTest(env) {
       `${STUDIO_UPDATE_TEST_ENV}.feedUrl must be http://127.0.0.1:<port>/ or github`,
     );
   }
+  if (
+    test.label !== undefined &&
+    (typeof test.label !== "string" || !/^[A-Za-z][A-Za-z0-9 ]{0,23}$/.test(test.label))
+  ) {
+    throw new Error(
+      `${STUDIO_UPDATE_TEST_ENV}.label must be up to 24 letters, digits and spaces`,
+    );
+  }
   return {
     feedUrl: test.feedUrl,
     root: test.root,
+    label: test.label ?? null,
     version:
       test.version === undefined
         ? null
@@ -138,6 +147,7 @@ export function createStudioBuild({ release, upstream, test }) {
       root: test.root,
       serverPort: STUDIO_UPDATE_TEST_IDENTITY.serverPort,
       hostDaemonPort: STUDIO_UPDATE_TEST_IDENTITY.hostDaemonPort,
+      label: test.label ?? null,
     },
   };
 }
@@ -163,10 +173,37 @@ export function applyStudioBuilderConfig(config, build) {
     version: build.version,
   };
   config.publish = [{ ...build.updateFeed, channel: "latest" }];
+  applyDesktopControlResources(config, DESKTOP_CONTROL_STAGE, existsSync);
   if (build.test !== null) {
-    config.extraMetadata.name = STUDIO_UPDATE_TEST_IDENTITY.packageName;
-    config.appId = STUDIO_UPDATE_TEST_IDENTITY.appId;
-    config.productName = STUDIO_UPDATE_TEST_IDENTITY.productName;
+    const identity = studioTestIdentity(build.test.label ?? null);
+    config.extraMetadata.name = identity.packageName;
+    config.appId = identity.appId;
+    config.productName = identity.productName;
   }
   return config;
+}
+
+export const DESKTOP_CONTROL_STAGE = resolve(desktopRoot, "release", "desktop-control");
+
+export function applyDesktopControlResources(config, stage, exists) {
+  if (!exists(join(stage, "cua-driver")) || !exists(join(stage, "bb-studio-desktop-helper"))) return config;
+  config.mac = {
+    ...config.mac,
+    extraResources: [
+      ...(config.mac?.extraResources ?? []),
+      { from: stage, to: "desktop-control", filter: ["cua-driver", "bb-studio-desktop-helper", "NOTICE.md", "driver.json"] },
+    ],
+  };
+  return config;
+}
+
+export function studioTestIdentity(label) {
+  if (label === null) return STUDIO_UPDATE_TEST_IDENTITY;
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return {
+    ...STUDIO_UPDATE_TEST_IDENTITY,
+    appId: STUDIO_UPDATE_TEST_IDENTITY.appId.replace(/updatetest$/, slug),
+    packageName: STUDIO_UPDATE_TEST_IDENTITY.packageName.replace(/updatetest$/, slug),
+    productName: `BB Studio ${label}`,
+  };
 }
