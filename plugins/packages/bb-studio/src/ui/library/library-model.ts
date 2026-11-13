@@ -6,6 +6,7 @@
 // shows 8 rows, then "N more" (UX review 3, item 7).
 import { TYPE_LABELS, type ArtifactType } from "../../artifacts/shared";
 import type { LibraryItem, LibraryKind } from "../../bot-threads-contract";
+export { GROUP_FOLD, foldRows } from "../bot-page/fold";
 
 export type LibraryGroupBy = "conversation" | "kind" | "date";
 export type LibraryKindFilter = "all" | "starred" | Exclude<LibraryKind, "other" | "artifact">;
@@ -56,8 +57,6 @@ export interface LibraryGroup {
   rows: LibraryRow[];
 }
 
-/** A group shows this many rows, then "N more". */
-export const GROUP_FOLD = 8;
 
 /**
  * What near-identical titles share: the part before a colon when that part
@@ -84,11 +83,6 @@ export function libraryRows(items: readonly LibraryItem[]): LibraryRow[] {
   return [...rows.values()];
 }
 
-/** The rows a group shows: all when open, else the first GROUP_FOLD; and how many it leaves out. */
-export function foldRows(rows: readonly LibraryRow[], open: boolean): { shown: LibraryRow[]; more: number } {
-  if (open || rows.length <= GROUP_FOLD) return { shown: [...rows], more: 0 };
-  return { shown: rows.slice(0, GROUP_FOLD), more: rows.length - GROUP_FOLD };
-}
 
 const sameTitle = (a: string, b: string) => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
 

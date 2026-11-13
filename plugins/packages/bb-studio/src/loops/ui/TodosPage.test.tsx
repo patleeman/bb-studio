@@ -302,3 +302,18 @@ it("opens at the top, also as studio/automations: nothing scrolls the page to Sc
   delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
   state.scheduled = [];
 });
+
+it("shows 8 rows of a long group, then \"N more in Later\", so Scheduled stays near the top", async () => {
+  state.groups = { ...empty, comingUp: Array.from({ length: 20 }, (_, n) => loop(`loop_l${n}`, `Later ${String(n).padStart(2, "0")}`, { status: "queued" })) };
+  state.scheduled = [{ key: "Morning brief", source: "automation", id: "Morning brief", botId: "bot_1", botName: "Chief of Staff", kind: "checkin", title: "Morning brief", nextAt: null, state: "active", scheduleText: "Daily 8:00", threadId: "thr_bot", link: "bb://automation/bot_1%3AMorning%20brief" }];
+  await render();
+  const later = group("Later")!;
+  expect(later.querySelector("[data-testid=bot-page-group-count]")?.textContent).toBe("20");
+  expect(titles(later)).toHaveLength(8);
+  expect(later.querySelector("[data-testid=todos-more]")?.textContent).toBe("12 more in Later");
+  expect(container.querySelectorAll("[data-testid=bot-page-row-title]")).toHaveLength(9);
+  await act(async () => later.querySelector<HTMLButtonElement>("[data-testid=todos-more]")!.click());
+  expect(titles(group("Later"))).toHaveLength(20);
+  expect(group("Later")!.querySelector("[data-testid=todos-more]")).toBeNull();
+  state.scheduled = [];
+});

@@ -3,7 +3,7 @@
 // due date or "when" on the right, in four groups: Today, This week, Later
 // and Waiting on others (rules in todos-model.ts), then Scheduled (the Bot's
 // check-ins, reminders, watchers and runners, src/loops/scheduled.ts), then
-// Done, folded. The
+// Done, folded. A group shows 8 rows, then "N more", as the Library's do. The
 // Bot chat's pending questions and unread replies lead Today. Search and the
 // area pills filter it; New hands a typed line to the Bot to fill in. A row
 // opens the todo as a tab in the workbench beside the page (TodoTab.tsx).
@@ -12,7 +12,7 @@ import { errorMessage } from "../../kit/format";
 import { Button } from "../../kit/ui/button";
 import { Input } from "../../kit/ui/input";
 import type { BotView } from "../../contract";
-import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, useRowOpen } from "../../ui/bot-page";
+import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageMore, BotPageRow, BotPageToolbar, foldRows, useRowOpen } from "../../ui/bot-page";
 import { useCall, useLive } from "../../ui/live";
 import type { Loop } from "../contract";
 import { SCHEDULED_ICON, scheduledMeta } from "./scheduled-model";
@@ -35,6 +35,9 @@ export function TodosPage({ view }: { view: BotView }) {
   const [query, setQuery] = useState("");
   const [area, setArea] = useState(ALL_AREAS);
   const [adding, setAdding] = useState(false);
+  const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(() => new Set());
+  const fold = <T,>(id: string, rows: readonly T[]) => foldRows(rows, unfolded.has(id));
+  const moreLine = (id: string, title: string, count: number) => count ? <BotPageMore count={count} group={title} testId="todos-more" onOpen={() => setUnfolded((open) => new Set([...open, id]))} /> : null;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(timer); }, []);
   const data = list.data;
@@ -49,6 +52,8 @@ export function TodosPage({ view }: { view: BotView }) {
   const nameOf = (loop: Loop) => ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owners.get(loop.owner));
   const total = TODO_GROUPS.reduce((sum, group) => sum + groups[group.id].length, 0) + chatRows;
   const add = (text: string) => call("loops.add", { text }).then(() => list.refresh());
+  const scheduledRows = fold("scheduled", scheduled);
+  const doneRows = fold("done", done);
   const botChat = people.botThreadId ? rowOpen({ kind: "conversation", id: people.botThreadId }, people.botName) : null;
 
   const row = (loop: Loop) => {
@@ -70,6 +75,7 @@ export function TodosPage({ view }: { view: BotView }) {
         const loops = groups[group.id];
         const chat = group.id === "today" ? chatRows : 0;
         if (!loops.length && !chat) return null;
+        const { shown, more } = fold(group.id, loops);
         return (
           <BotPageGroup key={group.id} title={group.title} count={loops.length + chat} testId={`todos-${group.id}`}>
             {group.id === "today" && showChat ? <>
@@ -79,7 +85,8 @@ export function TodosPage({ view }: { view: BotView }) {
               ))}
               {unread ? <BotPageRow testId="todo-unread" icon="MessageSquare" title={unread === 1 ? `A reply from ${people.botName}` : `${unread} replies from ${people.botName}`} meta="Unread" onOpen={botChat?.onOpen} disabled={!botChat} /> : null}
             </> : null}
-            {loops.map(row)}
+            {shown.map(row)}
+            {moreLine(group.id, group.title, more)}
           </BotPageGroup>
         );
       })}
@@ -87,19 +94,21 @@ export function TodosPage({ view }: { view: BotView }) {
         <BotPageGroup title="Scheduled" count={scheduled.length} testId="todos-scheduled"
           aside={<NewAutomationMenu kinds={newKinds(bot.kind === "external")} disabled={bot.state !== "active"} onPick={editor.openNew} />}>
           {editor.error ? <p role="alert" className="pb-2 text-xs text-destructive">{editor.error}</p> : null}
-          {scheduled.map((item) => (
+          {scheduledRows.shown.map((item) => (
             <BotPageRow key={item.key} testId="scheduled-row" data={{ "data-scheduled": item.key }} icon={SCHEDULED_ICON[item.kind]} muted={item.state === "paused"}
               title={item.title} titleText={item.title} meta={scheduledMeta(item, now)} {...rowOpen(item.link, item.title)} />
           ))}
+          {moreLine("scheduled", "Scheduled", scheduledRows.more)}
         </BotPageGroup>
       ) : null}
       {editor.dialogs}
       {data && done.length ? (
         <BotPageGroup title="Done" count={done.length} collapsible defaultOpen={false} testId="todos-done">
-          {done.map((loop) => (
+          {doneRows.shown.map((loop) => (
             <BotPageRow key={loop.id} testId="todo-done" data={{ "data-loop": loop.id }} muted icon={loop.status === "dropped" ? "X" : "CircleCheck"} iconClassName={loop.status === "dropped" ? undefined : "text-success"}
               title={loop.title} titleText={loop.title} meta={loop.closedAt ? shortWhen(loop.closedAt, now) : undefined} {...rowOpen({ kind: "todo", id: loop.id }, loop.title)} />
           ))}
+          {moreLine("done", "Done", doneRows.more)}
         </BotPageGroup>
       ) : null}
     </BotPageLayout>
