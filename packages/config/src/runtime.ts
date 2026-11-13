@@ -78,10 +78,10 @@ interface ResolvePortFromEnvArgs {
   name: string;
 }
 
-const BB_PROD_DATA_DIR_NAME = ".bb";
+const BB_PROD_DATA_DIR_NAME = ".bb-studio";
 const BB_DEV_DATA_ROOT_DIR = ".bb-dev";
-export const BB_PROD_SERVER_PORT = 38886;
-export const BB_PROD_HOST_DAEMON_PORT = 38887;
+export const BB_PROD_SERVER_PORT = 38986;
+export const BB_PROD_HOST_DAEMON_PORT = 38987;
 export const BB_LOOPBACK_HOST = "127.0.0.1";
 const BB_SQLITE_DATABASE_FILE_NAME = "bb.db";
 
