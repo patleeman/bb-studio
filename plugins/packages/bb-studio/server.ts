@@ -40,9 +40,6 @@ import { STUDIO_SETTINGS } from "./src/settings/schema";
 import { VoiceLive } from "./src/voice/live/live";
 import { registerVoiceLive } from "./src/voice/live/register";
 import { registerWindowRelay } from "./src/windows/server";
-import { MeetingLive } from "./src/voice/meeting/meeting";
-import { registerMeeting } from "./src/voice/meeting/register";
-import { MEETING_CHANNEL } from "./src/voice/meeting/shared";
 import { gatherSeed, type SeedMessage } from "./src/voice/live/identity";
 import { resolveTarget } from "./src/voice/live/targets";
 import { VOICE_LIVE_CHANNEL } from "./src/voice/live/shared";
@@ -1845,25 +1842,6 @@ export default async function plugin(bb: BbPluginApi) {
   });
   registerVoiceLive(bb, voiceLive);
   registerWindowRelay(bb);
-  // Meeting mode (src/voice/meeting): a named voice participant in an in-person
-  // meeting. Each lookup is its own back-office thread, under the Bot like voice threads.
-  const meeting = new MeetingLive({
-    db,
-    key: () => openaiKey(settingValues),
-    settings: () => settingValues,
-    monthUsd: () => voiceLive.monthUsd(),
-    openThread: async ({ title, text, note }) => (await bb.sdk.threads.spawn({
-      projectId: PERSONAL_PROJECT_ID, title,
-      environment: { type: "project-default" },
-      pluginMetadata: { meetingLookup: true },
-      input: [{ type: "text", text, mentions: [] }, { type: "text", text: note, mentions: [], visibility: "agent-only" }],
-    } as never)).id,
-    claim: async (threadId) => { const bot = bots.stored(); if (bot) await ownedThreads.claim(threadId, bot.id); },
-    publish: (signal) => bb.realtime.publish(MEETING_CHANNEL, signal),
-    mockUrl: () => process.env.STUDIO_VOICE_MOCK_URL?.trim() || null,
-    warn: (message) => bb.log.warn(message),
-  });
-  registerMeeting(bb, meeting);
   registerGroupTool(bb, { state: pageState, acting, jobs: async (botId) => (await automations.list(botId)).map((job) => ({ id: job.id, name: job.name })) });
   voiceSearch = (query, limit) => {
     const words = tokens(query);

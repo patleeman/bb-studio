@@ -4131,35 +4131,6 @@ small floating pill stays over every page until End. Each session keeps its
 record in a voice thread under the Bot. The design, the eyes-free rules,
 measured latency and cost are in [docs/voice/spike.md](../../docs/voice/spike.md).
 
-### Meeting agent
-
-A voice participant for an in-person meeting, called Iris by default. Start
-her from the New menu (**Start a meeting agent**) or the command palette
-(**Studio: Start a meeting agent**). She hears the room through the laptop's
-mic and answers through its speakers. The whole window becomes her stage,
-sized for people reading the laptop or a shared screen from across the table:
-her name and state, large captions, what she looked up, and the notes.
-
-- **She's quiet until addressed.** Say her name ("Iris, what's checkout's
-  p99 this week?"). For about 25 seconds after she speaks, follow-ups count
-  without the name. With **When the meeting agent answers** set to “When named, or when it’s clear”,
-  she also answers when the room clearly wants her without saying her name.
-  GPT-Live has no listen-only setting, so Studio also mutes her audio when
-  nobody addressed her. The room never hears an answer it didn't ask for.
-- **Ask** opens her for the next thing said. **Quiet** silences her
-  completely. **Minimize** (or Esc) shrinks the stage to a pill. **End
-  meeting** ends it.
-- **Lookups:** each question goes to its own read-only back-office thread
-  under the Bot. That thread can use the team's tools (Datadog, Slack, Jira,
-  docs, code). When it answers, the answer appears on the stage and she says
-  it.
-- **Notes:** she adds decisions, action items and notes when asked. They're
-  shown on the stage.
-- She can't send, file or change anything yet.
-- It uses gpt-live-1, with the voice, backend model and monthly cap from
-  hands-free voice's settings (Settings ▸ Voice); meetings count toward that cap. Her name is
-  **Meeting agent’s name**. The code is in `src/voice/meeting`.
-
 ## Backup and restore
 
 `bb studio backup [--out <file|folder>]` saves every Studio item into one

@@ -248,7 +248,6 @@ export class VoiceLive {
   }
 
   monthUsd(): number {
-    // Meeting sessions (src/voice/meeting, `mt_` ids) are priced the same way and share the cap.
     const rows = this.deps.db.prepare("SELECT * FROM voice_calls WHERE (id LIKE 'vl_%' OR id LIKE 'mt_%') AND started_at >= ?").all(monthStart(this.now())) as SessionRow[];
     return rows.reduce((sum, row) => sum + (this.cost(row) ?? 0), 0);
   }

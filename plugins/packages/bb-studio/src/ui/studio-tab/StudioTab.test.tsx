@@ -328,7 +328,7 @@ it("New offers the shared create list, Record a call and templates included", as
     await act(async () => (container.querySelector("button[aria-haspopup=menu]") as HTMLButtonElement).click());
     const menu = [...container.querySelectorAll("[role=menuitem]")].map((each) => each.textContent);
     expect(menu).toEqual(createEntries(providers as never, { templates }).map((entry) => entry.label));
-    expect(menu).toEqual(["Page", "Recording", "Record a call", "Start a meeting agent", "From template: Weekly"]);
+    expect(menu).toEqual(["Page", "Recording", "Record a call", "From template: Weekly"]);
   } finally { rpcCall.mockImplementation(original); }
 });
 

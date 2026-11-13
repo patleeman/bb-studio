@@ -98,7 +98,6 @@ import { openCollection, showLibrary, StudioPanel } from "./src/ui/StudioPanel";
 import { HealthFooter, HealthWatch, SETUP_SUBPATH, setHealthFooter } from "./src/ui/health/HealthViews";
 import { SetupPage } from "./src/ui/setup/SetupPage";
 import { HandsFreeComposerButton, HandsFreePill, startHandsFree } from "./src/voice/live/ui/HandsFree";
-import { MeetingStage, startMeeting } from "./src/voice/meeting/ui/MeetingStage";
 import { BOT_SUBPATH } from "./src/ui/bot/BotHome";
 import { BotPanel } from "./src/ui/bot/BotTabs";
 import { BotCacheBanner } from "./src/ui/bot/BotCache";
@@ -395,8 +394,6 @@ export default definePluginApp((app) => {
   // composer button is registered below, after Notes' Expand; its pill floats
   // over every page and thread until End.
   app.slots.experimental_appOverlay({ id: "handsfree", component: HandsFreePill });
-  // The meeting agent (src/voice/meeting/ui): a full-window stage for the room, or its pill.
-  app.slots.experimental_appOverlay({ id: "meeting", component: MeetingStage });
   registerThreadTab(app, { id: SIDE_THREAD_ACTION, title: "Side thread", icon: "MessageSquare", layout: "flush", component: SideThreadPanel, ...OFF_NEW_TAB });
   registerForkFromHere(app.slots, {
     call: async (method, input) => (await post(method, input)) as { threadId: string },
@@ -519,5 +516,4 @@ export default definePluginApp((app) => {
   // The Bot's last conversation, with BB's sidebar unfolded (src/ui/conversations/show-bot.ts).
   if (sidebarSections) app.commands.register({ id: "show-bot", title: "Studio: Show the Bot", defaultShortcut: { key: "0", control: true }, run: () => showBot(async () => (await post("bot_spaces", {})) as { bots: { id: string; mainThreadId: string | null }[]; currentBotId: string | null }) });
   app.commands.register({ id: "handsfree", title: "Studio: Hands-free voice", run: () => startHandsFree() });
-  app.commands.register({ id: "meeting", title: "Studio: Start a meeting agent", run: () => void startMeeting() });
 });

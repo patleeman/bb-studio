@@ -83,7 +83,7 @@ test("New offers the shared create list, Record a call and templates included", 
   await act(async () => {});
   const menu = [...container.querySelectorAll('[data-testid="menu-item"]')].map((each) => each.textContent?.trim());
   expect(menu).toEqual(createEntries(withTalk.providers as never, { templates }).map((entry) => entry.label));
-  expect(menu).toEqual(["page", "drawing", "Recording", "Record a call", "Start a meeting agent", "From template: Weekly"]);
+  expect(menu).toEqual(["page", "drawing", "Recording", "Record a call", "From template: Weekly"]);
 });
 
 test("off the Studio page it switches to the Bots list and shows a placeholder", async () => {
