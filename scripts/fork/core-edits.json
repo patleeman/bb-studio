@@ -93,7 +93,7 @@
     },
     "apps/app/src/components/sidebar/AppSidebar.tsx": {
       "seam": "sidebar",
-      "intent": "Renders PluginSidebarSections (ForkSidebarSections.tsx, imported at the top of the file) under the thread list. Nothing else: the rail and the sidebar footer are upstream's.",
+      "intent": "Renders PluginSidebarSections (ForkSidebarSections.tsx, imported at the top of the file) under the thread list, and once more with placement=\"footer\" right before the footer. Nothing else: the rail and the sidebar footer are upstream's.",
       "budget": 5
     },
     "apps/app/src/components/thread/timeline/ThreadTimelineRows.tsx": {

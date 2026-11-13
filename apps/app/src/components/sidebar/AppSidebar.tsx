@@ -368,6 +368,7 @@ export function AppSidebar({
           />
         )}
       </div>
+      <PluginSidebarSections placement="footer" onNavigate={closeOnMobile} />
       {placement === "list" ? footer : null}
       <SidebarResizeHandle
         testId="app-sidebar-resize-handle"
