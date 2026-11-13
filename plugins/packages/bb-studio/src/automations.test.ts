@@ -14,6 +14,8 @@ afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 
 type Off = { importedAt?: number | null; runScript?: RunWatcherScript; bbFile?: () => BbEntry[] };
 /** `off`: bb's automations plugin is off (a BB Studio copy): every call to it fails as BB answers then. */
+const copiedReminders = new Set<string>();
+
 async function setup(off: Off | null = null) {
   const threads = new Map([["bot1", makeThreadResponse({ id: "bot1", projectId: "proj_personal", providerId: "codex" })], ["bot9", makeThreadResponse({ id: "bot9", projectId: "proj_personal", providerId: "codex" })]]);
   const send = vi.fn(async () => ({ ok: true }));
@@ -60,7 +62,7 @@ async function setup(off: Off | null = null) {
   scheduler.resolve("heartbeat", () => ({ threadId: "bot1", prompt: "Heartbeat" }));
   scheduler.ensure({ owner: "heartbeat", ownerId: "proj_personal" }, { schedule: fromHeartbeat({ cadence: "weekdays", time: "08:00" }), timeZone: localZone() }, true);
   const auto = new Automations({
-    db, sdk: bb.sdk, scheduler, changed: () => {}, bot: () => bot,
+    db, sdk: bb.sdk, scheduler, changed: () => {}, bot: () => bot, copiedReminder: (id) => copiedReminders.has(id),
     heartbeat: { get: () => heartbeat, set: setHeartbeat, automation: () => ({ id: HB, projectId: "proj_personal" }) },
     runners: {
       list: listRunners, get: vi.fn() as never, create: vi.fn() as never, update: vi.fn() as never, setState: vi.fn() as never, runNow: vi.fn() as never, delete: vi.fn() as never, automation: () => null,
@@ -171,6 +173,16 @@ it("a reminder fires once and then shows as done", async () => {
   const again = await x.auto.update({ id: made.id, schedule: { type: "once", at: Date.now() + 86_400_000 * 3 } });
   expect(again.state).toBe("active");
   expect(trigger(x, made.id)!.state).toBe("on");
+});
+
+it("a reminder copied into the todos doesn't also wake the Bot: the todo carries it", async () => {
+  const x = await setup();
+  const made = await x.auto.create({ kind: "reminder", name: "Deploy", instruction: "Check the deploy.", schedule: { type: "once", at: Date.now() + 7_200_000 } });
+  copiedReminders.add(made.id);
+  try {
+    await fire(x, made.id);
+    expect(sent(x).filter((each) => each.input[0]!.text.includes(made.id))).toEqual([]);
+  } finally { copiedReminders.delete(made.id); }
 });
 
 it("running a reminder now does not use it up", async () => {

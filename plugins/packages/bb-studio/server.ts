@@ -1,7 +1,7 @@
 import { registerWorkCards, WORK_TOOLS } from "./src/work/register";
 import { runWorkCli } from "./src/work/cli";
 import { registerLoops, LOOP_TOOLS, loopPushActions } from './src/loops/register';
-import { scheduledContract, scheduledItems } from "./src/loops/scheduled";
+import { reminderLoopId, scheduledContract, scheduledItems } from "./src/loops/scheduled";
 import { automationTable, bbFromFile, bbFromOverview, readImportedAt, readStudioEntries, readThreadOwners } from "./src/automation-table";
 import { arrangeRailOnce } from "./src/rail-arrangement";
 import { arrangeFooterOnce } from "./src/footer-arrangement";
@@ -710,6 +710,7 @@ export default async function plugin(bb: BbPluginApi) {
   const automationBot = (botId?: string) => { const bot = bots.stored(botId); return bot ? { id: bot.id, name: bot.name, threadId: bot.threadId, state: bot.state, primary: bot.primary !== false, kind: bot.kind ?? "studio" } : null; };
   const automations: Automations = new Automations({
     db, sdk: bb.sdk, scheduler, changed: tagsChanged,
+    copiedReminder: (id) => loops.enabled() && !!db.prepare("SELECT 1 FROM bot_loops WHERE id = ?").get(reminderLoopId(id)),
     bot: automationBot,
     // With bb's automations plugin off (a BB Studio copy), watchers run here and bb's rows are read from its data file (src/automation-table.ts).
     bbFile: () => bbFromFile(join(bb.server.experimental_dataDir, "plugins", "automations", "data.db")),
@@ -2047,9 +2048,18 @@ export default async function plugin(bb: BbPluginApi) {
   });
   runnerTool("automation_list", "List your automations: check-ins, reminders, watchers and runners, with schedule, state, next run and last outcome.", z.object({}),
     async (_input: unknown, botId) => (await automations.list(botId)).map(describeAutomation).join("\n") || "No automations yet.");
-  runnerTool("automation_create", "Schedule something for yourself. kind checkin: wakes your thread on a schedule with an instruction. reminder: once, with schedule.at or schedule.in (\"tomorrow 9:00 remind me…\", \"in 2h check the deploy\"). watcher: a script on a schedule that wakes you only when it prints something (zero tokens otherwise). runner: a recurring job in its own thread.",
+  runnerTool("automation_create", "Schedule something for yourself. kind checkin: wakes your thread on a schedule with an instruction. reminder: once, with schedule.at or schedule.in (\"tomorrow 9:00 remind me…\", \"in 2h check the deploy\"); with Todos on it becomes a todo you own with that time, listed on the Todos page. watcher: a script on a schedule that wakes you only when it prints something (zero tokens otherwise). runner: a recurring job in its own thread.",
     z.object({ kind: z.enum(["checkin", "reminder", "watcher", "runner"]), name: z.string().trim().min(1).max(60), ...automationFields, schedule: toolSchedule }),
-    async (input: AutomationToolInput & { kind: "checkin" | "reminder" | "watcher" | "runner"; name: string }, botId) => `Made:\n${describeAutomation(await automations.create({ kind: input.kind, name: input.name, schedule: toSchedule(input.schedule!), ...automationChanges(input) } as never, botId))}`);
+    async (input: AutomationToolInput & { kind: "checkin" | "reminder" | "watcher" | "runner"; name: string }, botId) => {
+      const schedule = toSchedule(input.schedule!);
+      if (input.kind === "reminder" && schedule.type === "once" && loops.enabled()) {
+        const bot = bots.stored(botId);
+        const owner = !bot || bot.primary !== false || !bot.threadId ? "cos" : `thread:${bot.threadId}`;
+        const todo = loops.store.add({ title: input.name, why: input.instruction?.trim() ?? "", owner, kind: "do", trigger: { type: "time", at: schedule.at } });
+        return `Made a todo (a reminder is a todo you own): ${todo.title}, due ${new Date(schedule.at).toISOString()}, id ${todo.id}. Change it with todos_update.`;
+      }
+      return `Made:\n${describeAutomation(await automations.create({ kind: input.kind, name: input.name, schedule, ...automationChanges(input) } as never, botId))}`;
+    });
   runnerTool("automation_update", "Change an automation's name, instruction, schedule, model or script.",
     z.object({ id: z.string().min(1).describe("Automation id or name"), name: z.string().trim().min(1).max(60).optional(), ...automationFields }),
     async (input: AutomationToolInput & { id: string }, botId) => describeAutomation(await automations.update({ id: input.id, ...automationChanges(input) } as never, botId)));

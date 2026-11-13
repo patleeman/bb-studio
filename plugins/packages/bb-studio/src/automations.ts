@@ -136,6 +136,7 @@ export interface AutomationDeps {
   sdk: Sdk;
   /** Studio's scheduler: it wakes the Bot for check-ins and reminders. */
   scheduler: EngineScheduler;
+  copiedReminder?(id: string): boolean;
   changed(): void;
   bot(botId?: string): AutomationBot | null;
   /** The Bot's original check-in (its project heartbeat) and its schedule id. */
@@ -214,6 +215,7 @@ export class Automations {
       const row = this.deps.db.prepare("SELECT * FROM bot_automations WHERE id = ?").get(id) as Row | undefined;
       const threadId = row && row.kind !== "watcher" && !row.cleanup_pending ? this.deps.bot(row.bot_id)?.threadId : null;
       if (!row || !threadId) return null;
+      if (row.kind === "reminder" && this.deps.copiedReminder?.(row.id)) return null;
       return { threadId, prompt: row.kind === "checkin" ? checkinPrompt(row.name, row.instruction) : reminderPrompt(row.name, row.instruction, row.created_at) };
     });
   }
