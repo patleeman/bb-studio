@@ -1,3 +1,4 @@
+import { forkPlaceholder, type ForkPlaceholderState } from "@/components/promptbox/follow-up-placeholder.fork";
 import { createCoreComposerActions } from "@/lib/plugin-composer-handle";
 import { visibleQueuedMessages } from "@/lib/queued-system-notice";
 import { useQueuedMessagesExpanded } from "@/components/promptbox/banner/queued-messages-expanded";
@@ -224,6 +225,7 @@ interface ThreadDetailPromptAreaProps {
   steerActiveThreadOnEnter: boolean;
   composerFocusRequestKey: string | number;
   thread: ThreadWithRuntime;
+  forkPlaceholderState?: ForkPlaceholderState;
 }
 
 interface InlineDraftComposerOptions {
@@ -514,6 +516,7 @@ export function ThreadDetailPromptArea({
   steerActiveThreadOnEnter,
   composerFocusRequestKey,
   thread,
+  forkPlaceholderState,
 }: ThreadDetailPromptAreaProps) {
   const navigate = useImmediateRouteNavigate();
   const defaultExecutionOptionsQuery = useThreadDefaultExecutionOptions(
@@ -1152,10 +1155,10 @@ export function ThreadDetailPromptArea({
     isStopRequested,
     runtimeDisplayStatus,
   ]);
-  const promptPlaceholder = getFollowUpPromptPlaceholder(
+  const promptPlaceholder = (!isStopRequested && forkPlaceholder(runtimeDisplayStatus, forkPlaceholderState, false)) || getFollowUpPromptPlaceholder(
     isStopRequested ? "stopping" : runtimeDisplayStatus,
   );
-  const compactPromptPlaceholder = getCompactFollowUpPromptPlaceholder(
+  const compactPromptPlaceholder = (!isStopRequested && forkPlaceholder(runtimeDisplayStatus, forkPlaceholderState, true)) || getCompactFollowUpPromptPlaceholder(
     isStopRequested ? "stopping" : runtimeDisplayStatus,
   );
   const providerIds = useMemo(
