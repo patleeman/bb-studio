@@ -446,7 +446,7 @@ export default async function plugin(bb: BbPluginApi) {
   const tags = new TagStore(db);
   const stars = new StarStore(db);
   const tabs = new TabStore(db);
-  const threadTitles = new ThreadTitles(async (threadId) => ((await bb.sdk.threads.get({ threadId })) as { title?: string | null }).title ?? "");
+  const threadTitles = new ThreadTitles(async (threadId) => { const thread = (await bb.sdk.threads.get({ threadId })) as { title?: string | null; titleFallback?: string | null }; return thread.title?.trim() || thread.titleFallback?.trim() || ""; });
   /** Adds each item's tag ids, when it was starred, and the thread that made it. */
   const listed = async <T extends { pluginId: string; id: string }>(items: readonly T[]) => {
     const assigned = tags.assignments();
