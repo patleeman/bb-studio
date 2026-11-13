@@ -29,6 +29,8 @@ const FORK_API_SYMBOLS: Readonly<Record<string, readonly string[]>> = {
     "PluginAppSlots.experimental_modelLoadNotice",
     "ExperimentalModelLoadNoticeRegistration",
     "ExperimentalModelLoadNoticeProps",
+    "PluginAppSlots.experimental_newConversation",
+    "ExperimentalNewConversationRegistration",
     "PluginAppSlots.experimental_firstRun",
     "ExperimentalFirstRunRegistration",
     "ExperimentalFirstRunProps",
