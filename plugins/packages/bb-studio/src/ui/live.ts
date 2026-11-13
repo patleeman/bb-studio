@@ -5,12 +5,13 @@ import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import type { rpcContract } from "../contract";
 import type { rpcContract as loopsContract } from "../loops/contract";
 import type { rpcContract as workContract } from "../work/contract";
+import type { scheduledContract } from "../loops/scheduled";
 import type { authContract } from "../auth/contract";
 import type { accountsContract } from "../accounts/contract";
 import { useRealtime, useRealtimeConnectionState, useRpc, type PluginRpcCallArgs, type PluginRpcResult } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 
-type Contract = typeof rpcContract & typeof loopsContract & typeof workContract & typeof authContract & typeof accountsContract;
+type Contract = typeof rpcContract & typeof loopsContract & typeof scheduledContract & typeof workContract & typeof authContract & typeof accountsContract;
 export type Method = keyof Contract;
 export type RpcInput<M extends Method> = PluginRpcCallArgs<Contract[M]>[0];
 type Call = <M extends Method>(method: M, input: RpcInput<M>) => Promise<PluginRpcResult<Contract[M]>>;
