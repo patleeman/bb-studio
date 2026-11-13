@@ -40,14 +40,14 @@ describe("canonical Studio references", () => {
     ]);
   });
   it("reads a family address as the item its own address names", () => {
-    const ids = { design: "dsn_0123456789abcdef", excalidraw: "drw_0123456789abcdef", minis: "mini_0123456789abcdef", dashboards: "dsh_0123456789abcdef", artifacts: "art_0123456789abcdef" };
+    const ids = { design: "dsn_0123456789abcdef", excalidraw: "drw_0123456789abcdef", minis: "mini_0123456789abcdef", artifacts: "art_0123456789abcdef" };
     expect(parseStudioItemHref(`/plugins/studio/studio/pages/${ids.design}`)).toEqual({ pluginId: "design", id: ids.design });
     expect(parseStudioItemHref(`/plugins/studio/studio/pages/${ids.design}`)).toEqual(parseStudioItemHref(`/plugins/studio/studio/designs/${ids.design}`));
     expect(parseStudioItemHref(`/plugins/studio/studio/pages/${ids.excalidraw}`)).toEqual({ pluginId: "excalidraw", id: ids.excalidraw });
     expect(parseStudioItemHref("/plugins/studio/studio/pages/pg_1")).toEqual({ pluginId: "pages", id: "pg_1" });
     expect(parseStudioItemHref("/plugins/studio/studio/pages/pg_1/chat/thr_1")).toEqual({ pluginId: "pages", id: "pg_1" });
-    for (const pluginId of ["minis", "dashboards", "artifacts"] as const) expect(parseStudioItemHref(`/plugins/studio/studio/apps/${ids[pluginId]}`)).toEqual({ pluginId, id: ids[pluginId] });
-    expect(parseStudioItemHref(`/plugins/studio/studio/apps/${ids.dashboards}`)).toEqual(parseStudioItemHref(`/plugins/studio/studio/dashboards/${ids.dashboards}`));
+    for (const pluginId of ["minis", "artifacts"] as const) expect(parseStudioItemHref(`/plugins/studio/studio/apps/${ids[pluginId]}`)).toEqual({ pluginId, id: ids[pluginId] });
+    expect(parseStudioItemHref(`/plugins/studio/studio/apps/${ids.artifacts}`)).toEqual(parseStudioItemHref(`/plugins/studio/studio/artifacts/${ids.artifacts}`));
     expect(parseStudioItemHref(`/plugins/studio/studio/apps/${ids.design}`)).toBeNull();
     expect(parseStudioItemHref("/plugins/studio/studio/apps/nope")).toBeNull();
     // The kit's table and Studio's item model name the same namespaces for the same ids.
@@ -63,8 +63,6 @@ describe("canonical Studio references", () => {
     expect(parseStudioItemHref("/plugins/studio/studio/drawings/drw_1")).toEqual({ pluginId: "excalidraw", id: "drw_1" });
     expect(parseStudioItemHref("/plugins/excalidraw/drawings/drw_1")).toEqual({ pluginId: "excalidraw", id: "drw_1" });
     expect(parseStudioMentionReference("studio", "design:dsn_1")).toEqual({ pluginId: "design", id: "dsn_1" });
-    expect(parseStudioMentionReference("studio", "dashboard:dsh_1")).toEqual({ pluginId: "dashboards", id: "dsh_1" });
-    expect(parseStudioItemHref("/plugins/studio/studio/dashboards/dsh_1")).toEqual({ pluginId: "dashboards", id: "dsh_1" });
     expect(parseStudioItemHref("/plugins/studio/studio/designs/dsn_1")).toEqual({ pluginId: "design", id: "dsn_1" });
     expect(parseStudioItemHref("/plugins/design/designs/dsn_1")).toEqual({ pluginId: "design", id: "dsn_1" });
     expect(parseStudioMentionReference("studio", "recordings:rec_1")).toEqual({ pluginId: "talk", id: "rec_1" });

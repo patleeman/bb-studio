@@ -5949,7 +5949,6 @@ public enum Studio {
     case whiteboard
     case design
     case app
-    case dashboard
     case artifact
     case recording
     case board
@@ -5980,7 +5979,6 @@ public enum Studio {
       case "whiteboard": self = .whiteboard
       case "design": self = .design
       case "app": self = .app
-      case "dashboard": self = .dashboard
       case "artifact": self = .artifact
       case "recording": self = .recording
       case "board": self = .board
@@ -6013,7 +6011,6 @@ public enum Studio {
       case .whiteboard: try container.encode("whiteboard")
       case .design: try container.encode("design")
       case .app: try container.encode("app")
-      case .dashboard: try container.encode("dashboard")
       case .artifact: try container.encode("artifact")
       case .recording: try container.encode("recording")
       case .board: try container.encode("board")
@@ -6093,7 +6090,6 @@ public enum Studio {
     case whiteboard
     case design
     case app
-    case dashboard
     case artifact
     case recording
     case board
@@ -6124,7 +6120,6 @@ public enum Studio {
       case "whiteboard": self = .whiteboard
       case "design": self = .design
       case "app": self = .app
-      case "dashboard": self = .dashboard
       case "artifact": self = .artifact
       case "recording": self = .recording
       case "board": self = .board
@@ -6157,7 +6152,6 @@ public enum Studio {
       case .whiteboard: try container.encode("whiteboard")
       case .design: try container.encode("design")
       case .app: try container.encode("app")
-      case .dashboard: try container.encode("dashboard")
       case .artifact: try container.encode("artifact")
       case .recording: try container.encode("recording")
       case .board: try container.encode("board")

@@ -81,7 +81,7 @@ export function libraryKind(type: string | null | undefined): LibraryKind {
   if (type === "doc") return "page";
   if (type === "whiteboard") return "whiteboard";
   if (type === "design") return "design";
-  if (type === "mini" || type === "dashboard") return "app";
+  if (type === "mini") return "app";
   if (type === "artifact") return "artifact";
   return "other";
 }

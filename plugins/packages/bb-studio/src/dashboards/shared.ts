@@ -7,7 +7,7 @@ export const PLUGIN_ID = "dashboards";
 /** Studio's panel sub-path: /plugins/studio/studio/dashboards/<id> shows one dashboard. */
 export const ROUTE_SEGMENT = "dashboards";
 export const DASHBOARD_KIND = "dashboard";
-export const DASHBOARD_ICON = "studio/dashboard";
+
 /** The thread workbench's Dashboards tab. */
 export const DASHBOARD_TAB = "dashboards";
 /** Realtime channel: dashboard edits and fresh widget data. */

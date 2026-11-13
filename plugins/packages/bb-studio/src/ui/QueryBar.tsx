@@ -18,7 +18,7 @@ import {
 const FIELD_HINTS: Record<FilterField, string> = {
   kind: "Pages, recordings, whiteboards…",
   family: "Pages or apps",
-  type: "Docs, designs, dashboards…",
+  type: "Docs, designs, apps…",
   project: "A project, or global",
   tag: "A tag, or none",
   is: "Archived, templates or starred",

@@ -53,7 +53,7 @@ the item is deleted. `bb studio starred` lists them.
 ### The Studio tab in a thread
 
 A thread's side panel has a **Studio** tab (**+ → Studio**) for every
-kind: pages, drawings, designs, dashboards, artifacts, recordings and
+kind: pages, drawings, designs, artifacts, recordings and
 dictations, and each kind an add-on registers with Studio. Each item opened
 from the thread gets its own tab beside the others. It opens on Studio's
 library, the same component as the Studio app's new tab, with the same
@@ -78,7 +78,7 @@ The tab remembers where you left it, per thread and per tab: switch to
 another side-panel tab, reload Studio or restart BB, and it comes back on
 the same item (or the collection, with its kind chip) scrolled where it was.
 A card that opens the tab again on its item shows that item.
-The old per-kind tabs (Pages, Drawings, Design, Dashboards, Artifacts) are
+The old per-kind tabs (Pages, Drawings, Design, Artifacts) are
 gone; one of them still open from before shows as unavailable, so close it
 and open Studio.
 Double-click a tab, or press F2 on it, to rename its item. The tab row shows
@@ -1103,7 +1103,7 @@ Search page of its own.
 
 **Tab kinds.** Everything that can be a tab beside a conversation is one
 registry, `src/tab-kinds.ts`: Conversation, Worker, Bot; Page, Whiteboard,
-Design, App, Dashboard, Artifact, Recording; Visual Chat board; Memory,
+Design, App, Artifact, Recording; Visual Chat board; Memory,
 Library, Automations, Todos, Archive; VS Code; and bb's own File, Diff,
 Browser, Terminal and Workflow run. Each kind has its name, icon, the tab that
 shows it, its address, where its recent rows come from and whether it has a
@@ -1127,7 +1127,7 @@ Visual Chat's board tab.
 
 The page's Actions are Studio's action tabs under two headings
 (`experimental_newTabGroup`), titled by the kind's name. **New**:
-Conversation, Page, Whiteboard, Design, App, Dashboard (a conversation starts
+Conversation, Page, Whiteboard, Design, App (a conversation starts
 in the main view on the Bot's + New page; the rest open as a tab). **Open**:
 Conversation (a picker for any thread, Bot or item), Page (the item list),
 Memory, Library, Automations, Todos, Archive and VS Code. Each tooltip says
@@ -1183,7 +1183,7 @@ claim within 1.5 seconds and the tool says the conversation isn't on screen.
 | Tool | Input | Does |
 | --- | --- | --- |
 | `workbench_list` | none | The tabs with their keys, the selected one, which the agent opened, the layout, and what the user closed or changed |
-| `workbench_open` | `type`: every kind of the registry the agent may open (conversation, worker, bot, page, whiteboard, design, app, dashboard, artifact, recording, board, memory, library, automations, todos, archive, automation, todo, record, vscode, file, diff, url, workflow); `id`, `path` (file, diff), `line`/`endLine` (file), `url`; or `link` instead of type and id (`bb://page/pg_…`, a bb address, `::page{id="…"}`, `file:///…`, an http(s) URL); `pane` (1, 2, "new" or "window"), `index`; `focus` (default true); `force` | Opens it as a tab, or selects it if open, in that pane and place; with "window", in a window of its own. URLs need the desktop app's in-app browser |
+| `workbench_open` | `type`: every kind of the registry the agent may open (conversation, worker, bot, page, whiteboard, design, app, artifact, recording, board, memory, library, automations, todos, archive, automation, todo, record, vscode, file, diff, url, workflow); `id`, `path` (file, diff), `line`/`endLine` (file), `url`; or `link` instead of type and id (`bb://page/pg_…`, a bb address, `::page{id="…"}`, `file:///…`, an http(s) URL); `pane` (1, 2, "new" or "window"), `index`; `focus` (default true); `force` | Opens it as a tab, or selects it if open, in that pane and place; with "window", in a window of its own. URLs need the desktop app's in-app browser |
 | `workbench_close` | `key`, `force` | Closes a tab |
 | `workbench_focus` | `key`, `force` | Selects a tab and shows the panel |
 | `workbench_pop_out` | `key`, `force` | Opens an open tab in a window of its own, out of the workbench |
@@ -1458,7 +1458,7 @@ Results come in groups, the group with the best match first:
   conversation of that Bot with it, on the Bot's default model.
 - **Conversations and files** (**Recent** with nothing typed): every kind in
   the tab kinds registry (conversations, workers, pages, whiteboards,
-  designs, apps, dashboards, artifacts, recordings, boards, Bots, Bot pages,
+  designs, apps, artifacts, recordings, boards, Bots, Bot pages,
   VS Code), found by title and by Studio's search. They open as the registry
   says: a conversation in the main view, an item beside the conversation on
   screen; **⌘Enter** in a split. The launcher opens them in the main window.
@@ -2021,146 +2021,6 @@ sandbox CSP, so a screen gets an opaque origin with no access to BB.
 `bb studio backup` includes each design with its rounds, screens and
 comments; saved styles aren't in backups yet.
 
-## Dashboards
-
-Dashboards are built into Studio: live tiles, charts, tables and feeds on a
-responsive grid, which you and your agents build together. Items are
-`dashboards:<id>` and open at `/plugins/studio/studio/dashboards/<id>`.
-
-![Live BB screenshot of a dashboard open as a Studio tab](assets/dashboards-preview.png)
-
-The seeded "Launch metrics" dashboard as a Studio tab in a staged BB, in
-view mode: four stat tiles with deltas and sparklines (churn and incidents
-count down as good, so the extra incident is red), "Active users" pushed a
-moment ago, an area chart of weekly signups and trials, a custom gauge
-widget running in its sandboxed frame, a table and a changelog feed.
-
-![The same dashboard in BB's light theme](assets/dashboards-light.png)
-
-The same dashboard in BB's light theme.
-
-![A dashboard of tiles that have nothing to show yet](assets/dashboards-states.png)
-
-Tiles with nothing to show yet: a push tile waiting for an agent's data, a
-script waiting for approval (its command, and **Review command…**), a URL
-that couldn't be reached (the reason, and **Try again**), and an empty note,
-next to a working stat. A new dashboard offers **Add widget**:
-
-![A new dashboard with no widgets](assets/dashboards-empty.png)
-
-![Edit mode with the widget picker open](assets/dashboards-edit.png)
-
-Edit mode: dashed tiles with a drag handle, settings and remove in each
-header and a resize corner, over a faint dot grid, with the widget picker
-grouped into numbers, charts, lists and content.
-
-![The script approval dialog](assets/dashboards-approval.png)
-
-The approval dialog for a proposed script (the BB host's name is blurred
-for this README). Recapture all six with
-`BB_CAPTURE_ONLY=dashboards,dashboards-light,dashboards-empty,dashboards-states,dashboards-edit,dashboards-approval`;
-the captures check every tile and its state, the chart, the custom widget's
-sandbox, the edit-mode handles and picker groups, and that the dialog shows
-the full wrapped command with Deny focused, after a forged approve is
-refused.
-
-- **In the library.** Dashboards list next to pages and drawings, with
-  search over their names, widget titles and notes, tags, Move to,
-  archive, duplicate, templates and **Export → Dashboard JSON**.
-  `/plugins/studio/studio/dashboards` opens the library filtered to them.
-  **Setup → Kinds** turns them off (their data stays; nothing refreshes).
-- **In a thread.** The thread's **Studio** tab lists the dashboards made or
-  edited in that thread with its other items, then recent ones; search finds
-  any, and the **Dashboards** chip shows only dashboards. One opens beside the conversation with its toolbar and grid, sized to
-  the panel (so a narrow panel gets the 8- or 4-column layout). An open tab
-  counts as viewing: widgets refresh and scripts can be approved there.
-- **The grid.** [react-grid-layout](https://github.com/react-grid-layout/react-grid-layout)
-  2.3.0 (MIT), 12 columns wide, 8 below 1100 px and 4 below 700 px. **Edit**
-  lets you drag tiles by their header, resize them from the corner, **Add
-  widget** (each starts with sample data) and open each widget's settings:
-  title, type, options and data source. **Done** goes back to viewing. In
-  view mode each tile's header shows when it updated (or that it failed or
-  waits for approval), and its **⋯** menu refreshes it, opens its settings,
-  reviews or revokes its script, or removes it.
-  Layouts save per breakpoint. The clock button lists the last 20 versions;
-  restoring one keeps the current one in history.
-- **Widgets.** Stat (value, delta and sparkline), line, bar, area and pie
-  charts (Pages' chart colors), table, list or feed, ticker, Markdown note,
-  embed (a Studio item, a thread, or a web page in a sandboxed frame),
-  clock or countdown, image, progress bar or gauge, and custom widgets. All
-  follow BB's light and dark themes.
-- **Data.** Each widget reads one source:
-  - *Static*: JSON stored on the widget (256 KB).
-  - *URL*: JSON or RSS/Atom, fetched by Studio's server (so no CORS):
-    http and https only, at most 5 redirects, 2 MB, 15 s. Private and
-    localhost addresses work: it's your machine.
-  - *Script*: a shell command on the BB host that prints JSON or text. It
-    runs only after you approve its exact command and folder in the
-    dashboard; the approval is pinned to their SHA-256, so any change needs a
-    new approval. One approval covers every widget on that dashboard that
-    runs the same command and folder (say, one script whose output several
-    widgets `select` from), and revoking it stops all of them; another
-    dashboard asks again. Agents can propose a script but can't approve one. 30 s
-    and 1 MB per run. See [Script approval](#script-approval).
-  - *Push*: an agent sends data with `widget_set_data`, or a script with
-    `bb studio dashboards set-data <id> <widget> '<json>'`. Never polled.
-
-  URL widgets refresh at most every 60 s and scripts every 5 minutes, and
-  only while a dashboard is open in a BB window (each sends a heartbeat every
-  30 s); otherwise every 30 minutes. **Refresh** fetches now, at most every
-  10 s per widget. Studio keeps the last good value with its time and the
-  last error, so a tile shows "Updated 2m ago" or what went wrong, still
-  with its last data.
-- **Custom widgets.** HTML, CSS and JavaScript in an iframe with
-  `sandbox="allow-scripts"` (no same-origin) and a CSP with
-  `connect-src 'none'`, like Pages' HTML blocks. Studio posts
-  `{data, options, theme, size}` to it (also `window.bbWidget` and the
-  `bbwidget` event); it may post back `{height}`. Agents save reusable types
-  to your library with `widget_define`, or give one widget its own HTML.
-- **Agent tools and skill.** `dashboard_create` (with widgets in one call),
-  `dashboard_list`, `dashboard_read` (a readable summary with ids, sources,
-  values and errors), `dashboard_edit` (`add`, `move`, `resize`, `remove`,
-  `update`; all or nothing), `widget_define` and `widget_set_data`, all
-  checked with zod and capped in size, and the `dashboards` skill.
-  `@dashboard` mentions give the agent the summary.
-- **Commands.** `bb studio dashboards list`, `show <id>` and
-  `set-data <id> <widget-id> <json>`.
-- **Backup.** `bb studio backup` saves dashboards, their layouts, pushed
-  data and your widget library. Fetched data is fetched again, and script
-  approvals are never restored: a restored script waits for you.
-
-### Script approval
-
-**Review command…** on a waiting script opens the approval dialog: the exact
-command in full, the folder it runs in, the BB host's machine name, the
-schedule ("Every 15 minutes while the dashboard is open; every 30 minutes
-otherwise"), the 30 s and 1 MB limits, and who proposed it (you, or an agent
-and its thread). **Deny** has the focus. An approved script shows a quiet
-"Approved" line with **Revoke** in its settings.
-
-BB's plugin RPC can't tell the app from the `bb` CLI or a request from an
-agent's shell, so approval is a handshake the dialog makes. Opening it asks
-Studio for a one-time nonce (`dashboards.requestApproval`), which Studio
-issues only while a BB window shows the dashboard. **Approve** sends it back
-with the command's SHA-256 (`dashboards.approveScript`). A nonce approves
-that one command on that one widget, once; it isn't accepted in the dialog's
-first 0.75 s, expires after 5 minutes, and dies with Deny, a newer dialog,
-a restart, or any change to the dashboard while the dialog is open. Other
-plugins are refused, and agents have no tool for either step.
-
-This stops an agent that calls `approveScript` directly, replays an old
-approval, or changes the command after you've seen it. It doesn't stop a
-process with shell access that deliberately scripts both steps the way the
-dialog does: on your machine that process already runs as you. Keep agents
-you don't trust out of a full-access shell.
-
-Dashboards live in Studio's SQLite database: `dashboards`,
-`dashboard_widgets`, `dashboard_layouts` (one per breakpoint),
-`dashboard_widget_types` (the library), `dashboard_data` (value, fetched
-time, error), `dashboard_script_approvals`, `dashboard_script_proposals`
-(who wrote each command) and `dashboard_versions`. A dashboard holds at most
-60 widgets.
-
 ## Mini apps
 
 Mini apps are built into Studio: small interactive apps with their own data,
@@ -2260,8 +2120,6 @@ secrets aren't backed up, so a restored app asks again.
 - **Artifacts:** an HTML artifact's menu has **Convert to mini app**: its page
   becomes the app's `index.html` and its live state carries over. Agents do
   the same with `minis_create` and `fromArtifactId`.
-- **Dashboards:** an Embed tile whose link is a mini app runs the app itself,
-  live, sharing its data.
 
 ### Agents
 
@@ -3941,7 +3799,6 @@ Studio makes two kinds of thing. Each item has a **family** and, within it, a **
 | | `design` | UI screens or a slide deck | `dsn_…` | `design` | `design` |
 | | `whiteboard` | A whiteboard, shown in a page | `drw_…` or a UUID | `excalidraw` | `drawing` |
 | `app` (things that run) | `mini` | A mini app | `mini_…` | `minis` | `mini` |
-| | `dashboard` | A dashboard | `dsh_…` | `dashboards` | `dashboard` |
 | | `artifact` | A saved file or live HTML | `art_…` | `artifacts` | `artifact` |
 
 Recordings, dictations, VS Code workspaces and other plugins' items belong to neither family.
@@ -3969,8 +3826,8 @@ rows and moved or deleted nothing.
 | Address | Opens |
 | --- | --- |
 | `/plugins/studio/studio/pages/<id>` | Any page type: a doc, a design or a whiteboard |
-| `/plugins/studio/studio/apps/<id>` | Any app type: a mini app, a dashboard or an artifact |
-| `/plugins/studio/studio/designs/<id>`, `…/drawings/<id>`, `…/minis/<id>`, `…/dashboards/<id>`, `…/artifacts/<id>` | That type, as before |
+| `/plugins/studio/studio/apps/<id>` | Any app type: a mini app or an artifact |
+| `/plugins/studio/studio/designs/<id>`, `…/drawings/<id>`, `…/minis/<id>`, `…/artifacts/<id>` | That type, as before |
 | `/plugins/design/designs/<id>` and the other add-on addresses | That type, as before |
 
 Write the family address in new links. An item's `href` is still its type's
@@ -3996,14 +3853,14 @@ parameters and its handler; the family tools run those same handlers.
 | `pages_list` | Docs; with `type: "design"` or `"whiteboard"`, that type (as `design_list`, `whiteboard_list`) |
 | `pages_read` | A doc; given a `dsn_…` or `drw_…` id, that item (as `design_read`, `whiteboard_get`) |
 | `pages_create` | A doc; with `type: "design"` or `"whiteboard"`, one of those (as `design_create`, `whiteboard_create`) |
-| `apps_list` | Every app from the index; with `type`, that type's own list (as `minis_list`, `dashboard_list`, `artifacts_list`) |
-| `apps_read` | Any app by id (as `minis_read`, `dashboard_read`, `artifacts_read`) |
-| `apps_create` | `{ type, input }`, where `input` is the fields of `minis_create`, `dashboard_create` or `artifacts_save` |
+| `apps_list` | Every app from the index; with `type`, that type's own list (as `minis_list`, `artifacts_list`) |
+| `apps_read` | Any app by id (as `minis_read`, `artifacts_read`) |
+| `apps_create` | `{ type, input }`, where `input` is the fields of `minis_create` or `artifacts_save` |
 
 `type` on `pages_list` and `pages_create` is new and optional; every input
 those tools took before means the same. Editing stays with each type's tools
 (`pages_edit`, `design_write_screen`, `whiteboard_update`, `minis_update`,
-`dashboard_edit`, `artifacts_save`). A type turned off in **Setup → Kinds** is
+`artifacts_save`). A type turned off in **Setup → Kinds** is
 left out of `apps_list` and refused by the family tools.
 
 **Backups** carry no index: restored items index themselves, and the check runs
@@ -4061,7 +3918,7 @@ commands left to run; `--json` prints the whole summary.
 ## Kinds
 
 **Setup → Kinds** lists the kinds built into Studio: pages, whiteboards,
-recordings and dictation, artifacts, designs and dashboards.
+recordings and dictation, artifacts and designs.
 
 ![Live BB screenshot of the Kinds section in Studio's Setup page](assets/kinds.png)
 
@@ -4098,7 +3955,7 @@ transcribing finish on the server.
 
 A Studio provider (`studio_describe` version 2) may declare that one of its
 kinds stands in for a built-in kind with `replaces`, set to `page`,
-`drawing`, `recording`, `artifact`, `design` or `dashboard`:
+`drawing`, `recording`, `artifact` or `design`:
 
 ```ts
 studio_describe: () => ({

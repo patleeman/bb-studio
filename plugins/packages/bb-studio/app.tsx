@@ -77,7 +77,6 @@ import { isDrawingId } from "./src/draw/shared";
 import { DrawingDirective } from "./src/draw/ui/drawing-directive";
 import { isDesignId, QUESTIONS_RENDERER } from "./src/design/shared";
 import { DesignCard } from "./src/design/ui/design-card";
-import { isDashboardId } from "./src/dashboards/shared";
 import { isMiniId } from "./src/minis/shared";
 import { MiniCard } from "./src/minis/ui/mini-card";
 import { QuestionFormView } from "./src/design/ui/question-form";
@@ -90,8 +89,8 @@ import { TalkBridge } from "./src/pages/ui/talk-bridge";
 import { registerExploreApp } from "./src/explore/app";
 import { registerReactionsApp } from "./src/reactions/app";
 import "./src/pages/ui/styles.css";
-import "./src/dashboards/ui/dashboards.css";
 import "./src/ui/bot/timeline.css";
+import "./src/dashboards/ui/dashboards.css";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { openCollection, showLibrary, StudioPanel } from "./src/ui/StudioPanel";
@@ -172,8 +171,6 @@ const BUILTIN_VIEWS: Record<string, { isId(id: string): boolean; View: Component
   designs: { isId: isDesignId, View: lazy(() => import("./src/design/ui/route")) },
   // A recording's page, and the audio this device kept (`recordings/unsent`).
   recordings: { isId: (id) => isRecordingId(id) || id === UNSENT_PATH, View: lazy(() => import("./src/talk/ui/route")) },
-  // The grid (react-grid-layout) and the charts load when a dashboard first opens.
-  dashboards: { isId: isDashboardId, View: lazy(() => import("./src/dashboards/ui/route")) },
   // The app's frame loads its own libraries (the shelf); this is the host around it.
   minis: { isId: isMiniId, View: lazy(() => import("./src/minis/ui/route")) },
 };

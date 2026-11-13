@@ -1,11 +1,10 @@
 // Agent tools by family (src/item-model.ts). Every type keeps the tools it
-// had (`design_*`, `dashboard_*`, `artifacts_*`, `minis_*`, `whiteboard_*`),
+// had (`design_*`, `artifacts_*`, `minis_*`, `whiteboard_*`),
 // with the same parameters. The family names sit on top and run those same
 // handlers:
 // - pages_list, pages_read and pages_create also take a design or a
 //   whiteboard: `type` on list and create, the item's id on read.
-// - apps_list, apps_read and apps_create cover mini apps, dashboards and
-//   artifacts.
+// - apps_list, apps_read and apps_create cover mini apps and artifacts.
 // Each older tool's description says which family tool does the same.
 import { z } from "zod";
 import type { IndexedItem, IndexListOptions } from "./item-index";
@@ -48,12 +47,11 @@ export const TYPE_TOOLS: Record<Exclude<ItemType, "doc">, { list: string; read: 
   design: { list: "design_list", read: "design_read", create: "design_create", idParam: "designId", label: "Designs" },
   whiteboard: { list: "whiteboard_list", read: "whiteboard_get", create: "whiteboard_create", idParam: "whiteboardId", label: "Whiteboards" },
   mini: { list: "minis_list", read: "minis_read", create: "minis_create", idParam: "miniId", label: "Mini apps" },
-  dashboard: { list: "dashboard_list", read: "dashboard_read", create: "dashboard_create", idParam: "dashboardId", label: "Dashboards" },
   artifact: { list: "artifacts_list", read: "artifacts_read", create: "artifacts_save", idParam: "artifactId", label: "Artifacts" },
 };
 
 export const APP_TOOLS = ["apps_list", "apps_read", "apps_create"] as const;
-const APP_TYPES = ["mini", "dashboard", "artifact"] as const;
+const APP_TYPES = ["mini", "artifact"] as const;
 const PAGE_TYPES = ["doc", "design", "whiteboard"] as const;
 
 /** What each type's tool says about the family tool that does the same. */
@@ -67,9 +65,6 @@ const POINTERS: Record<string, string> = {
   minis_list: 'A mini app is a type of app: apps_list lists every app, and with type "mini" gives this same list.',
   minis_read: "A mini app is a type of app: apps_read with its id reads it the same way.",
   minis_create: 'A mini app is a type of app: apps_create with type "mini" makes one the same way.',
-  dashboard_list: 'A dashboard is a type of app: apps_list lists every app, and with type "dashboard" gives this same list.',
-  dashboard_read: "A dashboard is a type of app: apps_read with its id reads it the same way.",
-  dashboard_create: 'A dashboard is a type of app: apps_create with type "dashboard" makes one the same way.',
   artifacts_list: 'An artifact is a type of app: apps_list lists every app, and with type "artifact" gives this same list.',
   artifacts_read: "An artifact is a type of app: apps_read with its id reads it the same way.",
   artifacts_save: 'An artifact is a type of app: apps_create with type "artifact" saves one the same way.',
@@ -139,7 +134,7 @@ export function appTools(deps: AppToolDeps): AgentTool[] {
   return [
     {
       name: "apps_list",
-      description: 'List the user\'s Studio apps, the things that run: mini apps, dashboards and artifacts (saved files and live HTML). Each line has the type, id and link. Pass type for one type\'s own, fuller list, or query to match titles. Read one with apps_read; make one with apps_create.',
+      description: 'List the user\'s Studio apps, the things that run: mini apps and artifacts (saved files and live HTML). Each line has the type, id and link. Pass type for one type\'s own, fuller list, or query to match titles. Read one with apps_read; make one with apps_create.',
       parameters: z.object({ type: typeParam.optional(), query: z.string().max(200).optional().describe("Words a title must contain") }),
       execute: (async ({ type, query }: { type?: (typeof APP_TYPES)[number]; query?: string }, ctx: ToolContext) => {
         const needle = query?.trim().toLowerCase();
@@ -152,19 +147,19 @@ export function appTools(deps: AppToolDeps): AgentTool[] {
     },
     {
       name: "apps_read",
-      description: "Read a Studio app by its id, whatever its type: a mini app's source, state and records summary (mini_…), a dashboard's widgets and their data (dsh_…), or an artifact's details and text (art_…). The same as minis_read, dashboard_read and artifacts_read. Edit with the type's own tool: minis_update, dashboard_edit, or artifacts_save with artifactId.",
+      description: "Read a Studio app by its id, whatever its type: a mini app's source, state and records summary (mini_…), or an artifact's details and text (art_…). The same as minis_read and artifacts_read. Edit with the type's own tool: minis_update, or artifacts_save with artifactId.",
       parameters: z.object({ id: z.string().min(1).max(200).describe("The app's id, from apps_list or its link") }),
       execute: (async ({ id }: { id: string }, ctx: ToolContext) => {
         // The index knows every app; an id it doesn't have yet is read from its prefix.
         const type = deps.index.get(id.trim())?.type ?? typeOfId(id.trim())?.type;
-        if (type !== "mini" && type !== "dashboard" && type !== "artifact") return fail(`No app with id ${id}. apps_list shows the ids.`);
+        if (type !== "mini" && type !== "artifact") return fail(`No app with id ${id}. apps_list shows the ids.`);
         return deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type].read, { [TYPE_TOOLS[type].idParam]: id.trim() }, ctx) : offMessage(type);
       }) as never,
     },
     {
       name: "apps_create",
-      description: 'Make a Studio app. type "mini": a small interactive app with its own data (input as minis_create: name, files). type "dashboard": live tiles, charts and tables (input as dashboard_create: name, widgets). type "artifact": save a finished file (input as artifacts_save: title, and path or content with name). `input` takes exactly the fields of that tool, whose description has the details; the result is the same.',
-      parameters: z.object({ type: typeParam, input: z.record(z.string(), z.unknown()).describe("The fields of minis_create, dashboard_create or artifacts_save, by type") }),
+      description: 'Make a Studio app. type "mini": a small interactive app with its own data (input as minis_create: name, files). type "artifact": save a finished file (input as artifacts_save: title, and path or content with name). `input` takes exactly the fields of that tool, whose description has the details; the result is the same.',
+      parameters: z.object({ type: typeParam, input: z.record(z.string(), z.unknown()).describe("The fields of minis_create or artifacts_save, by type") }),
       execute: (async ({ type, input }: { type: (typeof APP_TYPES)[number]; input: Record<string, unknown> }, ctx: ToolContext) =>
         deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type].create, input, ctx) : offMessage(type)) as never,
     },

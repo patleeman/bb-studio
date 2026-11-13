@@ -42,7 +42,6 @@ export const BUILTIN_ROUTES: readonly BuiltinRoute[] = [
   { pluginId: "design", segment: "designs", kind: "design", legacyRoot: "/plugins/design/designs" },
   { pluginId: "talk", segment: "recordings", kind: "recording", legacyRoot: "/plugins/talk/recordings", pages: ["unsent"] },
   // Built into Studio from the start, so there's no old address.
-  { pluginId: "dashboards", segment: "dashboards", kind: "dashboard" },
   { pluginId: "minis", segment: "minis", kind: "mini" },
 ];
 
@@ -60,7 +59,7 @@ export const FAMILY_SEGMENTS: readonly string[] = ITEM_FAMILIES.map((family) => 
 
 /**
  * The type's route an id opens under a family segment: `pages/dsn_…` is the
- * designs route, `apps/dsh_…` the dashboards one. Null when the segment is no
+ * designs route, `apps/art_…` the artifacts one. Null when the segment is no
  * family's, or the id is not one of that family's types (a doc under `pages`
  * is the pages route itself, found the usual way).
  */

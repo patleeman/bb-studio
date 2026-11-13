@@ -352,9 +352,9 @@ describe("workbench_open's types come from the tab kinds registry", () => {
   });
 
   it("opens every Studio kind as its tab, and a board as Visual Chat's", async () => {
-    const deps = { threadTitle: async (id: string) => (id === "thr_b" ? "Election night" : null), itemTitle: (id: string) => (id === "dsh_0123456789abcdef" ? "Sales" : null), botName: (id: string) => (id === "bot_main" ? "Chief of Staff" : null), entryTitle: async (kind: string, id: string) => (`${kind}/${id}` === "todo/loop_1" ? "Pay the bill" : `${kind}/${id}` === "automation/bot_main:heartbeat" ? "Check-in" : null) } as unknown as WorkbenchToolDeps;
+    const deps = { threadTitle: async (id: string) => (id === "thr_b" ? "Election night" : null), itemTitle: (id: string) => (id === "art_0123456789abcdef" ? "Sales" : null), botName: (id: string) => (id === "bot_main" ? "Chief of Staff" : null), entryTitle: async (kind: string, id: string) => (`${kind}/${id}` === "todo/loop_1" ? "Pay the bill" : `${kind}/${id}` === "automation/bot_main:heartbeat" ? "Check-in" : null) } as unknown as WorkbenchToolDeps;
     const spec = async (input: object) => { const op = await openOp(input as never, "thr_1", deps); return typeof op === "string" ? op : op.type === "open" ? op.spec : op; };
-    expect(await spec({ type: "dashboard", id: "dsh_0123456789abcdef" })).toEqual({ kind: "tab", tab: { id: "studio" }, params: { kind: "dashboard", id: "dsh_0123456789abcdef" }, title: "Sales" });
+    expect(await spec({ type: "artifact", id: "art_0123456789abcdef" })).toEqual({ kind: "tab", tab: { id: "studio" }, params: { kind: "artifact", id: "art_0123456789abcdef" }, title: "Sales" });
     expect(await spec({ type: "board", id: "thr_b" })).toEqual({ kind: "tab", tab: { id: "board", pluginId: "studio-visual-chat" }, params: { threadId: "thr_b" }, title: "Election night" });
     expect(await spec({ type: "bot", id: "bot_main" })).toEqual({ kind: "tab", tab: { id: "bot" }, params: { botId: "bot_main" }, title: "Chief of Staff" });
     expect(await spec({ type: "archive", id: "bot_main" })).toEqual({ kind: "tab", tab: { id: "archive" }, params: { botId: "bot_main" }, title: "Archive" });
@@ -363,7 +363,7 @@ describe("workbench_open's types come from the tab kinds registry", () => {
     expect(await spec({ type: "workflow", id: "wfr_0123abcd" })).toEqual({ kind: "tab", tab: { id: "workflow-run", pluginId: "workflows" }, params: { runId: "wfr_0123abcd" }, title: "Workflow run" });
     expect(await spec({ type: "workflow", id: "nope" })).toBe("BB can't open that workflow run as a tab.");
     expect(await spec({ type: "memory", id: "bot_gone" })).toBe("No Bot has id bot_gone.");
-    expect(await spec({ type: "dashboard", id: "pg_plan" })).toBe("No dashboard has id pg_plan.");
+    expect(await spec({ type: "artifact", id: "pg_plan" })).toBe("No artifact has id pg_plan.");
     expect(await spec({ type: "todo", id: "loop_1" })).toEqual({ kind: "tab", tab: { id: "todo" }, params: { id: "loop_1" }, title: "Pay the bill" });
     expect(await spec({ link: "bb://automation/bot_main%3Aheartbeat" })).toEqual({ kind: "tab", tab: { id: "automation" }, params: { id: "bot_main:heartbeat" }, title: "Check-in" });
     expect(await spec({ link: "/plugins/studio/studio/todo/loop_1" })).toEqual({ kind: "tab", tab: { id: "todo" }, params: { id: "loop_1" }, title: "Pay the bill" });
@@ -375,15 +375,15 @@ describe("workbench_open's types come from the tab kinds registry", () => {
   it("takes a link instead of type and id: bb://, a BB address, a card directive, a file:// or an http(s) URL", async () => {
     const deps = {
       threadTitle: async (id: string) => (id === "thr_b" ? "Election night" : null),
-      itemTitle: (id: string) => (id === "dsh_0123456789abcdef" ? "Sales" : null),
+      itemTitle: (id: string) => (id === "art_0123456789abcdef" ? "Sales" : null),
       botName: (id: string) => (id === "bot_main" ? "Chief of Staff" : null),
       fileTarget: async (_threadId: string, path: string) => ({ kind: "host" as const, hostId: "h1", path }),
       workspacePath: async (_threadId: string, path: string) => path,
     } as unknown as WorkbenchToolDeps;
     const spec = async (input: object) => { const op = await openOp(input as never, "thr_1", deps); return typeof op === "string" ? op : op.type === "open" ? op.spec : op; };
-    expect(await spec({ link: "bb://dashboard/dsh_0123456789abcdef" })).toEqual({ kind: "tab", tab: { id: "studio" }, params: { kind: "dashboard", id: "dsh_0123456789abcdef" }, title: "Sales" });
-    expect(await spec({ link: "/plugins/studio/studio/apps/dsh_0123456789abcdef" })).toEqual({ kind: "tab", tab: { id: "studio" }, params: { kind: "dashboard", id: "dsh_0123456789abcdef" }, title: "Sales" });
-    expect(await spec({ link: "::dashboard{id=\"dsh_0123456789abcdef\"}" })).toEqual({ kind: "tab", tab: { id: "studio" }, params: { kind: "dashboard", id: "dsh_0123456789abcdef" }, title: "Sales" });
+    expect(await spec({ link: "bb://artifact/art_0123456789abcdef" })).toEqual({ kind: "tab", tab: { id: "studio" }, params: { kind: "artifact", id: "art_0123456789abcdef" }, title: "Sales" });
+    expect(await spec({ link: "/plugins/studio/studio/apps/art_0123456789abcdef" })).toEqual({ kind: "tab", tab: { id: "studio" }, params: { kind: "artifact", id: "art_0123456789abcdef" }, title: "Sales" });
+    expect(await spec({ link: "::artifact{id=\"art_0123456789abcdef\"}" })).toEqual({ kind: "tab", tab: { id: "studio" }, params: { kind: "artifact", id: "art_0123456789abcdef" }, title: "Sales" });
     expect(await spec({ link: "bb://conversation/thr_b", pane: 2 })).toEqual({ kind: "tab", tab: { id: "thread" }, params: { threadId: "thr_b" }, title: "Election night" });
     expect(await spec({ link: "bb://memory/bot_main" })).toEqual({ kind: "tab", tab: { id: "memory" }, params: { botId: "bot_main" }, title: "Memory" });
     expect(await spec({ link: "bb://vscode" })).toEqual({ kind: "tab", tab: { id: "code" }, title: "VS Code" });

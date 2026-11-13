@@ -45,7 +45,7 @@ export const TAB_IDS = {
 
 export type TabKindId =
   | "conversation" | "worker" | "bot"
-  | "page" | "whiteboard" | "design" | "app" | "dashboard" | "artifact" | "recording"
+  | "page" | "whiteboard" | "design" | "app" | "artifact" | "recording"
   | "board"
   | "memory" | "skills" | "library" | "automations" | "todos" | "archive"
   | "automation" | "todo" | "record"
@@ -125,7 +125,6 @@ export const ITEM_KINDS: readonly { id: TabKindId; tabKind: StudioTabKind }[] = 
   { id: "whiteboard", tabKind: "drawing" },
   { id: "design", tabKind: "design" },
   { id: "app", tabKind: "mini" },
-  { id: "dashboard", tabKind: "dashboard" },
   { id: "artifact", tabKind: "artifact" },
   { id: "recording", tabKind: "recording" },
 ];
@@ -180,7 +179,6 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
   item("whiteboard", "Whiteboard", "Whiteboards", "Edit", {}, true),
   item("design", "Design", "Designs", "Palette", {}, true),
   item("app", "App", "Apps", "AppWindow", { newTab: "added", recent: "added", workbenchOpen: "added" }, true),
-  item("dashboard", "Dashboard", "Dashboards", "ChartColumn", { newTab: "added", recent: "added", workbenchOpen: "added" }, true),
   item("artifact", "Artifact", "Artifacts", "studio/artifact", { newTab: "added", recent: "added", workbenchOpen: "added" }, false),
   item("recording", "Recording", "Recordings", "Mic", { newTab: "added", recent: "added", workbenchOpen: "added", sidebarDrag: { na: "The Library lists no recordings; drag one from the New Tab page's Recent or search, or Talk's Recordings page." } }, false),
   {

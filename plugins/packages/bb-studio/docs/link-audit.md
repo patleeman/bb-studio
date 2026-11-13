@@ -65,7 +65,6 @@ registry doesn't know (Settings) parses to nothing and stays bb's.
 | Whiteboard | `bb://whiteboard/drw_0123456789abcdef` | `/plugins/studio/studio/drawings/drw_0123456789abcdef` | `::drawing{id="drw_0123456789abcdef"}` |
 | Design | `bb://design/dsn_0123456789abcdef` | `/plugins/studio/studio/designs/dsn_0123456789abcdef` | `::design{id="dsn_0123456789abcdef"}` |
 | App | `bb://app/mini_0123456789abcdef` | `/plugins/studio/studio/minis/mini_0123456789abcdef` | `::mini{id="mini_0123456789abcdef"}` |
-| Dashboard | `bb://dashboard/dsh_0123456789abcdef` | `/plugins/studio/studio/dashboards/dsh_0123456789abcdef` | `::dashboard{id="dsh_0123456789abcdef"}` |
 | Artifact | `bb://artifact/art_0123456789abcdef` | `/plugins/studio/studio/artifacts/art_0123456789abcdef` | `::artifact{id="art_0123456789abcdef"}` |
 | Recording | `bb://recording/rec_0123456789` | `/plugins/studio/studio/recordings/rec_0123456789` | `::recording{id="rec_0123456789"}` |
 | Visual Chat board | `bb://board/thr_board` | `/plugins/studio-visual-chat/canvas/thr_board` |  |
@@ -99,7 +98,6 @@ the rule above; **n/a** says why it can't.
 | Whiteboard | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
 | Design | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
 | App | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
-| Dashboard | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
 | Artifact | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
 | Recording | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Visual Chat board | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |

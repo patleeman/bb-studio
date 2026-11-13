@@ -1,5 +1,4 @@
 import { MIGRATIONS } from "../../migrations";
-import { StudioServices } from "../../services";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import Database from "better-sqlite3";
 import type { Resolve, Transport } from "../../guarded-fetch";
@@ -24,7 +23,7 @@ export function dashboardHost(options: { now?: () => number; transport?: Transpo
   db.exec(MIGRATIONS[0]!);
   db.exec(DASHBOARD_TABLES);
   db.exec(DASHBOARD_PROPOSALS_TABLE);
-  const dashboards = registerDashboards(host.bb, db, new StudioServices(db), async () => {}, { resolve: async () => ["93.184.216.34"], ...options, tickMs: null });
+  const dashboards = registerDashboards(host.bb, db, async () => {}, { resolve: async () => ["93.184.216.34"], ...options, tickMs: null });
   host.bb.onDispose(() => dashboards.dispose());
   return { ...host, dashboards };
 }

@@ -108,7 +108,7 @@ const libraryItem = z.object({
   pluginId: z.string(),
   id: z.string(),
   title: z.string(),
-  /** The Library's flat kind; `type` is the item's own (doc, mini, dashboard…). */
+  /** The Library's flat kind; `type` is the item's own (doc, mini, artifact…). */
   kind: libraryKind,
   type: z.string().nullable(),
   href: z.string().nullable(),

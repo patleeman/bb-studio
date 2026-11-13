@@ -264,7 +264,6 @@ export function StudioLibrary({ thread }: { thread?: LibraryThreadHost } = {}) {
       },
       exportFormats: (item) => item.kind === "page" ? [{ format: "markdown", label: "Markdown and assets" }, { format: "html", label: "HTML and assets" }, { format: "pdf", label: "PDF" }]
         : item.kind === "drawing" ? [{ format: "png", label: "PNG" }, { format: "svg", label: "SVG" }, { format: "excalidraw", label: "Excalidraw JSON" }]
-          : item.kind === "dashboard" ? [{ format: "json", label: "Dashboard JSON" }]
           : item.kind === "mini" ? [{ format: "zip", label: "Source and data (ZIP)" }]
           : item.kind === "task" ? [{ format: "markdown", label: "Markdown" }, { format: "csv", label: "CSV" }]
           : item.kind === "table" ? [{ format: "csv", label: "CSV" }, { format: "markdown", label: "Markdown" }]

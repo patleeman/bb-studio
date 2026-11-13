@@ -16,7 +16,7 @@
   },
   "bb": {
     "name": "Studio",
-    "description": "The home of BB Studio, with pages and their whiteboards, recordings, designs, dashboards, mini apps and artifacts built in: one collection with search, tags, project leads, item conversations, quotes, emoji reactions on replies, VS Code on each thread’s worktree, and Decisions for Jev, fallback models and Smart Queue.",
+    "description": "The home of BB Studio, with pages and their whiteboards, recordings, designs, mini apps and artifacts built in: one collection with search, tags, project leads, item conversations, quotes, emoji reactions on replies, VS Code on each thread’s worktree, and Decisions for Jev, fallback models and Smart Queue.",
     "branding": {
       "icon": "./icons/studio.svg",
       "experimental_icons": {
@@ -36,7 +36,6 @@
         "call": "./icons/call.svg",
         "pages": "./icons/pages.svg",
         "explore": "./icons/explore.svg",
-        "dashboard": "./icons/dashboard.svg",
         "handsfree": "./icons/handsfree.svg",
         "phone-off": "./icons/phone-off.svg",
         "library": "./icons/library.svg"
@@ -81,7 +80,6 @@
     "micromark-extension-gfm": "^3.0.0",
     "pdf-lib": "1.17.1",
     "react-dom": "19.2.4",
-    "react-grid-layout": "2.3.0",
     "react-is": "19.3.0",
     "recharts": "3.10.1",
     "shiki": "4.4.3",

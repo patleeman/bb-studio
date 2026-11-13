@@ -1,6 +1,6 @@
 ---
 name: studio
-description: Use when the user refers to BB Studio or "my stuff" across pages, Talk recordings, drawings, dashboards and artifacts — finding an item they made, "the doc about X", "that recording from Tuesday", "what's in Studio" — or asks how Studio and its add-ons (pages, recordings, drawings, designs, dashboards and artifacts are built into Studio) fit together. Also load it when your instructions point here, before you write a page format (chart, embed, html block), a mini app, a ::next or ::explore line, and for your conversations, workers, the "Elsewhere" digest and finishing a conversation.
+description: Use when the user refers to BB Studio or "my stuff" across pages, Talk recordings, drawings and artifacts — finding an item they made, "the doc about X", "that recording from Tuesday", "what's in Studio" — or asks how Studio and its add-ons (pages, recordings, drawings, designs and artifacts are built into Studio) fit together. Also load it when your instructions point here, before you write a page format (chart, embed, html block), a mini app, a ::next or ::explore line, and for your conversations, workers, the "Elsewhere" digest and finishing a conversation.
 ---
 
 # Studio
@@ -14,14 +14,13 @@ the core: one collection that lists every item from every installed add-on.
 | Pages (built into Studio) | `pages` | Pages | the `pages` skill, `pages_*` tools and `bb studio pages` |
 | Studio Talk | `talk` | Recordings, dictations | the `talk` skill and `bb talk` |
 | Whiteboards (built into Studio, live in pages) | `excalidraw` | Whiteboards (kind `drawing`) | the `whiteboards` skill, `whiteboard_*` tools and `bb studio whiteboards` |
-| Dashboards (built into Studio) | `dashboards` | Dashboards: live stats, charts, tables and feeds | the `dashboards` skill, `dashboard_*` and `widget_*` tools and `bb studio dashboards` |
 | Studio Artifacts | `artifacts` | Artifacts: saved images, HTML, reports, files | the `artifacts` skill and `artifacts_*` tools |
 
 Items belong to a BB project or are global. Every item has a link
 (`/plugins/<plugin id>/<panel>/<item id>`); put it in replies as
 `[Title](link)` so the user can open it. Every Studio and BB entity also has
 a `bb://<kind>/<id>` link: `bb://page/pg_…`, `bb://whiteboard/drw_…`,
-`bb://design/dsn_…`, `bb://app/mini_…`, `bb://dashboard/dsh_…`,
+`bb://design/dsn_…`, `bb://app/mini_…`,
 `bb://artifact/art_…`, `bb://recording/rec_…`, `bb://conversation/thr_…`,
 `bb://worker/thr_…`, `bb://bot/bot_…`, `bb://board/thr_…`,
 `bb://memory/bot_…`, `bb://todos/bot_…`, `bb://archive/bot_…`,
@@ -39,7 +38,7 @@ Not found tab.
   project. `query` takes filters and words:
   `kind:page project:"Q4 launch" tag:draft -tag:done notes`.
   `family:page` lists every page type (docs, designs, whiteboards) and
-  `family:app` every app (mini apps, dashboards, artifacts); `type:design`
+  `family:app` every app (mini apps, artifacts); `type:design`
   lists one type.
 - Apps have their own tools: `apps_list`, `apps_read` (any app by id) and
   `apps_create`. Pages, designs and whiteboards share `pages_list`,
@@ -302,7 +301,7 @@ change nothing.
   `/plugins/studio/studio/pages/pg_…` or `/threads/thr_…`, a card directive
   such as `::page{id="pg_…"}`, a `file:///…` URL or an http(s) URL)
   opens a conversation, worker, board (thread `id`), a page, whiteboard,
-  design, app, dashboard, artifact or recording (its `id`), a Bot (its `id`),
+  design, app, artifact or recording (its `id`), a Bot (its `id`),
   Memory, the Library, Automations, Todos, the Archive (a Bot `id`, or none
   for the Bot on screen), one automation (`type: "automation"`, `id`
   `<botId>:<row id>`, or `bb://automation/<botId>:<row id>`), one todo

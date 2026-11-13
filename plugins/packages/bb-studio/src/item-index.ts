@@ -30,11 +30,11 @@ const SOURCES: readonly { type: ItemType; table: string; title: string; parent: 
   { type: "whiteboard", table: "drawings", title: "name", parent: "NULL", template: "template" },
   { type: "design", table: "designs", title: "name", parent: "NULL", template: "template" },
   { type: "mini", table: "minis", title: "name", parent: "NULL", template: "template" },
-  { type: "dashboard", table: "dashboards", title: "name", parent: "NULL", template: "template" },
   { type: "artifact", table: "artifacts", title: "title", parent: "NULL", template: "0" },
 ];
 
 const COLUMNS = "plugin_id, id, family, type, title, project_id, parent_id, created_at, updated_at, archived_at, template";
+const KNOWN_TYPES = `type IN (${ITEM_TYPES.map((each) => `'${each.type}'`).join(", ")})`;
 
 /** The index row of every item in a type's table. */
 function sourceSelect(source: (typeof SOURCES)[number]): string {
@@ -65,14 +65,14 @@ export class ItemIndex {
   /** The item with this id, whatever its type. `pluginId` narrows it to one namespace. */
   get(id: string, pluginId?: string): IndexedItem | null {
     const row = (pluginId
-      ? this.db.prepare(`SELECT ${COLUMNS} FROM items WHERE plugin_id = ? AND id = ?`).get(pluginId, id)
-      : this.db.prepare(`SELECT ${COLUMNS} FROM items WHERE id = ? ORDER BY plugin_id LIMIT 1`).get(id)) as Row | undefined;
+      ? this.db.prepare(`SELECT ${COLUMNS} FROM items WHERE plugin_id = ? AND id = ? AND ${KNOWN_TYPES}`).get(pluginId, id)
+      : this.db.prepare(`SELECT ${COLUMNS} FROM items WHERE id = ? AND ${KNOWN_TYPES} ORDER BY plugin_id LIMIT 1`).get(id)) as Row | undefined;
     return row ? read(row) : null;
   }
 
   /** Items newest-updated first. */
   list(options: IndexListOptions = {}): IndexedItem[] {
-    const where: string[] = [];
+    const where: string[] = [KNOWN_TYPES];
     const args: (string | number)[] = [];
     if (options.family) { where.push("family = ?"); args.push(options.family); }
     if (options.type) { where.push("type = ?"); args.push(options.type); }
@@ -82,7 +82,7 @@ export class ItemIndex {
     }
     if (!options.includeArchived) where.push("archived_at IS NULL");
     if (!options.includeTemplates) where.push("template = 0");
-    const rows = this.db.prepare(`SELECT ${COLUMNS} FROM items ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY updated_at DESC, id LIMIT ?`).all(...args, options.limit ?? 500) as Row[];
+    const rows = this.db.prepare(`SELECT ${COLUMNS} FROM items WHERE ${where.join(" AND ")} ORDER BY updated_at DESC, id LIMIT ?`).all(...args, options.limit ?? 500) as Row[];
     return rows.map(read);
   }
 

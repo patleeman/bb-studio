@@ -21,7 +21,7 @@ import { registerChat } from "./src/chat/server";
 import { ARTIFACT_TOOLS, registerArtifacts } from "./src/artifacts/server";
 import { DRAW_TOOLS, moveOrphanDrawings, registerDraw } from "./src/draw/server";
 import { DESIGN_TOOLS, registerDesign } from "./src/design/server";
-import { DASHBOARD_TOOLS, registerDashboards } from "./src/dashboards/server";
+import { registerDashboards } from "./src/dashboards/server";
 import { MINI_TOOLS, registerMinis } from "./src/minis/server";
 import { displayTitle as artifactTitle, versionType as artifactVersionType } from "./src/artifacts/server/store";
 import { registerTalk, TALK_TOOLS, type TalkSettingsHandle } from "./src/talk/server";
@@ -252,7 +252,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => drawings.dispose());
   const designs = registerDesign(bb, db, services, notifyBuiltin);
   bb.onDispose(() => designs.dispose());
-  const dashboards = registerDashboards(bb, db, services, notifyBuiltin);
+  const dashboards = registerDashboards(bb, db, notifyBuiltin);
   bb.onDispose(() => dashboards.dispose());
   // Mini apps' `playground.bb.studio.list` reads the collection through the hub, made below.
   const minis = registerMinis(bb, db, services, notifyBuiltin, {
@@ -360,8 +360,6 @@ export default async function plugin(bb: BbPluginApi) {
   const kindSettings = new KindSettingsStore(bb.storage.kv as never);
   await kindSettings.load();
   typeIsOn = (type) => builtinOn(kindSettings.current, itemType(type)!.pluginId);
-  // A dashboard kind that's off refreshes nothing.
-  dashboards.setEnabled(() => builtinOn(kindSettings.current, "dashboards"));
   const hub = new StudioHub(bb.sdk, [
     { pluginId: "studio-code", name: "VS Code", handlers: code.provider },
     { pluginId: "pages", name: "Pages", handlers: pages.provider },
@@ -369,7 +367,6 @@ export default async function plugin(bb: BbPluginApi) {
     { pluginId: "excalidraw", name: "Whiteboards", handlers: drawings.provider },
     { pluginId: "design", name: "Designs", handlers: designs.provider },
     { pluginId: "talk", name: "Recordings", handlers: recordings.provider },
-    { pluginId: "dashboards", name: "Dashboards", handlers: dashboards.provider },
     { pluginId: "minis", name: "Mini apps", handlers: minis.provider },
   ], {
     builtinOn: (pluginId) => builtinOn(kindSettings.current, pluginId),
@@ -399,7 +396,7 @@ export default async function plugin(bb: BbPluginApi) {
   for (const tool of appTools({ ...familyDeps, index: itemIndex })) bb.agents.registerTool(tool as never);
   /** Only a runner's thread gets this (src/runners.ts). */
   const RUNNER_TOOLS = ["runner_report"] as const;
-  const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS, dashboard: DASHBOARD_TOOLS, mini: MINI_TOOLS };
+  const KIND_TOOLS: Record<string, readonly string[]> = { page: PAGE_TOOLS, artifact: ARTIFACT_TOOLS, drawing: DRAW_TOOLS, design: DESIGN_TOOLS, recording: TALK_TOOLS, mini: MINI_TOOLS };
   // BB takes one agent configuration per plugin: the built-in kinds' tools in
   // every session, with Pages' instructions and the Next row's (Explore's), as
   // the Pages plugin gave them. A kind turned off gives neither, from the next
@@ -1683,13 +1680,13 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "studio_list_items",
     description:
-      "List the user's BB Studio items — pages (docs, designs, whiteboards), apps (mini apps, dashboards, artifacts), Talk recordings and anything else a Studio add-on provides — newest first. It lists this thread's project's items and global ones (the user's Bot, the personal project's lead, sees every project); a project: filter or allProjects lists beyond that. Each line has a link and the item's #tags, and a content match shows the text that matched; open or mention it to work with the item.",
+      "List the user's BB Studio items — pages (docs, designs, whiteboards), apps (mini apps, artifacts), Talk recordings and anything else a Studio add-on provides — newest first. It lists this thread's project's items and global ones (the user's Bot, the personal project's lead, sees every project); a project: filter or allProjects lists beyond that. Each line has a link and the item's #tags, and a content match shows the text that matched; open or mention it to work with the item.",
     parameters: z.object({
       query: z
         .string()
         .max(500)
         .optional()
-        .describe('Words match titles and content. Filters: family:<page|app> type:<doc|design|whiteboard|mini|dashboard|artifact> kind:<kind> project:<name|global> tag:<name|none> is:archived is:template is:starred; quote names with spaces, repeat a field for any of its values, prefix - to exclude. E.g. kind:page -tag:draft project:"Q4 launch" pricing'),
+        .describe('Words match titles and content. Filters: family:<page|app> type:<doc|design|whiteboard|mini|artifact> kind:<kind> project:<name|global> tag:<name|none> is:archived is:template is:starred; quote names with spaces, repeat a field for any of its values, prefix - to exclude. E.g. kind:page -tag:draft project:"Q4 launch" pricing'),
       kind: z.string().max(100).optional().describe("Only this kind, e.g. page, recording, drawing; same as kind: in the query"),
       allProjects: z.boolean().optional().describe("Include every project, not just this one"),
       tag: z.string().max(100).optional().describe("Only items with this tag; same as tag: in the query"),
@@ -2450,7 +2447,6 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "designs", summary: "List and read designs: list, show, html, rename, delete", usage: "bb studio designs <list|show|html|rename|delete> …" },
       { name: "recordings", summary: "Read Talk recordings and their transcripts: list, show, transcript, notes", usage: "bb studio recordings <list|show|transcript|notes> …" },
       { name: "pages", summary: "Read and write pages: list, show, create, append; explore stats for the Next row", usage: "bb studio pages <list|show|create|append|explore> …" },
-      { name: "dashboards", summary: "List and read dashboards, and push data to their widgets", usage: "bb studio dashboards <list|show|set-data> …" },
       { name: "minis", summary: "List mini apps, read their records and state, and run their actions", usage: "bb studio minis <list|show|data|state|watch|actions|do> …" },
       { name: "theme", summary: "List, show, check, create, update, apply and delete Bot themes", usage: "bb studio theme <list|show|create|update|apply|check|delete|template> …" },
       { name: "presence", summary: "List, show, check, create, update, apply and delete Bot presences", usage: "bb studio presence <list|show|create|update|apply|check|delete|template> …" },
@@ -2466,7 +2462,6 @@ export default async function plugin(bb: BbPluginApi) {
       // `drawings` is the old name of `whiteboards`; both stay.
       if (argv[0] === "whiteboards" || argv[0] === "drawings") return drawings.cli(argv.slice(1), ctx);
       if (argv[0] === "designs") return designs.cli(argv.slice(1), ctx);
-      if (argv[0] === "dashboards") return dashboards.cli(argv.slice(1));
       if (argv[0] === "minis") return minis.cli(argv.slice(1));
       if (argv[0] === "recordings") return recordings.cli(argv.slice(1));
       if (argv[0] === "presence") return runPresenceCli(argv.slice(1), { service: presenceService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)) });
@@ -2570,7 +2565,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|starred|move|providers|health|setup|reindex|backup|restore|pages|artifacts|whiteboards|designs|recordings|dashboards|minis|theme|presence|decisions|work> …");
+            return usage("bb studio <list|tags|starred|move|providers|health|setup|reindex|backup|restore|pages|artifacts|whiteboards|designs|recordings|minis|theme|presence|decisions|work> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };
