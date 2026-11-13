@@ -68,6 +68,9 @@ export const experimental_useContextCard = runtimeFunction(
 export const experimental_useWindows = runtimeFunction(
   "experimental_useWindows",
 );
+export const experimental_useDesktopControl = runtimeFunction(
+  "experimental_useDesktopControl",
+);
 export const experimental_useAppCommands = runtimeFunction(
   "experimental_useAppCommands",
 );
