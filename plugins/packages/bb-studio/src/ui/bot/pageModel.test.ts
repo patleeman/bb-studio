@@ -134,7 +134,7 @@ describe("Up next and Recent", () => {
     const frequent = entries.find((entry) => entry.muted)!;
     expect(frequent.parts[0]!.text).toBe("Frequent checks ran 7 times today with nothing to report.");
     expect(text.filter((line) => line.startsWith("Daily cleanup"))).toEqual(["Daily cleanup: Archived 5."]);
-    expect(text).toContain("Finished Set up GB Studio.");
+    expect(text).toContain("Archived Set up GB Studio.");
     // Nothing that hasn't happened yet.
     expect(text.some((line) => line.includes("Evening wrap-up"))).toBe(false);
   });

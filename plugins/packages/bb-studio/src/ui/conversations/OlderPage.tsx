@@ -82,7 +82,7 @@ export default function OlderPage({ botId }: { botId: string | null }) {
               meta={shortAge(entry.row.updatedAt, now)} {...thread(entry.row.threadId, entry.row.title)} />
           ) : (
             <BotPageRow key={entry.row.threadId} testId="older-finished" icon="CircleCheck" iconClassName="text-success" title={entry.row.title} titleText={entry.row.title}
-              status={{ label: "Finished" }} meta={shortDate(entry.row.finishedAt, now)} {...thread(entry.row.threadId, entry.row.title)}
+              status={{ label: "Archived" }} meta={shortDate(entry.row.finishedAt, now)} {...thread(entry.row.threadId, entry.row.title)}
               actions={<Button type="button" variant="outline" size="sm" data-testid="older-reopen" className="h-7 px-2.5 text-xs font-normal" onClick={() => void reopen(entry.row.threadId)}>Reopen</Button>} />
           ))}
         </BotPageGroup>
