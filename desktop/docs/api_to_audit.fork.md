@@ -97,10 +97,14 @@ Docs: `frontend-hooks-and-ui.md`.
 ## Sidebar section (`slots.experimental_sidebarSection`)
 
 A plugin adds a section of its own rows to the sidebar. Sections render
-after the thread list, inside the same scroll area, in plugin order. The
-component draws its own heading and rows and receives `{ activeThreadId,
-activeProjectId, isCompactViewport, onNavigate }`. A crashed section leaves
-the thread list and the other sections in place.
+after the thread list, inside the same scroll area, in plugin order. A
+section registered with `placement: "footer"` renders instead just above the
+sidebar footer, outside the scroll, under the footer's disclosure; BB Studio
+draws its account notice there ("Codex needs sign-in"), which is empty while
+every account works. The component draws its own heading and rows and
+receives `{ activeThreadId, activeProjectId, isCompactViewport, onNavigate,
+placement }`. A crashed section leaves the thread list and the other
+sections in place.
 
 Before this, a plugin with rows of its own had to replace the whole thread
 list through `experimental_threadList`, redraw threads itself, and switch
@@ -108,8 +112,9 @@ the user's `sidebar.threadListProvider` preference to make its list show.
 
 **Core callers.** None: core's own lists are the navigation and the thread
 list, both already replaceable plugins. The host is
-`components/sidebar/ForkSidebarSections.tsx`, mounted in `AppSidebar`
-next to `PluginThreadList` and given the same `closeOnMobile` callback.
+`components/sidebar/ForkSidebarSections.tsx`, mounted twice in `AppSidebar`:
+next to `PluginThreadList` and, with `placement="footer"`, right before the
+footer, each given the same `closeOnMobile` callback.
 
 Docs: `frontend-renderer-slots.md`.
 
@@ -1241,6 +1246,11 @@ code block, the new-thread home, a plugin page and a popover in the real
 `AppLayout`. Values go through a `CSS.supports` check. Studio's theme engine is the caller: its
 WebGL scene is the component and its theme's colors are the appearance.
 
+In the desktop app the last applied appearance is saved and painted on the
+next launch before bb's scripts run (the window background too), then
+replaced by the live one in a single layout effect; see `launch-theme` in
+STUDIO_FORK.md. A plugin does nothing for this.
+
 **Core callers.** bb's own light and dark goes through the same path: the
 override sits inside `getPreferredTheme` in `hooks/useTheme.ts`, so the
 `.dark` class, `usePreferredTheme` (code, diff and terminal themes) and
@@ -1430,22 +1440,32 @@ tooltip and a dialog with an opaque body in the real `AppLayout`.
 
 ## Hiding bb's own entries (`slots.experimental_hideHostEntries`)
 
-A plugin lists bb's own sidebar navigation keys, pages and settings sections
-to take out of the app. The sidebar leaves hidden rows out, a hidden page's
-address goes to the home view, and a hidden settings section is neither drawn
-nor offered by settings search. Registrations add up across plugins. BB Studio
-hides the Skills row, the Skills page and General's "bb CLI skills".
+A plugin lists bb's own sidebar navigation keys, pages, settings, Settings
+pages and sidebar footer items to take out of the app. The sidebar leaves
+hidden rows out, a hidden page's address goes to the home view, a hidden
+setting is neither drawn nor offered by settings search, a hidden Settings
+page (`settingsSections`) leaves the Settings list, the command palette and
+settings search and its address goes to General, and a hidden footer item
+(`footer`, by its preference key: `builtin:<id>` or
+`plugin:<pluginId>/<itemId>`) leaves the footer, its More menu and
+Customize. Registrations add up across plugins. BB Studio hides the Skills
+row, the Skills page, General's "bb CLI skills", the Mobile page (bb's
+TestFlight and APK downloads; the server address stays in Machines), bb's
+Mobile apps and Report a bug footer items and Provider usage's footer item.
 
 **Core callers.** `components/fork/ForkHiddenHostEntries.tsx` reads the
 registrations. `SidebarNavigationModel.tsx` filters its rows,
 `ToolsView.tsx`'s `SkillsView` redirects, `CliSkillsSettingsSection.tsx`
-draws nothing, and `useSettingsSearchConditions.ts` drops the `cliSkills`
-search entry.
+draws nothing, `useSettingsSearchConditions.ts` drops the `cliSkills`
+search entry, `settings-nav.tsx` filters the Settings pages and treats a
+hidden one's address as unknown, and `sidebarFooterPreferences.ts` filters
+the footer items.
 
 **Audit before stabilizing.**
 
-1. Only one page (`skills`) and one settings section (`cli-skills`) are
-   named. Decide whether pages and sections get stable ids bb maintains.
+1. Only one page (`skills`), one setting (`cli-skills`) and one Settings
+   page (`mobile`) are named. Decide whether pages and sections get stable
+   ids bb maintains. Footer keys are bb's own preference keys.
 2. Hiding is UI only. Pair it with a server policy where the entry's routes
    matter (the skill registry has `experimental_skillsRegistryPolicy`).
 3. The sidebar's stored order keeps a hidden key; it shows again where it

@@ -16,6 +16,7 @@ import type {
   ExperimentalThreadHeaderRegistration,
   ExperimentalPaletteSearchRegistration,
   ExperimentalReplyClassifierRegistration,
+  ExperimentalSidebarSectionPlacement,
   ExperimentalSidebarSectionRegistration,
   ExperimentalWindowRegistration,
   ExperimentalTabRegistration,
@@ -125,6 +126,9 @@ export function forkSlotMethods(
       collected.sidebarSections.push({
         id,
         title: requireNonEmptyString(kind, "title", registration.title),
+        ...(registration.placement === undefined
+          ? {}
+          : { placement: requirePlacement(kind, id, registration.placement) }),
         component: requireComponent(kind, registration.component),
       });
     },
@@ -298,6 +302,11 @@ export function forkSlotMethods(
         navigation: list("navigation", registration.navigation),
         pages: list("pages", registration.pages),
         settings: list("settings", registration.settings),
+        settingsSections: list(
+          "settingsSections",
+          registration.settingsSections,
+        ),
+        footer: list("footer", registration.footer),
       });
     },
     experimental_threadHeader(registration) {
@@ -446,6 +455,17 @@ export function forkFileOpenerFields(
           registration.experimental_handleOpen,
         ),
       };
+}
+
+function requirePlacement(
+  kind: string,
+  id: string,
+  value: unknown,
+): ExperimentalSidebarSectionPlacement {
+  if (value !== "list" && value !== "footer") {
+    throw new Error(`${kind} "${id}": placement must be "list" or "footer"`);
+  }
+  return value;
 }
 
 function requireFunction<T>(kind: string, field: string, value: unknown): T {

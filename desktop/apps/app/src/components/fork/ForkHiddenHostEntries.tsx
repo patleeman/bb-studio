@@ -12,6 +12,8 @@ interface HiddenHostEntries {
   navigation: ReadonlySet<string>;
   pages: ReadonlySet<string>;
   settings: ReadonlySet<string>;
+  settingsSections: ReadonlySet<string>;
+  footer: ReadonlySet<string>;
 }
 
 export function useForkHiddenHostEntries(): HiddenHostEntries {
@@ -22,6 +24,10 @@ export function useForkHiddenHostEntries(): HiddenHostEntries {
       navigation: new Set(entries.flatMap((entry) => entry.navigation ?? [])),
       pages: new Set(entries.flatMap((entry) => entry.pages ?? [])),
       settings: new Set(entries.flatMap((entry) => entry.settings ?? [])),
+      settingsSections: new Set(
+        entries.flatMap((entry) => entry.settingsSections ?? []),
+      ),
+      footer: new Set(entries.flatMap((entry) => entry.footer ?? [])),
     };
   }, [registrations]);
 }
@@ -53,4 +59,31 @@ export function useForkHiddenHostPage(
   page: ExperimentalHostPage,
 ): ReactElement | null {
   return useForkHostPageHidden(page) ? <Navigate to="/" replace /> : null;
+}
+
+export function useForkVisibleSettingsSections<
+  Section extends { id: string },
+>(sections: readonly Section[]): readonly Section[] {
+  const { settingsSections } = useForkHiddenHostEntries();
+  return useMemo(
+    () =>
+      settingsSections.size === 0
+        ? sections
+        : sections.filter((section) => !settingsSections.has(section.id)),
+    [sections, settingsSections],
+  );
+}
+
+export function useForkSettingsSectionHidden(section: string | null): boolean {
+  const { settingsSections } = useForkHiddenHostEntries();
+  return section !== null && settingsSections.has(section);
+}
+
+export function useForkVisibleFooterItems<Item extends { key: string }>(
+  items: Item[],
+): Item[] {
+  const { footer } = useForkHiddenHostEntries();
+  return footer.size === 0
+    ? items
+    : items.filter((item) => !footer.has(item.key));
 }

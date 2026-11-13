@@ -162,10 +162,14 @@ not remount, and they return to the bar when the host or the flag goes.
 ## Hide bb's own entries
 
 - `app.slots.experimental_hideHostEntries({ id, navigation?, pages?,
-settings? })` → takes bb's own entries out of the app: sidebar navigation
-  keys (`__bb__/skills`, `__bb__/extensions`, … or `<pluginId>/<panelId>`),
-  pages (`"skills"`: its address goes home) and settings sections
-  (`"cli-skills"`, also left out of settings search). UI only.
+settings?, settingsSections?, footer? })` → takes bb's own entries out of
+  the app: sidebar navigation keys (`__bb__/skills`, `__bb__/extensions`, …
+  or `<pluginId>/<panelId>`), pages (`"skills"`: its address goes home),
+  settings (`"cli-skills"`, also left out of settings search), Settings
+  pages (`"mobile"`: left out of the list, the palette and search; its
+  address goes to General) and sidebar footer items by key
+  (`builtin:mobile`, `builtin:report-bug`, `plugin:<pluginId>/<itemId>`:
+  out of the footer, More and Customize). UI only.
 
 ## The skill registry
 
