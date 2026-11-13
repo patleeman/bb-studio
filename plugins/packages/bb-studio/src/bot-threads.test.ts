@@ -268,6 +268,7 @@ it("shortens a reply to its first line and reads a repo tag only off a git check
   expect(latestLine("::page{id=\"pg_1\"}\n\n# Heading")).toBe("Heading");
   expect(latestLine("x".repeat(400))!.length).toBe(160);
   expect(latestLine("  ")).toBeNull();
+  expect(latestLine("Recap: The [Spring menu draft](bb://page/pg_1) has [3 items](/threads/thr_1).")).toBe("Recap: The Spring menu draft has 3 items.");
   expect(repoTag({ environmentPath: "/a/b", environmentBranchName: null })).toBeNull();
   expect(repoTag({ environmentName: "larkspur", environmentBranchName: "main" })).toEqual({ tag: "larkspur", branch: "main" });
 });

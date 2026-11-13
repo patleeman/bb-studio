@@ -66,7 +66,7 @@ export function JevConnection({ bare = false }: { bare?: boolean }) {
   const routes = status?.routes ?? [];
   return (
     <div className={bare ? "divide-y divide-border px-4" : "divide-y divide-border rounded-lg border border-border bg-card px-4"}>
-      <Row label={status?.provider === "auto" || !status ? "Providers auto will try" : "Provider"}>
+      <Row label={status?.provider === "auto" || !status ? "Providers auto will try" : "In use"}>
         {error ? (
           <><p role="alert" className="text-xs text-destructive">{error}</p><Button size="sm" variant="outline" onClick={refresh}>Retry</Button></>
         ) : loading ? <span className="text-sm text-muted-foreground">Loading…</span> : routes.length ? (

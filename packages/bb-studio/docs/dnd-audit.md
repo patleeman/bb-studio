@@ -24,7 +24,7 @@ does and its tests prove. Nothing here was dragged by hand in a running BB.
 | Source ↓ / Target → | Main panes (tab row, panel body, right edge) | Popped-out window's tab row | Composer | Page body | Main view |
 | --- | --- | --- | --- | --- | --- |
 | Bot sidebar row (a conversation or a worker) | works (BB) [a] | works (BB) [a] [k] | works (BB) [b] | works | works (BB) |
-| Bot page row (Memory, Library, Automations, Todos, the Archive's row) | works (BB) [a] | works (BB) [a] [k] | works (BB) [i] | not [4] | works (BB) |
+| Bot page row (Memory, Library, Todos, the Archive's row) | works (BB) [a] | works (BB) [a] [k] | works (BB) [i] | not [4] | works (BB) |
 | Bot switcher icon (a Bot) | works (BB) [a] | works (BB) [a] [k] | works (BB) [i] | not [4] | works (BB) |
 | Library row (a file) | works (BB) [c] | works (BB) [c] [k] | works (BB) [b] | works [d] | works (BB) |
 | New Tab Recent or search row | works (BB) [a] [j] | works (BB) [a] [j] [k] | works (BB) [b] [j] | works [d] [j] | works (BB) [j] |

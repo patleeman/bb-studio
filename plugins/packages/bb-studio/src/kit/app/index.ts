@@ -18,6 +18,7 @@ export { CopyReferenceMenuItem, ItemDeleteConfirm, ItemMenu, LinkedThreadMenuIte
 export { canOpenInWindow, OpenInWindowMenuItem, setItemWindowOpener, type ItemWindowOpener } from "./item-window";
 export { itemReferenceFrom } from "./item-reference";
 export { ItemDirectiveCard, remember } from "./directive-card";
+export { CHAT_CARD, CHAT_CARD_ACTION, CHAT_CARD_BODY, CHAT_CARD_FOOT, CHAT_CARD_HEAD, CHAT_CARD_ICON_BUTTON, CHAT_CARD_SKELETON, ChatCard, ChatCardAction, ChatCardFooter, ChatCardHeader, ChatCardIconButton } from "./chat-card";
 export { openAppPath, studioPath, panelHref } from "./nav";
 export { containerAt, routeContainer, StudioContainerProvider, useStudioContainer, wantsAlternate, type StudioContainer } from "./container";
 export { createStudioItem } from "./create-item";

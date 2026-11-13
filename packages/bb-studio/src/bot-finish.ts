@@ -3,16 +3,16 @@
 // memory record with a link back, and Main gets the card:
 //
 // 1. Archiving a conversation (BB's Archive anywhere, iOS, or `bot_finish`)
-//    sends one last turn INTO the conversation: write a summary of the
+//    sends one last agent-only turn INTO the conversation (no user bubble): write a summary of the
 //    decisions, what was left open and what was made; save it with
 //    memory_add (topic: the conversation, source: the conversation); call
 //    bot_finish_done with it. Main and workers can't be finished; a
 //    conversation that is working can't either (finish it when it's done).
 // 2. bot_finish_done (also when the user asks for it in the chat) archives
 //    the conversation in Studio (bot_threads.archived_at, finished_summary),
-//    posts the summary to Main from the conversation with an agent-only note
-//    that has the Bot answer with the `::finished{thread="…"}` card, and
-//    sets Main's row to "Archived “<title>” · summary saved". BB's own
+//    sends Main an agent-only note with the summary that has the Bot answer
+//    with the `::finished{thread="…"}` card, and sets Main's row to
+//    "Archived “<title>”". BB's own
 //    archive follows once the conversation's turn is over.
 // 3. If the turn ends (or fails) without bot_finish_done, or nothing happens
 //    for FINISH_TIMEOUT_MS, Studio finishes it with a summary built from the
@@ -91,10 +91,15 @@ export function fallbackSummary(replies: readonly string[], latest: string | nul
 }
 
 /** Main's message: the summary as the conversation's report, with links back. */
-export function mainCard(input: { threadId: string; botId: string; title: string; summary: string }): { text: string; note: string } {
+export function mainCard(input: { threadId: string; botId: string; title: string; summary: string }): { note: string } {
   return {
-    text: [`Archived “${input.title}” · summary saved`, "", input.summary.trim(), "", `[Open the conversation](/threads/${input.threadId}) · [See in Memory](${memoryPath(input.botId)})`].join("\n"),
-    note: `Studio: the user finished the conversation ${JSON.stringify(input.title)} (${input.threadId}); its summary above is saved in your memory. Show it as a card: reply with exactly this line and nothing else:\n::finished{thread="${input.threadId}"}`,
+    note: [
+      `Studio: the user archived the conversation ${JSON.stringify(input.title)} (${input.threadId}). Its summary, saved in your memory (${memoryPath(input.botId)}):`,
+      "",
+      input.summary.trim(),
+      "",
+      `Show it as a card: reply with exactly this line and nothing else:\n::finished{thread="${input.threadId}"}`,
+    ].join("\n"),
   };
 }
 
@@ -199,10 +204,7 @@ export class BotFinish {
     try {
       await this.deps.sdk.threads.send({
         threadId, mode: "auto",
-        input: [
-          { type: "text", text: "Archive this conversation.", mentions: [] },
-          { type: "text", text: finishInstruction({ threadId, title }), mentions: [], visibility: "agent-only" },
-        ],
+        input: [{ type: "text", text: finishInstruction({ threadId, title }), mentions: [], visibility: "agent-only" }],
       } as never);
     } catch (error) {
       this.deps.db.prepare("DELETE FROM bot_finishes WHERE thread_id = ?").run(threadId);
@@ -234,11 +236,11 @@ export class BotFinish {
     })();
     const main = this.deps.mainOf(rec.botId);
     if (main) {
-      this.deps.threads.setLatest(main, `Archived “${row.title}” · summary saved`);
+      this.deps.threads.setLatest(main, `Archived “${row.title}”`);
       const card = mainCard({ threadId, botId: rec.botId, title: row.title, summary: text });
       await this.deps.sdk.threads.send({
         threadId: main, mode: "auto", senderThreadId: threadId,
-        input: [{ type: "text", text: card.text, mentions: [] }, { type: "text", text: card.note, mentions: [], visibility: "agent-only" }],
+        input: [{ type: "text", text: card.note, mentions: [], visibility: "agent-only" }],
       } as never).catch((error: unknown) => this.deps.log(`Finish: posting to Main failed: ${error instanceof Error ? error.message : String(error)}`));
     }
     await this.archiveIfIdle(threadId);
@@ -328,7 +330,7 @@ export function registerBotFinish(bb: Bb, deps: Omit<FinishDeps, "sdk">) {
 
   bb.agents.registerTool({
     name: "bot_finish_done",
-    description: "Finish this conversation with its summary (the decisions, what was left open, what was made), after you saved it with memory_add. Studio archives the conversation, posts the summary to Main as a card, and keeps it findable in Search and the Library. Use it when Studio asks you to finish, or when the user asks you to finish this conversation. Not in Main or a worker.",
+    description: "Archive this conversation with its summary (the decisions, what was left open, what was made), after you saved it with memory_add. Studio archives the conversation, posts the summary to Main as a card, and keeps it findable in Search and the Library. Use it when Studio asks you to archive it, or when the user asks you to archive or finish this conversation. Not in Main or a worker.",
     parameters: z.object({ summary: z.string().trim().min(1).max(6000).describe("The summary in short markdown: **Decisions**, **Left open**, **Made**") }),
     execute: async ({ summary }, ctx) => {
       if (!ctx.threadId) return "This isn't a conversation.";

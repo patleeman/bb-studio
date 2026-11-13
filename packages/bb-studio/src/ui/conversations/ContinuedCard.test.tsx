@@ -13,6 +13,7 @@ vi.mock("../live", () => ({
   },
 }));
 vi.mock("../../kit/app/index", () => ({ Icon: ({ name }: { name: string }) => <i data-icon={name} /> }));
+vi.mock("../../kit/ui/index", async () => (await import("../../loops/ui/test-kit")).kitUi);
 
 const { ContinuedCard, fallbackAfter } = await import("./ContinuedCard");
 

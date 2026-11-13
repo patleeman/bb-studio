@@ -110,7 +110,7 @@ export function registerTabKindTabs(app: TabSlots): void {
     const entry = tabKindEntry(tab.kind);
     const id = entry.open.via === "studio" ? entry.open.tabId : null;
     if (!id) continue;
-    app.slots.experimental_tab({ ...threadTab(id), title: newTabTitle(id) ?? entry.name, ...newTabFields(id), icon: entry.icon, layout: "flush", component: tab.component } as never);
+    app.slots.experimental_tab({ ...threadTab(id), title: newTabTitle(id) ?? entry.name, ...(entry.actions.length ? newTabFields(id) : OFF_NEW_TAB), icon: entry.icon, layout: "flush", component: tab.component } as never);
   }
   const pages = hasGlobalWorkbench ? PAGE_PANELS : [];
   for (const tab of ENTRY_TABS) {

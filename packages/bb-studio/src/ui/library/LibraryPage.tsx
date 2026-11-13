@@ -3,7 +3,7 @@
 // its workers made, newest first, one line each with its kind, where it came
 // from ("made in Launch prep", "by Fable lead") and its age. Grouped by
 // conversation (default; the group's title opens it), kind or date; a
-// search field, Kind pills (App with Interactive and Saved under it) and a Group by menu. A group shows 8 rows, then "N more"; near-identical files from one
+// search field, pills (Starred and each kind, App with Interactive and Saved under it) and a Group by menu. A group shows 8 rows, then "N more"; near-identical files from one
 // source are one row with a count. A file opens as a tab in the workbench
 // beside the page; a kind with no workbench view opens at its own address.
 // Rules in library-model.ts; data from bot_library.
@@ -17,12 +17,12 @@ import { ItemIcon } from "../item-row";
 import { shortAge } from "../conversations/model";
 import { useLive } from "../live";
 import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageRow, BotPageToolbar, useRowOpen } from "../bot-page";
-import { foldRows, kindLabel, LIBRARY_APP_TYPES, LIBRARY_GROUPS, LIBRARY_KINDS, libraryGroups, provenance, type LibraryAppType, type LibraryGroupBy, type LibraryKindFilter } from "./library-model";
+import { foldRows, LIBRARY_APP_TYPES, LIBRARY_GROUPS, LIBRARY_KINDS, libraryGroups, libraryMeta, type LibraryAppType, type LibraryGroupBy, type LibraryKindFilter } from "./library-model";
 
 const GROUP_KEY = "studio.library.group";
 
 /** The Studio kind whose icon a file shows. */
-const iconKind = (item: LibraryItem): string => item.kind === "whiteboard" ? "drawing" : item.kind === "app" ? item.type ?? "mini" : item.kind === "other" ? item.type ?? "page" : item.kind;
+const iconKind = (item: LibraryItem): string => item.kind === "whiteboard" ? "drawing" : item.kind === "app" ? item.type ?? "mini" : item.kind === "other" ? item.type ?? "page" : item.kind === "artifact" && (item.format === "markdown" || item.format === "text") ? "page" : item.kind;
 
 function readGroup(): LibraryGroupBy {
   try { const value = localStorage.getItem(GROUP_KEY); return value === "kind" || value === "date" ? value : "conversation"; } catch { return "conversation"; }
@@ -44,13 +44,14 @@ export function LibraryPage() {
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(timer); }, []);
   useEffect(() => { try { localStorage.setItem(GROUP_KEY, groupBy); } catch { /* private mode */ } }, [groupBy]);
   const items = library.data?.items ?? NO_ITEMS;
-  const groups = useMemo(() => libraryGroups(items, { query, kind, appType, groupBy }, now), [items, query, kind, appType, groupBy, now]);
+  const botName = bot?.name;
+  const groups = useMemo(() => libraryGroups(items, { query, kind, appType, groupBy, botName }, now), [items, query, kind, appType, groupBy, botName, now]);
   const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(() => new Set());
 
   return (
     <BotPageLayout testId="library" title="Library" bot={bot?.name} botId={bot?.id}
-      toolbar={<BotPageToolbar<LibraryKindFilter, LibraryAppType> search={{ value: query, onChange: setQuery, placeholder: "Search files" }}
-        filter={{ label: "Kind", value: kind, options: LIBRARY_KINDS, onChange: (next) => { setKind(next); setAppType("all"); } }}
+      toolbar={<BotPageToolbar<LibraryKindFilter, LibraryAppType> search={{ value: query, onChange: setQuery, placeholder: "Search Library" }}
+        filter={{ label: "Show", value: kind, options: LIBRARY_KINDS, onChange: (next) => { setKind(next); setAppType("all"); } }}
         subFilter={kind === "app" ? { label: "App type", value: appType, options: LIBRARY_APP_TYPES, onChange: setAppType } : null}
         menus={<MenuSelect<LibraryGroupBy> testId="library-group" label="Group by" value={groupBy} choices={LIBRARY_GROUPS} onChange={setGroupBy} className="h-8 text-sm" />} />}>
       <NoDragStyle />
@@ -65,7 +66,7 @@ export function LibraryPage() {
               <BotPageRow key={key} testId="library-row" data={{ "data-count": String(count) }} icon={<ItemIcon kind={iconKind(item)} />}
                 title={count > 1 ? <>{item.title} <span data-testid="library-count" aria-label={`${count} like it`} className="text-xs tabular-nums text-muted-foreground">×{count}</span></> : item.title}
                 titleText={count > 1 ? `${item.title} (the newest of ${count} like it)` : item.title}
-                meta={[groupBy === "kind" ? null : kindLabel(item.kind), groupBy === "conversation" && item.madeIn && item.madeIn.kind !== "worker" ? null : provenance(item), shortAge(item.updatedAt, now)].filter(Boolean).join(" · ")}
+                meta={[...libraryMeta(item, groupBy, botName), shortAge(item.updatedAt, now)].join(" · ")}
                 disabled={!item.href} {...(item.href ? rowOpen(item.href, item.title) : {})} />
             ))}
             {more ? (

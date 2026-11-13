@@ -80,10 +80,10 @@ describe("the merged table", () => {
       "auto_20qc1awj8ag", "auto_mvujgmm9tag", "auto_twnts2ex3zy", "auto_x1kt5kijizw",
       "run_5wtmlkr048", "run_l4v5bcrvlz",
     ]);
-    expect(byId.get("aut_0ctdvm7eml")).toMatchObject({ kind: "watcher", when: "Every 2 h, 08:00–23:00", bb: { id: "auto_uwkxebxyzxg", projectId: "proj_personal" }, lastRunAt: IMPORTED - HOUR, lastRun: "ok", via: "studio" });
-    expect(byId.get("aut_3k8tydwuck")).toMatchObject({ when: "Daily 07:45", lastRun: "failed", script: "./card.sh" });
+    expect(byId.get("aut_0ctdvm7eml")).toMatchObject({ kind: "watcher", when: "Every 2 h, 8:00 AM–11:00 PM", bb: { id: "auto_uwkxebxyzxg", projectId: "proj_personal" }, lastRunAt: IMPORTED - HOUR, lastRun: "ok", via: "studio" });
+    expect(byId.get("aut_3k8tydwuck")).toMatchObject({ when: "Daily 7:45 AM", lastRun: "failed", script: "./card.sh" });
     expect(byId.get("aut_dqm9klzlbe")).toMatchObject({ kind: "checkin", bb: { id: "auto_8dc_eupcyd4" }, lastRunAt: IMPORTED - 3 * HOUR, threadId: "thr_demo000022" });
-    expect(byId.get("run_l4v5bcrvlz")).toMatchObject({ kind: "runner", when: "Daily 04:30", bb: { id: "auto_bh3d0ntpyla" }, lastRunAt: IMPORTED - 6 * HOUR, threadId: "thr_demo000009" });
+    expect(byId.get("run_l4v5bcrvlz")).toMatchObject({ kind: "runner", when: "Daily 4:30 AM", bb: { id: "auto_bh3d0ntpyla" }, lastRunAt: IMPORTED - 6 * HOUR, threadId: "thr_demo000009" });
     expect(byId.get("run_5wtmlkr048")).toMatchObject({ when: "Every 2 h at :15", bb: null, lastRunAt: null });
   });
 
@@ -98,7 +98,7 @@ describe("the merged table", () => {
 
   it("shows paused, disabled and finished ones, active first then by name", () => {
     const table = automationTable(input(studioDb()));
-    expect(table.rows[0]).toMatchObject({ name: "Evening wrap-up", status: "active", when: "Weekdays 18:00" });
+    expect(table.rows[0]).toMatchObject({ name: "Evening wrap-up", status: "active", when: "Weekdays 6:00 PM" });
     const rest = table.rows.slice(1);
     expect(rest.map((row) => row.name)).toEqual([...rest.map((row) => row.name)].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })));
     expect(table.rows.find((row) => row.id === "aut_remind")?.status).toBe("off");
@@ -191,35 +191,36 @@ describe("reading the sources", () => {
 
 describe("when, in a few words", () => {
   it.each([
-    [{ type: "times", days: [0, 1, 2, 3, 4, 5, 6], times: ["07:45"] }, "Daily 07:45"],
-    [{ type: "times", days: [1, 2, 3, 4, 5], times: ["09:00", "08:30"] }, "Weekdays 08:30, 09:00"],
-    [{ type: "times", days: [0], times: ["09:00"] }, "Sun 09:00"],
-    [{ type: "interval", every: 2, unit: "hours", days: [0, 1, 2, 3, 4, 5, 6], from: "08:00", to: "23:00" }, "Every 2 h, 08:00–23:00"],
-    [{ type: "interval", every: 1, unit: "hours", days: [0, 1, 2, 3, 4, 5, 6], quiet: { from: "03:00", to: "05:00" } }, "Hourly · quiet 03:00–05:00"],
+    [{ type: "times", days: [0, 1, 2, 3, 4, 5, 6], times: ["07:45"] }, "Daily 7:45 AM"],
+    [{ type: "times", days: [1, 2, 3, 4, 5], times: ["09:00", "08:30"] }, "Weekdays 8:30 AM, 9:00 AM"],
+    [{ type: "times", days: [0], times: ["09:00"] }, "Sun 9:00 AM"],
+    [{ type: "interval", every: 2, unit: "hours", days: [0, 1, 2, 3, 4, 5, 6], from: "08:00", to: "23:00" }, "Every 2 h, 8:00 AM–11:00 PM"],
+    [{ type: "interval", every: 1, unit: "hours", days: [0, 1, 2, 3, 4, 5, 6], quiet: { from: "03:00", to: "05:00" } }, "Hourly · quiet 3:00 AM–5:00 AM"],
     [{ type: "interval", every: 20, unit: "minutes", days: [0, 6] }, "Every 20 min · Weekends"],
-    [{ type: "cron", cron: "15 10 * * 0" }, "Sun 10:15"],
+    [{ type: "cron", cron: "15 10 * * 0" }, "Sun 10:15 AM"],
   ] as const)("%j is %s", (schedule, text) => {
     expect(whenText(schedule as never)).toBe(text);
   });
 
   it("dates a one-shot, with the year only when it isn't this year's", () => {
     const now = new Date(2026, 10, 11, 12).getTime();
-    expect(whenText({ type: "once", at: new Date(2026, 10, 14, 9, 30).getTime() }, now)).toBe("Once, Nov 14 09:30");
-    expect(whenText({ type: "once", at: new Date(2030, 0, 1, 4, 0).getTime() }, now)).toBe("Once, Jan 1 2030 04:00");
+    expect(whenText({ type: "once", at: new Date(2026, 10, 14, 9, 30).getTime() }, now)).toBe("Once, Nov 14, 9:30 AM");
+    expect(whenText({ type: "once", at: new Date(2030, 0, 1, 4, 0).getTime() }, now)).toBe("Once, Jan 1 2030, 4:00 AM");
   });
 
   it.each([
-    ["30 4 * * *", "Daily 04:30"],
-    ["0 9 * * 1-5", "Weekdays 09:00"],
-    ["15 7,12,17,22 * * *", "Daily 07:15, 12:15, 17:15, 22:15"],
-    ["0 8,10,12,14,16,18,20,22 * * *", "Every 2 h, 08:00–22:00"],
+    ["30 4 * * *", "Daily 4:30 AM"],
+    ["0 4 * * *", "Daily 4:00 AM"],
+    ["0 9 * * 1-5", "Weekdays 9:00 AM"],
+    ["15 7,12,17,22 * * *", "Daily 7:15 AM, 12:15 PM, 5:15 PM, 10:15 PM"],
+    ["0 8,10,12,14,16,18,20,22 * * *", "Every 2 h, 8:00 AM–10:00 PM"],
     ["0 0-2,5-23 * * *", "22× daily"],
     ["*/20 * * * *", "Every 20 min"],
-    ["*/30 9-17 * * 1-5", "Every 30 min, 09:00–17:30 · Weekdays"],
+    ["*/30 9-17 * * 1-5", "Every 30 min, 9:00 AM–5:30 PM · Weekdays"],
     ["0 * * * *", "Hourly"],
     ["15 */2 * * *", "Every 2 h at :15"],
     ["0 */6 * * *", "Every 6 h"],
-    ["30 9,13,18 * * 1", "Mon 09:30, 13:30, 18:30"],
+    ["30 9,13,18 * * 1", "Mon 9:30 AM, 1:30 PM, 6:30 PM"],
     ["0 9 1 * *", "Custom: 0 9 1 * *"],
   ])("cron %s is %s", (cron, text) => {
     expect(cronText(cron)).toBe(text);

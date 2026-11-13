@@ -66,7 +66,7 @@ it("with no Bot, the template's header still names the page", async () => {
   state.bots = [];
   await act(async () => root.render(<AutomationsPanel />));
   expect(container.querySelectorAll("h1")).toHaveLength(1);
-  expect(container.querySelector("[data-testid=studio-bar] [data-testid=page-bar-title]")?.textContent).toBe("Automations");
+  expect(container.querySelector("[data-testid=studio-bar] [data-testid=page-bar-title]")?.textContent).toBe("Todos");
 });
 
 it("hands the shown Bot's name to the page, whose header names it", async () => {

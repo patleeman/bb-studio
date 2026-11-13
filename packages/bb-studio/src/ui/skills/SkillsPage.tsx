@@ -122,7 +122,7 @@ export default function SkillsPage({ botId: routeBot }: { botId: string | null }
         <BotPageGroup title={filter === "archived" ? "Archived" : "Skills"} count={shown.length}>
           {shown.map((skill) => (
             <Fragment key={skill.name}>
-              <BotPageRow testId="skill-row" data={{ "data-skill": skill.name }} icon="BookOpen" title={skill.name} titleText={`${skill.name}: ${skill.description}`}
+              <BotPageRow testId="skill-row" data={{ "data-skill": skill.name }} icon="Toolbox" title={skill.name} titleText={`${skill.name}: ${skill.description}`}
                 muted={skill.state === "archived"} selected={selected === skill.name}
                 status={skill.pinned ? { label: "Pinned" } : skill.state === "stale" ? { label: "Stale", tone: "warning" } : null}
                 meta={skill.usedAt ? `used ${relativeTime(skill.usedAt, now)}` : relativeTime(skill.updatedAt, now)}

@@ -55,7 +55,7 @@ export default ({ pluginRpc, bbCli, sleep }) => {
       if (STAGE === "after") {
         // Values the sections show: a changed setting from the CLI, so the page isn't all defaults.
         await bbCli(["studio", "settings", "set", "loopsEnabled", "true"]);
-        for (const text of ["Voice", "Hold-to-talk key", "Hands-free model", "Monthly limit (USD)", "Recordings and calls", "Transcribe calls", "Agent replies", "Next row", "Quote the selected text", "Threads", "Smart Queue", "Attention Router", "Jev", "If Jev doesn’t answer, use", "Advanced", "Smart Queue batch confidence", "Phone notifications", "Push status", "Send a test push", "xAI API key", "TypeSafe API key"]) await client.waitForText(text, 30000);
+        for (const text of ["Voice", "Hold-to-talk key", "Hands-free model", "Monthly limit (USD)", "Recordings and calls", "Transcribe calls", "Agent replies", "Next row", "Quote the selected text", "Threads", "Smart Queue", "Attention Router", "Smart Queue model", "If Jev doesn’t answer, use", "Advanced", "Smart Queue batch confidence", "Phone notifications", "Push status", "Send a test push", "xAI API key", "TypeSafe API key"]) await client.waitForText(text, 30000);
         await absent(client, ["Explore: ", "Hands-free voice: ", "Segment length", "Jev timeout", "Bot avatars: OpenAI API key", "Attention time zone", "Daily attention budget", "Saved reactions", "Talk models", "Jev connection"]);
       } else {
         await client.waitForText("Hands-free voice", 30000);

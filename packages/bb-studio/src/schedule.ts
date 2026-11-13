@@ -198,7 +198,7 @@ function clock12(minute: number): { time: string; half: "AM" | "PM" } {
   const h = Math.floor(minute / 60), m = minute % 60;
   return { time: `${h % 12 || 12}:${String(m).padStart(2, "0")}`, half: h < 12 ? "AM" : "PM" };
 }
-const at12 = (minute: number) => { const { time, half } = clock12(minute); return `${time} ${half}`; };
+export const at12 = (minute: number) => { const { time, half } = clock12(minute); return `${time} ${half}`; };
 
 /** "7, 12, 5, 10 PM" style: whole hours lose ":00", and AM/PM follows the last time of each run of AM or PM times. */
 function shortTimes(minutes: number[]): string {

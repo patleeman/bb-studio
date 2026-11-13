@@ -98,7 +98,7 @@ it("puts each row's actions in its ⋯ menu", async () => {
   await render();
   const actions = (title: string) => [...row(title).querySelectorAll("[role=menuitem]")].map((each) => each.textContent);
   expect(row("Reply to Sam").querySelector("[aria-label='Actions: Reply to Sam about the Q3 planning doc']")).not.toBeNull();
-  expect(actions("Reply to Sam")).toEqual(["Discuss", "Done", "Later today", "Tonight", "Tomorrow", "This weekend", "When I’m home", "Pick a time…", "Chief of Staff", "Larkspur lead", "Change trigger…", "Drop"].map((label) => expect.stringContaining(label)));
+  expect(actions("Reply to Sam")).toEqual(["Discuss", "Done", "Later today", "Tonight", "Tomorrow", "This weekend", "When I’m home", "Pick a time…", "Chief of Staff", "Larkspur lead", "Change when…", "Dismiss"].map((label) => expect.stringContaining(label)));
   await click(row("Reply to Sam"), "Done");
   expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_n", action: "done" });
   await click(row("Reply to Sam"), "Larkspur lead");
@@ -107,10 +107,10 @@ it("puts each row's actions in its ⋯ menu", async () => {
   expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_n", action: "snooze", snooze: "tomorrow_morning" });
   await click(row("Choose the deck"), "Hudson — $21k");
   expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_d", action: "choose", option: "Hudson — $21k" });
-  await click(row("Call the plumber"), "Surface now");
+  await click(row("Call the plumber"), "Remind me now");
   expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_c", surfaceNow: true });
-  // Not Patrick's: no Surface now.
-  expect(actions("Book the car service")).toEqual(["Discuss", "Change trigger…"]);
+  // Not Patrick's: no Remind me now.
+  expect(actions("Book the car service")).toEqual(["Discuss", "Change when…"]);
   await click(row("Draft the Larkspur"), "Take it back");
   expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_a", changes: { owner: "patrick", status: "surfaced" } });
   await click(row("Draft the Larkspur"), "Open thread");
@@ -124,8 +124,8 @@ it("puts each row's actions in its ⋯ menu", async () => {
 
 it("changes a trigger in place under its row, with Send to iPhone", async () => {
   await render();
-  await click(row("Reply to Sam"), "Change trigger…");
-  const form = row("Reply to Sam").querySelector("form[aria-label='Change trigger']")!;
+  await click(row("Reply to Sam"), "Change when…");
+  const form = row("Reply to Sam").querySelector("form[aria-label='Change when']")!;
   await click(form, "Place");
   await click(form, "Leave");
   await act(async () => (form.querySelector("input[type=checkbox]") as HTMLInputElement).click());

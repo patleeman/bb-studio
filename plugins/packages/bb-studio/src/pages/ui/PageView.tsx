@@ -232,7 +232,7 @@ function ActivityPill({
                 <span className="min-w-0 flex-1">
                   <span className="line-clamp-2">
                     {request.botName} {STATUS_VERB[request.status]}{" "}
-                    {request.kind === "refresh" ? "a refresh" : request.kind === "comment" ? "a comment" : "a request"}
+                    {request.kind === "refresh" ? "a refresh" : "a request"}
                     {request.summary && request.kind !== "refresh" ? `: “${request.summary}”` : ""}
                   </span>
                   {request.error ? <span className="line-clamp-2 text-xs text-red-500">{request.error}</span> : null}

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { LibraryItem } from "../../bot-threads-contract";
-import { dateGroup, foldRows, GROUP_FOLD, LIBRARY_APP_TYPES, LIBRARY_KINDS, libraryGroups, libraryPasses, libraryRows, provenance, titleStem } from "./library-model";
+import { dateGroup, foldRows, GROUP_FOLD, LIBRARY_APP_TYPES, LIBRARY_KINDS, itemLabel, libraryGroups, libraryMeta, libraryPasses, libraryRows, provenance, titleStem } from "./library-model";
 
 const DAY = 24 * 60 * 60_000;
 const NOW = new Date(2026, 10, 11, 15, 0).getTime();
@@ -48,14 +48,55 @@ it("lists saved apps (artifacts) under App, with Interactive and Saved narrowing
   expect(ids("interactive")).toEqual(["timer"]);
   expect(ids("saved")).toEqual(["report"]);
   expect(libraryGroups(withSaved, { query: "", kind: "all", groupBy: "kind" }, NOW).map((group) => [group.title, group.items.length])).toEqual([["Pages", 3], ["Designs", 1], ["Apps", 2]]);
-  expect(LIBRARY_KINDS.map((each) => each.label)).toEqual(["All", "Page", "Whiteboard", "Design", "App"]);
+  expect(LIBRARY_KINDS.map((each) => each.label)).toEqual(["All", "Starred", "Page", "Whiteboard", "Design", "App", "Recording"]);
   expect(LIBRARY_APP_TYPES.map((each) => each.label)).toEqual(["All apps", "Interactive", "Saved"]);
+});
+
+it("lists recordings under Recording, and as a Recordings group after Apps", () => {
+  const withRecording = [...files, item({ id: "rec_call", pluginId: "talk", title: "Supplier call", kind: "recording", type: "recording", updatedAt: NOW - 3 * 60_000 })];
+  expect(libraryGroups(withRecording, { query: "", kind: "recording", groupBy: "date" }, NOW).flatMap((group) => group.items.map((each) => each.id))).toEqual(["rec_call"]);
+  expect(libraryGroups(withRecording, { query: "", kind: "all", groupBy: "kind" }, NOW).map((group) => group.title)).toEqual(["Pages", "Designs", "Apps", "Recordings"]);
+});
+
+it("shows only starred files under Starred, whatever their kind", () => {
+  const withStars = [...files, item({ id: "fav", title: "Pinned timer", kind: "app", type: "mini", starred: true, updatedAt: NOW - 5 * 60_000 }), item({ id: "fav2", title: "Pinned page", starred: true, updatedAt: NOW - 10 * 60_000 })];
+  expect(libraryGroups(withStars, { query: "", kind: "starred", groupBy: "date" }, NOW).flatMap((group) => group.items.map((each) => each.id))).toEqual(["fav", "fav2"]);
+  expect(libraryPasses(withStars[5]!, "timer", "starred")).toBe(true);
+  expect(libraryPasses(withStars[5]!, "page", "starred")).toBe(false);
+  expect(libraryPasses(files[0]!, "", "starred")).toBe(false);
+});
+
+it("files what the Bot made outside its conversations under the Bot, not under Made by you", () => {
+  const withProfile = [...files, item({ id: "profile", title: "Dot's core profile", byBot: true, updatedAt: NOW - 50 * DAY })];
+  expect(libraryGroups(withProfile, { query: "", kind: "all", groupBy: "conversation", botName: "Dot" }, NOW).map((group) => [group.title, group.items.map((each) => each.id)])).toEqual([
+    ["Fork redesign", ["kind"]], ["Launch prep", ["timer", "outline", "chess"]], ["Made by you", ["house"]], ["Dot", ["profile"]],
+  ]);
+  expect(provenance(withProfile[5]!, "Dot")).toBe("made by Dot");
+  expect(libraryPasses(withProfile[5]!, "made by dot", "all", "all", "Dot")).toBe(true);
 });
 
 it("says where a file came from", () => {
   expect(provenance(files[0]!)).toBe("made in Launch prep");
   expect(provenance(files[2]!)).toBe("by Fable: Breakdown pages");
   expect(provenance(files[4]!)).toBe("made by you");
+});
+
+it("names a saved file by what it is: a Markdown file is a Document, an HTML file an App", () => {
+  const saved = (id: string, format: string | null) => item({ id, kind: "artifact", type: "artifact", format });
+  expect(["markdown", "text", "html", "image", "pdf", null].map((format) => itemLabel(saved(format ?? "none", format)))).toEqual(["Document", "Document", "App", "Image", "PDF", "App"]);
+  expect(itemLabel(item({ id: "timer", kind: "app", type: "mini" }))).toBe("App");
+  expect(libraryMeta(saved("notes", "markdown"), "conversation")).toEqual(["Document", "made by you"]);
+  expect(libraryGroups([saved("notes", "markdown")], { query: "", kind: "all", groupBy: "kind" }, NOW).map((group) => group.title)).toEqual(["Apps"]);
+});
+
+it("never says a file is by a worker named after the file", () => {
+  const email = item({ id: "email", title: "Millers Flour discount email", kind: "artifact", type: "artifact", madeIn: byWorker("w_email", "Millers Flour discount email", "main", "Main") });
+  expect(provenance(email)).toBe("made in Main");
+  expect(libraryMeta(email, "conversation")).toEqual(["App"]);
+  expect(libraryMeta(email, "date")).toEqual(["App", "made in Main"]);
+  expect(libraryMeta(files[2]!, "conversation")).toEqual(["Page", "by Fable: Breakdown pages"]);
+  expect(libraryMeta(files[0]!, "conversation")).toEqual(["Page"]);
+  expect(libraryMeta(files[0]!, "kind")).toEqual(["made in Launch prep"]);
 });
 
 it("folds near-identical files from one source into one row with a count, the newest showing; never across sources or kinds", () => {

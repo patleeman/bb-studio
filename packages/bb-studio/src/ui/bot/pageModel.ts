@@ -234,7 +234,7 @@ export function recentEntries({ events, sources, frequent, reports, finished, ma
     }
   }
   for (const [day, tally] of quietFrequent) entries.push({ key: `frequent:${day}`, at: tally.at, muted: true, parts: [{ text: `Frequent checks ran ${plural(tally.count, "time", "times")} ${startOfDay(now, zone) === day ? "today" : "that day"} with nothing to report.` }] });
-  for (const thread of finished) entries.push({ key: `thread:${thread.id}`, at: thread.at, parts: [{ text: "Finished " }, { text: thread.title, tone: "strong" }, { text: "." }] });
+  for (const thread of finished) entries.push({ key: `thread:${thread.id}`, at: thread.at, parts: [{ text: "Archived " }, { text: thread.title, tone: "strong" }, { text: "." }] });
   for (const run of maintenance) if (!run.dryRun && !entries.some((entry) => entry.key === `maintenance:${run.at}`)) entries.push({ key: `maintenance:${run.at}`, at: run.at, parts: [{ text: `Daily cleanup: ${sentence(run.summary)}` }] });
   // Newest day first; in a day, newest first and the frequent tally last.
   const day = (entry: RecentEntry) => startOfDay(entry.at, zone);

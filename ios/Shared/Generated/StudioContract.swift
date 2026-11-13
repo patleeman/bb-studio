@@ -20070,6 +20070,7 @@ public enum Studio {
     case design
     case app
     case artifact
+    case recording
     case other
     case unknown(String)
 
@@ -20081,6 +20082,7 @@ public enum Studio {
       case "design": self = .design
       case "app": self = .app
       case "artifact": self = .artifact
+      case "recording": self = .recording
       case "other": self = .other
       default: self = .unknown(value)
       }
@@ -20094,6 +20096,7 @@ public enum Studio {
       case .design: try container.encode("design")
       case .app: try container.encode("app")
       case .artifact: try container.encode("artifact")
+      case .recording: try container.encode("recording")
       case .other: try container.encode("other")
       case .unknown(let value): try container.encode(value)
       }
@@ -20146,21 +20149,27 @@ public enum Studio {
     public var title: String?
     public var kind: BotLibraryOutputItemsItemKind?
     public var type: String?
+    public var format: String?
     public var href: String?
     public var updatedAt: Double?
     public var createdAt: Double?
     public var madeIn: BotLibraryOutputItemsItemMadeIn?
+    public var starred: Bool?
+    public var byBot: Bool?
 
-    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, kind: BotLibraryOutputItemsItemKind? = nil, type: String? = nil, href: String? = nil, updatedAt: Double? = nil, createdAt: Double? = nil, madeIn: BotLibraryOutputItemsItemMadeIn? = nil) {
+    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, kind: BotLibraryOutputItemsItemKind? = nil, type: String? = nil, format: String? = nil, href: String? = nil, updatedAt: Double? = nil, createdAt: Double? = nil, madeIn: BotLibraryOutputItemsItemMadeIn? = nil, starred: Bool? = nil, byBot: Bool? = nil) {
       self.pluginId = pluginId
       self.id = id
       self.title = title
       self.kind = kind
       self.type = type
+      self.format = format
       self.href = href
       self.updatedAt = updatedAt
       self.createdAt = createdAt
       self.madeIn = madeIn
+      self.starred = starred
+      self.byBot = byBot
     }
   }
 

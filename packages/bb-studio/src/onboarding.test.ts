@@ -263,6 +263,9 @@ describe("the first-chat prompt", () => {
     for (const tool of ["presence_list", "theme_list", "presence_apply", "theme_apply", "bot_set"]) expect(prompt).toContain(tool);
     expect(prompt).toMatch(/two to four exchanges/);
     expect(prompt).toMatch(/skip/);
+    expect(prompt).toContain("by your name (Assistant), never \"your Bot\"");
+    expect(prompt).toContain("start other conversations for bigger jobs");
+    expect(prompt).not.toContain("start threads");
   });
 });
 

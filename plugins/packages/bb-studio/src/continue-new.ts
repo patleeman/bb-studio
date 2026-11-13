@@ -33,6 +33,12 @@ export function handoffText(input: {
   return parts.join("\n\n");
 }
 
+export function continuedFromLine(source: { isMain?: boolean; title?: string | null }): string {
+  if (source.isMain) return "Continued from Main";
+  const title = source.title?.replace(/\s+/g, " ").trim();
+  return title ? `Continued from “${title}”` : "Continued from another conversation";
+}
+
 type TimelineRow = { kind?: string; role?: string; messageSeq?: number; initiator?: string };
 
 export function sourceSeqOf(rows: readonly TimelineRow[]): number | null {
@@ -44,8 +50,8 @@ export function sourceSeqOf(rows: readonly TimelineRow[]): number | null {
 }
 
 export interface ContinueDeps {
-  conversation(threadId: string): { botId: string; kind: "conversation" | "worker" } | null;
-  thread(threadId: string): Promise<{ projectId?: string | null; environmentId?: string | null } | null>;
+  conversation(threadId: string): { botId: string; kind: "conversation" | "worker"; isMain?: boolean; title?: string | null } | null;
+  thread(threadId: string): Promise<{ projectId?: string | null; environmentId?: string | null; providerId?: string | null; model?: string | null } | null>;
   timeline(threadId: string): Promise<readonly TimelineRow[]>;
   defaultModel(botId: string): { providerId: string; model: string; reasoning?: string | null } | null;
   spawn(request: Record<string, unknown>): Promise<{ id: string; projectId?: string | null }>;
@@ -80,13 +86,16 @@ export async function continueInNew(deps: ContinueDeps, sourceThreadId: string, 
   const model = preset ? {
     providerId: preset.providerId, model: preset.model, ...(preset.reasoning ? { reasoningLevel: preset.reasoning } : {}),
     executionInputSources: { providerId: "explicit", model: "explicit", ...(preset.reasoning ? { reasoningLevel: "explicit" } : {}) },
+  } : thread.providerId ? {
+    providerId: thread.providerId, ...(thread.model ? { model: thread.model } : {}),
+    executionInputSources: { providerId: "explicit", ...(thread.model ? { model: "explicit" } : {}) },
   } : {};
   const text = handoffText({ sourceThreadId, sourceSeq, handoff: input.handoff, moved: movable, openingMessage: input.openingMessage });
   deps.focus(source.botId);
   const made = await deps.spawn({
     projectId: thread.projectId, title: input.title, visibility: "visible",
     environment: thread.environmentId ? { type: "reuse", environmentId: thread.environmentId } : { type: "project-default" },
-    input: [{ type: "text", text, mentions: [] }],
+    input: [{ type: "text", text: continuedFromLine(source), mentions: [] }, { type: "text", text, mentions: [], visibility: "agent-only" }],
     pluginMetadata: { botConversation: source.botId, continuedFrom: { threadId: sourceThreadId, messageSeq: sourceSeq } },
     ...model,
   });

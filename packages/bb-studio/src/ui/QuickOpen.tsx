@@ -10,6 +10,7 @@ import { QUICK_OPEN_EVENT } from "../ids";
 import { useSearchEscape } from "../kit/ui/search-escape";
 import { SearchFreshness, useSearchFreshness } from "./SearchFreshness";
 import { highlightParts } from "../kit/search-match";
+import { ITEM_FAMILIES, typeOfKind } from "../item-model";
 
 type Result = { ref: { pluginId: string; id: string }; kind: string; title: string; snippet: { text: string; ranges: { start: number; end: number }[] }; href: string; projectId: string | null; updatedAt: number; score: number };
 type Row = { type: "result"; hit: Result } | { type: "command"; label: string; run: () => void };
@@ -21,6 +22,13 @@ const DEBOUNCE_MS = 150;
  */
 function makes(each: { id: string; replaces?: string; capabilities?: { create: boolean } }, kind: string): boolean {
   return (each.id === kind || each.replaces === kind) && Boolean(each.capabilities?.create);
+}
+
+const APPS = ITEM_FAMILIES.find((family) => family.id === "app")!.plural;
+
+export function resultGroup(pluginId: string, kind: string, plural: string | undefined): { key: string; label: string } {
+  if (typeOfKind(pluginId, kind)?.family === "app") return { key: "app", label: APPS };
+  return { key: kind, label: plural ?? (kind === "thread" ? "Threads" : kind) };
 }
 
 export function QuickOpen() {
@@ -122,7 +130,8 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
     ] satisfies Row[];
   }, [providers, rpc, navigate, context.projectId, onClose, results, open]);
   const visibleCommands = commands.filter((row) => row.type === "command" && (!query || row.label.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
-  const rows: Row[] = [...[...results].sort((a, b) => a.kind.localeCompare(b.kind) || b.score - a.score).map((hit): Row => ({ type: "result", hit })), ...visibleCommands];
+  const groupOf = (hit: Result) => resultGroup(hit.ref.pluginId, hit.kind, kinds.get(`${hit.ref.pluginId}:${hit.kind}`)?.plural);
+  const rows: Row[] = [...[...results].sort((a, b) => groupOf(a).key.localeCompare(groupOf(b).key) || b.score - a.score).map((hit): Row => ({ type: "result", hit })), ...visibleCommands];
   useEffect(() => setSelected(0), [query]);
   useEffect(() => setSelected((index) => Math.min(index, Math.max(0, rows.length - 1))), [rows.length]);
   useEffect(() => { list.current?.querySelector(`[data-index="${selected}"]`)?.scrollIntoView({ block: "nearest" }); }, [selected]);
@@ -160,10 +169,11 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
       <div ref={list} id="studio-quick-open-list" role="listbox" aria-label="Search results" className="min-h-0 flex-1 overflow-y-auto p-1.5">
         {rows.map((row, index) => {
           const kind = row.type === "result" ? row.hit.kind : "command";
-          const group = kind !== lastKind; lastKind = kind;
+          const heading = row.type === "result" ? groupOf(row.hit) : { key: "command", label: "Commands" };
+          const group = heading.key !== lastKind; lastKind = heading.key;
           const info = row.type === "result" ? kinds.get(`${row.hit.ref.pluginId}:${kind}`) : null;
           return <div key={row.type === "result" ? `${row.hit.ref.pluginId}:${row.hit.ref.id}` : row.label}>
-            {group ? <p className="px-2.5 pt-2 pb-1 text-xs font-medium text-muted-foreground">{!query && row.type === "result" ? "Recently changed" : kind === "command" ? "Commands" : info?.plural ?? (kind === "thread" ? "Threads" : kind)}</p> : null}
+            {group ? <p className="px-2.5 pt-2 pb-1 text-xs font-medium text-muted-foreground">{!query && row.type === "result" ? "Recently changed" : heading.label}</p> : null}
             <div id={`studio-quick-open-${index}`} data-index={index} role="option" aria-selected={index === selected} className={cn("studio-quick-open-row flex cursor-pointer items-center gap-3 rounded-md px-2.5 py-2", index === selected && "bg-state-hover")} onMouseMove={() => setSelected(index)} onClick={(event) => activate(row, alternateFor(event))}>
               {row.type === "result" ? <><ItemTile icon={null} kindIcon={info?.icon ?? (kind === "thread" ? "MessageSquare" : "File")} size="md" /><div className="min-w-0 flex-1"><div className="flex items-baseline gap-2"><span className="truncate text-sm font-medium">{untitled(row.hit.title)}</span><span className="shrink-0 text-xs text-muted-foreground">{info?.label ?? kind}{row.hit.projectId ? ` · ${projectName(projects, row.hit.projectId)}` : ""}</span></div>{row.hit.snippet.text ? <p className="studio-quick-open-snippet truncate text-xs text-muted-foreground"><Marked text={row.hit.snippet.text} query={query} /></p> : null}</div></> : <><Icon name="CornerDownRight" className="size-4 text-muted-foreground" /><span className="text-sm">{row.label}</span></>}
             </div>

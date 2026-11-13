@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { safeMessage } from "../auth/scrub";
 import type { ProviderState } from "../auth/contract";
+import { providerDisplayName } from "../auth/detect";
 import type { AccountSource, AccountState, AccountView, PinnedThread, QuotaWindow } from "./contract";
 
 const familySchema = z.object({
@@ -169,7 +170,7 @@ export function localAccountViews(states: readonly ProviderState[], signedOut: R
       id: state.providerId,
       source: "local" as const,
       provider: family(state.providerId),
-      name: state.displayName,
+      name: providerDisplayName(state),
       label: proxied ? "Account Pooler" : [state.accountEmail, state.planLabel].filter(Boolean).join(" · ") || null,
       state: out || state.status !== "ready" ? "signed_out" as const : "ready" as const,
       message: null,

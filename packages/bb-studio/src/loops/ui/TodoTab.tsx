@@ -39,17 +39,20 @@ export function TodoDetail({ loop, people, places, owner, refresh }: { loop: Loo
   const thread = ownerThread(loop.owner, people.botThreadId, owner);
   const sourceThread = loop.source?.kind === "thread" ? loop.source.ref : null;
   const by = loop.closedBy === "patrick" ? "You" : loop.closedBy === "cos" ? people.botName : loop.closedBy;
+  const due = loop.due !== null ? fullWhen(loop.due) : null;
+  const whenIsDue = !!trigger && trigger.text === due;
+  const withPush = (text: string) => <span className="inline-flex items-center gap-1.5">{text}{loop.push ? <Icon name="Smartphone" aria-label="Sends to iPhone" className="size-3.5 text-muted-foreground" /> : null}</span>;
   const facts: BotPageFact[] = [
-    ...(loop.due !== null ? [{ label: "Due", value: fullWhen(loop.due) }] : []),
-    ...(trigger ? [{ label: "When", value: <span className="inline-flex items-center gap-1.5">{trigger.text}{loop.push ? <Icon name="Smartphone" aria-label="Sends to iPhone" className="size-3.5 text-muted-foreground" /> : null}</span> }] : []),
+    ...(due !== null ? [{ label: "Due", value: whenIsDue ? withPush(due) : due }] : []),
+    ...(trigger && !whenIsDue ? [{ label: "When", value: withPush(trigger.text) }] : []),
     ...(loop.area ? [{ label: "Area", value: loop.area }] : []),
     { label: "Owner", value: ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owner) },
     ...(source ? [{ label: "Source", value: url ? <a href={url} target="_blank" rel="noreferrer" className="text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground">{source}</a>
       : sourceThread ? <button type="button" className="underline decoration-border underline-offset-2 hover:decoration-foreground" onClick={() => navigate.toThread(sourceThread)}>{source}</button> : source }] : []),
-    ...(closed && loop.closedAt ? [{ label: loop.status === "dropped" ? "Dropped" : "Done", value: `${by ? `${by} · ` : ""}${fullWhen(loop.closedAt)}` }] : []),
+    ...(closed && loop.closedAt ? [{ label: loop.status === "dropped" ? "Dismissed" : "Done", value: `${by ? `${by} · ` : ""}${fullWhen(loop.closedAt)}` }] : []),
   ];
   const snooze = <SnoozeMenu disabled={busy} onSnooze={(preset) => void act({ id: loop.id, action: "snooze", snooze: preset })} onPick={(at) => void update({ id: loop.id, changes: { status: "snoozed", trigger: { type: "time", at } } })} />;
-  const drop = <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void act({ id: loop.id, action: "drop" })}><Icon name="X" />Drop</button>;
+  const drop = <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void act({ id: loop.id, action: "drop" })}><Icon name="X" />Dismiss</button>;
   const discussButton = <button type="button" className={CARD_GHOST} disabled={busy} aria-label={`Discuss: ${loop.title}`} title={`Discuss with ${people.botName}`} onClick={() => void discuss(loop)}><Icon name="MessageCirclePlus" />Discuss</button>;
   const retrigger = <ChangeTrigger loop={loop} places={places} disabled={busy} onSave={(changes) => void update({ id: loop.id, changes: mine && loop.status === "surfaced" ? { ...changes, status: "queued" } : changes })} />;
   const actions = closed ? (
@@ -67,7 +70,7 @@ export function TodoDetail({ loop, people, places, owner, refresh }: { loop: Loo
       : loop.options.map((option) => <OptionButton key={option} option={option} disabled={busy} onChoose={() => void act({ id: loop.id, action: "choose", option })} />))
       : loop.kind === "read" ? <button type="button" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: loop.id, action: "got_it" })}><Icon name="CircleCheck" />Got it</button>
         : <button type="button" className={CARD_PRIMARY} disabled={busy} onClick={() => void act({ id: loop.id, action: "done" })}><Icon name="CircleCheck" />Done</button>}
-    {loop.status === "surfaced" ? null : <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, surfaceNow: true })}><Icon name="ArrowUp" />Surface now</button>}
+    {loop.status === "surfaced" ? null : <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, surfaceNow: true })}><Icon name="ArrowUp" />Remind me now</button>}
     {snooze}
     {loop.kind === "do" ? <HandOffMenu targets={people.targets} disabled={busy} onHandOff={(owner) => void act({ id: loop.id, action: "hand_off", owner })} /> : null}
     {discussButton}{retrigger}{drop}

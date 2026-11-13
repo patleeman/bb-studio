@@ -113,7 +113,7 @@ const STOPPED_NOTE = "Studio notice: something you own stopped after failing. Yo
 import { AutoResume, type ResumeTarget } from "./src/auto-resume";
 import { ThreadResume, type ThreadOwner } from "./src/thread-resume";
 import { BotOwnedThreads } from "./src/bot-owned";
-import { registerBotThreads } from "./src/bot-threads-server";
+import { recordingFiles, registerBotThreads } from "./src/bot-threads-server";
 import { BotSignal, type BotChange } from "./src/bot-signal";
 import { BOT_THREADS_CHANNEL } from "./src/bot-threads-contract";
 import { readMirroredSince, readMirrorLive } from "./src/mirror-live";
@@ -446,7 +446,7 @@ export default async function plugin(bb: BbPluginApi) {
   const tags = new TagStore(db);
   const stars = new StarStore(db);
   const tabs = new TabStore(db);
-  const threadTitles = new ThreadTitles(async (threadId) => ((await bb.sdk.threads.get({ threadId })) as { title?: string | null }).title ?? "");
+  const threadTitles = new ThreadTitles(async (threadId) => { const thread = (await bb.sdk.threads.get({ threadId })) as { title?: string | null; titleFallback?: string | null }; return thread.title?.trim() || thread.titleFallback?.trim() || ""; });
   /** Adds each item's tag ids, when it was starred, and the thread that made it. */
   const listed = async <T extends { pluginId: string; id: string }>(items: readonly T[]) => {
     const assigned = tags.assignments();
@@ -1011,9 +1011,12 @@ export default async function plugin(bb: BbPluginApi) {
       internal: learning.reviewThreads(),
       managedBot: (threadId) => ownedThreads.ownerOf(threadId),
     }),
-    items: () => itemIndex.list({ limit: 2000 }),
+    items: () => [...itemIndex.list({ limit: 2000 }), ...(builtinOn(kindSettings.current, "talk") ? recordingFiles(recordings.store.list({ limit: 500 })) : [])],
     originThreads: () => services.originThreads(),
     creatorThreads: () => services.creatorThreads(),
+    starred: () => new Set(stars.map().keys()),
+    fileFormats: () => new Map(artifacts.store.list().map((artifact) => [`artifacts:${artifact.id}`, artifactVersionType(artifact.version)] as const)),
+    botItems: () => new Map(bots.list().flatMap((bot) => (bot.memoryPageId ? [[`pages:${bot.memoryPageId}`, bot.id] as const] : []))),
     // Many events in a row reload open views once.
     changed: botThreadsChanged,
     log: (message) => bb.log.warn(message),
@@ -1028,8 +1031,8 @@ export default async function plugin(bb: BbPluginApi) {
     defaultModel: (botId) => bots.defaultModel(botId),
   });
   registerContinueNew(bb, {
-    conversation: (threadId) => { const rec = botThreads.store.get(threadId); return rec ? { botId: rec.botId, kind: rec.kind } : null; },
-    thread: async (threadId) => await bb.sdk.threads.get({ threadId }).catch(() => null) as { projectId?: string | null; environmentId?: string | null } | null,
+    conversation: (threadId) => { const rec = botThreads.store.get(threadId); return rec ? { botId: rec.botId, kind: rec.kind, isMain: rec.isMain, title: rec.title } : null; },
+    thread: async (threadId) => await bb.sdk.threads.get({ threadId }).catch(() => null) as { projectId?: string | null; environmentId?: string | null; providerId?: string | null; model?: string | null } | null,
     timeline: async (threadId) => ((await bb.sdk.threads.timeline({ threadId, segmentLimit: 40 } as never)) as unknown as { rows?: { kind?: string; role?: string; messageSeq?: number; initiator?: string }[] }).rows ?? [],
     defaultModel: (botId) => bots.defaultModel(botId),
     spawn: async (request) => await bb.sdk.threads.spawn(request as never) as { id: string; projectId?: string | null },
@@ -2407,7 +2410,7 @@ export default async function plugin(bb: BbPluginApi) {
       design: { name: "Studio Design", handlers: designs.backup },
       talk: { name: "Studio Talk", handlers: recordings.backup },
       dashboards: { name: "Studio Dashboards", handlers: dashboards.backup },
-      minis: { name: "Studio Mini apps", handlers: minis.backup },
+      minis: { name: "Studio Apps", handlers: minis.backup },
     },
   });
   registerBackup(bb, backups, join(bb.server.experimental_dataDir, "plugins", STUDIO_PLUGIN_ID));

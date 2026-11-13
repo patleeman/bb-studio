@@ -16,6 +16,7 @@ vi.mock("../live", () => ({
   useLive: () => ({ data: state.bot, error: null, loading: false, refresh: () => {} }),
 }));
 vi.mock("../../kit/app/index", () => ({ StudioBar: ({ children }: { children: ReactNode }) => <div>{children}</div> }));
+vi.mock("../page-bar", () => ({ PageBar: ({ title, detail }: { title: string; detail?: string }) => <div data-testid="page-bar"><h1 data-testid="page-bar-title">{title}</h1>{detail ? <span data-testid="page-bar-detail">{detail}</span> : null}</div> }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => ({ toThread: state.toThread }),
   experimental_NewThreadComposer: (props: Record<string, unknown> & { onSubmit(request: unknown): Promise<void> }) => {
@@ -56,6 +57,8 @@ it("seeds BB's composer with the Bot's default model and starts the conversation
   state.bot = { bot: { id: "home", name: "Home", defaultModel: { providerId: "claude", model: "opus", reasoningLevel: "high", modelName: "Opus 5.5" } }, run: null };
   await act(async () => { root.render(<NewConversationPage botId="home" projectId="proj_personal" />); });
   expect(state.composer!.props).toMatchObject({ defaultProviderId: "claude", defaultModel: "opus", defaultReasoningLevel: "high", defaultProjectId: "proj_personal" });
+  expect(document.querySelector('[data-testid="page-bar-title"]')?.textContent).toBe("New conversation");
+  expect(document.querySelector('[data-testid="page-bar-detail"]')?.textContent).toBe("Home");
   // Patrick picked Sonnet in the composer before sending: that wins.
   await act(async () => { await state.composer!.submit(request("sonnet")); });
   expect(state.call).toHaveBeenCalledWith("bot_conversation_start", { botId: "home", request: expect.objectContaining({ providerId: "claude", model: "sonnet" }) });

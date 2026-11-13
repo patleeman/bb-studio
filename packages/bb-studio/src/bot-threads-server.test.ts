@@ -1,7 +1,7 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
 import type { ThreadFacts } from "./bot-threads";
-import { libraryItems, libraryKind, registerBotThreads } from "./bot-threads-server";
+import { libraryItems, libraryKind, recordingFiles, registerBotThreads } from "./bot-threads-server";
 import type { IndexedItem } from "./item-index";
 import { MIGRATIONS } from "./migrations";
 
@@ -173,12 +173,38 @@ it("lists the Bot's files: what its conversations and workers made, and for the 
   ]);
   expect(list("home").map((each) => each.id)).toEqual(["pg_trip"]);
   expect(list("dot")[1]!.href).toBe("/plugins/studio/studio/pages/pg_plan");
-  expect(["doc", "whiteboard", "design", "mini", "artifact", null].map(libraryKind)).toEqual(["page", "whiteboard", "design", "app", "artifact", "other"]);
+  expect(["doc", "whiteboard", "design", "mini", "artifact", "recording", null].map(libraryKind)).toEqual(["page", "whiteboard", "design", "app", "artifact", "recording", "other"]);
   // Made through a conversation by one of the Bot's workers (its first activity names the worker): the worker gets the credit.
   const credited = libraryItems({ botId: "dot", primaryId: "dot", items, origins, creators: new Map([["pages:pg_plan", "lead"], ["pages:pg_trip", "lead"]]), record: (id) => (records.get(id) as never) ?? null, title: (id) => titles[id] ?? id });
   expect(credited.find((each) => each.id === "pg_plan")!.madeIn).toMatchObject({ threadId: "lead", kind: "worker", conversationTitle: "Fork redesign" });
   // Not across Bots: Trip is Home's conversation, the lead Dot's worker.
   expect(credited.some((each) => each.id === "pg_trip")).toBe(false);
+  const starred = libraryItems({ botId: "dot", primaryId: "dot", items, origins, starred: new Set(["pages:pg_mine", "pages:pg_trip"]), formats: new Map([["artifacts:art_diff", "markdown"]]), record: (id) => (records.get(id) as never) ?? null, title: (id) => titles[id] ?? id });
+  expect(starred.map((each) => [each.id, each.starred, each.format])).toEqual([["art_diff", false, "markdown"], ["pg_plan", false, null], ["pg_mine", true, null]]);
+});
+
+it("files what a Bot made outside its threads (its core profile) under that Bot, and what its Main made without a thread link under Main", () => {
+  const records = new Map([
+    ["thr_main", { botId: "dot", kind: "conversation" as const, threadId: "thr_main", ownerConversationId: null }],
+    ["thr_home", { botId: "home", kind: "conversation" as const, threadId: "thr_home", ownerConversationId: null }],
+  ]);
+  const items = [indexed({ id: "pg_dot_profile", updatedAt: 9 }), indexed({ id: "pg_home_profile", updatedAt: 8 }), indexed({ id: "pg_by_main", updatedAt: 7 }), indexed({ id: "pg_mine", updatedAt: 6 })];
+  const botItems = new Map([["pages:pg_dot_profile", "dot"], ["pages:pg_home_profile", "home"]]);
+  const list = (botId: string) => libraryItems({ botId, primaryId: "dot", items, origins: new Map(), creators: new Map([["pages:pg_by_main", "thr_main"]]), botItems, record: (id) => (records.get(id) as never) ?? null, title: (id) => (id === "thr_main" ? "Main" : id) });
+  expect(list("dot").map((each) => [each.id, each.byBot, each.madeIn?.title ?? null])).toEqual([["pg_dot_profile", true, null], ["pg_by_main", false, "Main"], ["pg_mine", false, null]]);
+  expect(list("home").map((each) => [each.id, each.byBot])).toEqual([["pg_home_profile", true]]);
+});
+
+it("lists Talk recordings, not dictations, as the user's recordings that open at their own address", () => {
+  const sources = recordingFiles([
+    { id: "rec_1", kind: "recording", title: "Supplier call", createdAt: 2, updatedAt: 4, archived: false },
+    { id: "rec_2", kind: "dictation", title: "Dictation", createdAt: 3, updatedAt: 5, archived: false },
+  ]);
+  const listed = libraryItems({ botId: "dot", primaryId: "dot", items: [indexed({ id: "pg_mine", updatedAt: 3 }), ...sources], origins: new Map(), record: () => null, title: (id) => id });
+  expect(listed.map((each) => [each.pluginId, each.id, each.kind, each.href, each.madeIn])).toEqual([
+    ["talk", "rec_1", "recording", "/plugins/studio/studio/recordings/rec_1", null],
+    ["pages", "pg_mine", "page", "/plugins/studio/studio/pages/pg_mine", null],
+  ]);
 });
 
 it("lists what the sidebar leaves out, and finished conversations, for the older list; info says when one is finishing", async () => {

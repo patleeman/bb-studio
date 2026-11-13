@@ -30,6 +30,7 @@ vi.mock("../../kit/app/host-sdk", () => ({
   registerThreadBanner: (slots: { experimental_threadBanner?: (registration: unknown) => void }, registration: unknown) => { if (!slots.experimental_threadBanner) return false; slots.experimental_threadBanner(registration); return true; },
   registerThreadHeader: (slots: { experimental_threadHeader?: (registration: unknown) => void }, registration: unknown) => { if (!slots.experimental_threadHeader) return false; slots.experimental_threadHeader(registration); return true; },
 }));
+vi.mock("../../kit/ui/index", async () => (await import("../../loops/ui/test-kit")).kitUi);
 vi.mock("../../kit/app/index", () => ({
   Icon: () => null,
   DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

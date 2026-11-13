@@ -68,7 +68,7 @@ it("on a mirrored install, the tab of what runs in bb is read-only", () => {
   state.views = [view("aut_3k8tydwuck", "watcher", "Morning card")];
   renderTab("aut_3k8tydwuck");
   expect(container.querySelector("[data-testid=automation-read-only]")?.textContent).toContain("./card.sh");
-  expect(buttons().filter((text) => ["Resume", "Pause", "Run now", "Edit", "Delete", "Take over", "Open in bb"].includes(text ?? ""))).toEqual([]);
+  expect(buttons().filter((text) => ["Resume", "Pause", "Run now", "Edit", "Delete", "Take over", "Open in Automations"].includes(text ?? ""))).toEqual([]);
   act(() => [...container.querySelectorAll("button")].find((button) => button.textContent === "Thread")!.click());
   expect(state.openThread).toHaveBeenCalledWith("thr_demo000022");
   renderTab("auto_x1kt5kijizw");
@@ -76,9 +76,10 @@ it("on a mirrored install, the tab of what runs in bb is read-only", () => {
   state.views = [];
 });
 
-it("a bb automation's tab opens bb's own automation page while bb's automations plugin is on", () => {
+it("an Automations plugin automation's tab opens its page in Automations while that plugin is on", () => {
   state.table = table([row({ id: "auto_x1kt5kijizw", kind: "bb", name: "Watch bb#1085", bb: { id: "auto_x1kt5kijizw", projectId: "proj_y6wu7yah45" }, via: "primary" })]);
   renderTab("auto_x1kt5kijizw");
+  expect(container.querySelector("[data-testid=automation-open-bb]")?.textContent).toBe("Open in Automations");
   act(() => container.querySelector<HTMLButtonElement>("[data-testid=automation-open-bb]")!.click());
   expect(state.open).toHaveBeenCalledWith("/plugins/automations/automations/proj_y6wu7yah45/auto_x1kt5kijizw");
 });

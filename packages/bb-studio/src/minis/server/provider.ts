@@ -7,8 +7,8 @@ import type { MiniRow, MiniStore } from "./store";
 
 export const MINI_STUDIO_KIND: StudioKind = {
   id: MINI_KIND,
-  label: "Mini app",
-  plural: "Mini apps",
+  label: "App",
+  plural: "Apps",
   icon: MINI_ICON,
   columns: [{ id: "records", label: "Records" }],
   actions: [],

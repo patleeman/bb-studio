@@ -41,7 +41,8 @@ afterEach(() => { act(() => root.unmount()); container.remove(); vi.useRealTimer
 it("is the Library on the Bot-page template: its header, Kind pills, conversation groups and one line per file", () => {
   act(() => root.render(<LibraryPage />));
   expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Library·Chief of Staff");
-  expect([...container.querySelectorAll("[data-testid=bot-page-pill]")].map((each) => each.textContent)).toEqual(["All", "Page", "Whiteboard", "Design", "App"]);
+  expect(container.querySelector<HTMLInputElement>("[data-testid=bot-page-search]")?.placeholder).toBe("Search Library");
+  expect([...container.querySelectorAll("[data-testid=bot-page-pill]")].map((each) => each.textContent)).toEqual(["All", "Starred", "Page", "Whiteboard", "Design", "App", "Recording"]);
   expect(container.querySelector("[data-testid=bot-page-subpills]")).toBeNull();
   const groups = [...container.querySelectorAll<HTMLElement>("[data-testid=library-group-section]")];
   expect(groups.map((each) => each.getAttribute("aria-label"))).toEqual(["Launch prep", "Made by you"]);
@@ -66,6 +67,33 @@ it("is the Library on the Bot-page template: its header, Kind pills, conversatio
   expect(state.openLink).toHaveBeenCalledTimes(3);
   act(() => [...container.querySelectorAll<HTMLButtonElement>("[data-testid=bot-page-pill]")].find((each) => each.textContent === "Whiteboard")!.click());
   expect([...container.querySelectorAll("[data-testid=library-row] [data-testid=bot-page-row-title]")].map((each) => each.textContent)).toEqual(["Grid sketch"]);
+});
+
+it("leaves out a worker's name when it is the file's own title", () => {
+  state.items = [item("art_email", "Millers Flour discount email", "artifact", 1, { ...lead, title: "Millers Flour discount email" })];
+  act(() => root.render(<LibraryPage />));
+  expect(container.querySelector("[data-testid=library-row] [data-testid=bot-page-row-meta]")?.textContent).toBe("App · 1h");
+});
+
+it("labels a saved Markdown file a Document", () => {
+  state.items = [{ ...item("art_notes", "Supplier notes", "artifact", 1), format: "markdown" }];
+  act(() => root.render(<LibraryPage />));
+  expect(container.querySelector("[data-testid=library-row] [data-testid=bot-page-row-meta]")?.textContent).toBe("Document · made by you · 1h");
+});
+
+it("files the Bot's core profile under the Bot", () => {
+  state.items = [{ ...item("pg_profile", "Chief of Staff's core profile", "page", 1), byBot: true }, item("pg_mine", "Groceries", "page", 3)];
+  act(() => root.render(<LibraryPage />));
+  const groups = [...container.querySelectorAll<HTMLElement>("[data-testid=library-group-section]")];
+  expect(groups.map((each) => each.getAttribute("aria-label"))).toEqual(["Chief of Staff", "Made by you"]);
+  expect(groups[0]!.querySelector("[data-testid=bot-page-row-meta]")?.textContent).toBe("Page · made by Chief of Staff · 1h");
+});
+
+it("shows the starred files under Starred", () => {
+  state.items = [{ ...item("pg_star", "Starred plan", "page", 1), starred: true }, item("pg_mine", "Groceries", "page", 3), { ...item("mini_star", "Starred timer", "app", 4), starred: true }];
+  act(() => root.render(<LibraryPage />));
+  act(() => [...container.querySelectorAll<HTMLButtonElement>("[data-testid=bot-page-pill]")].find((each) => each.textContent === "Starred")!.click());
+  expect([...container.querySelectorAll("[data-testid=library-row] [data-testid=bot-page-row-title]")].map((each) => each.textContent)).toEqual(["Starred plan", "Starred timer"]);
 });
 
 it("narrows App to Interactive or Saved with a second row of pills", () => {

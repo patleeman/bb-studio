@@ -212,7 +212,9 @@ it("at launch, opens the Bot's last conversation (Main by default) instead of BB
   expect(state.navigate.toThread).toHaveBeenCalledTimes(1);
   expect(state.navigate.toThread).toHaveBeenCalledWith("main");
   expect(hasLanded()).toBe(true);
-  // Once per window: later visits to the new-thread page stay there.
+  window.history.replaceState({ usr: { focusPrompt: true }, key: "n", idx: 1 }, "", "/somewhere");
+  window.history.replaceState({ usr: { focusPrompt: true }, key: "n", idx: 1 }, "", "/");
+  window.dispatchEvent(new PopStateEvent("popstate"));
   await mount(null);
   expect(state.navigate.toThread).toHaveBeenCalledTimes(1);
   // The last-open conversation wins while it is still listed; a thread on screen is left alone.
@@ -227,6 +229,28 @@ it("at launch, opens the Bot's last conversation (Main by default) instead of BB
   await act(async () => root.unmount());
   root = createRoot(host);
   await mount("fork");
+  expect(state.navigate.toThread).not.toHaveBeenCalled();
+});
+
+it("after an archive or Home leaves BB's new-thread page on screen, opens the Bot's Main, not its last conversation", async () => {
+  window.history.replaceState(null, "", "/threads/fork");
+  await mount("fork");
+  expect(state.navigate.toThread).not.toHaveBeenCalled();
+  rememberConversation("cos", "trunc");
+  window.history.pushState(null, "", "/");
+  window.dispatchEvent(new PopStateEvent("popstate"));
+  await mount(null);
+  expect(state.navigate.toThread).toHaveBeenCalledTimes(1);
+  expect(state.navigate.toThread).toHaveBeenCalledWith("main");
+});
+
+it("keeps BB's own New thread page: an arrival that asked for a new thread stays, even once BB clears that state", async () => {
+  window.history.replaceState(null, "", "/threads/fork");
+  await mount("fork");
+  window.history.pushState({ usr: { focusPrompt: true }, key: "a", idx: 2 }, "", "/");
+  window.dispatchEvent(new PopStateEvent("popstate"));
+  window.history.replaceState(null, "", "/");
+  await mount(null);
   expect(state.navigate.toThread).not.toHaveBeenCalled();
 });
 
@@ -371,7 +395,7 @@ describe("the Bot's space (round 7)", () => {
 
   it("lists the Bot's pages as rows, opens each, and selects the one on screen", async () => {
     await mount();
-    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Automations"]);
+    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Todos"]);
     await act(async () => { $('[data-testid="space-page-skills"]')!.click(); });
     expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "skills/cos" });
     await act(async () => { $('[data-testid="space-page-library"]')!.click(); });
@@ -390,6 +414,8 @@ describe("the Bot's space (round 7)", () => {
     state.live["loops.list"] = { needsYouNow: [{}, {}, {}], comingUp: [], agentsOnIt: [], waitingOnOthers: [], done: [] };
     await mount();
     expect($('[data-testid="space-todos-count"]')?.textContent).toBe("3");
+    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Todos"]);
+    expect($('[data-testid="space-page-automations"]')).toBeNull();
     await act(async () => { $('[data-testid="space-page-todos"]')!.click(); });
     expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "bot/cos/loops" });
   });

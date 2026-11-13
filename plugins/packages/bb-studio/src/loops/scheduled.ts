@@ -1,6 +1,6 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import type { AutomationTableRow } from "../automation-table-contract";
+import { MAINTENANCE_ID, type AutomationTableRow } from "../automation-table-contract";
 import type { BotAutomationView } from "../contract";
 import type { Loop } from "./contract";
 
@@ -56,7 +56,7 @@ export function scheduledItems(input: { loops: readonly Loop[]; bots: readonly S
   }
   for (const bot of input.bots) {
     for (const view of bot.automations) {
-      if (view.state !== "active" && view.state !== "paused") continue;
+      if (view.id === MAINTENANCE_ID || (view.state !== "active" && view.state !== "paused")) continue;
       if (view.kind === "reminder" && loopIds.has(reminderLoopId(view.id))) continue;
       items.push({
         key: `automation:${bot.id}:${view.id}`, source: "automation", id: view.id, botId: bot.id, botName: bot.name, kind: view.kind,
@@ -66,7 +66,7 @@ export function scheduledItems(input: { loops: readonly Loop[]; bots: readonly S
     }
     const listed = new Set(bot.automations.map((view) => view.id));
     for (const row of bot.table ?? []) {
-      if (listed.has(row.id) || row.status === "off") continue;
+      if (row.id === MAINTENANCE_ID || listed.has(row.id) || row.status === "off") continue;
       if (row.kind === "reminder" && loopIds.has(reminderLoopId(row.id))) continue;
       items.push({
         key: `automation:${bot.id}:${row.id}`, source: "automation", id: row.id, botId: bot.id, botName: bot.name, kind: row.kind,

@@ -70,10 +70,10 @@ export function HandOffMenu({ targets, disabled, onHandOff, className = CARD_BUT
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className={className} disabled={disabled}><Icon name="ArrowTurnForward" />Hand off<Icon name="ChevronDown" className="opacity-60" /></button>
+        <button type="button" className={className} disabled={disabled}><Icon name="ArrowTurnForward" />Give to<Icon name="ChevronDown" className="opacity-60" /></button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-52">
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Hand off to</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Give to</DropdownMenuLabel>
         {targets.map((target) => (
           <DropdownMenuItem key={target.owner} onSelect={() => onHandOff(target.owner)}>
             <Icon name="Bot" />{target.name}
@@ -143,7 +143,7 @@ export function ChangeTrigger({ loop, places, disabled, onSave, children }: { lo
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        {children ?? <button type="button" className={CARD_GHOST} disabled={disabled}><Icon name="DateTime" />Change trigger</button>}
+        {children ?? <button type="button" className={CARD_GHOST} disabled={disabled}><Icon name="DateTime" />Change when</button>}
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-3">
         {open ? <TriggerForm loop={loop} places={places} onCancel={() => setOpen(false)} onSave={(changes) => { setOpen(false); onSave(changes); }} /> : null}
@@ -169,8 +169,8 @@ export function TriggerForm({ loop, places, onCancel, onSave }: { loop: Loop; pl
         : type === "place" ? { type, place, direction }
           : { type: "none" };
   return (
-    <form className="flex flex-col gap-3" aria-label="Change trigger" onSubmit={(e) => { e.preventDefault(); if (trigger) onSave({ trigger, push }); }}>
-      <div className="text-sm font-medium text-foreground">Change trigger</div>
+    <form className="flex flex-col gap-3" aria-label="Change when" onSubmit={(e) => { e.preventDefault(); if (trigger) onSave({ trigger, push }); }}>
+      <div className="text-sm font-medium text-foreground">Change when</div>
       <Segmented<TriggerType> label="Trigger" value={type} onChange={setType} options={TABS.map((tab) => ({ value: tab.type, label: tab.label }))} />
       {type === "time" ? (
         <input type="datetime-local" aria-label="When" value={when} onChange={(e) => setWhen(e.target.value)} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm text-foreground" />

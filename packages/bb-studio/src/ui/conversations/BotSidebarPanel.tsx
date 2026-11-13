@@ -2,7 +2,7 @@
 // - Top, sticky: the Bot's space header (SpaceHeader.tsx): avatar, name, its
 //   status (running count, Paused), a ··· menu (Edit space…, Default model
 //   with bb's model picker, Archive: the older page, New Bot), and
-//   its pages as rows (Memory, Library, Automations, Todos). Edit space
+//   its pages as rows (Memory, Skills, Library, Todos). Edit space
 //   (EditSpace.tsx) covers the main view, or takes the lists' place where
 //   BB has none.
 // - Conversations, with "+ New" (BB's ghost button; BB's new-thread composer on
@@ -37,7 +37,7 @@ import { usePathname } from "../../kit/app/route";
 import { BotPresence } from "../../presence/ui/BotPresence";
 import { useCall, useLive } from "../live";
 import { conversationLines, doneLabel, hiddenThreadTarget, isOlderPage, landingThread, olderLabel, olderPath, secondLine, shortAge, spaceDots, splitWorkers, swipeStep, switchTarget, SWIPE_START, workerLines, type ConversationLine, type LiveThread, type WorkerLine } from "./model";
-import { currentBot, hasLanded, isLaunchPage, lastConversation, markLanded, rememberConversation, setBotSwitcher, setCurrentBot, setFocusHandler, setThreadOpener, useCurrentBot } from "./state";
+import { currentBot, hasLanded, isLaunchPage, lastConversation, markLanded, newThreadAsked, rememberConversation, setBotSwitcher, setCurrentBot, setFocusHandler, setThreadOpener, useCurrentBot, watchNewThreadArrivals } from "./state";
 
 import { MEMORY_SUBPATH } from "../../memory/shared";
 import { skillsPagePath } from "../skills/paths";
@@ -242,14 +242,17 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   // "Studio: Show the Bot" opens threads with BB's navigation while this is mounted.
   useEffect(() => { setThreadOpener((threadId) => navigate.toThread(threadId)); return () => setThreadOpener(null); }, [navigate]);
   useEffect(() => setLinkActionHandler("edit-space", () => { if (!bot) return false; setEditing(bot.id); return true; }), [bot]);
-  // At launch the main view is BB's empty new-thread page: open this Bot's last conversation (Main by default) instead, once.
+  useEffect(() => watchNewThreadArrivals(), []);
+  const hasData = !!data;
   useEffect(() => {
-    if (!bot || !data || hasLanded()) return;
+    if (!bot || !data) return;
+    const first = !hasLanded();
     markLanded();
     if (activeThreadId || !isLaunchPage(window.location.pathname)) return;
-    const target = landingThread(bot, lastConversation(bot.id), listed);
+    if (!first && newThreadAsked()) return;
+    const target = first ? landingThread(bot, lastConversation(bot.id), listed) : data.conversations.find((row) => row.isMain)?.threadId ?? landingThread(bot, null, null);
     if (target) navigate.toThread(target);
-  }, [bot?.id, data]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bot?.id, hasData, pathname, activeThreadId]); // eslint-disable-line react-hooks/exhaustive-deps
   const switchTo = useCallback((botId: string) => {
     const space = bots.find((each) => each.id === botId);
     if (!space || space.id === bot?.id) return;

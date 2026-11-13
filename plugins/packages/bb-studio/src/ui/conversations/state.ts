@@ -44,6 +44,39 @@ export function isLaunchPage(pathname: string): boolean {
   return pathname === "/" || pathname === "";
 }
 
+interface EntryEvents {
+  addEventListener(type: "currententrychange", listener: () => void): void;
+  removeEventListener(type: "currententrychange", listener: () => void): void;
+}
+
+let arrivedAsking: boolean | null = null;
+let lastPathname: string | null = null;
+
+export function asksForNewThread(state: unknown): boolean {
+  const usr = typeof state === "object" && state !== null ? (state as { usr?: unknown }).usr : null;
+  return typeof usr === "object" && usr !== null && (usr as { focusPrompt?: unknown }).focusPrompt === true;
+}
+
+export function watchNewThreadArrivals(): () => void {
+  const note = () => {
+    const pathname = window.location.pathname;
+    if (isLaunchPage(pathname) && (lastPathname === null || !isLaunchPage(lastPathname))) arrivedAsking = asksForNewThread(window.history.state);
+    lastPathname = pathname;
+  };
+  note();
+  const navigation = (window as { navigation?: EntryEvents }).navigation;
+  navigation?.addEventListener("currententrychange", note);
+  window.addEventListener("popstate", note);
+  return () => {
+    navigation?.removeEventListener("currententrychange", note);
+    window.removeEventListener("popstate", note);
+  };
+}
+
+export function newThreadAsked(): boolean {
+  return arrivedAsking ?? asksForNewThread(window.history.state);
+}
+
 /** How "Studio: Show the Bot" opens a thread: the sidebar's BB navigation while it is mounted. */
 export function setThreadOpener(open: ((threadId: string) => void) | null): void {
   threadOpener = open;
@@ -131,6 +164,8 @@ export function resetSidebarState(): void {
   bot = undefined;
   onFocus = null;
   landed = false;
+  arrivedAsking = null;
+  lastPathname = null;
   threadOpener = null;
   switcher = null;
   try { for (const key of [BOT_KEY, LAST_KEY]) { sessionStorage.removeItem(key); localStorage.removeItem(key); } } catch { /* private mode */ }

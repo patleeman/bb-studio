@@ -39,6 +39,14 @@ it("lists a reminder copied into the todos once, as its todo", () => {
   expect(items.map((item) => item.key)).toEqual([`todo:${reminderLoopId("aut_r")}`]);
 });
 
+it("leaves out the Bot's maintenance job, whatever it is called", () => {
+  const items = scheduledItems({
+    loops: [],
+    bots: [{ ...dot([automation({ id: "maintenance", name: "Housekeeping", state: "paused", nextRunAt: null }), automation({ id: "aut_2", name: "Maintenance" })]), table: [{ id: "maintenance", kind: "schedule", name: "Maintenance", when: "Daily 4:00 AM", lastRunAt: null, lastRun: null, status: "active", inBb: false, readOnly: false, bb: null, threadId: null, instruction: null, script: null, via: "primary" } as never] }],
+  });
+  expect(items.map((item) => [item.key, item.title])).toEqual([["automation:bot_main:aut_2", "Maintenance"]]);
+});
+
 it("filters to one thread: a thread's todos, and automations that wake it", () => {
   const items = scheduledItems({
     loops: [todo({ owner: "thread:thr_x" }), todo({ id: "loop_2", owner: "cos" })],
@@ -48,7 +56,7 @@ it("filters to one thread: a thread's todos, and automations that wake it", () =
   expect(items.map((item) => item.key)).toEqual(["automation:bot_main:aut_1", "todo:loop_1"]);
 });
 
-it("adds the Automations page's other rows (bb's own, maintenance), once each, leaving out what is off", () => {
+it("adds the Automations page's other rows (bb's own), once each, leaving out what is off and the Bot's own maintenance", () => {
   const row = (id: string, over: Record<string, unknown>) => ({ id, kind: "bb", name: id, when: "Daily 07:00", lastRunAt: null, lastRun: null, status: "active", inBb: false, readOnly: false, bb: null, threadId: "thr_x", instruction: null, script: null, via: "primary", ...over }) as never;
   const items = scheduledItems({
     loops: [],
@@ -57,6 +65,5 @@ it("adds the Automations page's other rows (bb's own, maintenance), once each, l
   expect(items.map((item) => [item.key, item.kind, item.state, item.scheduleText])).toEqual([
     ["automation:bot_main:aut_1", "checkin", "active", "Daily 8:00"],
     ["automation:bot_main:auto_bb", "bb", "active", "Daily 07:00"],
-    ["automation:bot_main:maintenance", "schedule", "paused", "Daily 07:00"],
   ]);
 });

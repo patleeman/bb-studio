@@ -61,12 +61,14 @@ Not found tab.
   prints the sign-in link and device code for the user and waits until it is
   saved. Never ask for, print or store tokens.
 - `bb studio accounts [status] [--source studio|bb|local] [--json]` lists every
-  Account Pooler account (BB Studio's own and bb's, labelled by source) and
+  Account Pooler account (BB Studio's own and, while the separate bb app this
+  copy was imported from runs, that app's; labelled by source) and
   local login with status, 5h/7d and per-model quota, reset times and pinned
   threads, then the open warnings. `bb studio accounts warnings`,
   `dismiss <warning-id>`, `use-other <account>` (BB Studio's pool only) and
-  `login <account>` (`--bb` is required for a bb account; only when the user
-  asks) do the same as the Accounts window. bb's pool is read, never changed.
+  `login <account>` (`--bb` is required for an account in the bb app; only
+  when the user asks) do the same as the Accounts window. The bb app's pool is
+  read, never changed.
 - `bb studio providers` shows which add-ons are installed and whether each is
   ready; an add-on that's stopped contributes nothing to the list.
 
@@ -304,8 +306,9 @@ change nothing.
   such as `::page{id="pg_…"}`, a `file:///…` URL or an http(s) URL)
   opens a conversation, worker, board (thread `id`), a page, whiteboard,
   design, app, artifact or recording (its `id`), a Bot (its `id`),
-  Memory, the Library, Automations, Todos, the Archive (a Bot `id`, or none
-  for the Bot on screen), one automation (`type: "automation"`, `id`
+  Memory, the Library, Todos (its Scheduled list is where automations are;
+  `automations` opens it there), the Archive (a Bot `id`, or none for the Bot
+  on screen), one automation (`type: "automation"`, `id`
   `<botId>:<row id>`, or `bb://automation/<botId>:<row id>`), one todo
   (`type: "todo"`, its `loop_…` id, or `bb://todo/loop_…`), one memory
   record (`type: "record"`, its `mem_…` id, or `bb://record/mem_…`), VS Code, a workflow run (its `wfr_…` id), a file or

@@ -131,7 +131,7 @@ ${TABLES} table tr:last-child td { border-bottom: 0; }
 
 const INSET = `${GLASS} [data-sidebar="inset"]`;
 const BARE = `background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; border-color: transparent;`;
-const BAR_HALO = `filter: drop-shadow(0 0 2px color-mix(in oklab, var(--canvas) 90%, transparent)) drop-shadow(0 0 6px color-mix(in oklab, var(--canvas) 60%, transparent));`;
+const BAR_HALO = `filter: drop-shadow(0 0 1.5px color-mix(in oklab, var(--canvas) 70%, transparent)) drop-shadow(0 0 5px color-mix(in oklab, var(--canvas) 35%, transparent));`;
 export const LIST_PAGE = `${INSET} header + main > div:has([data-resource-collection-viewport]):not(:has(.box-border.h-full.w-full, [data-page-scroll-viewport]))`;
 export const RULE_CLASSES = ["border-b", "border-t", "border-y", "border-l", "border-r", "border-x"] as const;
 export const RULES = `${INSET} .studio-root :is(${RULE_CLASSES.map((each) => `[class~="${each}"]`).join(", ")}, [class*="divide-y"] > *, [class*="divide-x"] > *)`;
@@ -208,6 +208,11 @@ export const GLASS_CHIPS = `${GLASS} [data-sidebar="inset"] :is([data-promptbox-
 export const STUDIO_RULE = `${GLASS} [data-studio-rule]`;
 export const DIFF_HOST = "diffs-container";
 export const GLASS_DIFF_CARD = `${GLASS} :is(.rounded-lg, .rounded-md)[class~="border"]:has(${DIFF_HOST})`;
+export const STUDIO_CARD = `${GLASS} [data-sidebar="inset"] [data-studio-card]:not([data-studio-card-tone])`;
+export const STUDIO_CARD_CSS = `
+${STUDIO_CARD} { border-color: transparent; background: var(--fork-panel); }
+${STUDIO_CARD}:is(button):hover { background: color-mix(in oklab, var(--ink) 8%, var(--fork-panel)); }
+`;
 export const CLASSIC_FOOTER = `${ON}:not([${GLASS_ATTRIBUTE}]) [data-sidebar="inset"] [data-scroll-footer] > div`;
 
 export const CHROME_CSS = `
@@ -255,4 +260,4 @@ ${BACKING_SELECTORS.threadBanner} { background: var(--studio-glass-transcript); 
 ${BACKING_SELECTORS.composerControls} { border-color: transparent; background-color: color-mix(in oklab, var(--ink) 10%, transparent); }
 ${BACKING_SELECTORS.composerControls}:hover { background-color: color-mix(in oklab, var(--ink) 18%, transparent); }
 ${Object.values(HALO_SELECTORS).join(", ")} { text-shadow: var(--studio-halo); }
-`;
+${STUDIO_CARD_CSS}`;

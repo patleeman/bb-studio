@@ -2,6 +2,8 @@ import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-
 import { useLayoutEffect, useRef } from "react";
 import { conversationLink } from "../../continue-shared";
 import { Icon } from "../../kit/app/index";
+import { CHAT_CARD, CHAT_CARD_HEAD } from "../../kit/app/chat-card";
+import { cn } from "../../kit/ui/index";
 import { useLive } from "../live";
 
 const THREAD_ID = /^[\w-]{3,200}$/;
@@ -37,15 +39,14 @@ export function ContinuedCard({ attributes }: PluginMessageDirectiveProps) {
   const title = info?.title || attributes.title || "New conversation";
   const status = info?.archivedAt ? "Archived" : info?.needsYou ? "Needs you" : null;
   return (
-    <button ref={ref} type="button" data-testid="continued-card" data-thread={threadId} onClick={() => navigate.toThread(threadId)}
-      className="studio-root my-2 flex w-full max-w-xl cursor-pointer items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 text-left text-sm transition-colors hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
-      <Icon name="MessageSquare" className="size-4 shrink-0 text-muted-foreground" />
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="text-xs text-muted-foreground">Continued in</span>
-        <span data-testid="continued-title" className="truncate font-semibold text-foreground">{title}</span>
+    <button ref={ref} type="button" data-studio-card="" data-testid="continued-card" data-thread={threadId} onClick={() => navigate.toThread(threadId)}
+      className={cn(CHAT_CARD, "group cursor-pointer transition-colors hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none")}>
+      <span data-studio-card-head="" className={cn(CHAT_CARD_HEAD, "w-full pr-3")}>
+        <Icon name="MessageSquare" className="size-4 shrink-0 text-muted-foreground" />
+        <span data-testid="continued-title" data-studio-card-title="" className="min-w-0 truncate text-sm font-medium text-foreground">{title}</span>
+        <span data-studio-card-meta="" className="min-w-0 flex-1 truncate text-xs text-muted-foreground">Continued in{status ? ` · ${status}` : ""}</span>
+        <Icon name="ArrowRight" className="size-3.5 shrink-0 text-muted-foreground group-hover:text-foreground" />
       </span>
-      {status ? <span className="shrink-0 text-xs text-muted-foreground">{status}</span> : null}
-      <Icon name="ArrowRight" className="size-4 shrink-0 text-muted-foreground" />
     </button>
   );
 }

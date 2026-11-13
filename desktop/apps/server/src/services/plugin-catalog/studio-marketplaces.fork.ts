@@ -8,7 +8,11 @@ import {
 } from "@bb/db";
 import { CURATED_PLUGIN_MARKETPLACE_NAME } from "@bb/server-contract";
 import { BUNDLED_MARKETPLACE_NAME } from "./bundled-marketplace-paths.js";
-import { CURATED_MARKETPLACE_V2_URL } from "./marketplace-manifest.js";
+import {
+  CURATED_MARKETPLACE_V2_URL,
+  type MarketplaceManifest,
+} from "./marketplace-manifest.js";
+import { FORK_BUNDLED_PLUGINS } from "../plugins/builtin-registry.fork.js";
 import {
   marketplaceSourceColumns,
   parseMarketplaceSource,
@@ -16,7 +20,8 @@ import {
 
 export const STUDIO_MARKETPLACE_NAME = "bb-studio";
 export const STUDIO_MARKETPLACE_SOURCE =
-  "git:github.com/patleeman/bb-studio@stable";
+  "https://raw.githubusercontent.com/patleeman/bb-studio/stable/marketplace.json";
+const STUDIO_REPO = /^https:\/\/github\.com\/patleeman\/bb-studio(\.git)?$/;
 const SEEDED_MARKER = "studio-default-added";
 
 export function shipsCuratedMarketplace(marketplaceUrl: string): boolean {
@@ -44,6 +49,7 @@ export function seedStudioMarketplace(deps: {
   db: DbConnection;
   dataDir: string;
 }): void {
+  moveStudioMarketplaceOffGit(deps.db);
   const marker = join(deps.dataDir, "marketplaces", SEEDED_MARKER);
   if (existsSync(marker)) return;
   if (getPluginMarketplace(deps.db, STUDIO_MARKETPLACE_NAME) === undefined) {
@@ -71,13 +77,67 @@ export function seedStudioMarketplace(deps: {
   writeFileSync(marker, `${new Date().toISOString()}\n`);
 }
 
+function moveStudioMarketplaceOffGit(db: DbConnection): void {
+  const row = getPluginMarketplace(db, STUDIO_MARKETPLACE_NAME);
+  if (
+    row?.sourceKind !== "git" ||
+    row.sourceGitSubdirectory !== null ||
+    !STUDIO_REPO.test(row.manifestUrl)
+  ) {
+    return;
+  }
+  const ref = row.sourceGitRef ?? "stable";
+  upsertPluginMarketplace(db, {
+    name: row.name,
+    ...marketplaceSourceColumns(
+      parseMarketplaceSource(
+        `https://raw.githubusercontent.com/patleeman/bb-studio/${ref}/marketplace.json`,
+        null,
+      ),
+    ),
+    sourceGitCommit: null,
+    manifestJson: row.manifestJson,
+    statsJson: row.statsJson,
+    etag: null,
+    lastModified: null,
+    lastSuccessfulRefreshAt: row.lastSuccessfulRefreshAt,
+    lastAttemptedRefreshAt: null,
+    lastError: row.lastError,
+  });
+}
+
 export function refreshAnchor(db: DbConnection): number | null {
   const curated = getPluginMarketplace(db, CURATED_PLUGIN_MARKETPLACE_NAME);
   if (curated !== undefined) return curated.lastAttemptedRefreshAt;
-  let latest: number | null = null;
-  for (const row of listPluginMarketplaces(db)) {
-    if (row.lastAttemptedRefreshAt === null) continue;
-    latest = Math.max(latest ?? 0, row.lastAttemptedRefreshAt);
+  const rows = listPluginMarketplaces(db).filter(
+    (row) => row.name !== BUNDLED_MARKETPLACE_NAME,
+  );
+  if (rows.length === 0) return Date.now();
+  let oldest = Number.POSITIVE_INFINITY;
+  for (const row of rows) {
+    if (row.lastAttemptedRefreshAt === null) return null;
+    oldest = Math.min(oldest, row.lastAttemptedRefreshAt);
   }
-  return latest;
+  return oldest;
+}
+
+export function withoutForkBuiltins<
+  T extends { catalog: MarketplaceManifest; manifestJson: string },
+>(materialized: T): T {
+  const builtins = new Set(
+    FORK_BUNDLED_PLUGINS.map((plugin) => plugin.pluginId),
+  );
+  const { catalog } = materialized;
+  if (!catalog.plugins.some((entry) => builtins.has(entry.id))) {
+    return materialized;
+  }
+  const filtered = {
+    ...catalog,
+    plugins: catalog.plugins.filter((entry) => !builtins.has(entry.id)),
+  } as MarketplaceManifest;
+  return {
+    ...materialized,
+    catalog: filtered,
+    manifestJson: JSON.stringify(filtered),
+  };
 }

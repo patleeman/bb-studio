@@ -21,7 +21,7 @@ has a canonical link that parses back to itself and opens through the router.
   (system browser, or the in-app browser), whatever the modifier.
 - With no conversation on screen, a thread opens in the main view; an item
   opens beside the Studio page, or in the main view elsewhere.
-- A Bot page (Memory, Library, Automations, Todos, Archive) is a list: a row
+- A Bot page (Memory, Library, Todos, Archive) is a list: a row
   opens its item as a tab in the workbench beside the page, a thread
   included (a conversation tab), and the page stays. Every row calls
   `useRowOpen()` (`src/ui/bot-page/open-row.ts`), which hands the row's
@@ -71,7 +71,7 @@ registry doesn't know (Settings) parses to nothing and stays bb's.
 | Memory | `bb://memory/bot_main` | `/plugins/studio/studio/memory/bot_main` |  |
 | Skills | `bb://skills/bot_main` | `/plugins/studio/studio/skills/bot_main` |  |
 | Library | `bb://library` | `/plugins/studio/studio` |  |
-| Automations | `bb://automations` | `/plugins/studio/automations` |  |
+| Scheduled | `bb://automations` | `/plugins/studio/automations` |  |
 | Todos | `bb://todos/bot_main` | `/plugins/studio/studio/bot/bot_main/loops` |  |
 | Archive | `bb://archive/bot_main` | `/plugins/studio/studio/conversations/bot_main` |  |
 | Automation | `bb://automation/bot_main%3Aaut_0123456789abcdef` | `/plugins/studio/studio/automation/bot_main%3Aaut_0123456789abcdef` |  |
@@ -104,7 +104,7 @@ the rule above; **n/a** says why it can't.
 | Memory | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Skills | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Library | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
-| Automations | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
+| Scheduled | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Todos | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Archive | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Automation | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |

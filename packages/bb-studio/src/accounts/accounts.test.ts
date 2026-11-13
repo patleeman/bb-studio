@@ -144,6 +144,14 @@ describe("status mapping", () => {
       ["local:codex", "signed_out", "provider:codex"],
     ]);
   });
+
+  it("names OpenCode as OpenCode, whatever the provider calls itself", () => {
+    const views = localAccountViews([
+      { providerId: "claude-code", displayName: "Claude Code", status: "ready", planLabel: null, accountEmail: null, loginCommand: "claude auth login" },
+      { providerId: "acp-opencode", displayName: "opencode", status: "ready", planLabel: null, accountEmail: null, loginCommand: "opencode auth login" },
+    ], new Set(), (id) => id);
+    expect(views.map((view) => view.name)).toEqual(["Claude Code", "OpenCode"]);
+  });
 });
 
 function view(overrides: Partial<AccountView> & { key: string }): AccountView {

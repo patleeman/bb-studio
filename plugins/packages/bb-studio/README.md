@@ -226,14 +226,16 @@ is a quiet line (one per morning message).
 ## Settings
 
 **Settings → Plugins → Studio** starts with Studio's API keys, which BB keeps
-in its secret files: OpenAI, OpenRouter, xAI, TypeSafe, Vercel AI Gateway,
-OpenCode Zen and your own Jev endpoint's key. Every other setting is Studio's
+in its secret files: OpenAI (hands-free voice), xAI, and the keys Smart Queue's
+model (Jev) runs on: TypeSafe, Vercel AI Gateway, OpenRouter, OpenCode Zen and
+your own endpoint's. Every other setting is Studio's
 own, in grouped sections below them: **Voice** (dictation and hands-free:
 model, voice, backend model and monthly limit), **Recordings and calls**,
 **Agent replies** (the Next row, reactions and App cards), **Threads** (Smart Queue,
 resume after a restart, Todos and page history), **Windows** (the launcher's
-shortcut; only in a BB with plugin windows, see [Windows](#windows)), **Jev** (the
-provider, its connection test, the fallback model and your own endpoint) and
+shortcut; only in a BB with plugin windows, see [Windows](#windows)), **Smart
+Queue model** (Jev's provider, its connection test, the fallback model and your
+own endpoint) and
 **Advanced** (Smart Queue batch confidence). Last, **Phone notifications**
 shows Studio Mobile's push status and **Send a test push**. The Attention
 Router's daily budget and quiet hours are on the Bot page, under **Controls →
@@ -456,20 +458,19 @@ header's ··· menu, or the iOS app) keeps its summary. There is no separate
 Finish item. Studio (`src/bot-finish.ts`):
 
 1. unarchives it for a moment (BB takes no turn in an archived thread) and
-   sends one last turn into the conversation, "Archive this conversation.",
-   with agent-only steps: write a summary (**Decisions**, **Left open**,
+   sends one last agent-only turn into the conversation (no user message)
+   with the steps: write a summary (**Decisions**, **Left open**,
    **Made**), save it with `memory_add` (topic: the conversation's title;
    source `{ kind: "conversation", id, title }`), then call
    `bot_finish_done { summary }`.
 2. When `bot_finish_done` arrives, the conversation is marked finished
    (`bot_threads.archived_at`, `finished_summary`; BB archives it again
-   once the turn is over), and Main gets the summary from the
-   conversation, with an agent-only note that has the Bot reply with the card
-   `::finished{thread="thr_…"}`: "✓ Archived: <title>", its dates, the
-   summary's sections, **Open the conversation** and **See in Memory**, and
-   how many memory records cite it. Main's row reads "Archived “<title>” ·
-   summary saved". Older `::finished` cards in transcripts render the same
-   card.
+   once the turn is over), and Main gets an agent-only note with the summary
+   that has the Bot reply with the card `::finished{thread="thr_…"}`:
+   "✓ Archived: <title>", its dates, the summary's sections, **Open the
+   conversation** and **See in Memory**, and how many memory records cite it.
+   Neither turn shows a user message. Main's row reads "Archived “<title>”".
+   Older `::finished` cards in transcripts render the same card.
 3. If the conversation can't take the turn, the turn ends or fails without
    `bot_finish_done`, or nothing happens for 10 minutes, Studio writes a
    summary from the last three replies, saves it to memory unless the Bot
@@ -500,9 +501,9 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   Controls are on the Info tab's Bot block (Pause, Resume and Stop in its
   icon group). Under it, the Bot's pages as rows:
   **Memory** (`/plugins/studio/studio/memory/<botId>`), **Library**
-  (`/plugins/studio/studio`), **Automations** (`/plugins/studio/automations`)
-  and, for the primary Bot with Todos on, **Todos**
-  (`/plugins/studio/studio/bot/<botId>/loops`) with what needs you now. The
+  (`/plugins/studio/studio`) and, for the primary Bot with Todos on, **Todos**
+  (`/plugins/studio/studio/bot/<botId>/loops`) with what needs you now and,
+  under **Scheduled**, what runs when. The
   row of the page on screen is selected. The header is clickable in the
   desktop app (no window drag).
 - **Conversations**, with **+ New** (BB's own new-thread composer,
@@ -514,8 +515,8 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   the ink at 55%), with a spinner while
   it works. The conversation that needs you is outlined in amber, with
   "Needs you: <reason>" on its second line. The row on screen is
-  highlighted; right-click for BB's thread menu (with **Finish
-  conversation**). Listed: Main always, and the others active in the last
+  highlighted; right-click for BB's thread menu (**Archive** keeps a summary;
+  see Archiving a conversation). Listed: Main always, and the others active in the last
   14 days, working, or needing you; the rest are counted in a quiet last row,
   "N older conversations".
 - **Workers**: the running ones and those waiting on you (up to 30), one
@@ -1046,7 +1047,7 @@ result open the document in the workbench beside the conversation.
 
 ### Library
 
-A Bot's pages (Todos, Memory, Library, Automations and the Archive) share
+A Bot's pages (Todos, Memory, Library and the Archive) share
 one template (`src/ui/bot-page`): one header row, "<Page> · <Bot>", in BB's
 title bar in place of the panel's "Library" label (`src/ui/page-bar.tsx`),
 where the Bot's name opens the Bot's page; then one column of the same width
@@ -1104,7 +1105,7 @@ Search page of its own.
 **Tab kinds.** Everything that can be a tab beside a conversation is one
 registry, `src/tab-kinds.ts`: Conversation, Worker, Bot; Page, Whiteboard,
 Design, App, Artifact, Recording; Visual Chat board; Memory,
-Library, Automations, Todos, Archive; VS Code; and bb's own File, Diff,
+Library, Scheduled (the Todos page at Scheduled), Todos, Archive; VS Code; and bb's own File, Diff,
 Browser, Terminal and Workflow run. Each kind has its name, icon, the tab that
 shows it, its address, where its recent rows come from and whether it has a
 sidebar row. The New Tab page, Recent, drag and drop, the agent's
@@ -1130,14 +1131,14 @@ The page's Actions are Studio's action tabs under two headings
 Conversation, Page, Whiteboard, Design, App (a conversation starts
 in the main view on the Bot's + New page; the rest open as a tab). **Open**:
 Conversation (a picker for any thread, Bot or item), Page (the item list),
-Memory, Library, Automations, Todos, Archive and VS Code. Each tooltip says
+Memory, Library, Todos, Archive and VS Code. Each tooltip says
 "New page" or "Open page", for bb's action search, which lists matches under
 its own Actions heading. Bot, Side thread, New thread and the thread's
-own Automations tab stay off the list (`experimental_showInNewTab: false`);
+own Scheduled tab stay off the list (`experimental_showInNewTab: false`);
 other controls open them.
 
 **Drag and drop into the workbench.** Conversation and worker rows, the Bot
-page rows (Memory, Library, Automations, Todos, and the Archive's "older"
+page rows (Memory, Library, Todos, and the Archive's "older"
 row), the Bot switcher's icons, Library rows and links in replies carry the
 shared drag payload, and so does every New Tab Recent and search row
 (`experimental_dragItem`, which bb writes). Dropped on a pane's tab strip, the thing opens as a tab
@@ -1218,14 +1219,14 @@ Plugins, Settings. Studio adds nothing to it. Its pages are nav panels with
 BB's `experimental_hideFromNavigation: true`: a route, and no rail icon,
 More entry, Customize row or command palette entry. They are the Library and the Bot's pages
 under it (`studio/studio`: Memory, Bot info, Controls, Todos, Archive),
-Automations (`studio/automations`) and VS Code (`studio/vscode`); Visual
+the Todos page at Scheduled (`studio/automations`, titled Todos) and VS Code (`studio/vscode`); Visual
 Chat's page is off the rail too. The Bot sidebar's page rows open them. Only
 the BB Studio fork gets the field: stock BB refuses a nav panel with an
 `experimental_` field it doesn't know, which drops the plugin's whole
 frontend, so there Studio leaves it out and its pages show on the rail
 (`src/stock-bb.test.ts`). Once per install Studio also hides
-BB's Automations (built in and its plugin's page: the Bot's Automations page
-lists what runs) and shows BB's Search, with BB's own rail preference
+BB's Automations (built in and its plugin's page: Scheduled on the Bot's
+Todos page lists what runs) and shows BB's Search, with BB's own rail preference
 (`src/rail-arrangement.ts`); the user can change either back in Customize.
 The Bot list asks for the fork's `experimental_hideSidebarHeader`, so the
 Bot header is the top of the sidebar and BB's "New conversation" row is
@@ -1234,17 +1235,17 @@ title bar layout the traffic lights, back, forward and the sidebar toggle
 stay where BB has them; in the browser layout back and forward move to the
 start of the main view's header and the toggle stays.
 
-**Automations** (`studio/automations`, `bb://automations`, and the Bot's
-Automations tab) opens the sidebar Bot's **Todos** page at **Scheduled**:
-there is one place for what runs when. Scheduled lists every automation
+**Scheduled**, on the sidebar Bot's **Todos** page, is the one place for what
+runs when; `bb://automations` and a thread's Scheduled tab open it there.
+The Bot sidebar has one row for it, **Todos**. Scheduled lists every automation
 that belongs to the Bot (check-ins, reminders, watchers, runners, bb's own
 automations and maintenance), each with its next run or Paused, and has
 **New** (check-in, reminder, watcher, runner). Timed todos stay in Today,
 This week and Later. A row opens the automation as a tab in the workbench
 beside the page (`bb://automation/<botId>:<row id>`): a Studio automation
 shows its detail (Pause or Resume, Run now, Edit, Delete, recent runs); a bb
-automation shows what it does, with **Open in bb** for bb's own automation
-page while bb's automations plugin is on. One that is in bb, and any whose
+automation shows what it does, with **Open in Automations** for its page in
+BB's Automations plugin while that plugin is on. One that is in bb, and any whose
 detail Studio can't load, is read-only: what it does and its thread.
 
 All of these read one model, `loops.scheduled` (`src/loops/scheduled.ts`):
@@ -1574,7 +1575,7 @@ the desktop fork).
 
 Pages are built into Studio: collaborative documents you write together with
 your agents, in a Notion-style block editor with live multiplayer editing,
-comments, charts, embeds, version history and ordinary agent chats. They used
+charts, embeds, version history and ordinary agent chats. They used
 to be the separate Studio Pages plugin (`pages`). Pages keep that id as their
 namespace (`pages:<id>`), so tags, tabs, links, chats and backups carry over.
 A page opens as a Studio tab at `/plugins/studio/studio/pages/<id>`; links to
@@ -2707,14 +2708,14 @@ so it's as you left it when you come back.
   Default or still set to it (BB already shows Default for the missing
   palette; the write replaces the stored id), so no teal step shows at
   launch (`src/theme/legacy-theme.ts`).
-- **Automations tab.** In a thread's side panel, **+ → Automations** lists
+- **Scheduled tab.** In a thread's side panel, the **Scheduled** tab lists
   what is scheduled for that thread, from `loops.scheduled`: its todos with a
   time and the Bot automations that wake it, each with its kind and next run
   (or Paused). A row opens its todo or automation. It refreshes every 30
   seconds while it's visible.
-- **Automations badge.** A regular thread with something scheduled shows a
+- **Scheduled badge.** A regular thread with something scheduled shows a
   clock with the count ("2 scheduled") in its header; click it to open the
-  Automations tab. Bot threads show a **Bot info** button beside the cache
+  Scheduled tab. Bot threads show a **Bot info** button beside the cache
   dot instead.
 
 ![A regular staged thread without a workspace: its header shows the Automations count and no VS Code button.](assets/thread-header-automations.png)
@@ -3952,7 +3953,8 @@ after a restore. A backup made before the index restores the same way.
 
 ## How it works
 
-- Some kinds are built into Studio (Artifacts so far; see
+- Studio's own kinds are built in (pages, whiteboards, recordings, designs
+  and apps; see
   [`docs/merging-add-ons.md`](../../docs/merging-add-ons.md)). They implement
   the same provider contract in-process, keep the plugin id they had as add-ons,
   and open under Studio's one panel. Other add-ons reach them through Studio's

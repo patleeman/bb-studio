@@ -803,12 +803,12 @@ export function registerMinis(
   // `@mini` in any composer, and takes a mini app sent: `<id>/take/<take id>`.
   bb.ui.registerMentionProvider(defineItemMention({
     id: "mini",
-    label: "Mini apps",
+    label: "Apps",
     search({ query }) {
       const q = query.trim().toLowerCase();
       return store.list({ limit: 200 })
         .filter((row) => !q || displayName(row).toLowerCase().includes(q))
-        .map((row) => ({ id: row.id, title: displayName(row), subtitle: "Mini app" }));
+        .map((row) => ({ id: row.id, title: displayName(row), subtitle: "App" }));
     },
     resolve: (itemId) => {
       const take = /^(mini_[0-9a-f]{16})\/take\/(take_[0-9a-f]{16})$/.exec(itemId);

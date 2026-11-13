@@ -47,6 +47,7 @@ import { z } from "zod";
 import type { BotAutomationRunView, BotAutomationView, HeartbeatRun } from "./contract";
 import { automationId, automationName } from "./automation-names";
 import { lastRunMark, whenText, type BbEntry, type StudioEntry } from "./automation-table";
+import { MAINTENANCE_ID } from "./automation-table-contract";
 import { automationsPluginOff } from "./automations-plugin";
 import { runWatcherScript, type RunWatcherScript } from "./watcher-script";
 import { tmpdir } from "node:os";
@@ -184,7 +185,6 @@ export type CreateInput = {
 export type UpdateInput = Partial<Omit<CreateInput, "kind">> & { id: string };
 
 const HEARTBEAT_ID = "heartbeat";
-const MAINTENANCE_ID = "maintenance";
 /** A run's message is the first one its thread got from a little before the run started… */
 const RUN_MESSAGE_SLACK_MS = 60_000;
 /** …to a while after (a queued send waits for the thread to be free). */

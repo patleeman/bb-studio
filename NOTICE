@@ -40,7 +40,7 @@ plugins/packages/bb-studio/docs/theme-credits.md.
 
 Theme palettes (hex values read from the sources on 2026-11-11)
 
-  bb Default        https://github.com/get-bb/bb
+  Classic           https://github.com/get-bb/bb (bb's default look)
                     MIT. Copyright (c) 2026 Michael Yong
   One Dark          https://github.com/atom/atom (packages/one-dark-syntax,
                     packages/one-dark-ui)

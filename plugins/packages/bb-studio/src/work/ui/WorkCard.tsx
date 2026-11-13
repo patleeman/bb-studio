@@ -1,6 +1,7 @@
 import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useRef } from "react";
 import { remember } from "../../kit/app/directive-card";
+import { CHAT_CARD_BODY, CHAT_CARD_SKELETON, ChatCard, ChatCardAction, ChatCardFooter, ChatCardHeader } from "../../kit/app/chat-card";
 import { relativeTime } from "../../kit/format";
 import { Icon, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
@@ -35,7 +36,7 @@ function LiveWorkCard({ id, threadId, messageId }: { id: string; threadId: strin
     void call("work.anchor", { id, threadId, messageId }).catch(() => {});
   }, [unplaced, call, id, threadId, messageId]);
   if (missing) return <div className="my-1 flex items-center gap-2 text-xs text-muted-foreground"><Icon name="Unavailable" className="size-3.5" />This work card was removed.</div>;
-  if (!card) return <div className="my-2 h-24 w-full max-w-3xl animate-pulse rounded-lg border border-border/70 bg-muted/40 motion-reduce:animate-none" />;
+  if (!card) return <div className={cn(CHAT_CARD_SKELETON, "h-24")} />;
   return <WorkCardView card={card} />;
 }
 
@@ -43,29 +44,25 @@ export function WorkCardView({ card, now = Date.now() }: { card: WorkCard; now?:
   const navigate = useBbNavigate();
   const kind = KIND[card.kind];
   return (
-    <div data-testid="work-card" data-work-card-id={card.id} data-state={card.state} className="studio-work-card my-2 w-full max-w-3xl rounded-lg">
-      <div className="rounded-lg border border-border/70 bg-background px-4 py-3">
-        <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-          <Icon name={kind.icon} className="size-3.5 shrink-0" />
-          <span className="shrink-0">{kind.label}</span>
-          {card.step ? <><span aria-hidden>·</span><span data-testid="work-step" className="min-w-0 truncate">{card.step}</span></> : null}
-          <span className="ml-auto shrink-0" title={new Date(card.updatedAt).toLocaleString()}>{relativeTime(card.updatedAt, now)}</span>
-        </div>
-        <div className="mt-1 text-base font-semibold leading-snug text-foreground">{card.title}</div>
-        <div className="mt-1 flex min-w-0 items-center gap-2 text-sm">
+    <ChatCard data-testid="work-card" data-work-card-id={card.id} data-state={card.state} className="studio-work-card">
+      <ChatCardHeader icon={kind.icon} title={card.title}
+        meta={<>{kind.label}{card.step ? <> · <span data-testid="work-step">{card.step}</span></> : null}</>}
+        actions={<span className="shrink-0 pr-1.5 text-xs text-muted-foreground" title={new Date(card.updatedAt).toLocaleString()}>{relativeTime(card.updatedAt, now)}</span>} />
+      <div className={cn(CHAT_CARD_BODY, "flex flex-col gap-2 pt-0")}>
+        <div className="flex min-w-0 items-center gap-2 text-sm">
           <StateGlyph state={card.state} />
           <span data-testid="work-state" className={cn("shrink-0", card.state === "needs-you" ? "text-warning" : card.state === "failed" ? "text-destructive" : "text-foreground")}>{STATE[card.state]}</span>
           {card.line ? <span data-testid="work-line" className="min-w-0 truncate text-muted-foreground">{card.line}</span> : null}
         </div>
         {card.state === "needs-you" && card.needs ? (
-          <div data-testid="work-needs" className="mt-2 rounded-md border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-warning/5 px-2.5 py-1.5 text-sm text-foreground">{card.needs}</div>
-        ) : null}
-        {card.workerThreadId ? (
-          <button type="button" data-testid="work-open" onClick={() => navigate.toThread(card.workerThreadId!)} className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
-            <Icon name="ArrowUpRight" className="size-3" />Open {card.kind === "lead" ? "lead" : "worker"}
-          </button>
+          <div data-testid="work-needs" className="rounded-md border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-warning/5 px-2.5 py-1.5 text-sm text-foreground">{card.needs}</div>
         ) : null}
       </div>
-    </div>
+      {card.workerThreadId ? (
+        <ChatCardFooter>
+          <ChatCardAction icon="ArrowUpRight" data-testid="work-open" onClick={() => navigate.toThread(card.workerThreadId!)}>Open {card.kind === "lead" ? "lead" : "worker"}</ChatCardAction>
+        </ChatCardFooter>
+      ) : null}
+    </ChatCard>
   );
 }

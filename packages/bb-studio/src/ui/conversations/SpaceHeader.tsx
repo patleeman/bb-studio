@@ -4,9 +4,10 @@
 // its name, a status line ("2 running", "Paused", "Paused · in bb" for a
 // Bot a BB Studio copy imported and doesn't run, or nothing), and a ···
 // menu (Edit space…, Default model: what its new conversations start on,
-// Archive: the older page, New Bot); then the Bot's pages as rows: Memory, Library,
-// Automations and Todos (the primary Bot's, with Todos on; the count is what
-// needs Patrick now). The row of the page on screen is selected.
+// Archive: the older page, New Bot); then the Bot's pages as rows: Memory, Skills,
+// Library and Todos (with the Todos list on, the primary Bot's Todos page and
+// what needs Patrick now; else the Todos page at Scheduled). The row of the page
+// on screen is selected.
 import type { ReactNode } from "react";
 import type { BotSpace } from "../../bot-threads-contract";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "../../kit/app/index";
@@ -72,7 +73,7 @@ export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
 }) {
   // Each row drags as its page (src/tab-kinds.ts), for the workbench: a drop opens that page as a tab.
   const row = (id: SpacePage, label: string, glyph: ReactNode, extra?: ReactNode) => (
-    <button key={id} type="button" data-testid={`space-page-${id}`} aria-current={page === id ? "page" : undefined} onClick={() => onPage(id)} className={PAGE_ROW}
+    <button key={id} type="button" data-testid={`space-page-${id}`} aria-current={page === id || (id === "todos" && page === "automations") ? "page" : undefined} onClick={() => onPage(id)} className={PAGE_ROW}
       {...dragSourceProps(bot ? refDragItem({ kind: id satisfies TabKindId, id: bot.id }, label) : null)}>
       <span aria-hidden className="flex w-4 shrink-0 justify-center text-muted-foreground">{glyph}</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -102,10 +103,11 @@ export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
       </div>
       <nav aria-label="Bot pages" className="mt-2 flex flex-col gap-px">
         {row("memory", "Memory", <span className="text-sm leading-none">◈</span>)}
-        {row("skills", "Skills", <Icon name="BookOpen" className="size-4" />)}
+        {row("skills", "Skills", <Icon name="Toolbox" className="size-4" />)}
         {row("library", "Library", <Icon name="studio/library" className="size-4" />)}
-        {row("automations", "Automations", <Icon name="Clock" className="size-4" />)}
-        {todos !== null ? row("todos", "Todos", <Icon name="ListTodo" className="size-4" />, todos > 0 ? <span data-testid="space-todos-count" className="shrink-0 text-xs tabular-nums text-warning">{todos}</span> : null) : null}
+        {todos !== null
+          ? row("todos", "Todos", <Icon name="ListTodo" className="size-4" />, todos > 0 ? <span data-testid="space-todos-count" className="shrink-0 text-xs tabular-nums text-warning">{todos}</span> : null)
+          : row("automations", "Todos", <Icon name="ListTodo" className="size-4" />)}
       </nav>
     </header>
   );

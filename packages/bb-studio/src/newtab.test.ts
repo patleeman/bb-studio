@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { registerNewTabItems } from "./kit/app/host-sdk";
 import { newTabRecents, newTabSearch, shownKind, type NewTabSearchSources, type NewTabSources } from "./newtab";
-import { TAB_KIND_REGISTRY } from "./tab-kinds";
+import { kindsNamedBy, TAB_KIND_REGISTRY } from "./tab-kinds";
 import { newTabItems, openedEntries, openedSearch, openNewTabEntry, STUDIO_NEW_TAB_ITEMS } from "./ui/newtab-items";
 import type { OpenDeps } from "./ui/tab-open";
 
@@ -117,6 +117,10 @@ it("searches under each kind's plural, with Recent on its own registration", () 
   expect(STUDIO_NEW_TAB_ITEMS.map((registration) => registration.id)).not.toContain("kind-todo");
   expect(STUDIO_NEW_TAB_ITEMS.slice(1).every((registration) => !registration.useRecents && registration.search)).toBe(true);
   expect(STUDIO_NEW_TAB_ITEMS.map((registration) => registration.title)).not.toContain("Studio");
+  const titles = STUDIO_NEW_TAB_ITEMS.map((registration) => registration.title);
+  expect(titles.filter((title) => title === "Apps")).toHaveLength(1);
+  expect(titles).not.toContain("Artifacts");
+  expect(kindsNamedBy("apps")).toEqual(["app", "artifact"]);
 });
 
 it("registers only on a BB that has the New Tab slot", () => {

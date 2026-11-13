@@ -26393,10 +26393,17 @@
                     "design",
                     "app",
                     "artifact",
+                    "recording",
                     "other"
                   ]
                 },
                 "type": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "format": {
                   "type": [
                     "string",
                     "null"
@@ -26461,6 +26468,12 @@
                       "type": "null"
                     }
                   ]
+                },
+                "starred": {
+                  "type": "boolean"
+                },
+                "byBot": {
+                  "type": "boolean"
                 }
               },
               "required": [

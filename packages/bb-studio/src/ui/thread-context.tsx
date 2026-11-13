@@ -74,7 +74,7 @@ export function registerThreadContext(app: PluginAppBuilder): void {
   });
   app.slots.experimental_threadContextSegment({
     id: "thread-automations",
-    title: "Automations",
+    title: "Scheduled",
     group: CONTEXT_GROUP,
     order: 2,
     summary: ({ threadId, projectId }) => <ThreadAutomationsSummary threadId={threadId} projectId={projectId} />,

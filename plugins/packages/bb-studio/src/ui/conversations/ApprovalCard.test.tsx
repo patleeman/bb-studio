@@ -16,6 +16,7 @@ vi.mock("../live", () => ({
   useLive: () => ({ data: { worker: { threadId: "thr_lead", title: "Fable lead: sidebar rewrite", projectId: null }, approval: state.approval }, error: null, loading: false, refresh: state.refresh }),
   useCall: () => state.call,
 }));
+vi.mock("../../kit/ui/index", async () => (await import("../../loops/ui/test-kit")).kitUi);
 vi.mock("../../kit/app/index", () => ({ Icon: () => null }));
 
 import { ApprovalCard } from "./ApprovalCard";

@@ -25,6 +25,7 @@ vi.mock("../live", async () => {
     useCall: () => state.call,
   };
 });
+vi.mock("../../kit/ui/index", async () => (await import("../../loops/ui/test-kit")).kitUi);
 vi.mock("../../kit/app/index", () => ({ Icon: () => null }));
 
 import { ConversationApprovals, SETTLED_SHOW_MS } from "./ConversationApprovals";

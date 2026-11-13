@@ -33,7 +33,7 @@ export const SETTINGS_GROUPS: readonly { id: Exclude<SettingGroup, "attention">;
   { id: "replies", title: "Agent replies" },
   { id: "threads", title: "Threads" },
   { id: "windows", title: "Windows" },
-  { id: "jev", title: "Jev" },
+  { id: "jev", title: "Smart Queue model" },
   { id: "advanced", title: "Advanced" },
 ];
 
@@ -82,7 +82,7 @@ export const STUDIO_SETTINGS = {
   desktopControl: { group: "windows", type: "boolean", label: "Desktop control", default: false, hidden: true },
 
   // Jev
-  decisions_jevProvider: { group: "jev", type: "select", label: "Jev provider", options: jevProviderChoices, optionLabels: { auto: "Auto", typesafe: "TypeSafe", vercel: "Vercel AI Gateway", openrouter: "OpenRouter", "opencode-zen": "OpenCode Zen", custom: "Your own endpoint" }, default: "auto" },
+  decisions_jevProvider: { group: "jev", type: "select", label: "Provider", description: "Jev, the model that decides whether a message to a busy thread steers it or waits. Auto tries each provider with a key.", options: jevProviderChoices, optionLabels: { auto: "Auto", typesafe: "TypeSafe", vercel: "Vercel AI Gateway", openrouter: "OpenRouter", "opencode-zen": "OpenCode Zen", custom: "Your own endpoint" }, default: "auto" },
   decisions_customJevEndpoint: { group: "jev", type: "string", label: "Endpoint URL", description: "Any endpoint that speaks TypeSafe’s System One API, such as https://gateway.example.com/v1/systemone. HTTPS except on localhost.", default: "", maxLength: 2000 },
   decisions_customJevApiKeyCommand: { group: "jev", type: "string", label: "Or a command that prints the key", description: "Run on the BB server; the token is reused until its JWT expires, or for five minutes.", default: "", maxLength: 2000 },
   decisions_customJevHeaders: { group: "jev", type: "string", label: "Extra headers", description: "`name: value` pairs separated by semicolons, such as `source: bb; org-id: 2`.", default: "", maxLength: 4000 },

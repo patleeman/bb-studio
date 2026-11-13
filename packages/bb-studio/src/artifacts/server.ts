@@ -495,7 +495,7 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database, servic
   // `@artifact` in any composer.
   bb.ui.registerMentionProvider(defineItemMention({
     id: "artifact",
-    label: "Artifacts",
+    label: "Apps",
     search({ query }) {
       const needle = query.trim().toLowerCase();
       return store

@@ -39,7 +39,7 @@ function classic(spec: ClassicSpec): ThemePackage {
 
 export const BB_DEFAULT = classic({
   id: "bb-default",
-  name: "bb Default",
+  name: "Classic",
   palette: ["#ffffff", "#262626", "#151515", "#3bb974"],
   light: { canvas: "#ffffff", ink: "#333333", sidebar: "#fafafa", accent: "#262626", accentInk: "#ffffff", selection: "#262626", error: "#a5000f", warning: "#eb7c33", success: "#3bb974" },
   dark: { canvas: "#151515", ink: "#c1c1c1", sidebar: "#1b1b1b", accent: "#c4c4c4", accentInk: "#1a1a1a", selection: "#c4c4c4", error: "#cc323d", warning: "#fc8c45", success: "#4bc680" },

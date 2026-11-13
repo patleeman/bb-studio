@@ -9,7 +9,7 @@ import { contrastChecks } from "./checks";
 import { MIAMI } from "./builtin/miami";
 import { SCENE_THEMES } from "./registry";
 import { chosenAlpha, contrastReport, haloCoverage, HALO, HALO_LAYERS, mixLooks, openAreaMeasure, resolveLook, surfaceBackgrounds, backdropRange, TEXT_MIN, UI_MIN } from "./look";
-import { HEADER_CSS, CHROME_CSS, GUTTER_CSS, TABLE_CSS, BACKING_SELECTORS, PAGE_ROOTS, HALO_SELECTORS, lookTokens, PILL_SELECTOR, SCROLLER_SELECTORS, WORKBENCH, WORKBENCH_BODY, WORKBENCH_STRIP, SHADOW_CLIP_SELECTORS, THEME_CSS, HEADER_ROW, LIST_PAGE, RULES, RULE_CLASSES, TITLE_BOX, PAGE_BAR_BOX, PROMPT_CARDS, PROMPT_CARD_LINES, TOAST_CARD, GLASS_CHIPS, CLASSIC_FOOTER, STUDIO_RULE, GLASS_DIFF_CARD, diffBody } from "./tokens";
+import { STUDIO_CARD, STUDIO_CARD_CSS, HEADER_CSS, CHROME_CSS, GUTTER_CSS, TABLE_CSS, BACKING_SELECTORS, PAGE_ROOTS, HALO_SELECTORS, lookTokens, PILL_SELECTOR, SCROLLER_SELECTORS, WORKBENCH, WORKBENCH_BODY, WORKBENCH_STRIP, SHADOW_CLIP_SELECTORS, THEME_CSS, HEADER_ROW, LIST_PAGE, RULES, RULE_CLASSES, TITLE_BOX, PAGE_BAR_BOX, PROMPT_CARDS, PROMPT_CARD_LINES, TOAST_CARD, GLASS_CHIPS, CLASSIC_FOOTER, STUDIO_RULE, GLASS_DIFF_CARD, diffBody } from "./tokens";
 import { themeModes } from "./schema";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -432,5 +432,13 @@ describe("bb's chrome under Studio", () => {
     expect(HEADER_CSS).not.toMatch(/anchor|position: fixed|50%|409|66px/);
     expect(HEADER_CSS).toContain(':is([data-fork-header-group], [data-sidebar="trigger"]) { background: transparent;');
     expect(HEADER_CSS).toContain('html[data-studio-glass] [data-sidebar="inset"] header { border-color: transparent; background: transparent; padding-inline: 0;');
+  });
+});
+
+describe("chat cards under a scene theme", () => {
+  it("gives every chat card the same glass panel and no line, as diff cards have, and leaves a warning card its tint", () => {
+    expect(STUDIO_CARD).toBe('html[data-studio-glass] [data-sidebar="inset"] [data-studio-card]:not([data-studio-card-tone])');
+    expect(STUDIO_CARD_CSS).toContain(`${STUDIO_CARD} { border-color: transparent; background: var(--fork-panel); }`);
+    expect(THEME_CSS).toContain(STUDIO_CARD_CSS);
   });
 });

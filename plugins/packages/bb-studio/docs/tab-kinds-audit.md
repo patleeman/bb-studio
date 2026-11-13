@@ -34,35 +34,37 @@ as it).
 | Memory | added | added | added | added | had |
 | Skills | added | added | added | added | added |
 | Library | added | added | added | added | had |
-| Automations | added | added | added | added | had |
+| Scheduled | n/a [3] | n/a [4] | added | added | had |
 | Todos | added | added | added | added | had |
 | Archive | added | added | added | added | had |
-| Automation | added | n/a [3] | added | added | added |
-| Todo | added | n/a [4] | added | added | added |
-| Memory record | added | n/a [5] | added | added | added |
-| VS Code | added | added | n/a [6] | added | had |
-| File (bb) | had | had | n/a [7] | had | had |
-| Diff (bb) | n/a [8] | n/a [9] | n/a [10] | had | n/a [11] |
-| Browser (bb) | had | n/a [12] | n/a [10] | had | had |
-| Terminal (bb) | had | n/a [13] | n/a [10] | n/a [14] | n/a [15] |
-| Workflow run (bb) | had | n/a [16] | n/a [10] | added | had |
+| Automation | added | n/a [5] | added | added | added |
+| Todo | added | n/a [6] | added | added | added |
+| Memory record | added | n/a [7] | added | added | added |
+| VS Code | added | added | n/a [8] | added | had |
+| File (bb) | had | had | n/a [9] | had | had |
+| Diff (bb) | n/a [10] | n/a [11] | n/a [12] | had | n/a [13] |
+| Browser (bb) | had | n/a [14] | n/a [12] | had | had |
+| Terminal (bb) | had | n/a [15] | n/a [12] | n/a [16] | n/a [17] |
+| Workflow run (bb) | had | n/a [18] | n/a [12] | added | had |
 
 [1] The Library lists no recordings; drag one from the New Tab page's Recent or search, or Talk's Recordings page.
 [2] Boards have no row in Studio's sidebar; drag one from the New Tab page's Recent or search.
-[3] Automations change on their own and would crowd Recent; the New Tab search finds one.
-[4] Todos change on their own and would crowd Recent; the New Tab search finds one.
-[5] Memory records change on their own and would crowd Recent; the New Tab search finds one.
-[6] VS Code has no sidebar row; drag it from the New Tab page's Recent, or open it from the launcher or a file.
-[7] bb's own: files are dragged from Finder, which bb attaches to the composer.
-[8] bb's New Tab page lists no diffs; bb's Git panel opens them.
-[9] bb keeps no recent diffs.
-[10] bb's own: no row.
-[11] Replies don't link a diff; bb's change cards open it.
-[12] bb keeps no recent browser tabs.
-[13] bb keeps no recent terminals.
-[14] A terminal opens by starting one; the agent has no terminal id to open. workbench_focus selects an open one.
-[15] Replies don't link a terminal.
-[16] bb keeps no recent workflow runs.
+[3] The Todos page is the one entry; this address opens it at Scheduled.
+[4] Recent lists the Todos page once, under Todos.
+[5] Automations change on their own and would crowd Recent; the New Tab search finds one.
+[6] Todos change on their own and would crowd Recent; the New Tab search finds one.
+[7] Memory records change on their own and would crowd Recent; the New Tab search finds one.
+[8] VS Code has no sidebar row; drag it from the New Tab page's Recent, or open it from the launcher or a file.
+[9] bb's own: files are dragged from Finder, which bb attaches to the composer.
+[10] bb's New Tab page lists no diffs; bb's Git panel opens them.
+[11] bb keeps no recent diffs.
+[12] bb's own: no row.
+[13] Replies don't link a diff; bb's change cards open it.
+[14] bb keeps no recent browser tabs.
+[15] bb keeps no recent terminals.
+[16] A terminal opens by starting one; the agent has no terminal id to open. workbench_focus selects an open one.
+[17] Replies don't link a terminal.
+[18] bb keeps no recent workflow runs.
 
 ## Notes
 

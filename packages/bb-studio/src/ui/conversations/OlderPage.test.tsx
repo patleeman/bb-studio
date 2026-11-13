@@ -46,7 +46,7 @@ it("is the Archive: its header names it and the Bot, and each thread is one line
   // Newest first; a finished conversation says so, with Reopen.
   expect(titles(container.querySelector("section[aria-label=Conversations]")!)).toEqual(["Launch prep", "Great Wolf trip"]);
   const finished = container.querySelector<HTMLElement>("[data-testid=older-finished]")!;
-  expect(finished.querySelector("[data-testid=bot-page-row-status]")?.textContent).toBe("Finished");
+  expect(finished.querySelector("[data-testid=bot-page-row-status]")?.textContent).toBe("Archived");
   expect(finished.querySelector("[data-testid=bot-page-row-meta]")?.textContent).toBe("Nov 7");
   const sweep = [...container.querySelectorAll<HTMLElement>("[data-testid=older-worker]")].find((each) => each.textContent?.includes("Staff sweep"))!;
   expect(sweep.querySelector("[data-testid=bot-page-row-meta]")?.textContent).toBe("homelab · 1w");

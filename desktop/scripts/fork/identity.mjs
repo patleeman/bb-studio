@@ -3,6 +3,10 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  appTelemetryFiles,
+  telemetrySwitchProblems,
+} from "./identity-absent.mjs";
+import {
   findIdentityOverlaps,
   formatIdentityTable,
   readCommitIdentity,
@@ -265,16 +269,8 @@ for (const [file, pairs] of edits) {
   writeFileSync(target, text);
 }
 
-const absent = [
-  ["apps/app/src/views/SettingsView.tsx", "Share anonymous usage data"],
-  [
-    "apps/app/src/components/settings/settings-search.ts",
-    "Share anonymous usage data",
-  ],
-];
-for (const [file, text] of absent) {
-  if (!readFileSync(join(root, file), "utf8").includes(text)) continue;
-  console.error(`STILL PRESENT ${file}: ${text}`);
+for (const problem of telemetrySwitchProblems(appTelemetryFiles(root))) {
+  console.error(`STILL PRESENT ${problem}`);
   failed = true;
 }
 

@@ -252,8 +252,8 @@ function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed
     setEditing(false);
     void update({ id: loop.id, changes: place === "needs" ? { ...changes, status: "queued" } : changes });
   };
-  const changeTrigger = <DropdownMenuItem onSelect={() => setEditing(true)}><Icon name="DateTime" />Change trigger…</DropdownMenuItem>;
-  const drop = <DropdownMenuItem onSelect={() => void act({ id: loop.id, action: "drop" })}><Icon name="X" />Drop</DropdownMenuItem>;
+  const changeTrigger = <DropdownMenuItem onSelect={() => setEditing(true)}><Icon name="DateTime" />Change when…</DropdownMenuItem>;
+  const drop = <DropdownMenuItem onSelect={() => void act({ id: loop.id, action: "drop" })}><Icon name="X" />Dismiss</DropdownMenuItem>;
   const snooze = (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger><Icon name="Clock" />Snooze</DropdownMenuSubTrigger>
@@ -287,7 +287,7 @@ function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed
       <DropdownMenuItem onSelect={() => void act({ id: loop.id, action: "done" })}><Icon name="CircleCheck" />Done</DropdownMenuItem>
       {snooze}
       <DropdownMenuSub>
-        <DropdownMenuSubTrigger><Icon name="ArrowTurnForward" />Hand off</DropdownMenuSubTrigger>
+        <DropdownMenuSubTrigger><Icon name="ArrowTurnForward" />Give to</DropdownMenuSubTrigger>
         <DropdownMenuSubContent className="min-w-48">
           {people.targets.map((target) => <DropdownMenuItem key={target.owner} onSelect={() => void act({ id: loop.id, action: "hand_off", owner: target.owner })}><Icon name="Bot" />{target.name}</DropdownMenuItem>)}
         </DropdownMenuSubContent>
@@ -302,7 +302,7 @@ function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed
     ]} />;
   } else if (place === "coming") {
     items = <>
-      {mine ? <DropdownMenuItem onSelect={() => void update({ id: loop.id, surfaceNow: true })}><Icon name="ArrowUp" />Surface now</DropdownMenuItem> : null}
+      {mine ? <DropdownMenuItem onSelect={() => void update({ id: loop.id, surfaceNow: true })}><Icon name="ArrowUp" />Remind me now</DropdownMenuItem> : null}
       {changeTrigger}
     </>;
     meta = <>

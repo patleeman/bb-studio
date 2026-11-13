@@ -37,7 +37,7 @@ it("Studio's own: a switch to each other Bot, each settings section and a toggle
   await byTitle("Switch to Home").run();
   expect(runners.switchBot).toHaveBeenCalledWith("home");
   expect(entries.filter((each) => each.key.startsWith("studio:settings:")).map((each) => each.title)).toEqual([
-    "Studio settings: Voice", "Studio settings: Recordings and calls", "Studio settings: Agent replies", "Studio settings: Threads", "Studio settings: Windows", "Studio settings: Jev", "Studio settings: Advanced",
+    "Studio settings: Voice", "Studio settings: Recordings and calls", "Studio settings: Agent replies", "Studio settings: Threads", "Studio settings: Windows", "Studio settings: Smart Queue model", "Studio settings: Advanced",
   ]);
   await byTitle("Studio settings: Voice").run();
   expect(runners.openSettings).toHaveBeenCalledWith("voice");

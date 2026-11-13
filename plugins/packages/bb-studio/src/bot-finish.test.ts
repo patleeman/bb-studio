@@ -47,16 +47,17 @@ async function setup(options: { isBotThread?: (threadId: string) => boolean } = 
   return { bb, harness, db, store, finish, threads, send, archive, unarchive, events, records, tick: (ms: number) => { now += ms; } };
 }
 
-it("sends the finishing turn into the conversation: a visible line and the agent-only steps", async () => {
+it("sends the finishing turn into the conversation as agent-only steps, with no user bubble", async () => {
   const x = await setup();
   expect(await x.finish.rpc.bot_finish({ threadId: "prep" })).toEqual({ state: "finishing" });
   expect(x.send).toHaveBeenCalledTimes(1);
   const input = (x.send.mock.calls[0]![0] as { threadId: string; input: { text: string; visibility?: string }[] });
   expect(input.threadId).toBe("prep");
-  expect(input.input[0]).toMatchObject({ text: "Archive this conversation." });
-  expect(input.input[1]).toMatchObject({ visibility: "agent-only", text: finishInstruction({ threadId: "prep", title: "Launch prep" }) });
-  expect(input.input[1]!.text).toContain('memory_add: topic "Launch prep", the summary as text, source {"kind":"conversation","id":"prep","title":"Launch prep"}');
-  expect(input.input[1]!.text).toContain("bot_finish_done");
+  expect(input.input).toHaveLength(1);
+  expect(input.input.every((part) => part.visibility === "agent-only")).toBe(true);
+  expect(input.input[0]).toMatchObject({ visibility: "agent-only", text: finishInstruction({ threadId: "prep", title: "Launch prep" }) });
+  expect(input.input[0]!.text).toContain('memory_add: topic "Launch prep", the summary as text, source {"kind":"conversation","id":"prep","title":"Launch prep"}');
+  expect(input.input[0]!.text).toContain("bot_finish_done");
   // Pressing it again while it finishes sends nothing more.
   expect(await x.finish.rpc.bot_finish({ threadId: "prep" })).toEqual({ state: "finishing" });
   expect(x.send).toHaveBeenCalledTimes(1);
@@ -81,15 +82,15 @@ it("bot_finish_done archives the conversation with its summary, posts the card t
   expect(x.store.get("prep")).toMatchObject({ finishedSummary: SUMMARY });
   expect(x.store.get("prep")!.archivedAt).not.toBeNull();
   expect(x.store.listed("dot").map((each) => each.threadId)).not.toContain("prep");
-  // Main: the summary from the conversation, and the note that has the Bot post the card.
   const post = x.send.mock.calls[0]![0] as { threadId: string; senderThreadId: string; input: { text: string; visibility?: string }[] };
   expect(post).toMatchObject({ threadId: "thr_main", senderThreadId: "prep" });
-  expect(post.input[0]!.text).toBe(mainCard({ threadId: "prep", botId: "dot", title: "Launch prep", summary: SUMMARY }).text);
-  expect(post.input[0]!.text.split("\n")[0]).toBe("Archived “Launch prep” · summary saved");
-  expect(post.input[0]!.text).toContain("[Open the conversation](/threads/prep) · [See in Memory](/plugins/studio/studio/memory/dot)");
-  expect(post.input[1]).toMatchObject({ visibility: "agent-only" });
-  expect(post.input[1]!.text).toContain('::finished{thread="prep"}');
-  expect(x.store.get("thr_main")!.latest?.text).toBe("Archived “Launch prep” · summary saved");
+  expect(post.input).toHaveLength(1);
+  expect(post.input.every((part) => part.visibility === "agent-only")).toBe(true);
+  expect(post.input[0]!.text).toBe(mainCard({ threadId: "prep", botId: "dot", title: "Launch prep", summary: SUMMARY }).note);
+  expect(post.input[0]!.text).toContain(SUMMARY);
+  expect(post.input[0]!.text).toContain('::finished{thread="prep"}');
+  expect(post.input[0]!.text).not.toContain("summary saved");
+  expect(x.store.get("thr_main")!.latest?.text).toBe("Archived “Launch prep”");
   // BB's archive waits for the turn to end.
   expect(x.archive).not.toHaveBeenCalled();
   x.threads.set("prep", { ...x.threads.get("prep")!, status: "idle" });
@@ -140,8 +141,8 @@ it("archiving a conversation in BB starts the same summary step; Main, a worker 
   await vi.waitFor(() => expect(x.send).toHaveBeenCalledTimes(1));
   const input = x.send.mock.calls[0]![0] as { threadId: string; input: { text: string; visibility?: string }[] };
   expect(input.threadId).toBe("prep");
-  expect(input.input[0]).toMatchObject({ text: "Archive this conversation." });
-  expect(input.input[1]!.text).toContain("memory_add");
+  expect(input.input).toEqual([expect.objectContaining({ visibility: "agent-only" })]);
+  expect(input.input[0]!.text).toContain("memory_add");
   await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never });
   await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("thr_main") as never });
   await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("review") as never });
@@ -162,7 +163,7 @@ it("BB refuses a turn in an archived thread, so archiving unarchives the convers
   await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never });
   await vi.waitFor(() => expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ threadId: "prep" })));
   expect(x.unarchive).toHaveBeenCalledWith({ threadId: "prep" });
-  expect((x.send.mock.calls[0]![0] as { input: { text: string }[] }).input[0]).toMatchObject({ text: "Archive this conversation." });
+  expect((x.send.mock.calls[0]![0] as { input: { text: string; visibility?: string }[] }).input).toEqual([expect.objectContaining({ visibility: "agent-only" })]);
   await x.harness.callAgentTool("bot_finish_done", { summary: SUMMARY }, { threadId: "prep" });
   expect(x.store.get("prep")!.finishedSummary).toBe(SUMMARY);
   expect(x.records).toEqual([]);

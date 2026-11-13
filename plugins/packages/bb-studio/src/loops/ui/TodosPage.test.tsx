@@ -109,18 +109,26 @@ it("names itself in the header, and lists one line per todo in Today, This week,
   const meta = (title: string) => row(title).querySelector("[data-testid=bot-page-row-meta]");
   expect(meta("Pay the Con Edison bill")?.textContent).toBe("Overdue");
   expect(meta("Pay the Con Edison bill")?.className).toContain("text-warning");
-  expect(meta("Reply to Sam about the Q3 planning doc")?.textContent).toBe("Due Fri");
+  expect(meta("Reply to Sam about the Q3 planning doc")?.textContent).toBe("Due Fri, 3:00 PM");
   expect(meta("Send the October expense report")?.textContent).toBe("Wed");
   expect(meta("Call the plumber about the slow drain")?.textContent).toBe("When you get home");
   expect(meta("Draft the Larkspur Q4 lead summary")?.textContent).toBe("Larkspur lead");
   expect(meta("Signed lease addendum")?.textContent).toBe("Since Sun");
   expect(meta("Choose the deck contractor")).toBeNull();
   const prep = row("Review the onboarding flow");
-  expect(prep.textContent).toBe("Review the onboarding flowDue Nov 12");
+  expect(prep.textContent).toBe("Review the onboarding flowDue Nov 12, 3:00 PM");
   expect(container.textContent).not.toContain("q3-planning-notes");
   expect(container.textContent).not.toContain("Tomorrow morning card");
   // Done is folded.
   expect(group("Done")?.querySelectorAll("[data-testid=todo-done]")).toHaveLength(0);
+});
+
+it("draws an open todo with an empty circle and a done one with a check", async () => {
+  await render();
+  expect(row("Pay the Con Edison bill").querySelector("[data-icon]")?.getAttribute("data-icon")).toBe("Circle");
+  expect(container.querySelector("[data-testid=todo-row] [data-icon=CircleCheck]")).toBeNull();
+  await act(async () => group("Done")!.querySelector<HTMLButtonElement>("button[aria-expanded]")!.click());
+  expect(row("Closed 1").querySelector("[data-icon]")?.getAttribute("data-icon")).toBe("CircleCheck");
 });
 
 it("filters by area pills and search; area lives only in the filter bar", async () => {
@@ -155,6 +163,15 @@ it("a row opens the todo through the link router, and the todo tab shows its des
   expect(state.openLink).toHaveBeenLastCalledWith("bb://todo/loop_w", { source: "botPage", title: "Signed lease addendum", modifiers: { meta: false, ctrl: false, shift: true } });
 });
 
+it("the todo tab shows one Due row when the todo comes back at its due time", async () => {
+  (state.groups as typeof empty).comingUp.push(loop("loop_m", "Call Millers Flour", { status: "queued", push: true, due: NOW + DAY - 6 * 3_600_000, trigger: { type: "time", at: NOW + DAY - 6 * 3_600_000 } }));
+  await render();
+  await openRow("Call Millers Flour");
+  const facts = [...detail()!.querySelectorAll("dt")].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
+  expect(facts).toEqual([["Due", "Tomorrow 9:00 AM"], ["Owner", "You"]]);
+  expect(detail()!.querySelector("dd [data-icon=Smartphone]")).not.toBeNull();
+});
+
 it("a deleted todo's tab says Not found, with its link", async () => {
   await openTab("loop_gone");
   expect(detail()).toBeNull();
@@ -167,7 +184,7 @@ it("a deleted todo's tab says Not found, with its link", async () => {
   state.getError = null;
 });
 
-it("acts from the detail: Done, choose, Surface now, Take it back, Open thread, Nudge them and Undo", async () => {
+it("acts from the detail: Done, choose, Remind me now, Take it back, Open thread, Nudge them and Undo", async () => {
   await render();
   await openRow("Reply to Sam about the Q3 planning doc");
   await act(async () => buttonIn(detail()!, "Done").click());
@@ -176,7 +193,7 @@ it("acts from the detail: Done, choose, Surface now, Take it back, Open thread, 
   await act(async () => buttonIn(detail()!, "Hudson").click());
   expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_d", action: "choose", option: "Hudson" });
   await openRow("Call the plumber about the slow drain");
-  await act(async () => buttonIn(detail()!, "Surface now").click());
+  await act(async () => buttonIn(detail()!, "Remind me now").click());
   expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_c", surfaceNow: true });
   await openRow("Draft the Larkspur Q4 lead summary");
   await act(async () => buttonIn(detail()!, "Take it back").click());
@@ -193,11 +210,23 @@ it("acts from the detail: Done, choose, Surface now, Take it back, Open thread, 
   expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_x1", changes: { status: "surfaced" } });
 });
 
+it("names a todo's actions in plain words: Remind me now, Give to, Change when, Dismiss", async () => {
+  await render();
+  await openRow("Call the plumber about the slow drain");
+  const labels = [...detail()!.querySelectorAll("button")].map((each) => each.textContent?.trim());
+  expect(labels).toEqual(expect.arrayContaining(["Done", "Remind me now", "Snooze", "Give to", "Discuss", "Change when", "Dismiss"]));
+  for (const old of ["Surface now", "Hand off", "Change trigger", "Drop"]) expect(labels).not.toContain(old);
+  await act(async () => buttonIn(detail()!, "Dismiss").click());
+  expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_c", action: "drop" });
+  await act(async () => buttonIn(detail()!, "Chief of Staff").click());
+  expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_c", action: "hand_off", owner: "cos" });
+});
+
 it("changes a trigger from the detail to a phone place with Send to iPhone", async () => {
   await render();
   await openRow("Call the plumber about the slow drain");
-  await act(async () => buttonIn(detail()!, "Change trigger").click());
-  const form = tabHost.querySelector("form[aria-label='Change trigger']")!;
+  await act(async () => buttonIn(detail()!, "Change when").click());
+  const form = tabHost.querySelector("form[aria-label='Change when']")!;
   expect([...form.querySelectorAll("[role=radiogroup][aria-label=Place] label")].map((each) => each.textContent)).toEqual(["Home", "Office", "Mom’s"]);
   await act(async () => ([...form.querySelectorAll("input[type=radio]")][1] as HTMLInputElement).click());
   await act(async () => buttonIn(form, "Leave").click());

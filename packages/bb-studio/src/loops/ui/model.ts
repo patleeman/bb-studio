@@ -9,7 +9,7 @@ export type Trigger = Loop["trigger"];
 export type SnoozePreset = "later_today" | "tonight" | "tomorrow_morning" | "this_weekend" | "home";
 
 export const KIND: Record<LoopKind, { label: string; icon: string }> = {
-  do: { label: "Do", icon: "CircleCheck" },
+  do: { label: "Do", icon: "Circle" },
   decide: { label: "Decide", icon: "Fork" },
   read: { label: "Read", icon: "FileText" },
   waiting: { label: "Waiting on others", icon: "TimeSchedule" },
@@ -28,6 +28,7 @@ const DAY = 86_400_000;
 const time = (at: number) => new Date(at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 const weekday = (at: number) => new Date(at).toLocaleDateString("en-US", { weekday: "short" });
 const startOfDay = (at: number) => { const d = new Date(at); d.setHours(0, 0, 0, 0); return d.getTime(); };
+const hasClock = (at: number) => { const d = new Date(at); const minute = d.getHours() * 60 + d.getMinutes(); return minute !== 0 && minute !== 24 * 60 - 1; };
 
 /** "3:00 PM" today, "Fri" this week, "Nov 9" later. */
 export function shortWhen(at: number, now = Date.now()): string {
@@ -51,9 +52,10 @@ export function dueLabel(due: number | null, now = Date.now()): { text: string; 
   if (due === null) return null;
   const days = Math.round((startOfDay(due) - startOfDay(now)) / DAY);
   if (days < 0) return { text: "Overdue", urgent: true };
-  if (days === 0) return { text: "Due today", urgent: true };
-  if (days === 1) return { text: "Due tomorrow", urgent: false };
-  return { text: `Due ${shortWhen(due, now)}`, urgent: false };
+  const clock = hasClock(due) ? `, ${time(due)}` : "";
+  if (days === 0) return { text: `Due today${clock}`, urgent: true };
+  if (days === 1) return { text: `Due tomorrow${clock}`, urgent: false };
+  return { text: `Due ${shortWhen(due, now)}${clock}`, urgent: false };
 }
 
 const titleCase = (name: string) => name.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
@@ -144,13 +146,13 @@ export function ownerThread(owner: string, botThreadId: string | null, resolved?
 type History = { type: string; at: number; data: string }[];
 const parse = (data: string): Record<string, unknown> => { try { return JSON.parse(data) as Record<string, unknown>; } catch { return {}; } };
 
-/** How a closed todo ended: "Done", "Got it", "Dropped", or the option chosen. */
+/** How a closed todo ended: "Done", "Got it", "Dismissed", or the option chosen. */
 export function closedVerb(loop: Loop, history: History): string {
   const closed = [...history].reverse().find((each) => each.type === "closed");
   const data = closed ? parse(closed.data) : {};
   if (data.action === "choose" && typeof data.option === "string") return optionParts(data.option).label;
   if (data.action === "got_it") return "Got it";
-  if (loop.status === "dropped" || data.action === "drop") return "Dropped";
+  if (loop.status === "dropped" || data.action === "drop") return "Dismissed";
   return "Done";
 }
 

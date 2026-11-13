@@ -8,12 +8,14 @@ import { z } from "zod";
 export const automationTableKind = z.enum(["watcher", "checkin", "schedule", "reminder", "runner", "bb"]);
 export type AutomationTableKind = z.infer<typeof automationTableKind>;
 
+export const MAINTENANCE_ID = "maintenance";
+
 export const automationTableRow = z.object({
   /** The row's id: the Studio automation's (`aut_…`, `heartbeat`, `maintenance`), the runner's (`run_…`), or the bb automation's (`auto_…`) for kind "bb". */
   id: z.string(),
   kind: automationTableKind,
   name: z.string(),
-  /** The schedule in a few words, 24-hour: "Daily 07:45", "Every 2 h, 08:00–23:00", "Weekdays 09:00", "Sun 10:15". */
+  /** The schedule in a few words, 12-hour: "Daily 7:45 AM", "Every 2 h, 8:00 AM–11:00 PM", "Weekdays 9:00 AM", "Sun 10:15 AM". */
   when: z.string(),
   lastRunAt: z.number().nullable(),
   /** How the latest run went: "ok" (ran or had nothing to do), "failed", or null when unknown or never run. */

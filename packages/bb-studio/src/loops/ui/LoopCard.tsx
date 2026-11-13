@@ -1,7 +1,7 @@
 // `::loop{id="loop_…"}` in the Bot's chat: one open todo as a card Patrick
 // acts on in place (docs/attention-router/backend.md). Each kind has its own
-// buttons: do (Done, Snooze, Hand off, Drop), decide (its options, Snooze),
-// read (Got it) and waiting (Nudge them, Drop). A handed-off todo shows who is
+// buttons: do (Done, Snooze, Give to, Dismiss), decide (its options, Snooze),
+// read (Got it) and waiting (Nudge them, Dismiss). A handed-off todo shows who is
 // on it, live; a closed one collapses to a line with Undo.
 //
 // The morning card's rows are `::loop{id row="1"}`, a compact line that opens
@@ -14,6 +14,7 @@ import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-
 import { useEffect, useState } from "react";
 import { Icon, cn } from "../../kit/ui/index";
 import { remember } from "../../kit/app/index";
+import { CHAT_CARD, CHAT_CARD_ACTION, CHAT_CARD_BODY, CHAT_CARD_HEAD, CHAT_CARD_ICON_BUTTON, CHAT_CARD_SKELETON, ChatCard, ChatCardHeader } from "../../kit/app/chat-card";
 import { useLive } from "../../ui/live";
 import type { Loop } from "../contract";
 import { CARD_BUTTON, CARD_GHOST, CARD_PRIMARY, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu } from "./LoopMenus";
@@ -65,7 +66,7 @@ function LiveLoop({ id, row }: { id: string; row: boolean }) {
   if (missing) return <div className="my-1 flex items-center gap-2 text-xs text-muted-foreground"><Icon name="Unavailable" className="size-3.5" />This todo was removed.</div>;
   if (!view) return row
     ? <div className="h-8 animate-pulse rounded-md bg-muted/40 motion-reduce:animate-none" />
-    : <div className="my-2 h-28 w-full max-w-3xl animate-pulse rounded-lg border border-border/70 bg-muted/40 motion-reduce:animate-none" />;
+    : <div className={cn(CHAT_CARD_SKELETON, "h-28")} />;
   return row ? <LoopRow view={view} people={people} refresh={live.refresh} /> : <LoopCard view={view} people={people} refresh={live.refresh} />;
 }
 
@@ -76,13 +77,13 @@ export function LoopCard({ view, people, refresh, bare = false }: { view: LoopVi
   if (loop.closedAt !== null) return <ClosedLine view={view} refresh={refresh} />;
   const release = releaseLabel(loop, history);
   return (
-    <div className={cn("w-full max-w-3xl", !bare && "my-2")} data-testid="loop-card" data-kind={loop.kind}>
+    <div className={cn("w-full", !bare && "my-2")} data-testid="loop-card" data-kind={loop.kind}>
       {bare ? null : (
         <div className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
           <Icon name={release.icon} className="size-3.5" />{release.text}
         </div>
       )}
-      <div className="rounded-lg border border-border/70 bg-background px-4 py-3">
+      <div data-studio-card="" className={cn(CHAT_CARD, CHAT_CARD_BODY, "my-0")}>
         {loop.owner === "patrick"
           ? <OpenCard loop={loop} people={people} refresh={refresh} now={now} />
           : <HandedOff loop={loop} history={history} owner={view.owner} people={people} refresh={refresh} now={now} />}
@@ -114,7 +115,7 @@ function Header({ loop, now, label }: { loop: Loop; now: number; label?: string 
 
 function Body({ loop }: { loop: Loop }) {
   return <>
-    <div className="mt-1 text-base font-semibold leading-snug text-foreground">{loop.title}</div>
+    <div data-studio-card-title="" className="mt-1 text-sm font-medium leading-snug text-foreground">{loop.title}</div>
     {loop.why ? <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{loop.why}</p> : null}
   </>;
 }
@@ -124,7 +125,7 @@ function OpenCard({ loop, people, refresh, now }: { loop: Loop; people: LoopPeop
   const [note, setNote] = useState<string | null>(null);
   const snooze = <SnoozeMenu disabled={busy} onSnooze={(preset) => void act({ id: loop.id, action: "snooze", snooze: preset })}
     onPick={(at) => void update({ id: loop.id, changes: { status: "snoozed", trigger: { type: "time", at } } })} />;
-  const drop = <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void act({ id: loop.id, action: "drop" })}><Icon name="X" />Drop</button>;
+  const drop = <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void act({ id: loop.id, action: "drop" })}><Icon name="X" />Dismiss</button>;
   let actions;
   if (loop.kind === "decide") {
     actions = <>
@@ -160,7 +161,7 @@ function OpenCard({ loop, people, refresh, now }: { loop: Loop; people: LoopPeop
 
 const STALE_MS = 3 * 86_400_000;
 
-/** The weekly stale review (src/loops/scheduler.ts): no update in three days, Keep or Drop. */
+/** The weekly stale review (src/loops/scheduler.ts): no update in three days, Keep or Dismiss. */
 function Stale({ loop, refresh, now }: { loop: Loop; refresh(): void; now: number }) {
   const { act, busy, error } = useLoopActions(refresh);
   return (
@@ -168,7 +169,7 @@ function Stale({ loop, refresh, now }: { loop: Loop; refresh(): void; now: numbe
       <Icon name="TimeSchedule" className="size-3.5" />No update in {elapsed(loop.updatedAt, now)}. Still on it?
       <span className="ml-auto flex gap-1.5">
         <button type="button" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: loop.id, action: "keep" })}><Icon name="Check" />Keep</button>
-        <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void act({ id: loop.id, action: "drop" })}><Icon name="X" />Drop</button>
+        <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void act({ id: loop.id, action: "drop" })}><Icon name="X" />Dismiss</button>
       </span>
       {error ? <p role="alert" className="w-full text-destructive">{error}</p> : null}
     </div>
@@ -209,14 +210,14 @@ function ClosedLine({ view, refresh }: { view: LoopView; refresh(): void }) {
   const verb = closedVerb(loop, history);
   const dropped = loop.status === "dropped";
   return (
-    <div className="my-1.5 w-full max-w-3xl" data-testid="loop-closed">
-      <div className="flex min-h-9 items-center gap-2 rounded-lg border border-border/70 bg-background px-3 py-1.5 text-sm">
+    <div className="my-2 w-full" data-testid="loop-closed">
+      <div data-studio-card="" className={cn(CHAT_CARD, CHAT_CARD_HEAD, "my-0 flex-row")}>
         <Icon name={dropped ? "X" : loop.kind === "decide" ? "Fork" : "CircleCheck"} className={cn("size-4 shrink-0", dropped ? "text-muted-foreground" : "text-success")} />
         <span className="shrink-0 font-medium text-foreground">{verb}</span>
         <span className="min-w-0 truncate text-muted-foreground">· {loop.title}</span>
         <span className="ml-auto shrink-0 text-xs text-muted-foreground">{loop.closedAt ? shortWhen(loop.closedAt) : ""}{loop.closedBy && loop.closedBy !== "patrick" ? " · closed by the Bot" : ""}</span>
         <button type="button" aria-label={`Undo ${verb.toLowerCase()}`} title="Undo" disabled={busy} onClick={() => void update({ id: loop.id, changes: { status: "surfaced" } })}
-          className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:opacity-50">
+          className={CHAT_CARD_ICON_BUTTON}>
           <Icon name="ArrowTurnBackward" className="size-3.5" />
         </button>
       </div>
@@ -297,13 +298,9 @@ function LoopsOpenCard() {
   const list = useLive("loops.list", {}, { pollMs: 60_000 });
   const summary = loopsSummary(list.data);
   return (
-    <div data-testid="loops-open" className="my-2 flex w-full max-w-xl flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border/70 bg-background px-4 py-3">
-      <Icon name="ListTodo" className="size-4 shrink-0 text-muted-foreground" />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="text-sm font-medium text-foreground">Todos</span>
-        <span className="text-xs text-muted-foreground">{summary || "\u00a0"}</span>
-      </div>
-      <button type="button" className={CARD_PRIMARY} onClick={() => openPane(people.botId)}><Icon name="PanelRight" />Open Todos</button>
-    </div>
+    <ChatCard data-testid="loops-open">
+      <ChatCardHeader icon="ListTodo" title="Todos" meta={summary || undefined}
+        actions={<button type="button" className={CHAT_CARD_ACTION} onClick={() => openPane(people.botId)}><Icon name="PanelRight" />Open Todos</button>} />
+    </ChatCard>
   );
 }

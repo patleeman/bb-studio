@@ -81,7 +81,7 @@ it("draws a do card with its release label, source, due and the four actions", a
   expect(container.textContent).toContain("He asked for your input");
   expect(container.textContent).toContain("Email from Sam B.");
   expect(container.textContent).toContain("Due Thu");
-  for (const label of ["Done", "Snooze", "Hand off", "Drop"]) expect(button(label)).toBeTruthy();
+  for (const label of ["Done", "Snooze", "Give to", "Dismiss"]) expect(button(label)).toBeTruthy();
   await click("Done");
   expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_1", action: "done" });
 });

@@ -327,7 +327,7 @@ export function repoTag(thread: Pick<ThreadFacts, "environmentName" | "environme
 
 /** The first line of a reply, short, for a conversation's second line; null for a quiet "[PASS]". */
 export function latestLine(text: string | null | undefined): string | null {
-  const clean = (text ?? "").replace(/::[a-z-]+\{[^}]*\}/g, "").replace(/[*_`#>]+/g, "").split("\n").map((line) => line.trim()).find((line) => line.length > 0) ?? "";
+  const clean = (text ?? "").replace(/::[a-z-]+\{[^}]*\}/g, "").replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[*_`#>]+/g, "").split("\n").map((line) => line.trim()).find((line) => line.length > 0) ?? "";
   if (!clean || /^\[PASS\]$/i.test(clean)) return null;
   return clean.length > LATEST_MAX ? `${clean.slice(0, LATEST_MAX - 1)}…` : clean;
 }
@@ -1114,7 +1114,7 @@ export class BotThreads {
     return after;
   }
 
-  /** Writes a conversation's second line directly (Main's "Finished “…” · summary saved"). */
+  /** Writes a conversation's second line directly (Main's "Archived “…”"). */
   setLatest(threadId: string, text: string): void {
     const result = this.deps.db.prepare("UPDATE bot_threads SET latest = ?, latest_at = ?, updated_at = ? WHERE thread_id = ? AND kind = 'conversation'").run(text.slice(0, LATEST_MAX), this.now(), this.now(), threadId);
     if (result.changes) this.deps.changed(rowChanges(null, this.get(threadId)));

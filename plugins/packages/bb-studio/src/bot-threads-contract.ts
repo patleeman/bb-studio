@@ -103,19 +103,22 @@ const threadInfo = z.object({
   workers: z.array(z.object({ threadId: z.string(), title: z.string(), status: workerStatus })),
 });
 
-const libraryKind = z.enum(["page", "whiteboard", "design", "app", "artifact", "other"]);
+const libraryKind = z.enum(["page", "whiteboard", "design", "app", "artifact", "recording", "other"]);
 const libraryItem = z.object({
   pluginId: z.string(),
   id: z.string(),
   title: z.string(),
-  /** The Library's flat kind; `type` is the item's own (doc, mini, artifact…). */
+  /** The Library's flat kind; `type` is the item's own (doc, mini, artifact…), `format` a saved file's (markdown, html, image…). */
   kind: libraryKind,
   type: z.string().nullable(),
+  format: z.string().nullable().optional(),
   href: z.string().nullable(),
   updatedAt: z.number(),
   createdAt: z.number().nullable(),
-  /** Who made it: a conversation or a worker of the Bot; null when Patrick made it himself. */
+  /** Who made it: a conversation or a worker of the Bot; null when Patrick made it himself, or the Bot outside its threads (`byBot`). */
   madeIn: z.object({ threadId: z.string(), title: z.string(), kind, conversationId: z.string().nullable(), conversationTitle: z.string().nullable() }).nullable(),
+  starred: z.boolean().optional(),
+  byBot: z.boolean().optional(),
 });
 
 /** A finished conversation, for Main's card and the finished banner (src/bot-finish.ts). */

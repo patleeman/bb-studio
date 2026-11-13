@@ -179,7 +179,7 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
   item("whiteboard", "Whiteboard", "Whiteboards", "Edit", {}, true),
   item("design", "Design", "Designs", "Palette", {}, true),
   item("app", "App", "Apps", "AppWindow", { newTab: "added", recent: "added", workbenchOpen: "added" }, true),
-  item("artifact", "Artifact", "Artifacts", "studio/artifact", { newTab: "added", recent: "added", workbenchOpen: "added" }, false),
+  item("artifact", "Artifact", "Apps", "studio/artifact", { newTab: "added", recent: "added", workbenchOpen: "added" }, false),
   item("recording", "Recording", "Recordings", "Mic", { newTab: "added", recent: "added", workbenchOpen: "added", sidebarDrag: { na: "The Library lists no recordings; drag one from the New Tab page's Recent or search, or Talk's Recordings page." } }, false),
   {
     id: "board", name: "Visual Chat board", plural: "Visual Chat boards", icon: "AppWindow", owner: "visual-chat", ref: "thread", open: { via: "plugin", pluginId: VISUAL_CHAT_PLUGIN, tabId: TAB_IDS.board },
@@ -187,9 +187,17 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
     surfaces: { newTab: "had", recent: "had", sidebarDrag: { na: "Boards have no row in Studio's sidebar; drag one from the New Tab page's Recent or search." }, workbenchOpen: "added", chatLink: "had" },
   },
   botPage("memory", "Memory", "Brain", TAB_IDS.memory),
-  botPage("skills", "Skills", "BookOpen", TAB_IDS.skills, "added"),
+  botPage("skills", "Skills", "Toolbox", TAB_IDS.skills, "added"),
   botPage("library", "Library", "studio/library", TAB_IDS.library),
-  botPage("automations", "Automations", "Clock", TAB_IDS.automations),
+  {
+    ...botPage("automations", "Scheduled", "ListTodo", TAB_IDS.automations),
+    actions: [], recents: null,
+    surfaces: {
+      newTab: { na: "The Todos page is the one entry; this address opens it at Scheduled." },
+      recent: { na: "Recent lists the Todos page once, under Todos." },
+      sidebarDrag: "added", workbenchOpen: "added", chatLink: "had",
+    },
+  },
   botPage("todos", "Todos", "ListTodo", TAB_IDS.todos),
   botPage("archive", "Archive", "Archive", TAB_IDS.archive),
   pageRow("automation", "Automation", "Automations", "Clock", TAB_IDS.automation, "Automations page"),

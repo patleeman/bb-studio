@@ -4,7 +4,7 @@ The classic themes in `src/theme/builtin/classic.ts` use these projects' publish
 
 | Theme | Source | License | Copyright |
 |---|---|---|---|
-| bb Default | https://github.com/get-bb/bb (`apps/app/src/components/ui/theme.css`; oklch tokens converted to hex) | MIT | Copyright (c) 2026 Michael Yong |
+| Classic (bb's default look) | https://github.com/get-bb/bb (`apps/app/src/components/ui/theme.css`; oklch tokens converted to hex) | MIT | Copyright (c) 2026 Michael Yong |
 | One Dark | https://github.com/atom/atom/tree/master/packages/one-dark-syntax (`styles/colors.less`); sidebar from `packages/one-dark-ui` (`@level-3-color`) | MIT | Copyright (c) 2016 GitHub Inc. (one-dark-syntax); Copyright (c) 2014 GitHub Inc. (one-dark-ui) |
 | Dracula | https://draculatheme.com/spec; sidebar `BGDark` from https://github.com/dracula/visual-studio-code | MIT | Copyright (c) 2023 Dracula Theme (dracula-theme); Copyright (c) 2016 Dracula Theme (visual-studio-code) |
 | Solarized Light | https://github.com/altercation/solarized | MIT | Copyright (c) 2011 Ethan Schoonover |
@@ -84,7 +84,7 @@ Checked on 2026-11-11 on macOS 26.6.2 with `system_profiler SPFontsDataType`, th
 | Data City | glyph atlas (canvas) | ui-monospace | System font | SF Mono SemiBold, else Menlo Bold |
 | Template for agent-made themes | heading, body | -apple-system | System font | SF Pro, each heading at its own weight |
 | Template for agent-made themes | mono | ui-monospace | System font | SF Mono |
-| bb Default, One Dark, Dracula, Solarized Light, GitHub Light, GitHub Dark, Nord, Catppuccin Mocha | heading, body | Inter Variable | Not a system font; bb ships it (`@fontsource-variable/inter`) | Inter Variable, each heading at its own weight |
+| Classic, One Dark, Dracula, Solarized Light, GitHub Light, GitHub Dark, Nord, Catppuccin Mocha | heading, body | Inter Variable | Not a system font; bb ships it (`@fontsource-variable/inter`) | Inter Variable, each heading at its own weight |
 | The same eight | mono | ui-monospace | System font | SF Mono |
 
 Later names in the stacks, on this Mac: Futura (Medium, Medium Italic, Bold, two Condensed), Gill Sans, Avenir Next Condensed, Trebuchet MS, Arial Narrow, Palatino, Hoefler Text, Georgia, Menlo and Monaco are installed. Century Gothic, Eurostile and Bank Gothic are not. "SF Pro Text", "SF Pro Display" and "SF Mono" are not installed under those names; the stacks reach San Francisco through `-apple-system` and `ui-monospace`, which come first.

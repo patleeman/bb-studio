@@ -20,6 +20,7 @@ vi.mock("../live", () => ({
   useLive: (_method: string, input: { threadId: string }) => ({ data: { info: input.threadId === "main" ? info("main", true) : input.threadId === "panel" ? info("panel", false) : null }, error: null, loading: false, refresh: () => {} }),
   useCall: () => async () => ({}),
 }));
+vi.mock("../../kit/ui/index", async () => (await import("../../loops/ui/test-kit")).kitUi);
 vi.mock("../../kit/app/index", () => ({
   Icon: () => null,
   DropdownMenu: () => null, DropdownMenuTrigger: () => null, DropdownMenuContent: () => null, DropdownMenuItem: () => null,

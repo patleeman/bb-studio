@@ -82,7 +82,7 @@ describe("the registry", () => {
     const own = { ...structuredClone(GRID), id: "neon", name: "Neon" };
     const registry = createThemeRegistry([own, { ...own, id: "grid" }, { nonsense: true }]);
     expect(registry.scenes().map((entry) => entry.theme.id)).toEqual(["miami-1985", "event-horizon", "grid", "kyoto-garden", "forest", "aurora-fjord", "tonights-sky", "data-city", "deep-sea", "neon"]);
-    expect(registry.classics().map((entry) => entry.theme.name)).toEqual(["bb Default", "One Dark", "Dracula", "Solarized Light", "GitHub Light", "GitHub Dark", "Nord", "Catppuccin Mocha"]);
+    expect(registry.classics().map((entry) => entry.theme.name)).toEqual(["Classic", "One Dark", "Dracula", "Solarized Light", "GitHub Light", "GitHub Dark", "Nord", "Catppuccin Mocha"]);
     expect(registry.get("neon")?.name).toBe("Neon");
     expect(registry.get("grid")).toBe(GRID);
     expect(registry.list().find((entry) => entry.theme.id === "neon")?.source).toBe("stored");

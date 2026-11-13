@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { CONTINUE_TOOL, continueInNew, continueResult, continuedLines, handoffText, registerContinueNew, sourceSeqOf, type ContinueDeps } from "./continue-new";
+import { CONTINUE_TOOL, continueInNew, continueResult, continuedFromLine, continuedLines, handoffText, registerContinueNew, sourceSeqOf, type ContinueDeps } from "./continue-new";
 import { MIGRATIONS } from "./migrations";
 import { findCardMessage, type TimelineReader } from "./work/register";
 import { WorkCardStore } from "./work/store";
@@ -63,7 +63,10 @@ it("starts a conversation of the same Bot from the handoff, not the transcript",
   expect(request).not.toHaveProperty("sourceThreadId");
   expect(request).not.toHaveProperty("sourceSeqEnd");
   for (const forkOnly of ["parentThreadId", "originKind", "startedOnBehalfOf", "senderThreadId"]) expect(request).not.toHaveProperty(forkOnly);
-  const text = (request.input as { text: string }[])[0]!.text;
+  const input = request.input as { text: string; visibility?: string }[];
+  expect(input[0]).toEqual({ type: "text", text: "Continued from another conversation", mentions: [] });
+  expect(input[1]!.visibility).toBe("agent-only");
+  const text = input[1]!.text;
   expect(text.startsWith("Continued from @thread:thr_main#msg=14\n\n**Decisions**")).toBe(true);
   expect(text).toContain("Dark mode?");
   for (const row of TIMELINE) if (row.text) expect(text).not.toContain(row.text);
@@ -99,7 +102,7 @@ it("moves the topic's work cards: each conversation's In flight list shows only 
   expect(work.get(other.id).threadId).toBe("thr_elsewhere");
   expect(work.inFlight("thr_main").map((card) => card.id)).toEqual([trip.id]);
   expect(work.inFlight("thr_hud").map((card) => card.id)).toEqual([hud.id]);
-  const text = (spawned[0]!.input as { text: string }[])[0]!.text;
+  const text = (spawned[0]!.input as { text: string }[])[1]!.text;
   expect(text).toContain(`**Moved here:** HUD mockups. Post each card once, on its own line, in your first reply: \`::work{id="${hud.id}"}\``);
   expect(text.endsWith("**First:** Show the two layouts and ask which")).toBe(true);
   const read: TimelineReader = async (threadId) => ({ rows: threadId === "thr_hud" ? [{ id: "r1", kind: "conversation", role: "assistant", text: `Picking up the HUD.\n\n::work{id="${hud.id}"}`, messageSeq: 3 }] : [] });
@@ -115,6 +118,12 @@ it("refuses a worker, a thread with no project, and bad input, and starts nothin
   expect(spawned).toEqual([]);
 });
 
+it("opens with one plain line naming where it came from: Main, or the conversation's title", () => {
+  expect(continuedFromLine({ isMain: true, title: "Assistant" })).toBe("Continued from Main");
+  expect(continuedFromLine({ isMain: false, title: "Spring  menu" })).toBe("Continued from “Spring menu”");
+  expect(continuedFromLine({})).toBe("Continued from another conversation");
+});
+
 it("links back to the user's latest message, and starts without a model or an environment when there's none", async () => {
   expect(sourceSeqOf(TIMELINE)).toBe(14);
   expect(sourceSeqOf([{ kind: "conversation", role: "user", initiator: "agent", messageSeq: 3 }, { kind: "conversation", role: "assistant", messageSeq: 4 }])).toBeNull();
@@ -122,7 +131,12 @@ it("links back to the user's latest message, and starts without a model or an en
   await continueInNew(deps({ defaultModel: () => null, thread: async () => ({ projectId: "proj_1", environmentId: null }), timeline: async () => { throw new Error("offline"); } }), "thr_main", { title: "T", handoff: "H" });
   expect(spawned[0]).toMatchObject({ projectId: "proj_1", environment: { type: "project-default" } });
   expect(spawned[0]).not.toHaveProperty("model");
-  expect((spawned[0]!.input as { text: string }[])[0]!.text.startsWith("Continued from @thread:thr_main\n\n")).toBe(true);
+  expect((spawned[0]!.input as { text: string }[])[1]!.text.startsWith("Continued from @thread:thr_main\n\n")).toBe(true);
+});
+
+it("without a Bot default model, starts on the provider and model the source conversation uses, not the project's default", async () => {
+  await continueInNew(deps({ defaultModel: () => null, thread: async () => ({ projectId: "proj_1", environmentId: null, providerId: "claude-code", model: "opus" }) }), "thr_main", { title: "T", handoff: "H" });
+  expect(spawned[0]).toMatchObject({ providerId: "claude-code", model: "opus", executionInputSources: { providerId: "explicit", model: "explicit" } });
 });
 
 it("registers the tool, which answers with the post line and reports failures as text", async () => {

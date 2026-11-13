@@ -1,8 +1,3 @@
-// Studio's own tables: tags (src/tags.ts), saved views (src/views.ts),
-// sidebar tabs (src/tabs.ts), item services (src/services.ts), search
-// (src/search-index.ts) and project leads (src/project-lead.ts). The space
-// tables are no longer used; they stay because migrations are append-only.
-
 /**
  * Append-only: statement index is the migration id, and BB checks each
  * statement against the hash it recorded, so never edit one (not even its

@@ -52,7 +52,7 @@ it("has the scene themes in a wrapping grid of live previews and a Classic grid 
   const scenes = names(rows[0]!);
   expect(scenes.at(-1)).toBe("After Dark");
   expect(scenes.slice(0, -1)).toContain("Grid");
-  expect(names(rows[1]!)).toEqual(["None", "bb Default", "One Dark", "Dracula", "Solarized Light", "GitHub Light", "GitHub Dark", "Nord", "Catppuccin Mocha", "Fjord"]);
+  expect(names(rows[1]!)).toEqual(["None", "Classic", "One Dark", "Dracula", "Solarized Light", "GitHub Light", "GitHub Dark", "Nord", "Catppuccin Mocha", "Fjord"]);
   expect(rows[0]!.compareDocumentPosition(rows[1]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect($('[data-theme-id="grid"]')!.getAttribute("aria-checked")).toBe("true");
   expect($('[data-theme-id="grid"]')!.querySelectorAll('[data-testid="palette-swatch"]')).toHaveLength(4);
