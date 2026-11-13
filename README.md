@@ -34,7 +34,7 @@ Also in BB Studio: the Library, Accounts, nine living scenes and eight classic t
 
 ## Built on bb
 
-[bb](https://getbb.app/) is a metaharness: one app that runs many coding agents and providers. BB Studio, a very opinionated fork of the excellent bb, adds an opinionated way of working on top.
+[bb](https://getbb.app/) is a metaharness: one app that runs many coding agents and providers. bb supplies the providers, the plugins and the threads that talk to each other; BB Studio is a very opinionated fork of the excellent bb that adds a way of working on top.
 
 ## Development
 
