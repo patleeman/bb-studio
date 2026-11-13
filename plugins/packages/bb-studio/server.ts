@@ -2410,7 +2410,7 @@ export default async function plugin(bb: BbPluginApi) {
       design: { name: "Studio Design", handlers: designs.backup },
       talk: { name: "Studio Talk", handlers: recordings.backup },
       dashboards: { name: "Studio Dashboards", handlers: dashboards.backup },
-      minis: { name: "Studio Mini apps", handlers: minis.backup },
+      minis: { name: "Studio Apps", handlers: minis.backup },
     },
   });
   registerBackup(bb, backups, join(bb.server.experimental_dataDir, "plugins", STUDIO_PLUGIN_ID));
