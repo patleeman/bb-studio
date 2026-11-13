@@ -31,7 +31,7 @@ import { registerExploreBuiltin } from "./src/explore/server";
 import { importReactionsSettings, REACTIONS_PLUGIN_ID, REACTIONS_SETTINGS_IMPORTED } from "./src/reactions/server";
 import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
 import { builtinProviderContract } from "./src/builtin-provider";
-import { BUILTIN_KINDS, builtinOn, frontendState, KindSettingsStore, resolveKinds, routeProviders, routingInstructions, type KindRoute } from "./src/kinds";
+import { BUILTIN_KINDS, builtinOn, frontendState, kindRowViews, KindSettingsStore, resolveKinds, routeProviders, routingInstructions, rowKinds, type KindRoute } from "./src/kinds";
 import { kindsContract, type KindsState } from "./src/kinds-contract";
 import { openaiKey } from "./src/openai-key";
 import { registerSettings } from "./src/settings/register";
@@ -2343,24 +2343,21 @@ export default async function plugin(bb: BbPluginApi) {
     const routes = await refreshRoutes();
     const settings = kindSettings.current;
     return {
-      kinds: BUILTIN_KINDS.map((each) => {
-        const route = routes.find((entry) => entry.kind === each.kind)!;
-        return { kind: each.kind, label: each.label, covers: each.covers, on: !settings.off.includes(each.kind), choice: route.choice, active: route.active, reason: route.reason, alternatives: route.alternatives };
-      }),
+      kinds: kindRowViews(routes, settings),
       frontend: frontendState(routes, settings),
     };
   };
   bb.rpc.register(kindsContract, {
     "kinds.state": () => kindsState(),
     "kinds.update": async ({ kind, on, use }) => {
-      const before = builtinOn(kindSettings.current, BUILTIN_KINDS.find((each) => each.kind === kind)?.pluginId ?? "");
+      const pluginIds = rowKinds(kind).map((each) => BUILTIN_KINDS.find((builtin) => builtin.kind === each)!.pluginId);
+      const before = pluginIds.map((pluginId) => builtinOn(kindSettings.current, pluginId));
       await kindSettings.update(kind, { on, use });
-      const pluginId = BUILTIN_KINDS.find((each) => each.kind === kind)!.pluginId;
-      bb.log.info(`Studio kind ${kind}: ${kindSettings.current.off.includes(kind) ? "off" : "on"}, open and create with ${kindSettings.current.use[kind] ?? "automatic"}.`);
+      for (const member of rowKinds(kind)) bb.log.info(`Studio kind ${member}: ${kindSettings.current.off.includes(member) ? "off" : "on"}, open and create with ${kindSettings.current.use[member] ?? "automatic"}.`);
       // Search drops an off kind's hits and indexes it again when it's back on.
-      if (before !== builtinOn(kindSettings.current, pluginId)) void searchIndex.changed(pluginId).catch(() => {});
+      pluginIds.forEach((pluginId, index) => { if (before[index] !== builtinOn(kindSettings.current, pluginId)) void searchIndex.changed(pluginId).catch(() => {}); });
       changes.append(null);
-      bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId });
+      for (const pluginId of pluginIds) bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId });
       return kindsState();
     },
   });

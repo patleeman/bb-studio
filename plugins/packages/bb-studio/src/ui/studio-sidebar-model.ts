@@ -1,9 +1,15 @@
 // What the Studio sidebar lists, from Studio's overview and its tabs: the
-// starred count, the kinds (with item counts), tags, pinned items and recent ones.
+// starred count, the kinds (with item counts; artifacts and mini apps are one
+// Apps row), tags, pinned items and recent ones.
 // Pure, so the grouping is tested directly.
 import type { CollectionItem } from "../kit/app/index";
 import type { ProviderView, TabView, TagView } from "../contract";
 import { formatQuery } from "../query";
+import { typeOfKind } from "../item-model";
+import { MINI_ICON } from "../minis/shared";
+
+const STUDIO_PLUGIN = "studio";
+export const APPS_QUERY = formatQuery({ filters: [{ field: "family", value: "app" }], text: "" });
 
 export interface SidebarKind { pluginId: string; id: string; label: string; icon: string; count: number; query: string }
 export interface SidebarTag { id: string; name: string; color: string; count: number; query: string }
@@ -29,6 +35,13 @@ export const RECENT_LIMIT = 15;
 const kindQuery = (id: string) => formatQuery({ filters: [{ field: "kind", value: id }], text: "" });
 const tagQuery = (name: string) => formatQuery({ filters: [{ field: "tag", value: name }], text: "" });
 
+function mergeApps(kinds: readonly SidebarKind[]): SidebarKind[] {
+  const apps = kinds.filter((kind) => typeOfKind(kind.pluginId, kind.id)?.family === "app");
+  if (!apps.length) return [...kinds];
+  const row: SidebarKind = { pluginId: STUDIO_PLUGIN, id: "app", label: "Apps", icon: MINI_ICON, count: apps.reduce((n, kind) => n + kind.count, 0), query: APPS_QUERY };
+  return kinds.flatMap((kind) => kind === apps[0] ? [row] : apps.includes(kind) ? [] : [kind]);
+}
+
 export function studioSidebarModel(
   data: { providers: ProviderView[]; items: CollectionItem[]; tags: TagView[] },
   tabs: TabView[],
@@ -50,7 +63,7 @@ export function studioSidebarModel(
     .map((kind, index) => ({ kind, index }))
     .sort((a, b) => rank(a.kind.id) - rank(b.kind.id) || a.index - b.index)
     .map(({ kind }) => kind);
-  const kinds = allKinds.filter((kind) => !IN_PAGE_KINDS.has(kind.id));
+  const kinds = mergeApps(allKinds.filter((kind) => !IN_PAGE_KINDS.has(kind.id)));
   const iconOf = new Map(allKinds.map((kind) => [`${kind.pluginId}:${kind.id}`, kind.icon]));
   const tags = data.tags.map((tag) => ({ ...tag, count: count((item) => (item.tags ?? []).includes(tag.id)), query: tagQuery(tag.name) }));
   const pinned = tabs.filter((tab) => tab.pinned).map((tab) => ({ key: `${tab.pluginId}:${tab.id}`, title: tab.title, icon: tab.icon, kindIcon: tab.kindIcon, href: tab.href }));

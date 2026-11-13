@@ -1,12 +1,14 @@
 // The Library's rules (6f, "the Bot's files"), pure so they are tested
-// directly (library-model.test.ts): search, the Kind filter, and grouping by
+// directly (library-model.test.ts): search, the Kind filter (App covers saved
+// and interactive apps, with a sub-filter), and grouping by
 // conversation (default), kind or date, newest first everywhere. In a group,
 // near-identical files from one source are one row with a count, and a group
 // shows 8 rows, then "N more" (UX review 3, item 7).
 import type { LibraryItem, LibraryKind } from "../../bot-threads-contract";
 
 export type LibraryGroupBy = "conversation" | "kind" | "date";
-export type LibraryKindFilter = "all" | Exclude<LibraryKind, "other">;
+export type LibraryKindFilter = "all" | Exclude<LibraryKind, "other" | "artifact">;
+export type LibraryAppType = "all" | "interactive" | "saved";
 
 export const LIBRARY_KINDS: readonly { id: LibraryKindFilter; label: string }[] = [
   { id: "all", label: "All" },
@@ -14,7 +16,11 @@ export const LIBRARY_KINDS: readonly { id: LibraryKindFilter; label: string }[] 
   { id: "whiteboard", label: "Whiteboard" },
   { id: "design", label: "Design" },
   { id: "app", label: "App" },
-  { id: "artifact", label: "Artifact" },
+];
+export const LIBRARY_APP_TYPES: readonly { id: LibraryAppType; label: string }[] = [
+  { id: "all", label: "All apps" },
+  { id: "interactive", label: "Interactive" },
+  { id: "saved", label: "Saved" },
 ];
 export const LIBRARY_GROUPS: readonly { id: LibraryGroupBy; label: string }[] = [
   { id: "conversation", label: "Conversation" },
@@ -22,8 +28,9 @@ export const LIBRARY_GROUPS: readonly { id: LibraryGroupBy; label: string }[] = 
   { id: "date", label: "Date" },
 ];
 
-const KIND_LABEL: Record<LibraryKind, string> = { page: "Page", whiteboard: "Whiteboard", design: "Design", app: "App", artifact: "Artifact", other: "Other" };
+const KIND_LABEL: Record<LibraryKind, string> = { page: "Page", whiteboard: "Whiteboard", design: "Design", app: "App", artifact: "App", other: "Other" };
 export const kindLabel = (kind: LibraryKind): string => KIND_LABEL[kind];
+const listedKind = (kind: LibraryKind): LibraryKind => kind === "artifact" ? "app" : kind;
 
 /** One row of a group: a file, or several near-identical ones from one source as one row (the newest opens). */
 export interface LibraryRow {
@@ -84,9 +91,10 @@ export function provenance(item: Pick<LibraryItem, "madeIn">): string {
   return item.madeIn.kind === "worker" ? `by ${item.madeIn.title}` : `made in ${item.madeIn.title}`;
 }
 
-/** Whether a file passes the search (its title, or where it was made) and the Kind filter. */
-export function libraryPasses(item: LibraryItem, query: string, kind: LibraryKindFilter): boolean {
-  if (kind !== "all" && item.kind !== kind) return false;
+/** Whether a file passes the search (its title, or where it was made), the Kind filter and, for apps, the type. */
+export function libraryPasses(item: LibraryItem, query: string, kind: LibraryKindFilter, appType: LibraryAppType = "all"): boolean {
+  if (kind !== "all" && listedKind(item.kind) !== kind) return false;
+  if (kind === "app" && appType !== "all" && item.kind !== (appType === "saved" ? "artifact" : "app")) return false;
   const words = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   if (!words.length) return true;
   const text = `${item.title} ${provenance(item)} ${item.madeIn?.conversationTitle ?? ""}`.toLocaleLowerCase();
@@ -107,11 +115,11 @@ export function dateGroup(at: number, now: number): { key: string; title: string
   return { key: "older", title: "Older", order: 4 };
 }
 
-const KIND_ORDER: readonly LibraryKind[] = ["page", "whiteboard", "design", "app", "artifact", "other"];
+const KIND_ORDER: readonly LibraryKind[] = ["page", "whiteboard", "design", "app", "other"];
 
 /** The files that pass, in groups; each group newest first, the groups by their newest file (kinds and dates in their own order). */
-export function libraryGroups(items: readonly LibraryItem[], options: { query: string; kind: LibraryKindFilter; groupBy: LibraryGroupBy }, now: number): LibraryGroup[] {
-  const shown = items.filter((item) => libraryPasses(item, options.query, options.kind)).sort((a, b) => b.updatedAt - a.updatedAt);
+export function libraryGroups(items: readonly LibraryItem[], options: { query: string; kind: LibraryKindFilter; appType?: LibraryAppType; groupBy: LibraryGroupBy }, now: number): LibraryGroup[] {
+  const shown = items.filter((item) => libraryPasses(item, options.query, options.kind, options.appType)).sort((a, b) => b.updatedAt - a.updatedAt);
   const groups = new Map<string, LibraryGroup & { order: number }>();
   for (const item of shown) {
     let key: string;
@@ -119,7 +127,7 @@ export function libraryGroups(items: readonly LibraryItem[], options: { query: s
     let threadId: string | null = null;
     let order = 0;
     if (options.groupBy === "kind") {
-      key = item.kind; title = `${kindLabel(item.kind)}s`; order = KIND_ORDER.indexOf(item.kind);
+      key = listedKind(item.kind); title = `${kindLabel(item.kind)}s`; order = KIND_ORDER.indexOf(listedKind(item.kind));
     } else if (options.groupBy === "date") {
       const group = dateGroup(item.updatedAt, now);
       key = group.key; title = group.title; order = group.order;
