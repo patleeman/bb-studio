@@ -456,20 +456,19 @@ header's ··· menu, or the iOS app) keeps its summary. There is no separate
 Finish item. Studio (`src/bot-finish.ts`):
 
 1. unarchives it for a moment (BB takes no turn in an archived thread) and
-   sends one last turn into the conversation, "Archive this conversation.",
-   with agent-only steps: write a summary (**Decisions**, **Left open**,
+   sends one last agent-only turn into the conversation (no user message)
+   with the steps: write a summary (**Decisions**, **Left open**,
    **Made**), save it with `memory_add` (topic: the conversation's title;
    source `{ kind: "conversation", id, title }`), then call
    `bot_finish_done { summary }`.
 2. When `bot_finish_done` arrives, the conversation is marked finished
    (`bot_threads.archived_at`, `finished_summary`; BB archives it again
-   once the turn is over), and Main gets the summary from the
-   conversation, with an agent-only note that has the Bot reply with the card
-   `::finished{thread="thr_…"}`: "✓ Archived: <title>", its dates, the
-   summary's sections, **Open the conversation** and **See in Memory**, and
-   how many memory records cite it. Main's row reads "Archived “<title>” ·
-   summary saved". Older `::finished` cards in transcripts render the same
-   card.
+   once the turn is over), and Main gets an agent-only note with the summary
+   that has the Bot reply with the card `::finished{thread="thr_…"}`:
+   "✓ Archived: <title>", its dates, the summary's sections, **Open the
+   conversation** and **See in Memory**, and how many memory records cite it.
+   Neither turn shows a user message. Main's row reads "Archived “<title>”".
+   Older `::finished` cards in transcripts render the same card.
 3. If the conversation can't take the turn, the turn ends or fails without
    `bot_finish_done`, or nothing happens for 10 minutes, Studio writes a
    summary from the last three replies, saves it to memory unless the Bot

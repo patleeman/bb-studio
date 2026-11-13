@@ -1114,7 +1114,7 @@ export class BotThreads {
     return after;
   }
 
-  /** Writes a conversation's second line directly (Main's "Finished “…” · summary saved"). */
+  /** Writes a conversation's second line directly (Main's "Archived “…”"). */
   setLatest(threadId: string, text: string): void {
     const result = this.deps.db.prepare("UPDATE bot_threads SET latest = ?, latest_at = ?, updated_at = ? WHERE thread_id = ? AND kind = 'conversation'").run(text.slice(0, LATEST_MAX), this.now(), this.now(), threadId);
     if (result.changes) this.deps.changed(rowChanges(null, this.get(threadId)));
