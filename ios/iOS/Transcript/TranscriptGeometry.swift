@@ -6,9 +6,6 @@ import CoreGraphics
 /// the scroll view's top edge, and the top inset (the header) makes the
 /// first valid offset negative.
 public enum TranscriptGeometry {
-    /// The first valid offset: the content's top just under the header.
-    public static func minOffset(topInset: CGFloat) -> CGFloat { -topInset }
-
     /// The last valid offset: the content's end just above the composer. A
     /// transcript shorter than its viewport rests at the top, so a short
     /// conversation in a half-height sheet has no gap above it.

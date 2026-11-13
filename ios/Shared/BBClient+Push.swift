@@ -38,10 +38,4 @@ extension BBClient {
         let body = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(input))
         let _: Mobile.LiveActivityRegisterOutput = try await rpc("mobile", Mobile.Method.live_activity_register, body)
     }
-
-    public func unregisterLiveActivities(deviceId: String, botId: String? = nil) async throws {
-        var input: [String: JSONValue] = ["deviceId": .string(deviceId)]
-        if let botId { input["botId"] = .string(botId) }
-        let _: JSONValue = try await rpc("mobile", Mobile.Method.live_activity_unregister, .object(input))
-    }
 }

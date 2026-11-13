@@ -701,11 +701,6 @@ final class ThreadModel: ObservableObject {
             self.error = message
         }
     }
-
-    /// The newest assistant reply, for voice chat and the watch.
-    var lastAssistantText: String? {
-        rows.last(where: { $0.isConversation && $0.role == "assistant" })?.text
-    }
 }
 
 /// Timeline rows grouped for a phone: messages stand alone, runs of tool calls

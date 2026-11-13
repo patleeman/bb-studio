@@ -14,7 +14,6 @@ public struct ThreadSummary: Sendable {
 
     /// The thread that needs you, else the most recent running one.
     public var headline: ThreadEntry? { needsYou.first ?? running.first }
-    public var isClear: Bool { needsYou.isEmpty && running.isEmpty }
 }
 
 /// What the widgets and the watch count as needing you: the Bot's attention

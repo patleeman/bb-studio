@@ -347,22 +347,6 @@ struct LoopDetail: Sendable {
     }
 }
 
-/// `loops.morning`, for the morning card's "+N more".
-struct LoopMorning: Decodable, Sendable {
-    var date: String
-    var items: [LoopItem]
-    var more: Int
-
-    private enum CodingKeys: String, CodingKey { case date, items, more }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        date = try c.decodeIfPresent(String.self, forKey: .date) ?? ""
-        items = (try c.decodeIfPresent([Studio.LoopsGetOutputLoop].self, forKey: .items) ?? []).map(LoopItem.init)
-        more = Int(try c.decodeIfPresent(Double.self, forKey: .more) ?? 0)
-    }
-}
-
 extension BBClient {
     func loops(area: String? = nil, owner: String? = nil) async throws -> LoopGroups {
         try await rpc("studio", Studio.Method.loops_list, LoopRequests.list(area: area, owner: owner))
@@ -403,10 +387,6 @@ extension BBClient {
     /// Replaces Studio's list of this phone's place names.
     func setLoopPlaces(_ names: [String]) async throws {
         let _: Studio.LoopsPlacesOutput = try await rpc("studio", Studio.Method.loops_setPlaces, LoopRequests.setPlaces(names))
-    }
-
-    func loopMorning() async throws -> LoopMorning {
-        try await rpc("studio", Studio.Method.loops_morning, .object([:]))
     }
 
     /// Studio's Attention Router setting (`loopsEnabled`, off by default).
