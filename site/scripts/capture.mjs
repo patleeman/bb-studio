@@ -44,7 +44,7 @@ function setTheme(botName, themeId) {
 // Each feature shot gets its own look: Classic (solid) themes where the
 // content should read clearly, scenes elsewhere. Miami 1985 appears once.
 const LOOKS = {
-  workbench: "event-horizon", "item-page": "github-light", "item-page-embeds": "solarized-light", "item-design": "nord",
+  hero: "event-horizon", workbench: "nord", "item-page": "github-light", "item-page-embeds": "solarized-light", "item-design": "nord",
   "item-dashboard": "catppuccin-mocha", "item-mini": "dracula", "item-code": "one-dark", "item-whiteboard": "bb-default",
   "item-recording": "kyoto-garden", "item-notes": "github-dark", "item-dictation": "aurora-fjord", "item-collection": "aurora-fjord", "item-artifact": "forest", cmdk: "data-city",
   sidebar: "tonights-sky", approval: "grid", replies: "tonights-sky", "page-memory": "github-dark", "page-todos": "nord",
@@ -281,6 +281,23 @@ if (want("composer")) {
   await go(main());
   await page.mouse.move(1590, 990);
   await shot("composer");
+  approval(true);
+}
+
+// ---- The hero: Main with one item beside it ------------------------------
+if (want("hero")) {
+  look("hero");
+  approval(false);
+  resetTabs();
+  await go(main());
+  await page.keyboard.press("Meta+k");
+  await wait(800);
+  await page.keyboard.type("launch plan");
+  await wait(1500);
+  await page.keyboard.press("Enter");
+  await wait(6000);
+  await page.mouse.move(1590, 990);
+  await shot("hero");
   approval(true);
 }
 

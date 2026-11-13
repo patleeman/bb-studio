@@ -2,6 +2,7 @@ import { registerLoops, LOOP_TOOLS, loopPushActions } from './src/loops/register
 import { automationTable, bbFromFile, bbFromOverview, readImportedAt, readStudioEntries, readThreadOwners } from "./src/automation-table";
 import { arrangeRailOnce } from "./src/rail-arrangement";
 import { arrangeFooterOnce } from "./src/footer-arrangement";
+import { retireLegacyThemeOnce } from "./src/theme/legacy-theme";
 import { RunnerPreflightError } from "./src/runner-machines";
 import { indexItem } from "./src/kit/server/studio-index";
 import { CODE_TOOLS, registerCode } from "./src/code/server";
@@ -963,6 +964,11 @@ export default async function plugin(bb: BbPluginApi) {
       list: () => bb.sdk.system.uiPreferences.list() as never,
       set: (input) => bb.sdk.system.uiPreferences.set(input as never),
     }).catch((error: unknown) => bb.log.warn(`Studio couldn't arrange the sidebar footer: ${error instanceof Error ? error.message : String(error)}`));
+    void retireLegacyThemeOnce({
+      kv: bb.storage.kv,
+      get: () => bb.sdk.theme.get(),
+      set: (themeId) => bb.sdk.theme.set(themeId),
+    }).catch((error: unknown) => bb.log.warn(`Studio couldn't move BB off the old BB Studio palette: ${error instanceof Error ? error.message : String(error)}`));
   }, 3_000);
   bb.onDispose(() => clearTimeout(footerStart));
   const memorySplitStart = setTimeout(() => { if (!disposed) memoryService.autoSplitAll(); }, 2_000);
