@@ -6,6 +6,7 @@ import { isPrivateAddress, type Transport } from "../guarded-fetch";
 import { proxyFetch } from "./server/net";
 import { MINI_SECRET_HOSTS, MINI_TABLES, RecordConflict } from "./server/store";
 import { hostAllowed, resolveLibs } from "./shared";
+import { artifactsHost } from "../artifacts/test/host";
 import { memoryStore, miniHost } from "./test/host";
 
 type Host = ReturnType<typeof miniHost>;
@@ -310,4 +311,16 @@ describe("mini apps on Studio", () => {
       expect(text(await tool(host, "minis_create", { name: "Nope", fromArtifactId: "art_missing" }))).toContain("not found");
     }, { artifactSource: (artifactId) => (artifactId === "art_1" ? { title: "Q3 report", html: "<h1>Q3</h1>", state: { filter: "EU" }, projectId: null } : null) });
   });
+});
+
+it("offers mini apps and saved files under the one Apps label in @mentions", async () => {
+  const saved = artifactsHost();
+  try {
+    await withHost(async (host) => {
+      const label = (registrations: { mentionProviders: readonly unknown[] }, id: string) => (registrations.mentionProviders as { id: string; label: string }[]).find((each) => each.id === id)?.label;
+      expect([label(host.harness.registrations, "mini"), label(saved.harness.registrations, "artifact")]).toEqual(["Apps", "Apps"]);
+    });
+  } finally {
+    await saved.harness.lifecycle.dispose();
+  }
 });
