@@ -690,7 +690,7 @@ describe("hands-free answer intent", () => {
   it.each(["answer", "invalid", undefined])("preserves full answers for %s intent", async (intent) => {
     const { live, send, db } = setup();
     const { sessionId } = await live.start({ sdp: "x" });
-    const message = "Patrick asks you to run through the changes you're working on";
+    const message = "The user asks you to run through the changes you're working on";
     const result = await live.tool(sessionId, "send_to_cos", JSON.stringify({ intent, message }), [said("run through the changes you're working on")]);
     expect(result).toContain('Asking Dot now.');
     expect(result).not.toContain("Say just that");

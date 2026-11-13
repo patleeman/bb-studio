@@ -6,7 +6,7 @@ each.
 
 ## Status (2026-11-06): one concept, Whiteboards
 
-Patrick asked for one concept, and approved a follow-up plan that reverses
+The user asked for one concept, and approved a follow-up plan that reverses
 two of the decisions below:
 
 - Whiteboards have a sidebar row again (after Pages), and New → Whiteboard
@@ -25,7 +25,7 @@ two of the decisions below:
 
 ## Status (2026-11-01)
 
-Patrick approved this list. The REMOVEs and the cheap REPOINTs are done:
+The user approved this list. The REMOVEs and the cheap REPOINTs are done:
 
 - Removed entirely: the composer + → Drawing action and its picker
   (`drawings.pickDrawing`), rather than the whiteboard repoint below.
@@ -71,7 +71,7 @@ Two more facts follow from this:
   (per project, or one global page) with one `drawing` embed per drawing that
   no page embeds yet. No scene data moves or changes.
 
-## Patrick's data
+## The user's data
 
 I read copies of the databases, and the live DB in read-only mode. I counted
 rows and read no content.
@@ -84,7 +84,7 @@ rows and read no content.
 | Old Draw plugin `data-before-main-2026-10-04.db` (snapshot) | 1 | `drw_40a21f39…`, **0 elements**, untitled, created 2026-10-03, not in Studio today |
 | `item_threads` rows for `excalidraw` | 1 | `drw_e5b6b10b…` (role `created`). That drawing no longer exists, so the row is dangling |
 
-**Patrick has no drawings and no whiteboards that could be lost.** The one
+**The user has no drawings and no whiteboards that could be lost.** The one
 snapshot drawing is empty. Don't delete the snapshot files. For other Studio
 installs, which may have drawings, any removal must still keep every drawing
 reachable (see "Migration" below).
@@ -197,7 +197,7 @@ Recommended: a one-time, idempotent startup task (code, not a SQL migration,
 because SQL migrations can't build page markdown):
 
 1. Find drawings that no page embeds.
-2. Skip it if there are none. That's true for Patrick today.
+2. Skip it if there are none. That's true for the user today.
 3. Otherwise, per project (or global), create one "Drawings" page with one
    `drawing` embed per orphan, newest first. Record that it ran, so deleting
    the page doesn't bring it back.

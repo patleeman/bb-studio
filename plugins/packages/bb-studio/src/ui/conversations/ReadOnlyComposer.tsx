@@ -62,7 +62,7 @@ function useThreadInfo(threadId: string | null) {
 }
 
 /**
- * Workers whose own question Patrick chose to answer himself ("Answer it
+ * Workers whose own question the user chose to answer themselves ("Answer it
  * here"): BB's composer, with its question stack, shows for them until the
  * window reloads. Only for a question: an approval goes to the conversation
  * that owns the worker, as a card (src/worker-approvals.ts).
@@ -329,7 +329,7 @@ function WorkerGlyph({ status }: { status: BotThreadInfo["workers"][number]["sta
 
 /**
  * A conversation's workers above its composer: a chip for each one running
- * or needing Patrick (its full title up to 240px) that has no work card in
+ * or needing the user (its full title up to 240px) that has no work card in
  * the conversation (the card and In flight show that one), and the rest folded into
  * one "N done" chip whose menu lists them. Nothing without workers. A banner
  * of BB's composer, and, where the composer is replaced (Main mirrored from

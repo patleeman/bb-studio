@@ -29,7 +29,7 @@ let threadOpener: ((threadId: string) => void) | null = null;
  * The main view's first landing in this window: on BB's empty new-thread
  * page at launch, the sidebar opens the Bot's last conversation (Main by
  * default) once. "＋ New conversation" and "Studio: Show the Bot" count as
- * landed, so the new-thread page stays when Patrick asked for it.
+ * landed, so the new-thread page stays when the user asked for it.
  */
 export function hasLanded(): boolean {
   return landed;
@@ -110,7 +110,7 @@ export function currentBot(): string | null {
   return bot;
 }
 
-/** Shows another Bot. The server learns it too (bot_focus), so Patrick's next thread is that Bot's conversation. */
+/** Shows another Bot. The server learns it too (bot_focus), so the user's next thread is that Bot's conversation. */
 export function setCurrentBot(next: string): void {
   if (currentBot() === next) { onFocus?.(next); return; }
   bot = next;

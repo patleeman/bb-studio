@@ -24,7 +24,7 @@ const NOW = Date.UTC(2026, 10, 12, 16, 0);
 
 function account(over: Partial<AccountView> & { key: string }): AccountView {
   const [source, id] = over.key.split(":") as [AccountView["source"], string];
-  return { id, source, provider: "claude", name: "Claude", label: "Patrick", state: "ready", message: null, windows: [], models: [], pinned: [], signIn: source === "local" ? null : `${source === "studio" ? "pool" : "bb"}:${id}`, ...over };
+  return { id, source, provider: "claude", name: "Claude", label: "Sam", state: "ready", message: null, windows: [], models: [], pinned: [], signIn: source === "local" ? null : `${source === "studio" ? "pool" : "bb"}:${id}`, ...over };
 }
 
 const STATUS: AccountsStatus = {
@@ -40,7 +40,7 @@ const STATUS: AccountsStatus = {
   dismissed: [],
 };
 
-const warning = (over: Partial<Warning> & { id: string }): Warning => ({ accountKey: "studio:a", source: "studio", kind: "signed_out", title: "Claude signed out", detail: "BB Studio · Patrick", action: "sign_in", target: "pool:a", ...over });
+const warning = (over: Partial<Warning> & { id: string }): Warning => ({ accountKey: "studio:a", source: "studio", kind: "signed_out", title: "Claude signed out", detail: "BB Studio · Sam", action: "sign_in", target: "pool:a", ...over });
 
 let root: Root | null = null;
 const container = () => document.body.lastElementChild as HTMLElement;
@@ -100,7 +100,7 @@ describe("warnings", () => {
     const dismiss = vi.fn();
     const list = [
       warning({ id: "studio:a:signed_out" }),
-      warning({ id: "bb:a:model:fable:rejected", source: "bb", accountKey: "bb:a", kind: "model", title: "Fable at 100%", detail: "bb · Patrick · resets Nov 16, 09:00", action: "switch_model" }),
+      warning({ id: "bb:a:model:fable:rejected", source: "bb", accountKey: "bb:a", kind: "model", title: "Fable at 100%", detail: "bb · Sam · resets Nov 16, 09:00", action: "switch_model" }),
       warning({ id: "studio:b:window:secondary:high", accountKey: "studio:b", kind: "window", title: "Claude 7d at 92%", action: "use_other" }),
     ];
     await render(<WarningList warnings={list} actions={{ run, dismiss }} />);

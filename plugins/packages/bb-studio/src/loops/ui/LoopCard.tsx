@@ -1,4 +1,4 @@
-// `::loop{id="loop_…"}` in the Bot's chat: one open todo as a card Patrick
+// `::loop{id="loop_…"}` in the Bot's chat: one open todo as a card the user
 // acts on in place (docs/attention-router/backend.md). Each kind has its own
 // buttons: do (Done, Snooze, Give to, Dismiss), decide (its options, Snooze),
 // read (Got it) and waiting (Nudge them, Dismiss). A handed-off todo shows who is

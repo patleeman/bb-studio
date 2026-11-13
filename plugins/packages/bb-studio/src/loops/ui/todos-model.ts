@@ -25,7 +25,7 @@ export function todoDate(loop: Pick<Loop, "due" | "trigger">): number | null {
 
 /**
  * The group of an open todo; null for a closed one. Someone else's (an
- * agent's, the Bot's) and "waiting" todos wait on others. One of Patrick's
+ * agent's, the Bot's) and "waiting" todos wait on others. One of the user's
  * that is out now is Today; else its date sorts it: up to the end of today
  * (overdue included) Today, within seven days This week, past that or with
  * no date Later.

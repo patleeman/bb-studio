@@ -183,7 +183,7 @@ content, each showing the matching text with the match in bold.
 ### Todos: todo cards and the Todos tab
 
 Todos (setting **Todos**, `loopsEnabled`, off by
-default) is how the Bot tracks what Patrick owes, decides, reads or waits on
+default) is how the Bot tracks what the user owes, decides, reads or waits on
 ([backend](../../docs/attention-router/backend.md)). The Bot posts a `::loop`
 line in its chat when the scheduler releases a todo, and it renders as a card
 with the todo's actions. `scripts/capture/captures/bb-studio-loops.mjs`
@@ -1321,7 +1321,7 @@ between Bots signals both.
 | --- | --- |
 | `conversations` | a conversation started (+ New, `bot_ask`), forked, recorded or moved; its turn starting, ending or failing; Finish asked, done or reopened; renamed or archived; Main's second line |
 | `workers` | a worker made, moved, archived or deleted; its turn starting, ending or failing; its approval or question raised or resolved |
-| `needs-you` | a conversation marked or cleared (`bot_needs_you_set`, `bot_needs_you`, a worker's raise and its resolution, Patrick replying, Finish); a question or approval pending in a conversation |
+| `needs-you` | a conversation marked or cleared (`bot_needs_you_set`, `bot_needs_you`, a worker's raise and its resolution, the user replying, Finish); a question or approval pending in a conversation |
 | `presence` | `bot_set_presence` or `bot_set_appearance` (and the agent tools that call them) |
 
 A Bot's presence state (idle, thinking, working, needs you) follows from
@@ -3788,7 +3788,7 @@ How the page is split (`src/memory/split.ts`):
 
 - Every heading is a section (`##`, `###`, `####`, below a lone `#` title),
   so a page with two top sections ("Check-in", "Memory") and many
-  subsections ("How Patrick works", "Standing rules", "Fork", …) treats each
+  subsections ("How the user works", "Standing rules", "Fork", …) treats each
   subsection on its own. Text under a heading before its first subheading
   is a section of its own, named after that heading; an empty one is none.
   Text above the first heading becomes records (topic "Notes").
@@ -3798,8 +3798,8 @@ How the page is split (`src/memory/split.ts`):
   heading. The name is the records' default topic and their source section.
 - Only two kinds of section stay in the **core profile**: the check-in list
   and how the user works, that is a section whose heading, or a heading
-  above it, is "Check-in" or "How <name> works" ("How Patrick works", "How
-  he works"; any case). Every other section (who the user is, rules,
+  above it, is "Check-in" or "How <name> works" ("How Sam works", "How
+  they work"; any case). Every other section (who the user is, rules,
   people, preferences, Systems, Facts and decisions, Fork, …) becomes
   **records**.
 - The profile must fit the 2,500-character cap (`PROFILE_CAP_CHARS`). When

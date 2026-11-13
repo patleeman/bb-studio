@@ -6,7 +6,7 @@
 // menu (Edit space…, Default model: what its new conversations start on,
 // Archive: the older page, New Bot); then the Bot's pages as rows: Memory, Skills,
 // Library and Todos (with the Todos list on, the primary Bot's Todos page and
-// what needs Patrick now; else the Todos page at studio/automations; for any
+// what needs the user now; else the Todos page at studio/automations; for any
 // other Bot, Scheduled, its automations, as todos are the primary's). The row of the page
 // on screen is selected.
 import type { ReactNode } from "react";

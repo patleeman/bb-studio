@@ -55,7 +55,7 @@ it("draws a card from live state: kind, step, title, state, one-liner", async ()
   expect(q('[data-testid="work-needs"]')).toBeNull();
 });
 
-it("redraws in place when the card changes, and shows what Patrick needs to do", async () => {
+it("redraws in place when the card changes, and shows what the user needs to do", async () => {
   await renderCard();
   state.get = card({ state: "needs-you", step: "3/5 Upload", line: "Waiting on approval", needs: "Approve the release draft", updatedAt: NOW });
   await renderCard();

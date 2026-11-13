@@ -355,7 +355,7 @@ never travels with the runner.
 Review returned path and Mac-only-tool warnings, then retry with `confirm: true`
 only after accepting them. Confirmation cannot bypass a missing CLI or sign-in.
 Use Bot Info → Runners to install the provider CLI on the selected machine.
-Patrick signs in directly there using the provider hint; never copy credentials.
+The user signs in directly there using the provider hint; never copy credentials.
 An offline machine skips due runs without falling back to the Mac. Studio
 reports once per outage, shows machine offline, and resumes when it reconnects.
 

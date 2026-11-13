@@ -30,7 +30,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
 
 function summary(overrides: Partial<PoolSummary> & { id: string }): PoolSummary {
   return {
-    provider: "claude", kind: "oauth", label: "Patrick", email: "me@example.test", enabled: true, status: "ready", error: null,
+    provider: "claude", kind: "oauth", label: "Sam", email: "me@example.test", enabled: true, status: "ready", error: null,
     heldUntil: null, usageRestriction: null, limitWindows: [], familyWeekly: {}, ...overrides,
   };
 }
@@ -79,7 +79,7 @@ describe("status mapping", () => {
   });
 
   it("labels each source and gives bb accounts a bb sign-in target", () => {
-    expect(poolAccountView(summary({ id: CLAUDE }), "studio")).toMatchObject({ key: `studio:${CLAUDE}`, signIn: `pool:${CLAUDE}`, label: "Patrick · me@example.test" });
+    expect(poolAccountView(summary({ id: CLAUDE }), "studio")).toMatchObject({ key: `studio:${CLAUDE}`, signIn: `pool:${CLAUDE}`, label: "Sam · me@example.test" });
     expect(poolAccountView(summary({ id: CLAUDE }), "bb")).toMatchObject({ key: `bb:${CLAUDE}`, signIn: `bb:${CLAUDE}` });
     expect(poolAccountView(summary({ id: CLAUDE, kind: "api-key" }), "studio").signIn).toBeNull();
   });
@@ -156,7 +156,7 @@ describe("status mapping", () => {
 
 function view(overrides: Partial<AccountView> & { key: string }): AccountView {
   const [source, id] = overrides.key.split(":") as [AccountView["source"], string];
-  return { id, source, provider: "claude", name: "Claude", label: "Patrick", state: "ready", message: null, windows: [], models: [], pinned: [], signIn: `pool:${id}`, ...overrides };
+  return { id, source, provider: "claude", name: "Claude", label: "Sam", state: "ready", message: null, windows: [], models: [], pinned: [], signIn: `pool:${id}`, ...overrides };
 }
 
 const quota = (id: string, label: string, percent: number | null, rejected = false) => ({ id, label, percent, resetAt: RESET, rejected });
@@ -169,7 +169,7 @@ describe("warnings", () => {
     expect(warnings.map((warning) => [warning.id, warning.title, warning.action])).toEqual([
       ["studio:a:window:secondary:high", "Claude 7d at 90%", "switch_model"],
     ]);
-    expect(warnings[0]!.detail).toBe("BB Studio · Patrick · resets Nov 16, 09:00");
+    expect(warnings[0]!.detail).toBe("BB Studio · Sam · resets Nov 16, 09:00");
   });
 
   it("names a rejected model with Switch model, and offers Use other account when another BB Studio account is ready", () => {

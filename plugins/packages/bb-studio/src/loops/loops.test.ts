@@ -101,7 +101,7 @@ it('hardcodes no area names in the Loops UI or the iOS app',async()=>{
  const {existsSync,readFileSync}=await import('node:fs');const paths=['./ui/model.ts','./ui/LoopsTab.tsx','./ui/LoopsPane.tsx','../../../../apps/ios/iOS/Loops/LoopsView.swift','../../../../../ios/iOS/Loops/LoopsView.swift'].map(path=>new URL(path,import.meta.url)).filter(url=>existsSync(url));
  expect(paths.length).toBeGreaterThanOrEqual(3);for(const url of paths)expect(readFileSync(url,'utf8')).not.toMatch(/\bAREAS\b|static let areas|"(Job|Larkspur|Systems)"/);});
 
-it('releases Patrick\'s own Surface now at once, past the morning hold and the budget, and says why when it can\'t',async()=>{
+it('releases the user\'s own Surface now at once, past the morning hold and the budget, and says why when it can\'t',async()=>{
  const handlers:Record<string,(x:any)=>unknown>={};let onChange:(v:Record<string,unknown>)=>void=()=>{};
  const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},
   settings:{define:()=>({get:async()=>({loopsEnabled:true,loopDailyBudget:0}),onChange:(f:typeof onChange)=>{onChange=f;}})},sdk:{threads:{get:async()=>null}}};

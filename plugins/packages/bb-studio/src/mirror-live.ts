@@ -100,7 +100,7 @@ export function readMirrorLive(dataDir: string, threadIds: readonly string[]): M
 
 /**
  * BB's facts with bb's live state over the mirrored threads: their status,
- * whether they wait on Patrick, and their latest change when bb's is newer.
+ * whether they wait on the user, and their latest change when bb's is newer.
  */
 export function overlayMirrorLive(threads: ReadonlyMap<string, ThreadFacts>, live: ReadonlyMap<string, MirrorLive>): Map<string, ThreadFacts> {
   const out = new Map(threads);

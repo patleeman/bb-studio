@@ -436,7 +436,7 @@ describe("the Bot's space (round 7)", () => {
     expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("automations");
   });
 
-  it("adds Todos with what needs Patrick now, for the primary Bot with Todos on", async () => {
+  it("adds Todos with what needs the user now, for the primary Bot with Todos on", async () => {
     state.loopsOn = true;
     state.live["loops.list"] = { needsYouNow: [{}, {}, {}], comingUp: [], agentsOnIt: [], waitingOnOthers: [], done: [] };
     await mount();
@@ -499,7 +499,7 @@ describe("the Bot's space (round 7)", () => {
     expect($$('[data-testid="space-dot-accent"]')).toEqual([]);
   });
 
-  it("marks a Bot that needs Patrick amber", async () => {
+  it("marks a Bot that needs the user amber", async () => {
     await mount();
     expect($$('[data-testid="space-dot"]').map((dot) => !!dot.querySelector('[data-testid="space-dot-amber"]'))).toEqual([false, true]);
   });

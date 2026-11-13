@@ -44,7 +44,7 @@ describe("failed runs in Needs you", () => {
     expect(failedRuns([{ ...security, runs: [{ ...run("r3", 14 * 60, "skipped"), outcome: "Skipped (thread busy)" }, ...security.runs!] }], new Set())).toHaveLength(1);
     expect(failedRuns([{ ...security, runs: [run("r3", 14 * 60, "succeeded"), ...security.runs!] }], new Set())).toEqual([]);
   });
-  // Patrick's live cases (Nov 1, 2026).
+  // The user's live cases (Nov 1, 2026).
   const sat = (minute: number) => zonedTime(2026, 10, 31, minute, NY);
   const morningKick = (id: string, at: number, status: string, outcome: string) => ({ id, at, status, outcome, threadId: null });
   const morning = source({ id: "morning", name: "Morning card", kind: "watcher", runs: [
@@ -89,7 +89,7 @@ describe("failed runs in Needs you", () => {
     expect(plainError("Thread thr_k3m9x2p4qa was archived. Restore it first.\n  at send (server.js:1)")).toBe("Thread was archived");
     expect(plainError("x".repeat(300))).toHaveLength(100);
   });
-  it("Patrick's dismissal hides that run only: the next failure shows again", () => {
+  it("The user's dismissal hides that run only: the next failure shows again", () => {
     expect(failedRuns([security], new Set([dismissKey("security", "r2")]))).toEqual([]);
     expect(failedRuns([{ ...security, runs: [run("r4", 14 * 60, "failed"), ...security.runs!] }], new Set([dismissKey("security", "r2")]))).toHaveLength(1);
   });

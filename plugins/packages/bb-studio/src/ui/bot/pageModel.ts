@@ -118,7 +118,7 @@ export function lastFailure(source: CalendarSource): { id: string; at: number; o
 
 /**
  * Each job whose latest finished run failed: it stays in Needs you until a
- * newer run succeeds (a watcher's quiet skip counts) or Patrick dismisses
+ * newer run succeeds (a watcher's quiet skip counts) or the user dismisses
  * that run. A run going on now doesn't clear it. A paused job's failure isn't
  * here: it's paused on purpose, and Paused marks it failed.
  */

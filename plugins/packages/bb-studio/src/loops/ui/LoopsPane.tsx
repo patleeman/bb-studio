@@ -1,5 +1,5 @@
 // The Todos pane: the Todos tab's sections in the thread's side panel, so the
-// list stays up while Patrick talks todos through with the Chief of Staff. It
+// list stays up while the user talks todos through with the Chief of Staff. It
 // is the "Todos" thread panel action (app.tsx), opened from the Bot chat's
 // header, a `::loops{open="pane"}` card, "N more in Todos" and
 // the panel launcher. Rows are compact: a title, one line of
@@ -184,7 +184,7 @@ export function withClosed(loops: readonly Loop[], place: Place, closed: Readonl
   return list;
 }
 
-/** Done is one click for Patrick's do and read todos (read: Got it); decisions and waits have their own actions. */
+/** Done is one click for the user's do and read todos (read: Got it); decisions and waits have their own actions. */
 export const closesFromCircle = (loop: Loop) => loop.owner === "patrick" && (loop.kind === "do" || loop.kind === "read");
 
 /** The row's kind circle as its Done checkbox: a check on hover, Mark done. */

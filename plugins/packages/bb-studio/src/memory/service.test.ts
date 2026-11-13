@@ -152,15 +152,15 @@ it("splits every Bot that still needs it at start, and leaves the others alone",
 it("splits an old page whose check-in and how-he-works sections are over the cap: the longest goes to records, and the profile fits", async () => {
   const x = await memoryHost();
   const habits = Array.from({ length: 30 }, (_, index) => `- Habit ${index + 1}: one recommendation, short reports in simple English.`).join("\n");
-  const checks = Array.from({ length: 12 }, (_, index) => `- Check ${index + 1}: anything waiting on Patrick from the morning sweep?`).join("\n");
-  const markdown = `## Check-in\n\n${checks}\n\n## How Patrick works\n\n${habits}\n`;
+  const checks = Array.from({ length: 12 }, (_, index) => `- Check ${index + 1}: anything waiting on Sam from the morning sweep?`).join("\n");
+  const markdown = `## Check-in\n\n${checks}\n\n## How Sam works\n\n${habits}\n`;
   expect(markdown.trim().length).toBeGreaterThan(PROFILE_CAP_CHARS);
   const old = x.legacy("bot_main", markdown);
   const result = x.memory.autoSplit("bot_main");
   expect(result).toEqual({ profilePageId: "pg_new1", records: 30, legacyPageId: old });
   expect(x.memory.overview("bot_main").profile).toMatchObject({ over: false, cap: PROFILE_CAP_CHARS });
   expect(x.pages.get("pg_new1")!.markdown).toBe(`## Check-in\n\n${checks}\n`);
-  expect((await x.memory.list({ botId: "bot_main", topic: "How Patrick works" })).total).toBe(30);
+  expect((await x.memory.list({ botId: "bot_main", topic: "How Sam works" })).total).toBe(30);
   expect(x.pages.get(old)!.markdown).toBe(markdown);
 });
 

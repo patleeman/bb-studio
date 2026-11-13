@@ -406,7 +406,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") return { tools: [...REVIEW_TOOLS, ...CODE_TOOLS], skills: ["studio-code"], instructions: "" };
     // The Bot's own thread is told who it is; paused or stopped, it gets no Studio tools but its own.
     // Every conversation of a Bot (src/bot-threads.ts) is that Bot: Main, a fork
-    // (a side thread from "Reply in thread" included) and a thread Patrick
+    // (a side thread from "Reply in thread" included) and a thread the user
     // started. BB sets a fork's session up while it's made, before Studio
     // records it: a side chat's metadata says whose it is from the start.
     // A conversation from + New says whose it is in its metadata too (bot_conversation_start).

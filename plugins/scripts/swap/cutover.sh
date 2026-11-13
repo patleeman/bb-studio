@@ -39,7 +39,7 @@ CLI="${CLI:?set CLI to the BB Studio CLI entry (apps/cli/dist/index.js)}"
 API="http://127.0.0.1:$STUDIO_PORT/api/v1"
 STATE="$ARCHIVE_ROOT/cutover-state-$(basename "$STUDIO_DIR")"
 HANDOFF_DOC="${HANDOFF_DOC:-$ARCHIVE_ROOT/HANDOFF.md}"
-HANDOFF_TEXT="${HANDOFF_TEXT:-You now run in BB Studio (port $STUDIO_PORT). Live bb is stopped, not deleted; your old thread $COS is archived here, read-only and searchable. Runners and automations are paused on purpose. Read $HANDOFF_DOC, reply with one line saying you have it, and wait for Patrick before changing anything.}"
+HANDOFF_TEXT="${HANDOFF_TEXT:-You now run in BB Studio (port $STUDIO_PORT). Live bb is stopped, not deleted; your old thread $COS is archived here, read-only and searchable. Runners and automations are paused on purpose. Read $HANDOFF_DOC, reply with one line saying you have it, and wait for the user before changing anything.}"
 
 mkdir -p "$LOG_DIR" "$STATE"; chmod 700 "$STATE"
 LOG="$LOG_DIR/cutover-$(date +%Y%m%d-%H%M%S)$([ $DRY = 1 ] && echo -dry || true).log"
@@ -290,7 +290,7 @@ fi
 trap - ERR
 cat <<EOF
 
-=== Done$([ $DRY = 1 ] && echo " (DRY RUN: nothing was changed)" || true). Patrick, now, in this order:
+=== Done$([ $DRY = 1 ] && echo " (DRY RUN: nothing was changed)" || true). Next steps, in this order:
   1. BB Studio > Accounts: sign in to Claude and to Codex.
   2. BB Studio > Studio settings > Phone notifications > APNs key: paste the .p8 key
      ($APNS_KEY_HINT). Never paste it into a chat.

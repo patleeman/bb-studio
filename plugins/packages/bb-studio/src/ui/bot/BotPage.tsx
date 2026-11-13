@@ -2,7 +2,7 @@
 // says in a sentence what it's doing (botPage.ts), with Open chat, Pause,
 // Stop… and Controls (BotControls.tsx, every setting). Working now sits beside
 // Needs you: due todos, the chat's pending questions, failed runs (until the
-// next run succeeds or Patrick dismisses one) and maintenance's decisions,
+// next run succeeds or the user dismisses one) and maintenance's decisions,
 // each with one action. Then the week at full width with Paused below it
 // (AutomationsCalendar.tsx), then Recent in plain words, Runners and the
 // Todos summary. The top of BB's Info tab on a Bot's thread is BotInfoRows.tsx.
@@ -79,7 +79,7 @@ export function useBotPageModel(view: BotView) {
   // Working now: what's running, runners by name.
   const working: WorkItem[] = [];
   for (const thread of activity?.inProgress ?? []) {
-    // Its own chat waiting on Patrick is a question in Needs you, not work.
+    // Its own chat waiting on the user is a question in Needs you, not work.
     if (thread.relation === "self" && thread.waitingFor) continue;
     const runner = runners.find((each) => each.threadId === thread.id);
     working.push({

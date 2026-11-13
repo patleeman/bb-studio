@@ -109,7 +109,7 @@ it("puts each row's actions in its ⋯ menu", async () => {
   expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_d", action: "choose", option: "Hudson — $21k" });
   await click(row("Call the plumber"), "Remind me now");
   expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_c", surfaceNow: true });
-  // Not Patrick's: no Remind me now.
+  // Not the user's: no Remind me now.
   expect(actions("Book the car service")).toEqual(["Discuss", "Change when…"]);
   await click(row("Draft the Larkspur"), "Take it back");
   expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_a", changes: { owner: "patrick", status: "surfaced" } });
@@ -219,7 +219,7 @@ it("closes a do or read todo in one click on its circle, done in place with Undo
   (state.groups as typeof empty).needsYouNow.push(loop("loop_r", "Your vendor demo moved to Thu", { kind: "read" }));
   await render();
   const circle = (title: string) => row(title).querySelector("[role=checkbox]") as HTMLButtonElement | null;
-  // Do and read rows (and Patrick's own coming-up do), not decisions, waits, agents or the Bot's.
+  // Do and read rows (and the user's own coming-up do), not decisions, waits, agents or the Bot's.
   expect(circle("Reply to Sam")!.getAttribute("aria-label")).toBe("Mark done: Reply to Sam about the Q3 planning doc");
   expect(circle("Reply to Sam")!.title).toBe("Mark done");
   expect(circle("Call the plumber")).not.toBeNull();

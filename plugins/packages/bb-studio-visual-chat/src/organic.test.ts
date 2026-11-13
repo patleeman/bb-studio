@@ -7,7 +7,7 @@ import { COMPOSITIONS } from "./shared";
 let clock = 0;
 const item = (id: string, kind: OrganicItem["kind"], size: OrganicItem["size"], importance = 3, extra: Partial<OrganicItem> = {}): OrganicItem => ({ id, kind, size, importance, createdAt: ++clock, updatedAt: clock, ...extra });
 
-/** Patrick's window, a narrower one, and a phone. */
+/** The user's window, a narrower one, and a phone. */
 const WIDE: Frame = { width: 1736, height: 950 };
 const MID: Frame = { width: 1136, height: 640 };
 const PHONE: Frame = { width: 420, height: 700 };

@@ -9,7 +9,7 @@
 // the week shows real outcomes without waiting a day.
 //
 // The quiet shots come first: nothing running and nothing waiting. Then the
-// busy fixture adds what needs Patrick (a failed Security run, a pending chat
+// busy fixture adds what needs the user (a failed Security run, a pending chat
 // question, two due loops, maintenance's call) and starts three runner runs.
 // Renders go to assets/bot-redesign/, named like the mockups' PNGs.
 import { createRequire } from "node:module";
@@ -178,7 +178,7 @@ export default ({ pluginRpc, bbCli, sleep }) => {
     } finally { db.close(); studio.close(); }
   }
 
-  /** What needs Patrick, and three runs going on now. */
+  /** What needs the user, and three runs going on now. */
   async function makeBusy() {
     const fixture = await seed();
     if (busy) return fixture;
@@ -202,11 +202,11 @@ export default ({ pluginRpc, bbCli, sleep }) => {
         studio.prepare("DELETE FROM bot_loops WHERE id LIKE 'loop_capture-%'").run();
         for (const each of loops) studio.prepare("INSERT INTO bot_loops VALUES (?, ?)").run(each.id, JSON.stringify(each));
         studio.prepare("DELETE FROM bot_run_dismissals").run();
-        // Last night's maintenance left three finished threads for Patrick to decide on.
+        // Last night's maintenance left three finished threads for the user to decide on.
         // The table is append-only: add the run once.
         if (!studio.prepare("SELECT 1 FROM bot_maintenance_runs WHERE bot_id = ? AND at = ?").get(bot.id, at(0, 3))) studio.prepare("INSERT INTO bot_maintenance_runs (bot_id, at, result) VALUES (?, ?, ?)").run(bot.id, at(0, 3), JSON.stringify({ at: at(0, 3), dryRun: false, summary: "Archived 5 finished threads, trimmed Memory by 140 words", actions: ["Archived 5 finished threads"], needsCall: ["Fix the flaky upload test", "Try the new router firmware", "Draft the HOA letter"].map((title, i) => ({ threadId: `thr_capture_call${i}`, title, reason: "Uncommitted changes in its workspace" })), suggestions: [] }));
       })();
-      // The Bot asked Patrick a question in its chat.
+      // The Bot asked the user a question in its chat.
       const thread = bbDb.prepare("SELECT provider_id FROM threads WHERE id = ?").get(bot.threadId);
       bbDb.prepare("DELETE FROM pending_interactions WHERE id = 'pi_capture_vault'").run();
       bbDb.prepare("INSERT INTO pending_interactions (id, thread_id, origin_kind, turn_id, provider_id, provider_thread_id, provider_request_id, status, payload, created_at, updated_at) VALUES (?, ?, 'provider', 'turn_capture', ?, ?, 'req_capture_vault', 'pending', ?, ?, ?)")

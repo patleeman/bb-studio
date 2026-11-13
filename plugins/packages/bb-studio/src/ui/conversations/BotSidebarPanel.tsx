@@ -8,16 +8,16 @@
 // - Conversations, with "+ New" (BB's ghost button; BB's new-thread composer on
 //   a Studio page, seeded with the Bot's default model): two-line rows, the title and
 //   its time, then the latest reply (a spinner while it works), or, amber
-//   and outlined, why it needs Patrick. A fork made at a message has no row:
+//   and outlined, why it needs the user. A fork made at a message has no row:
 //   it shows at that message, and its work and needs-you show on its parent's row.
-// - Workers: the running ones and those needing Patrick, one line each, a
+// - Workers: the running ones and those needing the user, one line each, a
 //   status glyph, the title, the repo it runs in
 //   and a short time. The five newest finished (the server's view; a run of
 //   one title folded into "×5") fold into one "N done" row that opens them in
 //   place; older ones are on the Archive page (the ··· menu). A worker never
-//   asks Patrick itself: the Bot raises it in the worker's conversation.
+//   asks the user itself: the Bot raises it in the worker's conversation.
 // - At the bottom, each Bot's icon (the shown one highlighted, an amber mark
-//   when it needs Patrick) and + for a new Bot. A click, a two-finger swipe
+//   when it needs the user) and + for a new Bot. A click, a two-finger swipe
 //   sideways on the sidebar or "Studio: Show Bot <n>" (Ctrl+Option+1…9)
 //   switches the whole sidebar; the main
 //   view goes to that Bot's last-open conversation, else its Main.
@@ -123,7 +123,7 @@ function WorkerRowView({ row, now, onOpen, menuTarget, slot }: { row: WorkerLine
 
 /**
  * The Bot switcher at the bottom (round 7): each Bot's own icon, the shown
- * one highlighted, an amber mark on one that needs Patrick, and "+" for a new
+ * one highlighted, an amber mark on one that needs the user, and "+" for a new
  * Bot. Right-click an icon for Edit space and its Theme submenu. Ctrl+Option+n shows the nth.
  */
 export function SpaceDots({ bots, current, onSwitch, onNew, onEdit, accents, themes, themeOf, onTheme }: { bots: readonly BotSpace[]; current: string | null; onSwitch(botId: string): void; onNew(): void; onEdit(botId: string): void; accents?: Readonly<Record<string, string>>; themes?: readonly ThemeChoice[]; themeOf?: Readonly<Record<string, string | null>>; onTheme?(botId: string, themeId: string | null): void }) {
@@ -196,7 +196,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(timer); }, []);
 
-  // The server learns which Bot is shown, so Patrick's next thread is its conversation.
+  // The server learns which Bot is shown, so the user's next thread is its conversation.
   useEffect(() => {
     setFocusHandler((botId) => { void call("bot_focus", { botId }).catch(() => {}); });
     return () => setFocusHandler(null);

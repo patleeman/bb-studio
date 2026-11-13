@@ -924,7 +924,7 @@ it("a Bot's default model starts as its Main's, once; setting it switches no thr
   await x.bots.switchModel(scout.threadId!, { providerId: "codex", model: "faster", reasoning: "low" });
   expect((await x.bots.get(scout.id)).bot).toMatchObject({ model: "faster", defaultModel: { model: "model" } });
   x.update.mockClear();
-  // Patrick sets the default: no thread changes, Main included.
+  // The user sets the default: no thread changes, Main included.
   const set = await x.bots.setDefaultModel({ botId: scout.id, providerId: "claude", model: "sonnet", reasoning: "medium" });
   expect(set.bot).toMatchObject({ model: "faster", defaultModel: { providerId: "claude", model: "sonnet", reasoningLevel: "medium" } });
   expect(x.bots.defaultModel(scout.id)).toEqual({ providerId: "claude", model: "sonnet", reasoning: "medium" });

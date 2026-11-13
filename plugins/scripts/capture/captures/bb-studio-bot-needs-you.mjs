@@ -1,5 +1,5 @@
 // The Bot page's Needs you failures (src/ui/bot/pageModel.ts failedRuns, and
-// BotPage.tsx's rows), from a staged BB seeded with Patrick's live cases:
+// BotPage.tsx's rows), from a staged BB seeded with the user's live cases:
 //
 // - Morning card: Saturday's 8:00 AM Morning kick failed ("Script exited with
 //   code null"); today's 8:00 AM run since was a quiet "skipped: empty
@@ -7,7 +7,7 @@
 // - Project Lead: a runner paused on purpose, whose Wednesday 12:00 AM run
 //   failed ("Target thread thr_… is in an error state"). It stays out of
 //   Needs you; Paused marks it.
-// - Three failures that still need Patrick, one per known error shape:
+// - Three failures that still need the user, one per known error shape:
 //   Status probe ("Script exited with code 2"), Backup check ("Target thread
 //   thr_… is in an error state") and Evening wrap-up (a timeout, in the Bot's
 //   chat at the message it sent, so Open deep-links to it).

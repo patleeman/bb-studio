@@ -57,7 +57,7 @@ hands-free voice).
 
 - **Grouping.** A push with a `conversationId` is grouped by it
   (`aps.thread-id`), so a conversation and its workers stack together.
-- **`needs-you`.** A new kind for a conversation that needs Patrick. It needs
+- **`needs-you`.** A new kind for a conversation that needs the user. It needs
   `botId` and `conversationId`, and `threadId` must be the conversation. It
   has no category, so no lock-screen actions.
 - **Worker approvals.** Studio sends one push per approval a Bot's worker

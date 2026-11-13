@@ -20,7 +20,7 @@ BB versions checked:
 |---|---|
 | Q1. Can a plugin ship a native helper and start it on stable BB? | **Yes.** Shown in a staged stable BB 0.47.1. Git installs keep the executable bit and add no quarantine, so an ad-hoc-signed helper runs. Notarization isn't needed for git installs. |
 | Q2. Can Electron's own loopback give a smaller v1? | **No, not from a plugin.** BB never sets `setDisplayMediaRequestHandler`, never uses `desktopCapturer`, and exposes no capture API. `getDisplayMedia` can't work in BB's window, and a plugin can't reach the main process to fix that. Only the BB team could add it. |
-| Q3. Does a process tap work when BB is the responsible app? | **Partly answered.** BB is the responsible app for the helper, and BB's Info.plist already has `NSAudioCaptureUsageDescription`. The capture itself didn't run: permission is "not determined", so starting the tap would show a system prompt on Patrick's screen. The code is built and waits for the lead's go-ahead (see [Q3](#q3-process-tap-with-bb-as-the-responsible-app)). |
+| Q3. Does a process tap work when BB is the responsible app? | **Partly answered.** BB is the responsible app for the helper, and BB's Info.plist already has `NSAudioCaptureUsageDescription`. The capture itself didn't run: permission is "not determined", so starting the tap would show a system prompt on the user's screen. The code is built and waits for the lead's go-ahead (see [Q3](#q3-process-tap-with-bb-as-the-responsible-app)). |
 
 **Recommended v1 path: the helper** (`bb-talk-tap`, shipped inside Studio and
 started by Studio's server), as the design proposes. Electron loopback can't be
@@ -102,7 +102,7 @@ Gatekeeper enforces it at launch only for quarantined files, so the helper ran.
   browser download, a zip from GitHub Releases, AirDrop, or BB downloading it
   over an API that adds quarantine. Gatekeeper then blocks an unnotarized
   helper with a "can't be opened" dialog. I didn't trigger this here, because
-  the dialog would appear on Patrick's screen.
+  the dialog would appear on the user's screen.
 - **What a release needs:**
   - Build a universal (arm64 + x86_64) helper with `-target …-macos14.2`.
   - Sign it with a Developer ID Application certificate and the hardened
@@ -241,7 +241,7 @@ helper later. Remove it with `tccutil reset AudioCapture dev.bb.desktop.nightly`
 
 ## What's blocked or needs the BB team
 
-- **Q3's capture run** needs one permission prompt answered on Patrick's
+- **Q3's capture run** needs one permission prompt answered on the user's
   screen (see above).
 - **BB team (only to improve things, not needed for v1):**
   - A real `NSAudioCaptureUsageDescription` in BB's Info.plist, instead of

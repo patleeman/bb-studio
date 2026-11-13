@@ -4,7 +4,7 @@ The old voice mode turns on in any thread: speech to text, then the thread,
 then text to speech of its reply. Hands-free voice
 ([spike.md](spike.md)) replaces it. **Dictation stays.**
 
-Patrick approved this list as recommended, and it was **removed on Nov 1**,
+The user approved this list as recommended, and it was **removed on Nov 1**,
 Read aloud included. The speech-only OpenRouter key went with it (Jev keeps
 its own `openRouterApiKey`), and iOS Talk to Bot (the Action button,
 `TalkToChiefIntent`, `bbstudio://bot-talk` and `chief-talk`) now opens
@@ -181,6 +181,6 @@ These are only available in a voice-mode thread: `voice_delegate`,
   `ThreadVoice` and `VoicePlayer`, and its read-along highlight is the
   Markdown and transcript plumbing above.
 
-Removing voice mode removes read-aloud, unless Patrick wants to keep it as its
-own feature. If he does, it needs `src/speech/` (the TTS engine and its
+Removing voice mode removes read-aloud, unless the user wants to keep it as its
+own feature. If they do, it needs `src/speech/` (the TTS engine and its
 settings) on desktop, and `VoicePlayer`'s piece playback on iOS.
