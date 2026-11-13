@@ -68,7 +68,6 @@ struct BotSpacesRoot: View {
             BotPageScreen(page: page, bot: bot, open: { [shell] in shell.open($0) }, openMain: { [shell, store] in
                 if let main = BotShell.mainThreadId(bot, view: bot.flatMap { store.view(for: $0.id) }) { shell.openConversation(main) }
             }, refresh: { [store] in Task { await store.refresh() } })
-            .id(bot?.id)
         case nil:
             ContentUnavailableView("No conversation selected", systemImage: Symbols.thread)
         }

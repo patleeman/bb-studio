@@ -19,6 +19,7 @@ struct BotPageScreen: View {
                 .navigationBarTitleDisplayMode(.large)
         case .automations:
             BotAutomationsSheet(botId: bot?.id, botName: bot?.name ?? BotInfo.defaultName, embedded: true)
+                .id(bot?.id)
         case .archive:
             ArchivePageView(botId: bot?.id, open: open, refresh: refresh)
         }
@@ -58,10 +59,8 @@ struct MemoryPageView: View {
     let botId: String?
     var open: (BotShellItem) -> Void
     @EnvironmentObject private var app: AppModel
-    @State private var overview: MemoryOverview?
-    @State private var records: [MemoryRecord]?
-    @State private var total = 0
-    @State private var error: String?
+    @State private var overviewLoad = PageLoad<MemoryOverview>()
+    @State private var recordsLoad = PageLoad<(records: [MemoryRecord], total: Int)>()
     @State private var query = ""
     @State private var topic: String?
     @State private var sort: MemoryPage.Sort = .newest
@@ -71,13 +70,24 @@ struct MemoryPageView: View {
     @State private var replacedOpen = false
     @State private var listTask: Task<Void, Never>?
 
+    private var overview: MemoryOverview? { overviewLoad.value }
+    private var records: [MemoryRecord]? { recordsLoad.value?.records }
+    private var total: Int { recordsLoad.value?.total ?? 0 }
+    private var scope: String { "\(app.client.baseURL.absoluteString)|\(botId ?? "")" }
+
     var body: some View {
         List {
             if let overview { chips(overview) }
-            if let error {
-                Section { Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary) }
+            if overview != nil, let error = overviewLoad.error {
+                PageLoadErrorRow(message: error, id: "memoryOverviewRetry") { overviewLoad.retry() }
+            }
+            if overview != nil, let error = recordsLoad.error {
+                PageLoadErrorRow(message: error, id: "memoryRecordsRetry") { startRecords() }
             }
             if let overview { profile(overview) }
+            if records == nil, overview != nil, recordsLoad.waiting {
+                ProgressView().frame(maxWidth: .infinity).listRowBackground(Color.clear).accessibilityIdentifier("memoryRecordsLoading")
+            }
             if let records {
                 let split = MemoryPage.split(records)
                 if records.isEmpty {
@@ -104,7 +114,15 @@ struct MemoryPageView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .overlay { if overview == nil && error == nil { ProgressView() } }
+        .overlay {
+            if overview == nil {
+                if let error = overviewLoad.error {
+                    PageLoadFailed(title: "Memory didn't load", message: error, id: "memoryRetry") { reloadAll() }
+                } else {
+                    ProgressView().accessibilityIdentifier("memoryLoading")
+                }
+            }
+        }
         .searchable(text: $query, prompt: MemoryPage.searchPrompt((overview?.current ?? 0) + (overview?.replaced ?? 0)))
         .navigationTitle("Memory")
         .navigationBarTitleDisplayMode(.large)
@@ -128,8 +146,12 @@ struct MemoryPageView: View {
             }
         }
         .refreshable { await reload() }
-        .task { await loadOverview() }
-        .task { await loadRecords() }
+        .task(id: scope) { reloadAll(force: false) }
+        .onChange(of: botId) { _, _ in
+            query = ""
+            topic = nil
+            profileText = nil
+        }
         .onChange(of: query) { _, _ in schedule(after: .milliseconds(250)) }
         .onChange(of: topic) { _, _ in schedule() }
         .onChange(of: sort) { _, _ in schedule() }
@@ -203,35 +225,41 @@ struct MemoryPageView: View {
         listTask = Task {
             if delay > .zero { try? await Task.sleep(for: delay) }
             guard !Task.isCancelled else { return }
-            await loadRecords()
+            startRecords()
         }
     }
 
     private func reload() async {
-        await loadOverview()
         listTask?.cancel()
-        await loadRecords()
+        profileText = nil
+        startOverview(force: true)
+        startRecords(force: true)
+        await overviewLoad.settle()
+        await recordsLoad.settle()
     }
 
-    private func loadOverview() async {
-        do {
-            overview = try await app.client.memoryOverview(botId: botId)
-            profileText = nil
-        } catch where BBClient.isCancellation(error) {
-        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+    private func reloadAll(force: Bool = true) {
+        startOverview(force: force)
+        startRecords(force: force)
     }
 
-    private func loadRecords() async {
+    private func startOverview(force: Bool = false) {
+        let client = app.client
+        let botId = botId
+        overviewLoad.describe = { BBClient.describe($0, server: client.baseURL) }
+        if force, overviewLoad.key == scope { return overviewLoad.retry() }
+        overviewLoad.run(key: scope) { try await client.memoryOverview(botId: botId) }
+    }
+
+    private func startRecords(force: Bool = false) {
+        let client = app.client
+        let botId = botId
         let asked = MemoryQuery(query: query, topic: topic, sort: sort)
-        do {
-            let result = try await app.client.memoryRecords(botId: botId, query: query, topic: topic, sort: sort)
-            // An older search that finishes late never replaces the current one's results.
-            guard asked.matches(query: query, topic: topic, sort: sort) else { return }
-            records = result.records
-            total = result.total
-            error = nil
-        } catch where BBClient.isCancellation(error) {
-        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+        let (query, topic, sort) = (query, topic, sort)
+        let key = "\(scope)|\(asked.query)|\(asked.topic ?? "")|\(asked.sort)"
+        recordsLoad.describe = { BBClient.describe($0, server: client.baseURL) }
+        if force, recordsLoad.key == key { return recordsLoad.retry() }
+        recordsLoad.run(key: key, scope: scope) { try await client.memoryRecords(botId: botId, query: query, topic: topic, sort: sort) }
     }
 }
 
@@ -386,18 +414,20 @@ struct LibraryPageView: View {
     var open: (BotShellItem) -> Void
     @EnvironmentObject private var app: AppModel
     @AppStorage("studio.library.group") private var groupBy: LibraryPage.GroupBy = .conversation
-    @State private var items: [BotLibraryItem]?
-    @State private var error: String?
+    @State private var load = PageLoad<[BotLibraryItem]>()
     @State private var query = ""
     @State private var kind: BotLibraryItem.Kind?
     @State private var unfolded: Set<String> = []
+
+    private var items: [BotLibraryItem]? { load.value }
+    private var scope: String { "\(app.client.baseURL.absoluteString)|\(botId ?? "")" }
 
     var body: some View {
         let groups = LibraryPage.groups(items ?? [], query: query, kind: kind, groupBy: groupBy)
         List {
             BotPageChips(choices: [(BotLibraryItem.Kind?.none, "All")] + LibraryPage.filters.map { (Optional($0), LibraryPage.label($0)) }, selection: $kind)
-            if let error, items == nil {
-                Section { Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary) }
+            if items != nil, let error = load.error {
+                PageLoadErrorRow(message: error, id: "libraryRowRetry") { load.retry() }
             }
             ForEach(groups) { group in
                 let fold = LibraryPage.folded(group.rows, open: unfolded.contains(group.id))
@@ -418,7 +448,15 @@ struct LibraryPageView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .overlay { if items == nil && error == nil { ProgressView() } }
+        .overlay {
+            if items == nil {
+                if let error = load.error {
+                    PageLoadFailed(title: "The library didn't load", message: error, id: "libraryRetry") { load.retry() }
+                } else {
+                    ProgressView().accessibilityIdentifier("libraryLoading")
+                }
+            }
+        }
         .searchable(text: $query, prompt: "Search files")
         .navigationTitle("Library")
         .navigationBarTitleDisplayMode(.large)
@@ -434,8 +472,13 @@ struct LibraryPageView: View {
                 .accessibilityIdentifier("libraryOptions")
             }
         }
-        .refreshable { await load() }
-        .task { await load() }
+        .refreshable { await load.reload() }
+        .task(id: scope) { start() }
+        .onChange(of: botId) { _, _ in
+            query = ""
+            kind = nil
+            unfolded = []
+        }
         .accessibilityIdentifier("library-page")
     }
 
@@ -472,12 +515,11 @@ struct LibraryPageView: View {
         }
     }
 
-    private func load() async {
-        do {
-            items = try await app.client.botLibrary(botId: botId)
-            error = nil
-        } catch where BBClient.isCancellation(error) {
-        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+    private func start() {
+        let client = app.client
+        let botId = botId
+        load.describe = { BBClient.describe($0, server: client.baseURL) }
+        load.run(key: scope) { try await client.botLibrary(botId: botId) }
     }
 }
 
@@ -486,10 +528,13 @@ struct ArchivePageView: View {
     var open: (BotShellItem) -> Void
     var refresh: () -> Void
     @EnvironmentObject private var app: AppModel
-    @State private var data: ArchiveData?
+    @State private var load = PageLoad<ArchiveData>()
     @State private var error: String?
     @State private var query = ""
     @State private var filter: ArchivePage.Filter = .all
+
+    private var data: ArchiveData? { load.value }
+    private var scope: String { "\(app.client.baseURL.absoluteString)|\(botId ?? "")" }
 
     var body: some View {
         let shown = data.map { ArchivePage.shown($0, query: query, filter: filter) } ?? (conversations: [], workers: [])
@@ -498,6 +543,9 @@ struct ArchivePageView: View {
                 (each, each.title + (data.flatMap { ArchivePage.count($0, each) }.map { " \($0)" } ?? ""))
             }, selection: $filter)
             if let error { Section { Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary) } }
+            if data != nil, let error = load.error {
+                PageLoadErrorRow(message: error, id: "archiveRowRetry") { load.retry() }
+            }
             if !shown.conversations.isEmpty {
                 Section {
                     ForEach(shown.conversations) { conversationRow($0) }
@@ -516,12 +564,20 @@ struct ArchivePageView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .overlay { if data == nil && error == nil { ProgressView() } }
+        .overlay {
+            if data == nil {
+                if let error = load.error {
+                    PageLoadFailed(title: "The archive didn't load", message: error, id: "archiveRetry") { load.retry() }
+                } else {
+                    ProgressView()
+                }
+            }
+        }
         .searchable(text: $query, prompt: "Search the archive")
         .navigationTitle("Archive")
         .navigationBarTitleDisplayMode(.large)
-        .refreshable { await load() }
-        .task { await load() }
+        .refreshable { await load.reload() }
+        .task(id: scope) { start() }
         .accessibilityIdentifier("archive-page")
     }
 
@@ -591,15 +647,15 @@ struct ArchivePageView: View {
 
     private func reopened() async {
         refresh()
-        await load()
+        error = nil
+        await load.reload()
     }
 
-    private func load() async {
-        do {
-            data = try await app.client.botArchive(botId: botId)
-            error = nil
-        } catch where BBClient.isCancellation(error) {
-        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+    private func start() {
+        let client = app.client
+        let botId = botId
+        load.describe = { BBClient.describe($0, server: client.baseURL) }
+        load.run(key: scope) { try await client.botArchive(botId: botId) }
     }
 }
 
@@ -701,5 +757,43 @@ struct MemoryQuery: Equatable {
 
     func matches(query: String, topic: String?, sort: some Hashable) -> Bool {
         self == MemoryQuery(query: query, topic: topic, sort: sort)
+    }
+}
+
+struct PageLoadFailed: View {
+    let title: String
+    let message: String
+    let id: String
+    let retry: () -> Void
+
+    var body: some View {
+        ContentUnavailableView {
+            Label(title, systemImage: "exclamationmark.triangle")
+        } description: {
+            Text(message)
+        } actions: {
+            Button("Retry", action: retry)
+                .buttonStyle(.borderedProminent)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier(id)
+        }
+    }
+}
+
+struct PageLoadErrorRow: View {
+    let message: String
+    let id: String
+    let retry: () -> Void
+
+    var body: some View {
+        Section {
+            HStack(spacing: 12) {
+                Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                Button("Retry", action: retry)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityIdentifier(id)
+            }
+        }
     }
 }
