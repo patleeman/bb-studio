@@ -133,4 +133,22 @@ final class RoomTests: XCTestCase {
         room.handle(.closePlace)
         XCTAssertEqual(room.mode, .menu, "one opened from the menu closes to the menu")
     }
+
+    func testTheFloorHidesBareStatusTokens() {
+        let rows = [
+            row("a", "assistant", "Checked the inbox. Nothing new."),
+            row("p", "assistant", "[PASS]"),
+            row("b", "assistant", "**[PASS]**"),
+            row("c", "assistant", "Done with the sweep.\n\n[DONE]"),
+            row("d", "assistant", "[fail]\n"),
+            row("e", "assistant", "Tests: [PASS] on all three"),
+            row("u", "user", "[OK]"),
+        ]
+        let lines = RoomFloor.lines(rows)
+        XCTAssertEqual(lines.map(\.id), ["a", "c", "e"])
+        XCTAssertEqual(lines.first { $0.id == "c" }?.text, "Done with the sweep.")
+        XCTAssertEqual(lines.first { $0.id == "e" }?.text, "Tests: [PASS] on all three", "a token inside a sentence stays")
+        XCTAssertTrue(RoomFloor.isStatusToken(" `[SKIPPED]` "))
+        XCTAssertFalse(RoomFloor.isStatusToken("[PASS] and more"))
+    }
 }
