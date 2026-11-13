@@ -20150,8 +20150,9 @@ public enum Studio {
     public var updatedAt: Double?
     public var createdAt: Double?
     public var madeIn: BotLibraryOutputItemsItemMadeIn?
+    public var starred: Bool?
 
-    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, kind: BotLibraryOutputItemsItemKind? = nil, type: String? = nil, href: String? = nil, updatedAt: Double? = nil, createdAt: Double? = nil, madeIn: BotLibraryOutputItemsItemMadeIn? = nil) {
+    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, kind: BotLibraryOutputItemsItemKind? = nil, type: String? = nil, href: String? = nil, updatedAt: Double? = nil, createdAt: Double? = nil, madeIn: BotLibraryOutputItemsItemMadeIn? = nil, starred: Bool? = nil) {
       self.pluginId = pluginId
       self.id = id
       self.title = title
@@ -20161,6 +20162,7 @@ public enum Studio {
       self.updatedAt = updatedAt
       self.createdAt = createdAt
       self.madeIn = madeIn
+      self.starred = starred
     }
   }
 

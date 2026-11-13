@@ -42,7 +42,7 @@ it("is the Library on the Bot-page template: its header, Kind pills, conversatio
   act(() => root.render(<LibraryPage />));
   expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Library·Chief of Staff");
   expect(container.querySelector<HTMLInputElement>("[data-testid=bot-page-search]")?.placeholder).toBe("Search Library");
-  expect([...container.querySelectorAll("[data-testid=bot-page-pill]")].map((each) => each.textContent)).toEqual(["All", "Page", "Whiteboard", "Design", "App"]);
+  expect([...container.querySelectorAll("[data-testid=bot-page-pill]")].map((each) => each.textContent)).toEqual(["All", "Starred", "Page", "Whiteboard", "Design", "App"]);
   expect(container.querySelector("[data-testid=bot-page-subpills]")).toBeNull();
   const groups = [...container.querySelectorAll<HTMLElement>("[data-testid=library-group-section]")];
   expect(groups.map((each) => each.getAttribute("aria-label"))).toEqual(["Launch prep", "Made by you"]);
@@ -67,6 +67,13 @@ it("is the Library on the Bot-page template: its header, Kind pills, conversatio
   expect(state.openLink).toHaveBeenCalledTimes(3);
   act(() => [...container.querySelectorAll<HTMLButtonElement>("[data-testid=bot-page-pill]")].find((each) => each.textContent === "Whiteboard")!.click());
   expect([...container.querySelectorAll("[data-testid=library-row] [data-testid=bot-page-row-title]")].map((each) => each.textContent)).toEqual(["Grid sketch"]);
+});
+
+it("shows the starred files under Starred", () => {
+  state.items = [{ ...item("pg_star", "Starred plan", "page", 1), starred: true }, item("pg_mine", "Groceries", "page", 3), { ...item("mini_star", "Starred timer", "app", 4), starred: true }];
+  act(() => root.render(<LibraryPage />));
+  act(() => [...container.querySelectorAll<HTMLButtonElement>("[data-testid=bot-page-pill]")].find((each) => each.textContent === "Starred")!.click());
+  expect([...container.querySelectorAll("[data-testid=library-row] [data-testid=bot-page-row-title]")].map((each) => each.textContent)).toEqual(["Starred plan", "Starred timer"]);
 });
 
 it("narrows App to Interactive or Saved with a second row of pills", () => {

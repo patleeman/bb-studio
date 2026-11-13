@@ -1,17 +1,18 @@
 // The Library's rules (6f, "the Bot's files"), pure so they are tested
-// directly (library-model.test.ts): search, the Kind filter (App covers saved
-// and interactive apps, with a sub-filter), and grouping by
+// directly (library-model.test.ts): search, the filter (Starred, or a kind:
+// App covers saved and interactive apps, with a sub-filter), and grouping by
 // conversation (default), kind or date, newest first everywhere. In a group,
 // near-identical files from one source are one row with a count, and a group
 // shows 8 rows, then "N more" (UX review 3, item 7).
 import type { LibraryItem, LibraryKind } from "../../bot-threads-contract";
 
 export type LibraryGroupBy = "conversation" | "kind" | "date";
-export type LibraryKindFilter = "all" | Exclude<LibraryKind, "other" | "artifact">;
+export type LibraryKindFilter = "all" | "starred" | Exclude<LibraryKind, "other" | "artifact">;
 export type LibraryAppType = "all" | "interactive" | "saved";
 
 export const LIBRARY_KINDS: readonly { id: LibraryKindFilter; label: string }[] = [
   { id: "all", label: "All" },
+  { id: "starred", label: "Starred" },
   { id: "page", label: "Page" },
   { id: "whiteboard", label: "Whiteboard" },
   { id: "design", label: "Design" },
@@ -91,9 +92,9 @@ export function provenance(item: Pick<LibraryItem, "madeIn">): string {
   return item.madeIn.kind === "worker" ? `by ${item.madeIn.title}` : `made in ${item.madeIn.title}`;
 }
 
-/** Whether a file passes the search (its title, or where it was made), the Kind filter and, for apps, the type. */
+/** Whether a file passes the search (its title, or where it was made), the filter (Starred or a kind) and, for apps, the type. */
 export function libraryPasses(item: LibraryItem, query: string, kind: LibraryKindFilter, appType: LibraryAppType = "all"): boolean {
-  if (kind !== "all" && listedKind(item.kind) !== kind) return false;
+  if (kind === "starred" ? !item.starred : kind !== "all" && listedKind(item.kind) !== kind) return false;
   if (kind === "app" && appType !== "all" && item.kind !== (appType === "saved" ? "artifact" : "app")) return false;
   const words = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   if (!words.length) return true;

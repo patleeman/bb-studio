@@ -48,8 +48,16 @@ it("lists saved apps (artifacts) under App, with Interactive and Saved narrowing
   expect(ids("interactive")).toEqual(["timer"]);
   expect(ids("saved")).toEqual(["report"]);
   expect(libraryGroups(withSaved, { query: "", kind: "all", groupBy: "kind" }, NOW).map((group) => [group.title, group.items.length])).toEqual([["Pages", 3], ["Designs", 1], ["Apps", 2]]);
-  expect(LIBRARY_KINDS.map((each) => each.label)).toEqual(["All", "Page", "Whiteboard", "Design", "App"]);
+  expect(LIBRARY_KINDS.map((each) => each.label)).toEqual(["All", "Starred", "Page", "Whiteboard", "Design", "App"]);
   expect(LIBRARY_APP_TYPES.map((each) => each.label)).toEqual(["All apps", "Interactive", "Saved"]);
+});
+
+it("shows only starred files under Starred, whatever their kind", () => {
+  const withStars = [...files, item({ id: "fav", title: "Pinned timer", kind: "app", type: "mini", starred: true, updatedAt: NOW - 5 * 60_000 }), item({ id: "fav2", title: "Pinned page", starred: true, updatedAt: NOW - 10 * 60_000 })];
+  expect(libraryGroups(withStars, { query: "", kind: "starred", groupBy: "date" }, NOW).flatMap((group) => group.items.map((each) => each.id))).toEqual(["fav", "fav2"]);
+  expect(libraryPasses(withStars[5]!, "timer", "starred")).toBe(true);
+  expect(libraryPasses(withStars[5]!, "page", "starred")).toBe(false);
+  expect(libraryPasses(files[0]!, "", "starred")).toBe(false);
 });
 
 it("says where a file came from", () => {

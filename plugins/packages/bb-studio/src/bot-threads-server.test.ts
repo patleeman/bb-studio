@@ -179,6 +179,8 @@ it("lists the Bot's files: what its conversations and workers made, and for the 
   expect(credited.find((each) => each.id === "pg_plan")!.madeIn).toMatchObject({ threadId: "lead", kind: "worker", conversationTitle: "Fork redesign" });
   // Not across Bots: Trip is Home's conversation, the lead Dot's worker.
   expect(credited.some((each) => each.id === "pg_trip")).toBe(false);
+  const starred = libraryItems({ botId: "dot", primaryId: "dot", items, origins, starred: new Set(["pages:pg_mine", "pages:pg_trip"]), record: (id) => (records.get(id) as never) ?? null, title: (id) => titles[id] ?? id });
+  expect(starred.map((each) => [each.id, each.starred])).toEqual([["art_diff", false], ["pg_plan", false], ["pg_mine", true]]);
 });
 
 it("lists what the sidebar leaves out, and finished conversations, for the older list; info says when one is finishing", async () => {

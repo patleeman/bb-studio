@@ -3,7 +3,7 @@
 // its workers made, newest first, one line each with its kind, where it came
 // from ("made in Launch prep", "by Fable lead") and its age. Grouped by
 // conversation (default; the group's title opens it), kind or date; a
-// search field, Kind pills (App with Interactive and Saved under it) and a Group by menu. A group shows 8 rows, then "N more"; near-identical files from one
+// search field, pills (Starred and each kind, App with Interactive and Saved under it) and a Group by menu. A group shows 8 rows, then "N more"; near-identical files from one
 // source are one row with a count. A file opens as a tab in the workbench
 // beside the page; a kind with no workbench view opens at its own address.
 // Rules in library-model.ts; data from bot_library.
@@ -50,7 +50,7 @@ export function LibraryPage() {
   return (
     <BotPageLayout testId="library" title="Library" bot={bot?.name} botId={bot?.id}
       toolbar={<BotPageToolbar<LibraryKindFilter, LibraryAppType> search={{ value: query, onChange: setQuery, placeholder: "Search Library" }}
-        filter={{ label: "Kind", value: kind, options: LIBRARY_KINDS, onChange: (next) => { setKind(next); setAppType("all"); } }}
+        filter={{ label: "Show", value: kind, options: LIBRARY_KINDS, onChange: (next) => { setKind(next); setAppType("all"); } }}
         subFilter={kind === "app" ? { label: "App type", value: appType, options: LIBRARY_APP_TYPES, onChange: setAppType } : null}
         menus={<MenuSelect<LibraryGroupBy> testId="library-group" label="Group by" value={groupBy} choices={LIBRARY_GROUPS} onChange={setGroupBy} className="h-8 text-sm" />} />}>
       <NoDragStyle />

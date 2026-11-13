@@ -46,6 +46,7 @@ export interface BotThreadsServerDeps {
   originThreads(): ReadonlyMap<string, string>;
   /** The agent thread each item's first activity names, by `<plugin>:<id>` (a worker that made it through Main). */
   creatorThreads?(): ReadonlyMap<string, string>;
+  starred?(): ReadonlySet<string>;
   /** Tells every window something changed (Studio's realtime channel), and the phone which Bots' threads did. */
   changed(changes: readonly BotChange[]): void;
   log(message: string): void;
@@ -112,13 +113,15 @@ export function libraryItems(input: {
   origins: ReadonlyMap<string, string>;
   /** The agent thread each item's first activity names; a worker there gets the credit over Main. */
   creators?: ReadonlyMap<string, string>;
+  starred?: ReadonlySet<string>;
   record(threadId: string): BotThreadRecord | null;
   title(threadId: string): string;
 }): LibraryItem[] {
   const result: LibraryItem[] = [];
   for (const item of input.items) {
     if (item.archived || item.template) continue;
-    const origin = fileOrigin(`${item.pluginId}:${item.id}`, input.origins, input.creators ?? null, input.record);
+    const key = `${item.pluginId}:${item.id}`;
+    const origin = fileOrigin(key, input.origins, input.creators ?? null, input.record);
     const rec = origin ? input.record(origin) : null;
     const owner = rec?.botId ?? input.primaryId;
     if (owner !== input.botId) continue;
@@ -128,6 +131,7 @@ export function libraryItems(input: {
       pluginId: item.pluginId, id: item.id, title: item.title.trim() || "Untitled", kind: libraryKind(item.type), type: item.type,
       href: info ? familyHref(info.family, item.id) : null, updatedAt: item.updatedAt, createdAt: item.createdAt || null,
       madeIn: origin ? { threadId: origin, title: input.title(origin), kind: rec?.kind ?? "conversation", conversationId, conversationTitle: conversationId ? input.title(conversationId) : null } : null,
+      starred: input.starred?.has(key) ?? false,
     });
   }
   return result.sort((a, b) => b.updatedAt - a.updatedAt);
@@ -454,7 +458,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     const records = new Map(threadIds.flatMap((threadId) => { const rec = store.get(threadId); return rec ? [[threadId, rec] as const] : []; }));
     const owners = [...records.values()].flatMap((rec) => rec.ownerConversationId ? [rec.ownerConversationId] : []);
     const threads = await facts([...threadIds, ...owners]);
-    return { botId: id, items: libraryItems({ botId: id, primaryId: deps.bots()[0]?.id ?? null, items, origins, creators, record: (threadId) => records.get(threadId) ?? store.get(threadId), title: titleFrom(threads) }) };
+    return { botId: id, items: libraryItems({ botId: id, primaryId: deps.bots()[0]?.id ?? null, items, origins, creators, starred: deps.starred?.() ?? new Set(), record: (threadId) => records.get(threadId) ?? store.get(threadId), title: titleFrom(threads) }) };
   };
 
   const rpc = {

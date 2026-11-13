@@ -1014,6 +1014,7 @@ export default async function plugin(bb: BbPluginApi) {
     items: () => itemIndex.list({ limit: 2000 }),
     originThreads: () => services.originThreads(),
     creatorThreads: () => services.creatorThreads(),
+    starred: () => new Set(stars.map().keys()),
     // Many events in a row reload open views once.
     changed: botThreadsChanged,
     log: (message) => bb.log.warn(message),

@@ -116,6 +116,7 @@ const libraryItem = z.object({
   createdAt: z.number().nullable(),
   /** Who made it: a conversation or a worker of the Bot; null when Patrick made it himself. */
   madeIn: z.object({ threadId: z.string(), title: z.string(), kind, conversationId: z.string().nullable(), conversationTitle: z.string().nullable() }).nullable(),
+  starred: z.boolean().optional(),
 });
 
 /** A finished conversation, for Main's card and the finished banner (src/bot-finish.ts). */
