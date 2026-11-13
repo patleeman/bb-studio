@@ -1,3 +1,4 @@
+import { preferAiService } from "./ai-service-preference.fork.js";
 import { getAiServiceSelections } from "@bb/db";
 import type {
   AiServiceSelection,
@@ -53,6 +54,7 @@ interface RunAiTaskArgs<T> {
   logContext?: JsonObject;
   timeoutMs?: number;
   signal?: AbortSignal;
+  preferServiceId?: string | undefined;
   call: (service: AiServiceRegistration, signal: AbortSignal) => Promise<T>;
   accept: (value: T) => T | null;
 }
@@ -195,7 +197,7 @@ export async function runAiTask<T>(
   if (args.signal?.aborted) {
     return fail("cancelled", REQUEST_CANCELLED_MESSAGE);
   }
-  const services = aiTaskServices(deps, args.task, selection);
+  const services = preferAiService(aiTaskServices(deps, args.task, selection), args.preferServiceId);
   if (services.length === 0) {
     return fail(
       "unavailable",
@@ -290,6 +292,7 @@ export function runTextAiTask(
     logContext?: JsonObject;
     timeoutMs?: number;
     signal?: AbortSignal;
+    preferServiceId?: string | undefined;
   },
 ): Promise<AiTaskOutcome<string>> {
   return runAiTask(deps, {
@@ -298,6 +301,7 @@ export function runTextAiTask(
     ...(args.logContext === undefined ? {} : { logContext: args.logContext }),
     ...(args.timeoutMs === undefined ? {} : { timeoutMs: args.timeoutMs }),
     ...(args.signal === undefined ? {} : { signal: args.signal }),
+    preferServiceId: args.preferServiceId,
     call: (service, signal) => {
       if (service.complete === null) {
         throw new Error("This service does not answer text prompts");
