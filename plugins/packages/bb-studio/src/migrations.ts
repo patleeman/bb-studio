@@ -1086,4 +1086,11 @@ export const MIGRATIONS = [
        text TEXT NOT NULL,
        created_at INTEGER NOT NULL
      );`,
+  `CREATE TABLE work_cards (
+       id TEXT PRIMARY KEY,
+       thread_id TEXT NOT NULL,
+       record TEXT NOT NULL,
+       finished_at INTEGER
+     );
+   CREATE INDEX work_cards_thread ON work_cards (thread_id, finished_at);`,
 ];
