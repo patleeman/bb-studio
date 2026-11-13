@@ -1,3 +1,4 @@
+import { keepDividerWhileReading } from "./unreadDividerOpenOnly.fork";
 import { useState } from "react";
 import type { ThreadTimelineUnreadDividerPlacement } from "@/components/thread/timeline";
 
@@ -75,6 +76,8 @@ function nextThreadUnreadDividerSnapshot(
   ) {
     return currentSnapshot;
   }
+  const reading = keepDividerWhileReading(currentSnapshot, thread);
+  if (reading !== null) return reading;
 
   const placement = buildUnreadDividerPlacement(thread);
   return {
