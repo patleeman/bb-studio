@@ -2162,9 +2162,10 @@ extension ThreadView {
                 typing: showsWorking, thinking: model.shelf.thinking)
         }
         let items = inRoom ? RoomFloor.clean(model.shownItems) : model.shownItems
-        return ThreadTranscriptRow.thread(items: items, hasOlder: model.hasOlder, unread: unreadItem(in: items), match: currentMatch,
+        let rows = ThreadTranscriptRow.thread(items: items, hasOlder: model.hasOlder, unread: unreadItem(in: items), match: currentMatch,
             editableId: worker == nil ? lastUserRowId : nil, pending: pending, interactions: shownInteractions,
             working: showsWorking, thinking: model.shelf.thinking, sideThreads: conversation != nil ? sideThreads : [:])
+        return inRoom ? RoomFloor.rows(rows) : rows
     }
 
     fileprivate var transcriptV2Actions: ThreadTranscriptActions {
@@ -2174,7 +2175,7 @@ extension ThreadView {
             draftReply: { draftReply($0) }, sendReply: { send(text: $0) }, quote: { quote($0) },
             select: { selecting = SelectionText(text: $0) }, edit: startEditing,
             saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil,
-            openThread: { botChrome?.openThread($0) }, replyInThread: { botChrome?.replyInThread($0) },
+            openThread: { id in if let botChrome { botChrome.openThread(id) } else { shell?.push(.thread(id: id)) } }, replyInThread: { botChrome?.replyInThread($0) },
             messageThread: inConversation ? { replyInThread($0) } : nil,
             forkConversation: inConversation ? { forkConversation($0) } : nil,
             openSideThread: inConversation ? { showThread($0) } : nil,

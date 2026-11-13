@@ -460,6 +460,7 @@ struct RoomView: View {
         guard let mode = RoomQA.mode else { return }
         switch mode {
         case "talk": room.handle(.tapInput)
+        case "read": room.handle(.tapFloor)
         case "record", "recordLocked":
             #if DEBUG
             session.talk.qaPretend(mode == "record" ? .recording : .handsFree)

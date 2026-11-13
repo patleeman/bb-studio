@@ -143,6 +143,14 @@ enum RoomFloor {
         }
     }
 
+    static func rows(_ rows: [ThreadTranscriptRow]) -> [ThreadTranscriptRow] {
+        rows.compactMap { row in
+            guard case .item(.message(let message), _) = row else { return row }
+            if let event = BotChatEntry.childEvent(message) { return .bot(.child(event, id: message.id), .init()) }
+            return BotChatEntry.shows(message) ? row : nil
+        }
+    }
+
     static func isStatusToken(_ line: String) -> Bool {
         line.range(of: #"^[\s`*_~]*\[(pass|fail|failed|done|ok|skip|skipped|noop)\][\s`*_~]*$"#, options: [.regularExpression, .caseInsensitive]) != nil
     }

@@ -137,6 +137,35 @@ final class RoomTests: XCTestCase {
         XCTAssertFalse(RoomFloor.isStatusToken("[PASS] and more"))
     }
 
+    func testTheRoomChatShowsBBsMessagesAsCardsAndHidesItsBareCheck() {
+        let finished = try! JSONDecoder().decode(TimelineRow.self, from: JSONSerialization.data(withJSONObject: [
+            "id": "s", "kind": "conversation", "role": "user", "initiator": "system", "text": "[bb system] @thread:thr_a completed",
+            "systemMessageKind": "child-completed", "systemMessageSubject": ["kind": "thread", "threadId": "thr_a", "threadName": "Review"],
+            "createdAt": 0] as [String: Any]))
+        let items: [TimelineItem] = [.message(row("u", "user", "Get the PRs moving")), .message(finished),
+                                     .message(row("k", "assistant", "✓")), .message(row("n", "user", "Note", initiator: "system")),
+                                     .message(row("a", "assistant", "On it."))]
+        let rows = RoomFloor.rows(ThreadTranscriptRow.thread(items: items, hasOlder: false, unread: nil, match: nil, editableId: nil,
+                                                             pending: [], interactions: [], working: false, thinking: nil))
+        XCTAssertEqual(rows.map(\.id), ["u", "child:s", "a"])
+        guard case .bot(.child(let event, _), _) = rows[1] else { return XCTFail("BB's message is a card") }
+        XCTAssertEqual(event.title, "Review")
+        XCTAssertEqual(event.threadId, "thr_a")
+    }
+
+    func testRowsOfOneTurnSitCloserThanTurns() {
+        let items: [TimelineItem] = [.message(row("u", "user", "Hi")), .activity([row("w", "assistant", "", kind: "work")]),
+                                     .message(row("a", "assistant", "Done.")), .message(row("b", "assistant", "More.")),
+                                     .message(row("v", "user", "Thanks"))]
+        let rows = ThreadTranscriptRow.thread(items: items, hasOlder: false, unread: nil, match: nil, editableId: nil,
+                                              pending: [], interactions: [], working: false, thinking: nil)
+        let same = rows.map { row -> Bool in
+            if case .item(_, let state) = row { return state.sameTurn }
+            return false
+        }
+        XCTAssertEqual(same, [false, false, true, true, false])
+    }
+
     func testAQuietThoughtIsHidden() {
         func thought(_ id: String, detail: String?, ms: Double, status: String = "completed") -> TimelineRow {
             var json: [String: Any] = ["id": id, "kind": "system", "systemKind": "operation", "operationKind": "reasoning",

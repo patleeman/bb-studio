@@ -360,6 +360,7 @@ struct BotChildCard: View {
     let event: BotChildEvent
     /// The thread's status now, from the Bot's Activity.
     let live: BotChildStatus?
+    var inset: CGFloat = 36
     let open: () -> Void
 
     private var status: BotChildStatus { live ?? event.status }
@@ -406,12 +407,12 @@ struct BotChildCard: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .frame(maxWidth: 360, alignment: .leading)
-            .background(Color(uiColor: .systemBackground), in: .rect(cornerRadius: 14, style: .continuous))
+            .background(inset == 0 ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(Color(uiColor: .systemBackground)), in: .rect(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.separator))
         }
         .buttonStyle(.plain)
         .disabled(event.threadId == nil)
-        .padding(.leading, 36)
+        .padding(.leading, inset)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityLabel("\(label), \(status.label)")
         .accessibilityHint(event.threadId != nil ? "Opens the thread" : "")
