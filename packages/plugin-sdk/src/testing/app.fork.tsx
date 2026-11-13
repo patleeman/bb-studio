@@ -179,6 +179,11 @@ export function forkTestHooks(
       close: () => Promise.resolve(false),
       hotkeyRegistered: () => Promise.resolve(false),
     }),
+    experimental_useDesktopControl: () => ({
+      native: false,
+      state: null,
+      request: () => Promise.resolve(null),
+    }),
   };
 }
 

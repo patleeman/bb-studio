@@ -19,6 +19,26 @@ resizable, hotkey, params })`. `hotkey` is a
   Opening a window that is already open with other `params`
   loads the new address in the same window, which keeps its place and size.
 
+## Desktop control
+
+- `experimental_useDesktopControl()` → `{ native, state, request(request) }`,
+  macOS desktop app only (`native` false and `state` null elsewhere). `state`
+  is the same in every window: `permissions` (Accessibility, Screen
+  Recording, Input Monitoring, live), `restartAdvised`, `hud` (shown and its
+  thread), `pointing`, `talkKey`, `talking`, numbered `pins` (app, window,
+  element, URL, a screenshot path), an agent's `activity` and a pending `ask`
+  for the person's cursor. `request` takes `requestPermission`, `openSettings`,
+  `refreshPermissions`, `relaunch`, `hud` (`shown`, `threadId`: hides the main
+  window while shown), `pointing` (refused until all three permissions are
+  granted), `talkKey`, `pinsTaken`, `clearPins`, `answer` (`session`, `once`,
+  `no`), `stop` and `resume`.
+- Backend: `bb.experimental_hooks.experimental_desktopControl({ threadId,
+agent, tool, args?, caption? })` → `{ ok, text?, images?, error? }`. The desktop
+  app decides: only the thread open in its HUD, background unless the person
+  granted their cursor, never password fields, paused while the person uses
+  that window. `tool` is `status`, `pins`, `windows`, `look`, `click`, `type`,
+  `key`, `hotkey`, `scroll`, `set_value` or `request_control`.
+
 ## Launcher items
 
 - `app.slots.experimental_launcherItem({ id, title, icon, section, keywords?,
