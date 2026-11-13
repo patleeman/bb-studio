@@ -1,4 +1,5 @@
 import { unreadDividerTurnStart } from "./unreadDividerTurnStart.fork";
+import { forkSignInErrorBody } from "./SignInErrorActions.fork";
 import {
   createContext,
   memo,
@@ -1216,12 +1217,12 @@ function TimelineExpandableBodyContent({
           <TimelineReasoningDetail text={row.detail} />
         ) : null;
       }
-      return row.detail ? (
+      return forkSignInErrorBody(row) ?? (row.detail ? (
         <TimelineSystemDetailBlock
           detail={row.detail}
           streaming={row.status === "pending"}
         />
-      ) : null;
+      ) : null);
     case "conversation":
       return null;
     default:
