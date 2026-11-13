@@ -611,6 +611,29 @@ it("refuses every change to what the import paused, and leaves it as it was", as
   expect(x.db.prepare("SELECT state, instruction FROM bot_automations WHERE id = 'aut_old'").get()).toEqual({ state: "paused", instruction: "Look" });
 });
 
+const oldRunner = (x: X, id: string, state: "active" | "paused") => x.db.prepare("INSERT INTO bot_runners (id, bot_id, name, job, project_id, state, cadence, time, created_at, updated_at) VALUES (?, 'bot_main', ?, 'x', 'proj_personal', ?, 'daily', '09:00', ?, ?)").run(id, `Runner ${id}`, state, IMPORTED - 1000, IMPORTED - 1000);
+
+it("refuses a change to a runner the import paused while the copy mirrors bb", async () => {
+  const x = await setup({ importedAt: IMPORTED });
+  oldRunner(x, "run_old", "paused");
+  expect(() => x.auto.guardRunner("run_old")).toThrow("It runs in bb");
+});
+
+it("after the cutover, Studio owns what the import paused: resume, run now, pause and delete all go through", async () => {
+  const x = await setup({ importedAt: null });
+  imported(x, "aut_old", "checkin", ["trg_automation_aut_old"]);
+  imported(x, "aut_fixed", "checkin", ["trg_automation_aut_fixed"]);
+  x.db.prepare("UPDATE bot_automations SET state = 'active', provision_pending = 1 WHERE id = 'aut_fixed'").run();
+  oldRunner(x, "run_old", "paused");
+  expect((await x.auto.list()).filter((row) => row.inBb)).toEqual([]);
+  expect(await x.auto.setState("aut_old", "active")).toMatchObject({ state: "active", inBb: false });
+  await x.auto.runNow("aut_old");
+  expect(await x.auto.setState("aut_fixed", "paused")).toMatchObject({ state: "paused", inBb: false });
+  await expect(x.auto.delete("aut_fixed")).resolves.toEqual({ deleted: true });
+  expect(() => x.auto.guardRunner("run_old")).not.toThrow();
+  expect(x.calls.filter((call) => call.method !== "automations_list")).toEqual([]);
+});
+
 it("with the plugin on but not answering, still fails closed", async () => {
   const x = await setup();
   await x.auto.create({ ...watcher, schedule: { type: "interval", every: 15, unit: "minutes", days: [0, 1, 2, 3, 4, 5, 6] } });

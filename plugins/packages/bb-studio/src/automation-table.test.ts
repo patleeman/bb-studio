@@ -165,6 +165,28 @@ describe("reading the sources", () => {
     writeFileSync(join(dir, "fork-import.json"), JSON.stringify({ version: 2, sourceDataDir: "/Users/x/.bb" }));
     expect(readImportedAt(dir)).toBeNull();
   });
+
+  it("knows a cut-over install by its cutoverAt mark or its paused mirror, and only then", () => {
+    const dir = tempDir();
+    const state = { version: 1, sourceDataDir: "/Users/x/.bb", sourceServerHostId: "host_demo", importedAt: IMPORTED, sourceEventRowid: 42 };
+    writeFileSync(join(dir, "fork-import.json"), JSON.stringify(state));
+    const fork = new Database(join(dir, "fork-import.db"));
+    fork.exec("CREATE TABLE cursors (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)");
+    fork.prepare("INSERT INTO cursors VALUES ('paused', 'false')").run();
+    expect(readImportedAt(dir)).toBe(IMPORTED);
+    fork.prepare("UPDATE cursors SET value = 'true' WHERE key = 'paused'").run();
+    expect(readImportedAt(dir)).toBeNull();
+    fork.prepare("DELETE FROM cursors").run();
+    fork.close();
+    writeFileSync(join(dir, "fork-import.json"), JSON.stringify({ ...state, cutoverAt: IMPORTED + HOUR }));
+    expect(readImportedAt(dir)).toBeNull();
+  });
+
+  it("after the cutover, nothing in the table is in bb or read-only", () => {
+    const table = automationTable(input(studioDb(), { importedAt: null }));
+    expect(table.mirrored).toBe(false);
+    expect(table.rows.every((row) => !row.inBb && !row.readOnly)).toBe(true);
+  });
 });
 
 describe("when, in a few words", () => {

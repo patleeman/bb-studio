@@ -295,14 +295,31 @@ export function bbFromFile(path: string): BbEntry[] {
   }
 }
 
-/** When BB Studio's one-way import from bb ran (`fork-import.json` in the server's data folder), or null on an install without it. */
+/** When BB Studio's one-way import from bb ran (`fork-import.json` in the server's data folder), or null on an install without it or once it is cut over from bb. */
 export function readImportedAt(dataDir: string): number | null {
   try {
-    const state = JSON.parse(readFileSync(join(dataDir, "fork-import.json"), "utf8")) as { version?: unknown; sourceDataDir?: unknown; importedAt?: unknown };
+    const state = JSON.parse(readFileSync(join(dataDir, "fork-import.json"), "utf8")) as { version?: unknown; sourceDataDir?: unknown; importedAt?: unknown; cutoverAt?: unknown };
     if (state.version !== 1 || typeof state.sourceDataDir !== "string") return null;
+    if (typeof state.cutoverAt === "number" || mirrorPaused(dataDir)) return null;
     return typeof state.importedAt === "number" ? state.importedAt : Number.MAX_SAFE_INTEGER;
   } catch {
     return null;
+  }
+}
+
+function mirrorPaused(dataDir: string): boolean {
+  const path = join(dataDir, "fork-import.db");
+  if (!existsSync(path)) return false;
+  let db: Database.Database | null = null;
+  try {
+    db = new Database(path, { readonly: true, fileMustExist: true });
+    db.pragma("busy_timeout = 1000");
+    const row = db.prepare("SELECT value FROM cursors WHERE key = 'paused'").get() as { value: string } | undefined;
+    return row?.value === "true";
+  } catch {
+    return false;
+  } finally {
+    db?.close();
   }
 }
 
