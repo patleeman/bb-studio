@@ -1,4 +1,4 @@
-import { curatedSourceUrl, isShippedMarketplace, refreshAnchor, seedStudioMarketplace, shipsCuratedMarketplace, withoutForkBuiltins } from "./studio-marketplaces.fork.js";
+import { configureShippedMarketplaces, curatedSourceUrl, isShippedMarketplace, refreshAnchor, seedStudioMarketplace, shipsCuratedMarketplace, withoutForkBuiltins } from "./studio-marketplaces.fork.js";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
@@ -197,6 +197,7 @@ export function createPluginCatalogService(deps: {
     return stagingReady;
   }
 
+  configureShippedMarketplaces(deps.marketplaceUrl);
   seedBundledMarketplace(Date.now());
   if (shipsCuratedMarketplace(deps.marketplaceUrl)) seedCuratedMarketplace();
   else seedStudioMarketplace(deps);
@@ -1038,7 +1039,7 @@ export function createPluginCatalogService(deps: {
         }));
         try {
           const name = materialized.catalog.name;
-          if (isShippedMarketplace(name, deps.marketplaceUrl)) {
+          if (isReservedMarketplace(name)) {
             throw new Error(
               `marketplace name "${name}" is reserved for a marketplace that ships with bb`,
             );
@@ -1081,7 +1082,7 @@ export function createPluginCatalogService(deps: {
 
     async removeMarketplace(name) {
       return withLock(name, async () => {
-        if (isShippedMarketplace(name, deps.marketplaceUrl)) {
+        if (isReservedMarketplace(name)) {
           throw new Error(`marketplace "${name}" cannot be removed`);
         }
         requireRow(name);
@@ -1365,10 +1366,7 @@ function catalogEntryKey(marketplace: string, entryId: string): string {
 }
 
 function isReservedMarketplace(name: string): boolean {
-  return (
-    name === BUNDLED_MARKETPLACE_NAME ||
-    name === CURATED_PLUGIN_MARKETPLACE_NAME
-  );
+  return isShippedMarketplace(name);
 }
 
 function marketplaceRank(name: string): number {

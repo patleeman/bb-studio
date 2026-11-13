@@ -443,8 +443,8 @@
     },
     "apps/server/src/services/plugin-catalog/plugin-catalog-service.ts": {
       "seam": "studio-marketplaces",
-      "intent": "With an empty marketplace URL (BB Studio's default, set by identity.mjs) bb's Community catalog is not seeded: BB Studio's own catalog is added once instead (seedStudioMarketplace), the periodic refresh is timed from the latest attempt (refreshAnchor), and bb-community can be added and removed by hand (isShippedMarketplace); its URLs fall back to getbb's v2 and v1 (curatedSourceUrl). Every fetched or added catalog loses entries whose id is a fork built-in (withoutForkBuiltins around materializeMarketplace). The helpers are in studio-marketplaces.fork.ts, imported at the top of the file. With a URL, bb's behavior is unchanged.",
-      "budget": 22
+      "intent": "With an empty marketplace URL (BB Studio's default, set by identity.mjs) bb's Community catalog is not seeded: BB Studio's own catalog is added once instead (seedStudioMarketplace), the periodic refresh is timed from the latest attempt (refreshAnchor), and bb-community is not reserved: it is not official and can be added and removed by hand (isReservedMarketplace asks isShippedMarketplace, set once per service by configureShippedMarketplaces); its URLs fall back to getbb's v2 and v1 (curatedSourceUrl). Every fetched or added catalog loses entries whose id is a fork built-in (withoutForkBuiltins around materializeMarketplace). The helpers are in studio-marketplaces.fork.ts, imported at the top of the file. With a URL, bb's behavior is unchanged.",
+      "budget": 24
     },
     "apps/server/src/services/system/desktop-app-update.ts": {
       "seam": "studio-release",
