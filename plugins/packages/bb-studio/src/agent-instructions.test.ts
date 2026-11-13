@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
-import { APP_POINTER, endOfReplyPointer, MINI_POINTER, PAGE_POINTER, studioInstructions, WORK_POINTER } from "./agent-instructions";
+import { APP_POINTER, CONTINUE_POINTER, endOfReplyPointer, MINI_POINTER, PAGE_POINTER, studioInstructions, WORK_POINTER } from "./agent-instructions";
 import { botInstructions } from "./bot";
 import { conversationInstructions } from "./bot-threads";
 import { DEFAULT_REPLIES } from "./explore/prompt";
@@ -41,13 +41,14 @@ it("keeps a typical conversation's instructions within 4,096 characters, the Bot
   expect(at(PAGE_POINTER)).toBeGreaterThan(at("</core-profile>"));
   expect(at(MINI_POINTER)).toBeGreaterThan(at(PAGE_POINTER));
   expect(at(WORK_POINTER)).toBeGreaterThan(at(MINI_POINTER));
+  expect(at(CONTINUE_POINTER)).toBeGreaterThan(at(WORK_POINTER));
   expect(instructions).toContain("::next{reply=\"…\" btw=\"…\" do=\"…\"}");
   expect(instructions).toContain("Quick replies to prefer: 👍 Looks good | 🔁 Try another way | ❓ Explain more.");
   expect(instructions.endsWith("Studio kinds: designs are off, don't offer them.")).toBe(true);
 });
 
 it("keeps each pointer to one or two lines and says which end-of-reply attributes are on", () => {
-  const pointers = [PAGE_POINTER, MINI_POINTER, APP_POINTER, WORK_POINTER, endOfReplyPointer({ next: true, explore: true, replies: DEFAULT_REPLIES })!, endOfReplyPointer({ next: false, explore: true, replies: null })!];
+  const pointers = [PAGE_POINTER, MINI_POINTER, APP_POINTER, WORK_POINTER, CONTINUE_POINTER, endOfReplyPointer({ next: true, explore: true, replies: DEFAULT_REPLIES })!, endOfReplyPointer({ next: false, explore: true, replies: null })!];
   for (const pointer of pointers) {
     expect(pointer).not.toContain("\n");
     expect(pointer.length).toBeLessThanOrEqual(320);
@@ -79,4 +80,15 @@ it("moves the long guidance into the studio skill, which the pointers name", () 
   for (const heading of ["## Agent guide", "### Pages", "### Apps", "### The Next row", "### Explore", "### Kinds"]) expect(skill).toContain(heading);
   // The rules that were in every session's instructions.
   for (const rule of ["```chart", "replace_all only when asked", "sandboxed iframe", "pages_comment_reply", "minis_update", "one stray \" breaks the whole line", "“curly” quotes", "Don't also write ::reactions or ::explore lines", "1 to 4 items separated by |"]) expect(skill).toContain(rule);
+});
+
+it("tells only a Bot's conversations to propose a new conversation and wait for a yes", () => {
+  const parts = { bot: "", runner: "", pages: false, minis: false, appCards: false, work: true, endOfReply: null, routing: "" };
+  expect(studioInstructions({ ...parts, conversation: "This is Main." })).toContain(CONTINUE_POINTER);
+  expect(studioInstructions({ ...parts, conversation: "" })).not.toContain(CONTINUE_POINTER);
+  expect(CONTINUE_POINTER).toContain("Offer a new conversation");
+  expect(CONTINUE_POINTER).toContain("only when they agree or ask");
+  expect(CONTINUE_POINTER).toContain("conversation_continue_new");
+  const skill = readFileSync(new URL("../skills/studio/SKILL.md", import.meta.url), "utf8");
+  for (const rule of ["conversation_continue_new { title, handoff, workCards?,", "act only when the user agrees", "It is not the transcript", "the phone shows\n  the link"]) expect(skill).toContain(rule);
 });

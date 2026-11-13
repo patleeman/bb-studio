@@ -33,6 +33,8 @@ import { askAboutItemHandler } from "./src/ui/ask-about-item";
 import { setAskAboutItem } from "./src/kit/app/item-header";
 import { registerReadOnlyComposer } from "./src/ui/conversations/ReadOnlyComposer";
 import { FinishedCard } from "./src/ui/conversations/finish";
+import { ContinuedCard } from "./src/ui/conversations/ContinuedCard";
+import { CONTINUED_DIRECTIVE } from "./src/continue-shared";
 import { OLDER_SUBPATH, olderBotFromPath } from "./src/ui/conversations/model";
 import { SKILLS_SUBPATH, skillsBotFromPath } from "./src/ui/skills/paths";
 import { newConversationRoute } from "./src/ui/conversations/new-conversation";
@@ -348,6 +350,7 @@ export default definePluginApp((app) => {
   // Archiving a conversation writes its summary (src/bot-finish.ts); the card
   // the Bot posts in Main is `::finished{thread="thr_…"}`.
   app.slots.messageDirective({ id: "finished", component: FinishedCard });
+  app.slots.messageDirective({ id: CONTINUED_DIRECTIVE, component: ContinuedCard });
   // A worker's approval, as a card in the conversation that owns it (src/worker-approvals.ts):
   // `::approval{thread="thr_…" id="…"}`, Approve / Deny through BB's own resolution.
   app.slots.messageDirective({ id: "approval", component: ApprovalCard });

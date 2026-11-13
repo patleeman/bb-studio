@@ -18,6 +18,8 @@ export const PAGE_POINTER = 'Pages: read with pages_read, change with small page
 export const MINI_POINTER = 'An app is a saved output or an interactive tool with its own data; apps_create makes either (type "artifact" or "mini"). For something the user will interact with or come back to, make an interactive app (type "mini") and show ::mini{id="mini_…"} on its own line; details are in the studio skill.';
 export const APP_POINTER = 'An app is a saved output or an interactive tool with its own data; apps_create makes either (type "artifact" or "mini"). For something the user will interact with or come back to, make an interactive app (type "mini"); show any app with ::app{id="…"} on its own line; details are in the studio skill.';
 
+export const CONTINUE_POINTER = 'New topic? Offer a new conversation for it; call conversation_continue_new only when they agree or ask.';
+
 export const WORK_POINTER = 'For work that runs a while (a worker, a release, a long job), post one live work card: work_card_create gives a ::work{id="wc_…"} line to post once; report progress with work_card_update, not new status messages.';
 
 /**
@@ -54,6 +56,6 @@ export interface InstructionParts {
 
 /** The instructions with MEMORY_SLOT where the memory block goes (src/memory/service.ts withMemory fills it). */
 export function studioInstructions(parts: InstructionParts): string {
-  return [parts.bot, parts.conversation, parts.runner, MEMORY_SLOT, parts.pages ? PAGE_POINTER : "", parts.minis ? (parts.appCards ? APP_POINTER : MINI_POINTER) : "", parts.work ? WORK_POINTER : "", parts.endOfReply ?? "", parts.routing]
+  return [parts.bot, parts.conversation, parts.runner, MEMORY_SLOT, parts.pages ? PAGE_POINTER : "", parts.minis ? (parts.appCards ? APP_POINTER : MINI_POINTER) : "", parts.work ? WORK_POINTER : "", parts.conversation ? CONTINUE_POINTER : "", parts.endOfReply ?? "", parts.routing]
     .filter(Boolean).join("\n\n");
 }
