@@ -18,7 +18,7 @@ it("registers the Bot pages and the New … actions beside a conversation, named
     ["memory-record", "Memory record", "thread", "undefined"],
     ...NEW_TAB_ACTIONS.filter((action) => action.create).map((action) => [action.tabId, action.title, "thread", "function"]),
   ]);
-  expect(tabs.filter((tab) => "experimental_showInNewTab" in tab).map((tab) => tab.id)).toEqual(["automation", "todo", "memory-record"]);
+  expect(tabs.filter((tab) => "experimental_showInNewTab" in tab).map((tab) => tab.id)).toEqual(["bot-automations", "automation", "todo", "memory-record"]);
 });
 
 it("opens what a New … action made as a tab beside the conversation, else in the main view", () => {
