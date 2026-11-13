@@ -542,3 +542,13 @@ describe("themes (round 8)", () => {
     forgetSavedAppearance(["cos", "home"]);
   });
 });
+
+it("shows No Bot yet only once first-run setup is over, not while it makes the starter Bot", async () => {
+  state.live.bot_spaces = { bots: [], currentBotId: null };
+  state.live.bot_welcome = { threadId: null, opened: true, pending: true, bot: null };
+  await mount(null);
+  expect(host.textContent).not.toContain("No Bot yet");
+  state.live.bot_welcome = { threadId: null, opened: true, pending: false, bot: null };
+  await mount(null);
+  expect(host.textContent).toContain("No Bot yet");
+});

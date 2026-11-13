@@ -1080,4 +1080,10 @@ export const MIGRATIONS = [
        dismissed_at INTEGER NOT NULL
      );`,
   `ALTER TABLE bot_side_threads ADD COLUMN kind TEXT NOT NULL DEFAULT 'reply';`,
+  `ALTER TABLE bot_side_threads ADD COLUMN kind_checked INTEGER NOT NULL DEFAULT 0;
+   CREATE TABLE thread_seeds (
+       thread_id TEXT PRIMARY KEY,
+       text TEXT NOT NULL,
+       created_at INTEGER NOT NULL
+     );`,
 ];

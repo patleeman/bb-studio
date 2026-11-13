@@ -28,6 +28,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
+import { turnContext, type ThreadSeeds } from "./thread-seeds";
 import { latestLine, repoTag, threadRunning, type BotThreads, type ThreadFacts, type WorkerStatus } from "./bot-threads";
 
 type Sdk = BbPluginApi["sdk"];
@@ -312,6 +313,7 @@ export interface LiveActivityDeps {
   actingBot(threadId: string | undefined): Promise<string | null>;
   log(message: string): void;
   now?(): number;
+  seeds?: ThreadSeeds;
 }
 
 /** A thread's details for the lookup tool. */
@@ -367,9 +369,10 @@ export function registerLiveActivity(bb: Bb, db: Database.Database, deps: LiveAc
   bb.events.on("thread.idle", ({ thread, lastAssistantText }) => safe("idle", () => activity.idle(thread as ThreadFacts, lastAssistantText)));
   bb.events.on("thread.failed", ({ thread }) => safe("failed", () => activity.failed(thread as ThreadFacts)));
   bb.events.on("interaction.pending", ({ thread }) => safe("pending", () => activity.pending(thread as ThreadFacts)));
-  bb.events.on("thread.deleted", ({ thread }) => safe("deleted", () => activity.deleted(thread.id)));
+  bb.events.on("thread.deleted", ({ thread }) => safe("deleted", () => { activity.deleted(thread.id); deps.seeds?.forget(thread.id); }));
 
-  const hooked = registerTurnContext(bb, (threadId) => digestFor(db, threadId, now()));
+  const hooked = registerTurnContext(bb, (threadId) => turnContext(deps.seeds?.take(threadId) ?? null, digestFor(db, threadId, now())));
+  if (hooked) deps.seeds?.enable();
 
   bb.agents.registerTool({
     name: "bot_activity_lookup",

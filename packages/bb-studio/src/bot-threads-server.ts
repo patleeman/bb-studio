@@ -13,6 +13,7 @@ import type { Presence } from "./presence/schema";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
+import type { ThreadSeeds } from "./thread-seeds";
 import { BotThreads, forkUndecided, botActivity, botNeedsYou, conversationTitle, conversationWorkers, latestLine, needsYouOf, olderView, repoTag, staleRaises, threadsView, workerStatus, type BotThreadRecord, type Signals, type ThreadFacts } from "./bot-threads";
 import { isWorkerApproval, viewOf, waitingOn, workerApprovalPush, type Interaction, type WorkerApprovalPush } from "./worker-approvals";
 import { PERSONAL_PROJECT_ID } from "./project-lead";
@@ -56,6 +57,7 @@ export interface BotThreadsServerDeps {
   mirrorLive?(threadIds: readonly string[]): ReadonlyMap<string, MirrorLive>;
   mirrored?(since: number): MirroredBatch | null;
   sideThreads?: SideThreads;
+  seeds?: ThreadSeeds;
   /** A Bot's default model (src/bot.ts): what its new conversations start on; null when it has none. */
   defaultModel(botId: string): { providerId: string; model: string; reasoning: ReasoningLevel | null } | null;
 }
@@ -388,6 +390,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     defaultModel: (botId) => deps.defaultModel(botId),
     changed: (threadId) => threadChanged(threadId),
     log: deps.log,
+    ...(deps.seeds ? { seeds: deps.seeds } : {}),
   });
   const forkConversation = async (input: MessageRef) => {
     const { threadId, projectId } = await messageThreads.fork(input);
@@ -559,6 +562,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     try { classified = (await mirrorCatchUp?.run()) ?? 0; } catch (error) { deps.log(`Sorting mirrored threads failed: ${error instanceof Error ? error.message : String(error)}`); }
     const linked = sides.linkForks();
     for (const threadId of linked) void sides.recount(threadId).catch(() => undefined);
+    try { await sides.correctKinds(); } catch (error) { deps.log(`Correcting reply and fork kinds failed: ${error instanceof Error ? error.message : String(error)}`); }
     if (classified) deps.log(`Conversations and workers: sorted ${classified} mirrored thread(s).`);
     return { classified, linked: linked.length };
   };

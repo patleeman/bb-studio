@@ -27,6 +27,9 @@ const RUNTIME = new Set([
   "node:util",
   "node:timers/promises",
   "node:fs/promises",
+  "node:fs",
+  "node:module",
+  "node:url",
   "node:path",
 ]);
 

@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { BotThreads, type Signals, type ThreadFacts } from "./bot-threads";
 import { buildDigest, DIGEST_HEADER, digestFor, registerLiveActivity, registerTurnContext, toolTitle, type DigestConversation, type DigestWorker } from "./live-activity";
 import { MIGRATIONS } from "./migrations";
+import { ThreadSeeds, TURN_CONTEXT_MAX } from "./thread-seeds";
 
 const dispose: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
@@ -48,8 +49,9 @@ async function setup(options: { hook?: boolean } = {}) {
   db.prepare("UPDATE bot_threads SET bot_id = 'scout' WHERE thread_id = 'trip'").run();
   const turnContext = vi.fn();
   if (options.hook) Object.assign(bb.experimental_hooks as object, { experimental_turnContext: turnContext });
-  const live = registerLiveActivity(bb, db, { threads: store, actingBot: async () => null, log: () => {}, now: () => now });
-  return { bb, harness, db, store, live, threads, events, turnContext, tick: (ms: number) => { now += ms; }, now: () => now };
+  const seeds = new ThreadSeeds(db);
+  const live = registerLiveActivity(bb, db, { threads: store, actingBot: async () => null, log: () => {}, now: () => now, seeds });
+  return { bb, harness, db, store, live, seeds, threads, events, turnContext, tick: (ms: number) => { now += ms; }, now: () => now };
 }
 
 it("keeps one row per thread from BB's events: running, its reply's first line when idle, failed, waiting, gone", async () => {
@@ -172,6 +174,22 @@ it("registers the digest on the per-turn context hook where BB has it, and nothi
   expect((hooks.experimental_turnContext.mock.calls[0]![0] as (context: { threadId: string }) => unknown)({ threadId: "t" })).toBeNull();
   const plain = await setup();
   expect(plain.live.hooked).toBe(false);
+});
+
+it("gives a seeded thread's first turn its transcript ahead of the digest, once, and only where BB has the hook", async () => {
+  const x = await setup({ hook: true });
+  expect(x.seeds.ready()).toBe(true);
+  const provider = x.turnContext.mock.calls[0]![0] as (context: { threadId: string }) => string | null;
+  x.seeds.put("prep", "This thread continues an earlier conversation.");
+  const first = provider({ threadId: "prep" })!;
+  expect(first.startsWith("This thread continues an earlier conversation.\n\nElsewhere:")).toBe(true);
+  expect(provider({ threadId: "prep" })).toMatch(/^Elsewhere:/);
+  x.seeds.put("nobody", "x".repeat(TURN_CONTEXT_MAX * 2));
+  expect(provider({ threadId: "nobody" })).toHaveLength(TURN_CONTEXT_MAX);
+  x.seeds.put("trip", "seed");
+  await x.harness.emitThreadEvent("thread.deleted", { thread: x.threads.get("trip") as never });
+  expect(x.seeds.take("trip")).toBeNull();
+  expect((await setup()).seeds.ready()).toBe(false);
 });
 
 it("looks one thread up for its own Bot: state, latest reply, owner, workers and last tool calls", async () => {

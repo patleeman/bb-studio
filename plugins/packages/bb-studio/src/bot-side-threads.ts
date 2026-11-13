@@ -15,6 +15,8 @@ export type ReplyRole = "user" | "assistant";
 export type SideKind = "reply" | "fork";
 
 const WORKING = new Set(["active", "starting"]);
+export const STUDIO_PLUGIN = "studio";
+export const KIND_RECORDED_SINCE = Date.parse("2026-11-12T09:41:13-05:00");
 
 interface SideRow {
   thread_id: string; bot_id: string; source_thread_id: string; message_id: string;
@@ -50,7 +52,7 @@ export interface TimelineRow {
 }
 interface TimelinePage { rows?: TimelineRow[]; timelinePage?: { olderCursor?: { anchorSeq: number; anchorId: string } | null } }
 type ThreadLike = {
-  id: string; originPluginId?: string | null; originKind?: string | null; sourceThreadId?: string | null; archivedAt?: number | null; status?: string; title?: string | null; titleFallback?: string | null;
+  id: string; originPluginId?: string | null; visibility?: string | null; originKind?: string | null; sourceThreadId?: string | null; archivedAt?: number | null; status?: string; title?: string | null; titleFallback?: string | null;
   projectId?: string; parentThreadId?: string | null; pinnedAt?: number | null; sectionId?: string | null; lastReadAt?: number | null; updatedAt?: number;
   parentNotifications?: "auto" | "off" | "stuck"; createdAt?: number;
 };
@@ -109,7 +111,7 @@ export class SideThreads {
   async list(sourceThreadId: string): Promise<SideThreadView[]> {
     if (this.isChat(sourceThreadId)) await this.discover(sourceThreadId).catch(() => undefined);
     const rows = this.deps.db.prepare("SELECT * FROM bot_side_threads WHERE source_thread_id = ? ORDER BY created_at, rowid").all(sourceThreadId) as SideRow[];
-    const live = (await this.live(rows)).filter(({ row, thread }) => row.replies > 0 || WORKING.has(thread.status ?? ""));
+    const live = (await this.live(rows)).filter(({ row, thread }) => row.kind === "fork" || row.replies > 0 || WORKING.has(thread.status ?? ""));
     const byMessage = new Map<string, SideThreadView>();
     for (const { row, thread } of live) {
       const kind = row.kind ?? "reply";
@@ -178,20 +180,37 @@ export class SideThreads {
   }
 
   record(threadId: string, botId: string, sourceThreadId: string, messageId: string, createdAt = Date.now(), kind: SideKind = "reply"): boolean {
-    const result = this.deps.db.prepare("INSERT OR IGNORE INTO bot_side_threads (thread_id, bot_id, source_thread_id, message_id, created_at, kind) VALUES (?, ?, ?, ?, ?, ?)")
+    const result = this.deps.db.prepare(`INSERT INTO bot_side_threads (thread_id, bot_id, source_thread_id, message_id, created_at, kind, kind_checked) VALUES (?, ?, ?, ?, ?, ?, 1)
+        ON CONFLICT(thread_id) DO UPDATE SET kind = excluded.kind, kind_checked = 1 WHERE kind != excluded.kind OR kind_checked = 0`)
       .run(threadId, botId, sourceThreadId, messageId, createdAt, kind);
     if (result.changes) this.deps.changed();
     return result.changes > 0;
   }
 
   linkForks(): string[] {
-    const linked = (this.deps.db.prepare(`INSERT OR IGNORE INTO bot_side_threads (thread_id, bot_id, source_thread_id, message_id, created_at)
-        SELECT thread_id, bot_id, forked_from_thread_id, forked_from_message_id, created_at FROM bot_threads
+    const linked = (this.deps.db.prepare(`INSERT OR IGNORE INTO bot_side_threads (thread_id, bot_id, source_thread_id, message_id, created_at, kind, kind_checked)
+        SELECT thread_id, bot_id, forked_from_thread_id, forked_from_message_id, created_at, 'fork', 1 FROM bot_threads
         WHERE kind = 'conversation' AND forked_from_thread_id IS NOT NULL AND forked_from_message_id IS NOT NULL
           AND thread_id NOT IN (SELECT thread_id FROM bot_side_threads)
       RETURNING thread_id`).all() as { thread_id: string }[]).map((row) => row.thread_id);
     if (linked.length) this.deps.changed();
     return linked;
+  }
+
+  async correctKinds(): Promise<number> {
+    const rows = this.deps.db.prepare(`SELECT s.thread_id, s.kind, s.created_at, b.forked_from_message_id IS NOT NULL AS linked
+        FROM bot_side_threads s LEFT JOIN bot_threads b ON b.thread_id = s.thread_id WHERE s.kind_checked = 0`).all() as { thread_id: string; kind: SideKind; created_at: number; linked: number }[];
+    let corrected = 0;
+    for (const row of rows) {
+      const thread = await this.deps.sdk.threads.get({ threadId: row.thread_id }).catch((error: { status?: number }) => error?.status === 404 ? "gone" as const : null) as ThreadLike | "gone" | null;
+      if (thread === "gone") { this.forget(row.thread_id); continue; }
+      if (!thread) continue;
+      const kind = inferSideKind({ kind: row.kind, createdAt: row.created_at, linked: !!row.linked }, thread);
+      const result = this.deps.db.prepare("UPDATE bot_side_threads SET kind = ?, kind_checked = 1 WHERE thread_id = ? AND kind_checked = 0").run(kind, row.thread_id);
+      if (result.changes && kind !== row.kind) corrected++;
+    }
+    if (corrected) this.deps.changed();
+    return corrected;
   }
 
   async created(thread: ThreadLike): Promise<void> {
@@ -314,6 +333,16 @@ export class SideThreads {
       threadId, segmentLimit: PAGE_SEGMENTS, ...(cursor ? { beforeAnchorSeq: String(cursor.anchorSeq), beforeAnchorId: cursor.anchorId } : {}),
     } as never) as unknown as TimelinePage;
   }
+}
+
+export function inferSideKind(row: { kind: SideKind; createdAt: number; linked: boolean }, thread: Pick<ThreadLike, "title" | "originPluginId" | "originKind" | "visibility">): SideKind {
+  const title = thread.title?.trim() ?? "";
+  if (title.endsWith(" · fork")) return "fork";
+  if (title.endsWith(" · thread")) return "reply";
+  if (thread.originPluginId === SIDE_CHAT_PLUGIN || thread.visibility === "hidden") return "reply";
+  if (thread.originKind === "fork" && thread.originPluginId !== STUDIO_PLUGIN) return "fork";
+  if (row.linked && row.createdAt < KIND_RECORDED_SINCE) return "fork";
+  return row.kind;
 }
 
 export function snippet(text: string | undefined): string {

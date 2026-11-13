@@ -58,7 +58,7 @@ test("splits a runtime file into its package and the path inside it", () => {
   });
 });
 
-test("copies only the listed runtime files, with each package's package.json", () => {
+test("copies only the listed runtime files, under dist/runtime", () => {
   const { root, source, target } = fixture([
     "@x/wasm/index_bg.wasm",
     "draw/dist/prod/index.js",
@@ -66,12 +66,12 @@ test("copies only the listed runtime files, with each package's package.json", (
   ]);
   try {
     copyRuntime(source, target);
-    const modules = join(target, "node_modules");
+    const modules = join(target, "dist", "runtime");
     assert.equal(
       readFileSync(join(modules, "@x/wasm/index_bg.wasm"), "utf8"),
       "wasm",
     );
-    assert.ok(existsSync(join(modules, "@x/wasm/package.json")));
+    assert.ok(!existsSync(join(target, "node_modules")));
     assert.ok(!existsSync(join(modules, "@x/wasm/unused.js")));
     assert.equal(
       readFileSync(join(modules, "draw/dist/prod/index.js"), "utf8"),

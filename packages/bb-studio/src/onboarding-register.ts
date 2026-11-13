@@ -5,6 +5,11 @@ import { markWelcomeOpened, readFlag, runOnboarding, welcomeThreadOf, type Onboa
 
 export const ONBOARDING_POLL_MS = 5_000;
 
+export function forkHooks(bb: { experimental_hooks?: object }): boolean {
+  const hooks = bb.experimental_hooks;
+  return !!hooks && Object.entries(hooks).some(([key, value]) => key === "experimental_threadForkPoint" && typeof value === "function");
+}
+
 export function registerOnboarding(bb: BbPluginApi, deps: { db: Database.Database; bots: Bots; errorText(error: unknown): string }) {
   const dataDir = bb.server.experimental_dataDir;
   const providers = async (): Promise<readonly OnboardingProviderState[]> => {
@@ -18,7 +23,7 @@ export function registerOnboarding(bb: BbPluginApi, deps: { db: Database.Databas
     busy = true;
     try {
       const flag = await runOnboarding({
-        dataDir, db: deps.db, sdk: bb.sdk as never, providers,
+        dataDir, db: deps.db, sdk: bb.sdk as never, providers, idleThreads: forkHooks(bb as { experimental_hooks?: object }),
         seedBot: (input) => deps.bots.seedStarter(input),
         startFirstChat: (input) => deps.bots.startFirstChat(input),
       });

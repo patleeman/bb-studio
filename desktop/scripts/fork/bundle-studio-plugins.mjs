@@ -60,15 +60,14 @@ export function copyRuntimeFiles(sourceDir, targetDir, files) {
     if (!existsSync(linked)) {
       throw new Error(`${file}: ${name} is not installed in ${sourceDir}`);
     }
-    const packageDir = realpathSync(linked);
-    const from = join(packageDir, subpath);
+    const from = join(realpathSync(linked), subpath);
     if (subpath.length === 0 || !existsSync(from)) {
-      throw new Error(`${file} is missing in ${packageDir}`);
+      throw new Error(`${file} is missing in ${linked}`);
     }
-    const into = join(targetDir, "node_modules", name);
-    mkdirSync(into, { recursive: true });
-    cpSync(join(packageDir, "package.json"), join(into, "package.json"));
-    cpSync(from, join(into, subpath), { recursive: true, dereference: true });
+    cpSync(from, join(targetDir, "dist", "runtime", file), {
+      recursive: true,
+      dereference: true,
+    });
   }
 }
 
@@ -94,9 +93,9 @@ function main(argv) {
 
 Each --out gets <dir>/bb-studio and <dir>/bb-studio-visual-chat: the package without
 node_modules, its dist/ from \`bb plugin build\`, a package.json whose entries
-point at dist/, and under node_modules only the files its package.json lists in
-studioRuntimeFiles (files the server resolves at run time, which esbuild does not
-inline). Point --out at packages/bb-app/server/dist/builtin-plugins
+point at dist/, and under dist/runtime the files its package.json lists in
+studioRuntimeFiles (files the server reads at run time, which esbuild does not
+inline; electron-builder drops a nested node_modules). Point --out at packages/bb-app/server/dist/builtin-plugins
 before electron-builder runs.`);
     process.exit(packages === null || outs.length === 0 ? 2 : 0);
   }

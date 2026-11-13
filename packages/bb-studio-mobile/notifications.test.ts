@@ -12,6 +12,14 @@ describe("quiet completions", () => {
     (body) => expect(isQuietCompletion({ body, data: { kind: "turn-finished" } })).toBe(false),
   );
 
+  it.each(['::approval{thread="thr_w" id="int_1"}', ' ::approval{thread="thr_w" id="int_1"}\n'])("suppresses a reply that is only an approval card: %s", (body) => {
+    expect(isQuietCompletion({ body, data: { kind: "turn-finished" } })).toBe(true);
+  });
+
+  it("keeps a reply that says more than the approval card", () => {
+    expect(isQuietCompletion({ body: 'Your worker needs you.\n::approval{thread="thr_w" id="int_1"}', data: { kind: "turn-finished" } })).toBe(false);
+  });
+
   it.each(["pending-interaction", "thread-error", undefined])("keeps %s alerts even with an empty body", (kind) => {
     expect(isQuietCompletion({ body: "", data: { kind } })).toBe(false);
   });

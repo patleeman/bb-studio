@@ -717,9 +717,14 @@ export class Bots {
 
   async seedStarter(input: { name: string; avatar: string }): Promise<{ id: string; threadId: string }> {
     const thread = await this.deps.sdk.threads.spawn({ projectId: PERSONAL_PROJECT_ID, title: input.name, environment: { type: "project-default" }, pluginMetadata: { bot: BOT_ID }, input: [] } as never);
-    const made = (await this.create({ name: input.name, avatar: input.avatar, threadId: thread.id })).bot;
-    if (!made) throw new Error("The Bot wasn't made.");
-    return { id: made.id, threadId: thread.id };
+    try {
+      const made = (await this.create({ name: input.name, avatar: input.avatar, threadId: thread.id })).bot;
+      if (!made) throw new Error("The Bot wasn't made.");
+      return { id: made.id, threadId: thread.id };
+    } catch (error) {
+      if (!this.stored(BOT_ID)) await this.deps.sdk.threads.delete({ threadId: thread.id, childThreadsConfirmed: false }).catch(() => {});
+      throw error;
+    }
   }
 
   async startFirstChat(input: { botId: string; providerId: string; prompt: string }): Promise<string | null> {
@@ -736,7 +741,6 @@ export class Bots {
     const row = this.need(input.botId);
     if (this.isPrimary(row)) await this.deps.leads.setLead(PERSONAL_PROJECT_ID, next.id);
     else this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(next.id, Date.now(), row.id);
-    await this.deps.sdk.threads.delete({ threadId, childThreadsConfirmed: false }).catch(() => {});
     await this.claimChains();
     this.deps.changed();
     return next.id;

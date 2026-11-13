@@ -7,7 +7,7 @@ import { DRAW_ICON, PLUGIN_ID, drawingHref, thumbnailUrl } from "../shared";
 import type { DrawingRow, DrawingStore } from "./store";
 import { sceneExport, sceneThumbnail } from "./thumbnail";
 import { readFile, readdir } from "node:fs/promises";
-import { createRequire } from "node:module";
+import { runtimeFile } from "../../kit/server/runtime-file";
 import { dirname, join } from "node:path";
 
 // resvg's WebAssembly build: BB installs plugins without optional dependencies,
@@ -16,7 +16,7 @@ import { dirname, join } from "node:path";
 let resvg: Promise<typeof import("@resvg/resvg-wasm")> | undefined;
 const loadResvg = () =>
   (resvg ??= import("@resvg/resvg-wasm").then(async (module) => {
-    await module.initWasm(await readFile(createRequire(import.meta.url).resolve("@resvg/resvg-wasm/index_bg.wasm")));
+    await module.initWasm(await readFile(runtimeFile("@resvg/resvg-wasm/index_bg.wasm")));
     return module;
   }).catch((error: unknown) => { resvg = undefined; throw error; }));
 
@@ -31,7 +31,7 @@ let exportFonts: Promise<Uint8Array[]> | undefined;
 const loadExportFonts = () => {
   if (exportFonts) return exportFonts;
   // Resolves to <package>/dist/prod/index.js; the fonts sit beside it.
-  const root = join(dirname(createRequire(import.meta.url).resolve("@excalidraw/excalidraw")), "fonts");
+  const root = join(dirname(runtimeFile("@excalidraw/excalidraw", "@excalidraw/excalidraw/dist/prod/index.js")), "fonts");
   exportFonts = (async () => {
     const files = (await Promise.all(EXPORT_FONT_DIRS.map(async (dir) => {
       const directory = join(root, dir);

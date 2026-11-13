@@ -66,10 +66,14 @@ hands-free voice).
   approval, and the title "Bot · Conversation". The relay looks the interaction
   up on `workerId` (the given `interactionId` when set), so the push gets
   `BB_APPROVAL`. BB's own `pending-interaction` push for a worker's approval
-  (no `workerId`) is dropped once Studio's `bot_push_ids` calls its thread a
-  worker; plans, questions, and a Studio that can't be reached keep BB's push.
-  The conversation's notification clears only once it is read and the
-  worker's approval no longer waits. A phone mute on the worker or the
+  (no `workerId`) is dropped only on a device Studio's push for that
+  interaction reached. The relay waits up to 5 seconds for Studio's push and
+  sends BB's when none came, or it reached no phone. Plans, questions, threads
+  Studio's `bot_push_ids` calls no worker, and a Studio that can't be reached
+  keep BB's push. The conversation's notification clears only once it is read
+  and the worker's approval no longer waits; a deleted worker waits on
+  nothing. A Bot's reply that is only an `::approval{…}` card sends no push,
+  since Studio's push already covers it. A phone mute on the worker or the
   conversation mutes it.
 - **Older apps.** The app before this change reads only `threadId` and
   `serverId` and ignores `kind`, so a `needs-you` push shows as a plain alert

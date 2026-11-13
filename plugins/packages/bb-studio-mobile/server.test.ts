@@ -552,6 +552,7 @@ describe("worker approvals", () => {
   async function approvalHost(options: { pending?: Record<string, unknown[]>; studio?: (threadId: string) => Promise<unknown>; read?: { lastReadAt: number; latestAttentionAt: number } } = {}) {
     const key = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ format: "pem", type: "pkcs8" }).toString();
     const pending = new Map(Object.entries(options.pending ?? {}));
+    const gone = new Set<string>();
     const studioCalls: string[] = [];
     const callRpc = vi.fn(async (call: { pluginId: string; method: string; input?: { threadId: string } }) => {
       if (call.pluginId !== "studio" || call.method !== "bot_push_ids") throw new Error("unknown plugin");
@@ -563,7 +564,7 @@ describe("worker approvals", () => {
       sdk: {
         threads: {
           get: async ({ threadId }: { threadId: string }) => makeThreadResponse({ id: threadId, ...(options.read ?? { lastReadAt: 0, latestAttentionAt: 1000 }) }),
-          interactions: { list: async ({ threadId }: { threadId: string }) => pending.get(threadId) ?? [] },
+          interactions: { list: async ({ threadId }: { threadId: string }) => { if (gone.has(threadId)) throw Object.assign(new Error("Not found"), { status: 404 }); return pending.get(threadId) ?? []; } },
         },
         plugins: { callRpc },
       } as never,
@@ -571,7 +572,7 @@ describe("worker approvals", () => {
     await plugin(host.bb);
     await host.bb.storage.kv.set("devices", { ["apns:" + device]: Date.now() });
     const push = async (messages: ExpoMessage[]) => (await host.harness.behavior.fetchHttp("POST", "/push", { body: JSON.stringify(messages), headers: { "content-type": "application/json" } })).json();
-    return { ...host, pending, push, studioCalls };
+    return { ...host, pending, gone, push, studioCalls };
   }
 
   it("sends Studio's worker approval with the Bot, its conversation, the worker and the interaction, as BB_APPROVAL", async () => {
@@ -604,19 +605,49 @@ describe("worker approvals", () => {
     } finally { await host.harness.lifecycle.dispose(); }
   });
 
-  it("drops BB's own push for a worker's approval, since Studio sends it", async () => {
+  it("drops BB's own push for a worker's approval only on the devices Studio's push reached", async () => {
     const requests = recordingSession();
     const host = await approvalHost({ pending: { thr_w: [approval("int_1")] }, studio: async (threadId) => ({ botId: "dot", conversationId: "thr_conv", workerId: threadId }) });
     try {
       const bbPush = { to: "apns:" + device, title: "Fable lead", body: "Run pnpm test?", data: { kind: "pending-interaction", threadId: "thr_w", projectId: "proj_studio" } };
       const expoPush = { to: "ExponentPushToken[other]", title: "Fable lead", body: "Run pnpm test?", data: { kind: "pending-interaction", threadId: "thr_w" } };
-      vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("must not forward"); }));
-      expect(await host.push([bbPush, expoPush])).toEqual({ data: [{ status: "ok" }, { status: "ok" }] });
+      const forwarded: unknown[] = [];
+      vi.stubGlobal("fetch", vi.fn(async (_url: string, init: RequestInit) => { const messages = JSON.parse(String(init.body)) as unknown[]; forwarded.push(...messages); return Response.json({ data: messages.map(() => ({ status: "ok" })) }); }));
+      const bbDelivery = host.push([bbPush, expoPush]);
+      await new Promise((resolve) => setTimeout(resolve, 50));
       expect(requests).toEqual([]);
-      expect(host.studioCalls).toEqual(["thr_w"]);
-      expect(await host.bb.storage.kv.get("notified-threads")).toBeUndefined();
       expect(await host.harness.behavior.callRpc("notify", studioPush)).toEqual({ ok: true, sent: 1 });
+      expect(await bbDelivery).toEqual({ data: [{ status: "ok" }, { status: "ok" }] });
       expect(requests).toHaveLength(1);
+      expect(JSON.parse(requests[0]!.body)).toMatchObject({ workerId: "thr_w", interactionId: "int_1" });
+      expect(forwarded).toEqual([expoPush]);
+      expect(host.studioCalls).toEqual(["thr_w"]);
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+
+  it("keeps BB's push for a worker's approval when Studio's own push reached no phone", async () => {
+    const requests = recordingSession();
+    const host = await approvalHost({ pending: { thr_w: [approval("int_1")] }, studio: async (threadId) => ({ botId: "dot", conversationId: "thr_conv", workerId: threadId }) });
+    try {
+      await host.bb.storage.kv.set("devices", {});
+      expect(await host.harness.behavior.callRpc("notify", studioPush)).toEqual({ ok: true, sent: 0 });
+      await host.push([{ to: "apns:" + device, title: "Fable lead", body: "Run pnpm test?", data: { kind: "pending-interaction", threadId: "thr_w" } }]);
+      expect(requests).toHaveLength(1);
+      expect(JSON.parse(requests[0]!.body)).toMatchObject({ threadId: "thr_w", interactionId: "int_1", aps: { category: "BB_APPROVAL" } });
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+
+  it("clears the conversation's notification once answered, even after its worker was deleted", async () => {
+    vi.useFakeTimers();
+    const requests = recordingSession();
+    const host = await approvalHost({ pending: { thr_w: [approval("int_1")] }, read: { lastReadAt: 2000, latestAttentionAt: 1000 } });
+    try {
+      await host.harness.behavior.callRpc("notify", studioPush);
+      host.gone.add("thr_w");
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(JSON.parse(requests.at(-1)!.body)).toMatchObject({ clearThreadIds: ["thr_conv"] });
+      expect(await host.bb.storage.kv.get("notified-threads")).toEqual({});
+      expect(await host.bb.storage.kv.get("notified-workers")).toEqual({});
     } finally { await host.harness.lifecycle.dispose(); }
   });
 

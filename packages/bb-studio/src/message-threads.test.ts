@@ -9,6 +9,7 @@ import type { ThreadFacts } from "./bot-threads";
 import { registerBotThreads } from "./bot-threads-server";
 import { MIGRATIONS } from "./migrations";
 import { readMirroredSince } from "./mirror-live";
+import { ThreadSeeds, turnContext } from "./thread-seeds";
 
 const dispose: (() => Promise<void> | void)[] = [];
 afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
@@ -37,7 +38,7 @@ function mirrorDir(rows: { id: string; at: number }[]) {
 const BB_HOST = "host_bb";
 const STUDIO_HOST = "host_studio";
 
-async function setup(options: { mirror?: string; mirroredHost?: boolean; forkFails?: boolean } = {}) {
+async function setup(options: { mirror?: string; mirroredHost?: boolean; forkFails?: boolean; stock?: boolean } = {}) {
   const threads = new Map<string, ThreadFacts & { environmentId?: string }>([
     ["thr_main", { id: "thr_main", title: "Main", projectId: "proj_personal", createdAt: 1, status: "idle", environmentId: "env_main" }],
   ]);
@@ -87,6 +88,8 @@ async function setup(options: { mirror?: string; mirroredHost?: boolean; forkFai
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const sides = new SideThreads({ db, sdk: bb.sdk, changed: () => {}, waits: [], botFor: (threadId) => threadId === "thr_main" ? { id: "dot", name: "Dot" } : null });
+  const seeds = new ThreadSeeds(db);
+  if (!options.stock) seeds.enable();
   const server = registerBotThreads(bb, db, {
     bots: () => [{ id: "dot", name: "Dot", avatar: "🤖", primary: true, threadId: "thr_main" }],
     signals: () => ({ bots: [{ id: "dot", threadId: "thr_main", chain: ["thr_main"] }], sideThread: (threadId) => sides.forThread(threadId), runnerBot: () => null, leadThreads: new Set(), internal: new Set(), managedBot: () => null }),
@@ -96,10 +99,11 @@ async function setup(options: { mirror?: string; mirroredHost?: boolean; forkFai
     actingBot: async () => null,
     defaultModel: () => null,
     sideThreads: sides,
+    seeds,
     ...(options.mirror ? { mirrored: (since: number) => readMirroredSince(options.mirror!, since) } : {}),
   });
   await server.start();
-  return { server, sides, threads, rows, fork, spawn, db };
+  return { server, sides, threads, rows, fork, spawn, db, seeds };
 }
 
 it("Fork conversation from here records the message it was forked from, so the message shows the fork", async () => {
@@ -109,7 +113,7 @@ it("Fork conversation from here records the message it was forked from, so the m
   expect(server.store.get(made.threadId)).toMatchObject({ botId: "dot", kind: "conversation", forkedFrom: { threadId: "thr_main", messageId: "thr_main:assistant:2", turnId: "t1" } });
   expect(fork).toHaveBeenCalledWith(expect.objectContaining({ title: "Main · fork" }));
   expect(sides.forThread(made.threadId)).toEqual({ botId: "dot", sourceThreadId: "thr_main", messageId: "thr_main:assistant:2" });
-  expect(await sides.list("thr_main")).toEqual([]);
+  expect(await sides.list("thr_main")).toEqual([expect.objectContaining({ messageId: "thr_main:assistant:2", threadId: made.threadId, kind: "fork", replies: 0, conversations: 1 })]);
   threads.get(made.threadId)!.status = "active";
   expect(await sides.list("thr_main")).toEqual([expect.objectContaining({ messageId: "thr_main:assistant:2", threadId: made.threadId, kind: "fork", conversations: 1 })]);
   const again = await server.rpc.bot_fork_conversation({ threadId: "thr_main", messageId: "thr_main:assistant:2", turnId: "t1", sourceSeqEnd: 9 });
@@ -188,6 +192,7 @@ it("the catch-up sorts threads the mirror imported after the first sweep, once, 
   mirror.add("mir_fork", 40);
   expect(await server.catchUp()).toEqual({ classified: 1, linked: 1 });
   expect(server.store.get("mir_fork")).toMatchObject({ kind: "conversation", forkedFrom: { threadId: "thr_main", messageId: "thr_main:assistant:2" } });
+  expect(db.prepare("SELECT kind FROM bot_side_threads WHERE thread_id = 'mir_fork'").get()).toEqual({ kind: "fork" });
 });
 
 it("reads only the mirror's rows changed since the last sweep", () => {
@@ -199,23 +204,31 @@ it("reads only the mirror's rows changed since the last sweep", () => {
   expect(readMirroredSince(join(mirror.dir, "nope"), -1)).toBeNull();
 });
 
-it("a fork whose parent session can't be copied starts from the transcript up to the message", async () => {
-  const { server, sides, spawn, threads } = await setup({ forkFails: true });
+it("a fork whose parent session can't be copied starts idle, with the transcript up to the message as its first turn's context", async () => {
+  const { server, sides, spawn, threads, seeds } = await setup({ forkFails: true });
   const made = await server.rpc.bot_thread_reply({ threadId: "thr_main", messageId: "thr_main:assistant:2" });
   expect(made).toMatchObject({ created: true });
   expect(made.threadId).toMatch(/^seeded_/);
-  const args = spawn.mock.calls[0]![0] as unknown as { title: string; input: { text: string; visibility: string }[]; startedOnBehalfOf: unknown; environment: unknown };
+  const args = spawn.mock.calls[0]![0] as unknown as { title: string; input: unknown[]; startedOnBehalfOf?: unknown; environment: unknown };
   expect(args.title).toBe("Main · thread");
-  expect(args.startedOnBehalfOf).toEqual({ initiator: "agent", senderThreadId: "thr_main" });
+  expect(args).not.toHaveProperty("startedOnBehalfOf");
   expect(args.environment).toEqual({ type: "reuse", environmentId: "env_main" });
-  expect(args.input).toHaveLength(1);
-  expect(args.input[0]!.visibility).toBe("agent-only");
-  expect(args.input[0]!.text).toContain("User: When do we ship?\n\nAssistant: Friday.");
-  expect(args.input[0]!.text).not.toContain("Who signs off?");
+  expect(args.input).toEqual([]);
   expect(server.store.get(made.threadId)).toMatchObject({ kind: "conversation", forkedFrom: { threadId: "thr_main", messageId: "thr_main:assistant:2" } });
   expect(sides.forThread(made.threadId)).toEqual({ botId: "dot", sourceThreadId: "thr_main", messageId: "thr_main:assistant:2" });
+  expect(await sides.list("thr_main")).toEqual([]);
+  const context = turnContext(seeds.take(made.threadId), null)!;
+  expect(context).toContain("User: When do we ship?\n\nAssistant: Friday.");
+  expect(context).not.toContain("Who signs off?");
+  expect(seeds.take(made.threadId)).toBeNull();
   threads.get(made.threadId)!.status = "active";
   expect(await sides.list("thr_main")).toEqual([expect.objectContaining({ threadId: made.threadId, kind: "reply", working: true })]);
+});
+
+it("on a BB that can't give an idle thread context, a failed fork starts nothing", async () => {
+  const { server, spawn } = await setup({ forkFails: true, stock: true });
+  await expect(server.rpc.bot_thread_reply({ threadId: "thr_main", messageId: "thr_main:assistant:2" })).rejects.toThrow("Couldn't start a thread from that message.");
+  expect(spawn).not.toHaveBeenCalled();
 });
 
 it("neither a reply thread nor a fork gets a row in Conversations; their work shows on the parent's row", async () => {

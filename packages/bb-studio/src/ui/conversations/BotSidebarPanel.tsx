@@ -187,6 +187,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const olderOpen = isOlderPage(pathname);
   const page = spacePageAt(pathname);
   const list = useLive("bot_list", {}, { pollMs: 60_000 });
+  const welcome = useLive("bot_welcome", {}, { enabled: !!spaces.data && !bots.length, pollMs: 2_000 });
   const loopsOn = useLoopsEnabled();
   const [editing, setEditing] = useState<string | null>(null);
   const [pickingModel, setPickingModel] = useState<string | null>(null);
@@ -337,6 +338,9 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   };
   const openAppPathTo = (path: string) => { navigate.toPluginPanel("studio", { subPath: path.replace(/^\/plugins\/studio\/studio\/?/, "") }); onNavigate(); };
 
+  if (spaces.data && !bots.length && welcome.data?.pending !== false) {
+    return <nav aria-label="Bot" aria-busy="true" data-testid="bot-sidebar" className="studio-root" />;
+  }
   if (spaces.data && !bots.length) {
     return (
       <nav aria-label="Bot" data-testid="bot-sidebar" className="studio-root flex flex-col gap-2 px-3 py-3 text-sm">
