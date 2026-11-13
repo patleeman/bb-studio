@@ -15,6 +15,7 @@ export type ReplyRole = "user" | "assistant";
 export type SideKind = "reply" | "fork";
 
 const WORKING = new Set(["active", "starting"]);
+const replying = (row: { replies: number }, thread: { status?: string | null }) => thread.status === "active" || (row.replies > 0 && WORKING.has(thread.status ?? ""));
 export const STUDIO_PLUGIN = "studio";
 export const KIND_RECORDED_SINCE = Date.parse("2026-11-12T09:41:13-05:00");
 
@@ -111,7 +112,7 @@ export class SideThreads {
   async list(sourceThreadId: string): Promise<SideThreadView[]> {
     if (this.isChat(sourceThreadId)) await this.discover(sourceThreadId).catch(() => undefined);
     const rows = this.deps.db.prepare("SELECT * FROM bot_side_threads WHERE source_thread_id = ? ORDER BY created_at, rowid").all(sourceThreadId) as SideRow[];
-    const live = (await this.live(rows)).filter(({ row, thread }) => row.kind === "fork" || row.replies > 0 || WORKING.has(thread.status ?? ""));
+    const live = (await this.live(rows)).filter(({ row, thread }) => row.kind === "fork" || row.replies > 0 || replying(row, thread));
     const byMessage = new Map<string, SideThreadView>();
     for (const { row, thread } of live) {
       const kind = row.kind ?? "reply";
@@ -123,7 +124,7 @@ export class SideThreads {
         replies: (seen?.replies ?? 0) + row.replies,
         lastReplyAt: Math.max(seen?.lastReplyAt ?? 0, row.last_reply_at ?? 0) || null,
         lastReplyRole: newer ? row.last_reply_role ?? seen?.lastReplyRole ?? null : seen!.lastReplyRole,
-        working: (seen?.working ?? false) || WORKING.has(thread.status ?? ""),
+        working: (seen?.working ?? false) || replying(row, thread),
         kind, conversations: (seen?.conversations ?? 0) + 1,
       });
     }

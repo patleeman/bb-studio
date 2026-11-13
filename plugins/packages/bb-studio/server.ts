@@ -652,6 +652,7 @@ export default async function plugin(bb: BbPluginApi) {
       // A new Bot's memory page is its core profile (src/memory).
       create: ({ botId, botName }) => memoryService.newProfile(botId, botName),
       addCheckin: (pageId, line) => pages.addCheckin(pageId, line),
+      retitle: (pageId, from, to) => pages.retitle(pageId, from, to),
     },
     userSkillsDir: join(bb.server.experimental_dataDir, "skills"),
     // Side threads show as their reply's row, not as work the Bot started.

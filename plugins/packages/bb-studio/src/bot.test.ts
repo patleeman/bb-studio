@@ -130,6 +130,22 @@ it("creates a Bot with a new chat in the personal project and names it in the he
   expect(x.callRpc.mock.calls.filter(([arg]) => String(arg.method).startsWith("automations_"))).toEqual([]);
 });
 
+it("a rename carries to the Main's title and the core profile's, unless the user retitled them", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Assistant", avatar: "🟣" });
+  const retitle = vi.fn(() => true);
+  (x.bots as unknown as { deps: { memory: { retitle: typeof retitle } } }).deps.memory.retitle = retitle;
+  x.pages.set("pg_profile", { title: "Assistant's core profile", markdown: "" });
+  x.db.prepare("UPDATE bots SET memory_page_id = 'pg_profile' WHERE id = ?").run(BOT_ID);
+  await x.bots.set({ name: "Penny" });
+  expect(x.update).toHaveBeenCalledWith({ threadId: "t1", title: "Penny" });
+  expect(retitle).toHaveBeenCalledWith("pg_profile", "Assistant's core profile", "Penny's core profile");
+  x.update.mockClear();
+  x.threads.set("t1", { ...x.threads.get("t1")!, title: "Planning" });
+  await x.bots.set({ name: "Juno" });
+  expect(x.update).not.toHaveBeenCalledWith(expect.objectContaining({ title: expect.anything() }));
+});
+
 it("reads the primary thread from project leads without writing the Bot row", async () => {
   const x = await setup();
   await x.bots.create({ name: "Dot", avatar: "🟣" });

@@ -351,6 +351,7 @@ export interface BotMemoryPages {
   create(input: { title: string; markdown: string; botId: string; botName: string }): string;
   /** Adds a line to the page's "## Check-in" section (made if missing); false when it was already there. */
   addCheckin?(pageId: string, line: string): boolean;
+  retitle?(pageId: string, from: string, to: string): boolean;
 }
 
 export interface BotDeps {
@@ -754,6 +755,7 @@ export class Bots {
       ...(input.shape !== undefined ? { shape: input.shape } : {}), ...(input.color ? { color: input.color } : {}),
       ...(input.role !== undefined ? { role: input.role.trim() || null } : {}),
     });
+    if (input.name && input.name !== before.name) await this.retitle(before, input.name);
     // The heartbeat's prompt carries the name.
     const key = this.runKey(before);
     const run = this.deps.leads.runs.get(key);
@@ -762,6 +764,15 @@ export class Bots {
       else await this.deps.leads.runs.set(key, this.view(before).threadId, run);
     }
     return this.get(before.id);
+  }
+
+  private async retitle(before: BotRow, name: string): Promise<void> {
+    const { threadId, memoryPageId } = this.view(before);
+    if (threadId) {
+      const thread = await this.deps.sdk.threads.get({ threadId }).catch(() => null) as { title?: string | null } | null;
+      if (thread && thread.title?.trim() === before.name) await this.deps.sdk.threads.update({ threadId, title: name } as never).catch(() => {});
+    }
+    if (memoryPageId) this.deps.memory?.retitle?.(memoryPageId, `${before.name}'s core profile`, `${name}'s core profile`);
   }
 
   presenceOf(botId: string): Presence {
