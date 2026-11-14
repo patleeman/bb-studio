@@ -50,7 +50,7 @@ step "phone: TranscriptScrollHoldUITests" env TEST_RUNNER_TRANSCRIPT_V2=1 xcodeb
 
 if [ -n "$duo" ]; then
   isolate "$duo"
-  for layout in outer split; do
+  for layout in outer outer-room split; do
     step "duo $layout: TranscriptV2UITests" env TEST_RUNNER_TRANSCRIPT_LAYOUT="$layout" xcodebuild test-without-building -scheme BBStudio -destination "id=$duo" \
       -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/TranscriptV2UITests
   done

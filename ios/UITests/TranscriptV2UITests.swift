@@ -18,15 +18,23 @@ import XCTest
 @MainActor
 final class TranscriptV2UITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
-    private let layout = ProcessInfo.processInfo.environment["TRANSCRIPT_LAYOUT"] ?? "phone"
+    private nonisolated static var requested: String { ProcessInfo.processInfo.environment["TRANSCRIPT_LAYOUT"] ?? "phone" }
+    private let layout = TranscriptV2UITests.requested == "outer-room" ? "outer" : TranscriptV2UITests.requested
+    private let inRoom = TranscriptV2UITests.requested == "outer-room"
     private var steps: [String] = []
     private var failures: [String] = []
 
     private var composerField: XCUIElement {
-        app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch
+        front(app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")))
     }
-    private var composer: XCUIElement { app.otherElements["threadComposer"].firstMatch }
-    private var pill: XCUIElement { app.buttons["jumpToLatest"].firstMatch }
+    private var composer: XCUIElement { front(app.otherElements.matching(identifier: "threadComposer")) }
+    private var pill: XCUIElement { front(app.buttons.matching(identifier: "jumpToLatest")) }
+
+    private func front(_ query: XCUIElementQuery) -> XCUIElement {
+        guard inRoom else { return query.firstMatch }
+        let count = query.count
+        return count > 1 ? query.element(boundBy: count - 1) : query.firstMatch
+    }
     private var attachment: XCUIElement { app.buttons["Remove attachment"].firstMatch }
 
     /// The Bot chat, end to end.
@@ -124,14 +132,14 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         let done = app.navigationBars["Select Text"].buttons["Done"]
         if done.waitForExistence(timeout: 10) { done.tap(); _ = done.waitForNonExistence(timeout: 5) } else { failures.append("actions: Select Text didn't open") }
 
-        let replyInThread = app.buttons["Reply in Thread"]
+        let replyInThread = app.buttons.matching(NSPredicate(format: "label ==[c] 'Reply in thread'")).firstMatch
         for _ in 0..<2 where !replyInThread.exists {
             reply.press(forDuration: 1)
             _ = replyInThread.waitForExistence(timeout: 4)
         }
         if !replyInThread.exists { failures.append("actions: no Reply in Thread on a reply") }
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap()
-        _ = app.buttons["Reply in Thread"].waitForNonExistence(timeout: 3)
+        app.coordinate(withNormalizedOffset: inRoom ? CGVector(dx: 0.75, dy: 0.62) : CGVector(dx: 0.5, dy: 0.08)).tap()
+        _ = replyInThread.waitForNonExistence(timeout: 3)
 
         // Your last message: Edit puts it back in the composer. Sent from
         // here: the demo's answer is short, so it stays on screen.
@@ -226,9 +234,14 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     /// resizes as it loads; the chat stays at its end.
     func testMiniCards() {
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaTranscriptV2", "-qaScrollLog", "-qaBotDemo", "duo",
-            "-qaDuoMinis", "mini_a,mini_b,mini_c", "-qaDark", "-qaDuoPhone", "-openURL", "bbstudio://thread/thr_botdemo01"]
+            "-qaDuoMinis", "mini_0000000000000a01,mini_0000000000000b02,mini_0000000000000c03", "-qaDark", "-qaDuoPhone", "-openURL", "bbstudio://thread/thr_botdemo01"]
         if layout == "split" { app.launchArguments += ["-qaDuoColdWide"] }
         app.launchOffline()
+        if !composerField.waitForExistence(timeout: 30),
+           app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'unit-tests.invalid'")).firstMatch.exists {
+            app.terminate()
+            app.launchOffline()
+        }
         XCTAssertTrue(composerField.waitForExistence(timeout: 30))
         if layout == "outer" { command("outer") }
         showRightPage()
@@ -236,6 +249,9 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         XCTAssertTrue(footer.waitForExistence(timeout: 15))
         watch("minis: open", atEnd: true, seconds: 5)
         steps.append("mini card frames: \(app.otherElements.matching(identifier: "miniCardFrame").count)")
+        let cards = app.descendants(matching: .any).matching(identifier: "replyItemCard").count
+        steps.append("mini cards: \(cards)")
+        if cards < 3 { failures.append("minis: only \(cards) mini cards in the reply") }
         shot("minis")
         command("mid")
         record("minis: up")
@@ -413,7 +429,11 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         watch("\(name): a reply streams with the keyboard up", atEnd: true, seconds: 5)
 
         // A tap on the transcript closes the keyboard; the draft stays.
-        transcriptPoint(dx: composer.frame.midX, dy: composer.frame.minY - 40).tap()
+        if inRoom {
+            transcriptPoint(dx: composer.frame.minX + 40, dy: composer.frame.minY - 70).tap()
+        } else {
+            transcriptPoint(dx: composer.frame.midX, dy: composer.frame.minY - 40).tap()
+        }
         expectKeyboard(false, "\(name): tap")
         watch("\(name): tap closed the keyboard", atEnd: true)
         expectDraft("\(name): tap")
@@ -421,7 +441,8 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         // A swipe down closes it too.
         composerField.tap()
         expectKeyboard(true, "\(name): keyboard up 2")
-        let start = transcriptPoint(dx: composer.frame.midX, dy: composer.frame.minY - 60)
+        let start = inRoom ? transcriptPoint(dx: composer.frame.maxX - 16, dy: composer.frame.minY - 80)
+            : transcriptPoint(dx: composer.frame.midX, dy: composer.frame.minY - 60)
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 300)))
         expectKeyboard(false, "\(name): swipe down")
         watch("\(name): swipe down closed the keyboard", atEnd: false)
@@ -464,7 +485,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
             "-qaBotDemo", layout == "phone" ? "chat" : "duo", "-qaDark", "-openURL", "bbstudio://bot"]
             + (cold ? ["-qaDemoLatency", "300", "-qaDemoColdCache"] : [])
         switch layout {
-        case "outer": app.launchArguments += ["-qaDuoPhone", "-qaDuoLong"]
+        case "outer": app.launchArguments += ["-qaDuoPhone", "-qaDuoLong"] + (inRoom ? ["-qaSpacesDemo", "list", "-qaSpacesSeedOnly"] : [])
         case "split": app.launchArguments += ["-qaDuoPhone", "-qaDuoColdWide", "-qaDuoWideTitles"]
         default: break
         }
@@ -477,6 +498,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     }
 
     private func standUpTheRoom() {
+        if inRoom { XCTAssertTrue(app.buttons["RoomFloor"].waitForExistence(timeout: 30), "the room shows on the folded Duo") }
         guard app.buttons["RoomFloor"].waitForExistence(timeout: 10) else { return }
         app.standRoomChat()
         XCTAssertTrue(app.buttons["roomLayDown"].waitForExistence(timeout: 10), "the room's chat stands up")
@@ -551,7 +573,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         let probe = window()?.keyboardTop ?? .nan
         steps.append(String(format: "%@: frames: composer bottom %.1f, keyboard frame top %.1f, XCUITest keyboard top %.1f",
                             step, composer.frame.maxY, probe, app.keyboards.firstMatch.frame.minY))
-        guard let gap = drawnGapUnderComposer() else {
+        guard let gap = drawnGapUnderComposer() ?? (inRoom && probe.isFinite ? probe - composer.frame.maxY : nil) else {
             return failures.append("\(step): no keyboard drawn under the composer")
         }
         steps.append(String(format: "%@: composer %.1f pt above the keyboard (drawn)", step, gap))
@@ -667,9 +689,13 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     /// The transcript: the largest scroll view over the composer.
     private func transcript() -> Scroll? {
         let mid = composer.exists ? composer.frame.midX + (layout == "split" ? 476 : 0) : nil
-        return window()?.scrolls.filter { scroll in
+        let over = window()?.scrolls.filter { scroll in
             scroll.height > 200 && scroll.contentHeight > 0 && (mid.map { scroll.x <= $0 && $0 <= scroll.x + scroll.width } ?? true)
-        }.max { $0.width * $0.height < $1.width * $1.height }
+        }
+        if inRoom, let over, let largest = over.map({ $0.width * $0.height }).max() {
+            return over.last { $0.width * $0.height >= largest * 0.6 }
+        }
+        return over?.max { $0.width * $0.height < $1.width * $1.height }
     }
 
     private func shot(_ name: String) {

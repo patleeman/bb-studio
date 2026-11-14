@@ -28,12 +28,14 @@ enum BotSpacesDemo {
         let pages = PageQA.shared
         let late = late
         let answered = OSAllocatedUnfairLock(initialState: late == nil)
-        BBClient.demoTransport = { method, path, body in
-            try await pages.delay(path)
-            if path.hasSuffix("/bot_spaces"), !answered.withLock({ $0 }) { throw URLError(.notConnectedToInternet) }
-            if let answer = state.respond(method, path, body) { return answer }
-            if let previous { return try await previous(method, path, body) }
-            throw URLError(.cannotConnectToHost)
+        if !ProcessInfo.processInfo.arguments.contains("-qaSpacesSeedOnly") {
+            BBClient.demoTransport = { method, path, body in
+                try await pages.delay(path)
+                if path.hasSuffix("/bot_spaces"), !answered.withLock({ $0 }) { throw URLError(.notConnectedToInternet) }
+                if let answer = state.respond(method, path, body) { return answer }
+                if let previous { return try await previous(method, path, body) }
+                throw URLError(.cannotConnectToHost)
+            }
         }
         let decoder = JSONDecoder()
         guard let spaces = try? decoder.decode(Studio.BotSpacesOutput.self, from: state.spacesJSON()) else { return }
