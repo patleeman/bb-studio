@@ -24,6 +24,7 @@ let bot: string | null | undefined;
 let onFocus: ((botId: string) => void) | null = null;
 let landed = false;
 let threadOpener: ((threadId: string) => void) | null = null;
+let conversationStarter: (() => boolean) | null = null;
 
 /**
  * The main view's first landing in this window: on BB's empty new-thread
@@ -84,6 +85,15 @@ export function setThreadOpener(open: ((threadId: string) => void) | null): void
 
 export function openThreadVia(fallback: (threadId: string) => void): (threadId: string) => void {
   return (threadId) => (threadOpener ?? fallback)(threadId);
+}
+
+/** How BB's Mod+N starts a conversation: the sidebar's "+ New" while it is mounted (it knows Main's project). */
+export function setConversationStarter(start: (() => boolean) | null): void {
+  conversationStarter = start;
+}
+
+export function startConversationVia(fallback: () => boolean): boolean {
+  return (conversationStarter ?? fallback)();
 }
 
 /** "Studio: Show Bot <n>" (app.tsx): the sidebar's switch while it is mounted, with how many Bots it shows. */
@@ -173,6 +183,7 @@ export function resetSidebarState(): void {
   arrivedAsking = null;
   lastPathname = null;
   threadOpener = null;
+  conversationStarter = null;
   switcher = null;
   try { for (const key of [BOT_KEY, LAST_KEY]) { sessionStorage.removeItem(key); localStorage.removeItem(key); } } catch { /* private mode */ }
   emit();

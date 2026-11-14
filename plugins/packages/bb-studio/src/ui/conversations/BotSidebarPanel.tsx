@@ -37,7 +37,7 @@ import { usePathname } from "../../kit/app/route";
 import { BotPresence } from "../../presence/ui/BotPresence";
 import { useCall, useLive } from "../live";
 import { conversationLines, doneLabel, hiddenThreadTarget, isOlderPage, landingThread, olderLabel, olderPath, secondLine, shortAge, spaceDots, splitWorkers, swipeStep, switchTarget, SWIPE_START, workerLines, type ConversationLine, type LiveThread, type WorkerLine } from "./model";
-import { currentBot, hasLanded, isLaunchPage, lastConversation, markLanded, newThreadAsked, rememberConversation, setBotSwitcher, setCurrentBot, setFocusHandler, setThreadOpener, useCurrentBot, watchNewThreadArrivals } from "./state";
+import { currentBot, hasLanded, isLaunchPage, lastConversation, markLanded, newThreadAsked, rememberConversation, setBotSwitcher, setCurrentBot, setConversationStarter, setFocusHandler, setThreadOpener, useCurrentBot, watchNewThreadArrivals } from "./state";
 
 import { MEMORY_SUBPATH } from "../../memory/shared";
 import { skillsPagePath } from "../skills/paths";
@@ -287,15 +287,19 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
     if (target) switchTo(target);
   };
 
-  const newConversation = () => {
-    if (!bot) return;
+  const newConversation = (): boolean => {
+    if (!bot) return false;
     markLanded();
     void call("bot_focus", { botId: bot.id }).catch(() => {});
     const main = data?.conversations.find((row) => row.isMain);
     navigate.toPluginPanel("studio", { subPath: newConversationPath(bot.id, main?.projectId ?? null) });
     onNavigate();
+    return true;
   };
   const toPanel = (subPath?: string) => { navigate.toPluginPanel("studio", subPath ? { subPath } : {}); onNavigate(); };
+  const newConversationRef = useRef(newConversation);
+  newConversationRef.current = newConversation;
+  useEffect(() => { setConversationStarter(() => newConversationRef.current()); return () => setConversationStarter(null); }, []);
   const editingBot = editing ? bots.find((each) => each.id === editing) ?? null : null;
   const stage = useMainViewRect(!!editingBot);
   const editingInSidebar = !!editingBot && !stage;

@@ -59,7 +59,7 @@ import { NORD } from "../../theme/builtin/classic";
 import { GRID } from "../../theme/builtin/grid";
 import { resetSceneSignals, sceneSignals } from "../../theme/signals";
 import { forgetSavedAppearance } from "../../theme/ui/state";
-import { canShowBot, hasLanded, rememberConversation, resetSidebarState, showBotNumber } from "./state";
+import { canShowBot, hasLanded, rememberConversation, resetSidebarState, showBotNumber, startConversationVia } from "./state";
 
 const space = (id: string, name: string, needsYou: boolean, mainThreadId: string, theme: unknown = null) => ({ id, name, avatar: "🤖", shape: null, color: null, avatarImageUrl: null, primary: id === "cos", mainThreadId, needsYou, theme });
 const NOW = Date.now();
@@ -187,6 +187,15 @@ it("opens a row in the main view, and + New opens BB's composer for this Bot in 
   expect(state.navigate.toCompose).not.toHaveBeenCalled();
   await act(async () => { $('[data-testid="space-page-memory"]')!.click(); });
   expect(state.navigate.toPluginPanel).toHaveBeenCalledWith("studio", { subPath: "memory/cos" });
+});
+
+it("starts BB's Mod+N conversation the way + New does while the sidebar is mounted", async () => {
+  await mount(null);
+  const fallback = vi.fn(() => true);
+  await act(async () => { expect(startConversationVia(fallback)).toBe(true); });
+  expect(fallback).not.toHaveBeenCalled();
+  expect(state.call).toHaveBeenCalledWith("bot_focus", { botId: "cos" });
+  expect(state.navigate.toPluginPanel).toHaveBeenCalledWith("studio", { subPath: "new-conversation/cos/proj_personal" });
 });
 
 it("keeps the header clickable in the desktop app, and with one Bot shows its icon and + for a new one", async () => {
