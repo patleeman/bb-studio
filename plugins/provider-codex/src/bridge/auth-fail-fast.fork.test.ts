@@ -2,25 +2,34 @@ import { describe, expect, it } from "vitest";
 import type { ThreadDelta } from "@get-bb/plugin-sdk/provider-bridge";
 import { failFastOnAuthError } from "./auth-fail-fast.fork.js";
 
-function reconnect(turnId: string, attempt: number): ThreadDelta {
+function reconnect(
+  turnId: string,
+  attempt: number,
+  cause: string,
+  httpStatusCode: number | null = 401,
+): ThreadDelta {
   return {
     kind: "provider.error",
     message: "Provider error",
-    detail: `Reconnecting... ${attempt}/5\nunexpected status 401 Unauthorized: Missing bearer or basic authentication in header`,
+    detail: `Reconnecting... ${attempt}/5\n${cause}`,
     willRetry: true,
     errorInfo: {
       category: "connection-failed",
       providerCode: "responseStreamConnectionFailed",
-      httpStatusCode: 401,
+      httpStatusCode,
     },
     providerTurnId: turnId,
   };
 }
 
+const MISSING =
+  "unexpected status 401 Unauthorized: Missing bearer or basic authentication in header";
+const EXPIRED = "unexpected status 401 Unauthorized: token expired";
+
 describe("a Codex turn that is not signed in", () => {
-  it("turns the first 401 reconnect into a final sign-in error and asks to stop the turn", () => {
+  it("ends the turn on the first reconnect when the credentials are missing", () => {
     const session = {};
-    const result = failFastOnAuthError(session, [reconnect("turn_1", 1)]);
+    const result = failFastOnAuthError(session, [reconnect("turn_1", 1, MISSING)]);
     expect(result.interruptTurnId).toBe("turn_1");
     expect(result.deltas).toEqual([
       expect.objectContaining({
@@ -37,9 +46,9 @@ describe("a Codex turn that is not signed in", () => {
 
   it("drops the reconnects that follow and records the stopped turn as failed", () => {
     const session = {};
-    failFastOnAuthError(session, [reconnect("turn_1", 1)]);
+    failFastOnAuthError(session, [reconnect("turn_1", 1, MISSING)]);
     const later = failFastOnAuthError(session, [
-      reconnect("turn_1", 2),
+      reconnect("turn_1", 2, MISSING),
       { kind: "turn.boundary", providerTurnId: "turn_1", status: "interrupted" },
     ]);
     expect(later.interruptTurnId).toBeNull();
@@ -56,23 +65,69 @@ describe("a Codex turn that is not signed in", () => {
     ]);
     expect(next.deltas[0]).toMatchObject({ status: "completed" });
   });
+});
 
-  it("leaves other reconnects alone so they are still retried", () => {
+describe("a signed-in Codex turn whose token is refreshed", () => {
+  it("lets a single 401 reconnect retry, so a refreshed token can recover", () => {
     const session = {};
-    const delta: ThreadDelta = {
-      kind: "provider.error",
-      message: "Provider error",
-      detail: "Reconnecting... 1/5\nstream disconnected before completion",
-      willRetry: true,
-      errorInfo: {
-        category: "connection-failed",
-        providerCode: null,
-        httpStatusCode: null,
-      },
-      providerTurnId: "turn_1",
-    };
-    const result = failFastOnAuthError(session, [delta]);
+    const first = reconnect("turn_1", 1, EXPIRED);
+    const result = failFastOnAuthError(session, [first]);
     expect(result.interruptTurnId).toBeNull();
-    expect(result.deltas).toEqual([delta]);
+    expect(result.deltas).toEqual([first]);
+    const done = failFastOnAuthError(session, [
+      { kind: "turn.boundary", providerTurnId: "turn_1", status: "completed" },
+    ]);
+    expect(done.deltas[0]).toMatchObject({ status: "completed" });
+  });
+
+  it("ends the turn on the second 401 in a row", () => {
+    const session = {};
+    failFastOnAuthError(session, [reconnect("turn_1", 1, EXPIRED)]);
+    const second = failFastOnAuthError(session, [reconnect("turn_1", 2, EXPIRED)]);
+    expect(second.interruptTurnId).toBe("turn_1");
+    expect(second.deltas[0]).toMatchObject({
+      willRetry: false,
+      errorInfo: { category: "unauthorized" },
+    });
+  });
+
+  it("starts counting again after a reconnect that isn't a 401", () => {
+    const session = {};
+    failFastOnAuthError(session, [reconnect("turn_1", 1, EXPIRED)]);
+    failFastOnAuthError(session, [
+      reconnect("turn_1", 2, "stream disconnected before completion", null),
+    ]);
+    const third = failFastOnAuthError(session, [reconnect("turn_1", 3, EXPIRED)]);
+    expect(third.interruptTurnId).toBeNull();
+  });
+
+  it("counts each turn on its own", () => {
+    const session = {};
+    failFastOnAuthError(session, [reconnect("turn_1", 1, EXPIRED)]);
+    const other = failFastOnAuthError(session, [reconnect("turn_2", 1, EXPIRED)]);
+    expect(other.interruptTurnId).toBeNull();
+  });
+});
+
+describe("other reconnects", () => {
+  it("are left alone, including text that only mentions 401", () => {
+    const session = {};
+    const plain: ThreadDelta = reconnect(
+      "turn_1",
+      1,
+      "stream disconnected before completion",
+      null,
+    );
+    const mention: ThreadDelta = reconnect(
+      "turn_1",
+      2,
+      "retrying request 401 of 500 after a timeout",
+      null,
+    );
+    const result = failFastOnAuthError(session, [plain, mention]);
+    expect(result.interruptTurnId).toBeNull();
+    expect(result.deltas).toEqual([plain, mention]);
+    const again = failFastOnAuthError(session, [mention]);
+    expect(again.interruptTurnId).toBeNull();
   });
 });
