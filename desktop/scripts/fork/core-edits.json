@@ -98,8 +98,8 @@
     },
     "apps/app/src/components/thread/timeline/ThreadTimelineRows.tsx": {
       "seam": "quiet-turns, message-menu, sign-in-errors, unread-divider",
-      "intent": "A finished assistant message that a plugin's reply classifier calls quiet (useQuietReply, lib/fork-reply-classifiers.ts, which redraws the row when a classifier registers after it was drawn) draws as QuietTurnMarker instead of a message. Core has no rule of its own. ConversationRowContent reads the plugins' slots.experimental_messageAction items (useForkMessageActions) and wraps the row's plugin actions in withForkMessageMenu (forkMessageActions.ts), which adds the items that are available for that message, keyed as menu items. A system row that is a sign-in error draws forkSignInErrorBody (SignInErrorActions.fork.tsx, imported at the top of the file: Sign in runs the provider's login command in a terminal, Pick another model opens the picker) instead of the detail code box. findUnreadDividerIndex moves the divider back to the first unread row of the reply's turn with unreadDividerTurnStart (unreadDividerTurnStart.fork.ts, imported at the top of the file), so NEW never sits between a Thought or tool row and its reply.",
-      "budget": 24
+      "intent": "A finished assistant message that a plugin's reply classifier calls quiet (useQuietReply, lib/fork-reply-classifiers.ts, which redraws the row when a classifier registers after it was drawn) draws as QuietTurnMarker instead of a message. Core has no rule of its own. ConversationRowContent reads the plugins' slots.experimental_messageAction items (useForkMessageActions) and wraps the row's plugin actions in withForkMessageMenu (forkMessageActions.ts), which adds the items that are available for that message, keyed as menu items. A system row that is a sign-in error draws forkSignInErrorBody (SignInErrorActions.fork.tsx, imported at the top of the file: Sign in runs the provider's login command in a terminal, Pick another model opens the picker) instead of the detail code box. findUnreadDividerIndex moves the divider back to the first unread row of the reply's turn with unreadDividerTurnStart (unreadDividerTurnStart.fork.ts, imported at the top of the file), so NEW never sits between a Thought or tool row and its reply. buildTimelineRowsListItems skips a settled Thought row with no text (isEmptyThought, emptyThought.fork.ts, imported at the top of the file); a thought with text, deferred text or still running is always drawn.",
+      "budget": 26
     },
     "apps/app/src/components/ui/tab-pill.tsx": {
       "seam": "workbench",
@@ -532,9 +532,9 @@
       "budget": 4
     },
     "packages/thread-view/src/build-thread-timeline.ts": {
-      "seam": "sign-in-errors, brief-thoughts",
-      "intent": "BuildTimelineRowsOptions carries providerDisplayName (optional); the root rows, the requested-turn rows and delegation child rows pass it on, and the error row passes it to buildTimelineErrorDisplay. The \"operation\" case returns no row for a finished Thought shorter than two seconds (isBriefThought, brief-thought.fork.ts, imported at the top of the file), so short replies carry no bare \"Thought\" line.",
-      "budget": 9
+      "seam": "sign-in-errors",
+      "intent": "BuildTimelineRowsOptions carries providerDisplayName (optional); the root rows, the requested-turn rows and delegation child rows pass it on, and the error row passes it to buildTimelineErrorDisplay.",
+      "budget": 6
     },
     "apps/app/src/components/promptbox/NewThreadComposer.tsx": {
       "seam": "picker-browse",
@@ -588,7 +588,7 @@
     },
     "plugins/provider-codex/src/bridge/bridge.ts": {
       "seam": "sign-in-errors",
-      "intent": "handleChildNotification passes the translator's deltas through failFastOnAuthError (auth-fail-fast.fork.ts, imported right under the shebang): the first 401 reconnect of a turn becomes its final unauthorized error and the bridge interrupts that Codex turn (requestCodexTurnInterrupt), so a signed-out Codex fails at once instead of after its own reconnects.",
+      "intent": "handleChildNotification passes the translator's deltas through failFastOnAuthError (auth-fail-fast.fork.ts, imported right under the shebang): a reconnect whose error shows missing credentials, or the second 401 reconnect in a row, becomes the turn's final unauthorized error and the bridge interrupts that Codex turn (requestCodexTurnInterrupt), so a signed-out Codex fails at once instead of after its own reconnects, while a single 401 can still recover after a token refresh.",
       "budget": 6
     },
     "apps/app/src/views/thread-detail/ThreadDetailPromptArea.tsx": {
