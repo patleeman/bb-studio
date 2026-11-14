@@ -1839,7 +1839,7 @@ describe("ThreadDetailPromptArea", () => {
       permissionMode: "auto",
     });
     expect(host!.getSelection?.()).toEqual(result);
-    expect(screen.getByTestId("submit-label").textContent).toBe("New thread");
+    expect(screen.getByTestId("submit-label").textContent).toBe("Send");
     expect(screen.getByTestId("command-suggestions").textContent).toBe(
       "claude-code:new-thread",
     );
@@ -1923,7 +1923,7 @@ describe("ThreadDetailPromptArea", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Same provider handoff" }),
     );
-    expect(screen.getByTestId("submit-label").textContent).toBe("New thread");
+    expect(screen.getByTestId("submit-label").textContent).toBe("Send");
     expect(screen.getByTestId("command-suggestions").textContent).toBe(
       "codex:new-thread",
     );
@@ -2000,7 +2000,7 @@ describe("ThreadDetailPromptArea", () => {
     mocks.promptDraft.text = "Keep going";
     renderPromptArea();
     fireEvent.click(screen.getByRole("button", { name: "Start handoff" }));
-    expect(screen.getByTestId("submit-label").textContent).toBe("New thread");
+    expect(screen.getByTestId("submit-label").textContent).toBe("Send");
     fireEvent.click(
       screen.getByRole("button", { name: "Same provider handoff" }),
     );
@@ -2024,12 +2024,12 @@ describe("ThreadDetailPromptArea", () => {
 
       fireEvent.click(screen.getByRole("button", { name: entryAction }));
 
-      expect(screen.getByTestId("submit-label").textContent).toBe("New thread");
+      expect(screen.getByTestId("submit-label").textContent).toBe("Send");
       expect(screen.getByTestId("submit-icon").textContent).toBe(
         "MessageSquarePlus",
       );
       expect(screen.getByTestId("submit-title").textContent).toBe(
-        "Create new thread (Enter)",
+        "Send in a new conversation (Enter)",
       );
       expect(screen.getByTestId("selected-model").textContent).toBe(
         "claude-opus-5",

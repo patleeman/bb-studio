@@ -117,12 +117,12 @@ export function ProjectSelector({
     : (selected?.name ??
       fallback?.name ??
       (allProjectsSelected ? "All projects" : undefined) ??
-      (noProjectSelected ? "No project" : "Work in a project"));
+      (noProjectSelected ? "Personal workspace" : "Work in a project"));
   const compactTriggerLabel = isLoading
     ? "Loading…"
     : (selected?.name ??
       fallback?.name ??
-      (allProjectsSelected ? "All projects" : "No project"));
+      (allProjectsSelected ? "All projects" : "Personal workspace"));
   const triggerIcon =
     isLoading || selected || fallback || allProjectsSelected
       ? "Folder"

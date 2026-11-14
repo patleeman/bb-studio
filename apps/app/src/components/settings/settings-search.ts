@@ -42,15 +42,15 @@ export const SETTINGS_SEARCH_INDEX: Record<
     keywords: ["preferences"],
     settings: [
       {
-        title: "Navigate to threads on creation",
+        title: "Open new conversations",
         keywords: ["new thread", "open", "background"],
       },
       {
-        title: "Default thread followup behavior",
+        title: "Follow-up behavior",
         keywords: ["enter", "steer", "queue", "follow-up"],
       },
       {
-        title: "Thread archive confirmation",
+        title: "Archive confirmation",
         keywords: ["confirm", "child threads"],
       },
       {
@@ -131,7 +131,7 @@ export const SETTINGS_SEARCH_INDEX: Record<
     keywords: ["bb cloud", "llm"],
     settings: [
       {
-        title: "Thread titles",
+        title: "Conversation titles",
         keywords: ["naming", "branch names", "generate"],
       },
       { title: "Commit messages", keywords: ["git", "generate"] },
@@ -160,7 +160,7 @@ export const SETTINGS_SEARCH_INDEX: Record<
         when: "sidebarNavigations",
       },
       {
-        title: "Sidebar thread list",
+        title: "Sidebar conversation list",
         keywords: ["threads", "plugin"],
         when: "threadLists",
       },
