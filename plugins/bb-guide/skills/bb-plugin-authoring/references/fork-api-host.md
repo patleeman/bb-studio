@@ -145,6 +145,11 @@ finalOutput }) => ({ quiet }))`. bb asks it for every turn that finishes;
 - Frontend: `app.slots.experimental_replyClassifier({ id, classify(text) })`
   → `{ quiet }` makes the thread view draw that reply as a small "Quiet
   check" marker. Use the same rule on both sides.
+- Frontend, optional: `classifyMessage(text, { part, initiator })` on the
+  same registration → `{ sender?, previewStart? }` draws a message that came
+  into the thread (not typed by the user) as a system row "Message from
+  <sender>", its preview starting at `previewStart`. With a quiet reply the
+  row and the reply fold into that one row. Return null for anything else.
 
 ## Title rows in cards
 
