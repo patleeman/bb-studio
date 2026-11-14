@@ -10,6 +10,7 @@ import { buildTimelineViewRows } from "@bb/thread-view";
 import {
   commandRow,
   conversationRow,
+  systemRow,
 } from "@/test/fixtures/thread-timeline-rows";
 import { makePluginRegistrationSet } from "@/test/fixtures/plugins";
 import {
@@ -17,7 +18,7 @@ import {
   setPluginSlotRegistrations,
 } from "@/lib/plugin-slots";
 import { ThreadTimelineRows } from "./ThreadTimelineRows";
-import { foldRelayedRows } from "./relayedFold.fork";
+import { foldRelayedRows, isAlertRow } from "./relayedFold.fork";
 
 afterEach(() => {
   cleanup();
@@ -238,3 +239,61 @@ describe("relayed rows in the thread view", () => {
     expect(container.textContent).toContain("Quiet check");
   });
 });
+
+describe("folds never hide failures", () => {
+  function alertExchange(
+    key: string,
+    systemMessageKind: "child-failed" | "child-needs-attention" | "child-interrupted",
+  ): TimelineRow[] {
+    const rows = exchange(key, { text: "[bb system] Worker stopped.", initiator: "system" }, "[PASS]");
+    const [message, ...rest] = rows;
+    return [{ ...message!, systemMessageKind } as TimelineRow, ...rest];
+  }
+
+  it.each(["child-failed", "child-needs-attention", "child-interrupted"] as const)(
+    "never folds a %s notice, so it keeps its own icon",
+    (kind) => {
+      registerStudioLike();
+      const rows = buildTimelineViewRows(alertExchange(`alert_${kind}`, kind));
+      expect(isAlertRow(rows[0]!)).toBe(true);
+      const fold = foldRelayedRows(rows, null);
+      expect(fold.folded.size).toBe(0);
+      expect(fold.rows).toBe(rows);
+    },
+  );
+
+  it("never folds an urgent relay (⚠️), with or without a header", () => {
+    registerStudioLike();
+    for (const text of [
+      "[bb message from thread:thr_runner]\n\n⚠️ From runner House: the backup failed.",
+      '⚠️ "Morning card" stopped again (3 times)',
+      "From runner House: ⚠️ disk full",
+    ]) {
+      const rows = buildTimelineViewRows(exchange(`urgent_${text.length}`, { text, initiator: "agent" }, "[PASS]"));
+      expect(foldRelayedRows(rows, null).folded.size).toBe(0);
+    }
+  });
+
+  it("keeps error and reconnect rows and failed steps visible inside a fold", () => {
+    registerStudioLike();
+    const [message, command, reply] = exchange("k", { text: LEAD, initiator: "agent" }, "[PASS]");
+    const turnId = "turn_k";
+    const rows = buildTimelineViewRows([
+      message!,
+      command!,
+      systemRow({ id: "k_error", systemKind: "error", title: "Tool call failed", status: "error", turnId, threadId: "thr_main", sourceSeqStart: 5001, sourceSeqEnd: 5001 }),
+      systemRow({ id: "k_reconnect", systemKind: "reconnect", title: "Reconnecting", status: "completed", turnId, threadId: "thr_main", sourceSeqStart: 5002, sourceSeqEnd: 5002 }),
+      commandRow({ id: "k_failed", command: "false", exitCode: 1, status: "error", sourceSeqStart: 5003, sourceSeqEnd: 5004, threadId: "thr_main", turnId }),
+      reply!,
+    ] as TimelineRow[]);
+    const fold = foldRelayedRows(rows, null);
+    const ids = fold.rows.map((row) => row.id);
+    expect([...fold.folded]).toEqual(["k_message"]);
+    expect(ids).toContain("k_error");
+    expect(ids).toContain("k_reconnect");
+    expect(ids).not.toContain("k_reply");
+    expect(ids).not.toContain("k_command");
+    expect(ids).toContain("k_failed");
+  });
+});
+
