@@ -64,6 +64,7 @@ final class RoomModel {
             closesToRest = false
         }
         if next != .menu { place = nil }
+        if next == .talk, mode != .talk { RoomPerf.standUp() }
         mode = next
         if effect == .focus { focusRequests += 1 }
         return effect

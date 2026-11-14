@@ -36,6 +36,20 @@ final class RoomQAUITests: ServerIsolatedUITestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [done], timeout: 10), .completed, what)
     }
 
+    func testStandUpsForTheFrameLog() throws {
+        guard ProcessInfo.processInfo.environment["ROOM_PERF"] != nil else { throw XCTSkip("writes room-perf.txt for a frame-timing run") }
+        launch()
+        sleep(4)
+        for _ in 0..<3 {
+            app.buttons["roomInput"].tap()
+            XCTAssertTrue(app.textViews["composerField"].waitForExistence(timeout: 10))
+            sleep(2)
+            app.buttons["roomLayDown"].tap()
+            XCTAssertTrue(app.buttons["roomInput"].waitForExistence(timeout: 10))
+            sleep(2)
+        }
+    }
+
     func testOneBotRubberBandsAndShowsNoToast() {
         launch(["-qaOneBot"])
         let presence = app.otherElements.matching(NSPredicate(format: "label BEGINSWITH 'Juniper, '")).firstMatch
