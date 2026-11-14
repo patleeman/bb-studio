@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { pathFor, TAB_KIND_REGISTRY, tabKindEntry, tabOpenFor, type TabRef } from "../tab-kinds";
 import { SAMPLE_REFS as SAMPLE } from "./audit";
-import { directiveFor, howFor, LINK_KINDS, linkFor, needsResolution, NOT_FOUND_TAB, NOT_FOUND_TITLE, openLink, parseLink, refOf, type LinkDeps, type LinkResolution, type LinkTarget } from "./router";
+import { directiveFor, goneText, howFor, LINK_KINDS, linkFor, needsResolution, NOT_FOUND_TAB, NOT_FOUND_TITLE, openLink, parseLink, refOf, type LinkDeps, type LinkResolution, type LinkTarget } from "./router";
 
 const ORIGIN = "http://127.0.0.1:38986";
 
@@ -206,7 +206,7 @@ describe("openLink", () => {
   it("a target that is gone says so in a toast from a conversation, leaving no tab in its panel, and opens the Not found tab on a Studio page", async () => {
     const { deps } = fakeDeps({ resolved: { found: false, title: null } });
     expect(await openLink(entity(SAMPLE.page, "bb://page/pg_0123456789abcdef"), { source: "transcript" }, deps)).toEqual({ via: "notFound", opened: false });
-    expect(deps.toast).toHaveBeenCalledWith("Not found: bb://page/pg_0123456789abcdef");
+    expect(deps.toast).toHaveBeenCalledWith("That page is gone");
     expect(deps.openStudioTab).not.toHaveBeenCalled();
     expect(deps.openTab).not.toHaveBeenCalled();
     expect(deps.openMain).not.toHaveBeenCalled();
@@ -219,7 +219,16 @@ describe("openLink", () => {
     const nowhere = fakeDeps({ resolved: { found: false }, thread: () => null });
     expect(await openLink(entity(SAMPLE.page, "bb://page/x"), { source: "transcript" }, nowhere.deps)).toEqual({ via: "notFound", opened: false });
     expect(nowhere.deps.openStudioTab).not.toHaveBeenCalled();
-    expect(nowhere.deps.toast).toHaveBeenCalledWith("Not found: bb://page/x");
+    expect(nowhere.deps.toast).toHaveBeenCalledWith("That page is gone");
+  });
+
+  it("names a missing link's kind in its toast, never its address or id", async () => {
+    const { deps } = fakeDeps({ resolved: { found: false, title: null } });
+    await openLink(entity(SAMPLE.conversation, "bb://conversation/thr_1"), { source: "transcript" }, deps);
+    expect(deps.toast).toHaveBeenLastCalledWith("That conversation is gone");
+    expect(goneText("Memory record")).toBe("That memory record is gone");
+    expect(goneText("Visual Chat board")).toBe("That Visual Chat board is gone");
+    expect(goneText("VS Code")).toBe("That VS Code is gone");
   });
 
   it("checks existence only where something can be gone, and a failed check still opens", async () => {
