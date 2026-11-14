@@ -144,7 +144,19 @@ export function forkSlotMethods(
       if (typeof registration.classify !== "function") {
         throw new Error(`${kind} "${id}": classify must be a function`);
       }
-      collected.replyClassifiers.push({ id, classify: registration.classify });
+      if (
+        registration.classifyMessage !== undefined &&
+        typeof registration.classifyMessage !== "function"
+      ) {
+        throw new Error(`${kind} "${id}": classifyMessage must be a function`);
+      }
+      collected.replyClassifiers.push({
+        id,
+        classify: registration.classify,
+        ...(registration.classifyMessage
+          ? { classifyMessage: registration.classifyMessage }
+          : {}),
+      });
     },
     experimental_linkHandler(registration) {
       const kind = "slots.experimental_linkHandler";
