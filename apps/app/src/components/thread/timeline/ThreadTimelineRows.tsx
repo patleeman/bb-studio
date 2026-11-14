@@ -1,3 +1,4 @@
+import { isEmptyThought } from "./emptyThought.fork";
 import { unreadDividerTurnStart } from "./unreadDividerTurnStart.fork";
 import { forkSignInErrorBody } from "./SignInErrorActions.fork";
 import {
@@ -2057,6 +2058,7 @@ export function buildTimelineRowsListItems({
     if (index === dividerIndex) {
       items.push({ kind: "unread-divider", id: "thread-unread-divider" });
     }
+    if (isEmptyThought(row)) continue;
     items.push({ kind: "row", row });
   }
 
