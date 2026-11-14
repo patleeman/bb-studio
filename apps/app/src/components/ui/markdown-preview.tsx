@@ -1,3 +1,4 @@
+import { withShortLineBreakPlugins } from "./markdown-short-line-breaks.fork";
 import { parseApplicationUrl } from "@bb/domain/application-url";
 import { openApplicationUrl } from "@/lib/application-url";
 import {
@@ -1929,7 +1930,7 @@ function MarkdownPreviewComponent({
       threadMentions,
     ],
   );
-  const baseRemarkPlugins = resolveMarkdownRemarkPlugins({
+  const baseRemarkPlugins = withShortLineBreakPlugins(threadMentions, resolveMarkdownRemarkPlugins({
     breaks:
       threadMentions?.preserveSoftBreaks === true ||
       promptMentions !== undefined,
@@ -1937,7 +1938,7 @@ function MarkdownPreviewComponent({
     messageDirectives: hasMessageDirectives,
     promptMentions: promptMentions !== undefined,
     threadMentions: threadMentions !== undefined,
-  });
+  }));
   const codeFenceRegistry = useCodeFenceLanguages();
   const remarkPlugins = useMemo((): MarkdownRemarkPlugins => {
     const plugins: MarkdownRemarkPlugins = [...baseRemarkPlugins];
