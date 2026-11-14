@@ -117,6 +117,12 @@ export function parseLink(text: string | null | undefined, origin: string = type
   return /^(mailto|tel):$/.test(url.protocol) ? { type: "external", url: url.href, link } : null;
 }
 
+/** "That page is gone": a missing link's toast names its kind, never its address or id. */
+export function goneText(kindName: string): string {
+  const plain = /^[A-Z][a-z]/.test(kindName) && !/\s[A-Z]/.test(kindName) ? `${kindName[0]!.toLowerCase()}${kindName.slice(1)}` : kindName;
+  return `That ${plain} is gone`;
+}
+
 export function howFor(modifiers?: LinkModifiers | null): LinkHow {
   if (modifiers?.shift) return "window";
   if (modifiers?.meta || modifiers?.ctrl) return "secondPane";
@@ -218,7 +224,7 @@ export async function openLink(target: LinkTarget, options: OpenLinkOptions, dep
   const place = (pane?: PanePlace): OpenPlace => ({ threadId, ...(pane !== undefined ? { pane } : {}) });
   if (!resolution.found) {
     const opened = !threadId && deps.studioPage() ? await deps.openStudioTab(notFoundTab(ref, target.link), place(how === "secondPane" ? secondPane(deps.pageWorkbench()) : undefined)) : false;
-    if (!opened) deps.toast(`${NOT_FOUND_TITLE}: ${target.link}`);
+    if (!opened) deps.toast(goneText(entry.name));
     return { via: "notFound", opened };
   }
   if (how === "main" && path) {
