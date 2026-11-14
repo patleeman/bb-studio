@@ -1,4 +1,5 @@
 import { forkPlaceholder, type ForkPlaceholderState } from "@/components/promptbox/follow-up-placeholder.fork";
+import { signInRecoveryHandoffDraft, signInRecoveryTitle, type SignInRecovery } from "./signInRecovery.fork";
 import { createCoreComposerActions } from "@/lib/plugin-composer-handle";
 import { visibleQueuedMessages } from "@/lib/queued-system-notice";
 import { useQueuedMessagesExpanded } from "@/components/promptbox/banner/queued-messages-expanded";
@@ -130,7 +131,6 @@ import { getThreadRoutePath } from "@/lib/route-paths";
 import { getThreadDisplayTitle } from "@/lib/thread-title";
 import {
   buildThreadHandoffCreateRequest,
-  buildThreadHandoffFollowUpDraft,
   stripThreadHandoffPrefix,
   type ThreadHandoffCreateSeed,
 } from "@bb/client-core";
@@ -220,6 +220,7 @@ interface ThreadDetailPromptAreaProps {
   composerFocusRequestKey: string | number;
   thread: ThreadWithRuntime;
   forkPlaceholderState?: ForkPlaceholderState;
+  forkSignInRecovery?: SignInRecovery | null;
 }
 
 interface InlineDraftComposerOptions {
@@ -429,6 +430,7 @@ export function ThreadDetailPromptArea({
   composerFocusRequestKey,
   thread,
   forkPlaceholderState,
+  forkSignInRecovery,
 }: ThreadDetailPromptAreaProps) {
   const navigate = useImmediateRouteNavigate();
   const defaultExecutionOptionsQuery = useThreadDefaultExecutionOptions(
@@ -784,15 +786,17 @@ export function ThreadDetailPromptArea({
           },
     );
     const currentDraft = promptDraft.getCurrent();
-    const seededDraft = buildThreadHandoffFollowUpDraft(
+    const seededDraft = signInRecoveryHandoffDraft(
       handoffSeed,
       currentDraft,
+      forkSignInRecovery,
     );
     if (seededDraft !== currentDraft) {
       promptDraft.setDraft(seededDraft);
     }
   }, [
     effectiveSelectedModel,
+    forkSignInRecovery,
     handoffSeed,
     overriddenFallbackIdentity,
     permissionMode,
@@ -1201,6 +1205,7 @@ export function ThreadDetailPromptArea({
       const request = {
         ...baseRequest,
         ...(pluginSubmission === undefined ? {} : { pluginSubmission }),
+        ...signInRecoveryTitle(thread, forkSignInRecovery),
       };
       const clearedSubmittedDraft =
         promptDraft.clearIfCurrentMatches(submittedDraft);
@@ -1224,6 +1229,7 @@ export function ThreadDetailPromptArea({
     [
       createThread,
       effectiveSelectedModel,
+      forkSignInRecovery,
       handoffSeed,
       navigate,
       permissionMode,
@@ -1233,6 +1239,7 @@ export function ThreadDetailPromptArea({
       serviceTier,
       setBottomAttachmentError,
       supportsServiceTier,
+      thread,
     ],
   );
 
@@ -1474,7 +1481,7 @@ export function ThreadDetailPromptArea({
       onChangeMessage: promptDraft.setTextAndMentions,
       onModifierSubmit: handleModifierSubmit,
       onSubmit: handleSend,
-      ...(isHandoffSelection
+      ...(isHandoffSelection && forkSignInRecovery == null
         ? {
             submitLabel: "New thread",
             submitIcon: "MessageSquarePlus",
@@ -1494,6 +1501,7 @@ export function ThreadDetailPromptArea({
       currentPromptDraft,
       handleModifierSubmit,
       handleSend,
+      forkSignInRecovery,
       isFollowUpSubmitting,
       isHandoffSelection,
       promptHistoryDrafts,
