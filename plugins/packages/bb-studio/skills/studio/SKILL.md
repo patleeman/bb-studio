@@ -233,6 +233,10 @@ commands, toggles Studio's settings, opens a typed URL, and asks the Bot
 opens the same omnibar from any app. Point the user there to find an item
 quickly.
 
+Name pages as the app does. The Todos page has the user's todos and, under
+**Scheduled**, your check-ins, reminders, watchers and runners: call those
+scheduled items, never automations. Bot settings is the Bot's settings page.
+
 ## Themes
 
 Each Bot has a theme: a live shader scene behind frosted glass, or a classic
@@ -307,8 +311,8 @@ change nothing.
   such as `::page{id="pg_…"}`, a `file:///…` URL or an http(s) URL)
   opens a conversation, worker, board (thread `id`), a page, whiteboard,
   design, app, artifact or recording (its `id`), a Bot (its `id`),
-  Memory, the Library, Todos (its Scheduled list is where automations are;
-  `automations` opens it there), the Archive (a Bot `id`, or none for the Bot
+  Memory, the Library, Todos (its Scheduled list holds your check-ins,
+  reminders, watchers and runners; `automations` opens it there), the Archive (a Bot `id`, or none for the Bot
   on screen), one automation (`type: "automation"`, `id`
   `<botId>:<row id>`, or `bb://automation/<botId>:<row id>`), one todo
   (`type: "todo"`, its `loop_…` id, or `bb://todo/loop_…`), one memory

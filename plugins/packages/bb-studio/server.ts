@@ -2097,9 +2097,9 @@ export default async function plugin(bb: BbPluginApi) {
     ...(input.script ? { script: { body: input.script, interpreter: input.interpreter ?? "bash" } } : {}),
     ...(input.target ? { target: input.target } : {}),
   });
-  runnerTool("automation_list", "List your automations: check-ins, reminders, watchers and runners, with schedule, state, next run and last outcome.", z.object({}),
-    async (_input: unknown, botId) => (await automations.list(botId)).map(describeAutomation).join("\n") || "No automations yet.");
-  runnerTool("automation_create", "Schedule something for yourself. kind checkin: wakes your thread on a schedule with an instruction. reminder: once, with schedule.at or schedule.in (\"tomorrow 9:00 remind me…\", \"in 2h check the deploy\"); with Todos on it becomes a todo you own with that time, listed on the Todos page. watcher: a script on a schedule that wakes you only when it prints something (zero tokens otherwise). runner: a recurring job in its own thread.",
+  runnerTool("automation_list", "List what you have scheduled: check-ins, reminders, watchers and runners, with schedule, state, next run and last outcome. The user sees them under Scheduled on the Todos page; call them scheduled items, never automations.", z.object({}),
+    async (_input: unknown, botId) => (await automations.list(botId)).map(describeAutomation).join("\n") || "Nothing scheduled yet.");
+  runnerTool("automation_create", "Schedule something for yourself. kind checkin: wakes your thread on a schedule with an instruction. reminder: once, with schedule.at or schedule.in (\"tomorrow 9:00 remind me…\", \"in 2h check the deploy\"); with Todos on it becomes a todo you own with that time, listed on the Todos page. watcher: a script on a schedule that wakes you only when it prints something (zero tokens otherwise). runner: a recurring job in its own thread. The user sees these under Scheduled on the Todos page; call them scheduled items, never automations.",
     z.object({ kind: z.enum(["checkin", "reminder", "watcher", "runner"]), name: z.string().trim().min(1).max(60), ...automationFields, schedule: toolSchedule }),
     async (input: AutomationToolInput & { kind: "checkin" | "reminder" | "watcher" | "runner"; name: string }, botId) => {
       const schedule = toSchedule(input.schedule!);
