@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
@@ -294,6 +294,64 @@ describe("folds never hide failures", () => {
     expect(ids).not.toContain("k_reply");
     expect(ids).not.toContain("k_command");
     expect(ids).toContain("k_failed");
+  });
+});
+
+describe("folds after a launch or reload", () => {
+  it("folds rows that loaded before Studio registered its classifier", () => {
+    const rows = exchange("late", { text: LEAD, initiator: "agent" }, "[PASS]");
+    const { container } = renderRows(rows);
+    expect(container.querySelector('[data-timeline-row-id="late_reply"]')).not.toBeNull();
+    act(() => registerStudioLike());
+    expect(container.querySelector('[data-timeline-row-id="late_reply"]')).toBeNull();
+    expect(container.textContent).not.toContain("Quiet check");
+    expect(rowText(container, "late_message")).toContain("Message from");
+  });
+
+  it("folds with the classifiers it is given, not only the current ones", () => {
+    const rows = buildTimelineViewRows(exchange("given", { text: LEAD, initiator: "agent" }, "[PASS]"));
+    expect(foldRelayedRows(rows, null, []).folded.size).toBe(0);
+    registerStudioLike();
+    expect(foldRelayedRows(rows, null, []).folded.size).toBe(0);
+    expect([...foldRelayedRows(rows, null).folded]).toEqual(["given_message"]);
+  });
+});
+
+describe("two relayed lines in one turn", () => {
+  function steered(): TimelineRow[] {
+    const turnId = "turn_two";
+    const at = (offset: number) => ({ sourceSeqStart: 9000 + offset, sourceSeqEnd: 9000 + offset, threadId: "thr_main", turnId });
+    return [
+      conversationRow({ id: "two_first", role: "user", initiator: "user", text: `${WATCHER}kettle-ok-09`, ...at(0) }),
+      commandRow({ id: "two_command", command: "ls", exitCode: 0, ...at(1) }),
+      conversationRow({ id: "two_second", role: "user", initiator: "user", text: `${WATCHER}kettle-ok-10`, ...at(2) }),
+      conversationRow({ id: "two_reply_a", role: "assistant", text: "[PASS]", ...at(3) }),
+      conversationRow({ id: "two_reply_b", role: "assistant", text: "[PASS]", ...at(4) }),
+    ];
+  }
+
+  it("folds both lines and both quiet replies", () => {
+    registerStudioLike();
+    const fold = foldRelayedRows(buildTimelineViewRows(steered()), null);
+    expect([...fold.folded].sort()).toEqual(["two_first", "two_second"]);
+    expect(fold.rows.map((row) => row.id)).toEqual(["two_first", "two_second"]);
+  });
+
+  it("leaves no stray Quiet check", () => {
+    registerStudioLike();
+    const { container } = renderRows(steered());
+    expect(container.textContent).not.toContain("Quiet check");
+    expect(rowText(container, "two_first")).toContain("Message from");
+    expect(rowText(container, "two_second")).toContain("Message from");
+  });
+
+  it("folds nothing when the turn ends in a real reply", () => {
+    registerStudioLike();
+    const rows = steered();
+    rows[4] = conversationRow({ id: "two_reply_b", role: "assistant", text: "The kettle is fine.", sourceSeqStart: 9004, sourceSeqEnd: 9004, threadId: "thr_main", turnId: "turn_two" });
+    const fold = foldRelayedRows(buildTimelineViewRows(rows), null);
+    expect(fold.rows.map((row) => row.id)).toContain("two_reply_b");
+    expect(fold.rows.map((row) => row.id)).not.toContain("two_reply_a");
   });
 });
 
