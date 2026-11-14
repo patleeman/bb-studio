@@ -5,6 +5,7 @@ import CryptoKit
 /// What a presence draws: the form (one of desktop's 8, or an agent-made one's
 /// module from `presences_list`), its colors, state and size.
 struct PresenceSpec: Hashable {
+    static let roomHeadroom: CGFloat = 1.35
     static let builtinForms = ["orb", "tesseract", "knot", "swarm", "mobius", "poly", "attractor", "klein"]
     static let defaultForms = ["tesseract", "orb", "poly"]
     static let fallbackForm = "tesseract"
@@ -18,6 +19,9 @@ struct PresenceSpec: Hashable {
     var state: BotPresenceState
     var workers: Int
     var size: CGFloat
+    var room: CGFloat = 1
+    var time: Double?
+    var canvas: CGFloat { size * max(1, room) }
     var scale: CGFloat
     var ink: String
     var surfaceLight: Bool
@@ -51,9 +55,10 @@ struct PresenceSpec: Hashable {
     var arguments: [String: Any] {
         var out: [String: Any] = [
             "form": form, "themeId": themeId, "mode": mode.rawValue, "motion": motion, "state": state.rawValue,
-            "workers": workers, "size": size, "dpr": scale, "ink": ink, "surfaceLight": surfaceLight,
+            "workers": workers, "size": size, "room": max(1, room), "dpr": scale, "ink": ink, "surfaceLight": surfaceLight,
         ]
         if let code { out["code"] = code }
+        if let time { out["time"] = time }
         if let customHex { out["customHex"] = customHex }
         return out
     }
@@ -61,7 +66,7 @@ struct PresenceSpec: Hashable {
     /// A file-safe key for the still cache.
     var stillKey: String {
         let parts = [form, code.map { Self.digest($0) } ?? "-", themeId, mode.rawValue, customHex ?? "-", state.rawValue,
-                     "\(state == .working ? workers : 0)", "\(Int(size))", "\(Int(scale))", ink, surfaceLight ? "l" : "d"]
+                     "\(state == .working ? workers : 0)", "\(Int(size))", "\(Int(scale))", ink, surfaceLight ? "l" : "d"] + (room > 1 ? ["r\(Int(room * 100))"] : []) + (time.map { ["t\($0)"] } ?? [])
         return Self.digest(parts.joined(separator: "|"))
     }
 
@@ -197,6 +202,7 @@ struct PresenceView: View {
     let state: BotPresenceState
     let workers: Int
     var size: CGFloat = 36
+    var room: CGFloat = 1
     @Environment(\.look) private var look
     @Environment(\.displayScale) private var scale
     @Environment(\.scenePhase) private var phase
@@ -205,7 +211,9 @@ struct PresenceView: View {
     @State private var image: UIImage?
 
     private var spec: PresenceSpec {
-        PresenceSpec(bot: bot, state: state, workers: workers, look: look, size: size, scale: scale, custom: catalog.entry(bot.presence?.form))
+        var spec = PresenceSpec(bot: bot, state: state, workers: workers, look: look, size: size, scale: scale, custom: catalog.entry(bot.presence?.form))
+        spec.room = room
+        return spec
     }
 
     var live: Bool { state != .idle && phase == .active && store.motionAllowed }
@@ -221,7 +229,7 @@ struct PresenceView: View {
                 Circle().fill(Color(lookHex: look.tokens.presence.palette.first ?? look.tokens.accent).opacity(0.35)).padding(size * 0.2)
             }
         }
-        .frame(width: size, height: size)
+        .frame(width: size * max(1, room), height: size * max(1, room))
         .task(id: spec) {
             image = PresenceStills.shared.cached(spec)
             if image == nil { image = await PresenceStills.shared.still(spec) }
@@ -247,7 +255,7 @@ struct LivePresenceView: UIViewRepresentable {
         container.isUserInteractionEnabled = false
         container.backgroundColor = .clear
         container.clipsToBounds = true
-        let host = LookWebView(page: .presence, frame: CGRect(x: 0, y: 0, width: spec.size, height: spec.size))
+        let host = LookWebView(page: .presence, frame: CGRect(x: 0, y: 0, width: spec.canvas, height: spec.canvas))
         host.webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         container.addSubview(host.webView)
         context.coordinator.host = host
@@ -257,7 +265,7 @@ struct LivePresenceView: UIViewRepresentable {
     func updateUIView(_ container: UIView, context: Context) {
         let coordinator = context.coordinator
         guard let host = coordinator.host, coordinator.mounted != spec else { return }
-        let first = coordinator.mounted == nil || coordinator.mounted?.form != spec.form || coordinator.mounted?.code != spec.code || coordinator.mounted?.size != spec.size
+        let first = coordinator.mounted == nil || coordinator.mounted?.form != spec.form || coordinator.mounted?.code != spec.code || coordinator.mounted?.size != spec.size || coordinator.mounted?.room != spec.room
         coordinator.mounted = spec
         let arguments = spec.arguments
         Task {

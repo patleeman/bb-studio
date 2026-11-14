@@ -89,6 +89,7 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
         var match = false
         var editable = false
         var sideThread: BotSideThread?
+        var sameTurn = false
     }
 
     var id: String {
@@ -146,8 +147,12 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
                        pending: [Outbox.Message], interactions: [PendingInteraction], working: Bool, thinking: String?,
                        sideThreads: [String: BotSideThread] = [:]) -> [Self] {
         var result: [Self] = hasOlder ? [.older] : []
+        var speaker: Bool?
         for item in items {
             var state = ItemState(unread: item.id == unread, match: item.id == match)
+            let mine: Bool = if case .message(let row) = item { row.isUser } else { false }
+            state.sameTurn = speaker == mine
+            speaker = mine
             if case .message(let row) = item {
                 state.editable = row.id == editableId
                 state.sideThread = sideThreads[row.id]
@@ -200,6 +205,7 @@ struct ThreadTranscriptRowView: View {
                     if state.match { RoundedRectangle(cornerRadius: 12).fill(.yellow.opacity(0.22)).padding(-6) }
                 }
             }
+            .padding(.top, state.unread ? 0 : state.sameTurn ? -4 : 6)
         case .pending(let message):
             PendingBubble(message: message)
         case .interaction(let interaction):
@@ -230,7 +236,7 @@ struct ThreadTranscriptRowView: View {
         case .autoCompacted(let compaction, _):
             BotAutoCompactedMarker(compaction: compaction)
         case .child(let event, _):
-            BotChildCard(event: event, live: state.live) {
+            BotChildCard(event: event, live: state.live, inset: actions.bot == nil ? 0 : 36) {
                 if let id = event.threadId { actions.openThread(id) }
             }
         }

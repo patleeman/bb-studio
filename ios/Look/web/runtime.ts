@@ -280,6 +280,8 @@ export interface PresenceSpec {
   state: PresenceStateName;
   workers: number;
   size: number;
+  room?: number;
+  time?: number;
   dpr: number;
   /** The surface's ink, for desktop's light-theme halo. */
   ink: string;
@@ -294,6 +296,27 @@ const CUSTOM_STEP = 1 / 31;
 function lookFor(spec: PresenceSpec): { palette: Palette; light: boolean } {
   const color = spec.customHex ? { source: "custom" as const, hex: spec.customHex } : { source: "theme" as const };
   return presenceLook({ color }, themeById(spec.themeId ?? null), spec.mode);
+}
+
+function canvasSize(spec: PresenceSpec): number {
+  return spec.size * Math.max(1, spec.room ?? 1);
+}
+
+function roomy(ctx: CanvasRenderingContext2D, spec: PresenceSpec): CanvasRenderingContext2D {
+  const off = ((canvasSize(spec) - spec.size) / 2) * spec.dpr;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  if (off === 0) return ctx;
+  return new Proxy(ctx, {
+    get(target, key) {
+      if (key === "setTransform") {
+        return (a: number, b: number, c: number, d: number, e: number, f: number) => target.setTransform(a, b, c, d, e + off, f + off);
+      }
+      const value = Reflect.get(target, key, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+    set(target, key, value) { return Reflect.set(target, key, value, target); },
+  });
 }
 
 function formOf(spec: PresenceSpec): string {
@@ -336,7 +359,7 @@ class LivePresence {
     document.documentElement.style.setProperty("--ink", spec.ink);
     if (spec.code) {
       const holder = document.createElement("span");
-      holder.style.cssText = `position:fixed;left:0;top:0;width:${spec.size}px;height:${spec.size}px;display:block`;
+      holder.style.cssText = `position:fixed;left:0;top:0;width:${canvasSize(spec)}px;height:${canvasSize(spec)}px;display:block`;
       document.body.appendChild(holder);
       this.holder = holder;
       this.sandbox = new PresenceSandbox({
@@ -348,7 +371,7 @@ class LivePresence {
       holder.append(this.sandbox.frame);
     } else {
       const canvas = document.createElement("canvas");
-      canvas.style.cssText = `position:fixed;left:0;top:0;width:${spec.size}px;height:${spec.size}px;display:block`;
+      canvas.style.cssText = `position:fixed;left:0;top:0;width:${canvasSize(spec)}px;height:${canvasSize(spec)}px;display:block`;
       document.body.appendChild(canvas);
       this.canvas = canvas;
       this.ctx = canvas.getContext("2d");
@@ -360,16 +383,16 @@ class LivePresence {
 
   private sizeCanvas(): void {
     if (!this.canvas) return;
-    const px = Math.round(this.spec.size * this.spec.dpr);
+    const px = Math.round(canvasSize(this.spec) * this.spec.dpr);
     if (this.canvas.width !== px) { this.canvas.width = px; this.canvas.height = px; }
-    this.canvas.style.width = this.canvas.style.height = `${this.spec.size}px`;
+    this.canvas.style.width = this.canvas.style.height = `${canvasSize(this.spec)}px`;
   }
 
   private paint(): void {
     const spec = this.spec;
     const started = performance.now();
     if (this.ctx && this.canvas) {
-      drawPresence(this.ctx, { form: formOf(spec) as never, size: spec.size, dpr: spec.dpr, clock: this.clock.real, formTime: this.clock.form, state: spec.state, workers: spec.workers, palette: this.palette, light: this.light });
+      drawPresence(roomy(this.ctx, spec), { form: formOf(spec) as never, size: spec.size, dpr: spec.dpr, clock: this.clock.real, formTime: this.clock.form, state: spec.state, workers: spec.workers, palette: this.palette, light: this.light });
       this.canvas.style.filter = haloFilter({ surfaceLight: spec.surfaceLight, state: spec.state, size: spec.size, clock: this.clock.real, palette: this.palette }).replace(/^none$/, "");
       this.frames += 1;
     } else if (this.sandbox?.ready) {
@@ -439,10 +462,10 @@ class LivePresence {
 function stillBuiltin(spec: PresenceSpec): string {
   const { palette, light } = lookFor(spec);
   const canvas = document.createElement("canvas");
-  canvas.width = Math.round(spec.size * spec.dpr);
+  canvas.width = Math.round(canvasSize(spec) * spec.dpr);
   canvas.height = canvas.width;
   const ctx = canvas.getContext("2d")!;
-  drawPresence(ctx, { form: formOf(spec) as never, size: spec.size, dpr: spec.dpr, clock: 0, formTime: START_TIME, state: spec.state, workers: spec.workers, palette, light });
+  drawPresence(roomy(ctx, spec), { form: formOf(spec) as never, size: spec.size, dpr: spec.dpr, clock: spec.time ?? 0, formTime: spec.time ?? START_TIME, state: spec.state, workers: spec.workers, palette, light });
   return withHalo(canvas, spec, palette);
 }
 

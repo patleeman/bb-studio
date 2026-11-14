@@ -93,7 +93,7 @@ export function setConversationStarter(start: (() => boolean) | null): void {
 }
 
 export function startConversationVia(fallback: () => boolean): boolean {
-  return (conversationStarter ?? fallback)();
+  return conversationStarter?.() || fallback();
 }
 
 /** "Studio: Show Bot <n>" (app.tsx): the sidebar's switch while it is mounted, with how many Bots it shows. */

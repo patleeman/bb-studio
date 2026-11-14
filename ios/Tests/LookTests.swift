@@ -306,4 +306,42 @@ final class LookTests: XCTestCase {
         XCTAssertLessThanOrEqual(frames, 66, "Live scenes are capped at 30 frames a second")
         XCTAssertGreaterThan(frames, 0, "Live mode draws")
     }
+
+    static func edgeAlpha(_ image: UIImage) -> UInt8 {
+        guard let cg = image.cgImage else { return 255 }
+        let w = cg.width, h = cg.height
+        var pixels = [UInt8](repeating: 0, count: w * h * 4)
+        let ctx = CGContext(data: &pixels, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        var top: UInt8 = 0
+        for x in 0..<w { for y in [0, h - 1] { top = max(top, pixels[(y * w + x) * 4 + 3]) } }
+        for y in 0..<h { for x in [0, w - 1] { top = max(top, pixels[(y * w + x) * 4 + 3]) } }
+        return top
+    }
+
+    func testNoFormIsCutOffAtTheRoomsHeadroom() async throws {
+        let stills = PresenceStills(directory: scratch("room"))
+        defer { stills.tearDown() }
+        var report: [String] = []
+        for room in ProcessInfo.processInfo.environment["PRESENCE_ROOMS"].map({ $0.split(separator: ",").compactMap { Double($0) } }) ?? [Double(PresenceSpec.roomHeadroom)] {
+            var clipped: [String] = []
+            for form in PresenceSpec.builtinForms {
+                for state in [BotPresenceState.idle, .thinking, .working, .needs] {
+                    for time in stride(from: 0.0, to: 30, by: 2.1) {
+                        var spec = PresenceSpec(bot: try bot(form: form), state: state, workers: 2, look: .onAir, size: 120, scale: 1)
+                        spec.room = CGFloat(room)
+                        spec.time = time
+                        let rendered = await stills.still(spec)
+                        let image = try XCTUnwrap(rendered, "\(form) \(state) \(time)")
+                        XCTAssertEqual(image.size.width, 120 * CGFloat(room), accuracy: 1)
+                        if Self.edgeAlpha(image) > 8 { clipped.append("\(form)/\(state)@\(time)"); break }
+                    }
+                }
+            }
+            report.append("room \(room): \(clipped.isEmpty ? "none cut off" : clipped.joined(separator: " "))")
+            if room == Double(PresenceSpec.roomHeadroom) { XCTAssertEqual(clipped, [], "cut off at the room's headroom") }
+        }
+        print("PRESENCE-ROOM " + report.joined(separator: " | "))
+    }
 }

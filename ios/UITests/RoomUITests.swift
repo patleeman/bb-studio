@@ -9,6 +9,10 @@ final class RoomUITests: ServerIsolatedUITestCase {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaLoopsDemo",
                                 "-qaRoomTheme", theme] + extra
         app.launchOffline()
+        if !app.buttons["roomMic"].waitForExistence(timeout: 30) {
+            app.terminate()
+            app.launchOffline()
+        }
         XCTAssertTrue(app.buttons["roomMic"].waitForExistence(timeout: 60), "the app opens on the room")
     }
 
@@ -29,7 +33,7 @@ final class RoomUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'roomCard-'")).firstMatch.waitForExistence(timeout: 15), "today's cards")
         XCTAssertTrue(app.buttons["RoomFloor"].exists, "Main's messages lie behind them")
         XCTAssertTrue(app.buttons["roomMic"].exists)
-        XCTAssertFalse(app.textViews["composerField"].exists, "no chat while at rest")
+        XCTAssertFalse(app.textViews["composerField"].isHittable, "the chat's input is put away while it lies down")
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'reply-in-thread-'")).firstMatch.exists,
                        "the resting chat is hidden from VoiceOver")
         shot("1-rest")
@@ -45,7 +49,7 @@ final class RoomUITests: ServerIsolatedUITestCase {
         shot("2-talk")
         app.buttons["roomLayDown"].tap()
         XCTAssertTrue(app.buttons["roomInput"].waitForExistence(timeout: 10), "back to the room")
-        XCTAssertTrue(field.waitForNonExistence(timeout: 10))
+        XCTAssertFalse(field.isHittable)
         XCTAssertFalse(app.keyboards.firstMatch.exists)
     }
 
@@ -63,6 +67,30 @@ final class RoomUITests: ServerIsolatedUITestCase {
         let gap = (cells[0].frame.maxY + cells[1].frame.minY) / 2
         app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 200, dy: gap)).tap()
         XCTAssertTrue(app.buttons["roomInput"].waitForExistence(timeout: 10), "a tap between messages lays it down")
+    }
+
+    func testADragOnTheFloorScrollsItAndATapStandsItUp() {
+        launch()
+        let floor = app.buttons["RoomFloor"]
+        XCTAssertTrue(floor.waitForExistence(timeout: 10))
+        let box = floor.frame
+        let strip = CGRect(x: box.minX, y: box.maxY - 160, width: box.width, height: 120)
+        func floorImage() -> Data {
+            let shot = XCUIScreen.main.screenshot().image
+            let scale = shot.scale
+            let crop = shot.cgImage!.cropping(to: CGRect(x: strip.minX * scale, y: strip.minY * scale, width: strip.width * scale, height: strip.height * scale))!
+            return UIImage(cgImage: crop).pngData()!
+        }
+        sleep(1)
+        let before = floorImage()
+        let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: box.midX, dy: box.maxY - 140))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 220)))
+        sleep(1)
+        XCTAssertTrue(app.buttons["roomInput"].exists, "a drag doesn't stand it up")
+        XCTAssertNotEqual(floorImage(), before, "the drag scrolled the lying chat back")
+        shot("1-rest-scrolled")
+        app.standRoomChat()
+        XCTAssertTrue(app.buttons["roomLayDown"].waitForExistence(timeout: 10) || app.textViews["composerField"].isHittable, "a tap stands it up")
     }
 
     func testTheFloorStandsTheChatUpToo() {
@@ -127,14 +155,26 @@ final class RoomUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(other.waitForExistence(timeout: 15))
         other.tap()
         XCTAssertTrue(app.textViews["composerField"].waitForExistence(timeout: 15), "the conversation opens")
-        app.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
+        if app.buttons["folded-back"].exists {
+            app.buttons["folded-back"].tap()
+        } else {
+            app.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()
+        }
         XCTAssertTrue(app.buttons["roomInput"].waitForExistence(timeout: 10), "back to the room")
     }
 
     func testMotionForTheRecording() throws {
         guard ProcessInfo.processInfo.environment["ROOM_MOTION"] != nil else { throw XCTSkip("only for the screen recording") }
-        launch(ProcessInfo.processInfo.environment["ROOM_MOTION"] == "reduce" ? ["-qaReduceMotion"] : [])
+        var extra = ProcessInfo.processInfo.environment["ROOM_MOTION"] == "reduce" ? ["-qaReduceMotion"] : []
+        if let count = ProcessInfo.processInfo.environment["ROOM_MESSAGES"] { extra += ["-qaDemoMessages", count] }
+        launch(extra)
         sleep(2)
+        let floor = app.buttons["RoomFloor"].frame
+        let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: floor.midX, dy: floor.maxY - 140))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 240)))
+        sleep(1)
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -240)))
+        sleep(1)
         for _ in 0..<2 {
             app.buttons["roomInput"].tap()
             XCTAssertTrue(app.textViews["composerField"].waitForExistence(timeout: 10))
@@ -151,6 +191,26 @@ final class RoomUITests: ServerIsolatedUITestCase {
         sleep(1)
         app.buttons["roomMenuClose"].tap()
         sleep(2)
+    }
+
+    func testChoosingAThemeRestylesTheRoom() {
+        launch()
+        let scene = any("roomScene")
+        XCTAssertTrue(scene.waitForExistence(timeout: 10))
+        let before = scene.value as? String
+        let target = before == "aurora-fjord" ? "tonights-sky" : "aurora-fjord"
+        app.buttons["roomMenuButton"].tap()
+        let theme = app.buttons["roomTheme"]
+        XCTAssertTrue(theme.waitForExistence(timeout: 10))
+        theme.tap()
+        let choice = app.buttons["roomTheme-\(target)"]
+        XCTAssertTrue(choice.waitForExistence(timeout: 10))
+        choice.tap()
+        let restyled = NSPredicate(format: "value == %@", target)
+        expectation(for: restyled, evaluatedWith: scene)
+        waitForExpectations(timeout: 15)
+        app.buttons["roomMenuClose"].tap()
+        shot("9-theme-changed")
     }
 
     func testReduceMotionStillStandsUpAndLaysDown() {

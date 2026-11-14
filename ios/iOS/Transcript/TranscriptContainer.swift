@@ -14,6 +14,10 @@ final class TranscriptHandle {
 
     func jumpToLatest(animated: Bool = true) { controller?.jumpToLatest(animated: animated) }
 
+    func scroll(by delta: CGFloat) { controller?.scroll(by: delta) }
+
+    func endScroll() { controller?.endScroll() }
+
     func scrollTo<ID: Hashable>(_ id: ID, position: TranscriptRowPosition = .top, animated: Bool = false) {
         controller?.scrollTo(AnyHashable(id), position: position, animated: animated)
     }
@@ -49,6 +53,7 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
     var pill: (TranscriptPillState, @escaping () -> Void) -> Pill
     var onNearTop: (() -> Void)?
     var onEmptyTap: (() -> Void)?
+    var rowsHidden = false
     var onPillChange: ((TranscriptPillState) -> Void)?
     var log: ((String) -> Void)?
     var dismissKeyboard: ((UIWindow) -> Void)?
@@ -77,6 +82,7 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         let coordinator = context.coordinator
         controller.onNearTop = onNearTop
         controller.onEmptyTap = onEmptyTap
+        controller.rowsHidden = rowsHidden
         controller.onPillChange = onPillChange
         controller.log = log
         if let dismissKeyboard { controller.dismissKeyboard = dismissKeyboard }

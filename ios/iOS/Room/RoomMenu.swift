@@ -71,8 +71,8 @@ struct RoomMenu: View {
                 .accessibilityIdentifier("roomWorkingNow")
             }
             HStack(spacing: 22) {
-                Button("Theme", action: theme).accessibilityIdentifier("roomTheme")
-                Button("Settings", action: settings).accessibilityIdentifier("roomSettings")
+                Button(action: theme) { Text("Theme").frame(minHeight: 44).contentShape(.rect) }.accessibilityIdentifier("roomTheme")
+                Button(action: settings) { Text("Settings").frame(minHeight: 44).contentShape(.rect) }.accessibilityIdentifier("roomSettings")
             }
             .font(.subheadline)
             .foregroundStyle(.white.opacity(0.65))
@@ -122,6 +122,8 @@ struct RoomPlaceSheet: View {
     var open: (BotShellItem) -> Void
     var startedConversation: (String) -> Void
     var closeToRoom: () -> Void
+    var theme: String = ""
+    var chooseTheme: (String) -> Void = { _ in }
     @EnvironmentObject private var app: AppModel
     @Environment(\.look) private var look
 
@@ -147,6 +149,8 @@ struct RoomPlaceSheet: View {
             LibraryPageView(botId: bot.id, open: open, tiles: true)
         case .schedules:
             BotAutomationsSheet(botId: bot.id, botName: bot.name, embedded: true).id(bot.id)
+        case .theme:
+            RoomThemePicker(bot: bot, current: theme, choose: chooseTheme)
         case .archive:
             ArchivePageView(botId: bot.id, open: open, refresh: { Task { await store.refresh() } })
         case .conversations:

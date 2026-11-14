@@ -150,7 +150,7 @@ final class ThreadModel: ObservableObject {
     /// `shownRows` grouped into the timeline's items, once per change.
     var shownItems: [TimelineItem] {
         if let itemsMemo { return itemsMemo }
-        let items = TimelineItem.group(shownRows)
+        let items = TimelineItem.group(shownRows.filter { !$0.isQuietThought })
         itemsMemo = items
         return items
     }

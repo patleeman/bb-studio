@@ -5,6 +5,7 @@ final class RoomSession: ObservableObject {
     let threadId: String
     let model: ThreadModel
     let talk: HoldToTalk
+    weak var transcript: TranscriptHandle?
 
     init(threadId: String) {
         self.threadId = threadId
@@ -58,21 +59,38 @@ struct RoomView: View {
     @ObservedObject var shell: BotShellModel
     let bot: BotSpace
     let mainThreadId: String
-    @StateObject private var session: RoomSession
+    @StateObject private var pager: RoomSessions
     @State private var room = RoomModel()
+    @State private var dragAxis: RoomPager.Axis?
+    @State private var pageOffset: CGFloat = 0
+    @State private var slide: Edge = .trailing
+    @State private var nudge: CGFloat = 0
+    @State private var toast: String?
     @State private var morning: LoopMorning?
-    @State private var theming = false
-    @State private var chatMounted = false
+    @State private var dragLast: CGFloat = 0
+    @State private var floorTop: CGFloat = 0
+    @State private var inheritedTrailing: CGFloat = 0
     @Environment(\.look) private var look
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.scenePhase) private var phase
+    @Environment(\.duoPage) private var duoPage
 
-    init(store: BotSpacesStore, shell: BotShellModel, bot: BotSpace, mainThreadId: String) {
+    var workbench: Workbench?
+
+    init(store: BotSpacesStore, shell: BotShellModel, bot: BotSpace, mainThreadId: String, workbench: Workbench? = nil) {
         self.store = store
         self.shell = shell
         self.bot = bot
         self.mainThreadId = mainThreadId
-        _session = StateObject(wrappedValue: RoomSession(threadId: mainThreadId))
+        self.workbench = workbench
+        _pager = StateObject(wrappedValue: RoomSessions(main: mainThreadId))
+    }
+
+    private var session: RoomSession { pager.current }
+    private var columnHeader: Bool { FoldedChrome.columnHeader || duoPage }
+    private var order: [String] { RoomPager.order(main: mainThreadId, conversations: view?.conversations ?? []) }
+    private var shownConversation: BotConversation? {
+        pager.shown == mainThreadId ? nil : view?.conversations.first { $0.threadId == pager.shown }
     }
 
     private var view: BotThreadsView? { store.view(for: bot.id) }
@@ -81,11 +99,17 @@ struct RoomView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            NavigationStack(path: $shell.detailPath) {
+            NavigationStack(path: workbench == nil ? $shell.detailPath : .constant([])) {
                 stage(proxy)
-                    .toolbar(room.standing ? .visible : .hidden, for: .navigationBar)
+                    .safeAreaPadding(.trailing, duoPage ? max(0, FoldedChrome.column - inheritedTrailing) : 0)
+                    .background {
+                        GeometryReader { box in
+                            Color.clear.onChange(of: box.safeAreaInsets.trailing, initial: true) { _, inset in inheritedTrailing = inset }
+                        }
+                    }
+                    .toolbar(room.standing && !columnHeader ? .automatic : .hidden, for: .navigationBar)
                     .toolbar {
-                        if room.standing {
+                        if room.standing && !columnHeader {
                             ToolbarItem(placement: .topBarLeading) {
                                 Button { layDown() } label: { Image(systemName: "chevron.down") }
                                     .accessibilityLabel("Back to the room")
@@ -94,25 +118,38 @@ struct RoomView: View {
                         }
                     }
                     .navigationDestination(for: Route.self) { route in destination(route) }
+
             }
             .sheet(item: placeBinding) { place in
                 RoomPlaceSheet(place: place, bot: bot, store: store, mainThreadId: mainThreadId, todayCount: todayCount,
                                open: openItem, startedConversation: { id in openItem(.conversation(id)) },
-                               closeToRoom: { room.show(.rest) })
+                               closeToRoom: { room.show(.rest) }, theme: look.theme.id, chooseTheme: chooseTheme)
                     .presentationDetents([.height(max(320, proxy.size.height + proxy.safeAreaInsets.bottom - RoomPlaceSheet.sliver))])
                     .presentationCornerRadius(14)
                     .presentationDragIndicator(.visible)
                     .presentationBackground(look.canvas)
-            }
-            .sheet(isPresented: $theming) {
-                NavigationStack { LookSettingsView() }
-                    .presentationDragIndicator(.visible)
             }
         }
         .background {
             RoomTalkWatcher(talk: session.talk) { state in
                 withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .snappy) { room.sync(talk: state) }
             } failed: { app.flash($0) }
+        }
+        .onChange(of: shell.detailPath, initial: true) { _, _ in moveToWorkbench() }
+        .onChange(of: workbench != nil) { _, _ in moveToWorkbench() }
+        .onChange(of: room.place) { _, place in
+            guard let workbench, let place else { return }
+            workbench.open(.place(place))
+            room.show(.rest)
+        }
+        .onChange(of: duoPage) { _, _ in
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
+        .onChange(of: shell.roomStandUp) { _, stand in
+            guard stand else { return }
+            shell.roomStandUp = false
+            room.show(.rest)
+            room.handle(.tapFloor)
         }
         .onChange(of: shell.roomOpen, initial: true) { _, page in
             guard let page else { return }
@@ -123,44 +160,130 @@ struct RoomView: View {
             guard phase == .active else { return }
             await loadMorning()
         }
-        .onChange(of: room.standing) { _, standing in mountChat(standing) }
+        .onChange(of: bot.appearance?.themeId) { _, saved in
+            if let saved, shell.themeOverride[bot.id] == saved { shell.themeOverride[bot.id] = nil }
+        }
         .task { applyQAMode() }
-        .task { await session.start(app) }
-        .onDisappear { session.stop() }
+        .task(id: pager.shown) { await session.start(app) }
+        .onDisappear { pager.current.stop() }
+        .overlay(alignment: .top) {
+            if let toast {
+                Text(toast).font(.headline).foregroundStyle(.white)
+                    .padding(.horizontal, 16).padding(.vertical, 8)
+                    .background(.black.opacity(0.45), in: .capsule)
+                    .padding(.top, 8)
+                    .transition(.opacity)
+                    .accessibilityIdentifier("roomBotToast")
+            }
+        }
+        .task {
+            guard let name = shell.botToast, name == bot.name else { return }
+            shell.botToast = nil
+            withAnimation(.easeInOut(duration: 0.2)) { toast = name }
+            try? await Task.sleep(for: .milliseconds(1400))
+            withAnimation(.easeInOut(duration: 0.3)) { toast = nil }
+        }
         .modifier(TalkLifecycle(talk: session.talk))
     }
 
+    static let tilt: Double = 31
+    static let perspective: CGFloat = 0.45
+
     private func stage(_ proxy: GeometryProxy) -> some View {
-        ZStack {
-            if chatMounted { chat.transition(.opacity) }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-            ZStack {
-                SceneBackdrop(theme: look.theme, botId: bot.id, view: view)
-                Rectangle().fill(.black.opacity(room.standing ? 0.5 : room.showsMenu ? 0.35 : 0))
-                    .ignoresSafeArea()
-                    .animation(.easeInOut(duration: 0.35), value: room.mode)
+        chat
+            .rotation3DEffect(.degrees(room.standing ? 0 : Self.tilt), axis: (x: 1, y: 0, z: 0), anchor: .bottom, perspective: Self.perspective)
+            .mask {
+                GeometryReader { box in
+                    let top = room.standing ? 0 : max(0, floorTop - box.frame(in: .global).minY)
+                    VStack(spacing: 0) {
+                        Color.clear.frame(height: top)
+                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: room.standing ? 0 : 90)
+                        Color.black
+                    }
+                }
+                .ignoresSafeArea()
             }
-            .allowsHitTesting(false)
-        }
-        .overlay { restLayers(proxy) }
+            .opacity(room.showsMenu ? 0 : 1)
+            .animation(reduceMotion ? nil : .spring(response: 0.6, dampingFraction: 0.9), value: room.standing)
+            .animation(.easeInOut(duration: 0.3), value: room.showsMenu)
+            .allowsHitTesting(room.standing)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background {
+                ZStack {
+                    SceneBackdrop(theme: look.theme, botId: bot.id, view: view)
+                    #if DEBUG
+                    Color.clear.frame(width: 1, height: 1).accessibilityElement().accessibilityIdentifier("roomScene").accessibilityValue(look.theme.id)
+                    #endif
+                    Rectangle().fill(.black.opacity(room.standing ? 0.5 : room.showsMenu ? 0.35 : 0.18))
+                        .ignoresSafeArea()
+                        .animation(.easeInOut(duration: 0.35), value: room.mode)
+                }
+                .allowsHitTesting(false)
+            }
+            .overlay { restLayers(proxy) }
+    }
+
+    private var floorGestures: some View {
+        Color.clear
+            .contentShape(.rect)
+            .gesture(DragGesture(minimumDistance: 6)
+                .onChanged { value in
+                    if dragAxis == nil { dragAxis = RoomPager.axis(value.translation) }
+                    switch dragAxis {
+                    case .vertical:
+                        let step = value.translation.height - dragLast
+                        dragLast = value.translation.height
+                        session.transcript?.scroll(by: step / cos(Self.tilt * .pi / 180))
+                    case .horizontal:
+                        let edge = RoomPager.step(order, from: pager.shown, by: value.translation.width < 0 ? 1 : -1) == nil
+                        pageOffset = value.translation.width * (edge ? 0.25 : 0.6)
+                    case nil:
+                        break
+                    }
+                }
+                .onEnded { value in
+                    if dragAxis == .horizontal {
+                        page(RoomPager.page(after: value.translation, predicted: value.predictedEndTranslation))
+                    } else {
+                        session.transcript?.endScroll()
+                    }
+                    dragAxis = nil
+                    dragLast = 0
+                })
+            .onTapGesture { if room.mode == .rest { room.handle(.tapFloor) } }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Main conversation")
+            .accessibilityHint("Opens the conversation")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { room.handle(.tapFloor) }
+            .accessibilityValue(order.count > 1 ? "Conversation \((order.firstIndex(of: pager.shown) ?? 0) + 1) of \(order.count)" : "")
+            .accessibilityAdjustableAction { direction in page(direction == .increment ? 1 : -1) }
+            .accessibilityIdentifier("RoomFloor")
     }
 
     private func restLayers(_ proxy: GeometryProxy) -> some View {
         ZStack(alignment: .bottom) {
-            if !chatMounted || !room.standing {
-                floor(min(430, proxy.size.height * 0.5))
+            if room.mode == .rest {
+                floorGestures
             }
             if room.showsDay {
-                RoomDayView(bot: bot, view: view, model: session.model, morning: morning, openMenu: openMenu,
-                            openTodos: { room.showPlace(.todos) }, done: done)
+                RoomDayView(bot: bot, view: view, model: session.model, morning: shownConversation == nil ? morning : nil,
+                            conversation: shownConversation, openMenu: openMenu,
+                            openTodos: { room.showPlace(.todos) }, done: done, reportBottom: { floorTop = $0 },
+                            switchBot: switchBot, nudge: nudge, canSwitch: (store.spaces?.bots.count ?? 1) > 1)
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: -40)).combined(with: .scale(scale: 0.97, anchor: .top)))
+            }
+            if room.showsDay && columnHeader {
+                FoldedColumn {
+                    Button(action: openMenu) { Label("Everything else", systemImage: "line.3.horizontal") }
+                        .accessibilityIdentifier("roomMenuButton")
+                }
+                .transition(.opacity)
             }
             if room.showsMenu {
                 RoomMenu(bot: bot, store: store, view: view, todayCount: todayCount, close: closeMenu,
                          openPlace: { room.handle(.open($0)) }, openWorker: { openItem(.worker($0)) },
-                         theme: { theming = true }, settings: { app.tab = .settings },
+                         theme: { room.handle(.open(.theme)) }, settings: openSettings,
                          switchBot: { shell.show($0, store: store, compact: false) })
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.97)))
             }
@@ -181,64 +304,68 @@ struct RoomView: View {
     }
 
     private var chat: some View {
-        ThreadView(threadId: mainThreadId, session: session)
-            .environment(\.botConversation, context(mainThreadId, kind: .conversation))
-            .environment(\.roomChat, RoomChat(focusRequests: room.focusRequests, layDown: layDown))
+        ZStack {
+            ThreadView(threadId: pager.shown, session: session)
+                .id(pager.shown)
+                .transition(reduceMotion ? .opacity : .push(from: slide))
+        }
+        .environment(\.botConversation, context(pager.shown, kind: .conversation))
+        .environment(\.roomChat, RoomChat(focusRequests: room.focusRequests, lying: !room.standing, layDown: layDown))
+        .offset(x: pageOffset)
     }
 
-    private func mountChat(_ standing: Bool) {
-        guard standing else {
-            withAnimation(.easeOut(duration: reduceMotion ? 0.2 : 0.14)) { chatMounted = false }
+    private func page(_ step: Int) {
+        let next = step == 0 ? nil : RoomPager.step(order, from: pager.shown, by: step)
+        guard let next else {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { pageOffset = 0 }
             return
         }
-        Task {
-            try? await Task.sleep(for: .milliseconds(reduceMotion ? 100 : 320))
-            guard room.standing else { return }
-            withAnimation(.easeIn(duration: 0.2)) { chatMounted = true }
+        slide = step > 0 ? .trailing : .leading
+        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.45, dampingFraction: 0.9)) {
+            pageOffset = 0
+            pager.show(next)
         }
     }
 
-    private func floor(_ height: CGFloat) -> some View {
-        RoomFloorView(model: session.model, look: look)
-            .padding(.horizontal, 18)
-            .frame(maxWidth: 640)
-            .frame(height: height, alignment: .bottom)
-            .rotation3DEffect(.degrees(room.standing && !reduceMotion ? 0 : 62), axis: (x: 1, y: 0, z: 0), anchor: .bottom, perspective: 0.55)
-            .mask {
-                LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: room.standing ? 0.85 : 0.3),
-                                       .init(color: .clear, location: room.standing ? 1 : 0.92)], startPoint: .bottom, endPoint: .top)
+    private func switchBot(_ step: Int) {
+        guard let next = BotShell.step(store.spaces, from: bot.id, by: step) else {
+            guard !reduceMotion else { return }
+            withAnimation(.spring(response: 0.18, dampingFraction: 0.5)) { nudge = CGFloat(-step) * 22 }
+            Task {
+                try? await Task.sleep(for: .milliseconds(180))
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) { nudge = 0 }
             }
-            .opacity(chatMounted || room.showsMenu ? 0 : 0.92)
-            .animation(floorAnimation, value: room.mode)
-            .animation(.easeInOut(duration: 0.25), value: chatMounted)
-            .padding(.bottom, 8)
-            .contentShape(.rect)
-            .onTapGesture { if room.mode == .rest { room.handle(.tapFloor) } }
-            .allowsHitTesting(room.mode == .rest)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Main conversation, last messages")
-            .accessibilityHint("Opens the conversation")
-            .accessibilityAddTraits(.isButton)
-            .accessibilityIdentifier("RoomFloor")
-            .accessibilityHidden(room.standing || room.showsMenu)
+            return
+        }
+        shell.botToast = store.spaces?.bots.first { $0.id == next }?.name
+        withAnimation(.easeInOut(duration: reduceMotion ? 0.25 : 0.4)) { shell.show(next, store: store, compact: false) }
     }
 
-    private var floorAnimation: Animation {
-        if reduceMotion { return .easeInOut(duration: 0.2) }
-        return room.standing ? .spring(response: 0.6, dampingFraction: 0.9) : .spring(response: 0.6, dampingFraction: 0.9).delay(0.1)
+    private var pageDots: some View {
+        HStack(spacing: 6) {
+            ForEach(order, id: \.self) { id in
+                Capsule().fill(.white.opacity(id == pager.shown ? 0.9 : 0.35))
+                    .frame(width: id == pager.shown ? 14 : 6, height: 6)
+            }
+        }
+        .animation(.snappy, value: pager.shown)
+        .accessibilityHidden(true)
+        .accessibilityIdentifier("roomPageDots")
     }
 
     private var dock: some View {
         VStack(spacing: 10) {
             if room.mode.recording {
                 RoomHint(talk: session.talk).transition(.opacity)
+            } else if order.count > 1 {
+                pageDots
             }
             HStack(spacing: 10) {
                 if room.mode.recording {
                     RoomWave(talk: session.talk)
                 } else {
                     Button { stand() } label: {
-                        Text("Message \(bot.name)")
+                        Text(shownConversation.map { "Message · " + ($0.title.isEmpty ? "Untitled" : $0.title) } ?? "Message \(bot.name)")
                             .font(.body)
                             .foregroundStyle(.white.opacity(0.55))
                             .lineLimit(1)
@@ -249,7 +376,7 @@ struct RoomView: View {
                             .contentShape(.capsule)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Message \(bot.name)")
+                    .accessibilityLabel(shownConversation.map { "Message " + $0.title } ?? "Message \(bot.name)")
                     .accessibilityIdentifier("roomInput")
                 }
                 RoomMic(talk: session.talk)
@@ -262,7 +389,22 @@ struct RoomView: View {
     }
 
     private var placeBinding: Binding<RoomPlace?> {
-        Binding(get: { room.place }, set: { value in if value == nil { room.handle(.closePlace) } })
+        Binding(get: { workbench == nil ? room.place : nil }, set: { value in if value == nil { room.handle(.closePlace) } })
+    }
+
+    private func moveToWorkbench() {
+        guard let workbench, !shell.detailPath.isEmpty else { return }
+        workbench.open(routes: shell.detailPath)
+        shell.detailPath = []
+    }
+
+    private func openSettings() {
+        guard let workbench else {
+            app.tab = .settings
+            return
+        }
+        workbench.open(.settings)
+        closeMenu()
     }
 
     private func stand() {
@@ -309,6 +451,24 @@ struct RoomView: View {
         }
     }
 
+    private func chooseTheme(_ themeId: String) {
+        Self.chooseTheme(themeId, bot: bot, shell: shell, store: store, app: app)
+    }
+
+    static func chooseTheme(_ themeId: String, bot: BotSpace, shell: BotShellModel, store: BotSpacesStore, app: AppModel) {
+        let previous = shell.themeOverride[bot.id]
+        shell.themeOverride[bot.id] = themeId
+        Task {
+            do {
+                try await app.client.setBotTheme(botId: bot.id, themeId: themeId, keeping: bot.appearance)
+                await store.refresh()
+            } catch {
+                shell.themeOverride[bot.id] = previous
+                app.flash("The theme didn't change: " + BBClient.describe(error))
+            }
+        }
+    }
+
     private func done(_ id: String) {
         Task {
             _ = try? await LoopsModel.shared.perform(id, .done)
@@ -333,7 +493,7 @@ struct RoomView: View {
     }
 
     private func context(_ threadId: String, kind: BotConversationContext.Kind) -> BotConversationContext {
-        BotShell.context(threadId: threadId, kind: kind, bot: bot, view: view, splitsThreads: false,
+        BotShell.context(threadId: threadId, kind: kind, bot: bot, view: view, splitsThreads: workbench != nil,
                          push: { [shell] route in shell.detailPath.append(route) },
                          openConversation: { id in openItem(.conversation(id)) },
                          showList: { [shell] in
@@ -347,6 +507,7 @@ struct RoomView: View {
         guard let mode = RoomQA.mode else { return }
         switch mode {
         case "talk": room.handle(.tapInput)
+        case "read": room.handle(.tapFloor)
         case "record", "recordLocked":
             #if DEBUG
             session.talk.qaPretend(mode == "record" ? .recording : .handsFree)
@@ -355,32 +516,6 @@ struct RoomView: View {
         default:
             if let place = RoomPlace(rawValue: mode) { room.show(.menu, place: place) }
         }
-    }
-}
-
-struct RoomFloorView: View {
-    @ObservedObject var model: ThreadModel
-    let look: Look
-
-    var body: some View {
-        VStack(spacing: 12) {
-            ForEach(RoomFloor.lines(model.rows)) { line in
-                Text(line.text)
-                    .font(.body)
-                    .lineLimit(2)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, line.who == .me ? 13 : 0)
-                    .padding(.vertical, line.who == .me ? 9 : 0)
-                    .background {
-                        if line.who == .me { UnevenRoundedRectangle(cornerRadii: .init(topLeading: 18, bottomLeading: 18, bottomTrailing: 4, topTrailing: 18)).fill(look.accent.opacity(0.55)) }
-                    }
-                    .frame(maxWidth: 520, alignment: line.who == .me ? .trailing : .leading)
-                    .frame(maxWidth: .infinity, alignment: line.who == .me ? .trailing : .leading)
-                    .padding(line.who == .me ? .leading : .trailing, 40)
-                    .lookHalo(look)
-            }
-        }
-        .frame(maxHeight: .infinity, alignment: .bottom)
     }
 }
 
@@ -412,27 +547,38 @@ struct RoomDayView: View {
     let bot: BotSpace
     let view: BotThreadsView?
     @ObservedObject var model: ThreadModel
+    @Environment(\.duoPage) private var duoPage
     let morning: LoopMorning?
+    var conversation: BotConversation? = nil
     var openMenu: () -> Void
     var openTodos: () -> Void
     var done: (String) -> Void
+    var reportBottom: (CGFloat) -> Void = { _ in }
+    var switchBot: (Int) -> Void = { _ in }
+    var nudge: CGFloat = 0
+    var canSwitch = false
     @Environment(\.look) private var look
 
     private var day: RoomDay.Line {
-        RoomDay.line(rows: model.rows, todayCount: morning.map { $0.items.count + $0.more }, status: BotShell.status(bot, view: view))
+        if let conversation {
+            return RoomDay.Line(lead: (conversation.title.isEmpty ? "Untitled" : conversation.title) + ".",
+                                rest: conversation.latest.map(RoomFloor.plain).flatMap { $0.isEmpty ? nil : $0 })
+        }
+        return RoomDay.line(rows: model.rows, todayCount: morning.map { $0.items.count + $0.more }, status: BotShell.status(bot, view: view))
     }
 
-    static func fit(height: CGFloat) -> (cards: Int, presence: CGFloat) {
-        switch height {
-        case 680...: (5, 150)
-        case 600..<680: (3, 130)
-        default: (2, 100)
+    static func fit(_ size: CGSize) -> (cards: Int, presence: CGFloat) {
+        let cards = switch size.height {
+        case 680...: 5
+        case 600..<680: 3
+        default: 2
         }
+        return (cards, (min(size.width * 0.28, size.height * 0.16)).rounded())
     }
 
     var body: some View {
         GeometryReader { proxy in
-            content(Self.fit(height: proxy.size.height))
+            content(Self.fit(proxy.size))
         }
     }
 
@@ -445,20 +591,32 @@ struct RoomDayView: View {
                     .foregroundStyle(.white.opacity(0.72))
                     .lookHalo(look)
                 Spacer()
-                Button(action: openMenu) {
-                    Image(systemName: "line.3.horizontal").font(.body.weight(.semibold)).frame(width: 44, height: 44)
+                if !(FoldedChrome.columnHeader || duoPage) {
+                    Button(action: openMenu) {
+                        Image(systemName: "line.3.horizontal").font(.body.weight(.semibold)).frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .lookGlass(look, \.hud, in: .circle, interactive: true)
+                    .accessibilityLabel("Everything else")
+                    .accessibilityIdentifier("roomMenuButton")
                 }
-                .buttonStyle(.plain)
-                .lookGlass(look, \.hud, in: .circle, interactive: true)
-                .accessibilityLabel("Everything else")
-                .accessibilityIdentifier("roomMenuButton")
             }
+            .frame(minHeight: 44)
             PresenceView(bot: bot, state: bot.presenceState(live: view),
-                         workers: view?.workers.filter { $0.status == .running }.count ?? bot.activity.workers, size: fit.presence)
+                         workers: view?.workers.filter { $0.status == .running }.count ?? bot.activity.workers, size: fit.presence,
+                         room: PresenceSpec.roomHeadroom)
+                .offset(x: nudge)
                 .frame(maxWidth: .infinity)
-                .frame(height: fit.presence + 18)
+                .frame(height: fit.presence * PresenceSpec.roomHeadroom)
+                .contentShape(.rect)
+                .gesture(DragGesture(minimumDistance: 20).onEnded { value in
+                    guard abs(value.translation.width) > 50, abs(value.translation.width) > abs(value.translation.height) * 1.5 else { return }
+                    switchBot(value.translation.width < 0 ? 1 : -1)
+                })
                 .accessibilityElement()
                 .accessibilityLabel("\(bot.name), \(BotShell.status(bot, view: view))")
+                .accessibilityHint(canSwitch ? "Swipe up or down to switch Bots" : "")
+                .accessibilityAdjustableAction { direction in switchBot(direction == .increment ? 1 : -1) }
             (Text(day.lead + (day.rest == nil ? "" : " ")) + Text(day.rest ?? "").foregroundStyle(.white.opacity(0.62)).fontWeight(.medium))
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(.white)
@@ -467,12 +625,13 @@ struct RoomDayView: View {
                 .frame(maxWidth: 360, alignment: .leading)
                 .lookHalo(look)
                 .accessibilityIdentifier("roomDayLine")
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 ForEach((morning?.items ?? []).prefix(fit.cards)) { item in
                     RoomCard(item: item, open: openTodos, done: { done(item.id) })
                 }
             }
             .padding(.top, 18)
+            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { reportBottom($0) }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 22)
@@ -495,26 +654,28 @@ struct RoomCard: View {
                 closing = true
                 done()
             } label: {
-                Circle().strokeBorder(.white.opacity(0.45), lineWidth: 1.5)
-                    .overlay { if closing { Image(systemName: "checkmark").font(.caption.weight(.bold)) } }
-                    .frame(width: 22, height: 22)
-                    .frame(width: 44, height: 52)
+                Circle().strokeBorder(.white.opacity(0.5), lineWidth: 1.2)
+                    .overlay { if closing { Image(systemName: "checkmark").font(.caption2.weight(.bold)) } }
+                    .frame(width: 17, height: 17)
+                    .frame(width: 40, height: 44)
                     .contentShape(.rect)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Done: \(item.title)")
             Button(action: open) {
-                Text(item.title).font(.body).foregroundStyle(.white).lineLimit(2)
-                    .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-                    .padding(.trailing, 14)
+                Text(item.title).font(.subheadline).foregroundStyle(.white.opacity(0.92)).lineLimit(2)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .padding(.trailing, 12)
                     .contentShape(.rect)
+                    .lookHalo(look)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("roomCard-\(item.id)")
         }
-        .padding(.leading, 4)
-        .background(look.canvas.opacity(0.86), in: .rect(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.white.opacity(0.07)))
+        .padding(.leading, 2)
+        .background(look.canvas.opacity(0.28), in: .rect(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
         .opacity(closing ? 0.5 : 1)
     }
 }

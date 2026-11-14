@@ -3,7 +3,7 @@ import Observation
 import SwiftUI
 
 enum RoomPlace: String, CaseIterable, Identifiable, Hashable {
-    case todos, conversations, memory, library, schedules, archive
+    case todos, conversations, memory, library, schedules, archive, theme
 
     static let menu: [RoomPlace] = [.todos, .conversations, .memory, .library, .schedules]
 
@@ -17,6 +17,7 @@ enum RoomPlace: String, CaseIterable, Identifiable, Hashable {
         case .library: "Library"
         case .schedules: "Schedules"
         case .archive: "Archive"
+        case .theme: "Theme"
         }
     }
 }
@@ -129,27 +130,25 @@ enum RoomTheme {
     }
 }
 
-struct RoomLine: Equatable, Identifiable {
-    enum Who: Equatable { case me, bot }
-    var id: String
-    var who: Who
-    var text: String
-}
-
 enum RoomFloor {
-    static let count = 6
-
-    static func lines(_ rows: [TimelineRow], count: Int = count) -> [RoomLine] {
-        var out: [RoomLine] = []
-        for row in rows.reversed() where out.count < count {
-            guard row.kind == "conversation", let role = row.role, role == "user" || role == "assistant",
-                  row.initiator == nil || row.initiator == "user" || role == "assistant" else { continue }
-            guard !LoopDirective.isMorning(LoopDirective.all(in: row.text ?? "")) else { continue }
-            let text = plain(row.text ?? "")
-            guard !text.isEmpty else { continue }
-            out.append(RoomLine(id: row.id, who: role == "user" ? .me : .bot, text: text))
+    static func clean(_ items: [TimelineItem]) -> [TimelineItem] {
+        items.compactMap { item in
+            guard case .message(var row) = item, row.kind == "conversation", let text = row.text, text.contains("["),
+                  text.components(separatedBy: "\n").contains(where: isStatusToken) else { return item }
+            let kept = text.components(separatedBy: "\n").filter { !isStatusToken($0) }
+            let joined = kept.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !joined.isEmpty || row.hasAttachments else { return nil }
+            row.text = joined
+            return .message(row)
         }
-        return out.reversed()
+    }
+
+    static func rows(_ rows: [ThreadTranscriptRow]) -> [ThreadTranscriptRow] {
+        rows.compactMap { row in
+            guard case .item(.message(let message), _) = row else { return row }
+            if let event = BotChatEntry.childEvent(message) { return .bot(.child(event, id: message.id), .init()) }
+            return BotChatEntry.shows(message) ? row : nil
+        }
     }
 
     static func isStatusToken(_ line: String) -> Bool {
@@ -212,6 +211,7 @@ enum RoomDay {
 
 struct RoomChat {
     var focusRequests: Int
+    var lying: Bool
     var layDown: () -> Void
 }
 
@@ -223,5 +223,58 @@ extension EnvironmentValues {
     var roomChat: RoomChat? {
         get { self[RoomChatKey.self] }
         set { self[RoomChatKey.self] = newValue }
+    }
+}
+
+enum RoomPager {
+    static let swipe: CGFloat = 60
+
+    static func order(main: String, conversations: [BotConversation]) -> [String] {
+        var seen: Set<String> = [main]
+        let others = conversations.filter { !$0.isMain && $0.forkedFrom == nil }.sorted { $0.updatedAt > $1.updatedAt }
+        return [main] + others.compactMap { seen.insert($0.threadId).inserted ? $0.threadId : nil }
+    }
+
+    static func step(_ order: [String], from current: String, by step: Int) -> String? {
+        guard let at = order.firstIndex(of: current), order.indices.contains(at + step) else { return nil }
+        return order[at + step]
+    }
+
+    enum Axis: Equatable { case vertical, horizontal }
+
+    static func axis(_ translation: CGSize) -> Axis? {
+        guard max(abs(translation.width), abs(translation.height)) > 10 else { return nil }
+        return abs(translation.width) > abs(translation.height) * 1.2 ? .horizontal : .vertical
+    }
+
+    static func page(after translation: CGSize, predicted: CGSize) -> Int {
+        let distance = abs(predicted.width) > abs(translation.width) ? predicted.width : translation.width
+        guard abs(distance) > swipe else { return 0 }
+        return distance < 0 ? 1 : -1
+    }
+}
+
+@MainActor
+final class RoomSessions: ObservableObject {
+    @Published private(set) var shown: String
+    private var sessions: [String: RoomSession] = [:]
+
+    init(main: String) { shown = main }
+
+    var current: RoomSession { session(for: shown) }
+
+    func session(for threadId: String) -> RoomSession {
+        if let session = sessions[threadId] { return session }
+        let session = RoomSession(threadId: threadId)
+        sessions[threadId] = session
+        return session
+    }
+
+    func show(_ threadId: String) {
+        guard threadId != shown else { return }
+        let leaving = current
+        leaving.talk.end()
+        leaving.stop()
+        shown = threadId
     }
 }

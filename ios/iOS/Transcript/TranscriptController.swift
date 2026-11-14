@@ -81,6 +81,14 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     var onNearTop: (() -> Void)?
     var onEmptyTap: (() -> Void)?
+    var rowsHidden = false {
+        didSet {
+            guard rowsHidden != oldValue, isViewLoaded else { return }
+            collectionView.accessibilityElementsHidden = rowsHidden
+            composerHost.view.accessibilityElementsHidden = rowsHidden
+            topHost.view.accessibilityElementsHidden = rowsHidden
+        }
+    }
     var onPillChange: ((TranscriptPillState) -> Void)?
     /// Scroll log lines: geometry, numbers and ids only.
     var log: ((String) -> Void)?
@@ -162,6 +170,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
         let collectionView = TranscriptCollectionView(frame: view.bounds, collectionViewLayout: layout)
         self.collectionView = collectionView
+        collectionView.accessibilityElementsHidden = rowsHidden
         collectionView.backgroundColor = .clear
         collectionView.contentInsetAdjustmentBehavior = .never
         collectionView.automaticallyAdjustsScrollIndicatorInsets = false
@@ -452,6 +461,25 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     /// Goes to the end and stays there: from far up, a jump to a screen above
     /// the end (which lays the end out), then a short animation.
+    func scroll(by delta: CGFloat) {
+        guard let collectionView, delta != 0 else { return }
+        if !readerMoved { scrollViewWillBeginDragging(collectionView) }
+        let inset = collectionView.adjustedContentInset
+        let top = -inset.top
+        let bottom = max(top, collectionView.contentSize.height - collectionView.bounds.height + inset.bottom)
+        var offset = collectionView.contentOffset
+        offset.y = min(bottom, max(top, offset.y - delta))
+        collectionView.setContentOffset(offset, animated: false)
+        layout.readerRow = topRow()?.id
+        updatePill()
+        checkNearTop()
+    }
+
+    func endScroll() {
+        guard readerMoved else { return }
+        readerRested("drag")
+    }
+
     func jumpToLatest(animated: Bool = true) {
         loadViewIfNeeded()
         pendingScroll = nil

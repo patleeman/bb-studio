@@ -54,6 +54,7 @@ struct ThreadView: View {
     @State private var resizeAnchor = TranscriptResizeAnchor()
     @State private var resizeRestore: Task<Void, Never>?
     @Environment(\.duoLayout) private var duoLayout
+    @Environment(\.duoPage) private var duoPage
     @State private var pickingSendTime = false
     @State private var showingFiles = false
     @State private var showingHistory = false
@@ -73,8 +74,10 @@ struct ThreadView: View {
     @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
     @Environment(\.botConversation) private var shell
     @Environment(\.roomChat) private var roomEnvironment
-    private let inRoom: Bool
+    private let roomSession: RoomSession?
+    private var inRoom: Bool { roomSession != nil }
     private var roomChat: RoomChat? { inRoom ? roomEnvironment : nil }
+    private var lying: Bool { roomChat?.lying == true }
     @State private var sideThreads: [String: BotSideThread] = [:]
     /// Forks made here this session, kept on their message until Studio lists them.
     @State private var madeForks: [String: String] = [:]
@@ -114,7 +117,7 @@ struct ThreadView: View {
     init(threadId: String, hidesTabBar: Bool = true, botChrome: BotChrome? = nil, session: RoomSession? = nil) {
         self.hidesTabBar = hidesTabBar
         self.botChrome = botChrome
-        inRoom = session != nil
+        roomSession = session
         _talk = StateObject(wrappedValue: session?.talk ?? HoldToTalk(threadId: threadId))
         _model = StateObject(wrappedValue: session?.model ?? ThreadModel(threadId: threadId))
         _notes = StateObject(wrappedValue: ThreadNotes(threadId: threadId))
@@ -173,7 +176,7 @@ struct ThreadView: View {
             if let error { app.flash(error) }
         }
         .onChange(of: roomChat?.focusRequests, initial: true) { _, requests in
-            if let requests, requests > 0 { composerFocused = true }
+            if let requests, requests > 0, roomChat?.lying == false { composerFocused = true }
         }
     }
 
@@ -2027,17 +2030,23 @@ extension ThreadView {
                     ToolbarItem(placement: .principal) { WorkerTitle(info: worker) }
                 }
             }
-            .overlay { if compactHeader && botChrome == nil { FoldedColumn { compactActions } } }
+            .overlay { if compactHeader && botChrome == nil && !lying { FoldedColumn { compactActions } } }
+            .onAppear { roomSession?.transcript = transcriptV2 }
     }
 
     /// The folded Duo's header: its buttons in the right column and a one-line title (`FoldedChrome`).
-    fileprivate var compactHeader: Bool { FoldedChrome.columnHeader && !duoLayout.twoPages }
+    fileprivate var compactHeader: Bool { (FoldedChrome.columnHeader || duoPage) && !duoLayout.twoPages }
 
     @ViewBuilder fileprivate var compactActions: some View {
         // The Bot's chat has its buttons from the Bot tab (`BotTab`). A
         // thread: back out of whichever stack it's on, and its own actions.
         if botChrome == nil {
-            FoldedBackButton()
+            if let roomChat {
+                Button { roomChat.layDown() } label: { Label("Back to the room", systemImage: "chevron.down") }
+                    .accessibilityIdentifier("roomLayDown")
+            } else {
+                FoldedBackButton()
+            }
             threadActions
         }
     }
@@ -2046,11 +2055,12 @@ extension ThreadView {
         TranscriptContainer(
             items: transcriptV2Rows, chrome: transcriptV2Chrome, handle: transcriptV2,
             row: { [actions = transcriptV2Actions] row in ThreadTranscriptRowView(row: row, actions: actions) },
-            composer: { Isolated { composer } },
+            composer: { Isolated { composer }.opacity(lying ? 0 : 1).allowsHitTesting(!lying).accessibilityHidden(lying) },
             top: transcriptV2HasTop ? { transcriptV2Top } : nil,
             pill: { state, jump in transcriptV2Pill(state, jump: jump) },
             onNearTop: { transcriptV2LoadOlder() },
             onEmptyTap: roomChat?.layDown,
+            rowsHidden: lying,
             log: ScrollLog.on ? { ScrollLog.request($0) } : nil,
             // Not while the window resizes, which reloads the keyboard mid-transition (crash 3).
             dismissKeyboard: { window in
@@ -2152,10 +2162,11 @@ extension ThreadView {
                 canLoadOlder: model.canLoadOlder, editableId: lastUserRowId, threadRows: model.rowIds, pending: pending,
                 typing: showsWorking, thinking: model.shelf.thinking)
         }
-        let items = model.shownItems
-        return ThreadTranscriptRow.thread(items: items, hasOlder: model.hasOlder, unread: unreadItem(in: items), match: currentMatch,
+        let items = inRoom ? RoomFloor.clean(model.shownItems) : model.shownItems
+        let rows = ThreadTranscriptRow.thread(items: items, hasOlder: model.hasOlder, unread: unreadItem(in: items), match: currentMatch,
             editableId: worker == nil ? lastUserRowId : nil, pending: pending, interactions: shownInteractions,
             working: showsWorking, thinking: model.shelf.thinking, sideThreads: conversation != nil ? sideThreads : [:])
+        return inRoom ? RoomFloor.rows(rows) : rows
     }
 
     fileprivate var transcriptV2Actions: ThreadTranscriptActions {
@@ -2165,7 +2176,7 @@ extension ThreadView {
             draftReply: { draftReply($0) }, sendReply: { send(text: $0) }, quote: { quote($0) },
             select: { selecting = SelectionText(text: $0) }, edit: startEditing,
             saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil,
-            openThread: { botChrome?.openThread($0) }, replyInThread: { botChrome?.replyInThread($0) },
+            openThread: { id in if let botChrome { botChrome.openThread(id) } else { shell?.push(.thread(id: id)) } }, replyInThread: { botChrome?.replyInThread($0) },
             messageThread: inConversation ? { replyInThread($0) } : nil,
             forkConversation: inConversation ? { forkConversation($0) } : nil,
             openSideThread: inConversation ? { showThread($0) } : nil,
@@ -2207,6 +2218,8 @@ extension ThreadView {
                                  title: botChrome?.bot.name ?? model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread",
                                  status: botChrome != nil ? botStatus : nil)
                     .background(.bar)
+                    .opacity(lying ? 0 : 1)
+                    .accessibilityHidden(lying)
             }
             if duoLayout.twoPages && botChrome == nil {
                 DuoHeader {
