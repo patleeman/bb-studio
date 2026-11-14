@@ -33,7 +33,7 @@ final class MiniAppUITests: StagedServerUITestCase {
         XCTAssertTrue(web.buttons["Count \(old + 1)"].waitForExistence(timeout: 5))
 
         web.buttons["Fetch"].tap()
-        let refused = web.staticTexts["Open this mini app in BB on your computer to reach the internet."]
+        let refused = web.staticTexts["Open this app in BB on your computer to reach the internet."]
         XCTAssertTrue(refused.waitForExistence(timeout: 10), "fetch is refused on the phone")
         screenshot("after")
     }

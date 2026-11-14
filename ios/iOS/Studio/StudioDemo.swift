@@ -2,8 +2,8 @@
 import Foundation
 
 /// Debug builds: `-qaStudioDemo` fills the Studio tab from local fixtures, for
-/// UI tests that run offline: a folder page with a page in it, a second page
-/// and a mini app, with their kinds. Requests it doesn't answer fail as if the
+/// UI tests that run offline: a folder page with a page in it, a second page,
+/// a mini app and a saved app, with their kinds. Requests it doesn't answer fail as if the
 /// server were unreachable, as they do offline without it. `-qaStudioStars`
 /// adds three starred pages, and Star and Unstar change them for the launch.
 enum StudioDemo {
@@ -73,6 +73,7 @@ enum StudioDemo {
             Fixture(id: "pg_duo_review", title: "Review checklist", parent: "pg_duo_launch", age: 2),
             Fixture(id: "pg_duo_regular", title: "Duo release review", age: 5),
             Fixture(plugin: "minis", id: "mini_duo_board", kind: "mini", title: "Release board", age: 26),
+            Fixture(plugin: "artifacts", id: "art_duonotes0000000a", kind: "artifact", title: "Release notes.md", age: 28),
         ]
         guard withStars else { return duo }
         return duo + [
@@ -117,7 +118,8 @@ enum StudioDemo {
         return #"""
         {"items":[\#(items.joined(separator: ","))],
          "providers":[{"pluginId":"pages","kinds":[{"id":"page","label":"Page"}]},
-                      {"pluginId":"minis","kinds":[{"id":"mini","label":"Mini app"}]}],
+                      {"pluginId":"minis","kinds":[{"id":"mini","label":"Mini app"}]},
+                      {"pluginId":"artifacts","kinds":[{"id":"artifact","label":"Artifact"}]}],
          "tags":[]}
         """#
     }

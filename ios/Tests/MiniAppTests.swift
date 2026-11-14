@@ -24,12 +24,12 @@ final class MiniAppTests: XCTestCase {
             """#.utf8)
         struct Get: Decodable { var mini: MiniApp? }
         let mini = try XCTUnwrap(try JSONDecoder().decode(Get.self, from: data).mini)
-        XCTAssertEqual(mini.displayName, "Untitled mini app")
+        XCTAssertEqual(mini.displayName, "Untitled app")
         XCTAssertEqual(mini.versionId, "ver_1")
         XCTAssertEqual(mini.manifest?.description, "Tracks tasks")
         XCTAssertEqual(mini.recordCount, 4)
         XCTAssertEqual(mini.accessText,
-            "This mini app asks for access: Reach any address under github.com over the internet, through Studio; "
+            "This app asks for access: Reach any address under github.com over the internet, through Studio; "
                 + "Open threads and Studio items in BB; Send the secret “token” you store for it, as a request header. The app never sees the value.")
         XCTAssertNil(try JSONDecoder().decode(Get.self, from: Data(#"{"mini":null}"#.utf8)).mini)
     }
@@ -135,11 +135,11 @@ final class MiniAppTests: XCTestCase {
         for (method, what) in [("fetch", "reach the internet"), ("bb.threads.list", "read your threads"),
                                ("bb.studio.list", "search Studio"), ("bb.open", "open BB items")] {
             let result = MiniRelay.call(method, params: .object([]), miniId: miniId, clientId: clientId)
-            XCTAssertEqual(result, .failure(MiniRelay.Refusal(message: "Open this mini app in BB on your computer to \(what).")), method)
+            XCTAssertEqual(result, .failure(MiniRelay.Refusal(message: "Open this app in BB on your computer to \(what).")), method)
         }
         XCTAssertEqual(MiniRelay.call("db.drop", params: .object([]), miniId: miniId, clientId: clientId),
             .failure(MiniRelay.Refusal(message: "Unknown call db.drop.")))
-        XCTAssertTrue(MiniRelay.sendRefused.hasPrefix("Open this mini app in BB on your computer"))
+        XCTAssertTrue(MiniRelay.sendRefused.hasPrefix("Open this app in BB on your computer"))
     }
 
     func testRepliesAndTheme() throws {

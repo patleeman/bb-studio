@@ -627,7 +627,7 @@ final class VoiceAudioSessionTests: XCTestCase {
 
     func testAppliesToTheSharedSession() throws {
         let session = AVAudioSession.sharedInstance()
-        try VoiceAudioConfig.handsFree.apply(to: session)
+        try onTheSharedAudioSession { try VoiceAudioConfig.handsFree.apply(to: session) }
         XCTAssertEqual(session.category, .playAndRecord)
         XCTAssertEqual(session.mode, .voiceChat)
         XCTAssertTrue(session.categoryOptions.contains(.allowBluetoothHFP))

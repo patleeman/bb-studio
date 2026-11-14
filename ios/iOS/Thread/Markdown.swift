@@ -2,8 +2,9 @@ import SwiftUI
 
 /// Block-level markdown on top of `AttributedString`'s inline parser: headings,
 /// paragraphs, ordered, nested and task lists, quotes, tables, rules and fenced
-/// code, and images. `::artifact{id="…"}` lines become artifact cards, `::page{…}`, `::drawing{…}`,
-/// `::design{…}`, `::recording{…}` and `::mini{…}` lines cards that preview and open the item,
+/// code, and images. `::app{id="…"}` lines (and the older `::artifact{…}` and `::mini{…}`) become
+/// app cards, by the id: a saved app's card or the live mini app; `::page{…}`, `::drawing{…}`,
+/// `::design{…}` and `::recording{…}` lines cards that preview and open the item,
 /// `::loop{…}` lines Attention Router cards (`LoopCard`),
 /// and `::inline-vis{…}` lines show the file they name; other directives, such as `::reactions{…}`,
 /// are left out; see `Directive`.
@@ -217,6 +218,14 @@ enum MarkdownBlock {
         return blocks
     }
 
+    static func appCard(_ directive: Directive) -> MarkdownBlock? {
+        guard ["app", "artifact", "mini"].contains(directive.name),
+              let id = directive.attributes["id"]?.trimmingCharacters(in: .whitespaces) else { return nil }
+        if Artifact.isId(id) { return .artifact(id) }
+        if MiniApp.isId(id) { return .item(.mini(id)) }
+        return nil
+    }
+
     private static func parseUncached(_ source: String) -> [MarkdownBlock] {
         var blocks: [MarkdownBlock] = []
         var paragraph: [String] = []
@@ -255,9 +264,9 @@ enum MarkdownBlock {
             } else if trimmed.isEmpty {
                 flush()
             } else if let directive = Directive(line: trimmed) {
-                if directive.name == "artifact", let id = directive.attributes["id"], Artifact.isId(id) {
+                if let card = appCard(directive) {
                     flush()
-                    blocks.append(.artifact(id))
+                    blocks.append(card)
                 } else if let item = ReplyItem(directive) {
                     flush()
                     blocks.append(.item(item))

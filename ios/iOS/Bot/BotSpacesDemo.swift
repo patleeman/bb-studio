@@ -628,7 +628,6 @@ enum BotSpacesDemo {
                 item("design", "dsn_demo_home", "Phone home screen", "design", "design", 5_000_000, madeIn: main),
                 item("pages", "pg_demo_questions", "Mock interview questions", "page", "doc", 7_000_000, madeIn: interview),
                 item("excalidraw", "drw_demo_arch", "System design sketch", "whiteboard", "whiteboard", 8_000_000, madeIn: interview),
-                item("dashboards", "dsh_demo_week", "This week", "app", "dashboard", 90_000_000, madeIn: nil),
                 item("minis", "mini_demo_pack", "Packing list", "app", "mini", 100_000_000, madeIn: nil),
             ]
         }

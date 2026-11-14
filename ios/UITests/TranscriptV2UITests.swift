@@ -469,10 +469,21 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         default: break
         }
         app.launchOffline()
+        if layout == "outer" { standUpTheRoom() }
         XCTAssertTrue(composerField.waitForExistence(timeout: 30))
         if layout == "outer" { command("outer") }
         showRightPage()
         Thread.sleep(forTimeInterval: 1)
+    }
+
+    private func standUpTheRoom() {
+        if !app.buttons["RoomFloor"].waitForExistence(timeout: 30) {
+            app.terminate()
+            app.launchOffline()
+        }
+        guard app.buttons["RoomFloor"].waitForExistence(timeout: 30) else { return }
+        app.standRoomChat()
+        XCTAssertTrue(app.buttons["roomLayDown"].waitForExistence(timeout: 10), "the room's chat stands up")
     }
 
     /// The split's right page on the simulator's screen (it's only as wide as the outer one).
@@ -526,7 +537,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     private func expectGap(_ step: String) {
         guard let geometry = window() else { return failures.append("\(step): no layout") }
         let below = geometry.height - composer.frame.maxY - (layout == "split" ? 0 : app.frame.minY)
-        let expected: CGFloat = layout == "split" ? 8 : 8 + geometry.safeBottom
+        let expected: CGFloat = layout == "split" ? 8 : layout == "outer" ? geometry.safeBottom : 8 + geometry.safeBottom
         steps.append(String(format: "%@: composer gap %.1f (expected %.1f, safe bottom %.1f)", step, below, expected, geometry.safeBottom))
         // A tab bar under the Bot chat on a phone holds the composer higher.
         if layout == "split" ? abs(below - expected) > 2 : below < expected - 2 {

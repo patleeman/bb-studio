@@ -18,7 +18,7 @@ final class DuoSidebarSearchUITests: ServerIsolatedUITestCase {
         try assertSearch(app, device: device)
         XCTAssertTrue(app.buttons["studio-kind-all"].exists)
         XCTAssertTrue(app.buttons["studio-kind-page"].exists)
-        XCTAssertTrue(app.buttons["studio-kind-mini"].exists)
+        XCTAssertTrue(app.buttons["studio-kind-app"].exists)
         XCTAssertTrue(app.staticTexts["Folders"].exists)
         XCTAssertTrue(app.buttons.matching(identifier: "studio-folder").firstMatch.exists)
         XCTAssertFalse(app.buttons["Dictate"].exists)

@@ -43,7 +43,7 @@ public struct MiniApp: Decodable, Identifiable, Hashable, Sendable {
 
     public var displayName: String {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return name.isEmpty ? "Untitled mini app" : name
+        return name.isEmpty ? "Untitled app" : name
     }
 
     /// How many records it keeps, over every collection.
@@ -56,7 +56,7 @@ public struct MiniApp: Decodable, Identifiable, Hashable, Sendable {
 
     /// The access banner's text while capabilities wait, as the desktop says it; nil when none wait.
     public var accessText: String? {
-        pending.isEmpty ? nil : "This mini app asks for access: \(pending.map(Self.describe).joined(separator: "; "))."
+        pending.isEmpty ? nil : "This app asks for access: \(pending.map(Self.describe).joined(separator: "; "))."
     }
 
     /// What a capability lets the app do, in plain words (the desktop's `describeCapability`).
@@ -181,11 +181,11 @@ public enum MiniRelay {
     }
 
     public static func desktopOnly(_ what: String) -> Refusal {
-        Refusal(message: "Open this mini app in BB on your computer to \(what).")
+        Refusal(message: "Open this app in BB on your computer to \(what).")
     }
 
     /// What the phone says when the app tries to send something to the agent.
-    public static let sendRefused = "Open this mini app in BB on your computer to send it to the agent."
+    public static let sendRefused = "Open this app in BB on your computer to send it to the agent."
 
     /// The answer to a call, posted back into the frame.
     public static func reply(_ id: OrderedJSON, value: OrderedJSON) -> OrderedJSON {

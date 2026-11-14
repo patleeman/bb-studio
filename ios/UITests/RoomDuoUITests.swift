@@ -57,6 +57,11 @@ final class RoomDuoUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["workbenchTab-place:library"].waitForExistence(timeout: 10), "Library opens as a tab")
         XCTAssertTrue(app.buttons["roomInput"].waitForExistence(timeout: 10), "the room goes back to rest")
         assertOnTheRightPage(app.otherElements["RoomSheet-library"], "Library, in the tab", shift: 0)
+        let tiles = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'library-row-'"))
+        XCTAssertTrue(tiles.firstMatch.waitForExistence(timeout: 10))
+        let columns = Set(tiles.allElementsBoundByIndex.map { Int($0.frame.minX.rounded()) })
+        XCTAssertGreaterThanOrEqual(columns.count, 3, "the Library fills the page with three or more columns")
+        XCTAssertTrue(app.textFields["librarySearchField"].exists, "search sits inside the page")
         sleep(2)
         capture("4b-landscape-library")
 

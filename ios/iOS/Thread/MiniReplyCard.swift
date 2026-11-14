@@ -28,8 +28,8 @@ struct MiniReplyCard: View {
         let records = mini?.recordCount ?? 0
         StudioCardChrome(
             route: .mini(id: id),
-            title: mini?.displayName ?? (missing ? "Deleted mini app" : "Mini app"),
-            detail: ["Mini app", mini.flatMap { $0.collections.isEmpty ? nil : records == 1 ? "1 record" : "\(records) records" }]
+            title: mini?.displayName ?? (missing ? "Deleted app" : "App"),
+            detail: ["App", mini.flatMap { $0.collections.isEmpty ? nil : records == 1 ? "1 record" : "\(records) records" }]
                 .compactMap { $0 }.joined(separator: " · "),
             missing: missing,
             hasPreview: mini != nil && !missing,
@@ -104,7 +104,7 @@ struct MiniReplyCard: View {
                 }
                 .onDisappear { pool.report(card, distance: nil) }
             } else {
-                Text("This mini app has no source yet. Ask an agent to build it.")
+                Text("This app has no source yet. Ask an agent to build it.")
                     .font(.footnote).foregroundStyle(.secondary).padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

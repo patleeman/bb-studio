@@ -54,10 +54,10 @@ struct WidgetMore: View {
 }
 
 enum WidgetText {
-    /// "now", "4m", "3h", "2d": `DashboardTime.ago` without "ago", for a row's end.
+    /// "now", "4m", "3h", "2d": `RelativeTime.ago` without "ago", for a row's end.
     static func age(_ at: Double?, now: Date) -> String? {
         guard let at, at > 0 else { return nil }
-        let text = DashboardTime.ago(at, now: now.timeIntervalSince1970 * 1000)
+        let text = RelativeTime.ago(at, now: now.timeIntervalSince1970 * 1000)
         return text == "just now" ? "now" : text.replacingOccurrences(of: " ago", with: "")
     }
 

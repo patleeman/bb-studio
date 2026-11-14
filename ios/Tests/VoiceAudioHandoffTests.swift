@@ -7,6 +7,18 @@ import XCTest
 // left the composer's mic at 0 Hz afterwards. These drive the fixes with fakes
 // (no mic, no WebRTC connection): lines starting "EVIDENCE" go to the evidence file.
 
+extension XCTestCase {
+    /// Runs `work` on the shared audio session; skips the test where the simulator
+    /// refuses to configure it (OSStatus -50, as on the CI runners).
+    func onTheSharedAudioSession<T>(_ work: () throws -> T) throws -> T {
+        do {
+            return try work()
+        } catch let error as NSError where error.domain == NSOSStatusErrorDomain && error.code == -50 {
+            throw XCTSkip("This simulator can't configure the shared audio session (OSStatus -50)")
+        }
+    }
+}
+
 /// A fake AVAudioSession: what was called, and a route the test sets.
 final class FakeAudioSession: AudioSessionControl {
     var calls: [String] = []
@@ -306,14 +318,16 @@ final class VoiceAudioHandoffTests: XCTestCase {
         let rtcSession = RTCAudioSession.sharedInstance()
         let original = RTCAudioSessionConfiguration.webRTC()
         defer { RTCAudioSessionConfiguration.setWebRTC(original) }
-        try VoiceAudioConfig.handsFree.apply(to: avSession)
+        try onTheSharedAudioSession { try VoiceAudioConfig.handsFree.apply(to: avSession) }
         let ours = avSession.categoryOptions
 
         // BEFORE (main): WebRTC configures the session with its default when its audio unit starts.
         let webRTCDefault = RTCAudioSessionConfiguration.webRTC()
-        rtcSession.lockForConfiguration()
-        try rtcSession.setCategory(AVAudioSession.Category(rawValue: webRTCDefault.category), mode: AVAudioSession.Mode(rawValue: webRTCDefault.mode), options: webRTCDefault.categoryOptions)
-        rtcSession.unlockForConfiguration()
+        try onTheSharedAudioSession {
+            rtcSession.lockForConfiguration()
+            defer { rtcSession.unlockForConfiguration() }
+            try rtcSession.setCategory(AVAudioSession.Category(rawValue: webRTCDefault.category), mode: AVAudioSession.Mode(rawValue: webRTCDefault.mode), options: webRTCDefault.categoryOptions)
+        }
         let before = avSession.categoryOptions
         let mainNoticed = avSession.category != VoiceAudioConfig.handsFree.category || avSession.mode != VoiceAudioConfig.handsFree.mode
         print("EVIDENCE webrtc-config BEFORE: ours \(ours.contains(.defaultToSpeaker) ? "defaultToSpeaker" : "no speaker") → after WebRTC's default \(before.contains(.defaultToSpeaker) ? "defaultToSpeaker" : "NO defaultToSpeaker (earpiece)"); main's category/mode check reapplies: \(mainNoticed); outputs \(avSession.currentRoute.outputs.map { "\($0.portType.rawValue) (\($0.portName))" })")
@@ -325,9 +339,11 @@ final class VoiceAudioHandoffTests: XCTestCase {
         // AFTER: ours is WebRTC's config, so its own setup keeps the speaker.
         WebRTCAudioControl().useConfiguration(.handsFree)
         let webRTCOurs = RTCAudioSessionConfiguration.webRTC()
-        rtcSession.lockForConfiguration()
-        try rtcSession.setCategory(AVAudioSession.Category(rawValue: webRTCOurs.category), mode: AVAudioSession.Mode(rawValue: webRTCOurs.mode), options: webRTCOurs.categoryOptions)
-        rtcSession.unlockForConfiguration()
+        try onTheSharedAudioSession {
+            rtcSession.lockForConfiguration()
+            defer { rtcSession.unlockForConfiguration() }
+            try rtcSession.setCategory(AVAudioSession.Category(rawValue: webRTCOurs.category), mode: AVAudioSession.Mode(rawValue: webRTCOurs.mode), options: webRTCOurs.categoryOptions)
+        }
         print("EVIDENCE webrtc-config AFTER: WebRTC's config now \(avSession.categoryOptions.contains(.defaultToSpeaker) ? "defaultToSpeaker" : "NO defaultToSpeaker"); applied: \(VoiceAudioConfig.handsFree.isApplied(to: avSession)); outputs \(avSession.currentRoute.outputs.map { "\($0.portType.rawValue) (\($0.portName))" })")
         XCTAssertTrue(avSession.categoryOptions.contains(.defaultToSpeaker))
         XCTAssertTrue(VoiceAudioConfig.handsFree.isApplied(to: avSession))

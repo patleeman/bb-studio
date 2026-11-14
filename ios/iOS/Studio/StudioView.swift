@@ -99,7 +99,7 @@ final class StudioStore: ObservableObject {
             supportsTags = listing.tags != nil
             starred = listing.starred ?? []
             supportsStars = listing.starred != nil
-            self.items = listing.items.sorted { $0.updatedAt > $1.updatedAt }
+            self.items = listing.items.filter { $0.pluginId != "dashboards" }.sorted { $0.updatedAt > $1.updatedAt }
             Spotlight.indexStudio(self.items, serverURL: serverURL)
             error = nil
             DiskCache.save(
@@ -335,7 +335,7 @@ final class StudioStore: ObservableObject {
 
     /// Kinds in the order the filter shows them.
     var kinds: [StudioKind] {
-        let present = Set(items.filter { !$0.archived }.map(\.kind))
+        let present = Set(items.filter { !$0.archived }.map { StudioKind.family($0.kind) })
         let known = StudioKind.known.filter { present.contains($0.id) }
         let others = present.subtracting(StudioKind.known.map(\.id)).sorted().map(StudioKind.other)
         return known + others
@@ -351,7 +351,6 @@ extension StudioItem {
         case "excalidraw": .drawing(id: itemId)
         case "artifacts": .artifact(id: itemId)
         case "design": .design(id: itemId)
-        case "dashboards": .dashboard(id: itemId)
         case "minis": .mini(id: itemId)
         default: href.flatMap(Route.init(href:))
         }
@@ -373,17 +372,24 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "recording", label: "Recording", plural: "Recordings", symbol: "waveform", tint: .red),
         StudioKind(id: "dictation", label: "Dictation", plural: "Dictations", symbol: "mic", tint: .orange),
         StudioKind(id: "drawing", label: "Whiteboard", plural: "Whiteboards", symbol: "scribble.variable", tint: .purple),
-        StudioKind(id: "artifact", label: "Artifact", plural: "Artifacts", symbol: "doc.text.image", tint: .teal),
+        StudioKind(id: "app", label: "App", plural: "Apps", symbol: "macwindow", tint: .teal),
         StudioKind(id: "design", label: "Design", plural: "Designs", symbol: "rectangle.on.rectangle.angled", tint: .pink),
-        StudioKind(id: "dashboard", label: "Dashboard", plural: "Dashboards", symbol: "square.grid.2x2", tint: .indigo),
-        StudioKind(id: "mini", label: "Mini app", plural: "Mini apps", symbol: "macwindow", tint: .mint),
     ]
+
+    private static let apps = [
+        StudioKind(id: "artifact", label: "App", plural: "Apps", symbol: "doc.text.image", tint: .teal),
+        StudioKind(id: "mini", label: "App", plural: "Apps", symbol: "macwindow", tint: .mint),
+    ]
+
+    static func family(_ kind: String) -> String {
+        kind == "artifact" || kind == "mini" ? "app" : kind
+    }
 
     static func other(_ id: String) -> StudioKind {
         StudioKind(id: id, label: id.capitalized, plural: id.capitalized, symbol: "square.dashed", tint: .gray)
     }
 
-    static func of(_ id: String) -> StudioKind { known.first { $0.id == id } ?? other(id) }
+    static func of(_ id: String) -> StudioKind { known.first { $0.id == id } ?? apps.first { $0.id == id } ?? other(id) }
 }
 
 struct StudioView: View {
@@ -1058,7 +1064,7 @@ struct StudioView: View {
         store.items.filter { item in
             if selectsDetail, let folder, item.itemId != folder && item.parentId != folder { return false }
             if item.archived != showArchived { return false }
-            if let kind, item.kind != kind { return false }
+            if let kind, StudioKind.family(item.kind) != kind { return false }
             if kind == nil, query.isEmpty, store.info(item)?.background == true { return false }
             if let tagFilter, item.tags?.contains(tagFilter) != true { return false }
             switch project {
@@ -1106,11 +1112,9 @@ struct StudioView: View {
         case "page": "Pages you and your agents write show up here."
         case "recording", "dictation": "Dictate or record, and Talk keeps the audio and transcript here."
         case "drawing": "Whiteboards live in pages. Make one on BB web with New → Whiteboard or /whiteboard in a page, or ask an agent to sketch one."
-        case "artifact": "Files agents save from threads, and ones you save from a reply, show up here."
+        case "app": "Apps agents make show up here: saved files such as reports and images, and interactive tools with their own data."
         case "design": "Ask an agent to design a screen, and its rounds of options show up here."
-        case "dashboard": "Ask an agent for a dashboard, or make one in BB on the desktop. Widgets refresh while it's open."
-        case "mini": "Ask an agent for a mini app: a small app with its own data, such as a tracker or a board."
-        default: "Pages, recordings, dictations, whiteboards and artifacts show up here."
+        default: "Pages, recordings, dictations, whiteboards and apps show up here."
         }
     }
 

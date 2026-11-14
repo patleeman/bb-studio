@@ -168,7 +168,7 @@ final class ArtifactRuntimeUITests: StagedServerUITestCase {
         try control("arm-lookup")
         let id = try XCTUnwrap(fixtures["lookup"]?["id"] as? String)
         app.open(URL(string: "bbstudio://artifact/\(id)")!)
-        XCTAssertTrue(app.staticTexts["Couldn't open the artifact"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["Couldn't open the app"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.buttons["Retry"].isHittable)
         capture(app, "lookup-error")
         app.buttons["Retry"].tap()

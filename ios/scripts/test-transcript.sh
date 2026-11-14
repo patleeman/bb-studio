@@ -31,22 +31,36 @@ isolate() {
 isolate "$phone"
 xcodebuild build-for-testing -scheme BBStudio -destination "id=$phone" -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -quiet
 
+failed=""
+step() {
+  name="$1"
+  shift
+  "$@" || failed="$failed
+  - $name"
+}
+
 report="${TRANSCRIPT_REPORT_DIR:-}"
-TEST_RUNNER_TRANSCRIPT_REPORT_DIR="$report" xcodebuild test-without-building -scheme BBStudio -destination "id=$phone" \
+step "phone: state machine, replay, TranscriptV2UITests" env TEST_RUNNER_TRANSCRIPT_REPORT_DIR="$report" xcodebuild test-without-building -scheme BBStudio -destination "id=$phone" \
   -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO \
   -only-testing:BBStudioTests/TranscriptFollowTests -only-testing:BBStudioTests/TranscriptReplayTests \
   -only-testing:BBStudioUITests/TranscriptV2UITests
 # Taps never move the transcript (Patrick, Oct 27), on the new one.
-TEST_RUNNER_TRANSCRIPT_V2=1 xcodebuild test-without-building -scheme BBStudio -destination "id=$phone" \
+step "phone: TranscriptScrollHoldUITests" env TEST_RUNNER_TRANSCRIPT_V2=1 xcodebuild test-without-building -scheme BBStudio -destination "id=$phone" \
   -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/TranscriptScrollHoldUITests
 
 if [ -n "$duo" ]; then
   isolate "$duo"
   for layout in outer split; do
-    TEST_RUNNER_TRANSCRIPT_LAYOUT="$layout" xcodebuild test-without-building -scheme BBStudio -destination "id=$duo" \
+    step "duo $layout: TranscriptV2UITests" env TEST_RUNNER_TRANSCRIPT_LAYOUT="$layout" xcodebuild test-without-building -scheme BBStudio -destination "id=$duo" \
       -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/TranscriptV2UITests
   done
   # The Duo's composer, pill and content-edge checks, on the new transcript.
-  TEST_RUNNER_TRANSCRIPT_V2=1 xcodebuild test-without-building -scheme BBStudio -destination "id=$duo" \
+  step "duo: DuoSplitComposerUITests" env TEST_RUNNER_TRANSCRIPT_V2=1 xcodebuild test-without-building -scheme BBStudio -destination "id=$duo" \
     -derivedDataPath "$derived" CODE_SIGNING_ALLOWED=NO -only-testing:BBStudioUITests/DuoSplitComposerUITests
 fi
+
+if [ -n "$failed" ]; then
+  echo "Transcript tests failed:$failed" >&2
+  exit 1
+fi
+echo "Transcript tests passed."

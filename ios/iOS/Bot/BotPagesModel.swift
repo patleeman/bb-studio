@@ -246,7 +246,6 @@ struct BotLibraryItem: Equatable, Identifiable {
         case "excalidraw": .drawing(id: itemId)
         case "artifacts": .artifact(id: itemId)
         case "design": .design(id: itemId)
-        case "dashboards": .dashboard(id: itemId)
         case "minis": .mini(id: itemId)
         default: href.flatMap(Route.init(href:))
         }
@@ -259,7 +258,6 @@ struct BotLibraryItem: Equatable, Identifiable {
         case "excalidraw": "drawing"
         case "artifacts": "artifact"
         case "design": "design"
-        case "dashboards": "dashboard"
         case "minis": "mini"
         default: type ?? "other"
         }
@@ -291,7 +289,11 @@ enum LibraryPage {
     static let filters: [BotLibraryItem.Kind] = [.page, .whiteboard, .design, .app]
 
     static func label(_ kind: BotLibraryItem.Kind) -> String {
-        kind == .other ? "Other" : kind.rawValue.capitalized
+        switch kind {
+        case .app, .artifact: "App"
+        case .other: "Other"
+        default: kind.rawValue.capitalized
+        }
     }
 
     static func chip(_ kind: BotLibraryItem.Kind) -> String {
@@ -370,9 +372,10 @@ enum LibraryPage {
             var threadId: String?
             switch groupBy {
             case .kind:
-                key = item.kind.rawValue
-                title = label(item.kind) + "s"
-                rank = BotLibraryItem.Kind.allCases.firstIndex(of: item.kind) ?? 0
+                let kind = item.kind == .artifact ? BotLibraryItem.Kind.app : item.kind
+                key = kind.rawValue
+                title = label(kind) + "s"
+                rank = BotLibraryItem.Kind.allCases.firstIndex(of: kind) ?? 0
             case .date:
                 (key, title, rank) = dateGroup(item.updatedAt, now: now)
             case .conversation:
@@ -571,7 +574,7 @@ extension BBClient {
 
     func botLibrary(botId: String?) async throws -> [BotLibraryItem] {
         let output: Studio.BotLibraryOutput = try await rpc("studio", Studio.Method.bot_library, Self.scoped(botId))
-        return (output.items ?? []).compactMap(BotLibraryItem.init)
+        return (output.items ?? []).compactMap(BotLibraryItem.init).filter { $0.pluginId != "dashboards" }
     }
 
     func botArchive(botId: String?) async throws -> ArchiveData {

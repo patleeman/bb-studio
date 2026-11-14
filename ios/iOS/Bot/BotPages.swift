@@ -414,6 +414,7 @@ struct LibraryPageView: View {
     var open: (BotShellItem) -> Void
     var tiles = false
     @EnvironmentObject private var app: AppModel
+    @Environment(\.workbenchPane) private var workbenchPane
     @AppStorage("studio.library.group") private var groupBy: LibraryPage.GroupBy = .conversation
     @State private var load = PageLoad<[BotLibraryItem]>()
     @State private var query = ""
@@ -437,10 +438,9 @@ struct LibraryPageView: View {
                 }
             }
         }
-        .searchable(text: $query, prompt: "Search files")
         .navigationTitle("Library")
         .navigationBarTitleDisplayMode(.large)
-        .libraryOptions(groupBy: $groupBy, tiles: tiles)
+        .libraryOptions(groupBy: $groupBy, query: $query, tiles: tiles, inline: inlineBar)
         .refreshable { await load.reload() }
         .task(id: scope) { start() }
         .onChange(of: botId) { _, _ in
@@ -451,6 +451,33 @@ struct LibraryPageView: View {
         .accessibilityIdentifier("library-page")
     }
 
+    private var inlineBar: Bool { tiles && workbenchPane }
+
+    private var searchBar: some View {
+        HStack(spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Search files", text: $query)
+                    .submitLabel(.search)
+                    .autocorrectionDisabled()
+                    .accessibilityIdentifier("librarySearchField")
+                if !query.isEmpty {
+                    Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary) }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Clear search")
+                }
+            }
+            .padding(.horizontal, 10)
+            .frame(minHeight: 38)
+            .background(.background.secondary, in: .rect(cornerRadius: 10))
+            LibraryOptionsMenu(groupBy: $groupBy, tiles: tiles)
+                .font(.body.weight(.semibold))
+                .frame(width: 44, height: 44)
+                .contentShape(.rect)
+        }
+        .padding(.bottom, 6)
+    }
+
     private var chips: some View {
         BotPageChips(choices: [(BotLibraryItem.Kind?.none, "All")] + LibraryPage.filters.map { (Optional($0), LibraryPage.chip($0)) }, selection: $kind)
     }
@@ -458,7 +485,8 @@ struct LibraryPageView: View {
     private func grid(_ groups: [BotLibraryGroup]) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                chips.padding(.horizontal, -16)
+                if inlineBar { searchBar }
+                chips.padding(.horizontal, -16).clipShape(.rect)
                 if items != nil, let error = load.error {
                     PageLoadFailed(title: "The library didn't load", message: error, id: "libraryRowRetry") { load.retry() }
                 }
@@ -477,6 +505,7 @@ struct LibraryPageView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 30)
         }
+        .ignoresSafeArea(.container, edges: workbenchPane ? .horizontal : [])
     }
 
     @ViewBuilder private func tile(_ row: BotLibraryRow) -> some View {
@@ -852,30 +881,45 @@ struct PageLoadErrorRow: View {
     }
 }
 
-private struct LibraryOptions: ViewModifier {
+private struct LibraryOptionsMenu: View {
     @Binding var groupBy: LibraryPage.GroupBy
     let tiles: Bool
 
-    func body(content: Content) -> some View {
-        content.toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    if !tiles {
-                        Picker("Group by", selection: $groupBy) { ForEach(LibraryPage.GroupBy.allCases) { Text($0.title).tag($0) } }
-                    }
-                    Section {
-                        NavigationLink(value: Route.visualChats) { Label("Visual Chat", systemImage: "rectangle.on.rectangle") }
-                    }
-                } label: { Image(systemName: "ellipsis") }
-                .accessibilityLabel("Library options")
-                .accessibilityIdentifier("libraryOptions")
+    var body: some View {
+        Menu {
+            if !tiles {
+                Picker("Group by", selection: $groupBy) { ForEach(LibraryPage.GroupBy.allCases) { Text($0.title).tag($0) } }
             }
+            Section {
+                NavigationLink(value: Route.visualChats) { Label("Visual Chat", systemImage: "rectangle.on.rectangle") }
+            }
+        } label: { Image(systemName: "ellipsis") }
+        .accessibilityLabel("Library options")
+        .accessibilityIdentifier("libraryOptions")
+    }
+}
+
+private struct LibraryOptions: ViewModifier {
+    @Binding var groupBy: LibraryPage.GroupBy
+    @Binding var query: String
+    let tiles: Bool
+    let inline: Bool
+
+    func body(content: Content) -> some View {
+        if inline {
+            content
+        } else {
+            content
+                .searchable(text: $query, prompt: "Search files")
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) { LibraryOptionsMenu(groupBy: $groupBy, tiles: tiles) }
+                }
         }
     }
 }
 
 extension View {
-    fileprivate func libraryOptions(groupBy: Binding<LibraryPage.GroupBy>, tiles: Bool) -> some View {
-        modifier(LibraryOptions(groupBy: groupBy, tiles: tiles))
+    fileprivate func libraryOptions(groupBy: Binding<LibraryPage.GroupBy>, query: Binding<String>, tiles: Bool, inline: Bool) -> some View {
+        modifier(LibraryOptions(groupBy: groupBy, query: query, tiles: tiles, inline: inline))
     }
 }

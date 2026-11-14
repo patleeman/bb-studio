@@ -15,6 +15,23 @@ final class SystemTests: XCTestCase {
         XCTAssertEqual(id, "art_abcdefghijklmnop")
     }
 
+    func testAppCardsPickTheirRendererByTheId() {
+        func card(_ line: String) -> String? {
+            switch MarkdownBlock.parse(line).first {
+            case .artifact(let id): "saved:" + id
+            case .item(.mini(let id)): "interactive:" + id
+            default: nil
+            }
+        }
+        for name in ["app", "artifact", "mini"] {
+            XCTAssertEqual(card("::\(name){id=\"art_abcdefghijklmnop\"}"), "saved:art_abcdefghijklmnop", name)
+            XCTAssertEqual(card("::\(name){id=\"mini_0123456789abcdef\"}"), "interactive:mini_0123456789abcdef", name)
+        }
+        XCTAssertNil(card(#"::app{id="nonsense"}"#))
+        XCTAssertTrue(EmbedCard.studioRef("app", "mini_0123456789abcdef")! == ("minis", "mini_0123456789abcdef"))
+        XCTAssertTrue(EmbedCard.studioRef("app", "art_abcdefghijklmnop")! == ("artifacts", "art_abcdefghijklmnop"))
+    }
+
     @MainActor
     func testOutboxKeepsMessageOrderUntilRemoved() {
         let threadId = "thr_test_\(UUID().uuidString)"

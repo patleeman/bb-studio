@@ -294,7 +294,7 @@ struct EmbedCard: View {
     @ObservedObject private var studio = StudioStore.shared
 
     /// Embeds of other add-ons' items, by the add-on that makes them.
-    private static let studioPlugins = ["drawing": "excalidraw", "artifact": "artifacts", "recording": "talk"]
+    private static let studioPlugins = ["drawing": "excalidraw", "artifact": "artifacts", "recording": "talk", "mini": "minis"]
 
     var body: some View {
         let target = embed.target ?? embed.url ?? embed.id ?? ""
@@ -377,6 +377,7 @@ struct EmbedCard: View {
         case "talk": .recording(id: ref.id)
         case "pages": .page(id: ref.id)
         case "design": .design(id: ref.id)
+        case "minis": .mini(id: ref.id)
         default: nil
         }
     }
@@ -384,6 +385,7 @@ struct EmbedCard: View {
     /// The add-on item an embed points at: an id for a known kind, `pluginId:id` for "item".
     static func studioRef(_ kind: String, _ target: String) -> (pluginId: String, id: String)? {
         guard !target.isEmpty else { return nil }
+        if kind == "app" { return (MiniApp.isId(target) ? "minis" : "artifacts", target) }
         if let pluginId = studioPlugins[kind] { return (pluginId, target) }
         guard kind == "item", let split = target.firstIndex(of: ":"), split != target.startIndex,
             target.index(after: split) != target.endIndex
