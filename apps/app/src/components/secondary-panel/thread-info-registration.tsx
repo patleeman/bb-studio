@@ -17,7 +17,7 @@ export const coreTabs = collectPluginAppRegistrations(
       availability: "fixed",
       id: "info",
       title: "Info",
-      tooltip: "Thread info",
+      tooltip: "Conversation info",
       icon: "Info",
       layout: "flush",
       component: ThreadInfoFixedTabContent,

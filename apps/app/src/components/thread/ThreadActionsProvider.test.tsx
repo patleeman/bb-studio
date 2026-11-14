@@ -607,7 +607,7 @@ describe("ThreadActionsProvider archive feedback", () => {
       if (!call) throw new Error("Expected archive toast");
       const [title, options] = call;
       expect(title).toBe(
-        source === "single" ? "Thread archived" : "Threads archived",
+        source === "single" ? "Conversation archived" : "Conversations archived",
       );
       expect(options).toMatchObject({
         cancel: { label: "Undo" },
@@ -658,7 +658,7 @@ describe("ThreadActionsProvider archive feedback", () => {
     });
     expect(appToast.message).not.toHaveBeenCalled();
     expect(vi.mocked(appToast.success).mock.calls[0]?.[0]).toBe(
-      "Thread archived",
+      "Conversation archived",
     );
     const toastOptions = vi.mocked(appToast.success).mock.calls[0]?.[1];
     expect(toastOptions).toMatchObject({

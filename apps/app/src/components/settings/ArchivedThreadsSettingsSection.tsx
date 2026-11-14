@@ -186,10 +186,10 @@ export function ArchivedThreadsSettingsSection() {
     <section className="space-y-5">
       <div>
         <h2 className="text-lg font-semibold text-foreground">
-          Archived threads
+          Archived conversations
         </h2>
         <p className="mt-1 text-xs text-subtle-foreground">
-          Find and restore archived threads from across your projects.
+          Find and restore archived conversations from across your projects.
         </p>
       </div>
 
