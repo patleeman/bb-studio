@@ -1055,7 +1055,7 @@ export default async function plugin(bb: BbPluginApi) {
     moveCard: (id, threadId) => work.store.move(id, threadId),
     changed: (threadId) => botThreads.threadChanged(threadId),
   });
-  const onboarding = registerOnboarding(bb, { db, bots, errorText });
+  const onboarding = registerOnboarding(bb, { db, bots, errorText, firstBot: () => remindersForFirstBot(studioSettings, true) });
   // Awareness (src/live-activity.ts): what each conversation and worker is
   // doing now, the per-turn digest of the others, and bot_activity_lookup.
   const liveActivity = registerLiveActivity(bb, db, { threads: botThreads.store, actingBot: async (threadId) => (await acting(threadId))?.botId ?? null, log: (message) => bb.log.warn(message), seeds: threadSeeds });

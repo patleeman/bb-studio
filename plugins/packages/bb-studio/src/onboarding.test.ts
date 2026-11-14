@@ -3,7 +3,7 @@ import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/tes
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { BOT_ID, Bots } from "./bot";
 import { BotThreads } from "./bot-threads";
 import { runLinkAction, setLinkActionHandler } from "./links/actions";
@@ -77,16 +77,18 @@ async function studio(threadList: string = "__automatic__", options: { refuseIdl
   const leads = new ProjectLeads({ db, sdk: bb.sdk, scheduler: testScheduler(db, bb.sdk).scheduler, changed: () => {}, personalPrompt: () => "", botPrompt: () => null });
   const bots = new Bots({ db, sdk: bb.sdk, leads, changed: () => {}, presenceChanged: () => {} });
   const store = new BotThreads({ db, sdk: bb.sdk, signals: () => ({ bots: [], focusedBotId: null, sideThread: () => null, runnerBot: () => null, leadThreads: new Set(), internal: new Set(), managedBot: () => null }), changed: () => {} });
+  const firstBot = vi.fn(async () => true);
   const run = () => runOnboarding({
     dataDir, db, sdk: bb.sdk as never,
     providers: async () => providerStates,
     seedBot: (input) => bots.seedStarter(input),
+    firstBot,
     startFirstChat: (input) => bots.startFirstChat(input),
     ...(options.idleThreads === undefined ? {} : { idleThreads: options.idleThreads }),
     now: () => 1_000,
   });
   const connect = (providerId: string) => { for (const state of providerStates) if (state.providerId === providerId) state.status = "ready"; };
-  return { dataDir, db, bots, store, leads, run, connect, spawns, turns, queued, prefs, sends, deleted, archived, threads };
+  return { dataDir, db, bots, store, leads, run, connect, firstBot, spawns, turns, queued, prefs, sends, deleted, archived, threads };
 }
 
 function bbDatabase(dataDir: string, threadIds: string[]) {
@@ -109,6 +111,7 @@ describe("first-run onboarding", () => {
     expect(bot.threadId).toBe("thr_1");
     expect(env.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("thr_1");
     expect(env.spawns).toEqual([expect.objectContaining({ title: STARTER_BOT.name, input: [], pluginMetadata: { bot: BOT_ID } })]);
+    expect(env.firstBot).toHaveBeenCalledTimes(1);
     expect(env.turns).toEqual([]);
     expect(env.prefs.get("sidebar.threadListProvider")).toEqual({ value: "studio/everything", revision: 2 });
     expect(welcomeThreadOf(env.dataDir)).toEqual({ threadId: "thr_1", botId: BOT_ID, opened: false });
@@ -243,6 +246,7 @@ describe("first-run onboarding", () => {
     const env = await studio();
     env.db.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, created_at, updated_at) VALUES (?, 'Dot', '🤖', 'active', 'thr_main', 0, 1, 1)").run(BOT_ID);
     expect(await env.run()).toMatchObject({ reason: "bots" });
+    expect(env.firstBot).not.toHaveBeenCalled();
     expect(env.spawns).toEqual([]);
     expect(env.bots.list().map((bot) => bot.name)).toEqual(["Dot"]);
     expect(readFlag(env.dataDir)).toMatchObject({ state: "done", reason: "bots" });
