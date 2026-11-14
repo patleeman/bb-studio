@@ -229,6 +229,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
             "-qaDuoMinis", "mini_a,mini_b,mini_c", "-qaDark", "-qaDuoPhone", "-openURL", "bbstudio://thread/thr_botdemo01"]
         if layout == "split" { app.launchArguments += ["-qaDuoColdWide"] }
         app.launchOffline()
+        if layout == "outer" { standUpTheRoom() }
         XCTAssertTrue(composerField.waitForExistence(timeout: 30))
         if layout == "outer" { command("outer") }
         showRightPage()
@@ -469,10 +470,18 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         default: break
         }
         app.launchOffline()
+        if layout == "outer" { standUpTheRoom() }
         XCTAssertTrue(composerField.waitForExistence(timeout: 30))
         if layout == "outer" { command("outer") }
         showRightPage()
         Thread.sleep(forTimeInterval: 1)
+    }
+
+    /// The folded Duo opens the Bot as its room, with the chat lying down: stand it up.
+    private func standUpTheRoom() {
+        guard app.buttons["RoomFloor"].waitForExistence(timeout: 30) else { return }
+        app.standRoomChat()
+        XCTAssertTrue(app.buttons["roomLayDown"].waitForExistence(timeout: 10), "the room's chat stands up")
     }
 
     /// The split's right page on the simulator's screen (it's only as wide as the outer one).
