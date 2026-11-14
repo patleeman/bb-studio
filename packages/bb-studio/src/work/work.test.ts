@@ -4,7 +4,7 @@ import type { z } from "zod";
 import { MIGRATIONS } from "../migrations";
 import { runWorkCli } from "./cli";
 import { rpcContract, SHOW_FINISHED_MS, type WorkCard } from "./contract";
-import { findCardMessage, registerWorkCards, WORK_TOOLS, type TimelineReader } from "./register";
+import { CREATE_DESCRIPTION, findCardMessage, registerWorkCards, WORK_TOOLS, type TimelineReader } from "./register";
 import { inFlightOrder, WorkCardStore } from "./store";
 
 const NOW = new Date("2026-11-13T15:00:00Z").getTime();
@@ -204,4 +204,8 @@ it("places a thread's new cards when its turn ends", async () => {
   text = directive;
   idle!({ thread: { id: "thr_main" } });
   await vi.waitFor(() => expect(store.get(card.id).messageSeq).toBe(3));
+});
+
+it("tells the Bot to link a worker's thread in a form the chat opens", () => {
+  expect(CREATE_DESCRIPTION).toContain("bare @thread:thr_… mention or [text](/threads/thr_…), never [text](@thread:thr_…)");
 });
