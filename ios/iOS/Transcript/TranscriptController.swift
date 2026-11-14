@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import os
 
 /// Where the composer rests, where rows sit, and when the transcript counts
 /// as at its end or its top. Set by the app per layout (phone, Duo pages).
@@ -120,6 +121,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     /// Within this of the end counts as at it.
     static let atEndSlack: CGFloat = 4
 
+    private let createdAt = AccessibilityTurnOn.watch()
     private let composerHost = TranscriptHost()
     private let topHost = TranscriptHost()
     private let pillHost = TranscriptHost()
@@ -135,6 +137,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private var composerEdges: [NSLayoutConstraint] = []
     private var pillPlacement: [NSLayoutConstraint] = []
     private var hasTop = false
+    private var appearedAt: TimeInterval?
+    private var accessibilityTurnedOnBeforeAppearing = false
 
     /// Our own animated scroll ("↓") is running.
     private var animating = false
@@ -204,6 +208,10 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         tap.delegate = self
         collectionView.addGestureRecognizer(tap)
 
+        for name in AccessibilityTurnOn.names {
+            NotificationCenter.default.addObserver(self, selector: #selector(accessibilityDidTurnOn), name: name, object: nil)
+        }
+
         // The pill under the composer, the header over all.
         for host in [pillHost, composerHost, topHost] {
             addChild(host)
@@ -252,6 +260,37 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         var snapshot = NSDiffableDataSourceSnapshot<Int, TranscriptRowID>()
         snapshot.appendSections([0])
         dataSource.applySnapshotUsingReloadData(snapshot)
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        appearedAt = ProcessInfo.processInfo.systemUptime
+        if accessibilityTurnedOnBeforeAppearing || (AccessibilityTurnOn.last ?? -.infinity) >= createdAt {
+            accessibilityTurnedOnBeforeAppearing = false
+            wakeHostedAccessibility()
+        }
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        appearedAt = nil
+    }
+
+    @objc private nonisolated func accessibilityDidTurnOn() {
+        let at = ProcessInfo.processInfo.systemUptime
+        DispatchQueue.main.async { [weak self] in self?.accessibilityTurnedOn(at: at) }
+    }
+
+    private func accessibilityTurnedOn(at uptime: TimeInterval) {
+        if let appearedAt {
+            if uptime < appearedAt { wakeHostedAccessibility() }
+        } else {
+            accessibilityTurnedOnBeforeAppearing = true
+        }
+    }
+
+    private func wakeHostedAccessibility() {
+        for host in [composerHost, topHost, pillHost] { host.wakeAccessibility() }
     }
 
     private func applyChrome() {
@@ -926,6 +965,31 @@ final class TranscriptCell: UICollectionViewCell {
 
 /// SwiftUI chrome in the container: its height measured at its width, set
 /// as a constraint, so wrapping text sizes it right.
+enum AccessibilityTurnOn {
+    static let names: [Notification.Name] = [
+        Notification.Name("AXFrontBoardCategoriesDidInstallNotification"),
+        UIAccessibility.voiceOverStatusDidChangeNotification,
+        UIAccessibility.switchControlStatusDidChangeNotification,
+    ]
+    private static let latest = OSAllocatedUnfairLock<TimeInterval?>(initialState: nil)
+    @MainActor private static var watching = false
+
+    static var last: TimeInterval? { latest.withLock { $0 } }
+
+    @MainActor static func watch() -> TimeInterval {
+        if !watching {
+            watching = true
+            for name in names {
+                NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { _ in
+                    let now = ProcessInfo.processInfo.systemUptime
+                    latest.withLock { $0 = now }
+                }
+            }
+        }
+        return ProcessInfo.processInfo.systemUptime
+    }
+}
+
 final class TranscriptHost: UIHostingController<AnyView> {
     init() {
         super.init(rootView: AnyView(EmptyView()))
@@ -942,6 +1006,10 @@ final class TranscriptHost: UIHostingController<AnyView> {
         view.backgroundColor = .clear
         view.setContentHuggingPriority(.defaultLow, for: .vertical)
         view.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+    }
+
+    func wakeAccessibility() {
+        _ = view.accessibilityElementCount()
     }
 
     /// Its intrinsic size changing (the composer grew a line) lays out the
