@@ -8,7 +8,7 @@ import { LoopScheduler, defaults, snooze } from './scheduler';
 export function loopPushActions(kind:Loop['kind']):('done'|'snooze'|'got_it'|'choose')[]{return kind==='read'?['got_it','snooze']:kind==='decide'?['choose','snooze']:['done','snooze'];}
 import { STUDIO_REALTIME_CHANNEL } from '../kit/contract';
 import { defineItemMention } from '../kit/server/mention';
-import { LOOP_MENTION, LOOP_TOPIC_HINT, loopContext } from './reference';
+import { LOOP_MENTION, LOOP_TOPIC_HINT, loopContext, ownerText } from './reference';
 import { KIND } from './ui/model';
 type ThreadLike={title?:string|null;titleFallback?:string|null;archivedAt?:number|null;deletedAt?:number|null};
 /** A `thread:<id>` owner by name. A deleted or missing thread has no link. */
@@ -33,7 +33,7 @@ export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:str
  // A thread owner's name: the thread's title, "(archived)" once archived, or a fallback when it's gone.
  const owner=async(id:string):Promise<z.infer<typeof ownerInfo>|null>=>{if(!id.startsWith('thread:'))return null;const threadId=id.slice('thread:'.length);return threadOwner(id,await bb.sdk.threads.get({threadId}).catch(()=>null) as ThreadLike|null);};
  const list=async(x:z.infer<typeof filters>)=>{const g=store.groups(x);const ids=new Set([...g.needsYouNow,...g.comingUp,...g.agentsOnIt,...g.waitingOnOthers,...g.done].map(l=>l.owner));return {...g,held:scheduler.held(),areas:store.areas(),owners:(await Promise.all([...ids].map(owner))).filter((o):o is z.infer<typeof ownerInfo>=>!!o)};};
- const action=async(x:z.infer<typeof act>)=>{const l=store.act(x,p=>snooze(p,config));if(x.action==='nudge')await post(`Todo ${l.id}: nudge. Draft the nudge message and show it to the user in this chat for approval. Do not send it until they approve.`);else if(['hand_off','choose'].includes(x.action))await post(`Todo ${l.id}: ${x.action}. ${x.option??''} Owner: ${l.owner}. Use todos_list to review and carry out the next step.`);return l;};
+ const action=async(x:z.infer<typeof act>)=>{const l=store.act(x,p=>snooze(p,config));if(x.action==='nudge')await post(`Todo ${l.id}: nudge. Draft the nudge message and show it to the user in this chat for approval. Do not send it until they approve.`);else if(['hand_off','choose'].includes(x.action))await post(`Todo ${l.id}: ${x.action}. ${x.option??''} Owner: ${ownerText(l.owner)}. Use todos_list to review and carry out the next step.`);return l;};
  const change=(x:z.infer<typeof update>)=>store.update(x.id,{...x.changes,...(x.surfaceNow?{status:'queued' as const,trigger:{type:'none' as const}}:{})});
  // A spoken or typed line becomes a draft todo the Bot fills in.
  const addLine=async(text:string)=>{const l=store.add({title:text,status:'in_progress',owner:'cos'});await post(`Fill in draft todo ${l.id} from this typed line using todos_update, then queue it: ${JSON.stringify(text)}`);return l;};

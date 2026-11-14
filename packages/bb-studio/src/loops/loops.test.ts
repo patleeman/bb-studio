@@ -192,3 +192,14 @@ it('takes "user" or "patrick" as the user in every todo and loop tool, whose sch
  expect(loops.store.groups({owner:'patrick'}).needsYouNow.map(l=>l.title)).toEqual(['Mine']);
  expect(()=>rpcContract['loops.act'].input.parse({id:'x',action:'hand_off',owner:'someone'})).toThrow();
 });
+it('tells the Bot "Owner: the user." after the user chooses, and the stored owner stays "patrick"',async()=>{
+ const handlers:Record<string,(x:any)=>unknown>={};
+ const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},
+  settings:{define:()=>({get:async()=>({loopsEnabled:false}),onChange:()=>{}})},sdk:{threads:{get:async()=>{throw Error('Not found');}}}};
+ const loops=registerLoops(bb as never,db,post,notify,(bb.settings.define as () => never)());await vi.advanceTimersByTimeAsync(0);
+ const l=loops.store.add({title:'Pick a builder',kind:'decide',options:['A','B']});
+ await handlers['loops.act']!({id:l.id,action:'choose',option:'A'});
+ expect(post.mock.calls.at(-1)?.[0]).toContain('Owner: the user.');
+ expect(post.mock.calls.at(-1)?.[0]).not.toContain('patrick');
+ expect(loops.store.get(l.id).owner).toBe('patrick');
+});

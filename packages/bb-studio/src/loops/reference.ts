@@ -7,6 +7,8 @@
 // app both use it.
 import type { Loop } from './contract';
 
+export const ownerText = (owner: string): string => (owner === 'patrick' || owner === 'user' ? 'the user' : owner);
+
 /** The mention provider's id: `@loop` in any composer. */
 export const LOOP_MENTION = 'loop';
 /** What a user message with this line, or a Todo mention, means to the Bot. */
@@ -37,7 +39,7 @@ export function loopContext(loop: Loop): string {
     `title: ${oneLine(loop.title)}`,
     `why: ${oneLine(loop.why) || '(none)'}`,
     `trigger: ${triggerText(loop.trigger)}${loop.push ? ', sends to iPhone' : ''}`,
-    `kind: ${loop.kind} · status: ${loop.status} · owner: ${loop.owner} · priority: ${loop.priority}${loop.area ? ` · area: ${loop.area}` : ''}`,
+    `kind: ${loop.kind} · status: ${loop.status} · owner: ${ownerText(loop.owner)} · priority: ${loop.priority}${loop.area ? ` · area: ${loop.area}` : ''}`,
   ];
   if (loop.due) lines.push(`due: ${iso(loop.due)}`);
   if (loop.options.length) lines.push(`options: ${loop.options.join(' | ')}`);
