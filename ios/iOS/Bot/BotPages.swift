@@ -465,7 +465,7 @@ struct LibraryPageView: View {
                 ForEach(groups) { group in
                     Text(group.title).font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
                         .padding(.top, 18).padding(.bottom, 6)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 10)], spacing: 10) {
                         ForEach(group.rows) { tile($0) }
                     }
                     .frame(maxWidth: .infinity)

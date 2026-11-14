@@ -16,6 +16,7 @@ public struct RelayedMessage: Hashable, Sendable {
 
     nonisolated(unsafe) private static let agentHeader = try! Regex(#"^\[bb message from thread:([^;\]\s]+)(?:;[^\]]*)?\]\s*"#)
     nonisolated(unsafe) private static let systemHeader = try! Regex(#"^\[bb system\]\s*"#)
+    nonisolated(unsafe) private static let studioHeader = try! Regex(#"^\[bb studio\][ \t]*(?:\r?\n)*"#)
     nonisolated(unsafe) private static let automationHeader = try! Regex(#"^\[bb automation due:([^\]\s]+)\]\s*"#)
     nonisolated(unsafe) private static let runnerLine = try! Regex(#"^(⚠️ )?From runner ([^:\n]+): "#)
     nonisolated(unsafe) private static let namedAutomation = try! Regex(#"^(?:Check-in|Reminder) "([^"\n]+)"(?: \([^)\n]*\))?: "#)
@@ -87,8 +88,14 @@ public struct RelayedMessage: Hashable, Sendable {
         return nil
     }
 
+    private static func markedStudioLine(_ text: Substring) -> RelayedMessage? {
+        guard let header = text.prefixMatch(of: studioHeader) else { return nil }
+        let rest = text[header.range.upperBound...]
+        return studioLine(rest) ?? RelayedMessage(kind: .studio, sender: studioSender, body: rest, summaryFrom: rest)
+    }
+
     private static func body(_ body: Substring) -> RelayedMessage {
-        if let line = studioLine(body) { return line }
+        if let line = markedStudioLine(body) ?? studioLine(body) { return line }
         let start = body.prefixMatch(of: leadTag)?.range.upperBound ?? body.startIndex
         return RelayedMessage(kind: .agent, sender: nil, body: body, summaryFrom: body[start...])
     }
@@ -102,6 +109,7 @@ public struct RelayedMessage: Hashable, Sendable {
             return RelayedMessage(kind: .automation, sender: named.map { capture($0, 1) } ?? "Automation", body: rest,
                                   summaryFrom: named.map { rest[$0.range.upperBound...] } ?? rest)
         }
+        if let marked = markedStudioLine(all) { return marked }
         if initiator != "user" {
             if let agent = all.prefixMatch(of: agentHeader) {
                 var message = body(all[agent.range.upperBound...])
@@ -113,8 +121,7 @@ public struct RelayedMessage: Hashable, Sendable {
                 return RelayedMessage(kind: .system, sender: studioSender, body: rest, summaryFrom: rest)
             }
         }
-        if initiator == "agent" || initiator == "system" { return nil }
-        return studioLine(all)
+        return nil
     }
 
     public static func of(_ row: TimelineRow) -> RelayedMessage? {

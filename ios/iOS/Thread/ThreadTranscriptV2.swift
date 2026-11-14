@@ -167,7 +167,7 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
                     state.editable = false
                     state.sameTurn = false
                     speaker = nil
-                    if let pass = Self.passReply(after: index, in: items) {
+                    if !relayed.urgent, let pass = Self.passReply(after: index, in: items) {
                         state.quiet = true
                         index = pass + 1
                     }

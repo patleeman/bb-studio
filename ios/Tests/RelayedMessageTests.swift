@@ -86,4 +86,20 @@ final class RelayedMessageTests: XCTestCase {
         }, ["m4", "m5"], "relayed rows stay off the floor")
         XCTAssertEqual(RoomFloor.rows(out, lying: false).count, out.count, "and show when the chat stands")
     }
+
+    func testAnUrgentRowNeverFolds() {
+        let rows = [
+            row("u1", "user", "[bb studio] ⚠️ \"Inbox sweep\" stopped again (twice today).", initiator: "user"),
+            row("u2", "assistant", "[PASS]"),
+        ]
+        let out = ThreadTranscriptRow.thread(items: TimelineItem.group(rows), hasOlder: false, unread: nil, match: nil, editableId: nil,
+                                             pending: [], interactions: [], working: false, thinking: nil)
+        let states: [(String, Bool)] = out.compactMap {
+            guard case .item(let item, let state) = $0 else { return nil }
+            return (item.id, state.quiet)
+        }
+        XCTAssertEqual(states.map(\.0), ["u1", "u2"])
+        XCTAssertEqual(states.first?.1, false)
+        XCTAssertNil(RelayedMessage.parse("Watcher A: hi", initiator: "user"), "a typed line is never relayed")
+    }
 }
