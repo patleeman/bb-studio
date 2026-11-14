@@ -202,6 +202,11 @@ it("keeps a conversation's latest reply, skips quiet ones, and hands a deleted c
   expect(store.get("conv")!.latest?.text).toBe("Done. The draft is on the page.");
   store.idle("conv", "[PASS]");
   expect(store.get("conv")!.latest?.text).toBe("Done. The draft is on the page.");
+  store.idle("conv", "Back in @thread:thr_main.");
+  expect(store.get("conv")!.latest?.text).toBe("Back in Main.");
+  store.idle("conv", "Report: @thread:thr_gone_1");
+  expect(store.get("conv")!.latest?.text).toBe("Report: a conversation");
+  store.idle("conv", "**Done.** The draft is on the page.");
   // A worker has no second line.
   store.idle("w", "hello");
   expect(store.get("w")!.latest).toBeNull();
@@ -268,6 +273,8 @@ it("shortens a reply to its first line and reads a repo tag only off a git check
   expect(latestLine("::page{id=\"pg_1\"}\n\n# Heading")).toBe("Heading");
   expect(latestLine("x".repeat(400))!.length).toBe(160);
   expect(latestLine("  ")).toBeNull();
+  expect(latestLine("Report A: @thread:thr_rr855dubiq · Report B: done")).toBe("Report A: a conversation · Report B: done");
+  expect(latestLine("See @thread:thr_ab12#msg=4 and @page:pg_0123abcd", (id) => (id === "thr_ab12" ? "Compare e-ink readers" : null))).toBe("See Compare e-ink readers and a page");
   expect(latestLine("Recap: The [Spring menu draft](bb://page/pg_1) has [3 items](/threads/thr_1).")).toBe("Recap: The Spring menu draft has 3 items.");
   expect(repoTag({ environmentPath: "/a/b", environmentBranchName: null })).toBeNull();
   expect(repoTag({ environmentName: "larkspur", environmentBranchName: "main" })).toEqual({ tag: "larkspur", branch: "main" });
