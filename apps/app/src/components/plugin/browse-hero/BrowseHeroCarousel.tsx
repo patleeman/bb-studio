@@ -16,12 +16,12 @@ const PLUGIN_RAIL: readonly IconName[] = [
 ];
 
 const PLUGIN_HERO_COPY: ShowcaseHeroCopy = {
-  ariaLabel: "What you can build with bb plugins",
-  headlineLead: "Turn bb into",
+  ariaLabel: "What you can build with BB Studio plugins",
+  headlineLead: "Turn BB Studio into",
   composingNoun: "whatever you need",
   description: PLUGINS_BROWSE_DESCRIPTION,
   tablistLabel: "Plugin examples",
-  frameTitlePrefix: "bb — ",
+  frameTitlePrefix: "BB Studio — ",
   frameBadge: "Plugin",
 };
 

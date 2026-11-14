@@ -317,7 +317,7 @@ export function ProvidersSettingsSection({
     <>
       <SettingsSection
         title="Providers"
-        description="Choose which agents you use in BB. Drag to reorder them in provider pickers."
+        description="Choose which agents you use in BB Studio. Drag to reorder them in provider pickers."
       >
         {providersQuery.isPending ? (
           <p className="text-sm text-muted-foreground">Loading providers…</p>
@@ -392,7 +392,7 @@ export function ProvidersSettingsSection({
           </SettingsWithControl>
           <SettingsWithControl
             label="Release idle agent sessions"
-            description="Stop agents that have been idle this long to free memory. Threads keep their history and pick up on your next message. Checked every 5 minutes."
+            description="Stop agents that have been idle this long to free memory. Conversations keep their history and pick up on your next message. Checked every 5 minutes."
           >
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

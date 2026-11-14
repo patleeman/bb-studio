@@ -438,7 +438,7 @@ export function PluginDetail({
   const updatesWithBb = plugin.source.startsWith("builtin:");
   const installedAt = sourceQuery.data?.installedAt ?? null;
   const installedValue = updatesWithBb
-    ? "Updates with bb"
+    ? "Updates with BB Studio"
     : installedAt !== null
       ? formatAbsoluteDate(installedAt)
       : sourceQuery.isPending

@@ -270,7 +270,7 @@ const SETTINGS_DROPDOWN_CONTENT_CLASS =
 const CREATE_CUSTOM_PALETTE_PROMPT =
   "Create a custom bb palette. First run `bb theme dir` to find the custom theme directory. Ask me for the palette name and visual direction, then create `<theme-dir>/<name>/theme.css` with light and dark theme variables compatible with bb's theme tokens.";
 const PALETTE_SETTING_DESCRIPTION =
-  "Palettes change bb's colors, including syntax colors in diffs and file previews. Choose a built-in palette or create one from a prompt.";
+  "Palettes change BB Studio's colors, including syntax colors in diffs and file previews. Choose a built-in palette or create one from a prompt.";
 
 interface PaletteMenuItemProps {
   active: boolean;
@@ -600,9 +600,9 @@ export function LocalOpenTargetSettingsSection({
 const IN_APP_BROWSER_LINK_SETTING_LABEL = "Open links in the in-app browser";
 const REWRITE_LOCALHOST_LINKS_SETTING_LABEL = "Rewrite localhost links";
 const NAVIGATE_TO_THREAD_AFTER_CREATE_SETTING_LABEL =
-  "Navigate to threads on creation";
+  "Open new conversations";
 const DIAGNOSTIC_EVENTS_SETTING_LABEL = "Show diagnostic events";
-const FOLLOW_UP_BEHAVIOR_SETTING_LABEL = "Default thread followup behavior";
+const FOLLOW_UP_BEHAVIOR_SETTING_LABEL = "Follow-up behavior";
 const FOLLOW_UP_BEHAVIOR_OPTIONS = [
   {
     steerOnEnter: false,
@@ -655,7 +655,7 @@ function ManagedBranchPrefixSetting({
       label={MANAGED_BRANCH_PREFIX_SETTING_LABEL}
       description={
         valid ? (
-          `bb puts this in front of every branch it creates for a worktree, such as ${draft}${MANAGED_BRANCH_PREFIX_EXAMPLE_SLUG}. Leave it empty for no prefix.`
+          `BB Studio puts this in front of every branch it creates for a worktree, such as ${draft}${MANAGED_BRANCH_PREFIX_EXAMPLE_SLUG}. Leave it empty for no prefix.`
         ) : (
           <span className="text-destructive" role="alert">
             This prefix cannot start a valid git branch name.
@@ -893,7 +893,7 @@ export function GeneralSettingsSection({
   );
   return (
     <>
-      <SettingsSection title="Threads & editing">
+      <SettingsSection title="Conversations & editing">
         <div className="space-y-5">
           <SettingsWithControl
             label={NAVIGATE_TO_THREAD_AFTER_CREATE_SETTING_LABEL}
@@ -907,7 +907,7 @@ export function GeneralSettingsSection({
 
           <SettingsWithControl
             label={FOLLOW_UP_BEHAVIOR_SETTING_LABEL}
-            description="What Enter does in the prompt box while the thread runs."
+            description="What Enter does in the prompt box while the conversation runs."
           >
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -959,20 +959,20 @@ export function GeneralSettingsSection({
           </SettingsWithControl>
 
           <SettingsWithControl
-            label="Thread archive confirmation"
-            description="Ask before archiving a thread with unarchived child threads."
+            label="Archive confirmation"
+            description="Ask before archiving a conversation with unarchived workers."
           >
             <Switch
               checked={confirmThreadArchive}
               disabled={generalSettingsDisabled}
               onCheckedChange={onConfirmThreadArchiveChange}
-              aria-label="Thread archive confirmation"
+              aria-label="Archive confirmation"
             />
           </SettingsWithControl>
 
           <SettingsWithControl
             label="Show messages from before a context clear"
-            description="Earlier messages stay in the thread for you to read. The agent doesn't see them."
+            description="Earlier messages stay in the conversation for you to read. The agent doesn't see them."
           >
             <Switch
               checked={keepHistoryAfterContextClear}
@@ -1017,7 +1017,7 @@ export function GeneralSettingsSection({
           {desktopBrowserAvailable ? (
             <SettingsWithControl
               label={IN_APP_BROWSER_LINK_SETTING_LABEL}
-              description="Open web links inside bb."
+              description="Open web links inside BB Studio."
             >
               <Switch
                 checked={openLinksInAppBrowser}
@@ -1125,7 +1125,7 @@ const EXPERIMENT_DEFINITIONS: Record<
       "When an idle thread holds at least 100k tokens and its prompt cache has expired, the composer offers to compact before your next send. Works with supported providers (e.g. Claude Code, Pi).",
   },
   dismissReadNotifications: {
-    label: "Clear notifications once a thread is read",
+    label: "Clear notifications once a conversation is read",
     description:
       "When you read a thread on any device, remove its notifications from your phones and tablets and from open bb windows and tabs. Phones need an app version that supports it.",
   },
