@@ -42,104 +42,12 @@ struct BotProfileSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    VStack(spacing: 14) {
-                        BotAvatar(look, size: 96)
-                            .shadow(color: tint.opacity(0.4), radius: 20, y: 10)
-                            .animation(.bouncy, value: shape)
-                            .animation(.smooth, value: color)
-                            .padding(.top, 8)
-                        TextField("Name", text: $name)
-                            .font(.title2.weight(.semibold))
-                            .multilineTextAlignment(.center)
-                            .textInputAutocapitalization(.words)
-                            .submitLabel(.done)
-                            .padding(.vertical, 10)
-                            .background(.fill.tertiary, in: .rect(cornerRadius: 14))
-                            .accessibilityLabel("Name")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .listRowBackground(Color.clear)
-                }
-                Section("Shape") {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
-                        ForEach(BotShape.allCases) { option in
-                            Button { shape = option } label: {
-                                BotAvatar(BotLook(shape: option.rawValue, color: color, emoji: ""), size: 40)
-                                    .frame(width: 54, height: 54)
-                                    .background(option == shape ? tint.opacity(0.16) : Color.clear, in: .rect(cornerRadius: 14))
-                                    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(option == shape ? tint : .clear, lineWidth: 2))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(option.label)
-                            .accessibilityAddTraits(option == shape ? .isSelected : [])
-                        }
-                    }
-                    .padding(.vertical, 4)
-                    .sensoryFeedback(.selection, trigger: shape)
-                }
-                Section {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 12) {
-                        ForEach(BotPalette.hexes, id: \.self) { hex in
-                            Button {
-                                matchName = false
-                                color = hex
-                            } label: {
-                                Circle().fill(BotPalette.color(hex))
-                                    .frame(width: 34, height: 34)
-                                    .padding(3)
-                                    .overlay(Circle().strokeBorder(hex == color ? BotPalette.color(hex) : .clear, lineWidth: 2.5))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Color \(BotPalette.hexes.firstIndex(of: hex)! + 1)")
-                            .accessibilityAddTraits(hex == color ? .isSelected : [])
-                        }
-                    }
-                    .padding(.vertical, 4)
-                    .sensoryFeedback(.selection, trigger: color)
-                    Toggle("Match the name", isOn: $matchName)
-                } header: { Text("Color") }
-                Section {
-                    TextField("You are my chief of staff. Keep me on top of…", text: $role, axis: .vertical)
-                        .lineLimit(2...5)
-                } header: { Text("Role") } footer: { Text("A sentence or two on what \(trimmedName.isEmpty ? "it" : trimmedName) does for you.") }
-                if !changes.isEmpty {
-                    Section {
-                        ForEach(changes.prefix(5)) { change in
-                            HStack(spacing: 8) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(change.byLine).font(.caption).foregroundStyle(.secondary)
-                                    Text(change.summary).font(.subheadline).lineLimit(2)
-                                }
-                                Spacer()
-                                if change.canRevert {
-                                    Button("Revert") { Task { await revert(change) } }.buttonStyle(.borderless).disabled(busy)
-                                } else if change.revertedAt != nil {
-                                    Text("Reverted").font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    } header: { Text("Profile changes") } footer: { Text("Changes \(bot?.name ?? "it") made to itself. Revert puts back what it replaced.") }
-                }
-                Section {
-                    ForEach(CheckIn.allCases.filter { $0 != .unchanged || checkIn == .unchanged }) { option in
-                        Button { checkIn = option } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: option.icon).foregroundStyle(tint).frame(width: 24)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(option.title).foregroundStyle(.primary)
-                                    if !option.detail.isEmpty { Text(option.detail).font(.caption).foregroundStyle(.secondary) }
-                                }
-                                Spacer()
-                                if option == checkIn { Image(systemName: "checkmark").fontWeight(.semibold).foregroundStyle(tint) }
-                            }
-                        }
-                        .accessibilityAddTraits(option == checkIn ? .isSelected : [])
-                    }
-                } header: { Text("Check-ins") } footer: {
-                    Text(bot?.state == .active || bot == nil ? "When \(trimmedName.isEmpty ? "it" : trimmedName) wakes on its own to look around." : "Resume it to change its check-ins.")
-                }
-                .disabled(bot != nil && bot?.state != .active)
+                identitySection
+                shapeSection
+                colorSection
+                roleSection
+                changesSection
+                checkInSection
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }
             .tint(tint)
@@ -164,6 +72,122 @@ struct BotProfileSheet: View {
             }
             .task { await loadChanges() }
         }
+    }
+
+    @ViewBuilder private var identitySection: some View {
+        Section {
+            VStack(spacing: 14) {
+                BotAvatar(look, size: 96)
+                    .shadow(color: tint.opacity(0.4), radius: 20, y: 10)
+                    .animation(.bouncy, value: shape)
+                    .animation(.smooth, value: color)
+                    .padding(.top, 8)
+                TextField("Name", text: $name)
+                    .font(.title2.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .textInputAutocapitalization(.words)
+                    .submitLabel(.done)
+                    .padding(.vertical, 10)
+                    .background(.fill.tertiary, in: .rect(cornerRadius: 14))
+                    .accessibilityLabel("Name")
+            }
+            .frame(maxWidth: .infinity)
+            .listRowBackground(Color.clear)
+        }
+    }
+
+    @ViewBuilder private var shapeSection: some View {
+        Section("Shape") {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
+                ForEach(BotShape.allCases) { option in
+                    Button { shape = option } label: {
+                        BotAvatar(BotLook(shape: option.rawValue, color: color, emoji: ""), size: 40)
+                            .frame(width: 54, height: 54)
+                            .background(option == shape ? tint.opacity(0.16) : Color.clear, in: .rect(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(option == shape ? tint : .clear, lineWidth: 2))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(option.label)
+                    .accessibilityAddTraits(option == shape ? .isSelected : [])
+                }
+            }
+            .padding(.vertical, 4)
+            .sensoryFeedback(.selection, trigger: shape)
+        }
+    }
+
+    @ViewBuilder private var colorSection: some View {
+        Section {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 12) {
+                ForEach(BotPalette.hexes, id: \.self) { hex in
+                    Button {
+                        matchName = false
+                        color = hex
+                    } label: {
+                        Circle().fill(BotPalette.color(hex))
+                            .frame(width: 34, height: 34)
+                            .padding(3)
+                            .overlay(Circle().strokeBorder(hex == color ? BotPalette.color(hex) : .clear, lineWidth: 2.5))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Color \(BotPalette.hexes.firstIndex(of: hex)! + 1)")
+                    .accessibilityAddTraits(hex == color ? .isSelected : [])
+                }
+            }
+            .padding(.vertical, 4)
+            .sensoryFeedback(.selection, trigger: color)
+            Toggle("Match the name", isOn: $matchName)
+        } header: { Text("Color") }
+    }
+
+    @ViewBuilder private var roleSection: some View {
+        Section {
+            TextField("You are my chief of staff. Keep me on top of…", text: $role, axis: .vertical)
+                .lineLimit(2...5)
+        } header: { Text("Role") } footer: { Text("A sentence or two on what \(trimmedName.isEmpty ? "it" : trimmedName) does for you.") }
+    }
+
+    @ViewBuilder private var changesSection: some View {
+        if !changes.isEmpty {
+            Section {
+                ForEach(changes.prefix(5)) { change in
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(change.byLine).font(.caption).foregroundStyle(.secondary)
+                            Text(change.summary).font(.subheadline).lineLimit(2)
+                        }
+                        Spacer()
+                        if change.canRevert {
+                            Button("Revert") { Task { await revert(change) } }.buttonStyle(.borderless).disabled(busy)
+                        } else if change.revertedAt != nil {
+                            Text("Reverted").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } header: { Text("Profile changes") } footer: { Text("Changes \(bot?.name ?? "it") made to itself. Revert puts back what it replaced.") }
+        }
+    }
+
+    @ViewBuilder private var checkInSection: some View {
+        Section {
+            ForEach(CheckIn.allCases.filter { $0 != .unchanged || checkIn == .unchanged }) { option in
+                Button { checkIn = option } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: option.icon).foregroundStyle(tint).frame(width: 24)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(option.title).foregroundStyle(.primary)
+                            if !option.detail.isEmpty { Text(option.detail).font(.caption).foregroundStyle(.secondary) }
+                        }
+                        Spacer()
+                        if option == checkIn { Image(systemName: "checkmark").fontWeight(.semibold).foregroundStyle(tint) }
+                    }
+                }
+                .accessibilityAddTraits(option == checkIn ? .isSelected : [])
+            }
+        } header: { Text("Check-ins") } footer: {
+            Text(bot?.state == .active || bot == nil ? "When \(trimmedName.isEmpty ? "it" : trimmedName) wakes on its own to look around." : "Resume it to change its check-ins.")
+        }
+        .disabled(bot != nil && bot?.state != .active)
     }
 
     private func loadChanges() async {
