@@ -24,6 +24,15 @@ it("hands Mod+N to the sidebar's + New while the sidebar is mounted", () => {
   setConversationStarter(null);
 });
 
+it("opens the Bot page itself when the sidebar has no Bot yet, so BB's bare page never opens", () => {
+  setConversationStarter(() => false);
+  openFrom.mockClear();
+  setCurrentBot("bot_juniper");
+  expect(startNewConversation()).toBe(true);
+  expect(openFrom).toHaveBeenCalledWith(null, { href: "/plugins/studio/studio/new-conversation/bot_juniper" }, { target: "main" }, expect.anything());
+  setConversationStarter(null);
+});
+
 it("registers the handler only on a BB that has the slot", () => {
   const registered: unknown[] = [];
   const run = () => true;
