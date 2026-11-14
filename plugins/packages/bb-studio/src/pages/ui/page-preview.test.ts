@@ -39,3 +39,7 @@ it("leaves code untouched, mentions included", () => {
 it("keeps an unclosed fence as code", () => {
   expect(chatMarkdown("```ts\nconst a = @[x](page:pg_a)")).toBe("```ts\nconst a = @[x](page:pg_a)");
 });
+
+it("labels callouts instead of showing their marker", () => {
+  expect(chatMarkdown("> [!TIP] Book early.\n> [!warning]\n> Bring a coat.\n> [!NOPE] kept\nHard  ")).toBe("> **Tip** Book early.\n> **Warning**\n> Bring a coat.\n> [!NOPE] kept\nHard  ");
+});
