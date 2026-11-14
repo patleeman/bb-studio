@@ -846,6 +846,22 @@ const replacements = [
     "while the bb desktop app is running",
     `while the ${NAME} desktop app is running`,
   ],
+  [
+    "apps/app/src/views/thread-detail/ThreadDetailPromptArea.tsx",
+    'submitLabel: "New thread",\n            submitIcon: "MessageSquarePlus",\n            submitTitle: "Create new thread (Enter)",',
+    'submitLabel: "Send",\n            submitIcon: "MessageSquarePlus",\n            submitTitle: "Send in a new conversation (Enter)",',
+  ],
+  [
+    "apps/app/src/views/thread-detail/ThreadDetailPromptArea.test.tsx",
+    '.textContent).toBe("New thread");',
+    '.textContent).toBe("Send");',
+    4,
+  ],
+  [
+    "apps/app/src/views/thread-detail/ThreadDetailPromptArea.test.tsx",
+    '"Create new thread (Enter)",',
+    '"Send in a new conversation (Enter)",',
+  ],
 ];
 for (const [file, from, to, expected = 1] of replacements) {
   const target = join(root, file);
