@@ -118,8 +118,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
 
         command("pasteboard?clear")
         menu(on: reply, "Copy", "actions: copy")
-        expectation(for: NSPredicate { _, _ in self.copied() == "Row actions reply." }, evaluatedWith: nil)
-        waitForExpectations(timeout: 5) { _ in }
+        _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in self.copied() == "Row actions reply." }, object: nil)], timeout: 10)
         if copied() != "Row actions reply." { failures.append("actions: Copy copied \(copied() ?? "nothing")") }
 
         menu(on: reply, "Quote", "actions: quote")
@@ -537,8 +536,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
 
     private func expectKeyboard(_ shown: Bool, _ step: String) {
         let keyboard = app.keyboards.firstMatch
-        expectation(for: NSPredicate { _, _ in keyboard.exists == shown }, evaluatedWith: nil)
-        waitForExpectations(timeout: 5) { _ in }
+        _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in keyboard.exists == shown }, object: nil)], timeout: 10)
         if keyboard.exists != shown { failures.append("\(step): keyboard \(shown ? "not up" : "still up")") }
     }
 
