@@ -167,7 +167,6 @@ struct RoomView: View {
             guard phase == .active else { return }
             await loadMorning()
         }
-        .modifier(KeyboardWarmup(phase: phase, atRest: { room.mode == .rest }))
         .onChange(of: bot.appearance?.themeId) { _, saved in
             if let saved, shell.themeOverride[bot.id] == saved { shell.themeOverride[bot.id] = nil }
         }
