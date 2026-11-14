@@ -1445,7 +1445,7 @@
               },
               "owner": {
                 "type": "string",
-                "pattern": "^(patrick|cos|thread:.+)$"
+                "pattern": "^(user|patrick|cos|thread:.+)$"
               },
               "trigger": {
                 "type": "object",
@@ -1727,7 +1727,7 @@
           },
           "owner": {
             "type": "string",
-            "pattern": "^(patrick|cos|thread:.+)$"
+            "pattern": "^(user|patrick|cos|thread:.+)$"
           },
           "snooze": {
             "type": "string",
