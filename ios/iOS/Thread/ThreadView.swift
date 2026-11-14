@@ -54,7 +54,6 @@ struct ThreadView: View {
     @State private var resizeAnchor = TranscriptResizeAnchor()
     @State private var resizeRestore: Task<Void, Never>?
     @Environment(\.duoLayout) private var duoLayout
-    @Environment(\.rightPage) private var rightPage
     @Environment(\.duoPage) private var duoPage
     @State private var pickingSendTime = false
     @State private var showingFiles = false
@@ -142,11 +141,6 @@ struct ThreadView: View {
         .sensoryFeedback(.error, trigger: model.error) { (_: String?, new: String?) in new != nil }
         .sensoryFeedback(.selection, trigger: attachments.count, condition: Self.grew)
         .userActivity(Spotlight.threadActivityType, isActive: model.thread != nil, describeActivity)
-        .task(id: rightPage && model.thread != nil) {
-            guard rightPage, model.thread != nil, Self.announced.insert(model.threadId).inserted else { return }
-            try? await Task.sleep(for: .seconds(1))
-            UIAccessibility.post(notification: .layoutChanged, argument: nil)
-        }
         .onChange(of: composerFocused, initial: true) { _, _ in reportClassicWriting() }
         .onAppear {
             reportClassicWriting()
@@ -158,8 +152,6 @@ struct ThreadView: View {
             ClassicBotActivity.shared.setReading(false)
         }
     }
-
-    private static var announced: Set<String> = []
 
     private func reportClassicWriting() {
         guard botChrome != nil else { return }

@@ -55,9 +55,7 @@ final class WebRTCAudioControl: RTCAudioControl {
         let webRTC = RTCAudioSessionConfiguration.webRTC()
         webRTC.category = config.category.rawValue
         webRTC.mode = config.mode.rawValue
-        var farField = false
-        if #available(iOS 26.2, *) { farField = true }
-        webRTC.categoryOptions = config.resolvedOptions(farFieldAvailable: farField)
+        webRTC.categoryOptions = config.optionsOnThisOS
         return webRTC
     }
 }
