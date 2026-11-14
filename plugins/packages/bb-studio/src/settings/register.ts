@@ -61,7 +61,12 @@ export async function registerSettings(bb: BbPluginApi, pluginId: string): Promi
     const set = await keys.status();
     return { keys: Object.entries(STUDIO_KEY_SETTINGS).map(([key, setting]) => ({ key, label: setting.label, description: setting.description, set: set[key] === true })) };
   };
-  const answer = () => ({ values: { ...store.current(), desktopControl }, changed: Object.keys(store.explicit()).filter((key) => !isHiddenSetting(key)) });
+  const answer = () => ({
+    values: { ...store.current(), desktopControl },
+    changed: Object.keys(store.explicit()).filter((key) => !isHiddenSetting(key)),
+    timeZone: loopTimeZone(process.env, store.current().todosTimeZone),
+    defaultTimeZone: loopTimeZone(process.env),
+  });
   const mobile = async <T>(method: string, outputSchema: z.ZodType<T>): Promise<T | null> => {
     const { plugins } = await bb.sdk.plugins.list();
     const plugin = plugins.find((each) => each.id === MOBILE_PLUGIN_ID) as { id: string; enabled?: boolean } | undefined;
@@ -71,7 +76,7 @@ export async function registerSettings(bb: BbPluginApi, pluginId: string): Promi
   const notInstalled: PushStatus = { installed: false, ready: false, problem: "Install the Studio Mobile plugin to send pushes to the BB Studio app.", devices: 0, lastDelivery: null };
 
   bb.rpc.register(settingsContract, {
-    "settings.get": async () => ({ ...answer(), timeZone: loopTimeZone() }),
+    "settings.get": async () => answer(),
     "settings.set": async ({ values }) => {
       await store.set(Object.fromEntries(Object.entries(values).filter(([key]) => !isHiddenSetting(key))));
       return answer();

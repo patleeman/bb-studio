@@ -24,7 +24,7 @@ import { useOpenThread } from "./workspace";
 import { botPath } from "./selection";
 import { noteBotName } from "../page-bar";
 import { usePendingQuestions } from "../../loops/ui/LoopsTab";
-import { openLoops, useLoopActions, useLoopsEnabled } from "../../loops/ui/hooks";
+import { openLoops, useLoopActions, useLoopsEnabled, useTodosZone } from "../../loops/ui/hooks";
 import { dueLabel } from "../../loops/ui/model";
 import { Elapsed, ProviderStatusMark, runningLabel } from "./ProviderStatusMark";
 import { useAuthNeeds } from "../../auth/ui/needs";
@@ -73,6 +73,7 @@ export function useBotPageModel(view: BotView) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(timer); }, []);
   const tz = zone();
+  const todosZone = useTodosZone();
   const names = page.data?.groupNames ?? {};
   const { sources, runners, activity } = jobs;
 
@@ -103,7 +104,7 @@ export function useBotPageModel(view: BotView) {
   const loopIcon = { do: "Circle", decide: "Fork", read: "FileText", waiting: "Clock" } as const;
   const loopNeeds = loopsOn ? loops.data?.needsYouNow ?? [] : [];
   const failures = failedRuns(sources, dismissed);
-  for (const loop of loopNeeds.filter((each) => dueLabel(each.due, now)?.urgent)) needs.push({ key: `loop:${loop.id}`, icon: loopIcon[loop.kind], title: loop.title, detail: loop.why || null, due: dueLabel(loop.due, now), action: loopAction(loop) });
+  for (const loop of loopNeeds.filter((each) => dueLabel(each.due, now, todosZone)?.urgent)) needs.push({ key: `loop:${loop.id}`, icon: loopIcon[loop.kind], title: loop.title, detail: loop.why || null, due: dueLabel(loop.due, now, todosZone), action: loopAction(loop) });
   // A failed run opens itself: its thread at the message it sent, or its automation's runs.
   const openRun = (run: FailedRun) => {
     const fallback = () => run.threadId ? openThread(run.threadId) : openAppPath(botPath(bot.id));
@@ -124,7 +125,7 @@ export function useBotPageModel(view: BotView) {
     key: `question:${question.id}`, icon: "CircleQuestion", title: question.text ?? question.reason, detail: `${question.text ? `${question.reason === "Asked you a question" ? "Asked you in chat" : question.reason}` : "In its chat"} ${agoWords(question.createdAt, now)}`,
     action: { label: question.reason.includes("approval") ? "Review" : "Answer", run: () => bot.threadId && openThread(bot.threadId) },
   });
-  for (const loop of loopNeeds.filter((each) => !dueLabel(each.due, now)?.urgent)) needs.push({ key: `loop:${loop.id}`, icon: loopIcon[loop.kind], title: loop.title, detail: loop.why || null, due: dueLabel(loop.due, now), action: loopAction(loop) });
+  for (const loop of loopNeeds.filter((each) => !dueLabel(each.due, now, todosZone)?.urgent)) needs.push({ key: `loop:${loop.id}`, icon: loopIcon[loop.kind], title: loop.title, detail: loop.why || null, due: dueLabel(loop.due, now, todosZone), action: loopAction(loop) });
   const lastMaintenance = maintenance.data?.runs.find((run) => !run.dryRun);
   if (lastMaintenance?.needsCall.length) {
     const count = lastMaintenance.needsCall.length;

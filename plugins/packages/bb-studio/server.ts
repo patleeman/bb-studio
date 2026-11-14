@@ -679,7 +679,7 @@ export default async function plugin(bb: BbPluginApi) {
     const bot = bots.stored();
     if (!bot?.threadId) throw new Error('A Bot chat is required');
     await bb.sdk.plugins.callRpc({pluginId:'mobile',method:'notify',outputSchema:z.unknown(),input:{title:loop.title,body:loop.why,kind:'turn-finished',threadId:bot.threadId,botId:bot.id,conversationId:bot.threadId,projectId:PERSONAL_PROJECT_ID,category:'BB_LOOP',loopId:loop.id,loopKind:loop.kind,actions:loopPushActions(loop.kind),...(loop.kind==='decide'&&loop.options.length?{options:loop.options.slice(0,4).map(o=>o.slice(0,120))}:{}),coalesceKey:loop.id} as never});
-  }, settings, loopTimeZone, (name, everyMs, work) => triggers.every(name, everyMs, work));
+  }, settings, () => loopTimeZone(process.env, studioSettings.current().todosTimeZone), (name, everyMs, work) => triggers.every(name, everyMs, work));
   loopsEnabled = loops.enabled;
   const work = registerWorkCards(bb, db);
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.

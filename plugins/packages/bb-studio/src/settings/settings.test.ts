@@ -140,7 +140,7 @@ describe("the combined handle Studio's server code reads", () => {
       const value = setting.type === "boolean" ? !setting.default
         : setting.type === "number" ? (setting.default === setting.max ? setting.min : Math.min(setting.max!, Number(setting.default) + 1))
           : setting.type === "select" ? setting.options!.find((option) => option !== setting.default)
-            : `${String(setting.default)}x`;
+            : (setting as { timeZone?: true }).timeZone ? "Europe/Paris" : `${String(setting.default)}x`;
       return [key, value];
     }));
     await store.set(changed as Record<string, string | number | boolean>);
@@ -154,9 +154,20 @@ describe("the combined handle Studio's server code reads", () => {
     expect(decisionsConstants({ STUDIO_JEV_TIMEOUT_MS: "99999" }).jevTimeoutMs).toBe(5000);
   });
 
-  it("Todos' time zone is this Mac's unless the host overrides it", () => {
+  it("Todos' time zone is the setting, else STUDIO_LOOP_TIME_ZONE, else this Mac's", () => {
+    expect(loopTimeZone({}, "America/Los_Angeles")).toBe("America/Los_Angeles");
+    expect(loopTimeZone({ STUDIO_LOOP_TIME_ZONE: "Europe/Paris" }, "America/Los_Angeles")).toBe("America/Los_Angeles");
+    expect(loopTimeZone({ STUDIO_LOOP_TIME_ZONE: "Europe/Paris" }, "")).toBe("Europe/Paris");
     expect(loopTimeZone({ STUDIO_LOOP_TIME_ZONE: "Europe/Paris" })).toBe("Europe/Paris");
     expect(loopTimeZone({ STUDIO_LOOP_TIME_ZONE: "Mars/Olympus" })).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    expect(loopTimeZone({}, "Mars/Olympus")).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  });
+
+  it("checks the Todos time zone setting: an IANA zone or empty", () => {
+    expect(STUDIO_SETTINGS.todosTimeZone).toMatchObject({ group: "attention", default: "" });
+    expect(checkSetting("todosTimeZone", " America/Los_Angeles ")).toEqual({ ok: true, value: "America/Los_Angeles" });
+    expect(checkSetting("todosTimeZone", "")).toEqual({ ok: true, value: "" });
+    expect(checkSetting("todosTimeZone", "Mars/Olympus")).toMatchObject({ ok: false, error: "Mars/Olympus isn't a time zone, such as America/Los_Angeles." });
   });
 });
 
@@ -288,7 +299,12 @@ describe("registerSettings on a host", () => {
     expect(got.values).toMatchObject({ autoTitle: false, loopQuietEnd: 6 });
     expect(got.values).not.toHaveProperty("openaiApiKey");
     expect(got.changed.sort()).toEqual(["autoTitle", "emojiItems", "loopQuietEnd"]);
-    expect(got.timeZone).toBeTruthy();
+    expect(got.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    const zoned = await host.harness.behavior.callRpc("settings.set", { values: { todosTimeZone: "America/Los_Angeles" } }) as { timeZone: string; defaultTimeZone: string };
+    expect(zoned).toMatchObject({ timeZone: "America/Los_Angeles", defaultTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+    expect((await host.harness.behavior.callRpc("settings.get", null) as { timeZone: string }).timeZone).toBe("America/Los_Angeles");
+    await expect(host.harness.behavior.callRpc("settings.set", { values: { todosTimeZone: "Mars/Olympus" } })).rejects.toThrow();
+    await host.harness.behavior.callRpc("settings.set", { values: { todosTimeZone: null } });
     const before = host.harness.inspection.realtimeSignals.length;
     const set = await host.harness.behavior.callRpc("settings.set", { values: { loopDailyBudget: 2, autoTitle: null } }) as { values: Record<string, unknown> };
     expect(set.values).toMatchObject({ loopDailyBudget: 2, autoTitle: true });

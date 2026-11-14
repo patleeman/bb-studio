@@ -16,7 +16,7 @@ import { useLive } from "../../ui/live";
 import type { Loop } from "../contract";
 import { CARD_BUTTON, CARD_GHOST, CARD_PRIMARY, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu } from "./LoopMenus";
 import { closedVerb, dueLabel, elapsed, INLINE_OPTIONS, KIND, lastEvent, ownerName, ownerThread, releaseLabel, safeUrl, shortWhen, sourceText, type OwnerInfo } from "./model";
-import { useLoopActions, useLoopPeople, useOpenLoopsPane, type LoopPeople } from "./hooks";
+import { useLoopActions, useLoopPeople, useOpenLoopsPane, useTodosZone, type LoopPeople } from "./hooks";
 
 export const isLoopId = (id: string) => /^loop_[A-Za-z0-9-]{1,80}$/.test(id);
 
@@ -53,8 +53,9 @@ function LiveLoop({ id, row }: { id: string; row: boolean }) {
 export function LoopCard({ view, people, refresh, bare = false }: { view: LoopView; people: LoopPeople; refresh(): void; bare?: boolean }) {
   const { loop, history } = view;
   const now = useNow();
+  const zone = useTodosZone();
   if (loop.closedAt !== null) return <ClosedLine view={view} refresh={refresh} />;
-  const release = releaseLabel(loop, history);
+  const release = releaseLabel(loop, history, zone);
   return (
     <div className={cn("w-full", !bare && "my-2")} data-testid="loop-card" data-kind={loop.kind}>
       {bare ? null : (
@@ -73,11 +74,12 @@ export function LoopCard({ view, people, refresh, bare = false }: { view: LoopVi
 }
 
 function Header({ loop, now, label }: { loop: Loop; now: number; label?: string }) {
+  const zone = useTodosZone();
   const kind = KIND[loop.kind];
   const source = sourceText(loop.source);
   const url = safeUrl(loop.source?.url);
-  const due = dueLabel(loop.due, now);
-  const right = loop.kind === "waiting" ? { text: `Since ${shortWhen(loop.createdAt, now)}`, urgent: false } : due;
+  const due = dueLabel(loop.due, now, zone);
+  const right = loop.kind === "waiting" ? { text: `Since ${shortWhen(loop.createdAt, now, zone)}`, urgent: false } : due;
   return (
     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
       <Icon name={kind.icon} className="size-3.5" />
@@ -185,6 +187,7 @@ function HandedOff({ loop, history, owner, people, refresh, now }: { loop: Loop;
 /** A closed todo: one line, how it ended, when, and Undo. */
 function ClosedLine({ view, refresh }: { view: LoopView; refresh(): void }) {
   const { loop, history } = view;
+  const zone = useTodosZone();
   const { update, busy, error } = useLoopActions(refresh);
   const verb = closedVerb(loop, history);
   const dropped = loop.status === "dropped";
@@ -194,7 +197,7 @@ function ClosedLine({ view, refresh }: { view: LoopView; refresh(): void }) {
         <Icon name={dropped ? "X" : loop.kind === "decide" ? "Fork" : "CircleCheck"} className={cn("size-4 shrink-0", dropped ? "text-muted-foreground" : "text-success")} />
         <span className="shrink-0 font-medium text-foreground">{verb}</span>
         <span className="min-w-0 truncate text-muted-foreground">· {loop.title}</span>
-        <span className="ml-auto shrink-0 text-xs text-muted-foreground">{loop.closedAt ? shortWhen(loop.closedAt) : ""}{loop.closedBy && loop.closedBy !== "patrick" ? " · closed by the Bot" : ""}</span>
+        <span className="ml-auto shrink-0 text-xs text-muted-foreground">{loop.closedAt ? shortWhen(loop.closedAt, Date.now(), zone) : ""}{loop.closedBy && loop.closedBy !== "patrick" ? " · closed by the Bot" : ""}</span>
         <button type="button" aria-label={`Undo ${verb.toLowerCase()}`} title="Undo" disabled={busy} onClick={() => void update({ id: loop.id, changes: { status: "surfaced" } })}
           className={CHAT_CARD_ICON_BUTTON}>
           <Icon name="ArrowTurnBackward" className="size-3.5" />
@@ -210,8 +213,9 @@ export function LoopRow({ view, people, refresh }: { view: LoopView; people: Loo
   const { loop } = view;
   const [open, setOpen] = useState(false);
   const now = useNow();
+  const zone = useTodosZone();
   const closed = loop.closedAt !== null;
-  const due = dueLabel(loop.due, now);
+  const due = dueLabel(loop.due, now, zone);
   const right = closed ? closedVerb(loop, view.history)
     : loop.kind === "decide" ? `${loop.options.length} option${loop.options.length === 1 ? "" : "s"}`
       : due?.text ?? (loop.kind === "read" ? "Read" : "");

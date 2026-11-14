@@ -21,6 +21,11 @@ export function useLoopsEnabled(): boolean {
   return values?.loopsEnabled === true;
 }
 
+export function useTodosZone(): string | undefined {
+  const { timeZone } = useStudioSettings();
+  return timeZone ?? undefined;
+}
+
 /** The Bot page's Todos tab: `bot/<botId>/loops`. */
 export const loopsPath = (botId: string) => `${botPath(botId)}/loops`;
 export const isLoopsPath = (pathname: string) => /^\/plugins\/studio\/studio\/bot\/[^/]+\/loops\/?$/.test(pathname);

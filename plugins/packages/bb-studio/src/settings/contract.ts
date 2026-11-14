@@ -34,14 +34,15 @@ export const settingsContract = defineRpcContract({
       values: settingsValuesSchema,
       /** The keys someone set; the rest follow their default. */
       changed: z.array(z.string()),
-      /** Todos' time zone: this Mac's, or STUDIO_LOOP_TIME_ZONE on the BB host. */
+      /** Todos' time zone: the todosTimeZone setting, else defaultTimeZone. */
       timeZone: z.string(),
+      defaultTimeZone: z.string().optional(),
     }),
   },
   "settings.set": {
     experimental_description: "Change Studio settings; null puts one back to its default. All or nothing.",
     input: z.object({ values: z.record(z.string(), value.nullable()) }),
-    output: z.object({ values: settingsValuesSchema, changed: z.array(z.string()) }),
+    output: z.object({ values: settingsValuesSchema, changed: z.array(z.string()), timeZone: z.string().optional(), defaultTimeZone: z.string().optional() }),
   },
   "settings.keys.get": {
     experimental_description: "Studio's API keys in settings-page order, each with whether it is set. Never the keys themselves.",

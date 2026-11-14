@@ -19,7 +19,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_ProviderModelPicker: () => <button type="button">Pick model</button>,
 }));
 vi.mock("./use-settings", () => ({
-  useStudioSettings: () => ({ values: state.values, changed: [], timeZone: "America/New_York", isLoading: !state.values, error: null, set: state.set }),
+  useStudioSettings: () => ({ values: state.values, changed: [], timeZone: "America/New_York", defaultTimeZone: "America/New_York", isLoading: !state.values, error: null, set: state.set }),
   readStudioSettingsNow: () => state.values,
 }));
 vi.mock("../../ui/live", () => ({ useLive: () => ({ data: { bot: { id: "bot_cos", name: "Chief of Staff" } }, loading: false, error: null, refresh: () => {} }) }));
@@ -245,12 +245,13 @@ describe("Studio's settings sections", () => {
 });
 
 describe("Bot ▸ Controls ▸ Attention", () => {
-  it("shows the budget, quiet hours and this Mac's time zone, and saves changes", async () => {
+  it("shows the budget, quiet hours and the time zone (this computer's by default), and saves changes", async () => {
     state.values = values({ loopsEnabled: true, loopDailyBudget: 5, loopQuietStart: 22, loopQuietEnd: 7 });
     await act(async () => { root.render(<BotAttention botName="Chief of Staff" />); });
     expect(host.querySelector('[role="switch"]')!.getAttribute("aria-checked")).toBe("true");
     expect($("attention-budget")!.textContent).toContain("5");
-    expect($("attention-zone")!.textContent).toContain("New York");
+    expect($("attention-zone")!.textContent).toContain("This computer · America/New York");
+    expect($("attention-zone")!.textContent).not.toContain("STUDIO_LOOP_TIME_ZONE");
     await click(host.querySelector('[aria-label="More interruptions"]'));
     expect(state.set).toHaveBeenCalledWith({ loopDailyBudget: 6 });
     await click(host.querySelector('[role="switch"]'));

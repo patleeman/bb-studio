@@ -31772,11 +31772,13 @@ public enum Studio {
     public var values: [String: StudioJSONValue]?
     public var changed: [String]?
     public var timeZone: String?
+    public var defaultTimeZone: String?
 
-    public init(values: [String: StudioJSONValue]? = nil, changed: [String]? = nil, timeZone: String? = nil) {
+    public init(values: [String: StudioJSONValue]? = nil, changed: [String]? = nil, timeZone: String? = nil, defaultTimeZone: String? = nil) {
       self.values = values
       self.changed = changed
       self.timeZone = timeZone
+      self.defaultTimeZone = defaultTimeZone
     }
   }
 
@@ -31791,10 +31793,14 @@ public enum Studio {
   public struct SettingsSetOutput: Sendable, Hashable, Codable {
     public var values: [String: StudioJSONValue]?
     public var changed: [String]?
+    public var timeZone: String?
+    public var defaultTimeZone: String?
 
-    public init(values: [String: StudioJSONValue]? = nil, changed: [String]? = nil) {
+    public init(values: [String: StudioJSONValue]? = nil, changed: [String]? = nil, timeZone: String? = nil, defaultTimeZone: String? = nil) {
       self.values = values
       self.changed = changed
+      self.timeZone = timeZone
+      self.defaultTimeZone = defaultTimeZone
     }
   }
 

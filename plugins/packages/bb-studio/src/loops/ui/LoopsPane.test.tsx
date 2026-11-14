@@ -29,7 +29,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   useSdk: () => sdk,
   experimental_useTabWindow: () => state.tabWindow,
 }));
-vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: "America/New_York", isLoading: false, error: null, set: async () => {}, ...(({ values: { loopsEnabled: state.enabled } })) }), readStudioSettingsNow: () => ({}) }));
+vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, isLoading: false, error: null, set: async () => {}, ...(({ values: { loopsEnabled: state.enabled } })) }), readStudioSettingsNow: () => ({}) }));
 const sdk = { projects: { list: async () => [{ id: "proj_k", name: "Larkspur" }] }, threads: { interactions: { list: async () => state.interactions } } };
 vi.mock("../../ui/live", () => ({
   useCall: () => state.call,

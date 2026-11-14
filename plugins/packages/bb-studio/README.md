@@ -278,8 +278,13 @@ environment variable (restart BB after setting one):
 | Jev: TypeSafe model | `jev-latest` | `STUDIO_TYPESAFE_MODEL` |
 | Jev timeout | 5000 ms | `STUDIO_JEV_TIMEOUT_MS` (250–15000) |
 | Smart Queue: minimum confidence to steer | 0.5 | `STUDIO_JEV_STEER_CONFIDENCE` (0–1) |
-| Attention time zone | this Mac's | `STUDIO_LOOP_TIME_ZONE` |
 | Talk segment length | 25 seconds | none |
+
+Todos' time zone is a setting again: **Time zone** in Bot settings ▸
+Attention (`todosTimeZone`; `bb studio settings set todosTimeZone
+America/Los_Angeles`). The Todos page, todo cards, the pane, snooze times,
+the scheduler's due and quiet hours, and the morning card all read it. Empty
+uses `STUDIO_LOOP_TIME_ZONE` when set, else this computer's zone.
 
 ## One Bot, many conversations
 

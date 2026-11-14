@@ -62,7 +62,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   // BB's Info row: label and value.
   experimental_DetailRow: ({ label, icon, children }: { label: React.ReactNode; icon?: string; children: React.ReactNode }) => React.createElement("div", { "data-detail-row": icon ?? "" }, React.createElement("dt", null, label), React.createElement("dd", null, children)),
 }));
-vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: "America/New_York", isLoading: false, error: null, set: async () => {}, ...(({ values: state.settings })) }), readStudioSettingsNow: () => ({}) }));
+vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, isLoading: false, error: null, set: async () => {}, ...(({ values: state.settings })) }), readStudioSettingsNow: () => ({}) }));
 const sdk = { projects: { list: async () => [] }, threads: { interactions: { list: async () => [] }, update: vi.fn(async (_args: unknown) => ({})), markRead: vi.fn(async (_args: unknown) => ({})), get: async ({ threadId }: { threadId: string }) => {
   if (!(threadId in state.threads)) throw new Error("Thread not found");
   return { id: threadId, projectId: state.threads[threadId], deletedAt: null };

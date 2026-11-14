@@ -44066,6 +44066,9 @@
           },
           "timeZone": {
             "type": "string"
+          },
+          "defaultTimeZone": {
+            "type": "string"
           }
         },
         "required": [
@@ -44142,6 +44145,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "defaultTimeZone": {
+            "type": "string"
           }
         },
         "required": [

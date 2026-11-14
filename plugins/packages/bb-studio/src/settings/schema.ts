@@ -10,6 +10,7 @@ import { CALL_RETENTION_OPTIONS, CALL_STT_OPTIONS, HOLD_KEY_OPTIONS } from "../k
 import { DEFAULT_REPLIES } from "../kit/pages-contract";
 import { DEFAULT_EMOJI_ITEMS } from "../reactions/emoji-items";
 import { jevProviderChoices } from "../decisions/server/jev-providers";
+import { isTimeZone } from "../loops/clock";
 import { ALL_VOICES, BACKEND_MODELS, DEFAULT_BACKEND_MODEL, DEFAULT_CAP_USD, DEFAULT_VOICE, LIVE_MODELS } from "../voice/live/shared";
 
 /** Studio publishes `{}` on this realtime channel after its settings change. */
@@ -22,7 +23,7 @@ interface Base { label: string; description?: string; group: SettingGroup; hidde
 export type StudioSetting = Base & (
   | { type: "boolean"; default: boolean }
   | { type: "number"; default: number; min: number; max: number; integer?: boolean }
-  | { type: "string"; default: string; maxLength: number; multiline?: boolean }
+  | { type: "string"; default: string; maxLength: number; multiline?: boolean; timeZone?: true }
   | { type: "select"; default: string; options: readonly string[]; optionLabels?: Record<string, string> }
 );
 export type SettingValue = boolean | number | string;
@@ -95,6 +96,7 @@ export const STUDIO_SETTINGS = {
   loopDailyBudget: { group: "attention", type: "number", label: "Interruptions a day", description: "After this many, new todos wait in the Todos list until tomorrow.", default: 5, min: 0, max: 100, integer: true },
   loopQuietStart: { group: "attention", type: "number", label: "Quiet hours start", description: "The hour, 0 to 23, when interruptions stop.", default: 22, min: 0, max: 23, integer: true },
   loopQuietEnd: { group: "attention", type: "number", label: "Quiet hours end", description: "The hour, 0 to 23, when interruptions start again.", default: 7, min: 0, max: 23, integer: true },
+  todosTimeZone: { group: "attention", type: "string", label: "Time zone", description: "Todos show and come due in this zone. Empty uses this computer’s.", default: "", maxLength: 100, timeZone: true },
 } as const satisfies Record<string, StudioSetting>;
 
 export type StudioSettingKey = keyof typeof STUDIO_SETTINGS;
@@ -136,7 +138,8 @@ export function checkSetting(key: string, value: unknown): { ok: true; value: Se
     case "string":
       if (typeof value !== "string") return { ok: false, error: `${key} needs text.` };
       if (value.length > setting.maxLength) return { ok: false, error: `${key} can be at most ${setting.maxLength} characters.` };
-      return { ok: true, value };
+      if (setting.timeZone && value.trim() && !isTimeZone(value)) return { ok: false, error: `${value} isn't a time zone, such as America/Los_Angeles.` };
+      return { ok: true, value: setting.timeZone ? value.trim() : value };
     case "select": {
       const known = typeof value === "string" ? setting.options.find((option) => option === value || value.startsWith(`${option} (`)) : undefined;
       return known !== undefined

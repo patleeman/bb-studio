@@ -1,5 +1,7 @@
 import { expect, it } from "vitest";
-import { areaChips, eventLabel, ownerName, ownerThread, triggerLabel } from "./model";
+import { areaChips, dueLabel, eventLabel, fullWhen, ownerName, ownerThread, shortWhen, snoozeHint, triggerLabel } from "./model";
+import { todoGroup } from "./todos-model";
+import { fromInputValue, inputValue, zonedTime } from "../clock";
 
 const NOW = new Date("2026-10-31T22:26:00").getTime();
 const names = { bot: "Chief of Staff", leads: new Map([["thr_lead", "Larkspur lead"]]) };
@@ -42,4 +44,36 @@ it("builds area chips from data only, keeping a chosen area with no loops left",
   expect(areaChips(["Alpha", "Beta"], null)).toEqual([null, "Alpha", "Beta"]);
   expect(areaChips(undefined, null)).toEqual([null]);
   expect(areaChips(["Alpha"], "Beta")).toEqual([null, "Alpha", "Beta"]);
+});
+
+it("reads times in Todos' time zone when one is set: a 9:00 AM Pacific call is 9:00 AM in Pacific and 12:00 PM in Eastern", () => {
+  const now = zonedTime(2026, 11, 13, 18, 0, "America/New_York");
+  const due = zonedTime(2026, 11, 16, 9, 0, "America/Los_Angeles");
+  expect(dueLabel(due, now, "America/Los_Angeles")).toEqual({ text: "Due Mon, 9:00 AM", urgent: false });
+  expect(dueLabel(due, now, "America/New_York")).toEqual({ text: "Due Mon, 12:00 PM", urgent: false });
+  expect(fullWhen(due, now, "America/Los_Angeles")).toBe("Mon 9:00 AM");
+  expect(shortWhen(due, due - 3_600_000, "America/Los_Angeles")).toBe("9:00 AM");
+  expect(triggerLabel({ type: "time", at: due }, now, null, "America/Los_Angeles").text).toBe("Mon 9:00 AM");
+});
+
+it("finds today, tomorrow and the week by the zone's calendar, not the computer's", () => {
+  const now = zonedTime(2026, 11, 13, 22, 30, "America/Los_Angeles");
+  const soon = zonedTime(2026, 11, 13, 23, 30, "America/Los_Angeles");
+  expect(dueLabel(soon, now, "America/Los_Angeles")?.text).toBe("Due today, 11:30 PM");
+  expect(dueLabel(soon, now, "America/New_York")?.text).toBe("Due today, 2:30 AM");
+  expect(dueLabel(soon, now, "Europe/London")?.text).toBe("Due today, 7:30 AM");
+  const todo = { closedAt: null, status: "queued", kind: "do", owner: "patrick", due: zonedTime(2026, 11, 14, 8, 0, "America/Los_Angeles"), trigger: { type: "none" } } as never;
+  expect(todoGroup(todo, now, "America/Los_Angeles")).toBe("week");
+  expect(todoGroup(todo, now, "America/New_York")).toBe("today");
+});
+
+it("names snooze times in the zone and reads a picked time in it", () => {
+  const now = zonedTime(2026, 11, 13, 9, 0, "America/Los_Angeles");
+  expect(snoozeHint("tonight", now, "America/Los_Angeles")).toBe("7:00 PM");
+  expect(snoozeHint("tomorrow_morning", now, "America/Los_Angeles")).toBe("Sat 8:00 AM");
+  expect(snoozeHint("this_weekend", now, "America/Los_Angeles")).toBe("Sat 10:00 AM");
+  expect(inputValue(zonedTime(2026, 11, 16, 9, 0, "America/Los_Angeles"), "America/Los_Angeles")).toBe("2026-11-16T09:00");
+  expect(fromInputValue("2026-11-16T09:00", "America/Los_Angeles")).toBe(Date.UTC(2026, 10, 16, 17, 0));
+  expect(fromInputValue("2026-03-08T02:30", "America/Los_Angeles")).toBe(Date.UTC(2026, 2, 8, 10, 30));
+  expect(fromInputValue("nonsense", "America/Los_Angeles")).toBeNull();
 });

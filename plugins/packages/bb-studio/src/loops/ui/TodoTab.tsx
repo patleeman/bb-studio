@@ -8,7 +8,7 @@ import { useLive } from "../../ui/live";
 import type { Loop } from "../contract";
 import { ChangeTrigger, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu, CARD_BUTTON, CARD_GHOST, CARD_PRIMARY } from "./LoopMenus";
 import { fullWhen, INLINE_OPTIONS, ownerName, ownerThread, safeUrl, sourceText, triggerLabel, type OwnerInfo } from "./model";
-import { useDiscussLoop, useLoopActions, useLoopPeople, usePlaceNames, type LoopPeople } from "./hooks";
+import { useDiscussLoop, useLoopActions, useLoopPeople, usePlaceNames, useTodosZone, type LoopPeople } from "./hooks";
 
 export const entryId = (params: JsonValue | null): string | null => {
   if (typeof params !== "object" || params === null || Array.isArray(params)) return null;
@@ -28,18 +28,19 @@ export function TodoTab({ params }: { params: JsonValue | null }) {
 
 export function TodoDetail({ loop, people, places, owner, refresh }: { loop: Loop; people: LoopPeople; places: string[]; owner: OwnerInfo | undefined; refresh(): void }) {
   const navigate = useBbNavigate();
+  const zone = useTodosZone();
   const { act, update, busy, error } = useLoopActions(refresh);
   const discuss = useDiscussLoop(people.botThreadId, people.botName);
   const [nudged, setNudged] = useState(false);
   const closed = loop.closedAt !== null;
   const mine = loop.owner === "patrick";
-  const trigger = loop.trigger.type === "none" ? null : triggerLabel(loop.trigger);
+  const trigger = loop.trigger.type === "none" ? null : triggerLabel(loop.trigger, Date.now(), null, zone);
   const source = sourceText(loop.source);
   const url = safeUrl(loop.source?.url);
   const thread = ownerThread(loop.owner, people.botThreadId, owner);
   const sourceThread = loop.source?.kind === "thread" ? loop.source.ref : null;
   const by = loop.closedBy === "patrick" ? "You" : loop.closedBy === "cos" ? people.botName : loop.closedBy;
-  const due = loop.due !== null ? fullWhen(loop.due) : null;
+  const due = loop.due !== null ? fullWhen(loop.due, Date.now(), zone) : null;
   const whenIsDue = !!trigger && trigger.text === due;
   const withPush = (text: string) => <span className="inline-flex items-center gap-1.5">{text}{loop.push ? <Icon name="Smartphone" aria-label="Sends to iPhone" className="size-3.5 text-muted-foreground" /> : null}</span>;
   const facts: BotPageFact[] = [
@@ -49,7 +50,7 @@ export function TodoDetail({ loop, people, places, owner, refresh }: { loop: Loo
     { label: "Owner", value: ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owner) },
     ...(source ? [{ label: "Source", value: url ? <a href={url} target="_blank" rel="noreferrer" className="text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground">{source}</a>
       : sourceThread ? <button type="button" className="underline decoration-border underline-offset-2 hover:decoration-foreground" onClick={() => navigate.toThread(sourceThread)}>{source}</button> : source }] : []),
-    ...(closed && loop.closedAt ? [{ label: loop.status === "dropped" ? "Dismissed" : "Done", value: `${by ? `${by} · ` : ""}${fullWhen(loop.closedAt)}` }] : []),
+    ...(closed && loop.closedAt ? [{ label: loop.status === "dropped" ? "Dismissed" : "Done", value: `${by ? `${by} · ` : ""}${fullWhen(loop.closedAt, Date.now(), zone)}` }] : []),
   ];
   const snooze = <SnoozeMenu disabled={busy} onSnooze={(preset) => void act({ id: loop.id, action: "snooze", snooze: preset })} onPick={(at) => void update({ id: loop.id, changes: { status: "snoozed", trigger: { type: "time", at } } })} />;
   const drop = <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void act({ id: loop.id, action: "drop" })}><Icon name="X" />Dismiss</button>;

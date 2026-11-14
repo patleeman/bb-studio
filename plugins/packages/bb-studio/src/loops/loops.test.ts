@@ -154,3 +154,20 @@ it('registers every tool as todos_x and keeps loops_x as its alias, with the sam
  const ids=async(name:string)=>JSON.parse(await named(name).execute({})).needsYouNow.map((x:{id:string})=>x.id);
  expect(await ids('todos_list')).toEqual([l.id]);expect(await ids('loops_list')).toEqual([l.id]);
 });
+it("decides due, quiet hours, snoozes and the morning card in Todos' time zone",()=>{
+ const l=store.add({title:'Call the dentist',due:Date.parse('2026-11-03T05:00:00Z')});
+ const zoned=(timeZone:string)=>new LoopScheduler(store,()=>({...defaults,timeZone}),post,notify);
+ expect(zoned('America/Los_Angeles').morning()).toMatchObject({date:'2026-11-02',items:[expect.objectContaining({id:l.id})]});
+ expect(zoned('America/New_York').morning().items.map(i=>i.id)).not.toContain(l.id);
+ expect(zoned('America/Los_Angeles').quiet()).toBe(false);
+ expect(zoned('Asia/Tokyo').quiet()).toBe(true);
+ expect(snooze('tomorrow_morning',{...defaults,timeZone:'America/Los_Angeles'})).toEqual({type:'time',at:Date.parse('2026-11-03T16:00:00Z')});
+});
+it('follows a changed time zone setting on the next settings change',async()=>{
+ const handlers:Record<string,(x:any)=>unknown>={};let onChange:(v:Record<string,unknown>)=>void=()=>{};let zone='America/New_York';
+ const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},sdk:{threads:{get:async()=>null}}};
+ registerLoops(bb as never,db,post,notify,{get:async()=>({loopsEnabled:true}),onChange:(f)=>{onChange=f;}},()=>zone);await vi.advanceTimersByTimeAsync(0);
+ expect((handlers['loops.morning']!({}) as {date:string}).date).toBe('2026-11-02');
+ zone='Asia/Tokyo';onChange({loopsEnabled:true,todosTimeZone:zone});
+ expect((handlers['loops.morning']!({}) as {date:string}).date).toBe('2026-11-03');
+});

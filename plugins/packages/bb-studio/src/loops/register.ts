@@ -18,7 +18,7 @@ export function threadOwner(owner:string,thread:ThreadLike|null):z.infer<typeof 
 const TOOL_VERBS=['add','list','get','update','act','fire','morning'];
 /** Every tool under both names: todos_x, and loops_x, its alias from before the rename. */
 export const LOOP_TOOLS=[...TOOL_VERBS.map(v=>`todos_${v}`),...TOOL_VERBS.map(v=>`loops_${v}`)];
-/** Todos' settings are Studio settings (src/settings): loopsEnabled under Threads, the rest under Bot ▸ Controls ▸ Attention. The time zone is this Mac's. */
+/** Todos' settings are Studio settings (src/settings): loopsEnabled under Threads, the rest under Bot ▸ Controls ▸ Attention, the time zone (todosTimeZone) included. */
 type LoopSettings={get():Promise<Record<string,unknown>>;onChange(listener:(next:Record<string,unknown>)=>void):void};
 export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:string)=>Promise<void>,notify:ConstructorParameters<typeof LoopScheduler>[3],settings:LoopSettings,timeZone:()=>string=()=>defaults.timeZone,every:(name:string,everyMs:number,work:()=>void)=>void=(_name,everyMs,work)=>{const timer=setInterval(work,everyMs);bb.onDispose(()=>clearInterval(timer));}){
  // Every saved change tells open windows (cards, the Todos tab, badges) to refetch.
