@@ -384,7 +384,7 @@ final class AppModel: ObservableObject {
 
     func openStudio(kind: String?, _ route: Route? = nil) {
         tab = .studio
-        if let kind { studioKind = kind }
+        if let kind { studioKind = StudioKind.family(kind) }
         studioPath = route.map { [$0] } ?? []
     }
 

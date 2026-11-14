@@ -297,7 +297,7 @@ final class ThreadUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
         sleep(2)
         shot("studio-all")
-        for (chip, name) in [("Pages", "page"), ("Recordings", "recording"), ("Dictations", "dictation"), ("Whiteboards", "drawing"), ("Artifacts", "artifact")] {
+        for (chip, name) in [("Pages", "page"), ("Recordings", "recording"), ("Dictations", "dictation"), ("Whiteboards", "drawing"), ("Apps", "app")] {
             let button = app.buttons[chip].firstMatch
             guard button.waitForExistence(timeout: 3) else { continue }
             button.tap()

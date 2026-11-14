@@ -23,16 +23,16 @@ struct MiniAppView: View {
             if let session, let mini = session.mini {
                 content(mini, session: session)
             } else if session?.missing == true {
-                ContentUnavailableView("Mini app not found", systemImage: StudioKind.of("mini").symbol,
+                ContentUnavailableView("App not found", systemImage: StudioKind.of("mini").symbol,
                     description: Text("It may have been deleted."))
             } else if let error = session?.error {
-                ContentUnavailableView("Couldn't open mini app", systemImage: StudioKind.of("mini").symbol, description: Text(error))
+                ContentUnavailableView("Couldn't open the app", systemImage: StudioKind.of("mini").symbol, description: Text(error))
             } else {
                 ProgressView()
             }
         }
         .modifier(RegularScrollingSurface())
-        .navigationTitle(session?.mini?.displayName ?? "Mini app")
+        .navigationTitle(session?.mini?.displayName ?? "App")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             Menu {
@@ -46,9 +46,9 @@ struct MiniAppView: View {
             } label: {
                 Image(systemName: "ellipsis.circle")
             }
-            .accessibilityLabel("Mini app options")
+            .accessibilityLabel("App options")
         }
-        .alert("Rename mini app", isPresented: $renaming) {
+        .alert("Rename app", isPresented: $renaming) {
             TextField("Name", text: $newName)
             Button("Cancel", role: .cancel) {}
             Button("Rename") { rename(newName.trimmingCharacters(in: .whitespacesAndNewlines)) }
@@ -59,7 +59,7 @@ struct MiniAppView: View {
             NavigationStack {
                 WebView(url: client.baseURL.appending(path: "plugins/studio/studio/minis/\(id)"))
                     .ignoresSafeArea(edges: .bottom)
-                    .navigationTitle(session?.mini?.displayName ?? "Mini app")
+                    .navigationTitle(session?.mini?.displayName ?? "App")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar { Button("Done") { showingWeb = false } }
             }
@@ -93,7 +93,7 @@ struct MiniAppView: View {
                     .accessibilityLabel(mini.displayName)
             } else {
                 ContentUnavailableView("No source yet", systemImage: StudioKind.of("mini").symbol,
-                    description: Text("This mini app has no source yet. Ask an agent to build it."))
+                    description: Text("This app has no source yet. Ask an agent to build it."))
             }
         }
         .background(Color(.systemBackground))

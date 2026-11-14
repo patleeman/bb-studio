@@ -42,7 +42,7 @@ final class MiniCardUITests: StagedServerUITestCase {
         add.tap()
         XCTAssertTrue(app.webViews.staticTexts["Task \(tasks + 1)"].waitForExistence(timeout: 10), "db.insert went through")
         app.webViews.buttons["Fetch"].firstMatch.tap()
-        XCTAssertTrue(app.webViews.staticTexts["Open this mini app in BB on your computer to reach the internet."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.webViews.staticTexts["Open this app in BB on your computer to reach the internet."].waitForExistence(timeout: 10))
         screenshot("used")
 
         // A drag that starts on the app scrolls the thread, since the app fits its card.
