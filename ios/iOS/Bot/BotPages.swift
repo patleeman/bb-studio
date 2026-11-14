@@ -420,6 +420,7 @@ struct LibraryPageView: View {
     @State private var query = ""
     @State private var kind: BotLibraryItem.Kind?
     @State private var unfolded: Set<String> = []
+    @State private var gridWidth: CGFloat = 0
 
     private var items: [BotLibraryItem]? { load.value }
     private var scope: String { "\(app.client.baseURL.absoluteString)|\(botId ?? "")" }
@@ -493,7 +494,7 @@ struct LibraryPageView: View {
                 ForEach(groups) { group in
                     Text(group.title).font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
                         .padding(.top, 18).padding(.bottom, 6)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 10)], spacing: 10) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: LibraryPage.tileColumnCount(width: gridWidth, workbench: workbenchPane)), spacing: 10) {
                         ForEach(group.rows) { tile($0) }
                     }
                     .frame(maxWidth: .infinity)
@@ -504,8 +505,8 @@ struct LibraryPageView: View {
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 30)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width - 32 } action: { gridWidth = $0 }
         }
-        .ignoresSafeArea(.container, edges: workbenchPane ? .horizontal : [])
     }
 
     @ViewBuilder private func tile(_ row: BotLibraryRow) -> some View {

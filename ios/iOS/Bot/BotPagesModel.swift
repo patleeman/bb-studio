@@ -296,6 +296,11 @@ enum LibraryPage {
         }
     }
 
+    static func tileColumnCount(width: CGFloat, workbench: Bool) -> Int {
+        let fit = Int((width + 10) / 130)
+        return max(workbench ? 3 : 2, fit)
+    }
+
     static func chip(_ kind: BotLibraryItem.Kind) -> String {
         kind == .app ? "Apps" : label(kind)
     }

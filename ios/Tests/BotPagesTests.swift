@@ -140,6 +140,8 @@ final class BotPagesTests: XCTestCase {
         XCTAssertEqual(Set(LibraryPage.groups(items, query: "", kind: .app, groupBy: .date).flatMap(\.rows).map(\.item.kind)), [.app, .artifact])
         XCTAssertEqual(LibraryPage.groups(items, query: "", kind: nil, groupBy: .kind).map(\.title), ["Pages", "Apps"])
         XCTAssertEqual([BotLibraryItem.Kind.artifact, .app].map(LibraryPage.label), ["App", "App"], "every app says App")
+        XCTAssertEqual([343, 427, 553].map { LibraryPage.tileColumnCount(width: $0, workbench: true) }, [3, 3, 4], "the workbench page")
+        XCTAssertEqual([334, 370].map { LibraryPage.tileColumnCount(width: $0, workbench: false) }, [2, 2], "a phone sheet")
     }
 
     func testLibraryFoldsLongGroupsAndGroupsByDate() {
@@ -169,6 +171,12 @@ final class BotPagesTests: XCTestCase {
         XCTAssertEqual(items.first?.title, "Untitled")
         XCTAssertEqual(items.first?.route, .design(id: "dsn_1"))
         XCTAssertEqual(items.map(\.itemId), ["dsn_1"], "dashboards stay on the desktop")
+        XCTAssertNil(RelatedSection.route("dashboards", "dsh_1"), "a related dashboard isn't a design")
+        XCTAssertNil(RelatedSection.route("unknown", "x_1"))
+        XCTAssertEqual(RelatedSection.route("design", "dsn_1"), .design(id: "dsn_1"))
+        XCTAssertEqual(RelatedSection.route("minis", "mini_1"), .mini(id: "mini_1"))
+        let studio = [StudioItem(pluginId: "dashboards", itemId: "dsh_1", kind: "dashboard", title: "W", createdAt: 0, updatedAt: 0), StudioItem(pluginId: "pages", itemId: "pg_1", kind: "page", title: "P", createdAt: 0, updatedAt: 0)]
+        XCTAssertEqual(StudioStore.shown(studio).map(\.itemId), ["pg_1"], "Studio leaves dashboards out, starred and cached too")
         XCTAssertEqual(BotLibraryItem(pluginId: "talk", itemId: "rec_1", title: "R", kind: .other, updatedAt: 0).route, .recording(id: "rec_1"))
         XCTAssertEqual(BotLibraryItem(pluginId: "excalidraw", itemId: "drw_1", title: "W", kind: .whiteboard, updatedAt: 0).studioKind, "drawing")
     }

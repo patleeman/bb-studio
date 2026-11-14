@@ -166,8 +166,6 @@ struct RoomPages<Room: View, Bench: View>: View {
                         .ignoresSafeArea()
                         .accessibilityHidden(true)
                     bench
-                        .environment(\.workbenchTrailingInset, proxy.safeAreaInsets.trailing)
-                        .ignoresSafeArea(.container, edges: .horizontal)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .environment(\.duoLayout, DuoLayout(size: .zero, innerScreen: layout.innerScreen))
                         .environment(\.horizontalSizeClass, .compact)
@@ -202,7 +200,6 @@ struct RoomWorkbench: View {
     var openMain: () -> Void
     var chooseTheme: (String) -> Void
     @Environment(\.look) private var look
-    @Environment(\.workbenchTrailingInset) private var trailingInset
 
     private var view: BotThreadsView? { store.view(for: bot.id) }
 
@@ -242,7 +239,6 @@ struct RoomWorkbench: View {
             }
             addMenu
         }
-        .padding(.trailing, trailingInset)
         .frame(height: 50, alignment: .bottom)
         .padding(.top, 6)
         .background(look.sidebar.ignoresSafeArea(edges: [.top, .trailing]))
