@@ -169,6 +169,7 @@ import { registerAuth } from "./src/auth/register";
 import { AUTH_USAGE, authCli } from "./src/auth/cli";
 import { createLiveBbPool, registerAccounts } from "./src/accounts/register";
 import { registerOnboarding } from "./src/onboarding-register";
+import { firstBotOfFreshInstall, readFlag } from "./src/onboarding";
 import { ACCOUNTS_USAGE, accountsCli } from "./src/accounts/cli";
 import { formatSetup, SetupService } from "./src/setup";
 import { setupContract } from "./src/setup-contract";
@@ -1401,7 +1402,7 @@ export default async function plugin(bb: BbPluginApi) {
     }),
     bot_get: ({ botId }) => bots.get(botId),
     bot_create: async (input) => {
-      const firstBot = bots.list().length === 0;
+      const firstBot = firstBotOfFreshInstall(bots.list().length, readFlag(bb.server.experimental_dataDir));
       const view = await bots.create(input);
       await remindersForFirstBot(studioSettings, firstBot).catch((error) => bb.log.warn(`Couldn't turn on Todo reminders for the first Bot: ${String(error)}`));
       return view;
