@@ -41,6 +41,7 @@
 // the ones with output it hasn't seen. The script needs no bb CLI, token or
 // callback, and a missed minute is caught up on the next poll.
 import { readAvailable } from "./kit/server/read-available";
+import { markStudioLine } from "./kit/relayed";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
@@ -98,7 +99,7 @@ export function reminderPrompt(name: string, instruction: string, setAt: number)
 /** What a watcher's run with output posts: a visible line, and a note for the agent. */
 export function watcherMessage(name: string, output: string, instruction: string, toRunner: boolean): { text: string; note: string } {
   const trimmed = output.trim();
-  const text = `Watcher ${name}: ${trimmed.length > OUTPUT_LIMIT ? `${trimmed.slice(0, OUTPUT_LIMIT - 1)}…` : trimmed}`;
+  const text = markStudioLine(`Watcher ${name}: ${trimmed.length > OUTPUT_LIMIT ? `${trimmed.slice(0, OUTPUT_LIMIT - 1)}…` : trimmed}`);
   const what = instruction.trim() ? ` What to do with it: ${instruction.trim()}` : "";
   const note = toRunner
     ? `Your watcher's script found the output above.${what} Handle it as a run of your job and report through runner_report as usual.`

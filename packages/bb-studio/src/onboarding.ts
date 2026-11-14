@@ -85,6 +85,16 @@ export async function showBotSidebar(sdk: OnboardingSdk): Promise<boolean> {
   return true;
 }
 
+/** Whether onboarding ran on this data dir: a new install, not one from before it or an import. */
+export function freshInstall(flag: OnboardingFlag | null): boolean {
+  return !!flag && (flag.state !== "done" || flag.reason === "ran");
+}
+
+/** Whether a Bot made now is a new install's first: no Bot yet, on a data dir onboarding ran on. */
+export function firstBotOfFreshInstall(botCount: number, flag: OnboardingFlag | null): boolean {
+  return botCount === 0 && freshInstall(flag);
+}
+
 export function readFlag(dataDir: string): OnboardingFlag | null {
   try {
     const value = JSON.parse(readFileSync(flagPath(dataDir), "utf8")) as Partial<OnboardingFlag>;

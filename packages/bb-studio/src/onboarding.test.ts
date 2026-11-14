@@ -10,7 +10,7 @@ import { runLinkAction, setLinkActionHandler } from "./links/actions";
 import { openLink, parseLink, type LinkDeps } from "./links/router";
 import { MIGRATIONS } from "./migrations";
 import { STARTER_BOT, starterFirstChatPrompt } from "./starter-bot";
-import { markWelcomeOpened, readFlag, readOnboarding, readyProvider, runOnboarding, welcomeThreadOf } from "./onboarding";
+import { firstBotOfFreshInstall, freshInstall, markWelcomeOpened, readFlag, readOnboarding, readyProvider, runOnboarding, welcomeThreadOf } from "./onboarding";
 import { PERSONAL_PROJECT_ID, ProjectLeads } from "./project-lead";
 import { testScheduler } from "./test/scheduler-fixture";
 
@@ -310,5 +310,25 @@ describe("link action handlers", () => {
     offHost();
     expect(runLinkAction("edit-space")).toBe(false);
     expect(calls).toEqual(["sidebar", "host"]);
+  });
+});
+
+describe("a fresh install", () => {
+  it("is one where onboarding ran on this data dir, not one with no Bots that came from before or an import", () => {
+    expect(freshInstall({ version: 1, state: "done", reason: "ran", at: 1, botId: BOT_ID, welcomeThreadId: "thr_1", opened: true })).toBe(true);
+    expect(freshInstall({ version: 1, state: "seeded", at: 1, botId: BOT_ID, welcomeThreadId: "thr_1", opened: false } as never)).toBe(true);
+    expect(freshInstall({ version: 1, state: "waiting", at: 1 })).toBe(true);
+    for (const reason of ["bots", "threads", "import", "unsupported"] as const) expect(freshInstall({ version: 1, state: "done", reason, at: 1, botId: null, welcomeThreadId: null, opened: true }), reason).toBe(false);
+    expect(freshInstall(null)).toBe(false);
+  });
+
+  it("turns reminders on from bot_create only for a fresh install's first Bot", () => {
+    const ran = { version: 1, state: "done", reason: "ran", at: 1, botId: null, welcomeThreadId: null, opened: true } as const;
+    const upgraded = { ...ran, reason: "threads" } as const;
+    expect(firstBotOfFreshInstall(0, ran)).toBe(true);
+    expect(firstBotOfFreshInstall(1, ran)).toBe(false);
+    expect(firstBotOfFreshInstall(0, upgraded)).toBe(false);
+    expect(firstBotOfFreshInstall(0, { ...ran, reason: "import" })).toBe(false);
+    expect(firstBotOfFreshInstall(0, null)).toBe(false);
   });
 });

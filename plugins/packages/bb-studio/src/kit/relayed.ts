@@ -19,6 +19,11 @@ export const RELAYED_SUMMARY_LIMIT = 100;
 
 const AGENT_HEADER = /^\[bb message from thread:([^;\]\s]+)(?:;[^\]]*)?\]\s*/u;
 const SYSTEM_HEADER = /^\[bb system\]\s*/u;
+const STUDIO_HEADER = /^\[bb studio\][ \t]*(?:\r?\n)*/u;
+
+/** The header Studio puts on its own lines in a thread, so they read as Studio's and never as something the user typed. */
+export const STUDIO_MARK = "[bb studio]";
+export const markStudioLine = (line: string): string => `${STUDIO_MARK} ${line}`;
 const AUTOMATION_HEADER = /^\[bb automation due:([^\]\s]+)\]\s*/u;
 const RUNNER_LINE = /^(⚠️ )?From runner ([^:\n]+): /u;
 const NAMED_AUTOMATION = /^(?:Check-in|Reminder) "([^"\n]+)"(?: \([^)\n]*\))?: /u;
@@ -88,8 +93,15 @@ function studioLine(text: string, start: number): RelayedMessage | null {
   return null;
 }
 
+function markedStudioLine(text: string, start: number): RelayedMessage | null {
+  const header = STUDIO_HEADER.exec(text.slice(start));
+  if (!header) return null;
+  const bodyStart = start + header[0].length;
+  return studioLine(text, bodyStart) ?? result("studio", text, { sender: RELAYED_STUDIO_SENDER, bodyStart, summaryStart: bodyStart });
+}
+
 export function parseRelayedBody(body: string): RelayedMessage {
-  const line = studioLine(body, 0);
+  const line = markedStudioLine(body, 0) ?? studioLine(body, 0);
   if (line) return line;
   const tag = LEAD_TAG.exec(body);
   return result("agent", body, { sender: null, bodyStart: 0, summaryStart: tag ? tag[0].length : 0 });
@@ -103,6 +115,8 @@ export function parseRelayedMessage(text: string, initiator: RelayedInitiator | 
     const named = NAMED_AUTOMATION.exec(text.slice(bodyStart));
     return result("automation", text, { sender: named ? named[1]! : "Automation", bodyStart, summaryStart: bodyStart + (named ? named[0].length : 0) });
   }
+  const marked = markedStudioLine(text, 0);
+  if (marked) return marked;
   if (initiator !== "user") {
     const agent = AGENT_HEADER.exec(text);
     if (agent) {
@@ -118,8 +132,7 @@ export function parseRelayedMessage(text: string, initiator: RelayedInitiator | 
     const system = SYSTEM_HEADER.exec(text);
     if (system) return result("system", text, { sender: RELAYED_STUDIO_SENDER, bodyStart: system[0].length, summaryStart: system[0].length });
   }
-  if (initiator === "agent" || initiator === "system") return null;
-  return studioLine(text, 0);
+  return null;
 }
 
 export function relayedSender(message: RelayedMessage, senderTitle?: string | null): string {

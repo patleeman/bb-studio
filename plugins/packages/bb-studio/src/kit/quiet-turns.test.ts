@@ -33,7 +33,8 @@ describe("quiet turn registration", () => {
     expect(classifyRelayedMessage(relay, { part: "message", initiator: "agent" })).toEqual({ previewStart: relay.indexOf("shipped.") });
     expect(classifyRelayedMessage("LEAD bb-studio: shipped.", { part: "body", initiator: null })).toEqual({ previewStart: "LEAD bb-studio: ".length });
     expect(classifyRelayedMessage("From runner House: Door open.", { part: "body", initiator: null })).toEqual({ sender: "runner House", previewStart: "From runner House: ".length });
-    expect(classifyRelayedMessage("Watcher Inbox: 3 new", { part: "message", initiator: "user" })).toEqual({ sender: "watcher Inbox", previewStart: "Watcher Inbox: ".length });
+    expect(classifyRelayedMessage("[bb studio] Watcher Inbox: 3 new", { part: "message", initiator: "user" })).toEqual({ sender: "watcher Inbox", previewStart: "[bb studio] Watcher Inbox: ".length });
+    expect(classifyRelayedMessage("Watcher Inbox: 3 new", { part: "message", initiator: "user" })).toBeNull();
     const due = "[bb automation due:aut_1]\n\nCheck-in \"Daily\": Plan.";
     expect(classifyRelayedMessage(due, { part: "message", initiator: "user" })).toEqual({ sender: "Daily", previewStart: due.indexOf("Check-in") });
     expect(classifyRelayedMessage("Status?", { part: "message", initiator: "user" })).toBeNull();

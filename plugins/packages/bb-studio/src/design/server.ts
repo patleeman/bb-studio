@@ -12,6 +12,7 @@ import type { StudioServices } from "../services";
 // directive, question form and thread tab keep their names
 // (docs/merging-add-ons.md).
 import { studioSchemas } from "../kit/contract";
+import { markStudioLine } from "../kit/relayed";
 import { createChangeBus, defineItemMention, serveBytes, type BackupHandlers, type StudioProviderHandlers } from "../kit/server/index";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
@@ -152,7 +153,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
       const round = screenIds.length ? Number(screenIds[0]!.slice(0, -1)) : null;
       await bb.sdk.threads.send({
         threadId: row.thread_id ?? requesterThreadId,
-        input: [{ type: "text", mentions: [], text: [`The reviewer checked ${round ? `round ${round}` : "the screens"} of "${displayName(row)}" and found problems:`, "", findings, "", paused ? pausedNote : "Fix them, then call design_ready again."].join("\n") }],
+        input: [{ type: "text", mentions: [], text: [markStudioLine(`The reviewer checked ${round ? `round ${round}` : "the screens"} of "${displayName(row)}" and found problems:`), "", findings, "", paused ? pausedNote : "Fix them, then call design_ready again."].join("\n") }],
         mode: "queue-if-active",
       });
     },

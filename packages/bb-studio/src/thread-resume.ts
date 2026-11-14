@@ -27,6 +27,7 @@
 // (host:changed host-connected), at startup once the first minute is past,
 // and on the five-minute sweep. One resume starts about every 15s, with at
 // most 3 resumed turns running at once.
+import { markStudioLine } from "./kit/relayed";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 
@@ -298,7 +299,7 @@ export class ThreadResume {
       await this.deps.sdk.threads.send({
         threadId, mode: "auto",
         input: [
-          { type: "text", text: RESUME_MARKER, mentions: [] },
+          { type: "text", text: markStudioLine(RESUME_MARKER), mentions: [] },
           { type: "text", text: RESUME_NOTE, mentions: [], visibility: "agent-only" },
         ],
       } as never);

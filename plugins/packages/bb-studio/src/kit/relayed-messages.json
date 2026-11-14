@@ -4,9 +4,10 @@
     "[bb automation due:<id>] at the very start, any initiator: kind automation. Sender is the name in a leading Check-in \"<name>\": or Reminder \"<name>\" (<when>): line, else Automation; the summary starts after that name.",
     "[bb message from thread:<id>] or [bb message from thread:<id>;…] at the very start, initiator not user: kind agent, senderThreadId <id>. The body after the header is read as a body (below).",
     "[bb system] at the very start, initiator not user: kind system, sender BB Studio.",
-    "Any other text with initiator agent or system: not relayed.",
-    "Initiator user (or unknown), no header: only Studio's own lines (below) are relayed. Every other user message is untouched.",
-    "Body: (⚠️ )?From runner <name>: gives kind runner, sender \"runner <name>\", urgent when ⚠️; Studio's lines give kind studio; otherwise a leading tag of 2+ capitals with an optional lowercase word and a colon (LEAD:, LEAD bb-studio:) is dropped from the summary.",
+    "[bb studio] at the very start, any initiator: Studio wrote the line. The text after the header (and any blank lines) is read as a Studio line (below); if none matches, kind studio, sender BB Studio, the summary from after the header.",
+    "Any other text, any initiator: not relayed.",
+    "Initiator user (or unknown) with no header: not relayed, even when it starts like a Studio line (Watcher <name>:, From runner <name>:), since a person may type that.",
+    "Body: a leading [bb studio] header is skipped; then (⚠️ )?From runner <name>: gives kind runner, sender \"runner <name>\", urgent when ⚠️; Studio's lines give kind studio; otherwise a leading tag of 2+ capitals with an optional lowercase word and a colon (LEAD:, LEAD bb-studio:) is dropped from the summary.",
     "Studio lines: Watcher <name>: (sender \"watcher <name>\"), 🗓 <tool> from [<title>](/threads/<id>): (sender <title>), and with sender BB Studio and the line kept whole: 📥 Handed to you:, ↻ Resumed after a restart, ⚠️ \"<title>\" stopped again (, ⚠️ <name> is off: BB turned it off again (, Maintenance: <n> threads need your call ; The reviewer checked round <n> of \"<design>\" and found problems: (sender design review).",
     "Sender for kind agent is the sending thread's title, else \"another conversation\".",
     "Summary: the first non-empty line from the summary start; leading > # - * 1. markers, markdown links (to their text), ** __ and backticks removed; whitespace collapsed; cut after the first . ! or ? followed by a space; at most 100 characters, cut at a word with …",
@@ -54,7 +55,7 @@
     {
       "name": "runner report without a sender thread",
       "initiator": "user",
-      "text": "From runner House: Machine offline: mini. Runs are skipped until it reconnects.",
+      "text": "[bb studio] From runner House: Machine offline: mini. Runs are skipped until it reconnects.",
       "reply": "[PASS]",
       "expect": { "kind": "runner", "sender": "runner House", "senderThreadId": null, "urgent": false, "summary": "Machine offline: mini.", "line": "From runner House · Machine offline: mini.", "folds": true }
     },
@@ -89,56 +90,56 @@
     {
       "name": "watcher line",
       "initiator": "user",
-      "text": "Watcher Morning card: Write today's morning card.",
+      "text": "[bb studio] Watcher Morning card: Write today's morning card.",
       "reply": "[PASS]",
       "expect": { "kind": "studio", "sender": "watcher Morning card", "senderThreadId": null, "urgent": false, "summary": "Write today's morning card.", "line": "From watcher Morning card · Write today's morning card.", "folds": true }
     },
     {
       "name": "handed thread",
       "initiator": "user",
-      "text": "📥 Handed to you: [Fix the build](/projects/proj_test0001/threads/thr_work0003)",
+      "text": "[bb studio] 📥 Handed to you: [Fix the build](/projects/proj_test0001/threads/thr_work0003)",
       "reply": "It's the flaky test; I'll keep an eye on it.",
       "expect": { "kind": "studio", "sender": "BB Studio", "senderThreadId": null, "urgent": false, "summary": "📥 Handed to you: Fix the build", "line": "From BB Studio · 📥 Handed to you: Fix the build", "folds": false }
     },
     {
       "name": "schedule change from another conversation",
       "initiator": "user",
-      "text": "🗓 runner make from [Trip planning](/threads/thr_conv0001): Made runner Flights, every day at 08:00.",
+      "text": "[bb studio] 🗓 runner make from [Trip planning](/threads/thr_conv0001): Made runner Flights, every day at 08:00.",
       "reply": "[PASS]",
       "expect": { "kind": "studio", "sender": "Trip planning", "senderThreadId": null, "urgent": false, "summary": "Made runner Flights, every day at 08:00.", "line": "From Trip planning · Made runner Flights, every day at 08:00.", "folds": true }
     },
     {
       "name": "resumed after a restart",
       "initiator": "user",
-      "text": "↻ Resumed after a restart",
+      "text": "[bb studio] ↻ Resumed after a restart",
       "reply": "[PASS]",
       "expect": { "kind": "studio", "sender": "BB Studio", "senderThreadId": null, "urgent": false, "summary": "↻ Resumed after a restart", "line": "From BB Studio · ↻ Resumed after a restart", "folds": true }
     },
     {
       "name": "thread stopped again",
       "initiator": "user",
-      "text": "⚠️ \"Nightly sync\" stopped again (restart) after 3 auto-resumes this hour. Check it, then send it a message to continue.",
+      "text": "[bb studio] ⚠️ \"Nightly sync\" stopped again (restart) after 3 auto-resumes this hour. Check it, then send it a message to continue.",
       "reply": "[PASS]",
       "expect": { "kind": "studio", "sender": "BB Studio", "senderThreadId": null, "urgent": true, "summary": "⚠️ \"Nightly sync\" stopped again (restart) after 3 auto-resumes this hour.", "line": "From BB Studio · ⚠️ \"Nightly sync\" stopped again (restart) after 3 auto-resumes this hour.", "folds": true }
     },
     {
       "name": "automation turned off again",
       "initiator": "user",
-      "text": "⚠️ Inbox sweep is off: BB turned it off again (error) after 3 resumes today. Check it, then resume it.",
+      "text": "[bb studio] ⚠️ Inbox sweep is off: BB turned it off again (error) after 3 resumes today. Check it, then resume it.",
       "reply": "[PASS]",
       "expect": { "kind": "studio", "sender": "BB Studio", "senderThreadId": null, "urgent": true, "summary": "⚠️ Inbox sweep is off: BB turned it off again (error) after 3 resumes today.", "line": "From BB Studio · ⚠️ Inbox sweep is off: BB turned it off again (error) after 3 resumes today.", "folds": true }
     },
     {
       "name": "maintenance alert",
       "initiator": "user",
-      "text": "Maintenance: 2 threads need your call in Bot info → Maintenance.",
+      "text": "[bb studio] Maintenance: 2 threads need your call in Bot info → Maintenance.",
       "reply": "[PASS]",
       "expect": { "kind": "studio", "sender": "BB Studio", "senderThreadId": null, "urgent": false, "summary": "Maintenance: 2 threads need your call in Bot info → Maintenance.", "line": "From BB Studio · Maintenance: 2 threads need your call in Bot info → Maintenance.", "folds": true }
     },
     {
       "name": "design review findings",
       "initiator": "user",
-      "text": "The reviewer checked round 2 of \"Home screen\" and found problems:\n\nThe close handle is too small.\n\nFix them, then call design_ready again.",
+      "text": "[bb studio] The reviewer checked round 2 of \"Home screen\" and found problems:\n\nThe close handle is too small.\n\nFix them, then call design_ready again.",
       "reply": "Fixed the handle.",
       "expect": { "kind": "studio", "sender": "design review", "senderThreadId": null, "urgent": false, "summary": "The reviewer checked round 2 of \"Home screen\" and found problems:", "line": "From design review · The reviewer checked round 2 of \"Home screen\" and found problems:", "folds": false }
     },
@@ -197,6 +198,34 @@
       "text": "Forwarded: [bb message from thread:thr_lead0001] was the header.",
       "reply": "[PASS]",
       "expect": null
+    },
+    {
+      "name": "typed message that starts like a watcher line is untouched",
+      "initiator": "user",
+      "text": "Watcher A: hi",
+      "reply": "Hi.",
+      "expect": null
+    },
+    {
+      "name": "typed message that starts like a runner report is untouched",
+      "initiator": "user",
+      "text": "From runner B: x",
+      "reply": "[PASS]",
+      "expect": null
+    },
+    {
+      "name": "typed message that starts like a Studio alert is untouched",
+      "initiator": "user",
+      "text": "↻ Resumed after a restart",
+      "reply": "[PASS]",
+      "expect": null
+    },
+    {
+      "name": "Studio line with a body no rule names",
+      "initiator": "user",
+      "text": "[bb studio] Something new happened. More below.",
+      "reply": "[PASS]",
+      "expect": { "kind": "studio", "sender": "BB Studio", "senderThreadId": null, "urgent": false, "summary": "Something new happened.", "line": "From BB Studio · Something new happened.", "folds": true }
     }
   ]
 }

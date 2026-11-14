@@ -72,7 +72,7 @@ it("resumes a thread a restart cut off, with the marker and an agent-only note",
   expect(await x.resume.attempt("thr_a")).toBe("resumed");
   expect(x.send).toHaveBeenCalledWith({
     threadId: "thr_a", mode: "auto",
-    input: [{ type: "text", text: RESUME_MARKER, mentions: [] }, { type: "text", text: RESUME_NOTE, mentions: [], visibility: "agent-only" }],
+    input: [{ type: "text", text: `[bb studio] ${RESUME_MARKER}`, mentions: [] }, { type: "text", text: RESUME_NOTE, mentions: [], visibility: "agent-only" }],
   });
   expect(x.resume.count("thr_a")).toBe(1);
 });
