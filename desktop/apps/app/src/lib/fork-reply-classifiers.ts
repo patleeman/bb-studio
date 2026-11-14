@@ -24,6 +24,28 @@ export function useQuietReply(text: string | null | undefined): boolean {
   return useSyncExternalStore(subscribePluginSlots, read, read);
 }
 
+function wellFormedClassification(
+  result: unknown,
+): { sender?: string; previewStart?: number } | null {
+  if (typeof result !== "object" || result === null || Array.isArray(result)) {
+    return null;
+  }
+  const { sender, previewStart } = result as Record<string, unknown>;
+  const senderOk =
+    sender === undefined ||
+    (typeof sender === "string" && sender.trim().length > 0);
+  const startOk =
+    previewStart === undefined ||
+    (typeof previewStart === "number" && Number.isInteger(previewStart));
+  if (!senderOk || !startOk || (sender === undefined && previewStart === undefined)) {
+    return null;
+  }
+  return {
+    ...(typeof sender === "string" ? { sender: sender.trim() } : {}),
+    ...(typeof previewStart === "number" ? { previewStart } : {}),
+  };
+}
+
 export function classifyPluginMessage(
   text: string,
   context: ExperimentalMessageClassificationContext,
@@ -31,17 +53,11 @@ export function classifyPluginMessage(
   for (const classifier of getPluginSlotSnapshot().replyClassifiers) {
     if (typeof classifier.classifyMessage !== "function") continue;
     try {
-      const result = classifier.classifyMessage(text, context);
-      if (result === null || result === undefined) continue;
-      const sender =
-        typeof result.sender === "string" && result.sender.trim().length > 0
-          ? result.sender.trim()
-          : null;
-      const start = result.previewStart;
-      const previewStart =
-        typeof start === "number" && Number.isInteger(start)
-          ? Math.min(Math.max(start, 0), text.length)
-          : 0;
+      const result: unknown = classifier.classifyMessage(text, context);
+      const parsed = wellFormedClassification(result);
+      if (parsed === null) continue;
+      const sender = parsed.sender ?? null;
+      const previewStart = Math.min(Math.max(parsed.previewStart ?? 0, 0), text.length);
       return { sender, previewStart };
     } catch {
       continue;

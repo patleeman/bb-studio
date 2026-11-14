@@ -1,5 +1,5 @@
 import { forkPlaceholder, type ForkPlaceholderState } from "@/components/promptbox/follow-up-placeholder.fork";
-import { signInRecoveryHandoffDraft, signInRecoveryTitle, type SignInRecovery } from "./signInRecovery.fork";
+import { signInRecoveryExitDraft, signInRecoveryHandoffDraft, signInRecoveryTitle, type SignInRecovery } from "./signInRecovery.fork";
 import { createCoreComposerActions } from "@/lib/plugin-composer-handle";
 import { visibleQueuedMessages } from "@/lib/queued-system-notice";
 import { useQueuedMessagesExpanded } from "@/components/promptbox/banner/queued-messages-expanded";
@@ -815,14 +815,16 @@ export function ThreadDetailPromptArea({
       handoffSourceSelection.overriddenFallbackIdentity,
     );
     setHandoffSourceSelection(null);
-    const restoredDraft = stripThreadHandoffPrefix(
+    const restoredDraft = signInRecoveryExitDraft(
       handoffSeed,
       promptDraft.getCurrent(),
+      forkSignInRecovery,
     );
     if (restoredDraft !== null) {
       promptDraft.setDraft(restoredDraft);
     }
   }, [
+    forkSignInRecovery,
     handoffSeed,
     handoffSourceSelection,
     promptDraft,
