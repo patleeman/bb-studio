@@ -1,4 +1,4 @@
-import { usePromptBoxModelPreference } from "@/hooks/thread-creation-options/persisted-selection-fields";
+import { useRememberedProviderModel } from "./rememberedProviderModel.fork";
 import { SignedOutTabMark, useSignedOutProviderIds } from "./signedOutProviders.fork";
 import { previewPick, type ProviderModelPickHandler } from "./previewPick.fork";
 import { forkModelPickerGate } from "@/components/fork/ForkModelPickerGate";
@@ -396,7 +396,7 @@ export function ModelReasoningPicker({
     (previewProvider === undefined ||
       (requireVerifiedProviderPreview && !previewCatalogIsVerified));
 
-  const rememberedPreviewModel = usePromptBoxModelPreference(previewProviderId ?? "").value;
+  const rememberedPreviewModel = useRememberedProviderModel(previewProviderId, selectedProviderId, modelValue);
   const previewSelection = useMemo(
     () =>
       isPreviewing
@@ -464,7 +464,7 @@ export function ModelReasoningPicker({
     (handoffMode || canSwitchProviders) &&
     providerOptions.length > 1 &&
     (!isShowingModelError || activeModelErrorIsProviderSpecific);
-  const signedOutProviders = useSignedOutProviderIds(providerRouting, showProviderTabs);
+  const signedOutProviders = useSignedOutProviderIds(providerRouting, showProviderTabs && open);
 
   const activeBrandPrefix = activeProvider?.brandPrefix;
   const filteredModelOptions = useMemo(() => {
