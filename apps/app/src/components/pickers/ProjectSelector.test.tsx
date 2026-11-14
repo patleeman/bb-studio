@@ -80,13 +80,13 @@ describe("ProjectSelector", () => {
     fireEvent.click(
       screen.getByRole("option", { name: "Don't work in a project" }),
     );
-    const trigger = screen.getByRole("button", { name: "Project: No project" });
+    const trigger = screen.getByRole("button", { name: "Project: Personal workspace" });
     expect(
       trigger.querySelector("[data-promptbox-full-label]")?.textContent,
-    ).toBe("No project");
+    ).toBe("Personal workspace");
     expect(
       trigger.querySelector("[data-promptbox-compact-label]")?.textContent,
-    ).toBe("No project");
+    ).toBe("Personal workspace");
     fireEvent.click(trigger);
     expect(
       screen
@@ -280,7 +280,7 @@ describe("ProjectSelector", () => {
     expect(onCreate).toHaveBeenCalledTimes(1);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Project: No project" }),
+      screen.getByRole("button", { name: "Project: Personal workspace" }),
     );
     expect(
       screen.getByRole<HTMLInputElement>("combobox", {

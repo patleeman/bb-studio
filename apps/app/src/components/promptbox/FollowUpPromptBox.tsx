@@ -797,7 +797,7 @@ function FollowUpPromptBoxWithComposer({
                 className="size-3.5 shrink-0"
                 aria-hidden
               />
-              <span>Handoff to new thread</span>
+              <span>Continue in a new conversation</span>
               <Button
                 type="button"
                 size="icon"

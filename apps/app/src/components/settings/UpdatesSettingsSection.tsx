@@ -596,7 +596,7 @@ export function BbAppUpdateRows({
           state="restart-required"
           buttonLeading={<BbLogo className="size-3" />}
           buttonLabel="Relaunch"
-          actionLabel="Relaunch bb to finish updating"
+          actionLabel="Relaunch BB Studio to finish updating"
           onClick={() => onRelaunchDesktop?.()}
         />,
       );
@@ -782,7 +782,7 @@ function ScheduledUpdateSplitButton({
       primaryAction={{ label: "Update now", onSelect: onUpdateNow }}
       primaryTooltip="Restart into the update without waiting for threads"
       triggerLabel="More update options"
-      mobileTitle="Update bb"
+      mobileTitle="Update BB Studio"
       secondaryActions={[
         {
           id: "skip-version",
@@ -894,7 +894,7 @@ function InAppUpdateRow({
           failure === null ? undefined : (RETRY_ACTION_ICON as IconName)
         }
         actionTooltip={failure === null ? undefined : "Retry"}
-        actionLabel="Download the update and restart bb"
+        actionLabel="Download the update and restart BB Studio"
         loading={applyPending}
         onClick={onApply}
       />
@@ -905,7 +905,7 @@ function InAppUpdateRow({
       updateButton,
       <FailureIndicator
         reason="Last update failed"
-        openLabel="View the failed bb update"
+        openLabel="View the failed BB Studio update"
         openTooltip="View details"
         onOpen={onShowResult === null ? undefined : () => onShowResult(failure)}
       />,
