@@ -60,6 +60,8 @@ export interface OnboardingDeps {
   sdk: OnboardingSdk;
   providers(): Promise<readonly OnboardingProviderState[]>;
   seedBot(input: { name: string; avatar: string }): Promise<{ id: string; threadId: string }>;
+  /** After the starter Bot is made: what a new install turns on with its first Bot. */
+  firstBot?(): Promise<unknown>;
   startFirstChat(input: { botId: string; providerId: string; prompt: string }): Promise<string | null>;
   idleThreads?: boolean;
   now?(): number;
@@ -172,6 +174,7 @@ async function onboard(deps: OnboardingDeps): Promise<OnboardingFlag> {
       if (idleThreadRefused(error)) return finish("unsupported");
       throw error;
     }
+    await deps.firstBot?.().catch(() => undefined);
     await showBotSidebar(deps.sdk).catch(() => false);
     flag = { version: 1, state: "seeded", at: now, botId: bot.id, welcomeThreadId: bot.threadId, opened: false };
     writeOnboarding(deps.dataDir, flag);

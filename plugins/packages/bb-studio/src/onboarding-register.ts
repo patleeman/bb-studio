@@ -10,7 +10,7 @@ export function forkHooks(bb: { experimental_hooks?: object }): boolean {
   return !!hooks && Object.entries(hooks).some(([key, value]) => key === "experimental_threadForkPoint" && typeof value === "function");
 }
 
-export function registerOnboarding(bb: BbPluginApi, deps: { db: Database.Database; bots: Bots; errorText(error: unknown): string }) {
+export function registerOnboarding(bb: BbPluginApi, deps: { db: Database.Database; bots: Bots; errorText(error: unknown): string; firstBot?(): Promise<unknown> }) {
   const dataDir = bb.server.experimental_dataDir;
   const providers = async (): Promise<readonly OnboardingProviderState[]> => {
     const { primaryHostId } = await bb.sdk.system.config();
@@ -25,6 +25,7 @@ export function registerOnboarding(bb: BbPluginApi, deps: { db: Database.Databas
       const flag = await runOnboarding({
         dataDir, db: deps.db, sdk: bb.sdk as never, providers, idleThreads: forkHooks(bb as { experimental_hooks?: object }),
         seedBot: (input) => deps.bots.seedStarter(input),
+        ...(deps.firstBot ? { firstBot: deps.firstBot } : {}),
         startFirstChat: (input) => deps.bots.startFirstChat(input),
       });
       if (flag.state === "done" && flag.reason === "ran" && !flag.opened) bb.log.info(`Onboarding made ${flag.botId} and started its first chat in ${flag.welcomeThreadId}.`);
