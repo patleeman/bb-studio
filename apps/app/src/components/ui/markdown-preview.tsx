@@ -1,3 +1,4 @@
+import { keepsShortLineBreaks, remarkShortLineBreaks } from "./markdown-short-line-breaks.fork";
 import { parseApplicationUrl } from "@bb/domain/application-url";
 import { openApplicationUrl } from "@/lib/application-url";
 import {
@@ -1890,6 +1891,8 @@ function MarkdownPreviewComponent({
       promptMentions !== undefined
     ) {
       plugins.push(remarkBreaks);
+    } else if (keepsShortLineBreaks(threadMentions)) {
+      plugins.push(remarkShortLineBreaks);
     }
     if (threadMentions !== undefined) {
       plugins.push(remarkThreadMentions);
