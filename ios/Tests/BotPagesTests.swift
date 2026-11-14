@@ -168,8 +168,7 @@ final class BotPagesTests: XCTestCase {
         let items = try await client.botLibrary(botId: "bot_a")
         XCTAssertEqual(items.first?.title, "Untitled")
         XCTAssertEqual(items.first?.route, .design(id: "dsn_1"))
-        XCTAssertEqual(items.last?.route, .dashboard(id: "dsh_1"), "apps open by plugin, not by the /apps family address")
-        XCTAssertEqual(items.last?.madeIn?.worker, true)
+        XCTAssertEqual(items.map(\.itemId), ["dsn_1"], "dashboards stay on the desktop")
         XCTAssertEqual(BotLibraryItem(pluginId: "talk", itemId: "rec_1", title: "R", kind: .other, updatedAt: 0).route, .recording(id: "rec_1"))
         XCTAssertEqual(BotLibraryItem(pluginId: "excalidraw", itemId: "drw_1", title: "W", kind: .whiteboard, updatedAt: 0).studioKind, "drawing")
     }

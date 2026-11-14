@@ -417,7 +417,6 @@ struct RoomWorkbench: View {
         case .recording: "Recording"
         case .artifact: "App"
         case .design: "Design"
-        case .dashboard: "Dashboard"
         case .mini: "App"
         case .terminals(_, let title): title
         case .visualChats, .visualChat: "Visual Chat"

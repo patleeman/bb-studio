@@ -246,7 +246,6 @@ struct BotLibraryItem: Equatable, Identifiable {
         case "excalidraw": .drawing(id: itemId)
         case "artifacts": .artifact(id: itemId)
         case "design": .design(id: itemId)
-        case "dashboards": .dashboard(id: itemId)
         case "minis": .mini(id: itemId)
         default: href.flatMap(Route.init(href:))
         }
@@ -259,7 +258,6 @@ struct BotLibraryItem: Equatable, Identifiable {
         case "excalidraw": "drawing"
         case "artifacts": "artifact"
         case "design": "design"
-        case "dashboards": "dashboard"
         case "minis": "mini"
         default: type ?? "other"
         }
@@ -576,7 +574,7 @@ extension BBClient {
 
     func botLibrary(botId: String?) async throws -> [BotLibraryItem] {
         let output: Studio.BotLibraryOutput = try await rpc("studio", Studio.Method.bot_library, Self.scoped(botId))
-        return (output.items ?? []).compactMap(BotLibraryItem.init)
+        return (output.items ?? []).compactMap(BotLibraryItem.init).filter { $0.pluginId != "dashboards" }
     }
 
     func botArchive(botId: String?) async throws -> ArchiveData {

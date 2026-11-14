@@ -99,7 +99,7 @@ final class StudioStore: ObservableObject {
             supportsTags = listing.tags != nil
             starred = listing.starred ?? []
             supportsStars = listing.starred != nil
-            self.items = listing.items.sorted { $0.updatedAt > $1.updatedAt }
+            self.items = listing.items.filter { $0.pluginId != "dashboards" }.sorted { $0.updatedAt > $1.updatedAt }
             Spotlight.indexStudio(self.items, serverURL: serverURL)
             error = nil
             DiskCache.save(
@@ -351,7 +351,6 @@ extension StudioItem {
         case "excalidraw": .drawing(id: itemId)
         case "artifacts": .artifact(id: itemId)
         case "design": .design(id: itemId)
-        case "dashboards": .dashboard(id: itemId)
         case "minis": .mini(id: itemId)
         default: href.flatMap(Route.init(href:))
         }
@@ -375,7 +374,6 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "drawing", label: "Whiteboard", plural: "Whiteboards", symbol: "scribble.variable", tint: .purple),
         StudioKind(id: "artifact", label: "Artifact", plural: "Artifacts", symbol: "doc.text.image", tint: .teal),
         StudioKind(id: "design", label: "Design", plural: "Designs", symbol: "rectangle.on.rectangle.angled", tint: .pink),
-        StudioKind(id: "dashboard", label: "Dashboard", plural: "Dashboards", symbol: "square.grid.2x2", tint: .indigo),
         StudioKind(id: "mini", label: "Mini app", plural: "Mini apps", symbol: "macwindow", tint: .mint),
     ]
 
@@ -1108,7 +1106,6 @@ struct StudioView: View {
         case "drawing": "Whiteboards live in pages. Make one on BB web with New → Whiteboard or /whiteboard in a page, or ask an agent to sketch one."
         case "artifact": "Files agents save from threads, and ones you save from a reply, show up here."
         case "design": "Ask an agent to design a screen, and its rounds of options show up here."
-        case "dashboard": "Ask an agent for a dashboard, or make one in BB on the desktop. Widgets refresh while it's open."
         case "mini": "Ask an agent for a mini app: a small app with its own data, such as a tracker or a board."
         default: "Pages, recordings, dictations, whiteboards and artifacts show up here."
         }

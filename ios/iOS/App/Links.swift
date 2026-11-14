@@ -212,7 +212,7 @@ enum Links {
         case .whiteboard: return id.map { .route(.drawing(id: $0)) } ?? .elsewhere("That link names no whiteboard.")
         case .design: return id.map { .route(.design(id: $0)) } ?? .elsewhere("That link names no design.")
         case .app: return id.map { .route(.mini(id: $0)) } ?? .elsewhere("That link names no app.")
-        case .dashboard: return id.map { .route(.dashboard(id: $0)) } ?? .elsewhere("That link names no dashboard.")
+        case .dashboard: return .elsewhere("Dashboards open in BB on your Mac.")
         case .artifact: return id.map { .route(.artifact(id: $0)) } ?? .elsewhere("That link names no artifact.")
         case .recording: return id.map { .route(.recording(id: $0)) } ?? .elsewhere("That link names no recording.")
         case .board: return .route(.visualChat(threadId: id))

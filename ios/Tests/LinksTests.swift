@@ -98,6 +98,7 @@ final class LinksTests: XCTestCase {
         XCTAssertEqual(Links.destination(LinkRef(kind: .worker, id: "t")), .thread("t", worker: true))
         XCTAssertEqual(Links.destination(LinkRef(kind: .archive, id: "bot_1")), .botPage(.archive, botId: "bot_1"))
         XCTAssertEqual(Links.destination(LinkRef(kind: .app, id: "mini_1")), .route(.mini(id: "mini_1")))
+        XCTAssertEqual(Links.destination(LinkRef(kind: .dashboard, id: "dsh_0123456789abcdef")), .elsewhere("Dashboards open in BB on your Mac."))
         XCTAssertEqual(Links.destination(LinkRef(kind: .board, id: "thr_v")), .route(.visualChat(threadId: "thr_v")))
         XCTAssertEqual(Links.destination(LinkRef(kind: .record, id: "mem_1")), .record("mem_1"))
         XCTAssertEqual(Links.destination(LinkRef(kind: .browser, id: "https://a.b")), .safari(URL(string: "https://a.b")!))

@@ -255,7 +255,6 @@ struct RouteDestination: View {
         case .recording(let id): RecordingDetailView(id: id)
         case .artifact(let id): ArtifactView(id: id)
         case .design(let id): DesignView(id: id).id(id)
-        case .dashboard(let id): DashboardView(id: id).id(id)
         case .mini(let id): MiniAppView(id: id).id(id)
         case .terminals(let scope, let title): TerminalsView(scope: scope, title: title)
         default: EmptyView()
