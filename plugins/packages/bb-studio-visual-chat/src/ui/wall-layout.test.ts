@@ -2,7 +2,7 @@
 // inside its own cell, and no card runs into the next row, however long the titles. jsdom does no layout, so
 // this renders the page frame's CSS and kit in headless Chrome (--dump-dom) and reads what it measured. It
 // Chrome won't size a window under 500px, so the page lays out in a frame of the exact size. It needs Chrome (CHROME_PATH, the usual install, or google-chrome on PATH, as on CI); without one it's skipped.
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -31,6 +31,12 @@ function findChrome(): string | null {
   return null;
 }
 const chrome = findChrome();
+
+function dumpDom(file: string): string {
+  const run = spawnSync(chrome!, ["--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars", "--window-size=1400,1000", "--virtual-time-budget=5000", "--dump-dom", pathToFileURL(file).href], { encoding: "utf8", timeout: 60_000, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
+  if (run.error || !run.stdout.includes("data-result=")) throw new Error(`Chrome returned no measurement (exit ${run.status}, ${run.signal ?? "no signal"}): ${run.error?.message ?? run.stderr.split("\n").slice(-5).join(" | ")}`);
+  return run.stdout;
+}
 
 /** The guide's showcase, the shape agents write, with titles long enough to wrap on a phone. */
 const LONG = ["The Legend of Zelda: Link's Awakening DX", "The Legend of Zelda: Oracle of Seasons", "Pokémon Crystal Version", "Wario Land 3", "Metal Gear Solid", "Dragon Warrior Monsters", "Shantae"];
@@ -75,7 +81,7 @@ addEventListener("message", (event) => { if (typeof event.data === "string") doc
 document.getElementById("f").srcdoc = ${JSON.stringify(inner).replace(/<\//g, "<\\/")};
 </script></body></html>`;
   writeFileSync(file, html);
-  const dom = execFileSync(chrome!, ["--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars", "--window-size=1400,1000", "--virtual-time-budget=5000", "--dump-dom", pathToFileURL(file).href], { encoding: "utf8", timeout: 60_000, stdio: ["ignore", "pipe", "ignore"] });
+  const dom = dumpDom(file);
   const raw = /data-result="([^"]*)"/.exec(dom)?.[1];
   if (!raw) throw new Error("Chrome returned no measurement");
   const decoded = raw.replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
@@ -150,7 +156,7 @@ parent.postMessage(JSON.stringify({ items }), "*");
   writeFileSync(file, `<!doctype html><html><body style="margin:0"><iframe id="f" style="width:${width}px;height:${height}px;border:0;display:block"></iframe>
 <script>addEventListener("message", (event) => { if (typeof event.data === "string") document.body.setAttribute("data-result", event.data); });
 document.getElementById("f").srcdoc = ${JSON.stringify(inner).replace(/<\//g, "<\\/")};</script></body></html>`);
-  const dom = execFileSync(chrome!, ["--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars", "--window-size=1400,1000", "--virtual-time-budget=5000", "--dump-dom", pathToFileURL(file).href], { encoding: "utf8", timeout: 60_000, stdio: ["ignore", "pipe", "ignore"] });
+  const dom = dumpDom(file);
   const raw = /data-result="([^"]*)"/.exec(dom)?.[1];
   if (!raw) throw new Error("Chrome returned no measurement");
   return JSON.parse(raw.replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")) as { items: { id: string; box: { x: number; y: number; right: number; bottom: number }; spill: number }[] };

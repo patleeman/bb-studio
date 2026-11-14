@@ -152,8 +152,9 @@ describe("the page's embed reports", () => {
   let cv: CanvasKit;
   let page: HTMLElement;
   let rect = { left: 10, top: 20, width: 300, height: 200 };
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 60));
+  const settle = (ms = 60) => vi.advanceTimersByTimeAsync(ms);
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "requestAnimationFrame", "cancelAnimationFrame"] });
     messages = [];
     rect = { left: 10, top: 20, width: 300, height: 200 };
     const parent = { postMessage: (m: unknown) => { if ((m as { type?: string }).type === EMBED_MESSAGE) messages.push(m as never); } };
@@ -166,7 +167,7 @@ describe("the page's embed reports", () => {
     // One kit for the file, as a frame has one.
     if (!cv) { canvasKit(window); cv = (window as unknown as { cv: CanvasKit }).cv; }
   });
-  afterEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
   const html = `<h1 data-cv-id="t">Stores</h1><div data-embed="map" data-q="retro games near 10604" data-cv-id="map"></div>`;
 
   it("report nothing while the page streams, then each committed placeholder's fields and place", async () => {
@@ -200,7 +201,11 @@ describe("the page's embed reports", () => {
     await settle();
     expect(messages.at(-1)!.moving).toBe(true);
     rect = { ...rect, left: 50 };
+    await settle(1000);
+    expect(messages.at(-1)!.moving).toBe(true);
     finish();
+    await settle(30);
+    expect(messages.at(-1)!.moving).toBe(true);
     await settle();
     expect(messages.at(-1)).toMatchObject({ moving: false, embeds: [{ id: "map", rect: { x: 50 } }] });
     delete (document as unknown as { getAnimations?: unknown }).getAnimations;
