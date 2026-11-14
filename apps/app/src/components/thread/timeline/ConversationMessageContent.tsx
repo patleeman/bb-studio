@@ -1,3 +1,5 @@
+import { relayedGeneratedSource } from "./relayedFold.fork";
+import { usePluginMessageClassification } from "@/lib/fork-reply-classifiers";
 import { ASSISTANT_MARKDOWN_THREAD_MENTIONS } from "@/components/ui/markdown-short-line-breaks.fork";
 import {
   useLayoutEffect,
@@ -349,6 +351,7 @@ function UserConversationMessage({
   turnRequest,
 }: UserConversationMessageProps) {
   const linkRouting = useMessageLinkRouting(threadId);
+  const relayed = usePluginMessageClassification(text, { part: "message", initiator });
   const automationDue =
     initiator === "user" ? parseAutomationDueMessage(text) : null;
   const generatedSource =
@@ -357,7 +360,7 @@ function UserConversationMessage({
           sourceKind: "agent" as const,
           sourceName: senderIsPluginSideChat
             ? "side chat"
-            : (senderThreadTitle ?? "Agent"),
+            : (relayed?.sender ?? senderThreadTitle ?? "Agent"),
           sourceProjectId: senderThreadProjectId,
           sourceThreadId: senderThreadId,
           sourceIsPluginSideChat: senderIsPluginSideChat,
@@ -378,7 +381,7 @@ function UserConversationMessage({
               sourceThreadId: null,
               sourceIsPluginSideChat: false,
             }
-          : null;
+          : relayedGeneratedSource(relayed);
   if (generatedSource !== null) {
     const body =
       automationDue === null
