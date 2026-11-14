@@ -1,3 +1,4 @@
+import { useForkNewConversation } from "@/components/fork/ForkNewConversation";
 import { PluginSidebarSections } from "./ForkSidebarSections";
 import {
   useCallback,
@@ -124,12 +125,14 @@ export function AppSidebar({
   const settingsShortcut = useAppCommandShortcut("settings.open");
   const pluginSidebarFooter = usePluginSidebarFooterDisclosure();
 
+  const forkNewConversation = useForkNewConversation();
   const handleNewChat = useCallback(() => {
     closeOnMobile();
+    if (forkNewConversation()) return;
     void navigate(getRootComposeRoutePath(), {
       state: { focusPrompt: true },
     });
-  }, [closeOnMobile, navigate]);
+  }, [closeOnMobile, forkNewConversation, navigate]);
 
   const showThreadShortcuts = useCallback(() => {
     const targets = getSidebarThreadShortcutTargets(sidebarRef.current);

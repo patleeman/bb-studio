@@ -37,7 +37,7 @@ import { usePathname } from "../../kit/app/route";
 import { BotPresence } from "../../presence/ui/BotPresence";
 import { useCall, useLive } from "../live";
 import { conversationLines, doneLabel, hiddenThreadTarget, isOlderPage, landingThread, olderLabel, olderPath, secondLine, shortAge, spaceDots, splitWorkers, swipeStep, switchTarget, SWIPE_START, workerLines, type ConversationLine, type LiveThread, type WorkerLine } from "./model";
-import { currentBot, hasLanded, isLaunchPage, lastConversation, markLanded, newThreadAsked, rememberConversation, setBotSwitcher, setCurrentBot, setFocusHandler, setThreadOpener, useCurrentBot, watchNewThreadArrivals } from "./state";
+import { currentBot, hasLanded, isLaunchPage, lastConversation, markLanded, newThreadAsked, rememberConversation, setBotSwitcher, setCurrentBot, setConversationStarter, setFocusHandler, setThreadOpener, useCurrentBot, watchNewThreadArrivals } from "./state";
 
 import { MEMORY_SUBPATH } from "../../memory/shared";
 import { skillsPagePath } from "../skills/paths";
@@ -94,9 +94,10 @@ export function ConversationRowView({ row, now, onOpen, menuTarget }: { row: Con
         <span data-testid="conversation-time" className={`shrink-0 text-xs tabular-nums ${INK_55}`}>{shortAge(row.updatedAt, now)}</span>
       </span>
       {line.text || line.tone !== "quiet" ? (
-        <span data-testid="conversation-line" data-tone={line.tone} className={`flex min-w-0 items-center gap-1.5 text-xs leading-[17px] ${line.tone === "needs-you" ? "text-warning" : INK_55}`}>
+        <span data-testid="conversation-line" data-tone={line.tone} className={`flex min-w-0 items-center gap-1.5 text-xs leading-[17px] ${line.tone === "needs-you" ? "text-warning" : line.tone === "failed" ? "text-destructive" : INK_55}`}>
           {line.tone === "needs-you" ? <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-warning" /> : null}
           {line.tone === "running" ? <span role="img" aria-label="Working" className="size-2.5 shrink-0 animate-spin rounded-full border-[1.5px] border-success border-r-transparent" /> : null}
+          {line.tone === "failed" ? <Icon name="X" className="size-3 shrink-0" aria-hidden /> : null}
           <span className="min-w-0 truncate">{line.text}</span>
         </span>
       ) : null}
@@ -286,15 +287,19 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
     if (target) switchTo(target);
   };
 
-  const newConversation = () => {
-    if (!bot) return;
+  const newConversation = (): boolean => {
+    if (!bot) return false;
     markLanded();
     void call("bot_focus", { botId: bot.id }).catch(() => {});
     const main = data?.conversations.find((row) => row.isMain);
     navigate.toPluginPanel("studio", { subPath: newConversationPath(bot.id, main?.projectId ?? null) });
     onNavigate();
+    return true;
   };
   const toPanel = (subPath?: string) => { navigate.toPluginPanel("studio", subPath ? { subPath } : {}); onNavigate(); };
+  const newConversationRef = useRef(newConversation);
+  newConversationRef.current = newConversation;
+  useEffect(() => { setConversationStarter(() => newConversationRef.current()); return () => setConversationStarter(null); }, []);
   const editingBot = editing ? bots.find((each) => each.id === editing) ?? null : null;
   const stage = useMainViewRect(!!editingBot);
   const editingInSidebar = !!editingBot && !stage;

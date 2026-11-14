@@ -3,7 +3,10 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { AvailableModel, ReasoningLevel } from "@bb/domain";
 import { makeProviderInfo } from "@bb/test-helpers/domain-fixtures";
+import { useEffect } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { useSetPromptBoxProviderModelReasoningPreference } from "@/hooks/thread-creation-options/persisted-selection-fields";
+import { forgetRememberedProviderModels, noteProviderModel } from "./rememberedProviderModel.fork";
 import { systemExecutionOptionsQueryKey } from "@/hooks/queries/query-keys";
 import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
 import { ModelReasoningPicker } from "./ModelReasoningPicker";
@@ -15,6 +18,12 @@ vi.mock("@/lib/sdk", () => ({
   sdk: {
     system: {
       executionOptions: vi.fn(() => new Promise<never>(() => undefined)),
+      providerStates: vi.fn(async () => ({
+        providers: [
+          { providerId: "codex", displayName: "Codex", status: "unauthenticated" },
+          { providerId: "claude-code", displayName: "Claude Code", status: "ready" },
+        ],
+      })),
     },
   },
 }));
@@ -46,6 +55,7 @@ function claudeModel(value: string, label: string): AvailableModel {
     reasoningDiscovery: "known" as const,
     supportedReasoningEfforts: [
       { reasoningEffort: "medium", description: "Medium" },
+      { reasoningEffort: "high", description: "High" },
     ],
     defaultReasoningEffort: "medium",
     isDefault: value === "claude-opus-4-7",
@@ -56,9 +66,18 @@ const MANY_CODEX_MODELS = ["gpt-5.5", "gpt-5.2", "gpt-4.1", "o3", "o4-mini", "gp
   (value) => ({ value, label: value }),
 );
 
+function RememberModel({ model }: { model: string }) {
+  const remember = useSetPromptBoxProviderModelReasoningPreference();
+  useEffect(() => {
+    remember({ providerId: "claude-code", model, reasoningLevel: "medium" });
+  }, [model, remember]);
+  return null;
+}
+
 function renderPicker(
   onProviderModelChange?: (pick: unknown) => void,
   codexModels: readonly PickerOption<string>[] = [{ value: "gpt-5.5", label: "GPT-5.5" }],
+  rememberedClaudeModel = "",
 ) {
   const onSelectedProviderChange = vi.fn();
   const onModelChange = vi.fn();
@@ -87,6 +106,7 @@ function renderPicker(
   );
   render(
     <div data-app-composer>
+      <RememberModel model={rememberedClaudeModel} />
       <ModelReasoningPicker
         providerOptions={providerOptions}
         selectedProviderId="codex"
@@ -116,6 +136,7 @@ function renderPicker(
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  forgetRememberedProviderModels();
 });
 
 describe("provider tabs only browse", () => {
@@ -212,5 +233,67 @@ describe("provider tabs only browse", () => {
     expect(await screen.findByText("Opus 4.7")).not.toBeNull();
     expect(onSelectedProviderChange).not.toHaveBeenCalled();
     expect(onModelChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps the model last used with a provider when only a level is picked on its tab", async () => {
+    const onProviderModelChange = vi.fn();
+    renderPicker(onProviderModelChange, undefined, "claude-sonnet-4-7");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Provider, model and reasoning" }),
+    );
+    fireEvent.click(screen.getByTitle("Claude Code"));
+    expect(await screen.findByText("Sonnet 4.7")).not.toBeNull();
+    fireEvent.click(await screen.findByRole("radio", { name: "High" }));
+
+    expect(onProviderModelChange).toHaveBeenCalledWith({
+      providerId: "claude-code",
+      model: "claude-sonnet-4-7",
+      reasoningLevel: "high",
+    });
+  });
+
+  it("falls back to the provider's default when its last model is gone", async () => {
+    const onProviderModelChange = vi.fn();
+    renderPicker(onProviderModelChange, undefined, "gpt-5.5");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Provider, model and reasoning" }),
+    );
+    fireEvent.click(screen.getByTitle("Claude Code"));
+    expect(await screen.findByText("Opus 4.7")).not.toBeNull();
+    fireEvent.click(await screen.findByRole("radio", { name: "High" }));
+
+    expect(onProviderModelChange).toHaveBeenCalledWith({
+      providerId: "claude-code",
+      model: "claude-opus-4-7",
+      reasoningLevel: "high",
+    });
+  });
+
+  it("marks a provider tab that isn't signed in", async () => {
+    renderPicker();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Provider, model and reasoning" }),
+    );
+    const mark = await screen.findByTestId("provider-tab-signed-out");
+    expect(mark.closest("button")?.getAttribute("title")).toBe("Codex");
+    expect(screen.getAllByTestId("provider-tab-signed-out")).toHaveLength(1);
+  });
+
+  it("keeps the model a composer last showed for that provider, even when nothing was stored", async () => {
+    noteProviderModel("claude-code", "claude-haiku-4-6");
+    const onProviderModelChange = vi.fn();
+    renderPicker(onProviderModelChange);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Provider, model and reasoning" }),
+    );
+    fireEvent.click(screen.getByTitle("Claude Code"));
+    expect(await screen.findByText("Haiku 4.6")).not.toBeNull();
+    fireEvent.click(await screen.findByRole("radio", { name: "High" }));
+
+    expect(onProviderModelChange).toHaveBeenCalledWith({
+      providerId: "claude-code",
+      model: "claude-haiku-4-6",
+      reasoningLevel: "high",
+    });
   });
 });

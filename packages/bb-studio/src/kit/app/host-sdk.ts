@@ -225,6 +225,19 @@ export function registerFirstRun(slots: object, registration: FirstRunRegistrati
   return true;
 }
 
+export interface NewConversationRegistration {
+  id: string;
+  run(): boolean;
+}
+
+/** BB's New thread (Mod+N, the sidebar row) asks `run` first (`slots.experimental_newConversation`); false on a BB without it. */
+export function registerNewConversation(slots: object, registration: NewConversationRegistration): boolean {
+  const slot = member(slots, "experimental_newConversation");
+  if (typeof slot !== "function") return false;
+  (slot as (registration: NewConversationRegistration) => void).call(slots, registration);
+  return true;
+}
+
 export interface ModelPickerGateRegistration {
   id: string;
   component: ComponentType<{ hasSelectedModel: boolean; children: ReactNode }>;

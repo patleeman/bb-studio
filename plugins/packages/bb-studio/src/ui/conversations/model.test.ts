@@ -65,6 +65,15 @@ it("puts BB's live state on the server's rows: running at once, a pending questi
   expect(secondLine({ needsYou: null, latest: "Morning brief is out", running: false })).toEqual({ tone: "quiet", text: "Morning brief is out" });
 });
 
+it("marks a conversation whose last turn failed until something runs again", () => {
+  const rows = [conversation({ threadId: "failed" }), conversation({ threadId: "retrying" }), conversation({ threadId: "fine" })];
+  const live = new Map([["failed", { id: "failed", status: "error" }], ["retrying", { id: "retrying", status: "error", runtimeStatus: "active" }], ["fine", { id: "fine", status: "idle" }]]);
+  const lines = conversationLines(rows, live, null);
+  expect(lines.map((line) => [line.threadId, line.failed])).toEqual([["failed", true], ["retrying", false], ["fine", false]]);
+  expect(secondLine(lines[0]!)).toEqual({ tone: "failed", text: "Last reply failed" });
+  expect(secondLine({ ...lines[0]!, needsYou: { reason: "Pick a date", at: 1 } }).tone).toBe("needs-you");
+});
+
 const worker = (over: Partial<WorkerRow> & { threadId: string }): WorkerRow => ({ title: over.threadId, status: "done", ownerConversationId: null, ownerTitle: null, projectId: null, updatedAt: 0, tag: null, branch: null, mirrored: false, sameTitle: 1, ...over });
 
 it("updates a worker's glyph from BB's live state, and keeps the server's for a hidden worker BB doesn't list", () => {

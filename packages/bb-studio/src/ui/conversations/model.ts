@@ -83,6 +83,8 @@ export function landingThread(space: Pick<BotSpace, "mainThreadId"> | null | und
 export interface ConversationLine extends ConversationRow {
   /** The row of the thread in the main view. */
   selected: boolean;
+  /** Its last turn failed (BB's live state says error) and nothing runs now. */
+  failed?: boolean;
 }
 
 /**
@@ -95,7 +97,8 @@ export function conversationLines(rows: readonly ConversationRow[], live: Readon
     const thread = row.mirrored ? undefined : live.get(row.threadId);
     const needsYou = row.needsYou ?? (thread?.hasPendingInteraction ? { reason: "Asked you a question", at: thread.updatedAt ?? row.updatedAt } : null);
     // BB's updatedAt counts only while it works: the importer moves it without any use.
-    return { ...row, running: thread ? isBusy(thread) : row.running, needsYou, updatedAt: isBusy(thread) ? Math.max(row.updatedAt, thread?.updatedAt ?? 0) : row.updatedAt, selected: row.threadId === activeThreadId };
+    const failed = !!thread && !isBusy(thread) && (thread.status === "error" || thread.runtimeStatus === "error");
+    return { ...row, running: thread ? isBusy(thread) : row.running, needsYou, failed, updatedAt: isBusy(thread) ? Math.max(row.updatedAt, thread?.updatedAt ?? 0) : row.updatedAt, selected: row.threadId === activeThreadId };
   });
 }
 
@@ -133,9 +136,10 @@ export function shortAge(at: number, now: number): string {
 }
 
 /** A conversation's second line: why it needs the user, else its latest reply, else what it is doing. */
-export function secondLine(row: Pick<ConversationLine, "needsYou" | "latest" | "running">): { tone: "needs-you" | "running" | "quiet"; text: string } {
+export function secondLine(row: Pick<ConversationLine, "needsYou" | "latest" | "running" | "failed">): { tone: "needs-you" | "running" | "failed" | "quiet"; text: string } {
   if (row.needsYou) return { tone: "needs-you", text: `Needs you: ${row.needsYou.reason}` };
   if (row.running) return { tone: "running", text: row.latest || "Working…" };
+  if (row.failed) return { tone: "failed", text: "Last reply failed" };
   return { tone: "quiet", text: row.latest ?? "" };
 }
 

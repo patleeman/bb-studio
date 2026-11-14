@@ -12,7 +12,7 @@
 // - working: the chat is busy (bot_attention's `working`, or the live view),
 //   a thread the chat spawned is (live view), or (on the selected Bot)
 //   bot_activity counts threads in progress;
-// - error: the chat's last turn failed and the user hasn't read it;
+// - error: the chat's last turn failed (read or not, until a turn succeeds);
 // - unread: a reply the user hasn't read. Read off bot_attention, not BB's
 //   isUnread: BB marks the chat unread after every turn, including the
 //   [PASS] a check-in ends with when nothing changed, which isn't news.
@@ -28,7 +28,7 @@ const BUSY = new Set(["starting", "active", "stopping", "provisioning"]);
 export function threadState(thread: StatusFields): ThreadState {
   if (thread.hasPendingInteraction || thread.indicator === "waiting-for-input") return "needs-you";
   if (isBusy(thread)) return "working";
-  if (thread.indicator === "unread-error") return "error";
+  if (thread.indicator === "unread-error" || thread.status === "error" || thread.runtimeStatus === "error") return "error";
   if (thread.indicator === "unread-success" || thread.isUnread) return "unread";
   return "idle";
 }

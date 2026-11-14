@@ -19,7 +19,7 @@ import { RecordTab } from "../memory/ui/RecordTab";
 import { AutomationTab } from "./automations/AutomationTab";
 import { ITEM_KINDS, NEW_TAB_ACTIONS, newTabFields, newTabTitle, STUDIO_PLUGIN, tabKindEntry, type TabKindId } from "../tab-kinds";
 import { AUTOMATIONS_PANEL, AutomationsPanel } from "./automations/AutomationsPanel";
-import { currentBot } from "./conversations/state";
+import { currentBot, markLanded, startConversationVia } from "./conversations/state";
 import { newConversationPath } from "./conversations/new-conversation";
 import { LibraryPage } from "./library/LibraryPage";
 import { createKind } from "./new-menu";
@@ -77,11 +77,20 @@ export function openMade(panel: Pick<ExperimentalPanelController, "openTab"> | n
   if (!opened) showInMain(href);
 }
 
+/** A new conversation with the Bot the sidebar shows (BB's Mod+N and New thread row, and the New tab's action). */
+export function startNewConversation(): boolean {
+  return startConversationVia(() => {
+    const botId = currentBot();
+    markLanded();
+    showInMain(botId ? `/plugins/${STUDIO_PLUGIN}/studio/${newConversationPath(botId, null)}` : `/plugins/${STUDIO_PLUGIN}/studio/bot`);
+    return true;
+  });
+}
+
 /** What a "New …" action does: make the kind and open it beside the conversation, or start a conversation. */
 export async function runNewAction(kind: TabKindId, panel: Pick<ExperimentalPanelController, "openTab"> | null): Promise<void> {
   if (kind === "conversation") {
-    const botId = currentBot();
-    showInMain(botId ? `/plugins/${STUDIO_PLUGIN}/studio/${newConversationPath(botId, null)}` : `/plugins/${STUDIO_PLUGIN}/studio/bot`);
+    startNewConversation();
     return;
   }
   const studioKind = makes(kind);

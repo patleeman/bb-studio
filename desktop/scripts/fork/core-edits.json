@@ -22,9 +22,9 @@
       "budget": 6
     },
     "apps/app/src/components/layout/AppLayout.tsx": {
-      "seam": "narrow-window, workbench, approvals, item-drag, pop-out, app-backdrop",
-      "intent": "One fork import at the top of the file (components/fork/ForkLayout.tsx). SidebarStateBridge's sidebar state goes through useForkLayoutBridge(useAtom(sidebarOpenAtom)): useNarrowWindowSidebar.fork.ts collapses the sidebar below 1100px and keeps it closed in a bare window. ForkLayoutHosts is the first child of the content shell: ForkAppBackdropHost (slots.experimental_appBackdrop: the backdrop portaled behind the layout, its appearance on <html>), ForkApprovalHost (pending approvals to the desktop dialog or bb's own), ForkItemDropHost (bb's composer, side panel and main view as drop targets for slots.experimental_itemDrop), ForkTabReturnHost, ForkOverlayScrollbarHost and the tooltip dismiss. In a bare window (isBareWindow: loaded with ?bbBare=1 by experimental_popOut) AppLayoutSidebar, SidebarTriggerOverlay and the AppHeader are not rendered: two inserted guard lines around each of the first two, one condition in showHeader.",
-      "budget": 10
+      "seam": "narrow-window, workbench, approvals, item-drag, pop-out, app-backdrop, new-conversation",
+      "intent": "One fork import at the top of the file (components/fork/ForkLayout.tsx). SidebarStateBridge's sidebar state goes through useForkLayoutBridge(useAtom(sidebarOpenAtom)): useNarrowWindowSidebar.fork.ts collapses the sidebar below 1100px and keeps it closed in a bare window. ForkLayoutHosts is the first child of the content shell: ForkAppBackdropHost (slots.experimental_appBackdrop: the backdrop portaled behind the layout, its appearance on <html>), ForkApprovalHost (pending approvals to the desktop dialog or bb's own), ForkItemDropHost (bb's composer, side panel and main view as drop targets for slots.experimental_itemDrop), ForkTabReturnHost, ForkOverlayScrollbarHost and the tooltip dismiss. In a bare window (isBareWindow: loaded with ?bbBare=1 by experimental_popOut) AppLayoutSidebar, SidebarTriggerOverlay and the AppHeader are not rendered: two inserted guard lines around each of the first two, one condition in showHeader. The thread.new command (Mod+N) runs useForkNewConversation() (ForkNewConversation.ts, imported at the top of the file) first, so a plugin's slots.experimental_newConversation can open its own new conversation; otherwise bb's new-thread page.",
+      "budget": 14
     },
     "apps/app/src/components/pickers/model-load-error-message.tsx": {
       "seam": "model-load-notice",
@@ -37,9 +37,9 @@
       "budget": 7
     },
     "apps/app/src/components/pickers/ModelReasoningPicker.tsx": {
-      "seam": "composer-labels, model-picker-gate, picker-browse",
-      "intent": "An unknown model id shows a readable label (formatUnknownModelLabel, unknownModelLabel.fork.ts, imported at the top of the file) instead of the raw id, and the trigger's reasoning half comes from triggerReasoningLabel (same file): a model the catalog lacks still shows its stored level, so a thread reads \"Opus 5.5 Medium\" like the new-thread page. ModelReasoningPicker returns forkModelPickerGate(<Popover…>, { hasSelectedModel }) (components/fork/ForkModelPickerGate.tsx, imported at the top of the file), so a plugin's slots.experimental_modelPickerGate can stand in for the picker (Studio's \"Sign in\" while no provider is ready). A provider tab click only browses: handleProviderSelect takes commit (default true) and the tab's onClick passes false, so onSelectedProviderChange is not called and the tab shows that provider's models as a preview; picking a model or a reasoning level while previewing sends one onProviderModelChange(previewPick(...)) (previewPick.fork.ts, imported at the top of the file) with the provider, model and level together, so the composer never stores a model under the old provider; without that prop it falls back to onSelectedProviderChange then onModelChange. The provider cycle chord still commits.",
-      "budget": 41
+      "seam": "composer-labels, model-picker-gate, picker-browse, sign-in-errors",
+      "intent": "An unknown model id shows a readable label (formatUnknownModelLabel, unknownModelLabel.fork.ts, imported at the top of the file) instead of the raw id, and the trigger's reasoning half comes from triggerReasoningLabel (same file): a model the catalog lacks still shows its stored level, so a thread reads \"Opus 5.5 Medium\" like the new-thread page. ModelReasoningPicker returns forkModelPickerGate(<Popover…>, { hasSelectedModel }) (components/fork/ForkModelPickerGate.tsx, imported at the top of the file), so a plugin's slots.experimental_modelPickerGate can stand in for the picker (Studio's \"Sign in\" while no provider is ready). A provider tab click only browses: handleProviderSelect takes commit (default true) and the tab's onClick passes false, so onSelectedProviderChange is not called and the tab shows that provider's models as a preview; picking a model or a reasoning level while previewing sends one onProviderModelChange(previewPick(...)) (previewPick.fork.ts, imported at the top of the file) with the provider, model and level together, so the composer never stores a model under the old provider; without that prop it falls back to onSelectedProviderChange then onModelChange. The provider cycle chord still commits. A provider tab whose provider isn't signed in draws SignedOutTabMark (signedOutProviders.fork.tsx, imported at the top of the file, its states from useSignedOutProviderIds). The browse preview starts from the model last used with that provider (useRememberedProviderModel, rememberedProviderModel.fork.ts, imported at the top of the file: the model any composer last showed for it this session, else the stored one) when its catalog is verified, so picking only a level on another provider's tab keeps that model, or the default when it's gone.",
+      "budget": 50
     },
     "apps/app/src/components/secondary-panel/NewTabFileSearch.tsx": {
       "seam": "new-tab-items",
@@ -92,14 +92,14 @@
       "budget": 3
     },
     "apps/app/src/components/sidebar/AppSidebar.tsx": {
-      "seam": "sidebar",
-      "intent": "Renders PluginSidebarSections (ForkSidebarSections.tsx, imported at the top of the file) under the thread list, and once more with placement=\"footer\" right before the footer. Nothing else: the rail and the sidebar footer are upstream's.",
-      "budget": 5
+      "seam": "sidebar, new-conversation",
+      "intent": "Renders PluginSidebarSections (ForkSidebarSections.tsx, imported at the top of the file) under the thread list, and once more with placement=\"footer\" right before the footer. Nothing else: the rail and the sidebar footer are upstream's. handleNewChat (the sidebar's New thread row) asks useForkNewConversation() (ForkNewConversation.ts, imported at the top of the file) first, the same way as Mod+N.",
+      "budget": 9
     },
     "apps/app/src/components/thread/timeline/ThreadTimelineRows.tsx": {
-      "seam": "quiet-turns, message-menu",
-      "intent": "A finished assistant message that a plugin's reply classifier calls quiet (useQuietReply, lib/fork-reply-classifiers.ts, which redraws the row when a classifier registers after it was drawn) draws as QuietTurnMarker instead of a message. Core has no rule of its own. ConversationRowContent reads the plugins' slots.experimental_messageAction items (useForkMessageActions) and wraps the row's plugin actions in withForkMessageMenu (forkMessageActions.ts), which adds the items that are available for that message, keyed as menu items.",
-      "budget": 15
+      "seam": "quiet-turns, message-menu, sign-in-errors, unread-divider",
+      "intent": "A finished assistant message that a plugin's reply classifier calls quiet (useQuietReply, lib/fork-reply-classifiers.ts, which redraws the row when a classifier registers after it was drawn) draws as QuietTurnMarker instead of a message. Core has no rule of its own. ConversationRowContent reads the plugins' slots.experimental_messageAction items (useForkMessageActions) and wraps the row's plugin actions in withForkMessageMenu (forkMessageActions.ts), which adds the items that are available for that message, keyed as menu items. A system row that is a sign-in error draws forkSignInErrorBody (SignInErrorActions.fork.tsx, imported at the top of the file: Sign in runs the provider's login command in a terminal, Pick another model opens the picker) instead of the detail code box. findUnreadDividerIndex moves the divider back to the first unread row of the reply's turn with unreadDividerTurnStart (unreadDividerTurnStart.fork.ts, imported at the top of the file), so NEW never sits between a Thought or tool row and its reply.",
+      "budget": 24
     },
     "apps/app/src/components/ui/tab-pill.tsx": {
       "seam": "workbench",
@@ -152,9 +152,9 @@
       "budget": 4
     },
     "apps/app/src/views/thread-detail/ThreadScreen.tsx": {
-      "seam": "composer-replace, thread-banner",
-      "intent": "bb's prompt area is built as bbPromptArea and passed through forkComposerArea (ForkComposerReplace.tsx), so a plugin's experimental_replace can stand in for the composer in the thread page and in every ThreadChat; null stays null. In the page presentation (only ThreadDetailView draws it), forkThreadBanner (ForkThreadBanners.tsx) is the first child of the thread window, so plugins' slots.experimental_threadBanner rows sit above the transcript; ThreadChat's panel and transcript presentations draw none. Both fork imports sit at the top of the file.",
-      "budget": 6
+      "seam": "composer-replace, thread-banner, host-copy",
+      "intent": "bb's prompt area is built as bbPromptArea and passed through forkComposerArea (ForkComposerReplace.tsx), so a plugin's experimental_replace can stand in for the composer in the thread page and in every ThreadChat; null stays null. In the page presentation (only ThreadDetailView draws it), forkThreadBanner (ForkThreadBanners.tsx) is the first child of the thread window, so plugins' slots.experimental_threadBanner rows sit above the transcript; ThreadChat's panel and transcript presentations draw none. Both fork imports sit at the top of the file. It passes forkPlaceholderState(timelineRows, …) (follow-up-placeholder.fork.ts, imported at the top of the file) to ThreadDetailPromptArea once the timeline has loaded.",
+      "budget": 9
     },
     "apps/app/src/views/thread-detail/ThreadDetailHeader.tsx": {
       "seam": "thread-header",
@@ -532,9 +532,9 @@
       "budget": 4
     },
     "packages/thread-view/src/build-thread-timeline.ts": {
-      "seam": "sign-in-errors",
-      "intent": "BuildTimelineRowsOptions carries providerDisplayName (optional); the root rows, the requested-turn rows and delegation child rows pass it on, and the error row passes it to buildTimelineErrorDisplay.",
-      "budget": 6
+      "seam": "sign-in-errors, brief-thoughts",
+      "intent": "BuildTimelineRowsOptions carries providerDisplayName (optional); the root rows, the requested-turn rows and delegation child rows pass it on, and the error row passes it to buildTimelineErrorDisplay. The \"operation\" case returns no row for a finished Thought shorter than two seconds (isBriefThought, brief-thought.fork.ts, imported at the top of the file), so short replies carry no bare \"Thought\" line.",
+      "budget": 9
     },
     "apps/app/src/components/promptbox/NewThreadComposer.tsx": {
       "seam": "picker-browse",
@@ -584,6 +584,21 @@
     "apps/app/src/components/promptbox/ExecutionControls.tsx": {
       "seam": "picker-browse",
       "intent": "ExecutionProviderConfig carries onProviderModelChange (ProviderModelPickHandler, previewPick.fork.ts, imported at the top of the file) and passes it to ModelReasoningPicker, so a pick from another provider's tab reaches the composer as one change.",
+      "budget": 3
+    },
+    "plugins/provider-codex/src/bridge/bridge.ts": {
+      "seam": "sign-in-errors",
+      "intent": "handleChildNotification passes the translator's deltas through failFastOnAuthError (auth-fail-fast.fork.ts, imported right under the shebang): the first 401 reconnect of a turn becomes its final unauthorized error and the bridge interrupts that Codex turn (requestCodexTurnInterrupt), so a signed-out Codex fails at once instead of after its own reconnects.",
+      "budget": 6
+    },
+    "apps/app/src/views/thread-detail/ThreadDetailPromptArea.tsx": {
+      "seam": "host-copy",
+      "intent": "Takes an optional forkPlaceholderState prop; forkPlaceholder (follow-up-placeholder.fork.ts, imported at the top of the file) supplies the placeholder for a conversation with no user message yet (\"Ask anything\") or whose last turn failed because the provider isn't signed in, and bb's own placeholder is used otherwise.",
+      "budget": 7
+    },
+    "apps/app/src/components/sidebar/SidebarUpdatesBadge.tsx": {
+      "seam": "update-label",
+      "intent": "sidebarUpdateButtonLabel asks forkSidebarUpdateLabel (sidebarUpdateLabel.fork.ts, imported at the top of the file) first: with no app update it names a single CLI or plugin update, or says \"N CLI updates\" / \"N plugin updates\", so a provider CLI update does not read like an app update.",
       "budget": 3
     }
   }
