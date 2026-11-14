@@ -16,6 +16,7 @@ import {
   classifyPluginMessage,
   isQuietReply,
   type PluginMessageClassification,
+  type ReplyClassifiers,
 } from "@/lib/fork-reply-classifiers";
 
 const KEPT_OPERATIONS: ReadonlySet<string> = new Set([
@@ -59,13 +60,19 @@ export interface RelayedGeneratedSource {
   sourceIsPluginSideChat: false;
 }
 
-export function isRelayedRow(row: ThreadTimelineViewRow): boolean {
+export function isRelayedRow(
+  row: ThreadTimelineViewRow,
+  classifiers: ReplyClassifiers = getPluginSlotSnapshot().replyClassifiers,
+): boolean {
   if (row.kind !== "conversation" || row.role !== "user") return false;
   if (row.initiator !== "user") return true;
   if (parseAutomationDueMessage(row.text) !== null) return true;
   return (
-    classifyPluginMessage(row.text, { part: "message", initiator: "user" }) !==
-    null
+    classifyPluginMessage(
+      row.text,
+      { part: "message", initiator: "user" },
+      classifiers,
+    ) !== null
   );
 }
 
@@ -88,33 +95,48 @@ function hiddenInFold(row: ThreadTimelineViewRow): boolean {
 export function foldRelayedRows(
   rows: readonly ThreadTimelineViewRow[],
   streamingAssistantMessageId: string | null,
+  classifiers: ReplyClassifiers = getPluginSlotSnapshot().replyClassifiers,
 ): RelayedFold {
+  const relayed = (row: ThreadTimelineViewRow | undefined): boolean =>
+    row !== undefined && isRelayedRow(row, classifiers) && !isAlertRow(row);
+  const quiet = (row: ThreadTimelineViewRow | undefined): boolean =>
+    row !== undefined &&
+    row.kind === "conversation" &&
+    row.role === "assistant" &&
+    row.id !== streamingAssistantMessageId &&
+    isQuietReply(row.text, classifiers);
+  const nextConversation = (from: number): number => {
+    let index = from;
+    while (index < rows.length && rows[index]!.kind !== "conversation") {
+      index += 1;
+    }
+    return index;
+  };
   const hidden = new Set<string>();
   const folded = new Set<string>();
   for (let index = 0; index < rows.length; index += 1) {
-    const row = rows[index]!;
-    if (!isRelayedRow(row) || isAlertRow(row)) continue;
-    let next = index + 1;
-    while (next < rows.length && rows[next]!.kind !== "conversation") {
-      next += 1;
+    if (!relayed(rows[index])) continue;
+    const group = new Set([index]);
+    let reply = nextConversation(index + 1);
+    while (relayed(rows[reply])) {
+      group.add(reply);
+      reply = nextConversation(reply + 1);
     }
-    const reply = rows[next];
-    if (
-      reply === undefined ||
-      reply.kind !== "conversation" ||
-      reply.role !== "assistant" ||
-      reply.id === streamingAssistantMessageId ||
-      !isQuietReply(reply.text)
+    if (!quiet(rows[reply])) continue;
+    let end = reply;
+    for (
+      let later = nextConversation(end + 1);
+      quiet(rows[later]);
+      later = nextConversation(end + 1)
     ) {
-      continue;
+      end = later;
     }
-    for (let between = index + 1; between < next; between += 1) {
-      const betweenRow = rows[between]!;
-      if (hiddenInFold(betweenRow)) hidden.add(betweenRow.id);
+    for (let at = index; at <= end; at += 1) {
+      const row = rows[at]!;
+      if (group.has(at)) folded.add(row.id);
+      else if (row.kind === "conversation" || hiddenInFold(row)) hidden.add(row.id);
     }
-    hidden.add(reply.id);
-    folded.add(row.id);
-    index = next;
+    index = end;
   }
   if (folded.size === 0) return { rows, folded: NO_FOLDS };
   return { rows: rows.filter((row) => !hidden.has(row.id)), folded };
@@ -137,8 +159,9 @@ export function useRelayedFold(
       foldRelayedRows(
         rows,
         scopeActive ? findStreamingAssistantMessageId(rows) : null,
+        slots.replyClassifiers,
       ),
-    [rows, scopeActive, findStreamingAssistantMessageId, slots],
+    [rows, scopeActive, findStreamingAssistantMessageId, slots.replyClassifiers],
   );
 }
 
