@@ -532,9 +532,9 @@
       "budget": 4
     },
     "packages/thread-view/src/build-thread-timeline.ts": {
-      "seam": "sign-in-errors",
-      "intent": "BuildTimelineRowsOptions carries providerDisplayName (optional); the root rows, the requested-turn rows and delegation child rows pass it on, and the error row passes it to buildTimelineErrorDisplay.",
-      "budget": 6
+      "seam": "sign-in-errors, brief-thoughts",
+      "intent": "BuildTimelineRowsOptions carries providerDisplayName (optional); the root rows, the requested-turn rows and delegation child rows pass it on, and the error row passes it to buildTimelineErrorDisplay. The \"operation\" case returns no row for a finished Thought shorter than two seconds (isBriefThought, brief-thought.fork.ts, imported at the top of the file), so short replies carry no bare \"Thought\" line.",
+      "budget": 9
     },
     "apps/app/src/components/promptbox/NewThreadComposer.tsx": {
       "seam": "picker-browse",
