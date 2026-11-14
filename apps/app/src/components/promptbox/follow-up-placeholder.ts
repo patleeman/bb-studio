@@ -20,7 +20,7 @@ export function getFollowUpPromptPlaceholder(
       return FIRST_MESSAGE_PLACEHOLDER;
     case "idle":
     case "active":
-      return "Ask for a follow-up. @ to mention files, folders, sections, or threads";
+      return "Ask for a follow-up. @ to mention files, folders, sections, or conversations";
     default:
       return assertNever(displayStatus);
   }

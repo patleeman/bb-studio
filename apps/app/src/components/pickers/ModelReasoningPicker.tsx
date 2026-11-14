@@ -1069,7 +1069,7 @@ export function ModelReasoningPicker({
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent
         align={align}
-        mobileTitle={handoffMode ? "Handoff to new thread" : "Model"}
+        mobileTitle={handoffMode ? "Continue in a new conversation" : "Model"}
         mobileClassName={cn(
           "h-[min(32rem,80dvh)]",
           handoffMode && HANDOFF_DRAWER_TOP_CLASS_NAME,
@@ -1216,7 +1216,7 @@ function HandoffModeHeader({ onBack }: { onBack: () => void }) {
         <Icon name="X" className="size-3.5" aria-hidden />
       </button>
       <span className="min-w-0 truncate text-xs font-normal text-subtle-foreground">
-        Handoff to new thread
+        Continue in a new conversation
       </span>
     </div>
   );

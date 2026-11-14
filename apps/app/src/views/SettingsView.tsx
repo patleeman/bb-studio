@@ -893,7 +893,7 @@ export function GeneralSettingsSection({
   );
   return (
     <>
-      <SettingsSection title="Threads & editing">
+      <SettingsSection title="Conversations & editing">
         <div className="space-y-5">
           <SettingsWithControl
             label={NAVIGATE_TO_THREAD_AFTER_CREATE_SETTING_LABEL}
@@ -1017,7 +1017,7 @@ export function GeneralSettingsSection({
           {desktopBrowserAvailable ? (
             <SettingsWithControl
               label={IN_APP_BROWSER_LINK_SETTING_LABEL}
-              description="Open web links inside bb."
+              description="Open web links inside BB Studio."
             >
               <Switch
                 checked={openLinksInAppBrowser}

@@ -812,7 +812,7 @@ describe("FollowUpPromptBox", () => {
         />,
       );
       expect(screen.getByLabelText("Follow-up prompt")).toBe(editor);
-      expect(screen.getByText("Handoff to new thread")).not.toBeNull();
+      expect(screen.getByText("Continue in a new conversation")).not.toBeNull();
       const exit = screen.getByRole("button", { name: "Exit handoff" });
       expect(exit.textContent).toBe("");
       fireEvent.click(exit);

@@ -141,7 +141,7 @@ it("names the server machine a new machine depends on", async () => {
   const rendered = renderAddMachineContent("host_server");
   expect(
     await screen.findByText(
-      "The new machine will connect to the bb server on Mac mini. Keep that computer on so the new machine can keep working.",
+      "The new machine will connect to the BB Studio server on Mac mini. Keep that computer on so the new machine can keep working.",
     ),
   ).toBeDefined();
   rendered.unmount();
@@ -153,7 +153,7 @@ it("does not name a fallback machine when the server has no primary host", async
   await screen.findByText("bb machine enroll test");
   expect(
     screen.getByText(
-      "The new machine will connect to your bb server. Keep the server machine on so the new machine can keep working.",
+      "The new machine will connect to your BB Studio server. Keep the server machine on so the new machine can keep working.",
     ),
   ).toBeDefined();
   expect(screen.queryByText(/Mac mini|MacBook Pro/u)).toBeNull();
