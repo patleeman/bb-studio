@@ -203,12 +203,14 @@ struct PresenceView: View {
     let workers: Int
     var size: CGFloat = 36
     var room: CGFloat = 1
+    var paused = false
     @Environment(\.look) private var look
     @Environment(\.displayScale) private var scale
     @Environment(\.scenePhase) private var phase
     @ObservedObject private var store = LookStore.shared
     @ObservedObject private var catalog = PresenceCatalog.shared
     @State private var image: UIImage?
+    @State private var liveShown = false
 
     private var spec: PresenceSpec {
         var spec = PresenceSpec(bot: bot, state: state, workers: workers, look: look, size: size, scale: scale, custom: catalog.entry(bot.presence?.form))
@@ -220,20 +222,29 @@ struct PresenceView: View {
 
     var body: some View {
         let spec = spec
+        let still = PresenceStills.shared.cached(spec) ?? image
+        let covered = live && liveShown
         ZStack {
-            if live {
-                LivePresenceView(spec: spec)
-            } else if let image {
-                Image(uiImage: image).resizable().interpolation(.high)
-            } else {
+            if let still {
+                Image(uiImage: still).resizable().interpolation(.high).opacity(covered ? 0 : 1)
+            } else if !covered {
                 Circle().fill(Color(lookHex: look.tokens.presence.palette.first ?? look.tokens.accent).opacity(0.35)).padding(size * 0.2)
+            }
+            if live {
+                LivePresenceView(spec: spec, running: !paused) {
+                    withAnimation(.easeOut(duration: 0.25)) { liveShown = true }
+                }
             }
         }
         .frame(width: size * max(1, room), height: size * max(1, room))
+        .onChange(of: live) { _, _ in liveShown = false }
         .task(id: spec) {
-            image = PresenceStills.shared.cached(spec)
-            if image == nil { image = await PresenceStills.shared.still(spec) }
+            guard PresenceStills.shared.cached(spec) == nil else { return }
+            let rendered = await PresenceStills.shared.still(spec)
+            withAnimation(.easeOut(duration: 0.25)) { image = rendered }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(bot.name)
         .accessibilityHidden(true)
         .accessibilityIdentifier("Presence")
     }
@@ -242,10 +253,13 @@ struct PresenceView: View {
 /// Desktop's presence, live, in its own sandboxed web view.
 struct LivePresenceView: UIViewRepresentable {
     let spec: PresenceSpec
+    var running = true
+    var shown: () -> Void = {}
 
     final class Coordinator {
         var host: LookWebView?
         var mounted: PresenceSpec?
+        var running: Bool?
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -255,6 +269,7 @@ struct LivePresenceView: UIViewRepresentable {
         container.isUserInteractionEnabled = false
         container.backgroundColor = .clear
         container.clipsToBounds = true
+        container.alpha = 0
         let host = LookWebView(page: .presence, frame: CGRect(x: 0, y: 0, width: spec.canvas, height: spec.canvas))
         host.webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         container.addSubview(host.webView)
@@ -264,13 +279,26 @@ struct LivePresenceView: UIViewRepresentable {
 
     func updateUIView(_ container: UIView, context: Context) {
         let coordinator = context.coordinator
-        guard let host = coordinator.host, coordinator.mounted != spec else { return }
-        let first = coordinator.mounted == nil || coordinator.mounted?.form != spec.form || coordinator.mounted?.code != spec.code || coordinator.mounted?.size != spec.size || coordinator.mounted?.room != spec.room
+        guard let host = coordinator.host else { return }
+        let running = running
+        if coordinator.mounted != nil, coordinator.running != running {
+            coordinator.running = running
+            Task { _ = try? await host.call("BBLook.presence.setLive(live, fps)", ["live": running, "fps": LookStore.liveFPS]) }
+        }
+        guard coordinator.mounted != spec else { return }
+        let reveal = coordinator.mounted == nil
+        let first = reveal || coordinator.mounted?.form != spec.form || coordinator.mounted?.code != spec.code || coordinator.mounted?.size != spec.size || coordinator.mounted?.room != spec.room
         coordinator.mounted = spec
+        coordinator.running = running
         let arguments = spec.arguments
-        Task {
-            if first { _ = try? await host.call("BBLook.presence.mount(spec, true, fps)", ["spec": arguments, "fps": LookStore.liveFPS]) }
+        let shown = shown
+        Task { @MainActor in
+            if first { _ = try? await host.call("BBLook.presence.mount(spec, live, fps)", ["spec": arguments, "live": running, "fps": LookStore.liveFPS]) }
             else { _ = try? await host.call("BBLook.presence.update(spec)", ["spec": arguments]) }
+            guard reveal else { return }
+            try? await Task.sleep(for: .milliseconds(120))
+            UIView.animate(withDuration: 0.25) { container.alpha = 1 }
+            shown()
         }
     }
 

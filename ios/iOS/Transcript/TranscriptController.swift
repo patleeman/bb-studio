@@ -26,6 +26,7 @@ struct TranscriptChrome: Equatable {
     var pill = PillPlacement.trailing
     /// Rows fade softly under the header (iOS's scroll edge effect).
     var softTopEdge = false
+    var topClear: CGFloat = 0
     /// The pill shows while the end is further than this below the view.
     var nearEnd: CGFloat = 80
     /// `onNearTop` fires when the top of what the reader sees is this close to the first row.
@@ -352,7 +353,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     /// The insets come from where the header and composer are; only a real change is written.
     private func updateInsets() {
-        let top = hasTop ? topHost.view.frame.maxY : view.safeAreaInsets.top
+        let top = (hasTop ? topHost.view.frame.maxY : view.safeAreaInsets.top) + chrome.topClear
         var bottom = view.bounds.maxY - composerHost.view.frame.minY
         if chrome.pill == .center, pill.shown { bottom += pillHost.view.bounds.height }
         bottom = max(0, bottom)

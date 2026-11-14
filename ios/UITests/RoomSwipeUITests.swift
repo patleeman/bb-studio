@@ -32,6 +32,7 @@ final class RoomSwipeUITests: ServerIsolatedUITestCase {
         launch()
         XCTAssertEqual(input.label, "Message Juniper")
         XCTAssertEqual(floor.value as? String, "Conversation 1 of 4")
+        XCTAssertTrue(app.descendants(matching: .any)["roomPageDots"].exists, "page dots")
         swipe(floor, by: 220, y: 0.8)
         pause(2)
         XCTAssertEqual(floor.value as? String, "Conversation 1 of 4", "Main is first: a swipe back rubber-bands")
@@ -59,6 +60,41 @@ final class RoomSwipeUITests: ServerIsolatedUITestCase {
         pause(2)
     }
 
+    func testEachConversationKeepsItsOwnDraft() {
+        launch()
+        let field = app.textViews["composerField"]
+        input.tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.typeText("Main only")
+        app.buttons["roomLayDown"].tap()
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
+        swipe(floor, by: -220, y: 0.8)
+        XCTAssertTrue(input.waitForLabel("Message Launch prep"))
+        input.tap()
+        XCTAssertTrue(app.staticTexts["Launch prep"].waitForExistence(timeout: 10))
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        let other = field.value as? String ?? ""
+        XCTAssertFalse(other.contains("Main only"), "Main's draft stays in Main: \(other)")
+        field.typeText("Prep only")
+        app.buttons["roomLayDown"].tap()
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
+        swipe(floor, by: 220, y: 0.8)
+        XCTAssertTrue(input.waitForLabel("Message Juniper"))
+        input.tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        let main = field.value as? String ?? ""
+        XCTAssertTrue(main.contains("Main only"), "Main keeps its draft: \(main)")
+        XCTAssertFalse(main.contains("Prep only"), "Launch prep's draft stays there: \(main)")
+        field.clearDraft()
+        app.buttons["roomLayDown"].tap()
+        swipe(floor, by: -220, y: 0.8)
+        XCTAssertTrue(input.waitForLabel("Message Launch prep"))
+        input.tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        XCTAssertTrue((field.value as? String ?? "").contains("Prep only"), "Launch prep keeps its draft")
+        field.clearDraft()
+    }
+
     func testSwipingThePresenceSwitchesBotsAndBack() {
         launch()
         let presence = app.otherElements.matching(NSPredicate(format: "label BEGINSWITH 'Juniper, '")).firstMatch
@@ -81,6 +117,11 @@ private extension XCUIElement {
     func waitForLabel(_ label: String, timeout: TimeInterval = 8) -> Bool {
         let done = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", label), object: self)
         return XCTWaiter.wait(for: [done], timeout: timeout) == .completed
+    }
+
+    func clearDraft() {
+        let text = value as? String ?? ""
+        typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: text.count + 2))
     }
 
     func waitForValue(_ value: String, timeout: TimeInterval = 8) -> Bool {

@@ -452,7 +452,7 @@ struct LibraryPageView: View {
     }
 
     private var chips: some View {
-        BotPageChips(choices: [(BotLibraryItem.Kind?.none, "All")] + LibraryPage.filters.map { (Optional($0), LibraryPage.label($0)) }, selection: $kind)
+        BotPageChips(choices: [(BotLibraryItem.Kind?.none, "All")] + LibraryPage.filters.map { (Optional($0), LibraryPage.chip($0)) }, selection: $kind)
     }
 
     private func grid(_ groups: [BotLibraryGroup]) -> some View {
@@ -465,9 +465,10 @@ struct LibraryPageView: View {
                 ForEach(groups) { group in
                     Text(group.title).font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
                         .padding(.top, 18).padding(.bottom, 6)
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 10)], spacing: 10) {
                         ForEach(group.rows) { tile($0) }
                     }
+                    .frame(maxWidth: .infinity)
                 }
                 if let items, groups.isEmpty {
                     ContentUnavailableView(items.isEmpty ? "No files" : "No files match", systemImage: "books.vertical").padding(.top, 40)

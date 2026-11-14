@@ -82,13 +82,21 @@ struct LookRoot: ViewModifier {
 
     func body(content: Content) -> some View {
         let theme = theme ?? store.theme(for: bot)
-        let chosen = store.sceneModes[theme.id].flatMap { theme.modes[$0.rawValue] != nil ? $0 : nil }
-        let fixed: ColorScheme? = chosen.map { $0 == .dark ? .dark : .light } ?? theme.fixedScheme
-        let look = Look(theme: theme, scheme: fixed ?? scheme, showsScene: theme.kind == .scene)
+        let fixed = Self.fixedScheme(theme, store: store)
+        let look = Self.look(theme, store: store, scheme: scheme)
         content
             .environment(\.look, look)
             .tint(look.accent)
             .preferredColorScheme(fixed)
+    }
+
+    static func fixedScheme(_ theme: LookTheme, store: LookStore) -> ColorScheme? {
+        let chosen = store.sceneModes[theme.id].flatMap { theme.modes[$0.rawValue] != nil ? $0 : nil }
+        return chosen.map { $0 == .dark ? .dark : .light } ?? theme.fixedScheme
+    }
+
+    static func look(_ theme: LookTheme, store: LookStore, scheme: ColorScheme) -> Look {
+        Look(theme: theme, scheme: fixedScheme(theme, store: store) ?? scheme, showsScene: theme.kind == .scene)
     }
 }
 

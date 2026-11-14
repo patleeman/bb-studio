@@ -119,6 +119,8 @@ struct AttachmentStrip: View {
                             .frame(width: 56, height: 56)
                             .background(.fill.tertiary)
                             .clipShape(.rect(cornerRadius: 8))
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(item.thumbnail != nil ? "Attached image \(item.name)" : "Attached file \(item.name)")
                             Button { items.removeAll { $0.id == item.id } } label: {
                                 Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette)
                                     .foregroundStyle(.white, .black.opacity(0.6))

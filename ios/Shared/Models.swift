@@ -83,6 +83,7 @@ public struct TimelineRow: Codable, Identifiable, Hashable, Sendable {
     public var sourceSeqEnd: Double?
     /// Who sent a user message: "user", or "system"/"agent" for BB's own messages.
     public var initiator: String?
+    public var senderThreadId: String?
     /// BB's own messages: `child-completed`, `child-failed`, … and what they are about.
     public var systemMessageKind: String?
     public var systemMessageSubject: SystemMessageSubject?

@@ -47,6 +47,41 @@ final class RoomQAUITests: ServerIsolatedUITestCase {
         shot("one-bot")
     }
 
+    func testOneConversationHasNoPagesAndTalksToTheBot() {
+        launch(["-qaOneConversation"])
+        let floor = app.descendants(matching: .any)["RoomFloor"].firstMatch
+        XCTAssertTrue(floor.waitForExistence(timeout: 10))
+        XCTAssertEqual(floor.value as? String ?? "", "", "no 'Conversation 1 of 1'")
+        XCTAssertFalse(app.descendants(matching: .any)["roomPageDots"].exists, "no page dots")
+        XCTAssertEqual(app.buttons["roomInput"].label, "Message Juniper")
+        let start = floor.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.8))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -220, dy: 0)))
+        sleep(1)
+        XCTAssertEqual(app.buttons["roomInput"].label, "Message Juniper", "a swipe has nowhere to go")
+        XCTAssertEqual(floor.value as? String ?? "", "")
+        shot("one-conversation")
+    }
+
+    func testRelayedMessagesFoldIntoOneRow() {
+        launch(["-qaRelayed"])
+        app.buttons["RoomFloor"].tap()
+        XCTAssertTrue(app.buttons["roomLayDown"].waitForExistence(timeout: 10), "the chat stands")
+        sleep(1)
+        let rows = app.buttons.matching(identifier: "relayedRow")
+        let lead = rows.matching(NSPredicate(format: "label BEGINSWITH 'From Theme stills renderer · '")).firstMatch
+        XCTAssertTrue(lead.waitForExistence(timeout: 10), "an agent's message is one line from its thread")
+        XCTAssertTrue(lead.label.hasSuffix("no reply needed"), "its [PASS] folds into it: \(lead.label)")
+        XCTAssertFalse(lead.label.contains("[bb message"))
+        let due = rows.matching(NSPredicate(format: "label BEGINSWITH 'From Automation · '")).firstMatch
+        XCTAssertTrue(due.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Two clashes this week'")).firstMatch.exists, "a real reply shows")
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS '[bb '")).firstMatch.exists, "no raw header")
+        shot("relayed")
+        lead.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'All eight themes render'")).firstMatch.waitForExistence(timeout: 5), "it opens to the whole message")
+        shot("relayed-open")
+    }
+
     func testNoTodosLeavesTheDayQuiet() {
         launch(["-qaLoopsEmpty"])
         XCTAssertTrue(app.descendants(matching: .any)["roomDayLine"].waitForExistence(timeout: 10))
@@ -93,16 +128,23 @@ final class RoomQAUITests: ServerIsolatedUITestCase {
         shot("foreground")
     }
 
+    private func audit() throws {
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription]) { issue in
+            print("audit issue:", issue.compactDescription, issue.element?.debugDescription ?? "no element")
+            return false
+        }
+    }
+
     func testEveryControlHasALabel() throws {
         launch()
-        try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+        try audit()
         app.buttons["roomInput"].tap()
         XCTAssertTrue(app.textViews["composerField"].waitForExistence(timeout: 10))
-        try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+        try audit()
         app.buttons["roomLayDown"].tap()
         app.buttons["roomMenuButton"].tap()
         XCTAssertTrue(app.buttons["roomPlace-todos"].waitForExistence(timeout: 10))
-        try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+        try audit()
     }
 
     func testASlowServerStillOpensTheRoom() {
