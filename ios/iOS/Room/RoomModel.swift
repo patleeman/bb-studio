@@ -133,7 +133,7 @@ enum RoomTheme {
 enum RoomFloor {
     static func clean(_ items: [TimelineItem]) -> [TimelineItem] {
         items.compactMap { item in
-            guard case .message(var row) = item, row.kind == "conversation", let text = row.text, text.contains("["),
+            guard case .message(var row) = item, row.kind == "conversation", !row.isPassReply, let text = row.text, text.contains("["),
                   text.components(separatedBy: "\n").contains(where: isStatusToken) else { return item }
             let kept = text.components(separatedBy: "\n").filter { !isStatusToken($0) }
             let joined = kept.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -143,10 +143,11 @@ enum RoomFloor {
         }
     }
 
-    static func rows(_ rows: [ThreadTranscriptRow]) -> [ThreadTranscriptRow] {
+    static func rows(_ rows: [ThreadTranscriptRow], lying: Bool = false) -> [ThreadTranscriptRow] {
         rows.compactMap { row in
-            guard case .item(.message(let message), _) = row else { return row }
+            guard case .item(.message(let message), let state) = row else { return row }
             if let event = BotChatEntry.childEvent(message) { return .bot(.child(event, id: message.id), .init()) }
+            if state.relayed != nil { return lying ? nil : row }
             return BotChatEntry.shows(message) ? row : nil
         }
     }

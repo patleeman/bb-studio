@@ -416,9 +416,31 @@ enum BotDemo {
     /// `-qaLoopsDemo`: the morning card and loop cards at the end of the chat.
     private static func loopRows() -> [TimelineRow] {
         let start = now - 300_000
-        return LoopsDemo.messages().enumerated().map { index, message in
+        let loops = LoopsDemo.messages().enumerated().map { index, message in
             row(id: "loop-\(index)", role: message.role, text: message.text, at: start + Double(index) * 1_000)
         }
+        guard relayedFixture, !loops.isEmpty else { return loops }
+        let relayed: [TimelineRow] = decode("[" + relayedJSON(start + 60_000).joined(separator: ",") + "]")
+        return loops + relayed
+    }
+
+    static var relayedFixture: Bool { ProcessInfo.processInfo.arguments.contains("-qaRelayed") }
+
+    private static func relayedJSON(_ at: Double) -> [String] {
+        func message(_ id: String, _ role: String, _ text: String, _ at: Double, initiator: String? = nil, sender: String? = nil) -> String {
+            var json: [String: Any] = ["id": id, "kind": "conversation", "role": role, "text": text, "createdAt": at]
+            if let initiator { json["initiator"] = initiator }
+            if let sender { json["senderThreadId"] = sender }
+            return String(decoding: try! JSONSerialization.data(withJSONObject: json), as: UTF8.self)
+        }
+        return [
+            message("rl1", "user", "[bb message from thread:thr_demo_w2]\n\nLEAD studio: the theme stills renderer is finished. All eight themes render in under a second.", at,
+                    initiator: "agent", sender: "thr_demo_w2"),
+            #"{"id":"rl1w","kind":"work","workKind":"tool","toolName":"bb_threads_list","title":"bb_threads_list","status":"completed","output":"","createdAt":\#(at + 5_000)}"#,
+            message("rl2", "assistant", "[PASS]", at + 10_000),
+            message("rl3", "user", "[bb automation due:auto_demo] Check this week's calendar for clashes.", at + 30_000, initiator: "user"),
+            message("rl4", "assistant", "Two clashes this week: the design review overlaps the dentist on Tuesday, and Thursday's call overlaps the flight.", at + 40_000),
+        ]
     }
 
     fileprivate static func decode<T: Decodable>(_ json: String) -> T {
@@ -478,6 +500,7 @@ enum BotDemo {
             items.append(message("m5", "assistant", "Just one thing: the **Lisbon offsite budget** needs your sign-off by 3pm. The PRs are merged and the deck is final.\n\nWant me to draft the approval note?\n\n::next{reply=\"👍 Draft it|🕒 Remind me at 2|🙅 Not today\" do=\"📅 Block focus time\"}", today + 30_000))
         }
         if spaceFixture { items += spaceRows(today + 60_000, message: message, work: work) }
+        if relayedFixture, LoopsDemo.messages().isEmpty { items += relayedJSON(today + 90_000) }
         return decode("[" + items.joined(separator: ",") + "]")
     }
 

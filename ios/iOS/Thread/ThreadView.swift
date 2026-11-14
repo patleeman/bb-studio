@@ -2166,7 +2166,7 @@ extension ThreadView {
         let rows = ThreadTranscriptRow.thread(items: items, hasOlder: model.hasOlder, unread: unreadItem(in: items), match: currentMatch,
             editableId: worker == nil ? lastUserRowId : nil, pending: pending, interactions: shownInteractions,
             working: showsWorking, thinking: model.shelf.thinking, sideThreads: conversation != nil ? sideThreads : [:])
-        return inRoom ? RoomFloor.rows(rows) : rows
+        return inRoom ? RoomFloor.rows(rows, lying: lying) : rows
     }
 
     fileprivate var transcriptV2Actions: ThreadTranscriptActions {
@@ -2181,7 +2181,13 @@ extension ThreadView {
             forkConversation: inConversation ? { forkConversation($0) } : nil,
             openSideThread: inConversation ? { showThread($0) } : nil,
             replier: conversation?.look,
-            resolve: { await model.resolve($0, $1) }, cancel: { await model.cancel($0) }, openWeb: { showingWeb = true })
+            resolve: { await model.resolve($0, $1) }, cancel: { await model.cancel($0) }, openWeb: { showingWeb = true },
+            threadTitle: { [conversation] id in
+                guard let conversation else { return nil }
+                if id == conversation.mainThreadId { return "Main" }
+                if id == conversation.threadId { return conversation.conversation?.title }
+                return conversation.allWorkers.first { $0.threadId == id }?.title
+            })
     }
 
     fileprivate var transcriptV2Chrome: TranscriptChrome {

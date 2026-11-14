@@ -144,6 +144,60 @@ struct MessageBubble: View {
     }
 }
 
+struct RelayedRow: View {
+    let relayed: RelayedMessage
+    var quiet = false
+    var title: String?
+    @State private var expanded = false
+
+    private var symbol: String {
+        switch relayed.kind {
+        case .agent: "arrow.turn.down.right"
+        case .runner: "figure.run"
+        case .automation: "clock"
+        case .system, .studio: relayed.urgent ? "exclamationmark.triangle" : "info.circle"
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.snappy) { expanded.toggle() }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: symbol).font(.caption.weight(.semibold)).frame(width: 16)
+                    Text(relayed.line(title: title)).font(.footnote).lineLimit(expanded ? 3 : 1)
+                    Spacer(minLength: 4)
+                    if quiet {
+                        Image(systemName: "checkmark").font(.caption2.weight(.semibold))
+                    }
+                    Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
+                        .rotationEffect(.degrees(expanded ? 90 : 0))
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(relayed.line(title: title) + (quiet ? ", no reply needed" : ""))
+            .accessibilityHint(expanded ? "Hides the message" : "Shows the whole message")
+            .accessibilityIdentifier("relayedRow")
+            if expanded {
+                MarkdownText(relayed.body)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .transition(.opacity)
+            }
+        }
+        .background(.fill.quaternary, in: .rect(cornerRadius: 12, style: .continuous))
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 struct QuietCheckMarker: View {
     var body: some View {
         Label {

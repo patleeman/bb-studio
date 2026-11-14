@@ -63,6 +63,7 @@ struct ThreadTranscriptActions {
     var resolve: (PendingInteraction, JSONValue) async -> Bool
     var cancel: (PendingInteraction) async -> Void
     var openWeb: () -> Void
+    var threadTitle: (String) -> String? = { _ in nil }
 }
 
 /// One row of a thread's transcript, with everything that changes how it
@@ -90,6 +91,8 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
         var editable = false
         var sideThread: BotSideThread?
         var sameTurn = false
+        var relayed: RelayedMessage?
+        var quiet = false
     }
 
     var id: String {
@@ -148,7 +151,10 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
                        sideThreads: [String: BotSideThread] = [:]) -> [Self] {
         var result: [Self] = hasOlder ? [.older] : []
         var speaker: Bool?
-        for item in items {
+        var index = items.startIndex
+        while index < items.endIndex {
+            let item = items[index]
+            index += 1
             var state = ItemState(unread: item.id == unread, match: item.id == match)
             let mine: Bool = if case .message(let row) = item { row.isUser } else { false }
             state.sameTurn = speaker == mine
@@ -156,6 +162,16 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
             if case .message(let row) = item {
                 state.editable = row.id == editableId
                 state.sideThread = sideThreads[row.id]
+                if let relayed = RelayedMessage.of(row) {
+                    state.relayed = relayed
+                    state.editable = false
+                    state.sameTurn = false
+                    speaker = nil
+                    if let pass = Self.passReply(after: index, in: items) {
+                        state.quiet = true
+                        index = pass + 1
+                    }
+                }
             }
             result.append(.item(item, state))
         }
@@ -163,6 +179,15 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
         result += interactions.map(Self.interaction)
         if working { result.append(.working(nil, thinking: thinking)) }
         return result
+    }
+}
+
+extension ThreadTranscriptRow {
+    static func passReply(after start: Int, in items: [TimelineItem]) -> Int? {
+        var at = start
+        while at < items.endIndex, case .activity = items[at] { at += 1 }
+        guard at < items.endIndex, case .message(let reply) = items[at], !reply.isUser, SilentOutput.isPass(reply.text) else { return nil }
+        return at
     }
 }
 
@@ -188,6 +213,8 @@ struct ThreadTranscriptRowView: View {
                 if state.unread { UnreadDivider() }
                 Group {
                     switch item {
+                    case .message where state.relayed != nil:
+                        RelayedRow(relayed: state.relayed!, quiet: state.quiet, title: state.relayed!.senderThreadId.flatMap(actions.threadTitle))
                     case .message(let row):
                         MessageBubble(
                             row: row, projectId: actions.projectId, react: actions.draftReply,
