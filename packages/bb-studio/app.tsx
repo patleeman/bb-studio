@@ -29,7 +29,7 @@ import { showBot } from "./src/ui/conversations/show-bot";
 import { hideBbSkills } from "./src/ui/skills/hide-bb-skills";
 import { hideBbChrome } from "./src/ui/footer/hide-bb-chrome";
 import { openBugReport, REPORT_BUG_FOOTER_ID } from "./src/ui/footer/report-bug";
-import { askAboutItemHandler } from "./src/ui/ask-about-item";
+import { askAboutItemHandler, askBotNameOf } from "./src/ui/ask-about-item";
 import { setAskAboutItem } from "./src/kit/app/item-header";
 import { registerReadOnlyComposer } from "./src/ui/conversations/ReadOnlyComposer";
 import { FinishedCard } from "./src/ui/conversations/finish";
@@ -332,9 +332,9 @@ export default definePluginApp((app) => {
   // (Settings, or `bb thread-list`): one Bot's conversations and workers, and
   // its space dots. BB shows it on its home and thread pages.
   if (sidebarSections) {
-    const spaces = async () => (await post("bot_spaces", {})) as { bots: { id: string; mainThreadId: string | null }[]; currentBotId: string | null };
+    const spaces = async () => (await post("bot_spaces", {})) as { bots: { id: string; name: string; mainThreadId: string | null }[]; currentBotId: string | null };
     // A file's header asks the Bot in the current conversation about it, not a new thread (src/ui/ask-about-item.ts).
-    setAskAboutItem(askAboutItemHandler(spaces, async (input) => (await post("bot_landing", input)) as { threadId: string | null }));
+    setAskAboutItem(askAboutItemHandler(spaces, async (input) => (await post("bot_landing", input)) as { threadId: string | null }), () => askBotNameOf(spaces));
     // The Bot header is the top of the sidebar: the fork's experimental_hideSidebarHeader drops BB's "New conversation"
     // row (the Bot's + New is beside Conversations). In the desktop app's title bar layout the traffic lights, back,
     // forward and the sidebar toggle stay in the title bar; in the browser layout back and forward move to the start

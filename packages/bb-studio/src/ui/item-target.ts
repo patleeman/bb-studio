@@ -50,7 +50,7 @@ export function itemKindOf(id: string): string | null {
 
 /** The workbench tab that shows a thread or an item beside a conversation; null for an item with no workbench view. */
 export function workbenchOpenFor(target: TabTarget, title: string): WorkbenchOpen | null {
-  if (target.kind === "thread") return { tabId: THREAD_TAB, params: { threadId: target.id }, title: title || "Thread" };
+  if (target.kind === "thread") return { tabId: THREAD_TAB, params: { threadId: target.id }, title: title || "Conversation" };
   const type = typeOfId(target.id);
   const kind = type ? tabKind(type.kind, target.id) : null;
   return kind ? { tabId: STUDIO_TAB, params: { kind: kind.kind, id: target.id }, title: title || "Untitled" } : null;

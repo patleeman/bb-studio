@@ -37,7 +37,7 @@ const view = (fields: Partial<SideThreadView>): SideThreadView => ({ messageId: 
 
 it("opens a message's thread in the side panel of the conversation it came from", async () => {
   expect(await openThreadBeside("thr_main", "thr_reply", host.toThread)).toBe(true);
-  expect(workbench.open).toHaveBeenCalledWith({ kind: "tab", tab: { id: "thread" }, params: { threadId: "thr_reply" }, title: "Thread" }, { focus: true });
+  expect(workbench.open).toHaveBeenCalledWith({ kind: "tab", tab: { id: "thread" }, params: { threadId: "thr_reply" }, title: "Conversation" }, { focus: true });
   expect(host.toThread).not.toHaveBeenCalled();
   expect(await openThreadBeside("thr_main", "thr_reply", host.toThread, async () => false)).toBe(false);
   expect(host.toThread).toHaveBeenCalledWith("thr_reply");

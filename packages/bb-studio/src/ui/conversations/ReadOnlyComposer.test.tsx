@@ -97,6 +97,7 @@ it("shows the worker's status line and sends a question to the Bot in its conver
   // An active composer: the helper sits on the right, beside a send button that reads as one.
   expect($('[data-testid="worker-ask-box"]')?.className).toContain("shadow-sm");
   expect($('[data-testid="worker-ask-where"]')?.textContent).toBe("Sends to Chief of Staff in Fork redesign");
+  expect(($('[data-testid="worker-ask"]') as HTMLTextAreaElement).placeholder).toBe("Ask Chief of Staff about this worker…");
   expect(($('[data-testid="worker-ask-send"]') as HTMLButtonElement).disabled).toBe(true);
   await type("Is it done?");
   await act(async () => { $('[data-testid="worker-ask"]')!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); });

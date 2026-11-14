@@ -325,9 +325,12 @@ export function repoTag(thread: Pick<ThreadFacts, "environmentName" | "environme
   return tag ? { tag, branch: thread.environmentBranchName } : null;
 }
 
-/** The first line of a reply, short, for a conversation's second line; null for a quiet "[PASS]". */
-export function latestLine(text: string | null | undefined): string | null {
-  const clean = (text ?? "").replace(/::[a-z-]+\{[^}]*\}/g, "").replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[*_`#>]+/g, "").split("\n").map((line) => line.trim()).find((line) => line.length > 0) ?? "";
+/** The first line of a reply, short, for a conversation's second line; null for a quiet "[PASS]". A thread mention reads as its title, else "a conversation"; a page mention as "a page". */
+export function latestLine(text: string | null | undefined, threadTitle: (threadId: string) => string | null = () => null): string | null {
+  const clean = (text ?? "").replace(/::[a-z-]+\{[^}]*\}/g, "").replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/@thread:(thr_[A-Za-z0-9_-]*[A-Za-z0-9])(?:#msg=\d+)?/g, (_, id: string) => threadTitle(id)?.trim() || "a conversation")
+    .replace(/@page:pg_[A-Za-z0-9_-]*[A-Za-z0-9]/g, "a page")
+    .replace(/[*_`#>]+/g, "").split("\n").map((line) => line.trim()).find((line) => line.length > 0) ?? "";
   if (!clean || /^\[PASS\]$/i.test(clean)) return null;
   return clean.length > LATEST_MAX ? `${clean.slice(0, LATEST_MAX - 1)}…` : clean;
 }
@@ -953,7 +956,7 @@ export class BotThreads {
   /** A conversation's turn ended: its latest reply becomes its second line. A quiet "[PASS]" changes nothing. */
   idle(threadId: string, lastAssistantText: string | null | undefined): void {
     this.touched(threadId);
-    const line = latestLine(lastAssistantText);
+    const line = latestLine(lastAssistantText, (id) => this.mentionTitle(id));
     if (!line) return;
     const result = this.deps.db.prepare("UPDATE bot_threads SET latest = ?, latest_at = ?, activity_at = ? WHERE thread_id = ? AND kind = 'conversation'").run(line, this.now(), this.now(), threadId);
     if (result.changes) this.deps.changed(rowChanges(null, this.get(threadId)));
@@ -972,7 +975,13 @@ export class BotThreads {
   /** Writes a conversation's latest line without a change notice (a lazy fill); "" marks it as having none. `overEmpty` also fills one marked "". */
   fillLatest(threadId: string, text: string | null, overEmpty = false): void {
     // Its time is the thread's activity, not now: a lazy fill isn't a new reply.
-    this.deps.db.prepare(`UPDATE bot_threads SET latest = ? WHERE thread_id = ? AND (latest IS NULL${overEmpty ? " OR latest = ''" : ""})`).run(latestLine(text) ?? "", threadId);
+    this.deps.db.prepare(`UPDATE bot_threads SET latest = ? WHERE thread_id = ? AND (latest IS NULL${overEmpty ? " OR latest = ''" : ""})`).run(latestLine(text, (id) => this.mentionTitle(id)) ?? "", threadId);
+  }
+
+  /** What a thread mention in a latest line reads as: Main, or the thread's own title. */
+  private mentionTitle(threadId: string): string | null {
+    const rec = this.get(threadId);
+    return rec?.isMain ? "Main" : rec?.title?.trim() || null;
   }
 
   /** Marks a conversation as needing the user (`reason`), or clears it (null). `source` names who raised it (a worker's id, or "bot"). */

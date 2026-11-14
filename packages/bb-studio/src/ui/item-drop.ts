@@ -99,7 +99,7 @@ export function canDropItem(item: DragItem, target: ItemDropTarget): boolean {
 
 /** A pill in the composer: BB's thread mention for a thread, Studio's item mention (its kind is the provider) for an item. False where BB has neither. */
 function insertPill(item: DragItem, shown: TabRef, target: Extract<ItemDropTarget, { zone: "composer" }>): boolean {
-  const label = item.title.trim() || (isThread(shown) ? "Thread" : "Untitled");
+  const label = item.title.trim() || (isThread(shown) ? "Conversation" : "Untitled");
   try {
     if (isThread(shown)) return typeof target.insertThreadMention === "function" && target.insertThreadMention({ id: shown.id!, title: label });
     const provider = shown.id ? itemKindOf(shown.id) : null;

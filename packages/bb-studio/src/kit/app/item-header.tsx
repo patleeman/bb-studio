@@ -33,20 +33,38 @@ export function openNewItemThread(navigate: ReturnType<typeof useBbNavigate>, it
 export interface AskAboutItem { item: ItemThread; itemRef: ItemChatRef; container: ReturnType<typeof useStudioContainer> }
 
 let askAbout: ((ask: AskAboutItem) => void) | null = null;
+let askBotName: (() => Promise<string | null>) | null = null;
 /**
  * The app's "Ask the Bot about this" (src/ui/ask-about-item.ts): the item
  * goes to the Bot in the current conversation, mentioned in its composer.
  * Without it the header offers "New thread about this", as before.
  */
-export function setAskAboutItem(handler: ((ask: AskAboutItem) => void) | null): void {
+export function setAskAboutItem(handler: ((ask: AskAboutItem) => void) | null, botName: (() => Promise<string | null>) | null = null): void {
   askAbout = handler;
+  askBotName = botName;
+}
+
+/** "Ask <the Bot's name> about this", or "the Bot" until the name is known. */
+export function askLabel(name: string | null | undefined): string {
+  return `Ask ${name?.trim() || "the Bot"} about this`;
+}
+
+function useAskBotName(): string | null {
+  const [name, setName] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void askBotName?.().then((next) => { if (live) setName(next); }, () => {});
+    return () => { live = false; };
+  }, []);
+  return name;
 }
 
 /** "Ask the Bot about this": the item, mentioned in the current conversation's composer. */
 export function AskBotButton({ item, itemRef }: { item: ItemThread; itemRef: ItemChatRef }) {
   const container = useStudioContainer();
+  const label = askLabel(useAskBotName());
   return (
-    <button type="button" aria-label="Ask the Bot about this" title="Ask the Bot about this" data-studio-item-ask={`${itemRef.pluginId}:${itemRef.id}`} className={ICON_BUTTON} onClick={() => askAbout?.({ item, itemRef, container })}>
+    <button type="button" aria-label={label} title={label} data-studio-item-ask={`${itemRef.pluginId}:${itemRef.id}`} className={ICON_BUTTON} onClick={() => askAbout?.({ item, itemRef, container })}>
       <Icon name="MessageSquarePlus" />
     </button>
   );

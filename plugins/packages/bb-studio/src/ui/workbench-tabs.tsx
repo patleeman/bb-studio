@@ -84,7 +84,7 @@ export function BotTabView({ params }: { params: JsonValue | null }) {
 
 /** The tab a search hit opens, or null for one with no workbench view. */
 export function targetForHit(hit: Pick<Hit, "kind" | "title" | "href" | "ref">): WorkbenchTarget | null {
-  if (hit.kind === "thread") return { tabId: THREAD_TAB, params: { threadId: hit.ref.id }, title: hit.title || "Thread" };
+  if (hit.kind === "thread") return { tabId: THREAD_TAB, params: { threadId: hit.ref.id }, title: hit.title || "Conversation" };
   const item = workbenchItem(hit.href);
   return item ? { tabId: STUDIO_TAB, params: itemParams(item.kind, item.id) as JsonValue, title: hit.title || "Untitled" } : null;
 }

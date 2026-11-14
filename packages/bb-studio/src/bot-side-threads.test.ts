@@ -248,7 +248,7 @@ it("lists a Bot's threads for its sidebar, latest first", async () => {
 
 it("titles a side thread with the reply's plain start", () => {
   expect(snippet("## Plan\n\nShip **Friday**.\n\n::bot-thread{}")).toBe("Plan Ship Friday.");
-  expect(snippet("::next{reply=\"x\"}")).toBe("Thread");
+  expect(snippet("::next{reply=\"x\"}")).toBe("Conversation");
   expect(snippet("a".repeat(80))).toHaveLength(60);
 });
 
