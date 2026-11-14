@@ -10,7 +10,7 @@ export const update = z.object({id:z.string(), changes:add.partial().optional(),
 export const filters = z.object({area:z.string().optional(),owner:z.string().optional()});
 // Saved place names from the phone, names only (never coordinates). iOS watches at most 20 regions.
 export const places = z.object({names:z.array(z.string().trim().min(1).max(60)).max(20)});
-// Why a due todo of Patrick's still waits: the daily budget is spent, or it's low priority and waits for the morning card.
+// Why a due todo of the user's still waits: the daily budget is spent, or it's low priority and waits for the morning card.
 export const hold = z.object({id:z.string(),reason:z.enum(['budget','morning'])});
 // A thread owner by name: the thread's title, with threadId null when the thread is gone.
 export const ownerInfo = z.object({owner:z.string(),name:z.string(),threadId:z.string().nullable()});

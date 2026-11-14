@@ -184,6 +184,7 @@ const botSkill = z.object({
 /** A Bot's skill learning (src/skill-learning.ts): background reviews and the curator. */
 const botLearning = z.object({
   enabled: z.boolean(), interval: z.number(), reviewModel: z.string().nullable(), defaultModel: z.string().nullable(), models: z.array(z.string()),
+  modelNames: z.record(z.string(), z.string()).optional(),
   consolidate: z.boolean(),
   toolTurns: z.number(), userTurns: z.number(), reviewing: z.boolean(),
   lastReview: z.object({ at: z.number(), result: z.string() }).nullable(),

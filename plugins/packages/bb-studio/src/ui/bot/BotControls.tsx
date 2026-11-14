@@ -11,6 +11,7 @@ import { Icon } from "../../kit/ui/index";
 import { useEffect, useState, type ReactNode } from "react";
 import type { BotView } from "../../contract";
 import { externalName } from "../../external-providers";
+import { formatModelName } from "../../model-names";
 import { useLive } from "../live";
 import { BotFace } from "../../presence/ui/BotFace";
 import { botProvider } from "./BotAvatar";
@@ -42,6 +43,12 @@ export function checkinWords(run: BotView["run"]): string {
   if (preset === "off") return "Off";
   if (preset) { const found = PRESETS.find((each) => each.id === preset)!; return `${found.label}, ${found.hint.replace(/^Weekdays /, "weekdays at ").replace("9–17", "9 AM to 5 PM")}`; }
   return statusLabel(run, "active").replace(/^Checks in /, "Custom: ");
+}
+
+export function runsOn(bot: Pick<NonNullable<BotView["bot"]>, "kind" | "providerId" | "model" | "modelName">): string {
+  const model = bot.model ? bot.modelName || formatModelName(bot.model) : null;
+  if (bot.kind === "external") return `${externalName(bot.providerId)}${model ? ` · ${model}` : ""}`;
+  return model ?? "Its thread's model";
 }
 
 export function BotControls({ view, refresh }: { view: BotView; refresh(): void }) {
@@ -88,7 +95,7 @@ export function BotControls({ view, refresh }: { view: BotView; refresh(): void 
             </div>
           </Part>
           <Part id="model" title="Model">
-            <Row label="Runs on" value={external ? `${externalName(bot.providerId)}${bot.model ? ` · ${bot.model}` : ""}` : bot.model ?? "Its thread's model"}
+            <Row label="Runs on" value={runsOn(bot)}
               action={bot.threadId && bot.providerId && bot.model ? <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => setSwitching(true)}>Switch model…</button> : null} />
           </Part>
           {external ? null : (
@@ -125,7 +132,7 @@ export function BotControls({ view, refresh }: { view: BotView; refresh(): void 
         </div>
       </div>
       {switching && bot.threadId && bot.providerId && bot.model
-        ? <SwitchModelDialog threadId={bot.threadId} providerId={bot.providerId} model={bot.model} onClose={() => setSwitching(false)} onSwitched={() => refresh()} />
+        ? <SwitchModelDialog threadId={bot.threadId} providerId={bot.providerId} model={bot.model} modelName={bot.modelName} onClose={() => setSwitching(false)} onSwitched={() => refresh()} />
         : null}
       {sheets}
     </div>

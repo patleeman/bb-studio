@@ -1,8 +1,8 @@
 // Studio's own settings: every setting that isn't an API key. They live in
 // Studio's storage (store.ts), not BB's declared settings, so Studio can
 // draw them in grouped sections (ui/sections.tsx) with plain labels.
-// `bb studio settings` reads and changes them (cli.ts). API keys stay BB's
-// secret fields (keys.ts). Key names are the ones BB's settings used, so a
+// `bb studio settings` reads and changes them (cli.ts). API keys stay in BB's
+// secret files (keys.ts, key-store.ts). Key names are the ones BB's settings used, so a
 // value migrates as is (migrate.ts).
 //
 // The frontend imports this file: keep it free of server and root SDK imports.
@@ -10,6 +10,7 @@ import { CALL_RETENTION_OPTIONS, CALL_STT_OPTIONS, HOLD_KEY_OPTIONS } from "../k
 import { DEFAULT_REPLIES } from "../kit/pages-contract";
 import { DEFAULT_EMOJI_ITEMS } from "../reactions/emoji-items";
 import { jevProviderChoices } from "../decisions/server/jev-providers";
+import { isTimeZone } from "../loops/clock";
 import { ALL_VOICES, BACKEND_MODELS, DEFAULT_BACKEND_MODEL, DEFAULT_CAP_USD, DEFAULT_VOICE, LIVE_MODELS } from "../voice/live/shared";
 
 /** Studio publishes `{}` on this realtime channel after its settings change. */
@@ -22,7 +23,7 @@ interface Base { label: string; description?: string; group: SettingGroup; hidde
 export type StudioSetting = Base & (
   | { type: "boolean"; default: boolean }
   | { type: "number"; default: number; min: number; max: number; integer?: boolean }
-  | { type: "string"; default: string; maxLength: number; multiline?: boolean }
+  | { type: "string"; default: string; maxLength: number; multiline?: boolean; timeZone?: true }
   | { type: "select"; default: string; options: readonly string[]; optionLabels?: Record<string, string> }
 );
 export type SettingValue = boolean | number | string;
@@ -49,7 +50,7 @@ export const STUDIO_SETTINGS = {
   // Recordings and calls
   autoTitle: { group: "recordings", type: "boolean", label: "Name recordings", default: true },
   autoMeetingNotes: { group: "recordings", type: "boolean", label: "Summarize recordings", default: false },
-  callTranscription: { group: "recordings", type: "select", label: "Transcribe calls", description: "This Mac keeps call audio here. A home server or BB’s voice service receives each piece of audio.", options: CALL_STT_OPTIONS, optionLabels: { [CALL_STT_OPTIONS[0]]: "This Mac", [CALL_STT_OPTIONS[1]]: "Home server", [CALL_STT_OPTIONS[2]]: "BB voice service" }, default: CALL_STT_OPTIONS[0] },
+  callTranscription: { group: "recordings", type: "select", label: "Transcribe calls", description: "This Mac keeps call audio here. A home server or the transcription service in Settings ▸ AI services receives each piece of audio.", options: CALL_STT_OPTIONS, optionLabels: { [CALL_STT_OPTIONS[0]]: "This Mac", [CALL_STT_OPTIONS[1]]: "Home server", [CALL_STT_OPTIONS[2]]: "AI services" }, default: CALL_STT_OPTIONS[0] },
   callServerUrl: { group: "recordings", type: "string", label: "Home server URL", description: "A speech-to-text server with an OpenAI-compatible /v1/audio/transcriptions endpoint, such as http://homelab:8000.", default: "", maxLength: 500 },
   callServerModel: { group: "recordings", type: "string", label: "Home server model", description: "Empty uses whisper-1.", default: "", maxLength: 200 },
   callLocalModel: { group: "recordings", type: "string", label: "Model on this Mac", description: "The WhisperKit model.", default: "openai_whisper-large-v3-v20240930_626MB", maxLength: 200 },
@@ -72,29 +73,30 @@ export const STUDIO_SETTINGS = {
   // Threads
   decisions_enabled: { group: "threads", type: "boolean", label: "Smart Queue", description: "Pauses while the standalone Smart Queue plugin is on.", default: true },
   autoResumeThreads: { group: "threads", type: "boolean", label: "Resume after a restart", description: "Up to 2 times an hour.", default: true },
-  loopsEnabled: { group: "threads", type: "boolean", label: "Todos", description: "The daily budget and quiet hours are on the Bot page, under Controls ▸ Attention.", default: false },
+  loopsEnabled: { group: "threads", type: "boolean", label: "Todo reminders", description: "Posts each due todo in the Bot’s chat, with its push, and starts the Bot’s own todos when they’re due.", default: false },
   snapshotsPerPage: { group: "threads", type: "number", label: "Page history", description: "Keep this many versions of each page, or 0 for all.", default: 50, min: 0, max: 1000, integer: true },
   exportDeletedThreads: { group: "threads", type: "boolean", label: "Export deleted threads", description: "If the file cannot be written, the thread is not deleted.", default: false },
-  exportDeletedThreadsFolder: { group: "threads", type: "string", label: "Export folder", description: "An absolute folder path on the BB server, such as /Users/you/bb-thread-exports. One .jsonl file per thread.", default: "", maxLength: 500 },
+  exportDeletedThreadsFolder: { group: "threads", type: "string", label: "Export folder", description: "An absolute folder path on this computer, such as /Users/you/bb-thread-exports. One .jsonl file per thread.", default: "", maxLength: 500 },
 
   // Windows (only a BB with plugin windows uses them; src/launcher)
   launcherHotkey: { group: "windows", type: "string", label: "Launcher shortcut", description: "Written like Alt+Space or Control+Shift+L. Empty for none.", default: "Alt+Space", maxLength: 40 },
   desktopControl: { group: "windows", type: "boolean", label: "Desktop control", default: false, hidden: true },
 
-  // Jev
-  decisions_jevProvider: { group: "jev", type: "select", label: "Provider", description: "Jev, the model that decides whether a message to a busy thread steers it or waits. Auto tries each provider with a key.", options: jevProviderChoices, optionLabels: { auto: "Auto", typesafe: "TypeSafe", vercel: "Vercel AI Gateway", openrouter: "OpenRouter", "opencode-zen": "OpenCode Zen", custom: "Your own endpoint" }, default: "auto" },
+  // Smart Queue model
+  decisions_jevProvider: { group: "jev", type: "select", label: "Provider", description: "The decision model Smart Queue asks first: it decides whether a message to a busy thread steers it or waits. Auto tries each provider with a key.", options: jevProviderChoices, optionLabels: { auto: "Auto", typesafe: "TypeSafe", vercel: "Vercel AI Gateway", openrouter: "OpenRouter", "opencode-zen": "OpenCode Zen", custom: "Your own endpoint" }, default: "auto" },
   decisions_customJevEndpoint: { group: "jev", type: "string", label: "Endpoint URL", description: "Any endpoint that speaks TypeSafe’s System One API, such as https://gateway.example.com/v1/systemone. HTTPS except on localhost.", default: "", maxLength: 2000 },
-  decisions_customJevApiKeyCommand: { group: "jev", type: "string", label: "Or a command that prints the key", description: "Run on the BB server; the token is reused until its JWT expires, or for five minutes.", default: "", maxLength: 2000 },
+  decisions_customJevApiKeyCommand: { group: "jev", type: "string", label: "Or a command that prints the key", description: "Runs on this computer; the token is reused until its JWT expires, or for five minutes.", default: "", maxLength: 2000 },
   decisions_customJevHeaders: { group: "jev", type: "string", label: "Extra headers", description: "`name: value` pairs separated by semicolons, such as `source: bb; org-id: 2`.", default: "", maxLength: 4000 },
   decisions_customJevModel: { group: "jev", type: "string", label: "Model name", description: "The model the endpoint expects, such as jev-latest.", default: "", maxLength: 200 },
 
   // Advanced
-  decisions_batchConfidence: { group: "advanced", type: "number", label: "Smart Queue batch confidence", description: "From 0 to 1. When a thread frees up, queued follow-ups Jev is this sure belong together go as one turn. 1 sends each on its own.", default: 0.5, min: 0, max: 1 },
+  decisions_batchConfidence: { group: "advanced", type: "number", label: "Smart Queue batch confidence", description: "From 0 to 1. When a thread frees up, queued follow-ups the decision model is this sure belong together go as one turn. 1 sends each on its own.", default: 0.5, min: 0, max: 1 },
 
   // Bot ▸ Controls ▸ Attention
   loopDailyBudget: { group: "attention", type: "number", label: "Interruptions a day", description: "After this many, new todos wait in the Todos list until tomorrow.", default: 5, min: 0, max: 100, integer: true },
   loopQuietStart: { group: "attention", type: "number", label: "Quiet hours start", description: "The hour, 0 to 23, when interruptions stop.", default: 22, min: 0, max: 23, integer: true },
   loopQuietEnd: { group: "attention", type: "number", label: "Quiet hours end", description: "The hour, 0 to 23, when interruptions start again.", default: 7, min: 0, max: 23, integer: true },
+  todosTimeZone: { group: "attention", type: "string", label: "Time zone", description: "Todos show and come due in this zone. Empty uses this computer’s.", default: "", maxLength: 100, timeZone: true },
 } as const satisfies Record<string, StudioSetting>;
 
 export type StudioSettingKey = keyof typeof STUDIO_SETTINGS;
@@ -136,7 +138,8 @@ export function checkSetting(key: string, value: unknown): { ok: true; value: Se
     case "string":
       if (typeof value !== "string") return { ok: false, error: `${key} needs text.` };
       if (value.length > setting.maxLength) return { ok: false, error: `${key} can be at most ${setting.maxLength} characters.` };
-      return { ok: true, value };
+      if (setting.timeZone && value.trim() && !isTimeZone(value)) return { ok: false, error: `${value} isn't a time zone, such as America/Los_Angeles.` };
+      return { ok: true, value: setting.timeZone ? value.trim() : value };
     case "select": {
       const known = typeof value === "string" ? setting.options.find((option) => option === value || value.startsWith(`${option} (`)) : undefined;
       return known !== undefined

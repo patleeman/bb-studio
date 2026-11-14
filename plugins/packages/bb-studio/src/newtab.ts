@@ -8,6 +8,7 @@
 // both sides and tests share it.
 import { z } from "zod";
 import { itemKindOfId, kindsNamedBy, TAB_KIND_REGISTRY, tabKindEntry, type TabKindId, type TabRef } from "./tab-kinds";
+import { shownThreadTitle } from "./reply-title";
 
 /** Rows Studio offers to Recent and to each search. */
 export const NEW_TAB_LIMIT = 8;
@@ -46,7 +47,8 @@ export const shownKind = (entry: Pick<NewTabEntry, "title" | "kind">): string =>
 
 export function entryFor(ref: TabRef, title: string, updatedAt: number, icon?: string | null): NewTabEntry {
   const kind = tabKindEntry(ref.kind);
-  return { id: `${ref.kind}:${ref.id ?? ""}`, title: title.trim() || UNTITLED[ref.kind] || "Untitled", kind: kind.name, icon: icon || kind.icon, updatedAt, ref };
+  const shown = kind.ref === "thread" ? shownThreadTitle(title) : title.trim();
+  return { id: `${ref.kind}:${ref.id ?? ""}`, title: shown || UNTITLED[ref.kind] || "Untitled", kind: kind.name, icon: icon || kind.icon, updatedAt, ref };
 }
 
 export function itemEntry(item: ItemRow): NewTabEntry | null {

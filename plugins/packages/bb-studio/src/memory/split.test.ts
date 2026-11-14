@@ -60,16 +60,16 @@ it("keeps the check-in list and how the user works in the profile, and makes eve
 });
 
 it("reads the profile headings in any case and for any name", () => {
-  expect(["Check-in", "CHECK-IN", "check in", "Checkins", "Weekly check-ins", "How Patrick works", "how PATRICK Works", "How he works", "How I work", "How Zoë works"].filter((heading) => PROFILE_HEADING.test(heading))).toHaveLength(10);
+  expect(["Check-in", "CHECK-IN", "check in", "Checkins", "Weekly check-ins", "How Sam works", "how SAM Works", "How he works", "How I work", "How Zoë works"].filter((heading) => PROFILE_HEADING.test(heading))).toHaveLength(10);
   expect(["Who he is", "Hard rules", "Preferences", "People", "How it works", "How the backup works", "Checking out"].some((heading) => PROFILE_HEADING.test(heading))).toBe(false);
 });
 
 /** A check-in list and a how-he-works section that together are over the 2,500-character cap. */
 const OVER_CAP_PAGE = `## Check-in
 
-${Array.from({ length: 12 }, (_, index) => `- Check ${index + 1}: anything waiting on Patrick from the morning sweep?`).join("\n")}
+${Array.from({ length: 12 }, (_, index) => `- Check ${index + 1}: anything waiting on Sam from the morning sweep?`).join("\n")}
 
-## How Patrick works
+## How Sam works
 
 ${Array.from({ length: 30 }, (_, index) => `- Habit ${index + 1}: one recommendation, short reports in simple English.`).join("\n")}
 
@@ -85,16 +85,16 @@ it("moves the longest profile section to records when the profile is over the ca
   expect(how).toBeGreaterThan(checkIn);
   const plan = planSplit({ markdown: OVER_CAP_PAGE, page, botName: "Dot" });
   expect(plan.sections.map((section) => [section.heading, section.target, section.overCap])).toEqual([
-    ["Check-in", "profile", false], ["How Patrick works", "records", true], ["Systems", "records", false],
+    ["Check-in", "profile", false], ["How Sam works", "records", true], ["Systems", "records", false],
   ]);
   expect(plan.profile.chars).toBeLessThanOrEqual(PROFILE_CAP_CHARS);
   expect(plan.profile.markdown).toMatch(/^## Check-in\n\n- Check 1:/);
   expect(plan.profile.markdown).not.toContain("Habit");
-  expect(plan.records.filter((record) => record.section === "How Patrick works")).toHaveLength(30);
+  expect(plan.records.filter((record) => record.section === "How Sam works")).toHaveLength(30);
   expect(plan.records.at(-1)).toMatchObject({ topic: "Systems", text: "homelab backs up on Saturday." });
   // A smaller cap moves the next longest too; an empty profile gets the two headings.
   const tight = planSplit({ markdown: OVER_CAP_PAGE, page, botName: "Dot", cap: 100 });
-  expect(tight.sections.filter((section) => section.overCap).map((section) => section.heading)).toEqual(["Check-in", "How Patrick works"]);
+  expect(tight.sections.filter((section) => section.overCap).map((section) => section.heading)).toEqual(["Check-in", "How Sam works"]);
   expect(tight.profile.markdown).toBe(EMPTY_PROFILE);
 });
 
@@ -122,7 +122,7 @@ const NESTED_PAGE = `# Chief of Staff's Memory
 
 ## Check-in
 
-- Anything waiting on Patrick?
+- Anything waiting on Sam?
 - Threads I started that finished, failed or stalled.
 - Garage sensor battery: the 1st of the month.
 
@@ -130,7 +130,7 @@ const NESTED_PAGE = `# Chief of Staff's Memory
 
 Long-lived notes; the newest at the bottom of each part.
 
-### How Patrick works
+### How Sam works
 
 - One recommendation, not a survey of options.
 - Short reports in simple English.
@@ -195,7 +195,7 @@ it("splits every heading level: each subsection is a unit, kept in the profile o
     ["check-in", "Check-in", "profile"],
     // The parent's own text, before its first subsection.
     ["memory", "Memory", "records"],
-    ["how-patrick-works", "How Patrick works", "profile"],
+    ["how-sam-works", "How Sam works", "profile"],
     ["standing-rules", "Standing rules", "records"],
     ["people", "People", "records"],
     ["family", "Family", "records"],
@@ -213,11 +213,11 @@ it("splits every heading level: each subsection is a unit, kept in the profile o
   ]);
   expect(plan.profile.markdown).toBe(`## Check-in
 
-- Anything waiting on Patrick?
+- Anything waiting on Sam?
 - Threads I started that finished, failed or stalled.
 - Garage sensor battery: the 1st of the month.
 
-## How Patrick works
+## How Sam works
 
 - One recommendation, not a survey of options.
 - Short reports in simple English.
@@ -252,5 +252,5 @@ it("keeps a profile section's subsections with it, one level below, and labels r
   expect(plan.profile.markdown).toBe("## How Sam works\n\nMornings only.\n\n### Communication\n\n- Short notes.\n");
   expect(plan.records.map((record) => record.topic)).toEqual(["Garden", "Projects › Larkspur"]);
   expect(["Memory", "Notes", "Misc", "Facts and decisions", "Sam's notes", "Long-term memory"].filter(catchAll)).toHaveLength(6);
-  expect(["Projects", "Systems", "Launch", "Patrick's projects"].some(catchAll)).toBe(false);
+  expect(["Projects", "Systems", "Launch", "Sam's projects"].some(catchAll)).toBe(false);
 });

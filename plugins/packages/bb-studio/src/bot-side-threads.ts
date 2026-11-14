@@ -1,5 +1,6 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
+import { isReplyTitle } from "./reply-title";
 
 type Sdk = BbPluginApi["sdk"];
 
@@ -339,7 +340,7 @@ export class SideThreads {
 export function inferSideKind(row: { kind: SideKind; createdAt: number; linked: boolean }, thread: Pick<ThreadLike, "title" | "originPluginId" | "originKind" | "visibility">): SideKind {
   const title = thread.title?.trim() ?? "";
   if (title.endsWith(" · fork")) return "fork";
-  if (title.endsWith(" · thread")) return "reply";
+  if (isReplyTitle(title)) return "reply";
   if (thread.originPluginId === SIDE_CHAT_PLUGIN || thread.visibility === "hidden") return "reply";
   if (thread.originKind === "fork" && thread.originPluginId !== STUDIO_PLUGIN) return "fork";
   if (row.linked && row.createdAt < KIND_RECORDED_SINCE) return "fork";

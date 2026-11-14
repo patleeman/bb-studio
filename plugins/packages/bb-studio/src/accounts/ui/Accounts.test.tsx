@@ -24,7 +24,7 @@ const NOW = Date.UTC(2026, 10, 12, 16, 0);
 
 function account(over: Partial<AccountView> & { key: string }): AccountView {
   const [source, id] = over.key.split(":") as [AccountView["source"], string];
-  return { id, source, provider: "claude", name: "Claude", label: "Patrick", state: "ready", message: null, windows: [], models: [], pinned: [], signIn: source === "local" ? null : `${source === "studio" ? "pool" : "bb"}:${id}`, ...over };
+  return { id, source, provider: "claude", name: "Claude", label: "Sam", state: "ready", message: null, windows: [], models: [], pinned: [], signIn: source === "local" ? null : `${source === "studio" ? "pool" : "bb"}:${id}`, ...over };
 }
 
 const STATUS: AccountsStatus = {
@@ -40,7 +40,7 @@ const STATUS: AccountsStatus = {
   dismissed: [],
 };
 
-const warning = (over: Partial<Warning> & { id: string }): Warning => ({ accountKey: "studio:a", source: "studio", kind: "signed_out", title: "Claude signed out", detail: "BB Studio · Patrick", action: "sign_in", target: "pool:a", ...over });
+const warning = (over: Partial<Warning> & { id: string }): Warning => ({ accountKey: "studio:a", source: "studio", kind: "signed_out", title: "Claude signed out", detail: "BB Studio · Sam", action: "sign_in", target: "pool:a", ...over });
 
 let root: Root | null = null;
 const container = () => document.body.lastElementChild as HTMLElement;
@@ -85,6 +85,30 @@ describe("Accounts panel", () => {
     expect(container().querySelector('[data-account="studio:a"] [data-testid="relogin"]')).not.toBeNull();
   });
 
+  it("shows a local login that isn't signed in as Signed out with Sign in, and wraps reset times and labels instead of cutting them off", async () => {
+    const onSignIn = vi.fn();
+    const status: AccountsStatus = {
+      ...STATUS,
+      accounts: [
+        account({ key: "local:claude-code", name: "Claude Code", label: "someone-with-a-long-address@example.test · Ultra", signIn: "provider:claude-code", windows: [{ id: "weekly", label: "Weekly limit", percent: 45, resetAt: RESET, rejected: false }] }),
+        account({ key: "local:codex", provider: "codex", name: "Codex", label: null, state: "signed_out", signIn: "provider:codex" }),
+      ],
+    };
+    await render(<AccountsPanel status={status} error={null} signingIn={null} onSignIn={onSignIn} onSignInDone={() => {}} onRefresh={() => {}} onClose={() => {}} api={api} now={NOW} />);
+    const root = container();
+    expect(root.querySelectorAll(".truncate")).toHaveLength(0);
+    const reset = root.querySelector('[data-account="local:claude-code"] [data-testid="quota-reset"]')!;
+    expect(reset.textContent).toMatch(/^resets Nov 16, /);
+    expect(reset.className).toContain("whitespace-nowrap");
+    expect(reset.parentElement!.className).toContain("flex-wrap");
+    expect(root.querySelector('[data-account="local:claude-code"] [data-testid="account-label"]')!.className).toContain("break-all");
+    const codex = root.querySelector('[data-account="local:codex"]')!;
+    expect(codex.querySelector('[data-testid="account-state"]')!.textContent).toBe("Signed out");
+    expect(codex.querySelector('[data-testid="account-sign-in"]')!.textContent).toBe("Sign in");
+    await act(async () => { (codex.querySelector('[data-testid="account-sign-in"]') as HTMLButtonElement).click(); });
+    expect(onSignIn).toHaveBeenCalledWith(expect.objectContaining({ key: "local:codex" }));
+  });
+
   it("offers Sign in only for signed-out or failing accounts with a sign-in", () => {
     expect(needsSignIn(account({ key: "studio:a", state: "signed_out" }))).toBe(true);
     expect(needsSignIn(account({ key: "studio:a", state: "limited" }))).toBe(false);
@@ -100,7 +124,7 @@ describe("warnings", () => {
     const dismiss = vi.fn();
     const list = [
       warning({ id: "studio:a:signed_out" }),
-      warning({ id: "bb:a:model:fable:rejected", source: "bb", accountKey: "bb:a", kind: "model", title: "Fable at 100%", detail: "bb · Patrick · resets Nov 16, 09:00", action: "switch_model" }),
+      warning({ id: "bb:a:model:fable:rejected", source: "bb", accountKey: "bb:a", kind: "model", title: "Fable at 100%", detail: "bb · Sam · resets Nov 16, 09:00", action: "switch_model" }),
       warning({ id: "studio:b:window:secondary:high", accountKey: "studio:b", kind: "window", title: "Claude 7d at 92%", action: "use_other" }),
     ];
     await render(<WarningList warnings={list} actions={{ run, dismiss }} />);

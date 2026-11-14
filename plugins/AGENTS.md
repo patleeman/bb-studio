@@ -71,7 +71,7 @@ Stable BB then refuses the plugin with "requires bb plugin SDK ...".
   `bb plugin build` on Nightly writes.
 - Run `pnpm check:compat` before handoff. It prints the current stable app and
   SDK versions and fails on any plugin that stable BB would refuse. On a Mac
-  with `bb`, it also fails when the BB running there (Patrick's Nightly can be
+  with `bb`, it also fails when the BB running there (the user's Nightly can be
   older than stable) would refuse a plugin on reload: update that BB before
   raising an SDK floor. Don't
   raise a floor past stable to make it pass; wait for the API to ship in
@@ -95,7 +95,7 @@ BB application in a staged environment before handoff.
   on its own data directory and ports, installs every plugin from GitHub at a
   pushed commit, seeds a demo project, and writes a `capture.env` to source
   before capturing. `node scripts/staged-bb.mjs stop` removes it.
-- Keep test agent runs out of Patrick's real session history. Agents that run
+- Keep test agent runs out of the user's real session history. Agents that run
   in a staged BB save transcripts to the provider's home folder, and those
   folders are archived and searched as his own conversations. Staged runs once
   added over 1,200 fake ORBIT-42 sessions that had to be deleted.

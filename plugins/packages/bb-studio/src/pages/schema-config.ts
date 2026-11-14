@@ -60,7 +60,7 @@ export const STUDIO_EMBEDS = {
   drawing: { pluginId: "excalidraw", panel: "drawings", label: "Whiteboard" },
   artifact: { pluginId: "artifacts", panel: "artifacts", label: "Artifact" },
   recording: { pluginId: "talk", panel: "recordings", label: "Recording" },
-  mini: { pluginId: "minis", panel: "minis", label: "Mini app" },
+  mini: { pluginId: "minis", panel: "minis", label: "App" },
 } as const;
 export type StudioEmbedKind = keyof typeof STUDIO_EMBEDS;
 

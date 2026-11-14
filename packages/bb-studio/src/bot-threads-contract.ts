@@ -1,6 +1,6 @@
 // The RPC for one Bot, many conversations (src/bot-threads.ts): the Bots as
 // spaces, a Bot's conversations and workers, one thread's place, the Bot's
-// files (Library), and Patrick's changes. Spread into Studio's contract
+// files (Library), and the user's changes. Spread into Studio's contract
 // (src/contract.ts). Every change publishes Studio's realtime channel
 // (`studio_changed`), so open views reload. The README's "Conversations and
 // workers: the API" section lists each method with its shapes for clients
@@ -31,7 +31,7 @@ const space = z.object({
   primary: z.boolean(),
   /** Its Main conversation (its chat thread); null before it has one. */
   mainThreadId: z.string().nullable(),
-  /** A conversation of this Bot needs Patrick: its dot is amber. */
+  /** A conversation of this Bot needs the user: its dot is amber. */
   needsYou: z.boolean(),
   appearance: appearanceSchema.nullable(),
   presence: presenceSchema.optional(),
@@ -115,7 +115,7 @@ const libraryItem = z.object({
   href: z.string().nullable(),
   updatedAt: z.number(),
   createdAt: z.number().nullable(),
-  /** Who made it: a conversation or a worker of the Bot; null when Patrick made it himself, or the Bot outside its threads (`byBot`). */
+  /** Who made it: a conversation or a worker of the Bot; null when the user made it themselves, or the Bot outside its threads (`byBot`). */
   madeIn: z.object({ threadId: z.string(), title: z.string(), kind, conversationId: z.string().nullable(), conversationTitle: z.string().nullable() }).nullable(),
   starred: z.boolean().optional(),
   byBot: z.boolean().optional(),
@@ -138,7 +138,7 @@ const finished = z.object({
 });
 
 export const botThreadsSchemas = {
-  /** Every Bot as a space, the primary first, with whether one needs Patrick; and the current Bot. */
+  /** Every Bot as a space, the primary first, with whether one needs the user; and the current Bot. */
   bot_spaces: { input: z.object({}), output: z.object({ bots: z.array(space), currentBotId: z.string().nullable() }) },
   /** A Bot's sidebar (the current Bot without `botId`): conversations, Main first, then by activity; workers, running first. */
   bot_threads_view: {
@@ -153,7 +153,7 @@ export const botThreadsSchemas = {
       hiddenWorkers: z.number(),
       /** Of `hiddenWorkers`, the ones that finished in the last 24 hours ("N more done today"). */
       hiddenToday: z.number(),
-      /** Conversations left out: not active in 14 days, not working, not needing Patrick. */
+      /** Conversations left out: not active in 14 days, not working, not needing the user. */
       olderConversations: z.number(),
     }),
   },
@@ -169,16 +169,16 @@ export const botThreadsSchemas = {
   bot_thread_info: { input: z.object({ threadId }), output: z.object({ info: threadInfo.nullable() }) },
   /** Where switching to a Bot lands: `last` while it still exists, else the Bot's Main, else null. */
   bot_landing: { input: z.object({ botId, last: threadId.nullable() }), output: z.object({ threadId: z.string().nullable() }) },
-  /** The Bot the sidebar shows: the thread Patrick starts next is its conversation. */
+  /** The Bot the sidebar shows: the thread the user starts next is its conversation. */
   bot_focus: { input: z.object({ botId }), output: z.object({ ok: z.boolean() }) },
   /**
    * Sends `text` to the Bot in the worker's conversation (Main when it has
    * none), with a link to the worker first. Answers the conversation.
    */
   bot_worker_ask: { input: z.object({ threadId, text: z.string().trim().min(1).max(20_000) }), output: z.object({ conversationId: z.string(), projectId: z.string().nullable() }) },
-  /** Patrick renames a conversation (null: BB's title) or archives or brings it back. Main can't be archived. */
+  /** The user renames a conversation (null: BB's title) or archives or brings it back. Main can't be archived. */
   bot_thread_update: { input: z.object({ threadId, title: z.string().max(200).nullable().optional(), archived: z.boolean().optional() }), output: z.object({ ok: z.boolean() }) },
-  /** Marks a conversation as needing Patrick with a reason, or clears it (null). */
+  /** Marks a conversation as needing the user with a reason, or clears it (null). */
   bot_needs_you_set: { input: z.object({ threadId, reason: z.string().max(200).nullable() }), output: z.object({ ok: z.boolean() }) },
   /**
    * Finish a conversation (not Main, not a worker, not while it works): one
@@ -221,7 +221,7 @@ export const botThreadsSchemas = {
   bot_reopen: { input: z.object({ threadId }), output: z.object({ ok: z.boolean() }) },
   /** A finished conversation's summary for its card; null when it wasn't finished. */
   bot_finished: { input: z.object({ threadId }), output: z.object({ finished: finished.nullable() }) },
-  /** The Bot's files: what its conversations and workers made, newest first (with the primary Bot, also what Patrick made himself). */
+  /** The Bot's files: what its conversations and workers made, newest first (with the primary Bot, also what the user made themselves). */
   bot_library: { input: z.object({ botId: botId.optional() }), output: z.object({ botId: z.string().nullable(), items: z.array(libraryItem) }) },
 };
 

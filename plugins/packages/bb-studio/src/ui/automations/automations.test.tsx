@@ -20,6 +20,7 @@ vi.mock("../live", () => ({
   },
 }));
 vi.mock("../../links/open", () => ({ openLinkFromAnywhere: headerForTest.openLink }));
+vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ values: null, changed: [], timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, defaultTimeZone: null, isLoading: false, error: null, set: async () => {} }) }));
 
 installTestPluginRuntime();
 

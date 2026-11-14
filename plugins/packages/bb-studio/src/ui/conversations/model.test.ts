@@ -8,7 +8,7 @@ const bots = [
   { id: "work", name: "Work", needsYou: false },
 ];
 
-it("draws one dot per Bot: the shown one active, amber for a Bot that needs Patrick, a number for the first nine", () => {
+it("draws one dot per Bot: the shown one active, amber for a Bot that needs the user, a number for the first nine", () => {
   const dots = spaceDots(bots, "cos");
   expect(dots.map((dot) => [dot.id, dot.active, dot.amber, dot.shortcut])).toEqual([["cos", true, false, 1], ["home", false, true, 2], ["work", false, false, 3]]);
   expect(dots[1]!.label).toBe("Home, needs you");
@@ -79,7 +79,7 @@ it("keeps the server's state for a thread mirrored from bb: the live view only k
   expect(conversationLines([conversation({ threadId: "main", isMain: true, running: true, mirrored: true })], live, null)[0]!.running).toBe(true);
 });
 
-it("splits workers into the active ones, needing Patrick first, and the done ones; and says how old a row is", () => {
+it("splits workers into the active ones, needing the user first, and the done ones; and says how old a row is", () => {
   const workers = [{ id: "a", status: "done" }, { id: "b", status: "running" }, { id: "c", status: "failed" }, { id: "d", status: "needs-you" }] as const;
   const split = splitWorkers(workers);
   expect(split.active.map((worker) => worker.id)).toEqual(["d", "b"]);

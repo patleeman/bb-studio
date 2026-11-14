@@ -9,7 +9,7 @@ const dispose: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 
 /**
- * Dot (primary, Main thr_main) and Home (Main thr_home). Patrick's
+ * Dot (primary, Main thr_main) and Home (Main thr_home). The user's
  * conversation "redesign" started the worker "lead", which started "review".
  */
 async function setup() {
@@ -91,7 +91,7 @@ it("answers a Bot's sidebar and one thread's place for the main view", async () 
   expect((await server.rpc.bot_thread_info({ threadId: "nope" })).info).toBeNull();
 });
 
-it("follows the Bot the sidebar shows: Patrick's next thread is its conversation, and its dot turns amber when it needs him", async () => {
+it("follows the Bot the sidebar shows: the user's next thread is its conversation, and its dot turns amber when it needs them", async () => {
   const { server, harness, threads } = await setup();
   server.rpc.bot_focus({ botId: "home" });
   expect(() => server.rpc.bot_focus({ botId: "gone" })).toThrow();
@@ -151,7 +151,7 @@ it("follows BB's archive and delete", async () => {
 
 const indexed = (over: Partial<IndexedItem> & { id: string }): IndexedItem => ({ pluginId: "pages", family: "page", type: "doc", title: over.id, projectId: null, parentId: null, createdAt: 1, updatedAt: 1, archived: false, template: false, ...over });
 
-it("lists the Bot's files: what its conversations and workers made, and for the primary Bot what Patrick made himself", () => {
+it("lists the Bot's files: what its conversations and workers made, and for the primary Bot what the user made themselves", () => {
   const records = new Map([
     ["redesign", { botId: "dot", kind: "conversation" as const, threadId: "redesign", ownerConversationId: null }],
     ["lead", { botId: "dot", kind: "worker" as const, threadId: "lead", ownerConversationId: "redesign" }],
@@ -225,6 +225,18 @@ it("lists what the sidebar leaves out, and finished conversations, for the older
   expect((await server.rpc.bot_thread_info({ threadId: "redesign" })).info!.finishing).toBe(false);
   db.prepare("INSERT INTO bot_finishes (thread_id, bot_id, title, state, requested_at, deadline_at) VALUES ('redesign', 'dot', 'Fork redesign', 'finishing', 1, 2)").run();
   expect((await server.rpc.bot_thread_info({ threadId: "redesign" })).info!.finishing).toBe(true);
+});
+
+it("names a finished conversation by BB's title when Studio's row has none", async () => {
+  const { server, threads, bb } = await setup();
+  const db = bb.storage.database();
+  threads.set("kindle", { id: "kindle", title: "Kindle vs Kobo for bed", createdAt: 1, updatedAt: 2, status: "idle", archivedAt: 60 } as never);
+  threads.set("hello", { id: "hello", title: null, titleFallback: "Say hello", createdAt: 1, updatedAt: 2, status: "idle", archivedAt: 70 } as never);
+  for (const [id, at] of [["kindle", 60], ["hello", 70], ["gone", 80]] as const) {
+    db.prepare("INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, source, created_at, updated_at, archived_at, finished_summary) VALUES (?, 'dot', 'conversation', 0, 'created', 1, 1, ?, 'Done')").run(id, at);
+  }
+  const older = await server.rpc.bot_threads_older({});
+  expect(older.finished.map((each) => [each.threadId, each.title])).toEqual([["gone", "Untitled conversation"], ["hello", "Say hello"], ["kindle", "Kindle vs Kobo for bed"]]);
 });
 
 it("moves forks agents made, recorded as conversations by an earlier start, to workers once at the next start", async () => {
@@ -303,7 +315,7 @@ it("forks a conversation from a message: BB forks after it, and the fork is the 
   const made = await server.rpc.bot_fork_conversation({ threadId: "redesign", messageId: "msg_7", turnId: "turn_3", sourceSeqEnd: 42 });
   expect(fork).toHaveBeenCalledWith(expect.objectContaining({ sourceThreadId: "redesign", sourceSeqEnd: 42, visibility: "visible" }));
   expect(made).toEqual({ threadId: "fork_5", projectId: "proj_studio" });
-  // BB's thread.created comes after: it doesn't move Patrick's fork.
+  // BB's thread.created comes after: it doesn't move the user's fork.
   await server.store.created(threads.get("fork_5")!);
   expect(server.store.get("fork_5")).toMatchObject({ botId: "dot", kind: "conversation", forkedFrom: { threadId: "redesign", messageId: "msg_7", turnId: "turn_3" }, source: "user" });
   const view = await server.rpc.bot_threads_view({});
@@ -320,14 +332,14 @@ const newRequest = (model: string) => ({
 it("+ New starts a conversation of that Bot on the model its composer sent, and a later default switches no conversation", async () => {
   const { server, spawn, update, models, defaults, threads } = await setup();
   defaults.set("home", { providerId: "claude", model: "opus", reasoning: "high" });
-  // The composer was seeded with the default and Patrick kept it.
+  // The composer was seeded with the default and the user kept it.
   const first = await server.rpc.bot_conversation_start({ botId: "home", request: newRequest("opus") });
   expect(spawn).toHaveBeenLastCalledWith(expect.objectContaining({ providerId: "claude", model: "opus", pluginMetadata: { botConversation: "home" } }));
   expect(server.store.get(first.threadId)).toMatchObject({ botId: "home", kind: "conversation", isMain: false, source: "user" });
   // BB's thread.created comes after: the conversation stays Home's.
   await server.store.created(threads.get(first.threadId)!);
   expect(server.store.get(first.threadId)).toMatchObject({ botId: "home", kind: "conversation" });
-  // A second one where Patrick picked another model before sending.
+  // A second one where the user picked another model before sending.
   const second = await server.rpc.bot_conversation_start({ botId: "home", request: newRequest("sonnet") });
   expect(models.get(second.threadId)).toBe("sonnet");
   // The default changes: both conversations keep their model.

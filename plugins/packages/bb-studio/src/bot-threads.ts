@@ -1,5 +1,5 @@
 // One Bot, many conversations (plan page pg_ca4aba3141b2d2af): every thread
-// belongs to a Bot, as a conversation (Patrick ↔ the Bot) or a worker (the
+// belongs to a Bot, as a conversation (the user ↔ the Bot) or a worker (the
 // Bot ↔ an agent it started). This is Studio's record of which is which.
 //
 // The table `bot_threads` (src/migrations.ts) has one row per thread:
@@ -13,11 +13,11 @@
 //                           everything else
 //   owner_conversation_id   a worker's conversation: the one whose thread
 //                           spawned it, else the Bot's Main
-//   title                   a title Patrick or the Bot gave it here, else null
+//   title                   a title the user or the Bot gave it here, else null
 //   archived_at             out of the sidebar (still searchable): archived
 //                           in BB, finished, or adopted past the cutoff
 //   finished_summary        what a finished conversation decided (step 4)
-//   needs_you_*             why a conversation needs Patrick, and who raised it
+//   needs_you_*             why a conversation needs the user, and who raised it
 //   latest, latest_at       the conversation's latest reply, for its row
 //   activity_at             its latest real activity: the last turn or item
 //                           event, or a turn Studio saw start or end; BB's
@@ -36,7 +36,7 @@
 //      Bot's chat): a worker of the primary Bot, owned by Main;
 //   5. Studio's own helper threads (skill reviews): an archived worker;
 //   6. a fork (BB's fork from a message, originKind "fork"): a conversation
-//      of the source's Bot, forked from it, when Patrick made it; a fork an
+//      of the source's Bot, forked from it, when the user made it; a fork an
 //      agent or a tool made is a worker owned by the conversation that owns
 //      its source. BB's thread record doesn't say who made a fork, so an
 //      agent's is told by: a parent or lifecycle owner; hidden visibility
@@ -49,10 +49,10 @@
 //      to it): a worker owned by that Bot's Main;
 //   9. an automation's run, or a hidden thread nobody spawned: a worker of
 //      the current Bot, owned by its Main;
-//  10. anything else (a thread Patrick started): a conversation of the
+//  10. anything else (a thread the user started): a conversation of the
 //      current Bot (the one the sidebar shows, `focus`), else the primary.
 // Rules 1-5 and 8 are authoritative: a later sweep (reconcile) applies them
-// over what an earlier guess said. A row Patrick changed (source "user")
+// over what an earlier guess said. A row the user changed (source "user")
 // keeps its kind and Bot.
 //
 // The first start fills the table from what exists (backfill). Existing
@@ -73,7 +73,7 @@ export type BotThreadSource = "backfill" | "created" | "reconciled" | "user";
 /** How many adopted standalone threads stay in the sidebar after the backfill; older ones are archived conversations. */
 export const ADOPT_RECENT = 50;
 const DAY_MS = 24 * 60 * 60_000;
-/** A conversation other than Main is listed while it was active this recently (or works, or needs Patrick); older ones are "N older conversations". */
+/** A conversation other than Main is listed while it was active this recently (or works, or needs the user); older ones are "N older conversations". */
 export const CONVERSATION_RECENT_MS = 14 * DAY_MS;
 /** A failed worker is listed this long, a done one this long; running and waiting ones always. */
 export const WORKER_FAILED_MS = 7 * DAY_MS;
@@ -181,7 +181,7 @@ function automationRun(thread: ThreadFacts): boolean {
 export interface Signals {
   /** Every Bot, the primary first: its chat thread and its handoff chain (the chat first). */
   bots: readonly { id: string; threadId: string | null; chain: readonly string[] }[];
-  /** The Bot the sidebar shows (the "current" Bot), for threads Patrick starts. */
+  /** The Bot the sidebar shows (the "current" Bot), for threads the user starts. */
   focusedBotId: string | null;
   sideThread(threadId: string): { botId: string; sourceThreadId: string; messageId: string } | null;
   runnerBot(threadId: string): string | null;
@@ -234,7 +234,7 @@ export function classifyThread(thread: ThreadFacts, signals: Signals, known: Kno
   if (side && signals.bots.some((bot) => bot.id === side.botId)) {
     return { botId: side.botId, kind: "conversation", isMain: false, forkedFrom: { threadId: side.sourceThreadId, messageId: side.messageId, turnId: null }, ownerConversationId: null, archived: false, authoritative: true };
   }
-  // BB's side chat ("Reply in thread"), made by its side-chat plugin: Patrick's reply, a conversation.
+  // BB's side chat ("Reply in thread"), made by its side-chat plugin: the user's reply, a conversation.
   if (thread.originKind === "fork" && thread.originPluginId === SIDE_CHAT_PLUGIN && thread.sourceThreadId) {
     const from = known(thread.sourceThreadId);
     const botId = from?.botId ?? currentBot(signals) ?? signals.bots[0]!.id;
@@ -280,9 +280,9 @@ export function classifyThread(thread: ThreadFacts, signals: Signals, known: Kno
 }
 
 /**
- * Whether a fork was made by an agent or a tool rather than by Patrick.
+ * Whether a fork was made by an agent or a tool rather than by the user.
  * BB's thread record has no field for who made it, so: a parent or
- * lifecycle owner; hidden (a thread Patrick starts in the app is visible); a
+ * lifecycle owner; hidden (a thread the user starts in the app is visible); a
  * source that is a worker (or an agent's thread Studio has no row for); a
  * source that was in a turn when the fork was made.
  */
@@ -345,7 +345,7 @@ export interface ConversationView {
   /** The latest reply's first line. */
   latest: string | null;
   running: boolean;
-  /** Why it needs Patrick: a reason the Bot raised, or its own pending question. */
+  /** Why it needs the user: a reason the Bot raised, or its own pending question. */
   needsYou: { reason: string; at: number } | null;
   /** Mirrored from bb: its state is bb's (src/mirror-live.ts). */
   mirrored: boolean;
@@ -375,7 +375,7 @@ export interface BotThreadsView {
   hiddenWorkers: number;
   /** Of those, the ones that finished in the last 24 hours ("N more done today"). */
   hiddenToday: number;
-  /** Conversations left out of `conversations`: not active in CONVERSATION_RECENT_MS, not working, not needing Patrick. */
+  /** Conversations left out of `conversations`: not active in CONVERSATION_RECENT_MS, not working, not needing the user. */
   olderConversations: number;
 }
 
@@ -405,7 +405,7 @@ export function needsYouOf(rec: Pick<BotThreadRecord, "needsYou">, thread: Pick<
  * A Bot's sidebar: Main first, then its other conversations by last
  * activity; then its workers, the ones that need attention or are running
  * first, then the newest. Archived rows are left out, and so are old ones:
- * a conversation not active in 14 days (unless it works or needs Patrick),
+ * a conversation not active in 14 days (unless it works or needs the user),
  * a worker failed more than 7 days or done more than 2 days ago. Those are
  * counted, and listed by olderView.
  */
@@ -563,7 +563,7 @@ export function staleRaises(records: readonly BotThreadRecord[], threads: Readon
   return [...new Set(sources)];
 }
 
-/** Whether a Bot has a conversation that needs Patrick (its space dot turns amber). */
+/** Whether a Bot has a conversation that needs the user (its space dot turns amber). */
 export function botNeedsYou(botId: string, records: readonly BotThreadRecord[], threads: ReadonlyMap<string, ThreadFacts>): boolean {
   return records.some((rec) => rec.botId === botId && rec.kind === "conversation" && rec.archivedAt === null && !!needsYouOf(rec, threads.get(rec.threadId)));
 }
@@ -659,7 +659,7 @@ export class BotThreads {
     return (this.deps.db.prepare("SELECT * FROM bot_threads WHERE owner_conversation_id = ? AND kind = 'worker' AND archived_at IS NULL ORDER BY created_at DESC").all(conversationId) as Row[]).map(record);
   }
 
-  /** The Bot the sidebar shows, for threads Patrick starts next. */
+  /** The Bot the sidebar shows, for threads the user starts next. */
   focus(): string | null {
     const row = this.deps.db.prepare("SELECT value FROM bot_threads_state WHERE key = 'focus'").get() as { value: string } | undefined;
     return row?.value ?? null;
@@ -679,7 +679,7 @@ export class BotThreads {
   }
 
   /**
-   * Writes a classification. A row Patrick changed keeps its Bot and kind;
+   * Writes a classification. A row the user changed keeps its Bot and kind;
    * a guess never overrides an authoritative row; titles, needs-you, latest
    * and a Finish stay.
    */
@@ -975,7 +975,7 @@ export class BotThreads {
     this.deps.db.prepare(`UPDATE bot_threads SET latest = ? WHERE thread_id = ? AND (latest IS NULL${overEmpty ? " OR latest = ''" : ""})`).run(latestLine(text) ?? "", threadId);
   }
 
-  /** Marks a conversation as needing Patrick (`reason`), or clears it (null). `source` names who raised it (a worker's id, or "bot"). */
+  /** Marks a conversation as needing the user (`reason`), or clears it (null). `source` names who raised it (a worker's id, or "bot"). */
   setNeedsYou(threadId: string, reason: string | null, source: string | null = null): boolean {
     const clean = reason?.trim().replace(/\s+/g, " ").slice(0, 200) || null;
     const before = this.get(threadId);
@@ -994,7 +994,7 @@ export class BotThreads {
     return changes;
   }
 
-  /** Patrick replied in a conversation after it was marked: the mark goes. */
+  /** The user replied in a conversation after it was marked: the mark goes. */
   async repliedSince(threadId: string): Promise<boolean> {
     const rec = this.get(threadId);
     if (!rec?.needsYou) return false;
@@ -1004,8 +1004,8 @@ export class BotThreads {
   }
 
   /**
-   * Patrick's changes: a title (null: BB's own), archived or not, or a move
-   * to another Bot or kind. Moves and kinds mark the row his, so no sweep
+   * The user's changes: a title (null: BB's own), archived or not, or a move
+   * to another Bot or kind. Moves and kinds mark the row theirs, so no sweep
    * changes it back.
    */
   update(threadId: string, patch: { title?: string | null; archived?: boolean; finishedSummary?: string | null }): BotThreadRecord {
@@ -1035,7 +1035,7 @@ export class BotThreads {
   /**
    * The rows the fork rules may move: forks recorded as conversations (not
    * side threads with their message), and listed workers (a side chat an
-   * earlier rule made one). Not Patrick's own.
+   * earlier rule made one). Not the user's own.
    */
   forkConversations(): BotThreadRecord[] {
     return (this.deps.db.prepare(`SELECT * FROM bot_threads WHERE source <> 'user' AND is_main = 0 AND (
@@ -1077,9 +1077,9 @@ export class BotThreads {
   }
 
   /**
-   * Records a fork Patrick made from a message ("Fork conversation from
+   * Records a fork the user made from a message ("Fork conversation from
    * here") as a conversation of the source's Bot, linked back to that
-   * message: his own call, so no later rule moves it (source "user"), even
+   * message: their own call, so no later rule moves it (source "user"), even
    * when BB's thread.created classified it first.
    */
   recordFork(threadId: string, botId: string, from: ForkedFrom): BotThreadRecord {
@@ -1097,8 +1097,8 @@ export class BotThreads {
   }
 
   /**
-   * Records a conversation Patrick started from a Bot's + New as that Bot's:
-   * his own call, so no later rule moves it (source "user"), even when BB's
+   * Records a conversation the user started from a Bot's + New as that Bot's:
+   * their own call, so no later rule moves it (source "user"), even when BB's
    * thread.created classified it first.
    */
   recordConversation(threadId: string, botId: string): BotThreadRecord {

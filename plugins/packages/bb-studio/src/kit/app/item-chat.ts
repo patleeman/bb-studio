@@ -27,9 +27,6 @@ export interface ItemChatHost {
   open(ref: ItemChatRef): void;
   /** Starts another conversation about the item. */
   start(ref: ItemChatRef): void;
-  /** Lets the user pick another thread as the item's home. */
-  choose(ref: ItemChatRef): void;
-  unlink(ref: ItemChatRef): Promise<void>;
   /**
    * Sends the quote to the home thread and shows it. Without a home thread,
    * opens the new-thread composer holding the quote and resolves to null.

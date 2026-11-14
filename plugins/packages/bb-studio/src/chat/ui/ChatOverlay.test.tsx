@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ItemChatHost } from "../../kit/app/index";
 import type { Viewed } from "../contract";
 import { ChatOverlay } from "./ChatOverlay";
-import { chooseThreadPath, itemDraftPath, quoteDraftPath, quoteDrafts } from "./conversation-drafts";
+import { itemDraftPath, quoteDraftPath, quoteDrafts } from "./conversation-drafts";
 
 const state = vi.hoisted(() => ({
   path: "/plugins/pages/pages/main",
@@ -57,7 +57,6 @@ beforeEach(async () => {
     if (method === "chat.home") return { thread: null };
     if (method === "chat.send") return { threadId: null };
     if (method === "chat.start") return { threadId: "created_thread" };
-    if (method === "chat.link") return { thread: { threadId: input.threadId, title: "Chosen", origin: "chosen" } };
     throw new Error(`Unexpected RPC ${method}`);
   });
   container = document.createElement("div");
@@ -107,11 +106,6 @@ describe("item Chat actions", () => {
     await actHost(host => host.watch(companion));
     await actHost(host => host.start(companion));
     expect(state.open).toHaveBeenCalledWith(...split(itemDraftPath(companion)));
-  });
-
-  it("opens the thread picker in a split", async () => {
-    await actHost(host => host.choose(companion));
-    expect(state.open).toHaveBeenCalledWith(...split(chooseThreadPath(companion)));
   });
 
   it("sends a quote to the linked thread and opens it in a split", async () => {

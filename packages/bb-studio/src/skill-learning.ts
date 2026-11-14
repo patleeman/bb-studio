@@ -36,6 +36,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { isPassOutput } from "./kit/silent";
 import { isPingRequest } from "./bot-cache";
+import { formatModelName } from "./model-names";
 
 type Sdk = BbPluginApi["sdk"];
 type ThreadLike = { id: string; status?: string; updatedAt?: number | null; archivedAt?: number | null };
@@ -244,6 +245,7 @@ export interface LearningDeps {
 
 export type LearningView = {
   enabled: boolean; interval: number; reviewModel: string | null; defaultModel: string | null; models: string[];
+  modelNames: Record<string, string>;
   consolidate: boolean;
   toolTurns: number; userTurns: number; reviewing: boolean;
   lastReview: { at: number; result: string } | null;
@@ -301,13 +303,16 @@ export class SkillLearning {
     const bot = this.studioBot(botId);
     let models: string[] = [];
     let defaultModel: string | null = null;
+    const modelNames: Record<string, string> = {};
     if (bot?.threadId) {
       const options = await this.providerModels(bot.threadId).catch(() => null);
       models = options?.map((each) => each.model) ?? [];
       defaultModel = options ? cheapestModel(options) : null;
+      for (const each of options ?? []) modelNames[each.model] = each.displayName?.trim() || formatModelName(each.model);
     }
+    if (row.review_model && !modelNames[row.review_model]) modelNames[row.review_model] = formatModelName(row.review_model);
     return {
-      enabled: !!row.enabled, interval: row.every_turns, reviewModel: row.review_model, defaultModel, models,
+      enabled: !!row.enabled, interval: row.every_turns, reviewModel: row.review_model, defaultModel, models, modelNames,
       consolidate: !!row.consolidate,
       toolTurns: row.tool_turns, userTurns: row.user_turns, reviewing: !!this.running(botId),
       lastReview: row.last_review_at && row.last_review_result ? { at: row.last_review_at, result: row.last_review_result } : null,

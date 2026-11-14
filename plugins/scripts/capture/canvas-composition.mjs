@@ -52,7 +52,7 @@ const PROMPTS = [
   { id: "plan", text: "Help me plan next week: a product launch on Thursday, two candidate interviews to run, a dentist appointment, and I want three gym sessions in." },
   { id: "data", text: `Here's sample data (made up, for a demo) of our support team's tickets by week and channel, with reply time, CSAT and backlog. How are we doing?\n\n${TICKETS}` },
   { id: "follow-up", text: "Which channel should we fix first, and what would it take?" },
-  // From Patrick's BB: a showcase has to be visual (pictures, ratings drawn).
+  // From the user's BB: a showcase has to be visual (pictures, ratings drawn).
   { id: "showcase", text: "I just bought a Chromatic, give me a showcase of games including ratings" },
 ];
 const SIZES = { wide: { width: 1800, height: 1150 }, narrow: { width: 1200, height: 800 } };

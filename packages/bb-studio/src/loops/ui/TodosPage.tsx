@@ -22,13 +22,14 @@ import { SCHEDULED_ICON, scheduledMeta } from "./scheduled-model";
 import { NewAutomationMenu, newKinds, useAutomationEditor, useAutomations } from "../../ui/bot/Automations";
 import { useNeedsYou } from "./LoopsTab";
 import { KIND, ownerName, shortWhen } from "./model";
-import { useLoopPeople } from "./hooks";
+import { useLoopPeople, useTodosZone } from "./hooks";
 import { ALL_AREAS, areaPills, groupTodos, openTodos, TODO_GROUPS, todoWhen } from "./todos-model";
 
 export function TodosPage({ view }: { view: BotView }) {
   const bot = view.bot!;
   const call = useCall();
   const people = useLoopPeople();
+  const zone = useTodosZone();
   const rowOpen = useRowOpen();
   const ownsTodos = bot.primary !== false;
   const list = useLive("loops.list", {}, { enabled: ownsTodos, pollMs: 60_000 });
@@ -47,7 +48,7 @@ export function TodosPage({ view }: { view: BotView }) {
   const data = ownsTodos ? list.data : undefined;
   const ready = ownsTodos ? !!data : !!scheduledList.data;
   const open = useMemo(() => data ? openTodos(data) : [], [data]);
-  const groups = useMemo(() => groupTodos(open, { area, query }, now), [open, area, query, now]);
+  const groups = useMemo(() => groupTodos(open, { area, query }, now, zone), [open, area, query, now, zone]);
   const owners = useMemo(() => new Map((data?.owners ?? []).map((each) => [each.owner, each] as const)), [data?.owners]);
   const done = useMemo(() => [...(data?.done ?? [])].filter((loop) => area === ALL_AREAS || loop.area === area).filter((loop) => !query.trim() || loop.title.toLowerCase().includes(query.trim().toLowerCase()))
     .sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0)), [data?.done, area, query]);
@@ -62,7 +63,7 @@ export function TodosPage({ view }: { view: BotView }) {
   const botChat = people.botThreadId ? rowOpen({ kind: "conversation", id: people.botThreadId }, people.botName) : null;
 
   const row = (loop: Loop) => {
-    const when = todoWhen(loop, nameOf(loop), now);
+    const when = todoWhen(loop, nameOf(loop), now, zone);
     return (
       <BotPageRow key={loop.id} testId="todo-row" data={{ "data-loop": loop.id }} icon={loop.owner === "patrick" || loop.kind === "waiting" ? KIND[loop.kind].icon : "Bot"}
         iconClassName={loop.status === "in_progress" ? "text-success" : undefined} title={loop.title} titleText={loop.title}
@@ -90,7 +91,7 @@ export function TodosPage({ view }: { view: BotView }) {
             {group.id === "today" && showChat ? <>
               {pending.map((question) => (
                 <BotPageRow key={question.id} testId="todo-chat" icon="MessageQuestion" title={question.text ?? question.reason} titleText={question.text ?? question.reason}
-                  meta={shortWhen(question.createdAt, now)} onOpen={botChat?.onOpen} disabled={!botChat} />
+                  meta={shortWhen(question.createdAt, now, zone)} onOpen={botChat?.onOpen} disabled={!botChat} />
               ))}
             </> : null}
             {shown.map(row)}
@@ -104,7 +105,7 @@ export function TodosPage({ view }: { view: BotView }) {
           {editor.error ? <p role="alert" className="pb-2 text-xs text-destructive">{editor.error}</p> : null}
           {scheduledRows.shown.map((item) => (
             <BotPageRow key={item.key} testId="scheduled-row" data={{ "data-scheduled": item.key }} icon={SCHEDULED_ICON[item.kind]} muted={item.state === "paused"}
-              title={item.title} titleText={item.title} meta={scheduledMeta(item, now)} {...rowOpen(item.link, item.title)} />
+              title={item.title} titleText={item.title} meta={scheduledMeta(item, now, zone)} {...rowOpen(item.link, item.title)} />
           ))}
           {!scheduled.length ? <BotPageEmpty testId="scheduled-empty" {...(query.trim() ? { title: noMatch("scheduled items", query) } : { title: "Nothing scheduled yet", hint: "Add a reminder or a check-in with New." })} /> : null}
           {moreLine("scheduled", "Scheduled", scheduledRows.more)}
@@ -115,7 +116,7 @@ export function TodosPage({ view }: { view: BotView }) {
         <BotPageGroup title="Done" count={done.length} collapsible defaultOpen={false} testId="todos-done">
           {doneRows.shown.map((loop) => (
             <BotPageRow key={loop.id} testId="todo-done" data={{ "data-loop": loop.id }} muted icon={loop.status === "dropped" ? "X" : "CircleCheck"} iconClassName={loop.status === "dropped" ? undefined : "text-success"}
-              title={loop.title} titleText={loop.title} meta={loop.closedAt ? shortWhen(loop.closedAt, now) : undefined} {...rowOpen({ kind: "todo", id: loop.id }, loop.title)} />
+              title={loop.title} titleText={loop.title} meta={loop.closedAt ? shortWhen(loop.closedAt, now, zone) : undefined} {...rowOpen({ kind: "todo", id: loop.id }, loop.title)} />
           ))}
           {moreLine("done", "Done", doneRows.more)}
         </BotPageGroup>

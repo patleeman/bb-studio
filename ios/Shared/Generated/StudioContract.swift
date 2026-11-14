@@ -201,8 +201,6 @@ public enum Studio {
     public static let chat_subject = "chat.subject"
     public static let chat_start = "chat.start"
     public static let chat_home = "chat.home"
-    public static let chat_link = "chat.link"
-    public static let chat_unlink = "chat.unlink"
     public static let chat_send = "chat.send"
     public static let artifacts_get = "artifacts.get"
     public static let artifacts_versionBytes = "artifacts.versionBytes"
@@ -320,7 +318,6 @@ public enum Studio {
     public static let minis_save = "minis.save"
     public static let minis_restoreVersion = "minis.restoreVersion"
     public static let minis_rename = "minis.rename"
-    public static let minis_fromArtifact = "minis.fromArtifact"
     public static let minis_duplicate = "minis.duplicate"
     public static let minis_live_save = "minis.live.save"
     public static let minis_live_emit = "minis.live.emit"
@@ -355,6 +352,8 @@ public enum Studio {
     public static let voiceLive_end = "voiceLive.end"
     public static let settings_get = "settings.get"
     public static let settings_set = "settings.set"
+    public static let settings_keys_get = "settings.keys.get"
+    public static let settings_keys_set = "settings.keys.set"
     public static let mobile_push_status = "mobile.push.status"
     public static let mobile_push_test = "mobile.push.test"
     public static let memory_get = "memory.get"
@@ -815,10 +814,6 @@ public enum Studio {
 
   public typealias ChatHome = ChatHomeOutput
 
-  public typealias ChatLink = ChatLinkOutput
-
-  public typealias ChatUnlink = ChatUnlinkOutput
-
   public typealias ChatSend = ChatSendOutput
 
   public typealias ArtifactsGet = ArtifactsGetOutput
@@ -1073,8 +1068,6 @@ public enum Studio {
 
   public typealias MinisRename = MinisRenameOutput
 
-  public typealias MinisFromArtifact = MinisFromArtifactOutput
-
   public typealias MinisDuplicate = MinisDuplicateOutput
 
   public typealias MinisLiveSave = MinisLiveSaveOutput
@@ -1144,6 +1137,12 @@ public enum Studio {
   public typealias SettingsGet = SettingsGetOutput
 
   public typealias SettingsSet = SettingsSetOutput
+
+  public typealias SettingsKeysGetInput = StudioJSONValue
+
+  public typealias SettingsKeysGet = SettingsKeysGetOutput
+
+  public typealias SettingsKeysSet = SettingsKeysSetOutput
 
   public typealias MobilePushStatusInput = StudioJSONValue
 
@@ -14228,6 +14227,7 @@ public enum Studio {
     public var reviewModel: String?
     public var defaultModel: String?
     public var models: [String]?
+    public var modelNames: [String: String]?
     public var consolidate: Bool?
     public var toolTurns: Double?
     public var userTurns: Double?
@@ -14235,12 +14235,13 @@ public enum Studio {
     public var lastReview: BotLearningOutputLastReview?
     public var lastCurator: BotLearningOutputLastCurator?
 
-    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningOutputLastReview? = nil, lastCurator: BotLearningOutputLastCurator? = nil) {
+    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, modelNames: [String: String]? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningOutputLastReview? = nil, lastCurator: BotLearningOutputLastCurator? = nil) {
       self.enabled = enabled
       self.interval = interval
       self.reviewModel = reviewModel
       self.defaultModel = defaultModel
       self.models = models
+      self.modelNames = modelNames
       self.consolidate = consolidate
       self.toolTurns = toolTurns
       self.userTurns = userTurns
@@ -14292,6 +14293,7 @@ public enum Studio {
     public var reviewModel: String?
     public var defaultModel: String?
     public var models: [String]?
+    public var modelNames: [String: String]?
     public var consolidate: Bool?
     public var toolTurns: Double?
     public var userTurns: Double?
@@ -14299,12 +14301,13 @@ public enum Studio {
     public var lastReview: BotLearningSetOutputLastReview?
     public var lastCurator: BotLearningSetOutputLastCurator?
 
-    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningSetOutputLastReview? = nil, lastCurator: BotLearningSetOutputLastCurator? = nil) {
+    public init(enabled: Bool? = nil, interval: Double? = nil, reviewModel: String? = nil, defaultModel: String? = nil, models: [String]? = nil, modelNames: [String: String]? = nil, consolidate: Bool? = nil, toolTurns: Double? = nil, userTurns: Double? = nil, reviewing: Bool? = nil, lastReview: BotLearningSetOutputLastReview? = nil, lastCurator: BotLearningSetOutputLastCurator? = nil) {
       self.enabled = enabled
       self.interval = interval
       self.reviewModel = reviewModel
       self.defaultModel = defaultModel
       self.models = models
+      self.modelNames = modelNames
       self.consolidate = consolidate
       self.toolTurns = toolTurns
       self.userTurns = userTurns
@@ -21708,80 +21711,6 @@ public enum Studio {
 
     public init(thread: ChatHomeOutputThread? = nil) {
       self.thread = thread
-    }
-  }
-
-  public struct ChatLinkInput: Sendable, Hashable, Codable {
-    public var pluginId: String?
-    public var id: String?
-    public var threadId: String?
-
-    public init(pluginId: String? = nil, id: String? = nil, threadId: String? = nil) {
-      self.pluginId = pluginId
-      self.id = id
-      self.threadId = threadId
-    }
-  }
-
-  public enum ChatLinkOutputThreadOrigin: Sendable, Hashable, Codable {
-    case chosen
-    case created
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "chosen": self = .chosen
-      case "created": self = .created
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .chosen: try container.encode("chosen")
-      case .created: try container.encode("created")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct ChatLinkOutputThread: Sendable, Hashable, Codable {
-    public var threadId: String?
-    public var title: String?
-    public var origin: ChatLinkOutputThreadOrigin?
-
-    public init(threadId: String? = nil, title: String? = nil, origin: ChatLinkOutputThreadOrigin? = nil) {
-      self.threadId = threadId
-      self.title = title
-      self.origin = origin
-    }
-  }
-
-  public struct ChatLinkOutput: Sendable, Hashable, Codable {
-    public var thread: ChatLinkOutputThread?
-
-    public init(thread: ChatLinkOutputThread? = nil) {
-      self.thread = thread
-    }
-  }
-
-  public struct ChatUnlinkInput: Sendable, Hashable, Codable {
-    public var pluginId: String?
-    public var id: String?
-
-    public init(pluginId: String? = nil, id: String? = nil) {
-      self.pluginId = pluginId
-      self.id = id
-    }
-  }
-
-  public struct ChatUnlinkOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-
-    public init(ok: Bool? = nil) {
-      self.ok = ok
     }
   }
 
@@ -30450,40 +30379,6 @@ public enum Studio {
     }
   }
 
-  public struct MinisFromArtifactInput: Sendable, Hashable, Codable {
-    public var artifactId: String?
-
-    public init(artifactId: String? = nil) {
-      self.artifactId = artifactId
-    }
-  }
-
-  public struct MinisFromArtifactOutputMini: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-    public var projectId: String?
-    public var versionId: String?
-    public var updatedAt: Double?
-    public var archived: Bool?
-
-    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, versionId: String? = nil, updatedAt: Double? = nil, archived: Bool? = nil) {
-      self.id = id
-      self.name = name
-      self.projectId = projectId
-      self.versionId = versionId
-      self.updatedAt = updatedAt
-      self.archived = archived
-    }
-  }
-
-  public struct MinisFromArtifactOutput: Sendable, Hashable, Codable {
-    public var mini: MinisFromArtifactOutputMini?
-
-    public init(mini: MinisFromArtifactOutputMini? = nil) {
-      self.mini = mini
-    }
-  }
-
   public struct MinisDuplicateInput: Sendable, Hashable, Codable {
     public var id: String?
     public var withData: Bool?
@@ -31877,11 +31772,13 @@ public enum Studio {
     public var values: [String: StudioJSONValue]?
     public var changed: [String]?
     public var timeZone: String?
+    public var defaultTimeZone: String?
 
-    public init(values: [String: StudioJSONValue]? = nil, changed: [String]? = nil, timeZone: String? = nil) {
+    public init(values: [String: StudioJSONValue]? = nil, changed: [String]? = nil, timeZone: String? = nil, defaultTimeZone: String? = nil) {
       self.values = values
       self.changed = changed
       self.timeZone = timeZone
+      self.defaultTimeZone = defaultTimeZone
     }
   }
 
@@ -31896,10 +31793,66 @@ public enum Studio {
   public struct SettingsSetOutput: Sendable, Hashable, Codable {
     public var values: [String: StudioJSONValue]?
     public var changed: [String]?
+    public var timeZone: String?
+    public var defaultTimeZone: String?
 
-    public init(values: [String: StudioJSONValue]? = nil, changed: [String]? = nil) {
+    public init(values: [String: StudioJSONValue]? = nil, changed: [String]? = nil, timeZone: String? = nil, defaultTimeZone: String? = nil) {
       self.values = values
       self.changed = changed
+      self.timeZone = timeZone
+      self.defaultTimeZone = defaultTimeZone
+    }
+  }
+
+  public struct SettingsKeysGetOutputKeysItem: Sendable, Hashable, Codable {
+    public var key: String?
+    public var label: String?
+    public var description: String?
+    public var set: Bool?
+
+    public init(key: String? = nil, label: String? = nil, description: String? = nil, set: Bool? = nil) {
+      self.key = key
+      self.label = label
+      self.description = description
+      self.set = set
+    }
+  }
+
+  public struct SettingsKeysGetOutput: Sendable, Hashable, Codable {
+    public var keys: [SettingsKeysGetOutputKeysItem]?
+
+    public init(keys: [SettingsKeysGetOutputKeysItem]? = nil) {
+      self.keys = keys
+    }
+  }
+
+  public struct SettingsKeysSetInput: Sendable, Hashable, Codable {
+    public var values: [String: String]?
+
+    public init(values: [String: String]? = nil) {
+      self.values = values
+    }
+  }
+
+  public struct SettingsKeysSetOutputKeysItem: Sendable, Hashable, Codable {
+    public var key: String?
+    public var label: String?
+    public var description: String?
+    public var set: Bool?
+
+    public init(key: String? = nil, label: String? = nil, description: String? = nil, set: Bool? = nil) {
+      self.key = key
+      self.label = label
+      self.description = description
+      self.set = set
+    }
+  }
+
+  public struct SettingsKeysSetOutput: Sendable, Hashable, Codable {
+    public var keys: [SettingsKeysSetOutputKeysItem]?
+
+    public init(keys: [SettingsKeysSetOutputKeysItem]? = nil) {
+      self.keys = keys
     }
   }
 

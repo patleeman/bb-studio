@@ -59,7 +59,7 @@ export async function askTheBot(): Promise<void> {
 export const STUDIO_LAUNCHER_ITEMS: readonly LauncherItemRegistration[] = [
   { id: "studio", title: "BB Studio", icon: "studio/studio", section: "apps", keywords: ["bb", "main window", "home"], order: 10, run: () => openInMain(NEW_THREAD_PATH) },
   { id: "vscode", title: "VS Code", icon: "Code", section: "apps", keywords: ["editor", "code", "workspace"], order: 40, run: () => openInMain(VSCODE_MAIN_PATH) },
-  // A thread Patrick starts is a conversation of the Bot the sidebar shows (src/bot-threads.ts).
+  // A thread the user starts is a conversation of the Bot the sidebar shows (src/bot-threads.ts).
   { id: "new-conversation", title: "New conversation", icon: "MessageSquarePlus", section: "actions", keywords: ["chat", "compose", "start", "thread"], order: 10, run: () => openInMain(NEW_THREAD_PATH) },
   { id: "ask-bot", title: "Ask the Bot", icon: "Bot", section: "actions", keywords: ["main", "chief", "question"], order: 15, run: askTheBot },
   { id: "new-page", title: "New page", icon: "FileText", section: "actions", keywords: ["document", "doc", "note", "write"], order: 20, run: newPage },

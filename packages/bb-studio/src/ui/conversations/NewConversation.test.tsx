@@ -59,7 +59,7 @@ it("seeds BB's composer with the Bot's default model and starts the conversation
   expect(state.composer!.props).toMatchObject({ defaultProviderId: "claude", defaultModel: "opus", defaultReasoningLevel: "high", defaultProjectId: "proj_personal" });
   expect(document.querySelector('[data-testid="page-bar-title"]')?.textContent).toBe("New conversation");
   expect(document.querySelector('[data-testid="page-bar-detail"]')?.textContent).toBe("Home");
-  // Patrick picked Sonnet in the composer before sending: that wins.
+  // The user picked Sonnet in the composer before sending: that wins.
   await act(async () => { await state.composer!.submit(request("sonnet")); });
   expect(state.call).toHaveBeenCalledWith("bot_conversation_start", { botId: "home", request: expect.objectContaining({ providerId: "claude", model: "sonnet" }) });
   expect(state.toThread).toHaveBeenCalledWith("thr_new");

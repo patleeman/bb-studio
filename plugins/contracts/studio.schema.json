@@ -16227,6 +16227,15 @@
               "type": "string"
             }
           },
+          "modelNames": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
           "consolidate": {
             "type": "boolean"
           },
@@ -16361,6 +16370,15 @@
           "models": {
             "type": "array",
             "items": {
+              "type": "string"
+            }
+          },
+          "modelNames": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
               "type": "string"
             }
           },
@@ -28787,110 +28805,6 @@
         "additionalProperties": false
       }
     },
-    "chat.link": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "pluginId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          },
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "threadId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          }
-        },
-        "required": [
-          "pluginId",
-          "id",
-          "threadId"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "thread": {
-            "anyOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "threadId": {
-                    "type": "string"
-                  },
-                  "title": {
-                    "type": "string"
-                  },
-                  "origin": {
-                    "type": "string",
-                    "enum": [
-                      "chosen",
-                      "created"
-                    ]
-                  }
-                },
-                "required": [
-                  "threadId",
-                  "title",
-                  "origin"
-                ],
-                "additionalProperties": false
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "thread"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "chat.unlink": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "pluginId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          },
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          }
-        },
-        "required": [
-          "pluginId",
-          "id"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "ok"
-        ],
-        "additionalProperties": false
-      }
-    },
     "chat.send": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -40658,70 +40572,6 @@
         "additionalProperties": false
       }
     },
-    "minis.fromArtifact": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "artifactId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          }
-        },
-        "required": [
-          "artifactId"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "mini": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "projectId": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "versionId": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "updatedAt": {
-                "type": "number"
-              },
-              "archived": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "id",
-              "name",
-              "projectId",
-              "versionId",
-              "updatedAt",
-              "archived"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "mini"
-        ],
-        "additionalProperties": false
-      }
-    },
     "minis.duplicate": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -44216,6 +44066,9 @@
           },
           "timeZone": {
             "type": "string"
+          },
+          "defaultTimeZone": {
+            "type": "string"
           }
         },
         "required": [
@@ -44292,11 +44145,125 @@
             "items": {
               "type": "string"
             }
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "defaultTimeZone": {
+            "type": "string"
           }
         },
         "required": [
           "values",
           "changed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "settings.keys.get": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "set": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "description",
+                "set"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "keys"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "settings.keys.set": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 10000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "values"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "set": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "description",
+                "set"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "keys"
         ],
         "additionalProperties": false
       }

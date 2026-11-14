@@ -90,7 +90,7 @@ export function customHeaders(value: string): Record<string, string> {
     // Never quote the entry: a header value can be a credential.
     if (colon < 1 || !headerName.test(name) || !headerValue)
       throw new Error(
-        `Custom Jev header ${position}${colon >= 1 && headerName.test(name) ? ` (${name})` : ""} is not in \`name: value\` form.`,
+        `Extra header ${position}${colon >= 1 && headerName.test(name) ? ` (${name})` : ""} is not in \`name: value\` form.`,
       );
     if (reservedHeaders.has(name.toLowerCase()))
       throw new Error(`Studio Decisions sets ${name} itself; use the custom key settings for authorization.`);
@@ -108,12 +108,12 @@ export function customEndpoint(value: string): URL {
   try {
     url = new URL(value);
   } catch {
-    throw new Error("The custom Jev endpoint is not a valid URL.");
+    throw new Error("Your own endpoint is not a valid URL.");
   }
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
   if (url.protocol !== "https:" && !(url.protocol === "http:" && local))
-    throw new Error("The custom Jev endpoint must use HTTPS, or HTTP on localhost.");
-  if (url.username || url.password) throw new Error("Put the custom Jev key in its own setting, not in the URL.");
+    throw new Error("Your own endpoint must use HTTPS, or HTTP on localhost.");
+  if (url.username || url.password) throw new Error("Put your own endpoint’s key under API keys, not in the URL.");
   return url;
 }
 
@@ -137,13 +137,13 @@ export function jevRoutes(
       const model = text(settings.customJevModel);
       if (!endpoint && !model && mode === "auto") continue;
       if (!endpoint || !model) {
-        problems.push("A custom Jev provider needs both an endpoint URL and a model.");
+        problems.push("Your own endpoint needs an endpoint URL and a model.");
         continue;
       }
       const apiKey = text(settings.customJevApiKey);
       const apiKeyCommand = text(settings.customJevApiKeyCommand);
       if (apiKey && apiKeyCommand) {
-        problems.push("Set either a custom Jev API key or a key command, not both.");
+        problems.push("Set either your own endpoint’s API key or a key command, not both.");
         continue;
       }
       try {
@@ -179,6 +179,6 @@ export function describeHttpFailure(route: JevRoute, status: number, detail: str
   const reason = detail ? ` ${detail.replace(/[.\s]+$/, "")}.` : "";
   if (status === 401 || status === 403) return `${route.name} rejected the API key (HTTP ${status}).${reason}`;
   if (status === 402) return `${route.name} says the account is out of credit (HTTP 402).${reason}`;
-  if (status === 429 || status === 529) return `${route.name} rate-limited Jev (HTTP ${status}).${reason}`;
+  if (status === 429 || status === 529) return `${route.name} rate-limited the decision model (HTTP ${status}).${reason}`;
   return `${route.name} request failed (HTTP ${status}).${reason}`;
 }

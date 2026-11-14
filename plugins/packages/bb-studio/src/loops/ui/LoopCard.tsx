@@ -1,4 +1,4 @@
-// `::loop{id="loop_…"}` in the Bot's chat: one open todo as a card Patrick
+// `::loop{id="loop_…"}` in the Bot's chat: one open todo as a card the user
 // acts on in place (docs/attention-router/backend.md). Each kind has its own
 // buttons: do (Done, Snooze, Give to, Dismiss), decide (its options, Snooze),
 // read (Got it) and waiting (Nudge them, Dismiss). A handed-off todo shows who is
@@ -7,9 +7,6 @@
 // The morning card's rows are `::loop{id row="1"}`, a compact line that opens
 // the full card, and `::loops{more="3"}`, a link to the Todos list. The Bot
 // posts `::loops{open="pane"}` to offer the Todos list beside the chat.
-//
-// With Todos off (the loopsEnabled setting), every card is a
-// quiet placeholder.
 import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import { Icon, cn } from "../../kit/ui/index";
@@ -19,21 +16,12 @@ import { useLive } from "../../ui/live";
 import type { Loop } from "../contract";
 import { CARD_BUTTON, CARD_GHOST, CARD_PRIMARY, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu } from "./LoopMenus";
 import { closedVerb, dueLabel, elapsed, INLINE_OPTIONS, KIND, lastEvent, ownerName, ownerThread, releaseLabel, safeUrl, shortWhen, sourceText, type OwnerInfo } from "./model";
-import { useLoopActions, useLoopPeople, useLoopsEnabled, useOpenLoopsPane, type LoopPeople } from "./hooks";
+import { useLoopActions, useLoopPeople, useOpenLoopsPane, useTodosZone, type LoopPeople } from "./hooks";
 
 export const isLoopId = (id: string) => /^loop_[A-Za-z0-9-]{1,80}$/.test(id);
 
 type History = { type: string; at: number; data: string }[];
 type LoopView = { loop: Loop; history: History; owner?: OwnerInfo };
-
-/** A quiet line in place of a card while Todos are off. */
-export function LoopsOff() {
-  return (
-    <div data-testid="loop-off" className="my-1 flex items-center gap-2 text-xs text-muted-foreground">
-      <Icon name="Unavailable" className="size-3.5" />Todos are off
-    </div>
-  );
-}
 
 /** The ticking "now", once a minute, for live elapsed times. */
 function useNow(): number {
@@ -42,19 +30,10 @@ function useNow(): number {
   return now;
 }
 
-/** While off, a morning card shows one placeholder: its first row's. Message id → that row's todo id. */
-const offRows = new Map<string, string>();
-
-export function LoopDirective({ attributes, message }: PluginMessageDirectiveProps) {
-  const enabled = useLoopsEnabled();
+export function LoopDirective({ attributes }: PluginMessageDirectiveProps) {
   const id = attributes.id ?? "";
   const row = attributes.row === "1" || attributes.row === "true";
   if (!isLoopId(id)) return null;
-  if (!enabled) {
-    if (!row) return <LoopsOff />;
-    if (!offRows.has(message.id)) offRows.set(message.id, id);
-    return offRows.get(message.id) === id ? <LoopsOff /> : null;
-  }
   return <LiveLoop id={id} row={row} />;
 }
 
@@ -74,8 +53,9 @@ function LiveLoop({ id, row }: { id: string; row: boolean }) {
 export function LoopCard({ view, people, refresh, bare = false }: { view: LoopView; people: LoopPeople; refresh(): void; bare?: boolean }) {
   const { loop, history } = view;
   const now = useNow();
+  const zone = useTodosZone();
   if (loop.closedAt !== null) return <ClosedLine view={view} refresh={refresh} />;
-  const release = releaseLabel(loop, history);
+  const release = releaseLabel(loop, history, zone);
   return (
     <div className={cn("w-full", !bare && "my-2")} data-testid="loop-card" data-kind={loop.kind}>
       {bare ? null : (
@@ -94,11 +74,12 @@ export function LoopCard({ view, people, refresh, bare = false }: { view: LoopVi
 }
 
 function Header({ loop, now, label }: { loop: Loop; now: number; label?: string }) {
+  const zone = useTodosZone();
   const kind = KIND[loop.kind];
   const source = sourceText(loop.source);
   const url = safeUrl(loop.source?.url);
-  const due = dueLabel(loop.due, now);
-  const right = loop.kind === "waiting" ? { text: `Since ${shortWhen(loop.createdAt, now)}`, urgent: false } : due;
+  const due = dueLabel(loop.due, now, zone);
+  const right = loop.kind === "waiting" ? { text: `Since ${shortWhen(loop.createdAt, now, zone)}`, urgent: false } : due;
   return (
     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
       <Icon name={kind.icon} className="size-3.5" />
@@ -206,6 +187,7 @@ function HandedOff({ loop, history, owner, people, refresh, now }: { loop: Loop;
 /** A closed todo: one line, how it ended, when, and Undo. */
 function ClosedLine({ view, refresh }: { view: LoopView; refresh(): void }) {
   const { loop, history } = view;
+  const zone = useTodosZone();
   const { update, busy, error } = useLoopActions(refresh);
   const verb = closedVerb(loop, history);
   const dropped = loop.status === "dropped";
@@ -215,7 +197,7 @@ function ClosedLine({ view, refresh }: { view: LoopView; refresh(): void }) {
         <Icon name={dropped ? "X" : loop.kind === "decide" ? "Fork" : "CircleCheck"} className={cn("size-4 shrink-0", dropped ? "text-muted-foreground" : "text-success")} />
         <span className="shrink-0 font-medium text-foreground">{verb}</span>
         <span className="min-w-0 truncate text-muted-foreground">· {loop.title}</span>
-        <span className="ml-auto shrink-0 text-xs text-muted-foreground">{loop.closedAt ? shortWhen(loop.closedAt) : ""}{loop.closedBy && loop.closedBy !== "patrick" ? " · closed by the Bot" : ""}</span>
+        <span className="ml-auto shrink-0 text-xs text-muted-foreground">{loop.closedAt ? shortWhen(loop.closedAt, Date.now(), zone) : ""}{loop.closedBy && loop.closedBy !== "patrick" ? " · closed by the Bot" : ""}</span>
         <button type="button" aria-label={`Undo ${verb.toLowerCase()}`} title="Undo" disabled={busy} onClick={() => void update({ id: loop.id, changes: { status: "surfaced" } })}
           className={CHAT_CARD_ICON_BUTTON}>
           <Icon name="ArrowTurnBackward" className="size-3.5" />
@@ -231,8 +213,9 @@ export function LoopRow({ view, people, refresh }: { view: LoopView; people: Loo
   const { loop } = view;
   const [open, setOpen] = useState(false);
   const now = useNow();
+  const zone = useTodosZone();
   const closed = loop.closedAt !== null;
-  const due = dueLabel(loop.due, now);
+  const due = dueLabel(loop.due, now, zone);
   const right = closed ? closedVerb(loop, view.history)
     : loop.kind === "decide" ? `${loop.options.length} option${loop.options.length === 1 ? "" : "s"}`
       : due?.text ?? (loop.kind === "read" ? "Read" : "");
@@ -258,10 +241,7 @@ export function LoopRow({ view, people, refresh }: { view: LoopView; people: Loo
  * no side panel.
  */
 export function LoopsDirective({ attributes }: PluginMessageDirectiveProps) {
-  const enabled = useLoopsEnabled();
-  // Off, the morning card's first row already says so; a lone card says it itself.
-  if (attributes.open !== undefined) return enabled ? <LoopsOpenCard /> : <LoopsOff />;
-  if (!enabled) return null;
+  if (attributes.open !== undefined) return <LoopsOpenCard />;
   const more = Number.parseInt(attributes.more ?? "", 10);
   if (!Number.isFinite(more) || more <= 0) return null;
   return <LoopsMore more={more} />;

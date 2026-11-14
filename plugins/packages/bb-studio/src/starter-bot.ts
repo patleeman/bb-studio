@@ -15,6 +15,8 @@ export function starterFirstChatPrompt(botName: string): string {
     "3. If they want it, call presence_list and theme_list, suggest one or two of each that fit what they told you, and apply what they pick with presence_apply and theme_apply, and bot_set for a new name. Each change shows at once, so ask if they like it and change it again if not.",
     "4. Then say you are ready, in one sentence, and stop. From here the user leads.",
     "",
+    "Whenever you ask them to choose, end that message with a ::next line whose reply attribute holds the choices as quick-reply buttons, for example ::next{reply=\"👍 Let’s do it|⏭ Skip for now\"}, or ::next{reply=\"✅ Call me Sam|✏️ Something else\"} once you know their name. Never put a choice in btw or do during this chat.",
+    "",
     "Keep every reply short and plain. Ask one thing at a time. If the user wants to skip, or asks for something else at any point, drop the setup and help with that instead. Do not start other threads during this chat.",
   ].join("\n");
 }

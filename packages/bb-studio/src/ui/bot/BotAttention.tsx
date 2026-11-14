@@ -1,9 +1,10 @@
 // Bot ▸ Controls ▸ Attention: how often the Chief of Staff may interrupt
 // with Todos. Its daily budget and quiet hours are Studio settings
-// (loopDailyBudget, loopQuietStart, loopQuietEnd; src/settings/schema.ts);
-// the time zone is this Mac's. The Todos switch is in
-// Studio's settings, under Threads.
-import { useState } from "react";
+// (loopDailyBudget, loopQuietStart, loopQuietEnd; src/settings/schema.ts),
+// and so is the time zone Todos show and come due in (todosTimeZone; empty is
+// this computer's). Todo reminders (loopsEnabled) is the switch for all of it;
+// the Todos list works either way.
+import { useMemo, useState } from "react";
 import { errorMessage } from "../../kit/format";
 import { cn, Icon, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../kit/ui/index";
 import { STUDIO_SETTINGS } from "../../settings/schema";
@@ -22,21 +23,33 @@ export function isQuietHour(hour: number, start: number, end: number): boolean {
   return start < end ? hour >= start && hour < end : hour >= start || hour < end;
 }
 
-/** "New York (EST), from this Mac". */
-function zoneWords(zone: string | null): string {
-  if (!zone) return "From this Mac";
-  const city = zone.split("/").pop()!.replace(/_/g, " ");
-  const short = new Intl.DateTimeFormat("en", { timeZone: zone, timeZoneName: "short" }).formatToParts(new Date()).find((part) => part.type === "timeZoneName")?.value;
-  return `${city}${short ? ` (${short})` : ""}, from this Mac`;
+const COMPUTER = "computer";
+
+export function zoneWords(zone: string): string {
+  const place = zone.replace(/_/g, " ");
+  try {
+    const short = new Intl.DateTimeFormat("en", { timeZone: zone, timeZoneName: "short" }).formatToParts(new Date()).find((part) => part.type === "timeZoneName")?.value;
+    return short ? `${place} (${short})` : place;
+  } catch {
+    return place;
+  }
+}
+
+function supportedZones(): string[] {
+  try {
+    return (Intl as unknown as { supportedValuesOf?(key: string): string[] }).supportedValuesOf?.("timeZone") ?? [];
+  } catch {
+    return [];
+  }
 }
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
 export function BotAttention(_props: { botName: string }) {
-  const { values, set, timeZone, error: loadError } = useStudioSettings();
+  const { values, set, defaultTimeZone, error: loadError } = useStudioSettings();
   const [error, setError] = useState<string | null>(null);
   if (!values) return <p className={cn("text-sm", loadError ? "text-destructive" : "text-muted-foreground")}>{loadError ?? "Loading…"}</p>;
-  const save = (patch: Record<string, number | boolean>) => { setError(null); set(patch).catch((cause: unknown) => setError(errorMessage(cause))); };
+  const save = (patch: Record<string, number | boolean | string>) => { setError(null); set(patch).catch((cause: unknown) => setError(errorMessage(cause))); };
   const budget = values.loopDailyBudget;
   const start = values.loopQuietStart;
   const end = values.loopQuietEnd;
@@ -46,9 +59,10 @@ export function BotAttention(_props: { botName: string }) {
       <div className="divide-y divide-border rounded-lg border border-border">
         <div className="flex items-center justify-between gap-4 px-4 py-3">
           <div className="min-w-0">
-            <div className="text-sm font-medium">Todos</div>
+            <div className="text-sm font-medium">{STUDIO_SETTINGS.loopsEnabled.label}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{STUDIO_SETTINGS.loopsEnabled.description}</div>
           </div>
-          <Switch checked={values.loopsEnabled} label="Todos" onChange={(next) => save({ loopsEnabled: next })} />
+          <Switch checked={values.loopsEnabled} label={STUDIO_SETTINGS.loopsEnabled.label} onChange={(next) => save({ loopsEnabled: next })} />
         </div>
         <div className="flex items-center justify-between gap-4 px-4 py-3" data-testid="attention-budget">
           <div className="min-w-0">
@@ -84,10 +98,10 @@ export function BotAttention(_props: { botName: string }) {
         </div>
         <div className="flex items-center justify-between gap-4 px-4 py-3" data-testid="attention-zone">
           <div className="min-w-0">
-            <div className="text-sm font-medium">Time zone</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">To use another, set STUDIO_LOOP_TIME_ZONE on the BB host.</div>
+            <div className="text-sm font-medium">{STUDIO_SETTINGS.todosTimeZone.label}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{STUDIO_SETTINGS.todosTimeZone.description}</div>
           </div>
-          <span className="text-sm text-muted-foreground">{zoneWords(timeZone)}</span>
+          <ZoneSelect value={values.todosTimeZone} computer={defaultTimeZone} onChange={(zone) => save({ todosTimeZone: zone })} />
         </div>
       </div>
       {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
@@ -100,6 +114,24 @@ function HourSelect({ label, value, onChange }: { label: string; value: number; 
     <Select value={String(value)} onValueChange={(next) => onChange(Number(next))}>
       <SelectTrigger aria-label={label} className="h-8 w-28 text-sm"><SelectValue /></SelectTrigger>
       <SelectContent>{HOURS.map((hour) => <SelectItem key={hour} value={String(hour)}>{hourLabel(hour)}</SelectItem>)}</SelectContent>
+    </Select>
+  );
+}
+
+function ZoneSelect({ value, computer, onChange }: { value: string; computer: string | null; onChange(zone: string): void }) {
+  const zones = useMemo(() => {
+    const all = supportedZones();
+    return value && !all.includes(value) ? [value, ...all] : all;
+  }, [value]);
+  const labels = useMemo(() => new Map(zones.map((zone) => [zone, zoneWords(zone)])), [zones]);
+  const here = computer ? `This computer · ${zoneWords(computer)}` : "This computer";
+  return (
+    <Select value={value || COMPUTER} onValueChange={(next) => onChange(next === COMPUTER ? "" : next)}>
+      <SelectTrigger aria-label={STUDIO_SETTINGS.todosTimeZone.label} className="h-8 w-64 text-sm"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value={COMPUTER}>{here}</SelectItem>
+        {zones.map((zone) => <SelectItem key={zone} value={zone}>{labels.get(zone)}</SelectItem>)}
+      </SelectContent>
     </Select>
   );
 }

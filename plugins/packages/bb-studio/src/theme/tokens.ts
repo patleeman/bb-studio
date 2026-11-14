@@ -193,8 +193,6 @@ ${TITLE_BOXES} { position: absolute; inset: 0; box-sizing: border-box; display: 
 ${TITLE_BOXES} > * { pointer-events: auto; }
 ${RESERVED_ROW} ${TITLE_BOXES} { padding-left: max(var(--studio-title-inset), calc(${CONTROLS_END} - max(0px, (100cqw - var(--studio-title-width)) / 2))); }
 ${TITLE_BOX} [data-fork-header-group="title"] { flex: 1; min-width: 0; max-width: none; padding: 0; align-items: center; ${BARE} }
-${TITLE_BOX} [data-fork-thread-header-after], ${TITLE_BOX} [data-fork-thread-header-after] > .studio-root { flex: 1; }
-${TITLE_BOX} [data-fork-header-group="title"] > span:last-child { margin-left: auto; }
 ${GLASS} [data-testid="edit-space-title-row"] { ${BAR_HALO} }
 ${GLASS} [data-testid="edit-space-pane"] [data-testid="theme-picker-actions"] { background: var(--studio-title-row-glass); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); border-top-color: transparent; }
 ${GLASS} :is([data-fork-header-group], [data-sidebar="trigger"]) { ${BARE} }
@@ -209,8 +207,10 @@ export const STUDIO_RULE = `${GLASS} [data-studio-rule]`;
 export const DIFF_HOST = "diffs-container";
 export const GLASS_DIFF_CARD = `${GLASS} :is(.rounded-lg, .rounded-md)[class~="border"]:has(${DIFF_HOST})`;
 export const STUDIO_CARD = `${GLASS} [data-sidebar="inset"] [data-studio-card]:not([data-studio-card-tone])`;
+export const GLASS_EDGE = "color-mix(in oklab, var(--ink) 12%, transparent)";
+export const GLASS_COMPOSER = `${GLASS} [data-sidebar="inset"] [data-promptbox]`;
 export const STUDIO_CARD_CSS = `
-${STUDIO_CARD} { border-color: transparent; background: var(--fork-panel); }
+${STUDIO_CARD} { border-color: ${GLASS_EDGE}; background: var(--fork-panel); }
 ${STUDIO_CARD}:is(button):hover { background: color-mix(in oklab, var(--ink) 8%, var(--fork-panel)); }
 `;
 export const CLASSIC_FOOTER = `${ON}:not([${GLASS_ATTRIBUTE}]) [data-sidebar="inset"] [data-scroll-footer] > div`;
@@ -255,7 +255,8 @@ ${PAGE_ROOTS} { background: transparent; }
 ${PILL_SELECTOR} { background-color: var(--pill-surface, var(--surface-recessed)); }
 ${PILL_SELECTOR}:hover { background-color: var(--state-hover); }
 ${PILL_SELECTOR}[data-state="on"] { background-color: var(--pill-surface-selected, var(--state-active)); }
-${BACKING_SELECTORS.composerReplace} { ${cardOf("composer")} padding: 8px 12px; }
+${BACKING_SELECTORS.composerReplace} { ${cardOf("composer")} padding: 8px 12px; border: 1px solid ${GLASS_EDGE}; }
+${GLASS_COMPOSER} { border: 1px solid ${GLASS_EDGE}; }
 ${BACKING_SELECTORS.threadBanner} { background: var(--studio-glass-transcript); align-self: center; width: min(100%, var(--fork-cards-column, 100%)); border-radius: var(--studio-card-radius); }
 ${BACKING_SELECTORS.composerControls} { border-color: transparent; background-color: color-mix(in oklab, var(--ink) 10%, transparent); }
 ${BACKING_SELECTORS.composerControls}:hover { background-color: color-mix(in oklab, var(--ink) 18%, transparent); }

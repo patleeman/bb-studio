@@ -15,10 +15,15 @@ import { LOOP_MENTION, loopReference } from "../reference";
 
 const PERSONAL_PROJECT_ID = "proj_personal";
 
-/** The `loopsEnabled` Studio setting (label "Todos", default off). */
+/** The `loopsEnabled` Studio setting (label "Todo reminders", default off). */
 export function useLoopsEnabled(): boolean {
   const { values } = useStudioSettings();
   return values?.loopsEnabled === true;
+}
+
+export function useTodosZone(): string | undefined {
+  const { timeZone } = useStudioSettings();
+  return timeZone ?? undefined;
 }
 
 /** The Bot page's Todos tab: `bot/<botId>/loops`. */
@@ -62,8 +67,8 @@ const chipLabel = (title: string) => { const line = title.replace(/\s+/g, " ").t
 
 /**
  * Discuss: the todo as an `@loop` chip at the end of the Bot chat's draft,
- * not sent, with the caret after it, so Patrick types his question. The Bot
- * gets the todo's id, title, why and trigger when he sends (reference.ts).
+ * not sent, with the caret after it, so the user types their question. The Bot
+ * gets the todo's id, title, why and trigger when they send (reference.ts).
  * Away from the chat (the Todos tab), it opens the chat first and waits for
  * its composer. True when the chip went in. From a menu, pass `focus: false`
  * and focus the composer (focusDiscussed) once the menu has closed, or the

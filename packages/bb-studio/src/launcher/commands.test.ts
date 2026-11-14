@@ -41,9 +41,9 @@ it("Studio's own: a switch to each other Bot, each settings section and a toggle
   ]);
   await byTitle("Studio settings: Voice").run();
   expect(runners.openSettings).toHaveBeenCalledWith("voice");
-  expect([byTitle("Resume after a restart").detail, byTitle("Todos").detail]).toEqual(["On", "Off"]);
+  expect([byTitle("Resume after a restart").detail, byTitle("Todo reminders").detail]).toEqual(["On", "Off"]);
   await byTitle("Resume after a restart").run();
-  await byTitle("Todos").run();
+  await byTitle("Todo reminders").run();
   expect(vi.mocked(runners.setSetting).mock.calls).toEqual([["autoResumeThreads", false], ["loopsEnabled", true]]);
   expect(entries.some((each) => /hud/i.test(each.title) || /hud/i.test(each.key))).toBe(false);
   const bare = studioCommandEntries({ bots: [], currentBotId: null, settings: null, windows: false }, runners);

@@ -22,7 +22,7 @@
  * a specific release.
  *
  * When the `bb` CLI is on this machine, it also checks the SDK of the BB that
- * is running here (Patrick's, which may be an older Nightly than stable): a
+ * is running here (the user's, which may be an older Nightly than stable): a
  * plugin whose engines.bbPluginSdk floor is above it would be refused on the
  * next reload. Pass --running-optional to only warn, or set
  * BB_RUNNING_SDK_VERSION to check against a given version.

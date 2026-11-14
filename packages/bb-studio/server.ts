@@ -122,6 +122,8 @@ import { readMirroredSince, readMirrorLive } from "./src/mirror-live";
 import { registerLiveActivity } from "./src/live-activity";
 import { ThreadSeeds } from "./src/thread-seeds";
 import { registerBotFinish } from "./src/bot-finish";
+import { askModel } from "./src/kit/decisions";
+import type { ModelSelection } from "./src/decisions/contract";
 import { studioInstructions } from "./src/agent-instructions";
 import { activityOf, conversationInstructions } from "./src/bot-threads";
 import { newTabRecents, newTabSearch, VISUAL_CHAT_PLUGIN_ID, type EntryRow, type NewTabSearchSources, type NewTabSources } from "./src/newtab";
@@ -406,7 +408,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") return { tools: [...REVIEW_TOOLS, ...CODE_TOOLS], skills: ["studio-code"], instructions: "" };
     // The Bot's own thread is told who it is; paused or stopped, it gets no Studio tools but its own.
     // Every conversation of a Bot (src/bot-threads.ts) is that Bot: Main, a fork
-    // (a side thread from "Reply in thread" included) and a thread Patrick
+    // (a side thread from "Reply in thread" included) and a thread the user
     // started. BB sets a fork's session up while it's made, before Studio
     // records it: a side chat's metadata says whose it is from the start.
     // A conversation from + New says whose it is in its metadata too (bot_conversation_start).
@@ -677,7 +679,7 @@ export default async function plugin(bb: BbPluginApi) {
     const bot = bots.stored();
     if (!bot?.threadId) throw new Error('A Bot chat is required');
     await bb.sdk.plugins.callRpc({pluginId:'mobile',method:'notify',outputSchema:z.unknown(),input:{title:loop.title,body:loop.why,kind:'turn-finished',threadId:bot.threadId,botId:bot.id,conversationId:bot.threadId,projectId:PERSONAL_PROJECT_ID,category:'BB_LOOP',loopId:loop.id,loopKind:loop.kind,actions:loopPushActions(loop.kind),...(loop.kind==='decide'&&loop.options.length?{options:loop.options.slice(0,4).map(o=>o.slice(0,120))}:{}),coalesceKey:loop.id} as never});
-  }, settings, loopTimeZone, (name, everyMs, work) => triggers.every(name, everyMs, work));
+  }, settings, () => loopTimeZone(process.env, studioSettings.current().todosTimeZone), (name, everyMs, work) => triggers.every(name, everyMs, work));
   loopsEnabled = loops.enabled;
   const work = registerWorkCards(bb, db);
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
@@ -1065,6 +1067,19 @@ export default async function plugin(bb: BbPluginApi) {
     },
     changed: botThreadsChanged,
     log: (message) => bb.log.warn(message),
+    providerReady: async (providerId) => {
+      const { primaryHostId } = await bb.sdk.system.config();
+      const state = (await bb.sdk.system.providerStates(primaryHostId ? { hostId: primaryHostId } : undefined)).providers.find((each) => each.providerId === providerId);
+      return !state || state.status === "ready";
+    },
+    summarize: async ({ threadId, prompt }) => {
+      const pick = await bots.signedInModel() as { providerId?: string; model?: string; reasoningLevel?: string };
+      const { primaryHostId } = await bb.sdk.system.config();
+      if (!pick.providerId || !primaryHostId) return null;
+      const modelSelection = pick.model ? { providerId: pick.providerId, model: pick.model, reasoningLevel: (pick.reasoningLevel ?? null) as ModelSelection["reasoningLevel"] } : undefined;
+      const result = await askModel(bb, { caller: "finish", requestId: threadId, hostId: primaryHostId, providerId: pick.providerId, prompt, ...(modelSelection ? { modelSelection } : {}) }, AbortSignal.timeout(120_000));
+      return result.text;
+    },
   });
   const botThreadsStart = setTimeout(() => void botThreads.start().then(() => liveActivity.start()).catch((error) => bb.log.warn(`Conversations and workers start: ${errorText(error)}`)), 5_000);
   bb.onDispose(() => clearTimeout(botThreadsStart));

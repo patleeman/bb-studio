@@ -6,7 +6,7 @@
 // occurrences. A frequent job (every 2 hours or more often) is hidden behind
 // Show frequent, and a band per day when shown. Runs that start within 15
 // minutes of the one before chain into one group block, named from its time
-// ("5 AM checks") unless the Bot or Patrick renamed it. Each job belongs to an
+// ("5 AM checks") unless the Bot or the user renamed it. Each job belongs to an
 // area (a runner, or the Bot itself), which picks its colour everywhere.
 // Pure, so the expansion is tested without a browser.
 import { cronValues, DAY_WORDS, endOfDay, runMinutes, type Schedule } from "../../schedule";

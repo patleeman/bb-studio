@@ -71,7 +71,7 @@ export function titleStem(title: string): string {
   return head.replace(/\.[a-z0-9]{2,4}$/, "").replace(/\d+/g, "#").replace(/[\s…·-]+/g, " ").trim();
 }
 
-/** Files of one kind from one thread with one title stem fold into one row; a file Patrick made himself never folds. */
+/** Files of one kind from one thread with one title stem fold into one row; a file the user made themselves never folds. */
 export function libraryRows(items: readonly LibraryItem[]): LibraryRow[] {
   const rows = new Map<string, LibraryRow>();
   for (const item of items) {

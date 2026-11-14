@@ -1,5 +1,5 @@
 // One artifact: its contents by type under Studio's item header, with its
-// versions, the thread it came from, and Save as page for text. Selected text
+// versions and Save as page for text. Selected text
 // or an image area can go to the artifact's thread (artifact-quote.tsx).
 import { AppTitle } from "../../ui/app-title";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -17,17 +17,13 @@ import {
   ItemDeleteConfirm,
   ItemMenu,
   cn,
-  projectName,
-  useProjects,
 } from "../../kit/app/index";
 
 import { errorMessage, relativeTime, shortDateTime } from "../../kit/format";
-import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useStudioOpen } from "../../ui/studio-open";
 import type { z } from "zod";
 import type { rpcContract } from "../contract";
-import type { rpcContract as minisContract } from "../../minis/contract";
-import { miniHref } from "../../minis/shared";
 import { ARTIFACT_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, TYPE_LABELS, artifactHref, contentUrl, formatBytes, isTextType } from "../shared";
 import { ArtifactBody, type BodyView } from "./artifact-body";
 import { QuoteCard, useSelectionPick, type Picked } from "./artifact-quote";
@@ -50,10 +46,7 @@ export function ArtifactViewer({
   onBack: (replace?: boolean) => void;
 }) {
   const rpc = useRpc<typeof rpcContract>();
-  const minis = useRpc<typeof minisContract>();
-  const navigate = useBbNavigate();
   const open = useStudioOpen();
-  const projects = useProjects();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** An older version being looked at; null follows the newest. */
@@ -166,28 +159,6 @@ export function ArtifactViewer({
     }
   }
 
-  /** A live HTML artifact as a mini app: its page and state, with records and access of its own. */
-  async function convertToMini() {
-    setBusy(true);
-    try {
-      const { mini } = await minis.call("minis.fromArtifact", { artifactId });
-      toast.success("Made a mini app", { action: { label: "Open", onClick: () => open({ href: miniHref(mini.id) }) } });
-    } catch (failure) {
-      toast.error(errorMessage(failure));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function move(projectId: string | null) {
-    try {
-      await rpc.call("artifacts.move", { id: artifactId, projectId });
-      toast.success(`Moved to ${projectName(projects, projectId)}`);
-    } catch (failure) {
-      toast.error(errorMessage(failure));
-    }
-  }
-
   async function remove() {
     deleting.current = true;
     try {
@@ -206,7 +177,7 @@ export function ArtifactViewer({
     <ItemDeleteConfirm label={`Delete this artifact${versions.length > 1 ? ` and its ${versions.length} versions` : ""}?`} onDelete={() => void remove()} onCancel={() => setConfirmDelete(false)} />
   ) : (
     <>
-      <ItemMenu reference={thread} item={{ pluginId: PLUGIN_ID, id: artifactId }} projects={projects} projectId={artifact.projectId} onMove={(id) => void move(id)} onDelete={() => setConfirmDelete(true)} busy={busy}>
+      <ItemMenu reference={thread} onDelete={() => setConfirmDelete(true)} busy={busy}>
           {/* The artifact's facts and its view, copy and download tools live here, not in the header row (UX review 2, item 12). */}
           <DropdownMenuLabel data-testid="artifact-facts" className="text-xs font-normal text-muted-foreground">{facts}</DropdownMenuLabel>
           {canToggle ? (
@@ -224,21 +195,10 @@ export function ArtifactViewer({
               <Icon name="Download" className="size-4" /> Download
             </a>
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-
-          {artifact.sourceThreadId ? (
-            <DropdownMenuItem onSelect={() => navigate.toThread(artifact.sourceThreadId!)}>
-              <Icon name="MessageSquare" className="size-4" /> Open source thread
-            </DropdownMenuItem>
-          ) : null}
+          {(text && version.type !== "html") || versions.length > 1 ? <DropdownMenuSeparator /> : null}
           {text && version.type !== "html" ? (
             <DropdownMenuItem disabled={busy} onSelect={() => void saveAsPage()}>
               <Icon name="studio/pages" fallback="FileText" className="size-4" /> Save as page
-            </DropdownMenuItem>
-          ) : null}
-          {version.type === "html" ? (
-            <DropdownMenuItem disabled={busy} onSelect={() => void convertToMini()}>
-              <Icon name="AppWindow" className="size-4" /> Convert to mini app
             </DropdownMenuItem>
           ) : null}
           {versions.length > 1 ? (

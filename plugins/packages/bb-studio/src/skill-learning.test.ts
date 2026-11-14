@@ -148,7 +148,7 @@ async function setup() {
     },
     providers: { models: (async () => ({ models: [
       { model: "claude-opus", description: "$4/$20 per Mtok", supportedReasoningEfforts: [{ reasoningEffort: "low" }, { reasoningEffort: "high" }] },
-      { model: "claude-haiku", description: "$0.10/$0.50 per Mtok", supportedReasoningEfforts: [{ reasoningEffort: "low" }] },
+      { model: "claude-haiku", displayName: "Haiku Fast", description: "$0.10/$0.50 per Mtok", supportedReasoningEfforts: [{ reasoningEffort: "low" }] },
     ] })) as never },
   } });
   dispose.push(() => harness.lifecycle.dispose());
@@ -186,7 +186,7 @@ it("takes a baseline first, then forks a review on a cheap model after 10 tool t
   expect(x.update).toHaveBeenCalledWith({ threadId: "fork1", model: "claude-haiku", reasoningLevel: "low" });
   expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ threadId: "fork1", input: [expect.objectContaining({ text: expect.stringMatching(/Background skill review for "Dot"/) })] }));
   const view = await x.learning.view("bot_main");
-  expect(view).toMatchObject({ reviewing: true, toolTurns: 0, defaultModel: "claude-haiku" });
+  expect(view).toMatchObject({ reviewing: true, toolTurns: 0, defaultModel: "claude-haiku", modelNames: { "claude-opus": "Opus", "claude-haiku": "Haiku Fast" } });
   expect(x.learning.reviewThreads()).toEqual(new Set(["fork1"]));
 
   // Single flight: no second review while one runs.

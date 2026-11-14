@@ -263,7 +263,7 @@ export class MiniStore {
 
   addTake(miniId: string, label: string, data: unknown): { id: string } {
     const text = JSON.stringify(data ?? null);
-    if (text.length > LIMITS.stateBytes) throw new Error("What the mini app sent is too large.");
+    if (text.length > LIMITS.stateBytes) throw new Error("What the app sent is too large.");
     const id = `take_${randomBytes(8).toString("hex")}`;
     this.db.prepare("INSERT INTO mini_takes (id, mini_id, label, data, created_at) VALUES (?, ?, ?, ?, ?)").run(id, miniId, label, text, this.now());
     this.db.prepare("DELETE FROM mini_takes WHERE mini_id = ? AND id NOT IN (SELECT id FROM mini_takes WHERE mini_id = ? ORDER BY created_at DESC LIMIT ?)").run(miniId, miniId, LIMITS.takes);
@@ -283,7 +283,7 @@ export class MiniStore {
 
   private checkData(miniId: string, text: string, replacing = 0) {
     if (text.length > LIMITS.recordBytes) throw new Error(`A record may be ${LIMITS.recordBytes / 1024} KB as JSON; this one is ${Math.ceil(text.length / 1024)} KB.`);
-    if (this.dataBytes(miniId) - replacing + text.length > LIMITS.dataBytes) throw new Error(`The mini app's records are over ${LIMITS.dataBytes / 1024 / 1024} MB. Remove some first.`);
+    if (this.dataBytes(miniId) - replacing + text.length > LIMITS.dataBytes) throw new Error(`The app's records are over ${LIMITS.dataBytes / 1024 / 1024} MB. Remove some first.`);
   }
 
   getRecord(miniId: string, collection: string, id: string): MiniRecord | null {

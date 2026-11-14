@@ -40,7 +40,7 @@ async function setup() {
       unarchive: (async ({ threadId }: { threadId: string }) => { threads.set(threadId, { ...threads.get(threadId)!, archivedAt: null }); return {}; }) as never,
       output: (async () => ({ output: null })) as never,
       interactions: { list: (async () => []) as never } as never,
-      events: { list: (async () => [{ seq: 1, type: "turn/completed", createdAt: Date.now() }]) as never },
+      events: { list: (async () => [{ seq: 1, type: "turn/completed", createdAt: Date.now() }, { seq: 2, type: "item/completed", createdAt: Date.now(), data: { item: { type: "agentMessage", text: "Done." } } }]) as never },
     },
   } });
   dispose.push(() => harness.lifecycle.dispose());

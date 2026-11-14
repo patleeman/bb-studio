@@ -473,7 +473,6 @@ export function CollectionPage({
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
                 <Icon name="studio/tag" fallback="Pin" className="size-4" /> Tags
-                <Icon name="ChevronRight" className="ml-auto size-3.5 text-muted-foreground" />
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="max-h-80 w-56 overflow-auto">{tagMenu([item])}</DropdownMenuSubContent>
             </DropdownMenuSub>

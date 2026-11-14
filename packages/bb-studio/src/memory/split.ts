@@ -36,7 +36,7 @@ import { cleanTopic, PROFILE_CAP_CHARS } from "./shared";
 
 export type SplitTarget = "profile" | "records";
 
-/** Headings that stay in the core profile: the check-in list ("Check-in", "Check-ins") and how the user works ("How Patrick works", "How he works"). */
+/** Headings that stay in the core profile: the check-in list ("Check-in", "Check-ins") and how the user works ("How Sam works", "How they work"). */
 export const PROFILE_HEADING = /\bcheck[-\s]?ins?\b|\bhow\s+(?!(?:it|this|that)\s)(?:[\p{L}\p{N}'’]+\s+)?works?\b/iu;
 
 /** Words of a catch-all heading that says nothing about what's under it: see `catchAll`. */

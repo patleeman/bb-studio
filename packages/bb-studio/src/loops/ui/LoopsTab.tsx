@@ -1,5 +1,5 @@
 // What the Todos pane (LoopsPane.tsx) and the Bot page share about todos:
-// the Bot chat's pending questions, what needs Patrick now, the board's
+// the Bot chat's pending questions, what needs the user now, the board's
 // filtered sections, the Owner menu, "Add a todo" and the area chip. The
 // Todos page itself is TodosPage.tsx.
 import { useSdk } from "@get-bb/plugin-sdk/app";
@@ -39,7 +39,7 @@ export function usePendingQuestions(threadId: string | null): Pending[] {
 }
 
 /**
- * What needs Patrick now on the Todos page and pane: released todos and the
+ * What needs the user now on the Todos page and pane: released todos and the
  * Bot chat's pending questions (a tracked question once, as its todo). A
  * reply he hasn't read is the chat's unread state, not a todo.
  */
@@ -51,7 +51,7 @@ export function useNeedsYou(botThreadId: string | null, needsYouNow: readonly Lo
 
 /**
  * What the Todos tab and the Todos pane show: the filtered sections, the Bot
- * chat's items that count as needing Patrick, and the filters' state.
+ * chat's items that count as needing the user, and the filters' state.
  */
 export function useLoopsBoard() {
   const people = useLoopPeople();

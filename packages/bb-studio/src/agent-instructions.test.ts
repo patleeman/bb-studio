@@ -13,7 +13,7 @@ import { STUDIO_SETTINGS } from "./settings/schema";
 /** A Bot like Chief of Staff: a role in the user's words and eight skills. */
 function realisticBot(): string {
   const skills = Array.from({ length: 8 }, (_, n) => ({ name: `weekly-task-${n}`, description: "Use when the user asks for the weekly staff sweep or the homelab backup check; the steps and what to report." }));
-  return botInstructions({ name: "Chief of Staff", state: "active", primary: true, role: "Runs Patrick's personal ops: inbox triage, calendar, the home server, launch prep and the BB Studio fork.", skills });
+  return botInstructions({ name: "Chief of Staff", state: "active", primary: true, role: "Runs Sam's personal ops: inbox triage, calendar, the home server, launch prep and the BB Studio fork.", skills });
 }
 
 it("keeps a typical conversation's instructions within 4,096 characters, the Bot, the note and the whole core profile first", async () => {

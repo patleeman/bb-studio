@@ -1,6 +1,6 @@
 // A Bot's + New: BB's own new-thread composer (experimental_NewThreadComposer)
 // on a Studio page, seeded with the Bot's default model and its Main's
-// project. Patrick can pick any other model before sending; the thread is
+// project. The user can pick any other model before sending; the thread is
 // started by bot_conversation_start as that Bot's conversation, and keeps
 // whatever model it was started on. The composer mounts at once, from the
 // Bot id in the address: the Bot's name and default model arrive after

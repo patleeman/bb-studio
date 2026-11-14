@@ -48,9 +48,8 @@ import {
 } from "./scene";
 import { useDrawingSync } from "./sync";
 import { DrawingSaveQueue } from "./save-queue";
-import { useDrawingProvider } from "./provider";
 import { DraftOwnership, DrawingDraftSession, drawingDraftStore, type DrawingDraft } from "./drafts";
-import { DRAWING_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, drawingHref } from "../shared";
+import { DRAWING_UPDATE_TYPE, REALTIME_CHANNEL, drawingHref } from "../shared";
 
 const SPIN = "animate-spin motion-reduce:animate-none";
 
@@ -71,7 +70,6 @@ export function DrawingEditor({
   onBack: (replace?: boolean) => void;
 }) {
   const rpc = useRpc<typeof rpcContract>();
-  const provider = useDrawingProvider();
   // The recovered copy opens where this editor is (src/ui/studio-open.tsx).
   const openItem = useStudioOpen(threadId ? { kind: "thread", threadId } : null);
   const openLink = useOpenLink();
@@ -460,18 +458,6 @@ export function DrawingEditor({
     }
   }
 
-  /** Moves through Studio's provider methods, as Studio's library does. */
-  async function move(target: string | null) {
-    try {
-      const { failed } = await provider("studio_move", { ids: [drawingId], projectId: target });
-      if (failed.length) throw new Error(failed[0]!.error);
-      projectId.current = target;
-      toast.success("Moved");
-    } catch (error) {
-      toast.error(`Couldn't move: ${errorMessage(error)}`);
-    }
-  }
-
   async function deleteDrawing() {
     deleting.current = true;
     try {
@@ -525,7 +511,7 @@ export function DrawingEditor({
       <button type="button" aria-label="Copy image" title="Copy image" className={ICON_BUTTON} onClick={() => void copyImage()}>
         <Icon name="Copy" className="size-4" />
       </button>
-      <ItemMenu reference={thread} item={{ pluginId: PLUGIN_ID, id: drawingId }} projectId={projectId.current} onMove={(target) => void move(target)} onDelete={() => setConfirmDelete(true)} className="w-52">
+      <ItemMenu reference={thread} onDelete={() => setConfirmDelete(true)} className="w-52">
 
           <DropdownMenuItem onSelect={() => void downloadPng()}>
             <Icon name="Download" className="size-4" /> Download PNG

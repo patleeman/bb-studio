@@ -9,16 +9,17 @@ import {
 } from "../../kit/ui/index";
 import type { Loop } from "../contract";
 import { optionParts, placeLabel, SNOOZE, snoozeHint, type SnoozePreset, type Trigger } from "./model";
+import { useTodosZone } from "./hooks";
+import { fromInputValue, inputValue } from "../clock";
 
 export const CARD_BUTTON = "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 text-sm text-foreground hover:bg-state-hover disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-state-active [&_svg]:size-3.5";
 export const CARD_PRIMARY = "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-foreground px-2.5 text-sm font-medium text-background hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-3.5";
 export const CARD_GHOST = "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-state-active [&_svg]:size-3.5";
 
-const fromLocalInput = (value: string): number | null => { const at = new Date(value).getTime(); return Number.isFinite(at) ? at : null; };
-const toLocalInput = (at: number) => { const d = new Date(at - new Date(at).getTimezoneOffset() * 60_000); return d.toISOString().slice(0, 16); };
 
 /** Snooze ▾: the presets, then Pick a time…, which asks for a date and time. */
 export function SnoozeMenu({ disabled, onSnooze, onPick, className = CARD_BUTTON, label = "Snooze" }: { disabled?: boolean; onSnooze(preset: SnoozePreset): void; onPick(at: number): void; className?: string; label?: string }) {
+  const zone = useTodosZone();
   const [picking, setPicking] = useState(false);
   return (
     <>
@@ -34,7 +35,7 @@ export function SnoozeMenu({ disabled, onSnooze, onPick, className = CARD_BUTTON
               <DropdownMenuItem onSelect={() => onSnooze(preset.id)}>
                 <Icon name={preset.icon} />
                 <span className="flex-1">{preset.label}</span>
-                <span className="text-xs text-muted-foreground">{snoozeHint(preset.id)}</span>
+                <span className="text-xs text-muted-foreground">{snoozeHint(preset.id, Date.now(), zone)}</span>
               </DropdownMenuItem>
             </span>
           ))}
@@ -48,8 +49,9 @@ export function SnoozeMenu({ disabled, onSnooze, onPick, className = CARD_BUTTON
 }
 
 export function PickTime({ onClose, onPick }: { onClose(): void; onPick(at: number): void }) {
-  const [value, setValue] = useState(() => toLocalInput(Date.now() + 3_600_000));
-  const at = fromLocalInput(value);
+  const zone = useTodosZone();
+  const [value, setValue] = useState(() => inputValue(Date.now() + 3_600_000, zone));
+  const at = fromInputValue(value, zone);
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-w-sm">
@@ -155,14 +157,15 @@ export function ChangeTrigger({ loop, places, disabled, onSave, children }: { lo
 export function TriggerForm({ loop, places, onCancel, onSave }: { loop: Loop; places: string[]; onCancel(): void; onSave(changes: { trigger: Trigger; push: boolean }): void }) {
   const current = loop.trigger;
   const [type, setType] = useState<TriggerType>(current.type);
-  const [when, setWhen] = useState(() => toLocalInput(current.type === "time" && current.at ? current.at : Date.now() + 3_600_000));
+  const zone = useTodosZone();
+  const [when, setWhen] = useState(() => inputValue(current.type === "time" && current.at ? current.at : Date.now() + 3_600_000, zone));
   const [event, setEvent] = useState(current.type === "event" ? current.event ?? "" : "");
   // Place keys are lower-case on the server; match the phone's names in any case.
   const names = places.length ? places : ["Home"];
   const [place, setPlace] = useState(() => current.type === "place" && current.place ? names.find((name) => name.toLowerCase() === current.place!.toLowerCase()) ?? current.place : names[0]!);
   const [direction, setDirection] = useState<"arrive" | "leave">(current.type === "place" ? current.direction ?? "arrive" : "arrive");
   const [push, setPush] = useState(loop.push);
-  const at = fromLocalInput(when);
+  const at = fromInputValue(when, zone);
   const trigger: Trigger | null =
     type === "time" ? (at ? { type, at } : null)
       : type === "event" ? (event.trim() ? { type, event: event.trim() } : null)

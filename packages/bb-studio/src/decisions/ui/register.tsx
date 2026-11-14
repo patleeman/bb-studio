@@ -54,7 +54,7 @@ export function JevConnection({ bare = false }: { bare?: boolean }) {
       const result = await rpc.call("decisions.jev.check", null);
       setCheck(
         result.ok
-          ? { state: "done", ok: true, text: `Jev answered through ${result.via} in ${result.ms} ms.` }
+          ? { state: "done", ok: true, text: `The decision model answered through ${result.via} in ${result.ms} ms.` }
           : { state: "done", ok: false, text: result.error },
       );
     } catch (error) {
@@ -70,7 +70,7 @@ export function JevConnection({ bare = false }: { bare?: boolean }) {
         {error ? (
           <><p role="alert" className="text-xs text-destructive">{error}</p><Button size="sm" variant="outline" onClick={refresh}>Retry</Button></>
         ) : loading ? <span className="text-sm text-muted-foreground">Loading…</span> : routes.length ? (
-          <ol className="flex flex-col items-start gap-1 text-sm sm:items-end" aria-label="Jev providers in order">
+          <ol className="flex flex-col items-start gap-1 text-sm sm:items-end" aria-label="Providers in order">
             {routes.map((route, index) => (
               <li key={route.name} className="text-foreground">
                 <span className="text-muted-foreground">{index + 1}.</span> {route.name}{" "}
@@ -161,7 +161,7 @@ export function FallbackModel({ bare = false }: { bare?: boolean }) {
   return (
     <div className={bare ? "divide-y divide-border px-4" : "divide-y divide-border rounded-lg border border-border bg-card px-4"}>
       <Row
-        label="If Jev doesn’t answer, use"
+        label="If the decision model doesn’t answer, use"
         description="Off sends every undecided Smart Queue message as a follow-up."
       >
         <Select disabled={busy} value={value.mode} onValueChange={(mode) => void chooseMode(mode as Fallback["mode"])}>

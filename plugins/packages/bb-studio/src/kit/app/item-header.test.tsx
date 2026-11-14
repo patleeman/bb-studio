@@ -9,7 +9,7 @@ const state = vi.hoisted(() => ({
   split: vi.fn(),
   openTab: vi.fn((_options: unknown) => true),
   toCompose: vi.fn(),
-  host: null as null | Record<"open" | "start" | "choose" | "unlink" | "watch", (...args: unknown[]) => unknown>,
+  host: null as null | Record<"open" | "start" | "watch", (...args: unknown[]) => unknown>,
   home: null as { threadId: string; title: string; origin: "chosen" } | null,
   globalWorkbench: false,
   tabWindow: null as null | { title: string; toolbar: HTMLElement | null },
@@ -50,7 +50,7 @@ beforeEach(async () => {
   state.split.mockClear();
   state.openTab.mockReset().mockReturnValue(true);
   state.toCompose.mockClear();
-  state.host = { open: vi.fn(), start: vi.fn(), choose: vi.fn(), unlink: vi.fn(async () => {}), watch: vi.fn() };
+  state.host = { open: vi.fn(), start: vi.fn(), watch: vi.fn() };
   state.home = null;
   state.globalWorkbench = false;
   state.tabWindow = null;
@@ -143,21 +143,16 @@ describe("New thread about an item", () => {
 });
 
 describe("Linked thread in the item menu", () => {
-  it("offers only linking while the item has no thread", async () => {
+  it("has no conversation entry while the item has no thread", async () => {
     await menu();
-    expect(entries()).toEqual(["Copy reference", "Link a thread…"]);
-    await pick("Link a thread…");
-    expect(state.host!.choose).toHaveBeenCalledWith({ pluginId: "pages", id: "launch" });
+    expect(entries()).toEqual(["Copy reference"]);
   });
-  it("opens, relinks and unlinks a linked thread", async () => {
+  it("opens the linked thread as Open conversation, with no linking or unlinking", async () => {
     state.home = { threadId: "thr_9", title: "Launch plan", origin: "chosen" };
     await menu();
-    expect(entries()).toEqual(["Copy reference", "Open “Launch plan”", "Link another thread…", "Unlink thread"]);
-    await pick("Open “Launch plan”");
+    expect(entries()).toEqual(["Copy reference", "Open conversation"]);
+    await pick("Open conversation");
     expect(state.host!.open).toHaveBeenCalledWith({ pluginId: "pages", id: "launch" });
-    await menu();
-    await pick("Unlink thread");
-    expect(state.host!.unlink).toHaveBeenCalledWith({ pluginId: "pages", id: "launch" });
   });
   it("draws no thread entries until Studio's item chat is up", async () => {
     state.host = null;
@@ -301,5 +296,24 @@ describe("Star", () => {
     expect(button().getAttribute("aria-pressed")).toBe("true");
     await act(async () => clear());
     expect(container.querySelector("[data-studio-star]")).toBeNull();
+  });
+  it("keeps the star in a narrow header, outside the folded item actions", async () => {
+    const width = window.innerWidth;
+    const resize = (value: number) => { Object.defineProperty(window, "innerWidth", { configurable: true, value }); window.dispatchEvent(new Event("resize")); };
+    const { setItemStarHost } = await import("./item-star");
+    let clear = () => {};
+    try {
+      await act(async () => { clear = setItemStarHost({ starred: () => false, set: vi.fn(async () => {}) }); });
+      await act(async () => resize(390));
+      const actions = container.querySelector<HTMLElement>("[data-studio-item-actions]")!;
+      expect(actions.style.display).toBe("none");
+      const star = container.querySelector<HTMLButtonElement>('[data-studio-star="pages:launch"]')!;
+      expect(star.getAttribute("aria-label")).toBe("Star");
+      expect(actions.contains(star)).toBe(false);
+      expect(star.closest('[style*="display: none"]')).toBeNull();
+    } finally {
+      await act(async () => clear());
+      await act(async () => resize(width));
+    }
   });
 });

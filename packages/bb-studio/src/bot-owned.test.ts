@@ -37,7 +37,7 @@ async function setup() {
   return { owned, threads, add, update, automations, runs, skip, db, callRpc, bots, handed };
 }
 
-/** Patrick's data: the Bot's child made an automation; each run is a top-level thread. */
+/** The user's data: the Bot's child made an automation; each run is a top-level thread. */
 function seedChief(x: Awaited<ReturnType<typeof setup>>) {
   x.add({ id: "thr_old_chief", title: "Chief of Staff" });
   x.add({ id: "thr_demo000022", title: "Chief of Staff", sourceThreadId: "thr_old_chief" });

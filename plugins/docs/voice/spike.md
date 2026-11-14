@@ -1,7 +1,7 @@
 # Hands-free voice: spike
 
 The spike behind the spec page "Voice mode: hands-free spec"
-(`pg_demo000000000003`), built on Patrick's decisions: a separate voice agent
+(`pg_demo000000000003`), built on the user's decisions: a separate voice agent
 that relays visibly to the CoS and threads, GPT-Live first with Realtime as the
 fallback, eyes-free rules enforced in Studio, Bluetooth mic routing, and an iOS
 screen with a talking icon and subtitles. CarPlay is on hold. This is a spike:
@@ -114,7 +114,7 @@ The tools are:
 
 ## Eyes-free rules, enforced in the tool layer
 
-Patrick's rule (Nov 1, replacing "read back every send"): **act at once, say it
+The user's rule (Nov 1, replacing "read back every send"): **act at once, say it
 briefly; confirm only what's destructive or hard to undo.** Every tool call is
 classified in [`rules.ts`](../../packages/bb-studio/src/voice/live/rules.ts)
 (`classify`) and enforced in [`live.ts`](../../packages/bb-studio/src/voice/live/live.ts),
@@ -373,7 +373,7 @@ shares:
 
 ## Desktop
 
-Patrick tests it first at the Mac, in the BB window, before any TestFlight.
+The user tests it first at the Mac, in the BB window, before any TestFlight.
 It uses the same voice agent, Studio relay, tool layer, eyes-free rules, cost
 cap and voice-thread posting as the iPhone.
 

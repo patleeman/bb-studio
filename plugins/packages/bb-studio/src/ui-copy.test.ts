@@ -56,3 +56,12 @@ it("no Studio view says Loop to the user: the feature is called Todos", () => {
   const found = files.flatMap((file) => readFileSync(file, "utf8").split("\n").flatMap((line, index) => (text.test(line) && !line.includes("ui-copy-ok") ? [`${relative(root, file)}:${index + 1}`] : [])));
   expect(found).toEqual([]);
 });
+
+it("no Studio view says mini app to the user: the Library calls them apps", () => {
+  const root = resolve(__dirname, "..");
+  const files = [join(root, "app.tsx"), ...sources(join(root, "src"))];
+  const text = /(>[^<>{}`"']*\b[Mm]ini apps?\b)|(["'`][^"'`]*\b[Mm]ini apps?\b[^"'`]*["'`])/;
+  const skip = (line: string) => /^\s*(\/\/|\*|\/\*)/.test(line) || /console\.\w+\(/.test(line) || line.includes("ui-copy-ok");
+  const found = files.flatMap((file) => readFileSync(file, "utf8").split("\n").flatMap((line, index) => (text.test(line) && !skip(line) ? [`${relative(root, file)}:${index + 1}`] : [])));
+  expect(found).toEqual([]);
+});

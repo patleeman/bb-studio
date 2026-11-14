@@ -24,12 +24,12 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: "settings", label: "Settings" },
 ];
 
-const displayName = (mini: Pick<Mini, "name"> | null | undefined) => mini?.name.trim() || "Untitled mini app";
+const displayName = (mini: Pick<Mini, "name"> | null | undefined) => mini?.name.trim() || "Untitled app";
 
 /** The app with its access banner and, when it breaks, why. */
 export function MiniApp({ mini, rpc, threadId, fit = false }: { mini: Mini; rpc: MiniRpc; threadId: string | null; fit?: boolean }) {
   const [error, setError] = useState<string | null>(null);
-  if (!mini.versionId) return <p className="p-4 text-sm text-muted-foreground">This mini app has no source yet.</p>;
+  if (!mini.versionId) return <p className="p-4 text-sm text-muted-foreground">This app has no source yet.</p>;
   return (
     <div className={cn("flex min-h-0 flex-col", fit ? "" : "h-full")}>
       <ApprovalBanner mini={mini} rpc={rpc} />
@@ -88,7 +88,7 @@ export function MiniBody({ miniId, threadId, header }: { miniId: string; threadI
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground" data-mini-view={miniId}>
       {header(mini, rename)}
-      {mini === null ? <p className="p-4 text-sm text-muted-foreground">This mini app was deleted.</p> : null}
+      {mini === null ? <p className="p-4 text-sm text-muted-foreground">This app was deleted.</p> : null}
       {mini ? (
         <>
           <SectionBar section={section} onSection={setSection} mini={mini} />
@@ -448,7 +448,7 @@ function SettingsSection({ mini, rpc }: { mini: Mini; rpc: MiniRpc }) {
 /** The app filling a box, as a widget: no chrome, the access banner when it waits. */
 export function MiniTile({ miniId }: { miniId: string }) {
   const { mini, rpc } = useMini(miniId);
-  if (mini === null) return <p className="p-3 text-xs text-muted-foreground">This mini app was deleted.</p>;
+  if (mini === null) return <p className="p-3 text-xs text-muted-foreground">This app was deleted.</p>;
   if (!mini) return null;
   return <MiniApp mini={mini} rpc={rpc} threadId={null} />;
 }

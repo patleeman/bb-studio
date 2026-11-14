@@ -3,20 +3,20 @@
 Branch `bb/needs-you-meaning-clearing-reason-claude-thr_demo000016`, on top of
 `origin/main` (`c8cbc412`). Not shipped.
 
-Patrick's report: "Security · Runner" sat in the Bot sidebar's **Needs you**
-with no way to clear it, and nothing in it needed him. His direction after the
+The user's report: "Security · Runner" sat in the Bot sidebar's **Needs you**
+with no way to clear it, and nothing in it needed them. Their direction after the
 first fix (a reason line, auto-clearing and Mark handled):
 
 > needs you under bots shouldn't be a thing? The bot should be handling it all.
 
 So this branch removes Needs you. The Bot triages, and the Bot's own row is
-the only place that asks for Patrick's attention.
+the only place that asks for the user's attention.
 
 ## The model
 
 1. **The Bot is the triage layer.** Runner reports, urgent alerts, failures
    and the questions its threads ask go to the Bot. It handles them, or tells
-   Patrick in its own chat. Patrick never triages runners directly.
+   the user in its own chat. The user never triages runners directly.
    - An urgent `runner_report` still posts its line into the Bot's chat and
      pushes to the phone. Its agent-only note now asks the Bot to triage:
      "if you can handle it yourself, do. If the user must act, tell them in
@@ -47,7 +47,7 @@ the only place that asks for Patrick's attention.
 2. **No Needs you section** in the Bots sidebar or in Bot info → Activity,
    on desktop or iOS. `bot_activity` no longer has `needsYou`.
 3. **The one signal is on the Bot's row**: `attention` (`src/bot-attention.ts`)
-   is set while the Bot's own chat has something waiting on Patrick:
+   is set while the Bot's own chat has something waiting on the user:
    - a pending question or approval in the chat, until it's answered;
    - Bot replies he hasn't read (newer than the chat's `lastReadAt`, not
      empty and not `[PASS]`), until he reads the chat.
@@ -58,7 +58,7 @@ the only place that asks for Patrick's attention.
    aren't expanded.
 4. **Runner rows show state only**: running, next …, quiet, reported, failed,
    paused, offline. No attention flag of their own. A runner whose last run
-   failed shows "failed"; the Bot decides whether to bother Patrick.
+   failed shows "failed"; the Bot decides whether to bother the user.
    `RunnerView.urgent` and `bot_runner_seen` are gone, and a migration clears
    every existing urgent flag (`UPDATE bot_runners SET urgent = 0`).
 5. **Threads the Bot started that wait on a question or approval** are the
@@ -69,7 +69,7 @@ the only place that asks for Patrick's attention.
    `bot_activity` tool lists them as "Waiting on an answer (yours to handle,
    or bring to the user)".
 6. **Mark handled is dropped**, with `bot_needs_you_dismiss` and
-   `bot_needs_you_restore`. Nothing needs it: the badge clears when Patrick
+   `bot_needs_you_restore`. Nothing needs it: the badge clears when the user
    reads or answers the Bot's chat.
 
 ## Desktop
@@ -92,7 +92,7 @@ the only place that asks for Patrick's attention.
 ## iOS
 
 - **Activity sheet**: no Needs you, no swipe or menu. When the Bot needs
-  Patrick, the sheet starts with a "<Bot> · Asked you a question" row and its
+  the user, the sheet starts with a "<Bot> · Asked you a question" row and its
   count; tapping it goes to the chat. Running lists the waiting thread with
   its `waitingFor` as a muted second line.
 - **Bell badge**: counts `attention.count`, and VoiceOver reads the reason.
@@ -128,7 +128,7 @@ this branch's Studio installed into the same instance:
 - **The nudge** (round 3): the deploy-key thread asked again, and Studio
   sent the Bot one agent-only note: "Your thread "Rotate the ORBIT-42
   deploy key" (/projects/…/threads/…) is waiting on an answer: Which vault
-  holds the ORBIT-42 deploy key? …". The Bot asked Patrick in its chat:
+  holds the ORBIT-42 deploy key? …". The Bot asked the user in its chat:
   "Which vault holds the ORBIT-42 deploy key: 1Password, AWS Secrets
   Manager, or Vault? Answer in @thread:…". The badge read "2 things for
   you" (it had also posted "I'll check whether the vault choice is already
@@ -183,7 +183,7 @@ watchOS path.
 
 - The Bot gets a nudge when one of its threads waits on an answer (above).
 - The badge keeps counting unread Bot replies, including replies to
-  Patrick's own messages: it works as the Bot chat's unread count.
+  the user's own messages: it works as the Bot chat's unread count.
 - iOS chat header shows the attention reason; widgets and the watch count
   the Bot's attention.
 - The waiting mark is amber on both platforms.

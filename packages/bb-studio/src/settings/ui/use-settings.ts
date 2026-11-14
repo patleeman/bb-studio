@@ -10,7 +10,7 @@ import { effectiveSettings, SETTINGS_CHANNEL, type SettingValue, type StudioSett
 
 const PLUGIN_ID = "studio";
 
-interface Answer { values: StudioSettingValues; changed: string[]; timeZone: string }
+interface Answer { values: StudioSettingValues; changed: string[]; timeZone: string; defaultTimeZone?: string }
 interface State { data: Answer | null; error: string | null; loading: boolean }
 
 let state: State = { data: null, error: null, loading: true };
@@ -37,6 +37,7 @@ export interface StudioSettingsState {
   values: StudioSettingValues | null;
   changed: readonly string[];
   timeZone: string | null;
+  defaultTimeZone: string | null;
   isLoading: boolean;
   error: string | null;
   /** Saves a change; `null` restores the default. Throws when the server refuses it. */
@@ -52,12 +53,13 @@ export function useStudioSettings(): StudioSettingsState {
     generation += 1;
     inflight = false;
     const answer = await rpc.call("settings.set", { values: patch });
-    emit({ data: { values: effectiveSettings(answer.values), changed: answer.changed, timeZone: state.data?.timeZone ?? "" }, error: null, loading: false });
+    emit({ data: { values: effectiveSettings(answer.values), changed: answer.changed, timeZone: answer.timeZone ?? state.data?.timeZone ?? "", defaultTimeZone: answer.defaultTimeZone ?? state.data?.defaultTimeZone }, error: null, loading: false });
   }, [rpc]);
   return {
     values: snapshot.data?.values ?? null,
     changed: snapshot.data?.changed ?? [],
     timeZone: snapshot.data?.timeZone || null,
+    defaultTimeZone: snapshot.data?.defaultTimeZone || null,
     isLoading: snapshot.loading,
     error: snapshot.error,
     set,

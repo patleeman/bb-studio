@@ -5,7 +5,7 @@
 //
 // Events: thread.created classifies a new thread at once; archived,
 // unarchived and deleted follow BB; idle stores a conversation's latest
-// reply and clears its needs-you mark once Patrick replied after it; every
+// reply and clears its needs-you mark once the user replied after it; every
 // status change of a recorded thread (active, idle, failed, a pending
 // question) tells open views to reload.
 import type { Appearance } from "./theme/appearance";
@@ -117,7 +117,7 @@ export function fileOrigin(key: string, origins: ReadonlyMap<string, string>, cr
 
 /**
  * The Bot's files: items its conversations and workers made, newest first.
- * An item no thread made (Patrick's own), or whose thread no Bot has, counts
+ * An item no thread made (the user's own), or whose thread no Bot has, counts
  * as the primary Bot's.
  */
 export function libraryItems(input: {
@@ -278,9 +278,13 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     if (!id) return { botId: null, conversations: [], workers: [], finished: [] };
     const { records, threads } = await botRows(id);
     const rest = olderView(id, records, threads, Date.now());
-    const finished = records.filter((rec) => rec.botId === id && rec.kind === "conversation" && rec.archivedAt !== null && rec.finishedSummary !== null)
-      .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0)).slice(0, 200)
-      .map((rec) => ({ threadId: rec.threadId, title: rec.title?.trim() || "Untitled conversation", finishedAt: rec.archivedAt!, summary: rec.finishedSummary! }));
+    const done = records.filter((rec) => rec.botId === id && rec.kind === "conversation" && rec.archivedAt !== null && rec.finishedSummary !== null)
+      .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0)).slice(0, 200);
+    const archived = done.length
+      ? await bb.sdk.threads.list({ threadIds: done.map((rec) => rec.threadId), archived: true, includeHidden: true, limit: 200 } as never).catch(() => []) as ThreadFacts[]
+      : [];
+    const bbTitles = new Map(archived.map((thread) => [thread.id, thread.title?.trim() || thread.titleFallback?.trim() || null]));
+    const finished = done.map((rec) => ({ threadId: rec.threadId, title: rec.title?.trim() || bbTitles.get(rec.threadId) || "Untitled conversation", finishedAt: rec.archivedAt!, summary: rec.finishedSummary! }));
     return { ...rest, finished };
   };
 
@@ -332,7 +336,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     };
   };
 
-  /** Sends Patrick's question about a worker to the Bot in the worker's conversation. */
+  /** Sends the user's question about a worker to the Bot in the worker's conversation. */
   const askAboutWorker = async (threadId: string, text: string) => {
     const rec = store.get(threadId);
     if (!rec || rec.kind !== "worker") throw new Error("That thread isn't a worker.");
@@ -424,7 +428,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
 
   /**
    * A Bot's + New: BB's new-thread request (its composer, seeded with the
-   * Bot's default model; Patrick's picks win), spawned and recorded as that
+   * Bot's default model; the user's picks win), spawned and recorded as that
    * Bot's conversation. The Bot is focused first, so BB's thread.created
    * places it there too.
    */
@@ -513,7 +517,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     bot_ask: (input: { text: string; to: { kind: "thread"; threadId: string } | { kind: "new"; botId: string | null } }) => ask(input),
   };
 
-  // The tools: a Bot's own view of its conversations and workers, and its way to raise something with Patrick.
+  // The tools: a Bot's own view of its conversations and workers, and its way to raise something with the user.
   const describe = async (botId: string) => {
     const shown = await view(botId);
     const lines = [

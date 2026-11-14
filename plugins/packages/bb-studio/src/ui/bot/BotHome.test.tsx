@@ -3,6 +3,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { useThreadTabRequests } from "../../kit/app/thread-panel";
+import { runsOn } from "./BotControls";
 
 const state = vi.hoisted(() => ({
   data: {} as Record<string, unknown>,
@@ -61,7 +62,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   // BB's Info row: label and value.
   experimental_DetailRow: ({ label, icon, children }: { label: React.ReactNode; icon?: string; children: React.ReactNode }) => React.createElement("div", { "data-detail-row": icon ?? "" }, React.createElement("dt", null, label), React.createElement("dd", null, children)),
 }));
-vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: "America/New_York", isLoading: false, error: null, set: async () => {}, ...(({ values: state.settings })) }), readStudioSettingsNow: () => ({}) }));
+vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, isLoading: false, error: null, set: async () => {}, ...(({ values: state.settings })) }), readStudioSettingsNow: () => ({}) }));
 const sdk = { projects: { list: async () => [] }, threads: { interactions: { list: async () => [] }, update: vi.fn(async (_args: unknown) => ({})), markRead: vi.fn(async (_args: unknown) => ({})), get: async ({ threadId }: { threadId: string }) => {
   if (!(threadId in state.threads)) throw new Error("Thread not found");
   return { id: threadId, projectId: state.threads[threadId], deletedAt: null };
@@ -812,7 +813,7 @@ test("an external bot shows its provider's logo; Controls keeps Profile, Model a
   await show(<BotPanel />);
   expect([...container.querySelectorAll("[data-controls]")].map((each) => each.getAttribute("data-controls"))).toEqual(["profile", "model", "checkins"]);
   expect(container.querySelector('[data-testid="bot-external-note"]')).toBeNull();
-  expect(container.textContent).toContain("hermes-agent");
+  expect(container.textContent).toContain("Hermes · Hermes Agent");
   expect(button("Open")).toBeUndefined();
   expect(container.textContent).not.toContain("Procedures it saved");
 });
@@ -823,6 +824,7 @@ test("Switch model hands off to another provider, saying so, and switches in pla
   expect(modelChangeKind({ providerId: "claude", model: "opus" }, { providerId: "codex", model: "gpt-5", reasoningLevel: "high" })).toBe("handoff");
   expect(modelChangeKind({ providerId: "claude", model: "opus" }, { providerId: "claude", model: "opus", reasoningLevel: "high" })).toBe("unchanged");
   expect(pendingLabel("handoff", "Codex", "gpt-5")).toBe("Handing off to Codex…");
+  expect(pendingLabel("in-place", "Claude", "claude-opus-5-5")).toBe("Switching to Opus 5.5…");
   const { SwitchModelDialog } = await import("./BotModel");
   let finish: (value: unknown) => void = () => {};
   state.call.mockImplementation((() => new Promise((resolve) => { finish = resolve; })) as never);
@@ -849,14 +851,17 @@ test("Skills: learn from work, the last review, history, pins and archived skill
     ] },
     bot_skill_history: { versions: [{ id: 1, name: "deploy-check", body: "new", diff: "- old\n+ new", warnings: ["Advisory lint warning"], at: 1 }] },
     bot_learning: {
-      enabled: true, interval: 10, reviewModel: null, defaultModel: "claude-haiku-5-5", models: ["claude-opus-5-5", "claude-haiku-5-5"], consolidate: false,
+      enabled: true, interval: 10, reviewModel: null, defaultModel: "claude-haiku-5-5", models: ["claude-opus-5-5", "claude-haiku-5-5"], modelNames: { "claude-haiku-5-5": "Haiku 5.5 Fast" }, consolidate: false,
       toolTurns: 3, userTurns: 1, reviewing: false, lastReview: { at: Date.now() - 2 * 3_600_000, result: "Saved 1 skill" }, lastCurator: null,
     },
   };
   state.pathname = CONTROLS;
   await show(<BotPanel />);
   expect(container.textContent).toContain("Saved 1 skill · 2h ago");
-  expect(container.textContent).toContain("Cheapest (claude-haiku-5-5)");
+  expect(container.textContent).toContain("Cheapest (Haiku 5.5 Fast)");
+  const reviewModels = [...container.querySelectorAll('select[aria-label="Review model"] option')].map((option) => option.textContent);
+  expect(reviewModels).toEqual(["Cheapest (Haiku 5.5 Fast)", "Opus 5.5", "Haiku 5.5 Fast"]);
+  expect(container.textContent).not.toContain("claude-");
   expect(container.textContent).toContain("stale");
   expect(container.textContent).toContain("- old\n+ new");
   expect(container.textContent).not.toContain("old-report");
@@ -1091,4 +1096,11 @@ test("the sidebar has no Todos row or Needs you list under the primary Bot: its 
   expect(container.textContent).not.toContain("All todos");
   expect(container.querySelector('section[aria-label="Needs you"]')).toBeNull();
   expect(container.querySelector("[data-testid=bot-main] [data-testid=bot-status]")?.getAttribute("data-state")).toBe("needs-you");
+});
+
+test("Controls name the model a Bot runs on by its display name, never its id", () => {
+  expect(runsOn({ kind: "studio", providerId: "claude-code", model: "claude-haiku-4-5-20251001", modelName: "Haiku 4.5" })).toBe("Haiku 4.5");
+  expect(runsOn({ kind: "studio", providerId: "claude-code", model: "claude-opus-5-5", modelName: null })).toBe("Opus 5.5");
+  expect(runsOn({ kind: "studio", providerId: null, model: null, modelName: null })).toBe("Its thread's model");
+  expect(runsOn({ kind: "external", providerId: "hermes", model: "grok-4", modelName: "Grok 4" })).toBe("Hermes · Grok 4");
 });

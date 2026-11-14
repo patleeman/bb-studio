@@ -11,9 +11,12 @@ import { useSearchEscape } from "../kit/ui/search-escape";
 import { SearchFreshness, useSearchFreshness } from "./SearchFreshness";
 import { highlightParts } from "../kit/search-match";
 import { ITEM_FAMILIES, typeOfKind } from "../item-model";
+import { shownThreadTitle } from "../reply-title";
 
 type Result = { ref: { pluginId: string; id: string }; kind: string; title: string; snippet: { text: string; ranges: { start: number; end: number }[] }; href: string; projectId: string | null; updatedAt: number; score: number };
 type Row = { type: "result"; hit: Result } | { type: "command"; label: string; run: () => void };
+
+const hitTitle = (hit: Pick<Result, "kind" | "title">): string => untitled(hit.kind === "thread" ? shownThreadTitle(hit.title) : hit.title);
 const DEBOUNCE_MS = 150;
 
 /**
@@ -141,8 +144,8 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
     if (row.type === "command") return row.run();
     onClose();
     const threadId = threadLinkId(row.hit.href);
-    if (threadId) open({ threadId, title: untitled(row.hit.title) }, { alternate });
-    else open({ href: row.hit.href, title: untitled(row.hit.title), ...(kinds.get(`${row.hit.ref.pluginId}:${row.hit.kind}`)?.icon ? { icon: kinds.get(`${row.hit.ref.pluginId}:${row.hit.kind}`)!.icon } : {}) }, { alternate });
+    if (threadId) open({ threadId, title: hitTitle(row.hit) }, { alternate });
+    else open({ href: row.hit.href, title: hitTitle(row.hit), ...(kinds.get(`${row.hit.ref.pluginId}:${row.hit.kind}`)?.icon ? { icon: kinds.get(`${row.hit.ref.pluginId}:${row.hit.kind}`)!.icon } : {}) }, { alternate });
   };
   // Escape clears what is typed before it closes the dialog.
   const searchField = useSearchEscape(query, () => setQuery(""));
@@ -175,7 +178,7 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
           return <div key={row.type === "result" ? `${row.hit.ref.pluginId}:${row.hit.ref.id}` : row.label}>
             {group ? <p className="px-2.5 pt-2 pb-1 text-xs font-medium text-muted-foreground">{!query && row.type === "result" ? "Recently changed" : heading.label}</p> : null}
             <div id={`studio-quick-open-${index}`} data-index={index} role="option" aria-selected={index === selected} className={cn("studio-quick-open-row flex cursor-pointer items-center gap-3 rounded-md px-2.5 py-2", index === selected && "bg-state-hover")} onMouseMove={() => setSelected(index)} onClick={(event) => activate(row, alternateFor(event))}>
-              {row.type === "result" ? <><ItemTile icon={null} kindIcon={info?.icon ?? (kind === "thread" ? "MessageSquare" : "File")} size="md" /><div className="min-w-0 flex-1"><div className="flex items-baseline gap-2"><span className="truncate text-sm font-medium">{untitled(row.hit.title)}</span><span className="shrink-0 text-xs text-muted-foreground">{info?.label ?? kind}{row.hit.projectId ? ` · ${projectName(projects, row.hit.projectId)}` : ""}</span></div>{row.hit.snippet.text ? <p className="studio-quick-open-snippet truncate text-xs text-muted-foreground"><Marked text={row.hit.snippet.text} query={query} /></p> : null}</div></> : <><Icon name="CornerDownRight" className="size-4 text-muted-foreground" /><span className="text-sm">{row.label}</span></>}
+              {row.type === "result" ? <><ItemTile icon={null} kindIcon={info?.icon ?? (kind === "thread" ? "MessageSquare" : "File")} size="md" /><div className="min-w-0 flex-1"><div className="flex items-baseline gap-2"><span className="truncate text-sm font-medium">{hitTitle(row.hit)}</span><span className="shrink-0 text-xs text-muted-foreground">{info?.label ?? kind}{row.hit.projectId ? ` · ${projectName(projects, row.hit.projectId)}` : ""}</span></div>{row.hit.snippet.text ? <p className="studio-quick-open-snippet truncate text-xs text-muted-foreground"><Marked text={row.hit.snippet.text} query={query} /></p> : null}</div></> : <><Icon name="CornerDownRight" className="size-4 text-muted-foreground" /><span className="text-sm">{row.label}</span></>}
             </div>
           </div>;
         })}

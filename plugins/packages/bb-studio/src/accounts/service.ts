@@ -87,8 +87,10 @@ export class AccountsService {
     }
     const signedOut = new Set(auth.entries.filter((entry) => entry.source === "provider" && entry.signedOut).map((entry) => entry.id.slice("provider:".length)));
     const connected = accounts.some((account) => account.state === "ready" || account.state === "limited") || providers.some((state) => state.status === "ready" && !!state.loginCommand);
-    accounts.push(...localAccountViews(providers, signedOut, providerFamily, !connected, usage ?? {}));
-    const all = computeWarnings(accounts, now, this.deps.timeZone);
+    const local = localAccountViews(providers, signedOut, providerFamily, usage ?? {});
+    accounts.push(...local);
+    const quiet = new Set(connected ? local.filter((account) => account.state === "signed_out" && !signedOut.has(account.id)).map((account) => account.key) : []);
+    const all = computeWarnings(accounts.filter((account) => !quiet.has(account.key)), now, this.deps.timeZone);
     const settled = new Set(accounts.filter((account) => sources.find((source) => source.source === account.source)?.state === "on" && (usage !== null || account.source !== "local")).map((account) => account.key));
     this.deps.store.keepOnly(new Set(all.map((warning) => warning.id)), settled);
     const dismissed = this.deps.store.list();

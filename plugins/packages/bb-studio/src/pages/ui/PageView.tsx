@@ -18,7 +18,7 @@ import { PageConnection } from "./connection";
 import { HistoryDialog } from "./dialogs";
 import { pagePath, REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
 import { PageEditor } from "./PageEditor";
-import { actorName, PageMenu, relativeTime, ICON_BUTTON, type BotsState, type Project, type Rpc } from "./shared";
+import { actorName, PageMenu, relativeTime, ICON_BUTTON, type BotsState, type Rpc } from "./shared";
 import { pageFieldKey, toggleTalk, useTalk, type TalkView } from "./talk";
 import { usePageTitle } from "./use-page-title";
 import { NoteActions } from "./notes/NoteActions";
@@ -266,7 +266,6 @@ export function PageView({
   page,
   pages,
   bots,
-  projects,
   rpc,
   requestsVersion,
   chatThreadId,
@@ -278,7 +277,6 @@ export function PageView({
   page: PageMetaView;
   pages: PageMetaView[];
   bots: BotsState;
-  projects: Project[];
   rpc: Rpc;
   requestsVersion: number;
   /** Existing page chat links still open their conversation. */
@@ -363,7 +361,6 @@ export function PageView({
           <PageMenu
             page={page}
             rpc={rpc}
-            projects={projects}
             onChanged={() => {}}
             onDeleted={onDeleted}
             triggerClassName={ICON_BUTTON}

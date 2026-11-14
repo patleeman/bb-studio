@@ -206,9 +206,9 @@ it("runs BB's commands, typed addresses and setting toggles where they belong", 
   expect(titles()[0]).toBe("Open bb://page/pg_9");
   await press("Enter");
   expect(state.openLink).toHaveBeenLastCalledWith("bb://page/pg_9", { source: "launcher", modifiers: { meta: false, shift: false } });
-  await type("todos");
-  expect(rows().find((row) => row.textContent?.startsWith("Todos"))?.textContent).toContain("Off");
-  await act(async () => { rows().find((row) => row.textContent?.startsWith("Todos"))!.click(); });
+  await type("todo reminders");
+  expect(rows().find((row) => row.textContent?.startsWith("Todo reminders"))?.textContent).toContain("Off");
+  await act(async () => { rows().find((row) => row.textContent?.startsWith("Todo reminders"))!.click(); });
   expect(state.set).toHaveBeenCalledWith({ loopsEnabled: true });
 });
 

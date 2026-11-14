@@ -101,7 +101,7 @@ it('hardcodes no area names in the Loops UI or the iOS app',async()=>{
  const {existsSync,readFileSync}=await import('node:fs');const paths=['./ui/model.ts','./ui/LoopsTab.tsx','./ui/LoopsPane.tsx','../../../../apps/ios/iOS/Loops/LoopsView.swift','../../../../../ios/iOS/Loops/LoopsView.swift'].map(path=>new URL(path,import.meta.url)).filter(url=>existsSync(url));
  expect(paths.length).toBeGreaterThanOrEqual(3);for(const url of paths)expect(readFileSync(url,'utf8')).not.toMatch(/\bAREAS\b|static let areas|"(Job|Larkspur|Systems)"/);});
 
-it('releases Patrick\'s own Surface now at once, past the morning hold and the budget, and says why when it can\'t',async()=>{
+it('releases the user\'s own Surface now at once, past the morning hold and the budget, and says why when it can\'t',async()=>{
  const handlers:Record<string,(x:any)=>unknown>={};let onChange:(v:Record<string,unknown>)=>void=()=>{};
  const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},
   settings:{define:()=>({get:async()=>({loopsEnabled:true,loopDailyBudget:0}),onChange:(f:typeof onChange)=>{onChange=f;}})},sdk:{threads:{get:async()=>null}}};
@@ -117,7 +117,7 @@ it('releases Patrick\'s own Surface now at once, past the morning hold and the b
  expect((db.prepare("SELECT count(*) n FROM loop_events WHERE type='surfaced'").get() as {n:number}).n).toBe(0);
  const cos=loops.store.add({title:'CoS job',owner:'cos'});await expect(handlers['loops.update']!({id:cos.id,surfaceNow:true})).rejects.toThrow('Only your own todos');
  loops.store.act({id:low.id,action:'done'},()=>({type:'none'}));await expect(handlers['loops.update']!({id:low.id,surfaceNow:true})).rejects.toThrow('already closed');
- onChange({loopsEnabled:false});await expect(handlers['loops.update']!({id:later.id,surfaceNow:true})).rejects.toThrow('Todos are off');
+ onChange({loopsEnabled:false});await expect(handlers['loops.update']!({id:later.id,surfaceNow:true})).rejects.toThrow('Todo reminders are off');
  // The Bot's own surfaceNow keeps the policy: queued, trigger none, held for the morning.
  const botLow=loops.store.add({title:'Bot low',priority:'low',trigger:{type:'time',at:Date.now()+3600000}});const tool=(bb.agents.registerTool as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0]).find((t:{name:string})=>t.name==='loops_update');
  expect(JSON.parse(await tool.execute({id:botLow.id,surfaceNow:true}))).toMatchObject({status:'queued',trigger:{type:'none'}});});
@@ -153,4 +153,21 @@ it('registers every tool as todos_x and keeps loops_x as its alias, with the sam
  const l=loops.store.add({title:'Pay the tax',status:'surfaced'});
  const ids=async(name:string)=>JSON.parse(await named(name).execute({})).needsYouNow.map((x:{id:string})=>x.id);
  expect(await ids('todos_list')).toEqual([l.id]);expect(await ids('loops_list')).toEqual([l.id]);
+});
+it("decides due, quiet hours, snoozes and the morning card in Todos' time zone",()=>{
+ const l=store.add({title:'Call the dentist',due:Date.parse('2026-11-03T05:00:00Z')});
+ const zoned=(timeZone:string)=>new LoopScheduler(store,()=>({...defaults,timeZone}),post,notify);
+ expect(zoned('America/Los_Angeles').morning()).toMatchObject({date:'2026-11-02',items:[expect.objectContaining({id:l.id})]});
+ expect(zoned('America/New_York').morning().items.map(i=>i.id)).not.toContain(l.id);
+ expect(zoned('America/Los_Angeles').quiet()).toBe(false);
+ expect(zoned('Asia/Tokyo').quiet()).toBe(true);
+ expect(snooze('tomorrow_morning',{...defaults,timeZone:'America/Los_Angeles'})).toEqual({type:'time',at:Date.parse('2026-11-03T16:00:00Z')});
+});
+it('follows a changed time zone setting on the next settings change',async()=>{
+ const handlers:Record<string,(x:any)=>unknown>={};let onChange:(v:Record<string,unknown>)=>void=()=>{};let zone='America/New_York';
+ const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},sdk:{threads:{get:async()=>null}}};
+ registerLoops(bb as never,db,post,notify,{get:async()=>({loopsEnabled:true}),onChange:(f)=>{onChange=f;}},()=>zone);await vi.advanceTimersByTimeAsync(0);
+ expect((handlers['loops.morning']!({}) as {date:string}).date).toBe('2026-11-02');
+ zone='Asia/Tokyo';onChange({loopsEnabled:true,todosTimeZone:zone});
+ expect((handlers['loops.morning']!({}) as {date:string}).date).toBe('2026-11-03');
 });

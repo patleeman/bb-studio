@@ -74,7 +74,7 @@ it("classifies a thread by the first rule that fits", () => {
   expect(classifyThread({ id: "thr_run" }, s, none)).toMatchObject({ botId: "bot_scout", kind: "worker", ownerConversationId: "thr_scout" });
   expect(classifyThread({ id: "a1", originPluginId: "automations" }, s, none)).toMatchObject({ kind: "worker", ownerConversationId: "thr_main" });
   expect(classifyThread({ id: "h1", visibility: "hidden" }, s, none)).toMatchObject({ kind: "worker" });
-  // A thread Patrick starts: a conversation of the current Bot, else the primary.
+  // A thread the user starts: a conversation of the current Bot, else the primary.
   expect(classifyThread({ id: "r1" }, s, none)).toMatchObject({ botId: "bot_dot", kind: "conversation", forkedFrom: null, authoritative: false });
   expect(classifyThread({ id: "r2" }, signals({ focusedBotId: "bot_scout" }), none)).toMatchObject({ botId: "bot_scout", kind: "conversation" });
   expect(classifyThread({ id: "r3" }, signals({ bots: [] }), none)).toBeNull();
@@ -126,7 +126,7 @@ it("keeps the newest standalone threads in the sidebar and archives older ones a
   expect(store.get(`t${ADOPT_RECENT + 4}`)!.archivedAt).toBeNull();
 });
 
-it("classifies new threads as they are made: Patrick's go to the current Bot, spawned ones to the conversation that spawned them", async () => {
+it("classifies new threads as they are made: the user's go to the current Bot, spawned ones to the conversation that spawned them", async () => {
   const { store, byId } = setup([{ id: "thr_main" }, { id: "thr_scout" }]);
   await store.backfill();
   store.setFocus("bot_scout");
@@ -151,7 +151,7 @@ it("classifies new threads as they are made: Patrick's go to the current Bot, sp
   expect(store.forkedAt("fork2", { sourceThreadId: "new_conv", turnId: "turn_4" })).toBe(false);
 });
 
-it("reconciles authoritative facts over a guess, follows a handoff, and leaves Patrick's own changes alone", async () => {
+it("reconciles authoritative facts over a guess, follows a handoff, and leaves the user's own changes alone", async () => {
   let runner: string | null = null;
   let bots: Signals["bots"] = [{ id: "bot_dot", threadId: "thr_main", chain: ["thr_main"] }];
   const { store, db } = setup([{ id: "thr_main" }, { id: "late_runner" }, { id: "kept" }]);
@@ -169,14 +169,14 @@ it("reconciles authoritative facts over a guess, follows a handoff, and leaves P
   expect(live.get("thr_new")).toMatchObject({ isMain: true, archivedAt: null });
   expect(live.get("thr_main")).toMatchObject({ isMain: false, kind: "conversation" });
   expect(live.get("thr_main")!.archivedAt).not.toBeNull();
-  // Patrick's own row stays his.
+  // The user's own row stays theirs.
   db.prepare("UPDATE bot_threads SET source = 'user' WHERE thread_id = 'kept'").run();
   runner = "kept";
   live.reconcile();
   expect(live.get("kept")).toMatchObject({ kind: "conversation" });
 });
 
-it("marks a conversation as needing Patrick and clears it when the worker's wait is over or he archives it", async () => {
+it("marks a conversation as needing the user and clears it when the worker's wait is over or they archive it", async () => {
   const { store } = setup([{ id: "thr_main" }, { id: "conv" }, { id: "w", parentThreadId: "conv" }]);
   await store.backfill();
   expect(store.conversationFor("w")).toBe("conv");
@@ -210,7 +210,7 @@ it("keeps a conversation's latest reply, skips quiet ones, and hands a deleted c
   expect(store.get("w")!.ownerConversationId).toBe("thr_main");
 });
 
-it("lets Patrick rename and archive a conversation, but not archive Main", async () => {
+it("lets the user rename and archive a conversation, but not archive Main", async () => {
   const { store } = setup([{ id: "thr_main" }, { id: "conv" }]);
   await store.backfill();
   expect(store.update("conv", { title: "  Launch prep " }).title).toBe("Launch prep");
@@ -259,7 +259,7 @@ it("draws the sidebar: Main first, conversations by activity, the needs-you reas
   expect(view.workers.map((each) => [each.threadId, each.status])).toEqual([["w1", "running"], ["w3", "done"], ["w2", "failed"]]);
   expect(view.workers[0]).toMatchObject({ tag: "bb-studio-native", branch: "exp/studio-native", ownerTitle: "Fork redesign" });
   expect(view.hiddenWorkers).toBe(1);
-  // The amber space dot: a conversation of that Bot needs Patrick.
+  // The amber space dot: a conversation of that Bot needs the user.
   expect(botNeedsYou("bot_dot", records, threads)).toBe(true);
   expect(botNeedsYou("bot_scout", records, threads)).toBe(false);
 });
@@ -273,7 +273,7 @@ it("shortens a reply to its first line and reads a repo tag only off a git check
   expect(repoTag({ environmentName: "larkspur", environmentBranchName: "main" })).toEqual({ tag: "larkspur", branch: "main" });
 });
 
-it("tells an agent's fork from Patrick's by its spawner, its visibility, its source and the source's turn", () => {
+it("tells an agent's fork from the user's by its spawner, its visibility, its source and the source's turn", () => {
   expect(agentFork({ visibility: "visible" }, { kind: "conversation" })).toBe(false);
   expect(agentFork({ parentThreadId: "p" }, null)).toBe(true);
   expect(agentFork({ visibility: "hidden" }, { kind: "conversation" })).toBe(true);
@@ -283,7 +283,7 @@ it("tells an agent's fork from Patrick's by its spawner, its visibility, its sou
   expect(agentFork({ sourceBusy: false, sourceIsWorker: false }, null)).toBe(false);
 });
 
-it("records a new fork made while its source was mid-turn as a worker, and Patrick's forks as conversations", async () => {
+it("records a new fork made while its source was mid-turn as a worker, and the user's forks as conversations", async () => {
   const { store, byId } = setup([{ id: "thr_main" }, { id: "conv", createdAt: 5 }]);
   await store.backfill();
   byId.set("conv", { id: "conv", status: "active" });
@@ -296,7 +296,7 @@ it("records a new fork made while its source was mid-turn as a worker, and Patri
   expect(store.get("idle_fork")).toMatchObject({ kind: "conversation", forkedFrom: { threadId: "conv" } });
 });
 
-it("moves forks agents made, recorded as conversations before, to workers once; Patrick's own stay", async () => {
+it("moves forks agents made, recorded as conversations before, to workers once; the user's own stay", async () => {
   const { store, db } = setup([{ id: "thr_main" }, { id: "conv", createdAt: 5 }]);
   await store.backfill();
   const insert = db.prepare("INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, forked_from_thread_id, owner_conversation_id, source, created_at, updated_at) VALUES (?, 'bot_dot', 'conversation', 0, 'conv', NULL, ?, 1, 1)");
@@ -449,7 +449,7 @@ it("decides the same fork without the hidden flag: from its source chain, else f
   expect(await turn.store.midTurn("thr_demo000023", 1787608961000)).toBe(false);
   await turn.store.backfill();
   expect(turn.store.get("thr_demo000018")).toMatchObject({ kind: "worker" });
-  // Made after the source's turn completed, from a plain thread: Patrick's fork, a conversation.
+  // Made after the source's turn completed, from a plain thread: the user's fork, a conversation.
   const mine = larkspur({ thr_demo000018: { visibility: "visible", createdAt: 1787609600000 }, thr_demo000023: { visibility: "visible", originKind: null, sourceThreadId: null } });
   await mine.store.backfill();
   expect(mine.store.get("thr_demo000018")).toMatchObject({ kind: "conversation", forkedFrom: { threadId: "thr_demo000023" } });

@@ -134,7 +134,7 @@ it("on a BB that can't replace the composer, draws the box as a banner that hide
   expect(host.innerHTML).toBe("");
 });
 
-it("shows a conversation's active workers as chips, the one that needs Patrick first, and folds the done ones into one chip", async () => {
+it("shows a conversation's active workers as chips, the one that needs the user first, and folds the done ones into one chip", async () => {
   state.threadId = "conv";
   await act(async () => { root.render(<ConversationWorkersLine />); });
   expect($('[data-testid="conversation-workers"]')?.textContent).not.toContain("from here");
@@ -176,7 +176,7 @@ it("shows only the done chip when nothing is active, and nothing without workers
   expect(host.innerHTML).toBe("");
 });
 
-it("lets Patrick answer a waiting worker's own question himself: its composer comes back in this window", async () => {
+it("lets the user answer a waiting worker's own question themselves: its composer comes back in this window", async () => {
   state.infos = { ...state.infos, w9: { ...worker, threadId: "w9", status: "needs-you", waitingOn: "question" } };
   function Probe() { return <><output>{String(useReadOnly("w9"))}</output><ReadOnlyComposer threadId="w9" /></>; }
   await act(async () => { root.render(<Probe />); });

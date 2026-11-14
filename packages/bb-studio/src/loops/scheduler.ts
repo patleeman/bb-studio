@@ -23,7 +23,7 @@ export class LoopScheduler {
  /** Whether `now` falls in quiet hours (they hold pushes, never cards). */
  quiet(now=Date.now()){const s=this.settings(),h=local(now,s.timeZone).hour;return s.quietStart>s.quietEnd?h>=s.quietStart||h<s.quietEnd:h>=s.quietStart&&h<s.quietEnd;}
  /**
-  * Patrick's due todos in release order, each released now or held: by the
+  * The user's due todos in release order, each released now or held: by the
   * daily budget (cards released today in the configured zone), or, low
   * priority, for the morning card. Urgent bypasses the budget. Quiet hours
   * don't hold cards: a card in the chat at night counts toward the budget,
@@ -34,16 +34,16 @@ export class LoopScheduler {
  return this.store.all().filter(l=>l.owner==='patrick'&&waitsForTrigger(l)&&isDue(l,now)).sort((a,b)=>RANK[a.priority]-RANK[b.priority]).map(loop=>{
   const held:Hold|null=loop.priority==='urgent'?null:loop.priority==='low'?'morning':count>=s.dailyBudget?'budget':null;
   if(!held)count++;return {loop,held};});}
- /** Why each due todo of Patrick's waits (loops.list `held`). */
+ /** Why each due todo of the user's waits (loops.list `held`). */
  held(now=Date.now()){return this.plan(now).flatMap(({loop,held})=>held?[{id:loop.id,reason:held}]:[]);}
  /**
-  * Patrick pressed Surface now: post the card right away, skipping the
-  * low-priority morning hold and the daily budget (his own ask, so it
+  * The user pressed Surface now: post the card right away, skipping the
+  * low-priority morning hold and the daily budget (their own ask, so it
   * isn't an interruption and doesn't count toward the budget). Throws why
   * when it can't, so the button never silently does nothing.
   */
  async surfaceNow(id:string){const l=this.store.get(id);
- if(!this.settings().enabled)throw Error('Todos are off. Turn them on in Studio settings to surface todos.');
+ if(!this.settings().enabled)throw Error('Todo reminders are off. Turn them on in Bot settings ▸ Attention.');
  if(l.closedAt)throw Error('This todo is already closed.');
  if(l.owner!=='patrick')throw Error('Only your own todos can be surfaced. Take it back first.');
  if(l.status!=='surfaced')await this.post(`Please post this card in your chat exactly once: ::loop{id="${l.id}"}`);

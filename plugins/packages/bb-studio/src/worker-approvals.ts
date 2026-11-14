@@ -1,4 +1,4 @@
-// A worker waiting on Patrick's approval (a command, a file change, a tool
+// A worker waiting on the user's approval (a command, a file change, a tool
 // or a permission it asked for) doesn't bring the worker's composer back.
 // The approval goes to the conversation that owns the worker (Main when it
 // has none), as an Approve / Deny card:
@@ -10,7 +10,7 @@
 // `bot_worker_approval_resolve`, which calls BB's own per-thread resolution
 // (sdk.threads.interactions.resolve, what the composer's approval stack
 // uses) with the resolution BB would build. The owning conversation shows as
-// needing Patrick ("Approve: <short command>") until the approval is
+// needing the user ("Approve: <short command>") until the approval is
 // resolved, from the card or anywhere else (src/bot-nudge.ts raises it;
 // src/bot-threads-server.ts clears it).
 //

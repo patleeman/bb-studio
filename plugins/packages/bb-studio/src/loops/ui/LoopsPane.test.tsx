@@ -29,7 +29,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   useSdk: () => sdk,
   experimental_useTabWindow: () => state.tabWindow,
 }));
-vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: "America/New_York", isLoading: false, error: null, set: async () => {}, ...(({ values: { loopsEnabled: state.enabled } })) }), readStudioSettingsNow: () => ({}) }));
+vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, isLoading: false, error: null, set: async () => {}, ...(({ values: { loopsEnabled: state.enabled } })) }), readStudioSettingsNow: () => ({}) }));
 const sdk = { projects: { list: async () => [{ id: "proj_k", name: "Larkspur" }] }, threads: { interactions: { list: async () => state.interactions } } };
 vi.mock("../../ui/live", () => ({
   useCall: () => state.call,
@@ -109,7 +109,7 @@ it("puts each row's actions in its ⋯ menu", async () => {
   expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_d", action: "choose", option: "Hudson — $21k" });
   await click(row("Call the plumber"), "Remind me now");
   expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_c", surfaceNow: true });
-  // Not Patrick's: no Remind me now.
+  // Not the user's: no Remind me now.
   expect(actions("Book the car service")).toEqual(["Discuss", "Change when…"]);
   await click(row("Draft the Larkspur"), "Take it back");
   expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_a", changes: { owner: "patrick", status: "surfaced" } });
@@ -180,14 +180,14 @@ it("in a window of its own, leaves the title to the window's bar: the count and 
   state.tabWindow = null;
 });
 
-it("opens the full page from its header, and says when Todos are off", async () => {
+it("opens the full page from its header, and lists todos while Todo reminders are off", async () => {
   await render();
   await act(async () => (container.querySelector("[aria-label='Open the full Todos page']") as HTMLButtonElement).click());
   expect(state.open).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_1/loops");
   state.enabled = false;
   await render();
-  expect(container.textContent).toContain("Todos are off");
-  expect(container.querySelector("section")).toBeNull();
+  expect(container.textContent).not.toContain("are off");
+  expect(container.querySelector("section")).not.toBeNull();
 });
 
 it("opens the pane when the sidebar asks the Bot chat, now or once the chat opens, once, and reports whether it opened", async () => {
@@ -219,7 +219,7 @@ it("closes a do or read todo in one click on its circle, done in place with Undo
   (state.groups as typeof empty).needsYouNow.push(loop("loop_r", "Your vendor demo moved to Thu", { kind: "read" }));
   await render();
   const circle = (title: string) => row(title).querySelector("[role=checkbox]") as HTMLButtonElement | null;
-  // Do and read rows (and Patrick's own coming-up do), not decisions, waits, agents or the Bot's.
+  // Do and read rows (and the user's own coming-up do), not decisions, waits, agents or the Bot's.
   expect(circle("Reply to Sam")!.getAttribute("aria-label")).toBe("Mark done: Reply to Sam about the Q3 planning doc");
   expect(circle("Reply to Sam")!.title).toBe("Mark done");
   expect(circle("Call the plumber")).not.toBeNull();

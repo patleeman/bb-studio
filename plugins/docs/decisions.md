@@ -118,7 +118,7 @@ card starts a fresh decision for the new text.
 
 ## Settings
 
-Open **Settings → Plugins → Studio**. The keys are BB secret fields at the top (`bb plugin config studio`); the rest are in Studio's Threads, Jev and Advanced sections (`bb studio settings`).
+Open **Settings → Plugins → Studio**. The keys are in the **API keys** section at the bottom of the page, and each falls back to its environment variable; the rest are in Studio's Threads, Smart Queue model and Advanced sections (`bb studio settings`).
 
 | Setting | Default | Purpose |
 | --- | --- | --- |

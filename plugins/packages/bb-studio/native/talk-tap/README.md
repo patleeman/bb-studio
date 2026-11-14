@@ -80,7 +80,7 @@ Details:
 ## Live capture
 
 This path is built and unit-tested, but it has never run on the development
-Mac. The first real tap shows a macOS prompt, so Patrick runs it when he
+Mac. The first real tap shows a macOS prompt, so the user runs it when they
 first uses the feature.
 
 - **Them (process tap):**

@@ -36,7 +36,6 @@ import {
 import type { Recording, Segment, TalkRpcContract } from "../shared/contract";
 import {
   HTTP_ROOT,
-  PLUGIN_ID,
   RECORDING_CHANGED,
   formatClock,
   formatLength,
@@ -50,7 +49,6 @@ import { talk, useTalkState } from "./controller";
 import { sameKey, type SetAsideSegment } from "./outbox";
 import { RecordingPlayer, type PlaybackState } from "./playback";
 import { UnsentNotice } from "./unsent-notice";
-import { useRecordingProvider } from "./provider";
 import { openCollection } from "../../ui/StudioPanel";
 import { unsentAudioState } from "./unsent-state";
 import { CallTranscript, useCallLive } from "./call-ui";
@@ -286,17 +284,6 @@ function NotesRow({ recording, notes }: { recording: Recording; notes: ReturnTyp
 /** `onBack` replaces going to Studio's collection, as in a thread's Studio tab. */
 export function RecordingDetail({ id, onBack }: { id: string; onBack?: () => void }) {
   const { rpc, data, error, refetch } = useRecording(id);
-  const provider = useRecordingProvider();
-  const move = async (target: string | null) => {
-    try {
-      const { failed } = await provider("studio_move", { ids: [id], projectId: target });
-      if (failed.length) throw new Error(failed[0]!.error);
-      toast.success("Moved");
-      refetch();
-    } catch (cause) {
-      toast.error(`Couldn't move: ${errorMessage(cause)}`);
-    }
-  };
   const navigate = useBbNavigate();
   const state = useTalkState();
   const segments = data?.segments ?? [];
@@ -409,7 +396,7 @@ export function RecordingDetail({ id, onBack }: { id: string; onBack?: () => voi
             <button type="button" aria-label="Copy transcript" title="Copy transcript" className={ICON_BUTTON} disabled={transcript === ""} onClick={copy}>
               <Icon name="Copy" className="size-4" />
             </button>
-            <ItemMenu reference={{ title: recording.title, href: recordingHref(recording.id) }} item={{ pluginId: PLUGIN_ID, id: recording.id }} projectId={recording.projectId} onMove={(target) => void move(target)} onDelete={() => setConfirmDelete(true)} deleteDisabled={activeHere || recording.status === "recording"}>
+            <ItemMenu reference={{ title: recording.title, href: recordingHref(recording.id) }} onDelete={() => setConfirmDelete(true)} deleteDisabled={activeHere || recording.status === "recording"}>
 
                 <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, { title: recording.title, href: recordingHref(recording.id) })}>
                   <Icon name="MessageSquarePlus" className="size-4" /> New thread

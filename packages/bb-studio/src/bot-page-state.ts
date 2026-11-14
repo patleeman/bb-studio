@@ -1,13 +1,13 @@
 // What the Bot page remembers beyond the Bot's jobs (src/ui/bot/BotPage.tsx):
 //
 // - Calendar group names. Runs that start within 15 minutes of each other
-//   form one block, named from its time ("5 AM checks") until Patrick or the
+//   form one block, named from its time ("5 AM checks") until the user or the
 //   Bot renames it ("Area sweep"). A name is saved under the group's key
 //   (src/calendar-group-key.ts): its window's clock times and its jobs, so it
 //   holds on every day the group runs and lapses when the group changes.
 //   The Bot renames one with bot_calendar_group_rename.
 // - Dismissed failures. A failed run sits in Needs you until a later run of
-//   the job succeeds or Patrick dismisses it; a dismissal is that one run.
+//   the job succeeds or the user dismisses it; a dismissal is that one run.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";

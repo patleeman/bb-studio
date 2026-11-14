@@ -45,8 +45,8 @@ describe("plugin setting keys", () => {
     const files = [...sources(join(root, "src")), join(root, "server.ts")];
     const keys = files.flatMap((path) => definedKeys(path).map((key) => ({ path: path.slice(root.length + 1), key })));
     expect(keys.filter(({ key }) => !VALID.test(key))).toEqual([]);
-    // Studio declares its API keys and, on the migrating load, the old fields;
-    // Studio's own settings keep the same names.
+    // Studio declares the old fields on the migrating load; its API keys and
+    // its own settings keep the same names.
     const declared = [...Object.keys(STUDIO_KEY_SETTINGS), ...Object.keys(LEGACY_SETTINGS), ...Object.keys(STUDIO_SETTINGS)];
     expect(declared).toContain("loopsEnabled");
     expect(declared.filter((key) => !VALID.test(key))).toEqual([]);

@@ -160,11 +160,12 @@ export function localUsageWindows(usage: LocalUsage): Record<string, QuotaWindow
   return out;
 }
 
-export function localAccountViews(states: readonly ProviderState[], signedOut: ReadonlySet<string>, family: (providerId: string) => string, offerSignIn = false, usage: Readonly<Record<string, QuotaWindow[]>> = {}): AccountView[] {
-  const offered = (state: ProviderState) => offerSignIn && !!state.loginCommand && SIGN_IN_STATES.has(state.status);
-  return states.filter((state) => state.status === "ready" || signedOut.has(state.providerId) || offered(state)).map((state) => {
+export const canSignIn = (state: Pick<ProviderState, "status" | "loginCommand">) => !!state.loginCommand && SIGN_IN_STATES.has(state.status);
+
+export function localAccountViews(states: readonly ProviderState[], signedOut: ReadonlySet<string>, family: (providerId: string) => string, usage: Readonly<Record<string, QuotaWindow[]>> = {}): AccountView[] {
+  return states.filter((state) => state.status === "ready" || signedOut.has(state.providerId) || canSignIn(state)).map((state) => {
     const proxied = state.status === "ready" && state.planLabel === "Proxied";
-    const out = signedOut.has(state.providerId) || offered(state);
+    const out = signedOut.has(state.providerId) || canSignIn(state);
     return {
       key: `local:${state.providerId}`,
       id: state.providerId,

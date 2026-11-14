@@ -16,11 +16,9 @@ export type QuoteDraft = z.infer<typeof savedQuote>;
 
 const refSegment = (item: ItemRef) => encodeURIComponent(JSON.stringify({ pluginId: item.pluginId, id: item.id }));
 export const itemDraftPath = (item: ItemRef) => `${ROOT}/item/${refSegment(item)}`;
-/** Picking the thread an item's chat and quotes go to. */
-export const chooseThreadPath = (item: ItemRef) => `${ROOT}/choose/${refSegment(item)}`;
 export const quoteDraftPath = (id: string) => `${ROOT}/quote/${id}`;
 
-export type DraftRoute = { kind: "plain" } | { kind: "item" | "choose"; item: ItemRef } | { kind: "quote"; id: string };
+export type DraftRoute = { kind: "plain" } | { kind: "item"; item: ItemRef } | { kind: "quote"; id: string };
 
 export function draftRoute(subPath: string | undefined): DraftRoute | null {
   if (!subPath) return { kind: "plain" };
@@ -28,13 +26,12 @@ export function draftRoute(subPath: string | undefined): DraftRoute | null {
     const id = z.uuid().safeParse(subPath.slice(6));
     return id.success ? { kind: "quote", id: id.data } : null;
   }
-  const kind = subPath.startsWith("item/") ? "item" : subPath.startsWith("choose/") ? "choose" : null;
-  if (!kind) return null;
-  const raw = subPath.slice(kind.length + 1);
+  if (!subPath.startsWith("item/")) return null;
+  const raw = subPath.slice("item/".length);
   for (const decode of [false, true]) {
     try {
       const item = ref.safeParse(JSON.parse(decode ? decodeURIComponent(raw) : raw));
-      if (item.success) return { kind, item: item.data };
+      if (item.success) return { kind: "item", item: item.data };
     } catch {}
   }
   return null;

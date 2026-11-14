@@ -29,7 +29,7 @@ const recordSchema = z.object({
 });
 
 const itemSchema = z.object({
-  id: z.string().refine(isMiniId, "Not a mini app id."),
+  id: z.string().refine(isMiniId, "Not an app id."),
   projectId: z.string().min(1).max(200).nullable(),
   name: z.string().max(10_000),
   icon: z.string().max(100).nullable(),
@@ -85,14 +85,14 @@ export function createMiniBackup(deps: { db: Database.Database; store: MiniStore
           let item: BackupItem;
           try {
             const parsed = itemSchema.safeParse(readJson(reader, `items/${name}`));
-            if (!parsed.success) throw new Error(`Not a valid mini app: ${parsed.error.issues.slice(0, 3).map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`);
+            if (!parsed.success) throw new Error(`Not a valid app: ${parsed.error.issues.slice(0, 3).map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`);
             item = parsed.data;
-            if (!fileSafeIdMatches(item.id, name.slice(0, -5))) throw new Error("The file name doesn't match the mini app id.");
+            if (!fileSafeIdMatches(item.id, name.slice(0, -5))) throw new Error("The file name doesn't match the app id.");
           } catch (error) {
             tally.record("failed", { id: name.replace(/\.json$/, ""), title: null }, error instanceof Error ? error.message : String(error));
             continue;
           }
-          const ref = { id: item.id, title: item.name || "Untitled mini app" };
+          const ref = { id: item.id, title: item.name || "Untitled app" };
           let compiled;
           try {
             compiled = Object.keys(item.files).length ? compile(item.files) : null;

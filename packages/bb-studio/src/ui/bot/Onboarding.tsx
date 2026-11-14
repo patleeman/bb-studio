@@ -20,7 +20,7 @@ export const IDEAS: { label: string; text: string }[] = [
   { label: "Watch my projects", text: "Keep an eye on my projects and tell me what needs me." },
   { label: "Morning brief", text: "Give me a short brief every weekday morning: what changed, what's stuck, what needs me." },
   { label: "Plan my week", text: "Help me plan my week and keep me on track." },
-  { label: "Triage threads", text: "Watch my threads, nudge the stuck ones and tell me which need an answer." },
+  { label: "Track my todos", text: "Keep my todos, remind me when they're due and check in on the ones that slip." },
 ];
 
 export interface WelcomeLook { shape: string | null; color: string | null; emoji: string }

@@ -73,7 +73,7 @@ Both relay tools require an `intent`:
 
 - `answer`: questions and requests such as “run through”, “walk me through”,
   “what's the status”, or “tell me about”. The message preserves the request:
-  “Patrick asks you to run through the changes you're working on.” The target
+  “The user asks you to run through the changes you're working on.” The target
   is told to answer fully in plain speakable sentences, leading with the answer.
 - `do`: a task to carry out.
 - `fyi`: information to pass on.

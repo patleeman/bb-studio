@@ -5,13 +5,14 @@ const SOURCE_NAMES = { studio: "BB Studio", bb: "bb", local: "This Mac" } as con
 
 export const sourceName = (source: AccountView["source"]) => SOURCE_NAMES[source];
 
-export function resetText(resetAt: number | null, now: number, timeZone?: string): string | null {
+export function resetText(resetAt: number | null, now: number, timeZone?: string, locale?: string): string | null {
   if (resetAt === null) return null;
   const at = new Date(resetAt);
-  const sameDay = new Date(now).toDateString() === at.toDateString();
-  const time = at.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, ...(timeZone ? { timeZone } : {}) });
-  if (sameDay) return `resets ${time}`;
-  const day = at.toLocaleDateString("en-US", { month: "short", day: "numeric", ...(timeZone ? { timeZone } : {}) });
+  const zone = timeZone ? { timeZone } : {};
+  const dayOf = (time: number) => new Date(time).toLocaleDateString("en-CA", zone);
+  const time = at.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit", ...zone });
+  if (dayOf(now) === dayOf(resetAt)) return `resets ${time}`;
+  const day = at.toLocaleDateString(locale, { month: "short", day: "numeric", ...zone });
   return `resets ${day}, ${time}`;
 }
 

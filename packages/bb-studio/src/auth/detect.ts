@@ -3,7 +3,7 @@ import type { AuthEntry, PoolAccount, ProviderState } from "./contract";
 const TURN_AUTH_ERROR = /failed to authenticate|oauth (?:session|token) (?:has )?expired|could not be refreshed|refresh[_ ]token|not logged in|please (?:run )?\/?login|sign(?:ed)? ?in again|invalid (?:api key|authentication|bearer token)|authentication_error|unauthori[sz]ed/i;
 const PROVIDER_NAMES: Record<string, string> = { claude: "Claude", codex: "Codex" };
 const ALIASES: Record<string, string> = { claude: "claude", "claude-code": "claude", codex: "codex" };
-const DISPLAY_NAMES: Record<string, string> = { "acp-opencode": "OpenCode" };
+const DISPLAY_NAMES: Record<string, string> = { "acp-opencode": "OpenCode", "acp-omp": "Oh My Pi" };
 
 export const poolEntryId = (accountId: string) => `pool:${accountId}`;
 export const providerEntryId = (providerId: string) => `provider:${providerId}`;

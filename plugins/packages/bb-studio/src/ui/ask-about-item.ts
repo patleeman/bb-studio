@@ -1,8 +1,8 @@
 // "Ask the Bot about this" in a file's header (UX review 3, item 6). One
 // Bot, many conversations: a file isn't a new thread's topic, it is
-// something to ask the Bot about where Patrick already is. The file goes to
+// something to ask the Bot about where the user already is. The file goes to
 // the current conversation, mentioned in its composer (BB's mention pill),
-// and Patrick writes the question:
+// and the user writes the question:
 // - in a conversation's workbench: that conversation;
 // - anywhere else (the Library, a file in the main view): the Bot's
 //   last-open conversation, else its Main, which opens.

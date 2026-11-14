@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildSeed, gatherSeed, memoryEssentials, RECENT_MESSAGES, SEED_BUDGET, SEED_CHAR_CAP, type SeedSources } from "./identity";
 
-const MEMORY = "## Check-in\n- Look at the inbox\n- Chase the Larkspur lead\n\n## Memory\n- Patrick drives to **Larkspur** on Tuesdays.\n- The eBay fetcher runs nightly.";
+const MEMORY = "## Check-in\n- Look at the inbox\n- Chase the Larkspur lead\n\n## Memory\n- Sam drives to **Larkspur** on Tuesdays.\n- The eBay fetcher runs nightly.";
 
 function sources(overrides: Partial<SeedSources> = {}): SeedSources {
   return {
@@ -31,7 +31,7 @@ describe("the identity seed", () => {
       expect(seed.missing).toEqual([]);
       expect(seed.text).toContain("You are Dot, the user's Chief of Staff.");
       expect(seed.text).toContain("Role: Keeps the week on track.");
-      expect(seed.text).toContain("Patrick drives to Larkspur on Tuesdays.");
+      expect(seed.text).toContain("Sam drives to Larkspur on Tuesdays.");
       // The Memory page's essentials, not its check-in list.
       expect(seed.text).not.toContain("Chase the Larkspur lead");
       expect(seed.text).toContain("Needs you now:\n- Reply to Dana\n- Sign off the Lisbon budget\nComing up:\n- Renew the domain");

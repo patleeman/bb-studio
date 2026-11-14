@@ -9,7 +9,7 @@ import { contrastChecks } from "./checks";
 import { MIAMI } from "./builtin/miami";
 import { SCENE_THEMES } from "./registry";
 import { chosenAlpha, contrastReport, haloCoverage, HALO, HALO_LAYERS, mixLooks, openAreaMeasure, resolveLook, surfaceBackgrounds, backdropRange, TEXT_MIN, UI_MIN } from "./look";
-import { STUDIO_CARD, STUDIO_CARD_CSS, HEADER_CSS, CHROME_CSS, GUTTER_CSS, TABLE_CSS, BACKING_SELECTORS, PAGE_ROOTS, HALO_SELECTORS, lookTokens, PILL_SELECTOR, SCROLLER_SELECTORS, WORKBENCH, WORKBENCH_BODY, WORKBENCH_STRIP, SHADOW_CLIP_SELECTORS, THEME_CSS, HEADER_ROW, LIST_PAGE, RULES, RULE_CLASSES, TITLE_BOX, PAGE_BAR_BOX, PROMPT_CARDS, PROMPT_CARD_LINES, TOAST_CARD, GLASS_CHIPS, CLASSIC_FOOTER, STUDIO_RULE, GLASS_DIFF_CARD, diffBody } from "./tokens";
+import { STUDIO_CARD, STUDIO_CARD_CSS, HEADER_CSS, CHROME_CSS, GUTTER_CSS, TABLE_CSS, BACKING_SELECTORS, PAGE_ROOTS, HALO_SELECTORS, lookTokens, PILL_SELECTOR, SCROLLER_SELECTORS, WORKBENCH, WORKBENCH_BODY, WORKBENCH_STRIP, SHADOW_CLIP_SELECTORS, THEME_CSS, HEADER_ROW, LIST_PAGE, RULES, RULE_CLASSES, TITLE_BOX, PAGE_BAR_BOX, PROMPT_CARDS, PROMPT_CARD_LINES, TOAST_CARD, GLASS_CHIPS, CLASSIC_FOOTER, STUDIO_RULE, GLASS_DIFF_CARD, GLASS_EDGE, GLASS_COMPOSER, diffBody } from "./tokens";
 import { themeModes } from "./schema";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -175,7 +175,7 @@ describe("the tokens", () => {
     expect(tokens["--font-sans"]).toBe(GRID.type.body);
   });
 
-  it("leave the transcript to the host's column card with no backing of their own, keep a thread banner inside that column, give a full card only to a plugin page that has no column card of its own, make filter pills light glass with the selected one denser, card the composer's replacement, draw no 1px line on them or on the replacement's buttons, and leave side-panel threads alone", () => {
+  it("leave the transcript to the host's column card with no backing of their own, keep a thread banner inside that column, give a full card only to a plugin page that has no column card of its own, make filter pills light glass with the selected one denser, card the composer's replacement, draw only the glass hairline on the composer and its replacement and no line on the replacement's buttons, and leave side-panel threads alone", () => {
     const tokens = lookTokens(resolveLook(GRID, defaults(GRID), "dark"));
     expect(tokens["--studio-glass-main"]).toBe("color-mix(in oklab, var(--canvas) 3%, transparent)");
     expect(tokens["--studio-blur-main"]).toBe("0px");
@@ -210,9 +210,11 @@ describe("the tokens", () => {
     expect(rule).toContain("border-radius: var(--studio-card-radius);");
     expect(rule).toContain("border: 0;");
     expect(rule).toContain("box-shadow: var(--fork-cards-shadow, none);");
-    expect(THEME_CSS.split(`${BACKING_SELECTORS.composerReplace} {`)[1]!.split("}")[0]).toContain("background: var(--studio-glass-composer); ");
+    const replacement = THEME_CSS.split(`${BACKING_SELECTORS.composerReplace} {`)[1]!.split("}")[0]!;
+    expect(replacement).toContain("background: var(--studio-glass-composer); ");
+    expect(replacement.indexOf(`border: 1px solid ${GLASS_EDGE};`)).toBeGreaterThan(replacement.indexOf("border: 0;"));
     expect(THEME_CSS).not.toMatch(/-edge|-rim/);
-    for (const line of THEME_CSS.split("\n")) if (!line.includes("needs-you") && !line.includes("table :is(th, td)")) expect(line).not.toMatch(/border(-(top|right|bottom|left|color|width|style))*:(?! (0|transparent);)/);
+    for (const line of THEME_CSS.split("\n")) if (!line.includes("needs-you") && !line.includes("table :is(th, td)")) expect(line.replaceAll(`border: 1px solid ${GLASS_EDGE};`, "").replaceAll(`border-color: ${GLASS_EDGE};`, "")).not.toMatch(/border(-(top|right|bottom|left|color|width|style))*:(?! (0|transparent);)/);
     expect(Object.keys(tokens).filter((name) => /-edge|-rim/.test(name))).toEqual([]);
     expect(tokens["--studio-card-radius"]).toBe("8px");
     expect(lookTokens(resolveLook(MIAMI, defaults(MIAMI), "dark"))["--studio-card-radius"]).toBe("8px");
@@ -335,12 +337,12 @@ describe("the title row under glass", () => {
     expect(rule(`${reserved} ${boxes}`)).toBe(` padding-left: max(var(--studio-title-inset), calc(${controlsEnd} - max(0px, (100cqw - var(--studio-title-width)) / 2))); `);
   });
 
-  it("lays bb's own title group out in the box: the title and the Bot's words left, Pop out and the thread menu right, with no pill, and the row's actions stay at the window's edge", () => {
+  it("lays bb's own title group out in the box: the title, the Bot's words and the thread menu together on the left as without a theme, with no pill, and the row's actions stay at the window's edge", () => {
     const group = rule(`${TITLE_BOX} [data-fork-header-group="title"]`);
     expect(group).toContain("flex: 1;");
     expect(group).toContain("background: transparent;");
-    expect(rule(`${TITLE_BOX} [data-fork-thread-header-after], ${TITLE_BOX} [data-fork-thread-header-after] > .studio-root`)).toBe(" flex: 1; ");
-    expect(rule(`${TITLE_BOX} [data-fork-header-group="title"] > span:last-child`)).toBe(" margin-left: auto; ");
+    expect(HEADER_CSS).not.toContain("data-fork-thread-header-after");
+    expect(HEADER_CSS).not.toContain("span:last-child");
     expect(rule(`${HEADER_ROW} > :has(> [data-fork-header-group="actions"]), ${HEADER_ROW} > [data-fork-header-group="actions"]`)).toBe(" margin-left: auto; ");
     expect(rule(`${boxes} > *`)).toBe(" pointer-events: auto; ");
   });
@@ -436,9 +438,19 @@ describe("bb's chrome under Studio", () => {
 });
 
 describe("chat cards under a scene theme", () => {
-  it("gives every chat card the same glass panel and no line, as diff cards have, and leaves a warning card its tint", () => {
+  it("gives every chat card the glass panel and a hairline in the ink so it shows over a dark scene, and leaves a warning card its tint", () => {
+    expect(GLASS_EDGE).toBe("color-mix(in oklab, var(--ink) 12%, transparent)");
     expect(STUDIO_CARD).toBe('html[data-studio-glass] [data-sidebar="inset"] [data-studio-card]:not([data-studio-card-tone])');
-    expect(STUDIO_CARD_CSS).toContain(`${STUDIO_CARD} { border-color: transparent; background: var(--fork-panel); }`);
+    expect(STUDIO_CARD_CSS).toContain(`${STUDIO_CARD} { border-color: ${GLASS_EDGE}; background: var(--fork-panel); }`);
     expect(THEME_CSS).toContain(STUDIO_CARD_CSS);
+  });
+
+  it("gives the composer the same hairline, over the host's borderless cards", () => {
+    expect(GLASS_COMPOSER).toBe('html[data-studio-glass] [data-sidebar="inset"] [data-promptbox]');
+    expect(THEME_CSS).toContain(`${GLASS_COMPOSER} { border: 1px solid ${GLASS_EDGE}; }`);
+  });
+
+  it("draws no card edge or composer edge outside a glass theme", () => {
+    for (const line of THEME_CSS.split("\n").filter((each) => each.includes(GLASS_EDGE))) expect(line).toMatch(/^html\[data-studio-glass\] /);
   });
 });

@@ -66,8 +66,8 @@ const loops = new Map<string, VoiceLoop>([
 ]);
 /** The seed's sources (identity.ts), faked: the CoS with a Memory page and recent chat, and the Larkspur lead. */
 const SEED_SOURCES: SeedSources = {
-  bots: () => [{ name: COS.name, role: "Keeps Patrick's week on track and chases what's waiting.", threadId: COS.threadId, memoryPageId: "pg_memory", primary: true }],
-  memory: () => "## Check-in\n- Look at the inbox\n\n## Memory\n- Patrick drives to Larkspur on Tuesdays.\n- The eBay fetcher runs nightly; Larkspur's lead owns it.",
+  bots: () => [{ name: COS.name, role: "Keeps Sam's week on track and chases what's waiting.", threadId: COS.threadId, memoryPageId: "pg_memory", primary: true }],
+  memory: () => "## Check-in\n- Look at the inbox\n\n## Memory\n- Sam drives to Larkspur on Tuesdays.\n- The eBay fetcher runs nightly; Larkspur's lead owns it.",
   leadOf: (threadId) => LEADS.find((lead) => lead.threadId === threadId)?.project ?? null,
   runnerOf: () => null,
   thread: async (threadId) => { const thread = THREADS.find((each) => each.id === threadId); return thread ? { title: thread.title, project: LEADS.find((lead) => lead.threadId === threadId)?.project ?? null } : null; },

@@ -21,6 +21,11 @@ export type PushStatus = z.infer<typeof pushStatusSchema>;
 export const pushTestSchema = z.object({ ok: z.boolean(), sent: z.number().int().min(0), message: z.string() });
 export type PushTest = z.infer<typeof pushTestSchema>;
 
+export const apiKeysSchema = z.object({
+  keys: z.array(z.object({ key: z.string(), label: z.string(), description: z.string(), set: z.boolean() })),
+});
+export type ApiKeys = z.infer<typeof apiKeysSchema>;
+
 export const settingsContract = defineRpcContract({
   "settings.get": {
     experimental_description: "Studio's settings that aren't API keys, with defaults filled in, and the facts the settings sections show.",
@@ -29,14 +34,25 @@ export const settingsContract = defineRpcContract({
       values: settingsValuesSchema,
       /** The keys someone set; the rest follow their default. */
       changed: z.array(z.string()),
-      /** Todos' time zone: this Mac's, or STUDIO_LOOP_TIME_ZONE on the BB host. */
+      /** Todos' time zone: the todosTimeZone setting, else defaultTimeZone. */
       timeZone: z.string(),
+      defaultTimeZone: z.string().optional(),
     }),
   },
   "settings.set": {
     experimental_description: "Change Studio settings; null puts one back to its default. All or nothing.",
     input: z.object({ values: z.record(z.string(), value.nullable()) }),
-    output: z.object({ values: settingsValuesSchema, changed: z.array(z.string()) }),
+    output: z.object({ values: settingsValuesSchema, changed: z.array(z.string()), timeZone: z.string().optional(), defaultTimeZone: z.string().optional() }),
+  },
+  "settings.keys.get": {
+    experimental_description: "Studio's API keys in settings-page order, each with whether it is set. Never the keys themselves.",
+    input: z.null(),
+    output: apiKeysSchema,
+  },
+  "settings.keys.set": {
+    experimental_description: "Save Studio API keys; an empty value or null removes one. Answers which keys are set.",
+    input: z.object({ values: z.record(z.string(), z.string().max(10_000).nullable()) }),
+    output: apiKeysSchema,
   },
   "mobile.push.status": {
     experimental_description: "Whether the Mobile plugin can send pushes, to how many phones, and the last delivery.",

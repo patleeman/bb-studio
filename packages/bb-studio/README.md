@@ -182,11 +182,12 @@ content, each showing the matching text with the match in bold.
 
 ### Todos: todo cards and the Todos tab
 
-Todos (setting **Todos**, `loopsEnabled`, off by
-default) is how the Bot tracks what Patrick owes, decides, reads or waits on
-([backend](../../docs/attention-router/backend.md)). The Bot posts a `::loop`
-line in its chat when the scheduler releases a todo, and it renders as a card
-with the todo's actions. `scripts/capture/captures/bb-studio-loops.mjs`
+Todos are how the Bot tracks what the user owes, decides, reads or waits on
+([backend](../../docs/attention-router/backend.md)). The Todos list, its
+cards and the pane work at all times. **Todo reminders** (`loopsEnabled`, off
+by default; Bot settings ▸ Attention, or Studio's settings under Threads) is
+the switch for the scheduler: with it on, the Bot posts a `::loop` line in its
+chat when a todo comes due, and it renders as a card with the todo's actions. `scripts/capture/captures/bb-studio-loops.mjs`
 captures the cards, the Todos tab and the pane from a staged BB with fixed
 demo todos; the screenshots aren't committed.
 
@@ -251,7 +252,8 @@ replies), which the migration carried over. Bot → Controls → Attention:
 
 ![Bot Controls, Attention](assets/settings/bot-controls-dark.png)
 
-`bb plugin config studio` lists only the API keys. The rest are scriptable
+API keys are in the **API keys** section at the bottom of Studio's settings
+page, kept in BB's secret files. The rest are scriptable
 with `bb studio settings`:
 
 ```sh
@@ -276,8 +278,13 @@ environment variable (restart BB after setting one):
 | Jev: TypeSafe model | `jev-latest` | `STUDIO_TYPESAFE_MODEL` |
 | Jev timeout | 5000 ms | `STUDIO_JEV_TIMEOUT_MS` (250–15000) |
 | Smart Queue: minimum confidence to steer | 0.5 | `STUDIO_JEV_STEER_CONFIDENCE` (0–1) |
-| Attention time zone | this Mac's | `STUDIO_LOOP_TIME_ZONE` |
 | Talk segment length | 25 seconds | none |
+
+Todos' time zone is a setting again: **Time zone** in Bot settings ▸
+Attention (`todosTimeZone`; `bb studio settings set todosTimeZone
+America/Los_Angeles`). The Todos page, todo cards, the pane, snooze times,
+the scheduler's due and quiet hours, and the morning card all read it. Empty
+uses `STUDIO_LOOP_TIME_ZONE` when set, else this computer's zone.
 
 ## One Bot, many conversations
 
@@ -494,7 +501,8 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   status line with no model (each conversation has its own): "2 running",
   "Paused", "Stopped", "Paused · in bb" on a BB Studio copy for a Bot its
   import stopped (the Info tab's and the automations table's rule), or
-  nothing; and **···**: **Edit space…**, **Default model** (bb's provider
+  nothing; and **···**: **Edit <name>…**, **Bot settings…** (the Bot's
+  Controls page), **Default model** (bb's provider
   and model picker in a small dialog, see Default model below),
   **Archive** (the older page, `/plugins/studio/studio/conversations/<botId>`),
   then New Bot. Bot info and
@@ -548,7 +556,7 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   (**Studio: Show Bot 1…9**, BB commands you can rebind in Settings →
   Keyboard; BB keeps Ctrl+1…9 for its own "Open thread"); the whole sidebar
   switches, and the main view goes to that Bot's last-open
-  conversation (else its Main). Right-click an icon for **Edit space…** and
+  conversation (else its Main). Right-click an icon for **Edit <name>…** and
   **Theme ›**, every theme with that Bot's checked; picking one applies it
   to that Bot.
   Opening another Bot's conversation from a link shows that Bot.
@@ -1321,7 +1329,7 @@ between Bots signals both.
 | --- | --- |
 | `conversations` | a conversation started (+ New, `bot_ask`), forked, recorded or moved; its turn starting, ending or failing; Finish asked, done or reopened; renamed or archived; Main's second line |
 | `workers` | a worker made, moved, archived or deleted; its turn starting, ending or failing; its approval or question raised or resolved |
-| `needs-you` | a conversation marked or cleared (`bot_needs_you_set`, `bot_needs_you`, a worker's raise and its resolution, Patrick replying, Finish); a question or approval pending in a conversation |
+| `needs-you` | a conversation marked or cleared (`bot_needs_you_set`, `bot_needs_you`, a worker's raise and its resolution, the user replying, Finish); a question or approval pending in a conversation |
 | `presence` | `bot_set_presence` or `bot_set_appearance` (and the agent tools that call them) |
 
 A Bot's presence state (idle, thinking, working, needs you) follows from
@@ -1664,11 +1672,11 @@ The compact page header at 390 pixels, with **Item actions** open.
   **Display**. **New → Page** opens a blank page as a Studio tab.
 - **Projects and nesting.** Pages belong to a project or are global, and
   nest to any depth, with a breadcrumb back up. Give a page an emoji icon,
-  move it, archive it, or delete it from its ⋯ menu.
+  move it to the top level, archive it, or delete it from its ⋯ menu.
 - **Threads about a page.** The header's new-thread button opens a composer
   beside the page with the page as context; sending starts an agent thread in
-  the page's project. The page's ⋯ menu opens its linked thread, links
-  another, or unlinks it (see Item threads).
+  the page's project. The page's ⋯ menu has **Open conversation** for its
+  linked thread (see Item threads).
 - **Version history.** Pages saves a version before an agent's first
   edit in a while. You can save one yourself and restore any version, and the
   current page is saved before a restore.
@@ -1884,7 +1892,7 @@ with `BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=artifacts-compact-header`.
   play with seeking. Markdown renders as a document. Code and text use BB's
   source viewer (first 2 MB). Other files offer a download. The header has an
   editable title with a **Saved** badge, the artifact's chat, Copy, Download, and a menu with Open
-  source thread, Save as page, Versions, Move to and Delete. Select text or
+  conversation, Save as page, Versions and Delete. Select text or
   drag over an image to **Send to thread**.
 - **Live HTML.** An HTML artifact's page gets `window.playground`, the same
   API as BB playgrounds: shared state that persists per artifact and syncs to
@@ -2013,9 +2021,9 @@ secrets aren't backed up, so a restored app asks again.
 
 #### Elsewhere in Studio
 
-- **Artifacts:** an HTML artifact's menu has **Convert to mini app**: its page
-  becomes the app's `index.html` and its live state carries over. Agents do
-  the same with `minis_create` and `fromArtifactId`.
+- **Artifacts:** agents turn a live HTML artifact into a mini app with
+  `minis_create` and `fromArtifactId`: its page becomes the app's
+  `index.html` and its live state carries over.
 
 #### Agents
 
@@ -2083,7 +2091,7 @@ open. Recapture with
 - **Editor** (`/plugins/studio/studio/drawings/<id>`). Excalidraw loads the
   first time a whiteboard opens full size, not with Studio. It autosaves as
   you work. The header has an editable name, sync status, the item's chat,
-  copy image, and a menu with **Download PNG**, Move to and Delete. **Back**
+  copy image, and a menu with **Download PNG** and Delete. **Back**
   returns to the whiteboard's page. The editor follows BB's active theme. In
   a thread, **Attach** adds the whiteboard to the conversation as an image.
 - **Card in the agent's reply.** When an agent adds or changes a whiteboard,
@@ -3788,7 +3796,7 @@ How the page is split (`src/memory/split.ts`):
 
 - Every heading is a section (`##`, `###`, `####`, below a lone `#` title),
   so a page with two top sections ("Check-in", "Memory") and many
-  subsections ("How Patrick works", "Standing rules", "Fork", …) treats each
+  subsections ("How the user works", "Standing rules", "Fork", …) treats each
   subsection on its own. Text under a heading before its first subheading
   is a section of its own, named after that heading; an empty one is none.
   Text above the first heading becomes records (topic "Notes").
@@ -3798,8 +3806,8 @@ How the page is split (`src/memory/split.ts`):
   heading. The name is the records' default topic and their source section.
 - Only two kinds of section stay in the **core profile**: the check-in list
   and how the user works, that is a section whose heading, or a heading
-  above it, is "Check-in" or "How <name> works" ("How Patrick works", "How
-  he works"; any case). Every other section (who the user is, rules,
+  above it, is "Check-in" or "How <name> works" ("How Sam works", "How
+  they work"; any case). Every other section (who the user is, rules,
   people, preferences, Systems, Facts and decisions, Fork, …) becomes
   **records**.
 - The profile must fit the 2,500-character cap (`PROFILE_CAP_CHARS`). When
@@ -4277,8 +4285,8 @@ The hub offers `duplicate`, `setTemplate`, `instantiateTemplate`, `templates`, `
 
 ## Item threads
 
-An item has no thread of its own until you start or link one. Studio owns the
-new-thread button, the linked thread and quotes for every kind.
+An item has no thread of its own until one starts about it or makes it. Studio
+owns the new-thread button, the linked thread and quotes for every kind.
 
 - **New thread** (the header's icon) opens a composer in the workbench beside
   the item, with the item as its context. Nothing is created until you send;
@@ -4286,8 +4294,10 @@ new-thread button, the linked thread and quotes for every kind.
   first message, and that thread is linked to the item. Beside a Studio page
   this needs a BB where the page has a workbench (the BB Studio fork); on
   stable BB the composer opens in a split, as before.
-- The item's **⋯** menu has **Open “<thread>”** for a linked thread,
-  **Link a thread…** (a thread picker) and **Unlink thread**.
+- The item's **⋯** menu has **Open conversation** for a linked thread: the
+  one started about the item, else the one that made it.
+- The header's **Star** stays visible when the header is narrow; the other
+  tools fold into its **⋯**.
 - A quote goes to the linked thread, or opens the composer with the quote
   when there is none.
 

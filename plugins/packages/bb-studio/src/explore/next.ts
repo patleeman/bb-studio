@@ -120,16 +120,29 @@ export function parseBtwNotes(raw: string | undefined, max: number = NEXT_LIMITS
   return notes;
 }
 
+/** A `btw` item that is really a quick answer ("⏭ Skip for now"): a few words, not a note. */
+export function isQuickAnswer(note: BtwNote): boolean {
+  return note.emoji !== BUG_EMOJI && note.text.split(/\s+/).length <= 5 && !/[.!…]$/.test(note.text) && !/^i noticed\b/i.test(note.text);
+}
+
 export function parseNextItems(attributes: Readonly<Record<string, string | undefined>>): NextItems {
-  const btw = parseBtwNotes(attributes.btw);
+  const notes = parseBtwNotes(attributes.btw, NEXT_LIMITS.btw + NEXT_LIMITS.reply);
   const legacy = parseExploreWithWhy(attributes.explore, MAX_ITEMS).map((item) => ({
     emoji: item.emoji,
     label: item.label,
     text: item.why ? `${item.label} — ${item.why}` : item.label,
   }));
+  const reply = parseExploreItems(attributes.reply, NEXT_LIMITS.reply);
+  const seen = new Set(reply.map((item) => labelKey(item.label)));
+  for (const note of notes.filter(isQuickAnswer)) {
+    if (reply.length >= NEXT_LIMITS.reply || seen.has(labelKey(note.text))) continue;
+    seen.add(labelKey(note.text));
+    reply.push({ emoji: note.emoji, label: note.text });
+  }
+  const btw = notes.filter((note) => !isQuickAnswer(note)).slice(0, NEXT_LIMITS.btw);
   return {
-    reply: parseExploreItems(attributes.reply, NEXT_LIMITS.reply),
-    btw: btw.length ? btw : legacy,
+    reply,
+    btw: notes.length ? btw : legacy,
     do: parseExploreItems(attributes.do, NEXT_LIMITS.do),
   };
 }

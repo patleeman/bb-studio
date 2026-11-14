@@ -25,7 +25,7 @@ export interface SpaceDot {
   id: string;
   name: string;
   active: boolean;
-  /** That Bot has a conversation that needs Patrick. */
+  /** That Bot has a conversation that needs the user. */
   amber: boolean;
   /** "Chief of Staff, needs you" for the dot's label. */
   label: string;
@@ -33,7 +33,7 @@ export interface SpaceDot {
   shortcut: number | null;
 }
 
-/** One dot per Bot, in order; the current one filled, amber when that Bot needs Patrick. */
+/** One dot per Bot, in order; the current one filled, amber when that Bot needs the user. */
 export function spaceDots(bots: readonly Pick<BotSpace, "id" | "name" | "needsYou">[], currentId: string | null): SpaceDot[] {
   const current = bots.some((bot) => bot.id === currentId) ? currentId : bots[0]?.id ?? null;
   return bots.map((bot, index) => ({
@@ -132,7 +132,7 @@ export function shortAge(at: number, now: number): string {
   return `${Math.floor(ms / (7 * 24 * 60 * MINUTE))}w`;
 }
 
-/** A conversation's second line: why it needs Patrick, else its latest reply, else what it is doing. */
+/** A conversation's second line: why it needs the user, else its latest reply, else what it is doing. */
 export function secondLine(row: Pick<ConversationLine, "needsYou" | "latest" | "running">): { tone: "needs-you" | "running" | "quiet"; text: string } {
   if (row.needsYou) return { tone: "needs-you", text: `Needs you: ${row.needsYou.reason}` };
   if (row.running) return { tone: "running", text: row.latest || "Working…" };
@@ -141,7 +141,7 @@ export function secondLine(row: Pick<ConversationLine, "needsYou" | "latest" | "
 
 /**
  * Workers split for the sidebar and the line above a conversation's
- * composer: the active ones (needing Patrick first, then running) shown one
+ * composer: the active ones (needing the user first, then running) shown one
  * by one, and the rest (done, failed) folded into one "N done".
  */
 export function splitWorkers<Worker extends { status: WorkerRow["status"] }>(workers: readonly Worker[]): { active: Worker[]; done: Worker[] } {

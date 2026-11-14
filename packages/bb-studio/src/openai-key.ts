@@ -1,6 +1,6 @@
 // Studio's one OpenAI API key: hands-free voice (GPT-Live and the Realtime
 // API) uses it. It stays secret on the server and
-// falls back to OPENAI_API_KEY on the BB host. Never log it, and never put it
+// falls back to the OPENAI_API_KEY environment variable. Never log it, and never put it
 // in an RPC answer: voice clients get at most a 2-minute Realtime secret.
 //
 // It replaced "Bot avatars: OpenAI API key" (botAvatarOpenaiApiKey). That
@@ -12,7 +12,7 @@ export const OPENAI_KEY_SETTING = "openaiApiKey";
 export const LEGACY_OPENAI_KEY_SETTING = "botAvatarOpenaiApiKey";
 
 export const OPENAI_KEY_SETTINGS = {
-  [OPENAI_KEY_SETTING]: { type: "string", label: "OpenAI API key", description: "Hands-free voice. Falls back to OPENAI_API_KEY on the BB host.", secret: true, default: "" },
+  [OPENAI_KEY_SETTING]: { type: "string", label: "OpenAI API key", description: "Hands-free voice. If empty, Studio uses the OPENAI_API_KEY environment variable.", secret: true, default: "" },
 } as const;
 
 const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");

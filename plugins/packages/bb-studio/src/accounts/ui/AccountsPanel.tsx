@@ -37,10 +37,10 @@ function Meter({ window, now }: { window: QuotaWindow; now: number }) {
   const reset = resetText(window.resetAt, now);
   return (
     <li data-quota={window.id} className="flex flex-col gap-1">
-      <div className="flex min-w-0 items-baseline gap-2 text-xs">
-        <span className="shrink-0 font-medium text-foreground">{window.label}</span>
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xs">
+        <span className="min-w-0 break-words font-medium text-foreground">{window.label}</span>
         <span className={cn("shrink-0 tabular-nums", full ? "text-destructive" : "text-muted-foreground")}>{percent === null ? "–" : `${percent}%`}{window.rejected ? " · rejected" : ""}</span>
-        {reset ? <span className="min-w-0 flex-1 truncate text-right text-muted-foreground">{reset}</span> : null}
+        {reset ? <span data-testid="quota-reset" className="ml-auto whitespace-nowrap text-right text-muted-foreground">{reset}</span> : null}
       </div>
       <div className="h-1 overflow-hidden rounded-full bg-foreground/10" aria-hidden>
         <div className={cn("h-full rounded-full", tone)} style={{ width: `${Math.max(0, Math.min(100, percent ?? 0))}%` }} />
@@ -62,15 +62,15 @@ export interface AccountRowProps {
 export function AccountRow({ account, now, signingIn, onSignIn, onSignInDone, api, env }: AccountRowProps) {
   const quota = [...account.windows, ...account.models];
   return (
-    <li data-account={account.key} data-account-state={account.state} className="flex flex-col gap-2 rounded-md border border-border/70 bg-foreground/[0.025] p-2.5">
-      <div className="flex min-w-0 items-center gap-2">
+    <li data-account={account.key} data-account-state={account.state} className="flex flex-col gap-2 rounded-md bg-foreground/[0.035] px-2 py-2">
+      <div className="flex min-w-0 items-start gap-2">
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm font-medium text-foreground">{account.name}</span>
-          {account.label ? <span className="truncate text-xs text-muted-foreground">{account.label}</span> : null}
+          <span className="break-words text-sm font-medium text-foreground">{account.name}</span>
+          {account.label ? <span data-testid="account-label" className="break-all text-xs text-muted-foreground">{account.label}</span> : null}
         </span>
         <span data-testid="account-state" className={cn("shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium", STATE_TONE[account.state])}>{STATE_TEXT[account.state]}</span>
       </div>
-      {account.message ? <p className="truncate text-xs text-muted-foreground" title={account.message}>{account.message}</p> : null}
+      {account.message ? <p className="break-words text-xs text-muted-foreground">{account.message}</p> : null}
       {quota.length ? <ul className="flex flex-col gap-1.5">{quota.map((window) => <Meter key={`${window.id}:${window.label}`} window={window} now={now} />)}</ul> : null}
       {signingIn && account.signIn ? (
         <div className="rounded-md border border-border/70 bg-background/40 p-2">
@@ -104,7 +104,7 @@ export interface AccountsPanelProps {
 export function AccountsPanel({ status, error, signingIn, onSignIn, onSignInDone, onRefresh, onClose, api, env, now = Date.now() }: AccountsPanelProps) {
   const sources = status?.sources.filter((source) => source.state !== "off" || status.accounts.some((account) => account.source === source.source)) ?? [];
   return (
-    <div data-testid="accounts" className="studio-root flex w-full flex-col gap-3 p-2">
+    <div data-testid="accounts" className="studio-root flex w-full flex-col gap-3 px-1 py-2">
       <div className="flex items-center gap-2 px-0.5">
         <Icon name="UserRound" className="size-4 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 text-sm font-medium text-foreground">Accounts</span>

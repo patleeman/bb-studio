@@ -7,6 +7,7 @@ import { cn, Icon } from "../../kit/ui/index";
 import { openLinkFromAnywhere } from "../../links/open";
 import type { ScheduledItem } from "../../loops/scheduled";
 import { SCHEDULED_ICON, scheduledMeta } from "../../loops/ui/scheduled-model";
+import { useTodosZone } from "../../loops/ui/hooks";
 import { useLive } from "../live";
 import { AUTOMATIONS_TAB, KIND_LABEL, wakeLabel } from "./model";
 
@@ -21,6 +22,7 @@ export function ThreadAutomationsPanel({ threadId }: ThreadTabProps) {
 }
 
 export function ScheduledView({ items, error, now = Date.now() }: { items: readonly ScheduledItem[] | null; error: string | null; now?: number }) {
+  const zone = useTodosZone();
   if (error && !items) {
     return (
       <div role="status" className="flex items-start gap-2 px-1 py-2 text-sm text-muted-foreground">
@@ -50,7 +52,7 @@ export function ScheduledView({ items, error, now = Date.now() }: { items: reado
           >
             <Icon name={SCHEDULED_ICON[item.kind]} aria-hidden className="size-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{item.title}</span>
-            <span className="shrink-0 text-xs text-muted-foreground">{KIND_LABEL[item.kind]} · {scheduledMeta(item, now)}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">{KIND_LABEL[item.kind]} · {scheduledMeta(item, now, zone)}</span>
           </button>
         </li>
       ))}

@@ -19,12 +19,13 @@ const state = vi.hoisted(() => ({
   chatOpen: false,
   composer: { insert: vi.fn(), focus: vi.fn() },
   scheduled: [] as unknown[],
+  zone: null as string | null,
 }));
 vi.mock("../../kit/composer", () => ({ threadComposer: (threadId: string) => state.chatOpen && threadId === "thr_bot" ? state.composer : null }));
 vi.mock("../../links/open", () => ({ openLinkFromAnywhere: state.openLink, clickModifiers: (event?: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean }) => ({ meta: !!event?.metaKey, ctrl: !!event?.ctrlKey, shift: !!event?.shiftKey }) }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useBbNavigate: () => ({ toThread: state.toThread }), useSdk: () => sdk }));
-vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: "America/New_York", isLoading: false, error: null, set: async () => {}, values: { loopsEnabled: true } }), readStudioSettingsNow: () => ({}) }));
+vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ changed: [], timeZone: state.zone ?? Intl.DateTimeFormat().resolvedOptions().timeZone, isLoading: false, error: null, set: async () => {}, values: { loopsEnabled: true } }), readStudioSettingsNow: () => ({}) }));
 const sdk = { projects: { list: async () => [{ id: "proj_k", name: "Larkspur" }] }, threads: { interactions: { list: async () => state.interactions } } };
 vi.mock("../../ui/live", () => ({
   useCall: () => state.call,
@@ -54,7 +55,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   state.chatOpen = false; state.composer.insert.mockClear(); state.composer.focus.mockClear(); state.toThread.mockImplementation(() => { state.chatOpen = true; });
-  state.call.mockClear(); state.toThread.mockClear(); state.openLink.mockClear(); state.interactions = []; state.attention = null;
+  state.call.mockClear(); state.toThread.mockClear(); state.openLink.mockClear(); state.interactions = []; state.attention = null; state.zone = null;
   state.groups = {
     ...empty,
     needsYouNow: [
@@ -337,4 +338,16 @@ it("under a Bot that isn't the primary, is that Bot's Scheduled alone, titled Sc
   expect(container.querySelector("[data-testid=todos-empty]")).toBeNull();
   expect(container.textContent).not.toContain("Pay the Con Edison bill");
   state.scheduled = [];
+});
+
+it("shows due times in Todos' time zone, not the computer's: 9:00 AM Pacific reads 9:00 AM with Pacific set", async () => {
+  const { zonedTime } = await import("../clock");
+  const due = zonedTime(2026, 11, 2, 9, 0, "America/Los_Angeles") + 4 * DAY;
+  state.groups = { ...empty, comingUp: [loop("loop_call", "Call the dentist", { status: "queued", due })] };
+  state.zone = "America/Los_Angeles";
+  await act(async () => { root.render(<TodosPage view={view} />); });
+  expect(container.textContent).toContain("Due Fri, 9:00 AM");
+  state.zone = "America/New_York";
+  await act(async () => { root.render(<TodosPage view={view} />); });
+  expect(container.textContent).toContain("Due Fri, 12:00 PM");
 });

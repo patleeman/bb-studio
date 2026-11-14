@@ -48,7 +48,7 @@ const button = (label: string) => [...host.querySelectorAll<HTMLButtonElement>("
 it("shows archive errors and disables metadata actions while the update is pending", async () => {
   let reject!: (error: Error) => void;
   state.call.mockReturnValue(new Promise((_resolve, fail) => { reject = fail; }));
-  act(() => root.render(<PageMenu page={page} rpc={{ call: state.call } as never} projects={[]} onChanged={() => {}} />));
+  act(() => root.render(<PageMenu page={page} rpc={{ call: state.call } as never} onChanged={() => {}} />));
   await act(async () => button("Archive").click());
 
   expect(button("Archive").disabled).toBe(true);
@@ -61,7 +61,7 @@ it("shows archive errors and disables metadata actions while the update is pendi
 it("shows delete errors", async () => {
   vi.stubGlobal("confirm", vi.fn(() => true));
   state.call.mockRejectedValue(new Error("permission denied"));
-  act(() => root.render(<PageMenu page={page} rpc={{ call: state.call } as never} projects={[]} onChanged={() => {}} />));
+  act(() => root.render(<PageMenu page={page} rpc={{ call: state.call } as never} onChanged={() => {}} />));
   await act(async () => button("Delete").click());
   await act(async () => { await Promise.resolve(); });
 

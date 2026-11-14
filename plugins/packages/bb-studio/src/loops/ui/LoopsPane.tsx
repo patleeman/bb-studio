@@ -1,5 +1,5 @@
 // The Todos pane: the Todos tab's sections in the thread's side panel, so the
-// list stays up while Patrick talks todos through with the Chief of Staff. It
+// list stays up while the user talks todos through with the Chief of Staff. It
 // is the "Todos" thread panel action (app.tsx), opened from the Bot chat's
 // header, a `::loops{open="pane"}` card, "N more in Todos" and
 // the panel launcher. Rows are compact: a title, one line of
@@ -21,7 +21,7 @@ import type { Loop } from "../contract";
 import { PickTime, TriggerForm } from "./LoopMenus";
 import { AddLoop, AreaChip, OwnerMenu, useLoopsBoard, type RowProps } from "./LoopsTab";
 import { areaChips, dueLabel, elapsed, fullWhen, KIND, optionParts, ownerName, ownerThread, shortWhen, SNOOZE, snoozeHint, sourceText, triggerLabel } from "./model";
-import { focusDiscussed, LOOPS_PANE, loopDragProps, openLoops, useDiscussLoop, useLoopActions, useLoopsEnabled } from "./hooks";
+import { focusDiscussed, LOOPS_PANE, loopDragProps, openLoops, useDiscussLoop, useLoopActions, useTodosZone } from "./hooks";
 
 export { LOOPS_PANE };
 
@@ -30,24 +30,18 @@ const MENU_BUTTON = "inline-flex size-7 shrink-0 items-center justify-center rou
 
 /** The "Todos" thread panel tab. `threadId` is the chat it's beside. */
 export function LoopsPane({ threadId }: ThreadTabProps) {
-  const enabled = useLoopsEnabled();
   const navigate = useBbNavigate();
   useEffect(() => { renameTabOf(navigate)?.({ tab: { id: LOOPS_PANE }, title: "Todos" }); }, [navigate]);
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground" data-testid="loops-pane">
-      {enabled ? <Board threadId={threadId} /> : (
-        <div className="flex flex-col items-center gap-1.5 px-6 py-10 text-center">
-          <Icon name="Unavailable" className="size-5 text-muted-foreground" />
-          <div className="text-sm font-medium">Todos are off</div>
-          <p className="text-sm text-muted-foreground">Turn on in Studio’s settings.</p>
-        </div>
-      )}
+      <Board threadId={threadId} />
     </div>
   );
 }
 
 function Board({ threadId }: { threadId: string }) {
   const navigate = useBbNavigate();
+  const zone = useTodosZone();
   const [showAllDone, setShowAllDone] = useState(false);
   const { people, area, setArea, owner, setOwner, ownerLabel, list, groups, pending, open, chat, needs, nextAt, row, add, filtered } = useLoopsBoard();
   // Todos closed from their circle stay where they were, done with Undo,
@@ -111,13 +105,13 @@ function Board({ threadId }: { threadId: string }) {
             <PaneSection title="Needs you now" count={needs}>
               {pending.map((question) => (
                 <PaneRow key={question.id} testId="loop-pending" icon="MessageQuestion" title={question.reason}
-                  meta={<span>{where} · {shortWhen(question.createdAt)}</span>} trailing={openChat} />
+                  meta={<span>{where} · {shortWhen(question.createdAt, Date.now(), zone)}</span>} trailing={openChat} />
               ))}
               {lines(groups.needsYouNow, "needs")}
             </PaneSection>
           ) : null}
           {groups.comingUp.length || kept("coming") ? (
-            <PaneSection title="Coming up" count={groups.comingUp.length} aside={Number.isFinite(nextAt) ? `Next: ${fullWhen(nextAt)}` : undefined}>
+            <PaneSection title="Coming up" count={groups.comingUp.length} aside={Number.isFinite(nextAt) ? `Next: ${fullWhen(nextAt, Date.now(), zone)}` : undefined}>
               {lines(groups.comingUp, "coming")}
             </PaneSection>
           ) : null}
@@ -184,7 +178,7 @@ export function withClosed(loops: readonly Loop[], place: Place, closed: Readonl
   return list;
 }
 
-/** Done is one click for Patrick's do and read todos (read: Got it); decisions and waits have their own actions. */
+/** Done is one click for the user's do and read todos (read: Got it); decisions and waits have their own actions. */
 export const closesFromCircle = (loop: Loop) => loop.owner === "patrick" && (loop.kind === "do" || loop.kind === "read");
 
 /** The row's kind circle as its Done checkbox: a check on hover, Mark done. */
@@ -227,6 +221,7 @@ function Dotted({ parts, area }: { parts: ReactNode[]; area: string | null }) {
 /** One open todo: its line and its ⋯ menu, with what its section allows. */
 function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed }: RowProps & { place: Place; onClosed(action: "done" | "got_it"): void }) {
   const navigate = useBbNavigate();
+  const zone = useTodosZone();
   const { act, update, busy, error } = useLoopActions(refresh);
   const discuss = useDiscussLoop(people.botThreadId, people.botName);
   // After Discuss the caret goes to the composer once the menu has closed, not back to ⋯.
@@ -238,8 +233,8 @@ function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed
   const owner = owners.get(loop.owner);
   const who = ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owner);
   const thread = ownerThread(loop.owner, people.botThreadId, owner);
-  const due = dueLabel(loop.due);
-  const trigger = triggerLabel(loop.trigger, Date.now(), held.get(loop.id));
+  const due = dueLabel(loop.due, Date.now(), zone);
+  const trigger = triggerLabel(loop.trigger, Date.now(), held.get(loop.id), zone);
   const source = sourceText(loop.source);
   const working = loop.status === "in_progress";
 
@@ -256,7 +251,7 @@ function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed
       <DropdownMenuSubContent className="min-w-56">
         {SNOOZE.map((preset) => (
           <DropdownMenuItem key={preset.id} onSelect={() => void act({ id: loop.id, action: "snooze", snooze: preset.id })}>
-            <Icon name={preset.icon} /><span className="flex-1">{preset.label}</span><span className="text-xs text-muted-foreground">{snoozeHint(preset.id)}</span>
+            <Icon name={preset.icon} /><span className="flex-1">{preset.label}</span><span className="text-xs text-muted-foreground">{snoozeHint(preset.id, Date.now(), zone)}</span>
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
@@ -325,7 +320,7 @@ function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed
       {changeTrigger}<DropdownMenuSeparator />{drop}
     </>;
     meta = <>
-      <span>Since {shortWhen(loop.createdAt)}</span>
+      <span>Since {shortWhen(loop.createdAt, Date.now(), zone)}</span>
       {source ? <><span aria-hidden>·</span><span className="min-w-0 truncate">{source}</span></> : null}
       <AreaChip area={loop.area} />
     </>;
@@ -364,11 +359,12 @@ function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed
 
 function DoneLine({ loop, people, refresh }: RowProps) {
   const { update, busy } = useLoopActions(refresh);
+  const zone = useTodosZone();
   const dropped = loop.status === "dropped";
   const by = loop.closedBy === "patrick" ? "You" : loop.closedBy === "cos" ? people.botName : loop.closedBy ?? "";
   return (
     <PaneRow testId="loop-done" muted icon={dropped ? "X" : "CircleCheck"} iconClass={dropped ? undefined : "text-success"} title={loop.title}
-      meta={<span>{by}{by ? " · " : ""}{loop.closedAt ? fullWhen(loop.closedAt) : ""}</span>}
+      meta={<span>{by}{by ? " · " : ""}{loop.closedAt ? fullWhen(loop.closedAt, Date.now(), zone) : ""}</span>}
       trailing={
         <button type="button" aria-label={`Undo: ${loop.title}`} title="Undo" disabled={busy} onClick={() => void update({ id: loop.id, changes: { status: "surfaced" } })} className={MENU_BUTTON}>
           <Icon name="ArrowTurnBackward" />

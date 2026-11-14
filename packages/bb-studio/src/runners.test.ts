@@ -39,7 +39,7 @@ async function setup() {
     if (method === "automations_delete") { automations.splice(automations.indexOf(row!), 1); return { ok: true }; }
     return { ok: true, sent: 1 };
   });
-  const hosts = [{ id: "host_red4", name: "homelab", status: "connected" }];
+  const hosts = [{ id: "host_homelab", name: "homelab", status: "connected" }];
   const cli = { codex: { installed: true, displayName: "Codex" } };
   const providerStates = { providers: [{ providerId: "codex", status: "ready", loginCommand: "codex login" }] };
   const pathsExist = vi.fn(async ({ paths }: { paths: string[] }) => ({ existence: Object.fromEntries(paths.map(path => [path, !path.startsWith("/Users")])) }));
@@ -509,8 +509,8 @@ it("exposes the last run's failure separately from a previous successful report"
 it("resolves machine ids and unique names, refuses ambiguous or missing names", async () => {
   const x = await setup();
   expect(await resolveRunnerMachine(x.sdk, "")).toBeNull();
-  expect((await resolveRunnerMachine(x.sdk, "HOMELAB"))?.id).toBe("host_red4");
-  expect((await resolveRunnerMachine(x.sdk, "host_red4"))?.name).toBe("homelab");
+  expect((await resolveRunnerMachine(x.sdk, "HOMELAB"))?.id).toBe("host_homelab");
+  expect((await resolveRunnerMachine(x.sdk, "host_homelab"))?.name).toBe("homelab");
   await expect(resolveRunnerMachine(x.sdk, "missing")).rejects.toThrow("No machine");
   x.hosts.push({ id: "duplicate", name: "homelab", status: "connected" });
   await expect(resolveRunnerMachine(x.sdk, "homelab")).rejects.toThrow("ambiguous");
@@ -521,12 +521,12 @@ it("checks paths and Mac tools before creating, requires confirmation without ma
   const input = { name: "Files", job: "Use Beeper and osascript for /Users/alex/mail and ~/notes", schedule, machine: "homelab" };
   const check = await x.runners.preflight(input);
   expect(check.warnings).toEqual(expect.arrayContaining([expect.stringContaining("/Users/alex/mail"), expect.stringContaining("Beeper"), expect.stringContaining("osascript")]));
-  expect(x.pathsExist).toHaveBeenCalledWith({ hostId: "host_red4", paths: ["/Users/alex/mail", "~/notes"] });
+  expect(x.pathsExist).toHaveBeenCalledWith({ hostId: "host_homelab", paths: ["/Users/alex/mail", "~/notes"] });
   await expect(x.runners.create(input)).rejects.toBeInstanceOf(RunnerPreflightError);
   expect(await x.runners.list()).toEqual([]);
   const runner = await x.runners.create({ ...input, confirm: true });
-  expect(runner).toMatchObject({ machine: "host_red4", machineName: "homelab" });
-  expect(x.spawn).toHaveBeenCalledWith(expect.objectContaining({ environment: { type: "provider", environmentProviderId: "personal-workspace", inputs: null, machine: { type: "existing", hostId: "host_red4" } } }));
+  expect(runner).toMatchObject({ machine: "host_homelab", machineName: "homelab" });
+  expect(x.spawn).toHaveBeenCalledWith(expect.objectContaining({ environment: { type: "provider", environmentProviderId: "personal-workspace", inputs: null, machine: { type: "existing", hostId: "host_homelab" } } }));
 });
 
 it("blocks missing CLI and sign-in even when confirmed, installs only on the selected host", async () => {
@@ -535,7 +535,7 @@ it("blocks missing CLI and sign-in even when confirmed, installs only on the sel
   x.cli.codex.installed = false;
   await expect(x.runners.create(input)).rejects.toThrow("Install Codex on homelab");
   await x.runners.installProvider({ machine: "homelab" });
-  expect(x.installProviderCli).toHaveBeenCalledWith({ hostId: "host_red4", provider: "codex", actionKind: "install" });
+  expect(x.installProviderCli).toHaveBeenCalledWith({ hostId: "host_homelab", provider: "codex", actionKind: "install" });
   x.cli.codex.installed = true;
   x.providerStates.providers[0]!.status = "unauthenticated";
   await expect(x.runners.create(input)).rejects.toThrow("needs sign-in on homelab. Run codex login");
@@ -569,7 +569,7 @@ it("migrates the same row and automation with the last 3 reports, then archives;
   for (const summary of ["discard", "one", "two", "three"]) await x.runners.report(runner.threadId!, { level: "log", summary });
   const automationId = x.runners.automation(runner.id)!.id;
   const moved = await x.runners.migrate({ id: runner.id, machine: "homelab" });
-  expect(moved).toMatchObject({ id: runner.id, machine: "host_red4", name: runner.name, job: runner.job, schedule: runner.schedule, lastReport: "three" });
+  expect(moved).toMatchObject({ id: runner.id, machine: "host_homelab", name: runner.name, job: runner.job, schedule: runner.schedule, lastReport: "three" });
   expect(moved.threadId).not.toBe(runner.threadId);
   expect(x.runners.automation(runner.id)?.id).toBe(automationId);
   // The schedule follows the runner's row: its next run wakes the new thread, not the archived one.
@@ -649,7 +649,7 @@ it("moves an adopted runner by pointing its BB automation at the new thread", as
 it("uses the target default directory when personal workspace is unavailable", async () => {
   const x = await setup();
   x.environmentProviders.splice(0);
-  expect(await runnerEnvironment(x.sdk, "host_red4")).toEqual({ type: "host", hostId: "host_red4", workspace: { type: "unmanaged", path: null } });
+  expect(await runnerEnvironment(x.sdk, "host_homelab")).toEqual({ type: "host", hostId: "host_homelab", workspace: { type: "unmanaged", path: null } });
 });
 
 it("records offline admission without sending a nested dispatch; the sweep alerts once", async () => {
@@ -666,9 +666,9 @@ it("ignores URL paths during preflight and respects host-specific provider avail
   const x = await setup();
   const check = await x.runners.preflight({ machine: "homelab", job: "Check https://example.com/news and /srv/data" });
   expect(check.warnings).toEqual([]);
-  expect(x.pathsExist).toHaveBeenCalledWith({ hostId: "host_red4", paths: ["/srv/data"] });
-  x.environmentProviders[0]!.machineAvailability = { host_red4: { status: "unavailable" } } as never;
-  expect(await runnerEnvironment(x.sdk, "host_red4")).toMatchObject({ type: "host", hostId: "host_red4" });
+  expect(x.pathsExist).toHaveBeenCalledWith({ hostId: "host_homelab", paths: ["/srv/data"] });
+  x.environmentProviders[0]!.machineAvailability = { host_homelab: { status: "unavailable" } } as never;
+  expect(await runnerEnvironment(x.sdk, "host_homelab")).toMatchObject({ type: "host", hostId: "host_homelab" });
 });
 
 it("suspends the automation through an outage and resumes on reconnection without replaying a run", async () => {

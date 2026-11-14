@@ -377,8 +377,7 @@ export default definePluginApp((app) => {
   app.slots.messageDirective({ id: BOT_THREAD_DIRECTIVE, component: BotThreadDirective });
   // Todos (docs/attention-router/backend.md): `::loop{id="loop_…"}`
   // is a todo's card, `row="1"` its morning row; `::loops{more="3"}` and
-  // `::loops{open="pane"}` open the Todos pane beside the chat. Quiet
-  // placeholders while the loopsEnabled setting is off.
+  // `::loops{open="pane"}` open the Todos pane beside the chat.
   app.slots.messageDirective({ id: "loop", component: LoopDirective });
   app.slots.messageDirective({ id: "loops", component: LoopsDirective });
   app.slots.messageDirective({ id: "work", component: WorkDirective });
