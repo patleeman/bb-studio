@@ -41,7 +41,7 @@ describe("a brief Thought row", () => {
     expect(render(3_000).text).toContain("Thought");
   });
 
-  it("is never hidden while the model is still thinking", () => {
+  it("is never hidden while the model is still thinking, or when Stop cut it short", () => {
     const thinking = {
       kind: "operation",
       opType: "reasoning",
@@ -53,5 +53,8 @@ describe("a brief Thought row", () => {
     expect(
       isBriefThought({ ...thinking, status: "completed", completedAt: 1_200 }),
     ).toBe(true);
+    expect(
+      isBriefThought({ ...thinking, status: "interrupted", completedAt: 1_200 }),
+    ).toBe(false);
   });
 });
