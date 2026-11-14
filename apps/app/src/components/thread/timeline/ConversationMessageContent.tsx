@@ -1,3 +1,4 @@
+import { ASSISTANT_MARKDOWN_THREAD_MENTIONS } from "@/components/ui/markdown-short-line-breaks.fork";
 import {
   useLayoutEffect,
   useMemo,
@@ -15,7 +16,6 @@ import type { PromptTextMention } from "@bb/domain";
 import { fileNameFromPath } from "@bb/thread-view";
 import { cn } from "@bb/shared-ui/lib/utils";
 import {
-  AUTHORED_MARKDOWN_THREAD_MENTIONS,
   MarkdownPreview,
   type MarkdownThreadMentions,
 } from "../../ui/markdown-preview.js";
@@ -558,7 +558,7 @@ function AssistantConversationMessage({
         incrementalBlocks
         linkRouting={linkRouting}
         messageDirectives={messageDirectives}
-        threadMentions={AUTHORED_MARKDOWN_THREAD_MENTIONS}
+        threadMentions={ASSISTANT_MARKDOWN_THREAD_MENTIONS}
       />
       {streamingSplit === null ? null : (
         <MarkdownPreview
@@ -569,7 +569,7 @@ function AssistantConversationMessage({
           incrementalBlocks
           linkRouting={linkRouting}
           messageDirectives={messageDirectives}
-          threadMentions={AUTHORED_MARKDOWN_THREAD_MENTIONS}
+          threadMentions={ASSISTANT_MARKDOWN_THREAD_MENTIONS}
         />
       )}
     </>
