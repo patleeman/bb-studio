@@ -1022,6 +1022,12 @@
       "coverage": "generated method"
     },
     {
+      "file": "ios/iOS/Room/RoomThemePicker.swift",
+      "plugin": "studio",
+      "method": "bot_set_appearance",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/iOS/Studio/MiniAppView.swift",
       "plugin": "studio",
       "method": "minis.rename",
