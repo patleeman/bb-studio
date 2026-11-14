@@ -1,5 +1,5 @@
 import { useRememberedProviderModel } from "./rememberedProviderModel.fork";
-import { SignedOutTabMark, useSignedOutProviderIds } from "./signedOutProviders.fork";
+import { SignedOutTabMark, signedInFirst, useBrowseSignedInOnOpen, useSignedOutProviderIds } from "./signedOutProviders.fork";
 import { previewPick, type ProviderModelPickHandler } from "./previewPick.fork";
 import { forkModelPickerGate } from "@/components/fork/ForkModelPickerGate";
 import { formatUnknownModelLabel, triggerReasoningLabel as forkTriggerReasoningLabel } from "./unknownModelLabel.fork";
@@ -603,6 +603,7 @@ export function ModelReasoningPicker({
             reasoningValue,
         });
         setMoreModelsOpenedBy(null);
+        setOpen(false);
         return;
       }
       if (isPreviewing && onProviderModelChange) onProviderModelChange(previewPick({ providerId: activeProviderId, model, preferredReasoningLevel: reasoningValue, catalog: previewQuery.data }));
@@ -610,6 +611,7 @@ export function ModelReasoningPicker({
       if (!isPreviewing || !onProviderModelChange) onModelChange(model);
       setMoreModelsOpenedBy(null);
       setPreviewProviderId(null);
+      setOpen(false);
     },
     [
       onProviderModelChange,
@@ -667,6 +669,7 @@ export function ModelReasoningPicker({
       selectedProviderId,
     ],
   );
+  useBrowseSignedInOnOpen({ open, signedOut: signedOutProviders, selectedProviderId, options: providerOptions, browsing: isPreviewing || browsingHandoff, browse: (providerId) => handleProviderSelect(providerId, false) });
   const startHandoffMode = useCallback(() => {
     handoff?.onStart();
     handleHandoffProviderSelect(selectedProviderId);
@@ -1089,7 +1092,7 @@ export function ModelReasoningPicker({
         {handoffMode ? <HandoffModeHeader onBack={exitHandoffMode} /> : null}
         {showProviderTabs ? (
           <div className="flex shrink-0 items-center gap-0.5 border-b border-border bg-background px-2.5 pt-1">
-            {providerOptions.map((provider) => {
+            {signedInFirst(providerOptions, signedOutProviders).map((provider) => {
               const TabIcon = provider.icon;
               const isActive = provider.value === activeProviderId;
               const isHandoffSource =
@@ -1184,7 +1187,7 @@ export function ModelReasoningPicker({
           showReasoningSection={showReasoningSection}
           reasoningValue={activeReasoningValue}
           reasoningOptions={activeReasoningOptions}
-          onReasoningSelect={handleReasoningSelect}
+          onReasoningSelect={(level) => { handleReasoningSelect(level); if (!handoffMode && !previewSelectionBlocked) setOpen(false); }}
           serviceTierOptions={activeServiceTierOptions}
           serviceTierValue={serviceTierValue}
           onServiceTierChange={onServiceTierChange}
