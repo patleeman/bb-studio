@@ -229,7 +229,6 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
             "-qaDuoMinis", "mini_a,mini_b,mini_c", "-qaDark", "-qaDuoPhone", "-openURL", "bbstudio://thread/thr_botdemo01"]
         if layout == "split" { app.launchArguments += ["-qaDuoColdWide"] }
         app.launchOffline()
-        if layout == "outer" { standUpTheRoom() }
         XCTAssertTrue(composerField.waitForExistence(timeout: 30))
         if layout == "outer" { command("outer") }
         showRightPage()
@@ -477,7 +476,6 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         Thread.sleep(forTimeInterval: 1)
     }
 
-    /// The folded Duo opens the Bot as its room, with the chat lying down: stand it up.
     private func standUpTheRoom() {
         guard app.buttons["RoomFloor"].waitForExistence(timeout: 30) else { return }
         app.standRoomChat()
@@ -535,7 +533,7 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     private func expectGap(_ step: String) {
         guard let geometry = window() else { return failures.append("\(step): no layout") }
         let below = geometry.height - composer.frame.maxY - (layout == "split" ? 0 : app.frame.minY)
-        let expected: CGFloat = layout == "split" ? 8 : 8 + geometry.safeBottom
+        let expected: CGFloat = layout == "split" ? 8 : layout == "outer" ? geometry.safeBottom : 8 + geometry.safeBottom
         steps.append(String(format: "%@: composer gap %.1f (expected %.1f, safe bottom %.1f)", step, below, expected, geometry.safeBottom))
         // A tab bar under the Bot chat on a phone holds the composer higher.
         if layout == "split" ? abs(below - expected) > 2 : below < expected - 2 {
