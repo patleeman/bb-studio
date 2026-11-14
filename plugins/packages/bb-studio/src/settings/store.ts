@@ -78,3 +78,14 @@ export class StudioSettingsStore {
     return () => this.listeners.delete(listener);
   }
 }
+
+/**
+ * Todo reminders are off by default, so an install from before keeps its
+ * value. A new install's first Bot turns them on, unless someone set them.
+ * True when it turned them on.
+ */
+export async function remindersForFirstBot(store: Pick<StudioSettingsStore, "explicit" | "set">, firstBot: boolean): Promise<boolean> {
+  if (!firstBot || Object.hasOwn(store.explicit(), "loopsEnabled")) return false;
+  await store.set({ loopsEnabled: true });
+  return true;
+}
