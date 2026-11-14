@@ -1,3 +1,4 @@
+import { forkMentionHref, isMentionHref } from "./markdown-mention-links.fork";
 import { withShortLineBreakPlugins } from "./markdown-short-line-breaks.fork";
 import { parseApplicationUrl } from "@bb/domain/application-url";
 import { openApplicationUrl } from "@/lib/application-url";
@@ -545,6 +546,7 @@ function buildLocalAwareUrlTransform({
   localImageRouting,
 }: BuildLocalAwareUrlTransformArgs): UrlTransform {
   return (value, key, node) => {
+    if (key === "href" && isMentionHref(value)) return forkMentionHref(value) ?? value;
     if (key === "href" && localFileRouting !== undefined) {
       const localFile = resolveMarkdownLocalFileTarget(
         value,
