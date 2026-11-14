@@ -184,7 +184,7 @@ export function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
             ? <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_pause")}><Icon name="Pause" />Pause</button>
             : <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />Resume</button>}
           {bot.state !== "stopped" ? <button type="button" className={GHOST_BUTTON} disabled={!!busy} onClick={() => setSheet("stop")}><Icon name="Square" />Stop…</button> : null}
-          <button type="button" className={OUTLINE_BUTTON} data-testid="bot-controls" onClick={() => openAppPath(controlsPath(bot.id))}><Icon name="SlidersHorizontal" />Controls</button>
+          <button type="button" className={OUTLINE_BUTTON} data-testid="bot-controls" onClick={() => openAppPath(controlsPath(bot.id))}><Icon name="SlidersHorizontal" />Bot settings</button>
         </div>
       </header>
       {error ? <p role="alert" className="pb-2 text-xs text-destructive">{error}</p> : null}

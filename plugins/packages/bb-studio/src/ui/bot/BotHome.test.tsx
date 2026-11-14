@@ -344,6 +344,7 @@ test("the Bot page: a status sentence, Open chat, Pause, Stop… and Controls wi
   await show(<BotPanel />);
   expect(container.querySelector("[data-testid=bot-info-status]")?.textContent).toMatch(/^Working on 1 thing\./);
   // The ⋯ menu is gone: its items live in Controls.
+  expect(container.querySelector('[data-testid="bot-controls"]')?.textContent).toBe("Bot settings");
   expect(container.querySelector('[aria-label="Bot menu"]')).toBeNull();
   expect(button("Skills…")).toBeUndefined();
   expect(container.querySelector('input[aria-label="Bot name"]')).toBeNull();
@@ -527,6 +528,9 @@ test("Controls: profile and history collapsed until asked, Memory, Skills, and p
   };
   state.pathname = CONTROLS;
   await show(<BotPanel />);
+  expect(container.querySelector('[data-testid="page-bar-title"]')?.textContent).toBe("Bot settings");
+  expect(container.querySelector('[data-testid="page-bar-detail"]')?.textContent).toBe("Dot");
+  expect(container.querySelector('[data-testid="bot-controls-page"] h1')?.textContent).toBe("Bot settings");
   expect([...container.querySelectorAll("[data-controls]")].map((each) => each.getAttribute("data-controls"))).toEqual(["profile", "model", "memory", "skills", "checkins", "cache", "maintenance"]);
   // The components Bot info had, moved: one each.
   expect(container.querySelectorAll('[data-controls="profile"] [data-testid="bot-profile-section"]')).toHaveLength(1);
@@ -615,7 +619,7 @@ test("the Bot's block at the top of BB's Info tab is BB's own rows: Bot with its
   const controls = container.querySelector('[role=group][aria-label="Dot controls"]')!;
   expect([...controls.querySelectorAll("button")].map((each) => each.getAttribute("aria-label"))).toEqual(["Pause", "Stop"]);
   expect(container.querySelector("[data-testid=bot-pane]")).toBeNull();
-  expect(container.textContent).not.toMatch(/Up next|Recent|Schedule|Controls/);
+  expect(container.textContent).not.toMatch(/Up next|Recent|Schedule|Bot settings/);
   const { openAppPath } = await import("../../kit/app/index");
   await act(async () => click(container.querySelector("[data-testid=bot-info-needs]")));
   expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_main");

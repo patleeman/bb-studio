@@ -170,10 +170,10 @@ describe("Studio's settings sections", () => {
     for (const key of ["explore_next", "explore_explore", "explore_quickReplies", "explore_replyItems", "emojiItems", "showInSelectionMenu", "showInAssistantBar", "showInUserBar"]) expect($(`setting-${key}`)).not.toBeNull();
   });
 
-  it("Threads: Todos links to Bot ▸ Controls ▸ Attention", async () => {
+  it("Threads: Todos links to Bot settings ▸ Attention", async () => {
     await render("settings-threads");
     for (const key of ["decisions_enabled", "autoResumeThreads", "loopsEnabled", "snapshotsPerPage"]) expect($(`setting-${key}`)).not.toBeNull();
-    await click([...host.querySelectorAll("button")].find((button) => button.textContent === "Bot ▸ Controls ▸ Attention"));
+    await click([...host.querySelectorAll("button")].find((button) => button.textContent === "Bot settings ▸ Attention"));
     expect(state.open).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_cos/controls#attention");
   });
 
