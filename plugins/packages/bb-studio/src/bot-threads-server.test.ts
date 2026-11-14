@@ -221,22 +221,22 @@ it("lists what the sidebar leaves out, and finished conversations, for the older
   expect(view.conversations.map((each) => each.threadId)).not.toContain("stale");
   const older = await server.rpc.bot_threads_older({});
   expect(older.conversations.map((each) => [each.threadId, each.title, each.updatedAt])).toEqual([["stale", "GORUCK return", old]]);
-  expect(older.finished).toEqual([{ threadId: "prep", title: "Launch prep", finishedAt: 50, summary: "**Decisions**" }]);
+  expect(older.finished).toEqual([{ threadId: "prep", title: "Launch prep", finishedAt: 50, summary: "**Decisions**", failed: false }]);
   expect((await server.rpc.bot_thread_info({ threadId: "redesign" })).info!.finishing).toBe(false);
   db.prepare("INSERT INTO bot_finishes (thread_id, bot_id, title, state, requested_at, deadline_at) VALUES ('redesign', 'dot', 'Fork redesign', 'finishing', 1, 2)").run();
   expect((await server.rpc.bot_thread_info({ threadId: "redesign" })).info!.finishing).toBe(true);
 });
 
-it("names a finished conversation by BB's title when Studio's row has none", async () => {
+it("names a finished conversation by BB's title when Studio's row has none, and marks one whose last reply failed", async () => {
   const { server, threads, bb } = await setup();
   const db = bb.storage.database();
   threads.set("kindle", { id: "kindle", title: "Kindle vs Kobo for bed", createdAt: 1, updatedAt: 2, status: "idle", archivedAt: 60 } as never);
-  threads.set("hello", { id: "hello", title: null, titleFallback: "Say hello", createdAt: 1, updatedAt: 2, status: "idle", archivedAt: 70 } as never);
+  threads.set("hello", { id: "hello", title: null, titleFallback: "Say hello", createdAt: 1, updatedAt: 2, status: "error", archivedAt: 70 } as never);
   for (const [id, at] of [["kindle", 60], ["hello", 70], ["gone", 80]] as const) {
     db.prepare("INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, source, created_at, updated_at, archived_at, finished_summary) VALUES (?, 'dot', 'conversation', 0, 'created', 1, 1, ?, 'Done')").run(id, at);
   }
   const older = await server.rpc.bot_threads_older({});
-  expect(older.finished.map((each) => [each.threadId, each.title])).toEqual([["gone", "Untitled conversation"], ["hello", "Say hello"], ["kindle", "Kindle vs Kobo for bed"]]);
+  expect(older.finished.map((each) => [each.threadId, each.title, each.failed])).toEqual([["gone", "Untitled conversation", false], ["hello", "Say hello", true], ["kindle", "Kindle vs Kobo for bed", false]]);
 });
 
 it("moves forks agents made, recorded as conversations by an earlier start, to workers once at the next start", async () => {
