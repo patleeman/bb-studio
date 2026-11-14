@@ -228,7 +228,7 @@ struct BotLibraryItem: Equatable, Identifiable {
         case .design: .design
         case .app: .app
         case .artifact: .artifact
-        case .other, .unknown, nil: .other
+        case .recording, .other, .unknown, nil: .other
         }
         let title = wire.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         self.init(pluginId: pluginId, itemId: id, title: title.isEmpty ? "Untitled" : title, kind: kind, type: wire.type, href: wire.href,
