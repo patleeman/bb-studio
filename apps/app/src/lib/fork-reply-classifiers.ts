@@ -1,15 +1,25 @@
 import { useMemo, useSyncExternalStore } from "react";
 import type { ExperimentalMessageClassificationContext } from "@get-bb/plugin-sdk";
 import { getPluginSlotSnapshot, subscribePluginSlots } from "./plugin-slots";
+import type { PluginReplyClassifierSlot } from "./fork-slots";
+
+export type ReplyClassifiers = readonly PluginReplyClassifierSlot[];
+
+function currentClassifiers(): ReplyClassifiers {
+  return getPluginSlotSnapshot().replyClassifiers;
+}
 
 export interface PluginMessageClassification {
   sender: string | null;
   previewStart: number;
 }
 
-export function isQuietReply(text: string | null | undefined): boolean {
+export function isQuietReply(
+  text: string | null | undefined,
+  classifiers: ReplyClassifiers = currentClassifiers(),
+): boolean {
   if (typeof text !== "string") return false;
-  for (const classifier of getPluginSlotSnapshot().replyClassifiers) {
+  for (const classifier of classifiers) {
     try {
       if (classifier.classify(text)?.quiet === true) return true;
     } catch {
@@ -49,8 +59,9 @@ function wellFormedClassification(
 export function classifyPluginMessage(
   text: string,
   context: ExperimentalMessageClassificationContext,
+  classifiers: ReplyClassifiers = currentClassifiers(),
 ): PluginMessageClassification | null {
-  for (const classifier of getPluginSlotSnapshot().replyClassifiers) {
+  for (const classifier of classifiers) {
     if (typeof classifier.classifyMessage !== "function") continue;
     try {
       const result: unknown = classifier.classifyMessage(text, context);
