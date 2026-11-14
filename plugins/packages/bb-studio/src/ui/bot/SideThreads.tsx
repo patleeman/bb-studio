@@ -28,7 +28,7 @@ export function SideThreadPanel({ params }: ThreadTabProps) {
 }
 
 export async function openThreadBeside(sourceThreadId: string, threadId: string, fallback: (threadId: string) => void, open: typeof openTabRef = openTabRef): Promise<boolean> {
-  const opened = await open({ kind: "conversation", id: threadId }, "Thread", { threadId: sourceThreadId }).catch(() => false);
+  const opened = await open({ kind: "conversation", id: threadId }, "Conversation", { threadId: sourceThreadId }).catch(() => false);
   if (!opened) fallback(threadId);
   return opened;
 }

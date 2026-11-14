@@ -145,7 +145,7 @@ export class SideThreads {
     const rows = this.deps.db.prepare("SELECT * FROM bot_side_threads WHERE bot_id = ? ORDER BY created_at DESC, rowid DESC").all(botId) as SideRow[];
     return (await this.live(rows)).map(({ row, thread }) => ({
       threadId: row.thread_id, sourceThreadId: row.source_thread_id, messageId: row.message_id,
-      title: thread.title?.trim() || thread.titleFallback?.trim() || "Thread",
+      title: thread.title?.trim() || thread.titleFallback?.trim() || "Conversation",
       replies: row.replies, working: thread.status === "active", updatedAt: row.last_reply_at ?? row.created_at,
       menu: {
         projectId: thread.projectId ?? "", parentThreadId: thread.parentThreadId ?? null, pinnedAt: thread.pinnedAt ?? null, sectionId: thread.sectionId ?? null,
@@ -353,6 +353,6 @@ export function snippet(text: string | undefined): string {
     .replace(/[`*_#>[\]]/g, "")
     .replace(/\s+/g, " ")
     .trim();
-  if (!plain) return "Thread";
+  if (!plain) return "Conversation";
   return plain.length > 60 ? `${plain.slice(0, 59).trimEnd()}…` : plain;
 }
