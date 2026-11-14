@@ -209,6 +209,17 @@ reply of exactly `[PASS]`).
   classifier counts as saying nothing.
 - Frontend: `app.slots.experimental_replyClassifier({ id, classify })`. The
   thread view draws a reply classified quiet as a "Quiet check" marker.
+- Frontend, optional: `classifyMessage(text, { part, initiator })` on the
+  same registration says how to draw a message that came into the thread (a
+  user-role row). For a row bb would draw as the user's own bubble, any result
+  draws it as a system row ("Message from <sender>") instead; `sender` also
+  names an agent message's source over the sending thread's title;
+  `previewStart` moves the one-line preview past a leading tag (`part:
+  "body"` is called with the text after bb's own header). A system, agent or
+  automation row, or one a plugin classified, whose turn ends in a quiet reply
+  folds with that reply into its own row (the work rows of that turn are
+  hidden, warnings stay) and draws a check as its icon. Studio's rules are in
+  its `src/kit/relayed.ts`.
 
 **Core callers.** `services/threads/turn-classifiers.fork.ts` is the registry;
 `services/threads/quiet-turn.fork.ts` asks it. `lifecycle-outcome.ts` calls
@@ -217,13 +228,20 @@ which keep `latestAttentionAt` after a quiet `run.succeeded`;
 `internal/events.ts` adds one condition to the parent notice, and
 `plugin-service.ts` spreads `forkIdleFields` into the event.
 push-notifications' `sender.ts` returns early on the flag. On the client,
-`lib/fork-reply-classifiers.ts` reads the slot for `ThreadTimelineRows`.
+`lib/fork-reply-classifiers.ts` reads the slot for `ThreadTimelineRows`;
+`relayedFold.fork.tsx` folds relayed rows with their quiet reply and supplies
+the sender, preview start and check icon to `ConversationMessageContent` and
+`GeneratedConversationMessage`.
 
 **Audit before stabilizing.**
 
 1. The two halves (backend hook, frontend slot) must agree; consider one
    declaration that serves both.
-2. Decide whether classification should carry more than `quiet`.
+2. Decide whether classification should carry more than `quiet`, and
+   whether `classifyMessage` should be its own slot. The timeline rows do not
+   say which plugin sent a message (the turn request has `originPluginId`);
+   with that on the row, a plugin could classify only its own messages
+   instead of matching their text.
 3. bb's own hook system is asynchronous (`experimental_hooks.on`). This one
    is synchronous because turn completion is; decide whether it should join
    the hook registry.
