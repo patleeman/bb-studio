@@ -163,13 +163,15 @@ describe("the combined handle Studio's server code reads", () => {
     expect(decisionsConstants({ STUDIO_JEV_TIMEOUT_MS: "99999" }).jevTimeoutMs).toBe(5000);
   });
 
-  it("Todos' time zone is the setting, else STUDIO_LOOP_TIME_ZONE, else this Mac's", () => {
+  it("Todos' time zone is the setting, else STUDIO_LOOP_TIME_ZONE, else this Mac's, else UTC", () => {
     expect(loopTimeZone({}, "America/Los_Angeles")).toBe("America/Los_Angeles");
     expect(loopTimeZone({ STUDIO_LOOP_TIME_ZONE: "Europe/Paris" }, "America/Los_Angeles")).toBe("America/Los_Angeles");
     expect(loopTimeZone({ STUDIO_LOOP_TIME_ZONE: "Europe/Paris" }, "")).toBe("Europe/Paris");
     expect(loopTimeZone({ STUDIO_LOOP_TIME_ZONE: "Europe/Paris" })).toBe("Europe/Paris");
     expect(loopTimeZone({ STUDIO_LOOP_TIME_ZONE: "Mars/Olympus" })).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
     expect(loopTimeZone({}, "Mars/Olympus")).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({ timeZone: "" } as Intl.ResolvedDateTimeFormatOptions);
+    expect(loopTimeZone({})).toBe("UTC");
   });
 
   it("checks the Todos time zone setting: an IANA zone or empty", () => {

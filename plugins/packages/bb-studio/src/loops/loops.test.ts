@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MIGRATIONS } from '../migrations';
 import { LoopStore } from './store';
-import { LoopScheduler, defaults as baseDefaults, snooze } from './scheduler';
+import { LoopScheduler, defaults as baseDefaults, snooze, systemTimeZone } from './scheduler';
 import { rpcContract } from './contract';
 import { LOOP_TOOLS, loopPushActions, registerLoops, threadOwner } from './register';
 const defaults={...baseDefaults,enabled:true};
@@ -24,6 +24,7 @@ it('releases snoozed time todos and repeats overdue pushes only the next day',as
 it('keeps a latched event across scheduler recreation',async()=>{const l=store.add({title:'Reply',trigger:{type:'event',event:'reply'}});scheduler.fire('reply');const restarted=new LoopScheduler(store,()=>defaults,post,notify);await restarted.tick();expect(store.get(l.id).status).toBe('surfaced');});
 
 it('defaults OFF: releases no cards, urgent pushes or stale cards while store and events still work',async()=>{expect(baseDefaults.enabled).toBe(false);const l=store.add({title:'Urgent',priority:'urgent',push:true,trigger:{type:'event',event:'reply'}});const off=new LoopScheduler(store,()=>baseDefaults,post,notify);expect(off.fire('reply').matched).toBe(1);store.add({title:'Already surfaced',status:'surfaced',priority:'urgent',push:true});await off.tick();expect(store.get(l.id).status).toBe('queued');expect(post).not.toHaveBeenCalled();expect(notify).not.toHaveBeenCalled();expect(off.morning()).toBeDefined();});
+it('falls back to this computer\'s time zone, never a fixed city',()=>{expect(baseDefaults.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);expect(systemTimeZone('Asia/Tokyo')).toBe('Asia/Tokyo');expect(systemTimeZone('')).toBe('UTC');});
 it('keeps place names only, deduped ignoring case and replaced as a whole',()=>{expect(store.places()).toEqual([]);expect(store.setPlaces([' Home ','Office','home','Mom’s'])).toEqual(['Home','Office','Mom’s']);expect(store.places()).toEqual(['Home','Office','Mom’s']);store.setPlaces(['Gym']);expect(store.places()).toEqual(['Gym']);expect(()=>rpcContract['loops.setPlaces'].input.parse({names:Array.from({length:21},(_,i)=>`P${i}`)})).toThrow();expect(()=>rpcContract['loops.setPlaces'].input.parse({names:['x'.repeat(61)]})).toThrow();expect(rpcContract['loops.places'].output.parse({names:store.places()})).toEqual({names:['Gym']});});
 it('matches place triggers by lower-case name',()=>{const l=store.add({title:'Plumber',trigger:{type:'place',place:'Home',direction:'arrive'}});expect(store.get(l.id).trigger.place).toBe('home');expect(scheduler.fire('place:home:arrive').matched).toBe(1);});
 it('reopens a closed todo when an update sets an open status (Undo)',()=>{const l=store.add({title:'Call',status:'surfaced'});store.act({id:l.id,action:'done'},()=>({type:'none'}));const back=store.update(l.id,{status:'surfaced'});expect(back.closedAt).toBeNull();expect(back.status).toBe('surfaced');expect(store.history(l.id).map(e=>e.type)).toContain('reopened');expect(store.groups().needsYouNow.map(x=>x.id)).toEqual([l.id]);});

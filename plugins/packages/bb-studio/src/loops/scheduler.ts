@@ -5,7 +5,8 @@ const RANK={urgent:0,normal:1,low:2} as const;
 /** A none trigger, or a time trigger that has come. Events and places become due times when they fire. */
 export const isDue=(l:Pick<Loop,'trigger'>,now:number)=>l.trigger.type==='none'||l.trigger.type==='time'&&l.trigger.at!==undefined&&l.trigger.at<=now;
 export type Settings={enabled:boolean;timeZone:string;dailyBudget:number;quietStart:number;quietEnd:number};
-export const defaults:Settings={enabled:false,timeZone:'America/New_York',dailyBudget:5,quietStart:22,quietEnd:7};
+export const systemTimeZone=(zone:string|undefined=Intl.DateTimeFormat().resolvedOptions().timeZone)=>zone||'UTC';
+export const defaults:Settings={enabled:false,timeZone:systemTimeZone(),dailyBudget:5,quietStart:22,quietEnd:7};
 export function local(now:number,zone:string){const parts=new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23',weekday:'short'}).formatToParts(now);const p=Object.fromEntries(parts.map(p=>[p.type,p.value]));return {date:`${p.year}-${p.month}-${p.day}`,hour:Number(p.hour),minute:Number(p.minute),weekday:p.weekday};}
 // Resolve wall-clock presets in the configured zone, including DST offsets.
 export function snooze(preset:string,settings:Settings,now=Date.now()):Loop['trigger'] {
