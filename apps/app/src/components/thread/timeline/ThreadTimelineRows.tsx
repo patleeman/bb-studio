@@ -1,3 +1,4 @@
+import { RelayedFoldContext, RelayedRowFolded, useRelayedFold } from "./relayedFold.fork";
 import { isEmptyThought } from "./emptyThought.fork";
 import { unreadDividerTurnStart } from "./unreadDividerTurnStart.fork";
 import { forkSignInErrorBody } from "./SignInErrorActions.fork";
@@ -811,12 +812,14 @@ function ConversationRow({
     return <QuietTurnMarker />;
   }
   return (
+    <RelayedRowFolded rowId={row.id}>
     <ConversationRowContent
       row={row}
       showAssistantMessageActions={showAssistantMessageActions}
       mobileActionDisplay={isLatestActionableMessage ? "inline" : "overflow"}
       streaming={isStreamingMessage}
     />
+    </RelayedRowFolded>
   );
 }
 
@@ -2189,14 +2192,15 @@ function TimelineRowsList({
     rows,
     unreadDividerPlacement,
   });
+  const relayedFold = useRelayedFold(rows, scopeActive, findStreamingAssistantMessageId);
   const items = useMemo(
     () =>
       buildTimelineRowsListItems({
-        rows,
+        rows: relayedFold.rows,
         scopeActive,
         unreadDividerPlacement: loadedUnreadDividerPlacement,
       }),
-    [rows, scopeActive, loadedUnreadDividerPlacement],
+    [relayedFold.rows, scopeActive, loadedUnreadDividerPlacement],
   );
   useLandOnUnreadDivider({
     items,
@@ -2232,6 +2236,7 @@ function TimelineRowsList({
   }, [items, rows, spacing, stableSearchExpandedRowIds, navigationTargetRowId]);
   const isTopLevelList = spacing === "top-level";
   return (
+    <RelayedFoldContext.Provider value={relayedFold.folded}>
     <TimelineSearchExpansionContext.Provider value={stableSearchExpandedRowIds}>
       <div
         className={cn(
@@ -2302,6 +2307,7 @@ function TimelineRowsList({
         />
       </div>
     </TimelineSearchExpansionContext.Provider>
+    </RelayedFoldContext.Provider>
   );
 }
 
