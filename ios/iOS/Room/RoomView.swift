@@ -69,11 +69,17 @@ struct RoomView: View {
     @State private var morning: LoopMorning?
     @State private var dragLast: CGFloat = 0
     @State private var floorTop: CGFloat = 0
+    @State private var maskOpen = false
+    @State private var sceneSize: CGSize = .zero
+    @State private var presenceSize: CGFloat = 0
+    @State private var switching = false
     @State private var inheritedTrailing: CGFloat = 0
     @Environment(\.look) private var look
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.scenePhase) private var phase
     @Environment(\.duoPage) private var duoPage
+    @Environment(\.displayScale) private var displayScale
+    @Environment(\.colorScheme) private var scheme
 
     var workbench: Workbench?
 
@@ -171,7 +177,7 @@ struct RoomView: View {
                 Text(toast).font(.headline).foregroundStyle(.white)
                     .padding(.horizontal, 16).padding(.vertical, 8)
                     .background(.black.opacity(0.45), in: .capsule)
-                    .padding(.top, 8)
+                    .padding(.top, 60)
                     .transition(.opacity)
                     .accessibilityIdentifier("roomBotToast")
             }
@@ -183,8 +189,21 @@ struct RoomView: View {
             try? await Task.sleep(for: .milliseconds(1400))
             withAnimation(.easeInOut(duration: 0.3)) { toast = nil }
         }
+        .task(id: "\(bot.id)|\(Int(sceneSize.width))x\(Int(sceneSize.height))|\(Int(presenceSize))") {
+            try? await Task.sleep(for: .seconds(1.2))
+            for step in [1, -1] {
+                guard !Task.isCancelled else { return }
+                if let id = BotShell.step(store.spaces, from: bot.id, by: step) { await warm(id) }
+            }
+        }
+        .onChange(of: room.standing, initial: true) { _, standing in
+            withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : standing ? .easeIn(duration: 0.22).delay(0.12) : .easeOut(duration: 0.06)) { maskOpen = standing }
+        }
         .modifier(TalkLifecycle(talk: session.talk))
     }
+
+    static let floorGap: CGFloat = 14
+    static let floorFade: CGFloat = 72
 
     static let tilt: Double = 31
     static let perspective: CGFloat = 0.45
@@ -194,11 +213,14 @@ struct RoomView: View {
             .rotation3DEffect(.degrees(room.standing ? 0 : Self.tilt), axis: (x: 1, y: 0, z: 0), anchor: .bottom, perspective: Self.perspective)
             .mask {
                 GeometryReader { box in
-                    let top = room.standing ? 0 : max(0, floorTop - box.frame(in: .global).minY)
-                    VStack(spacing: 0) {
-                        Color.clear.frame(height: top)
-                        LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: room.standing ? 0 : 90)
-                        Color.black
+                    let top = max(0, floorTop + Self.floorGap - box.frame(in: .global).minY)
+                    ZStack(alignment: .top) {
+                        VStack(spacing: 0) {
+                            Color.clear.frame(height: top)
+                            LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: Self.floorFade)
+                            Color.black
+                        }
+                        Color.black.opacity(maskOpen ? 1 : 0)
                     }
                 }
                 .ignoresSafeArea()
@@ -211,6 +233,7 @@ struct RoomView: View {
             .background {
                 ZStack {
                     SceneBackdrop(theme: look.theme, botId: bot.id, view: view)
+                        .onGeometryChange(for: CGSize.self) { $0.size } action: { sceneSize = SceneBackdrop.stillSize($0) }
                     #if DEBUG
                     Color.clear.frame(width: 1, height: 1).accessibilityElement().accessibilityIdentifier("roomScene").accessibilityValue(look.theme.id)
                     #endif
@@ -257,7 +280,7 @@ struct RoomView: View {
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { room.handle(.tapFloor) }
             .accessibilityValue(order.count > 1 ? "Conversation \((order.firstIndex(of: pager.shown) ?? 0) + 1) of \(order.count)" : "")
-            .accessibilityAdjustableAction { direction in page(direction == .increment ? 1 : -1) }
+            .modifier(RoomPaging(pages: order.count, page: page))
             .accessibilityIdentifier("RoomFloor")
     }
 
@@ -266,13 +289,15 @@ struct RoomView: View {
             if room.mode == .rest {
                 floorGestures
             }
-            if room.showsDay {
-                RoomDayView(bot: bot, view: view, model: session.model, morning: shownConversation == nil ? morning : nil,
-                            conversation: shownConversation, openMenu: openMenu,
-                            openTodos: { room.showPlace(.todos) }, done: done, reportBottom: { floorTop = $0 },
-                            switchBot: switchBot, nudge: nudge, canSwitch: (store.spaces?.bots.count ?? 1) > 1)
-                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: -40)).combined(with: .scale(scale: 0.97, anchor: .top)))
-            }
+            RoomDayView(bot: bot, view: view, model: session.model, morning: shownConversation == nil ? morning : nil,
+                        conversation: shownConversation, openMenu: openMenu,
+                        openTodos: { room.showPlace(.todos) }, done: done, reportBottom: reportFloor,
+                        reportPresence: { presenceSize = $0 },
+                        switchBot: switchBot, nudge: nudge, canSwitch: (store.spaces?.bots.count ?? 1) > 1, shown: room.showsDay)
+                .opacity(room.showsDay ? 1 : 0)
+                .animation(reduceMotion ? .easeInOut(duration: 0.2) : room.showsDay ? .easeOut(duration: 0.28) : .easeOut(duration: 0.14), value: room.showsDay)
+                .allowsHitTesting(room.showsDay)
+                .accessibilityHidden(!room.showsDay)
             if room.showsDay && columnHeader {
                 FoldedColumn {
                     Button(action: openMenu) { Label("Everything else", systemImage: "line.3.horizontal") }
@@ -300,6 +325,8 @@ struct RoomView: View {
             .animation(.easeInOut(duration: 0.2), value: room.mode)
         }
         .ignoresSafeArea(.keyboard)
+        .padding(.top, proxy.safeAreaInsets.top)
+        .ignoresSafeArea(.container, edges: .top)
         .environment(\.colorScheme, .dark)
     }
 
@@ -327,7 +354,30 @@ struct RoomView: View {
         }
     }
 
+    private func reportFloor(_ bottom: CGFloat) {
+        guard floorTop > 0, bottom < floorTop else {
+            floorTop = bottom
+            return
+        }
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3).delay(0.18)) { floorTop = bottom }
+    }
+
+    private func warm(_ botId: String) async {
+        guard let next = store.spaces?.bots.first(where: { $0.id == botId }), sceneSize.width > 1, presenceSize > 0 else { return }
+        let looks = LookStore.shared
+        let theme = RoomTheme.resolve(botThemeId: shell.themeOverride[next.id] ?? next.appearance?.themeId, phoneThemeId: looks.themeId, catalog: looks.catalog)
+        let look = LookRoot.look(theme, store: looks, scheme: scheme)
+        _ = await SceneStills.shared.still(theme: theme, mode: look.mode, size: sceneSize, scale: min(2, displayScale))
+        let live = store.view(for: next.id)
+        var spec = PresenceSpec(bot: next, state: next.presenceState(live: live),
+                                workers: live?.workers.filter { $0.status == .running }.count ?? next.activity.workers,
+                                look: look, size: presenceSize, scale: displayScale, custom: PresenceCatalog.shared.entry(next.presence?.form))
+        spec.room = PresenceSpec.roomHeadroom
+        _ = await PresenceStills.shared.still(spec)
+    }
+
     private func switchBot(_ step: Int) {
+        guard !switching else { return }
         guard let next = BotShell.step(store.spaces, from: bot.id, by: step) else {
             guard !reduceMotion else { return }
             withAnimation(.spring(response: 0.18, dampingFraction: 0.5)) { nudge = CGFloat(-step) * 22 }
@@ -337,8 +387,13 @@ struct RoomView: View {
             }
             return
         }
-        shell.botToast = store.spaces?.bots.first { $0.id == next }?.name
-        withAnimation(.easeInOut(duration: reduceMotion ? 0.25 : 0.4)) { shell.show(next, store: store, compact: false) }
+        switching = true
+        Task {
+            await RoomWarmth.wait(upTo: .milliseconds(700)) { await warm(next) }
+            switching = false
+            shell.botToast = store.spaces?.bots.first { $0.id == next }?.name
+            withAnimation(.easeInOut(duration: reduceMotion ? 0.25 : 0.4)) { shell.show(next, store: store, compact: false) }
+        }
     }
 
     private var pageDots: some View {
@@ -350,7 +405,11 @@ struct RoomView: View {
         }
         .animation(.snappy, value: pager.shown)
         .accessibilityHidden(true)
-        .accessibilityIdentifier("roomPageDots")
+        .background {
+            #if DEBUG
+            Color.clear.frame(width: 1, height: 1).accessibilityElement().accessibilityIdentifier("roomPageDots")
+            #endif
+        }
     }
 
     private var dock: some View {
@@ -554,9 +613,11 @@ struct RoomDayView: View {
     var openTodos: () -> Void
     var done: (String) -> Void
     var reportBottom: (CGFloat) -> Void = { _ in }
+    var reportPresence: (CGFloat) -> Void = { _ in }
     var switchBot: (Int) -> Void = { _ in }
     var nudge: CGFloat = 0
     var canSwitch = false
+    var shown = true
     @Environment(\.look) private var look
 
     private var day: RoomDay.Line {
@@ -604,7 +665,7 @@ struct RoomDayView: View {
             .frame(minHeight: 44)
             PresenceView(bot: bot, state: bot.presenceState(live: view),
                          workers: view?.workers.filter { $0.status == .running }.count ?? bot.activity.workers, size: fit.presence,
-                         room: PresenceSpec.roomHeadroom)
+                         room: PresenceSpec.roomHeadroom, paused: !shown)
                 .offset(x: nudge)
                 .frame(maxWidth: .infinity)
                 .frame(height: fit.presence * PresenceSpec.roomHeadroom)
@@ -617,23 +678,31 @@ struct RoomDayView: View {
                 .accessibilityLabel("\(bot.name), \(BotShell.status(bot, view: view))")
                 .accessibilityHint(canSwitch ? "Swipe up or down to switch Bots" : "")
                 .accessibilityAdjustableAction { direction in switchBot(direction == .increment ? 1 : -1) }
-            (Text(day.lead + (day.rest == nil ? "" : " ")) + Text(day.rest ?? "").foregroundStyle(.white.opacity(0.62)).fontWeight(.medium))
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.white)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: 360, alignment: .leading)
-                .lookHalo(look)
-                .accessibilityIdentifier("roomDayLine")
+            ZStack(alignment: .topLeading) {
+                (Text(day.lead + (day.rest == nil ? "" : " ")) + Text(day.rest ?? "").foregroundStyle(.white.opacity(0.62)).fontWeight(.medium))
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 360, alignment: .leading)
+                    .lookHalo(look)
+                    .accessibilityIdentifier("roomDayLine")
+                    .id(conversation?.threadId ?? "main")
+                    .transition(.asymmetric(insertion: .opacity.animation(.easeOut(duration: 0.2).delay(0.16)),
+                                            removal: .opacity.animation(.easeIn(duration: 0.14))))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             VStack(spacing: 6) {
                 ForEach((morning?.items ?? []).prefix(fit.cards)) { item in
                     RoomCard(item: item, open: openTodos, done: { done(item.id) })
+                        .transition(.opacity)
                 }
             }
             .padding(.top, 18)
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { reportBottom($0) }
             Spacer(minLength: 0)
         }
+        .onChange(of: fit.presence, initial: true) { _, size in reportPresence(size) }
         .padding(.horizontal, 22)
         .padding(.top, 8)
         .frame(maxWidth: 640)
@@ -750,5 +819,43 @@ struct RoomMic: View {
             .onEnded { _ in
                 if talk.state == .recording || talk.state == .cancelling { talk.release() }
             }
+    }
+}
+
+@MainActor
+final class RoomWarmth {
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    static func wait(upTo limit: Duration, _ work: @escaping @MainActor () async -> Void) async {
+        let warmth = RoomWarmth()
+        await withCheckedContinuation { continuation in
+            warmth.continuation = continuation
+            Task { @MainActor in
+                await work()
+                warmth.finish()
+            }
+            Task { @MainActor in
+                try? await Task.sleep(for: limit)
+                warmth.finish()
+            }
+        }
+    }
+
+    private func finish() {
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+struct RoomPaging: ViewModifier {
+    let pages: Int
+    let page: (Int) -> Void
+
+    func body(content: Content) -> some View {
+        if pages > 1 {
+            content.accessibilityAdjustableAction { direction in page(direction == .increment ? 1 : -1) }
+        } else {
+            content
+        }
     }
 }

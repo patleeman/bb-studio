@@ -362,6 +362,7 @@ struct BotChildCard: View {
     let live: BotChildStatus?
     var inset: CGFloat = 36
     let open: () -> Void
+    @Environment(\.look) private var look
 
     private var status: BotChildStatus { live ?? event.status }
     private var symbol: String {
@@ -407,8 +408,8 @@ struct BotChildCard: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .frame(maxWidth: 360, alignment: .leading)
-            .background(inset == 0 ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(Color(uiColor: .systemBackground)), in: .rect(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.separator))
+            .background(inset == 0 ? AnyShapeStyle(look.canvas.opacity(0.28)) : AnyShapeStyle(Color(uiColor: .systemBackground)), in: .rect(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(inset == 0 ? AnyShapeStyle(.white.opacity(0.14)) : AnyShapeStyle(.separator), lineWidth: inset == 0 ? 0.5 : 1))
         }
         .buttonStyle(.plain)
         .disabled(event.threadId == nil)

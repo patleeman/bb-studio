@@ -23,6 +23,9 @@ struct BotSpacesRoot: View {
         #endif
     }
     private var shownBot: BotSpace? { BotShell.shownBot(store.spaces, chosen: shell.shownBotId) }
+    private func roomTheme(_ bot: BotSpace) -> LookTheme {
+        RoomTheme.resolve(botThemeId: shell.themeOverride[bot.id] ?? bot.appearance?.themeId, phoneThemeId: looks.themeId, catalog: looks.catalog)
+    }
     private var shownMain: String? { shownBot.flatMap { BotShell.mainThreadId($0, view: store.view(for: $0.id)) } }
 
     var body: some View {
@@ -30,6 +33,7 @@ struct BotSpacesRoot: View {
             if inRoom, let bot = shownBot, let main = shownMain {
                 RoomPages(pages: pages, layout: layout) {
                     RoomView(store: store, shell: shell, bot: bot, mainThreadId: main, workbench: pages == nil ? nil : workbench)
+                        .lookRoot(bot: bot, theme: roomTheme(bot))
                         .id(main)
                 } bench: {
                     RoomWorkbench(workbench: workbench, bot: bot, store: store, mainThreadId: main,
@@ -37,7 +41,7 @@ struct BotSpacesRoot: View {
                                   chooseTheme: { RoomView.chooseTheme($0, bot: bot, shell: shell, store: store, app: app) })
                 }
                 .transition(.opacity)
-                .lookRoot(bot: bot, theme: RoomTheme.resolve(botThemeId: shell.themeOverride[bot.id] ?? bot.appearance?.themeId, phoneThemeId: looks.themeId, catalog: looks.catalog))
+                .lookRoot(bot: bot, theme: roomTheme(bot))
             } else {
                 split.lookRoot(bot: shownBot)
             }

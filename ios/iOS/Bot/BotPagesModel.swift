@@ -288,10 +288,18 @@ enum LibraryPage {
     }
 
     static let fold = 8
-    static let filters: [BotLibraryItem.Kind] = [.page, .whiteboard, .design, .app, .artifact]
+    static let filters: [BotLibraryItem.Kind] = [.page, .whiteboard, .design, .app]
 
     static func label(_ kind: BotLibraryItem.Kind) -> String {
         kind == .other ? "Other" : kind.rawValue.capitalized
+    }
+
+    static func chip(_ kind: BotLibraryItem.Kind) -> String {
+        kind == .app ? "Apps" : label(kind)
+    }
+
+    static func matches(_ kind: BotLibraryItem.Kind, filter: BotLibraryItem.Kind) -> Bool {
+        kind == filter || (filter == .app && kind == .artifact)
     }
 
     static func provenance(_ item: BotLibraryItem) -> String {
@@ -308,7 +316,7 @@ enum LibraryPage {
     }
 
     static func passes(_ item: BotLibraryItem, query: String, kind: BotLibraryItem.Kind?) -> Bool {
-        if let kind, item.kind != kind { return false }
+        if let kind, !matches(item.kind, filter: kind) { return false }
         let words = query.lowercased().split(whereSeparator: \.isWhitespace)
         guard !words.isEmpty else { return true }
         let text = "\(item.title) \(provenance(item)) \(item.madeIn?.conversationTitle ?? "")".lowercased()

@@ -136,6 +136,8 @@ final class BotPagesTests: XCTestCase {
         XCTAssertEqual(LibraryPage.provenance(items[3]), "made by you")
         XCTAssertEqual(LibraryPage.groups(items, query: "", kind: .page, groupBy: .conversation).flatMap(\.rows).map(\.item.itemId), ["p1"])
         XCTAssertEqual(LibraryPage.groups(items, query: "fable", kind: nil, groupBy: .conversation).flatMap(\.rows).map(\.item.itemId), ["a1"])
+        XCTAssertEqual(LibraryPage.filters.map(LibraryPage.chip), ["Page", "Whiteboard", "Design", "Apps"], "one chip for apps and artifacts")
+        XCTAssertEqual(Set(LibraryPage.groups(items, query: "", kind: .app, groupBy: .date).flatMap(\.rows).map(\.item.kind)), [.app, .artifact])
         XCTAssertEqual(LibraryPage.groups(items, query: "", kind: nil, groupBy: .kind).map(\.title), ["Pages", "Apps", "Artifacts"])
     }
 

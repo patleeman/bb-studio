@@ -223,7 +223,8 @@ enum BotSpacesDemo {
         func viewJSON(_ botId: String) -> Data {
             lock.withLock {
                 let now = Self.now
-                let list = (conversations[botId] ?? []).filter { !finished.contains($0.id) && $0.parent == nil }.map { conversation -> [String: Any] in
+                let one = ProcessInfo.processInfo.arguments.contains("-qaOneConversation")
+                let list = (conversations[botId] ?? []).filter { !finished.contains($0.id) && $0.parent == nil && (!one || $0.main) }.map { conversation -> [String: Any] in
                     [
                         "threadId": conversation.id, "title": conversation.title, "isMain": conversation.main,
                         "forkedFrom": conversation.parent.map { ["threadId": $0.threadId, "messageId": $0.messageId, "title": $0.title] } ?? NSNull(),

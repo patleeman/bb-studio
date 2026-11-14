@@ -175,14 +175,19 @@ struct SceneBackdrop: View {
 
     static let parallax: CGFloat = 12
 
+    static func stillSize(_ size: CGSize) -> CGSize {
+        CGSize(width: size.width + 2 * parallax, height: size.height + 2 * parallax)
+    }
+
     var body: some View {
         GeometryReader { geo in
-            let size = CGSize(width: geo.size.width + 2 * Self.parallax, height: geo.size.height + 2 * Self.parallax)
+            let size = Self.stillSize(geo.size)
+            let shown = theme.kind == .scene ? SceneStills.shared.cached(SceneStills.key(theme: theme, mode: look.mode, size: size, scale: min(2, scale))) ?? image : image
             ZStack {
                 Color(lookHex: theme.scene?.fallback ?? look.tokens.canvas)
                 if store.liveSceneRuns(foreground: phase == .active) {
                     LiveSceneView(theme: theme.id, mode: look.mode, size: geo.size, signals: SceneSignals.payload(botId: botId, view: view))
-                } else if let image {
+                } else if let image = shown {
                     ParallaxImage(image: image, amount: Self.parallax)
                         .frame(width: size.width, height: size.height)
                         .offset(x: -Self.parallax, y: -Self.parallax)
@@ -191,8 +196,12 @@ struct SceneBackdrop: View {
             .task(id: "\(theme.id)|\(look.mode)|\(Int(size.width))x\(Int(size.height))|\(hour)") {
                 let key = SceneStills.key(theme: theme, mode: look.mode, size: size, scale: min(2, scale))
                 if let chosen = SceneStills.chosenMode(key: key), store.sceneModes[theme.id] != chosen { store.sceneModes[theme.id] = chosen }
-                image = SceneStills.shared.cached(key)
-                if image == nil { image = await SceneStills.shared.still(theme: theme, mode: look.mode, size: size, scale: min(2, scale)) }
+                if let cached = SceneStills.shared.cached(key) {
+                    image = cached
+                } else {
+                    let rendered = await SceneStills.shared.still(theme: theme, mode: look.mode, size: size, scale: min(2, scale))
+                    withAnimation(.easeOut(duration: 0.3)) { image = rendered }
+                }
             }
         }
         .ignoresSafeArea()
