@@ -132,17 +132,17 @@ export function EditSpace({ bot, bots, onClose, stage = null }: { bot: BotSpace;
       after={<>{modelField}{errorLine}</>} actions={actions} actionsClassName={stage ? STAGE_ACTIONS : SIDEBAR_ACTIONS} />
   );
   const shownTheme = appearance ? registry.get(appearance.themeId) : null;
+  const title = `Edit ${bot.name}`;
   const titleRow = (className: string) => (
     <header data-testid="edit-space-title-row" className={className}>
-      <h2 className="text-sm font-semibold">Edit space</h2>
-      <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{name.trim() || bot.name}</span>
+      <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</h2>
       <Button type="button" variant="ghost" size="icon" aria-label="Close" data-testid="edit-space-close" className="-mr-1.5 size-7" onClick={onClose}><Icon name="X" className="size-4" /></Button>
     </header>
   );
   if (stage) {
     return (
       <EditSpaceStage rect={stage} scene={shownTheme?.kind === "scene"}>
-        <section aria-label="Edit space" data-testid="edit-space" className="flex min-h-0 flex-1 flex-col">
+        <section aria-label={title} data-testid="edit-space" className="flex min-h-0 flex-1 flex-col">
           <div data-testid="edit-space-scroll" className={glass ? STAGE_FRAME_BARE : STAGE_FRAME}>
             {glass ? titleRow(STAGE_BARE_TITLE_ROW) : null}
             <div data-testid="edit-space-pane" className={glass ? STAGE_PANE_BARE : STAGE_PANE}>
@@ -156,8 +156,8 @@ export function EditSpace({ bot, bots, onClose, stage = null }: { bot: BotSpace;
     );
   }
   return (
-    <section aria-label="Edit space" data-testid="edit-space" data-studio-no-drag="all" className="flex flex-col gap-3 px-1 pt-3">
-      <h2 className="px-2 text-sm font-semibold">Edit space</h2>
+    <section aria-label={title} data-testid="edit-space" data-studio-no-drag="all" className="flex flex-col gap-3 px-1 pt-3">
+      <h2 className="px-2 text-sm font-semibold">{title}</h2>
       <div data-testid="edit-space-profile" className="flex flex-col gap-5 px-2">{nameField}{presenceField}</div>
       <div className="px-2">{picker}</div>
     </section>
