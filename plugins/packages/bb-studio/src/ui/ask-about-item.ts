@@ -33,6 +33,14 @@ export async function askTarget(container: AskAboutItem["container"], spaces: Sp
   return threadId ? { threadId, opens: true } : null;
 }
 
+/** The name of the Bot "Ask … about this" goes to: the one on screen, else the current or first. */
+export async function askBotNameOf(spaces: () => Promise<{ bots: readonly { id: string; name?: string }[]; currentBotId: string | null } | null>): Promise<string | null> {
+  const known = await spaces().catch(() => null);
+  if (!known) return null;
+  const id = currentBot() ?? known.currentBotId ?? known.bots[0]?.id ?? null;
+  return known.bots.find((bot) => bot.id === id)?.name ?? null;
+}
+
 /** The pill for a Studio item: its kind is the provider. Null for an item BB can't mention. */
 export function itemMention(ask: Pick<AskAboutItem, "item" | "itemRef">): ComposerMention | null {
   const provider = itemKindOf(ask.itemRef.id);

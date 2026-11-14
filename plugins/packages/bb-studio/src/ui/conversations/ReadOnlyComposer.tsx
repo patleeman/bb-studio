@@ -6,7 +6,7 @@
 //   for is a "From" row there. On a BB without the header slot, the same
 //   one muted row ("Running · for Main") sits under the header (BB's
 //   `experimental_threadBanner`), or above the box without banners. Its composer is
-//   replaced by an active composer, "Ask the Bot about this worker…", with
+//   replaced by an active composer, "Ask <Bot> about this worker…", with
 //   "Sends to <Bot> in <conversation>" on the right by its send button: it
 //   sends the
 //   text to the Bot in that conversation, with a link to the worker first,
@@ -266,7 +266,7 @@ export function WorkerAskBox({ info, onSent }: { info: BotThreadInfo; onSent?(co
       {/* An active composer (6c): the box is live, the send button always readable; the helper sits on the right beside it. */}
       <div data-testid="worker-ask-box" className="cursor-text rounded-[10px] border border-border bg-background px-3 pb-2 pt-2.5 shadow-sm focus-within:border-ring"
         onClick={(event) => { if (event.target === event.currentTarget) event.currentTarget.querySelector("textarea")?.focus(); }}>
-        <textarea data-testid="worker-ask" aria-label="Ask the Bot about this worker" placeholder="Ask the Bot about this worker…" rows={2} value={text} disabled={busy}
+        <textarea data-testid="worker-ask" aria-label={`Ask ${info.botName} about this worker`} placeholder={`Ask ${info.botName} about this worker…`} rows={2} value={text} disabled={busy}
           onChange={(event) => setText(event.target.value)} onKeyDown={onKeyDown}
           className="block w-full resize-none bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
         <div className="flex items-center justify-end gap-2.5 text-xs text-muted-foreground">
