@@ -39,11 +39,11 @@ export class LoopScheduler {
  /**
   * The user pressed Surface now: post the card right away, skipping the
   * low-priority morning hold and the daily budget (their own ask, so it
-  * isn't an interruption and doesn't count toward the budget). Throws why
-  * when it can't, so the button never silently does nothing.
+  * isn't an interruption and doesn't count toward the budget), with Todo
+  * reminders on or off. Throws why when it can't, so the button never
+  * silently does nothing.
   */
  async surfaceNow(id:string){const l=this.store.get(id);
- if(!this.settings().enabled)throw Error('Todo reminders are off. Turn them on in Bot settings ▸ Attention.');
  if(l.closedAt)throw Error('This todo is already closed.');
  if(l.owner!=='patrick')throw Error('Only your own todos can be surfaced. Take it back first.');
  if(l.status!=='surfaced')await this.post(`Please post this card in your chat exactly once: ::loop{id="${l.id}"}`);

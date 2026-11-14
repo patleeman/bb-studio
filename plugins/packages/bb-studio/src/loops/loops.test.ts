@@ -102,7 +102,7 @@ it('hardcodes no area names in the Loops UI or the iOS app',async()=>{
  const {existsSync,readFileSync}=await import('node:fs');const paths=['./ui/model.ts','./ui/LoopsTab.tsx','./ui/LoopsPane.tsx','../../../../apps/ios/iOS/Loops/LoopsView.swift','../../../../../ios/iOS/Loops/LoopsView.swift'].map(path=>new URL(path,import.meta.url)).filter(url=>existsSync(url));
  expect(paths.length).toBeGreaterThanOrEqual(3);for(const url of paths)expect(readFileSync(url,'utf8')).not.toMatch(/\bAREAS\b|static let areas|"(Job|Larkspur|Systems)"/);});
 
-it('releases the user\'s own Surface now at once, past the morning hold and the budget, and says why when it can\'t',async()=>{
+it('releases the user\'s own Surface now at once, past the morning hold, the budget and reminders being off, and says why when it can\'t',async()=>{
  const handlers:Record<string,(x:any)=>unknown>={};let onChange:(v:Record<string,unknown>)=>void=()=>{};
  const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},
   settings:{define:()=>({get:async()=>({loopsEnabled:true,loopDailyBudget:0}),onChange:(f:typeof onChange)=>{onChange=f;}})},sdk:{threads:{get:async()=>null}}};
@@ -118,7 +118,7 @@ it('releases the user\'s own Surface now at once, past the morning hold and the 
  expect((db.prepare("SELECT count(*) n FROM loop_events WHERE type='surfaced'").get() as {n:number}).n).toBe(0);
  const cos=loops.store.add({title:'CoS job',owner:'cos'});await expect(handlers['loops.update']!({id:cos.id,surfaceNow:true})).rejects.toThrow('Only your own todos');
  loops.store.act({id:low.id,action:'done'},()=>({type:'none'}));await expect(handlers['loops.update']!({id:low.id,surfaceNow:true})).rejects.toThrow('already closed');
- onChange({loopsEnabled:false});await expect(handlers['loops.update']!({id:later.id,surfaceNow:true})).rejects.toThrow('Todo reminders are off');
+ onChange({loopsEnabled:false});const off=loops.store.add({title:'With reminders off',trigger:{type:'time',at:Date.now()+86400000}});expect(await handlers['loops.update']!({id:off.id,surfaceNow:true})).toMatchObject({status:'surfaced'});expect(post).toHaveBeenCalledTimes(3);expect(post.mock.calls[2]![0]).toContain(`::loop{id="${off.id}"}`);
  // The Bot's own surfaceNow keeps the policy: queued, trigger none, held for the morning.
  const botLow=loops.store.add({title:'Bot low',priority:'low',trigger:{type:'time',at:Date.now()+3600000}});const tool=(bb.agents.registerTool as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0]).find((t:{name:string})=>t.name==='loops_update');
  expect(JSON.parse(await tool.execute({id:botLow.id,surfaceNow:true}))).toMatchObject({status:'queued',trigger:{type:'none'}});});
