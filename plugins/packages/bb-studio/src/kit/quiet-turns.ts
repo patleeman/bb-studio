@@ -4,6 +4,7 @@
 // notice and the push, and the thread view draws the reply as a small
 // "Quiet check" marker. On a BB without these hooks both calls do nothing.
 import { isPassOutput } from "./silent";
+import { parseRelayedBody, parseRelayedMessage } from "./relayed";
 
 interface TurnClassifierHooks {
   experimental_classifyTurns?: (classifier: (turn: { threadId: string; finalOutput: string | null }) => { quiet: boolean }) => void;
@@ -17,14 +18,37 @@ export function registerQuietTurnClassifier(bb: { experimental_hooks?: object })
   return true;
 }
 
+export interface MessageClassificationContext {
+  part: "message" | "body";
+  initiator: "user" | "agent" | "system" | null;
+}
+
+export interface MessageClassification {
+  sender?: string;
+  previewStart: number;
+}
+
 interface ReplyClassifierSlots {
-  experimental_replyClassifier?: (registration: { id: string; classify: (text: string) => { quiet: boolean } }) => void;
+  experimental_replyClassifier?: (registration: {
+    id: string;
+    classify: (text: string) => { quiet: boolean };
+    classifyMessage: (text: string, context: MessageClassificationContext) => MessageClassification | null;
+  }) => void;
+}
+
+export function classifyRelayedMessage(text: string, context: MessageClassificationContext): MessageClassification | null {
+  const relayed = context.part === "body" ? parseRelayedBody(text) : parseRelayedMessage(text, context.initiator);
+  if (!relayed) return null;
+  return {
+    ...(relayed.sender ? { sender: relayed.sender } : {}),
+    previewStart: relayed.kind === "automation" ? relayed.bodyStart : relayed.summaryStart,
+  };
 }
 
 /** Frontend half: `app.slots.experimental_replyClassifier`. Returns whether BB took it. */
 export function registerQuietReplyClassifier(slots: object): boolean {
   const target = slots as ReplyClassifierSlots;
   if (typeof target.experimental_replyClassifier !== "function") return false;
-  target.experimental_replyClassifier({ id: "pass", classify: (text) => ({ quiet: isPassOutput(text) }) });
+  target.experimental_replyClassifier({ id: "pass", classify: (text) => ({ quiet: isPassOutput(text) }), classifyMessage: classifyRelayedMessage });
   return true;
 }
