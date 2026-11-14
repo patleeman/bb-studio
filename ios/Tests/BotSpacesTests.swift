@@ -293,6 +293,83 @@ final class BotSpacesTests: XCTestCase {
         XCTAssertEqual(calls.viewRequests(), ["bot_a"])
     }
 
+    private func offlineClient(online: LockedFlag, calls: Calls) -> BBClient {
+        let base = client(calls: calls)
+        let answer = base.transport
+        base.transport = { method, path, body in
+            if !online.value {
+                calls.record("offline", .null)
+                throw URLError(.notConnectedToInternet)
+            }
+            return try await answer!(method, path, body)
+        }
+        return base
+    }
+
+    @MainActor
+    func testAnOfflineFirstAskIsRetriedUntilSpacesAnswer() async {
+        let calls = Calls()
+        let online = LockedFlag()
+        let store = BotSpacesStore(serverURL: server)
+        store.coalesceDelay = .milliseconds(10)
+        store.retryDelays = [.milliseconds(40), .milliseconds(80)]
+        store.attach(client: offlineClient(online: online, calls: calls), realtime: nil)
+        store.askIfUnknown()
+        await waitUntil { calls.count("offline") >= 3 }
+        XCTAssertEqual(store.support, .unknown, "offline is not an answer")
+        XCTAssertNotNil(store.error)
+        XCTAssertGreaterThanOrEqual(store.retries, 2, "asked again on its own, backing off")
+
+        online.value = true
+        await waitUntil({ store.support == .available }, timeout: .seconds(2))
+        XCTAssertEqual(store.support, .available)
+        XCTAssertEqual(store.retries, 0)
+        XCTAssertEqual(store.spaces?.current?.id, "bot_a")
+        let asked = calls.count("bot_spaces")
+        await settle()
+        XCTAssertEqual(calls.count("bot_spaces"), asked, "no retries once it answered")
+    }
+
+    @MainActor
+    func testForegroundAsksAgainRightAwayWhileUnknown() async {
+        let calls = Calls()
+        let online = LockedFlag()
+        let store = BotSpacesStore(serverURL: server)
+        store.coalesceDelay = .milliseconds(10)
+        store.retryDelays = [.seconds(60)]
+        store.attach(client: offlineClient(online: online, calls: calls), realtime: nil)
+        store.askIfUnknown()
+        await waitUntil { calls.count("offline") == 1 }
+        await settle()
+        XCTAssertEqual(calls.count("offline"), 1, "the next retry waits")
+
+        online.value = true
+        store.askIfUnknown()
+        await waitUntil { store.support == .available }
+        XCTAssertEqual(store.support, .available, "foreground or network-up asks at once")
+
+        store.askIfUnknown()
+        await settle()
+        XCTAssertEqual(calls.count("bot_spaces"), 1, "nothing to ask once known")
+    }
+
+    @MainActor
+    func testReconnectAnswersAnOfflineFirstAsk() async {
+        let calls = Calls()
+        let online = LockedFlag()
+        let store = BotSpacesStore(serverURL: server)
+        store.coalesceDelay = .milliseconds(10)
+        store.retryDelays = [.seconds(60)]
+        store.attach(client: offlineClient(online: online, calls: calls), realtime: nil)
+        store.askIfUnknown()
+        await waitUntil { calls.count("offline") == 1 }
+        online.value = true
+        store.handle(.connected)
+        await waitUntil { store.support == .available }
+        XCTAssertEqual(store.support, .available)
+        XCTAssertEqual(store.retries, 0)
+    }
+
     @MainActor
     func testStudioNotRunningKeepsTheLastAnswer() async {
         let calls = Calls()

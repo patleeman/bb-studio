@@ -8,17 +8,57 @@ import XCTest
 // (no mic, no WebRTC connection): lines starting "EVIDENCE" go to the evidence file.
 
 extension XCTestCase {
-    func onTheSharedAudioSession<T>(_ work: () throws -> T) throws -> T {
+    func onTheSharedAudioSession<T>(
+        category: AVAudioSession.Category = .playAndRecord, mode: AVAudioSession.Mode = .voiceChat,
+        probe: (AVAudioSession.Category, AVAudioSession.Mode) throws -> Void = { try AVAudioSession.sharedInstance().setCategory($0, mode: $1, options: []) },
+        _ work: () throws -> T
+    ) throws -> T {
         do {
             return try work()
         } catch let error as NSError where error.domain == NSOSStatusErrorDomain && error.code == -50 {
             do {
-                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
+                try probe(category, mode)
             } catch let baseline as NSError where baseline.domain == NSOSStatusErrorDomain && baseline.code == -50 {
-                throw XCTSkip("This simulator can't configure the shared audio session at all (OSStatus -50, even for .playback)")
+                throw XCTSkip("This simulator rejects \(category.rawValue) with mode \(mode.rawValue) even with no options (OSStatus -50)")
             }
             throw error
         }
+    }
+}
+
+final class SharedAudioSessionSkipTests: XCTestCase {
+    private let rejected = NSError(domain: NSOSStatusErrorDomain, code: -50)
+
+    func testSkipsOnlyWhenTheBaselineCategoryAndModeAreRejected() throws {
+        var probed: [String] = []
+        do {
+            _ = try onTheSharedAudioSession(probe: { category, mode in
+                probed.append("\(category.rawValue)/\(mode.rawValue)")
+                throw self.rejected
+            }) { () throws -> Int in throw rejected }
+            XCTFail("expected a skip")
+        } catch is XCTSkip {
+        }
+        XCTAssertEqual(probed, ["\(AVAudioSession.Category.playAndRecord.rawValue)/\(AVAudioSession.Mode.voiceChat.rawValue)"])
+    }
+
+    func testABadOptionsCombinationStillFails() {
+        XCTAssertThrowsError(try onTheSharedAudioSession(probe: { _, _ in }) { () throws -> Int in throw rejected }) { error in
+            XCTAssertFalse(error is XCTSkip)
+            XCTAssertEqual((error as NSError).code, -50)
+        }
+    }
+
+    func testOtherErrorsAreNeverSkipped() {
+        let other = NSError(domain: NSOSStatusErrorDomain, code: 561017449)
+        XCTAssertThrowsError(try onTheSharedAudioSession(probe: { _, _ in throw self.rejected }) { () throws -> Int in throw other }) { error in
+            XCTAssertFalse(error is XCTSkip)
+            XCTAssertEqual((error as NSError).code, 561017449)
+        }
+    }
+
+    func testTheWorkRunsAsIs() throws {
+        XCTAssertEqual(try onTheSharedAudioSession(probe: { _, _ in XCTFail("no probe when the work succeeds") }) { 7 }, 7)
     }
 }
 

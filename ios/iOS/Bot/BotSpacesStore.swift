@@ -13,6 +13,7 @@ final class BotSpacesStore: ObservableObject {
     var shownBotId: String?
 
     var coalesceDelay: Duration = .milliseconds(300)
+    var retryDelays: [Duration] = SpacesLaunch.retries
 
     private(set) var watched: Set<String> = []
     private var client: BBClient?
@@ -25,6 +26,8 @@ final class BotSpacesStore: ObservableObject {
     private var flushTask: Task<Void, Never>?
     private var spacesGeneration = 0
     private var viewGeneration: [String: Int] = [:]
+    private var retryTask: Task<Void, Never>?
+    private(set) var retries = 0
 
     init(serverURL: URL = ServerScope.selectedURL) {
         self.serverURL = serverURL
@@ -89,6 +92,13 @@ final class BotSpacesStore: ObservableObject {
         default:
             break
         }
+    }
+
+    func askIfUnknown() {
+        guard support == .unknown, client != nil else { return }
+        retryTask?.cancel()
+        retryTask = nil
+        schedule(spaces: true)
     }
 
     func refresh() async {
@@ -160,6 +170,7 @@ final class BotSpacesStore: ObservableObject {
         do {
             let loaded = try await client.botSpaces()
             guard generation == spacesGeneration else { return }
+            stopRetrying()
             setSupport(.available)
             spaces = loaded
             error = nil
@@ -173,6 +184,7 @@ final class BotSpacesStore: ObservableObject {
             }
         } catch where BBClient.isUnknownRPC(error) {
             guard generation == spacesGeneration else { return }
+            stopRetrying()
             setSupport(.unavailable)
             let botIds = Array(views.keys)
             spaces = nil
@@ -182,7 +194,27 @@ final class BotSpacesStore: ObservableObject {
         } catch {
             guard generation == spacesGeneration else { return }
             self.error = BBClient.describe(error, plugin: "Studio", server: serverURL)
+            if support == .unknown { retryLater() }
         }
+    }
+
+    private func retryLater() {
+        guard retryTask == nil else { return }
+        let delay = SpacesLaunch.retryDelay(retries, delays: retryDelays)
+        retries += 1
+        retryTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, let self else { return }
+            retryTask = nil
+            guard support == .unknown else { return }
+            schedule(spaces: true)
+        }
+    }
+
+    private func stopRetrying() {
+        retryTask?.cancel()
+        retryTask = nil
+        retries = 0
     }
 
     private func setSupport(_ value: BotSpacesSupport) {
@@ -196,10 +228,24 @@ final class BotSpacesStore: ObservableObject {
 extension BotSpacesStore {
     func seedForDemo(_ spaces: BotSpaces, views: [String: BotThreadsView]) {
         restored = true
+        stopRetrying()
         support = .available
         self.spaces = spaces
         self.views = views
         if let botId = spaces.current?.id { watched.insert(botId) }
+    }
+
+    func seedUnknownForDemo() {
+        restored = true
+        support = .unknown
+        spaces = nil
+        views = [:]
+    }
+
+    func seedUnavailableForDemo() {
+        restored = true
+        stopRetrying()
+        support = .unavailable
     }
 }
 #endif
