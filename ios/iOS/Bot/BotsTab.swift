@@ -44,6 +44,9 @@ struct BotsTab: View {
             await load()
         }
         .onChange(of: model.botRoute) { _, _ in consumeRoute() }
+        .onChange(of: open != .primary, initial: true) { _, browsing in ClassicBotActivity.shared.setBrowsing(browsing) }
+        .onAppear { ClassicBotActivity.shared.setBrowsing(open != .primary) }
+        .onDisappear { ClassicBotActivity.shared.setBrowsing(false) }
     }
 
     /// The primary bot is always called without an id, so older Studios and the

@@ -17,7 +17,16 @@ struct BotOnboardingView: View {
     private var look: BotLook { BotSetup.look(first: first) }
     private var tint: Color { BotPalette.color(look.color) }
 
+    private var drafting: Bool { focused || creating || !goal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
     var body: some View {
+        content
+            .onChange(of: drafting, initial: true) { _, value in ClassicBotActivity.shared.setDrafting(value) }
+            .onAppear { ClassicBotActivity.shared.setDrafting(drafting) }
+            .onDisappear { ClassicBotActivity.shared.setDrafting(false) }
+    }
+
+    private var content: some View {
         ScrollView {
             VStack(spacing: 0) {
                 BotAvatar(look, size: 88, working: creating)

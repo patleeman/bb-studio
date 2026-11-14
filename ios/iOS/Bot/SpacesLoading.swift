@@ -6,12 +6,23 @@ import SwiftUI
     private(set) var away = false
     private(set) var writing = false
     private(set) var reading = false
+    private(set) var drafting = false
+    private(set) var browsing = false
+    @ObservationIgnored private var readingByThread: [String: Bool] = [:]
 
-    var busy: Bool { away || writing || reading }
+    var busy: Bool { away || writing || reading || drafting || browsing }
 
     func setAway(_ value: Bool) { if away != value { away = value } }
     func setWriting(_ value: Bool) { if writing != value { writing = value } }
-    func setReading(_ value: Bool) { if reading != value { reading = value } }
+    func setDrafting(_ value: Bool) { if drafting != value { drafting = value } }
+    func setBrowsing(_ value: Bool) { if browsing != value { browsing = value } }
+
+    func setReading(_ value: Bool, threadId: String? = nil) {
+        if let threadId { readingByThread[threadId] = value }
+        if reading != value { reading = value }
+    }
+
+    func reading(threadId: String) -> Bool { readingByThread[threadId] ?? false }
 
     static let touchHold: TimeInterval = 5
 
@@ -28,11 +39,12 @@ import SwiftUI
 @MainActor
 enum TouchClock {
     private(set) static var last = Date.distantPast
-    private static var watched: Set<ObjectIdentifier> = []
+
+    static func forget() { last = .distantPast }
 
     static func watch() {
         for window in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).flatMap(\.windows)
-        where watched.insert(ObjectIdentifier(window)).inserted {
+        where window.gestureRecognizers?.contains(where: { $0 is Recognizer }) != true {
             window.addGestureRecognizer(Recognizer())
         }
     }

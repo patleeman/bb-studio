@@ -143,4 +143,18 @@ final class SpacesLoadingUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.descendants(matching: .any)["loops-screen"].firstMatch.waitForExistence(timeout: 30), "the room opens its Todos")
         XCTAssertFalse(classic.exists)
     }
+
+    func testAnExistingUserTappingBotFromThreadsGetsTheRoomAtOnce() {
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaReduceMotion",
+                                "-qaStartOnThreads"]
+        app.launchOffline()
+        let bot = app.tabBars.buttons["Bot"]
+        XCTAssertTrue(bot.waitForExistence(timeout: 30), "the link opens Threads")
+        XCTAssertFalse(room.exists)
+        sleep(2)
+        bot.tap()
+        let tapped = Date()
+        XCTAssertTrue(room.waitForExistence(timeout: 10))
+        XCTAssertLessThan(Date().timeIntervalSince(tapped), 2.5, "the room at once, not after the touch hold")
+    }
 }
