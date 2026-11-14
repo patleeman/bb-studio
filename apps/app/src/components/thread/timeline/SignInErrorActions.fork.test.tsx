@@ -8,6 +8,8 @@ const mutate = vi.fn();
 const dispatch = vi.fn();
 const openTerminal = vi.fn(() => true);
 let providerStatus = "unauthenticated";
+let environmentHostId = "host_local";
+let desktop: object | null = {};
 
 vi.mock("@/hooks/queries/thread-queries", () => ({
   useThread: () => ({
@@ -22,12 +24,23 @@ vi.mock("@/hooks/queries/system-queries", () => ({
           providerId: "codex",
           displayName: "Codex",
           status: providerStatus,
-          loginCommand: "codex login",
-          localLoginCommand: null,
+          loginCommand: "codex login --device-auth",
+          localLoginCommand: "codex login",
         },
       ],
     },
   }),
+}));
+vi.mock("@/hooks/queries/environment-queries", () => ({
+  useEnvironment: () => ({ data: { id: "env_1", hostId: environmentHostId } }),
+}));
+vi.mock("@/hooks/useHostDaemon", () => ({
+  useHostDaemon: () => ({
+    isLocalDaemonHost: (hostId: string | null | undefined) => hostId === "host_local",
+  }),
+}));
+vi.mock("@/lib/bb-desktop", () => ({
+  getBbDesktopInfo: () => desktop,
 }));
 vi.mock("@/hooks/queries/thread-terminal-queries", () => ({
   useCreateTerminal: () => ({ mutate, isPending: false }),
@@ -59,6 +72,8 @@ function row(title: string): TimelineRow {
 
 beforeEach(() => {
   providerStatus = "unauthenticated";
+  environmentHostId = "host_local";
+  desktop = {};
   mutate.mockReset();
   dispatch.mockReset();
 });
@@ -96,6 +111,15 @@ describe("a sign-in error row", () => {
     });
     callbacks.onSuccess({ id: "term_1" });
     expect(openTerminal).toHaveBeenCalledWith({ id: "term_1" });
+  });
+
+  it("signs in with a device code when the conversation runs on another machine", () => {
+    environmentHostId = "host_remote";
+    render(<>{forkSignInErrorBody(row("Codex isn't signed in"))}</>);
+    fireEvent.click(screen.getByRole("button", { name: "Sign in to Codex" }));
+    expect(mutate.mock.calls[0]?.[0]).toMatchObject({
+      start: { mode: "command", command: "codex login --device-auth" },
+    });
   });
 
   it("opens the composer's model picker", () => {
