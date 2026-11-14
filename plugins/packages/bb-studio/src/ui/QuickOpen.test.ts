@@ -61,3 +61,18 @@ it("lists mini apps and saved files under one Apps heading", async () => {
   expect(headings).toEqual(["Apps", "page"]);
   expect([...document.querySelectorAll('[role="option"]')].slice(0, 3).map((each) => each.textContent?.slice(0, 10))).toEqual(["mini_timer", "art_report", "pg_planpag"]);
 });
+
+it("shows a reply thread as Reply in <conversation>", async () => {
+  const thread = { ref: { pluginId: "bb", id: "thr_reply" }, kind: "thread", title: "Main · thread", snippet: { text: "", ranges: [] }, href: "/threads/thr_reply", projectId: null, updatedAt: 1, score: 4 };
+  state.rpc.call.mockImplementation(async (method: string) => method === "overview" ? { providers: [] } : method === "searchAll" ? [thread] as never : []);
+  const input = document.querySelector<HTMLInputElement>('[role="combobox"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "main");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise(resolve => setTimeout(resolve, 200));
+  });
+  state.rpc.call.mockImplementation(async (method: string) => method === "overview" ? { providers: [] } : []);
+  const option = document.querySelector('[role="option"]')!;
+  expect(option.textContent).toContain("Reply in Main");
+  expect(option.textContent).not.toContain("· thread");
+});

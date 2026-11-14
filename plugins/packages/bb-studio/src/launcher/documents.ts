@@ -2,6 +2,7 @@ import { entryFor, type NewTabEntry } from "../newtab";
 import { itemKindOfId, pathFor, tabKindEntry, type TabRef } from "../tab-kinds";
 import type { OpenedTab } from "../ui/opened-tabs";
 import { hostIcon } from "../ui/item-icons";
+import { shownThreadTitle } from "../reply-title";
 import type { LauncherDocument } from "./rank";
 import { threadPath } from "./shared";
 
@@ -42,7 +43,7 @@ export function hitDocument(hit: SearchHit, found: boolean): LauncherDocument | 
   if (!path.startsWith("/")) return null;
   const kind = ref ? tabKindEntry(ref.kind) : null;
   return {
-    key: `${hit.ref.pluginId}:${hit.ref.id}`, title: hit.title.trim() || "Untitled", icon: thread ? "MessageSquare" : kind?.icon ?? hostIcon(hit.kind),
+    key: `${hit.ref.pluginId}:${hit.ref.id}`, title: (thread ? shownThreadTitle(hit.title) : hit.title.trim()) || "Untitled", icon: thread ? "MessageSquare" : kind?.icon ?? hostIcon(hit.kind),
     kind: kind?.name ?? kindLabel(hit.kind), path, updatedAt: hit.updatedAt, ...(ref ? { ref } : {}), ...(found ? { found } : {}),
   };
 }
