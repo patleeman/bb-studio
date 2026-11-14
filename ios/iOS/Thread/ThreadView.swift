@@ -148,7 +148,10 @@ struct ThreadView: View {
             UIAccessibility.post(notification: .layoutChanged, argument: nil)
         }
         .onChange(of: composerFocused, initial: true) { _, _ in reportClassicWriting() }
-        .onAppear { reportClassicWriting() }
+        .onAppear {
+            reportClassicWriting()
+            if botChrome != nil { ClassicBotActivity.shared.setReading(ClassicBotActivity.shared.reading(threadId: model.threadId)) }
+        }
         .onDisappear {
             guard botChrome != nil else { return }
             ClassicBotActivity.shared.setWriting(false)
@@ -2079,7 +2082,7 @@ extension ThreadView {
             composer: { Isolated { composer }.opacity(lying ? 0 : 1).allowsHitTesting(!lying).accessibilityHidden(lying) },
             top: transcriptV2HasTop ? { transcriptV2Top } : nil,
             pill: { state, jump in
-                if botChrome != nil { ClassicBotActivity.shared.setReading(state.shown) }
+                if botChrome != nil { ClassicBotActivity.shared.setReading(state.shown, threadId: model.threadId) }
                 return transcriptV2Pill(state, jump: jump)
             },
             onNearTop: { transcriptV2LoadOlder() },

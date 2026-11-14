@@ -49,6 +49,7 @@ struct RootView: View {
         .animation(.easeInOut(duration: 0.25), value: shown)
         .onChange(of: shown, initial: true) { old, value in
             launch.shown = value
+            if old != .classic, value == .classic { TouchClock.forget() }
             if old == .loading, value != .loading { UIAccessibility.post(notification: .screenChanged, argument: nil) }
             if value == .room, model.botShowsLoops {
                 model.botShowsLoops = false

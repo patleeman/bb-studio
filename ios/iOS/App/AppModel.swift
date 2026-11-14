@@ -106,7 +106,9 @@ final class AppModel: ObservableObject {
     @Published private(set) var realtime: BBRealtime
     /// Bot is the primary tab: every launch opens on it. Links, notification
     /// taps, widgets and Siri set their own tab after this, so they always win.
-    @Published var tab: Tab = .bot
+    @Published var tab: Tab = .bot {
+        didSet { if tab == .bot, oldValue != .bot { TouchClock.forget() } }
+    }
     @Published var path: [Route] = []
     @Published var studioPath: [Route] = []
     /// What the Bots tab should show next, set by links and the Action button.
@@ -145,6 +147,7 @@ final class AppModel: ObservableObject {
         BotLiveActivities.shared.attach(store: BotSpacesStore.shared, client: client)
         #if DEBUG
         BotSpacesDemo.install(BotSpacesStore.shared)
+        if ProcessInfo.processInfo.arguments.contains("-qaStartOnThreads") { tab = .inbox }
         #endif
     }
 
@@ -426,6 +429,11 @@ final class AppModel: ObservableObject {
 
     /// The Bot's Loops screen.
     func openLoops() {
+        if inSpaces {
+            tab = .bot
+            shellLink = .page(.todos, botId: nil)
+            return
+        }
         if tab != .bot { openBots(.primary) }
         botShowsLoops = true
     }
