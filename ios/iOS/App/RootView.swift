@@ -9,8 +9,9 @@ struct RootView: View {
     @State private var innerScreen = false
     @State private var pane = DuoPaneState.shared
     @ObservedObject private var spaces = BotSpacesStore.shared
-    @State private var launch = SpacesLaunch()
+    @State private var launch = SpacesLaunch(timedOut: BotSpacesStore.shared.skipsLoading)
     @State private var classic = ClassicBotActivity.shared
+    @State private var tick = 0
 
     var body: some View {
         #if DEBUG
@@ -18,8 +19,10 @@ struct RootView: View {
         #endif
         let layout = DuoLayout(size: windowSize, leadingInset: windowLeadingInset, trailingInset: windowTrailingInset,
                                pane: pane.pane, dragWidth: pane.dragWidth, innerScreen: innerScreen)
-        let idle = model.tab == .bot && model.path.isEmpty && model.sheet == nil && !classic.busy
-        let shown = launch.next(support: spaces.support, idle: idle)
+        let _ = tick
+        let idle = model.tab == .bot && model.path.isEmpty && model.botDraft == nil
+        let quiet = model.sheet == nil && !classic.busy && !(launch.shown == .classic && ClassicBotActivity.held())
+        let shown = launch.next(support: spaces.support, idle: idle, quiet: quiet, linked: model.botShowsLoops)
         Group {
             switch shown {
             case .room:
@@ -44,7 +47,23 @@ struct RootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: shown)
-        .onChange(of: shown, initial: true) { _, value in launch.shown = value }
+        .onChange(of: shown, initial: true) { old, value in
+            launch.shown = value
+            if old == .loading, value != .loading { UIAccessibility.post(notification: .screenChanged, argument: nil) }
+            if value == .room, model.botShowsLoops {
+                model.botShowsLoops = false
+                model.shellLink = .page(.todos, botId: nil)
+            }
+        }
+        .task(id: spaces.support == .available && launch.shown == .classic && model.tab == .bot) {
+            guard spaces.support == .available, launch.shown == .classic, model.tab == .bot else { return }
+            while !Task.isCancelled {
+                TouchClock.watch()
+                try? await Task.sleep(for: .seconds(1))
+                tick += 1
+            }
+        }
+        .onAppear { TouchClock.watch() }
         .task {
             try? await Task.sleep(for: fallback)
             launch.timedOut = true

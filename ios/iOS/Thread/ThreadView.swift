@@ -54,6 +54,7 @@ struct ThreadView: View {
     @State private var resizeAnchor = TranscriptResizeAnchor()
     @State private var resizeRestore: Task<Void, Never>?
     @Environment(\.duoLayout) private var duoLayout
+    @Environment(\.rightPage) private var rightPage
     @Environment(\.duoPage) private var duoPage
     @State private var pickingSendTime = false
     @State private var showingFiles = false
@@ -141,18 +142,25 @@ struct ThreadView: View {
         .sensoryFeedback(.error, trigger: model.error) { (_: String?, new: String?) in new != nil }
         .sensoryFeedback(.selection, trigger: attachments.count, condition: Self.grew)
         .userActivity(Spotlight.threadActivityType, isActive: model.thread != nil, describeActivity)
-        .task(id: duoLayout.twoPages) {
-            guard duoLayout.twoPages else { return }
+        .task(id: rightPage && model.thread != nil) {
+            guard rightPage, model.thread != nil, Self.announced.insert(model.threadId).inserted else { return }
             try? await Task.sleep(for: .seconds(1))
             UIAccessibility.post(notification: .layoutChanged, argument: nil)
         }
         .onChange(of: composerFocused, initial: true) { _, _ in reportClassicWriting() }
-        .onDisappear { if botChrome != nil { ClassicBotActivity.shared.writing = false } }
+        .onAppear { reportClassicWriting() }
+        .onDisappear {
+            guard botChrome != nil else { return }
+            ClassicBotActivity.shared.setWriting(false)
+            ClassicBotActivity.shared.setReading(false)
+        }
     }
+
+    private static var announced: Set<String> = []
 
     private func reportClassicWriting() {
         guard botChrome != nil else { return }
-        ClassicBotActivity.shared.writing = composerFocused || !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        ClassicBotActivity.shared.setWriting(composerFocused || !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 
     /// For the haptics on a count: it went up.
@@ -2070,7 +2078,10 @@ extension ThreadView {
             row: { [actions = transcriptV2Actions] row in ThreadTranscriptRowView(row: row, actions: actions) },
             composer: { Isolated { composer }.opacity(lying ? 0 : 1).allowsHitTesting(!lying).accessibilityHidden(lying) },
             top: transcriptV2HasTop ? { transcriptV2Top } : nil,
-            pill: { state, jump in transcriptV2Pill(state, jump: jump) },
+            pill: { state, jump in
+                if botChrome != nil { ClassicBotActivity.shared.setReading(state.shown) }
+                return transcriptV2Pill(state, jump: jump)
+            },
             onNearTop: { transcriptV2LoadOlder() },
             onEmptyTap: roomChat?.layDown,
             rowsHidden: lying,

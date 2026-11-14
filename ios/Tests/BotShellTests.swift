@@ -87,6 +87,29 @@ final class BotShellTests: XCTestCase {
         XCTAssertEqual(SpacesLaunch().next(support: .unavailable, idle: true), .classic)
     }
 
+    func testAnExistingUserWithASheetAtLaunchGetsTheRoomAtOnce() {
+        var launch = SpacesLaunch()
+        XCTAssertEqual(launch.update(support: .available, idle: true, quiet: false), .room, "the first decision ignores a sheet, as before")
+    }
+
+    func testOnlyAQuietClassicChatSwitchesToTheRoom() {
+        var launch = SpacesLaunch(shown: .classic, timedOut: true)
+        XCTAssertEqual(launch.update(support: .available, idle: true, quiet: false), .classic, "a sheet, a draft, reading or a touch holds it")
+        XCTAssertEqual(launch.update(support: .available, idle: true, quiet: true), .room)
+        XCTAssertEqual(launch.update(support: .available, idle: false, quiet: false), .room, "the room stays")
+        XCTAssertEqual(launch.update(support: .unavailable, idle: true), .classic, "an older Studio after a reconnect")
+    }
+
+    func testALoopsLinkOrASheetDuringLoadingShowsClassic() {
+        XCTAssertEqual(SpacesLaunch().next(support: .unknown, idle: true, linked: true), .classic, "classic opens the Loops")
+        XCTAssertEqual(SpacesLaunch().next(support: .unknown, idle: true, quiet: false), .classic, "classic shows the sheet")
+        XCTAssertEqual(SpacesLaunch().next(support: .unknown, idle: false), .classic, "a draft for the Bot chat")
+    }
+
+    func testAServerThatAnsweredWithAnErrorSkipsLoading() {
+        XCTAssertEqual(SpacesLaunch(timedOut: true).next(support: .unknown, idle: true), .classic)
+    }
+
     func testRetriesBackOff() {
         XCTAssertEqual((0..<5).map { SpacesLaunch.retryDelay($0) }, [.seconds(5), .seconds(15), .seconds(60), .seconds(60), .seconds(60)])
         XCTAssertEqual(SpacesLaunch.retryDelay(0, delays: []), .seconds(60))

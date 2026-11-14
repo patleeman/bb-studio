@@ -7,9 +7,9 @@ final class SpacesLoadingUITests: ServerIsolatedUITestCase {
     private var classic: XCUIElement { app.tabBars.firstMatch }
     private var room: XCUIElement { app.buttons["roomInput"] }
 
-    private func launch(late: String, fallback: Int? = nil) {
+    private func launch(late: String, fallback: Int? = nil, extra: [String] = []) {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaReduceMotion",
-                                "-qaSpacesLate", late] + (fallback.map { ["-qaSpacesFallback", String($0)] } ?? [])
+                                "-qaSpacesLate", late] + (fallback.map { ["-qaSpacesFallback", String($0)] } ?? []) + extra
         app.launchOffline()
         let started = loading.waitForExistence(timeout: 20) || classic.exists || room.exists
         if !started {
@@ -83,5 +83,64 @@ final class SpacesLoadingUITests: ServerIsolatedUITestCase {
         app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'approval note'")).firstMatch.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "the keyboard is put away")
         XCTAssertTrue(room.waitForExistence(timeout: 15), "the room once the chat is idle")
+    }
+
+    func testASheetHoldsTheSwitchUntilItCloses() {
+        launch(late: "15000")
+        XCTAssertTrue(classic.waitForExistence(timeout: 10))
+        let message = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'approval note'")).firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 20))
+        let select = app.buttons["Select Text"]
+        for _ in 0..<2 where !select.exists {
+            message.press(forDuration: 1)
+            _ = select.waitForExistence(timeout: 4)
+        }
+        select.tap()
+        let done = app.navigationBars["Select Text"].buttons["Done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 10), "the sheet is up")
+        let opened = Date()
+        while Date().timeIntervalSince(opened) < 16 {
+            XCTAssertFalse(room.exists, "no switch under a sheet")
+            sleep(1)
+        }
+        XCTAssertTrue(done.exists, "the sheet is still up")
+        shot("5-sheet-held")
+        done.tap()
+        XCTAssertTrue(room.waitForExistence(timeout: 20), "the room once the sheet closed and the chat is quiet")
+    }
+
+    func testALoopsLinkDuringLoadingOpensTheLoops() {
+        launch(late: "12000", extra: ["-qaLoopsDemo", "-openURL", "bbstudio://loops"])
+        let loops = app.descendants(matching: .any)["loops-screen"].firstMatch
+        XCTAssertTrue(loops.waitForExistence(timeout: 20), "the link is not dropped: classic shows the Loops")
+        XCTAssertFalse(loading.exists)
+        sleep(14)
+        XCTAssertFalse(room.exists, "the Loops hold the switch")
+        app.buttons["loops-back"].firstMatch.tap()
+        XCTAssertTrue(room.waitForExistence(timeout: 20), "the room once the chat is back")
+        XCTAssertFalse(loops.exists, "nothing latched reopens the Loops")
+    }
+
+    func testAnExistingUserColdLaunchingIntoASheetGetsTheRoomAtOnce() {
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaReduceMotion",
+                                "-openURL", "bbstudio://capture"]
+        app.launchOffline()
+        let sheet = app.navigationBars["Capture to BB"]
+        let deadline = Date().addingTimeInterval(30)
+        while !(sheet.exists && room.exists), Date() < deadline {
+            XCTAssertFalse(classic.exists, "no classic frame")
+            XCTAssertFalse(loading.exists, "no loading frame")
+            usleep(200_000)
+        }
+        XCTAssertTrue(sheet.exists, "the sheet is up")
+        XCTAssertTrue(room.exists, "over the room")
+    }
+
+    func testALoopsLinkForAnExistingUserOpensTheRoomsTodos() {
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaReduceMotion",
+                                "-qaLoopsDemo", "-openURL", "bbstudio://loops"]
+        app.launchOffline()
+        XCTAssertTrue(app.descendants(matching: .any)["loops-screen"].firstMatch.waitForExistence(timeout: 30), "the room opens its Todos")
+        XCTAssertFalse(classic.exists)
     }
 }

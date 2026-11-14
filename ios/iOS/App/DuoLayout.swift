@@ -380,6 +380,7 @@ extension EnvironmentValues {
     /// Inside a sidebar list that ignores the window's trailing safe area
     /// (`SidebarListMargins`): its rows have no status column to take back.
     @Entry var sidebarIgnoresTrailingSafeArea = false
+    @Entry var rightPage = false
 }
 
 /// The sidebar list's margins. The left page inherits the window's trailing

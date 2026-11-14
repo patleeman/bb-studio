@@ -128,8 +128,9 @@ struct BotTab: View {
             showsLoops = true
         }
         .onChange(of: model.botDraft) { _, text in if text != nil { showsLoops = false } }
-        .onChange(of: !path.isEmpty || sheet != nil || (showsLoops && loopsOn), initial: true) { _, away in ClassicBotActivity.shared.away = away }
-        .onDisappear { ClassicBotActivity.shared.away = false }
+        .onChange(of: !path.isEmpty || sheet != nil || (showsLoops && loopsOn), initial: true) { _, away in ClassicBotActivity.shared.setAway(away) }
+        .onAppear { ClassicBotActivity.shared.setAway(!path.isEmpty || sheet != nil || (showsLoops && loopsOn)) }
+        .onDisappear { ClassicBotActivity.shared.setAway(false) }
         // Each Activity refresh brings the Loops along, and who can take a hand-off.
         .task(id: activity) {
             guard botId == nil, let bot else { return }
