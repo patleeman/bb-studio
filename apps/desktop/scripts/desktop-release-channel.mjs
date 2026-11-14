@@ -33,8 +33,8 @@ export function resolveDesktopBuildPlatform(nodePlatform) {
 export function createDesktopReleaseConfig(channel) {
   if (channel === "nightly") {
     return {
-      appId: "dev.bb.desktop.nightly",
-      applicationName: "bb Nightly",
+      appId: "nyc.plee.bbstudio.nightly",
+      applicationName: "BB Studio Nightly",
       artifactName: "bb-nightly-${version}-${arch}.${ext}",
       iconFileName: "icon-nightly.png",
       // The Linux binary name must differ from stable so both channels can be
@@ -52,9 +52,9 @@ export function createDesktopReleaseConfig(channel) {
   }
 
   return {
-    appId: "dev.bb.desktop",
-    applicationName: "bb",
-    artifactName: "${productName}-${version}-${arch}.${ext}",
+    appId: "nyc.plee.bbstudio",
+    applicationName: "BB Studio",
+    artifactName: "BB-Studio-${version}-${arch}.${ext}",
     iconFileName: "icon.png",
     linuxExecutableName: "bb",
     macIconPath: "assets/icon.icns",
@@ -69,5 +69,5 @@ export function createDesktopReleaseConfig(channel) {
 }
 
 export function createDesktopUpdateReleaseBaseUrl(releaseTag) {
-  return `https://github.com/get-bb/bb/releases/download/${releaseTag}/`;
+  return `https://updates.invalid/bb-studio/${releaseTag}/`;
 }
