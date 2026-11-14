@@ -128,16 +128,23 @@ final class RoomQAUITests: ServerIsolatedUITestCase {
         shot("foreground")
     }
 
+    private func audit() throws {
+        try app.performAccessibilityAudit(for: [.sufficientElementDescription]) { issue in
+            print("audit issue:", issue.compactDescription, issue.element?.debugDescription ?? "no element")
+            return false
+        }
+    }
+
     func testEveryControlHasALabel() throws {
         launch()
-        try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+        try audit()
         app.buttons["roomInput"].tap()
         XCTAssertTrue(app.textViews["composerField"].waitForExistence(timeout: 10))
-        try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+        try audit()
         app.buttons["roomLayDown"].tap()
         app.buttons["roomMenuButton"].tap()
         XCTAssertTrue(app.buttons["roomPlace-todos"].waitForExistence(timeout: 10))
-        try app.performAccessibilityAudit(for: [.sufficientElementDescription])
+        try audit()
     }
 
     func testASlowServerStillOpensTheRoom() {

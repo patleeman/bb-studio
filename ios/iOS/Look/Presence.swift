@@ -243,6 +243,8 @@ struct PresenceView: View {
             let rendered = await PresenceStills.shared.still(spec)
             withAnimation(.easeOut(duration: 0.25)) { image = rendered }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(bot.name)
         .accessibilityHidden(true)
         .accessibilityIdentifier("Presence")
     }

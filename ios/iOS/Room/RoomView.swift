@@ -414,7 +414,7 @@ struct RoomView: View {
         .accessibilityHidden(true)
         .background {
             #if DEBUG
-            Color.clear.frame(width: 1, height: 1).accessibilityElement().accessibilityIdentifier("roomPageDots")
+            Color.clear.frame(width: 1, height: 1).accessibilityElement().accessibilityLabel("Pages").accessibilityIdentifier("roomPageDots")
             #endif
         }
     }
@@ -664,7 +664,9 @@ struct RoomDayView: View {
                     .foregroundStyle(.white.opacity(0.72))
                     .lookHalo(look)
                 Spacer()
-                if !(FoldedChrome.columnHeader || duoPage) {
+                if !(FoldedChrome.columnHeader || duoPage) && !shown {
+                    Color.clear.frame(width: 44, height: 44)
+                } else if !(FoldedChrome.columnHeader || duoPage) {
                     Button(action: openMenu) {
                         Image(systemName: "line.3.horizontal").font(.body.weight(.semibold)).frame(width: 44, height: 44)
                     }
@@ -708,6 +710,8 @@ struct RoomDayView: View {
                 ForEach((morning?.items ?? []).prefix(fit.cards)) { item in
                     RoomCard(item: item, open: openTodos, done: { done(item.id) })
                         .transition(.opacity)
+                        .accessibilityHidden(!shown)
+                        .allowsHitTesting(shown)
                 }
             }
             .padding(.top, 18)
