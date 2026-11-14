@@ -747,6 +747,10 @@
     {
       "file": "apps/app/src/components/thread/timeline/ThreadTimelineRows.unread-divider.test.ts",
       "title": "lands on an error that ended the turn"
+    },
+    {
+      "file": "packages/thread-view/test/build-thread-timeline.test.ts",
+      "title": "keeps a canonical disclosure ID when completed reasoning gains a delegation prefix"
     }
   ],
   "removeLines": [
@@ -799,6 +803,10 @@
     {
       "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
       "title": "shows shortcut keycaps only on desktop, including filtered plugin results (compact: %s)"
+    },
+    {
+      "file": "packages/thread-view/test/reasoning-zero-duration.test.ts",
+      "title": "renders $title when completion is $completedAt"
     }
   ]
 }
