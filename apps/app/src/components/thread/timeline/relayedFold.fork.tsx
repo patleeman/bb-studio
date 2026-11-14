@@ -25,6 +25,22 @@ const KEPT_OPERATIONS: ReadonlySet<string> = new Set([
   "thread-interrupted",
 ]);
 
+const KEPT_SYSTEM_KINDS: ReadonlySet<string> = new Set(["error", "reconnect"]);
+
+const ALERT_MESSAGE_KINDS: ReadonlySet<string> = new Set([
+  "child-failed",
+  "child-needs-attention",
+  "child-interrupted",
+]);
+
+const ALERT_ICONS: ReadonlySet<IconName> = new Set<IconName>([
+  "AlertTriangle",
+  "AlertCircle",
+  "CircleX",
+]);
+
+const URGENT_BODY = /^(?:\[bb [^\]\n]*\]\s*)?(?:[^\n:]{0,80}:\s*)?⚠/u;
+
 const NO_FOLDS: ReadonlySet<string> = new Set();
 
 export const RelayedFoldContext = createContext<ReadonlySet<string>>(NO_FOLDS);
@@ -53,12 +69,20 @@ export function isRelayedRow(row: ThreadTimelineViewRow): boolean {
   );
 }
 
+export function isAlertRow(row: ThreadTimelineViewRow): boolean {
+  if (row.kind !== "conversation" || row.role !== "user") return false;
+  if (ALERT_MESSAGE_KINDS.has(row.systemMessageKind ?? "")) return true;
+  return URGENT_BODY.test(row.text.trimStart());
+}
+
 function hiddenInFold(row: ThreadTimelineViewRow): boolean {
-  return !(
-    row.kind === "system" &&
-    row.systemKind === "operation" &&
-    KEPT_OPERATIONS.has(row.operationKind)
-  );
+  if (row.kind === "system") {
+    if (KEPT_SYSTEM_KINDS.has(row.systemKind)) return false;
+    if (row.systemKind === "operation" && KEPT_OPERATIONS.has(row.operationKind)) {
+      return false;
+    }
+  }
+  return !("status" in row && row.status === "error");
 }
 
 export function foldRelayedRows(
@@ -69,7 +93,7 @@ export function foldRelayedRows(
   const folded = new Set<string>();
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index]!;
-    if (!isRelayedRow(row)) continue;
+    if (!isRelayedRow(row) || isAlertRow(row)) continue;
     let next = index + 1;
     while (next < rows.length && rows[next]!.kind !== "conversation") {
       next += 1;
@@ -147,5 +171,6 @@ export function relayedGeneratedSource(
 }
 
 export function useRelayedLeadingIcon(icon: IconName): IconName {
-  return useContext(RelayedRowFoldedContext) ? "Check" : icon;
+  const folded = useContext(RelayedRowFoldedContext);
+  return folded && !ALERT_ICONS.has(icon) ? "Check" : icon;
 }
