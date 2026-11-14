@@ -216,6 +216,39 @@ export interface ExperimentalReplyClassification {
 export interface ExperimentalReplyClassifierRegistration {
   id: string;
   classify(text: string): ExperimentalReplyClassification | null | undefined;
+  /**
+   * Optional. Say how bb should draw a message that came into the thread
+   * (a user-role row). Called with the row's whole text (`part: "message"`)
+   * and, for a row bb draws as a system row, with the body after bb's own
+   * header (`part: "body"`). Return null to leave the row alone. Must be
+   * synchronous, pure and fast. Experimental: see docs/api_to_audit.fork.md.
+   */
+  classifyMessage?(
+    text: string,
+    context: ExperimentalMessageClassificationContext,
+  ): ExperimentalMessageClassification | null | undefined;
+}
+
+/**
+ * What bb knows about a message it asks a classifier about. `initiator` is
+ * null for `part: "body"`. Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalMessageClassificationContext {
+  part: "message" | "body";
+  initiator: "user" | "agent" | "system" | null;
+}
+
+/**
+ * A message that was not typed by the user. For a row bb would draw as the
+ * user's own message, any result draws it as a system row instead. `sender`
+ * names where it came from ("Message from <sender>"); `previewStart` is the
+ * offset into the text where the row's one-line preview starts. When the
+ * thread's reply to it is quiet, the row and the reply fold into this one
+ * row. Experimental: see docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalMessageClassification {
+  sender?: string;
+  previewStart?: number;
 }
 
 /**
