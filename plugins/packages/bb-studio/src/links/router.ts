@@ -217,7 +217,7 @@ export async function openLink(target: LinkTarget, options: OpenLinkOptions, dep
   const wb = threadId ? deps.workbench(threadId) : null;
   const place = (pane?: PanePlace): OpenPlace => ({ threadId, ...(pane !== undefined ? { pane } : {}) });
   if (!resolution.found) {
-    const opened = threadId || deps.studioPage() ? await deps.openStudioTab(notFoundTab(ref, target.link), place(how === "secondPane" ? secondPane(wb) : undefined)) : false;
+    const opened = !threadId && deps.studioPage() ? await deps.openStudioTab(notFoundTab(ref, target.link), place(how === "secondPane" ? secondPane(deps.pageWorkbench()) : undefined)) : false;
     if (!opened) deps.toast(`${NOT_FOUND_TITLE}: ${target.link}`);
     return { via: "notFound", opened };
   }

@@ -203,15 +203,19 @@ describe("openLink", () => {
     expect(deps.relay).toHaveBeenLastCalledWith("https://example.com/", "workbench");
   });
 
-  it("a target that is gone opens the Not found tab, named for the kind, the id and the link as typed", async () => {
+  it("a target that is gone says so in a toast from a conversation, leaving no tab in its panel, and opens the Not found tab on a Studio page", async () => {
     const { deps } = fakeDeps({ resolved: { found: false, title: null } });
-    expect(await openLink(entity(SAMPLE.page, "bb://page/pg_0123456789abcdef"), { source: "transcript" }, deps)).toEqual({ via: "notFound", opened: true });
-    expect(deps.openStudioTab).toHaveBeenCalledWith(
-      { pluginId: "studio", tabId: NOT_FOUND_TAB, params: { kind: "page", id: "pg_0123456789abcdef", link: "bb://page/pg_0123456789abcdef" }, title: NOT_FOUND_TITLE },
-      { threadId: "thr_cur" },
-    );
+    expect(await openLink(entity(SAMPLE.page, "bb://page/pg_0123456789abcdef"), { source: "transcript" }, deps)).toEqual({ via: "notFound", opened: false });
+    expect(deps.toast).toHaveBeenCalledWith("Not found: bb://page/pg_0123456789abcdef");
+    expect(deps.openStudioTab).not.toHaveBeenCalled();
     expect(deps.openTab).not.toHaveBeenCalled();
     expect(deps.openMain).not.toHaveBeenCalled();
+    const page = fakeDeps({ resolved: { found: false, title: null }, thread: () => null, studioPage: () => true });
+    expect(await openLink(entity(SAMPLE.page, "bb://page/pg_0123456789abcdef"), { source: "palette" }, page.deps)).toEqual({ via: "notFound", opened: true });
+    expect(page.deps.openStudioTab).toHaveBeenCalledWith(
+      { pluginId: "studio", tabId: NOT_FOUND_TAB, params: { kind: "page", id: "pg_0123456789abcdef", link: "bb://page/pg_0123456789abcdef" }, title: NOT_FOUND_TITLE },
+      { threadId: null },
+    );
     const nowhere = fakeDeps({ resolved: { found: false }, thread: () => null });
     expect(await openLink(entity(SAMPLE.page, "bb://page/x"), { source: "transcript" }, nowhere.deps)).toEqual({ via: "notFound", opened: false });
     expect(nowhere.deps.openStudioTab).not.toHaveBeenCalled();
