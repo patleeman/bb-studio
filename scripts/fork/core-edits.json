@@ -98,8 +98,8 @@
     },
     "apps/app/src/components/thread/timeline/ThreadTimelineRows.tsx": {
       "seam": "quiet-turns, message-menu, sign-in-errors, unread-divider",
-      "intent": "A finished assistant message that a plugin's reply classifier calls quiet (useQuietReply, lib/fork-reply-classifiers.ts, which redraws the row when a classifier registers after it was drawn) draws as QuietTurnMarker instead of a message. Core has no rule of its own. ConversationRowContent reads the plugins' slots.experimental_messageAction items (useForkMessageActions) and wraps the row's plugin actions in withForkMessageMenu (forkMessageActions.ts), which adds the items that are available for that message, keyed as menu items. A system row that is a sign-in error draws forkSignInErrorBody (SignInErrorActions.fork.tsx, imported at the top of the file: Sign in runs the provider's login command in a terminal, Pick another model opens the picker) instead of the detail code box. findUnreadDividerIndex moves the divider back to the first unread row of the reply's turn with unreadDividerTurnStart (unreadDividerTurnStart.fork.ts, imported at the top of the file), so NEW never sits between a Thought or tool row and its reply. buildTimelineRowsListItems skips a settled Thought row with no text (isEmptyThought, emptyThought.fork.ts, imported at the top of the file); a thought with text, deferred text or still running is always drawn.",
-      "budget": 26
+      "intent": "A finished assistant message that a plugin's reply classifier calls quiet (useQuietReply, lib/fork-reply-classifiers.ts, which redraws the row when a classifier registers after it was drawn) draws as QuietTurnMarker instead of a message. Core has no rule of its own. ConversationRowContent reads the plugins' slots.experimental_messageAction items (useForkMessageActions) and wraps the row's plugin actions in withForkMessageMenu (forkMessageActions.ts), which adds the items that are available for that message, keyed as menu items. A system row that is a sign-in error draws forkSignInErrorBody (SignInErrorActions.fork.tsx, imported at the top of the file: Sign in runs the provider's login command in a terminal, Pick another model opens the picker) instead of the detail code box. findUnreadDividerIndex moves the divider back to the first unread row of the reply's turn with unreadDividerTurnStart (unreadDividerTurnStart.fork.ts, imported at the top of the file), so NEW never sits between a Thought or tool row and its reply. buildTimelineRowsListItems skips a settled Thought row with no text (isEmptyThought, emptyThought.fork.ts, imported at the top of the file); a thought with text, deferred text or still running is always drawn. TimelineRowsList builds its items from useRelayedFold's rows and provides its folded ids (relayedFold.fork.tsx, imported at the top of the file): a message that came into the thread whose turn ends in a quiet reply folds with that reply into its own row; ConversationRow wraps its content in RelayedRowFolded so that row draws a check.",
+      "budget": 35
     },
     "apps/app/src/components/ui/tab-pill.tsx": {
       "seam": "workbench",
@@ -557,9 +557,9 @@
       "budget": 5
     },
     "apps/app/src/components/thread/timeline/GeneratedConversationMessage.tsx": {
-      "seam": "host-copy",
-      "intent": "For a child-completed system message the collapsed preview starts after the \"<thread> completed:\" header (childCompletedPreviewStart, childCompletedPreview.fork.ts, imported at the top of the file), so a finished worker shows the first line of its result; mentions are clipped from that offset.",
-      "budget": 6
+      "seam": "host-copy, quiet-turns",
+      "intent": "For a child-completed system message the collapsed preview starts after the \"<thread> completed:\" header, and otherwise where a plugin's classifyMessage puts it (useGeneratedPreviewStart, childCompletedPreview.fork.ts, imported at the top of the file), so a finished worker shows the first line of its result and a relayed message shows its line without a leading tag; mentions are clipped from that offset. The leading icon is a check when the row is folded with a quiet reply (useRelayedLeadingIcon, relayedFold.fork.tsx).",
+      "budget": 11
     },
     "apps/app/src/components/promptbox/follow-up-placeholder.ts": {
       "seam": "host-copy",
@@ -612,9 +612,9 @@
       "budget": 3
     },
     "apps/app/src/components/thread/timeline/ConversationMessageContent.tsx": {
-      "seam": "soft-breaks",
-      "intent": "ASSISTANT_THREAD_MENTIONS is wrapped in withShortLineBreaks (markdown-short-line-breaks.fork.ts, imported at the top of the file), so an assistant's poem or address keeps its line breaks.",
-      "budget": 5
+      "seam": "soft-breaks, quiet-turns",
+      "intent": "ASSISTANT_THREAD_MENTIONS is wrapped in withShortLineBreaks (markdown-short-line-breaks.fork.ts, imported at the top of the file), so an assistant's poem or address keeps its line breaks. A user-role row asks the plugins' classifyMessage about its text (usePluginMessageClassification, lib/fork-reply-classifiers.ts): an agent message takes the plugin's sender over the sending thread's title, and a row that would be the user's own bubble but that a plugin classified draws as a generated row from that sender (relayedGeneratedSource, relayedFold.fork.tsx). Both imports sit at the top of the file.",
+      "budget": 12
     }
   }
 }
