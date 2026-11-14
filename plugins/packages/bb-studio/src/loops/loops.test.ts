@@ -6,7 +6,7 @@ import { LoopStore } from './store';
 import { LoopScheduler, defaults as baseDefaults, snooze, systemTimeZone } from './scheduler';
 import { rpcContract } from './contract';
 import { LOOP_TOOLS, loopPushActions, registerLoops, threadOwner } from './register';
-const defaults={...baseDefaults,enabled:true};
+const defaults={...baseDefaults,enabled:true,timeZone:'America/New_York'};
 let db:Database.Database,store:LoopStore,scheduler:LoopScheduler,post:ReturnType<typeof vi.fn<(text:string)=>Promise<void>>>,notify:ReturnType<typeof vi.fn<(loop:import('./contract').Loop)=>Promise<void>>>;
 beforeEach(()=>{vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-02T15:00:00Z'));db=new Database(':memory:');db.exec(MIGRATIONS.find((sql)=>sql.includes('CREATE TABLE bot_loops'))!);store=new LoopStore(db);post=vi.fn(async(_text:string)=>{});notify=vi.fn(async(_loop:import('./contract').Loop)=>{});scheduler=new LoopScheduler(store,()=>defaults,post,notify);});
 afterEach(()=>{db.close();vi.useRealTimers();});
