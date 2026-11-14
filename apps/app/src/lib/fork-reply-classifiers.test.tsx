@@ -96,6 +96,47 @@ describe("classifyPluginMessage", () => {
     ).toBeNull();
   });
 
+  it("treats a malformed answer as not classified, so a buggy plugin can't turn typed messages into system rows", () => {
+    const answers: unknown[] = [
+      true,
+      "x",
+      1,
+      {},
+      [],
+      { sender: 3 },
+      { sender: "   " },
+      { previewStart: "4" },
+      { previewStart: 1.5 },
+      { sender: "ok", previewStart: "4" },
+    ];
+    for (const answer of answers) {
+      resetPluginSlotStoreForTest();
+      setPluginSlotRegistrations(
+        "studio",
+        makePluginRegistrationSet({
+          replyClassifiers: [
+            { id: "junk", classify: () => null, classifyMessage: (() => answer) as never },
+          ],
+        }),
+      );
+      expect(
+        classifyPluginMessage("Hello there", { part: "message", initiator: "user" }),
+      ).toBeNull();
+    }
+    resetPluginSlotStoreForTest();
+    setPluginSlotRegistrations(
+      "studio",
+      makePluginRegistrationSet({
+        replyClassifiers: [
+          { id: "ok", classify: () => null, classifyMessage: () => ({ previewStart: 6 }) },
+        ],
+      }),
+    );
+    expect(
+      classifyPluginMessage("LEAD: shipped", { part: "body", initiator: null }),
+    ).toEqual({ sender: null, previewStart: 6 });
+  });
+
   it("is null when no plugin classifies messages", () => {
     expect(
       classifyPluginMessage("Watcher Inbox: 3 new", {
