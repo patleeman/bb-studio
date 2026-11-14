@@ -1,9 +1,12 @@
 import { readFileSync } from "node:fs";
+import { makePluginRegistrationSet } from "@/test/fixtures/plugins";
+import { resetPluginSlotStoreForTest, setPluginSlotRegistrations } from "@/lib/plugin-slots";
 import { describe, expect, it, vi } from "vitest";
 import type { TimelineRow } from "@bb/server-contract";
 import { buildThreadHandoffCreateRequest, emptyPromptDraftState } from "@bb/client-core";
 import {
   signInRecovery,
+  signInRecoveryExitDraft,
   signInRecoveryHandoffDraft,
   signInRecoveryTitle,
 } from "./signInRecovery.fork";
@@ -14,6 +17,7 @@ vi.mock("@/lib/sdk", () => ({ sdk: { threads: sdkCalls } }));
 
 const signInError = {
   id: "row_error",
+  turnId: "turn_fail",
   kind: "system",
   systemKind: "error",
   title: "Codex isn't signed in",
@@ -31,9 +35,11 @@ function userRow(
   text: string,
   initiator: "user" | "agent" = "user",
   mentions: unknown[] = [],
+  turnId = "turn_fail",
 ): TimelineRow {
   return {
     id: `row_${text}`,
+    turnId,
     kind: "conversation",
     role: "user",
     initiator,
@@ -45,6 +51,7 @@ function userRow(
 
 const reply = {
   id: "row_reply",
+  turnId: "turn_earlier",
   kind: "conversation",
   role: "assistant",
   text: "Hello!",
@@ -191,4 +198,75 @@ describe("sign-in recovery", () => {
     expect(end).toBeGreaterThan(start);
     expect(area.slice(start, end)).not.toMatch(/archive|retire/iu);
   });
+
+  it("never re-posts an old, answered message when a later Bot-started turn fails in Main", () => {
+    const rows = [
+      userRow("hi", "user", [], "turn_1"),
+      { ...(reply as object), turnId: "turn_1" } as TimelineRow,
+      userRow("[bb message from thread:thr_worker]\n\nHeartbeat", "agent", [], "turn_fail"),
+      signInError,
+    ];
+    expect(signInRecovery(rows, false)).toBeNull();
+    const draft = signInRecoveryHandoffDraft(seed, emptyPromptDraftState(), signInRecovery(rows, false));
+    expect(draft.text).toBe("Continue from @thread:thr_source\n\n");
+  });
+
+  it("takes the user's message only from the turn that failed", () => {
+    const answered = [
+      userRow("hi", "user", [], "turn_1"),
+      { ...(reply as object), turnId: "turn_1" } as TimelineRow,
+    ];
+    expect(signInRecovery([...answered, { ...(signInError as object), turnId: "turn_other" } as TimelineRow], false)).toBeNull();
+    expect(signInRecovery([...answered, { ...(signInError as object), turnId: null } as TimelineRow], false)).toBeNull();
+    expect(signInRecovery([...answered, userRow("Now a poem"), signInError], false)?.input).toEqual([
+      { type: "text", text: "Now a poem", mentions: [] },
+    ]);
+  });
+
+  it("never re-posts a Studio line or an automation as if the user typed it", () => {
+    resetPluginSlotStoreForTest();
+    setPluginSlotRegistrations(
+      "studio",
+      makePluginRegistrationSet({
+        replyClassifiers: [
+          {
+            id: "relay",
+            classify: () => null,
+            classifyMessage: (text) => (text.startsWith("Watcher ") ? { sender: "watcher Morning card" } : null),
+          },
+        ],
+      }),
+    );
+    expect(signInRecovery([userRow("Watcher Morning card: write today's card."), signInError], false)).toBeNull();
+    expect(signInRecovery([userRow("[bb automation due:aut_1] Check the inbox"), signInError], false)).toBeNull();
+    resetPluginSlotStoreForTest();
+  });
+
+  it("clears the recovered message when the user backs out, so it can't be sent twice in the failed conversation", () => {
+    const only = signInRecovery([userRow(poem), signInError], false);
+    const seeded = signInRecoveryHandoffDraft(seed, emptyPromptDraftState(), only);
+    expect(signInRecoveryExitDraft(seed, seeded, only)).toEqual(emptyPromptDraftState());
+    const later = signInRecovery([userRow("Hi"), reply, userRow("Now a poem"), signInError], false);
+    const continued = signInRecoveryHandoffDraft(seed, emptyPromptDraftState(), later);
+    expect(signInRecoveryExitDraft(seed, continued, later)).toEqual(emptyPromptDraftState());
+    const edited = { text: "Now a poem about rain", mentions: [], attachments: [] };
+    expect(signInRecoveryExitDraft(seed, edited, only)).toBeNull();
+    const typed = signInRecoveryHandoffDraft(seed, { text: "Mine", mentions: [], attachments: [] }, null);
+    expect(signInRecoveryExitDraft(seed, typed, null)?.text).toBe("Mine");
+  });
+
+  it("recovers a thread's first message, which bb records before its turn starts", () => {
+    const seedMessage = { ...(userRow("Say hello.") as object), turnId: null } as TimelineRow;
+    const provisioned = { id: "op", kind: "system", systemKind: "operation", turnId: null, title: "Provisioned thread" } as unknown as TimelineRow;
+    expect(signInRecovery([seedMessage, provisioned, signInError], false)?.input).toEqual([
+      { type: "text", text: "Say hello.", mentions: [] },
+    ]);
+  });
+
+  it("recovers nothing when another turn's rows sit between the message and the error", () => {
+    const seedMessage = { ...(userRow("hi") as object), turnId: null } as TimelineRow;
+    const otherTurnWork = { id: "work", kind: "command", turnId: "turn_1", status: "completed" } as unknown as TimelineRow;
+    expect(signInRecovery([seedMessage, otherTurnWork, signInError], false)).toBeNull();
+  });
 });
+
