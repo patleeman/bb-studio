@@ -1,4 +1,5 @@
 import type { SystemMessageKind } from "@bb/domain";
+import { usePluginMessageClassification } from "@/lib/fork-reply-classifiers";
 
 const HEADER_END = /^[^\n]*\bcompleted[^\n]*:\s*\n\s*\n/u;
 const SKIPPED_LINE = /^\s*(?:\||#{1,6}(?:\s|$)|(?:[-*_]\s*){3,}$|```|~~~|$)/u;
@@ -20,4 +21,18 @@ export function childCompletedPreviewStart(
     offset = end + 1;
   }
   return bodyStart;
+}
+
+export function useGeneratedPreviewStart(
+  systemMessageKind: SystemMessageKind,
+  text: string,
+): number {
+  const childStart = childCompletedPreviewStart(systemMessageKind, text);
+  const classification = usePluginMessageClassification(text, {
+    part: "body",
+    initiator: null,
+  });
+  if (childStart > 0) return childStart;
+  const start = classification?.previewStart ?? 0;
+  return text.slice(start).trim().length === 0 ? 0 : start;
 }
