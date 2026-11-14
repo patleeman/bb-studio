@@ -375,6 +375,21 @@ const everywhere = [
     '"Search"',
   ],
   [
+    "apps/app/src/components/sidebar/SidebarNavigationRail.test.tsx",
+    "{ name: /Search threads/u }",
+    "{ name: /^Search$/u }",
+  ],
+  [
+    "apps/app/src/components/sidebar/SidebarNavigationRail.test.tsx",
+    '"Show Search threads in sidebar"',
+    '"Show Search in sidebar"',
+  ],
+  [
+    "apps/app/src/components/sidebar/SidebarUpdatesBadge.test.tsx",
+    '"bb 0.49.0"',
+    `"${NAME} 0.49.0"`,
+  ],
+  [
     "apps/app/src/lib/localhost-link-rewrite-description.test.ts",
     "you use to open BB.",
     `you use to open ${NAME}.`,
