@@ -302,7 +302,7 @@
     white-space: nowrap;
   }
 
-  @container promptbox (max-width: 30rem) {
+  @container promptbox (max-width: 24rem) {
     [data-composer-box] [data-promptbox-full-label],
     [data-composer-box] [data-promptbox-hide-compact] {
       display: none !important;
@@ -322,7 +322,7 @@
     }
   }
 
-  @container promptbox-shell (max-width: 34rem) {
+  @container promptbox-shell (max-width: 26rem) {
     [data-promptbox-shell] [data-promptbox-full-label],
     [data-promptbox-shell] [data-promptbox-hide-compact] {
       display: none !important;
@@ -412,7 +412,7 @@
   }
 }
 
-@container promptbox-shell (max-width: 30rem) {
+@container promptbox-shell (max-width: 24rem) {
   [data-follow-up-composer] {
     --follow-up-composer-container-compact: true;
   }
