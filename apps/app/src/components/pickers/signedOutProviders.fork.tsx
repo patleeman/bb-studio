@@ -27,7 +27,6 @@ export function useSignedOutProviderIds(
     environmentId: routing?.environmentId,
     hostId: routing?.hostId,
     enabled,
-    poll: false,
   });
   return signedOutProviderIds(query.data?.providers);
 }
