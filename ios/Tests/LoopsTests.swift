@@ -77,6 +77,16 @@ final class LoopsTests: XCTestCase {
         XCTAssertEqual(LoopCardState(enabled: true, loop: try loop(status: "done", closedAt: 1, closedBy: "patrick")).phase, .closed)
     }
 
+    func testTheUserOwnerIsYouUnderEitherName() throws {
+        for name in ["user", "patrick"] {
+            XCTAssertTrue(try loop(owner: name).isYours)
+            XCTAssertEqual(LoopCardState(enabled: true, loop: try loop(owner: name)).phase, .open)
+            XCTAssertTrue(LoopCardState(enabled: true, loop: try loop(status: "done", closedAt: 1, closedBy: name)).canUndo)
+        }
+        XCTAssertFalse(try loop(owner: "cos").isYours)
+        XCTAssertFalse(LoopCardState(enabled: true, loop: try loop(status: "done", closedAt: 1, closedBy: "cos")).canUndo)
+    }
+
     func testButtonsByKindOnThePhoneAndWide() throws {
         let doCard = LoopCardState(enabled: true, loop: try loop())
         XCTAssertEqual(doCard.buttons(wide: false).shown, [.done, .snooze])

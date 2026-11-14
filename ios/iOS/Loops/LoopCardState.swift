@@ -119,5 +119,5 @@ struct LoopCardState: Equatable {
     }
 
     /// You closed it here, so it can come back.
-    var canUndo: Bool { phase == .closed && loop?.closedBy == "patrick" }
+    var canUndo: Bool { phase == .closed && LoopItem.isYou(loop?.closedBy) }
 }

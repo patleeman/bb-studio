@@ -250,7 +250,7 @@ private struct LoopsRow: View {
         switch section {
         case .comingUp: LoopFormat.trigger(loop.trigger)
         case .agents: "\(model.ownerName(loop.owner)) is on it"
-        case .done: [loop.status == .dropped ? "Dropped" : "Done", loop.closedBy.map { $0 == "patrick" ? "by you" : "by \(model.ownerName($0))" }].compactMap { $0 }.joined(separator: " ")
+        case .done: [loop.status == .dropped ? "Dropped" : "Done", loop.closedBy.map { LoopItem.isYou($0) ? "by you" : "by \(model.ownerName($0))" }].compactMap { $0 }.joined(separator: " ")
         default: loop.why
         }
     }
@@ -302,7 +302,7 @@ private struct LoopsRow: View {
                 if let thread = loop.ownerThreadId { pill("Open thread") { app.openThread(thread) } }
                 pill("Take back") { act(.takeBack) }
             case .done:
-                if loop.closedBy == "patrick" { pill("Undo") { act(.undo) } }
+                if LoopItem.isYou(loop.closedBy) { pill("Undo") { act(.undo) } }
             }
             if section != .done { more }
         }

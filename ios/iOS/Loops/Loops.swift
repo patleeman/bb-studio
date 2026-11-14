@@ -28,7 +28,7 @@ struct LoopItem: Identifiable, Hashable, Sendable {
     var source: Source?
     var kind: Kind
     var options: [String]
-    /// `patrick`, `cos` or `thread:<id>`.
+    /// `user` (`patrick` from older servers), `cos` or `thread:<id>`.
     var owner: String
     var trigger: Trigger
     var priority: Priority
@@ -43,7 +43,8 @@ struct LoopItem: Identifiable, Hashable, Sendable {
     var closedBy: String?
 
     var isClosed: Bool { closedAt != nil || status == .done || status == .dropped }
-    var isYours: Bool { owner == "patrick" }
+    var isYours: Bool { LoopItem.isYou(owner) }
+    static func isYou(_ who: String?) -> Bool { who == "user" || who == "patrick" }
     /// A lead thread's id when one owns it.
     var ownerThreadId: String? { owner.hasPrefix("thread:") ? String(owner.dropFirst("thread:".count)) : nil }
 
