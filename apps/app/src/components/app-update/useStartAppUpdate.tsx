@@ -51,7 +51,7 @@ export function useStartAppUpdate(): StartAppUpdate {
       }}
     >
       <ConfirmDeleteDialogContent
-        title="Update bb now?"
+        title="Update BB Studio now?"
         description={runningThreadsWarning(
           confirmingThreads ?? 0,
           threadsResumeAfterRestart,

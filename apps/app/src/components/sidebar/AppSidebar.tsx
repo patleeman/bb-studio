@@ -75,7 +75,7 @@ import {
 
 import { NAV_RAIL_WIDTH_CLASS } from "./navRailWidth";
 
-const BUG_REPORT_NEW_ISSUE_URL = "https://github.com/get-bb/bb/issues/new";
+const BUG_REPORT_NEW_ISSUE_URL = "https://github.com/patleeman/bb-studio/issues/new";
 
 interface AppSidebarProps {
   onResizeMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
