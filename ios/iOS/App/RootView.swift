@@ -9,7 +9,8 @@ struct RootView: View {
     @State private var innerScreen = false
     @State private var pane = DuoPaneState.shared
     @ObservedObject private var spaces = BotSpacesStore.shared
-    @State private var showsSpaces = false
+    @State private var launch = SpacesLaunch()
+    @State private var classic = ClassicBotActivity.shared
 
     var body: some View {
         #if DEBUG
@@ -17,11 +18,17 @@ struct RootView: View {
         #endif
         let layout = DuoLayout(size: windowSize, leadingInset: windowLeadingInset, trailingInset: windowTrailingInset,
                                pane: pane.pane, dragWidth: pane.dragWidth, innerScreen: innerScreen)
-        let usesSpaces = BotShell.usesSpaces(support: spaces.support, showing: showsSpaces, idle: model.tab == .bot && model.path.isEmpty)
+        let idle = model.tab == .bot && model.path.isEmpty && model.sheet == nil && !classic.busy
+        let shown = launch.next(support: spaces.support, idle: idle)
         Group {
-            if usesSpaces {
+            switch shown {
+            case .room:
                 spacesRoot(layout)
-            } else {
+            case .loading:
+                SpacesLoadingView(serverURL: spaces.serverURL)
+                    .transition(.opacity)
+                    .modifier(RootNotice())
+            case .classic:
                 HStack(spacing: 0) {
                     DuoTabRail(selection: $model.tab)
                         .frame(width: layout.railWidth)
@@ -36,7 +43,12 @@ struct RootView: View {
                 }
             }
         }
-        .onChange(of: usesSpaces, initial: true) { _, value in showsSpaces = value }
+        .animation(.easeInOut(duration: 0.25), value: shown)
+        .onChange(of: shown, initial: true) { _, value in launch.shown = value }
+        .task {
+            try? await Task.sleep(for: fallback)
+            launch.timedOut = true
+        }
         .background {
             if layout.twoPages {
                 RegularSurfaceBackground(name: "root", style: AnyShapeStyle(Color(uiColor: .systemGroupedBackground)), fullWidth: true)
@@ -60,6 +72,14 @@ struct RootView: View {
             windowTrailingInset = trailing
             innerScreen = inner
         })
+    }
+
+    private var fallback: Duration {
+        #if DEBUG
+        let ms = UserDefaults.standard.integer(forKey: "qaSpacesFallback")
+        if ms > 0 { return .milliseconds(ms) }
+        #endif
+        return SpacesLaunch.fallback
     }
 
     private var tabVisibility: Visibility { DuoLayout(size: windowSize).twoPages ? .hidden : .automatic }

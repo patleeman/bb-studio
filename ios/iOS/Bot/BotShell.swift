@@ -61,6 +61,33 @@ struct BotSpaceDot: Equatable, Identifiable {
     var label: String { name + (amber ? ", needs you" : "") }
 }
 
+struct SpacesLaunch: Equatable {
+    enum Shown: Equatable { case loading, classic, room }
+
+    static let fallback: Duration = .seconds(3)
+    static let retries: [Duration] = [.seconds(5), .seconds(15), .seconds(60)]
+
+    var shown = Shown.loading
+    var timedOut = false
+
+    func next(support: BotSpacesSupport, idle: Bool) -> Shown {
+        if BotShell.usesSpaces(support: support, showing: shown == .room, idle: idle) { return .room }
+        if shown == .loading, support == .unknown, idle, !timedOut { return .loading }
+        return .classic
+    }
+
+    @discardableResult
+    mutating func update(support: BotSpacesSupport, idle: Bool) -> Shown {
+        shown = next(support: support, idle: idle)
+        return shown
+    }
+
+    static func retryDelay(_ attempt: Int, delays: [Duration] = retries) -> Duration {
+        guard let last = delays.last else { return .seconds(60) }
+        return attempt < delays.count ? delays[max(0, attempt)] : last
+    }
+}
+
 enum BotShell {
     static func usesSpaces(support: BotSpacesSupport, showing: Bool, idle: Bool) -> Bool {
         guard support == .available else { return false }

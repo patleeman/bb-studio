@@ -141,6 +141,7 @@ struct ThreadView: View {
         .sensoryFeedback(.error, trigger: model.error) { (_: String?, new: String?) in new != nil }
         .sensoryFeedback(.selection, trigger: attachments.count, condition: Self.grew)
         .userActivity(Spotlight.threadActivityType, isActive: model.thread != nil, describeActivity)
+        .background { if botChrome != nil { ClassicBotWriting(draft: draftText, focused: composerFocused) } }
     }
 
     /// For the haptics on a count: it went up.
@@ -1771,6 +1772,19 @@ struct ThreadView: View {
 }
 
 /// The composer's text, observed only by the views that read it.
+private struct ClassicBotWriting: View {
+    let draft: DraftText
+    let focused: Bool
+
+    var body: some View {
+        let writing = focused || !draft.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        Color.clear
+            .onChange(of: writing, initial: true) { _, writing in ClassicBotActivity.shared.writing = writing }
+            .onDisappear { ClassicBotActivity.shared.writing = false }
+            .accessibilityHidden(true)
+    }
+}
+
 @Observable @MainActor final class DraftText {
     var value = ""
     @ObservationIgnored private var saving: Task<Void, Never>?

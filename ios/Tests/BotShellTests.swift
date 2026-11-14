@@ -50,6 +50,48 @@ final class BotShellTests: XCTestCase {
         XCTAssertTrue(BotShell.usesSpaces(support: .available, showing: true, idle: false), "once shown it stays")
     }
 
+    func testLaunchShowsTheRoomWhenSpacesAnswerBeforeTheFallback() {
+        var launch = SpacesLaunch()
+        XCTAssertEqual(launch.update(support: .unknown, idle: true), .loading, "neutral while support is unknown")
+        XCTAssertEqual(launch.update(support: .available, idle: true), .room, "straight to the room, no classic flash")
+        launch.timedOut = true
+        XCTAssertEqual(launch.update(support: .available, idle: false), .room, "once shown it stays")
+    }
+
+    func testLaunchFallsBackToClassicThenSwitchesToTheRoomWhenIdle() {
+        var launch = SpacesLaunch()
+        XCTAssertEqual(launch.update(support: .unknown, idle: true), .loading)
+        launch.timedOut = true
+        XCTAssertEqual(launch.update(support: .unknown, idle: true), .classic, "classic after the fallback")
+        XCTAssertEqual(launch.update(support: .unknown, idle: true), .classic, "never back to loading")
+        XCTAssertEqual(launch.update(support: .available, idle: false), .classic, "a draft, a sheet or an open thread holds the switch")
+        XCTAssertEqual(launch.update(support: .available, idle: true), .room, "switches on its own once idle")
+        XCTAssertEqual(launch.update(support: .available, idle: false), .room, "and stays while the chat stands up")
+    }
+
+    func testLaunchOnAnOlderStudioIsClassicAtOnce() {
+        var launch = SpacesLaunch()
+        XCTAssertEqual(launch.update(support: .unknown, idle: true), .loading)
+        XCTAssertEqual(launch.update(support: .unavailable, idle: true), .classic)
+        XCTAssertEqual(launch.update(support: .unknown, idle: true), .classic)
+    }
+
+    func testLaunchWithALinkSkipsTheLoadingState() {
+        var launch = SpacesLaunch()
+        XCTAssertEqual(launch.update(support: .unknown, idle: false), .classic, "a linked thread opens at once")
+        XCTAssertEqual(launch.update(support: .unknown, idle: true), .classic)
+    }
+
+    func testLaunchWithKnownSupportNeverShowsLoading() {
+        XCTAssertEqual(SpacesLaunch().next(support: .available, idle: true), .room)
+        XCTAssertEqual(SpacesLaunch().next(support: .unavailable, idle: true), .classic)
+    }
+
+    func testRetriesBackOff() {
+        XCTAssertEqual((0..<5).map { SpacesLaunch.retryDelay($0) }, [.seconds(5), .seconds(15), .seconds(60), .seconds(60), .seconds(60)])
+        XCTAssertEqual(SpacesLaunch.retryDelay(0, delays: []), .seconds(60))
+    }
+
     @MainActor
     func testStoreGateFollowsTheStoredSupport() {
         XCTAssertFalse(BotSpacesStore(serverURL: server).useSpaces, "unknown on first launch")

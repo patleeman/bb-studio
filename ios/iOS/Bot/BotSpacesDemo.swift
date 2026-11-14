@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+import os
 
 enum BotSpacesDemo {
     static var variant: String? {
@@ -10,13 +11,26 @@ enum BotSpacesDemo {
 
     static let sideThreadId = "thr_demo_side_m3"
 
+    static var late: Duration? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-qaSpacesLate") else { return nil }
+        let value = arguments.indices.contains(index + 1) ? Int(arguments[index + 1]) : nil
+        return value.map { .milliseconds($0) } ?? .seconds(86_400)
+    }
+
     @MainActor static func install(_ store: BotSpacesStore) {
-        guard variant != nil else { return }
+        guard variant != nil else {
+            if BotDemo.variant != nil { store.seedUnavailableForDemo() }
+            return
+        }
         let state = State.shared
         let previous = BBClient.demoTransport
         let pages = PageQA.shared
+        let late = late
+        let answered = OSAllocatedUnfairLock(initialState: late == nil)
         BBClient.demoTransport = { method, path, body in
             try await pages.delay(path)
+            if path.hasSuffix("/bot_spaces"), !answered.withLock({ $0 }) { throw URLError(.notConnectedToInternet) }
             if let answer = state.respond(method, path, body) { return answer }
             if let previous { return try await previous(method, path, body) }
             throw URLError(.cannotConnectToHost)
@@ -26,6 +40,15 @@ enum BotSpacesDemo {
         var views: [String: BotThreadsView] = [:]
         for botId in ["bot_juniper", "bot_home", "bot_research"] {
             if let wire = try? decoder.decode(Studio.BotThreadsViewOutput.self, from: state.viewJSON(botId)) { views[botId] = BotThreadsView(wire) }
+        }
+        if let late {
+            store.seedUnknownForDemo()
+            Task { @MainActor in
+                try? await Task.sleep(for: late)
+                answered.withLock { $0 = true }
+                store.seedForDemo(BotSpaces(spaces), views: views)
+            }
+            return
         }
         guard ProcessInfo.processInfo.arguments.contains("-qaDemoCachedBot"),
               let cached = try? decoder.decode(Studio.BotSpacesOutput.self, from: Data(String(decoding: state.spacesJSON(), as: UTF8.self)
