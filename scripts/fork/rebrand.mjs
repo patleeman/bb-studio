@@ -342,32 +342,35 @@ const replacements = [
     'tooltip: "Thread info",',
     'tooltip: "Conversation info",',
   ],
-];
-const everywhere = [
   [
     "apps/app/src/components/settings/UpdatesSettingsSection.test.tsx",
     "Download the update and restart bb",
     `Download the update and restart ${NAME}`,
+    11,
   ],
   [
     "apps/app/src/components/settings/UpdatesSettingsSection.test.tsx",
     "Relaunch bb to finish updating",
     `Relaunch ${NAME} to finish updating`,
+    2,
   ],
   [
     "apps/app/src/components/settings/UpdatesSettingsSection.test.tsx",
     "View the failed bb update",
     `View the failed ${NAME} update`,
+    2,
   ],
   [
     "apps/app/src/components/pickers/ModelReasoningPicker.test.tsx",
     '"Handoff to new thread"',
     '"Continue in a new conversation"',
+    4,
   ],
   [
     "apps/app/src/components/sidebar/SidebarNavigationRail.test.tsx",
     '"Search threads"',
     '"Search"',
+    5,
   ],
   [
     "apps/app/src/components/sidebar/SidebarNavigationList.test.tsx",
@@ -388,34 +391,33 @@ const everywhere = [
     "apps/app/src/components/sidebar/SidebarUpdatesBadge.test.tsx",
     '"bb 0.49.0"',
     `"${NAME} 0.49.0"`,
+    2,
   ],
   [
     "apps/app/src/lib/localhost-link-rewrite-description.test.ts",
     "you use to open BB.",
     `you use to open ${NAME}.`,
+    2,
   ],
 ];
-for (const [file, from, to] of replacements) {
+for (const [file, from, to, expected = 1] of replacements) {
   const target = join(root, file);
   const before = readFileSync(target, "utf8");
-  if (before.includes(to)) continue;
-  if (!before.includes(from)) {
-    console.error(`NOT FOUND ${file}: ${from}`);
+  const found = before.split(from).length - 1;
+  if (found !== expected) {
+    console.error(
+      `${found === 0 ? "NOT FOUND" : "UNEXPECTED COUNT"} ${file}: ${found} of ${expected} expected: ${from}`,
+    );
     process.exitCode = 1;
     continue;
   }
-  writeFileSync(target, before.replace(from, to));
-}
-for (const [file, from, to] of everywhere) {
-  const target = join(root, file);
-  const before = readFileSync(target, "utf8");
-  if (!before.includes(from)) {
-    if (before.includes(to)) continue;
-    console.error(`NOT FOUND ${file}: ${from}`);
+  const after = before.replaceAll(from, to);
+  if (!to.includes(from) && after.includes(from)) {
+    console.error(`STILL PRESENT ${file}: ${from}`);
     process.exitCode = 1;
     continue;
   }
-  writeFileSync(target, before.replaceAll(from, to));
+  writeFileSync(target, after);
 }
 execFileSync("node", ["scripts/generate-pwa-icons.mjs"], {
   cwd: join(root, "apps/app"),
