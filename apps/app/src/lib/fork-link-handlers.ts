@@ -1,6 +1,7 @@
 import type { ExperimentalLinkClick } from "@get-bb/plugin-sdk";
 import { getPluginSlotSnapshot } from "./plugin-slots";
 import { resolveRouteHref } from "./route-paths";
+import { isMentionHref } from "@/components/ui/markdown-mention-links.fork";
 
 const CONTENT_ROOT_SELECTOR = "[data-markdown-preview]";
 
@@ -51,22 +52,31 @@ function asksForClick(
   );
 }
 
+function claimMentionClick(
+  event: MouseEvent,
+  anchor: HTMLAnchorElement,
+  openWithPlugin: typeof openUrlWithPlugin,
+): boolean {
+  const href = anchor.getAttribute("href");
+  if (!isMentionHref(href)) return false;
+  openWithPlugin(href ?? "", linkClickOf(event));
+  event.preventDefault();
+  event.stopPropagation();
+  return true;
+}
+
 export function handleLinkClick(
   event: MouseEvent,
   openWithPlugin: typeof openUrlWithPlugin = openUrlWithPlugin,
 ): boolean {
-  if (
-    event.defaultPrevented ||
-    event.button !== 0 ||
-    getPluginSlotSnapshot().linkHandlers.length === 0
-  ) {
-    return false;
-  }
+  if (event.defaultPrevented || event.button !== 0) return false;
   const anchor =
     event.target instanceof Element
       ? event.target.closest<HTMLAnchorElement>("a[href]:not([download])")
       : null;
   if (anchor === null) return false;
+  if (claimMentionClick(event, anchor, openWithPlugin)) return true;
+  if (getPluginSlotSnapshot().linkHandlers.length === 0) return false;
   const click = linkClickOf(event);
   if (!asksForClick(anchor, click, window.location.origin)) return false;
   if (!openWithPlugin(anchor.href, click)) return false;
