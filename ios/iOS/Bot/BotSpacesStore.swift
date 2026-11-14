@@ -94,10 +94,15 @@ final class BotSpacesStore: ObservableObject {
         }
     }
 
+    var configured: Bool { serverURL != ServerScope.unconfiguredURL }
+
+    var skipsLoading: Bool { support == .unknown && BotSpacesSupport.answeredWithError(serverURL: serverURL) }
+
     func askIfUnknown() {
-        guard support == .unknown, client != nil else { return }
+        guard support == .unknown, client != nil, configured else { return }
         retryTask?.cancel()
         retryTask = nil
+        retries = 0
         schedule(spaces: true)
     }
 
@@ -194,12 +199,13 @@ final class BotSpacesStore: ObservableObject {
         } catch {
             guard generation == spacesGeneration else { return }
             self.error = BBClient.describe(error, plugin: "Studio", server: serverURL)
+            if (error as? BBError).map({ $0.status > 0 }) == true { BotSpacesSupport.rememberErrorAnswer(true, serverURL: serverURL) }
             if support == .unknown { retryLater() }
         }
     }
 
     private func retryLater() {
-        guard retryTask == nil else { return }
+        guard retryTask == nil, configured else { return }
         let delay = SpacesLaunch.retryDelay(retries, delays: retryDelays)
         retries += 1
         retryTask = Task { [weak self] in
@@ -218,6 +224,7 @@ final class BotSpacesStore: ObservableObject {
     }
 
     private func setSupport(_ value: BotSpacesSupport) {
+        BotSpacesSupport.rememberErrorAnswer(false, serverURL: serverURL)
         guard support != value else { return }
         support = value
         BotSpacesSupport.store(value, serverURL: serverURL)

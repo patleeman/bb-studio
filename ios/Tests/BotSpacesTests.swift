@@ -10,6 +10,7 @@ final class BotSpacesTests: XCTestCase {
 
     override func tearDown() {
         BotSpacesSupport.store(.unknown, serverURL: server)
+        BotSpacesSupport.rememberErrorAnswer(false, serverURL: server)
         BotSpacesCache.clear(botIds: ["bot_a", "bot_b"], serverURL: server)
     }
 
@@ -368,6 +369,66 @@ final class BotSpacesTests: XCTestCase {
         await waitUntil { store.support == .available }
         XCTAssertEqual(store.support, .available)
         XCTAssertEqual(store.retries, 0)
+    }
+
+    @MainActor
+    func testAnErrorAnswerIsRememberedUntilSpacesAnswer() async {
+        let calls = Calls()
+        let up = LockedFlag()
+        let store = BotSpacesStore(serverURL: server)
+        store.coalesceDelay = .milliseconds(10)
+        store.retryDelays = [.seconds(60)]
+        store.attach(client: client(spaces: { up.value ? (200, Self.spacesJSON) : (503, #"{"ok":false,"error":{"message":"studio is not running"}}"#) }, calls: calls), realtime: nil)
+        XCTAssertFalse(store.skipsLoading)
+        await store.refresh()
+        XCTAssertEqual(store.support, .unknown)
+        XCTAssertTrue(BotSpacesStore(serverURL: server).skipsLoading, "the next launch goes classic at once")
+        up.value = true
+        store.askIfUnknown()
+        await waitUntil { store.support == .available }
+        XCTAssertFalse(BotSpacesSupport.answeredWithError(serverURL: server))
+    }
+
+    @MainActor
+    func testAnOfflineAnswerIsNotRememberedAsAnError() async {
+        let calls = Calls()
+        let store = BotSpacesStore(serverURL: server)
+        store.coalesceDelay = .milliseconds(10)
+        store.retryDelays = [.seconds(60)]
+        store.attach(client: offlineClient(online: LockedFlag(), calls: calls), realtime: nil)
+        store.askIfUnknown()
+        await waitUntil { calls.count("offline") == 1 }
+        await settle()
+        XCTAssertFalse(BotSpacesStore(serverURL: server).skipsLoading)
+    }
+
+    @MainActor
+    func testTheForegroundAskStartsTheBackoffOver() async {
+        let calls = Calls()
+        let store = BotSpacesStore(serverURL: server)
+        store.coalesceDelay = .milliseconds(10)
+        store.retryDelays = [.seconds(60)]
+        store.attach(client: offlineClient(online: LockedFlag(), calls: calls), realtime: nil)
+        store.askIfUnknown()
+        await waitUntil { store.retries == 1 }
+        store.askIfUnknown()
+        XCTAssertEqual(store.retries, 0)
+    }
+
+    @MainActor
+    func testNothingIsAskedOfTheUnconfiguredServer() async {
+        let calls = Calls()
+        let store = BotSpacesStore(serverURL: ServerScope.unconfiguredURL)
+        let client = BBClient(baseURL: ServerScope.unconfiguredURL)
+        client.transport = { _, path, _ in
+            calls.record(String(path.split(separator: "/").last ?? ""), .null)
+            throw URLError(.cannotFindHost)
+        }
+        store.coalesceDelay = .milliseconds(10)
+        store.attach(client: client, realtime: nil)
+        store.askIfUnknown()
+        await settle()
+        XCTAssertEqual(calls.count("bot_spaces"), 0)
     }
 
     @MainActor

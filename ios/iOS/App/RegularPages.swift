@@ -19,6 +19,7 @@ struct RegularPages<Sidebar: View, Detail: View>: View {
                 }
             CreaseGutter()
             detail.frame(maxWidth: .infinity)
+                .environment(\.rightPage, layout.twoPages)
                 .overlay(alignment: .leading) { DuoPaneEdge() }
                 .background {
                     if layout.twoPages { RegularSurfaceBackground(name: "detail", rightPage: true) }

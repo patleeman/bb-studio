@@ -70,15 +70,22 @@ struct SpacesLaunch: Equatable {
     var shown = Shown.loading
     var timedOut = false
 
-    func next(support: BotSpacesSupport, idle: Bool) -> Shown {
-        if BotShell.usesSpaces(support: support, showing: shown == .room, idle: idle) { return .room }
-        if shown == .loading, support == .unknown, idle, !timedOut { return .loading }
-        return .classic
+    func next(support: BotSpacesSupport, idle: Bool, quiet: Bool = true, linked: Bool = false) -> Shown {
+        switch shown {
+        case .room:
+            return support == .available ? .room : .classic
+        case .loading:
+            if support == .available, idle { return .room }
+            if support == .unknown, idle, quiet, !linked, !timedOut { return .loading }
+            return .classic
+        case .classic:
+            return support == .available && idle && quiet ? .room : .classic
+        }
     }
 
     @discardableResult
-    mutating func update(support: BotSpacesSupport, idle: Bool) -> Shown {
-        shown = next(support: support, idle: idle)
+    mutating func update(support: BotSpacesSupport, idle: Bool, quiet: Bool = true, linked: Bool = false) -> Shown {
+        shown = next(support: support, idle: idle, quiet: quiet, linked: linked)
         return shown
     }
 

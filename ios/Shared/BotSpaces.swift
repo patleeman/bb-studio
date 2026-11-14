@@ -252,6 +252,20 @@ public enum BotSpacesSupport: String, Codable, Sendable {
         AppGroup.defaults.string(forKey: key(serverURL)).flatMap(BotSpacesSupport.init(rawValue:)) ?? .unknown
     }
 
+    static func errorKey(_ serverURL: URL) -> String { ServerScope.key("botSpacesErrorAnswer", serverURL: serverURL) }
+
+    public static func answeredWithError(serverURL: URL) -> Bool {
+        AppGroup.defaults.bool(forKey: errorKey(serverURL))
+    }
+
+    static func rememberErrorAnswer(_ value: Bool, serverURL: URL) {
+        if value {
+            AppGroup.defaults.set(true, forKey: errorKey(serverURL))
+        } else {
+            AppGroup.defaults.removeObject(forKey: errorKey(serverURL))
+        }
+    }
+
     static func store(_ value: BotSpacesSupport, serverURL: URL) {
         if value == .unknown {
             AppGroup.defaults.removeObject(forKey: key(serverURL))

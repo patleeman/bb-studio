@@ -407,7 +407,7 @@ struct RoomView: View {
         HStack(spacing: 6) {
             ForEach(order, id: \.self) { id in
                 Capsule().fill(.white.opacity(id == pager.shown ? 0.9 : 0.35))
-                    .frame(width: id == pager.shown ? 14 : 6, height: 6)
+                    .frame(width: id == pager.shown ? 14 : RoomDock.dots, height: RoomDock.dots)
             }
         }
         .animation(.snappy, value: pager.shown)
@@ -420,7 +420,7 @@ struct RoomView: View {
     }
 
     private var dock: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: RoomDock.spacing) {
             if room.mode.recording {
                 RoomHint(talk: session.talk).transition(.opacity)
             } else if order.count > 1 {
@@ -440,7 +440,7 @@ struct RoomView: View {
                             .font(.body)
                             .foregroundStyle(.white.opacity(0.55))
                             .lineLimit(1)
-                            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                            .frame(maxWidth: .infinity, minHeight: RoomDock.field, alignment: .leading)
                             .padding(.horizontal, 20)
                             .background(look.canvas.opacity(0.9), in: .capsule)
                             .overlay(Capsule().strokeBorder(.white.opacity(0.12)))
@@ -454,8 +454,8 @@ struct RoomView: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 10)
-        .padding(.bottom, 8)
+        .padding(.top, RoomDock.top)
+        .padding(.bottom, RoomDock.bottom)
         .animation(.snappy, value: room.mode)
     }
 
@@ -650,14 +650,8 @@ struct RoomDayView: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            content(Self.fit(proxy.size))
-        }
-    }
-
-    private func content(_ fit: (cards: Int, presence: CGFloat)) -> some View {
         let day = day
-        return VStack(alignment: .leading, spacing: 0) {
+        RoomColumn(reportPresence: reportPresence) {
             HStack {
                 Text(Date.now, format: .dateTime.weekday(.wide).month(.wide).day())
                     .font(.subheadline.weight(.medium))
@@ -676,13 +670,12 @@ struct RoomDayView: View {
                     .accessibilityIdentifier("roomMenuButton")
                 }
             }
-            .frame(minHeight: 44)
+        } presence: { size in
             PresenceView(bot: bot, state: bot.presenceState(live: view),
-                         workers: view?.workers.filter { $0.status == .running }.count ?? bot.activity.workers, size: fit.presence,
+                         workers: view?.workers.filter { $0.status == .running }.count ?? bot.activity.workers, size: size,
                          room: PresenceSpec.roomHeadroom, paused: !shown)
                 .offset(x: nudge)
-                .frame(maxWidth: .infinity)
-                .frame(height: fit.presence * PresenceSpec.roomHeadroom)
+                .roomPresenceSlot(size)
                 .contentShape(.rect)
                 .gesture(DragGesture(minimumDistance: 20).onEnded { value in
                     guard abs(value.translation.width) > 50, abs(value.translation.width) > abs(value.translation.height) * 1.5 else { return }
@@ -692,6 +685,7 @@ struct RoomDayView: View {
                 .accessibilityLabel("\(bot.name), \(BotShell.status(bot, view: view))")
                 .accessibilityHint(canSwitch ? "Swipe up or down to switch Bots" : "")
                 .accessibilityAdjustableAction { direction in switchBot(direction == .increment ? 1 : -1) }
+        } below: { cards in
             ZStack(alignment: .topLeading) {
                 (Text(day.lead + (day.rest == nil ? "" : " ")) + Text(day.rest ?? "").foregroundStyle(.white.opacity(0.62)).fontWeight(.medium))
                     .font(.title2.weight(.semibold))
@@ -707,7 +701,7 @@ struct RoomDayView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(spacing: 6) {
-                ForEach((morning?.items ?? []).prefix(fit.cards)) { item in
+                ForEach((morning?.items ?? []).prefix(cards)) { item in
                     RoomCard(item: item, open: openTodos, done: { done(item.id) })
                         .transition(.opacity)
                         .accessibilityHidden(!shown)
@@ -716,13 +710,47 @@ struct RoomDayView: View {
             }
             .padding(.top, 18)
             .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxY } action: { reportBottom($0) }
-            Spacer(minLength: 0)
         }
-        .onChange(of: fit.presence, initial: true) { _, size in reportPresence(size) }
-        .padding(.horizontal, 22)
-        .padding(.top, 8)
-        .frame(maxWidth: 640)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+}
+
+struct RoomColumn<Header: View, Presence: View, Below: View>: View {
+    var reportPresence: (CGFloat) -> Void = { _ in }
+    @ViewBuilder var header: () -> Header
+    @ViewBuilder var presence: (CGFloat) -> Presence
+    @ViewBuilder var below: (Int) -> Below
+
+    var body: some View {
+        GeometryReader { proxy in
+            let fit = RoomDayView.fit(proxy.size)
+            VStack(alignment: .leading, spacing: 0) {
+                header().frame(minHeight: 44)
+                presence(fit.presence)
+                below(fit.cards)
+                Spacer(minLength: 0)
+            }
+            .onChange(of: fit.presence, initial: true) { _, size in reportPresence(size) }
+            .padding(.horizontal, 22)
+            .padding(.top, 8)
+            .frame(maxWidth: 640)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+    }
+}
+
+enum RoomDock {
+    static let spacing: CGFloat = 10
+    static let field: CGFloat = 52
+    static let top: CGFloat = 10
+    static let bottom: CGFloat = 8
+    static let dots: CGFloat = 6
+
+    static func height(dots shown: Bool) -> CGFloat { top + field + bottom + (shown ? dots + spacing : 0) }
+}
+
+extension View {
+    func roomPresenceSlot(_ size: CGFloat) -> some View {
+        frame(maxWidth: .infinity).frame(height: size * PresenceSpec.roomHeadroom)
     }
 }
 
@@ -798,7 +826,7 @@ struct RoomMic: View {
         Image(systemName: "mic.fill")
             .font(.title3.weight(.semibold))
             .foregroundStyle(talk.isActive ? Color.white : Color(red: 0.04, green: 0.06, blue: 0.13))
-            .frame(width: 52, height: 52)
+            .frame(width: RoomDock.field, height: RoomDock.field)
             .background(talk.isActive ? (talk.state == .cancelling ? Color.gray : Color(red: 1, green: 0.35, blue: 0.35)) : Color(white: 0.93), in: .circle)
             .scaleEffect(talk.isActive ? 1.18 : 1)
             .animation(.snappy(duration: 0.2), value: talk.state)

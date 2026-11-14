@@ -174,6 +174,7 @@ final class AppModel: ObservableObject {
         flushOutboxOnConnect()
         BotSpacesStore.shared.attach(client: client, realtime: realtime)
         BotLiveActivities.shared.attach(store: BotSpacesStore.shared, client: client)
+        BotSpacesStore.shared.askIfUnknown()
         path = []
         studioPath = []
         newThreadDraft = nil
