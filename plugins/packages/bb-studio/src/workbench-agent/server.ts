@@ -7,6 +7,7 @@
 // record (what the agent opened, what the user closed or changed) here, in
 // memory, and hands it to the window with each call.
 import { randomUUID } from "node:crypto";
+import { access } from "node:fs/promises";
 import { isAbsolute, normalize, relative, resolve } from "node:path";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
@@ -312,6 +313,13 @@ export function fileTargetIn(place: ThreadPlace, primaryHostId: string | null, p
   return hostId ? { kind: "host", hostId, path: file } : null;
 }
 
+/** The file's full path when it is on the machine BB runs on, else null (another machine's files aren't checked). */
+export function localFileIn(place: ThreadPlace, primaryHostId: string | null, path: string): string | null {
+  const file = isAbsolute(path) ? resolve(path) : place.root ? resolve(place.root, path) : null;
+  if (!file || !primaryHostId) return null;
+  return (place.hostId ?? primaryHostId) === primaryHostId ? file : null;
+}
+
 /** A path as the worktree names it (relative to its folder), for the diff tab. */
 export function workspacePathIn(place: ThreadPlace, path: string): string {
   if (isAbsolute(path) && place.root && inside(place.root, resolve(path))) return relative(place.root, resolve(path));
@@ -345,6 +353,10 @@ export function registerWorkbenchAgent(bb: BbPluginApi, deps: { itemTitle(id: st
     },
     fileTarget: async (threadId: string, path: string) => fileTargetIn(await place(threadId), await primaryHostId(), path),
     workspacePath: async (threadId: string, path: string) => workspacePathIn(await place(threadId), path),
+    fileExists: async (threadId: string, path: string) => {
+      const file = localFileIn(await place(threadId), await primaryHostId(), path);
+      return file === null ? true : access(file).then(() => true, () => false);
+    },
   };
   bb.rpc.register(linksContract, linkHandlers(lookups));
   const tools = workbenchTools({ router, records, ...lookups });
