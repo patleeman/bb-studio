@@ -94,9 +94,10 @@ export function ConversationRowView({ row, now, onOpen, menuTarget }: { row: Con
         <span data-testid="conversation-time" className={`shrink-0 text-xs tabular-nums ${INK_55}`}>{shortAge(row.updatedAt, now)}</span>
       </span>
       {line.text || line.tone !== "quiet" ? (
-        <span data-testid="conversation-line" data-tone={line.tone} className={`flex min-w-0 items-center gap-1.5 text-xs leading-[17px] ${line.tone === "needs-you" ? "text-warning" : INK_55}`}>
+        <span data-testid="conversation-line" data-tone={line.tone} className={`flex min-w-0 items-center gap-1.5 text-xs leading-[17px] ${line.tone === "needs-you" ? "text-warning" : line.tone === "failed" ? "text-destructive" : INK_55}`}>
           {line.tone === "needs-you" ? <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-warning" /> : null}
           {line.tone === "running" ? <span role="img" aria-label="Working" className="size-2.5 shrink-0 animate-spin rounded-full border-[1.5px] border-success border-r-transparent" /> : null}
+          {line.tone === "failed" ? <Icon name="X" className="size-3 shrink-0" aria-hidden /> : null}
           <span className="min-w-0 truncate">{line.text}</span>
         </span>
       ) : null}
