@@ -63,12 +63,12 @@ export const BUILTIN_PLUGINS = [
   {
     name: "bb-account",
     pluginId: "bb-account",
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     name: "connect",
     pluginId: "connect",
-    defaultEnabled: true,
+    defaultEnabled: false,
   },
   {
     name: "environment-project-checkout",
