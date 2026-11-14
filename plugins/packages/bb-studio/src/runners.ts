@@ -40,6 +40,7 @@ import { resolveRunnerMachine, runnerMachineCheck, runnerEnvironment, RunnerPref
 // src/bot-owned.ts hides it with the rest of the Bot's chain. Anything that
 // needs the user still comes through runner_report.
 import { readAvailable } from "./kit/server/read-available";
+import { markStudioLine } from "./kit/relayed";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
@@ -783,7 +784,7 @@ export async function alertBot(sdk: Sdk, input: { botThreadId: string; senderThr
   await sdk.threads.send({
     threadId: input.botThreadId, mode: "auto", ...(input.senderThreadId ? { senderThreadId: input.senderThreadId } : {}),
     input: [
-      { type: "text", text: input.line, mentions: [] },
+      { type: "text", text: input.senderThreadId ? input.line : markStudioLine(input.line), mentions: [] },
       { type: "text", text: input.note ?? "Runner report, already shown to the user as is. Don't reply or acknowledge it; reply exactly [PASS] unless it asks you to act on something.", mentions: [], visibility: "agent-only" },
     ],
   } as never);

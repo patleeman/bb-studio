@@ -214,7 +214,7 @@ it("a watcher wakes the Bot only for output, once per run", async () => {
   ]);
   await x.auto.tick();
   expect(x.send).toHaveBeenCalledTimes(1);
-  expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ threadId: "bot1", input: [expect.objectContaining({ text: "Watcher Releases: v2.0.0 released" }), expect.objectContaining({ visibility: "agent-only" })] }));
+  expect(x.send).toHaveBeenCalledWith(expect.objectContaining({ threadId: "bot1", input: [expect.objectContaining({ text: "[bb studio] Watcher Releases: v2.0.0 released" }), expect.objectContaining({ visibility: "agent-only" })] }));
   await x.auto.tick();
   expect(x.send).toHaveBeenCalledTimes(1);
   const runs = await x.auto.runs(made.id);
@@ -571,7 +571,7 @@ it("with bb's automations plugin off, a watcher made after the import runs on St
   x.clock.now = x.engine.get("watcher", made.id)!.nextAt! + 1;
   await x.engine.tick();
   expect(runScript).toHaveBeenCalledWith(expect.objectContaining({ body: "echo", interpreter: "bash" }));
-  expect(sent(x)).toEqual([expect.objectContaining({ threadId: "bot1", input: [expect.objectContaining({ text: "Watcher Releases: v2.0.0 released" }), expect.objectContaining({ visibility: "agent-only" })] })]);
+  expect(sent(x)).toEqual([expect.objectContaining({ threadId: "bot1", input: [expect.objectContaining({ text: "[bb studio] Watcher Releases: v2.0.0 released" }), expect.objectContaining({ visibility: "agent-only" })] })]);
   expect((await x.auto.runs(made.id)).map((run) => run.outcome)).toEqual(["Woke it: v2.0.0 released"]);
 
   runScript.mockResolvedValueOnce({ exitCode: 0, output: "", error: null });

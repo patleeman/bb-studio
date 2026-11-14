@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { foldsWithReply, parseRelayedMessage, relayedLine, type RelayedInitiator } from "./relayed";
+import { foldsWithReply, markStudioLine, parseRelayedMessage, relayedLine, type RelayedInitiator } from "./relayed";
 import { tellLine, TRIAGE_NOTE } from "../runners";
 import { watcherMessage } from "../automations";
 import { dueMessage } from "../triggers/scheduler";
@@ -53,9 +53,9 @@ describe("relayed messages: Studio's own senders", () => {
   });
 
   it("reads the restart and turned-off alerts as Studio writes them", () => {
-    expect(parseRelayedMessage(RESUME_MARKER, "user")).toMatchObject({ kind: "studio", sender: "BB Studio" });
-    expect(parseRelayedMessage(`⚠️ ${threadExhaustedLine("Sync", "host restarted")}`, "user")).toMatchObject({ kind: "studio", urgent: true });
-    expect(parseRelayedMessage(`⚠️ ${automationExhaustedLine("Sweep", "error")}`, "user")).toMatchObject({ kind: "studio", urgent: true });
+    expect(parseRelayedMessage(markStudioLine(RESUME_MARKER), "user")).toMatchObject({ kind: "studio", sender: "BB Studio" });
+    expect(parseRelayedMessage(markStudioLine(`⚠️ ${threadExhaustedLine("Sync", "host restarted")}`), "user")).toMatchObject({ kind: "studio", urgent: true });
+    expect(parseRelayedMessage(markStudioLine(`⚠️ ${automationExhaustedLine("Sweep", "error")}`), "user")).toMatchObject({ kind: "studio", urgent: true });
   });
 
   it("puts the summary start after the header and a dropped tag", () => {
@@ -63,6 +63,12 @@ describe("relayed messages: Studio's own senders", () => {
     const parsed = parseRelayedMessage(text, "agent")!;
     expect(text.slice(parsed.bodyStart)).toBe("LEAD bb-studio: shipped.");
     expect(text.slice(parsed.summaryStart)).toBe("shipped.");
+  });
+
+  it("never reads a typed line as Studio's, however it starts; only Studio's header marks one", () => {
+    for (const typed of ["Watcher A: hi", "From runner B: x", "⚠️ From runner B: x", "📥 Handed to you: this", "Maintenance: 2 threads need your call soon"]) expect(parseRelayedMessage(typed, "user"), typed).toBeNull();
+    expect(parseRelayedMessage(markStudioLine("Watcher A: hi"), "user")).toMatchObject({ kind: "studio", sender: "watcher A", summary: "hi" });
+    expect(parseRelayedMessage(`[bb message from thread:thr_runr0001]\n\n${markStudioLine("From runner B: x")}`, "agent")).toMatchObject({ kind: "runner", sender: "runner B", summary: "x" });
   });
 
   it("never reads an assistant-looking or empty text", () => {
