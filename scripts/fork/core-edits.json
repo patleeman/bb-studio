@@ -588,7 +588,7 @@
     },
     "plugins/provider-codex/src/bridge/bridge.ts": {
       "seam": "sign-in-errors",
-      "intent": "handleChildNotification passes the translator's deltas through failFastOnAuthError (auth-fail-fast.fork.ts, imported right under the shebang): the first 401 reconnect of a turn becomes its final unauthorized error and the bridge interrupts that Codex turn (requestCodexTurnInterrupt), so a signed-out Codex fails at once instead of after its own reconnects.",
+      "intent": "handleChildNotification passes the translator's deltas through failFastOnAuthError (auth-fail-fast.fork.ts, imported right under the shebang): a reconnect whose error shows missing credentials, or the second 401 reconnect in a row, becomes the turn's final unauthorized error and the bridge interrupts that Codex turn (requestCodexTurnInterrupt), so a signed-out Codex fails at once instead of after its own reconnects, while a single 401 can still recover after a token refresh.",
       "budget": 6
     },
     "apps/app/src/views/thread-detail/ThreadDetailPromptArea.tsx": {
