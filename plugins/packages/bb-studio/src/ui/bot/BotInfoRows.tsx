@@ -52,7 +52,7 @@ export function BotInfoRows({ threadId, view, refresh, openPath }: { threadId: s
       </DetailRow>
       <DetailRow label="Status" icon="Activity"><span data-testid="bot-info-status">{botStatusText(bot)}</span></DetailRow>
       {model ? <DetailRow label="Model" icon="Cpu"><span data-testid="bot-info-model" className="truncate">{model}</span></DetailRow> : null}
-      {needs !== null ? (
+      {needs ? (
         <DetailRow label="Needs you" icon="CircleAlert">
           <button type="button" data-testid="bot-info-needs" className="hover:underline" onClick={() => openPath(todosOn ? loopsPath(bot.id) : botPath(bot.id))}>{needs}</button>
         </DetailRow>

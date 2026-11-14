@@ -635,6 +635,15 @@ test("on a BB Studio copy, a Bot the import stopped reads Paused · in bb, with 
   expect(container.querySelector("[role=group]")).toBeNull();
 });
 
+test("the Info tab leaves out Needs you when nothing waits on the user", async () => {
+  state.data = { bot_thread_owner: { botId: "bot_main" }, bot_get: { bot: dot, run: null }, bot_attention: { attention: null } };
+  await show(<BotInfoSection threadId="thr_bot" />);
+  const labels = [...container.querySelectorAll("[data-detail-row] dt")].map((each) => each.textContent);
+  expect(labels).toContain("Status");
+  expect(labels).not.toContain("Needs you");
+  expect(container.querySelector("[data-testid=bot-info-needs]")).toBeNull();
+});
+
 test("the thread header's main button is the Bot (its avatar and name), before the page link; it opens BB's Info tab, on Bot threads only", async () => {
   const { botInfoHeaderAction, pageLinkHeaderAction } = await import("../thread-header");
   // BB draws a plugin's header actions as one split button, the first as the button: the Bot.
