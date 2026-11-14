@@ -2,10 +2,17 @@ import { useState, type ReactNode } from "react";
 import type { TimelineRow } from "@bb/server-contract";
 import { Button } from "@bb/shared-ui/button";
 import { useAppCommandRunner } from "@/components/commands/AppCommandProvider";
+import {
+  resolveSignInCommand,
+  signInBrowserIsOnMachine,
+} from "@/components/onboarding/onboarding-model";
+import { useEnvironment } from "@/hooks/queries/environment-queries";
 import { useCreateTerminal } from "@/hooks/queries/thread-terminal-queries";
 import { useSystemProviderStates } from "@/hooks/queries/system-queries";
 import { useThread } from "@/hooks/queries/thread-queries";
+import { useHostDaemon } from "@/hooks/useHostDaemon";
 import { useAppNavigationHost } from "@/lib/app-navigation-host";
+import { getBbDesktopInfo } from "@/lib/bb-desktop";
 import { useThreadTimelineNavigation } from "./ThreadTimelineNavigationContext";
 
 const SIGN_IN_TITLE = /^(.+) isn't signed in$/u;
@@ -33,11 +40,24 @@ export function SignInErrorActions({
   const threadId = useThreadTimelineNavigation()?.threadId ?? "";
   const thread = useThread(threadId).data;
   const environmentId = thread?.environmentId ?? undefined;
-  const states = useSystemProviderStates(
-    environmentId === undefined ? {} : { environmentId },
-  ).data?.providers;
+  const states = useSystemProviderStates({
+    ...(environmentId === undefined ? {} : { environmentId }),
+    enabled: thread !== undefined,
+  }).data?.providers;
+  const hostId = useEnvironment(environmentId).data?.hostId ?? null;
+  const { isLocalDaemonHost } = useHostDaemon();
   const state = states?.find((each) => each.providerId === thread?.providerId);
-  const command = state?.localLoginCommand ?? state?.loginCommand ?? null;
+  const command =
+    state === undefined
+      ? null
+      : resolveSignInCommand(
+          state,
+          signInBrowserIsOnMachine({
+            agentOnLocalDaemonHost: isLocalDaemonHost(hostId),
+            hostname: window.location.hostname,
+            isDesktop: getBbDesktopInfo() !== null,
+          }),
+        );
   const canSignIn =
     threadId !== "" &&
     command !== null &&
