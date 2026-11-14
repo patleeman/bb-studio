@@ -32,11 +32,14 @@ export const newTabEntrySchema = z.object({
 export type NewTabEntry = z.infer<typeof newTabEntrySchema>;
 
 /** An item of the Studio tab's kinds: a page, a whiteboard, a design, an app, an artifact, a recording. */
-export interface ItemRow { id: string; title: string; updatedAt: number; emoji?: string | null }
-export interface BotThreadRow { threadId: string; kind: "conversation" | "worker"; title: string; updatedAt: number }
+export interface ItemRow { id: string; title: string; updatedAt: number; emoji?: string | null; kindName?: string | null }
+export interface BotThreadRow { threadId: string; kind: "conversation" | "worker"; title: string; updatedAt: number; isMain?: boolean }
 export interface BoardRow { threadId: string; title: string; updatedAt: number }
 export interface BotRow { id: string; name: string; updatedAt: number }
 export interface EntryRow { kind: "automation" | "todo" | "record"; id: string; title: string; updatedAt: number }
+
+/** The Bot's own chat, as its sidebar names it. */
+const MAIN_TITLE = "Main";
 
 const UNTITLED: Partial<Record<TabKindId, string>> = { conversation: "Untitled conversation", worker: "Untitled worker", board: "Untitled board", bot: "Bot" };
 
@@ -53,11 +56,13 @@ export function entryFor(ref: TabRef, title: string, updatedAt: number, icon?: s
 
 export function itemEntry(item: ItemRow): NewTabEntry | null {
   const kind = itemKindOfId(item.id);
-  return kind ? entryFor({ kind, id: item.id }, item.title, item.updatedAt, item.emoji) : null;
+  if (!kind) return null;
+  const entry = entryFor({ kind, id: item.id }, item.title, item.updatedAt, item.emoji);
+  return item.kindName ? { ...entry, kind: item.kindName } : entry;
 }
 
 export function threadEntry(thread: BotThreadRow): NewTabEntry {
-  return entryFor({ kind: thread.kind, id: thread.threadId }, thread.title, thread.updatedAt);
+  return entryFor({ kind: thread.kind, id: thread.threadId }, thread.isMain ? MAIN_TITLE : thread.title, thread.updatedAt);
 }
 
 export function boardEntry(board: BoardRow): NewTabEntry {

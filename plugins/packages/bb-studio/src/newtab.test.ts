@@ -44,6 +44,16 @@ it("merges every kind the server keeps, newest first and named by the registry, 
   expect(entries[3]!.ref).toEqual({ kind: "page", id: PAGE });
 });
 
+it("names a saved file as the Library does, and the Bot's chat Main as the sidebar does", async () => {
+  const entries = await newTabRecents(sources({
+    items: () => [{ id: "art_0123456789abcdef", title: "Reading list", updatedAt: 900, kindName: "Document" }, { id: "art_fedcba9876543210", title: "Old file", updatedAt: 800 }],
+    botThreads: async () => [{ threadId: "thr_main", kind: "conversation" as const, title: "Scout", updatedAt: 700, isMain: true }],
+    boards: async () => [],
+    bots: () => [],
+  }), { threadId: null, limit: 10 });
+  expect(entries.map((entry) => [entry.title, entry.kind])).toEqual([["Reading list", "Document"], ["Old file", "Artifact"], ["Main", "Conversation"]]);
+});
+
 it("keeps Recent to the newest few and survives a missing Visual Chat", async () => {
   const entries = await newTabRecents(sources({ boards: async () => { throw new Error("Not installed"); } }), { threadId: null, limit: 2 });
   expect(entries.map((entry) => entry.id)).toEqual(["conversation:thr_here", "worker:thr_w"]);

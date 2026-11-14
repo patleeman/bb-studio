@@ -70,6 +70,9 @@ export const TYPE_LABELS: Record<ArtifactType, string> = {
   other: "File",
 };
 
+/** What the Library and Recent call a saved file of this type. */
+export const FILE_KIND_LABELS: Record<ArtifactType, string> = { ...TYPE_LABELS, html: "App", markdown: "Document", text: "Document" };
+
 export const TYPE_ICONS: Record<ArtifactType, string> = {
   image: "studio/artifact-image",
   audio: "studio/artifact-audio",

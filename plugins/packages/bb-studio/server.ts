@@ -27,6 +27,7 @@ import { DESIGN_TOOLS, registerDesign } from "./src/design/server";
 import { registerDashboards } from "./src/dashboards/server";
 import { MINI_TOOLS, registerMinis } from "./src/minis/server";
 import { displayTitle as artifactTitle, versionType as artifactVersionType } from "./src/artifacts/server/store";
+import { FILE_KIND_LABELS, isArtifactId } from "./src/artifacts/shared";
 import { registerTalk, TALK_TOOLS, type TalkSettingsHandle } from "./src/talk/server";
 import { PAGE_TOOLS, registerPages } from "./src/pages/server";
 import { registerExploreBuiltin } from "./src/explore/server";
@@ -1222,10 +1223,14 @@ export default async function plugin(bb: BbPluginApi) {
   // Studio's rows on the side panel's New Tab page (src/newtab.ts): every kind of the tab kinds registry the server can list.
   const NEW_TAB_ITEM_KINDS = ITEM_KINDS.map((each) => each.tabKind as string);
   const itemKindsOf = (kinds: readonly TabKindId[]) => ITEM_KINDS.filter((each) => kinds.includes(each.id)).map((each) => each.tabKind as string);
-  const itemRows = (hits: readonly SearchHit[]) => hits.map((hit) => ({ id: hit.ref.id, title: hit.title, updatedAt: hit.updatedAt }));
-  const botThreadRows = async (records: readonly { threadId: string; kind: "conversation" | "worker"; title: string | null; updatedAt: number }[]) => {
+  const fileKindName = (id: string) => {
+    const artifact = isArtifactId(id) ? artifacts.store.get(id) : null;
+    return artifact ? FILE_KIND_LABELS[artifactVersionType(artifact.version)] : null;
+  };
+  const itemRows = (hits: readonly SearchHit[]) => hits.map((hit) => ({ id: hit.ref.id, title: hit.title, updatedAt: hit.updatedAt, kindName: fileKindName(hit.ref.id) }));
+  const botThreadRows = async (records: readonly { threadId: string; kind: "conversation" | "worker"; title: string | null; updatedAt: number; isMain?: boolean }[]) => {
     const titles = await threadTitles.titles(records.filter((rec) => !rec.title?.trim()).map((rec) => rec.threadId));
-    return records.map((rec) => ({ threadId: rec.threadId, kind: rec.kind, title: rec.title?.trim() || titles.get(rec.threadId) || "", updatedAt: rec.updatedAt }));
+    return records.map((rec) => ({ threadId: rec.threadId, kind: rec.kind, title: rec.title?.trim() || titles.get(rec.threadId) || "", updatedAt: rec.updatedAt, isMain: rec.isMain === true }));
   };
   const visualChatBoards = async () => (await bb.sdk.plugins.callRpc({
     pluginId: VISUAL_CHAT_PLUGIN_ID, method: "canvas.list", input: null as never,
@@ -1270,7 +1275,7 @@ export default async function plugin(bb: BbPluginApi) {
     bots: botRows,
   };
   const newTabSearchSources: NewTabSearchSources = {
-    items: (query, limit) => searchIndex.search(query, { kinds: NEW_TAB_ITEM_KINDS, limit }).map((hit) => ({ row: { id: hit.ref.id, title: hit.title, updatedAt: hit.updatedAt }, score: hit.score })),
+    items: (query, limit) => searchIndex.search(query, { kinds: NEW_TAB_ITEM_KINDS, limit }).map((hit) => ({ row: { id: hit.ref.id, title: hit.title, updatedAt: hit.updatedAt, kindName: fileKindName(hit.ref.id) }, score: hit.score })),
     itemsOfKinds: (kinds, limit) => kinds.length ? itemRows(searchIndex.recent(limit, { kinds: itemKindsOf(kinds) })) : [],
     botThreads: async (query, limit) => {
       const hits = await externalResults(bb, query, { kinds: ["thread"], limit: limit * 3 });
@@ -1278,7 +1283,7 @@ export default async function plugin(bb: BbPluginApi) {
         const rec = botThreads.store.get(hit.ref.id);
         return rec && rec.archivedAt === null ? [{ hit, rec }] : [];
       });
-      const rows = await botThreadRows(found.map(({ hit, rec }) => ({ threadId: rec.threadId, kind: rec.kind, title: rec.title ?? hit.title, updatedAt: hit.updatedAt })));
+      const rows = await botThreadRows(found.map(({ hit, rec }) => ({ threadId: rec.threadId, kind: rec.kind, title: rec.title ?? hit.title, updatedAt: hit.updatedAt, isMain: rec.isMain })));
       return rows.map((row, index) => ({ row, score: found[index]!.hit.score }));
     },
     boards: visualChatBoards,
