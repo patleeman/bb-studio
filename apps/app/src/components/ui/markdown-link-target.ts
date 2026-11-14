@@ -1,3 +1,4 @@
+import { isMentionHref } from "./markdown-mention-links.fork";
 import { parseApplicationUrl } from "@bb/domain/application-url";
 import type { Heading, Nodes, Root } from "mdast";
 import type { MouseEvent as ReactMouseEvent } from "react";
@@ -51,6 +52,7 @@ export function resolveMarkdownLocalFileTarget(
   absolute: MarkdownAbsoluteLocalFileLinkRouting,
   relative: MarkdownRelativeLocalFileLinkRouting | undefined,
 ): ResolvedMarkdownLocalFileTarget | null {
+  if (isMentionHref(value)) return null;
   const absoluteLink =
     parseLocalFileHref({ absoluteLinks: absolute, href: value }) ??
     (absolute.kind === "trusted-host" && relative !== undefined
