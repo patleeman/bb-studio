@@ -141,7 +141,13 @@ struct ThreadView: View {
         .sensoryFeedback(.error, trigger: model.error) { (_: String?, new: String?) in new != nil }
         .sensoryFeedback(.selection, trigger: attachments.count, condition: Self.grew)
         .userActivity(Spotlight.threadActivityType, isActive: model.thread != nil, describeActivity)
-        .background { if botChrome != nil { ClassicBotWriting(draft: draftText, focused: composerFocused) } }
+        .onChange(of: composerFocused, initial: true) { _, _ in reportClassicWriting() }
+        .onDisappear { if botChrome != nil { ClassicBotActivity.shared.writing = false } }
+    }
+
+    private func reportClassicWriting() {
+        guard botChrome != nil else { return }
+        ClassicBotActivity.shared.writing = composerFocused || !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// For the haptics on a count: it went up.
@@ -1240,6 +1246,7 @@ struct ThreadView: View {
 
     private func saveDraftLocally() {
         Drafts.save(model.threadId, text: draft, mentions: mentions, serverURL: model.serverURL)
+        reportClassicWriting()
     }
 
     /// Puts unsent text back in the composer, and in storage in case the thread closed meanwhile.
@@ -1772,19 +1779,6 @@ struct ThreadView: View {
 }
 
 /// The composer's text, observed only by the views that read it.
-private struct ClassicBotWriting: View {
-    let draft: DraftText
-    let focused: Bool
-
-    var body: some View {
-        let writing = focused || !draft.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        Color.clear
-            .onChange(of: writing, initial: true) { _, writing in ClassicBotActivity.shared.writing = writing }
-            .onDisappear { ClassicBotActivity.shared.writing = false }
-            .accessibilityHidden(true)
-    }
-}
-
 @Observable @MainActor final class DraftText {
     var value = ""
     @ObservationIgnored private var saving: Task<Void, Never>?
