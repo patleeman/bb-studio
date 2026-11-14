@@ -3,7 +3,7 @@ import type Database from 'better-sqlite3';
 import { z } from 'zod';
 import { rpcContract, add, act, update, filters, ownerInfo, type Loop } from './contract';
 import { LoopStore, placeKey } from './store';
-import { LoopScheduler, defaults, snooze } from './scheduler';
+import { LoopScheduler, defaults, snooze, systemTimeZone } from './scheduler';
 /** The lock-screen actions a todo's push offers, by kind (the app's BB_LOOP categories). */
 export function loopPushActions(kind:Loop['kind']):('done'|'snooze'|'got_it'|'choose')[]{return kind==='read'?['got_it','snooze']:kind==='decide'?['choose','snooze']:['done','snooze'];}
 import { STUDIO_REALTIME_CHANNEL } from '../kit/contract';
@@ -20,7 +20,7 @@ const TOOL_VERBS=['add','list','get','update','act','fire','morning'];
 export const LOOP_TOOLS=[...TOOL_VERBS.map(v=>`todos_${v}`),...TOOL_VERBS.map(v=>`loops_${v}`)];
 /** Todos' settings are Studio settings (src/settings): loopsEnabled under Threads, the rest under Bot ▸ Controls ▸ Attention, the time zone (todosTimeZone) included. */
 type LoopSettings={get():Promise<Record<string,unknown>>;onChange(listener:(next:Record<string,unknown>)=>void):void};
-export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:string)=>Promise<void>,notify:ConstructorParameters<typeof LoopScheduler>[3],settings:LoopSettings,timeZone:()=>string=()=>defaults.timeZone,every:(name:string,everyMs:number,work:()=>void)=>void=(_name,everyMs,work)=>{const timer=setInterval(work,everyMs);bb.onDispose(()=>clearInterval(timer));}){
+export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:string)=>Promise<void>,notify:ConstructorParameters<typeof LoopScheduler>[3],settings:LoopSettings,timeZone:()=>string=()=>systemTimeZone(),every:(name:string,everyMs:number,work:()=>void)=>void=(_name,everyMs,work)=>{const timer=setInterval(work,everyMs);bb.onDispose(()=>clearInterval(timer));}){
  // Every saved change tells open windows (cards, the Todos tab, badges) to refetch.
  const store=new LoopStore(db,()=>bb.realtime.publish(STUDIO_REALTIME_CHANNEL,{pluginId:'studio'}));
  let config=defaults;

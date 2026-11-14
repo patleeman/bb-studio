@@ -15,7 +15,7 @@ import { LOOP_MENTION, loopReference } from "../reference";
 
 const PERSONAL_PROJECT_ID = "proj_personal";
 
-/** The `loopsEnabled` Studio setting (label "Todo reminders", default off). */
+/** The `loopsEnabled` Studio setting (label "Todo reminders", default on). */
 export function useLoopsEnabled(): boolean {
   const { values } = useStudioSettings();
   return values?.loopsEnabled === true;

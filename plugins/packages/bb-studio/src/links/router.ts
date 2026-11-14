@@ -70,6 +70,12 @@ function parseDirective(text: string): TabRef | null | undefined {
   return refOf(kind, kind === "todos" ? null : id);
 }
 
+function mentionRef(text: string): TabRef | null | undefined {
+  const match = /^@?(page|thread):([^\s/?#]+)$/.exec(text);
+  if (!match) return undefined;
+  return refOf(match[1] === "page" ? "page" : "conversation", decode(match[2]!));
+}
+
 function parseScheme(rest: string): TabRef | null {
   const clean = rest.split(/[?#]/)[0]!.replace(/^\/+/, "");
   const slash = clean.indexOf("/");
@@ -89,8 +95,8 @@ export function parseLink(text: string | null | undefined, origin: string = type
   const entity = (ref: TabRef | null): LinkTarget | null => (ref ? { type: "entity", ref, link } : null);
   const directive = parseDirective(link);
   if (directive !== undefined) return entity(directive);
-  const reference = /^(page|thread):([^\s/?#]+)$/.exec(link);
-  if (reference) return entity(refOf(reference[1] === "page" ? "page" : "conversation", decode(reference[2]!)));
+  const reference = mentionRef(link);
+  if (reference !== undefined) return entity(reference);
   if (link.toLowerCase().startsWith(PREFIX)) {
     const action = link.slice(PREFIX.length).split(/[?#]/)[0]!.replace(/^\/+|\/+$/g, "").toLowerCase();
     if (isLinkAction(action)) return { type: "action", action, link };
@@ -99,7 +105,11 @@ export function parseLink(text: string | null | undefined, origin: string = type
   if (link.startsWith("/") && !link.startsWith("//")) return entity(refOfPath(link));
   let url: URL;
   try { url = new URL(link); } catch { return null; }
-  if (url.protocol === "file:") return entity(refOf("file", decode(url.pathname)));
+  if (url.protocol === "file:") {
+    const path = decode(url.pathname);
+    const mention = path ? mentionRef(path.slice(path.lastIndexOf("/") + 1)) : undefined;
+    return entity(mention !== undefined ? mention : refOf("file", path));
+  }
   if (/^https?:$/.test(url.protocol)) {
     if (origin && url.origin === origin) return entity(refOfPath(`${url.pathname}${url.search}${url.hash}`));
     return { type: "external", url: url.href, link };
@@ -207,7 +217,7 @@ export async function openLink(target: LinkTarget, options: OpenLinkOptions, dep
   const wb = threadId ? deps.workbench(threadId) : null;
   const place = (pane?: PanePlace): OpenPlace => ({ threadId, ...(pane !== undefined ? { pane } : {}) });
   if (!resolution.found) {
-    const opened = threadId || deps.studioPage() ? await deps.openStudioTab(notFoundTab(ref, target.link), place(how === "secondPane" ? secondPane(wb) : undefined)) : false;
+    const opened = !threadId && deps.studioPage() ? await deps.openStudioTab(notFoundTab(ref, target.link), place(how === "secondPane" ? secondPane(deps.pageWorkbench()) : undefined)) : false;
     if (!opened) deps.toast(`${NOT_FOUND_TITLE}: ${target.link}`);
     return { via: "notFound", opened };
   }

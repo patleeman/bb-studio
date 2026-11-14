@@ -19331,12 +19331,14 @@ public enum Studio {
     public var title: String?
     public var finishedAt: Double?
     public var summary: String?
+    public var failed: Bool?
 
-    public init(threadId: String? = nil, title: String? = nil, finishedAt: Double? = nil, summary: String? = nil) {
+    public init(threadId: String? = nil, title: String? = nil, finishedAt: Double? = nil, summary: String? = nil, failed: Bool? = nil) {
       self.threadId = threadId
       self.title = title
       self.finishedAt = finishedAt
       self.summary = summary
+      self.failed = failed
     }
   }
 

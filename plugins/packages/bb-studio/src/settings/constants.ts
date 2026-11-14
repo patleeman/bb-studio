@@ -16,8 +16,8 @@ const validZone = (zone: string | undefined) => {
 
 /**
  * Todos' time zone: the todosTimeZone setting (Bot settings ▸ Attention), else
- * STUDIO_LOOP_TIME_ZONE, else this Mac's (the BB server's), else New York.
+ * STUDIO_LOOP_TIME_ZONE, else this Mac's (the BB server's), else UTC.
  */
 export function loopTimeZone(env: NodeJS.ProcessEnv = process.env, setting?: string): string {
-  return validZone(setting) ?? validZone(env.STUDIO_LOOP_TIME_ZONE) ?? validZone(Intl.DateTimeFormat().resolvedOptions().timeZone) ?? "America/New_York";
+  return validZone(setting) ?? validZone(env.STUDIO_LOOP_TIME_ZONE) ?? validZone(Intl.DateTimeFormat().resolvedOptions().timeZone) ?? "UTC";
 }

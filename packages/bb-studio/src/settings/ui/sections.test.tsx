@@ -170,10 +170,10 @@ describe("Studio's settings sections", () => {
     for (const key of ["explore_next", "explore_explore", "explore_quickReplies", "explore_replyItems", "emojiItems", "showInSelectionMenu", "showInAssistantBar", "showInUserBar"]) expect($(`setting-${key}`)).not.toBeNull();
   });
 
-  it("Threads: Todos links to Bot ▸ Controls ▸ Attention", async () => {
+  it("Threads: Todos links to Bot settings ▸ Attention", async () => {
     await render("settings-threads");
     for (const key of ["decisions_enabled", "autoResumeThreads", "loopsEnabled", "snapshotsPerPage"]) expect($(`setting-${key}`)).not.toBeNull();
-    await click([...host.querySelectorAll("button")].find((button) => button.textContent === "Bot ▸ Controls ▸ Attention"));
+    await click([...host.querySelectorAll("button")].find((button) => button.textContent === "Bot settings ▸ Attention"));
     expect(state.open).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_cos/controls#attention");
   });
 
@@ -258,10 +258,10 @@ describe("Bot ▸ Controls ▸ Attention", () => {
     expect(state.set).toHaveBeenCalledWith({ loopsEnabled: false });
   });
 
-  it("names the switch for what it holds: Todo reminders, off by default", async () => {
+  it("names the switch for what it holds: Todo reminders, on by default", async () => {
     await act(async () => { root.render(<BotAttention botName="Chief of Staff" />); });
     const toggle = host.querySelector('[role="switch"]')!;
-    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
     expect(toggle.getAttribute("aria-label")).toBe("Todo reminders");
     expect(text()).toContain("Posts each due todo in the Bot’s chat");
   });

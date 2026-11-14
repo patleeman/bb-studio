@@ -162,7 +162,7 @@ export const botThreadsSchemas = {
     input: z.object({ botId: botId.optional() }),
     output: z.object({
       botId: z.string().nullable(), conversations: z.array(conversation), workers: z.array(worker),
-      finished: z.array(z.object({ threadId: z.string(), title: z.string(), finishedAt: z.number(), summary: z.string() })),
+      finished: z.array(z.object({ threadId: z.string(), title: z.string(), finishedAt: z.number(), summary: z.string(), failed: z.boolean().optional() })),
     }),
   },
   /** One thread's place; null for a thread no Bot has (yet). */

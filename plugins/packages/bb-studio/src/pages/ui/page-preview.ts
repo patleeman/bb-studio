@@ -1,11 +1,21 @@
 // A page's Markdown made readable by chat's renderer, for the inline preview
 // under a `::page` card. Chat knows none of Pages' extensions, so mentions
-// become links or plain labels and JSON blocks become a short line of text.
+// become links or plain labels, callouts a bold label, and JSON blocks a short
+// line of text.
 import { pagePath } from "../constants";
 
 const MENTION = /@\[((?:\\.|[^\]\\])*)\]\((bot|page|thread|date|agent|item):([^)\s]+)\)/g;
 const FENCE = /^\s*(`{3,}|~{3,})\s*([\w-]*)/;
 const DATA_BLOCKS = new Set(["embed", "chart", "stats"]);
+
+const CALLOUT = /^(\s*>\s*)\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/i;
+
+function callout(line: string): string {
+  const match = CALLOUT.exec(line);
+  if (!match) return line;
+  const rest = line.slice(match[0].length);
+  return `${match[1]}**${match[2]![0]!.toUpperCase()}${match[2]!.slice(1).toLowerCase()}**${rest ? ` ${rest}` : ""}`;
+}
 
 function mentions(line: string): string {
   return line.replace(MENTION, (_, label: string, kind: string, target: string) => {
@@ -44,7 +54,7 @@ export function chatMarkdown(markdown: string): string {
   for (let index = 0; index < lines.length; index++) {
     const open = FENCE.exec(lines[index]);
     if (!open) {
-      out.push(mentions(lines[index]));
+      out.push(callout(mentions(lines[index])));
       continue;
     }
     // A fence runs to a closing fence of the same character, at least as long.

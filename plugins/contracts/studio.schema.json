@@ -25359,6 +25359,9 @@
                 },
                 "summary": {
                   "type": "string"
+                },
+                "failed": {
+                  "type": "boolean"
                 }
               },
               "required": [

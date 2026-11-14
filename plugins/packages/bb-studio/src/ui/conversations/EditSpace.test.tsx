@@ -83,6 +83,8 @@ it("is one view with no tabs: Name, Presence, the Appearance picker with its sli
   state.stored = { bot: { id: "cos", defaultModel: { providerId: "claude", model: "opus", reasoningLevel: "high", modelName: "Opus 5.5" } }, run: null };
   await mount();
   const view = $('[data-testid="edit-space"]')!;
+  expect(view.querySelector("h2")!.textContent).toBe("Edit Chief of Staff");
+  expect(view.getAttribute("aria-label")).toBe("Edit Chief of Staff");
   expect(view.querySelector('[role="radiogroup"][aria-label="Edit space"]')).toBeNull();
   expect($$('[data-testid^="edit-space-tab-"]')).toEqual([]);
   const order = ['input[aria-label="Name"]', '[role="radiogroup"][aria-label="Form"]', '[role="radiogroup"][aria-label="Scene"], [aria-label="Scene"]', '[data-theme-id="none"]', '[aria-label="Intensity"]', '[role="switch"][aria-label="Use on every Bot"]', '[data-testid="default-model-picker"]', '[data-testid="theme-picker-actions"]'].map((selector) => {
@@ -237,6 +239,7 @@ describe("in the main view (round 8, 8f)", () => {
     expect(pane.className.split(" ")).toEqual(expect.arrayContaining(["max-h-full", "overflow-x-hidden", "overflow-y-auto"]));
     expect(staged.querySelector('[data-testid="edit-space-scroll"]')!.className.split(" ")).toContain("overflow-hidden");
     expect(pane.firstElementChild!.getAttribute("data-testid")).toBe("edit-space-title-row");
+    expect(pane.firstElementChild!.querySelector("h2")!.textContent).toBe("Edit Chief of Staff");
     expect(pane.firstElementChild!.className.split(" ")).toEqual(expect.arrayContaining(["sticky", "top-0", "-mx-5"]));
     expect(pane.firstElementChild!.querySelector('[data-testid="edit-space-close"]')).not.toBeNull();
     expect(pane.lastElementChild!.querySelector('[data-testid="theme-picker-actions"]') ?? pane.querySelector('[data-testid="theme-picker-actions"]')).not.toBeNull();

@@ -184,7 +184,7 @@ content, each showing the matching text with the match in bold.
 
 Todos are how the Bot tracks what the user owes, decides, reads or waits on
 ([backend](../../docs/attention-router/backend.md)). The Todos list, its
-cards and the pane work at all times. **Todo reminders** (`loopsEnabled`, off
+cards and the pane work at all times. **Todo reminders** (`loopsEnabled`, on
 by default; Bot settings ▸ Attention, or Studio's settings under Threads) is
 the switch for the scheduler: with it on, the Bot posts a `::loop` line in its
 chat when a todo comes due, and it renders as a card with the todo's actions. `scripts/capture/captures/bb-studio-loops.mjs`

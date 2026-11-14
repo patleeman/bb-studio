@@ -11,6 +11,7 @@ export interface LinkResolveDeps {
   entryTitle(kind: "automation" | "todo" | "record", id: string): Promise<string | null>;
   fileTarget(threadId: string, path: string): Promise<FileTarget | null>;
   workspacePath(threadId: string, path: string): Promise<string>;
+  fileExists?(threadId: string, path: string): Promise<boolean>;
 }
 
 const missing: LinkResolution = { found: false, title: null, spec: null };
@@ -48,7 +49,8 @@ export async function resolveLink(input: { kind: string; id: string | null; thre
       if (!id || !threadId) return missing;
       if (entry.id === "diff") return present(`Diff of ${await deps.workspacePath(threadId, id)}`, { kind: "diff", path: await deps.workspacePath(threadId, id) });
       const target = await deps.fileTarget(threadId, id);
-      return target ? present(id, { kind: "file", target, location: null }) : missing;
+      if (!target || (deps.fileExists && !(await deps.fileExists(threadId, id)))) return missing;
+      return present(id, { kind: "file", target, location: null });
     }
   }
 }

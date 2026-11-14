@@ -216,6 +216,14 @@ it("acts from the detail: Done, choose, Remind me now, Take it back, Open thread
   expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_x1", changes: { status: "surfaced" } });
 });
 
+it("shows why Remind me now failed in the detail", async () => {
+  state.call.mockImplementationOnce(async () => { throw new Error("An active Bot chat is required"); });
+  await render();
+  await openRow("Call the plumber about the slow drain");
+  await act(async () => buttonIn(detail()!, "Remind me now").click());
+  expect(detail()!.querySelector("[role='alert']")?.textContent).toBe("An active Bot chat is required");
+});
+
 it("names a todo's actions in plain words: Remind me now, Give to, Change when, Dismiss", async () => {
   await render();
   await openRow("Call the plumber about the slow drain");

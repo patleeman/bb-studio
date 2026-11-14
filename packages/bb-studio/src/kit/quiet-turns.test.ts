@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { registerQuietReplyClassifier, registerQuietTurnClassifier } from "./quiet-turns";
+import { classifyRelayedMessage, registerQuietReplyClassifier, registerQuietTurnClassifier } from "./quiet-turns";
 
 describe("quiet turn registration", () => {
   it("gives BB a turn classifier that calls exactly [PASS] quiet", () => {
@@ -23,5 +23,20 @@ describe("quiet turn registration", () => {
     expect(registerQuietTurnClassifier({ experimental_hooks: {} })).toBe(false);
     expect(registerQuietTurnClassifier({})).toBe(false);
     expect(registerQuietReplyClassifier({})).toBe(false);
+  });
+
+  it("tells BB which messages came from elsewhere, with their sender and where the line starts", () => {
+    let registration: { classifyMessage?: typeof classifyRelayedMessage } | null = null;
+    registerQuietReplyClassifier({ experimental_replyClassifier: (each: typeof registration) => { registration = each; } });
+    expect(registration!.classifyMessage).toBe(classifyRelayedMessage);
+    const relay = "[bb message from thread:thr_lead0001]\n\nLEAD bb-studio: shipped.";
+    expect(classifyRelayedMessage(relay, { part: "message", initiator: "agent" })).toEqual({ previewStart: relay.indexOf("shipped.") });
+    expect(classifyRelayedMessage("LEAD bb-studio: shipped.", { part: "body", initiator: null })).toEqual({ previewStart: "LEAD bb-studio: ".length });
+    expect(classifyRelayedMessage("From runner House: Door open.", { part: "body", initiator: null })).toEqual({ sender: "runner House", previewStart: "From runner House: ".length });
+    expect(classifyRelayedMessage("Watcher Inbox: 3 new", { part: "message", initiator: "user" })).toEqual({ sender: "watcher Inbox", previewStart: "Watcher Inbox: ".length });
+    const due = "[bb automation due:aut_1]\n\nCheck-in \"Daily\": Plan.";
+    expect(classifyRelayedMessage(due, { part: "message", initiator: "user" })).toEqual({ sender: "Daily", previewStart: due.indexOf("Check-in") });
+    expect(classifyRelayedMessage("Status?", { part: "message", initiator: "user" })).toBeNull();
+    expect(classifyRelayedMessage("Why does [bb message from thread:thr_x] show?", { part: "message", initiator: "user" })).toBeNull();
   });
 });

@@ -73,7 +73,7 @@ export const STUDIO_SETTINGS = {
   // Threads
   decisions_enabled: { group: "threads", type: "boolean", label: "Smart Queue", description: "Pauses while the standalone Smart Queue plugin is on.", default: true },
   autoResumeThreads: { group: "threads", type: "boolean", label: "Resume after a restart", description: "Up to 2 times an hour.", default: true },
-  loopsEnabled: { group: "threads", type: "boolean", label: "Todo reminders", description: "Posts each due todo in the Bot’s chat, with its push, and starts the Bot’s own todos when they’re due.", default: false },
+  loopsEnabled: { group: "threads", type: "boolean", label: "Todo reminders", description: "Posts each due todo in the Bot’s chat, with its push, and starts the Bot’s own todos when they’re due.", default: true },
   snapshotsPerPage: { group: "threads", type: "number", label: "Page history", description: "Keep this many versions of each page, or 0 for all.", default: 50, min: 0, max: 1000, integer: true },
   exportDeletedThreads: { group: "threads", type: "boolean", label: "Export deleted threads", description: "If the file cannot be written, the thread is not deleted.", default: false },
   exportDeletedThreadsFolder: { group: "threads", type: "string", label: "Export folder", description: "An absolute folder path on this computer, such as /Users/you/bb-thread-exports. One .jsonl file per thread.", default: "", maxLength: 500 },

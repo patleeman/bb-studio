@@ -79,6 +79,7 @@ it("moves the long guidance into the studio skill, which the pointers name", () 
   expect(skill).toMatch(/^---\nname: studio\n/);
   for (const heading of ["## Agent guide", "### Pages", "### Apps", "### The Next row", "### Explore", "### Kinds"]) expect(skill).toContain(heading);
   // The rules that were in every session's instructions.
+  expect(skill).toContain("call those\nscheduled items, never automations");
   for (const rule of ["```chart", "replace_all only when asked", "sandboxed iframe", "pages_comment_reply", "minis_update", "one stray \" breaks the whole line", "“curly” quotes", "Don't also write ::reactions or ::explore lines", "1 to 4 items separated by |"]) expect(skill).toContain(rule);
 });
 

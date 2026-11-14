@@ -79,6 +79,17 @@ it("narrows to Conversations, Workers or Failed, and by search", async () => {
   expect(titles().length).toBeGreaterThan(1);
 });
 
+it("counts an archived conversation whose last reply failed as failed", () => {
+  state.older = { ...(state.older as object), finished: [{ threadId: "thr_hello", title: "Say hello.", finishedAt: NOW - DAY, summary: "", failed: true }, { threadId: "thr_prep", title: "Launch prep", finishedAt: NOW - 3 * DAY, summary: "" }] };
+  render();
+  expect(pill("Failed").textContent).toBe("Failed3");
+  const hello = [...container.querySelectorAll<HTMLElement>("[data-testid=older-finished]")].find((each) => each.textContent?.includes("Say hello."))!;
+  expect(hello.querySelector("[data-testid=bot-page-row-status]")?.textContent).toBe("Failed");
+  act(() => pill("Failed").click());
+  expect([...container.querySelectorAll("section")].map((each) => each.getAttribute("aria-label"))).toEqual(["Conversations", "Failed workers"]);
+  expect(titles()).toEqual(["Say hello.", "Staff sweep", "Fix the CI flake"]);
+});
+
 it("opens a row's thread through the link router as a conversation tab, and reopens a finished conversation", async () => {
   render();
   const trip = container.querySelector<HTMLElement>("[data-testid=older-conversation]")!;

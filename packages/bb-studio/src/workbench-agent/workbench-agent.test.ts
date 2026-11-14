@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TAB_KIND_REGISTRY } from "../tab-kinds";
 import { adaptWorkbench, clearSeenMark, PANE_LIMITS, type HostWorkbenchLike, type PanelTab, type WorkbenchLike } from "./exec";
-import { fileTargetIn, NO_ANSWER, OFF_SCREEN, openOp, STACKED, WorkbenchRecords, WorkbenchRouter, workbenchTools, type WorkbenchToolDeps } from "./server";
+import { fileTargetIn, localFileIn, NO_ANSWER, OFF_SCREEN, openOp, STACKED, WorkbenchRecords, WorkbenchRouter, workbenchTools, type WorkbenchToolDeps } from "./server";
 import { adaptLayout, NEW_MARK, type OpenSpec, type WorkbenchLayout } from "./shared";
 import { handleCommand } from "./ui/bridge";
 
@@ -219,6 +219,15 @@ it("names a file by worktree path when it is in the worktree, else by full path 
   expect(fileTargetIn(place, "host_main", "/etc/hosts")).toEqual({ kind: "host", hostId: "host_1", path: "/etc/hosts" });
   expect(fileTargetIn({ environmentId: null, hostId: null, root: null }, "host_main", "src/a.ts")).toBeNull();
   expect(fileTargetIn({ environmentId: null, hostId: null, root: null }, "host_main", "/tmp/x")).toEqual({ kind: "host", hostId: "host_main", path: "/tmp/x" });
+});
+
+it("checks a file only on the machine BB runs on", () => {
+  const here = { environmentId: "env_1", hostId: "host_main", root: "/work/repo" };
+  expect(localFileIn(here, "host_main", "notes/a.md")).toBe("/work/repo/notes/a.md");
+  expect(localFileIn({ environmentId: null, hostId: null, root: null }, "host_main", "/tmp/x")).toBe("/tmp/x");
+  expect(localFileIn({ ...here, hostId: "host_far" }, "host_main", "notes/a.md")).toBeNull();
+  expect(localFileIn(here, null, "notes/a.md")).toBeNull();
+  expect(localFileIn({ environmentId: null, hostId: null, root: null }, "host_main", "a.md")).toBeNull();
 });
 
 it("tells the agent when the window doesn't finish in time", async () => {

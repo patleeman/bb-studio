@@ -284,7 +284,8 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
       ? await bb.sdk.threads.list({ threadIds: done.map((rec) => rec.threadId), archived: true, includeHidden: true, limit: 200 } as never).catch(() => []) as ThreadFacts[]
       : [];
     const bbTitles = new Map(archived.map((thread) => [thread.id, thread.title?.trim() || thread.titleFallback?.trim() || null]));
-    const finished = done.map((rec) => ({ threadId: rec.threadId, title: rec.title?.trim() || bbTitles.get(rec.threadId) || "Untitled conversation", finishedAt: rec.archivedAt!, summary: rec.finishedSummary! }));
+    const failed = new Set(archived.filter((thread) => thread.status === "error").map((thread) => thread.id));
+    const finished = done.map((rec) => ({ threadId: rec.threadId, title: rec.title?.trim() || bbTitles.get(rec.threadId) || "Untitled conversation", finishedAt: rec.archivedAt!, summary: rec.finishedSummary!, failed: failed.has(rec.threadId) }));
     return { ...rest, finished };
   };
 

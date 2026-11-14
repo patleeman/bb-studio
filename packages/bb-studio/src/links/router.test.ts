@@ -51,10 +51,15 @@ describe("canonical links", () => {
     expect(parseLink("::page{id=\"dsn_0123456789abcdef\"}")).toEqual(entity(SAMPLE.design, "::page{id=\"dsn_0123456789abcdef\"}"));
   });
 
-  it("reads the older page: and thread: references, file:// URLs and web links", () => {
+  it("reads page: and thread: references with or without @, also when a renderer made them file:// paths, file:// URLs and web links", () => {
     expect(parseLink("page:pg_0123456789abcdef")).toEqual(entity(SAMPLE.page, "page:pg_0123456789abcdef"));
     expect(parseLink("thread:thr_1")).toEqual(entity(SAMPLE.conversation, "thread:thr_1"));
     expect(parseLink("file:///Users/p/src/a.ts")).toEqual(entity(SAMPLE.file, "file:///Users/p/src/a.ts"));
+    expect(parseLink("@thread:thr_1")).toEqual(entity(SAMPLE.conversation, "@thread:thr_1"));
+    expect(parseLink("@page:pg_0123456789abcdef")).toEqual(entity(SAMPLE.page, "@page:pg_0123456789abcdef"));
+    const wrapped = "file:///work/workspaces/thr_9/%40thread%3Athr_1";
+    expect(parseLink(wrapped)).toEqual(entity(SAMPLE.conversation, wrapped));
+    expect(parseLink("file:///work/workspaces/thr_9/@page:pg_0123456789abcdef")).toEqual(entity(SAMPLE.page, "file:///work/workspaces/thr_9/@page:pg_0123456789abcdef"));
     expect(parseLink("file:///Users/p/My%20Notes/a.md")).toEqual(entity({ kind: "file", id: "/Users/p/My Notes/a.md" }, "file:///Users/p/My%20Notes/a.md"));
     expect(parseLink("https://example.com/docs", ORIGIN)).toEqual({ type: "external", url: "https://example.com/docs", link: "https://example.com/docs" });
     expect(parseLink("mailto:a@b.c")).toEqual({ type: "external", url: "mailto:a@b.c", link: "mailto:a@b.c" });
@@ -198,15 +203,19 @@ describe("openLink", () => {
     expect(deps.relay).toHaveBeenLastCalledWith("https://example.com/", "workbench");
   });
 
-  it("a target that is gone opens the Not found tab, named for the kind, the id and the link as typed", async () => {
+  it("a target that is gone says so in a toast from a conversation, leaving no tab in its panel, and opens the Not found tab on a Studio page", async () => {
     const { deps } = fakeDeps({ resolved: { found: false, title: null } });
-    expect(await openLink(entity(SAMPLE.page, "bb://page/pg_0123456789abcdef"), { source: "transcript" }, deps)).toEqual({ via: "notFound", opened: true });
-    expect(deps.openStudioTab).toHaveBeenCalledWith(
-      { pluginId: "studio", tabId: NOT_FOUND_TAB, params: { kind: "page", id: "pg_0123456789abcdef", link: "bb://page/pg_0123456789abcdef" }, title: NOT_FOUND_TITLE },
-      { threadId: "thr_cur" },
-    );
+    expect(await openLink(entity(SAMPLE.page, "bb://page/pg_0123456789abcdef"), { source: "transcript" }, deps)).toEqual({ via: "notFound", opened: false });
+    expect(deps.toast).toHaveBeenCalledWith("Not found: bb://page/pg_0123456789abcdef");
+    expect(deps.openStudioTab).not.toHaveBeenCalled();
     expect(deps.openTab).not.toHaveBeenCalled();
     expect(deps.openMain).not.toHaveBeenCalled();
+    const page = fakeDeps({ resolved: { found: false, title: null }, thread: () => null, studioPage: () => true });
+    expect(await openLink(entity(SAMPLE.page, "bb://page/pg_0123456789abcdef"), { source: "palette" }, page.deps)).toEqual({ via: "notFound", opened: true });
+    expect(page.deps.openStudioTab).toHaveBeenCalledWith(
+      { pluginId: "studio", tabId: NOT_FOUND_TAB, params: { kind: "page", id: "pg_0123456789abcdef", link: "bb://page/pg_0123456789abcdef" }, title: NOT_FOUND_TITLE },
+      { threadId: null },
+    );
     const nowhere = fakeDeps({ resolved: { found: false }, thread: () => null });
     expect(await openLink(entity(SAMPLE.page, "bb://page/x"), { source: "transcript" }, nowhere.deps)).toEqual({ via: "notFound", opened: false });
     expect(nowhere.deps.openStudioTab).not.toHaveBeenCalled();

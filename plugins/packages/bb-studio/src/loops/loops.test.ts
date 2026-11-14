@@ -3,10 +3,10 @@ import Database from 'better-sqlite3';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MIGRATIONS } from '../migrations';
 import { LoopStore } from './store';
-import { LoopScheduler, defaults as baseDefaults, snooze } from './scheduler';
+import { LoopScheduler, defaults as baseDefaults, snooze, systemTimeZone } from './scheduler';
 import { rpcContract } from './contract';
 import { LOOP_TOOLS, loopPushActions, registerLoops, threadOwner } from './register';
-const defaults={...baseDefaults,enabled:true};
+const defaults={...baseDefaults,enabled:true,timeZone:'America/New_York'};
 let db:Database.Database,store:LoopStore,scheduler:LoopScheduler,post:ReturnType<typeof vi.fn<(text:string)=>Promise<void>>>,notify:ReturnType<typeof vi.fn<(loop:import('./contract').Loop)=>Promise<void>>>;
 beforeEach(()=>{vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-02T15:00:00Z'));db=new Database(':memory:');db.exec(MIGRATIONS.find((sql)=>sql.includes('CREATE TABLE bot_loops'))!);store=new LoopStore(db);post=vi.fn(async(_text:string)=>{});notify=vi.fn(async(_loop:import('./contract').Loop)=>{});scheduler=new LoopScheduler(store,()=>defaults,post,notify);});
 afterEach(()=>{db.close();vi.useRealTimers();});
@@ -24,6 +24,7 @@ it('releases snoozed time todos and repeats overdue pushes only the next day',as
 it('keeps a latched event across scheduler recreation',async()=>{const l=store.add({title:'Reply',trigger:{type:'event',event:'reply'}});scheduler.fire('reply');const restarted=new LoopScheduler(store,()=>defaults,post,notify);await restarted.tick();expect(store.get(l.id).status).toBe('surfaced');});
 
 it('defaults OFF: releases no cards, urgent pushes or stale cards while store and events still work',async()=>{expect(baseDefaults.enabled).toBe(false);const l=store.add({title:'Urgent',priority:'urgent',push:true,trigger:{type:'event',event:'reply'}});const off=new LoopScheduler(store,()=>baseDefaults,post,notify);expect(off.fire('reply').matched).toBe(1);store.add({title:'Already surfaced',status:'surfaced',priority:'urgent',push:true});await off.tick();expect(store.get(l.id).status).toBe('queued');expect(post).not.toHaveBeenCalled();expect(notify).not.toHaveBeenCalled();expect(off.morning()).toBeDefined();});
+it('falls back to this computer\'s time zone, never a fixed city',()=>{expect(baseDefaults.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);expect(systemTimeZone('Asia/Tokyo')).toBe('Asia/Tokyo');expect(systemTimeZone('')).toBe('UTC');});
 it('keeps place names only, deduped ignoring case and replaced as a whole',()=>{expect(store.places()).toEqual([]);expect(store.setPlaces([' Home ','Office','home','Mom’s'])).toEqual(['Home','Office','Mom’s']);expect(store.places()).toEqual(['Home','Office','Mom’s']);store.setPlaces(['Gym']);expect(store.places()).toEqual(['Gym']);expect(()=>rpcContract['loops.setPlaces'].input.parse({names:Array.from({length:21},(_,i)=>`P${i}`)})).toThrow();expect(()=>rpcContract['loops.setPlaces'].input.parse({names:['x'.repeat(61)]})).toThrow();expect(rpcContract['loops.places'].output.parse({names:store.places()})).toEqual({names:['Gym']});});
 it('matches place triggers by lower-case name',()=>{const l=store.add({title:'Plumber',trigger:{type:'place',place:'Home',direction:'arrive'}});expect(store.get(l.id).trigger.place).toBe('home');expect(scheduler.fire('place:home:arrive').matched).toBe(1);});
 it('reopens a closed todo when an update sets an open status (Undo)',()=>{const l=store.add({title:'Call',status:'surfaced'});store.act({id:l.id,action:'done'},()=>({type:'none'}));const back=store.update(l.id,{status:'surfaced'});expect(back.closedAt).toBeNull();expect(back.status).toBe('surfaced');expect(store.history(l.id).map(e=>e.type)).toContain('reopened');expect(store.groups().needsYouNow.map(x=>x.id)).toEqual([l.id]);});
@@ -102,7 +103,7 @@ it('hardcodes no area names in the Loops UI or the iOS app',async()=>{
  const {existsSync,readFileSync}=await import('node:fs');const paths=['./ui/model.ts','./ui/LoopsTab.tsx','./ui/LoopsPane.tsx','../../../../apps/ios/iOS/Loops/LoopsView.swift','../../../../../ios/iOS/Loops/LoopsView.swift'].map(path=>new URL(path,import.meta.url)).filter(url=>existsSync(url));
  expect(paths.length).toBeGreaterThanOrEqual(3);for(const url of paths)expect(readFileSync(url,'utf8')).not.toMatch(/\bAREAS\b|static let areas|"(Job|Larkspur|Systems)"/);});
 
-it('releases the user\'s own Surface now at once, past the morning hold and the budget, and says why when it can\'t',async()=>{
+it('releases the user\'s own Surface now at once, past the morning hold, the budget and reminders being off, and says why when it can\'t',async()=>{
  const handlers:Record<string,(x:any)=>unknown>={};let onChange:(v:Record<string,unknown>)=>void=()=>{};
  const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},
   settings:{define:()=>({get:async()=>({loopsEnabled:true,loopDailyBudget:0}),onChange:(f:typeof onChange)=>{onChange=f;}})},sdk:{threads:{get:async()=>null}}};
@@ -118,7 +119,7 @@ it('releases the user\'s own Surface now at once, past the morning hold and the 
  expect((db.prepare("SELECT count(*) n FROM loop_events WHERE type='surfaced'").get() as {n:number}).n).toBe(0);
  const cos=loops.store.add({title:'CoS job',owner:'cos'});await expect(handlers['loops.update']!({id:cos.id,surfaceNow:true})).rejects.toThrow('Only your own todos');
  loops.store.act({id:low.id,action:'done'},()=>({type:'none'}));await expect(handlers['loops.update']!({id:low.id,surfaceNow:true})).rejects.toThrow('already closed');
- onChange({loopsEnabled:false});await expect(handlers['loops.update']!({id:later.id,surfaceNow:true})).rejects.toThrow('Todo reminders are off');
+ onChange({loopsEnabled:false});const off=loops.store.add({title:'With reminders off',trigger:{type:'time',at:Date.now()+86400000}});expect(await handlers['loops.update']!({id:off.id,surfaceNow:true})).toMatchObject({status:'surfaced'});expect(post).toHaveBeenCalledTimes(3);expect(post.mock.calls[2]![0]).toContain(`::loop{id="${off.id}"}`);
  // The Bot's own surfaceNow keeps the policy: queued, trigger none, held for the morning.
  const botLow=loops.store.add({title:'Bot low',priority:'low',trigger:{type:'time',at:Date.now()+3600000}});const tool=(bb.agents.registerTool as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0]).find((t:{name:string})=>t.name==='loops_update');
  expect(JSON.parse(await tool.execute({id:botLow.id,surfaceNow:true}))).toMatchObject({status:'queued',trigger:{type:'none'}});});

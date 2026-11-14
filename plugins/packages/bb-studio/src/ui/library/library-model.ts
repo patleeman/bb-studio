@@ -4,7 +4,7 @@
 // conversation (default), kind or date, newest first everywhere. In a group,
 // near-identical files from one source are one row with a count, and a group
 // shows 8 rows, then "N more" (UX review 3, item 7).
-import { TYPE_LABELS, type ArtifactType } from "../../artifacts/shared";
+import { FILE_KIND_LABELS, type ArtifactType } from "../../artifacts/shared";
 import type { LibraryItem, LibraryKind } from "../../bot-threads-contract";
 export { GROUP_FOLD, foldRows } from "../bot-page/fold";
 
@@ -34,8 +34,7 @@ export const LIBRARY_GROUPS: readonly { id: LibraryGroupBy; label: string }[] = 
 
 const KIND_LABEL: Record<LibraryKind, string> = { page: "Page", whiteboard: "Whiteboard", design: "Design", app: "App", artifact: "App", recording: "Recording", other: "Other" };
 export const kindLabel = (kind: LibraryKind): string => KIND_LABEL[kind];
-const FILE_LABEL: Record<ArtifactType, string> = { ...TYPE_LABELS, html: "App", markdown: "Document", text: "Document" };
-export const itemLabel = (item: Pick<LibraryItem, "kind" | "format">): string => (item.kind === "artifact" && item.format && item.format in FILE_LABEL ? FILE_LABEL[item.format as ArtifactType] : kindLabel(item.kind));
+export const itemLabel = (item: Pick<LibraryItem, "kind" | "format">): string => (item.kind === "artifact" && item.format && item.format in FILE_KIND_LABELS ? FILE_KIND_LABELS[item.format as ArtifactType] : kindLabel(item.kind));
 const listedKind = (kind: LibraryKind): LibraryKind => kind === "artifact" ? "app" : kind;
 
 /** One row of a group: a file, or several near-identical ones from one source as one row (the newest opens). */

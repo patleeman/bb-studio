@@ -43,6 +43,9 @@ describe("links.resolve", () => {
     expect(await resolveLink({ kind: "file", id: "/Users/p/a.ts", threadId: "thr_1" }, lookups)).toEqual({ found: true, title: "/Users/p/a.ts", spec: { kind: "file", target: { kind: "host", hostId: "h1", path: "/Users/p/a.ts" }, location: null } });
     expect(await resolveLink({ kind: "file", id: "a.ts", threadId: "thr_1" }, lookups)).toMatchObject({ found: false });
     expect(await resolveLink({ kind: "file", id: "/Users/p/a.ts", threadId: null }, lookups)).toMatchObject({ found: false });
+    const checked = { ...deps(), fileExists: vi.fn(async (_threadId: string, path: string) => path !== "/work/gone.md") };
+    expect(await resolveLink({ kind: "file", id: "/work/gone.md", threadId: "thr_1" }, checked)).toEqual({ found: false, title: null, spec: null });
+    expect(await resolveLink({ kind: "file", id: "/work/here.md", threadId: "thr_1" }, checked)).toMatchObject({ found: true, title: "/work/here.md" });
     expect(await resolveLink({ kind: "diff", id: "./src/a.ts", threadId: "thr_1" }, lookups)).toEqual({ found: true, title: "Diff of src/a.ts", spec: { kind: "diff", path: "src/a.ts" } });
     expect(await resolveLink({ kind: "browser", id: "https://example.com/", threadId: null }, lookups)).toEqual({ found: true, title: "https://example.com/", spec: { kind: "url", url: "https://example.com/" } });
     expect(await resolveLink({ kind: "browser", id: "javascript:alert(1)", threadId: null }, lookups)).toMatchObject({ found: false });

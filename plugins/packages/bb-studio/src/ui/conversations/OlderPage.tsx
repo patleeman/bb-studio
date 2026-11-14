@@ -33,7 +33,7 @@ const WORKER_STATUS: Record<string, { label: string; tone: BotPageTone }> = {
   failed: { label: "Failed", tone: "danger" },
 };
 
-const ARCHIVE_PLURAL: Record<ArchiveFilter, string> = { all: "archived items", conversations: "archived conversations", workers: "archived workers", failed: "failed workers" };
+const ARCHIVE_PLURAL: Record<ArchiveFilter, string> = { all: "archived items", conversations: "archived conversations", workers: "archived workers", failed: "failed conversations or workers" };
 
 const matches = (query: string, ...texts: (string | null | undefined)[]) => {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -57,14 +57,14 @@ export default function OlderPage({ botId }: { botId: string | null }) {
     setError(null);
     try { await call("bot_reopen", { threadId }); live.refresh(); } catch (cause) { setError(errorMessage(cause) || "It didn't reopen."); }
   };
-  const showConversations = filter === "all" || filter === "conversations";
+  const showConversations = filter !== "workers";
   const showWorkers = filter !== "conversations";
   const conversations = showConversations ? [
     ...(data?.conversations ?? []).filter((row) => matches(query, row.title, row.forkedFrom?.title)).map((row) => ({ kind: "older" as const, at: row.updatedAt, row })),
     ...(data?.finished ?? []).filter((row) => matches(query, row.title)).map((row) => ({ kind: "finished" as const, at: row.finishedAt, row })),
-  ].sort((a, b) => b.at - a.at) : [];
+  ].filter((entry) => filter !== "failed" || (entry.kind === "finished" && entry.row.failed === true)).sort((a, b) => b.at - a.at) : [];
   const workers = showWorkers ? (data?.workers ?? []).filter((row) => (filter !== "failed" || row.status === "failed") && matches(query, row.title, row.ownerTitle, row.tag)) : [];
-  const failed = (data?.workers ?? []).filter((row) => row.status === "failed").length;
+  const failed = (data?.workers ?? []).filter((row) => row.status === "failed").length + (data?.finished ?? []).filter((row) => row.failed === true).length;
   const conversationCount = (data?.conversations.length ?? 0) + (data?.finished.length ?? 0);
   return (
     <BotPageLayout testId="older-page" title="Archive" bot={bot?.name} botId={bot?.id}
@@ -86,8 +86,8 @@ export default function OlderPage({ botId }: { botId: string | null }) {
             <BotPageRow key={entry.row.threadId} testId="older-conversation" icon="MessageSquare" title={entry.row.title} titleText={entry.row.title}
               meta={shortAge(entry.row.updatedAt, now)} {...thread(entry.row.threadId, entry.row.title)} />
           ) : (
-            <BotPageRow key={entry.row.threadId} testId="older-finished" icon="CircleCheck" iconClassName="text-success" title={entry.row.title} titleText={entry.row.title}
-              status={{ label: "Archived" }} meta={shortDate(entry.row.finishedAt, now)} {...thread(entry.row.threadId, entry.row.title)}
+            <BotPageRow key={entry.row.threadId} testId="older-finished" icon={entry.row.failed ? <OlderGlyph status="failed" stale={false} /> : "CircleCheck"} iconClassName={entry.row.failed ? undefined : "text-success"} title={entry.row.title} titleText={entry.row.title}
+              status={entry.row.failed ? { label: "Failed", tone: "danger" } : { label: "Archived" }} meta={shortDate(entry.row.finishedAt, now)} {...thread(entry.row.threadId, entry.row.title)}
               actions={<Button type="button" variant="outline" size="sm" data-testid="older-reopen" className="h-7 px-2.5 text-xs font-normal" onClick={() => void reopen(entry.row.threadId)}>Reopen</Button>} />
           ))}
         </BotPageGroup>

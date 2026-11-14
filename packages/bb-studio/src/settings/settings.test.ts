@@ -112,6 +112,15 @@ describe("Studio's settings store", () => {
     const again = new StudioSettingsStore(kv);
     expect((await again.load()).loopDailyBudget).toBe(3);
   });
+
+  it("turns Todo reminders on for a new install and keeps a stored choice", async () => {
+    const fresh = new StudioSettingsStore(memoryKv());
+    expect((await fresh.load()).loopsEnabled).toBe(true);
+    const kv = memoryKv(new Map([[SETTINGS_KV_KEY, { loopsEnabled: false }]]));
+    const existing = new StudioSettingsStore(kv);
+    expect((await existing.load()).loopsEnabled).toBe(false);
+    expect(kv.rows.get(SETTINGS_KV_KEY)).toEqual({ loopsEnabled: false });
+  });
 });
 
 describe("the combined handle Studio's server code reads", () => {
@@ -154,13 +163,15 @@ describe("the combined handle Studio's server code reads", () => {
     expect(decisionsConstants({ STUDIO_JEV_TIMEOUT_MS: "99999" }).jevTimeoutMs).toBe(5000);
   });
 
-  it("Todos' time zone is the setting, else STUDIO_LOOP_TIME_ZONE, else this Mac's", () => {
+  it("Todos' time zone is the setting, else STUDIO_LOOP_TIME_ZONE, else this Mac's, else UTC", () => {
     expect(loopTimeZone({}, "America/Los_Angeles")).toBe("America/Los_Angeles");
     expect(loopTimeZone({ STUDIO_LOOP_TIME_ZONE: "Europe/Paris" }, "America/Los_Angeles")).toBe("America/Los_Angeles");
     expect(loopTimeZone({ STUDIO_LOOP_TIME_ZONE: "Europe/Paris" }, "")).toBe("Europe/Paris");
     expect(loopTimeZone({ STUDIO_LOOP_TIME_ZONE: "Europe/Paris" })).toBe("Europe/Paris");
     expect(loopTimeZone({ STUDIO_LOOP_TIME_ZONE: "Mars/Olympus" })).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
     expect(loopTimeZone({}, "Mars/Olympus")).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({ timeZone: "" } as Intl.ResolvedDateTimeFormatOptions);
+    expect(loopTimeZone({})).toBe("UTC");
   });
 
   it("checks the Todos time zone setting: an IANA zone or empty", () => {
@@ -181,11 +192,11 @@ describe("the one-time migration", () => {
   }
 
   it("carries every changed value over under the same key, keeps defaults unset, and runs once", async () => {
-    const d = deps({ autoTitle: false, loopDailyBudget: 3, loopQuietStart: 23, explore_replyItems: "👍 Yes", voiceLiveMonthlyCapUsd: 35, voiceLiveVoice: "cedar", decisions_batchConfidence: 1, callTranscription: "Home server", callServerUrl: "http://homelab:8000", snapshotsPerPage: 50, loopsEnabled: true });
+    const d = deps({ autoTitle: false, loopDailyBudget: 3, loopQuietStart: 23, explore_replyItems: "👍 Yes", voiceLiveMonthlyCapUsd: 35, voiceLiveVoice: "cedar", decisions_batchConfidence: 1, callTranscription: "Home server", callServerUrl: "http://homelab:8000", snapshotsPerPage: 50, loopsEnabled: false });
     await d.store.load();
     const report = await migrateSettings(d);
     expect(report?.copied.sort()).toEqual(["autoTitle", "callServerUrl", "callTranscription", "decisions_batchConfidence", "explore_replyItems", "loopDailyBudget", "loopQuietStart", "loopsEnabled", "voiceLiveMonthlyCapUsd", "voiceLiveVoice"].sort());
-    expect(d.store.current()).toMatchObject({ autoTitle: false, loopDailyBudget: 3, loopQuietStart: 23, explore_replyItems: "👍 Yes", voiceLiveMonthlyCapUsd: 35, decisions_batchConfidence: 1, callTranscription: "Home server", loopsEnabled: true, snapshotsPerPage: 50 });
+    expect(d.store.current()).toMatchObject({ autoTitle: false, loopDailyBudget: 3, loopQuietStart: 23, explore_replyItems: "👍 Yes", voiceLiveMonthlyCapUsd: 35, decisions_batchConfidence: 1, callTranscription: "Home server", loopsEnabled: false, snapshotsPerPage: 50 });
     // snapshotsPerPage was at its default, so it follows the default.
     expect(d.store.explicit()).not.toHaveProperty("snapshotsPerPage");
     expect(d.kv.rows.get(SETTINGS_MIGRATED_KEY)).toMatchObject({ copied: report!.copied });

@@ -23,6 +23,7 @@ import { BotMaintenance } from "./BotMaintenance";
 import { BotAttention } from "./BotAttention";
 import { botPath } from "./selection";
 import { skillsPagePath } from "../skills/paths";
+import { PageBar } from "../page-bar";
 
 const STATE_DOT = { active: "bg-success", paused: "bg-warning", stopped: "bg-muted-foreground/50" } as const;
 type Section = { id: string; label: string };
@@ -69,16 +70,17 @@ export function BotControls({ view, refresh }: { view: BotView; refresh(): void 
     requestAnimationFrame(() => document.getElementById(`controls-${id}`)?.scrollIntoView({ block: "start" }));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className="flex flex-col pb-12" aria-label={`${bot.name} controls`} data-testid="bot-controls-page">
+    <div className="flex flex-col pb-12" aria-label={`Bot settings · ${bot.name}`} data-testid="bot-controls-page">
+      <PageBar title="Bot settings" detail={bot.name} />
       <button type="button" className="flex items-center gap-1.5 self-start pt-6 text-sm text-muted-foreground hover:text-foreground" onClick={() => openAppPath(botPath(bot.id))}>
         <Icon name="ArrowLeft" className="size-3.5" aria-hidden />{bot.name}
       </button>
       <h1 className="flex items-center gap-3 pt-3 pb-6 text-xl font-semibold">
-        <BotFace botId={bot.id} size={30} provider={botProvider(bot)} />Controls
+        <BotFace botId={bot.id} size={30} provider={botProvider(bot)} />Bot settings
       </h1>
       {error ? <p role="alert" className="pb-2 text-xs text-destructive">{error}</p> : null}
       <div className="flex items-start gap-10">
-        <nav aria-label="Controls sections" className="sticky top-4 hidden w-44 shrink-0 flex-col gap-0.5 @3xl/page:flex">
+        <nav aria-label="Bot settings sections" className="sticky top-4 hidden w-44 shrink-0 flex-col gap-0.5 @3xl/page:flex">
           {sections.map((section) => (
             <button key={section.id} type="button" aria-current={current === section.id ? "true" : undefined} onClick={() => go(section.id)}
               className="h-8 rounded-md px-2.5 text-left text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground aria-[current]:bg-state-active aria-[current]:text-foreground">{section.label}</button>
