@@ -2,12 +2,15 @@ import { z } from 'zod';
 import { defineRpcContract } from '@get-bb/plugin-sdk';
 // An event trigger's `label` says it in words ("when Unraid fixes the PHP CVE"); without one the UI prettifies the event key.
 export const trigger = z.object({ type: z.enum(['none','time','event','place']), at: z.number().optional(), event: z.string().optional(), place: z.string().optional(), direction: z.enum(['arrive','leave']).optional(), label: z.string().trim().max(120).optional() });
+const OWNER_INPUT = /^(user|patrick|cos|thread:.+)$/;
+const toStoredOwner = (value: string) => (value === 'user' ? 'patrick' : value);
+export const ownerInput = z.string().regex(OWNER_INPUT).transform(toStoredOwner);
 export const loop = z.object({ id: z.string(), title: z.string().trim().min(1).max(500), why: z.string(), source: z.object({kind:z.string(),ref:z.string(),url:z.string().optional()}).nullable(), kind:z.enum(['do','decide','read','waiting']), options:z.array(z.string()), owner:z.string().regex(/^(patrick|cos|thread:.+)$/), trigger, priority:z.enum(['urgent','normal','low']), push:z.boolean(), status:z.enum(['queued','surfaced','snoozed','in_progress','done','dropped']), due:z.number().nullable(), area:z.string().nullable(), createdAt:z.number(), updatedAt:z.number(), closedAt:z.number().nullable(), closedBy:z.string().nullable() });
 export type Loop = z.infer<typeof loop>;
-export const add = loop.omit({id:true,createdAt:true,updatedAt:true,closedAt:true,closedBy:true}).partial().extend({title:loop.shape.title});
-export const act = z.object({ id:z.string(), action:z.enum(['done','drop','got_it','choose','snooze','hand_off','nudge','keep']), option:z.string().optional(), owner:loop.shape.owner.optional(), snooze:z.enum(['later_today','tonight','tomorrow_morning','this_weekend','home','mac']).optional() });
+export const add = loop.omit({id:true,createdAt:true,updatedAt:true,closedAt:true,closedBy:true}).partial().extend({title:loop.shape.title,owner:ownerInput.optional()});
+export const act = z.object({ id:z.string(), action:z.enum(['done','drop','got_it','choose','snooze','hand_off','nudge','keep']), option:z.string().optional(), owner:ownerInput.optional(), snooze:z.enum(['later_today','tonight','tomorrow_morning','this_weekend','home','mac']).optional() });
 export const update = z.object({id:z.string(), changes:add.partial().optional(), surfaceNow:z.boolean().optional()});
-export const filters = z.object({area:z.string().optional(),owner:z.string().optional()});
+export const filters = z.object({area:z.string().optional(),owner:z.string().transform(toStoredOwner).optional()});
 // Saved place names from the phone, names only (never coordinates). iOS watches at most 20 regions.
 export const places = z.object({names:z.array(z.string().trim().min(1).max(60)).max(20)});
 // Why a due todo of the user's still waits: the daily budget is spent, or it's low priority and waits for the morning card.

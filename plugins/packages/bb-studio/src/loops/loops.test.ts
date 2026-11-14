@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MIGRATIONS } from '../migrations';
@@ -170,4 +171,24 @@ it('follows a changed time zone setting on the next settings change',async()=>{
  expect((handlers['loops.morning']!({}) as {date:string}).date).toBe('2026-11-02');
  zone='Asia/Tokyo';onChange({loopsEnabled:true,todosTimeZone:zone});
  expect((handlers['loops.morning']!({}) as {date:string}).date).toBe('2026-11-03');
+});
+it('takes "user" or "patrick" as the user in every todo and loop tool, whose schema lists both, and stores the value older agents know',async()=>{
+ let handlers:Record<string,(x:unknown)=>unknown>={};
+ const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},
+  settings:{define:()=>({get:async()=>({loopsEnabled:false}),onChange:()=>{}})},sdk:{threads:{get:async()=>{throw Error('Not found');}}}};
+ const loops=registerLoops(bb as never,db,post,notify,(bb.settings.define as () => never)());await vi.advanceTimersByTimeAsync(0);
+ const tools=(bb.agents.registerTool as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0] as {name:string;parameters:import('zod').ZodTypeAny;execute:(x:unknown)=>Promise<string>|string});
+ for(const name of ['todos_add','loops_add','todos_update','loops_update','todos_act','loops_act']){
+  const owner=(z.toJSONSchema(tools.find(t=>t.name===name)!.parameters,{io:'input'}) as {properties:Record<string,{pattern?:string;properties?:Record<string,{pattern?:string}>}>}).properties;
+  expect(owner.owner?.pattern??owner.changes?.properties?.owner?.pattern).toBe('^(user|patrick|cos|thread:.+)$');
+ }
+ const run=async(name:string,input:unknown)=>{const t=tools.find(x=>x.name===name)!;return JSON.parse(await t.execute(t.parameters.parse(input)));};
+ const made=await run('loops_add',{title:'Mine',owner:'user'});
+ expect(made.owner).toBe('patrick');
+ await run('todos_act',{id:made.id,action:'hand_off',owner:'cos'});
+ expect((await run('todos_update',{id:made.id,changes:{owner:'user',status:'surfaced'}})).owner).toBe('patrick');
+ expect(rpcContract['loops.act'].input.parse({id:'x',action:'hand_off',owner:'user'}).owner).toBe('patrick');
+ expect(rpcContract['loops.list'].input.parse({owner:'user'}).owner).toBe('patrick');
+ expect(loops.store.groups({owner:'patrick'}).needsYouNow.map(l=>l.title)).toEqual(['Mine']);
+ expect(()=>rpcContract['loops.act'].input.parse({id:'x',action:'hand_off',owner:'someone'})).toThrow();
 });
