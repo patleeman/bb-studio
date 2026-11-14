@@ -377,7 +377,7 @@ const everywhere = [
   [
     "apps/app/src/components/sidebar/SidebarNavigationRail.test.tsx",
     "{ name: /Search threads/u }",
-    "{ name: /^Search$/u }",
+    "{ name: /Show Search in sidebar/u }",
   ],
   [
     "apps/app/src/components/sidebar/SidebarNavigationRail.test.tsx",
