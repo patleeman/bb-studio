@@ -1,3 +1,5 @@
+import { keepsShortLineBreaks, remarkShortLineBreaks } from "./markdown-short-line-breaks.fork";
+import { forkMentionHref, isMentionHref } from "./markdown-mention-links.fork";
 import { parseApplicationUrl } from "@bb/domain/application-url";
 import { openApplicationUrl } from "@/lib/application-url";
 import {
@@ -487,6 +489,7 @@ function buildLocalAwareUrlTransform({
   localImageRouting,
 }: BuildLocalAwareUrlTransformArgs): UrlTransform {
   return (value, key, node) => {
+    if (key === "href" && isMentionHref(value)) return forkMentionHref(value) ?? value;
     if (key === "href" && localFileRouting !== undefined) {
       const localFile = resolveMarkdownLocalFileTarget(
         value,
@@ -1921,6 +1924,8 @@ function MarkdownPreviewComponent({
       promptMentions !== undefined
     ) {
       plugins.push(remarkBreaks);
+    } else if (keepsShortLineBreaks(threadMentions)) {
+      plugins.push(remarkShortLineBreaks);
     }
     if (threadMentions !== undefined) {
       plugins.push(remarkThreadMentions);

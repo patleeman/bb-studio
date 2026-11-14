@@ -1,3 +1,6 @@
+import { withShortLineBreaks } from "@/components/ui/markdown-short-line-breaks.fork";
+import { relayedGeneratedSource } from "./relayedFold.fork";
+import { usePluginMessageClassification } from "@/lib/fork-reply-classifiers";
 import {
   useLayoutEffect,
   useMemo,
@@ -125,10 +128,10 @@ const COLLAPSED_MESSAGE_FADE_STYLE: CSSProperties = {
     "linear-gradient(to bottom, black calc(100% - 2.5rem), transparent)",
 };
 
-const ASSISTANT_THREAD_MENTIONS: MarkdownThreadMentions = {
+const ASSISTANT_THREAD_MENTIONS: MarkdownThreadMentions = withShortLineBreaks({
   mentions: [],
   preserveSoftBreaks: false,
-};
+});
 
 const STREAMING_SETTLED_MARKDOWN_CLASS_NAME = "[&>p:last-child]:mb-2";
 const STREAMING_TAIL_MARKDOWN_CLASS_NAME =
@@ -356,6 +359,7 @@ function UserConversationMessage({
   turnRequest,
 }: UserConversationMessageProps) {
   const linkRouting = useMessageLinkRouting(threadId);
+  const relayed = usePluginMessageClassification(text, { part: "message", initiator });
   const automationDue =
     initiator === "user" ? parseAutomationDueMessage(text) : null;
   const generatedSource =
@@ -364,7 +368,7 @@ function UserConversationMessage({
           sourceKind: "agent" as const,
           sourceName: senderIsPluginSideChat
             ? "side chat"
-            : (senderThreadTitle ?? "Agent"),
+            : (relayed?.sender ?? senderThreadTitle ?? "Agent"),
           sourceProjectId: senderThreadProjectId,
           sourceThreadId: senderThreadId,
           sourceIsPluginSideChat: senderIsPluginSideChat,
@@ -385,7 +389,7 @@ function UserConversationMessage({
               sourceThreadId: null,
               sourceIsPluginSideChat: false,
             }
-          : null;
+          : relayedGeneratedSource(relayed);
   if (generatedSource !== null) {
     const body =
       automationDue === null

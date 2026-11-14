@@ -34,7 +34,7 @@ interface AiTaskRow {
 const AI_TASK_ROWS: readonly AiTaskRow[] = [
   {
     task: "thread-title",
-    label: "Thread titles",
+    label: "Conversation titles",
     hint: "Branch names follow the title.",
     offDescription: "Titles use the start of the prompt.",
     testTask: "thread-title",
@@ -203,7 +203,7 @@ export function AiServicesSettingsSection() {
   return (
     <SettingsSection
       title="AI services"
-      description="Choose services for thread titles, commit messages, and voice input. Automatic tries the conversation's own provider first, then other signed-in services. A service you choose stays selected."
+      description="Choose services for conversation titles, commit messages, and voice input. Automatic tries the conversation's own provider first, then other signed-in services. A service you choose stays selected."
     >
       <div className="space-y-5">
         {AI_TASK_ROWS.map((row) => {

@@ -640,7 +640,7 @@ describe("bb's pages over an app backdrop", () => {
           <SettingsRowList>
             <SettingsRow>
               <span data-testid="settings-text">
-                Navigate to threads on creation
+                Open new conversations
               </span>
               <div className="flex size-8 rounded-md bg-background" />
               <button
