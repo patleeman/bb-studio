@@ -607,14 +607,19 @@
       "budget": 6
     },
     "apps/app/src/components/ui/markdown-preview.tsx": {
-      "seam": "soft-breaks",
-      "intent": "When bb would not add remark-breaks and threadMentions was marked by withShortLineBreaks (markdown-short-line-breaks.fork.ts, imported at the top of the file), remarkShortLineBreaks is added: single newlines become line breaks in each paragraph that is not hard-wrapped prose.",
-      "budget": 3
+      "seam": "soft-breaks, mention-links",
+      "intent": "When bb would not add remark-breaks and threadMentions was marked by withShortLineBreaks (markdown-short-line-breaks.fork.ts, imported at the top of the file), remarkShortLineBreaks is added: single newlines become line breaks in each paragraph that is not hard-wrapped prose. buildLocalAwareUrlTransform maps an href that is an @ mention (isMentionHref, markdown-mention-links.fork.ts, imported at the top of the file) through forkMentionHref before any local-file resolution: @thread:<id> becomes /threads/<id>, other mentions stay raw for the plugins' link handlers.",
+      "budget": 5
     },
     "apps/app/src/components/thread/timeline/ConversationMessageContent.tsx": {
       "seam": "soft-breaks, quiet-turns",
       "intent": "ASSISTANT_THREAD_MENTIONS is wrapped in withShortLineBreaks (markdown-short-line-breaks.fork.ts, imported at the top of the file), so an assistant's poem or address keeps its line breaks. A user-role row asks the plugins' classifyMessage about its text (usePluginMessageClassification, lib/fork-reply-classifiers.ts): an agent message takes the plugin's sender over the sending thread's title, and a row that would be the user's own bubble but that a plugin classified draws as a generated row from that sender (relayedGeneratedSource, relayedFold.fork.tsx). Both imports sit at the top of the file.",
       "budget": 12
+    },
+    "apps/app/src/components/ui/markdown-link-target.ts": {
+      "seam": "mention-links",
+      "intent": "resolveMarkdownLocalFileTarget returns null for an href that is an @ mention (isMentionHref, markdown-mention-links.fork.ts, imported at the top of the file), so a mention is never opened as a file in the thread's workspace.",
+      "budget": 2
     }
   }
 }
