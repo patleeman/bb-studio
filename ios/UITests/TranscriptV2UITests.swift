@@ -234,9 +234,14 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     /// resizes as it loads; the chat stays at its end.
     func testMiniCards() {
         app.launchArguments = ["-skipPushPrompt", "YES", "-qaTranscriptV2", "-qaScrollLog", "-qaBotDemo", "duo",
-            "-qaDuoMinis", "mini_a,mini_b,mini_c", "-qaDark", "-qaDuoPhone", "-openURL", "bbstudio://thread/thr_botdemo01"]
+            "-qaDuoMinis", "mini_0000000000000a01,mini_0000000000000b02,mini_0000000000000c03", "-qaDark", "-qaDuoPhone", "-openURL", "bbstudio://thread/thr_botdemo01"]
         if layout == "split" { app.launchArguments += ["-qaDuoColdWide"] }
         app.launchOffline()
+        if !composerField.waitForExistence(timeout: 30),
+           app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'unit-tests.invalid'")).firstMatch.exists {
+            app.terminate()
+            app.launchOffline()
+        }
         XCTAssertTrue(composerField.waitForExistence(timeout: 30))
         if layout == "outer" { command("outer") }
         showRightPage()
@@ -244,6 +249,9 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
         XCTAssertTrue(footer.waitForExistence(timeout: 15))
         watch("minis: open", atEnd: true, seconds: 5)
         steps.append("mini card frames: \(app.otherElements.matching(identifier: "miniCardFrame").count)")
+        let cards = app.descendants(matching: .any).matching(identifier: "replyItemCard").count
+        steps.append("mini cards: \(cards)")
+        if cards < 3 { failures.append("minis: only \(cards) mini cards in the reply") }
         shot("minis")
         command("mid")
         record("minis: up")

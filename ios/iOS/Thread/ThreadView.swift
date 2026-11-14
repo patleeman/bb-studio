@@ -141,6 +141,11 @@ struct ThreadView: View {
         .sensoryFeedback(.error, trigger: model.error) { (_: String?, new: String?) in new != nil }
         .sensoryFeedback(.selection, trigger: attachments.count, condition: Self.grew)
         .userActivity(Spotlight.threadActivityType, isActive: model.thread != nil, describeActivity)
+        .task(id: duoLayout.twoPages) {
+            guard duoLayout.twoPages else { return }
+            try? await Task.sleep(for: .seconds(1))
+            UIAccessibility.post(notification: .layoutChanged, argument: nil)
+        }
         .onChange(of: composerFocused, initial: true) { _, _ in reportClassicWriting() }
         .onDisappear { if botChrome != nil { ClassicBotActivity.shared.writing = false } }
     }
