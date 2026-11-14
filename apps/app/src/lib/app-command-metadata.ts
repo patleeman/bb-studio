@@ -39,13 +39,13 @@ export const APP_COMMAND_GROUPS: readonly AppCommandGroup[] = [
     commands: [
       command(
         "thread.new",
-        "New thread",
-        "Start a thread in the active project.",
+        "New conversation",
+        "Start a conversation in the active project.",
       ),
       command(
         "thread.search",
-        "Search threads",
-        "Search threads in the quick palette.",
+        "Search",
+        "Search threads and plugin items in the quick palette.",
       ),
       command("thread.rename", "Rename thread", "Rename the focused thread."),
       command(

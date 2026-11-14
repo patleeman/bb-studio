@@ -108,8 +108,8 @@ export function AddMachineContent({
 
 function serverMachineNotice(serverMachineName: string | null): string {
   return serverMachineName === null
-    ? "The new machine will connect to your bb server. Keep the server machine on so the new machine can keep working."
-    : `The new machine will connect to the bb server on ${serverMachineName}. Keep that computer on so the new machine can keep working.`;
+    ? "The new machine will connect to your BB Studio server. Keep the server machine on so the new machine can keep working."
+    : `The new machine will connect to the BB Studio server on ${serverMachineName}. Keep that computer on so the new machine can keep working.`;
 }
 
 export type MachineAccessGateState =
