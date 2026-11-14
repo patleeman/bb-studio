@@ -2192,6 +2192,7 @@ extension ThreadView {
 
     fileprivate var transcriptV2Chrome: TranscriptChrome {
         var chrome = TranscriptChrome()
+        chrome.topClear = lying ? RoomChat.floorClear : 0
         // The composer's own 8 pt padding is the gap above the keyboard or the edge.
         chrome.composerGap = 0
         // The Duo's inner screen draws no home indicator (its 34-point inset is reported anyway).

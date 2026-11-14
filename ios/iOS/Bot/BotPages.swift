@@ -468,6 +468,7 @@ struct LibraryPageView: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
                         ForEach(group.rows) { tile($0) }
                     }
+                    .frame(maxWidth: .infinity)
                 }
                 if let items, groups.isEmpty {
                     ContentUnavailableView(items.isEmpty ? "No files" : "No files match", systemImage: "books.vertical").padding(.top, 40)

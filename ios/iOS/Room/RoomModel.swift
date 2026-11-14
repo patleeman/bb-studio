@@ -147,7 +147,7 @@ enum RoomFloor {
         rows.compactMap { row in
             guard case .item(.message(let message), let state) = row else { return row }
             if let event = BotChatEntry.childEvent(message) { return .bot(.child(event, id: message.id), .init()) }
-            if state.relayed != nil { return lying ? nil : row }
+            if let relayed = state.relayed { return lying && !relayed.urgent ? nil : row }
             return BotChatEntry.shows(message) ? row : nil
         }
     }
@@ -211,6 +211,7 @@ enum RoomDay {
 }
 
 struct RoomChat {
+    static let floorClear: CGFloat = 110
     var focusRequests: Int
     var lying: Bool
     var layDown: () -> Void

@@ -70,6 +70,7 @@ struct RoomView: View {
     @State private var dragLast: CGFloat = 0
     @State private var floorTop: CGFloat = 0
     @State private var maskOpen = false
+    @State private var dockTop: CGFloat = 0
     @State private var sceneSize: CGSize = .zero
     @State private var presenceSize: CGFloat = 0
     @State private var switching = false
@@ -204,6 +205,7 @@ struct RoomView: View {
 
     static let floorGap: CGFloat = 14
     static let floorFade: CGFloat = 72
+    static let dockFade: CGFloat = 32
 
     static let tilt: Double = 31
     static let perspective: CGFloat = 0.45
@@ -213,12 +215,16 @@ struct RoomView: View {
             .rotation3DEffect(.degrees(room.standing ? 0 : Self.tilt), axis: (x: 1, y: 0, z: 0), anchor: .bottom, perspective: Self.perspective)
             .mask {
                 GeometryReader { box in
-                    let top = max(0, floorTop + Self.floorGap - box.frame(in: .global).minY)
+                    let frame = box.frame(in: .global)
+                    let top = max(0, floorTop + Self.floorGap - frame.minY)
+                    let bottom = dockTop > 0 ? max(0, frame.maxY - dockTop + 4) : 0
                     ZStack(alignment: .top) {
                         VStack(spacing: 0) {
                             Color.clear.frame(height: top)
                             LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: Self.floorFade)
                             Color.black
+                            LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: Self.dockFade)
+                            Color.clear.frame(height: bottom)
                         }
                         Color.black.opacity(maskOpen ? 1 : 0)
                     }
@@ -320,6 +326,7 @@ struct RoomView: View {
                     Color.clear.frame(height: 70)
                 } else {
                     dock.transition(.opacity)
+                        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { dockTop = $0 }
                 }
             }
             .animation(.easeInOut(duration: 0.2), value: room.mode)
@@ -424,7 +431,12 @@ struct RoomView: View {
                     RoomWave(talk: session.talk)
                 } else {
                     Button { stand() } label: {
-                        Text(shownConversation.map { "Message · " + ($0.title.isEmpty ? "Untitled" : $0.title) } ?? "Message \(bot.name)")
+                        ZStack(alignment: .leading) {
+                            Text(shownConversation.map { "Message · " + ($0.title.isEmpty ? "Untitled" : $0.title) } ?? "Message \(bot.name)")
+                                .id(pager.shown)
+                                .transition(.asymmetric(insertion: .opacity.animation(.easeOut(duration: 0.15).delay(0.1)),
+                                                        removal: .opacity.animation(.easeIn(duration: 0.1))))
+                        }
                             .font(.body)
                             .foregroundStyle(.white.opacity(0.55))
                             .lineLimit(1)

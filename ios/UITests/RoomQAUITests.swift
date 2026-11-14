@@ -72,7 +72,7 @@ final class RoomQAUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(lead.waitForExistence(timeout: 10), "an agent's message is one line from its thread")
         XCTAssertTrue(lead.label.hasSuffix("no reply needed"), "its [PASS] folds into it: \(lead.label)")
         XCTAssertFalse(lead.label.contains("[bb message"))
-        let due = rows.matching(NSPredicate(format: "label BEGINSWITH 'From a schedule · '")).firstMatch
+        let due = rows.matching(NSPredicate(format: "label BEGINSWITH 'From Automation · '")).firstMatch
         XCTAssertTrue(due.exists)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Two clashes this week'")).firstMatch.exists, "a real reply shows")
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS '[bb '")).firstMatch.exists, "no raw header")

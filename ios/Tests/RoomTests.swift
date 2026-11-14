@@ -130,7 +130,10 @@ final class RoomTests: XCTestCase {
             row("w", "assistant", "", kind: "work"),
         ]
         let items = RoomFloor.clean(rows.map(TimelineItem.message))
-        XCTAssertEqual(items.map(\.id), ["a", "c", "e", "w"])
+        XCTAssertEqual(items.map(\.id), ["a", "p", "b", "c", "e", "w"], "a [PASS] stays for the relayed fold")
+        let shown = RoomFloor.rows(ThreadTranscriptRow.thread(items: items, hasOlder: false, unread: nil, match: nil, editableId: nil,
+                                                              pending: [], interactions: [], working: false, thinking: nil))
+        XCTAssertEqual(shown.map(\.id), ["a", "c", "e", "w"], "and the room still hides it")
         XCTAssertEqual(items.first { $0.id == "c" }?.rows.first?.text, "Done with the sweep.")
         XCTAssertEqual(items.first { $0.id == "e" }?.rows.first?.text, "Tests: [PASS] on all three", "a token inside a sentence stays")
         XCTAssertTrue(RoomFloor.isStatusToken(" `[SKIPPED]` "))

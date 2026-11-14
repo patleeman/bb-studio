@@ -174,7 +174,7 @@ struct RelayedRow: View {
                     Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
                         .rotationEffect(.degrees(expanded ? 90 : 0))
                 }
-                .foregroundStyle(.secondary)
+                .foregroundStyle(relayed.urgent ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
                 .contentShape(.rect)
