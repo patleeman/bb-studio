@@ -147,19 +147,10 @@ private struct WorkbenchPaneKey: EnvironmentKey {
     static let defaultValue = false
 }
 
-private struct WorkbenchTrailingInsetKey: EnvironmentKey {
-    static let defaultValue: CGFloat = 0
-}
-
 extension EnvironmentValues {
     var workbenchPane: Bool {
         get { self[WorkbenchPaneKey.self] }
         set { self[WorkbenchPaneKey.self] = newValue }
-    }
-
-    var workbenchTrailingInset: CGFloat {
-        get { self[WorkbenchTrailingInsetKey.self] }
-        set { self[WorkbenchTrailingInsetKey.self] = newValue }
     }
 
     var duoPage: Bool {

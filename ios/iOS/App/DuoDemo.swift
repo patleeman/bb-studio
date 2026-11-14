@@ -120,6 +120,11 @@ enum DuoDemo {
             size = CGSize(width: 951, height: 669)
             origin.x = -(url.query().flatMap(Double.init) ?? 0)
             screenSize = CGSize(width: 951, height: 669)
+        case "shift-portrait":
+            let parts = (url.query() ?? "").split(separator: ",").compactMap { Double($0) }
+            size = CGSize(width: 669, height: 951)
+            origin = CGPoint(x: -(parts.first ?? 0), y: -(parts.dropFirst().first ?? 0))
+            screenSize = size
         // Beside another app in iOS's own split of the inner screen: the
         // right half of it, kept on the simulator's screen so it can be tapped.
         case "split":
