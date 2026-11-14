@@ -9,19 +9,124 @@ import XCTest
 
 extension XCTestCase {
     func onTheSharedAudioSession<T>(
-        category: AVAudioSession.Category = .playAndRecord, mode: AVAudioSession.Mode = .voiceChat,
-        probe: (AVAudioSession.Category, AVAudioSession.Mode) throws -> Void = { try AVAudioSession.sharedInstance().setCategory($0, mode: $1, options: []) },
+        category: AVAudioSession.Category, mode: AVAudioSession.Mode, options: AVAudioSession.CategoryOptions,
+        probe: SharedAudioSessionSkip.Probe = SharedAudioSessionSkip.sharedSession,
         _ work: () throws -> T
     ) throws -> T {
         do {
             return try work()
-        } catch let error as NSError where error.domain == NSOSStatusErrorDomain && error.code == -50 {
-            do {
-                try probe(category, mode)
-            } catch let baseline as NSError where baseline.domain == NSOSStatusErrorDomain && baseline.code == -50 {
-                throw XCTSkip("This simulator rejects \(category.rawValue) with mode \(mode.rawValue) even with no options (OSStatus -50)")
+        } catch where SharedAudioSessionSkip.isRejection(error) {
+            if let reason = SharedAudioSessionSkip.reason(category: category, mode: mode, options: options, probe: probe) {
+                throw XCTSkip(reason)
             }
             throw error
+        }
+    }
+
+    func onTheSharedAudioSession<T>(
+        applying config: VoiceAudioConfig,
+        probe: SharedAudioSessionSkip.Probe = SharedAudioSessionSkip.sharedSession,
+        _ work: () throws -> T
+    ) throws -> T {
+        try onTheSharedAudioSession(category: config.category, mode: config.mode, options: config.optionsOnThisOS, probe: probe, work)
+    }
+}
+
+enum SharedAudioSessionSkip {
+    typealias Probe = (AVAudioSession.Category, AVAudioSession.Mode, AVAudioSession.CategoryOptions) throws -> Void
+
+    static let sharedSession: Probe = { try AVAudioSession.sharedInstance().setCategory($0, mode: $1, options: $2) }
+
+    struct Rule {
+        let option: AVAudioSession.CategoryOptions
+        let name: String
+        let categories: Set<AVAudioSession.Category>
+        var requires: AVAudioSession.CategoryOptions = []
+    }
+
+    static var rules: [Rule] {
+        let mixing: Set<AVAudioSession.Category> = [.playAndRecord, .playback, .multiRoute]
+        let recording: Set<AVAudioSession.Category> = [.playAndRecord, .record]
+        var rules = [
+            Rule(option: .mixWithOthers, name: "mixWithOthers", categories: mixing),
+            Rule(option: .duckOthers, name: "duckOthers", categories: mixing),
+            Rule(option: .interruptSpokenAudioAndMixWithOthers, name: "interruptSpokenAudioAndMixWithOthers", categories: mixing),
+            Rule(option: .allowBluetoothHFP, name: "allowBluetoothHFP", categories: recording),
+            Rule(option: .allowBluetoothA2DP, name: "allowBluetoothA2DP", categories: [.playAndRecord]),
+            Rule(option: .allowAirPlay, name: "allowAirPlay", categories: [.playAndRecord]),
+            Rule(option: .defaultToSpeaker, name: "defaultToSpeaker", categories: [.playAndRecord]),
+            Rule(option: .bluetoothHighQualityRecording, name: "bluetoothHighQualityRecording", categories: recording),
+        ]
+        if #available(iOS 26.2, *) {
+            rules.append(Rule(option: .farFieldInput, name: "farFieldInput", categories: recording, requires: .allowBluetoothHFP))
+        }
+        return rules
+    }
+
+    static func isRejection(_ error: Error) -> Bool {
+        let error = error as NSError
+        return error.domain == NSOSStatusErrorDomain && error.code == -50
+    }
+
+    static func documentedProblem(category: AVAudioSession.Category, mode: AVAudioSession.Mode,
+                                  options: AVAudioSession.CategoryOptions) -> String? {
+        switch mode {
+        case .default: break
+        case .voiceChat, .videoChat, .gameChat:
+            if category != .playAndRecord { return "\(mode.rawValue) needs playAndRecord" }
+        default: return "no documented rule for \(mode.rawValue)"
+        }
+        var left = options
+        for rule in rules where options.contains(rule.option) {
+            if !rule.categories.contains(category) { return "\(rule.name) isn't valid with \(category.rawValue)" }
+            if !options.isSuperset(of: rule.requires) { return "\(rule.name) needs \(names(rule.requires))" }
+            left.remove(rule.option)
+        }
+        return left.isEmpty ? nil : "no documented rule for options \(left.rawValue)"
+    }
+
+    static func reason(category: AVAudioSession.Category, mode: AVAudioSession.Mode,
+                       options: AVAudioSession.CategoryOptions, probe: Probe) -> String? {
+        guard documentedProblem(category: category, mode: mode, options: options) == nil,
+              rejects(probe, category, mode, options) else { return nil }
+        if rejects(probe, category, mode, []) {
+            return "This simulator rejects \(category.rawValue) with mode \(mode.rawValue) even with no options (OSStatus -50)"
+        }
+        let refused = rules.filter { options.contains($0.option) && rejects(probe, .playAndRecord, .default, $0.requires.union($0.option)) }
+        guard !refused.isEmpty else { return nil }
+        let rest = refused.reduce(options) { $0.subtracting($1.option) }
+        guard (try? probe(category, mode, rest)) != nil else { return nil }
+        return "This simulator rejects \(refused.map(\.name).joined(separator: ", ")) even as Apple documents it "
+            + "(playAndRecord, default mode, with what it requires; OSStatus -50), and takes the rest of \(category.rawValue)/\(mode.rawValue)"
+    }
+
+    private static func rejects(_ probe: Probe, _ category: AVAudioSession.Category, _ mode: AVAudioSession.Mode,
+                                _ options: AVAudioSession.CategoryOptions) -> Bool {
+        do {
+            try probe(category, mode, options)
+            return false
+        } catch {
+            return isRejection(error)
+        }
+    }
+
+    private static func names(_ options: AVAudioSession.CategoryOptions) -> String {
+        rules.filter { options.contains($0.option) }.map(\.name).joined(separator: ", ")
+    }
+}
+
+private final class FakeAudioSimulator {
+    var calls: [String] = []
+    let rejects: (AVAudioSession.Category, AVAudioSession.Mode, AVAudioSession.CategoryOptions) -> Bool
+
+    init(rejects: @escaping (AVAudioSession.Category, AVAudioSession.Mode, AVAudioSession.CategoryOptions) -> Bool) {
+        self.rejects = rejects
+    }
+
+    var probe: SharedAudioSessionSkip.Probe {
+        { category, mode, options in
+            self.calls.append("\(category == .playAndRecord ? "playAndRecord" : category.rawValue)/\(mode == .default ? "default" : mode == .voiceChat ? "voiceChat" : mode.rawValue)/\(options.rawValue)")
+            if self.rejects(category, mode, options) { throw NSError(domain: NSOSStatusErrorDomain, code: -50) }
         }
     }
 }
@@ -29,36 +134,93 @@ extension XCTestCase {
 final class SharedAudioSessionSkipTests: XCTestCase {
     private let rejected = NSError(domain: NSOSStatusErrorDomain, code: -50)
 
-    func testSkipsOnlyWhenTheBaselineCategoryAndModeAreRejected() throws {
-        var probed: [String] = []
+    private func skips(_ category: AVAudioSession.Category, _ mode: AVAudioSession.Mode, _ options: AVAudioSession.CategoryOptions,
+                       on simulator: FakeAudioSimulator) -> String? {
         do {
-            _ = try onTheSharedAudioSession(probe: { category, mode in
-                probed.append("\(category.rawValue)/\(mode.rawValue)")
-                throw self.rejected
-            }) { () throws -> Int in throw rejected }
-            XCTFail("expected a skip")
-        } catch is XCTSkip {
+            _ = try onTheSharedAudioSession(category: category, mode: mode, options: options, probe: simulator.probe) { () throws -> Int in
+                throw rejected
+            }
+        } catch let skip as XCTSkip {
+            return skip.message ?? "skipped"
+        } catch {
+            XCTAssertTrue(SharedAudioSessionSkip.isRejection(error), "the work's own error comes back")
         }
-        XCTAssertEqual(probed, ["\(AVAudioSession.Category.playAndRecord.rawValue)/\(AVAudioSession.Mode.voiceChat.rawValue)"])
+        return nil
     }
 
-    func testABadOptionsCombinationStillFails() {
-        XCTAssertThrowsError(try onTheSharedAudioSession(probe: { _, _ in }) { () throws -> Int in throw rejected }) { error in
-            XCTAssertFalse(error is XCTSkip)
-            XCTAssertEqual((error as NSError).code, -50)
+    func testSkipsWhenTheSimulatorRejectsFarFieldInEveryDocumentedForm() throws {
+        guard #available(iOS 26.2, *) else { throw XCTSkip("farFieldInput is iOS 26.2") }
+        let simulator = FakeAudioSimulator { _, _, options in options.contains(.farFieldInput) }
+        let config = VoiceAudioConfig.handsFree
+        let reason = skips(config.category, config.mode, config.resolvedOptions(farFieldAvailable: true), on: simulator)
+        XCTAssertEqual(reason?.contains("farFieldInput"), true, reason ?? "no skip")
+        XCTAssertEqual(reason?.contains("defaultToSpeaker"), false)
+        let farFieldReference = AVAudioSession.CategoryOptions([.farFieldInput, .allowBluetoothHFP]).rawValue
+        XCTAssertTrue(simulator.calls.contains("playAndRecord/default/\(farFieldReference)"), "\(simulator.calls)")
+        XCTAssertEqual(simulator.calls.last, "playAndRecord/voiceChat/\(config.options.rawValue)")
+    }
+
+    func testSkipsWhenTheSimulatorRejectsTheCategoryAndModeThemselves() {
+        let simulator = FakeAudioSimulator { category, _, _ in category == .playAndRecord }
+        XCTAssertNotNil(skips(.playAndRecord, .voiceChat, [.allowBluetoothHFP], on: simulator))
+    }
+
+    func testOurConfigFailsWhenAppleDoesNotDocumentIt() {
+        let everything = FakeAudioSimulator { _, _, _ in true }
+        XCTAssertNil(skips(.playback, .default, [.defaultToSpeaker], on: everything))
+        XCTAssertNil(skips(.playback, .voiceChat, [], on: everything))
+        XCTAssertNil(skips(.playAndRecord, .default, [.overrideMutedMicrophoneInterruption], on: everything))
+        XCTAssertNil(skips(.playAndRecord, .measurement, [], on: everything))
+        XCTAssertEqual(everything.calls, [], "a documented problem fails before any probe")
+    }
+
+    func testFarFieldWithoutHFPFails() throws {
+        guard #available(iOS 26.2, *) else { throw XCTSkip("farFieldInput is iOS 26.2") }
+        let simulator = FakeAudioSimulator { _, _, options in options.contains(.farFieldInput) }
+        XCTAssertNil(skips(.playAndRecord, .voiceChat, [.farFieldInput, .defaultToSpeaker], on: simulator))
+    }
+
+    func testACombinationTheSimulatorTakesOptionByOptionFails() {
+        let simulator = FakeAudioSimulator { _, _, options in options.isSuperset(of: [.duckOthers, .defaultToSpeaker]) }
+        XCTAssertNil(skips(.playAndRecord, .voiceChat, [.duckOthers, .defaultToSpeaker], on: simulator))
+    }
+
+    func testTheRestOfTheCombinationMustBeTaken() {
+        let simulator = FakeAudioSimulator { _, mode, options in
+            options.contains(.bluetoothHighQualityRecording) || (mode == .voiceChat && options.contains(.duckOthers))
+        }
+        XCTAssertNil(skips(.playAndRecord, .voiceChat, [.bluetoothHighQualityRecording, .duckOthers], on: simulator))
+        XCTAssertNotNil(skips(.playAndRecord, .voiceChat, [.bluetoothHighQualityRecording, .defaultToSpeaker], on: simulator))
+    }
+
+    func testAnExactCombinationTheSimulatorTakesFails() {
+        let simulator = FakeAudioSimulator { _, _, _ in false }
+        XCTAssertNil(skips(.playAndRecord, .voiceChat, [.defaultToSpeaker], on: simulator))
+        XCTAssertEqual(simulator.calls, ["playAndRecord/voiceChat/\(AVAudioSession.CategoryOptions.defaultToSpeaker.rawValue)"])
+    }
+
+    func testOurConfigsAreDocumented() {
+        for config in [VoiceAudioConfig.handsFree, .dictation(echoCancelling: true), .dictation(echoCancelling: false)] {
+            XCTAssertNil(SharedAudioSessionSkip.documentedProblem(category: config.category, mode: config.mode, options: config.optionsOnThisOS))
         }
     }
 
     func testOtherErrorsAreNeverSkipped() {
         let other = NSError(domain: NSOSStatusErrorDomain, code: 561017449)
-        XCTAssertThrowsError(try onTheSharedAudioSession(probe: { _, _ in throw self.rejected }) { () throws -> Int in throw other }) { error in
+        let simulator = FakeAudioSimulator { _, _, _ in true }
+        XCTAssertThrowsError(try onTheSharedAudioSession(category: .playAndRecord, mode: .voiceChat, options: [], probe: simulator.probe) { () throws -> Int in
+            throw other
+        }) { error in
             XCTAssertFalse(error is XCTSkip)
             XCTAssertEqual((error as NSError).code, 561017449)
         }
+        XCTAssertEqual(simulator.calls, [])
     }
 
     func testTheWorkRunsAsIs() throws {
-        XCTAssertEqual(try onTheSharedAudioSession(probe: { _, _ in XCTFail("no probe when the work succeeds") }) { 7 }, 7)
+        let simulator = FakeAudioSimulator { _, _, _ in true }
+        XCTAssertEqual(try onTheSharedAudioSession(applying: .handsFree, probe: simulator.probe) { 7 }, 7)
+        XCTAssertEqual(simulator.calls, [])
     }
 }
 
@@ -361,12 +523,13 @@ final class VoiceAudioHandoffTests: XCTestCase {
         let rtcSession = RTCAudioSession.sharedInstance()
         let original = RTCAudioSessionConfiguration.webRTC()
         defer { RTCAudioSessionConfiguration.setWebRTC(original) }
-        try onTheSharedAudioSession { try VoiceAudioConfig.handsFree.apply(to: avSession) }
+        try onTheSharedAudioSession(applying: .handsFree) { try VoiceAudioConfig.handsFree.apply(to: avSession) }
         let ours = avSession.categoryOptions
 
         // BEFORE (main): WebRTC configures the session with its default when its audio unit starts.
         let webRTCDefault = RTCAudioSessionConfiguration.webRTC()
-        try onTheSharedAudioSession {
+        try onTheSharedAudioSession(category: AVAudioSession.Category(rawValue: webRTCDefault.category),
+                                    mode: AVAudioSession.Mode(rawValue: webRTCDefault.mode), options: webRTCDefault.categoryOptions) {
             rtcSession.lockForConfiguration()
             defer { rtcSession.unlockForConfiguration() }
             try rtcSession.setCategory(AVAudioSession.Category(rawValue: webRTCDefault.category), mode: AVAudioSession.Mode(rawValue: webRTCDefault.mode), options: webRTCDefault.categoryOptions)
@@ -382,7 +545,8 @@ final class VoiceAudioHandoffTests: XCTestCase {
         // AFTER: ours is WebRTC's config, so its own setup keeps the speaker.
         WebRTCAudioControl().useConfiguration(.handsFree)
         let webRTCOurs = RTCAudioSessionConfiguration.webRTC()
-        try onTheSharedAudioSession {
+        try onTheSharedAudioSession(category: AVAudioSession.Category(rawValue: webRTCOurs.category),
+                                    mode: AVAudioSession.Mode(rawValue: webRTCOurs.mode), options: webRTCOurs.categoryOptions) {
             rtcSession.lockForConfiguration()
             defer { rtcSession.unlockForConfiguration() }
             try rtcSession.setCategory(AVAudioSession.Category(rawValue: webRTCOurs.category), mode: AVAudioSession.Mode(rawValue: webRTCOurs.mode), options: webRTCOurs.categoryOptions)
@@ -647,3 +811,4 @@ final class TalkMicRecoveryTests: XCTestCase {
         try? session.setActive(false)
     }
 }
+

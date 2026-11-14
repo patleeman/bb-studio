@@ -41,10 +41,14 @@ struct VoiceAudioConfig: Equatable, Sendable {
         return resolved
     }
 
-    func apply(to session: AudioSessionControl) throws {
+    var optionsOnThisOS: AVAudioSession.CategoryOptions {
         var farField = false
         if #available(iOS 26.2, *) { farField = true }
-        try session.setCategory(category, mode: mode, options: resolvedOptions(farFieldAvailable: farField))
+        return resolvedOptions(farFieldAvailable: farField)
+    }
+
+    func apply(to session: AudioSessionControl) throws {
+        try session.setCategory(category, mode: mode, options: optionsOnThisOS)
         if prefersEchoCancelledInput, session.isEchoCancelledInputAvailable {
             try? session.setPrefersEchoCancelledInput(true)
         }
