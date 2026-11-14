@@ -6,6 +6,7 @@ import { makeProviderInfo } from "@bb/test-helpers/domain-fixtures";
 import { useEffect } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { useSetPromptBoxProviderModelReasoningPreference } from "@/hooks/thread-creation-options/persisted-selection-fields";
+import { forgetRememberedProviderModels, noteProviderModel } from "./rememberedProviderModel.fork";
 import { systemExecutionOptionsQueryKey } from "@/hooks/queries/query-keys";
 import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
 import { ModelReasoningPicker } from "./ModelReasoningPicker";
@@ -135,6 +136,7 @@ function renderPicker(
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  forgetRememberedProviderModels();
 });
 
 describe("provider tabs only browse", () => {
@@ -275,5 +277,23 @@ describe("provider tabs only browse", () => {
     const mark = await screen.findByTestId("provider-tab-signed-out");
     expect(mark.closest("button")?.getAttribute("title")).toBe("Codex");
     expect(screen.getAllByTestId("provider-tab-signed-out")).toHaveLength(1);
+  });
+
+  it("keeps the model a composer last showed for that provider, even when nothing was stored", async () => {
+    noteProviderModel("claude-code", "claude-haiku-4-6");
+    const onProviderModelChange = vi.fn();
+    renderPicker(onProviderModelChange);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Provider, model and reasoning" }),
+    );
+    fireEvent.click(screen.getByTitle("Claude Code"));
+    expect(await screen.findByText("Haiku 4.6")).not.toBeNull();
+    fireEvent.click(await screen.findByRole("radio", { name: "High" }));
+
+    expect(onProviderModelChange).toHaveBeenCalledWith({
+      providerId: "claude-code",
+      model: "claude-haiku-4-6",
+      reasoningLevel: "high",
+    });
   });
 });
