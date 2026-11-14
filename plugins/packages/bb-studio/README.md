@@ -2815,8 +2815,6 @@ assertion fails.
 
 ![Relay after a Claude Code → Codex handoff: the chat is the new Codex thread, whose real reply says it's here on Codex (gpt-6.1-sol), and its two earlier threads, each titled Relay, are under Earlier conversations in the Bots sidebar](assets/bot-handoff.png)
 
-![No Bot yet: a centered welcome, Meet your Bot, with a drawn blob avatar, one question (What should your Bot help with?), Create Bot, and ideas that fill it (Watch my projects, Morning brief, Plan my week, Triage threads); the Bots sidebar shows a Your first bot row](assets/bot-create.png)
-
 ![The first chat after Create: Chief of Staff's chat as BB's thread page, the setup message with what it should help with (the ORBIT-42 launch), and its reply introducing itself and asking where to track the launch, what needs you and when the morning update should arrive, before it picks its own name and look; the new Bot in the Bots sidebar](assets/bot-first-chat.png)
 
 The Bot is your always-on agent, modelled on ChatGPT's dots. It replaced
