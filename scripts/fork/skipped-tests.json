@@ -749,18 +749,6 @@
       "title": "lands on an error that ended the turn"
     },
     {
-      "file": "packages/thread-view/test/build-thread-timeline.test.ts",
-      "title": "keeps a canonical disclosure ID when completed reasoning gains a delegation prefix"
-    },
-    {
-      "file": "apps/server/test/public/public-thread-data.test.ts",
-      "title": "hydrates a summary whose range reaches turn completion"
-    },
-    {
-      "file": "apps/server/test/public/public-thread-timeline-output-preview.test.ts",
-      "title": "defers settled row content when asked and loads each row by item"
-    },
-    {
       "file": "packages/provider-parity/src/parity.self.test.ts",
       "title": "codex/auth-failure reproduces its recording"
     }
@@ -815,10 +803,6 @@
     {
       "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
       "title": "shows shortcut keycaps only on desktop, including filtered plugin results (compact: %s)"
-    },
-    {
-      "file": "packages/thread-view/test/reasoning-zero-duration.test.ts",
-      "title": "renders $title when completion is $completedAt"
     }
   ]
 }
