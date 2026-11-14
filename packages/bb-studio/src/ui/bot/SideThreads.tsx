@@ -13,7 +13,7 @@ import { useCall } from "../live";
 import { mountSideThreadRows, sideThreadLabel, type ThreadFooter } from "./reply-in-thread";
 
 export const SIDE_THREAD_ACTION = "bot-side-thread";
-export const REPLY_IN_THREAD = "Reply in thread";
+export const REPLY_IN_THREAD = "Reply to this message";
 
 export function BotThreadDirective(_props: PluginMessageDirectiveProps) {
   return null;
@@ -46,7 +46,7 @@ export function ReplyInThreadAction({ message }: ExperimentalMessageMetadataProp
       await openThreadBeside(message.threadId, opened.threadId, (threadId) => navigate.toThread(threadId));
     } catch (cause) {
       console.warn("Reply in thread failed", errorMessage(cause));
-      toast.error("Couldn't open the thread.", { description: errorMessage(cause) });
+      toast.error("Couldn't open the reply.", { description: errorMessage(cause) });
     } finally {
       setBusy(false);
     }

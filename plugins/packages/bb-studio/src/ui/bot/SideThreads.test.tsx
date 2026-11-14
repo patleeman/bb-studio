@@ -53,7 +53,7 @@ it("shows Reply in thread on a Bot's replies only, and opens the thread beside t
   expect(element.querySelector("[data-studio-reply-in-thread]")).toBeNull();
   await render(<ReplyInThreadAction message={assistant} />);
   const button = element.querySelector<HTMLButtonElement>("[data-studio-reply-in-thread]")!;
-  expect(button.getAttribute("aria-label")).toBe("Reply in thread");
+  expect(button.getAttribute("aria-label")).toBe("Reply to this message");
   await act(async () => { button.click(); });
   await settled();
   expect(host.calls).toEqual([{ method: "bot_thread_reply", input: { threadId: "thr_main", messageId: "m1", turnId: "t1" } }]);

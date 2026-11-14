@@ -409,7 +409,7 @@ describe("KeyboardSettingsSection", () => {
     ]);
     expect(
       screen.getByRole("button", {
-        name: "Record shortcut for Rename thread, current shortcut unassigned",
+        name: "Record shortcut for Rename conversation, current shortcut unassigned",
       }),
     ).toBeTruthy();
     expect(
@@ -457,7 +457,7 @@ describe("KeyboardSettingsSection", () => {
       "Record shortcut for Sidebar settings",
       "Record shortcut for Toggle sidebar",
       "Record shortcut for Open navigation",
-      "Record shortcut for Previous thread",
+      "Record shortcut for Previous conversation",
     ]);
   });
 
@@ -523,7 +523,7 @@ describe("KeyboardSettingsSection", () => {
         ).toBeDefined();
         expect(
           screen.queryByRole("button", {
-            name: /^Record shortcut for Open thread 1,/,
+            name: /^Record shortcut for Open conversation 1,/,
           }),
         ).toBeNull();
       }
@@ -697,7 +697,7 @@ describe("KeyboardSettingsSection", () => {
   it("lets users assign a command that has no default shortcut", () => {
     render(<KeyboardSettingsSection />);
     const recorder = screen.getByRole("button", {
-      name: "Record shortcut for Rename thread, current shortcut unassigned",
+      name: "Record shortcut for Rename conversation, current shortcut unassigned",
     });
     expect(recorder.hasAttribute("disabled")).toBe(false);
     expect(within(recorder).getByText("Unassigned")).toBeDefined();
@@ -768,7 +768,7 @@ describe("KeyboardSettingsSection", () => {
     });
 
     const jumpRecorder = screen.getByRole("button", {
-      name: "Record shortcut for Open thread 1, current shortcut Ctrl + Shift + 1",
+      name: "Record shortcut for Open conversation 1, current shortcut Ctrl + Shift + 1",
     });
     fireEvent.click(jumpRecorder);
     testState.recorderButtonCalls.clear();
@@ -837,7 +837,7 @@ describe("KeyboardSettingsSection", () => {
     render(<KeyboardSettingsSection />);
 
     const defaults = screen.getByLabelText(
-      "Default shortcuts for Open thread 1",
+      "Default shortcuts for Open conversation 1",
     );
     const webGroup = within(defaults).getByText("Web").parentElement;
     expect(within(webGroup!).getByText("⌃ 1")).toBeDefined();
@@ -848,7 +848,7 @@ describe("KeyboardSettingsSection", () => {
     expect(within(defaults).queryByText("Ctrl + Shift + 1")).toBeNull();
     expect(
       screen.getByRole("button", {
-        name: "Record shortcut for Open thread 1, current shortcut ⌃ 1",
+        name: "Record shortcut for Open conversation 1, current shortcut ⌃ 1",
       }),
     ).toBeDefined();
   });
@@ -859,7 +859,7 @@ describe("KeyboardSettingsSection", () => {
     render(<KeyboardSettingsSection />);
 
     const defaults = screen.getByLabelText(
-      "Default shortcuts for Open thread 1",
+      "Default shortcuts for Open conversation 1",
     );
     const webGroup = within(defaults).getByText("Web").parentElement;
     expect(within(webGroup!).getByText("⌃ 1")).toBeDefined();
@@ -867,7 +867,7 @@ describe("KeyboardSettingsSection", () => {
     expect(within(desktopGroup!).getByText("⌘ 1")).toBeDefined();
     expect(
       screen.getByRole("button", {
-        name: "Record shortcut for Open thread 1, current shortcut ⌘ 1",
+        name: "Record shortcut for Open conversation 1, current shortcut ⌘ 1",
       }),
     ).toBeDefined();
   });

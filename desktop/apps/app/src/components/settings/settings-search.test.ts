@@ -70,7 +70,7 @@ describe("searchSettings", () => {
       "AI services",
       "Appearance",
       "Archived conversations",
-      "General › App links",
+      "General › Archive confirmation",
     ]);
   });
 

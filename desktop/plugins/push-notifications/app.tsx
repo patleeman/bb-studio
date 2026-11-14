@@ -150,8 +150,8 @@ function NotificationSettings() {
         </p>
       ) : null}
       <p className="text-xs text-muted-foreground">
-        Channel settings apply to this bb server. Each browser needs permission.
-        Click a notification to open its thread.
+        Channel settings apply to this BB Studio server. Each browser needs permission.
+        Click a notification to open its conversation.
       </p>
     </div>
   );
