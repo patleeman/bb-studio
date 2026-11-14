@@ -131,14 +131,15 @@ final class BotPagesTests: XCTestCase {
         XCTAssertEqual(groups[1].threadId, "thr_m")
         XCTAssertEqual(groups[1].count, 3)
         XCTAssertEqual(groups[1].rows.map(\.count), [2, 1], "lookalikes from one source fold")
-        XCTAssertEqual(LibraryPage.meta(items[0], groupBy: .conversation, now: Date(timeIntervalSince1970: 0)).hasPrefix("Artifact · by Fable lead"), true)
+        XCTAssertEqual(LibraryPage.meta(items[0], groupBy: .conversation, now: Date(timeIntervalSince1970: 0)).hasPrefix("App · by Fable lead"), true)
         XCTAssertEqual(LibraryPage.meta(items[2], groupBy: .conversation, now: Date(timeIntervalSince1970: 0)).hasPrefix("Page · "), true, "no 'made in' under its own group")
         XCTAssertEqual(LibraryPage.provenance(items[3]), "made by you")
         XCTAssertEqual(LibraryPage.groups(items, query: "", kind: .page, groupBy: .conversation).flatMap(\.rows).map(\.item.itemId), ["p1"])
         XCTAssertEqual(LibraryPage.groups(items, query: "fable", kind: nil, groupBy: .conversation).flatMap(\.rows).map(\.item.itemId), ["a1"])
         XCTAssertEqual(LibraryPage.filters.map(LibraryPage.chip), ["Page", "Whiteboard", "Design", "Apps"], "one chip for apps and artifacts")
         XCTAssertEqual(Set(LibraryPage.groups(items, query: "", kind: .app, groupBy: .date).flatMap(\.rows).map(\.item.kind)), [.app, .artifact])
-        XCTAssertEqual(LibraryPage.groups(items, query: "", kind: nil, groupBy: .kind).map(\.title), ["Pages", "Apps", "Artifacts"])
+        XCTAssertEqual(LibraryPage.groups(items, query: "", kind: nil, groupBy: .kind).map(\.title), ["Pages", "Apps"])
+        XCTAssertEqual([BotLibraryItem.Kind.artifact, .app].map(LibraryPage.label), ["App", "App"], "every app says App")
     }
 
     func testLibraryFoldsLongGroupsAndGroupsByDate() {

@@ -291,7 +291,11 @@ enum LibraryPage {
     static let filters: [BotLibraryItem.Kind] = [.page, .whiteboard, .design, .app]
 
     static func label(_ kind: BotLibraryItem.Kind) -> String {
-        kind == .other ? "Other" : kind.rawValue.capitalized
+        switch kind {
+        case .app, .artifact: "App"
+        case .other: "Other"
+        default: kind.rawValue.capitalized
+        }
     }
 
     static func chip(_ kind: BotLibraryItem.Kind) -> String {
@@ -370,9 +374,10 @@ enum LibraryPage {
             var threadId: String?
             switch groupBy {
             case .kind:
-                key = item.kind.rawValue
-                title = label(item.kind) + "s"
-                rank = BotLibraryItem.Kind.allCases.firstIndex(of: item.kind) ?? 0
+                let kind = item.kind == .artifact ? BotLibraryItem.Kind.app : item.kind
+                key = kind.rawValue
+                title = label(kind) + "s"
+                rank = BotLibraryItem.Kind.allCases.firstIndex(of: kind) ?? 0
             case .date:
                 (key, title, rank) = dateGroup(item.updatedAt, now: now)
             case .conversation:

@@ -143,7 +143,16 @@ private struct DuoPageKey: EnvironmentKey {
     static let defaultValue = false
 }
 
+private struct WorkbenchPaneKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 extension EnvironmentValues {
+    var workbenchPane: Bool {
+        get { self[WorkbenchPaneKey.self] }
+        set { self[WorkbenchPaneKey.self] = newValue }
+    }
+
     var duoPage: Bool {
         get { self[DuoPageKey.self] }
         set { self[DuoPageKey.self] = newValue }

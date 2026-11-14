@@ -78,7 +78,7 @@ struct ArtifactView: View {
                 content(artifact, version)
             } else if let error {
                 ContentUnavailableView {
-                    Label("Couldn't open the artifact", systemImage: "exclamationmark.triangle")
+                    Label("Couldn't open the app", systemImage: "exclamationmark.triangle")
                 } description: {
                     Text(error)
                 } actions: {
@@ -105,7 +105,7 @@ struct ArtifactView: View {
         }
         .animation(.snappy, value: notice)
         .modifier(RegularScrollingSurface())
-        .navigationTitle(artifact?.displayTitle ?? "Artifact")
+        .navigationTitle(artifact?.displayTitle ?? "App")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
         .toolbar { Button { showingRelated = true } label: { Label("Related", systemImage: "link") } }
@@ -480,7 +480,7 @@ struct ArtifactCard: View {
     var body: some View {
         StudioCardChrome(
             route: .artifact(id: id),
-            title: artifact?.displayTitle ?? (missing ? "Deleted artifact" : "Artifact"),
+            title: artifact?.displayTitle ?? (missing ? "Deleted app" : "App"),
             detail: artifact.map { [$0.version.typeLabel, ByteCountFormatter.string(fromByteCount: Int64($0.version.size), countStyle: .file)]
                 .joined(separator: " · ") },
             missing: missing,

@@ -166,9 +166,11 @@ struct RoomPages<Room: View, Bench: View>: View {
                         .ignoresSafeArea()
                         .accessibilityHidden(true)
                     bench
+                        .ignoresSafeArea(.container, edges: .horizontal)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .environment(\.duoLayout, DuoLayout(size: .zero, innerScreen: layout.innerScreen))
                         .environment(\.horizontalSizeClass, .compact)
+                        .environment(\.workbenchPane, true)
                 }
             }
         }
@@ -413,7 +415,7 @@ struct RoomWorkbench: View {
         case .archived: "Archived"
         case .drawing: "Drawing"
         case .recording: "Recording"
-        case .artifact: "Artifact"
+        case .artifact: "App"
         case .design: "Design"
         case .dashboard: "Dashboard"
         case .mini: "App"
