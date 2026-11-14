@@ -51,10 +51,15 @@ describe("canonical links", () => {
     expect(parseLink("::page{id=\"dsn_0123456789abcdef\"}")).toEqual(entity(SAMPLE.design, "::page{id=\"dsn_0123456789abcdef\"}"));
   });
 
-  it("reads the older page: and thread: references, file:// URLs and web links", () => {
+  it("reads page: and thread: references with or without @, also when a renderer made them file:// paths, file:// URLs and web links", () => {
     expect(parseLink("page:pg_0123456789abcdef")).toEqual(entity(SAMPLE.page, "page:pg_0123456789abcdef"));
     expect(parseLink("thread:thr_1")).toEqual(entity(SAMPLE.conversation, "thread:thr_1"));
     expect(parseLink("file:///Users/p/src/a.ts")).toEqual(entity(SAMPLE.file, "file:///Users/p/src/a.ts"));
+    expect(parseLink("@thread:thr_1")).toEqual(entity(SAMPLE.conversation, "@thread:thr_1"));
+    expect(parseLink("@page:pg_0123456789abcdef")).toEqual(entity(SAMPLE.page, "@page:pg_0123456789abcdef"));
+    const wrapped = "file:///work/workspaces/thr_9/%40thread%3Athr_1";
+    expect(parseLink(wrapped)).toEqual(entity(SAMPLE.conversation, wrapped));
+    expect(parseLink("file:///work/workspaces/thr_9/@page:pg_0123456789abcdef")).toEqual(entity(SAMPLE.page, "file:///work/workspaces/thr_9/@page:pg_0123456789abcdef"));
     expect(parseLink("file:///Users/p/My%20Notes/a.md")).toEqual(entity({ kind: "file", id: "/Users/p/My Notes/a.md" }, "file:///Users/p/My%20Notes/a.md"));
     expect(parseLink("https://example.com/docs", ORIGIN)).toEqual({ type: "external", url: "https://example.com/docs", link: "https://example.com/docs" });
     expect(parseLink("mailto:a@b.c")).toEqual({ type: "external", url: "mailto:a@b.c", link: "mailto:a@b.c" });

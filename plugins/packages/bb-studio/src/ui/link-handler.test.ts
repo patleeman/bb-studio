@@ -12,9 +12,11 @@ describe("the fork link handler", () => {
     expect(open).toHaveBeenLastCalledWith("bb://conversation/thr_1", { how: "secondPane", source: "transcript" });
     expect(handleStudioLink("/threads/thr_1", { modifiers: { shift: true } }, ORIGIN, open)).toBe(true);
     expect(open).toHaveBeenLastCalledWith("/threads/thr_1", { how: "window", source: "transcript" });
+    expect(handleStudioLink("file:///work/workspaces/thr_9/%40thread%3Athr_1", undefined, ORIGIN, open)).toBe(true);
+    expect(open).toHaveBeenLastCalledWith("file:///work/workspaces/thr_9/%40thread%3Athr_1", { how: "workbench", source: "transcript" });
     expect(handleStudioLink("https://example.com/plugins/studio/studio/pages/pg_1", undefined, ORIGIN, open)).toBe(false);
     expect(handleStudioLink(`${ORIGIN}/settings`, { modifiers: { meta: true } }, ORIGIN, open)).toBe(false);
     expect(handleStudioLink("mailto:a@b.c", undefined, ORIGIN, open)).toBe(false);
-    expect(open).toHaveBeenCalledTimes(3);
+    expect(open).toHaveBeenCalledTimes(4);
   });
 });
