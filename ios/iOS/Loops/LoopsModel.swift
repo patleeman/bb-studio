@@ -124,7 +124,7 @@ final class LoopsModel {
 
     /// Who an owner is, in words: "You", the Bot's name, or the lead's title.
     func ownerName(_ owner: String) -> String {
-        if owner == "patrick" { return "You" }
+        if LoopItem.isYou(owner) { return "You" }
         if owner == "cos" { return botName }
         if owner.hasPrefix("thread:") {
             let id = String(owner.dropFirst("thread:".count))
