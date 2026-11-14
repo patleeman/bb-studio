@@ -8,13 +8,16 @@ import XCTest
 // (no mic, no WebRTC connection): lines starting "EVIDENCE" go to the evidence file.
 
 extension XCTestCase {
-    /// Runs `work` on the shared audio session; skips the test where the simulator
-    /// refuses to configure it (OSStatus -50, as on the CI runners).
     func onTheSharedAudioSession<T>(_ work: () throws -> T) throws -> T {
         do {
             return try work()
         } catch let error as NSError where error.domain == NSOSStatusErrorDomain && error.code == -50 {
-            throw XCTSkip("This simulator can't configure the shared audio session (OSStatus -50)")
+            do {
+                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [])
+            } catch let baseline as NSError where baseline.domain == NSOSStatusErrorDomain && baseline.code == -50 {
+                throw XCTSkip("This simulator can't configure the shared audio session at all (OSStatus -50, even for .playback)")
+            }
+            throw error
         }
     }
 }
