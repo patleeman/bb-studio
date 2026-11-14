@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { useSetPromptBoxProviderModelReasoningPreference } from "@/hooks/thread-creation-options/persisted-selection-fields";
 import { forgetRememberedProviderModels, noteProviderModel } from "./rememberedProviderModel.fork";
+import { signedInFirst, signedInProviderToBrowse } from "./signedOutProviders.fork";
 import { systemExecutionOptionsQueryKey } from "@/hooks/queries/query-keys";
 import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
 import { ModelReasoningPicker } from "./ModelReasoningPicker";
@@ -295,5 +296,52 @@ describe("provider tabs only browse", () => {
       model: "claude-haiku-4-6",
       reasoningLevel: "high",
     });
+  });
+});
+
+describe("signed-out providers", () => {
+  beforeAll(() => ModelReasoningMenu.preload());
+
+  it("orders signed-in providers first and keeps their order", () => {
+    const options = [{ value: "codex" }, { value: "claude-code" }, { value: "pi" }];
+    expect(signedInFirst(options, new Set(["codex"])).map((o) => o.value)).toEqual([
+      "claude-code",
+      "pi",
+      "codex",
+    ]);
+    expect(signedInFirst(options, new Set())).toBe(options);
+  });
+
+  it("browses the first signed-in provider only when the selected one is signed out", () => {
+    const options = [{ value: "codex" }, { value: "claude-code" }];
+    expect(signedInProviderToBrowse(options, new Set(["codex"]), "codex")).toBe("claude-code");
+    expect(signedInProviderToBrowse(options, new Set(["codex"]), "claude-code")).toBeNull();
+    expect(signedInProviderToBrowse(options, new Set(["codex", "claude-code"]), "codex")).toBeNull();
+  });
+
+  it("opens on the signed-in provider's tab, listed first, when the selected provider is signed out", async () => {
+    const { onSelectedProviderChange, onModelChange } = renderPicker();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Provider, model and reasoning" }),
+    );
+
+    expect(await screen.findByText("Opus 4.7")).not.toBeNull();
+    const tabs = screen
+      .getAllByRole("button")
+      .filter((button) => button.title === "Codex" || button.title === "Claude Code");
+    expect(tabs.map((tab) => tab.title)).toEqual(["Claude Code", "Codex"]);
+    expect(onSelectedProviderChange).not.toHaveBeenCalled();
+    expect(onModelChange).not.toHaveBeenCalled();
+  });
+
+  it("closes after a model pick so typing goes back to the composer", async () => {
+    const { onModelChange } = renderPicker();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Provider, model and reasoning" }),
+    );
+    fireEvent.click(await screen.findByText("Sonnet 4.7"));
+
+    expect(onModelChange).toHaveBeenCalledWith("claude-sonnet-4-7");
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 });
