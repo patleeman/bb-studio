@@ -803,6 +803,18 @@
     {
       "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
       "title": "shows shortcut keycaps only on desktop, including filtered plugin results (compact: %s)"
+    },
+    {
+      "file": "apps/app/src/components/pickers/ModelReasoningPicker.test.tsx",
+      "title": "stays open while changing both the model and reasoning effort"
+    },
+    {
+      "file": "apps/app/src/components/pickers/ModelReasoningPicker.test.tsx",
+      "title": "can hand off within the source provider and exit the picker mode"
+    },
+    {
+      "file": "apps/app/src/components/plugin/PluginProviderModelPicker.test.tsx",
+      "title": "reconciles model capabilities and drops unsupported service tiers"
     }
   ]
 }
