@@ -11,7 +11,7 @@ import { STUDIO_KEY_SETTINGS } from "./keys";
 import { describeMigration, LEGACY_SETTINGS, migrateSettings, SETTINGS_MIGRATED_KEY } from "./migrate";
 import { registerSettings } from "./register";
 import { checkSetting, effectiveSettings, parseSettingText, SETTINGS_GROUPS, settingDefaults, STUDIO_SETTINGS, STUDIO_SETTING_KEYS, VISIBLE_SETTING_KEYS } from "./schema";
-import { SETTINGS_KV_KEY, StudioSettingsStore } from "./store";
+import { remindersForFirstBot, SETTINGS_KV_KEY, StudioSettingsStore } from "./store";
 import { decisionsConstants, decisionsDefaults } from "../decisions/settings";
 import { loopTimeZone } from "./constants";
 
@@ -113,12 +113,21 @@ describe("Studio's settings store", () => {
     expect((await again.load()).loopDailyBudget).toBe(3);
   });
 
-  it("turns Todo reminders on for a new install and keeps a stored choice", async () => {
+  it("turns Todo reminders on with a new install's first Bot, and leaves an existing install's value alone", async () => {
     const fresh = new StudioSettingsStore(memoryKv());
-    expect((await fresh.load()).loopsEnabled).toBe(true);
+    await fresh.load();
+    expect(fresh.current().loopsEnabled).toBe(false);
+    expect(await remindersForFirstBot(fresh, true)).toBe(true);
+    expect(fresh.explicit()).toEqual({ loopsEnabled: true });
+    const unset = new StudioSettingsStore(memoryKv());
+    await unset.load();
+    expect(await remindersForFirstBot(unset, false)).toBe(false);
+    expect(unset.current().loopsEnabled).toBe(false);
+    expect(unset.explicit()).toEqual({});
     const kv = memoryKv(new Map([[SETTINGS_KV_KEY, { loopsEnabled: false }]]));
-    const existing = new StudioSettingsStore(kv);
-    expect((await existing.load()).loopsEnabled).toBe(false);
+    const stored = new StudioSettingsStore(kv);
+    await stored.load();
+    expect(await remindersForFirstBot(stored, true)).toBe(false);
     expect(kv.rows.get(SETTINGS_KV_KEY)).toEqual({ loopsEnabled: false });
   });
 });
@@ -192,11 +201,11 @@ describe("the one-time migration", () => {
   }
 
   it("carries every changed value over under the same key, keeps defaults unset, and runs once", async () => {
-    const d = deps({ autoTitle: false, loopDailyBudget: 3, loopQuietStart: 23, explore_replyItems: "👍 Yes", voiceLiveMonthlyCapUsd: 35, voiceLiveVoice: "cedar", decisions_batchConfidence: 1, callTranscription: "Home server", callServerUrl: "http://homelab:8000", snapshotsPerPage: 50, loopsEnabled: false });
+    const d = deps({ autoTitle: false, loopDailyBudget: 3, loopQuietStart: 23, explore_replyItems: "👍 Yes", voiceLiveMonthlyCapUsd: 35, voiceLiveVoice: "cedar", decisions_batchConfidence: 1, callTranscription: "Home server", callServerUrl: "http://homelab:8000", snapshotsPerPage: 50, loopsEnabled: true });
     await d.store.load();
     const report = await migrateSettings(d);
     expect(report?.copied.sort()).toEqual(["autoTitle", "callServerUrl", "callTranscription", "decisions_batchConfidence", "explore_replyItems", "loopDailyBudget", "loopQuietStart", "loopsEnabled", "voiceLiveMonthlyCapUsd", "voiceLiveVoice"].sort());
-    expect(d.store.current()).toMatchObject({ autoTitle: false, loopDailyBudget: 3, loopQuietStart: 23, explore_replyItems: "👍 Yes", voiceLiveMonthlyCapUsd: 35, decisions_batchConfidence: 1, callTranscription: "Home server", loopsEnabled: false, snapshotsPerPage: 50 });
+    expect(d.store.current()).toMatchObject({ autoTitle: false, loopDailyBudget: 3, loopQuietStart: 23, explore_replyItems: "👍 Yes", voiceLiveMonthlyCapUsd: 35, decisions_batchConfidence: 1, callTranscription: "Home server", loopsEnabled: true, snapshotsPerPage: 50 });
     // snapshotsPerPage was at its default, so it follows the default.
     expect(d.store.explicit()).not.toHaveProperty("snapshotsPerPage");
     expect(d.kv.rows.get(SETTINGS_MIGRATED_KEY)).toMatchObject({ copied: report!.copied });

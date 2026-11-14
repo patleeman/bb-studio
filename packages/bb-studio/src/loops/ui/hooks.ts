@@ -15,7 +15,7 @@ import { LOOP_MENTION, loopReference } from "../reference";
 
 const PERSONAL_PROJECT_ID = "proj_personal";
 
-/** The `loopsEnabled` Studio setting (label "Todo reminders", default on). */
+/** The `loopsEnabled` Studio setting (label "Todo reminders"; off by default, on for a new install from its first Bot). */
 export function useLoopsEnabled(): boolean {
   const { values } = useStudioSettings();
   return values?.loopsEnabled === true;

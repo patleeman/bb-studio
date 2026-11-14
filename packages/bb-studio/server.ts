@@ -38,6 +38,7 @@ import { BUILTIN_KINDS, builtinOn, frontendState, kindRowViews, KindSettingsStor
 import { kindsContract, type KindsState } from "./src/kinds-contract";
 import { openaiKey } from "./src/openai-key";
 import { registerSettings } from "./src/settings/register";
+import { remindersForFirstBot } from "./src/settings/store";
 import { loopTimeZone } from "./src/settings/constants";
 import { settingsCli, SETTINGS_USAGE } from "./src/settings/cli";
 import { STUDIO_SETTINGS } from "./src/settings/schema";
@@ -1399,7 +1400,12 @@ export default async function plugin(bb: BbPluginApi) {
       resolved: (threadId) => { botThreads.threadChanged(threadId); botThreads.store.clearNeedsYouFrom(threadId); void nudges.settled(threadId).catch(() => {}); },
     }),
     bot_get: ({ botId }) => bots.get(botId),
-    bot_create: (input) => bots.create(input),
+    bot_create: async (input) => {
+      const firstBot = bots.list().length === 0;
+      const view = await bots.create(input);
+      await remindersForFirstBot(studioSettings, firstBot).catch((error) => bb.log.warn(`Couldn't turn on Todo reminders for the first Bot: ${String(error)}`));
+      return view;
+    },
     bot_set: (input) => bots.set(input),
     bot_set_appearance: (input) => {
       if (input.appearance && !themes.get(input.appearance.themeId)) throw new Error(`No theme ${input.appearance.themeId}.`);
