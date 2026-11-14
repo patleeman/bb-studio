@@ -1,4 +1,5 @@
-import { childCompletedPreviewStart } from "./childCompletedPreview.fork";
+import { useGeneratedPreviewStart } from "./childCompletedPreview.fork";
+import { useRelayedLeadingIcon } from "./relayedFold.fork";
 import {
   memo,
   useCallback,
@@ -578,16 +579,16 @@ export const GeneratedConversationMessage = memo(
           timestamp={timestamp}
         />
       ) : undefined;
-    const leadingIcon = generatedConversationIconName(
+    const leadingIcon = useRelayedLeadingIcon(generatedConversationIconName(
       sourceKind,
       systemMessageKind,
-    );
+    ));
     const titleOnly = systemMessageIsTitleOnly(sourceKind, systemMessageKind);
     const hasExpandedOnlyContent =
       attachmentItems.filePaths.length > 0 ||
       attachmentItems.imageItems.length > 0 ||
       bodyRequestLabel !== null;
-    const previewStart = childCompletedPreviewStart(systemMessageKind, messageText);
+    const previewStart = useGeneratedPreviewStart(systemMessageKind, messageText);
     const collapsedPreviewSource =
       generatedConversationCollapsedPreview(messageText.slice(previewStart));
     const collapsedPreviewTextRef = useRef<HTMLElement | null>(null);
