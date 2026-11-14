@@ -1,3 +1,4 @@
+import { isBriefThought } from "./brief-thought.fork.js";
 import type {
   ProviderCommand,
   ThreadContextWindowUsage,
@@ -842,6 +843,7 @@ function convertMessage(
         },
       ];
     case "operation": {
+      if (isBriefThought(message)) return [];
       const parentChange = parentChangeForMessage(message);
       const operationKind = operationKindForMessage(message, parentChange);
       const base = buildTimelineRowBase(message, options.rowIdPrefix);
