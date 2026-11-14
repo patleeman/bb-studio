@@ -61,14 +61,18 @@ final class StudioStore: ObservableObject {
         }
     }
 
+    nonisolated static func shown(_ items: [StudioItem]) -> [StudioItem] {
+        items.filter { $0.pluginId != "dashboards" }
+    }
+
     func restore() {
         guard !loaded else { return }
         if let snapshot = DiskCache.load(StudioSnapshot.self, key: StudioSnapshot.cacheKey, serverURL: serverURL) {
-            items = snapshot.items
+            items = Self.shown(snapshot.items)
             kindInfo = snapshot.kinds ?? []
             tags = snapshot.tags ?? []
             supportsTags = snapshot.tags != nil
-            starred = snapshot.starred ?? []
+            starred = Self.shown(snapshot.starred ?? [])
             supportsStars = snapshot.starred != nil
             loaded = true
         }
@@ -97,9 +101,9 @@ final class StudioStore: ObservableObject {
             kindInfo = listing.kinds
             tags = listing.tags ?? []
             supportsTags = listing.tags != nil
-            starred = listing.starred ?? []
+            starred = Self.shown(listing.starred ?? [])
             supportsStars = listing.starred != nil
-            self.items = listing.items.filter { $0.pluginId != "dashboards" }.sorted { $0.updatedAt > $1.updatedAt }
+            self.items = Self.shown(listing.items).sorted { $0.updatedAt > $1.updatedAt }
             Spotlight.indexStudio(self.items, serverURL: serverURL)
             error = nil
             DiskCache.save(

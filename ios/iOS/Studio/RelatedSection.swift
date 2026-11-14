@@ -144,16 +144,18 @@ struct RelatedSection: View {
     static let replyRowID = "relatedReplyRow"
 
 
+    static func route(_ plugin: String, _ id: String) -> Route? {
+        let segment = ["artifacts": "artifacts", "excalidraw": "drawings", "talk": "recordings", "pages": "pages",
+                       "minis": "minis", "design": "designs"][plugin]
+        return segment.flatMap { Route(href: "/plugins/studio/studio/\($0)/\(id)") }
+    }
+
     @ViewBuilder
     private func relatedItem(_ plugin: String?, _ id: String?, label: String) -> some View {
         if let plugin, let id {
-            let href = plugin == "artifacts" ? "/plugins/studio/studio/artifacts/\(id)"
-                : plugin == "excalidraw" ? "/plugins/studio/studio/drawings/\(id)"
-                : plugin == "talk" ? "/plugins/studio/studio/recordings/\(id)"
-                : plugin == "pages" ? "/plugins/studio/studio/pages/\(id)"
-                : plugin == "minis" ? "/plugins/studio/studio/minis/\(id)"
-                : "/plugins/studio/studio/designs/\(id)"
-            if let route = Route(href: href) {
+            if plugin == "dashboards" {
+                Label("\(label): opens in BB on your Mac", systemImage: "link").foregroundStyle(.secondary)
+            } else if let route = Self.route(plugin, id) {
                 NavigationLink(value: route) { Label(label, systemImage: "link") }
             } else {
                 Label("\(label): \(plugin)", systemImage: "link")

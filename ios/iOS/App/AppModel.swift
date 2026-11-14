@@ -244,6 +244,7 @@ final class AppModel: ObservableObject {
         case "artifact", "artifacts": openStudio(kind: "artifact", id.map { .artifact(id: $0) })
         case "design", "designs": openStudio(kind: "design", id.map { .design(id: $0) })
         case "mini", "minis": openStudio(kind: "mini", id.map { .mini(id: $0) })
+        case "dashboard", "dashboards": flash("Dashboards open in BB on your Mac.")
         case "visual-chat":
             // The list under the chat, so Back goes to it.
             openStudio(kind: nil, .visualChats)
