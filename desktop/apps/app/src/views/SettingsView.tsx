@@ -893,7 +893,7 @@ export function GeneralSettingsSection({
   );
   return (
     <>
-      <SettingsSection title="Threads & editing">
+      <SettingsSection title="Conversations & editing">
         <div className="space-y-5">
           <SettingsWithControl
             label={NAVIGATE_TO_THREAD_AFTER_CREATE_SETTING_LABEL}

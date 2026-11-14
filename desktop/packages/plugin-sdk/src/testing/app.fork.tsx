@@ -18,6 +18,7 @@ import type {
   ExperimentalNewTabItemsRegistration,
   ExperimentalThreadBannerRegistration,
   ExperimentalModelLoadNoticeRegistration,
+  ExperimentalNewConversationRegistration,
   ExperimentalFirstRunRegistration,
   ExperimentalModelPickerGateRegistration,
   ExperimentalHideHostEntriesRegistration,
@@ -99,6 +100,7 @@ export interface ForkCapturedPluginApp {
   threadBanners: ExperimentalThreadBannerRegistration[];
   modelLoadNotices: ExperimentalModelLoadNoticeRegistration[];
   firstRuns: ExperimentalFirstRunRegistration[];
+  newConversations: ExperimentalNewConversationRegistration[];
   modelPickerGates: ExperimentalModelPickerGateRegistration[];
   hiddenHostEntries: ExperimentalHideHostEntriesRegistration[];
   threadHeaders: ExperimentalThreadHeaderRegistration[];

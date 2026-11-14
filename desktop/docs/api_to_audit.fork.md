@@ -595,6 +595,25 @@ Sign in, instead of leaving only the pooler's HTTP 429.
 2. The composer's send-blocking message (`formatModelLoadErrorText`) is text
    and draws no notice.
 
+## New conversations the plugin's way (`slots.experimental_newConversation`)
+
+bb's New thread command (Mod+N) and the sidebar's New thread row ask the
+plugin first. `run()` returns true when the plugin opened the new
+conversation itself; false or a throw falls back to bb's new-thread page.
+Studio is the caller: it opens a new conversation with the Bot the sidebar
+shows, instead of the bare "/" page with no project.
+
+**Core callers.** `components/fork/ForkNewConversation.ts`
+(`useForkNewConversation`), called by the `thread.new` handler in
+`layout/AppLayout.tsx` and by `handleNewChat` in `sidebar/AppSidebar.tsx`.
+
+**Audit before stabilizing.**
+
+1. `run` is synchronous and gets no context (project, source of the
+   request); decide whether it should.
+2. Only the first plugin that returns true wins; there is no ordering beyond
+   the plugin id.
+
 ## The model picker's stand-in (`slots.experimental_modelPickerGate`)
 
 A plugin's component is drawn wherever bb draws its model picker, with bb's

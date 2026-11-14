@@ -1,3 +1,5 @@
+import { useRememberedProviderModel } from "./rememberedProviderModel.fork";
+import { SignedOutTabMark, useSignedOutProviderIds } from "./signedOutProviders.fork";
 import { previewPick, type ProviderModelPickHandler } from "./previewPick.fork";
 import { forkModelPickerGate } from "@/components/fork/ForkModelPickerGate";
 import { formatUnknownModelLabel, triggerReasoningLabel as forkTriggerReasoningLabel } from "./unknownModelLabel.fork";
@@ -389,6 +391,7 @@ export function ModelReasoningPicker({
     (previewProvider === undefined ||
       (requireVerifiedProviderPreview && !previewCatalogIsVerified));
 
+  const rememberedPreviewModel = useRememberedProviderModel(previewProviderId, selectedProviderId, modelValue);
   const previewSelection = useMemo(
     () =>
       isPreviewing
@@ -397,7 +400,7 @@ export function ModelReasoningPicker({
             selectedOnlyModels: previewProvider
               ? (previewQuery.data?.selectedOnlyModels ?? [])
               : [],
-            selectedModel: "",
+            selectedModel: previewCatalogIsVerified ? rememberedPreviewModel : "",
             preferredReasoningLevel: reasoningValue,
             provider: previewProvider,
             catalogIsVerified: previewCatalogIsVerified,
@@ -412,6 +415,7 @@ export function ModelReasoningPicker({
       previewQuery.data?.models,
       previewQuery.data?.selectedOnlyModels,
       reasoningValue,
+      rememberedPreviewModel,
     ],
   );
   const previewModelOptions = previewSelection?.modelOptions ?? modelOptions;
@@ -455,6 +459,7 @@ export function ModelReasoningPicker({
     (handoffMode || canSwitchProviders) &&
     providerOptions.length > 1 &&
     (!isShowingModelError || activeModelErrorIsProviderSpecific);
+  const signedOutProviders = useSignedOutProviderIds(providerRouting, showProviderTabs && open);
 
   const activeBrandPrefix = activeProvider?.brandPrefix;
   const filteredModelOptions = useMemo(() => {
@@ -1064,7 +1069,7 @@ export function ModelReasoningPicker({
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent
         align={align}
-        mobileTitle={handoffMode ? "Handoff to new thread" : "Model"}
+        mobileTitle={handoffMode ? "Continue in a new conversation" : "Model"}
         mobileClassName={cn(
           "h-[min(32rem,80dvh)]",
           handoffMode && HANDOFF_DRAWER_TOP_CLASS_NAME,
@@ -1130,6 +1135,7 @@ export function ModelReasoningPicker({
                       {provider.label.charAt(0)}
                     </span>
                   )}
+                  <SignedOutTabMark signedOut={signedOutProviders.has(provider.value)} />
                 </button>
               );
             })}
@@ -1210,7 +1216,7 @@ function HandoffModeHeader({ onBack }: { onBack: () => void }) {
         <Icon name="X" className="size-3.5" aria-hidden />
       </button>
       <span className="min-w-0 truncate text-xs font-normal text-subtle-foreground">
-        Handoff to new thread
+        Continue in a new conversation
       </span>
     </div>
   );

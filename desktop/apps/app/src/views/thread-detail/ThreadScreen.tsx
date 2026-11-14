@@ -1,3 +1,4 @@
+import { forkPlaceholderState } from "@/components/promptbox/follow-up-placeholder.fork";
 import { forkComposerArea } from "@/components/fork/ForkComposerReplace";
 import { forkThreadBanner } from "@/components/fork/ForkThreadBanners";
 import {
@@ -593,6 +594,7 @@ export function ThreadScreen({
       childThreadsSection={childThreadsSection}
       contextEnvironmentId={composer.contextEnvironmentId}
       thread={thread}
+      forkPlaceholderState={isThreadTimelinePending ? null : forkPlaceholderState(timelineRows, timeline.hasOlderTimelineRows)}
     />
   ) : null;
   const promptArea = forkComposerArea(thread.id, bbPromptArea);
