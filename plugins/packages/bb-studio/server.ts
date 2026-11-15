@@ -1,6 +1,7 @@
 import { registerWorkCards, WORK_TOOLS } from "./src/work/register";
 import { handedBy, registerUserTasks } from "./src/tasks/user";
 import { isClosed as isTaskClosed } from "./src/tasks/contract";
+import { handoffPush, loopPushInput } from "./src/tasks/handoff-push";
 import { registerTasks, TASK_TOOLS } from "./src/tasks/register";
 import { adoptAtStart } from "./src/tasks/migrate";
 import { AutomationTasks, readSources } from "./src/tasks/automations";
@@ -10,7 +11,7 @@ import { cardNeedsUser, TaskStore, taskTitle, tasksUnavailable } from "./src/tas
 import { withToolLabel } from "./src/tool-labels";
 import { CONTINUE_TOOL, registerContinueNew } from "./src/continue-new";
 import { runWorkCli } from "./src/work/cli";
-import { registerLoops, LOOP_TOOLS, loopPushActions } from './src/loops/register';
+import { registerLoops, LOOP_TOOLS } from './src/loops/register';
 import { reminderLoopId, scheduledContract, scheduledItems } from "./src/loops/scheduled";
 import { automationTable, bbFromFile, bbFromOverview, readImportedAt, readStudioEntries, readThreadOwners } from "./src/automation-table";
 import { arrangeRailOnce } from "./src/rail-arrangement";
@@ -698,12 +699,13 @@ export default async function plugin(bb: BbPluginApi) {
     const bot = bots.stored();
     if (!bot?.threadId) throw new Error('A Bot chat is required');
     taskPushedAt.set(bot.id, Date.now());
-    await bb.sdk.plugins.callRpc({pluginId:'mobile',method:'notify',outputSchema:z.unknown(),input:{title:loop.title,body:loop.why,kind:'turn-finished',threadId:bot.threadId,botId:bot.id,conversationId:bot.threadId,projectId:PERSONAL_PROJECT_ID,category:'BB_LOOP',loopId:loop.id,loopKind:loop.kind,actions:loopPushActions(loop.kind),...(loop.kind==='decide'&&loop.options.length?{options:loop.options.slice(0,4).map(o=>o.slice(0,120))}:{}),coalesceKey:loop.id} as never});
+    await bb.sdk.plugins.callRpc({ pluginId: 'mobile', method: 'notify', outputSchema: z.unknown(), input: loopPushInput(loop, { id: bot.id, threadId: bot.threadId }, new TaskStore(db).find(loop.id)?.conversation ?? null, PERSONAL_PROJECT_ID) as never });
   };
   const loops = registerLoops(bb, db, postToBot, pushLoop, settings, () => loopTimeZone(process.env, studioSettings.current().todosTimeZone), (name, everyMs, work) => triggers.every(name, everyMs, work));
   loopsEnabled = loops.enabled;
-  const work = registerWorkCards(bb, db);
-  registerTasks(bb, db, postToBot);
+  const movedToUser = handoffPush({ db, enabled: () => loops.scheduler.settings().enabled, quiet: () => loops.scheduler.quiet(), push: pushLoop, log: (message) => bb.log.warn(message) });
+  const work = registerWorkCards(bb, db, { moved: movedToUser });
+  registerTasks(bb, db, postToBot, undefined, movedToUser);
   const userTasks = registerUserTasks(bb, db, {
     post: postToBot,
     send: async (threadId, text) => { await bb.sdk.threads.send({threadId,mode:'auto',input:[{type:'text',text,mentions:[],visibility:'agent-only'}]} as never); },
@@ -1127,7 +1129,7 @@ export default async function plugin(bb: BbPluginApi) {
     lastRequest: async (threadId) => ((await bb.sdk.threads.events.list({ threadId, types: ["client/turn/requested"], order: "desc", limit: "1" } as never)) as { data?: unknown }[])[0]?.data ?? null,
     allowed: (threadId) => repliesAllowed(pushRpc, threadId),
     notify: async (input) => { await bb.sdk.plugins.callRpc({ pluginId: "mobile", method: "notify", outputSchema: z.unknown(), input: input as never }); },
-    needsUser: (card) => cardNeedsUser(new TaskStore(db).find(card.id), card.kind),
+    needsUser: (card) => { const store = new TaskStore(db); return cardNeedsUser(store.find(card.id), card.kind, store.find(card.id) ? store.history(card.id) : []); },
     pushedTaskSince: (botId, since) => (taskPushedAt.get(botId) ?? 0) >= since,
     defaultProjectId: PERSONAL_PROJECT_ID,
     log: (message) => bb.log.warn(message),
