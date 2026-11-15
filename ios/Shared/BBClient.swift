@@ -423,8 +423,8 @@ extension BBClient {
     }
 
     /// Permanent. BB refuses when the thread has child threads, and the error says so.
-    public func delete(_ threadId: String) async throws {
-        let body = try encoder.encode(["childThreadsConfirmed": false] as JSONValue)
+    public func delete(_ threadId: String, withChildren: Bool = false) async throws {
+        let body = try encoder.encode(["childThreadsConfirmed": .bool(withChildren)] as JSONValue)
         let (status, data) = try await raw(method: "DELETE", path: "/api/v1/threads/\(threadId)", body: body)
         guard (200..<300).contains(status) else {
             throw BBError(status: status, message: Self.errorMessage(data) ?? "HTTP \(status) deleting the thread")

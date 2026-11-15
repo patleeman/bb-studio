@@ -271,7 +271,7 @@ struct RoomView: View {
             RoomCanvas(pages: pages, layout: layout) {
                 ZStack(alignment: .bottom) {
                     stage(proxy, menuButton: false)
-                    if room.showsMenu { menu }
+                    if room.showsMenu { menu(closeInColumn: true) }
                 }
                 .padding(.trailing, pages == .stacked ? max(0, FoldedChrome.column - proxy.safeAreaInsets.trailing) : 0)
                 .padding(.top, proxy.safeAreaInsets.top)
@@ -296,10 +296,11 @@ struct RoomView: View {
             .opacity(spreadOpen ? 0 : 1)
             .allowsHitTesting(!spreadOpen)
             .accessibilityHidden(spreadOpen)
-            if !spreadOpen && !room.showsMenu {
+            if !spreadOpen {
                 FoldedColumn {
-                    Button(action: openMenu) { Label("Everything else", systemImage: "line.3.horizontal") }
-                        .accessibilityIdentifier("roomMenuButton")
+                    RoomColumnMenuButton(open: room.showsMenu, reduceMotion: reduceMotion) {
+                        if room.showsMenu { closeMenu() } else { openMenu() }
+                    }
                 }
             }
             if spreadOpen {
@@ -352,14 +353,15 @@ struct RoomView: View {
     private func rest(_ proxy: GeometryProxy) -> some View {
         ZStack(alignment: .bottom) {
             stage(proxy, menuButton: !columnHeader)
-            if room.showsDay && columnHeader {
+            if room.showsMenu { menu(closeInColumn: columnHeader) }
+            if (room.showsDay || room.showsMenu) && columnHeader {
                 FoldedColumn {
-                    Button(action: openMenu) { Label("Everything else", systemImage: "line.3.horizontal") }
-                        .accessibilityIdentifier("roomMenuButton")
+                    RoomColumnMenuButton(open: room.showsMenu, reduceMotion: reduceMotion) {
+                        if room.showsMenu { closeMenu() } else { openMenu() }
+                    }
                 }
                 .transition(.opacity)
             }
-            if room.showsMenu { menu }
         }
         .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.5, dampingFraction: 0.9), value: room.mode)
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -378,8 +380,8 @@ struct RoomView: View {
         .environment(\.colorScheme, .dark)
     }
 
-    private var menu: some View {
-        RoomMenu(bot: bot, store: store, view: view, todayCount: todayCount, close: closeMenu,
+    private func menu(closeInColumn: Bool) -> some View {
+        RoomMenu(bot: bot, store: store, view: view, todayCount: todayCount, closeInColumn: closeInColumn, close: closeMenu,
                  openPlace: { room.handle(.open($0)) }, openWorker: { openItem(.worker($0)) },
                  theme: { room.handle(.open(.theme)) }, settings: openSettings,
                  switchBot: { shell.show($0, store: store, compact: false) })

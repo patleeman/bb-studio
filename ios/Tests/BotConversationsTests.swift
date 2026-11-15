@@ -133,6 +133,36 @@ final class BotConversationsTests: XCTestCase {
         XCTAssertFalse(ConversationFinish.can(nil))
     }
 
+    func testArchiveAndDeleteSkipMainAndRunningConversations() throws {
+        let json = #"{"botId":"b","conversations":[{"threadId":"m","title":"Main","isMain":true},{"threadId":"o","title":"Other","isMain":false},{"threadId":"r","title":"Busy","isMain":false,"running":true}],"workers":[]}"#
+        let view = BotThreadsView(try JSONDecoder().decode(Studio.BotThreadsViewOutput.self, from: Data(json.utf8)))
+        XCTAssertFalse(ConversationFinish.canRemove(view.conversations[0]), "never Main")
+        XCTAssertTrue(ConversationFinish.canRemove(view.conversations[1]))
+        XCTAssertFalse(ConversationFinish.canRemove(view.conversations[1], running: true), "not while its thread runs")
+        XCTAssertFalse(ConversationFinish.canRemove(view.conversations[2]), "not while it's working")
+        XCTAssertFalse(ConversationFinish.canRemove(nil))
+        XCTAssertEqual(ConversationFinish.deleteTitle("Launch prep"), "Delete “Launch prep”?")
+        XCTAssertEqual(ConversationFinish.deleteTitle(""), "Delete “Untitled”?")
+        XCTAssertTrue(ConversationFinish.deleteMessage.hasPrefix("This can't be undone."))
+    }
+
+    func testDeleteConfirmsChildThreadsOnlyWhenAsked() async throws {
+        let client = BBClient(baseURL: URL(string: "https://delete-\(UUID().uuidString.lowercased()).invalid")!)
+        let lock = NSLock()
+        nonisolated(unsafe) var sent: [(String, String, Bool?)] = []
+        client.transport = { method, path, body in
+            let input = body.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+            lock.withLock { sent.append((method, path, input["childThreadsConfirmed"] as? Bool)) }
+            return (200, Data(#"{"ok":true}"#.utf8))
+        }
+        try await client.delete("thr_a", withChildren: true)
+        try await client.delete("thr_b")
+        let calls = lock.withLock { sent }
+        XCTAssertEqual(calls.map(\.0), ["DELETE", "DELETE"])
+        XCTAssertEqual(calls.map(\.1), ["/api/v1/threads/thr_a", "/api/v1/threads/thr_b"])
+        XCTAssertEqual(calls.map(\.2), [true, false])
+    }
+
     func testNewConversationUsesTheBotsDefaultModel() async throws {
         let (client, calls) = makeClient { method, _ in
             method == "bot_get" ? ["bot": ["defaultModel": ["providerId": "codex", "model": "gpt-6", "reasoningLevel": "low"]]] as [String: Any]

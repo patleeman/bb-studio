@@ -156,6 +156,7 @@ enum BotSpacesDemo {
         private var sides: [Side] = []
         private var threads: [String: Thread] = [:]
         private var finished: Set<String> = ["thr_demo_lisbon"]
+        private var gone: Set<String> = []
         private var finishedAt: [String: (at: Double, summary: String)] = [:]
         private var memory: [[String: Any]] = []
         private var memoryMade = 0
@@ -282,6 +283,18 @@ enum BotSpacesDemo {
             guard path.hasPrefix(prefix) else { return nil }
             let rest = path.dropFirst(prefix.count).split(separator: "?").first.map(String.init) ?? ""
             let parts = rest.split(separator: "/").map(String.init)
+            if method == "DELETE", parts.count == 1, let id = parts.first {
+                return lock.withLock {
+                    guard input["childThreadsConfirmed"] as? Bool == true else {
+                        return (409, Data(#"{"error":{"message":"This thread has child threads"}}"#.utf8))
+                    }
+                    gone.insert(id)
+                    for key in conversations.keys { conversations[key]?.removeAll { $0.id == id } }
+                    finished.remove(id)
+                    threads[id] = nil
+                    return json(["ok": true])
+                }
+            }
             guard let id = parts.first, lock.withLock({ threads[id] != nil }) else { return nil }
             switch (method, parts.dropFirst().first) {
             case ("GET", nil): return json(thread(id))
@@ -498,7 +511,7 @@ enum BotSpacesDemo {
                         let info = finishedAt[conversation.id] ?? (now, "")
                         return ["threadId": conversation.id, "title": conversation.title, "finishedAt": info.at, "summary": info.summary]
                     }
-                    let older: [[String: Any]] = [[
+                    let older: [[String: Any]] = gone.contains("thr_demo_kitchen") ? [] : [[
                         "threadId": "thr_demo_kitchen", "title": "Kitchen remodel quotes", "isMain": false, "forkedFrom": NSNull(), "projectId": "proj_personal",
                         "updatedAt": now - 2_000_000_000, "latest": "Three quotes in", "running": false, "needsYou": NSNull(), "mirrored": false,
                     ]]

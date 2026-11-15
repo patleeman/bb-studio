@@ -41,6 +41,72 @@ final class RoomDuoUITests: ServerIsolatedUITestCase {
         XCTAssertGreaterThanOrEqual(element.frame.minX + shift, 951 / 2 + 16 - 0.5, "\(what) stays right of the hinge", file: file, line: line)
     }
 
+    private func press(_ id: String) {
+        let element = app.buttons[id]
+        if element.isHittable && element.frame.maxX <= 466 && element.frame.maxY <= 678 { element.tap() } else { command("activate?" + id) }
+    }
+
+    private func assertTheMenuClosesFromTheMenuButtonsSpot(_ posture: String, file: StaticString = #filePath, line: UInt = #line) {
+        let menu = app.buttons["roomMenuButton"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 15), "\(posture): the menu button", file: file, line: line)
+        sleep(1)
+        let spot = menu.frame
+        XCTAssertGreaterThanOrEqual(min(spot.width, spot.height), 44, "\(posture): a 44-point target", file: file, line: line)
+        press("roomMenuButton")
+        let close = app.buttons["roomMenuClose"]
+        XCTAssertTrue(close.waitForExistence(timeout: 10), "\(posture): the menu's close", file: file, line: line)
+        XCTAssertTrue(app.buttons["roomPlace-tasks"].waitForExistence(timeout: 10), file: file, line: line)
+        sleep(1)
+        XCTAssertEqual(app.buttons.matching(identifier: "roomMenuClose").count, 1, "\(posture): one close", file: file, line: line)
+        XCTAssertEqual(close.label, "Back to the room", file: file, line: line)
+        XCTAssertEqual(close.frame.minX, spot.minX, accuracy: 0.5, "\(posture): close where the menu button was", file: file, line: line)
+        XCTAssertEqual(close.frame.minY, spot.minY, accuracy: 0.5, "\(posture): close where the menu button was", file: file, line: line)
+        XCTAssertEqual(close.frame.width, spot.width, accuracy: 0.5, file: file, line: line)
+        XCTAssertEqual(close.frame.height, spot.height, accuracy: 0.5, file: file, line: line)
+        let gutter = spot.minX - 8
+        for id in ["roomPlace-tasks", "roomPlace-schedules", "roomWorkingNow", "roomTheme", "roomSettings"] where app.buttons[id].exists {
+            XCTAssertLessThanOrEqual(app.buttons[id].frame.maxX, gutter, "\(posture): \(id) stays out of the rail", file: file, line: line)
+        }
+        press("roomMenuClose")
+        XCTAssertTrue(menu.waitForExistence(timeout: 10), "\(posture): back to the room", file: file, line: line)
+        sleep(1)
+        XCTAssertEqual(menu.frame.minX, spot.minX, accuracy: 0.5, file: file, line: line)
+        XCTAssertEqual(menu.frame.minY, spot.minY, accuracy: 0.5, file: file, line: line)
+    }
+
+    func testTheMenuClosesFromTheMenuButtonsSpotOnTheRail() throws {
+        guard ProcessInfo.processInfo.environment["ROOM_DUO"] != nil else { throw XCTSkip("needs the iPhone Duo simulator") }
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaLoopsDemo", "-qaRoomTheme", "forest"]
+        app.launchOffline()
+        if !app.buttons["roomMenuButton"].waitForExistence(timeout: 30) {
+            app.terminate()
+            app.launchOffline()
+        }
+        XCTAssertTrue(app.buttons["roomMenuButton"].waitForExistence(timeout: 60))
+        assertTheMenuClosesFromTheMenuButtonsSpot("folded")
+        command("landscape")
+        assertTheMenuClosesFromTheMenuButtonsSpot("landscape")
+        command("portrait")
+        assertTheMenuClosesFromTheMenuButtonsSpot("portrait")
+        press("roomMenuButton")
+        for id in ["roomPlace-tasks", "roomPlace-schedules", "roomTheme", "roomSettings"] {
+            XCTAssertTrue(app.buttons[id].waitForExistence(timeout: 5), id)
+            XCTAssertLessThanOrEqual(app.buttons[id].frame.maxY, 951 / 2 - 16 + 0.5, "portrait: \(id) fits the top page")
+            XCTAssertGreaterThanOrEqual(app.buttons[id].frame.minY, 0, "portrait: \(id) isn't cut off")
+        }
+        press("roomMenuClose")
+        command("outer")
+        press("roomMenuButton")
+        XCTAssertTrue(app.buttons["roomMenuClose"].waitForExistence(timeout: 10))
+        command("landscape")
+        XCTAssertTrue(app.buttons["roomMenuClose"].waitForExistence(timeout: 10), "the menu stays open across unfolding")
+        XCTAssertEqual(app.buttons.matching(identifier: "roomMenuClose").count, 1)
+        command("outer")
+        XCTAssertTrue(app.buttons["roomMenuClose"].waitForExistence(timeout: 10), "and folding from landscape")
+        press("roomMenuClose")
+        assertTheMenuClosesFromTheMenuButtonsSpot("folded again")
+    }
+
     private func assertOnTheTopPage(_ element: XCUIElement, _ what: String, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertTrue(element.waitForExistence(timeout: 10), what, file: file, line: line)
         XCTAssertLessThanOrEqual(element.frame.maxY, 951 / 2 - 16 + 0.5, "\(what) stays above the hinge", file: file, line: line)

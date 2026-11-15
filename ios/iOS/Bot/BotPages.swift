@@ -627,6 +627,7 @@ struct ArchivePageView: View {
     @State private var error: String?
     @State private var query = ""
     @State private var filter: ArchivePage.Filter = .all
+    @State private var deleting: ArchiveData.Conversation?
 
     private var data: ArchiveData? { load.value }
     private var scope: String { "\(app.client.baseURL.absoluteString)|\(botId ?? "")" }
@@ -668,6 +669,14 @@ struct ArchivePageView: View {
                 }
             }
         }
+        .alert(ConversationFinish.deleteTitle(deleting?.title ?? ""),
+               isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), presenting: deleting) { row in
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) { Task { await delete(row.threadId) } }
+                .accessibilityIdentifier("confirmDelete")
+        } message: { _ in
+            Text(ConversationFinish.deleteMessage)
+        }
         .modifier(PageChrome(title: "Archive", query: $query, prompt: "Search the archive") { EmptyView() })
         .navigationBarTitleDisplayMode(.large)
         .refreshable { await load.reload() }
@@ -688,9 +697,8 @@ struct ArchivePageView: View {
                     }
                 }
             }
-            .swipeActions(edge: .trailing) {
-                Button("Reopen", systemImage: "arrow.uturn.backward") { Task { await reopen(row.threadId) } }.tint(.accentColor)
-            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) { archiveActions(row, swipe: true) }
+            .contextMenu { archiveActions(row, swipe: false) }
             .accessibilityIdentifier("archive-finished-\(row.threadId)")
         } else {
             Button { open(.conversation(row.threadId)) } label: {
@@ -702,8 +710,39 @@ struct ArchivePageView: View {
                 }
             }
             .tint(.primary)
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) { archiveActions(row, swipe: true) }
+            .contextMenu { archiveActions(row, swipe: false) }
             .accessibilityIdentifier("archive-conversation-\(row.threadId)")
         }
+    }
+
+    @ViewBuilder private func archiveActions(_ row: ArchiveData.Conversation, swipe: Bool) -> some View {
+        if row.finished {
+            Button { Task { await reopen(row.threadId) } } label: { Label("Restore", systemImage: "arrow.uturn.backward") }
+                .tint(.accentColor)
+                .accessibilityIdentifier("archiveRestore-\(row.threadId)")
+        } else {
+            Button { Task { await archive(row.threadId) } } label: { Label("Archive", systemImage: "archivebox") }
+                .tint(.indigo)
+                .accessibilityIdentifier("archiveArchive-\(row.threadId)")
+        }
+        Button(role: swipe ? nil : .destructive) { deleting = row } label: { Label("Delete", systemImage: "trash") }
+            .tint(.red)
+            .accessibilityIdentifier("archiveDelete-\(row.threadId)")
+    }
+
+    private func archive(_ threadId: String) async {
+        do {
+            try await app.client.finishConversation(threadId: threadId)
+            await reopened()
+        } catch { self.error = "It didn't archive: " + BBClient.describe(error) }
+    }
+
+    private func delete(_ threadId: String) async {
+        do {
+            try await app.client.delete(threadId, withChildren: true)
+            await reopened()
+        } catch { self.error = "It didn't delete: " + BBClient.describe(error) }
     }
 
     private func workerRow(_ row: ArchiveData.Worker) -> some View {

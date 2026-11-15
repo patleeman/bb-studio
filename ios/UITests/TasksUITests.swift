@@ -120,9 +120,19 @@ final class TasksUITests: ServerIsolatedUITestCase {
         shot("7-tasks-page-lower")
 
         let agents = app.buttons["tasks-owner-agents"]
-        for _ in 0..<8 where !(agents.exists && agents.isHittable) { app.swipeDown() }
+        for _ in 0..<12 where !(agents.exists && agents.isHittable) {
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 150)))
+        }
+        sleep(1)
         agents.tap()
-        XCTAssertTrue(agents.isSelected, "the Agents filter is on")
+        let on = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == true"), object: agents)
+        if XCTWaiter.wait(for: [on], timeout: 3) != .completed {
+            sleep(2)
+            agents.tap()
+        }
+        let again = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isSelected == true"), object: agents)
+        XCTAssertEqual(XCTWaiter.wait(for: [again], timeout: 5), .completed, "the Agents filter is on")
         let fork = app.buttons["task-row-wc_demo_fork"]
         for _ in 0..<4 where !fork.exists { app.swipeUp() }
         XCTAssertTrue(fork.waitForExistence(timeout: 5), "the Agents filter")

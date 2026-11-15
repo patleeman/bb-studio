@@ -1,10 +1,13 @@
 import SwiftUI
 
 struct RoomMenu: View {
+    static let hitPadding: CGFloat = 12
+
     let bot: BotSpace
     @ObservedObject var store: BotSpacesStore
     let view: BotThreadsView?
     let todayCount: Int?
+    var closeInColumn = false
     var close: () -> Void
     var openPlace: (RoomPlace) -> Void
     var openWorker: (String) -> Void
@@ -18,29 +21,45 @@ struct RoomMenu: View {
     }
 
     var body: some View {
+        ViewThatFits(in: .vertical) {
+            menu(compact: false)
+            menu(compact: true)
+            ScrollView { menu(compact: true) }.scrollBounceBehavior(.basedOnSize)
+        }
+        .frame(maxWidth: 640, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("RoomMenu")
+    }
+
+    private func menu(compact: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 botName
                 Spacer()
-                Button(action: close) {
-                    Image(systemName: "xmark").font(.body.weight(.semibold)).frame(width: 44, height: 44)
+                if !closeInColumn {
+                    Button(action: close) {
+                        Image(systemName: "xmark").font(.body.weight(.semibold)).frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .lookGlass(look, \.hud, in: .circle, interactive: true)
+                    .accessibilityLabel("Back to the room")
+                    .accessibilityIdentifier("roomMenuClose")
                 }
-                .buttonStyle(.plain)
-                .lookGlass(look, \.hud, in: .circle, interactive: true)
-                .accessibilityLabel("Back to the room")
-                .accessibilityIdentifier("roomMenuClose")
             }
+            .frame(minHeight: 44)
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(RoomPlace.menu) { place in
                     Button { openPlace(place) } label: {
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
-                            Text(place.title).font(.system(size: 34, weight: .semibold))
+                            Text(place.title).font(.system(size: compact ? 28 : 34, weight: .semibold))
                             if place == .tasks, let todayCount {
                                 Text("\(todayCount) today").font(.subheadline.weight(.medium)).foregroundStyle(.white.opacity(0.55))
                             }
                         }
                         .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                        .padding(.horizontal, RoomMenu.hitPadding)
+                        .frame(minHeight: compact ? 46 : 56)
                         .contentShape(.rect)
                         .lookHalo(look)
                     }
@@ -48,8 +67,9 @@ struct RoomMenu: View {
                     .accessibilityIdentifier("roomPlace-\(place.rawValue)")
                 }
             }
-            .padding(.top, 40)
-            Spacer(minLength: 16)
+            .padding(.horizontal, -RoomMenu.hitPadding)
+            .padding(.top, compact ? 12 : 40)
+            Spacer(minLength: compact ? 10 : 16)
             if let working {
                 Button { openWorker(working.threadId) } label: {
                     HStack(spacing: 12) {
@@ -70,22 +90,19 @@ struct RoomMenu: View {
                 .accessibilityLabel("Working now: \(working.title)")
                 .accessibilityIdentifier("roomWorkingNow")
             }
-            HStack(spacing: 22) {
-                Button(action: theme) { Text("Theme").frame(minHeight: 44).contentShape(.rect) }.accessibilityIdentifier("roomTheme")
-                Button(action: settings) { Text("Settings").frame(minHeight: 44).contentShape(.rect) }.accessibilityIdentifier("roomSettings")
+            HStack(spacing: 0) {
+                Button(action: theme) { Text("Theme").padding(.horizontal, 11).frame(minHeight: 44).contentShape(.rect) }.accessibilityIdentifier("roomTheme")
+                Button(action: settings) { Text("Settings").padding(.horizontal, 11).frame(minHeight: 44).contentShape(.rect) }.accessibilityIdentifier("roomSettings")
             }
+            .padding(.horizontal, -11)
             .font(.subheadline)
             .foregroundStyle(.white.opacity(0.65))
             .frame(minHeight: 44)
-            .padding(.top, 10)
+            .padding(.top, compact ? 4 : 10)
         }
         .padding(.horizontal, 22)
         .padding(.top, 8)
         .padding(.bottom, 12)
-        .frame(maxWidth: 640, maxHeight: .infinity, alignment: .top)
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("RoomMenu")
     }
 
     @ViewBuilder private var botName: some View {
@@ -108,6 +125,20 @@ struct RoomMenu: View {
         } else {
             Text(bot.name).font(.subheadline).foregroundStyle(.white.opacity(0.7))
         }
+    }
+}
+
+struct RoomColumnMenuButton: View {
+    let open: Bool
+    let reduceMotion: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(open ? "Back to the room" : "Everything else", systemImage: open ? "xmark" : "line.3.horizontal")
+                .contentTransition(reduceMotion ? .opacity : .symbolEffect(.replace))
+        }
+        .accessibilityIdentifier(open ? "roomMenuClose" : "roomMenuButton")
     }
 }
 
@@ -184,12 +215,14 @@ struct RoomConversations: View {
     @EnvironmentObject private var app: AppModel
     @State private var starting = false
     @State private var showsEarlier = false
+    @State private var removed: Set<String> = []
+    @State private var deleting: BotConversation?
     @Environment(\.look) private var look
 
     private var view: BotThreadsView? { store.view(for: bot.id) }
 
     var body: some View {
-        let lines = BotShell.lines(view)
+        let lines = BotShell.lines(view).filter { !removed.contains($0.threadId) }
         let split = BotShell.splitWorkers(view?.workers ?? [])
         let today = split.done.filter { Calendar.current.isDateInToday(Date(timeIntervalSince1970: $0.updatedAt / 1000)) }
         let earlier = split.done.filter { !Calendar.current.isDateInToday(Date(timeIntervalSince1970: $0.updatedAt / 1000)) }
@@ -209,6 +242,8 @@ struct RoomConversations: View {
                     }
                     .tint(.primary)
                     .accessibilityIdentifier("roomConversation-\(line.threadId)")
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) { removeActions(line.threadId, swipe: true) }
+                    .contextMenu { removeActions(line.threadId, swipe: false) }
                 }
             }
             if !split.active.isEmpty {
@@ -258,11 +293,51 @@ struct RoomConversations: View {
                 .accessibilityLabel("New conversation")
                 .accessibilityIdentifier("roomNewConversation")
         })
+        .onChange(of: view?.conversations.map(\.threadId)) { _, ids in
+            removed.formIntersection(ids ?? [])
+        }
+        .alert(ConversationFinish.deleteTitle(deleting?.title ?? ""),
+               isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), presenting: deleting) { conversation in
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) { remove(conversation.threadId, delete: true) }
+                .accessibilityIdentifier("confirmDelete")
+        } message: { _ in
+            Text(ConversationFinish.deleteMessage)
+        }
         .sheet(isPresented: $starting) {
             NewConversationSheet(botName: bot.name) { text in
                 let id = try await BotShell.startConversation(text, bot: bot, view: view, client: app.client)
                 await store.refresh()
                 started(id)
+            }
+        }
+    }
+
+    @ViewBuilder private func removeActions(_ threadId: String, swipe: Bool) -> some View {
+        if let conversation = view?.conversations.first(where: { $0.threadId == threadId }), ConversationFinish.canRemove(conversation) {
+            Button { remove(threadId, delete: false) } label: { Label("Archive", systemImage: "archivebox") }
+                .tint(.indigo)
+                .accessibilityIdentifier("roomConversationArchive-\(threadId)")
+            Button(role: swipe ? nil : .destructive) { deleting = conversation } label: { Label("Delete", systemImage: "trash") }
+                .tint(.red)
+                .accessibilityIdentifier("roomConversationDelete-\(threadId)")
+        }
+    }
+
+    private func remove(_ threadId: String, delete: Bool) {
+        withAnimation(.snappy) { _ = removed.insert(threadId) }
+        let client = app.client
+        Task {
+            do {
+                if delete {
+                    try await client.delete(threadId, withChildren: true)
+                } else {
+                    try await client.finishConversation(threadId: threadId)
+                }
+                await store.refresh()
+            } catch {
+                withAnimation(.snappy) { _ = removed.remove(threadId) }
+                app.flash((delete ? "It didn't delete: " : "It didn't archive: ") + BBClient.describe(error, server: client.baseURL))
             }
         }
     }
