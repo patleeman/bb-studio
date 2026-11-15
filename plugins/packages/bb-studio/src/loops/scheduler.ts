@@ -1,7 +1,6 @@
 import type { Loop } from './contract';
 import { LoopStore, waitsForTrigger } from './store';
-import { isClosed, needsYou } from '../tasks/contract';
-import { inLoopView, toLoop } from '../tasks/views';
+import { isClosed } from '../tasks/contract';
 const OVERNIGHT_MS=24*3600000;
 export type Hold='budget'|'morning';
 const RANK={urgent:0,normal:1,low:2} as const;
@@ -23,16 +22,16 @@ export class LoopScheduler {
  private running=false;
  constructor(readonly store:LoopStore,readonly settings:()=>Settings,readonly post:(text:string)=>Promise<void>,readonly notify:(loop:Loop)=>Promise<void>){}
  fire(event:string){let matched=0;for(const l of this.store.all()){const t=l.trigger;if(!l.closedAt&&['queued','snoozed'].includes(l.status)&&((t.type==='event'&&t.event===event)||(t.type==='place'&&`place:${t.place}:${t.direction}`===event))){this.store.update(l.id,{trigger:{type:'time',at:Date.now()}});matched++;}}return {matched};}
- morning(options:{cards?:boolean}={}){const now=Date.now(),zone=this.settings().timeZone,date=local(now,zone).date;
+ morning(){const now=Date.now(),zone=this.settings().timeZone,date=local(now,zone).date;
  const moved=this.movedToYou(now-OVERNIGHT_MS);
  const open=this.store.all().filter(l=>!l.closedAt);
- const cards=options.cards?this.store.tasks.all().filter(t=>!inLoopView(t)&&needsYou(t)&&moved.has(t.id)).map(toLoop):[];
  const today=(l:Loop)=>l.owner==='patrick'&&(moved.has(l.id)||l.kind==='decide'||l.status==='surfaced'&&l.kind!=='waiting'||l.due!==null&&local(l.due,zone).date<=date);
- const items=[...open.filter(today),...cards].sort((a,b)=>RANK[a.priority]-RANK[b.priority]||Number(moved.has(b.id))-Number(moved.has(a.id))||(a.due??Infinity)-(b.due??Infinity));
+ const items=open.filter(today).sort((a,b)=>RANK[a.priority]-RANK[b.priority]||Number(moved.has(b.id))-Number(moved.has(a.id))||(a.due??Infinity)-(b.due??Infinity));
  return {date,items:items.slice(0,5),more:Math.max(0,items.length-5),lowPriority:open.filter(l=>l.priority==='low'&&l.status==='queued'),movedToYou:items.filter(l=>moved.has(l.id)).map(l=>l.id)};}
  /** Tasks handed to the user since `since` that are still theirs. */
  movedToYou(since:number):Set<string>{const rows=this.store.db.prepare("SELECT task_id AS id, data FROM task_events WHERE type='handed_off' AND at > ? ORDER BY seq").all(since) as {id:string;data:string}[];
- const ids=new Set<string>();for(const r of rows){try{if((JSON.parse(r.data) as {owner?:string}).owner==='patrick')ids.add(r.id);}catch{continue;}}
+ const last=new Map<string,boolean>();for(const r of rows){try{const d=JSON.parse(r.data) as {owner?:string;by?:string|null};if(d.owner==='patrick')last.set(r.id,d.by!=='patrick');}catch{continue;}}
+ const ids=new Set([...last].filter(([,byAgent])=>byAgent).map(([id])=>id));
  return new Set([...ids].filter(id=>{const t=this.store.tasks.find(id);return !!t&&t.owner==='patrick'&&!isClosed(t);}));}
  /** Whether `now` falls in quiet hours (they hold pushes, never cards). */
  quiet(now=Date.now()){const s=this.settings(),h=local(now,s.timeZone).hour;return s.quietStart>s.quietEnd?h>=s.quietStart||h<s.quietEnd:h>=s.quietStart&&h<s.quietEnd;}

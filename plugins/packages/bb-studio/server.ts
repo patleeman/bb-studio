@@ -1,5 +1,6 @@
 import { registerWorkCards, WORK_TOOLS } from "./src/work/register";
-import { registerUserTasks } from "./src/tasks/user";
+import { handedBy, registerUserTasks } from "./src/tasks/user";
+import { isClosed as isTaskClosed } from "./src/tasks/contract";
 import { registerTasks, TASK_TOOLS } from "./src/tasks/register";
 import { adoptAtStart } from "./src/tasks/migrate";
 import { withToolLabel } from "./src/tool-labels";
@@ -696,14 +697,20 @@ export default async function plugin(bb: BbPluginApi) {
   loopsEnabled = loops.enabled;
   const work = registerWorkCards(bb, db);
   registerTasks(bb, db, postToBot);
-  registerUserTasks(bb, db, {
+  const userTasks = registerUserTasks(bb, db, {
     post: postToBot,
     send: async (threadId, text) => { await bb.sdk.threads.send({threadId,mode:'auto',input:[{type:'text',text,mentions:[],visibility:'agent-only'}]} as never); },
     thread: async (threadId) => (await bb.sdk.threads.get({ threadId })) as never,
-    loopAct: (x) => loops.act(x),
+    loopAct: (x) => loops.actDirect(x),
     reopenLoop: (id) => loops.store.update(id, { status: 'surfaced' }),
     snoozeLoopUntil: (id, at) => loops.store.update(id, { status: 'snoozed', trigger: { type: 'time', at } }),
     held: () => loops.scheduler.held(),
+  });
+  loops.routeActs(async (x) => {
+    const task = loops.store.tasks.find(x.id);
+    if (!task || task.owner !== 'patrick' || isTaskClosed(task) || !handedBy(loops.store.history(x.id))) return null;
+    await userTasks.act({ id: x.id, action: x.action as 'choose' | 'done' | 'drop' | 'got_it', ...(x.option ? { option: x.option } : {}) });
+    return loops.store.get(x.id);
   });
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
   const runners: Runners = new Runners({

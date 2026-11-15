@@ -6,9 +6,9 @@ import { rpcContract as loopsContract } from "../loops/contract";
 import { registerWorkCards } from "../work/register";
 import { registerTasks } from "./register";
 import { tasksContract } from "./rpc-contract";
-import { markTasksUnavailable } from "./store";
+import { guardTasks, markTasksUnavailable } from "./store";
 import { handedBy, inFlightOrder, registerUserTasks } from "./user";
-import type { Task } from "./contract";
+import { isClosed, type Task } from "./contract";
 
 const NOW = new Date("2026-11-13T15:00:00Z").getTime();
 let db: Database.Database;
@@ -39,15 +39,21 @@ function setup({ sendFails = false } = {}) {
   const loops = registerLoops(bb as never, db, post, async () => {}, { get: async () => ({ loopsEnabled: false }), onChange: () => {} }, () => "UTC", () => {});
   registerWorkCards(bb as never, db, { read: async () => ({ rows: [] }), thread: async () => ({ status: "active" }) });
   const agent = registerTasks(bb as never, db, post);
-  const titles: Record<string, string> = { thr_worker: "Fix the flaky test", thr_lead: "Larkspur lead", thr_main: "Main" };
+  const titles: Record<string, string> = { thr_worker: "Fix the flaky test", thr_lead: "Larkspur lead", thr_main: "Main", thr_old: "Old worker" };
   const user = registerUserTasks(bb as never, db, {
     post,
     send: async (threadId, text) => { if (sendFails) throw new Error("thread is gone"); sent.push({ threadId, text }); },
-    thread: async (id) => (titles[id] ? { title: titles[id] } : null),
-    loopAct: (x) => loops.act(x),
+    thread: async (id) => (titles[id] ? { title: titles[id], archivedAt: id === "thr_old" ? NOW : null } : null),
+    loopAct: (x) => loops.actDirect(x),
     reopenLoop: (id) => loops.store.update(id, { status: "surfaced" }),
     snoozeLoopUntil: (id, at) => loops.store.update(id, { status: "snoozed", trigger: { type: "time", at } }),
     held: () => loops.scheduler.held(),
+  });
+  loops.routeActs(async (x) => {
+    const task = loops.store.tasks.find(x.id);
+    if (!task || task.owner !== "patrick" || isClosed(task) || !handedBy(loops.store.history(x.id))) return null;
+    await user.act({ id: x.id, action: x.action as "choose", ...(x.option ? { option: x.option } : {}) });
+    return loops.store.get(x.id);
   });
   const tool = async (name: string, input: unknown, threadId = "thr_worker") => JSON.parse(await tools[name]!.execute(input, { threadId }));
   return { handlers, tools, posts, sent, loops, agent, user, tool };
@@ -131,7 +137,7 @@ it("closes and reopens a work card's task, and won't snooze one", async () => {
   const id = made.id as string;
   await expect(handlers["tasks.act"]!({ id, action: "snooze", snooze: "tonight" })).rejects.toThrow(/own to-dos/);
   expect((await handlers["tasks.act"]!({ id, action: "done" })).task.state).toBe("done");
-  expect((await handlers["tasks.act"]!({ id, action: "reopen" })).task).toMatchObject({ state: "waiting", owner: "patrick" });
+  expect((await handlers["tasks.act"]!({ id, action: "reopen" })).task).toMatchObject({ state: "todo", owner: "patrick" });
   expect((await handlers["tasks.get"]!({ id })).todo).toBe(false);
 });
 
@@ -209,8 +215,9 @@ it("the morning list has the user's Today, decisions, due tasks and what was han
   expect(morning.items.map((l) => l.id)).not.toContain(later.id);
   expect(morning.movedToYou).toEqual([task.id]);
   const forAgent = JSON.parse(await tools.todos_morning!.execute({}, {}));
-  expect(forAgent.items.map((l: { id: string }) => l.id)).toEqual([task.id, card.id, today.id]);
-  expect(forAgent.movedToYou).toEqual([task.id, card.id]);
+  expect(forAgent.items.map((l: { id: string }) => l.id)).toEqual([task.id, today.id]);
+  expect(forAgent.items.map((l: { id: string }) => l.id).some((id: string) => id.startsWith("wc_"))).toBe(false);
+  expect(forAgent.movedToYou).toEqual([task.id]);
   vi.setSystemTime(NOW + 25 * 3_600_000);
   expect(loops.scheduler.morning().movedToYou).toEqual([]);
 });
@@ -247,4 +254,101 @@ it("records a Done line when an agent closes its own task", async () => {
   const view = await handlers["tasks.get"]!({ id: task.id });
   expect(view.history.map((e: { type: string }) => e.type)).toEqual(["created", "closed"]);
   expect(JSON.parse(view.history[1].data)).toMatchObject({ action: "done", by: "thread:thr_worker" });
+});
+
+it("handing on an agent's task tells the agent that had it to stop", async () => {
+  const { handlers, tool, sent, posts } = setup();
+  const { task } = await tool("task_create", { title: "Run the build", owner: "me" });
+  await handlers["tasks.act"]!({ id: task.id, action: "hand_off", to: "cos" });
+  expect(posts).toEqual([expect.stringMatching(/^The user handed you a task: "Run the build"/)]);
+  expect(sent).toEqual([{ threadId: "thr_worker", text: expect.stringMatching(/handed task "Run the build".* to the Bot\. Stop working on it/) }]);
+});
+
+it("handing on a question an agent asked tells that agent who has it now", async () => {
+  const { handlers, tool, sent } = setup();
+  const { task } = await tool("task_create", { title: "Pick a db", owner: "me" });
+  await tool("task_handoff", { id: task.id, to: "user", needs: "Which one?", options: ["A", "B"] });
+  await handlers["tasks.act"]!({ id: task.id, action: "hand_off", to: "thread:thr_lead" });
+  expect(sent.find((m) => m.threadId === "thr_worker")!.text).toMatch(/handed your question on task "Pick a db".* to the thread "Larkspur lead" \(thread:thr_lead\).*Don't wait/);
+  expect(sent.find((m) => m.threadId === "thr_lead")!.text).toMatch(/^The user handed you a task/);
+});
+
+it("after the user's own take-back, a choice doesn't go to the agent that last had it, and the morning list doesn't count it as handed over", async () => {
+  const { handlers, tool, sent, posts, loops } = setup();
+  const { task } = await tool("task_create", { title: "Pick a db", owner: "me" });
+  await tool("task_handoff", { id: task.id, to: "user", needs: "Which one?", options: ["A", "B"] });
+  await handlers["tasks.act"]!({ id: task.id, action: "hand_off", to: "cos" });
+  await handlers["tasks.act"]!({ id: task.id, action: "take_back" });
+  expect(handedBy((await handlers["tasks.get"]!({ id: task.id })).history)).toBeNull();
+  expect(loops.scheduler.morning().movedToYou).toEqual([]);
+  posts.length = 0; sent.length = 0;
+  const out = await handlers["tasks.act"]!({ id: task.id, action: "choose", option: "A" });
+  expect(out.task).toMatchObject({ owner: "patrick", state: "done" });
+  expect(posts.some((p) => /carry on with that choice/i.test(p))).toBe(false);
+});
+
+it("Done on an agent's task tells it; its later update keeps the task closed unless it reopens on purpose; Undo tells it again", async () => {
+  const { handlers, tool, sent } = setup();
+  const { task } = await tool("task_create", { title: "Draft the notes", owner: "me", card: true });
+  const done = await handlers["tasks.act"]!({ id: task.id, action: "done" });
+  expect(done.task).toMatchObject({ state: "done", closedBy: "patrick" });
+  expect(sent.at(-1)).toEqual({ threadId: "thr_worker", text: expect.stringMatching(/finished task "Draft the notes".*Stop working on it, and don't reopen it unless they ask\./) });
+  const kept = await tool("task_update", { id: task.id, state: "in_progress", line: "Still polishing" });
+  expect(kept).toMatchObject({ state: "done", progress: { line: "Still polishing" }, note: expect.stringMatching(/stays closed/) });
+  expect((await tool("task_update", { id: task.id, state: "in_progress", reopen: true })).state).toBe("in_progress");
+  await handlers["tasks.act"]!({ id: task.id, action: "drop" });
+  expect(sent.at(-1)!.text).toMatch(/^The user dismissed task/);
+  const undone = await handlers["tasks.act"]!({ id: task.id, action: "reopen" });
+  expect(undone.task.state).toBe("in_progress");
+  expect(sent.at(-1)!.text).toMatch(/^The user reopened task "Draft the notes"/);
+});
+
+it("a work card the user closed stays closed when the worker updates it", async () => {
+  const { handlers, tools } = setup();
+  const made = JSON.parse(await tools.work_card_create!.execute({ title: "Release 1.0.7", kind: "release" }, { threadId: "thr_main" }));
+  await handlers["tasks.act"]!({ id: made.id, action: "done" });
+  const card = JSON.parse(await tools.work_card_update!.execute({ id: made.id, state: "running", step: "5/5" }, { threadId: "thr_main" }));
+  expect(card).toMatchObject({ state: "done" });
+});
+
+it("a choice made on the phone or from a push goes back to the agent that asked, like the desktop's", async () => {
+  const { handlers, tool, sent } = setup();
+  const { task } = await tool("task_create", { title: "Pick a provider", owner: "me" });
+  await tool("task_handoff", { id: task.id, to: "user", options: ["Backblaze", "Wasabi"] });
+  const loop = await handlers["loops.act"]!({ id: task.id, action: "choose", option: "Wasabi" });
+  expect(loop).toMatchObject({ owner: "thread:thr_worker", status: "in_progress" });
+  expect(sent.at(-1)).toEqual({ threadId: "thr_worker", text: expect.stringMatching(/chose "Wasabi"/) });
+  const own = await handlers["loops.add"]!({ text: "Mine" });
+  expect(await handlers["loops.act"]!({ id: own.id, action: "done" })).toMatchObject({ status: "done" });
+});
+
+it("refuses a hand-off to a thread that is gone or archived, and leaves the owner as it was", async () => {
+  const { handlers } = setup();
+  const todo = await handlers["loops.add"]!({ text: "Look into it" });
+  await expect(handlers["tasks.act"]!({ id: todo.id, action: "hand_off", to: "thread:thr_old" })).rejects.toThrow(/gone or archived/);
+  await expect(handlers["tasks.act"]!({ id: todo.id, action: "hand_off", to: "thread:thr_missing" })).rejects.toThrow(/gone or archived/);
+  expect((await handlers["tasks.get"]!({ id: todo.id })).task.owner).toBe("patrick");
+});
+
+it("a bad history row doesn't break acting on the task", async () => {
+  const { handlers } = setup();
+  const todo = await handlers["loops.add"]!({ text: "Odd history" });
+  db.prepare("INSERT INTO task_events (task_id, type, at, data) VALUES (?, 'handed_off', ?, '{not json')").run(todo.id, NOW);
+  expect((await handlers["tasks.act"]!({ id: todo.id, action: "done" })).task.state).toBe("done");
+});
+
+it("Undo on a work card the user owned brings it back as To do, without an empty Needs you", async () => {
+  const { handlers, tools } = setup();
+  const made = JSON.parse(await tools.work_card_create!.execute({ title: "Approve", kind: "release", state: "needs-you", needs: "Approve" }, { threadId: "thr_main" }));
+  await handlers["tasks.act"]!({ id: made.id, action: "done" });
+  const back = await handlers["tasks.act"]!({ id: made.id, action: "reopen" });
+  expect(back.task).toMatchObject({ owner: "patrick", state: "todo", needs: null });
+});
+
+it("turns a runtime database error into a plain message for the UI and logs the database's own", async () => {
+  const log = vi.fn();
+  const failing = guardTasks(db, { boom: () => { const e = new Error("SQLITE_BUSY: database is locked"); e.name = "SqliteError"; throw e; }, other: async () => { throw new Error("Task x not found"); } }, false, log);
+  expect(() => failing.boom()).toThrow(/^Tasks couldn't be read or saved just now/);
+  expect(log).toHaveBeenCalledWith(expect.stringContaining("database is locked"));
+  await expect(failing.other()).rejects.toThrow("Task x not found");
 });

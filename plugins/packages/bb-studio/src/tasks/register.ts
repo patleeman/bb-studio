@@ -6,7 +6,7 @@ import { ownerText } from "../loops/reference";
 import { placeKey } from "../loops/store";
 import type { Loop } from "../loops/contract";
 import { directiveFor } from "../work/shared";
-import { createInput, handoffInput, isClosed, listInput, needsYou, updateInput, USER_OWNER, type Task, type TaskCreateInput, type TaskHandoffInput, type TaskListInput, type TaskUpdateInput } from "./contract";
+import { closedByUser, createInput, handoffInput, isClosed, listInput, needsYou, updateInput, USER_OWNER, type Task, type TaskCreateInput, type TaskHandoffInput, type TaskListInput, type TaskUpdateInput } from "./contract";
 import { guardTasks, surfaceForUser, TaskStore, toStoredOwner } from "./store";
 import { inLoopView, inWorkView } from "./views";
 
@@ -65,12 +65,14 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
     return { task: saved, ...(saved.card ? { directive: directiveFor(saved.id) } : {}), ...(posted ? { note: posted } : {}) };
   };
 
+  const before = (id: string) => store.get(id);
   const update = (input: TaskUpdateInput, ctx: Ctx = {}) => {
     const x = updateInput.parse(input);
     if (x.parentId !== undefined) checkParent(x.parentId, x.id);
     const trigger = checkTrigger(x.trigger);
-    return store.change(x.id, (t) => {
-      if (t.stale) { t.stale = false; if (x.state === undefined) t.state = "in_progress"; }
+    const kept = closedByUser(store.get(x.id)) && !x.reopen;
+    const task = store.change(x.id, (t) => {
+      if (t.stale && !kept) { t.stale = false; if (x.state === undefined) t.state = "in_progress"; }
       if (x.title !== undefined) t.title = x.title;
       if (x.why !== undefined) t.why = x.why;
       if (x.state !== undefined) t.state = x.state;
@@ -92,7 +94,9 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
       if (x.parentId !== undefined) t.parentId = x.parentId;
       if (x.schedule !== undefined) t.schedule = x.schedule;
       if (x.state !== undefined && !isClosed(t)) t.stale = false;
+      if (kept && !isClosed(t)) t.state = before(x.id).state;
     }, caller(ctx));
+    return kept && x.state !== undefined && !isClosed({ state: x.state }) ? { ...task, note: "The user closed this task, so it stays closed. Ask them before reopening it (then pass reopen: true)." } : task;
   };
 
   const get = (id: string) => {

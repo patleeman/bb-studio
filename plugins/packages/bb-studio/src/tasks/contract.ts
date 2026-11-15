@@ -20,6 +20,7 @@ const OWNER = /^(patrick|cos|thread:.+)$/;
 export const storedOwner = z.string().regex(OWNER);
 export const ownerInput = z.string().regex(/^(user|patrick|cos|me|thread:.+)$/).describe('"user" (the user), "cos" (the Bot), "me" (the calling thread) or "thread:<id>"');
 export const isClosed = (task: { state: TaskState }) => CLOSED_STATES.includes(task.state);
+export const closedByUser = (task: { state: TaskState; closedBy: string | null }) => isClosed(task) && task.closedBy === USER_OWNER;
 export const needsYou = (task: { owner: string; state: TaskState; kind: TaskKind }) => task.owner === USER_OWNER && task.state === "waiting" && task.kind !== "waiting-outside";
 
 const text = (max: number) => z.string().trim().max(max);
@@ -115,6 +116,7 @@ export const updateInput = z.object({
   id: z.string().min(1),
   title: text(500).min(1).optional(),
   state: z.enum(TASK_STATES).optional(),
+  reopen: z.boolean().optional().describe("Reopen a task the user closed; only when they asked for it"),
   conversation: z.string().min(1).nullable().optional(),
   ...fields,
 });

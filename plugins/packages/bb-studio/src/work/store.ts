@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { TaskStore } from "../tasks/store";
+import { closedByUser } from "../tasks/contract";
 import { agentOwner, applyWork, inWorkView, taskFromWork, toWork } from "../tasks/views";
 import { changes as changesSchema, createInput, isFinished, SHOW_FINISHED_MS, workCard, type CreateInput, type WorkCard, type WorkChanges } from "./contract";
 
@@ -40,8 +41,11 @@ export class WorkCardStore {
   }
 
   update(id: string, input: WorkChanges): WorkCard {
-    const x = changesSchema.parse(input);
+    const parsed = changesSchema.parse(input);
     const current = this.get(id);
+    const task = this.tasks.find(id);
+    const kept = !!task && closedByUser(task) && parsed.state !== undefined && !isFinished({ state: parsed.state });
+    const x = kept ? { ...parsed, state: undefined } : parsed;
     const empty = (value: string | null | undefined) => (value === undefined ? undefined : value || null);
     const next: WorkCard = {
       ...current,

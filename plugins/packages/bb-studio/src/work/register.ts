@@ -107,7 +107,7 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     "work.anchor": async ({ id, threadId, messageId }) => await place(store.anchor(id, threadId, messageId)),
     "work.dismiss": ({ id }) => store.dismiss(id),
     "work.clear": ({ threadId }) => ({ cleared: store.clearFinished(threadId) }),
-  }));
+  }, false, (message) => bb.log.warn(message)));
 
   bb.agents.registerTool({
     name: "work_card_create",

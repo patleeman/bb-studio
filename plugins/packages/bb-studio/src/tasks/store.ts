@@ -13,8 +13,21 @@ export function assertTasksReady(db: Database.Database, detail = true): void {
   if (reason) throw new Error(unavailableMessage(detail ? reason : undefined));
 }
 
-export function guardTasks<T extends Record<string, (...args: never[]) => unknown>>(db: Database.Database, handlers: T, detail = false): T {
-  return Object.fromEntries(Object.entries(handlers).map(([name, handler]) => [name, (...args: never[]) => { assertTasksReady(db, detail); return handler(...args); }])) as T;
+export const TASKS_FAILED = "Tasks couldn't be read or saved just now. Try again; if it keeps happening, restart BB Studio.";
+const isDatabaseError = (error: unknown) => error instanceof Error && (error.name === "SqliteError" || /^SQLITE_/.test(String((error as { code?: unknown }).code ?? "")));
+
+export function guardTasks<T extends Record<string, (...args: never[]) => unknown>>(db: Database.Database, handlers: T, detail = false, log?: (message: string) => void): T {
+  const clean = (name: string, error: unknown): never => {
+    if (detail || !isDatabaseError(error)) throw error;
+    log?.(`Tasks: ${name} failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(TASKS_FAILED);
+  };
+  return Object.fromEntries(Object.entries(handlers).map(([name, handler]) => [name, (...args: never[]) => {
+    assertTasksReady(db, detail);
+    let out: unknown;
+    try { out = handler(...args); } catch (error) { return clean(name, error); }
+    return out instanceof Promise ? out.catch((error: unknown) => clean(name, error)) : out;
+  }])) as T;
 }
 
 export function surfaceForUser(t: Task): void {

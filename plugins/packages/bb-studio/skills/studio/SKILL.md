@@ -214,6 +214,11 @@ job, keep it updated, and hand it over instead of posting status messages.
   `needs`, give `options` for a decision) or to the Bot or a thread. When the
   user hands a task to you, you get a message with it; when they choose an
   option on a task you handed them, it comes back to you with their choice.
+- When the user closes a task you own, you are told; stop work on it. Your
+  later `task_update` is kept in its history but the task stays closed; pass
+  `reopen: true` only when the user asked you to reopen it. When they hand it
+  to someone else or take it back (it goes to their Today at once, even with a
+  time still ahead), you are told to stop too.
 - `::loop{id="…"}` and `::work{id="…"}` both draw the same task card; a
   morning row is `::loop{id="…" row="N"}`.
 - The older names keep working: `todos_*` and `loops_*` for the user's tasks,
