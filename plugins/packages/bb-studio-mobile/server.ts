@@ -31,7 +31,8 @@ import {
   type ExpoTicket,
 } from "./apns.js";
 import { CLEAR_BATCH, clearPayload, keptWorkers, noteNotified, noteWorkers, partition, type Notified, type NotifiedWorkers, type ThreadReadState } from "./clear.js";
-import { isQuietCompletion } from "./notifications.js";
+import { isQuietCompletion, triggerOf, turnPushAllowed, type TurnTrigger } from "./notifications.js";
+import { collapseIdFor, PushWindows, summaryBody, windowKey } from "./push-window.js";
 import { StudioApprovals } from "./studio-approvals.js";
 import { activityTokenSchema, botIdSchema, deviceIdSchema, liveActivityPayload, liveActivityPriority, liveActivityPushSchema, LiveActivityTokens, MOBILE_MIGRATIONS, tokenKindSchema } from "./live-activities.js";
 import { describeMobileMigration, LEGACY_KEY_PATH_KEY, LEGACY_MOBILE_SETTINGS, migrateMobileSettings, MOBILE_MIGRATED_KEY, MOBILE_SETTINGS, mobileConstants } from "./settings.js";
@@ -296,13 +297,56 @@ export default async function plugin(bb: BbPluginApi) {
     return studioApprovals.reached(interactionId, message.to);
   }
 
-  async function deliver(messages: ExpoMessage[]): Promise<ExpoTicket[]> {
+  type EventRow = { type?: string; turnId?: string | null; scope?: { turnId?: string | null } | null; data?: Record<string, unknown> };
+  const turnOf = (event: EventRow) => event.scope?.turnId ?? event.turnId ?? null;
+  /** The thread's latest turn: what started it and its final reply. Null when BB's events can't tell. */
+  async function latestTurn(threadId: string): Promise<{ trigger: TurnTrigger; reply: string | null } | null> {
+    try {
+      const list = (types: string[], limit: number) => bb.sdk.threads.events.list({ threadId, types, order: "desc", limit: String(limit) } as never) as Promise<EventRow[]>;
+      const [started] = await list(["turn/started"], 1);
+      const turnId = started ? turnOf(started) : null;
+      if (!turnId) return null;
+      const [accepted, requested, completed] = await Promise.all([list(["turn/input/accepted"], 5), list(["client/turn/requested"], 20), list(["item/completed"], 100)]);
+      const requestId = accepted.find((event) => turnOf(event) === turnId)?.data?.clientRequestId;
+      const request = typeof requestId === "string" ? requested.find((event) => event.data?.requestId === requestId) : undefined;
+      if (typeof requestId === "string" && !request) return null;
+      const items = completed.filter((event) => turnOf(event) === turnId);
+      const message = items.map((event) => event.data?.item as { type?: string; text?: string } | undefined).find((item) => item?.type === "agentMessage");
+      if (!message && completed.length >= 100 && items.length === completed.length) return null;
+      const reply = typeof message?.text === "string" && message.text.trim() !== "" ? message.text : null;
+      return { trigger: triggerOf(request?.data ?? null), reply };
+    } catch {
+      return null;
+    }
+  }
+
+  /** BB's own push for a finished turn (push-notifications: it has a subscription), checked against the turn it is about. */
+  async function quietTurn(message: ExpoMessage, turns: Map<string, Promise<boolean>>): Promise<boolean> {
+    const data = message.data;
+    if (data?.kind !== "turn-finished" || typeof data.subscriptionId !== "string" || typeof data.threadId !== "string" || data.botId !== undefined) return false;
+    const threadId = data.threadId;
+    if (!turns.has(threadId)) turns.set(threadId, latestTurn(threadId).then((turn) => turn !== null && !turnPushAllowed(turn)));
+    return turns.get(threadId)!;
+  }
+
+  const windows = new PushWindows(async ({ key, messages, shown, held, since }) => {
+    const thread = await bb.sdk.threads.get({ threadId: key }).catch(() => null);
+    const lastReadAt = thread?.lastReadAt ?? 0;
+    if (thread && lastReadAt >= thread.latestAttentionAt) return false;
+    const count = thread && lastReadAt >= since ? held : shown;
+    const tickets = await deliver(messages.map((message) => ({ ...message, body: summaryBody(message.body, count), collapseId: collapseIdFor(key) })), { windowed: false });
+    return tickets.some((ticket) => ticket.status === "ok");
+  });
+  bb.onDispose(() => windows.dispose());
+
+  async function deliver(messages: ExpoMessage[], options: { windowed?: boolean } = {}): Promise<ExpoTicket[]> {
     const tickets: ExpoTicket[] = new Array(messages.length);
     const expoIndexes: number[] = [];
     const apnsIndexes: number[] = [];
     const lookups: Lookups = new Map();
     const owners = new Map<string, Promise<boolean>>();
-    const studios = await Promise.all(messages.map((message) => isQuietCompletion(message) ? true : sentByStudio(message, lookups, owners)));
+    const turns = new Map<string, Promise<boolean>>();
+    const studios = await Promise.all(messages.map(async (message) => isQuietCompletion(message) || await quietTurn(message, turns) || await sentByStudio(message, lookups, owners)));
     messages.forEach((message, index) => {
       if (studios[index]) {
         tickets[index] = { status: "ok" };
@@ -322,6 +366,24 @@ export default async function plugin(bb: BbPluginApi) {
           apnsIndexes.splice(position, 1);
         }
       }
+    }
+
+    // One reply push per conversation per window (push-window.ts); the rest wait and go out as one.
+    if (options.windowed !== false && apnsIndexes.length > 0) {
+      const byKey = new Map<string, number[]>();
+      for (const index of apnsIndexes) {
+        const key = windowKey(messages[index]!);
+        if (key) byKey.set(key, [...(byKey.get(key) ?? []), index]);
+      }
+      const held = new Set<number>();
+      for (const [key, indexes] of byKey) {
+        if (windows.offer(key, indexes.map((index) => messages[index]!))) {
+          for (const index of indexes) messages[index] = { ...messages[index]!, collapseId: collapseIdFor(key) };
+        } else {
+          for (const index of indexes) { held.add(index); tickets[index] = { status: "ok" }; }
+        }
+      }
+      if (held.size > 0) apnsIndexes.splice(0, apnsIndexes.length, ...apnsIndexes.filter((index) => !held.has(index)));
     }
 
     if (apnsIndexes.length > 0) {

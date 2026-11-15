@@ -18,6 +18,8 @@ import { createSkillsRegistryGate } from "./src/skills-registry";
 import { skillsRegistryContract } from "./src/skills-registry-contract";
 import { hostApproval } from "./src/kit/host-approval";
 import { registerQuietTurnClassifier } from "./src/kit/quiet-turns";
+import { quietByDefault, repliesAllowed } from "./src/push-levels";
+import { MainPushes } from "./src/main-push";
 import { registerDecisions } from "./src/decisions/server";
 import { BotMaintenance } from "./src/bot-maintenance";
 import { registerChat } from "./src/chat/server";
@@ -179,6 +181,8 @@ import { backupFileName, registerBackup } from "./src/backup/register";
 import { readFile as readTextFile, stat as statPath } from "node:fs/promises";
 import { isAbsolute, resolve as resolvePath } from "node:path";
 import { registerDesktopToolsIfEnabled } from "./src/desktop/server";
+
+const WORKER_LEVELS_KEY = "push-levels:workers-input-only";
 
 /** How often Studio re-checks plugin health on its own. */
 const HEALTH_INTERVAL_MS = 3 * 60_000;
@@ -1015,6 +1019,7 @@ export default async function plugin(bb: BbPluginApi) {
     botSignal.add(changes);
   };
   const threadSeeds = new ThreadSeeds(db);
+  const pushRpc = (call: Parameters<typeof bb.sdk.plugins.callRpc>[0]) => bb.sdk.plugins.callRpc(call);
   const botThreads = registerBotThreads(bb, db, {
     bots: () => bots.list().map((bot) => ({ id: bot.id, name: bot.name, avatar: bot.avatar, shape: bot.shape ?? null, color: bot.color ?? null, primary: !!bot.primary, threadId: bot.threadId, appearance: bot.appearance ?? null, presence: bots.presenceOf(bot.id) })),
     signals: () => ({
@@ -1033,6 +1038,8 @@ export default async function plugin(bb: BbPluginApi) {
     botItems: () => new Map(bots.list().flatMap((bot) => (bot.memoryPageId ? [[`pages:${bot.memoryPageId}`, bot.id] as const] : []))),
     // Many events in a row reload open views once.
     changed: botThreadsChanged,
+    // A Bot's new lead, runner or agent thread pushes only questions and errors (src/push-levels.ts).
+    becameWorker: (threadId) => void quietByDefault(pushRpc, [threadId]).catch(() => null),
     log: (message) => bb.log.warn(message),
     actingBot: async (threadId) => (await acting(threadId))?.botId ?? null,
     // Where BB forked a thread: the fork's `experimental_threadForkPoint`, read by name as src/kit/quiet-turns.ts reads its hooks.
@@ -1044,6 +1051,27 @@ export default async function plugin(bb: BbPluginApi) {
     seeds: threadSeeds,
     defaultModel: (botId) => bots.defaultModel(botId),
   });
+  // Workers from before that default get it once, after the first classification settles.
+  const quietWorkersOnce = setTimeout(() => void (async () => {
+    if (await bb.storage.kv.get(WORKER_LEVELS_KEY)) return;
+    const set = await quietByDefault(pushRpc, botThreads.store.listed().flatMap((rec) => (rec.kind === "worker" ? [rec.threadId] : [])));
+    if (set === null) return;
+    await bb.storage.kv.set(WORKER_LEVELS_KEY, { at: Date.now(), set: set.length });
+  })().catch((error) => bb.log.warn(`Worker push levels: ${errorText(error)}`)), 60_000);
+  quietWorkersOnce.unref?.();
+  bb.onDispose(() => clearTimeout(quietWorkersOnce));
+  // Main is hidden, so BB never pushes it: Studio pushes its replies meant for the user (src/main-push.ts).
+  const mainPushes = new MainPushes({
+    mainOf: (threadId) => { const bot = bots.list().find((each) => each.threadId === threadId); return bot ? { botId: bot.id, name: bot.name } : null; },
+    thread: (threadId) => bb.sdk.threads.get({ threadId }).catch(() => null),
+    lastRequest: async (threadId) => ((await bb.sdk.threads.events.list({ threadId, types: ["client/turn/requested"], order: "desc", limit: "1" } as never)) as { data?: unknown }[])[0]?.data ?? null,
+    allowed: (threadId) => repliesAllowed(pushRpc, threadId),
+    notify: async (input) => { await bb.sdk.plugins.callRpc({ pluginId: "mobile", method: "notify", outputSchema: z.unknown(), input: input as never }); },
+    defaultProjectId: PERSONAL_PROJECT_ID,
+    log: (message) => bb.log.warn(message),
+  });
+  bb.onDispose(() => mainPushes.dispose());
+  bb.events.on("thread.idle", (event) => mainPushes.idle(event));
   registerContinueNew(bb, {
     conversation: (threadId) => { const rec = botThreads.store.get(threadId); return rec ? { botId: rec.botId, kind: rec.kind, isMain: rec.isMain, title: rec.title } : null; },
     thread: async (threadId) => await bb.sdk.threads.get({ threadId }).catch(() => null) as { projectId?: string | null; environmentId?: string | null; providerId?: string | null; model?: string | null } | null,

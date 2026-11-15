@@ -44,8 +44,23 @@ Copies that can't import the kit say so and are tested against it:
   directives only render `::name` blocks inside a message, so nothing can
   hide or restyle a whole assistant message: a `[PASS]` shows as text.
 
-## What BB does not do yet
+## What BB does with it
 
-BB itself still treats `[PASS]` as a normal reply: it posts the parent's
-"child completed" notice, sends its own push and marks the thread unread. See
-`docs/drafts/bb-issue-pass-output.md`.
+On the BB Studio fork, Studio registers `isPassOutput` as BB's turn
+classifier, so a `[PASS]` turn raises no unread mark, parent notice or push.
+On a BB without that hook, BB still treats `[PASS]` as a normal reply and
+Studio Mobile drops the push. See `docs/drafts/bb-issue-pass-output.md`.
+
+## Phone pushes for a Bot
+
+- **Main** is hidden, so BB never pushes it. Studio pushes Main's replies
+  meant for the user (a real message, a work card or loop, the morning card)
+  through Studio Mobile, unless Main's own BB level is input-only or muted.
+  It sends none for `[PASS]`, an approval card alone, a cache keepalive, or a
+  reply the user already read.
+- **Workers** (leads, runners, agents' threads) are set to BB's input-only
+  level when Studio records them, on the thread itself, so the global and
+  worker defaults can stay "All activity". A level the user set stays.
+  Studio sets it once on the workers that existed before.
+- Studio Mobile drops BB's push for a keepalive or a silent relayed turn, and
+  sends at most one reply push per conversation every 3 minutes.
