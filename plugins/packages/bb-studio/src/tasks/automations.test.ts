@@ -607,3 +607,24 @@ it("QA: a finding's title follows its latest text; a replayed run adds nothing; 
   tasks.watcherRun("aut_silent", "[warn] Cert expires in 1 days", null, NOW + 5 * HOUR);
   expect(store.get("task_auto-aut-silent").automation!.severity).toBe("warn");
 });
+
+it("live recheck: after a critical finding pushed the user's task, the Bot marking it urgent with push doesn't push it again", async () => {
+  seed();
+  const pushes: string[] = [];
+  const { store, tasks, tool } = setup({ push: async (task) => { pushes.push(task.id); } });
+  tasks.watcherRun("aut_silent", "[warn] Disk 91% full", null, NOW);
+  const [disk] = children(store, "aut_silent");
+  await tool("task_handoff", { id: disk!.id, to: "user", needs: "Free some space" }, "thr_main");
+  tasks.watcherRun("aut_silent", "[critical] Disk 99% full", null, NOW + HOUR);
+  expect(pushes).toEqual([disk!.id]);
+  await tool("task_update", { id: disk!.id, priority: "urgent", push: true }, "thr_main");
+  const { LoopStore } = await import("../loops/store");
+  const { LoopScheduler } = await import("../loops/scheduler");
+  const notify = vi.fn(async () => {});
+  const scheduler = new LoopScheduler(new LoopStore(db), () => ({ enabled: true, timeZone: "UTC", budget: 5, quietStart: 22, quietEnd: 7, morning: 8 }) as never, async () => {}, notify);
+  await scheduler.tick();
+  expect(notify).not.toHaveBeenCalled();
+  const fresh = (await tool("task_create", { title: "Pay rent", owner: "user", push: true, priority: "urgent" }, "thr_main")).task;
+  await scheduler.tick();
+  expect(notify.mock.calls.map((c) => (c as unknown as [{ id: string }])[0].id)).toEqual([fresh.id]);
+});
