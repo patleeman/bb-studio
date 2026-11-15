@@ -10,8 +10,8 @@ import { LoopScheduler } from "../loops/scheduler";
 import { registerWorkCards } from "../work/register";
 import { WORK_ID } from "../work/shared";
 import { WorkCardStore } from "../work/store";
-import { task as taskSchema, type Task } from "./contract";
-import { backupPath, KEEP_BACKUPS, migrateToTasks, summarizeTaskMigration, verifyTaskMigration } from "./migrate";
+import { task as taskSchema, TODO_ID, type Task } from "./contract";
+import { adoptAtStart, backupPath, KEEP_BACKUPS, migrateToTasks, summarizeTaskMigration, verifyTaskMigration } from "./migrate";
 import { registerTasks, TASK_TOOLS } from "./register";
 import { markTasksUnavailable, normalizeTask, TaskStore } from "./store";
 import { applyLoop, applyWork, taskFromLoop, taskFromWork, toLoop, toWork } from "./views";
@@ -131,7 +131,7 @@ it("models subtasks: children under a parent, and no cycles", async () => {
   const child = (await call("task_create", { title: "Run 1", owner: "cos", parentId: parent.id })).task;
   expect(parent.schedule).toEqual({ text: "Mondays at 9", cron: "0 9 * * 1", timeZone: null, automationId: null, paused: false });
   expect((await call("task_get", { id: parent.id })).children).toEqual([{ id: child.id, title: "Run 1", owner: "cos", state: "in_progress" }]);
-  expect((await call("task_update", { id: parent.id, parentId: child.id })).error).toMatch(/own parent/);
+  expect((await call("task_update", { id: parent.id, parentId: child.id })).error).toMatch(/own subtasks/);
   expect((await call("task_list", { parentId: parent.id })).tasks.map((t: Task) => t.id)).toEqual([child.id]);
 });
 
@@ -461,7 +461,7 @@ it("adopts even when the backup fails, says why, and leaves the file in the way 
   file.close();
 });
 
-it("keeps only the newest backups", () => {
+it("keeps the first backup and the two newest", () => {
   dir = mkdtempSync(join(tmpdir(), "tasks-prune-"));
   const path = join(dir, "data.db");
   const older = [1, 2, 3, 4].map((day) => backupPath(path, NOW - day * 86400000));
@@ -473,7 +473,57 @@ it("keeps only the newest backups", () => {
   const report = migrateToTasks(file);
   const left = readdirSync(dir).filter((name) => name.includes("before-tasks")).sort();
   expect(left).toHaveLength(KEEP_BACKUPS);
-  expect(left).toEqual([older[1], older[0], report.backup].map((p) => p!.slice(dir!.length + 1)).sort());
+  expect(left).toEqual([older[3], older[0], report.backup].map((p) => p!.slice(dir!.length + 1)).sort());
   expect(existsSync(join(dir, "data.other.db"))).toBe(true);
   file.close();
+});
+
+it.each([
+  ["every row", "BEFORE INSERT ON tasks BEGIN SELECT RAISE(ABORT, 'database or disk is full'); END"],
+  ["some rows", "BEFORE INSERT ON tasks WHEN NEW.id IN ('loop_c', 'wc_done') BEGIN SELECT RAISE(ABORT, 'database or disk is full'); END"],
+])("when %s can't be written: adopts nothing, takes no backup, and shows the error until a start succeeds", async (_case, trigger) => {
+  dir = mkdtempSync(join(tmpdir(), "tasks-fail-"));
+  const path = join(dir, "data.db");
+  const file = new Database(path);
+  migrate(file);
+  legacy(file);
+  file.exec(`CREATE TRIGGER tasks_full ${trigger}`);
+  const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+  expect(adoptAtStart(file, log)).toBeNull();
+  expect(log.error).toHaveBeenCalledWith(expect.stringMatching(/adopting todos and work cards failed.*disk is full/));
+  expect(file.prepare("SELECT (SELECT count(*) FROM tasks) + (SELECT count(*) FROM task_legacy) + (SELECT count(*) FROM task_events) AS n").get()).toEqual({ n: 0 });
+  expect(readdirSync(dir).filter((name) => name.includes("before-tasks"))).toEqual([]);
+  const { bb, handlers } = fakeBb();
+  registerLoops(bb as never, file, async () => {}, async () => {}, { get: async () => ({}), onChange: () => {} }, () => "UTC", () => {});
+  registerWorkCards(bb as never, file, { read: async () => ({ rows: [] }) });
+  await expect(Promise.resolve().then(() => handlers["loops.list"]!({}))).rejects.toThrow(/could not be moved to tasks.*database or disk is full/);
+  await expect(Promise.resolve().then(() => handlers["work.list"]!({ threadId: "thr_lead" }))).rejects.toThrow(/could not be moved to tasks/);
+  expect(adoptAtStart(file, log)).toBeNull();
+  expect(readdirSync(dir).filter((name) => name.includes("before-tasks"))).toEqual([]);
+  file.exec("DROP TRIGGER tasks_full");
+  const fixed = new Database(path);
+  const moved = adoptAtStart(fixed, log);
+  expect(moved).toMatchObject({ adopted: { loops: 8, cards: 7, events: 3 } });
+  expect(moved!.backup).not.toBeNull();
+  expect(verifyTaskMigration(fixed).filter((p) => p.id !== "loop_broken")).toEqual([]);
+  fixed.close();
+  file.close();
+});
+
+it("lists a task for the user in the morning card with an id its card draws", async () => {
+  const { call, loops } = setup();
+  const { task } = await call("task_create", { title: "Sign the lease", owner: "user", due: NOW });
+  const morning = new LoopScheduler(loops.store, () => ({ enabled: true, timeZone: "UTC", dailyBudget: 5, quietStart: 22, quietEnd: 7 }), async () => {}, async () => {}).morning();
+  expect(morning.items.map((l) => l.id)).toEqual([task.id]);
+  expect(TODO_ID.test(task.id)).toBe(true);
+  expect(TODO_ID.test("loop_reminder_aut_1")).toBe(true);
+  expect(TODO_ID.test("wc_1")).toBe(false);
+});
+
+it("names a deeper cycle as one", async () => {
+  const { call } = setup();
+  const top = (await call("task_create", { title: "Top", owner: "cos" })).task;
+  const sub = (await call("task_create", { title: "Sub", owner: "cos", parentId: top.id })).task;
+  expect((await call("task_update", { id: top.id, parentId: top.id })).error).toMatch(/its own parent/);
+  expect((await call("task_update", { id: top.id, parentId: sub.id })).error).toMatch(/own subtasks/);
 });

@@ -9,6 +9,7 @@ export const TASK_ORIGINS = ["loop", "work", "task"] as const;
 export const PRIORITIES = ["urgent", "normal", "low"] as const;
 export const USER_OWNER = "patrick";
 export const TASK_ID = /^task_[A-Za-z0-9-]{1,80}$/;
+export const TODO_ID = /^(loop|task)_[A-Za-z0-9_-]{1,120}$/;
 export const TASKS_UNAVAILABLE = "Todos and work cards could not be moved to tasks";
 export const unavailableMessage = (reason: string) => `${TASKS_UNAVAILABLE}, so they can't be shown: ${reason}. Nothing was lost. Restart BB Studio to try again.`;
 

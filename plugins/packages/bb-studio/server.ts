@@ -1,7 +1,6 @@
 import { registerWorkCards, WORK_TOOLS } from "./src/work/register";
 import { registerTasks, TASK_TOOLS } from "./src/tasks/register";
-import { migrateToTasks } from "./src/tasks/migrate";
-import { markTasksUnavailable } from "./src/tasks/store";
+import { adoptAtStart } from "./src/tasks/migrate";
 import { withToolLabel } from "./src/tool-labels";
 import { CONTINUE_TOOL, registerContinueNew } from "./src/continue-new";
 import { runWorkCli } from "./src/work/cli";
@@ -204,16 +203,7 @@ export default async function plugin(bb: BbPluginApi) {
   };
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
-  try {
-    const moved = migrateToTasks(db);
-    if (moved.adopted.loops || moved.adopted.cards) bb.log.info(`Tasks: adopted ${moved.adopted.loops} todo(s) and ${moved.adopted.cards} work card(s); backup at ${moved.backup ?? "none"}.`);
-    if (moved.backupError) bb.log.warn(`Tasks: the backup before adopting failed (${moved.backupError}); adopted anyway, the old tables are untouched.`);
-    for (const skipped of moved.skipped) bb.log.warn(`Tasks: ${skipped.source} ${skipped.id} was not adopted: ${skipped.reason}`);
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    markTasksUnavailable(db, reason);
-    bb.log.error(`Tasks: adopting todos and work cards failed; Todos and In flight show an error until the next start retries: ${reason}`);
-  }
+  adoptAtStart(db, bb.log);
   const themes = new ThemeStore(db);
   // Pages and Apps: the item index (src/item-index.ts). Triggers keep it in
   // step; this check puts right whatever one missed, before anything reads it.

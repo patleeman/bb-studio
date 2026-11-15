@@ -226,6 +226,22 @@ it("Clear done takes every finished row off the list at once and asks the server
   expect(q('[data-testid="in-flight-clear"]')).toBeNull();
 });
 
+it("shows a cleared card again once it comes back changed: reopened, or handed to the user", async () => {
+  state.list = many();
+  await renderList();
+  await act(async () => q('[data-testid="in-flight-clear"]')!.click());
+  state.list = many();
+  await renderList();
+  expect(rows().map((row) => row.title)).toEqual(["Live one", "Live two"]);
+  expect(q('[data-testid="in-flight-needs"]')!.textContent).toBe("1 needs you");
+  const live = many().filter((c) => c.state !== "done" && c.state !== "failed");
+  const d1 = many().find((c) => c.id === "wc_d1")!, d2 = many().find((c) => c.id === "wc_d2")!;
+  state.list = [...live, { ...d1, state: "running", finishedAt: null, updatedAt: NOW + 5_000 }, { ...d2, state: "needs-you", needs: "Look", finishedAt: null, updatedAt: NOW + 6_000 }];
+  await renderList();
+  expect(rows().map((row) => row.title).sort()).toEqual(["Done one", "Done two", "Live one", "Live two"]);
+  expect(q('[data-testid="in-flight-needs"]')!.textContent).toBe("2 need you");
+});
+
 it("puts the rows back when clearing fails", async () => {
   state.list = many();
   state.call.mockRejectedValueOnce(new Error("offline"));

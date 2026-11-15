@@ -28,7 +28,7 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
   const checkParent = (id: string | null | undefined, self?: string) => {
     if (!id) return;
     for (let at: string | null = id, depth = 0; at; depth++) {
-      if (at === self) throw new Error("A task can't be its own parent.");
+      if (at === self) throw new Error(depth === 0 ? "A task can't be its own parent." : "That parent is one of this task's own subtasks.");
       if (depth > 20) throw new Error("Subtasks go at most 20 levels deep.");
       at = store.get(at).parentId;
     }

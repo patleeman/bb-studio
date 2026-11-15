@@ -13,12 +13,13 @@ import { Icon, cn } from "../../kit/ui/index";
 import { remember } from "../../kit/app/index";
 import { CHAT_CARD, CHAT_CARD_ACTION, CHAT_CARD_BODY, CHAT_CARD_HEAD, CHAT_CARD_ICON_BUTTON, CHAT_CARD_SKELETON, ChatCard, ChatCardHeader } from "../../kit/app/chat-card";
 import { useLive } from "../../ui/live";
+import { TODO_ID } from "../../tasks/contract";
 import type { Loop } from "../contract";
 import { CARD_BUTTON, CARD_GHOST, CARD_PRIMARY, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu } from "./LoopMenus";
 import { closedVerb, dueLabel, elapsed, INLINE_OPTIONS, KIND, lastEvent, ownerName, ownerThread, releaseLabel, safeUrl, shortWhen, sourceText, type OwnerInfo } from "./model";
 import { useLoopActions, useLoopPeople, useOpenLoopsPane, useTodosZone, type LoopPeople } from "./hooks";
 
-export const isLoopId = (id: string) => /^loop_[A-Za-z0-9-]{1,80}$/.test(id);
+export const isLoopId = (id: string) => TODO_ID.test(id);
 
 type History = { type: string; at: number; data: string }[];
 type LoopView = { loop: Loop; history: History; owner?: OwnerInfo };

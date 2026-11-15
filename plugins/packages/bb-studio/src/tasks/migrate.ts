@@ -4,7 +4,7 @@ import { basename, dirname, extname, join } from "node:path";
 import { loop as loopSchema } from "../loops/contract";
 import { workCard as workSchema } from "../work/contract";
 import { needsYou } from "./contract";
-import { TaskStore } from "./store";
+import { markTasksUnavailable, TaskStore } from "./store";
 import { taskFromLoop, taskFromWork, toLoop, toWork } from "./views";
 
 type Legacy = { id: string; record: string };
@@ -53,9 +53,45 @@ export const KEEP_BACKUPS = 3;
 export function pruneBackups(file: string, keep = KEEP_BACKUPS): string[] {
   const ext = extname(file);
   const prefix = `${basename(file, ext)}.before-tasks-`;
-  const old = readdirSync(dirname(file)).filter((name) => name.startsWith(prefix) && name.endsWith(ext || ".db")).sort().reverse().slice(keep);
+  const all = readdirSync(dirname(file)).filter((name) => name.startsWith(prefix) && name.endsWith(ext || ".db")).sort();
+  const old = all.length > keep ? all.slice(1, all.length - (keep - 1)) : [];
   for (const name of old) rmSync(join(dirname(file), name), { force: true });
   return old;
+}
+
+type Readable<T> = { row: Legacy; record: T };
+
+function sortRows<T extends { id: string }>(rows: Legacy[], schema: { parse(value: unknown): T }, source: "loop" | "work", skipped: MigrationProblem[]): Readable<T>[] {
+  const out: Readable<T>[] = [];
+  for (const row of rows) {
+    try {
+      const record = schema.parse(JSON.parse(row.record));
+      if (record.id !== row.id) throw new Error(`record id ${record.id} differs from row id`);
+      out.push({ row, record });
+    } catch (error) {
+      skipped.push({ id: row.id, source, reason: message(error) });
+    }
+  }
+  return out;
+}
+
+class Rehearsal extends Error {}
+
+type Log = { info(message: string): void; warn(message: string): void; error(message: string): void };
+
+export function adoptAtStart(db: Database.Database, log: Log): TaskMigrationReport | null {
+  try {
+    const moved = migrateToTasks(db);
+    if (moved.adopted.loops || moved.adopted.cards) log.info(`Tasks: adopted ${moved.adopted.loops} todo(s) and ${moved.adopted.cards} work card(s); backup at ${moved.backup ?? "none"}.`);
+    if (moved.backupError) log.warn(`Tasks: the backup before adopting failed (${moved.backupError}); adopted anyway, the old tables are untouched.`);
+    for (const skipped of moved.skipped) log.warn(`Tasks: ${skipped.source} ${skipped.id} does not read as one and was not adopted: ${skipped.reason}`);
+    return moved;
+  } catch (error) {
+    const reason = message(error);
+    markTasksUnavailable(db, reason);
+    log.error(`Tasks: adopting todos and work cards failed; Todos and In flight show an error until the next start retries: ${reason}`);
+    return null;
+  }
 }
 
 export function migrateToTasks(db: Database.Database, options: { backup?: boolean; now?: () => number } = {}): TaskMigrationReport {
@@ -65,12 +101,40 @@ export function migrateToTasks(db: Database.Database, options: { backup?: boolea
   if (hasTable(db, "loop_events") && hasTable(db, "bot_loops")) {
     report.orphanEvents = (db.prepare("SELECT count(*) AS n FROM loop_events WHERE loop_id NOT IN (SELECT id FROM bot_loops)").get() as { n: number }).n;
   }
-  const readable = (rows: Legacy[], schema: { parse(value: unknown): { id: string } }) => rows.some((row) => { try { return schema.parse(JSON.parse(row.record)).id === row.id; } catch { return false; } });
-  if (!readable(todo.loops, loopSchema) && !readable(todo.cards, workSchema)) {
-    for (const row of todo.loops) report.skipped.push({ id: row.id, source: "loop", reason: "the record does not read as a todo" });
-    for (const row of todo.cards) report.skipped.push({ id: row.id, source: "work", reason: "the record does not read as a work card" });
-    return report;
-  }
+  const loops = sortRows(todo.loops, loopSchema, "loop", report.skipped);
+  const cards = sortRows(todo.cards, workSchema, "work", report.skipped);
+  if (!loops.length && !cards.length) return report;
+  const store = new TaskStore(db, () => {}, now);
+  const exists = db.prepare("SELECT 1 FROM tasks WHERE id = ?");
+  const ledger = db.prepare("INSERT OR IGNORE INTO task_legacy (id, source, adopted_at) VALUES (?, ?, ?)");
+  const events = hasTable(db, "loop_events")
+    ? db.prepare("INSERT INTO task_events (task_id, type, at, data) SELECT loop_id, type, at, data FROM loop_events WHERE loop_id = ? ORDER BY seq")
+    : null;
+  const adopt = (rehearse: boolean) => {
+    const adopted = { loops: 0, cards: 0, events: 0 };
+    try {
+      db.transaction(() => {
+        for (const { row, record } of loops) {
+          if (!exists.get(row.id)) {
+            store.write(taskFromLoop(record));
+            adopted.events += events?.run(row.id).changes ?? 0;
+          }
+          ledger.run(row.id, "loop", now());
+          adopted.loops++;
+        }
+        for (const { row, record } of cards) {
+          if (!exists.get(row.id)) store.write(taskFromWork(record));
+          ledger.run(row.id, "work", now());
+          adopted.cards++;
+        }
+        if (rehearse) throw new Rehearsal();
+      })();
+    } catch (error) {
+      if (!(error instanceof Rehearsal)) throw error;
+    }
+    return adopted;
+  };
+  adopt(true);
   if (options.backup !== false) {
     try {
       report.backup = backupDatabase(db, now());
@@ -79,39 +143,7 @@ export function migrateToTasks(db: Database.Database, options: { backup?: boolea
       report.backupError = message(error);
     }
   }
-  const store = new TaskStore(db, () => {}, now);
-  const exists = db.prepare("SELECT 1 FROM tasks WHERE id = ?");
-  const ledger = db.prepare("INSERT OR IGNORE INTO task_legacy (id, source, adopted_at) VALUES (?, ?, ?)");
-  const events = hasTable(db, "loop_events")
-    ? db.prepare("INSERT INTO task_events (task_id, type, at, data) SELECT loop_id, type, at, data FROM loop_events WHERE loop_id = ? ORDER BY seq")
-    : null;
-  db.transaction(() => {
-    for (const row of todo.loops) {
-      try {
-        const parsed = loopSchema.parse(JSON.parse(row.record));
-        if (parsed.id !== row.id) throw new Error(`record id ${parsed.id} differs from row id`);
-        if (!exists.get(row.id)) {
-          store.write(taskFromLoop(parsed));
-          report.adopted.events += events?.run(row.id).changes ?? 0;
-        }
-        ledger.run(row.id, "loop", now());
-        report.adopted.loops++;
-      } catch (error) {
-        report.skipped.push({ id: row.id, source: "loop", reason: message(error) });
-      }
-    }
-    for (const row of todo.cards) {
-      try {
-        const parsed = workSchema.parse(JSON.parse(row.record));
-        if (parsed.id !== row.id) throw new Error(`record id ${parsed.id} differs from row id`);
-        if (!exists.get(row.id)) store.write(taskFromWork(parsed));
-        ledger.run(row.id, "work", now());
-        report.adopted.cards++;
-      } catch (error) {
-        report.skipped.push({ id: row.id, source: "work", reason: message(error) });
-      }
-    }
-  })();
+  report.adopted = adopt(false);
   return report;
 }
 
