@@ -98,19 +98,19 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.navigationBars["Library"].waitForNonExistence(timeout: 10), "the design opens in its viewer")
     }
 
-    func testTodosAndAutomationsOpen() {
+    func testTasksAndAutomationsOpen() {
         launch(["-qaLoopsDemo"])
-        openPage("todos")
-        XCTAssertTrue(app.navigationBars["Todos"].waitForExistence(timeout: 15))
-        XCTAssertTrue(any("loops-screen").waitForExistence(timeout: 15), "the existing Todos screen")
-        XCTAssertTrue(app.textFields["loops-add"].waitForExistence(timeout: 15))
-        shot("todos")
+        openPage("tasks")
+        XCTAssertTrue(app.navigationBars["Tasks"].waitForExistence(timeout: 15))
+        XCTAssertTrue(any("tasks-screen").waitForExistence(timeout: 15), "the Tasks screen")
+        XCTAssertTrue(app.textFields["tasks-add"].waitForExistence(timeout: 15))
+        shot("tasks")
         app.closeRoomSheet()
 
         openPage("automations")
         XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.staticTexts["Check-in"].waitForExistence(timeout: 15), "the Bot's automations")
-        XCTAssertFalse(app.buttons["Done"].exists, "embedded, with no Done of its own")
+        XCTAssertFalse(any("RoomSheet-schedules").buttons["Done"].exists, "embedded, with no Done of its own")
         shot("automations")
     }
 

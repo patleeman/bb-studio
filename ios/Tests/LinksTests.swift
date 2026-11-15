@@ -40,7 +40,8 @@ final class LinksTests: XCTestCase {
     func testDirectivesReferencesAndPaths() {
         XCTAssertEqual(entity(#"::page{id="pg_x"}"#), LinkRef(kind: .page, id: "pg_x"))
         XCTAssertEqual(entity(#"::drawing{id="drw_0123456789abcdef"}"#)?.kind, .whiteboard)
-        XCTAssertEqual(entity(#"::loop{id="loop_1"}"#), LinkRef(kind: .todos, id: nil))
+        XCTAssertEqual(entity(#"::loop{id="loop_1"}"#), LinkRef(kind: .todo, id: "loop_1"))
+        XCTAssertEqual(entity(#"::work{id="wc_1"}"#), LinkRef(kind: .todo, id: "wc_1"))
         XCTAssertEqual(entity(#"::bot-thread{threadId='thr_t'}"#), LinkRef(kind: .conversation, id: "thr_t"))
         XCTAssertNil(Links.parse(#"::unknown{id="x"}"#))
         XCTAssertEqual(entity("page:pg_x"), LinkRef(kind: .page, id: "pg_x"))

@@ -42,10 +42,12 @@ enum RoomQA {
         #endif
     }
 
-    static var mode: String? {
+    static var mode: String? { value("-qaRoomMode") }
+
+    static func value(_ flag: String) -> String? {
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
-        guard let at = arguments.firstIndex(of: "-qaRoomMode"), arguments.indices.contains(at + 1) else { return nil }
+        guard let at = arguments.firstIndex(of: flag), arguments.indices.contains(at + 1) else { return nil }
         return arguments[at + 1]
         #else
         nil
@@ -67,6 +69,7 @@ struct RoomView: View {
     @State private var nudge: CGFloat = 0
     @State private var toast: String?
     @State private var morning: LoopMorning?
+    @State private var tasks = TasksModel.shared
     @State private var dragLast: CGFloat = 0
     @State private var floorTop: CGFloat = 0
     @State private var maskOpen = false
@@ -102,7 +105,15 @@ struct RoomView: View {
 
     private var view: BotThreadsView? { store.view(for: bot.id) }
     private var reduceMotion: Bool { systemReduceMotion || RoomQA.reduceMotion }
-    private var todayCount: Int? { morning.map { $0.items.count + $0.more } }
+    private var todayCount: Int? {
+        if tasks.supported == false { return morning.map { $0.items.count + $0.more } }
+        return tasks.list.map { _ in tasks.today.count }
+    }
+
+    private var cards: [TaskItem]? {
+        if tasks.supported == false { return morning.map { $0.items.map(TaskItem.init(loop:)) } }
+        return tasks.list.map { _ in tasks.roomCards() }
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -165,7 +176,22 @@ struct RoomView: View {
         }
         .task(id: phase) {
             guard phase == .active else { return }
-            await loadMorning()
+            while !Task.isCancelled {
+                await loadMorning()
+                try? await Task.sleep(for: .seconds(60))
+            }
+        }
+        .onChange(of: room.mode) { _, mode in
+            if mode == .rest { Task { await loadMorning() } }
+        }
+        .task(id: view?.workers.map(\.id).joined(separator: ",")) {
+            TasksModel.shared.botThreadId = mainThreadId
+            if LoopsModel.shared.botName != bot.name { LoopsModel.shared.botName = bot.name }
+            var leads = (view?.workers ?? []).filter { $0.status == .running }.map { (id: $0.threadId, title: $0.title) }
+            #if DEBUG
+            if LoopsDemo.mode != nil { leads.insert((LoopsDemo.leadId, "Larkspur lead"), at: 0) }
+            #endif
+            if leads.map({ $0.id + "\u{1F}" + $0.title }) != LoopsModel.shared.leads.map({ $0.id + "\u{1F}" + $0.title }) { LoopsModel.shared.leads = leads }
         }
         .onChange(of: bot.appearance?.themeId) { _, saved in
             if let saved, shell.themeOverride[bot.id] == saved { shell.themeOverride[bot.id] = nil }
@@ -295,9 +321,10 @@ struct RoomView: View {
             if room.mode == .rest {
                 floorGestures
             }
-            RoomDayView(bot: bot, view: view, model: session.model, morning: shownConversation == nil ? morning : nil,
+            RoomDayView(bot: bot, view: view, model: session.model, cards: shownConversation == nil ? cards : nil,
+                        todayCount: shownConversation == nil ? todayCount : nil,
                         conversation: shownConversation, openMenu: openMenu,
-                        openTodos: { room.showPlace(.todos) }, done: done, reportBottom: reportFloor,
+                        openTask: openTask, act: act, reportBottom: reportFloor,
                         reportPresence: { presenceSize = $0 },
                         switchBot: switchBot, nudge: nudge, canSwitch: (store.spaces?.bots.count ?? 1) > 1, shown: room.showsDay)
                 .opacity(room.showsDay ? 1 : 0)
@@ -345,6 +372,7 @@ struct RoomView: View {
         }
         .environment(\.botConversation, context(pager.shown, kind: .conversation))
         .environment(\.roomChat, RoomChat(focusRequests: room.focusRequests, lying: !room.standing, layDown: layDown))
+        .environment(\.openTaskThread, { openItem(.conversation($0)) })
         .offset(x: pageOffset)
     }
 
@@ -501,7 +529,7 @@ struct RoomView: View {
         let place: RoomPlace = switch page {
         case .memory: .memory
         case .library: .library
-        case .todos: .todos
+        case .todos: .tasks
         case .automations: .schedules
         case .archive: .archive
         }
@@ -540,14 +568,39 @@ struct RoomView: View {
         }
     }
 
-    private func done(_ id: String) {
+    private func openTask(_ id: String) {
+        tasks.focus = id
+        room.showPlace(.tasks)
+    }
+
+    private func act(_ task: TaskItem, _ action: TaskAction) {
         Task {
-            _ = try? await LoopsModel.shared.perform(id, .done)
+            do {
+                if tasks.supported == false {
+                    let loop: LoopAction? = switch action {
+                    case .done: .done
+                    case .gotIt: .gotIt
+                    case .drop: .drop
+                    case .choose(let option): .choose(option)
+                    case .snooze(let snooze): .snooze(snooze)
+                    case .handOff(let to): .handOff(owner: to)
+                    case .takeBack: .takeBack
+                    default: nil
+                    }
+                    if let loop { try await LoopsModel.shared.perform(task.id, loop) }
+                } else if let note = try await tasks.perform(task.id, action) {
+                    app.flash(note)
+                }
+            } catch {
+                app.flash("Couldn't update the task: \(BBClient.describe(error))")
+            }
             await loadMorning()
         }
     }
 
     private func loadMorning() async {
+        await tasks.refresh()
+        guard tasks.supported == false else { return }
         await LoopsModel.shared.checkEnabled()
         guard LoopsModel.shared.enabled == true, let next = try? await app.client.loopMorning() else { return }
         morning = next
@@ -575,6 +628,21 @@ struct RoomView: View {
     }
 
     private func applyQAMode() {
+        if let id = RoomQA.value("-qaTaskFocus") { tasks.focus = id }
+        if let id = RoomQA.value("-qaPushTask") {
+            Task {
+                try? await Task.sleep(for: .seconds(1.5))
+                if let route = NotificationActions.taskRoute(["loopId": id, "conversationId": RoomQA.value("-qaPushConversation") ?? "", "threadId": mainThreadId]) {
+                    app.openTask(route.id, conversation: route.conversation)
+                }
+            }
+        }
+        if let id = RoomQA.value("-qaTaskSheet") {
+            Task {
+                try? await Task.sleep(for: .seconds(1.5))
+                app.sheet = .task(id: id)
+            }
+        }
         guard let mode = RoomQA.mode else { return }
         switch mode {
         case "talk": room.handle(.tapInput)
@@ -619,11 +687,12 @@ struct RoomDayView: View {
     let view: BotThreadsView?
     @ObservedObject var model: ThreadModel
     @Environment(\.duoPage) private var duoPage
-    let morning: LoopMorning?
+    let cards: [TaskItem]?
+    var todayCount: Int? = nil
     var conversation: BotConversation? = nil
     var openMenu: () -> Void
-    var openTodos: () -> Void
-    var done: (String) -> Void
+    var openTask: (String) -> Void = { _ in }
+    var act: (TaskItem, TaskAction) -> Void = { _, _ in }
     var reportBottom: (CGFloat) -> Void = { _ in }
     var reportPresence: (CGFloat) -> Void = { _ in }
     var switchBot: (Int) -> Void = { _ in }
@@ -637,7 +706,27 @@ struct RoomDayView: View {
             return RoomDay.Line(lead: (conversation.title.isEmpty ? "Untitled" : conversation.title) + ".",
                                 rest: conversation.latest.map(RoomFloor.plain).flatMap { $0.isEmpty ? nil : $0 })
         }
-        return RoomDay.line(rows: model.rows, todayCount: morning.map { $0.items.count + $0.more }, status: BotShell.status(bot, view: view))
+        return RoomDay.line(rows: model.rows, todayCount: todayCount, status: BotShell.status(bot, view: view))
+    }
+
+    static func height(_ task: TaskItem) -> CGFloat {
+        let subtitle = !task.isMine || TaskRules.roomLine(task) != nil
+        var height = max(44, 16 + (task.title.count > 34 ? 40 : 20) + (subtitle ? 16 : 0))
+        if task.isMine && task.kind == .decide && !task.options.isEmpty { height += 38 }
+        return CGFloat(height)
+    }
+
+    static func fitting(_ tasks: [TaskItem], count: Int) -> [TaskItem] {
+        let budget = CGFloat(count) * 46 + CGFloat(max(0, count - 1)) * 6
+        var used: CGFloat = 0
+        var out: [TaskItem] = []
+        for task in tasks.prefix(count) {
+            let next = used + height(task) + (out.isEmpty ? 0 : 6)
+            if !out.isEmpty && next > budget { break }
+            used = next
+            out.append(task)
+        }
+        return out
     }
 
     static func fit(_ size: CGSize) -> (cards: Int, presence: CGFloat) {
@@ -701,8 +790,8 @@ struct RoomDayView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(spacing: 6) {
-                ForEach((morning?.items ?? []).prefix(cards)) { item in
-                    RoomCard(item: item, open: openTodos, done: { done(item.id) })
+                ForEach(RoomDayView.fitting(self.cards ?? [], count: cards)) { item in
+                    RoomCard(task: item, names: TasksModel.shared.names, open: { openTask(item.id) }, act: { act(item, $0) })
                         .transition(.opacity)
                         .accessibilityHidden(!shown)
                         .allowsHitTesting(shown)
@@ -755,41 +844,127 @@ extension View {
 }
 
 struct RoomCard: View {
-    let item: LoopItem
+    let task: TaskItem
+    let names: TaskNames
     var open: () -> Void
-    var done: () -> Void
-    @State private var closing = false
+    var act: (TaskAction) -> Void
+    @State private var closing: TaskAction?
     @Environment(\.look) private var look
 
+    private var deciding: Bool { task.isMine && task.kind == .decide && !task.options.isEmpty }
+
     var body: some View {
-        HStack(spacing: 0) {
-            Button {
-                closing = true
-                done()
-            } label: {
-                Circle().strokeBorder(.white.opacity(0.5), lineWidth: 1.2)
-                    .overlay { if closing { Image(systemName: "checkmark").font(.caption2.weight(.bold)) } }
-                    .frame(width: 17, height: 17)
-                    .frame(width: 40, height: 44)
-                    .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Done: \(item.title)")
-            Button(action: open) {
-                Text(item.title).font(.subheadline).foregroundStyle(.white.opacity(0.92)).lineLimit(2)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 0) {
+                leading
+                Button(action: open) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(task.title).font(.subheadline).foregroundStyle(.white.opacity(0.92)).lineLimit(2)
+                        if let line = subtitle {
+                            Text(line).font(.caption.weight(task.needsYou ? .semibold : .regular))
+                                .foregroundStyle(task.needsYou ? Color.orange : .white.opacity(0.62)).lineLimit(2)
+                        }
+                    }
                     .padding(.vertical, 8)
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .padding(.trailing, 12)
                     .contentShape(.rect)
                     .lookHalo(look)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(label)
+                .accessibilityHint("Opens the task")
+                .accessibilityIdentifier("roomCard-\(task.id)")
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("roomCard-\(item.id)")
+            if deciding {
+                options.padding(.leading, 40).padding(.trailing, 10).padding(.bottom, 10)
+            }
         }
         .padding(.leading, 2)
         .background(look.canvas.opacity(0.28), in: .rect(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.white.opacity(0.14), lineWidth: 0.5))
-        .opacity(closing ? 0.5 : 1)
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(task.needsYou ? Color.orange.opacity(0.75) : .white.opacity(0.14), lineWidth: task.needsYou ? 1 : 0.5))
+        .opacity(closing == nil ? 1 : 0.5)
+        .contentShape(.contextMenuPreview, .rect(cornerRadius: 10))
+        .contextMenu { TaskMenu(task: task, names: names, open: open, perform: run) }
+        .task(id: closing) {
+            guard closing != nil else { return }
+            try? await Task.sleep(for: .seconds(8))
+            closing = nil
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("roomTask-\(task.id)")
+        .accessibilityValue(TaskRules.status(task).id)
+    }
+
+    @ViewBuilder private var leading: some View {
+        if deciding {
+            Image(systemName: "arrow.triangle.branch").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.6))
+                .frame(width: 40, height: 44)
+                .accessibilityHidden(true)
+        } else if task.isMine && !task.isClosed {
+            Button {
+                run(task.kind == .read ? .gotIt : .done)
+            } label: {
+                Circle().strokeBorder(task.needsYou ? Color.orange : .white.opacity(0.5), lineWidth: 1.2)
+                    .overlay { if closing != nil { Image(systemName: "checkmark").font(.caption2.weight(.bold)) } }
+                    .frame(width: 17, height: 17)
+                    .frame(width: 40, height: 44)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(task.kind == .read ? "Got it" : "Done"): \(task.title)")
+        } else {
+            Circle().fill(Color.green.opacity(0.85)).frame(width: 7, height: 7)
+                .frame(width: 40, height: 44)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var options: some View {
+        FlowLayout(spacing: 6) {
+            if task.options.count <= 3 {
+                ForEach(task.options, id: \.self) { option in
+                    Button { run(.choose(option)) } label: {
+                        Text(LoopOption(option).title).font(.caption.weight(.semibold)).foregroundStyle(.white).lineLimit(1)
+                            .padding(.horizontal, 12).frame(minHeight: 32)
+                            .background(.white.opacity(closing == .choose(option) ? 0.32 : 0.16), in: .capsule)
+                            .contentShape(.capsule)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(closing != nil)
+                    .accessibilityLabel("Choose \(option)")
+                    .accessibilityIdentifier("roomOption")
+                }
+            } else {
+                Button(action: open) {
+                    Text("Choose… (\(task.options.count))").font(.caption.weight(.semibold)).foregroundStyle(.white)
+                        .padding(.horizontal, 12).frame(minHeight: 32)
+                        .background(.white.opacity(0.16), in: .capsule)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("roomOption")
+            }
+        }
+    }
+
+    private var subtitle: String? {
+        if !task.isMine { return "\(names.label(task.owner)) is on it" }
+        return TaskRules.roomLine(task)
+    }
+
+    private var label: String {
+        var parts = [task.title]
+        if task.needsYou { parts.append("Needs you") }
+        if let subtitle { parts.append(subtitle) }
+        return parts.joined(separator: ", ")
+    }
+
+    private func run(_ action: TaskAction) {
+        switch action {
+        case .done, .gotIt, .choose, .drop: closing = action
+        default: break
+        }
+        act(action)
     }
 }
 

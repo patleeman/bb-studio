@@ -1052,6 +1052,42 @@
       "coverage": "dynamic dispatch; runtime validation required"
     },
     {
+      "file": "ios/iOS/Tasks/TasksModel.swift",
+      "plugin": "studio",
+      "method": "tasks.list",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Tasks/TasksModel.swift",
+      "plugin": "studio",
+      "method": "tasks.get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Tasks/TasksModel.swift",
+      "plugin": "studio",
+      "method": "tasks.act",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Tasks/TasksModel.swift",
+      "plugin": "studio",
+      "method": "tasks.inFlight",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Tasks/TasksModel.swift",
+      "plugin": "studio",
+      "method": "work.dismiss",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Tasks/TasksModel.swift",
+      "plugin": "studio",
+      "method": "work.clear",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/iOS/Thread/InlineVis.swift",
       "plugin": "inline-vis",
       "method": "preparePreview",

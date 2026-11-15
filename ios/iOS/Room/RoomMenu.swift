@@ -35,7 +35,7 @@ struct RoomMenu: View {
                     Button { openPlace(place) } label: {
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
                             Text(place.title).font(.system(size: 34, weight: .semibold))
-                            if place == .todos, let todayCount {
+                            if place == .tasks, let todayCount {
                                 Text("\(todayCount) today").font(.subheadline.weight(.medium)).foregroundStyle(.white.opacity(0.55))
                             }
                         }
@@ -139,9 +139,10 @@ struct RoomPlaceSheet: View {
 
     @ViewBuilder private var content: some View {
         switch place {
-        case .todos:
-            LoopsView(attention: nil, openChat: { open(.conversation(mainThreadId)) })
-                .navigationTitle("Todos")
+        case .tasks:
+            TasksView(openChat: { open(.conversation(mainThreadId)) })
+                .environment(\.openTaskThread, { open(.conversation($0)) })
+                .navigationTitle("Tasks")
                 .navigationBarTitleDisplayMode(.large)
         case .memory:
             MemoryPageView(botId: bot.id, open: open)

@@ -416,7 +416,7 @@ enum BotDemo {
     /// `-qaLoopsDemo`: the morning card and loop cards at the end of the chat.
     private static func loopRows() -> [TimelineRow] {
         let start = now - 300_000
-        let loops = LoopsDemo.messages().enumerated().map { index, message in
+        let loops = (LoopsDemo.messages() + TasksDemo.messages()).enumerated().map { index, message in
             row(id: "loop-\(index)", role: message.role, text: message.text, at: start + Double(index) * 1_000)
         }
         guard relayedFixture, !loops.isEmpty else { return loops }

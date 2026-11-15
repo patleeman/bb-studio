@@ -120,14 +120,14 @@ final class RoomUITests: ServerIsolatedUITestCase {
     func testTheMenuOpensEachPlaceAsASheetAndPullingDownGoesBack() {
         launch()
         app.buttons["roomMenuButton"].tap()
-        XCTAssertTrue(app.buttons["roomPlace-todos"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label ENDSWITH ' today'")).firstMatch.exists, "Todos with today's count")
+        XCTAssertTrue(app.buttons["roomPlace-tasks"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label ENDSWITH ' today'")).firstMatch.exists, "Tasks with today's count")
         XCTAssertTrue(app.buttons["roomWorkingNow"].exists, "what's working now")
         XCTAssertTrue(app.buttons["roomTheme"].exists)
         XCTAssertTrue(app.buttons["roomSettings"].exists)
         shot("4-menu")
 
-        for (place, check, name) in [("todos", "loops-screen", "5-todos"), ("conversations", "roomNewConversation", "6-conversations"),
+        for (place, check, name) in [("tasks", "tasks-screen", "5-tasks"), ("conversations", "roomNewConversation", "6-conversations"),
                                      ("memory", "memoryProfile", "7-memory"), ("library", "library-page", "8-library")] {
             app.openRoomPlace(place)
             XCTAssertTrue(any(check).waitForExistence(timeout: 15), "\(place) opens as a sheet")
@@ -143,12 +143,12 @@ final class RoomUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["roomInput"].waitForExistence(timeout: 10), "back to the room")
     }
 
-    func testACardOpensTodosAndAConversationOpensOverTheRoom() {
+    func testACardOpensTasksAndAConversationOpensOverTheRoom() {
         launch()
         let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'roomCard-'")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 15))
         card.tap()
-        XCTAssertTrue(any("loops-screen").waitForExistence(timeout: 15), "a card opens Todos")
+        XCTAssertTrue(any("tasks-screen").waitForExistence(timeout: 15), "a card opens Tasks")
         app.closeRoomSheet()
         app.openRoomPlace("conversations")
         let other = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'roomConversation-' AND NOT identifier ENDSWITH %@", "thr_botdemo01")).firstMatch

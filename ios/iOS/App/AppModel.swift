@@ -71,6 +71,7 @@ enum Sheet: Identifiable, Hashable {
     /// Hands-free voice (iOS/VoiceLive); `autoStart` starts the session as it opens (Talk to Bot).
     /// `threadId`: the thread it was launched from, which the session speaks as; none means the Chief of Staff.
     case handsFree(autoStart: Bool = false, threadId: String? = nil)
+    case task(id: String)
 
     var id: String {
         switch self {
@@ -79,6 +80,7 @@ enum Sheet: Identifiable, Hashable {
         case .recording: "recording"
         case .write: "write"
         case .handsFree(_, let threadId): "hands-free:\(threadId ?? "")"
+        case .task(let id): "task:\(id)"
         }
     }
 }
@@ -334,8 +336,8 @@ final class AppModel: ObservableObject {
             }
         case .automation:
             follow(.botPage(.automations, botId: nil), push: push)
-        case .todo:
-            follow(.botPage(.todos, botId: nil), push: push)
+        case .todo(let id):
+            if id.isEmpty { follow(.botPage(.todos, botId: nil), push: push) } else { openTask(id, conversation: nil) }
         case .record(let id):
             follow(.route(.memoryRecord(id: id)), push: push)
         case .route(let route):
@@ -367,6 +369,24 @@ final class AppModel: ObservableObject {
     func openThread(_ id: String) {
         tab = .inbox
         path = [.thread(id: id)]
+    }
+
+    func openTaskThread(_ id: String) {
+        if case .task? = sheet { sheet = nil }
+        if inSpaces {
+            tab = .bot
+            shellLink = .thread(id, worker: false)
+        } else {
+            openThread(id)
+        }
+    }
+
+    func openTask(_ id: String, conversation: String?) {
+        if let conversation { openTaskThread(conversation) } else if inSpaces { tab = .bot } else { openLoops() }
+        Task {
+            try? await Task.sleep(for: .milliseconds(450))
+            sheet = .task(id: id)
+        }
     }
 
     func open(_ route: Route) {
