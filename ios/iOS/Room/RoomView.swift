@@ -137,6 +137,11 @@ struct RoomView: View {
     }
 
     var body: some View {
+        lifecycle(polling(routing(canvas)))
+            .modifier(TalkLifecycle(talk: session.talk))
+    }
+
+    private var canvas: some View {
         GeometryReader { proxy in
             if let pages {
                 duo(proxy, pages)
@@ -145,103 +150,148 @@ struct RoomView: View {
             }
         }
         .background {
-            RoomTalkWatcher(talk: session.talk) { state in
-                withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .snappy) { room.sync(talk: state) }
-            } failed: { app.flash($0) }
+            RoomTalkWatcher(talk: session.talk) { state in syncTalk(state) } failed: { app.flash($0) }
         }
-        .onChange(of: pages) { _, _ in
-            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-            if pages != nil, room.standing { room.show(.rest) }
-            if pages != nil, app.tab == .settings {
-                app.tab = .bot
-                settingsOpen = true
-            } else if pages == nil, settingsOpen {
-                settingsOpen = false
-                app.tab = .settings
-            }
+    }
+
+    private func routing<Content: View>(_ content: Content) -> some View {
+        content
+            .onChange(of: pages) { _, _ in pagesChanged() }
+            .onChange(of: shell.roomOpen, initial: true) { _, page in roomOpenChanged(page) }
+            .onChange(of: shell.roomFocus, initial: true) { _, id in roomFocusChanged(id) }
+            .onChange(of: shell.detailPath) { _, path in detailPathChanged(path) }
+            .onChange(of: order) { old, new in orderChanged(old, new) }
+    }
+
+    private func polling<Content: View>(_ content: Content) -> some View {
+        content
+            .task(id: phase) { await pollMorning() }
+            .task(id: flightKey) { await pollFlight() }
+            .onChange(of: room.mode) { _, mode in modeChanged(mode) }
+            .task(id: workersKey) { syncLeads() }
+            .onChange(of: bot.appearance?.themeId) { _, saved in themeSaved(saved) }
+    }
+
+    private func lifecycle<Content: View>(_ content: Content) -> some View {
+        content
+            .task { applyQAMode() }
+            .task(id: pager.shown) { await session.start(app) }
+            .onDisappear { pager.current.stop() }
+            .overlay(alignment: .top) { toastView }
+            .task { await showToast() }
+            .task(id: warmKey) { await warmNeighbours() }
+    }
+
+    private var flightKey: String { "\(pager.shown)|\(phase == .active)|\(tasks.supported != false)" }
+    private var workersKey: String? { view?.workers.map(\.id).joined(separator: ",") }
+    private var warmKey: String { "\(bot.id)|\(Int(sceneSize.width))x\(Int(sceneSize.height))|\(Int(presenceSize))" }
+
+    @ViewBuilder private var toastView: some View {
+        if let toast {
+            Text(toast).font(.headline).foregroundStyle(.white)
+                .padding(.horizontal, 16).padding(.vertical, 8)
+                .background(.black.opacity(0.45), in: .capsule)
+                .padding(.top, 60)
+                .transition(.opacity)
+                .accessibilityIdentifier("roomBotToast")
         }
-        .onChange(of: shell.roomOpen, initial: true) { _, page in
-            guard let page else { return }
-            shell.roomOpen = nil
-            open(page)
-        }
-        .onChange(of: shell.roomFocus, initial: true) { _, id in
-            guard let id else { return }
-            shell.roomFocus = nil
-            focus(on: id, stand: id != mainThreadId)
-        }
-        .onChange(of: shell.detailPath) { _, path in
-            guard !path.isEmpty else { return }
+    }
+
+    private func syncTalk(_ state: HoldToTalk.State) {
+        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .snappy) { room.sync(talk: state) }
+    }
+
+    private func pagesChanged() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        if pages != nil, room.standing { room.show(.rest) }
+        if pages != nil, app.tab == .settings {
+            app.tab = .bot
+            settingsOpen = true
+        } else if pages == nil, settingsOpen {
             settingsOpen = false
-            if room.place != nil || room.showsMenu { room.show(.rest) }
+            app.tab = .settings
         }
-        .onChange(of: order) { old, new in
-            guard !new.contains(pager.shown) else { return }
-            let before = old.firstIndex(of: pager.shown).map { Array(old[..<$0].reversed()) } ?? []
-            let next = before.first { new.contains($0) } ?? mainThreadId
-            slide = .leading
-            withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.45, dampingFraction: 0.9)) {
-                pageOffset = 0
-                pager.show(next)
-            }
+    }
+
+    private func roomOpenChanged(_ page: BotPage?) {
+        guard let page else { return }
+        shell.roomOpen = nil
+        open(page)
+    }
+
+    private func roomFocusChanged(_ id: String?) {
+        guard let id else { return }
+        shell.roomFocus = nil
+        focus(on: id, stand: id != mainThreadId)
+    }
+
+    private func detailPathChanged(_ path: [Route]) {
+        guard !path.isEmpty else { return }
+        settingsOpen = false
+        if room.place != nil || room.showsMenu { room.show(.rest) }
+    }
+
+    private func orderChanged(_ old: [String], _ new: [String]) {
+        guard !new.contains(pager.shown) else { return }
+        let before: [String] = old.firstIndex(of: pager.shown).map { Array(old[..<$0].reversed()) } ?? []
+        let next = before.first { new.contains($0) } ?? mainThreadId
+        slide = .leading
+        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.45, dampingFraction: 0.9)) {
+            pageOffset = 0
+            pager.show(next)
         }
-        .task(id: phase) {
-            guard phase == .active else { return }
-            while !Task.isCancelled {
-                await loadMorning()
-                try? await Task.sleep(for: .seconds(60))
-            }
+    }
+
+    private func pollMorning() async {
+        guard phase == .active else { return }
+        while !Task.isCancelled {
+            await loadMorning()
+            try? await Task.sleep(for: .seconds(60))
         }
-        .task(id: "\(pager.shown)|\(phase == .active)|\(tasks.supported != false)") {
-            guard phase == .active, tasks.supported != false else { return }
-            while !Task.isCancelled {
-                await tasks.loadFlight(pager.shown)
-                try? await Task.sleep(for: .seconds(20))
-            }
+    }
+
+    private func pollFlight() async {
+        guard phase == .active, tasks.supported != false else { return }
+        while !Task.isCancelled {
+            await tasks.loadFlight(pager.shown)
+            try? await Task.sleep(for: .seconds(20))
         }
-        .onChange(of: room.mode) { _, mode in
-            if mode == .rest { Task { await loadMorning() } }
+    }
+
+    private func modeChanged(_ mode: RoomMode) {
+        if mode == .rest { Task { await loadMorning() } }
+    }
+
+    private func syncLeads() {
+        TasksModel.shared.botThreadId = mainThreadId
+        if LoopsModel.shared.botName != bot.name { LoopsModel.shared.botName = bot.name }
+        var leads: [(id: String, title: String)] = (view?.workers ?? []).filter { $0.status == .running }.map { (id: $0.threadId, title: $0.title) }
+        #if DEBUG
+        if LoopsDemo.mode != nil { leads.insert((LoopsDemo.leadId, "Larkspur lead"), at: 0) }
+        #endif
+        let next: [String] = leads.map { $0.id + "\u{1F}" + $0.title }
+        let current: [String] = LoopsModel.shared.leads.map { $0.id + "\u{1F}" + $0.title }
+        if next != current { LoopsModel.shared.leads = leads }
+    }
+
+    private func themeSaved(_ saved: String?) {
+        if let saved, shell.themeOverride[bot.id] == saved { shell.themeOverride[bot.id] = nil }
+    }
+
+    private func showToast() async {
+        guard let name = shell.botToast, name == bot.name else { return }
+        shell.botToast = nil
+        withAnimation(.easeInOut(duration: 0.2)) { toast = name }
+        try? await Task.sleep(for: .milliseconds(1400))
+        withAnimation(.easeInOut(duration: 0.3)) { toast = nil }
+    }
+
+    private func warmNeighbours() async {
+        try? await Task.sleep(for: .seconds(1.2))
+        for step in [1, -1] {
+            guard !Task.isCancelled else { return }
+            if let id = BotShell.step(store.spaces, from: bot.id, by: step) { await warm(id) }
         }
-        .task(id: view?.workers.map(\.id).joined(separator: ",")) {
-            TasksModel.shared.botThreadId = mainThreadId
-            if LoopsModel.shared.botName != bot.name { LoopsModel.shared.botName = bot.name }
-            var leads = (view?.workers ?? []).filter { $0.status == .running }.map { (id: $0.threadId, title: $0.title) }
-            #if DEBUG
-            if LoopsDemo.mode != nil { leads.insert((LoopsDemo.leadId, "Larkspur lead"), at: 0) }
-            #endif
-            if leads.map({ $0.id + "\u{1F}" + $0.title }) != LoopsModel.shared.leads.map({ $0.id + "\u{1F}" + $0.title }) { LoopsModel.shared.leads = leads }
-        }
-        .onChange(of: bot.appearance?.themeId) { _, saved in
-            if let saved, shell.themeOverride[bot.id] == saved { shell.themeOverride[bot.id] = nil }
-        }
-        .task { applyQAMode() }
-        .task(id: pager.shown) { await session.start(app) }
-        .onDisappear { pager.current.stop() }
-        .overlay(alignment: .top) {
-            if let toast {
-                Text(toast).font(.headline).foregroundStyle(.white)
-                    .padding(.horizontal, 16).padding(.vertical, 8)
-                    .background(.black.opacity(0.45), in: .capsule)
-                    .padding(.top, 60)
-                    .transition(.opacity)
-                    .accessibilityIdentifier("roomBotToast")
-            }
-        }
-        .task {
-            guard let name = shell.botToast, name == bot.name else { return }
-            shell.botToast = nil
-            withAnimation(.easeInOut(duration: 0.2)) { toast = name }
-            try? await Task.sleep(for: .milliseconds(1400))
-            withAnimation(.easeInOut(duration: 0.3)) { toast = nil }
-        }
-        .task(id: "\(bot.id)|\(Int(sceneSize.width))x\(Int(sceneSize.height))|\(Int(presenceSize))") {
-            try? await Task.sleep(for: .seconds(1.2))
-            for step in [1, -1] {
-                guard !Task.isCancelled else { return }
-                if let id = BotShell.step(store.spaces, from: bot.id, by: step) { await warm(id) }
-            }
-        }
-        .modifier(TalkLifecycle(talk: session.talk))
     }
 
     private func folded(_ proxy: GeometryProxy) -> some View {
@@ -414,38 +464,66 @@ struct RoomView: View {
 
     private func stage(_ proxy: GeometryProxy, menuButton: Bool) -> some View {
         ZStack {
-            Color.clear
-                .contentShape(.rect)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(title)
-                .accessibilityHint(pages == nil ? "Opens the conversation" : "Moves to the conversation's reply box")
-                .accessibilityAddTraits(.isButton)
-                .accessibilityAction { openChat() }
-                .accessibilityValue(order.count > 1 ? "Conversation \((order.firstIndex(of: pager.shown) ?? 0) + 1) of \(order.count)" : "")
-                .modifier(RoomPaging(pages: order.count, page: page))
-                .accessibilityIdentifier("RoomStage")
-            ZStack {
-                RoomPresenceHost(model: session.model, bot: bot, view: view, title: title, main: isMain, record: shownRecord,
-                                 flight: flight, onIt: onIt, yours: yours, names: tasks.names, menuButton: menuButton, shown: room.showsDay,
-                                 bottomClear: pages != nil && order.count > 1 ? 24 : 0, nudge: nudge,
-                                 canSwitch: (store.spaces?.bots.count ?? 1) > 1, openMenu: openMenu, openChat: openChat,
-                                 openTask: openTask, openThread: { openItem(.worker($0)) }, openTasks: { room.showPlace(.tasks) },
-                                 act: act, switchBot: switchBot, reportPresence: { presenceSize = $0 },
-                                 reportPresenceFrame: { presenceFrame = $0 })
-                    .id(pager.shown)
-                    .transition(reduceMotion ? .opacity : .asymmetric(insertion: .opacity.combined(with: .move(edge: slide)),
-                                                                     removal: .opacity.combined(with: .move(edge: slide == .trailing ? .leading : .trailing))))
-            }
-            .offset(x: pageOffset)
-            .opacity(room.showsDay ? 1 : 0)
-            .animation(reduceMotion ? .easeInOut(duration: 0.2) : room.showsDay ? .easeOut(duration: 0.28) : .easeOut(duration: 0.14), value: room.showsDay)
-            .allowsHitTesting(room.showsDay)
-            .accessibilityHidden(!room.showsDay)
+            stageElement
+            presenceLayer(menuButton: menuButton)
             if pages != nil && order.count > 1 && room.showsDay {
                 pageDots.frame(maxHeight: .infinity, alignment: .bottom).padding(.bottom, 8)
             }
         }
         .highPriorityGesture(stageDrag)
+    }
+
+    private var stageValue: String {
+        guard order.count > 1 else { return "" }
+        let at = (order.firstIndex(of: pager.shown) ?? 0) + 1
+        return "Conversation \(at) of \(order.count)"
+    }
+
+    private var stageElement: some View {
+        Color.clear
+            .contentShape(.rect)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
+            .accessibilityHint(pages == nil ? "Opens the conversation" : "Moves to the conversation's reply box")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { openChat() }
+            .accessibilityValue(stageValue)
+            .modifier(RoomPaging(pages: order.count, page: page))
+            .accessibilityIdentifier("RoomStage")
+    }
+
+    private var presenceTransition: AnyTransition {
+        if reduceMotion { return .opacity }
+        let away: Edge = slide == .trailing ? .leading : .trailing
+        return .asymmetric(insertion: .opacity.combined(with: .move(edge: slide)), removal: .opacity.combined(with: .move(edge: away)))
+    }
+
+    private var dayAnimation: Animation {
+        if reduceMotion { return .easeInOut(duration: 0.2) }
+        return room.showsDay ? .easeOut(duration: 0.28) : .easeOut(duration: 0.14)
+    }
+
+    private func presenceHost(menuButton: Bool) -> RoomPresenceHost {
+        RoomPresenceHost(model: session.model, bot: bot, view: view, title: title, main: isMain, record: shownRecord,
+                         flight: flight, onIt: onIt, yours: yours, names: tasks.names, menuButton: menuButton, shown: room.showsDay,
+                         bottomClear: pages != nil && order.count > 1 ? 24 : 0, nudge: nudge,
+                         canSwitch: (store.spaces?.bots.count ?? 1) > 1, openMenu: openMenu, openChat: openChat,
+                         openTask: openTask, openThread: { openItem(.worker($0)) }, openTasks: { room.showPlace(.tasks) },
+                         act: act, switchBot: switchBot, reportPresence: { presenceSize = $0 },
+                         reportPresenceFrame: { presenceFrame = $0 })
+    }
+
+    private func presenceLayer(menuButton: Bool) -> some View {
+        ZStack {
+            presenceHost(menuButton: menuButton)
+                .id(pager.shown)
+                .transition(presenceTransition)
+        }
+        .offset(x: pageOffset)
+        .opacity(room.showsDay ? 1 : 0)
+        .animation(dayAnimation, value: room.showsDay)
+        .allowsHitTesting(room.showsDay)
+        .accessibilityHidden(!room.showsDay)
     }
 
     private var stageDrag: some Gesture {
