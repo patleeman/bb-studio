@@ -24,10 +24,25 @@ enum LoopNotifications {
         let serverId = info["serverId"] as? String
         do {
             try await client.validateNotificationOrigin(serverId)
-            try await client.loopAction(loopId, action)
+            do {
+                guard let task = taskAction(action) else { throw BBError(status: 404, message: "") }
+                _ = try await client.taskAction(loopId, task)
+            } catch where BBClient.isUnknownRPC(error) && loopId.hasPrefix("loop_") {
+                try await client.loopAction(loopId, action)
+            }
         } catch {
             await NotificationActions.confirm(info["threadId"] as? String ?? "", "Didn't go through: \(BBClient.describe(error))", serverId: serverId)
         }
         return true
+    }
+
+    static func taskAction(_ action: LoopAction) -> TaskAction? {
+        switch action {
+        case .done: .done
+        case .gotIt: .gotIt
+        case .choose(let option): .choose(option)
+        case .snooze(let snooze): .snooze(snooze)
+        default: nil
+        }
     }
 }

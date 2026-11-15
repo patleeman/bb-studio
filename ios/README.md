@@ -375,6 +375,20 @@ Headless simulator runs: `-skipPushPrompt YES -openURL bbstudio://thread/<id>`.
 
 ### Testing
 
+`TasksUITests` checks Tasks offline (`-qaLoopsDemo` also answers `tasks.*`
+and `work.*` from a local store): the room's cards are today's tasks (a
+decision's options on the card, no Done next to them), Hand off and Take back
+from a card's menu, the Tasks page (Mine Today and Later, Agents on it,
+Waiting, Scheduled & recurring, N done; a typed task is yours at once), In
+flight above the composer (× per card, N done, Clear done), the task card in
+the chat (Ended, a finding's severity), a task push opening its card in its
+conversation (`-qaPushTask <id> -qaPushConversation <thread>`), an older
+Studio without `tasks.*` (`-qaTasksOld`: the old Todos and loop cards),
+offline and Retry (`-qaTasksOffline`, 45 s), and no tasks (`-qaLoopsEmpty`).
+`-qaTaskCards` adds the demo's work cards to Main's chat. `TEST_RUNNER_TASKS_OUT`
+keeps PNGs. LoopsUITests run with `-qaTasksOld`, so they keep covering the
+loop card an older Studio shows.
+
 `LoopsUITests` checks the Attention Router offline (`-qaLoopsDemo`): card
 actions, Snooze, Hand off, Nudge, the morning card, the Todos screen and
 Change trigger, the setting turned off and Places on an iPhone simulator, and

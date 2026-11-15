@@ -3,15 +3,15 @@ import Observation
 import SwiftUI
 
 enum RoomPlace: String, CaseIterable, Identifiable, Hashable {
-    case todos, conversations, memory, library, schedules, archive, theme
+    case tasks, conversations, memory, library, schedules, archive, theme
 
-    static let menu: [RoomPlace] = [.todos, .conversations, .memory, .library, .schedules]
+    static let menu: [RoomPlace] = [.tasks, .conversations, .memory, .library, .schedules]
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .todos: "Todos"
+        case .tasks: "Tasks"
         case .conversations: "Conversations"
         case .memory: "Memory"
         case .library: "Library"

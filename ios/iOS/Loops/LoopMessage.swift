@@ -46,7 +46,7 @@ struct LoopMessage: View {
                 ForEach(Array(Self.parts(text).enumerated()), id: \.offset) { _, part in
                     switch part {
                     case .text(let text): bubble(text)
-                    case .card(let id): LoopCard(id: id)
+                    case .card(let id): TaskCard(id: id)
                     }
                 }
             }

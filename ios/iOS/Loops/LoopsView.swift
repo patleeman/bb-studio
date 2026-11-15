@@ -98,7 +98,7 @@ struct LoopsView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 10) {
                 Image(systemName: "plus").foregroundStyle(.secondary)
-                TextField("Add a todo: “call the plumber when I'm home”", text: $adding)
+                TextField("Add a todo for yourself", text: $adding)
                     .focused($addFocused)
                     .submitLabel(.done)
                     .onSubmit(add)

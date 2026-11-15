@@ -63,7 +63,7 @@ struct MarkdownText: View {
             InlineVisCard(vis: vis)
         case .loop(let directive):
             switch directive {
-            case .card(let id): LoopCard(id: id)
+            case .card(let id): TaskCard(id: id)
             case .row(let id): LoopRowLine(id: id)
             case .more(let count): LoopsMoreLink(count: count)
             }

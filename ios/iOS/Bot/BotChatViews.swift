@@ -162,7 +162,7 @@ struct BotMessageRow: View {
         LinearGradient(colors: [tint, tint.mix(with: .black, by: 0.18)], startPoint: .top, endPoint: .bottom)
     }
 
-    private var hasLoops: Bool { text.contains("::loop") && !LoopDirective.all(in: text).isEmpty }
+    private var hasLoops: Bool { (text.contains("::loop") || text.contains("::work")) && !LoopDirective.all(in: text).isEmpty }
 
     private var reply: some View {
         // As on the desktop: the avatar and name open the Bot's run.

@@ -217,6 +217,9 @@ private struct RootSheets: ViewModifier {
             case .handsFree(let autoStart, let threadId):
                 VoiceLiveView(controller: VoiceLiveController.make(client: model.client, threadId: threadId), autoStart: autoStart)
                     .presentationDragIndicator(.hidden)
+            case .task(let id):
+                TaskSheet(id: id)
+                    .presentationDragIndicator(.visible)
             }
         }
     }

@@ -136,11 +136,11 @@ final class SpacesLoadingUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(room.exists, "over the room")
     }
 
-    func testALoopsLinkForAnExistingUserOpensTheRoomsTodos() {
+    func testALoopsLinkForAnExistingUserOpensTheRoomsTasks() {
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaReduceMotion",
                                 "-qaLoopsDemo", "-openURL", "bbstudio://loops"]
         app.launchOffline()
-        XCTAssertTrue(app.descendants(matching: .any)["loops-screen"].firstMatch.waitForExistence(timeout: 30), "the room opens its Todos")
+        XCTAssertTrue(app.descendants(matching: .any)["tasks-screen"].firstMatch.waitForExistence(timeout: 30), "the room opens its Tasks")
         XCTAssertFalse(classic.exists)
     }
 

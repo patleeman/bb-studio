@@ -97,7 +97,7 @@ enum LoopsDemo {
                 case "update": return update(input)
                 case "add":
                     let now = Self.now
-                    let loop = Self.loop("loop_new\(loops.count)", input["text"] as? String ?? "", owner: "cos", status: "in_progress", created: now)
+                    let loop = Self.loop("loop_new\(loops.count)", input["text"] as? String ?? "", owner: "patrick", status: "surfaced", created: now)
                     loops.append(loop)
                     return ok(loop)
                 case "place", "fire": return ok(["matched": 0])

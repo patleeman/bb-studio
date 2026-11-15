@@ -207,7 +207,7 @@ final class LoopsUITests: ServerIsolatedUITestCase {
 
     func testPlacesPhone() throws {
         guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("Phone only") }
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaLoopsDemo", "-qaPlacesDemo", "-qaPlacesAccess", "whileUsing",
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaLoopsDemo", "-qaTasksOld", "-qaPlacesDemo", "-qaPlacesAccess", "whileUsing",
                                "-qaReduceMotion", "-openURL", "bbstudio://settings"]
         app.launchOffline()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 20))
@@ -284,14 +284,14 @@ final class LoopsUITests: ServerIsolatedUITestCase {
 
     private func launchPhone(mode: String? = nil, extra: [String] = []) throws {
         guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("Phone only") }
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaLoopsDemo"] + (mode.map { [$0] } ?? []) + extra + ["-qaReduceMotion"]
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaLoopsDemo"] + (mode.map { [$0] } ?? []) + extra + ["-qaReduceMotion", "-qaTasksOld"]
         app.launchOffline()
         XCTAssertTrue(app.textViews.matching(NSPredicate(format: "label BEGINSWITH 'Message'")).firstMatch.waitForExistence(timeout: 25))
         if abs(app.windows.firstMatch.frame.width - 466) < 2 { throw XCTSkip("The Duo has its own tests") }
     }
 
     private func launchDuo() throws {
-        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "duo", "-qaDuoPhone", "-qaLoopsDemo", "-qaReduceMotion", "-openURL", "bbstudio://bot"]
+        app.launchArguments = ["-skipPushPrompt", "YES", "-qaBotDemo", "duo", "-qaDuoPhone", "-qaLoopsDemo", "-qaTasksOld", "-qaReduceMotion", "-openURL", "bbstudio://bot"]
         app.launchOffline()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 20))
         guard abs(app.windows.firstMatch.frame.width - 466) < 2 else { throw XCTSkip("Duo only (466 × 678 outer screen)") }

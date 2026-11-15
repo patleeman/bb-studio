@@ -9,10 +9,11 @@ enum LoopDirective: Equatable {
 
     init?(_ directive: Directive) {
         switch directive.name {
-        case "loop":
+        case "loop", "work":
             guard let id = directive.attributes["id"]?.trimmingCharacters(in: .whitespaces),
-                  id.wholeMatch(of: /[A-Za-z0-9_-]{1,80}/) != nil else { return nil }
-            self = ["1", "true"].contains(directive.attributes["row"] ?? "") ? .row(id: id) : .card(id: id)
+                  id.wholeMatch(of: /[A-Za-z0-9_-]{1,120}/) != nil else { return nil }
+            let row = Int(directive.attributes["row"]?.trimmingCharacters(in: .whitespaces) ?? "").map { $0 >= 1 } ?? (directive.attributes["row"] == "true")
+            self = directive.name == "loop" && row ? .row(id: id) : .card(id: id)
         case "loops":
             guard let more = directive.attributes["more"].flatMap({ Int($0.trimmingCharacters(in: .whitespaces)) }), more > 0 else { return nil }
             self = .more(more)
@@ -23,13 +24,13 @@ enum LoopDirective: Equatable {
 
     /// The loop directives in a reply, outside code blocks, in order.
     static func all(in text: String) -> [LoopDirective] {
-        guard text.contains("::loop") else { return [] }
+        guard text.contains("::loop") || text.contains("::work") else { return [] }
         var inCode = false
         var found: [LoopDirective] = []
         for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") { inCode.toggle(); continue }
-            if !inCode, trimmed.hasPrefix("::loop"), let directive = Directive(line: trimmed).flatMap(LoopDirective.init) {
+            if !inCode, trimmed.hasPrefix("::loop") || trimmed.hasPrefix("::work"), let directive = Directive(line: trimmed).flatMap(LoopDirective.init) {
                 found.append(directive)
             }
         }

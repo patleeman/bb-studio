@@ -54,6 +54,12 @@ enum NotificationActions {
         return fixed.union(LoopCategories.fixed())
     }
 
+    static func taskRoute(_ info: [AnyHashable: Any]) -> (id: String, conversation: String?)? {
+        guard let id = info["loopId"] as? String, !id.isEmpty else { return nil }
+        let conversation = [info["conversationId"], info["threadId"]].lazy.compactMap { $0 as? String }.first { !$0.isEmpty }
+        return (id, conversation)
+    }
+
     /// Runs a lock-screen action. Returns false when the app should open the thread instead.
     static func handle(_ response: UNNotificationResponse) async -> Bool {
         let info = response.notification.request.content.userInfo

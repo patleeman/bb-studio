@@ -1588,6 +1588,9 @@ struct ThreadView: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            if conversation != nil || botChrome != nil {
+                InFlightBar(threadId: model.threadId, typing: composerFocused)
+            }
             if let conversation {
                 WorkerApprovalCards(approvals: approvals, openWorker: { conversation.push(.thread(id: $0)) }, decide: decideApproval)
             }
@@ -1777,6 +1780,10 @@ struct ThreadView: View {
             guard id == model.threadId else { return }
             composerFocused = true
             app.replyThreadId = nil
+        }
+        .task(id: conversation != nil || botChrome != nil ? model.threadId : "") {
+            guard conversation != nil || botChrome != nil else { return }
+            await InFlightBar.poll(model.threadId)
         }
     }
 

@@ -143,7 +143,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                     completionHandler()
                     return
                 }
-                if let threadId = userInfo["threadId"] as? String {
+                if let route = NotificationActions.taskRoute(userInfo) {
+                    await MainActor.run { AppModel.shared.openTask(route.id, conversation: route.conversation) }
+                } else if let threadId = userInfo["threadId"] as? String {
                     await MainActor.run { AppModel.shared.openThread(threadId) }
                 }
             }

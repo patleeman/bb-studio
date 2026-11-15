@@ -78,7 +78,7 @@ final class RoomQAUITests: ServerIsolatedUITestCase {
 
     func testRelayedMessagesFoldIntoOneRow() {
         launch(["-qaRelayed"])
-        app.buttons["RoomFloor"].tap()
+        app.standRoomChat()
         XCTAssertTrue(app.buttons["roomLayDown"].waitForExistence(timeout: 10), "the chat stands")
         sleep(1)
         let rows = app.buttons.matching(identifier: "relayedRow")
@@ -121,7 +121,7 @@ final class RoomQAUITests: ServerIsolatedUITestCase {
         shot("xxl-talk")
         app.buttons["roomLayDown"].tap()
         app.buttons["roomMenuButton"].tap()
-        XCTAssertTrue(app.buttons["roomPlace-todos"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["roomPlace-tasks"].waitForExistence(timeout: 10))
         shot("xxl-menu")
     }
 
@@ -157,7 +157,7 @@ final class RoomQAUITests: ServerIsolatedUITestCase {
         try audit()
         app.buttons["roomLayDown"].tap()
         app.buttons["roomMenuButton"].tap()
-        XCTAssertTrue(app.buttons["roomPlace-todos"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["roomPlace-tasks"].waitForExistence(timeout: 10))
         try audit()
     }
 

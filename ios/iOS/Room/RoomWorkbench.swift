@@ -36,6 +36,8 @@ enum WorkbenchItem: Hashable {
     init?(key: String) {
         if key == "settings" {
             self = .settings
+        } else if key == "place:todos" {
+            self = .place(.tasks)
         } else if key.hasPrefix("place:"), let place = RoomPlace(rawValue: String(key.dropFirst(6))) {
             self = .place(place)
         } else if key.hasPrefix("thread:"), key.count > 7 {
@@ -49,7 +51,7 @@ enum WorkbenchItem: Hashable {
         switch page {
         case .memory: .memory
         case .library: .library
-        case .todos: .todos
+        case .todos: .tasks
         case .automations: .schedules
         case .archive: .archive
         }

@@ -98,7 +98,7 @@ enum Links {
 
     private static let directiveKinds: [String: LinkKind] = [
         "page": .page, "drawing": .whiteboard, "whiteboard": .whiteboard, "design": .design, "mini": .app, "app": .app,
-        "dashboard": .dashboard, "artifact": .artifact, "recording": .recording, "loop": .todos, "loops": .todos,
+        "dashboard": .dashboard, "artifact": .artifact, "recording": .recording, "loop": .todo, "work": .todo, "loops": .todos,
         "bot-thread": .conversation, "board": .board,
     ]
 
@@ -110,6 +110,7 @@ enum Links {
             attributes[String(each.1)] = (each.2 ?? each.3 ?? each.4).map(String.init) ?? ""
         }
         let id = [attributes["id"], attributes["threadId"]].compactMap { $0 }.first { !$0.isEmpty }
+        if kind == .todo && id == nil { return .some(ref(.todos, nil)) }
         return .some(ref(kind, kind == .todos ? nil : id))
     }
 
