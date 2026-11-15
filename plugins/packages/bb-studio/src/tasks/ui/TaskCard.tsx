@@ -16,7 +16,7 @@ import { useCardOnScreen } from "../../work/ui/on-screen";
 import { isClosed, needsYou, TODO_ID, USER_OWNER, type Task } from "../contract";
 import type { TaskView } from "../rpc-contract";
 import { WORK_ID } from "../../work/shared";
-import { everMine, handOffTargets, historyLines, isMine, ownerLabel, ownerThreadId, rowNumber, taskKind, taskStatus, type Glyph, type Names, type Tone } from "./model";
+import { everMine, handOffTargets, historyLines, isMine, ownerLabel, ownerShort, ownerThreadId, rowNumber, taskKind, taskStatus, type Glyph, type Names, type Tone } from "./model";
 
 const STALE_MS = 3 * 86_400_000;
 
@@ -74,9 +74,9 @@ function useBotFace() {
   return bot ? { shape: bot.shape ?? null, color: bot.color ?? null, emoji: bot.avatar } : null;
 }
 
-export function OwnerBadge({ owner, names, className }: { owner: string; names: Names; className?: string }) {
+export function OwnerBadge({ owner, names, className, task }: { owner: string; names: Names; className?: string; task?: Pick<Task, "owner" | "title" | "kind" | "card"> }) {
   const face = useBotFace();
-  const name = ownerLabel(owner, names);
+  const name = task ? ownerShort(task, names) : ownerLabel(owner, names);
   const avatar = owner === "cos" && face
     ? <BotAvatar shape={face.shape} color={face.color} emoji={face.emoji} size={16} />
     : <span aria-hidden className="flex size-4 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><Icon name={owner === USER_OWNER ? "UserRound" : "Bot"} className="size-2.5" /></span>;
@@ -119,7 +119,9 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
   let actions: ReactNode;
   if (closed) {
     actions = <>
-      <button type="button" data-testid="task-undo" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: task.id, action: "reopen" })}><Icon name="ArrowTurnBackward" />Undo</button>
+      {task.closedBy === null || task.closedBy === USER_OWNER
+        ? <button type="button" data-testid="task-undo" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: task.id, action: "reopen" })}><Icon name="ArrowTurnBackward" />Undo</button>
+        : <button type="button" data-testid="task-reopen" className={CARD_BUTTON} disabled={busy} title={task.owner === USER_OWNER ? "Reopens it for you" : `Reopens it and asks ${ownerLabel(task.owner, names)} to carry on`} onClick={() => void act({ id: task.id, action: "reopen" })}><Icon name="RotateCw" />{task.owner === USER_OWNER ? "Reopen" : `Reopen for ${ownerShort(task, names)}`}</button>}
       {openButton}
     </>;
   } else if (mine) {
@@ -161,7 +163,7 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
       <div className={cn(CHAT_CARD_BODY, "flex flex-col gap-2 pt-0")}>
         {task.why ? <p data-testid="task-why" className="line-clamp-2 text-sm text-muted-foreground">{task.why}</p> : null}
         <div className="flex min-w-0 items-center gap-2 text-sm">
-          <OwnerBadge owner={task.owner} names={names} />
+          <OwnerBadge owner={task.owner} names={names} task={task} />
           <span aria-hidden className="text-muted-foreground">·</span>
           <TaskGlyph glyph={status.glyph} stale={status.stale} label={status.label} />
           <span data-testid="task-state" className={cn("shrink-0", TONE[status.tone])}>{status.stale ? "Ended without a final update" : status.label}</span>

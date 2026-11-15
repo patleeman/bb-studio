@@ -6,7 +6,7 @@ import { ownerText } from "../loops/reference";
 import { placeKey } from "../loops/store";
 import type { Loop } from "../loops/contract";
 import { directiveFor } from "../work/shared";
-import { closedByUser, createInput, handoffInput, isClosed, listInput, needsYou, updateInput, USER_OWNER, type Task, type TaskCreateInput, type TaskHandoffInput, type TaskListInput, type TaskUpdateInput } from "./contract";
+import { closedByUser, KEPT_CLOSED, createInput, handoffInput, isClosed, listInput, needsYou, updateInput, USER_OWNER, type Task, type TaskCreateInput, type TaskHandoffInput, type TaskListInput, type TaskUpdateInput } from "./contract";
 import { guardTasks, surfaceForUser, TaskStore, toStoredOwner } from "./store";
 import { inLoopView, inWorkView } from "./views";
 
@@ -78,7 +78,7 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
       if (x.state !== undefined) t.state = x.state;
       if (x.kind !== undefined) t.kind = x.kind;
       if (x.options !== undefined) t.options = x.options;
-      if (x.needs !== undefined) t.needs = x.needs || null;
+      if (x.needs !== undefined && !kept) t.needs = x.needs || null;
       if (x.priority !== undefined) t.priority = x.priority;
       if (x.conversation !== undefined) t.conversation = x.conversation;
       if (x.project !== undefined) t.project = x.project;
@@ -86,8 +86,8 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
       if (x.due !== undefined) t.timing.due = x.due;
       if (trigger !== undefined) { t.timing.trigger = trigger; t.timing.snoozed = false; }
       if (x.push !== undefined) t.attention.push = x.push;
-      if (x.step !== undefined) t.progress.step = x.step || null;
-      if (x.line !== undefined) t.progress.line = x.line || null;
+      if (x.step !== undefined && !kept) t.progress.step = x.step || null;
+      if (x.line !== undefined && !kept) t.progress.line = x.line || null;
       if (x.workers !== undefined) t.workers = x.workers;
       if (x.outputs !== undefined) t.outputs = x.outputs;
       if (x.source !== undefined) t.source = x.source;
@@ -96,7 +96,9 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
       if (x.state !== undefined && !isClosed(t)) t.stale = false;
       if (kept && !isClosed(t)) t.state = before(x.id).state;
     }, caller(ctx));
-    return kept && x.state !== undefined && !isClosed({ state: x.state }) ? { ...task, note: "The user closed this task, so it stays closed. Ask them before reopening it (then pass reopen: true)." } : task;
+    if (!kept) return task;
+    if (x.step !== undefined || x.line !== undefined) store.event(x.id, "progress", { step: x.step ?? null, line: x.line ?? null, by: caller(ctx), kept: true });
+    return { ...task, note: KEPT_CLOSED };
   };
 
   const get = (id: string) => {

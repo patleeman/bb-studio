@@ -7,7 +7,7 @@ import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageMore, BotPageRow, Bot
 import { MenuSelect } from "../../ui/menu-select";
 import { useCall, useLive } from "../../ui/live";
 import { isClosed, needsYou, USER_OWNER, type Task } from "../../tasks/contract";
-import { ALL, filterChoices, ownerFilterOf, ownerLabel, sectionTasks, taskKind, taskStatus, type Names, type SectionId } from "../../tasks/ui/model";
+import { ALL, filterChoices, ownerFilterOf, ownerLabel, ownerShort, sectionTasks, taskSection, taskKind, taskStatus, type Names, type SectionId } from "../../tasks/ui/model";
 import { SCHEDULED_ICON, scheduledMeta } from "./scheduled-model";
 import { NewAutomationMenu, newKinds, useAutomationEditor, useAutomations } from "../../ui/bot/Automations";
 import { useNeedsYou } from "./LoopsTab";
@@ -25,7 +25,7 @@ export function taskMeta(task: Task, names: Names, now: number, zone?: string): 
   if (trigger.type === "time" && trigger.at !== undefined) return { text: shortWhen(trigger.at, now, zone), tone: "neutral" };
   if (trigger.type === "place" && trigger.place) return { text: placeLabel(trigger.place, trigger.direction), tone: "neutral" };
   if (trigger.type === "event" && trigger.event) return { text: eventLabel(trigger.event, trigger.label), tone: "neutral" };
-  if (task.owner !== USER_OWNER) return { text: `${ownerLabel(task.owner, names)} · ${taskStatus(task).label}`, tone: "neutral" };
+  if (task.owner !== USER_OWNER) return { text: `${ownerShort(task, names)} · ${taskStatus(task).label}`, tone: "neutral" };
   if (task.kind === "waiting-outside") return { text: `Since ${shortWhen(task.createdAt, now, zone)}`, tone: "neutral" };
   return null;
 }
@@ -55,7 +55,7 @@ export function TodosPage({ view }: { view: BotView }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(timer); }, []);
   const names: Names = { bot: people.botName, leads: people.leads, threads: list.data?.threads ?? [], botThreadId: people.botThreadId };
-  const sections = useMemo(() => sectionTasks(tasks, { area, project, owner, query }, now, zone), [tasks, area, project, owner, query, now, zone]);
+  const sections = useMemo(() => sectionTasks(tasks, { area, project, owner, query, botThreadId: people.botThreadId }, now, zone), [tasks, area, project, owner, query, now, zone, people.botThreadId]);
   const filtered = area !== ALL || project !== ALL || owner !== ALL;
   const showChat = !query.trim() && area === ALL && project === ALL && (owner === ALL || owner === USER_OWNER);
   const chatRows = showChat ? pending.length : 0;
@@ -70,7 +70,7 @@ export function TodosPage({ view }: { view: BotView }) {
     area: filterChoices(tasks, (t) => t.area),
     project: filterChoices(tasks, (t) => t.project, (id) => projects.get(id) ?? id),
     owner: [{ id: ALL, label: "Everyone" }, { id: USER_OWNER, label: "You" }, { id: "cos", label: people.botName }, { id: "agents", label: "Agents" },
-      ...[...new Set(tasks.map((t) => t.owner).filter((o) => o.startsWith("thread:")))].map((o) => ({ id: o, label: ownerLabel(o, names) }))],
+      ...[...new Set(tasks.map((t) => t.owner).filter((o) => o.startsWith("thread:") && o !== `thread:${people.botThreadId}`))].map((o) => ({ id: o, label: ownerLabel(o, names) }))],
   };
 
   const row = (task: Task) => {
@@ -78,7 +78,7 @@ export function TodosPage({ view }: { view: BotView }) {
     const closed = isClosed(task);
     const agent = task.owner !== USER_OWNER && task.kind !== "waiting-outside";
     return (
-      <BotPageRow key={task.id} testId={closed ? "task-done-row" : "task-row"} data={{ "data-task": task.id, "data-owner": ownerFilterOf(task.owner) }} muted={closed}
+      <BotPageRow key={task.id} testId={closed ? "task-done-row" : "task-row"} data={{ "data-task": task.id, "data-owner": ownerFilterOf(task.owner, people.botThreadId) }} muted={closed}
         icon={closed ? (task.state === "done" ? "CircleCheck" : "X") : agent ? "Bot" : taskKind(task).icon}
         iconClassName={closed ? (task.state === "done" ? "text-success" : undefined) : task.state === "in_progress" ? "text-success" : needsYou(task) ? "text-warning" : undefined}
         title={task.title} titleText={task.title} meta={meta?.text} metaTone={meta?.tone ?? "neutral"} {...rowOpen({ kind: "todo", id: task.id }, task.title)} />
@@ -101,6 +101,7 @@ export function TodosPage({ view }: { view: BotView }) {
   const mine = sections.today.length + sections.later.length + chatRows;
   const scheduledCount = scheduled.length + sections.scheduled.length;
   const scheduledRows = fold("scheduled", scheduled);
+  const anyScheduled = (scheduledList.data?.items ?? []).some((item) => item.source === "automation" && item.botId === bot.id) || tasks.some((t) => taskSection(t, now, zone) === "scheduled");
   const doneRows = fold("done", sections.done);
 
   return (
@@ -135,7 +136,7 @@ export function TodosPage({ view }: { view: BotView }) {
             <BotPageRow key={item.key} testId="scheduled-row" data={{ "data-scheduled": item.key }} icon={SCHEDULED_ICON[item.kind]} muted={item.state === "paused"}
               title={item.title} titleText={item.title} meta={scheduledMeta(item, now, zone)} {...rowOpen(item.link, item.title)} />
           ))}
-          {!scheduledCount && !(scheduledList.error && !scheduledList.data) ? <BotPageEmpty testId="scheduled-empty" {...(query.trim() ? { title: noMatch("scheduled items", query) } : filtered ? { title: "No scheduled items match these filters" } : { title: "Nothing scheduled yet", hint: "Add a reminder or a check-in with New." })} /> : null}
+          {!scheduledCount && !(scheduledList.error && !scheduledList.data) ? <BotPageEmpty testId="scheduled-empty" {...(query.trim() ? { title: noMatch("scheduled items", query) } : filtered && anyScheduled ? { title: "No scheduled items match these filters" } : { title: "Nothing scheduled yet", hint: "Add a reminder or a check-in with New." })} /> : null}
           {moreLine("scheduled", "Scheduled", scheduledRows.more)}
         </BotPageGroup>
       ) : null}

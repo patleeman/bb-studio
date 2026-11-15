@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { Task } from "../contract";
-import { ALL, everMine, filterChoices, handOffTargets, historyLines, inFlightDetail, matches, ownerLabel, rowNumber, sectionTasks, taskSection, taskStatus } from "./model";
+import { ALL, everMine, ownerShort, filterChoices, handOffTargets, historyLines, inFlightDetail, matches, ownerLabel, rowNumber, sectionTasks, taskSection, taskStatus } from "./model";
 
 const NOW = new Date("2026-11-13T15:00:00Z").getTime();
 const t = (patch: Partial<Task> = {}): Task => ({
@@ -96,4 +96,30 @@ it("knows whether a task was ever the user's", () => {
   expect(everMine([{ type: "created", at: 1, data: JSON.stringify({ by: "thread:thr_w", owner: "thread:thr_w" }) }])).toBe(false);
   expect(everMine([{ type: "added_by_you", at: 1, data: "{}" }])).toBe(true);
   expect(everMine([{ type: "handed_off", at: 1, data: JSON.stringify({ owner: "cos", from: "patrick" }) }])).toBe(true);
+});
+
+it("files the Bot's chat under the Bot in the owner filter", () => {
+  const f = { area: ALL, project: ALL, owner: "cos", query: "", botThreadId: "thr_bot" };
+  expect(matches(t({ owner: "thread:thr_bot" }), f)).toBe(true);
+  expect(matches(t({ owner: "cos" }), f)).toBe(true);
+  expect(matches(t({ owner: "thread:thr_bot" }), { ...f, owner: "agents" })).toBe(false);
+});
+
+it("doesn't repeat the title as the owner's name", () => {
+  const n = { ...names, threads: [{ owner: "thread:thr_w", name: "Worker: draft release notes", threadId: "thr_w" }] };
+  expect(ownerShort(t({ owner: "thread:thr_w", title: "Worker: draft release notes", card: { kind: "worker", messageId: null, messageSeq: null, dismissedAt: null } }), n)).toBe("Its worker");
+  expect(ownerShort(t({ owner: "thread:thr_w", title: "Ship it" }), n)).toBe("Worker: draft release notes");
+  expect(ownerShort(t({ owner: "cos", title: "Chief of Staff" }), n)).toBe("Chief of Staff");
+});
+
+it("writes one history line per choice, and marks updates that came after the task was closed", () => {
+  const lines = historyLines([
+    { type: "handed_off", at: 10, data: JSON.stringify({ owner: "thread:thr_w", from: "patrick", by: "patrick" }) },
+    { type: "progress", at: 10, data: JSON.stringify({ step: null, line: "Chose: Short" }) },
+    { type: "acted", at: 10, data: JSON.stringify({ action: "choose", option: "Short" }) },
+    { type: "closed", at: 20, data: JSON.stringify({ action: "choose", option: "Taco Lab" }) },
+    { type: "acted", at: 20, data: JSON.stringify({ action: "choose", option: "Taco Lab" }) },
+    { type: "progress", at: 30, data: JSON.stringify({ step: "5/5", line: "Back on it", kept: true }) },
+  ], names);
+  expect(lines.map((l) => l.text)).toEqual(["5/5 · Back on it (after it was closed)", "You chose Taco Lab", "You chose Short", "You handed it to Fix the flaky test"]);
 });

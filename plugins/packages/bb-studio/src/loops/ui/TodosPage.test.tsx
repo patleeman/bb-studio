@@ -387,3 +387,13 @@ it("shows due times in Todos' time zone, not the computer's: 9:00 AM Pacific rea
   await act(async () => { root.render(<TodosPage view={view} />); });
   expect(container.textContent).toContain("Due Fri, 12:00 PM");
 });
+
+it("lists the Bot once in the owner filter, covering the tasks its chat owns, and says Nothing scheduled yet when a filter is on but nothing is scheduled", async () => {
+  (state.groups as Record<string, Loop[]>).agentsOnIt.push(loop("loop_m", "Card from Main", { owner: "thread:thr_bot", status: "in_progress" }), loop("loop_b", "The Bot's own", { owner: "cos", status: "in_progress" }));
+  await render();
+  const owners = [...container.querySelectorAll<HTMLElement>("[role=menuitem]")].map((each) => each.textContent).filter((label) => label === "Chief of Staff");
+  expect(owners).toHaveLength(1);
+  await act(async () => [...container.querySelectorAll<HTMLButtonElement>("[role=menuitem]")].find((each) => each.textContent === "Chief of Staff")!.click());
+  expect(titles(container)).toEqual(["Card from Main", "The Bot's own"]);
+  expect(container.querySelector("[data-testid=scheduled-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("Nothing scheduled yet");
+});

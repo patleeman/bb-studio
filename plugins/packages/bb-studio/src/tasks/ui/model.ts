@@ -97,13 +97,18 @@ export function historyLines(history: readonly TaskEvent[], names: Names): Histo
       case "surfaced": case "surfaced_by_you": text = "Came up in Today"; break;
       case "acted": text = d.action === "choose" && str(d.option) ? `You chose ${str(d.option)}` : d.action === "nudge" ? "You asked for a nudge" : null; break;
       case "state": text = d.state === "waiting" ? "Waiting" : d.state === "in_progress" ? "In progress" : d.state === "todo" ? "To do" : null; break;
-      case "progress": text = [str(d.step), str(d.line)].filter(Boolean).join(" · ") || null; break;
+      case "progress": text = [str(d.step), str(d.line)].filter(Boolean).join(" · ") || null; if (text && d.kept) text += " (after it was closed)"; break;
       case "started": text = "Started"; break;
       default: text = null;
     }
     if (text) out.push({ at: event.at, text, type: event.type });
   }
-  return out.filter((line, i) => !(line.type === "closed" && out[i - 1]?.type === "acted" && out[i - 1]?.text.startsWith("You chose"))).reverse();
+  const chosen = (line: HistoryLine) => line.type === "acted" && line.text.startsWith("You chose");
+  return out.filter((line, i) => {
+    if (line.type === "closed" && line.text.startsWith("Chose ") && (chosen(out[i - 1] ?? line) || chosen(out[i + 1] ?? line))) return false;
+    if (line.type === "progress" && line.text.startsWith("Chose: ") && out.some((other) => chosen(other) && Math.abs(other.at - line.at) < 1000)) return false;
+    return true;
+  }).reverse();
 }
 
 export function taskDate(task: Pick<Task, "timing">): number | null {
@@ -136,16 +141,17 @@ export function taskSection(task: Task, now = Date.now(), zone?: string): Sectio
 }
 
 export const ALL = "all";
-export type TaskFilters = { area: string; project: string; owner: string; query: string };
+export type TaskFilters = { area: string; project: string; owner: string; query: string; botThreadId?: string | null };
 
-export function ownerFilterOf(owner: string): string {
+export function ownerFilterOf(owner: string, botThreadId?: string | null): string {
+  if (botThreadId && owner === `thread:${botThreadId}`) return "cos";
   return owner === USER_OWNER || owner === "cos" ? owner : "agents";
 }
 
 export function matches(task: Task, f: TaskFilters): boolean {
   if (f.area !== ALL && (task.area ?? "").trim() !== f.area) return false;
   if (f.project !== ALL && task.project !== f.project) return false;
-  if (f.owner !== ALL && ownerFilterOf(task.owner) !== f.owner && task.owner !== f.owner) return false;
+  if (f.owner !== ALL && ownerFilterOf(task.owner, f.botThreadId) !== f.owner && task.owner !== f.owner) return false;
   const words = f.query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   if (!words.length) return true;
   const text = [task.title, task.why, task.area ?? "", task.project ?? "", task.source?.ref ?? "", task.progress.line ?? ""].join(" ").toLowerCase();
@@ -186,4 +192,13 @@ export function everMine(history: readonly TaskEvent[]): boolean {
     const d = parse(e.data);
     return (e.type === "created" || e.type === "handed_off") && (d.owner === USER_OWNER || d.from === USER_OWNER);
   });
+}
+
+export function ownerShort(task: Pick<Task, "owner" | "title" | "kind" | "card">, names: Names): string {
+  const name = ownerLabel(task.owner, names);
+  if (!task.owner.startsWith("thread:")) return name;
+  const a = name.trim().toLowerCase(), b = task.title.trim().toLowerCase();
+  if (!a || !b || !(a === b || a.includes(b) || b.includes(a))) return name;
+  const card = task.card?.kind;
+  return card === "lead" ? "Its lead" : card === "release" ? "Its release worker" : "Its worker";
 }

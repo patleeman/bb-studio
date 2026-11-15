@@ -106,7 +106,7 @@ it("takes a task back from an agent: it lands in Today as the user's and the age
   const { task } = await tool("task_create", { title: "Draft the release notes", owner: "me", card: true, step: "2/4 Draft", line: "Writing the intro" });
   const out = await handlers["tasks.act"]!({ id: task.id, action: "take_back" });
   expect(out.task).toMatchObject({ owner: "patrick", state: "todo", attention: { queue: "surfaced" }, progress: { step: null, line: null } });
-  expect(sent).toEqual([{ threadId: "thr_worker", text: expect.stringMatching(/took task "Draft the release notes".*back\. Stop working on it/) }]);
+  expect(sent).toEqual([{ threadId: "thr_worker", text: expect.stringMatching(/took task "Draft the release notes".*back to do it themselves\. Stop working on it/) }]);
 });
 
 it("an agent hands a decision to the user; choosing hands it back to that agent with the choice", async () => {
@@ -273,18 +273,19 @@ it("handing on a question an agent asked tells that agent who has it now", async
   expect(sent.find((m) => m.threadId === "thr_lead")!.text).toMatch(/^The user handed you a task/);
 });
 
-it("after the user's own take-back, a choice doesn't go to the agent that last had it, and the morning list doesn't count it as handed over", async () => {
+it("take back, then choose: the choice goes to the agent that asked, the Bot gets nothing, and the morning list doesn't rank the take-back", async () => {
   const { handlers, tool, sent, posts, loops } = setup();
-  const { task } = await tool("task_create", { title: "Pick a db", owner: "me" });
-  await tool("task_handoff", { id: task.id, to: "user", needs: "Which one?", options: ["A", "B"] });
+  const { task } = await tool("task_create", { title: "Pick the tone", owner: "me" });
+  await tool("task_handoff", { id: task.id, to: "user", needs: "Which tone?", options: ["Formal", "Friendly"] });
   await handlers["tasks.act"]!({ id: task.id, action: "hand_off", to: "cos" });
   await handlers["tasks.act"]!({ id: task.id, action: "take_back" });
-  expect(handedBy((await handlers["tasks.get"]!({ id: task.id })).history)).toBeNull();
+  expect(handedBy((await handlers["tasks.get"]!({ id: task.id })).history)).toBe("thread:thr_worker");
   expect(loops.scheduler.morning().movedToYou).toEqual([]);
   posts.length = 0; sent.length = 0;
-  const out = await handlers["tasks.act"]!({ id: task.id, action: "choose", option: "A" });
-  expect(out.task).toMatchObject({ owner: "patrick", state: "done" });
-  expect(posts.some((p) => /carry on with that choice/i.test(p))).toBe(false);
+  const out = await handlers["tasks.act"]!({ id: task.id, action: "choose", option: "Friendly" });
+  expect(out.task).toMatchObject({ owner: "thread:thr_worker", state: "in_progress", progress: { line: "Chose: Friendly" } });
+  expect(sent).toEqual([{ threadId: "thr_worker", text: expect.stringMatching(/chose "Friendly" for task "Pick the tone"/) }]);
+  expect(posts).toEqual([]);
 });
 
 it("Done on an agent's task tells it; its later update keeps the task closed unless it reopens on purpose; Undo tells it again", async () => {
@@ -294,7 +295,8 @@ it("Done on an agent's task tells it; its later update keeps the task closed unl
   expect(done.task).toMatchObject({ state: "done", closedBy: "patrick" });
   expect(sent.at(-1)).toEqual({ threadId: "thr_worker", text: expect.stringMatching(/finished task "Draft the notes".*Stop working on it, and don't reopen it unless they ask\./) });
   const kept = await tool("task_update", { id: task.id, state: "in_progress", line: "Still polishing" });
-  expect(kept).toMatchObject({ state: "done", progress: { line: "Still polishing" }, note: expect.stringMatching(/stays closed/) });
+  expect(kept).toMatchObject({ state: "done", progress: { line: null }, note: expect.stringMatching(/stays closed and your update went only into its history/) });
+  expect((await handlers["tasks.get"]!({ id: task.id })).history.at(-1)).toMatchObject({ type: "progress", data: expect.stringContaining("Still polishing") });
   expect((await tool("task_update", { id: task.id, state: "in_progress", reopen: true })).state).toBe("in_progress");
   await handlers["tasks.act"]!({ id: task.id, action: "drop" });
   expect(sent.at(-1)!.text).toMatch(/^The user dismissed task/);
@@ -307,8 +309,9 @@ it("a work card the user closed stays closed when the worker updates it", async 
   const { handlers, tools } = setup();
   const made = JSON.parse(await tools.work_card_create!.execute({ title: "Release 1.0.7", kind: "release" }, { threadId: "thr_main" }));
   await handlers["tasks.act"]!({ id: made.id, action: "done" });
-  const card = JSON.parse(await tools.work_card_update!.execute({ id: made.id, state: "running", step: "5/5" }, { threadId: "thr_main" }));
-  expect(card).toMatchObject({ state: "done" });
+  const card = JSON.parse(await tools.work_card_update!.execute({ id: made.id, state: "running", step: "5/5", line: "Back on it" }, { threadId: "thr_main" }));
+  expect(card).toMatchObject({ state: "done", step: null, line: null, note: expect.stringMatching(/stays closed/) });
+  expect((await handlers["tasks.get"]!({ id: made.id })).history.at(-1)).toMatchObject({ type: "progress", data: expect.stringContaining("Back on it") });
 });
 
 it("a choice made on the phone or from a push goes back to the agent that asked, like the desktop's", async () => {
@@ -351,4 +354,23 @@ it("turns a runtime database error into a plain message for the UI and logs the 
   expect(() => failing.boom()).toThrow(/^Tasks couldn't be read or saved just now/);
   expect(log).toHaveBeenCalledWith(expect.stringContaining("database is locked"));
   await expect(failing.other()).rejects.toThrow("Task x not found");
+});
+
+it("Done then Undo on a question an agent asked brings the question back to Today, and tells the agent", async () => {
+  const { handlers, tools, sent } = setup();
+  const made = JSON.parse(await tools.work_card_create!.execute({ title: "Settings polish", kind: "lead", workerThreadId: "thr_lead" }, { threadId: "thr_main" }));
+  await tools.work_card_update!.execute({ id: made.id, state: "needs-you", needs: "Reset or Restore defaults?" }, { threadId: "thr_main" });
+  await handlers["tasks.act"]!({ id: made.id, action: "done" });
+  const back = await handlers["tasks.act"]!({ id: made.id, action: "reopen" });
+  expect(back.task).toMatchObject({ owner: "patrick", state: "waiting", needs: "Reset or Restore defaults?", attention: { queue: "surfaced" } });
+  expect(sent.at(-1)).toEqual({ threadId: "thr_lead", text: expect.stringMatching(/reopened task "Settings polish".*Your question is back with them/) });
+});
+
+it("Done then Undo on a decision an agent asked keeps its options and its place in Today", async () => {
+  const { handlers, tool } = setup();
+  const { task } = await tool("task_create", { title: "Pick a venue", owner: "me" });
+  await tool("task_handoff", { id: task.id, to: "user", needs: "Which venue?", options: ["Taco Lab", "Noodle Bar"] });
+  await handlers["tasks.act"]!({ id: task.id, action: "done" });
+  const back = await handlers["tasks.act"]!({ id: task.id, action: "reopen" });
+  expect(back.task).toMatchObject({ owner: "patrick", state: "waiting", kind: "decide", options: ["Taco Lab", "Noodle Bar"], needs: "Which venue?", attention: { queue: "surfaced" } });
 });

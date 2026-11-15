@@ -20,6 +20,7 @@ const OWNER = /^(patrick|cos|thread:.+)$/;
 export const storedOwner = z.string().regex(OWNER);
 export const ownerInput = z.string().regex(/^(user|patrick|cos|me|thread:.+)$/).describe('"user" (the user), "cos" (the Bot), "me" (the calling thread) or "thread:<id>"');
 export const isClosed = (task: { state: TaskState }) => CLOSED_STATES.includes(task.state);
+export const KEPT_CLOSED = "The user closed this task, so it stays closed and your update went only into its history. Ask them before reopening it (task_update with reopen: true).";
 export const closedByUser = (task: { state: TaskState; closedBy: string | null }) => isClosed(task) && task.closedBy === USER_OWNER;
 export const needsYou = (task: { owner: string; state: TaskState; kind: TaskKind }) => task.owner === USER_OWNER && task.state === "waiting" && task.kind !== "waiting-outside";
 

@@ -6,7 +6,7 @@ import { useComposerThread } from "../../kit/composer";
 import { Icon, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import { isClosed, needsYou, TASKS_UNAVAILABLE, USER_OWNER, type Task } from "../../tasks/contract";
-import { inFlightDetail, ownerLabel, ownerThreadId, taskStatus } from "../../tasks/ui/model";
+import { inFlightDetail, ownerShort, ownerThreadId, taskStatus } from "../../tasks/ui/model";
 import { TaskGlyph } from "../../tasks/ui/TaskCard";
 import { openLoops, useLoopPeople } from "../../loops/ui/hooks";
 import { ENDED_DETAIL } from "./model";
@@ -40,7 +40,7 @@ export function InFlight({ threadId }: { threadId: string }) {
   const onScreen = useCardsOnScreen();
   const tasks = live.data?.tasks ?? [];
   const threads = live.data?.threads ?? [];
-  const names = { bot: people.botName, leads: people.leads, threads };
+  const names = { bot: people.botName, leads: people.leads, threads, botThreadId: people.botThreadId };
   const visible = tasks.filter((task) => !onScreen.has(task.id) && hidden.get(task.id) !== task.updatedAt);
   const rows = visible.some((task) => !isClosed(task)) ? visible : [];
   if (!live.data && live.error?.includes(TASKS_UNAVAILABLE)) return <p role="alert" data-testid="in-flight-error" className="px-3 py-1.5 text-xs text-destructive">{live.error}</p>;
@@ -76,7 +76,7 @@ export function InFlight({ threadId }: { threadId: string }) {
         <button type="button" data-testid="in-flight-row" data-state={status.id} data-owner={card.owner} data-stale={card.stale || undefined} title={card.title} onClick={() => reveal(card)} className="flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 py-1 pl-3 pr-1 text-left text-xs transition-colors hover:bg-state-hover focus-visible:bg-state-hover focus-visible:outline-none">
           <span className="flex w-3 shrink-0 justify-center"><TaskGlyph glyph={status.glyph} stale={status.stale} label={status.label} /></span>
           <span className="min-w-0 max-w-[45%] shrink-0 truncate text-foreground">{card.title}</span>
-          {agent ? <span data-testid="in-flight-owner" className="max-w-[25%] shrink-0 truncate text-muted-foreground">{ownerLabel(card.owner, names)}</span> : null}
+          {agent ? <span data-testid="in-flight-owner" className="max-w-[25%] shrink-0 truncate text-muted-foreground">{ownerShort(card, names)}</span> : null}
           <span className="min-w-0 flex-1 truncate text-subtle-foreground">{detail}</span>
           {status.id === "needs-you"
             ? <span data-testid="in-flight-needs-you" className="shrink-0 rounded bg-warning/15 px-1.5 py-px text-2xs font-medium text-warning">Needs you</span>

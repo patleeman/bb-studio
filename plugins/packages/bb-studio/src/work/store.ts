@@ -44,8 +44,9 @@ export class WorkCardStore {
     const parsed = changesSchema.parse(input);
     const current = this.get(id);
     const task = this.tasks.find(id);
-    const kept = !!task && closedByUser(task) && parsed.state !== undefined && !isFinished({ state: parsed.state });
-    const x = kept ? { ...parsed, state: undefined } : parsed;
+    const kept = !!task && closedByUser(task);
+    if (kept && (parsed.step !== undefined || parsed.line !== undefined)) this.tasks.event(id, "progress", { step: parsed.step ?? null, line: parsed.line ?? null, by: task!.workers[0] ? `thread:${task!.workers[0]}` : null, kept: true });
+    const x = kept ? { ...parsed, state: undefined, step: undefined, line: undefined, needs: undefined } : parsed;
     const empty = (value: string | null | undefined) => (value === undefined ? undefined : value || null);
     const next: WorkCard = {
       ...current,

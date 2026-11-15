@@ -33,7 +33,8 @@ export function handedBy(history: readonly TaskEvent[]): string | null {
     if (event.type !== "handed_off") continue;
     let data: { owner?: string; from?: string; by?: string | null };
     try { data = JSON.parse(event.data || "{}") as typeof data; } catch { continue; }
-    if (data.owner !== USER_OWNER || data.by === USER_OWNER) return null;
+    if (data.by === USER_OWNER) continue;
+    if (data.owner !== USER_OWNER) return null;
     return data.from && AGENT.test(data.from) ? data.from : null;
   }
   return null;
@@ -129,7 +130,7 @@ export class UserTasks {
     const previous = AGENT.test(before.owner) ? before.owner : asked;
     const told = previous && previous !== to
       ? await this.tell(previous, before.owner === previous
-        ? `The user handed task ${this.brief(before)} to ${toName}. Stop working on it; it is theirs now.`
+        ? `The user handed task ${this.brief(before)} to ${toName}. Stop working on it; they have it now.`
         : `The user handed your question on task ${this.brief(before)} to ${toName}, who has the task now. Don't wait for the user's answer on it.`)
       : null;
     return { task, note: failed ?? told };
@@ -146,7 +147,7 @@ export class UserTasks {
       t.timing.snoozed = false;
       t.progress = { step: null, line: null };
     }, USER_OWNER);
-    const failed = await this.tell(before.owner, `The user took task ${this.brief(task)} back. Stop working on it; it is theirs now.`);
+    const failed = await this.tell(before.owner, `The user took task ${this.brief(task)} back to do it themselves. Stop working on it.`);
     return { task, note: failed };
   }
 
@@ -179,10 +180,20 @@ export class UserTasks {
     if (x.action === "choose" && from && !isClosed(before) && before.owner === USER_OWNER) return this.answer(x.id, x.option ?? "", from);
     if (x.action === "reopen") {
       if (!isClosed(before)) return { task: before, note: null };
-      if (todo) { this.deps.reopenLoop(x.id); this.store.change(x.id, (t) => { t.needs = null; if (AGENT.test(t.owner)) t.state = "in_progress"; }, USER_OWNER); }
-      else this.store.change(x.id, (t) => { t.state = t.owner === USER_OWNER ? "todo" : "in_progress"; t.needs = null; t.stale = false; }, USER_OWNER);
+      const asked = before.owner === USER_OWNER && !!from && !!before.needs;
+      if (todo) this.deps.reopenLoop(x.id);
+      this.store.change(x.id, (t) => {
+        t.stale = false;
+        if (AGENT.test(t.owner)) { t.state = "in_progress"; t.needs = null; return; }
+        t.attention.queue = "surfaced";
+        t.timing.snoozed = false;
+        if (asked) t.state = "waiting";
+        else { t.state = t.kind === "waiting-outside" ? "waiting" : "todo"; t.needs = null; }
+      }, USER_OWNER);
       const task = this.store.get(x.id);
-      const note = AGENT.test(task.owner) ? await this.tell(task.owner, `The user reopened task ${this.brief(task)} It is yours again; carry on and record progress with task_update.`) : null;
+      const note = AGENT.test(task.owner)
+        ? await this.tell(task.owner, `The user reopened task ${this.brief(task)} It is yours again; carry on and record progress with task_update.`)
+        : asked && from ? await this.tell(from, `The user reopened task ${this.brief(task)} Your question is back with them; wait for their answer.`) : null;
       return { task, note };
     }
     if (x.action === "snooze" && todo && x.at !== undefined && !x.snooze) {

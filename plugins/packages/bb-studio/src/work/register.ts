@@ -5,6 +5,7 @@ import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { changes, createInput, directiveFor, isFinished, rpcContract, WORK_ID, type CreateInput, type WorkCard, type WorkChanges } from "./contract";
 import { WorkCardStore } from "./store";
 import { assertTasksReady, guardTasks } from "../tasks/store";
+import { closedByUser, KEPT_CLOSED } from "../tasks/contract";
 
 type TimelineRow = { id: string; kind?: string; role?: string; text?: string; messageSeq?: number };
 type TimelinePage = { rows?: TimelineRow[]; timelinePage?: { olderCursor?: { anchorSeq: number; anchorId: string } | null } };
@@ -125,7 +126,7 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     name: "work_card_update",
     description: UPDATE_DESCRIPTION,
     parameters: changes.extend({ id: z.string().regex(WORK_ID) }),
-    execute: async ({ id, ...rest }) => { assertTasksReady(db); return JSON.stringify(update(id, rest)); },
+    execute: async ({ id, ...rest }) => { assertTasksReady(db); const t = store.tasks.find(id); const kept = !!t && closedByUser(t); const card = update(id, rest); return JSON.stringify(kept ? { ...card, note: KEPT_CLOSED } : card); },
   });
   bb.agents.registerTool({
     name: "work_card_get",

@@ -210,3 +210,14 @@ it("offers Keep or Dismiss on one of the user's to-dos with no update in three d
   await click("Keep");
   expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "task_1", action: "keep" });
 });
+
+it("a card the agent closed offers Reopen for that agent, not Undo", async () => {
+  put({ owner: "thread:thr_w", state: "failed", closedAt: NOW - 1_000, closedBy: "thread:thr_w", workers: ["thr_w"] });
+  await render("work", { id: "task_1" });
+  expect(container.querySelector('[data-testid="task-undo"]')).toBeNull();
+  const reopen = container.querySelector<HTMLButtonElement>('[data-testid="task-reopen"]')!;
+  expect(reopen.textContent).toBe("Reopen for Fix the flaky test");
+  expect(reopen.title).toBe("Reopens it and asks Fix the flaky test to carry on");
+  await act(async () => reopen.click());
+  expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "task_1", action: "reopen" });
+});
