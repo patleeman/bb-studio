@@ -158,7 +158,7 @@ export class UserTasks {
     if (x.action === "choose" && from && !isClosed(before) && before.owner === USER_OWNER) return this.answer(x.id, x.option ?? "", from);
     if (x.action === "reopen") {
       if (!isClosed(before)) return { task: before, note: null };
-      if (todo) this.deps.reopenLoop(x.id);
+      if (todo) { this.deps.reopenLoop(x.id); this.store.change(x.id, (t) => { t.needs = null; }, USER_OWNER); }
       else this.store.change(x.id, (t) => { t.state = t.owner === USER_OWNER ? "waiting" : "in_progress"; t.stale = false; }, USER_OWNER);
       return { task: this.store.get(x.id), note: null };
     }

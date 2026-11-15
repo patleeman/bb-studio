@@ -10,6 +10,7 @@ import { ChangeTrigger, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu, CARD
 import { fullWhen, INLINE_OPTIONS, shortWhen, ownerName, ownerThread, safeUrl, sourceText, triggerLabel, type OwnerInfo } from "./model";
 import { TaskCardView, useTaskActions } from "../../tasks/ui/TaskCard";
 import { historyLines, taskStatus } from "../../tasks/ui/model";
+import { needsYou } from "../../tasks/contract";
 import type { TaskView } from "../../tasks/rpc-contract";
 import { useDiscussLoop, useLoopActions, useLoopPeople, usePlaceNames, useTodosZone, type LoopPeople } from "./hooks";
 
@@ -58,7 +59,7 @@ export function TodoDetail({ loop, people, places, owner, refresh, view = null }
     ...(loop.area ? [{ label: "Area", value: loop.area }] : []),
     { label: "Owner", value: ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owner) },
     ...(view ? [{ label: "State", value: taskStatus(view.task).label }] : []),
-    ...(view?.task.needs && !closed ? [{ label: "Needs", value: view.task.needs }] : []),
+    ...(view && view.task.needs && needsYou(view.task) ? [{ label: "Needs", value: view.task.needs }] : []),
     ...(source ? [{ label: "Source", value: url ? <a href={url} target="_blank" rel="noreferrer" className="text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground">{source}</a>
       : sourceThread ? <button type="button" className="underline decoration-border underline-offset-2 hover:decoration-foreground" onClick={() => navigate.toThread(sourceThread)}>{source}</button> : source }] : []),
     ...(closed && loop.closedAt ? [{ label: loop.status === "dropped" ? "Dismissed" : "Done", value: `${by ? `${by} · ` : ""}${fullWhen(loop.closedAt, Date.now(), zone)}` }] : []),
@@ -100,7 +101,7 @@ export function TodoDetail({ loop, people, places, owner, refresh, view = null }
         <section aria-label="History" data-testid="todo-history" className="flex flex-col gap-1 pt-2 text-xs">
           <h3 className="text-xs font-medium text-subtle-foreground">History</h3>
           <ol className="flex flex-col gap-1">
-            {history.slice(0, 20).map((line, i) => (
+            {history.slice(0, 6).map((line, i) => (
               <li key={`${line.at}-${i}`} className="flex min-w-0 items-baseline gap-2">
                 <span className="w-16 shrink-0 tabular-nums text-subtle-foreground">{shortWhen(line.at, Date.now(), zone)}</span>
                 <span className="min-w-0 text-muted-foreground">{line.text}</span>

@@ -142,7 +142,7 @@ it("snoozes a todo to a picked time, and Undo reopens a closed one into Today", 
   const snoozed = await handlers["tasks.act"]!({ id: todo.id, action: "snooze", at });
   expect(snoozed.task.timing).toMatchObject({ snoozed: true, trigger: { type: "time", at } });
   await handlers["tasks.act"]!({ id: todo.id, action: "done" });
-  expect((await handlers["tasks.act"]!({ id: todo.id, action: "reopen" })).task).toMatchObject({ state: "todo", attention: { queue: "surfaced" } });
+  expect((await handlers["tasks.act"]!({ id: todo.id, action: "reopen" })).task).toMatchObject({ state: "todo", attention: { queue: "surfaced" }, needs: null });
 });
 
 it("In flight lists this conversation's tasks, the user's first, then agents', then finished cards; never closed cardless or cleared ones", async () => {
@@ -238,4 +238,13 @@ it("names every thread in the task's history, not only today's owner", async () 
   await handlers["tasks.act"]!({ id: task.id, action: "take_back" });
   const view = await handlers["tasks.get"]!({ id: task.id });
   expect(view.threads.map((t: { owner: string }) => t.owner).sort()).toEqual(["thread:thr_lead", "thread:thr_worker"]);
+});
+
+it("records a Done line when an agent closes its own task", async () => {
+  const { handlers, tool } = setup();
+  const { task } = await tool("task_create", { title: "Ship the docs", owner: "me", card: true });
+  await tool("task_update", { id: task.id, state: "done" });
+  const view = await handlers["tasks.get"]!({ id: task.id });
+  expect(view.history.map((e: { type: string }) => e.type)).toEqual(["created", "closed"]);
+  expect(JSON.parse(view.history[1].data)).toMatchObject({ action: "done", by: "thread:thr_worker" });
 });
