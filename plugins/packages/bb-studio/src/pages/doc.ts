@@ -5,6 +5,7 @@ import { updateYFragment, yXmlFragmentToProseMirrorRootNode } from "y-prosemirro
 import * as Y from "yjs";
 import { blocksToMarkdown, markdownToBlocks, shortId, type PageBlock } from "./markdown";
 import { DOCUMENT_FRAGMENT } from "./schema-config";
+import { snapToWords } from "./word-snap";
 import { createServerEditor, type PageEditor } from "./schema-server";
 
 // Server-side access to a page's Y.Doc. Agent edits are applied as
@@ -345,21 +346,33 @@ export function addCommentMark(doc: Y.Doc, ref: string, threadId: string, quote:
 /** The text each comment thread is anchored to, and the block holding it. */
 export function commentAnchors(doc: Y.Doc): Map<string, { blockId: string; text: string }> {
   const root = yXmlFragmentToProseMirrorRootNode(fragmentOf(doc), pmSchema());
-  const anchors = new Map<string, { blockId: string; text: string }>();
+  const anchors = new Map<string, { blockId: string; text: string; start: number; end: number; contiguous: boolean; block: string }>();
   for (const block of blockContainers(root)) {
     const content = block.node.firstChild;
     if (!content?.isTextblock) continue;
+    const blockText = content.textContent;
+    let offset = 0;
     content.forEach((child) => {
+      const length = child.isText ? child.text!.length : child.textContent.length;
       for (const mark of child.marks) {
         if (mark.type.name !== "comment") continue;
         const threadId = String(mark.attrs.threadId);
-        const anchor = anchors.get(threadId) ?? { blockId: block.id, text: "" };
-        if (anchor.blockId === block.id) anchor.text += child.isText ? child.text : "";
+        const anchor = anchors.get(threadId) ?? { blockId: block.id, text: "", start: offset, end: offset, contiguous: true, block: blockText };
+        if (anchor.blockId === block.id) {
+          anchor.text += child.isText ? child.text : "";
+          if (offset !== anchor.end) anchor.contiguous = false;
+          anchor.end = offset + length;
+        }
         anchors.set(threadId, anchor);
       }
+      offset += length;
     });
   }
-  return anchors;
+  return new Map([...anchors].map(([threadId, anchor]) => {
+    if (!anchor.contiguous) return [threadId, { blockId: anchor.blockId, text: anchor.text }];
+    const [start, end] = snapToWords(anchor.block, anchor.start, anchor.end);
+    return [threadId, { blockId: anchor.blockId, text: anchor.block.slice(start, end) }];
+  }));
 }
 
 /** Blocks with text, in order: what a new comment can be anchored to. */

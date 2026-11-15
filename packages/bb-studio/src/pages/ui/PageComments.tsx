@@ -10,6 +10,7 @@ import { CommentsPanel, type CommentThread } from "../../ui/comments/CommentsPan
 import { THREADS_MAP } from "../schema-config";
 import type { PageConnection } from "./connection";
 import { pageFieldLabel } from "./talk";
+import { snapPositions } from "../word-snap";
 
 type Draft = { from: number; to: number; quote: string };
 
@@ -130,15 +131,20 @@ export function usePageComments({ editor, threadStore, connection, open, onOpenC
     return threadViews(threadStore.getThreads().values(), deleted, (id) => {
       const position = positions.get(id);
       if (!position) return { quote: "", at: null };
-      try { return { quote: doc.textBetween(position.from, position.to, " "), at: position.from }; }
+      try {
+        const shown = snapPositions(doc, position.from, position.to);
+        return { quote: doc.textBetween(shown.from, shown.to, " "), at: position.from };
+      }
       catch { return { quote: "", at: position.from }; }
     });
   }, [version, threadStore, positions, connection, editor]);
 
   const startDraft = useCallback(() => {
-    const { from, to, empty } = editor.prosemirrorState.selection;
-    if (empty) return;
-    const quote = editor.prosemirrorState.doc.textBetween(from, to, " ");
+    const { selection, doc } = editor.prosemirrorState;
+    if (selection.empty) return;
+    const { from, to } = snapPositions(doc, selection.from, selection.to);
+    const quote = doc.textBetween(from, to, " ");
+    if (from !== selection.from || to !== selection.to) editor._tiptapEditor.commands.setTextSelection({ from, to });
     comments.startPendingComment();
     setDraft({ from, to, quote });
     onOpenChange(true);
