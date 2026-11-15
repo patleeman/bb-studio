@@ -252,6 +252,73 @@ final class RoomDuoUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["roomMic"].waitForExistence(timeout: 15))
     }
 
+    func testUnfoldedLinksPushesAndNowKeepTheRoom() throws {
+        guard ProcessInfo.processInfo.environment["ROOM_DUO"] != nil else { throw XCTSkip("needs the iPhone Duo simulator") }
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaLoopsDemo",
+                                "-qaRoomTheme", "forest", "-qaPushTask", "task_demo_quote", "-qaPushConversation", "thr_demo_interview",
+                                "-qaPushDelay", "50"]
+        app.launchOffline()
+        if !app.buttons["roomNow"].waitForExistence(timeout: 30) {
+            app.terminate()
+            app.launchOffline()
+        }
+        XCTAssertTrue(app.buttons["roomNow"].waitForExistence(timeout: 60))
+        command("landscape")
+        sleep(2)
+        app.buttons["roomNow"].tap()
+        sleep(2)
+        XCTAssertTrue(app.buttons["roomNow"].isHittable, "tapping Now keeps the presence page")
+        XCTAssertTrue(any("roomTitle").exists)
+        any("RoomStage").swipeUp()
+        sleep(2)
+        XCTAssertTrue(app.buttons["roomNow"].isHittable, "so does a swipe up")
+        capture("p-landscape-now-tapped")
+        openPlace("memory", check: "memoryProfile")
+        XCTAssertTrue(any("task-sheet").waitForExistence(timeout: 45), "a push while Memory is open shows its task")
+        XCTAssertFalse(any("RoomSpread").exists, "and closes Memory")
+        capture("p-landscape-push-over-memory")
+        app.buttons["task-sheet-close"].tap()
+        XCTAssertTrue(any("roomTitle").waitForLabel(prefix: "Launch prep"), "the room is on the push's conversation")
+        capture("p-landscape-push-conversation")
+        command("shift?476")
+        let more = app.buttons["More"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        more.tap()
+        XCTAssertTrue(app.buttons["menuArchive"].waitForExistence(timeout: 5))
+        app.buttons["menuArchive"].tap()
+        command("landscape")
+        XCTAssertTrue(any("roomTitle").waitForLabel(prefix: "Juniper", timeout: 15), "archiving the shown conversation moves both pages to its neighbour")
+        capture("p-landscape-after-archive")
+    }
+
+    func testStills() throws {
+        guard ProcessInfo.processInfo.environment["ROOM_STILLS"] != nil else { throw XCTSkip("only for the stills") }
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaLoopsDemo", "-qaRoomLead",
+                                "-qaRoomTheme", ProcessInfo.processInfo.environment["ROOM_THEME"] ?? "forest"]
+        app.launchOffline()
+        if !app.buttons["roomNow"].waitForExistence(timeout: 30) {
+            app.terminate()
+            app.launchOffline()
+        }
+        XCTAssertTrue(app.buttons["roomNow"].waitForExistence(timeout: 60))
+        command("landscape")
+        sleep(4)
+        for name in ["main", "lead"] {
+            if name == "lead" {
+                any("RoomStage").swipeLeft()
+                XCTAssertTrue(any("roomTitle").waitForLabel(prefix: "Launch prep"))
+                command("landscape")
+                sleep(4)
+            }
+            capture("duo-landscape-\(name)")
+            shot("duo-landscape-\(name)-screen-left")
+            command("shift?476")
+            sleep(2)
+            shot("duo-landscape-\(name)-screen-right")
+            command("shift?240")
+        }
+    }
+
     func testTheRecording() throws {
         guard ProcessInfo.processInfo.environment["ROOM_RECORD"] != nil else { throw XCTSkip("only for the recording") }
         app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaLoopsDemo", "-qaRoomLead",

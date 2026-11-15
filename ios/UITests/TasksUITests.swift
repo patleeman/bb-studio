@@ -215,6 +215,16 @@ final class TasksUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["roomInput"].waitForExistence(timeout: 10), "the room stays")
     }
 
+    func testATaskPushWhileAPlaceIsOpenClosesItAndShowsTheTask() {
+        launch(["-qaRoomMode", "memory", "-qaPushTask", "task_demo_quote", "-qaPushConversation", "thr_demo_interview", "-qaPushDelay", "25"], ready: "RoomSheet-memory")
+        XCTAssertTrue(any("RoomSheet-memory").waitForExistence(timeout: 10), "Memory is open")
+        XCTAssertTrue(any("task-sheet").waitForExistence(timeout: 30), "the push shows its task")
+        XCTAssertFalse(any("RoomSheet-memory").exists, "and closes Memory")
+        app.buttons["task-sheet-close"].tap()
+        XCTAssertTrue(app.staticTexts["Launch prep"].waitForExistence(timeout: 10), "on its conversation")
+        shot("18-push-over-a-place")
+    }
+
     func testAnOlderStudioKeepsTodos() {
         launch(["-qaTasksOld"])
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'roomCard-'")).firstMatch.waitForExistence(timeout: 15), "the morning list still fills the room")

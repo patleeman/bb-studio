@@ -207,6 +207,13 @@ final class BotShellModel: ObservableObject {
     @Published var compactColumn: NavigationSplitViewColumn = .sidebar
     @Published var detailPath: [Route] = []
     @Published var roomOpen: BotPage?
+    @Published var roomFocus: String?
+    private var landing = false
+
+    func takeLanding() -> Bool {
+        defer { landing = false }
+        return landing
+    }
     @Published var themeOverride: [String: String] = [:]
     @Published var botToast: String?
     private(set) var landed = false
@@ -266,6 +273,7 @@ final class BotShellModel: ObservableObject {
         else { return }
         landed = true
         shownBotId = bot.id
+        landing = true
         selection = .conversation(main)
         compactColumn = .detail
     }

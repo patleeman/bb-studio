@@ -184,7 +184,9 @@ final class RoomUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(other.waitForExistence(timeout: 15))
         other.tap()
         XCTAssertTrue(app.textViews["composerField"].waitForExistence(timeout: 15), "the conversation opens")
-        if app.buttons["folded-back"].exists {
+        if app.buttons["roomLayDown"].exists {
+            app.buttons["roomLayDown"].tap()
+        } else if app.buttons["folded-back"].exists {
             app.buttons["folded-back"].tap()
         } else {
             app.navigationBars.firstMatch.buttons.element(boundBy: 0).tap()

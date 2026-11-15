@@ -129,18 +129,23 @@ struct InFlightBar: View {
             Button { reveal(task, names: names) } label: {
                 HStack(spacing: 8) {
                     TaskGlyph(status: status)
-                    Text(task.title).font(.footnote).lineLimit(1).layoutPriority(1)
-                    if !task.isMine {
-                        Text(names.short(task)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    }
-                    if let detail = TaskRules.detail(task) {
-                        Text(detail).font(.caption).foregroundStyle(.tertiary).lineLimit(1)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) {
+                            Text(task.title).font(.footnote).lineLimit(1)
+                            if !task.isMine { Text(names.short(task)).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                            if let detail = TaskRules.detail(task) { Text(detail).font(.caption).foregroundStyle(.tertiary).lineLimit(1) }
+                        }
+                        HStack(spacing: 8) {
+                            Text(task.title).font(.footnote).lineLimit(1)
+                            if !task.isMine { Text(names.short(task)).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                        }
+                        Text(task.title).font(.footnote).lineLimit(1)
                     }
                     Spacer(minLength: 4)
                     if status.id == "needs-you" {
-                        TaskChip(text: "Needs you", tone: .warning)
+                        TaskChip(text: "Needs you", tone: .warning).fixedSize()
                     } else {
-                        Text(status.label).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                        Text(status.label).font(.caption2).foregroundStyle(.secondary).lineLimit(1).fixedSize()
                     }
                 }
                 .padding(.leading, 12).padding(.trailing, task.cardKind == nil ? 12 : 2)

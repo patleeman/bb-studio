@@ -230,7 +230,7 @@ struct RoomConversations: View {
             Section {
                 ForEach(lines) { line in
                     Button {
-                        if line.threadId == mainThreadId { closeToRoom() } else { open(.conversation(line.threadId)) }
+                        open(.conversation(line.threadId))
                     } label: {
                         HStack {
                             BotConversationRow(line: line)
