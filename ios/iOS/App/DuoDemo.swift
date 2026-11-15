@@ -60,7 +60,18 @@ enum DuoDemo {
             }
             return result
         }
+        func composers(_ view: UIView) -> [[String: Any]] {
+            if let field = view as? UITextView, field.accessibilityIdentifier == "composerField", field.window != nil,
+               let host = sequence(first: field as UIView, next: \.superview).first(where: { $0.superview?.next is TranscriptController }) {
+                let rect = field.convert(field.bounds, to: nil)
+                let box = host.convert(host.bounds, to: nil)
+                return [["field": ["x": rect.minX, "y": rect.minY, "width": rect.width, "height": rect.height],
+                         "host": ["x": box.minX, "y": box.minY, "width": box.width, "height": box.height]]]
+            }
+            return view.subviews.flatMap(composers)
+        }
         return ["width": window.bounds.width, "height": window.bounds.height,
+                "composers": (window.windowScene?.windows ?? [window]).flatMap(composers),
                 "pane": DuoPaneState.shared.pane.rawValue,
                 "safeRight": window.safeAreaInsets.right, "safeBottom": window.safeAreaInsets.bottom,
                 "keyboardTop": keyboardTop ?? window.bounds.height,

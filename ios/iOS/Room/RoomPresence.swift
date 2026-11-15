@@ -56,7 +56,8 @@ struct RoomFit: Equatable {
 }
 
 extension Look {
-    var roomTint: Color { mode == .light ? Color(white: 0.96) : Color(lookHex: tokens.presence.palette.first ?? tokens.accent) }
+    var roomTint: Color { mode == .light ? Color(white: 0.96) : micTint }
+    var micTint: Color { Color(lookHex: tokens.presence.palette.first ?? tokens.accent) }
 }
 
 struct RoomPresenceScreen: View {

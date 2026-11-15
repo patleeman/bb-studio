@@ -320,13 +320,16 @@ struct TalkDraft: ViewModifier {
 struct HoldToTalkMic: View {
     @ObservedObject var talk: HoldToTalk
     var prominent = false
+    var themeTint: Color?
     /// Resets when the hold ends any way, including a cancelled gesture.
     @GestureState private var holding = false
     /// When the last hold ended, so its release doesn't also count as a tap.
     @State private var heldUntil: Date?
 
     var body: some View {
-        icon
+        Group {
+            if let themeTint { tinted(themeTint) } else { icon }
+        }
             // The tap on its own, beside the hold: composed with `exclusively`,
             // SwiftUI (iOS 27) never ended the tap, so the mic did nothing.
             .onTapGesture {
@@ -368,6 +371,17 @@ struct HoldToTalkMic: View {
             // A 44pt target around the 36pt circle.
             .frame(minWidth: 44, minHeight: 44)
             .contentShape(Rectangle())
+    }
+
+    private func tinted(_ tint: Color) -> some View {
+        Image(systemName: talk.isActive ? "mic.fill" : "mic")
+            .font(.title3.weight(.medium))
+            .foregroundStyle(talk.isActive ? Color.white : tint)
+            .frame(width: 44, height: 44)
+            .background(talk.isActive ? (talk.state == .cancelling ? Color.gray : Color(red: 1, green: 0.35, blue: 0.35)) : .clear, in: .circle)
+            .scaleEffect(talk.isActive ? 1.12 : 1)
+            .animation(.snappy(duration: 0.2), value: talk.state)
+            .contentShape(.circle)
     }
 
     /// Hold to talk: a quarter-second press, then the drag that can cancel.
