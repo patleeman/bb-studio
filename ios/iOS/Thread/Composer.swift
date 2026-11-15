@@ -171,6 +171,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
     /// nothing; the model chip shows with the keyboard (40 pt less chat hidden).
     var compact = false
     var prominentMic = false
+    var micTint: Color?
     var attaches = true
     @ViewBuilder let settings: () -> Settings
     @ViewBuilder let send: () -> Send
@@ -251,7 +252,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
 
     @ViewBuilder private var micAndSend: some View {
         if let talk {
-            HoldToTalkMic(talk: talk, prominent: prominentMic && empty)
+            HoldToTalkMic(talk: talk, prominent: prominentMic && empty && micTint == nil, themeTint: micTint)
         } else {
             Button(action: dictate) {
                 Image(systemName: "mic").font(.title3).frame(width: 36, height: 36)

@@ -149,6 +149,7 @@ final class ComposerKeyboardUITests: ServerIsolatedUITestCase {
             Thread.sleep(forTimeInterval: 1)
             shot("unfolded-right-page-empty")
             type("one")
+            Thread.sleep(forTimeInterval: 2)
             command("outer")
             Thread.sleep(forTimeInterval: 3)
             standUpAgain()

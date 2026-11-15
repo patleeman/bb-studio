@@ -74,6 +74,7 @@ struct ThreadView: View {
     @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
     @Environment(\.botConversation) private var shell
     @Environment(\.roomChat) private var roomEnvironment
+    @Environment(\.look) private var look
     private let roomSession: RoomSession?
     private var inRoom: Bool { roomSession != nil }
     private var roomChat: RoomChat? { inRoom ? roomEnvironment : nil }
@@ -1421,7 +1422,7 @@ struct ThreadView: View {
                 text: $draftText.value, focused: $composerFocused, attachments: $attachments,
                 placeholder: TalkIndicator.placeholder(talk) ?? WorkerInfo.askPlaceholder,
                 dictate: { talk.startDictation() }, talk: talk, clear: true, dictation: dictation,
-                compact: true, prominentMic: true, attaches: false
+                compact: true, prominentMic: true, micTint: look.micTint, attaches: false
             ) {
                 EmptyView()
             } send: {
@@ -1727,7 +1728,7 @@ struct ThreadView: View {
                 toPage: canUseNotes && !editing && !compactInput ? ComposerPageAction(
                     label: ThreadNotes.expandLabel(hasNote: notes.note != nil, draftEmpty: draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
                     busy: notes.expanding, disabled: dictation.blocksSend, run: expandToPage) : nil,
-                compact: true, prominentMic: compactInput
+                compact: true, prominentMic: compactInput, micTint: compactInput ? look.micTint : nil
             ) {
                 if !compactInput {
                     Button { choosingModel = true } label: { ComposerSettingsLabel(title: executionLabel) }
