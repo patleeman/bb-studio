@@ -2479,7 +2479,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "minis", summary: "List mini apps, read their records and state, and run their actions", usage: "bb studio minis <list|show|data|state|watch|actions|do> …" },
       { name: "theme", summary: "List, show, check, create, update, apply and delete Bot themes", usage: "bb studio theme <list|show|create|update|apply|check|delete|template> …" },
       { name: "presence", summary: "List, show, check, create, update, apply and delete Bot presences", usage: "bb studio presence <list|show|create|update|apply|check|delete|template> …" },
-      { name: "work", summary: "Live work cards: create one, update it in place, show and list a conversation's In flight cards", usage: "bb studio work <create|update|show|list> …" },
+      { name: "work", summary: "Live work cards: create one, update it in place, show and list a conversation's In flight cards, remove finished ones from the list", usage: "bb studio work <create|update|show|list|dismiss|clear> …" },
     ],
     async run(argv, ctx) {
       // Built-in kinds' commands (`bb artifacts …` before the merge).

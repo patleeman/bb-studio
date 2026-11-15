@@ -6,6 +6,10 @@ export function inFlightRows(cards: readonly WorkCard[]): WorkCard[] {
   return cards.some((card) => !isFinished(card)) ? [...cards] : [];
 }
 
+export function splitRows(cards: readonly WorkCard[]): { live: WorkCard[]; finished: WorkCard[] } {
+  return { live: cards.filter((card) => !isFinished(card)), finished: cards.filter(isFinished) };
+}
+
 export function openCount(cards: readonly WorkCard[]): number {
   return cards.filter((card) => !isFinished(card)).length;
 }

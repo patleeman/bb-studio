@@ -219,7 +219,14 @@ progress) goes on ONE live card, not in new status messages.
   once you know it) and give the worker the card id, so it updates the card
   itself.
 - A done or failed card leaves the In flight list a day after it finished.
-- The CLI is `bb studio work <create|update|show|list>`.
+  The list folds finished cards into one "N done" line under the live ones;
+  the user can clear them with Clear done or remove one row with its ×. The
+  card stays in the transcript.
+- A worker card still running when its worker thread ends its turn, fails or
+  is archived shows as ended without a final update (`state: "done"`,
+  `stale: true`). Your next update to the card takes over, so finish your
+  card with state done or failed before you end.
+- The CLI is `bb studio work <create|update|show|list|dismiss|clear>`.
 
 ## In the app
 

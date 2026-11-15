@@ -7,10 +7,11 @@ import { Icon, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import type { WorkCard } from "../contract";
 import { WORK_ID, type WorkState } from "../shared";
-import { KIND, shownStep, STATE } from "./model";
+import { ENDED_DETAIL, KIND, shownStep, STATE } from "./model";
 import { useCardOnScreen } from "./on-screen";
 
-export function StateGlyph({ state, className }: { state: WorkState; className?: string }) {
+export function StateGlyph({ state, stale = false, className }: { state: WorkState; stale?: boolean; className?: string }) {
+  if (stale) return <span role="img" aria-label={ENDED_DETAIL} data-testid="state-ended" className={cn("flex shrink-0 items-center text-muted-foreground", className)}><Icon name="Check" aria-hidden className="size-3" /><span aria-hidden className="-ml-px text-[9px] font-semibold leading-none">?</span></span>;
   if (state === "running") return <span role="img" aria-label={STATE.running} className={cn("size-2 shrink-0 animate-spin rounded-full border-[1.5px] border-success border-r-transparent motion-reduce:animate-none", className)} />;
   if (state === "waiting") return <Icon name="Clock" aria-label={STATE.waiting} className={cn("size-3 shrink-0 text-muted-foreground", className)} />;
   if (state === "needs-you") return <span role="img" aria-label={STATE["needs-you"]} className={cn("size-2 shrink-0 rounded-full bg-warning", className)} />;
@@ -49,7 +50,7 @@ export function WorkCardView({ card, now = Date.now() }: { card: WorkCard; now?:
   const step = shownStep(card);
   const onScreen = useCardOnScreen(card.id);
   return (
-    <ChatCard ref={onScreen} data-testid="work-card" data-work-card-id={card.id} data-state={card.state} className="studio-work-card">
+    <ChatCard ref={onScreen} data-testid="work-card" data-work-card-id={card.id} data-state={card.state} data-stale={card.stale || undefined} className="studio-work-card">
       <ChatCardHeader icon={kind.icon} title={card.title} onOpen={open}
         meta={<>{kind.label}{step ? <> · <span data-testid="work-step">{step}</span></> : null}</>}
         actions={<>
@@ -58,8 +59,8 @@ export function WorkCardView({ card, now = Date.now() }: { card: WorkCard; now?:
         </>} />
       <div className={cn(CHAT_CARD_BODY, "flex flex-col gap-2 pt-0")}>
         <div className="flex min-w-0 items-center gap-2 text-sm">
-          <StateGlyph state={card.state} />
-          <span data-testid="work-state" className={cn("shrink-0", card.state === "needs-you" ? "text-warning" : card.state === "failed" ? "text-destructive" : "text-foreground")}>{STATE[card.state]}</span>
+          <StateGlyph state={card.state} stale={card.stale} />
+          <span data-testid="work-state" className={cn("shrink-0", card.stale ? "text-muted-foreground" : card.state === "needs-you" ? "text-warning" : card.state === "failed" ? "text-destructive" : "text-foreground")}>{card.stale ? ENDED_DETAIL : STATE[card.state]}</span>
           {card.line ? <span data-testid="work-line" className="min-w-0 truncate text-muted-foreground">{card.line}</span> : null}
         </div>
         {card.state === "needs-you" && card.needs ? (

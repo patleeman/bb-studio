@@ -16,6 +16,13 @@ export const STATE: Record<WorkState, string> = {
   failed: "Failed",
 };
 
+export const ENDED = "Ended";
+export const ENDED_DETAIL = "Ended without a final update";
+
+export function stateLabel(card: { state: WorkState; stale?: boolean }): string {
+  return card.stale ? ENDED : STATE[card.state];
+}
+
 export function shownStep(card: { state: WorkState; step: string | null }): string | null {
   return isFinished(card) ? null : card.step;
 }

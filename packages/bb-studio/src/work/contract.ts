@@ -21,6 +21,8 @@ export const workCard = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
   finishedAt: z.number().nullable(),
+  stale: z.boolean().default(false),
+  dismissedAt: z.number().nullable().default(null),
 });
 export type WorkCard = z.infer<typeof workCard>;
 
@@ -57,4 +59,6 @@ export const rpcContract = defineRpcContract({
   "work.create": { input: createInput.extend({ threadId: z.string().min(1) }), output: z.object({ card: workCard, directive: z.string() }) },
   "work.update": { input: updateInput, output: workCard },
   "work.anchor": { input: anchorInput, output: workCard },
+  "work.dismiss": { input: z.object({ id: workCard.shape.id }), output: workCard },
+  "work.clear": { input: z.object({ threadId: z.string().min(1) }), output: z.object({ cleared: z.number().int().min(0) }) },
 });

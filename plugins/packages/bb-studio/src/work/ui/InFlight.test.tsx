@@ -5,19 +5,22 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { WorkCard } from "../contract";
 
 const NOW = new Date("2026-11-13T15:00:00Z").getTime();
-const card = (patch: Partial<WorkCard> = {}): WorkCard => ({ id: "wc_1", threadId: "thr_main", title: "Release 1.0.2", kind: "release", state: "running", step: "2/5 Sign", line: "Notarizing the DMG", needs: null, workerThreadId: null, messageId: "m_1", messageSeq: 41, createdAt: NOW - 60_000, updatedAt: NOW - 60_000, finishedAt: null, ...patch });
+const card = (patch: Partial<WorkCard> = {}): WorkCard => ({ id: "wc_1", threadId: "thr_main", title: "Release 1.0.2", kind: "release", state: "running", step: "2/5 Sign", line: "Notarizing the DMG", needs: null, workerThreadId: null, messageId: "m_1", messageSeq: 41, createdAt: NOW - 60_000, updatedAt: NOW - 60_000, finishedAt: null, stale: false, dismissedAt: null, ...patch });
 const state = vi.hoisted(() => ({
   list: [] as WorkCard[],
   toThread: vi.fn(),
   toAppPath: vi.fn((_path: string, _options?: unknown) => true) as ((path: string, options?: unknown) => boolean) | null,
   pathname: "/threads/thr_main",
   composerThread: "thr_main" as string | null,
+  call: vi.fn(async (_method: string, _input: unknown): Promise<unknown> => ({})),
+  refresh: vi.fn(),
 }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => (state.toAppPath ? { toThread: state.toThread, experimental_toAppPath: state.toAppPath } : { toThread: state.toThread }),
 }));
 vi.mock("../../ui/live", () => ({
-  useLive: (method: string) => ({ data: method === "work.list" ? { cards: state.list } : null, error: null, loading: false, refresh: () => {} }),
+  useLive: (method: string) => ({ data: method === "work.list" ? { cards: state.list } : null, error: null, loading: false, refresh: state.refresh }),
+  useCall: () => state.call,
 }));
 vi.mock("../../kit/ui/index", async () => (await import("../../loops/ui/test-kit")).kitUi);
 vi.mock("../../kit/app/directive-card", () => ({ remember: (_key: string, value: unknown) => value }));
@@ -36,6 +39,9 @@ beforeEach(() => {
   Object.assign(state, { list: [], pathname: "/threads/thr_main", composerThread: "thr_main" });
   state.toAppPath = vi.fn((_path: string, _options?: unknown) => true);
   state.toThread.mockClear();
+  state.call.mockReset();
+  state.call.mockImplementation(async () => ({}));
+  state.refresh.mockClear();
   Element.prototype.scrollIntoView = vi.fn();
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
 });
@@ -67,6 +73,8 @@ it("shows nothing with no open work, finished cards included", async () => {
   expect(container.innerHTML).toBe("");
   state.list = [card({ id: "wc_open" }), card({ state: "done", finishedAt: NOW - 1_000 })];
   await renderList();
+  expect(rows().map((row) => row.dataset.state)).toEqual(["running"]);
+  await act(async () => q('[data-testid="in-flight-done"]')!.click());
   expect(rows().map((row) => row.dataset.state)).toEqual(["running", "done"]);
   expect(rows()[1]!.textContent).not.toContain("2/5 Sign");
   expect(q('[data-testid="in-flight-count"]')!.textContent).toBe("1");
@@ -168,4 +176,77 @@ it("leaves out a card that is on screen, and lists it again once it scrolls away
   await act(async () => observers.at(-1)!.callback([{ isIntersecting: false, intersectionRatio: 0 }]));
   expect(rows().map((row) => row.title)).toEqual(["Research"]);
   vi.unstubAllGlobals();
+});
+
+const many = () => [
+  card({ id: "wc_d1", title: "Done one", state: "done", finishedAt: NOW - 1_000 }),
+  card({ id: "wc_live1", title: "Live one" }),
+  card({ id: "wc_d2", title: "Done two", state: "done", finishedAt: NOW - 2_000 }),
+  card({ id: "wc_f1", title: "Failed one", state: "failed", finishedAt: NOW - 3_000 }),
+  card({ id: "wc_live2", title: "Live two", state: "needs-you", needs: "Approve" }),
+];
+
+it("folds finished rows into one line under the live ones, and opens them on a click", async () => {
+  state.list = many();
+  await renderList();
+  expect(rows().map((row) => row.title)).toEqual(["Live one", "Live two"]);
+  const fold = q('[data-testid="in-flight-done"]')!;
+  expect(fold.textContent).toBe("3 done");
+  expect(fold.getAttribute("aria-expanded")).toBe("false");
+  expect(q('[data-testid="in-flight-count"]')!.textContent).toBe("2");
+  await act(async () => fold.click());
+  expect(rows().map((row) => row.title)).toEqual(["Live one", "Live two", "Done one", "Done two", "Failed one"]);
+  expect(fold.getAttribute("aria-expanded")).toBe("true");
+  await act(async () => fold.click());
+  expect(rows()).toHaveLength(2);
+  state.list = [card()];
+  await renderList();
+  expect(q('[data-testid="in-flight-done"]')).toBeNull();
+  expect(q('[data-testid="in-flight-clear"]')).toBeNull();
+});
+
+it("Clear done takes every finished row off the list at once and asks the server to keep it that way", async () => {
+  state.list = many();
+  await renderList();
+  await act(async () => q('[data-testid="in-flight-clear"]')!.click());
+  expect(state.call).toHaveBeenCalledWith("work.clear", { threadId: "thr_main" });
+  expect(state.refresh).toHaveBeenCalled();
+  expect(rows().map((row) => row.title)).toEqual(["Live one", "Live two"]);
+  expect(q('[data-testid="in-flight-done"]')).toBeNull();
+  expect(q('[data-testid="in-flight-clear"]')).toBeNull();
+});
+
+it("puts the rows back when clearing fails", async () => {
+  state.list = many();
+  state.call.mockRejectedValueOnce(new Error("offline"));
+  await renderList();
+  await act(async () => q('[data-testid="in-flight-clear"]')!.click());
+  expect(q('[data-testid="in-flight-done"]')!.textContent).toBe("3 done");
+});
+
+it("removes one row with its ×, live or done", async () => {
+  state.list = many();
+  await renderList();
+  await act(async () => q('[data-testid="in-flight-done"]')!.click());
+  const dismissOf = (title: string) => rows().find((row) => row.title === title)!.parentElement!.querySelector<HTMLElement>('[data-testid="in-flight-dismiss"]')!;
+  expect(dismissOf("Done two").getAttribute("aria-label")).toBe("Remove Done two from In flight");
+  await act(async () => dismissOf("Done two").click());
+  expect(state.call).toHaveBeenLastCalledWith("work.dismiss", { id: "wc_d2" });
+  await act(async () => dismissOf("Live one").click());
+  expect(state.call).toHaveBeenLastCalledWith("work.dismiss", { id: "wc_live1" });
+  expect(rows().map((row) => row.title)).toEqual(["Live two", "Done one", "Failed one"]);
+  expect(q('[data-testid="in-flight-done"]')!.textContent).toBe("2 done");
+});
+
+it("shows an ended card as done with a question, never Running", async () => {
+  state.list = [card({ id: "wc_live" }), card({ id: "wc_end", title: "Stuck worker", state: "done", stale: true, finishedAt: NOW - 1_000 })];
+  await renderList();
+  expect(q('[data-testid="in-flight-done"]')!.textContent).toBe("1 done");
+  await act(async () => q('[data-testid="in-flight-done"]')!.click());
+  const ended = rows()[1]!;
+  expect(ended.dataset.stale).toBe("true");
+  expect(ended.textContent).toContain("Ended");
+  expect(ended.textContent).not.toContain("Running");
+  expect(ended.textContent).not.toContain("2/5 Sign");
+  expect(ended.querySelector('[data-testid="state-ended"]')!.getAttribute("aria-label")).toBe("Ended without a final update");
 });

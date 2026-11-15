@@ -4,7 +4,7 @@ import type { z } from "zod";
 import { MIGRATIONS } from "../migrations";
 import { runWorkCli } from "./cli";
 import { rpcContract, SHOW_FINISHED_MS, type WorkCard } from "./contract";
-import { CREATE_DESCRIPTION, findCardMessage, registerWorkCards, WORK_TOOLS, type TimelineReader } from "./register";
+import { CREATE_DESCRIPTION, endsCard, findCardMessage, registerWorkCards, WORK_TOOLS, type TimelineReader, type WorkerThread } from "./register";
 import { inFlightOrder, WorkCardStore } from "./store";
 
 const NOW = new Date("2026-11-13T15:00:00Z").getTime();
@@ -62,7 +62,7 @@ it("lists one conversation's cards in flight, drops finished ones after a day", 
 });
 
 it("orders needs-you first, then running and waiting by age, then finished, newest first", () => {
-  const at = (minutes: number, patch: Partial<WorkCard>): WorkCard => ({ id: `wc_${minutes}`, threadId: "t", title: String(minutes), kind: "task", state: "running", step: null, line: null, needs: null, workerThreadId: null, messageId: null, messageSeq: null, createdAt: minutes, updatedAt: minutes, finishedAt: null, ...patch });
+  const at = (minutes: number, patch: Partial<WorkCard>): WorkCard => ({ id: `wc_${minutes}`, threadId: "t", title: String(minutes), kind: "task", state: "running", step: null, line: null, needs: null, workerThreadId: null, messageId: null, messageSeq: null, createdAt: minutes, updatedAt: minutes, finishedAt: null, stale: false, dismissedAt: null, ...patch });
   const order = inFlightOrder([at(1, { state: "done", finishedAt: 10 }), at(2, {}), at(3, { state: "needs-you" }), at(4, { state: "waiting" }), at(5, { state: "failed", finishedAt: 20 })]);
   expect(order.map((card) => card.title)).toEqual(["3", "2", "4", "5", "1"]);
 });
@@ -105,7 +105,7 @@ function fakeBb() {
     realtime: { publish: vi.fn() }, log: { warn: vi.fn() },
     agents: { registerTool: (tool: { name: string; execute(input: unknown, ctx: unknown): Promise<string> }) => { tools[tool.name] = tool; } },
     rpc: { register: (_contract: unknown, map: typeof handlers) => Object.assign(handlers, map) },
-    sdk: { threads: { timeline: vi.fn(), update: vi.fn(async (_input: unknown) => ({})) } },
+    sdk: { threads: { timeline: vi.fn(), update: vi.fn(async (_input: unknown) => ({})), get: vi.fn(async (_input: unknown) => ({ status: "active", archivedAt: null })) } },
   };
   return { bb, handlers, tools };
 }
@@ -208,4 +208,153 @@ it("places a thread's new cards when its turn ends", async () => {
 
 it("tells the Bot to link a worker's thread in a form the chat opens", () => {
   expect(CREATE_DESCRIPTION).toContain("bare @thread:thr_… mention or [text](/threads/thr_…), never [text](@thread:thr_…)");
+});
+
+it("clears a conversation's finished cards from In flight and keeps them readable", () => {
+  const live = store.create({ title: "Live", threadId: "thr_main" });
+  const done = store.create({ title: "Done", threadId: "thr_main" });
+  const failed = store.create({ title: "Failed", threadId: "thr_main" });
+  const other = store.create({ title: "Other done", threadId: "thr_other" });
+  for (const card of [done, failed, other]) store.update(card.id, { state: card === failed ? "failed" : "done" });
+  const changed = vi.fn();
+  const watched = new WorkCardStore(db, changed);
+  expect(watched.clearFinished("thr_main")).toBe(2);
+  expect(changed).toHaveBeenCalledTimes(1);
+  expect(store.inFlight("thr_main").map((card) => card.id)).toEqual([live.id]);
+  expect(store.inFlight("thr_other").map((card) => card.id)).toEqual([other.id]);
+  expect(store.get(done.id)).toMatchObject({ state: "done", dismissedAt: NOW });
+  expect(watched.clearFinished("thr_main")).toBe(0);
+  expect(changed).toHaveBeenCalledTimes(1);
+});
+
+it("dismisses one row for good, and brings it back only when the work restarts or needs the user", () => {
+  const done = store.create({ title: "Done", threadId: "thr_main", state: "done" });
+  const live = store.create({ title: "Live", threadId: "thr_main" });
+  store.dismiss(done.id);
+  store.dismiss(live.id);
+  expect(store.inFlight("thr_main")).toEqual([]);
+  expect(new WorkCardStore(db).inFlight("thr_main")).toEqual([]);
+  store.update(live.id, { line: "Still going" });
+  store.update(done.id, { line: "Notes" });
+  expect(store.inFlight("thr_main")).toEqual([]);
+  expect(store.update(live.id, { state: "needs-you", needs: "Approve" }).dismissedAt).toBeNull();
+  expect(store.update(done.id, { state: "running" }).dismissedAt).toBeNull();
+  expect(store.inFlight("thr_main").map((card) => card.title)).toEqual(["Live", "Done"]);
+});
+
+it("still drops a finished or ended card from In flight after a day", () => {
+  const done = store.create({ title: "Done", threadId: "thr_main", state: "done" });
+  const ended = store.create({ title: "Ended", threadId: "thr_main", workerThreadId: "thr_w" });
+  store.markStale(ended.id);
+  vi.setSystemTime(NOW + SHOW_FINISHED_MS - 1);
+  expect(store.inFlight("thr_main").map((card) => card.id).sort()).toEqual([done.id, ended.id].sort());
+  vi.setSystemTime(NOW + SHOW_FINISHED_MS + 1);
+  expect(store.inFlight("thr_main")).toEqual([]);
+});
+
+it("reads cards saved before stale and dismissals existed", () => {
+  const { stale: _stale, dismissedAt: _dismissed, ...old } = store.create({ title: "Old", threadId: "thr_main" });
+  db.prepare("UPDATE work_cards SET record = ? WHERE id = ?").run(JSON.stringify(old), old.id);
+  expect(store.get(old.id)).toMatchObject({ stale: false, dismissedAt: null });
+  expect(store.inFlight("thr_main")).toHaveLength(1);
+});
+
+it("marks a card ended as done with stale set, and the next real update takes over", () => {
+  const card = store.create({ title: "Worker", kind: "worker", threadId: "thr_main", workerThreadId: "thr_w", step: "2/4" });
+  vi.setSystemTime(NOW + 1_000);
+  const ended = store.markStale(card.id);
+  expect(ended).toMatchObject({ state: "done", stale: true, finishedAt: NOW + 1_000, step: "2/4" });
+  expect(rpcContract["work.get"].output.parse(ended).state).toBe("done");
+  vi.setSystemTime(NOW + 2_000);
+  expect(store.update(card.id, { line: "Back at it" })).toMatchObject({ state: "running", stale: false, finishedAt: null, line: "Back at it" });
+  store.markStale(card.id);
+  vi.setSystemTime(NOW + 3_000);
+  expect(store.update(card.id, { state: "done", line: "Shipped" })).toMatchObject({ state: "done", stale: false, finishedAt: NOW + 3_000 });
+  expect(store.markStale(card.id).stale).toBe(false);
+});
+
+it("ends a card when its worker finishes or goes away, never a lead's or the conversation's own", () => {
+  const card = (patch: Partial<WorkCard>): WorkCard => ({ ...store.create({ title: "W", kind: "worker", threadId: "thr_main", workerThreadId: "thr_w" }), ...patch });
+  const idle: WorkerThread = { status: "idle", archivedAt: null };
+  expect(endsCard(card({}), idle)).toBe(true);
+  expect(endsCard(card({}), { status: "error" })).toBe(true);
+  expect(endsCard(card({}), { status: "active" })).toBe(false);
+  expect(endsCard(card({}), { status: "active", archivedAt: NOW })).toBe(true);
+  expect(endsCard(card({}), null)).toBe(true);
+  expect(endsCard(card({ state: "waiting" }), idle)).toBe(false);
+  expect(endsCard(card({ state: "needs-you" }), idle)).toBe(false);
+  expect(endsCard(card({ state: "needs-you" }), { status: "idle", archivedAt: NOW })).toBe(true);
+  expect(endsCard(card({ kind: "lead" }), idle)).toBe(false);
+  expect(endsCard(card({ workerThreadId: "thr_main" }), idle)).toBe(false);
+  expect(endsCard(card({ workerThreadId: null }), null)).toBe(false);
+  expect(endsCard(card({ state: "done" }), null)).toBe(false);
+});
+
+function eventBb() {
+  const { bb, handlers } = fakeBb();
+  const on: Record<string, (event: { thread: { id: string } }) => void> = {};
+  return { bb: { ...bb, events: { on: (name: string, handler: (event: { thread: { id: string } }) => void) => { on[name] = handler; } } }, on, handlers };
+}
+
+it("ends a running worker's card when its thread goes idle, fails or is archived, and revives it when the thread runs again", async () => {
+  const { bb, on } = eventBb();
+  const work = registerWorkCards(bb as never, db, { read: async () => page([]), thread: async () => ({ status: "active" }) });
+  await work.swept;
+  const a = work.create({ title: "A", kind: "worker", threadId: "thr_main", workerThreadId: "thr_a" }).card;
+  const b = work.create({ title: "B", kind: "worker", threadId: "thr_main", workerThreadId: "thr_b", state: "waiting" }).card;
+  const c = work.create({ title: "C", kind: "worker", threadId: "thr_main", workerThreadId: "thr_c" }).card;
+  on["thread.idle"]!({ thread: { id: "thr_a" } });
+  on["thread.idle"]!({ thread: { id: "thr_b" } });
+  on["thread.failed"]!({ thread: { id: "thr_c" } });
+  expect(store.get(a.id)).toMatchObject({ state: "done", stale: true });
+  expect(store.get(b.id)).toMatchObject({ state: "waiting", stale: false });
+  expect(store.get(c.id)).toMatchObject({ state: "done", stale: true });
+  on["thread.archived"]!({ thread: { id: "thr_b" } });
+  expect(store.get(b.id)).toMatchObject({ state: "done", stale: true });
+  on["thread.active"]!({ thread: { id: "thr_a" } });
+  expect(store.get(a.id)).toMatchObject({ state: "running", stale: false, finishedAt: null });
+  store.dismiss(c.id);
+  on["thread.active"]!({ thread: { id: "thr_c" } });
+  expect(store.get(c.id)).toMatchObject({ state: "running", dismissedAt: null });
+  const finished = work.create({ title: "D", kind: "worker", threadId: "thr_main", workerThreadId: "thr_d", state: "done" }).card;
+  on["thread.idle"]!({ thread: { id: "thr_d" } });
+  on["thread.active"]!({ thread: { id: "thr_d" } });
+  expect(store.get(finished.id)).toMatchObject({ state: "done", stale: false });
+});
+
+it("sweeps cards already stuck on Running when it loads", async () => {
+  const stuck = store.create({ title: "Stuck", kind: "worker", threadId: "thr_main", workerThreadId: "thr_idle" });
+  const gone = store.create({ title: "Gone", kind: "release", threadId: "thr_main", workerThreadId: "thr_archived", state: "needs-you", needs: "Sign" });
+  const live = store.create({ title: "Live", kind: "worker", threadId: "thr_main", workerThreadId: "thr_live" });
+  const lead = store.create({ title: "Lead", kind: "lead", threadId: "thr_main", workerThreadId: "thr_lead" });
+  const unknown = store.create({ title: "Unreachable", kind: "worker", threadId: "thr_main", workerThreadId: "thr_down" });
+  const threads: Record<string, WorkerThread> = { thr_idle: { status: "idle", archivedAt: null }, thr_archived: { status: "idle", archivedAt: NOW - 1 }, thr_live: { status: "active", archivedAt: null }, thr_lead: { status: "idle", archivedAt: null } };
+  const { bb } = eventBb();
+  const work = registerWorkCards(bb as never, db, { read: async () => page([]), thread: async (id) => { if (id === "thr_down") throw new Error("offline"); return threads[id] ?? null; } });
+  await work.swept;
+  expect(store.get(stuck.id)).toMatchObject({ state: "done", stale: true });
+  expect(store.get(gone.id)).toMatchObject({ state: "done", stale: true, needs: null });
+  expect(store.get(live.id)).toMatchObject({ state: "running", stale: false });
+  expect(store.get(lead.id)).toMatchObject({ state: "running", stale: false });
+  expect(store.get(unknown.id)).toMatchObject({ state: "running", stale: false });
+  expect(bb.log.warn).toHaveBeenCalledWith(expect.stringContaining("offline"));
+});
+
+it("serves dismiss and clear over RPC and the CLI", async () => {
+  const { bb, handlers } = fakeBb();
+  const work = registerWorkCards(bb as never, db, { read: async () => page([]), thread: async () => ({ status: "active" }) });
+  const a = work.create({ title: "A", threadId: "thr_main", state: "done" }).card;
+  const b = work.create({ title: "B", threadId: "thr_main", state: "failed" }).card;
+  const c = work.create({ title: "C", threadId: "thr_main" }).card;
+  expect(rpcContract["work.dismiss"].output.parse(await handlers["work.dismiss"]!({ id: a.id } as never)).dismissedAt).toBe(NOW);
+  expect(rpcContract["work.clear"].output.parse(await handlers["work.clear"]!({ threadId: "thr_main" } as never))).toEqual({ cleared: 1 });
+  expect(store.inFlight("thr_main").map((card) => card.id)).toEqual([c.id]);
+  work.update(b.id, { state: "running" });
+  expect((await runWorkCli(["dismiss", c.id], work, {})).exitCode).toBe(0);
+  work.update(b.id, { state: "done" });
+  expect((await runWorkCli(["clear"], work, { threadId: "thr_main" })).stdout).toBe("Cleared 1 finished card.\n");
+  expect((await runWorkCli(["clear"], work, {})).exitCode).toBe(1);
+  const ended = work.create({ title: "E", kind: "worker", threadId: "thr_main", workerThreadId: "thr_e" }).card;
+  store.markStale(ended.id);
+  expect((await runWorkCli(["show", ended.id], work, {})).stdout).toContain("ended\tE");
 });
