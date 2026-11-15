@@ -298,7 +298,7 @@ it("a watcher's finding is one task; the next finding for the same thing updates
   expect(store.history(finding!.id).at(-1)).toMatchObject({ type: "found_again", data: expect.stringContaining("\"count\":2") });
   const both = tasks.watcherRun("aut_silent", "Kensico health rc=1: writer: Claude spend $5.80 today for write-ups and summaries (over $5/day)\nOpenCode Go 5-hour window: only 12% left", null, NOW + 26 * HOUR);
   expect(both).toMatchObject({ post: "Kensico health rc=1: writer: Claude spend $5.80 today for write-ups and summaries (over $5/day)\nOpenCode Go 5-hour window: only 12% left" });
-  expect(children(store, "aut_silent").map((t) => [t.automation!.count, t.title])).toEqual([[3, finding!.title], [1, "Silent heartbeat: OpenCode Go 5-hour window: only 12% left"]]);
+  expect(children(store, "aut_silent").map((t) => [t.automation!.count, t.title])).toEqual([[3, "Silent heartbeat: Kensico health rc=1: writer: Claude spend $5.80 today for write-ups and summaries (over $5/day)"], [1, "Silent heartbeat: OpenCode Go 5-hour window: only 12% left"]]);
   expect(store.get("task_auto-aut-silent").progress.line).toMatch(/^Found: Kensico health/);
 });
 
@@ -585,4 +585,25 @@ it("re-review: past 20 open findings, new ones roll into one \"N more findings\"
   expect(tasks.watcherRun("aut_silent", "Problem v", null, NOW + HOUR)).toBe("quiet");
   expect(tasks.watcherRun("aut_silent", "Problem x", null, NOW + 2 * HOUR)).toMatchObject({ post: "Problem x", taskId: more.id });
   expect(store.get(more.id).title).toBe("Silent heartbeat: 4 more findings");
+});
+
+it("QA: a finding's title follows its latest text; a replayed run adds nothing; the row shows the severity of the finding it names; Source names the watcher", () => {
+  seed();
+  const { store, raw, tasks } = setup();
+  const plan = raw.watcherRun("aut_silent", "[warn] Cert expires in 9 days", null, NOW);
+  (plan as { done(posted: boolean): void }).done(false);
+  const replay = raw.watcherRun("aut_silent", "[warn] Cert expires in 9 days", null, NOW);
+  (replay as { done(posted: boolean): void }).done(false);
+  raw.watcherRun("aut_silent", "[warn] Cert expires in 9 days", null, NOW);
+  const [cert] = children(store, "aut_silent");
+  expect(cert!.automation!.count).toBe(1);
+  expect(store.get("task_auto-aut-silent").automation!.count).toBe(1);
+  (raw.watcherRun("aut_silent", "[warn] Cert expires in 9 days", null, NOW + HOUR) as { done(posted: boolean): void }).done(true);
+  tasks.watcherRun("aut_silent", "[warn] Cert expires in 1 days", null, NOW + 2 * HOUR);
+  expect(store.get(cert!.id)).toMatchObject({ title: "Silent heartbeat: Cert expires in 1 days", why: "Cert expires in 1 days", source: { kind: "watcher", ref: "Silent heartbeat" } });
+  tasks.watcherRun("aut_silent", "[critical] Disk /var 99% full", null, NOW + 3 * HOUR);
+  tasks.watcherRun("aut_silent", "Nightly export failed", null, NOW + 4 * HOUR);
+  expect(store.get("task_auto-aut-silent")).toMatchObject({ progress: { line: "Found: Nightly export failed" }, automation: { severity: null } });
+  tasks.watcherRun("aut_silent", "[warn] Cert expires in 1 days", null, NOW + 5 * HOUR);
+  expect(store.get("task_auto-aut-silent").automation!.severity).toBe("warn");
 });

@@ -548,3 +548,16 @@ it("names a deeper cycle as one", async () => {
   expect((await call("task_update", { id: top.id, parentId: top.id })).error).toMatch(/its own parent/);
   expect((await call("task_update", { id: top.id, parentId: sub.id })).error).toMatch(/own subtasks/);
 });
+
+it("a card needs the user only when its task does: a running worker card doesn't, a question handed over or the user's own list item does", async () => {
+  const { call } = setup();
+  const { cardNeedsUser } = await import("./store");
+  const store = new TaskStore(db);
+  const running = (await call("task_create", { title: "Build", owner: "me", card: true })).task;
+  expect(cardNeedsUser(store.find(running.id), "work")).toBe(false);
+  const asked = (await call("task_handoff", { id: running.id, to: "user", needs: "Approve" })).task;
+  expect(cardNeedsUser(store.find(asked.id), "work")).toBe(true);
+  const mine = (await call("task_create", { title: "Call mom", owner: "user" })).task;
+  expect(cardNeedsUser(store.find(mine.id), "loop")).toBe(true);
+  expect(cardNeedsUser(null, "work")).toBe(true);
+});

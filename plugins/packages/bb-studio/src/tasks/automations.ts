@@ -289,7 +289,7 @@ export class AutomationTasks {
     const run: Task = {
       id: this.store.newId("task"), title: `${src.name} · ${this.when(now, src.timeZone)}`, why: "", owner: src.owner, state: "in_progress", kind: "do", options: [], needs: null,
       priority: "normal", conversation: null, project: null, area: null, timing: { due: null, trigger: { type: "none" }, snoozed: false }, attention: { queue: null, push: false },
-      progress: { step: null, line: null }, workers: [], outputs: [], source: { kind: "automation", ref: src.id }, parentId: parent.id, schedule: null, card: null,
+      progress: { step: null, line: null }, workers: [], outputs: [], source: { kind: "automation", ref: src.name }, parentId: parent.id, schedule: null, card: null,
       automation: { id: src.id, kind: src.kind, role: "run", thread, keys: [], count: 0, lastAt: null, mode: null, clearedAt: null, posted: true, sentAt, nudgedAt: null, nudged: null, severity: null, pushedAt: null },
       stale: false, origin: "task", createdAt: now, updatedAt: now, closedAt: null, closedBy: null,
     };
@@ -386,7 +386,9 @@ export class AutomationTasks {
     if (finding === null || !body) {
       this.ran(parent, [], at);
       this.setParent(parent.id, (link, p) => {
-        link.count += 1; link.lastAt = at; link.severity = highest(this.openFindings(parent.id).map((t) => t.automation!.severity));
+        if (link.lastAt !== at) link.count += 1;
+        link.lastAt = at;
+        if (!this.openFindings(parent.id).length) link.severity = null;
         if (link.mode !== "each" && !this.openFindings(parent.id).length) p.progress.line = "Nothing found";
       });
       return "quiet";
@@ -415,7 +417,7 @@ export class AutomationTasks {
     const unposted: Task[] = [];
     const worse: { task: Task; severity: Severity }[] = [];
     for (const { task, lines: own } of touched.values()) {
-      let again = this.foundAgain(task, own.map((line) => line.text), at);
+      let again = this.foundAgain(task, own.map((line) => line.text), at, src.name);
       const severity = highest(own.map((line) => line.severity));
       const higher = !!severity && rank(severity) > rank(again.automation!.severity ?? "info");
       if (isClosed(again)) {
@@ -431,8 +433,9 @@ export class AutomationTasks {
     this.ran(parent, lines.map((line) => line.key), at);
     const made = fresh.length ? this.addFinding(src, parent, fresh, control?.owner ?? src.owner, at) : null;
     this.setParent(parent.id, (link, p) => {
-      link.count += 1; link.lastAt = at; p.progress.line = clip(`Found: ${lines[0]!.text}`);
-      link.severity = highest(this.openFindings(parent.id).map((t) => t.automation!.severity));
+      if (link.lastAt !== at) link.count += 1;
+      link.lastAt = at; p.progress.line = clip(`Found: ${lines[0]!.text}`);
+      link.severity = this.shownSeverity(parent.id, lines[0]!.key);
     });
     if (!made && !unposted.length && !worse.length) return "quiet";
     const post = control?.key ? body : body.split("\n").map((line) => lineSeverity(line.trim()).text).join("\n");
@@ -446,7 +449,7 @@ export class AutomationTasks {
         if (!posted) return;
         for (const t of [...(made ? [made] : []), ...unposted]) this.patch(t.id, (link) => { link.posted = true; });
         for (const { task, severity } of worse) this.raise(task.id, severity);
-        this.setParent(parent.id, (link) => { link.severity = highest(this.openFindings(parent.id).map((t) => t.automation!.severity)); });
+        this.setParent(parent.id, (link) => { link.severity = this.shownSeverity(parent.id, lines[0]!.key); });
       },
     };
   }
@@ -507,6 +510,10 @@ export class AutomationTasks {
     return this.store.get(overflow.id);
   }
 
+  private shownSeverity(parentId: string, key: string): Severity | null {
+    return this.openFindings(parentId).find((t) => t.automation!.keys.includes(key))?.automation!.severity ?? null;
+  }
+
   private openFindings(parentId: string): Task[] {
     return this.openChildren(parentId).filter((t) => t.automation?.role === "finding");
   }
@@ -517,7 +524,7 @@ export class AutomationTasks {
       id: this.store.newId("task"), title: clip(`${src.name}: ${lines[0]!.text}`, 160), why: text.slice(0, 4000), owner, state: "in_progress", kind: "do", options: [], needs: null,
       priority: "normal", conversation: owner === "cos" ? src.thread : owner.startsWith("thread:") ? owner.slice(7) : null, project: null, area: null,
       timing: { due: null, trigger: { type: "none" }, snoozed: false }, attention: { queue: null, push: false },
-      progress: { step: null, line: clip(lines[0]!.text) }, workers: [], outputs: [], source: { kind, ref: src.id }, parentId: parent.id, schedule: null, card: null,
+      progress: { step: null, line: clip(lines[0]!.text) }, workers: [], outputs: [], source: { kind, ref: src.name }, parentId: parent.id, schedule: null, card: null,
       automation: { id: src.id, kind: "watcher", role: "finding", thread: src.thread, keys: lines.map((line) => line.key), count: 1, lastAt: at, mode: null, clearedAt: null, posted: false, sentAt: null, nudgedAt: null, nudged: null, severity: highest(lines.map((line) => line.severity)), pushedAt: null },
       stale: false, origin: "task", createdAt: at, updatedAt: at, closedAt: null, closedBy: null,
     };
@@ -526,7 +533,8 @@ export class AutomationTasks {
     return saved;
   }
 
-  private foundAgain(task: Task, texts: string[], at: number): Task {
+  private foundAgain(task: Task, texts: string[], at: number, name: string): Task {
+    if (task.automation!.lastAt === at) return task;
     const next = structuredClone(task);
     const link = next.automation!;
     const text = texts.join("\n").slice(0, 4000);
@@ -536,6 +544,7 @@ export class AutomationTasks {
     if (!isClosed(next)) {
       next.progress.line = clip(texts[0]!);
       next.why = text;
+      if (next.source?.kind !== OVERFLOW) next.title = clip(`${name}: ${texts[0]!}`, 160);
     }
     next.updatedAt = at;
     const saved = this.store.save(next);

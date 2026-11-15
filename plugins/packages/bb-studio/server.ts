@@ -6,7 +6,7 @@ import { adoptAtStart } from "./src/tasks/migrate";
 import { AutomationTasks, readSources } from "./src/tasks/automations";
 import { toLoop } from "./src/tasks/views";
 import type { Loop } from "./src/loops/contract";
-import { TaskStore, taskTitle, tasksUnavailable } from "./src/tasks/store";
+import { cardNeedsUser, TaskStore, taskTitle, tasksUnavailable } from "./src/tasks/store";
 import { withToolLabel } from "./src/tool-labels";
 import { CONTINUE_TOOL, registerContinueNew } from "./src/continue-new";
 import { runWorkCli } from "./src/work/cli";
@@ -693,9 +693,11 @@ export default async function plugin(bb: BbPluginApi) {
     if (!bot?.threadId || bot.state !== 'active') throw new Error('An active Bot chat is required');
     await bb.sdk.threads.send({threadId:bot.threadId,mode:'auto',input:[{type:'text',text,mentions:[],visibility:'agent-only'}]} as never);
   };
+  const taskPushedAt = new Map<string, number>();
   const pushLoop = async (loop: Loop) => {
     const bot = bots.stored();
     if (!bot?.threadId) throw new Error('A Bot chat is required');
+    taskPushedAt.set(bot.id, Date.now());
     await bb.sdk.plugins.callRpc({pluginId:'mobile',method:'notify',outputSchema:z.unknown(),input:{title:loop.title,body:loop.why,kind:'turn-finished',threadId:bot.threadId,botId:bot.id,conversationId:bot.threadId,projectId:PERSONAL_PROJECT_ID,category:'BB_LOOP',loopId:loop.id,loopKind:loop.kind,actions:loopPushActions(loop.kind),...(loop.kind==='decide'&&loop.options.length?{options:loop.options.slice(0,4).map(o=>o.slice(0,120))}:{}),coalesceKey:loop.id} as never});
   };
   const loops = registerLoops(bb, db, postToBot, pushLoop, settings, () => loopTimeZone(process.env, studioSettings.current().todosTimeZone), (name, everyMs, work) => triggers.every(name, everyMs, work));
@@ -1125,6 +1127,8 @@ export default async function plugin(bb: BbPluginApi) {
     lastRequest: async (threadId) => ((await bb.sdk.threads.events.list({ threadId, types: ["client/turn/requested"], order: "desc", limit: "1" } as never)) as { data?: unknown }[])[0]?.data ?? null,
     allowed: (threadId) => repliesAllowed(pushRpc, threadId),
     notify: async (input) => { await bb.sdk.plugins.callRpc({ pluginId: "mobile", method: "notify", outputSchema: z.unknown(), input: input as never }); },
+    needsUser: (card) => cardNeedsUser(new TaskStore(db).find(card.id), card.kind),
+    pushedTaskSince: (botId, since) => (taskPushedAt.get(botId) ?? 0) >= since,
     defaultProjectId: PERSONAL_PROJECT_ID,
     log: (message) => bb.log.warn(message),
   });

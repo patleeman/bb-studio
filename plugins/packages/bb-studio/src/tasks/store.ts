@@ -37,6 +37,12 @@ export function taskTitle(db: Database.Database, id: string): string | null {
   } catch { return null; }
 }
 
+export function cardNeedsUser(task: Task | null, kind: "work" | "loop"): boolean {
+  if (!task) return true;
+  if (needsYou(task)) return true;
+  return kind === "loop" && task.owner === USER_OWNER && !isClosed(task);
+}
+
 export function surfaceForUser(t: Task): void {
   if (needsYou(t) && t.attention.queue === null) t.attention.queue = "surfaced";
 }
