@@ -269,42 +269,69 @@ struct RoomNowLine: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Button(action: open) {
-            VStack(spacing: 5) {
-                HStack(spacing: 7) {
-                    RoomPulse(active: now.active, tint: look.roomTint)
-                    Text("NOW").font(.caption2.weight(.semibold)).kerning(0.9)
-                }
-                .foregroundStyle(look.roomTint.opacity(now.active ? 0.9 : 0.55))
-                Text(now.text)
-                    .font(.title3.weight(.medium))
-                    .foregroundStyle(.white.opacity(now.active ? 0.96 : 0.75))
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .contentTransition(.opacity)
-                TimelineView(.periodic(from: .now, by: 30)) { context in
-                    if let small = now.small(now: context.date) {
-                        Text(small)
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.55))
-                            .lineLimit(1)
-                            .contentTransition(.opacity)
-                    }
-                }
-            }
-            .frame(maxWidth: 420)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
-            .lookHalo(look)
-            .contentShape(.rect)
+        Button(action: open) { label }
+            .buttonStyle(.plain)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: now)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(spoken)
+            .accessibilityHint("Opens the conversation")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityIdentifier("roomNow")
+    }
+
+    private var spoken: String {
+        guard let small = now.small() else { return "Now: " + now.text }
+        return "Now: " + now.text + ", " + small
+    }
+
+    private var tag: some View {
+        HStack(spacing: 7) {
+            RoomPulse(active: now.active, tint: look.roomTint)
+            Text("NOW").font(.caption2.weight(.semibold)).kerning(0.9)
         }
-        .buttonStyle(.plain)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: now)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Now: " + now.text + (now.small().map { ", " + $0 } ?? ""))
-        .accessibilityHint("Opens the conversation")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityIdentifier("roomNow")
+        .foregroundStyle(look.roomTint.opacity(now.active ? 0.9 : 0.55))
+    }
+
+    private var headline: some View {
+        Text(now.text)
+            .font(.title3.weight(.medium))
+            .foregroundStyle(.white.opacity(now.active ? 0.96 : 0.75))
+            .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .contentTransition(.opacity)
+    }
+
+    private var detail: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            RoomNowDetail(text: now.small(now: context.date))
+        }
+    }
+
+    private var label: some View {
+        VStack(spacing: 5) {
+            tag
+            headline
+            detail
+        }
+        .frame(maxWidth: 420)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .lookHalo(look)
+        .contentShape(.rect)
+    }
+}
+
+struct RoomNowDetail: View {
+    let text: String?
+
+    var body: some View {
+        if let text {
+            Text(text)
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.55))
+                .lineLimit(1)
+                .contentTransition(.opacity)
+        }
     }
 }
 
