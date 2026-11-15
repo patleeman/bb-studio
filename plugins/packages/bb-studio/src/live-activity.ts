@@ -29,6 +29,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import { turnContext, type ThreadSeeds } from "./thread-seeds";
+import { taskTitle } from "./tasks/store";
 import { latestLine, repoTag, threadRunning, type BotThreads, type ThreadFacts, type WorkerStatus } from "./bot-threads";
 
 type Sdk = BbPluginApi["sdk"];
@@ -105,7 +106,7 @@ export class LiveActivity {
   active(thread: Partial<ThreadFacts> & { id: string }): void { this.write(thread, { state: "running", startedAt: this.clock() }); }
   /** A turn ended: its reply's first line (a quiet "[PASS]" keeps the last one). */
   idle(thread: Partial<ThreadFacts> & { id: string }, lastAssistantText: string | null | undefined): void {
-    const line = latestLine(lastAssistantText);
+    const line = latestLine(lastAssistantText, () => null, (id) => taskTitle(this.db, id));
     this.write(thread, { state: "idle", endedAt: this.clock(), ...(line ? { line } : {}) });
   }
   failed(thread: Partial<ThreadFacts> & { id: string }): void { this.write(thread, { state: "failed", endedAt: this.clock() }); }

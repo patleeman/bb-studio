@@ -30,6 +30,13 @@ export function guardTasks<T extends Record<string, (...args: never[]) => unknow
   }])) as T;
 }
 
+export function taskTitle(db: Database.Database, id: string): string | null {
+  try {
+    const row = db.prepare("SELECT json_extract(record, '$.title') AS title FROM tasks WHERE id = ?").get(id) as { title: unknown } | undefined;
+    return typeof row?.title === "string" ? row.title : null;
+  } catch { return null; }
+}
+
 export function surfaceForUser(t: Task): void {
   if (needsYou(t) && t.attention.queue === null) t.attention.queue = "surfaced";
 }

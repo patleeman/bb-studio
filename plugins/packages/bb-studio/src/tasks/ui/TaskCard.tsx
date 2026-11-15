@@ -131,7 +131,7 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
     const nudge = view.todo && task.kind === "waiting-outside" ? <button type="button" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: task.id, action: "nudge" })}><Icon name="BellDot" />Nudge them</button> : null;
     actions = <>
       {options ?? (task.kind === "waiting-outside" ? nudge : done(true))}
-      {options || task.kind === "waiting-outside" ? done(false) : null}
+      {!options && task.kind === "waiting-outside" ? done(false) : null}
       {snooze}
       {handOff}
       {openButton}

@@ -95,6 +95,18 @@ export function TodosPage({ view }: { view: BotView }) {
       </BotPageGroup>
     );
   };
+  const subgroup = (id: SectionId, title: string, rows: readonly Task[], extra = 0, lead: ReactNode = null) => {
+    if (!rows.length && !extra) return null;
+    const { shown, more } = fold(id, rows);
+    return (
+      <section key={id} aria-label={title} data-testid={`tasks-${id}`} className="flex flex-col gap-px">
+        <h3 className="flex h-7 items-center gap-2 px-2 text-xs font-medium text-subtle-foreground">{title}<span data-testid="bot-page-group-count" className="tabular-nums">{rows.length + extra}</span></h3>
+        {lead}
+        {shown.map(row)}
+        {moreLine(id, title, more)}
+      </section>
+    );
+  };
   const empty = query.trim() ? { title: noMatch("tasks", query), action: { label: "Clear search", onClick: () => setQuery("") } }
     : filtered ? { title: "No tasks match these filters", action: { label: "Show all", onClick: () => { setArea(ALL); setProject(ALL); setOwner(ALL); } } }
       : { title: "No tasks yet", hint: "Ask the Bot to take something on, or add a task.", action: adding ? null : { label: "New task", onClick: () => setAdding(true) } };
@@ -116,13 +128,16 @@ export function TodosPage({ view }: { view: BotView }) {
       {adding ? <AddTask onAdd={add} onClose={() => setAdding(false)} /> : null}
       {ownsTasks && list.error ? <p role="alert" data-testid="tasks-error" className="text-sm text-destructive">{list.error}</p> : null}
       {ownsTasks && list.data && total === 0 ? <BotPageEmpty testId="tasks-empty" {...empty} /> : null}
-      {ownsTasks && list.data && mine ? <h2 data-testid="tasks-mine" className="px-2 pt-1 text-xs font-medium text-subtle-foreground">Mine</h2> : null}
       {ownsTasks && list.data ? <>
-        {group("today", "Today", sections.today, chatRows, showChat ? pending.map((question) => (
-          <BotPageRow key={question.id} testId="todo-chat" icon="MessageQuestion" title={question.text ?? question.reason} titleText={question.text ?? question.reason}
-            meta={shortWhen(question.createdAt, now, zone)} onOpen={botChat?.onOpen} disabled={!botChat} />
-        )) : null)}
-        {group("later", "Later", sections.later)}
+        {mine ? (
+          <BotPageGroup title="Mine" count={mine} testId="tasks-mine">
+            {subgroup("today", "Today", sections.today, chatRows, showChat ? pending.map((question) => (
+              <BotPageRow key={question.id} testId="todo-chat" icon="MessageQuestion" title={question.text ?? question.reason} titleText={question.text ?? question.reason}
+                meta={shortWhen(question.createdAt, now, zone)} onOpen={botChat?.onOpen} disabled={!botChat} />
+            )) : null)}
+            {subgroup("later", "Later", sections.later)}
+          </BotPageGroup>
+        ) : null}
         {group("agents", "Agents on it", sections.agents)}
         {group("waiting", "Waiting", sections.waiting)}
       </> : null}

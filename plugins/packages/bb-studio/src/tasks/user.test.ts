@@ -311,7 +311,9 @@ it("a work card the user closed stays closed when the worker updates it", async 
   await handlers["tasks.act"]!({ id: made.id, action: "done" });
   const card = JSON.parse(await tools.work_card_update!.execute({ id: made.id, state: "running", step: "5/5", line: "Back on it" }, { threadId: "thr_main" }));
   expect(card).toMatchObject({ state: "done", step: null, line: null, note: expect.stringMatching(/stays closed/) });
-  expect((await handlers["tasks.get"]!({ id: made.id })).history.at(-1)).toMatchObject({ type: "progress", data: expect.stringContaining("Back on it") });
+  const kept = (await handlers["tasks.get"]!({ id: made.id })).history.at(-1);
+  expect(kept).toMatchObject({ type: "progress", data: expect.stringContaining("Back on it") });
+  expect(JSON.parse(kept.data)).toMatchObject({ by: "thread:thr_main", kept: true });
 });
 
 it("a choice made on the phone or from a push goes back to the agent that asked, like the desktop's", async () => {

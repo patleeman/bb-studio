@@ -67,9 +67,9 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     name(card, null);
     return { card, directive: directiveFor(card.id) };
   };
-  const update = (id: string, changes: WorkChanges) => {
+  const update = (id: string, changes: WorkChanges, by: string | null = null) => {
     const before = store.find(id);
-    const card = store.update(id, changes);
+    const card = store.update(id, changes, by);
     name(card, before);
     return card;
   };
@@ -126,7 +126,7 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     name: "work_card_update",
     description: UPDATE_DESCRIPTION,
     parameters: changes.extend({ id: z.string().regex(WORK_ID) }),
-    execute: async ({ id, ...rest }) => { assertTasksReady(db); const t = store.tasks.find(id); const kept = !!t && closedByUser(t); const card = update(id, rest); return JSON.stringify(kept ? { ...card, note: KEPT_CLOSED } : card); },
+    execute: async ({ id, ...rest }, ctx) => { assertTasksReady(db); const t = store.tasks.find(id); const kept = !!t && closedByUser(t); const card = update(id, rest, ctx?.threadId ? `thread:${ctx.threadId}` : null); return JSON.stringify(kept ? { ...card, note: KEPT_CLOSED } : card); },
   });
   bb.agents.registerTool({
     name: "work_card_get",

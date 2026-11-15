@@ -85,9 +85,12 @@ it("a do task of the user's: title, why, owner You, To do, and Done, Snooze, Han
   expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "task_1", action: "done" });
 });
 
-it("a decision shows its options as buttons and chooses one", async () => {
+it("a decision shows its options as buttons and chooses one; choosing is the Done, so there is no Done button", async () => {
   put({ kind: "decide", options: ["Backblaze", "Wasabi"] });
   await render("loop", { id: "task_1" });
+  expect(card().querySelector('[data-testid="task-done"]')).toBeNull();
+  const text = card().querySelector('[data-testid="task-actions"]')!.textContent!;
+  for (const label of ["Snooze", "Hand off"]) expect(text).toContain(label);
   await click("Wasabi");
   expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "task_1", action: "choose", option: "Wasabi" });
 });

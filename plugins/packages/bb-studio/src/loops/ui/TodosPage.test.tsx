@@ -107,8 +107,10 @@ const type = async (input: HTMLInputElement, value: string) => {
 it("names itself Tasks, and lists Mine (Today, then Later), Agents on it, Waiting, Scheduled & recurring and Done", async () => {
   await render();
   expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Tasks·Chief of Staff");
-  expect(container.querySelector("[data-testid=tasks-mine]")?.textContent).toBe("Mine");
-  expect([...container.querySelectorAll("section")].map((each) => each.getAttribute("aria-label"))).toEqual(["Today", "Later", "Agents on it", "Waiting", "Scheduled & recurring", "Done"]);
+  expect([...container.querySelectorAll("section")].map((each) => each.getAttribute("aria-label"))).toEqual(["Mine", "Today", "Later", "Agents on it", "Waiting", "Scheduled & recurring", "Done"]);
+  expect(group("Mine")!.querySelector("h2")?.textContent).toBe("Mine6");
+  expect([...group("Mine")!.querySelectorAll("section")].map((each) => each.getAttribute("aria-label"))).toEqual(["Today", "Later"]);
+  expect([...container.querySelectorAll("h2")].map((each) => each.textContent)).not.toContain("Today3");
   expect(titles(group("Today"))).toEqual(["Pay the Con Edison bill", "Reply to Sam about the Q3 planning doc", "Choose the deck contractor"]);
   expect(titles(group("Later"))).toEqual(["Send the October expense report", "Review the onboarding flow", "Call the plumber about the slow drain"]);
   expect(titles(group("Agents on it"))).toEqual(["Draft the Larkspur Q4 lead summary"]);
