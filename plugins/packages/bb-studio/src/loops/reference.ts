@@ -12,7 +12,7 @@ export const ownerText = (owner: string): string => (owner === 'patrick' || owne
 /** The mention provider's id: `@loop` in any composer. */
 export const LOOP_MENTION = 'loop';
 /** What a user message with this line, or a Todo mention, means to the Bot. */
-export const LOOP_TOPIC_HINT = 'A ::loop{id="…"} line or a Todo mention in the user\'s message means that todo is the topic: read it with todos_get before you answer.';
+export const LOOP_TOPIC_HINT = 'A ::loop{id="…"} line or a Task mention in the user\'s message means that task is the topic: read it with todos_get before you answer.';
 
 const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim();
 
@@ -34,7 +34,7 @@ function triggerText(trigger: Loop['trigger']): string {
 /** What a Todo mention gives the Bot: the todo's id, title, why and trigger, and how to act on it. */
 export function loopContext(loop: Loop): string {
   const lines = [
-    `The user brought this todo into the chat to discuss it; it is the topic of their message. Use todos_get for its history and todos_update or todos_act to change it.`,
+    `The user brought this task into the chat to discuss it; it is the topic of their message. Use todos_get for its history and todos_update or todos_act to change it.`,
     `id: ${loop.id}`,
     `title: ${oneLine(loop.title)}`,
     `why: ${oneLine(loop.why) || '(none)'}`,

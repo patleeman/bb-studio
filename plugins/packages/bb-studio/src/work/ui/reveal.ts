@@ -1,5 +1,6 @@
 import type { ToAppPath } from "../../kit/app/host-sdk";
 import { WORK_ID } from "../shared";
+import { TODO_ID } from "../../tasks/contract";
 import { messageLinkPath } from "./in-flight-model";
 
 export const FLASH_CLASS = "studio-work-flash";
@@ -10,7 +11,7 @@ const POLL_MS = 100;
 const timers = new WeakMap<Element, ReturnType<typeof setTimeout>>();
 
 export function cardElement(id: string, root: ParentNode = document): HTMLElement | null {
-  return WORK_ID.test(id) ? root.querySelector<HTMLElement>(`[data-work-card-id="${id}"]`) : null;
+  return WORK_ID.test(id) || TODO_ID.test(id) ? root.querySelector<HTMLElement>(`[data-work-card-id="${id}"]`) : null;
 }
 
 export function flashCard(element: HTMLElement): void {

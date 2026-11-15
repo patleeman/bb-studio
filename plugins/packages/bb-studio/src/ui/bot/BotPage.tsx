@@ -319,8 +319,8 @@ function LoopsSummary({ model }: { model: BotPageModel }) {
     [groups.waitingOnOthers.length, "waiting on others"], [groups.done.filter((loop) => (loop.closedAt ?? 0) >= weekAgo).length, "done this week"],
   ] : [];
   return (
-    <section aria-label="Todos" data-testid="bot-loops" className="pt-10">
-      <SectionHead title="Todos" action={<button type="button" className={OUTLINE_BUTTON} data-testid="bot-loops-tab" onClick={() => openLoops(model.bot.id)}>Open Todos<Icon name="ChevronRight" /></button>} />
+    <section aria-label="Tasks" data-testid="bot-loops" className="pt-10">
+      <SectionHead title="Tasks" action={<button type="button" className={OUTLINE_BUTTON} data-testid="bot-loops-tab" onClick={() => openLoops(model.bot.id)}>Open Tasks<Icon name="ChevronRight" /></button>} />
       <p className="flex flex-wrap gap-x-5 gap-y-1 border-b border-border py-2.5 text-sm text-muted-foreground">
         {groups ? counts.map(([count, label]) => <span key={label}><span className="font-medium text-foreground tabular-nums">{count}</span> {label}</span>) : "Loading…"}
       </p>

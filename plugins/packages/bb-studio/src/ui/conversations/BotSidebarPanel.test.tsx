@@ -427,7 +427,7 @@ describe("the Bot's space (round 7)", () => {
 
   it("lists the Bot's pages as rows, opens each, and selects the one on screen", async () => {
     await mount();
-    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Todos"]);
+    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Tasks"]);
     await act(async () => { $('[data-testid="space-page-skills"]')!.click(); });
     expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "skills/cos" });
     await act(async () => { $('[data-testid="space-page-library"]')!.click(); });
@@ -441,7 +441,7 @@ describe("the Bot's space (round 7)", () => {
     expect($('[data-testid="space-page-library"]')?.getAttribute("aria-current")).toBeNull();
   });
 
-  it("names another Bot's page row Scheduled: the Todos list is the primary Bot's", async () => {
+  it("names another Bot's page row Scheduled: the Tasks list is the primary Bot's", async () => {
     state.loopsOn = true;
     state.live.bot_spaces = { bots: [space("cos", "Chief of Staff", false, "main"), space("home", "Home", false, "home_main")], currentBotId: "home" };
     await mount();
@@ -451,12 +451,12 @@ describe("the Bot's space (round 7)", () => {
     expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("automations");
   });
 
-  it("adds Todos with what needs the user now, for the primary Bot with Todos on", async () => {
+  it("adds Tasks with what needs the user now, for the primary Bot with Task reminders on", async () => {
     state.loopsOn = true;
     state.live["loops.list"] = { needsYouNow: [{}, {}, {}], comingUp: [], agentsOnIt: [], waitingOnOthers: [], done: [] };
     await mount();
     expect($('[data-testid="space-todos-count"]')?.textContent).toBe("3");
-    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Todos"]);
+    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Tasks"]);
     expect($('[data-testid="space-page-automations"]')).toBeNull();
     await act(async () => { $('[data-testid="space-page-todos"]')!.click(); });
     expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "bot/cos/loops" });

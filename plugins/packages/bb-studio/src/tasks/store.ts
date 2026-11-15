@@ -8,13 +8,13 @@ const unavailable = new WeakMap<Database.Database, string>();
 export const markTasksUnavailable = (db: Database.Database, reason: string) => { unavailable.set(db, reason); };
 export const tasksUnavailable = (db: Database.Database) => unavailable.get(db) ?? null;
 
-export function assertTasksReady(db: Database.Database): void {
+export function assertTasksReady(db: Database.Database, detail = true): void {
   const reason = tasksUnavailable(db);
-  if (reason) throw new Error(unavailableMessage(reason));
+  if (reason) throw new Error(unavailableMessage(detail ? reason : undefined));
 }
 
-export function guardTasks<T extends Record<string, (...args: never[]) => unknown>>(db: Database.Database, handlers: T): T {
-  return Object.fromEntries(Object.entries(handlers).map(([name, handler]) => [name, (...args: never[]) => { assertTasksReady(db); return handler(...args); }])) as T;
+export function guardTasks<T extends Record<string, (...args: never[]) => unknown>>(db: Database.Database, handlers: T, detail = false): T {
+  return Object.fromEntries(Object.entries(handlers).map(([name, handler]) => [name, (...args: never[]) => { assertTasksReady(db, detail); return handler(...args); }])) as T;
 }
 
 export function surfaceForUser(t: Task): void {

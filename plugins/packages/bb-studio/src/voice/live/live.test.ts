@@ -232,7 +232,7 @@ describe("eyes-free rules in the tool layer", () => {
     const { live, act, add, restore, loops, advance } = setup();
     const { sessionId } = await live.start({ sdp: "x" });
     for (const action of ["choose", "nudge", "keep"]) {
-      expect(await live.tool(sessionId, "todos_act", JSON.stringify({ loop_id: "loop_1", action }))).toMatch(/Voice can mark a todo done, snooze it, hand it off or drop it/);
+      expect(await live.tool(sessionId, "todos_act", JSON.stringify({ loop_id: "loop_1", action }))).toMatch(/Voice can mark a task done, snooze it, hand it off or drop it/);
     }
     expect(act).not.toHaveBeenCalled();
 
@@ -261,19 +261,19 @@ describe("eyes-free rules in the tool layer", () => {
     expect(loops.loop_2!.status).toBe("snoozed");
   });
 
-  it("destructive: dropping a todo waits for the user's own spoken yes", async () => {
+  it("destructive: dropping a task waits for the user's own spoken yes", async () => {
     const { live, act, loops } = setup();
     const { sessionId } = await live.start({ sdp: "x" });
     const asked = await live.tool(sessionId, "todos_act", JSON.stringify({ loop_id: "loop_ts", action: "drop" }));
-    expect(prompt(asked)).toBe(`Drop the todo 'Remove the stale Tailscale node'? Say yes to drop.`);
+    expect(prompt(asked)).toBe(`Drop the task 'Remove the stale Tailscale node'? Say yes to drop.`);
     expect(act).not.toHaveBeenCalled();
     const id = actionId(asked);
     // The model can't confirm on its own; filler, unclear talk and the voice's own echo aren't a yes.
     expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }))).toMatch(/hasn't heard the user answer/);
     expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [heard("Thank you for watching", id)])).toMatch(/hasn't heard/);
-    expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [heard("Drop the todo Remove the stale Tailscale node? Say yes to drop.", id)])).toMatch(/didn't hear a clear yes/);
+    expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [heard("Drop the task Remove the stale Tailscale node? Say yes to drop.", id)])).toMatch(/didn't hear a clear yes/);
     expect(act).not.toHaveBeenCalled();
-    expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [heard("Yes, drop it", id)])).toBe(`Dropped the todo 'Remove the stale Tailscale node'. Say that briefly; it can't be undone by voice.`);
+    expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [heard("Yes, drop it", id)])).toBe(`Dropped the task 'Remove the stale Tailscale node'. Say that briefly; it can't be undone by voice.`);
     expect(act).toHaveBeenCalledWith("loop_ts", "drop");
     expect(loops.loop_ts!.status).toBe("dropped");
     expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [heard("yes", id)])).toBe("That was already done.");
@@ -516,9 +516,9 @@ describe("the voice thread", () => {
       expect.stringMatching(/^🎙 \*\*Voice session · /),
       "**You:** What's waiting?",
       "**Voice:** Two things.",
-      "✓ **Todo done:** Reply to Dana",
+      "✓ **Task done:** Reply to Dana",
       "**You:** yes",
-      `⚠️ **Done after a spoken yes:** Dropped the todo 'Remove the stale Tailscale node'.`,
+      `⚠️ **Done after a spoken yes:** Dropped the task 'Remove the stale Tailscale node'.`,
       "**You:** Tell Dot to book the car",
       "→ **Sent to Dot:** Book the car service for Friday",
       "← **Dot answered:** Booked for Friday at 8.",

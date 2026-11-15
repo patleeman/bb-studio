@@ -1,4 +1,5 @@
 import { registerWorkCards, WORK_TOOLS } from "./src/work/register";
+import { registerUserTasks } from "./src/tasks/user";
 import { registerTasks, TASK_TOOLS } from "./src/tasks/register";
 import { adoptAtStart } from "./src/tasks/migrate";
 import { withToolLabel } from "./src/tool-labels";
@@ -695,6 +696,15 @@ export default async function plugin(bb: BbPluginApi) {
   loopsEnabled = loops.enabled;
   const work = registerWorkCards(bb, db);
   registerTasks(bb, db, postToBot);
+  registerUserTasks(bb, db, {
+    post: postToBot,
+    send: async (threadId, text) => { await bb.sdk.threads.send({threadId,mode:'auto',input:[{type:'text',text,mentions:[],visibility:'agent-only'}]} as never); },
+    thread: async (threadId) => (await bb.sdk.threads.get({ threadId })) as never,
+    loopAct: (x) => loops.act(x),
+    reopenLoop: (id) => loops.store.update(id, { status: 'surfaced' }),
+    snoozeLoopUntil: (id, at) => loops.store.update(id, { status: 'snoozed', trigger: { type: 'time', at } }),
+    held: () => loops.scheduler.held(),
+  });
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
   const runners: Runners = new Runners({
     db, sdk: bb.sdk, scheduler, changed: tagsChanged,
@@ -1438,7 +1448,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_create: async (input) => {
       const firstBot = firstBotOfFreshInstall(bots.list().length, readFlag(bb.server.experimental_dataDir));
       const view = await bots.create(input);
-      await remindersForFirstBot(studioSettings, firstBot).catch((error) => bb.log.warn(`Couldn't turn on Todo reminders for the first Bot: ${String(error)}`));
+      await remindersForFirstBot(studioSettings, firstBot).catch((error) => bb.log.warn(`Couldn't turn on Task reminders for the first Bot: ${String(error)}`));
       return view;
     },
     bot_set: (input) => bots.set(input),
@@ -2138,9 +2148,9 @@ export default async function plugin(bb: BbPluginApi) {
     ...(input.script ? { script: { body: input.script, interpreter: input.interpreter ?? "bash" } } : {}),
     ...(input.target ? { target: input.target } : {}),
   });
-  runnerTool("automation_list", "List what you have scheduled: check-ins, reminders, watchers and runners, with schedule, state, next run and last outcome. The user sees them under Scheduled on the Todos page; call them scheduled items, never automations.", z.object({}),
+  runnerTool("automation_list", "List what you have scheduled: check-ins, reminders, watchers and runners, with schedule, state, next run and last outcome. The user sees them under Scheduled on the Tasks page; call them scheduled items, never automations.", z.object({}),
     async (_input: unknown, botId) => (await automations.list(botId)).map(describeAutomation).join("\n") || "Nothing scheduled yet.");
-  runnerTool("automation_create", "Schedule something for yourself. kind checkin: wakes your thread on a schedule with an instruction. reminder: once, with schedule.at or schedule.in (\"tomorrow 9:00 remind me…\", \"in 2h check the deploy\"); with Todos on it becomes a todo you own with that time, listed on the Todos page. watcher: a script on a schedule that wakes you only when it prints something (zero tokens otherwise). runner: a recurring job in its own thread. The user sees these under Scheduled on the Todos page; call them scheduled items, never automations.",
+  runnerTool("automation_create", "Schedule something for yourself. kind checkin: wakes your thread on a schedule with an instruction. reminder: once, with schedule.at or schedule.in (\"tomorrow 9:00 remind me…\", \"in 2h check the deploy\"); with Tasks on it becomes a task you own with that time, listed on the Tasks page. watcher: a script on a schedule that wakes you only when it prints something (zero tokens otherwise). runner: a recurring job in its own thread. The user sees these under Scheduled on the Tasks page; call them scheduled items, never automations.",
     z.object({ kind: z.enum(["checkin", "reminder", "watcher", "runner"]), name: z.string().trim().min(1).max(60), ...automationFields, schedule: toolSchedule }),
     async (input: AutomationToolInput & { kind: "checkin" | "reminder" | "watcher" | "runner"; name: string }, botId) => {
       const schedule = toSchedule(input.schedule!);
@@ -2148,7 +2158,7 @@ export default async function plugin(bb: BbPluginApi) {
         const bot = bots.stored(botId);
         const owner = !bot || bot.primary !== false || !bot.threadId ? "cos" : `thread:${bot.threadId}`;
         const todo = loops.store.add({ title: input.name, why: input.instruction?.trim() ?? "", owner, kind: "do", trigger: { type: "time", at: schedule.at } });
-        return `Made a todo (a reminder is a todo you own): ${todo.title}, due ${new Date(schedule.at).toISOString()}, id ${todo.id}. Change it with todos_update.`;
+        return `Made a task (a reminder is a task you own): ${todo.title}, due ${new Date(schedule.at).toISOString()}, id ${todo.id}. Change it with todos_update.`;
       }
       return `Made:\n${describeAutomation(await automations.create({ kind: input.kind, name: input.name, schedule, ...automationChanges(input) } as never, botId))}`;
     });

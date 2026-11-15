@@ -116,8 +116,8 @@ export function AddLoop({ onAdd, compact = false }: { onAdd(text: string): Promi
     <div className="flex flex-col gap-1">
       <form className={cn("flex items-center gap-2 rounded-lg border border-border px-3 focus-within:border-ring", compact ? "h-9" : "h-11")} onSubmit={(e) => { e.preventDefault(); void submit(); }}>
         <Icon name="Plus" className="size-4 shrink-0 text-muted-foreground" />
-        <input aria-label="Add a todo" value={text} disabled={busy} maxLength={500} onChange={(e) => setText(e.target.value)}
-          placeholder="Add a todo" className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
+        <input aria-label="Add a task" value={text} disabled={busy} maxLength={500} onChange={(e) => setText(e.target.value)}
+          placeholder="Add a task" className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
         <button type="submit" aria-label="Add" disabled={!text.trim() || busy}
           className="inline-flex h-6 items-center rounded border border-border px-1.5 text-muted-foreground hover:text-foreground disabled:opacity-50">
           <Icon name="CornerDownLeft" className="size-3.5" />

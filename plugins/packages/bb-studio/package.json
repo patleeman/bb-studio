@@ -16,7 +16,7 @@
   },
   "bb": {
     "name": "Studio",
-    "description": "The home of BB Studio: pages, whiteboards, recordings, designs and apps in one library, with Bots, Todos, Smart Queue and VS Code on each thread.",
+    "description": "The home of BB Studio: pages, whiteboards, recordings, designs and apps in one library, with Bots, Tasks, Smart Queue and VS Code on each thread.",
     "branding": {
       "icon": "./icons/studio.svg",
       "experimental_icons": {

@@ -3,6 +3,7 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Loop } from "../contract";
+import { taskFromLoop } from "../../tasks/views";
 
 const NOW = new Date("2026-11-02T15:00:00").getTime();
 const DAY = 86_400_000;
@@ -20,6 +21,8 @@ const state = vi.hoisted(() => ({
   composer: { insert: vi.fn(), focus: vi.fn() },
   scheduled: [] as unknown[],
   zone: null as string | null,
+  listError: null as string | null,
+  scheduledError: null as string | null,
 }));
 vi.mock("../../kit/composer", () => ({ threadComposer: (threadId: string) => state.chatOpen && threadId === "thr_bot" ? state.composer : null }));
 vi.mock("../../links/open", () => ({ openLinkFromAnywhere: state.openLink, clickModifiers: (event?: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean }) => ({ meta: !!event?.metaKey, ctrl: !!event?.ctrlKey, shift: !!event?.shiftKey }) }));
@@ -33,19 +36,22 @@ vi.mock("../../ui/live", () => ({
     const found = method === "loops.get" ? Object.values(state.groups as Record<string, Loop[]>).flat().find((each) => each.id === input?.id) : undefined;
     if (method === "loops.get" && state.getError) return { data: null, loading: false, error: state.getError, refresh: () => {} };
     if (method === "loops.get") return { data: found ? { loop: found, history: [] } : null, loading: false, error: found ? null : "Todo not found", refresh: () => {} };
-    const data = method === "loops.list" ? state.groups
+    if (method === "tasks.get") return { data: null, loading: false, error: "Task not found", refresh: () => {} };
+    const data = method === "tasks.list" ? { tasks: Object.values(state.groups as Record<string, Loop[]>).flat().map(taskFromLoop), threads: [{ owner: "thread:thr_lead", name: "Larkspur lead", threadId: "thr_lead" }], held: [] }
       : method === "loops.scheduled" ? { items: state.scheduled }
       : method === "bot_get" ? { bot: { id: "bot_1", name: "Chief of Staff", threadId: "thr_bot" } }
       : method === "bot_list" ? { bots: [{ id: "bot_1", name: "Chief of Staff", threadId: "thr_bot", primary: true, state: "active" }] }
         : method === "project_leads" ? { leads: [{ projectId: "proj_k", leadThreadId: "thr_lead", run: null }] }
           : method === "loops.places" ? { names: ["Home", "Office", "Mom’s"] }
             : method === "bot_attention" ? { attention: state.attention } : null;
+    if (method === "tasks.list" && state.listError) return { data: null, loading: false, error: state.listError, refresh: () => {} };
+    if (method === "loops.scheduled" && state.scheduledError) return { data: null, loading: false, error: state.scheduledError, refresh: () => {} };
     return { data, loading: false, error: null, refresh: () => {} };
   },
 }));
 vi.mock("../../kit/ui/index", async () => (await import("./test-kit")).kitUi);
 vi.mock("../../kit/ui/icon", () => ({ Icon: ({ name }: { name: string }) => <i data-icon={name} /> }));
-vi.mock("../../kit/app/index", () => ({ GHOST_BUTTON: "", PRIMARY_BUTTON: "", DANGER_BUTTON: "", openAppPath: vi.fn(), StudioBar: ({ children }: { children?: ReactNode }) => <div>{children}</div> }));
+vi.mock("../../kit/app/index", async () => ({ ...(await import("./test-kit")).kitUi, GHOST_BUTTON: "", PRIMARY_BUTTON: "", DANGER_BUTTON: "", openAppPath: vi.fn(), StudioBar: ({ children }: { children?: ReactNode }) => <div>{children}</div> }));
 
 const { TodosPage } = await import("./TodosPage");
 const { TodoTab } = await import("./TodoTab");
@@ -78,12 +84,12 @@ beforeEach(() => {
 afterEach(() => { act(() => { root.unmount(); tabRoot.unmount(); }); container.remove(); tabHost.remove(); vi.useRealTimers(); });
 
 const render = async () => { await act(async () => root.render(<TodosPage view={view} />)); await act(async () => { await Promise.resolve(); await Promise.resolve(); }); };
-const group = (name: string) => container.querySelector<HTMLElement>(`section[aria-label="${name}"]`);
+const group = (name: string) => [...container.querySelectorAll<HTMLElement>("section")].find((each) => each.getAttribute("aria-label") === name) ?? null;
 const titles = (scope: Element | null) => [...(scope?.querySelectorAll("[data-testid=bot-page-row-title]") ?? [])].map((each) => each.textContent);
-const row = (title: string) => [...container.querySelectorAll<HTMLElement>("[data-testid=todo-row], [data-testid=todo-done]")].find((each) => each.querySelector("[data-testid=bot-page-row-title]")?.textContent === title)!;
+const row = (title: string) => [...container.querySelectorAll<HTMLElement>("[data-testid=task-row], [data-testid=task-done-row]")].find((each) => each.querySelector("[data-testid=bot-page-row-title]")?.textContent === title)!;
 const openTab = async (id: string) => { await act(async () => tabRoot.render(<TodoTab params={{ id }} />)); };
 const openRow = async (title: string) => {
-  const id = row(title).dataset.loop!;
+  const id = row(title).dataset.task!;
   await act(async () => row(title).querySelector<HTMLButtonElement>("[data-testid=bot-page-row-open]")!.click());
   expect(state.openLink).toHaveBeenLastCalledWith(`bb://todo/${id}`, { source: "botPage", title, modifiers: { meta: false, ctrl: false, shift: false } });
   await openTab(id);
@@ -98,31 +104,34 @@ const type = async (input: HTMLInputElement, value: string) => {
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); });
 };
 
-it("names itself in the header, and lists one line per todo in Today, This week, Later and Waiting on others", async () => {
+it("names itself Tasks, and lists Mine (Today, then Later), Agents on it, Waiting, Scheduled & recurring and Done", async () => {
   await render();
-  expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Todos·Chief of Staff");
-  expect([...container.querySelectorAll("section")].map((each) => each.getAttribute("aria-label"))).toEqual(["Today", "This week", "Later", "Waiting on others", "Scheduled", "Done"]);
-  // Out now, and overdue, are Today; a snooze two days out is this week; no date or ten days out is later.
+  expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Tasks·Chief of Staff");
+  expect(container.querySelector("[data-testid=tasks-mine]")?.textContent).toBe("Mine");
+  expect([...container.querySelectorAll("section")].map((each) => each.getAttribute("aria-label"))).toEqual(["Today", "Later", "Agents on it", "Waiting", "Scheduled & recurring", "Done"]);
   expect(titles(group("Today"))).toEqual(["Pay the Con Edison bill", "Reply to Sam about the Q3 planning doc", "Choose the deck contractor"]);
-  expect(titles(group("This week"))).toEqual(["Send the October expense report"]);
-  expect(titles(group("Later"))).toEqual(["Review the onboarding flow", "Call the plumber about the slow drain"]);
-  expect(titles(group("Waiting on others"))).toEqual(["Draft the Larkspur Q4 lead summary", "Signed lease addendum"]);
-  // One small when on the right; nothing else on the line: no area chip, description, source or trigger pill.
+  expect(titles(group("Later"))).toEqual(["Send the October expense report", "Review the onboarding flow", "Call the plumber about the slow drain"]);
+  expect(titles(group("Agents on it"))).toEqual(["Draft the Larkspur Q4 lead summary"]);
+  expect(titles(group("Waiting"))).toEqual(["Signed lease addendum"]);
   const meta = (title: string) => row(title).querySelector("[data-testid=bot-page-row-meta]");
   expect(meta("Pay the Con Edison bill")?.textContent).toBe("Overdue");
   expect(meta("Pay the Con Edison bill")?.className).toContain("text-warning");
   expect(meta("Reply to Sam about the Q3 planning doc")?.textContent).toBe("Due Fri, 3:00 PM");
   expect(meta("Send the October expense report")?.textContent).toBe("Wed");
   expect(meta("Call the plumber about the slow drain")?.textContent).toBe("When you get home");
-  expect(meta("Draft the Larkspur Q4 lead summary")?.textContent).toBe("Larkspur lead");
+  expect(meta("Draft the Larkspur Q4 lead summary")?.textContent).toBe("Larkspur lead · Running");
   expect(meta("Signed lease addendum")?.textContent).toBe("Since Sun");
   expect(meta("Choose the deck contractor")).toBeNull();
-  const prep = row("Review the onboarding flow");
-  expect(prep.textContent).toBe("Review the onboarding flowDue Nov 12, 3:00 PM");
+  expect(row("Review the onboarding flow").textContent).toBe("Review the onboarding flowDue Nov 12, 3:00 PM");
   expect(container.textContent).not.toContain("q3-planning-notes");
-  expect(container.textContent).not.toContain("Tomorrow morning card");
-  // Done is folded.
-  expect(group("Done")?.querySelectorAll("[data-testid=todo-done]")).toHaveLength(0);
+  expect(group("Done")?.textContent).toContain("2 done");
+  expect(group("Done")?.querySelectorAll("[data-testid=task-done-row]")).toHaveLength(0);
+});
+
+it("files an agent's task that waits for its time under Scheduled & recurring", async () => {
+  (state.groups as Record<string, Loop[]>).agentsOnIt.push(loop("loop_s", "Check the deploy tonight", { owner: "cos", status: "queued", trigger: { type: "time", at: NOW + 3_600_000 } }));
+  await render();
+  expect(titles(group("Scheduled & recurring"))).toContain("Check the deploy tonight");
 });
 
 it("draws an open todo with an empty circle and a done one with a check", async () => {
@@ -133,22 +142,41 @@ it("draws an open todo with an empty circle and a done one with a check", async 
   expect(row("Closed 1").querySelector("[data-icon]")?.getAttribute("data-icon")).toBe("CircleCheck");
 });
 
-it("filters by area pills and search; area lives only in the filter bar", async () => {
+it("filters by area, owner and search, and says when nothing matches", async () => {
   await render();
-  const pills = () => [...container.querySelectorAll<HTMLButtonElement>("[data-testid=bot-page-pill]")];
-  expect(pills().map((each) => each.textContent)).toEqual(["All", "Home", "Job", "Larkspur"]);
-  expect([...container.querySelectorAll("[data-testid=todo-row]")].some((each) => each.textContent?.includes("Home"))).toBe(false);
-  await act(async () => pills().find((each) => each.textContent === "Home")!.click());
+  const menu = (id: string) => container.querySelector<HTMLElement>(`[data-testid=${id}]`)!;
+  const pick = async (label: string) => act(async () => [...container.querySelectorAll<HTMLButtonElement>("[role=menuitem]")].find((each) => each.textContent === label)!.click());
+  expect(menu("tasks-filter-area").dataset.value).toBe("all");
+  expect(container.querySelector("[data-testid=tasks-filter-project]")).toBeNull();
+  await pick("Home");
+  expect(menu("tasks-filter-area").dataset.value).toBe("Home");
   expect(titles(container)).toEqual(["Pay the Con Edison bill", "Choose the deck contractor", "Call the plumber about the slow drain"]);
-  await act(async () => pills().find((each) => each.textContent === "All")!.click());
+  await pick("All");
+  await pick("Agents");
+  expect(titles(container)).toEqual(["Draft the Larkspur Q4 lead summary"]);
+  await pick("Chief of Staff");
+  expect(container.querySelector("[data-testid=tasks-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("No tasks match these filters");
+  await act(async () => container.querySelector<HTMLButtonElement>("[data-testid=tasks-empty] [data-testid=bot-page-empty-action]")!.click());
+  expect(menu("tasks-filter-owner").dataset.value).toBe("all");
   await type(container.querySelector<HTMLInputElement>("[data-testid=bot-page-search]")!, "onboarding sign");
   expect(titles(container)).toEqual(["Review the onboarding flow"]);
   await type(container.querySelector<HTMLInputElement>("[data-testid=bot-page-search]")!, "nothing like it");
-  expect(container.querySelector("[data-testid=todos-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("No todos match “nothing like it”");
+  expect(container.querySelector("[data-testid=tasks-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("No tasks match “nothing like it”");
   expect(container.querySelector("[data-testid=scheduled-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("No scheduled items match “nothing like it”");
-  await act(async () => container.querySelector<HTMLButtonElement>("[data-testid=todos-empty] [data-testid=bot-page-empty-action]")!.click());
+  await act(async () => container.querySelector<HTMLButtonElement>("[data-testid=tasks-empty] [data-testid=bot-page-empty-action]")!.click());
   expect(container.querySelector<HTMLInputElement>("[data-testid=bot-page-search]")!.value).toBe("");
-  expect(titles(container).length).toBeGreaterThan(1);
+});
+
+it("shows the tasks error and Scheduled's own error instead of empty lists", async () => {
+  state.listError = "Tasks could not be loaded. Nothing was lost. Restart BB Studio to try again.";
+  state.scheduledError = "Tasks could not be loaded. Nothing was lost. Restart BB Studio to try again.";
+  await render();
+  expect(container.querySelector("[data-testid=tasks-error]")?.textContent).toBe(state.listError);
+  expect(container.querySelector("[data-testid=tasks-scheduled] [data-testid=scheduled-error]")?.textContent).toBe(state.scheduledError);
+  expect(container.querySelector("[data-testid=tasks-empty]")).toBeNull();
+  expect(container.querySelector("[data-testid=scheduled-empty]")).toBeNull();
+  expect(container.textContent).not.toMatch(/SQLITE|disk/);
+  state.listError = null; state.scheduledError = null;
 });
 
 it("a row opens the todo through the link router, and the todo tab shows its description, due date, when, area, owner and source with the plan's link", async () => {
@@ -182,7 +210,7 @@ it("a deleted todo's tab says Not found, with its link", async () => {
   await openTab("loop_gone");
   expect(detail()).toBeNull();
   expect(tabHost.querySelector("[data-testid=link-not-found]")?.textContent).toContain("bb://todo/loop_gone");
-  expect(tabHost.querySelector("[data-testid=link-not-found]")?.textContent).toContain("Todo");
+  expect(tabHost.querySelector("[data-testid=link-not-found]")?.textContent).toContain("Task");
   state.getError = "The server didn't answer";
   await openTab("loop_n");
   expect(tabHost.querySelector("[data-testid=link-not-found]")).toBeNull();
@@ -190,7 +218,7 @@ it("a deleted todo's tab says Not found, with its link", async () => {
   state.getError = null;
 });
 
-it("acts from the detail: Done, choose, Remind me now, Take it back, Open thread, Nudge them and Undo", async () => {
+it("acts from the detail: Done, choose, Remind me now, Take back, Open thread, Nudge them and Undo", async () => {
   await render();
   await openRow("Reply to Sam about the Q3 planning doc");
   await act(async () => buttonIn(detail()!, "Done").click());
@@ -202,8 +230,8 @@ it("acts from the detail: Done, choose, Remind me now, Take it back, Open thread
   await act(async () => buttonIn(detail()!, "Remind me now").click());
   expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_c", surfaceNow: true });
   await openRow("Draft the Larkspur Q4 lead summary");
-  await act(async () => buttonIn(detail()!, "Take it back").click());
-  expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_a", changes: { owner: "patrick", status: "surfaced" } });
+  await act(async () => buttonIn(detail()!, "Take back").click());
+  expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "loop_a", action: "take_back" });
   await act(async () => buttonIn(detail()!, "Open thread").click());
   expect(state.toThread).toHaveBeenCalledWith("thr_lead");
   await openRow("Signed lease addendum");
@@ -224,16 +252,16 @@ it("shows why Remind me now failed in the detail", async () => {
   expect(detail()!.querySelector("[role='alert']")?.textContent).toBe("An active Bot chat is required");
 });
 
-it("names a todo's actions in plain words: Remind me now, Give to, Change when, Dismiss", async () => {
+it("names a task's actions in plain words: Remind me now, Hand off, Change when, Dismiss", async () => {
   await render();
   await openRow("Call the plumber about the slow drain");
   const labels = [...detail()!.querySelectorAll("button")].map((each) => each.textContent?.trim());
-  expect(labels).toEqual(expect.arrayContaining(["Done", "Remind me now", "Snooze", "Give to", "Discuss", "Change when", "Dismiss"]));
-  for (const old of ["Surface now", "Hand off", "Change trigger", "Drop"]) expect(labels).not.toContain(old);
+  expect(labels).toEqual(expect.arrayContaining(["Done", "Remind me now", "Snooze", "Hand off", "Discuss", "Change when", "Dismiss"]));
+  for (const old of ["Surface now", "Give to", "Change trigger", "Drop"]) expect(labels).not.toContain(old);
   await act(async () => buttonIn(detail()!, "Dismiss").click());
   expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_c", action: "drop" });
   await act(async () => buttonIn(detail()!, "Chief of Staff").click());
-  expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_c", action: "hand_off", owner: "cos" });
+  expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "loop_c", action: "hand_off", to: "cos" });
 });
 
 it("changes a trigger from the detail to a phone place with Send to iPhone", async () => {
@@ -257,10 +285,10 @@ it("Discuss in the detail opens the Bot chat, then puts the todo in its draft", 
   await vi.waitFor(() => expect(state.composer.insert).toHaveBeenCalledWith([{ provider: "loop", id: "loop_c", label: "Call the plumber about the slow drain" }, " "], { at: "end" }));
 });
 
-it("New hands a typed line to the Bot", async () => {
+it("New adds a typed line as the user's task", async () => {
   await render();
   await act(async () => buttonIn(container, "New").click());
-  const input = container.querySelector<HTMLInputElement>("input[aria-label='New todo']")!;
+  const input = container.querySelector<HTMLInputElement>("input[aria-label='New task']")!;
   await type(input, "call the plumber when I'm home");
   await act(async () => buttonIn(container.querySelector("[data-testid=todo-add]")!, "Add").click());
   expect(state.call).toHaveBeenCalledWith("loops.add", { text: "call the plumber when I'm home" });
@@ -282,15 +310,15 @@ it("leads Today with the Bot chat's pending questions (a tracked one once), whic
   expect(state.openLink).toHaveBeenLastCalledWith("bb://conversation/thr_bot", { source: "botPage", title: "Chief of Staff", modifiers: { meta: false, ctrl: false, shift: false } });
 });
 
-it("says No todos yet when nothing is open, with New todo, and Done still there", async () => {
+it("says No tasks yet when nothing is open, with New task, and Done still there", async () => {
   state.groups = { ...empty, done: [loop("loop_v", "Cancel the hosting Pro trial", { status: "done", closedAt: NOW, closedBy: "patrick" })] };
   await render();
-  expect(container.querySelector("[data-testid=todos-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("No todos yet");
-  expect(container.querySelector("[data-testid=todos-empty] [data-testid=bot-page-empty-action]")?.textContent).toBe("New todo");
-  expect(group("Done")?.textContent).toContain("Done1");
+  expect(container.querySelector("[data-testid=tasks-empty] [data-testid=bot-page-empty-title]")?.textContent).toBe("No tasks yet");
+  expect(container.querySelector("[data-testid=tasks-empty] [data-testid=bot-page-empty-action]")?.textContent).toBe("New task");
+  expect(group("Done")?.textContent).toContain("1 done");
 });
 
-it("lists the Bot's check-ins, reminders, watchers and runners under Scheduled, each opening its automation", async () => {
+it("lists the Bot's check-ins, reminders, watchers and runners under Scheduled & recurring, each opening its automation", async () => {
   state.groups = { ...empty };
   const item = (key: string, over: Record<string, unknown>) => ({ key, source: "automation", id: key, botId: "bot_1", botName: "Chief of Staff", kind: "checkin", title: key, nextAt: null, state: "active", scheduleText: "Daily 8:00", threadId: "thr_bot", link: `bb://automation/bot_1%3A${key}`, ...over });
   state.scheduled = [
@@ -300,7 +328,7 @@ it("lists the Bot's check-ins, reminders, watchers and runners under Scheduled, 
     item("A timed todo", { source: "todo", link: "bb://todo/loop_t" }),
   ];
   await render();
-  const rows = [...container.querySelectorAll("[data-testid=todos-scheduled] [data-testid=scheduled-row]")];
+  const rows = [...container.querySelectorAll("[data-testid=tasks-scheduled] [data-testid=scheduled-row]")];
   expect(rows.map((each) => each.textContent)).toEqual(["Morning brief4:00 PM", "Inbox watchPaused"]);
   expect(rows[0]!.getAttribute("data-row-link")).toBe("bb://automation/bot_1%3AMorning%20brief");
   state.scheduled = [];
@@ -326,11 +354,11 @@ it("shows 8 rows of a long group, then \"N more in Later\", so Scheduled stays n
   const later = group("Later")!;
   expect(later.querySelector("[data-testid=bot-page-group-count]")?.textContent).toBe("20");
   expect(titles(later)).toHaveLength(8);
-  expect(later.querySelector("[data-testid=todos-more]")?.textContent).toBe("12 more in Later");
+  expect(later.querySelector("[data-testid=tasks-more]")?.textContent).toBe("12 more in Later");
   expect(container.querySelectorAll("[data-testid=bot-page-row-title]")).toHaveLength(9);
-  await act(async () => later.querySelector<HTMLButtonElement>("[data-testid=todos-more]")!.click());
+  await act(async () => later.querySelector<HTMLButtonElement>("[data-testid=tasks-more]")!.click());
   expect(titles(group("Later"))).toHaveLength(20);
-  expect(group("Later")!.querySelector("[data-testid=todos-more]")).toBeNull();
+  expect(group("Later")!.querySelector("[data-testid=tasks-more]")).toBeNull();
   state.scheduled = [];
 });
 

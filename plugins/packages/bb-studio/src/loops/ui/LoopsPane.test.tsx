@@ -83,7 +83,7 @@ const click = (scope: Element, text: string) => act(async () => buttonIn(scope, 
 it("shows the tab's five sections, compact, with the count that needs you in its header", async () => {
   await render();
   expect([...container.querySelectorAll("section")].map((each) => each.getAttribute("aria-label"))).toEqual(["Needs you now", "Coming up", "Agents on it", "Waiting on others", "Done · last 7 days"]);
-  expect(container.querySelector("header")!.textContent).toBe("Todos2");
+  expect(container.querySelector("header")!.textContent).toBe("Tasks2");
   expect(row("Reply to Sam").textContent).toContain("Fri");
   expect(row("Choose the deck").textContent).toContain("2 options");
   expect(row("Call the plumber").textContent).toContain("When you get home");
@@ -145,13 +145,13 @@ it("builds the area chips from the loops' areas and filters by one", async () =>
   expect(state.inputs.at(-1)).toEqual({ area: "Alpha" });
 });
 
-it("filters by area and owner, and adds a todo", async () => {
+it("filters by area and owner, and adds a task", async () => {
   await render();
   await click(container.querySelector("[role=group][aria-label=Area]")!, "Home");
   expect(state.inputs.at(-1)).toEqual({ area: "Home" });
   await click(container, "Me");
   expect(state.inputs.at(-1)).toEqual({ area: "Home", owner: "patrick" });
-  const input = container.querySelector("input[aria-label='Add a todo']") as HTMLInputElement;
+  const input = container.querySelector("input[aria-label='Add a task']") as HTMLInputElement;
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "renew the passport");
     input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -172,17 +172,17 @@ it("beside the Bot's chat, its questions say so; beside another thread they open
 });
 
 it("in a window of its own, leaves the title to the window's bar: the count and the full page button stay", async () => {
-  state.tabWindow = { title: "Todos", toolbar: null };
+  state.tabWindow = { title: "Tasks", toolbar: null };
   await render();
   expect(container.querySelector("header h2")).toBeNull();
   expect(container.querySelector("header")!.textContent).toBe("2");
-  expect(container.querySelector("header [aria-label='Open the full Todos page']")).not.toBeNull();
+  expect(container.querySelector("header [aria-label='Open the full Tasks page']")).not.toBeNull();
   state.tabWindow = null;
 });
 
-it("opens the full page from its header, and lists todos while Todo reminders are off", async () => {
+it("opens the full page from its header, and lists tasks while Task reminders are off", async () => {
   await render();
-  await act(async () => (container.querySelector("[aria-label='Open the full Todos page']") as HTMLButtonElement).click());
+  await act(async () => (container.querySelector("[aria-label='Open the full Tasks page']") as HTMLButtonElement).click());
   expect(state.open).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_1/loops");
   state.enabled = false;
   await render();
@@ -199,7 +199,7 @@ it("opens the pane when the sidebar asks the Bot chat, now or once the chat open
   await act(async () => root.render(<Chat threadId="thr_bot" />));
   await expect(early).resolves.toBe(true);
   expect(state.openPanel).toHaveBeenCalledTimes(1);
-  expect(state.openPanel).toHaveBeenCalledWith({ actionId: "loops", title: "Todos" });
+  expect(state.openPanel).toHaveBeenCalledWith({ actionId: "loops", title: "Tasks" });
   // Asked while the chat is open; another thread's request isn't its.
   void requestLoopsPane("thr_other");
   expect(state.openPanel).toHaveBeenCalledTimes(1);
@@ -280,7 +280,7 @@ it("drags a row as its ::loop line and title, as plain text", async () => {
 it("lists no unread reply from the Bot as something that needs you", async () => {
   state.attention = { reason: "1", count: 1, since: NOW, unread: 2 };
   await render("thr_other");
-  expect(container.querySelector("header")!.textContent).toBe("Todos2");
+  expect(container.querySelector("header")!.textContent).toBe("Tasks2");
   expect(container.textContent).not.toContain("replies from");
   expect(container.textContent).not.toContain("not read yet");
 });

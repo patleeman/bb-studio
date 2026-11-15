@@ -109,9 +109,9 @@ export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
         {row("skills", "Skills", <Icon name="Toolbox" className="size-4" />)}
         {row("library", "Library", <Icon name="studio/library" className="size-4" />)}
         {todos !== null
-          ? row("todos", "Todos", <Icon name="ListTodo" className="size-4" />, todos > 0 ? <span data-testid="space-todos-count" className="shrink-0 text-xs tabular-nums text-warning">{todos}</span> : null)
+          ? row("todos", "Tasks", <Icon name="ListTodo" className="size-4" />, todos > 0 ? <span data-testid="space-todos-count" className="shrink-0 text-xs tabular-nums text-warning">{todos}</span> : null)
           : bot && !bot.primary ? row("automations", "Scheduled", <Icon name="Clock" className="size-4" />)
-            : row("automations", "Todos", <Icon name="ListTodo" className="size-4" />)}
+            : row("automations", "Tasks", <Icon name="ListTodo" className="size-4" />)}
       </nav>
     </header>
   );

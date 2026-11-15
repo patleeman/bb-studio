@@ -138,7 +138,7 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
   };
 
   const tool = <S extends z.ZodTypeAny>(name: string, description: string, parameters: S, execute: (x: z.infer<S>, ctx: Ctx) => unknown) => {
-    const run = guardTasks(db, { execute: (x: z.infer<S>, c: Ctx) => execute(x, c) });
+    const run = guardTasks(db, { execute: (x: z.infer<S>, c: Ctx) => execute(x, c) }, true);
     bb.agents.registerTool({ name, description, parameters, execute: async (x: z.infer<S>, ctx: Ctx) => {
       try { return JSON.stringify(await run.execute(x as never, (ctx ?? {}) as never)); } catch (error) { return `Error: ${error instanceof Error ? error.message : String(error)}`; }
     } } as never);

@@ -117,8 +117,8 @@ import { runVsCode } from "./src/code/open-vscode";
 import { onMainWindowPath } from "./src/launcher/main-actions";
 import { VSCODE_MAIN_PATH } from "./src/launcher/shared";
 import { readKindsSnapshot, whenOn } from "./src/ui/kinds-snapshot";
-import { LoopDirective, LoopsDirective } from "./src/loops/ui/LoopCard";
-import { WorkDirective } from "./src/work/ui/WorkCard";
+import { LoopsDirective } from "./src/loops/ui/LoopCard";
+import { TaskDirective } from "./src/tasks/ui/TaskCard";
 import { InFlightBanner } from "./src/work/ui/InFlight";
 import "./src/work/ui/work.css";
 import { LOOPS_PANE, LoopsPane } from "./src/loops/ui/LoopsPane";
@@ -364,7 +364,7 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "todos-tab-name", component: TodosTabName });
   // `studio/automations`: the Bot's Todos page (src/ui/automations/AutomationsPanel.tsx).
   // Its title row is the page's own, in BB's title bar (headerContent), as the Library's is: one row, not two.
-  app.slots.navPanel({ id: AUTOMATIONS_PANEL, title: "Todos", icon: "ListTodo", path: AUTOMATIONS_PANEL, component: withPageTabs(AutomationsPanel, AUTOMATIONS_PANEL), headerContent: StudioBarSlot, ...OFF_RAIL });
+  app.slots.navPanel({ id: AUTOMATIONS_PANEL, title: "Tasks", icon: "ListTodo", path: AUTOMATIONS_PANEL, component: withPageTabs(AutomationsPanel, AUTOMATIONS_PANEL), headerContent: StudioBarSlot, ...OFF_RAIL });
   // VS Code, its own page in BB's rail (`studio/vscode`): the workspace used
   // last, else the picker (src/code/vscode-panel.tsx).
   app.slots.navPanel({ id: VSCODE_PANEL, title: "VS Code", icon: CODE_ICON, path: VSCODE_PANEL, component: VsCodePanel, headerContent: StudioBarSlot, experimental_usePageTitle: useCodePageTitle, ...OFF_RAIL });
@@ -379,12 +379,12 @@ export default definePluginApp((app) => {
   // Todos (docs/attention-router/backend.md): `::loop{id="loop_…"}`
   // is a todo's card, `row="1"` its morning row; `::loops{more="3"}` and
   // `::loops{open="pane"}` open the Todos pane beside the chat.
-  app.slots.messageDirective({ id: "loop", component: LoopDirective });
+  app.slots.messageDirective({ id: "loop", component: TaskDirective });
   app.slots.messageDirective({ id: "loops", component: LoopsDirective });
-  app.slots.messageDirective({ id: "work", component: WorkDirective });
+  app.slots.messageDirective({ id: "work", component: TaskDirective });
   app.composer.customize({ id: "in-flight", scopes: ["thread"], banners: [{ id: "in-flight", component: InFlightBanner }] });
   // The Todos pane: the todo list in a tab beside the chat.
-  registerThreadTab(app, { id: LOOPS_PANE, title: newTabTitle(LOOPS_PANE) ?? "Todos", icon: "ListTodo", layout: "flush", component: LoopsPane, ...newTabFields(LOOPS_PANE) });
+  registerThreadTab(app, { id: LOOPS_PANE, title: newTabTitle(LOOPS_PANE) ?? "Tasks", icon: "ListTodo", layout: "flush", component: LoopsPane, ...newTabFields(LOOPS_PANE) });
   // The Bot's other pages as tabs (Memory, Library, Automations, the Archive) and the New Tab page's "New …" actions (src/tab-kinds.ts).
   registerTabKindTabs(app);
   // Hands-free voice (src/voice/live/ui): a session is its own thread. Its

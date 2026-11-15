@@ -90,7 +90,7 @@ describe("ScheduledView", () => {
   it("lists each item with its kind and next run, and opens its link", () => {
     render(<ScheduledView items={[item(), item({ key: "todo:loop_1", source: "todo", kind: "todo", title: "Pay the bill", link: "bb://todo/loop_1", nextAt: null, state: "paused" })]} error={null} now={NOW} />);
     const rows = [...document.querySelectorAll<HTMLButtonElement>("[data-scheduled]")];
-    expect(rows.map((row) => row.textContent)).toEqual([expect.stringMatching(/^Check inboxCheck-in · /), "Pay the billTodo · Paused"]);
+    expect(rows.map((row) => row.textContent)).toEqual([expect.stringMatching(/^Check inboxCheck-in · /), "Pay the billTask · Paused"]);
     fireEvent.click(rows[1]!);
     expect(headerForTest.openLink).toHaveBeenCalledWith("bb://todo/loop_1", { source: "botPage", title: "Pay the bill" });
   });

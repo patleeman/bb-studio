@@ -9,10 +9,10 @@ const { keepTodosTabName, RENAME_SETTLE_MS } = await import("./tab-name");
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); });
 
-it("names the Todos tab when Studio loads, and again after another window or a navigation brings an old title back", () => {
+it("names the Tasks tab when Studio loads, and again after another window or a navigation brings an old title back", () => {
   const calls: unknown[] = [];
   const stop = keepTodosTabName({ experimental_renameTab: (options: unknown) => { calls.push(options); return true; } }, window);
-  expect(calls).toEqual([{ tab: { id: "loops" }, title: "Todos" }]);
+  expect(calls).toEqual([{ tab: { id: "loops" }, title: "Tasks" }]);
   vi.advanceTimersByTime(RENAME_SETTLE_MS);
   expect(calls).toHaveLength(2);
   window.dispatchEvent(new Event("storage"));
@@ -25,15 +25,15 @@ it("names the Todos tab when Studio loads, and again after another window or a n
   expect(calls).toHaveLength(3);
 });
 
-it("renames a Todos tab that was opened with parameters, which the plain rename does not match", () => {
+it("renames a Tasks tab that was opened with parameters, which the plain rename does not match", () => {
   const calls: unknown[] = [];
   const tabs = [
     { key: "a", title: "Loops", detail: { kind: "plugin", pluginId: "studio", tab: { id: "loops" }, params: { botId: "bot_main" } } },
-    { key: "b", title: "Todos", detail: { kind: "plugin", pluginId: "studio", tab: { id: "loops" }, params: null } },
+    { key: "b", title: "Tasks", detail: { kind: "plugin", pluginId: "studio", tab: { id: "loops" }, params: null } },
     { key: "c", title: "Loops", detail: { kind: "plugin", pluginId: "other", tab: { id: "loops" }, params: null } },
   ];
   const stop = keepTodosTabName({ experimental_renameTab: (options: unknown) => { calls.push(options); return true; }, experimental_workbench: () => ({ threadId: "thr", list: () => ({ open: true, selectedKey: "a", tabs }) }) }, window);
-  expect(calls).toEqual([{ tab: { id: "loops" }, title: "Todos" }, { tab: { id: "loops" }, params: { botId: "bot_main" }, title: "Todos" }]);
+  expect(calls).toEqual([{ tab: { id: "loops" }, title: "Tasks" }, { tab: { id: "loops" }, params: { botId: "bot_main" }, title: "Tasks" }]);
   stop();
 });
 

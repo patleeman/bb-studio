@@ -1016,6 +1016,31 @@
    "date": "2026-11-02",
    "items": [
     {
+     "id": "loop_00000000-0000-4000-8000-000000000007",
+     "title": "Server down",
+     "why": "",
+     "source": {
+      "kind": "email",
+      "ref": "msg-1",
+      "url": "https://example.com/m/1"
+     },
+     "kind": "do",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "none"
+     },
+     "priority": "urgent",
+     "push": true,
+     "status": "surfaced",
+     "due": null,
+     "area": null,
+     "createdAt": 1793631600000,
+     "updatedAt": 1793635260000,
+     "closedAt": null,
+     "closedBy": null
+    },
+    {
      "id": "loop_00000000-0000-4000-8000-000000000009",
      "title": "Book the dentist",
      "why": "",
@@ -1053,6 +1078,29 @@
      "status": "queued",
      "due": 1793638800000,
      "area": "House",
+     "createdAt": 1793631600000,
+     "updatedAt": 1793635260000,
+     "closedAt": null,
+     "closedBy": null
+    },
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000008",
+     "title": "Water the plants",
+     "why": "",
+     "source": null,
+     "kind": "do",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "place",
+      "place": "home",
+      "direction": "arrive"
+     },
+     "priority": "normal",
+     "push": false,
+     "status": "surfaced",
+     "due": null,
+     "area": null,
      "createdAt": 1793631600000,
      "updatedAt": 1793635260000,
      "closedAt": null,
@@ -1069,6 +1117,31 @@
    "date": "2026-11-02",
    "items": [
     {
+     "id": "loop_00000000-0000-4000-8000-000000000007",
+     "title": "Server down",
+     "why": "",
+     "source": {
+      "kind": "email",
+      "ref": "msg-1",
+      "url": "https://example.com/m/1"
+     },
+     "kind": "do",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "none"
+     },
+     "priority": "urgent",
+     "push": true,
+     "status": "surfaced",
+     "due": null,
+     "area": null,
+     "createdAt": 1793631600000,
+     "updatedAt": 1793635260000,
+     "closedAt": null,
+     "closedBy": null
+    },
+    {
      "id": "loop_00000000-0000-4000-8000-000000000009",
      "title": "Book the dentist",
      "why": "",
@@ -1106,6 +1179,29 @@
      "status": "queued",
      "due": 1793638800000,
      "area": "House",
+     "createdAt": 1793631600000,
+     "updatedAt": 1793635260000,
+     "closedAt": null,
+     "closedBy": null
+    },
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000008",
+     "title": "Water the plants",
+     "why": "",
+     "source": null,
+     "kind": "do",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "place",
+      "place": "home",
+      "direction": "arrive"
+     },
+     "priority": "normal",
+     "push": false,
+     "status": "surfaced",
+     "due": null,
+     "area": null,
      "createdAt": 1793631600000,
      "updatedAt": 1793635260000,
      "closedAt": null,
@@ -1699,7 +1795,7 @@
  {
   "step": "mention resolve",
   "value": {
-   "context": "The user brought this todo into the chat to discuss it; it is the topic of their message. Use todos_get for its history and todos_update or todos_act to change it.\nid: loop_00000000-0000-4000-8000-000000000001\ntitle: Call the plumber\nwhy: Leak under the kitchen sink\ntrigger: time, 2026-11-02T16:00:00.000Z, sends to iPhone\nkind: do · status: queued · owner: the user · priority: normal · area: House\ndue: 2026-11-02T17:00:00.000Z"
+   "context": "The user brought this task into the chat to discuss it; it is the topic of their message. Use todos_get for its history and todos_update or todos_act to change it.\nid: loop_00000000-0000-4000-8000-000000000001\ntitle: Call the plumber\nwhy: Leak under the kitchen sink\ntrigger: time, 2026-11-02T16:00:00.000Z, sends to iPhone\nkind: do · status: queued · owner: the user · priority: normal · area: House\ndue: 2026-11-02T17:00:00.000Z"
   }
  },
  {

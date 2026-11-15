@@ -1,5 +1,8 @@
 import type { Loop } from './contract';
 import { LoopStore, waitsForTrigger } from './store';
+import { isClosed, needsYou } from '../tasks/contract';
+import { inLoopView, toLoop } from '../tasks/views';
+const OVERNIGHT_MS=24*3600000;
 export type Hold='budget'|'morning';
 const RANK={urgent:0,normal:1,low:2} as const;
 /** A none trigger, or a time trigger that has come. Events and places become due times when they fire. */
@@ -20,7 +23,17 @@ export class LoopScheduler {
  private running=false;
  constructor(readonly store:LoopStore,readonly settings:()=>Settings,readonly post:(text:string)=>Promise<void>,readonly notify:(loop:Loop)=>Promise<void>){}
  fire(event:string){let matched=0;for(const l of this.store.all()){const t=l.trigger;if(!l.closedAt&&['queued','snoozed'].includes(l.status)&&((t.type==='event'&&t.event===event)||(t.type==='place'&&`place:${t.place}:${t.direction}`===event))){this.store.update(l.id,{trigger:{type:'time',at:Date.now()}});matched++;}}return {matched};}
- morning(){const now=Date.now(),date=local(now,this.settings().timeZone).date;const open=this.store.all().filter(l=>!l.closedAt);const items=open.filter(l=>l.owner==='patrick'&&(l.kind==='decide'||l.due!==null&&local(l.due,this.settings().timeZone).date<=date)).sort((a,b)=>({urgent:0,normal:1,low:2}[a.priority]-{urgent:0,normal:1,low:2}[b.priority])||(a.due??Infinity)-(b.due??Infinity));return {date,items:items.slice(0,5),more:Math.max(0,items.length-5),lowPriority:open.filter(l=>l.priority==='low'&&l.status==='queued')};}
+ morning(options:{cards?:boolean}={}){const now=Date.now(),zone=this.settings().timeZone,date=local(now,zone).date;
+ const moved=this.movedToYou(now-OVERNIGHT_MS);
+ const open=this.store.all().filter(l=>!l.closedAt);
+ const cards=options.cards?this.store.tasks.all().filter(t=>!inLoopView(t)&&needsYou(t)&&moved.has(t.id)).map(toLoop):[];
+ const today=(l:Loop)=>l.owner==='patrick'&&(moved.has(l.id)||l.kind==='decide'||l.status==='surfaced'&&l.kind!=='waiting'||l.due!==null&&local(l.due,zone).date<=date);
+ const items=[...open.filter(today),...cards].sort((a,b)=>RANK[a.priority]-RANK[b.priority]||Number(moved.has(b.id))-Number(moved.has(a.id))||(a.due??Infinity)-(b.due??Infinity));
+ return {date,items:items.slice(0,5),more:Math.max(0,items.length-5),lowPriority:open.filter(l=>l.priority==='low'&&l.status==='queued'),movedToYou:items.filter(l=>moved.has(l.id)).map(l=>l.id)};}
+ /** Tasks handed to the user since `since` that are still theirs. */
+ movedToYou(since:number):Set<string>{const rows=this.store.db.prepare("SELECT task_id AS id, data FROM task_events WHERE type='handed_off' AND at > ? ORDER BY seq").all(since) as {id:string;data:string}[];
+ const ids=new Set<string>();for(const r of rows){try{if((JSON.parse(r.data) as {owner?:string}).owner==='patrick')ids.add(r.id);}catch{continue;}}
+ return new Set([...ids].filter(id=>{const t=this.store.tasks.find(id);return !!t&&t.owner==='patrick'&&!isClosed(t);}));}
  /** Whether `now` falls in quiet hours (they hold pushes, never cards). */
  quiet(now=Date.now()){const s=this.settings(),h=local(now,s.timeZone).hour;return s.quietStart>s.quietEnd?h>=s.quietStart||h<s.quietEnd:h>=s.quietStart&&h<s.quietEnd;}
  /**
@@ -46,7 +59,7 @@ export class LoopScheduler {
   */
  async surfaceNow(id:string){const l=this.store.get(id);
  if(l.closedAt)throw Error('This todo is already closed.');
- if(l.owner!=='patrick')throw Error('Only your own todos can be surfaced. Take it back first.');
+ if(l.owner!=='patrick')throw Error('Only your own tasks can be surfaced. Take it back first.');
  if(l.status!=='surfaced')await this.post(`Please post this card in your chat exactly once: ::loop{id="${l.id}"}`);
  this.store.event(l.id,'surfaced_by_you');return this.store.update(l.id,{status:'surfaced'});}
  async tick(){if(this.running||!this.settings().enabled)return;this.running=true;try{const now=Date.now(),s=this.settings(),p=local(now,s.timeZone),quiet=this.quiet(now);

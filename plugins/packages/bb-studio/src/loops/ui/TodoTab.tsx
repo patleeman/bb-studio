@@ -8,6 +8,7 @@ import { useLive } from "../../ui/live";
 import type { Loop } from "../contract";
 import { ChangeTrigger, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu, CARD_BUTTON, CARD_GHOST, CARD_PRIMARY } from "./LoopMenus";
 import { fullWhen, INLINE_OPTIONS, ownerName, ownerThread, safeUrl, sourceText, triggerLabel, type OwnerInfo } from "./model";
+import { TaskCardView, useTaskActions } from "../../tasks/ui/TaskCard";
 import { useDiscussLoop, useLoopActions, useLoopPeople, usePlaceNames, useTodosZone, type LoopPeople } from "./hooks";
 
 export const entryId = (params: JsonValue | null): string | null => {
@@ -20,7 +21,11 @@ export function TodoTab({ params }: { params: JsonValue | null }) {
   const people = useLoopPeople();
   const places = usePlaceNames(true);
   const live = useLive("loops.get", { id: id ?? "" }, { enabled: !!id, pollMs: 60_000 });
-  if (id && live.error && !live.data && !/not found/i.test(live.error)) return <BotItemError message={live.error} />;
+  const gone = !!id && !!live.error && !live.data && /not found/i.test(live.error);
+  const task = useLive("tasks.get", { id: id ?? "" }, { enabled: gone, pollMs: 60_000 });
+  if (id && live.error && !live.data && !gone) return <BotItemError message={live.error} />;
+  if (gone && task.data) return <div className="mx-auto w-full max-w-2xl p-4"><TaskCardView view={task.data} people={people} refresh={task.refresh} /></div>;
+  if (gone && !task.error) return null;
   if (!id || (live.error && !live.data)) return <NotFoundTab params={{ kind: "todo", id, link: id ? linkFor({ kind: "todo", id }) : "bb://todo" }} />;
   if (!live.data) return null;
   return <TodoDetail key={id} loop={live.data.loop} people={people} places={places} owner={live.data.owner} refresh={live.refresh} />;
@@ -30,6 +35,7 @@ export function TodoDetail({ loop, people, places, owner, refresh }: { loop: Loo
   const navigate = useBbNavigate();
   const zone = useTodosZone();
   const { act, update, busy, error } = useLoopActions(refresh);
+  const tasks = useTaskActions(refresh);
   const discuss = useDiscussLoop(people.botThreadId, people.botName);
   const [nudged, setNudged] = useState(false);
   const closed = loop.closedAt !== null;
@@ -63,7 +69,8 @@ export function TodoDetail({ loop, people, places, owner, refresh }: { loop: Loo
     {discussButton}{retrigger}{drop}
   </> : !mine ? <>
     {thread ? <button type="button" className={CARD_BUTTON} onClick={() => navigate.toThread(thread)}><Icon name="MessageSquare" />{loop.owner === "cos" ? "Open chat" : "Open thread"}</button> : null}
-    <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, changes: { owner: "patrick", status: "surfaced" } })}><Icon name="ArrowTurnBackward" />Take it back</button>
+    <button type="button" className={CARD_GHOST} disabled={busy || tasks.busy} onClick={() => void tasks.act({ id: loop.id, action: "take_back" })}><Icon name="ArrowTurnBackward" />Take back</button>
+    <HandOffMenu targets={people.targets.filter((t) => t.owner !== loop.owner)} disabled={busy || tasks.busy} onHandOff={(to) => void tasks.act({ id: loop.id, action: "hand_off", to })} />
     {discussButton}
   </> : <>
     {loop.kind === "decide" ? (loop.options.length > INLINE_OPTIONS
@@ -73,14 +80,15 @@ export function TodoDetail({ loop, people, places, owner, refresh }: { loop: Loo
         : <button type="button" className={CARD_PRIMARY} disabled={busy} onClick={() => void act({ id: loop.id, action: "done" })}><Icon name="CircleCheck" />Done</button>}
     {loop.status === "surfaced" ? null : <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, surfaceNow: true })}><Icon name="ArrowUp" />Remind me now</button>}
     {snooze}
-    {loop.kind === "do" ? <HandOffMenu targets={people.targets} disabled={busy} onHandOff={(owner) => void act({ id: loop.id, action: "hand_off", owner })} /> : null}
+    <HandOffMenu targets={people.targets} disabled={busy || tasks.busy} onHandOff={(to) => void tasks.act({ id: loop.id, action: "hand_off", to })} />
     {discussButton}{retrigger}{drop}
   </>;
   return (
     <BotItemDetail testId="todo-detail" title={loop.title} facts={facts} actions={<>
       {actions}
       {nudged ? <p role="status" className="w-full text-xs text-muted-foreground">{people.botName} is drafting a nudge in the chat.</p> : null}
-      {error ? <p role="alert" className="w-full text-xs text-destructive">{error}</p> : null}
+      {tasks.note ? <p role="status" className="w-full text-xs text-muted-foreground">{tasks.note}</p> : null}
+      {error ?? tasks.error ? <p role="alert" className="w-full text-xs text-destructive">{error ?? tasks.error}</p> : null}
     </>}>
       {loop.why ? <p data-testid="todo-why" className="text-sm whitespace-pre-wrap text-foreground">{loop.why}</p> : null}
     </BotItemDetail>

@@ -72,10 +72,10 @@ export function HandOffMenu({ targets, disabled, onHandOff, className = CARD_BUT
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className={className} disabled={disabled}><Icon name="ArrowTurnForward" />Give to<Icon name="ChevronDown" className="opacity-60" /></button>
+        <button type="button" className={className} disabled={disabled}><Icon name="ArrowTurnForward" />Hand off<Icon name="ChevronDown" className="opacity-60" /></button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-52">
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Give to</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Hand off to</DropdownMenuLabel>
         {targets.map((target) => (
           <DropdownMenuItem key={target.owner} onSelect={() => onHandOff(target.owner)}>
             <Icon name="Bot" />{target.name}

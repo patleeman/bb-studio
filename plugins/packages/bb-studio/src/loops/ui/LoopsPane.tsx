@@ -31,7 +31,7 @@ const MENU_BUTTON = "inline-flex size-7 shrink-0 items-center justify-center rou
 /** The "Todos" thread panel tab. `threadId` is the chat it's beside. */
 export function LoopsPane({ threadId }: ThreadTabProps) {
   const navigate = useBbNavigate();
-  useEffect(() => { renameTabOf(navigate)?.({ tab: { id: LOOPS_PANE }, title: "Todos" }); }, [navigate]);
+  useEffect(() => { renameTabOf(navigate)?.({ tab: { id: LOOPS_PANE }, title: "Tasks" }); }, [navigate]);
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground" data-testid="loops-pane">
       <Board threadId={threadId} />
@@ -66,10 +66,10 @@ function Board({ threadId }: { threadId: string }) {
     <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
       {tabWindow ? null : <>
         <Icon name="ListTodo" className="size-4 text-muted-foreground" />
-        <h2 className="text-sm font-medium">Todos</h2>
+        <h2 className="text-sm font-medium">Tasks</h2>
       </>}
       {needs ? <span className="rounded-full bg-warning px-1.5 text-xs font-medium leading-4 text-background tabular-nums" aria-label={`${needs} need you now`}>{needs}</span> : null}
-      <button type="button" className={cn(ICON_BUTTON, "ml-auto")} aria-label="Open the full Todos page" title="Open the full Todos page" onClick={() => openLoops(people.botId)}>
+      <button type="button" className={cn(ICON_BUTTON, "ml-auto")} aria-label="Open the full Tasks page" title="Open the full Tasks page" onClick={() => openLoops(people.botId)}>
         <Icon name="Maximize2" className="size-4" />
       </button>
     </header>
@@ -98,7 +98,7 @@ function Board({ threadId }: { threadId: string }) {
         {open === 0 && !chat && !closed.size ? (
           <div className="flex flex-col items-center gap-1.5 px-4 py-10 text-center" data-testid="loops-empty">
             <Icon name="ListTodo" className="size-5 text-muted-foreground" />
-            <div className="text-sm font-medium">{filtered ? "No todos match" : "No todos"}</div>
+            <div className="text-sm font-medium">{filtered ? "No tasks match" : "No tasks"}</div>
           </div>
         ) : <>
           {needs || kept("needs") ? (
@@ -278,7 +278,7 @@ function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed
       <DropdownMenuItem onSelect={() => void act({ id: loop.id, action: "done" })}><Icon name="CircleCheck" />Done</DropdownMenuItem>
       {snooze}
       <DropdownMenuSub>
-        <DropdownMenuSubTrigger><Icon name="ArrowTurnForward" />Give to</DropdownMenuSubTrigger>
+        <DropdownMenuSubTrigger><Icon name="ArrowTurnForward" />Hand off</DropdownMenuSubTrigger>
         <DropdownMenuSubContent className="min-w-48">
           {people.targets.map((target) => <DropdownMenuItem key={target.owner} onSelect={() => void act({ id: loop.id, action: "hand_off", owner: target.owner })}><Icon name="Bot" />{target.name}</DropdownMenuItem>)}
         </DropdownMenuSubContent>
