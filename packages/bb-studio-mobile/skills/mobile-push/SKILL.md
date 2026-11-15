@@ -16,6 +16,16 @@ still send when they have nothing to add. The relay returns a successful ticket 
 alert. Attachment-only completions use a preview of the attachment. Questions,
 errors, and useful completion replies still notify normally.
 
+For BB's own completion push, the relay also reads the thread's latest turn.
+A turn started by Studio's cache keepalive never pushes. A turn with no final
+reply pushes only when the user started it, so a relayed message, an
+automation or a provider continuation that ended silently sends nothing.
+
+Plain reply pushes are limited to one per conversation (else thread) every 3
+minutes. Later ones wait and go out as one "N new" push with the collapse id
+`conversation:<id>`, which replaces the earlier one; none goes out if the
+conversation was read meanwhile.
+
 ## Actionable notifications
 
 Before delivering a `pending-interaction` push, the relay looks up the

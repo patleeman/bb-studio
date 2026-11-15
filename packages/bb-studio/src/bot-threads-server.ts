@@ -53,6 +53,8 @@ export interface BotThreadsServerDeps {
   fileFormats?(): ReadonlyMap<string, string>;
   /** Tells every window something changed (Studio's realtime channel), and the phone which Bots' threads did. */
   changed(changes: readonly BotChange[]): void;
+  /** A thread just became a worker of a Bot (src/bot-threads.ts). */
+  becameWorker?(threadId: string): void;
   log(message: string): void;
   /** The Bot a thread acts for, for the tools (its own conversation, a runner's, a thread it started). */
   actingBot(threadId: string | undefined): Promise<string | null>;
@@ -165,6 +167,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
   };
   const store = new BotThreads({
     db, sdk: bb.sdk, changed, log: deps.log,
+    ...(deps.becameWorker ? { becameWorker: deps.becameWorker } : {}),
     signals: () => ({ ...deps.signals(), focusedBotId: null }),
     ...(deps.mirrorLive ? { mirrorLive: deps.mirrorLive } : {}),
   });

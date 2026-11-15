@@ -586,6 +586,8 @@ export interface BotThreadsDeps {
   mirrorLive?(threadIds: readonly string[]): ReadonlyMap<string, MirrorLive>;
   signals(): Signals;
   changed(changes: readonly BotChange[]): void;
+  /** A thread just became a worker (a lead, a runner, an agent's thread), not by the backfill. */
+  becameWorker?(threadId: string): void;
   log?(message: string): void;
   now?(): number;
 }
@@ -708,6 +710,7 @@ export class BotThreads {
         .run(found.botId, found.kind, found.isMain ? 1 : 0, found.forkedFrom?.threadId ?? null, found.forkedFrom?.threadId ?? null, found.forkedFrom?.messageId ?? null,
           found.ownerConversationId, found.isMain ? 1 : 0, archive ? 1 : 0, now, source === "backfill" ? "backfill" : "reconciled", now, thread.id);
       if (found.isMain) this.deps.db.prepare("UPDATE bot_threads SET is_main = 0 WHERE bot_id = ? AND is_main = 1 AND thread_id <> ?").run(found.botId, thread.id);
+      if (existing.kind !== "worker" && found.kind === "worker" && source !== "backfill" && !found.archived) this.deps.becameWorker?.(thread.id);
       return true;
     }
     this.deps.db.prepare(`INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, forked_from_thread_id, forked_from_message_id, forked_from_turn_id, owner_conversation_id, title, archived_at, finished_summary,
@@ -715,6 +718,7 @@ export class BotThreads {
       .run(thread.id, found.botId, found.kind, found.isMain ? 1 : 0, found.forkedFrom?.threadId ?? null, found.forkedFrom?.messageId ?? null, found.forkedFrom?.turnId ?? null, found.ownerConversationId,
         found.archived ? now : null, source, thread.createdAt ?? now, now);
     if (found.isMain) this.deps.db.prepare("UPDATE bot_threads SET is_main = 0 WHERE bot_id = ? AND is_main = 1 AND thread_id <> ?").run(found.botId, thread.id);
+    if (found.kind === "worker" && source !== "backfill" && !found.archived) this.deps.becameWorker?.(thread.id);
     return true;
   }
 

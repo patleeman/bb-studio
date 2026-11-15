@@ -24,6 +24,21 @@ settings, see [`skills/mobile-push/SKILL.md`](skills/mobile-push/SKILL.md).
   the push. Actions target only that exact request.
 - **Quiet completions.** A finished turn with no text, or only `[PASS]`, is not
   sent to APNs or Expo. The relay still reports success.
+- **Turns nobody needs to hear about.** For BB's own push of a finished turn,
+  the relay reads the turn: what started it and its final reply. It drops the
+  push for Studio's cache keepalive (whatever it replied), for a final reply
+  of `[PASS]` or only an approval card, and for a turn with no reply at all
+  unless the user started it. A relayed message (another thread, BB's child
+  notices, Studio, an automation) or a turn the provider went on with by
+  itself pushes only when it ends in a real reply. When the turn can't be
+  read, the push goes out.
+- **One push per conversation per 3 minutes.** A plain reply push
+  (`turn-finished` or `needs-you`, no `coalesceKey`, no loop, no interaction)
+  goes out at once and opens a window for its conversation (else its thread).
+  Later ones wait; when the window ends, the latest goes out as one push,
+  "N new · …", with the collapse id `conversation:<id>`, so it replaces the
+  earlier one. A conversation read before then gets none. Approvals,
+  questions, errors, loops and keyed alerts are never held.
 - **Muted threads.** A muted thread sends nothing to the app. Other
   subscribers still get it.
 - **Collapse ids.** A `notify` call with `coalesceKey` sets `apns-collapse-id`,

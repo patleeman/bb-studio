@@ -146,7 +146,7 @@ describe("notify", () => {
       const replacement = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
       const key = replacement.privateKey.export({ format: "pem", type: "pkcs8" }).toString();
       await host.harness.behavior.setSettings({ apnsKey: key });
-      await host.harness.behavior.callRpc("notify", input);
+      await host.harness.behavior.callRpc("notify", { ...input, threadId: "thr_b" });
       const jwt = requests[1]!.headers.authorization!.replace(/^bearer /, "");
       const [header, payload, signature] = jwt.split(".");
       expect(verify("sha256", Buffer.from(`${header}.${payload}`), { key: replacement.publicKey, dsaEncoding: "ieee-p1363" }, Buffer.from(signature!, "base64url"))).toBe(true);
