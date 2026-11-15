@@ -4,11 +4,11 @@ import { CommentsExtension, DefaultThreadStoreAuth } from "@blocknote/core/comme
 import { withCollaboration, YjsThreadStore } from "@blocknote/core/yjs";
 import {
   BlockNoteViewEditor,
-  FloatingComposerController,
-  FloatingThreadController,
+  FormattingToolbar,
+  FormattingToolbarController,
   getDefaultReactSlashMenuItems,
+  getFormattingToolbarItems,
   SuggestionMenuController,
-  ThreadsSidebar,
   useCreateBlockNote,
   type DefaultReactSuggestionItem,
 } from "@blocknote/react";
@@ -19,8 +19,8 @@ import { itemReferenceFrom } from "../../kit/app/index";
 import { clickModifiers } from "../../links/open";
 import { useRpc, useSdk } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useSyncExternalStore, type MouseEvent as ReactMouseEvent } from "react";
-import { Icon } from "../../kit/ui/index";
+import { useCallback, useEffect, useMemo, useRef, type MouseEvent as ReactMouseEvent } from "react";
+import { Icon, cn } from "../../kit/ui/index";
 import { HTTP_ROOT, HUMAN_USER_ID, MAX_UPLOAD_BYTES, UPLOAD_PATH } from "../constants";
 import { type BotView, type PageMetaView, type rpcContract } from "../contract";
 import { DOCUMENT_FRAGMENT, STUDIO_EMBEDS, THREADS_MAP, type StudioEmbedKind } from "../schema-config";
@@ -32,7 +32,7 @@ import { createHighlighter } from "./code";
 import type { PageConnection } from "./connection";
 import { authorInfo, usePagesUi } from "./context";
 import { useDarkMode } from "./shared";
-import { CommentDictation } from "./CommentDictation";
+import { CommentsPortal, PageCommentButton, StartCommentProvider, usePageComments } from "./PageComments";
 import { editWhiteboardWhenShown } from "./whiteboard";
 import { studioFileUrl } from "../../kit/pages-contract";
 import {
@@ -62,6 +62,12 @@ const STUDIO_NEW: { kind: StudioEmbedKind; aliases: string[] }[] = [
 ];
 
 export type SidePanel = "comments" | null;
+
+const FORMATTING_ITEMS = getFormattingToolbarItems().filter((item) => item.key !== "addCommentButton" && item.key !== "addTiptapCommentButton");
+
+function PageFormattingToolbar() {
+  return <FormattingToolbar>{[...FORMATTING_ITEMS, <PageCommentButton key="pageCommentButton" />]}</FormattingToolbar>;
+}
 
 function avatarUrl(label: string, background: string): string {
   const glyph = [...label.trim()][0] ?? "?";
@@ -127,14 +133,16 @@ export function PageEditor({
   bots,
   pages,
   sidePanel,
-  onCloseSidePanel,
+  onSidePanel,
+  panelSlot,
 }: {
   connection: PageConnection;
   page: PageMetaView;
   bots: BotView[];
   pages: PageMetaView[];
   sidePanel: SidePanel;
-  onCloseSidePanel(): void;
+  onSidePanel(panel: SidePanel): void;
+  panelSlot: HTMLElement | null;
 }) {
   const sdk = useSdk();
   const rpc = useRpc<typeof rpcContract>();
@@ -157,17 +165,6 @@ export function PageEditor({
     [connection],
   );
 
-  const openThreads = useSyncExternalStore(
-    useCallback((onChange: () => void) => threadStore.subscribe(onChange), [threadStore]),
-    () => {
-      let count = 0;
-      // ThreadData leaves out a soft-deleted thread's `deletedAt`; the Y.Map has it.
-      const raw = connection.doc.getMap(THREADS_MAP);
-      const deleted = (id: string) => Boolean((raw.get(id) as { get(key: string): unknown } | undefined)?.get("deletedAt"));
-      for (const thread of threadStore.getThreads().values()) if (!thread.resolved && !deleted(thread.id)) count += 1;
-      return count;
-    },
-  );
 
   const editor = useCreateBlockNote(
     withCollaboration({
@@ -483,20 +480,24 @@ export function PageEditor({
     return uniqueTitles(filterSuggestionItems([...pageItems, ...dates, ...threadItems, ...studioItems], query).slice(0, 30));
   }, [editor, sdk, ui, page.id, page.projectId]);
 
+  const onCommentsOpen = useCallback((open: boolean) => onSidePanel(open ? "comments" : null), [onSidePanel]);
+  const comments = usePageComments({ editor, threadStore, connection, open: sidePanel === "comments", onOpenChange: onCommentsOpen, pageTitle: page.title });
+
   return (
+    <StartCommentProvider start={comments.startDraft}>
     <BlockNoteView
       editor={editor}
       theme={dark ? "dark" : "light"}
       slashMenu={false}
       sideMenu={false}
       comments={false}
+      formattingToolbar={false}
       renderEditor={false}
       className="pages-editor flex min-h-0 min-w-0 flex-1"
     >
-      <CommentDictation page={page}>
       <div
         ref={fieldRef}
-        className="pages-main relative min-w-0 flex-1"
+        className={cn("pages-main relative min-w-0 flex-1", comments.pulse && "pages-comment-pulse")}
         {...itemDrop.handlers}
         {...{ [TALK_FIELD_ATTR]: fieldKey, [TALK_FIELD_LABEL_ATTR]: pageFieldLabel(page.title) }}
         onFocus={() => (cursorPlaced.current = true)}
@@ -505,43 +506,12 @@ export function PageEditor({
         <BlockNoteViewEditor />
         {itemDrop.indicator}
       </div>
-      {sidePanel === "comments" ? (
-        // A card floating over the page's right edge; a bottom sheet on phones.
-        // Positioned against the page view, so no ancestor up to it may be positioned.
-        <aside
-          aria-label="Comments"
-          onClick={openLink}
-          className="pages-comments absolute top-14 right-3 bottom-3 z-30 flex w-80 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl max-md:inset-x-0 max-md:top-auto max-md:bottom-0 max-md:h-[75%] max-md:w-auto max-md:rounded-b-none"
-        >
-          <header className="flex h-11 shrink-0 items-center justify-between border-b border-border pr-2 pl-4">
-            <span className="text-sm font-medium">Comments</span>
-            <button
-              type="button"
-              aria-label="Close comments"
-              className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground"
-              onClick={onCloseSidePanel}
-            >
-              <Icon name="X" className="size-4" />
-            </button>
-          </header>
-          <div className="min-h-0 flex-1 overflow-auto p-3">
-            {openThreads ? null : (
-              <p className="px-1 py-2 text-sm text-muted-foreground">No open comments</p>
-            )}
-            <ThreadsSidebar filter="open" sort="position" />
-          </div>
-        </aside>
-      ) : null}
+      <CommentsPortal slot={panelSlot}>{comments.panel}</CommentsPortal>
       <PageSideMenu pageId={page.id} />
       <SuggestionMenuController triggerCharacter="/" getItems={slashMenuItems} />
       <SuggestionMenuController triggerCharacter="@" getItems={mentionItems} />
-      <Suspense>
-        <FloatingComposerController />
-        {/* The sidebar owns replies while open. A second floating thread can
-            dismiss and unmount its draft when a sidebar control is clicked. */}
-        {sidePanel !== "comments" && <FloatingThreadController />}
-      </Suspense>
-      </CommentDictation>
+      <FormattingToolbarController formattingToolbar={PageFormattingToolbar} />
     </BlockNoteView>
+    </StartCommentProvider>
   );
 }

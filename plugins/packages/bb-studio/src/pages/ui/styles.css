@@ -107,8 +107,20 @@
 .pages-editor .bn-thread-mark:not([data-orphan="true"]) {
   background: color-mix(in oklch, #facc15 22%, transparent);
 }
+.pages-editor .bn-thread-mark-selected,
 .pages-editor .bn-thread-mark .bn-thread-mark-selected {
-  background: color-mix(in oklch, #facc15 38%, transparent);
+  background: color-mix(in oklch, #facc15 48%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in oklch, #eab308 85%, transparent);
+}
+.pages-comment-pulse .bn-thread-mark-selected {
+  animation: pages-comment-pulse 1.1s ease-out;
+}
+@keyframes pages-comment-pulse {
+  0%, 30% { background: color-mix(in oklch, #facc15 85%, transparent); }
+  100% { background: color-mix(in oklch, #facc15 48%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pages-comment-pulse .bn-thread-mark-selected { animation: none; }
 }
 /* Empty-block hints read like BB's input placeholders. */
 .pages-editor .bn-block-content:has(.ProseMirror-trailingBreak:only-child)::after {
@@ -123,11 +135,6 @@
 }
 .pages-main > .bn-editor:focus {
   outline: none;
-}
-/* Leave room for the comment microphone without covering the draft text. */
-.pages-comment-dictation .bn-comment-editor .bn-editor {
-  padding-right: 44px;
-  min-height: 40px;
 }
 /* Slash and @ menus: single-line rows sized like BB's own menus. */
 .pages-editor .bn-suggestion-menu {
@@ -177,50 +184,6 @@
 .pages-editor .pages-embed svg:not([class*="size-"]) {
   width: revert-layer;
   height: revert-layer;
-}
-/* Comment threads: a compact card that matches BB's popovers rather than
-   BlockNote's roomier default. */
-.pages-editor .bn-thread {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--card);
-  box-shadow: 0 6px 24px rgb(0 0 0 / 0.18);
-}
-.pages-editor .bn-thread > * {
-  padding-inline: 0;
-}
-/* The quoted text the thread is anchored to. */
-.pages-editor .bn-thread > :first-child:not(.bn-thread-comments) {
-  padding: 0;
-  font-size: 12px;
-  font-style: normal;
-  color: var(--muted-foreground);
-}
-.pages-editor .bn-thread-comments {
-  padding-block: 0;
-  gap: 14px;
-}
-.pages-editor .bn-thread-comments:last-child {
-  border-bottom: 0;
-}
-.pages-editor .bn-thread-comments:not(:last-child) {
-  padding-bottom: 12px;
-}
-.pages-editor .bn-comment-editor .bn-editor {
-  font-size: 14px;
-}
-.pages-comments .bn-thread {
-  box-shadow: none;
-  width: 100%;
-}
-.pages-comments .bn-threads-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 /* Phones: the side menu's drag handles need hover, so the body text can use

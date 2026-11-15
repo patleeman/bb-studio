@@ -55,14 +55,17 @@ export default ({ projectId, seedPages, pluginRpc, sleep }) => [
       });
       const cleanup = () => pluginRpc("studio", "pages.remove", { id: page.id }).catch(() => {});
       const original = await pluginRpc("studio", "pages.markdown", { id: page.id });
-      const insert = async (text, selector = ".pages-comment-dictation") => {
+      const DRAFT = '[data-testid="comment-draft"]';
+      const THREAD = "[data-comment-thread]";
+      const insert = async (text, selector) => {
         const accepted = await client.evaluate(`(() => {
-          const field = document.querySelector(${JSON.stringify(selector)});
-          if (!field) throw new Error('Comment draft not found');
+          const field = document.querySelector(${JSON.stringify(`${selector} [data-talk-field]`)});
+          if (!field) throw new Error('Comment field not found');
           return !field.dispatchEvent(new CustomEvent('bb-talk:insert', { cancelable: true, detail: { text: ${JSON.stringify(text)} } }));
         })()`);
-        if (!accepted) throw new Error("Comment draft did not accept dictation");
+        if (!accepted) throw new Error("Comment field did not accept dictation");
       };
+      const fieldValue = (selector) => client.evaluate(`document.querySelector(${JSON.stringify(`${selector} textarea`)})?.value ?? ""`);
       const comments = () => pluginRpc("studio", "pages.comments", { id: page.id });
       const waitForComments = async (count) => {
         for (let attempt = 0; attempt < 40; attempt++) {
@@ -72,12 +75,11 @@ export default ({ projectId, seedPages, pluginRpc, sleep }) => [
         }
         throw new Error(`Expected ${count} saved comments: ${JSON.stringify(await comments())}`);
       };
-      const selectThread = async () => {
+      const showThread = async () => {
         if (!await client.evaluate(`Boolean(document.querySelector('aside[aria-label="Comments"]'))`)) await client.clickAriaButtonWithPointer("Comments");
-        await client.waitForSelector(".pages-comments .bn-thread");
+        await client.waitForSelector(THREAD);
         await client.waitForText("One more check:");
-        await client.clickElementWithTextAndPointer(".pages-comments .bn-inline-content", "One more check: Please test edits made offline before the beta release.");
-        await client.waitForSelector('.pages-comments button[aria-label="Dictate comment"]');
+        await client.waitForSelector(`${THREAD} button[aria-label="Dictate comment"]`);
       };
       try {
         await openPage(client, page.id);
@@ -90,46 +92,47 @@ export default ({ projectId, seedPages, pluginRpc, sleep }) => [
           const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
           document.dispatchEvent(new Event('selectionchange'));
         })()`);
-        await client.waitForAriaButton("Add comment");
-        await client.clickAriaButtonWithPointer("Add comment");
+        await client.waitForAriaButton("Comment");
+        await client.clickAriaButtonWithPointer("Comment");
+        await client.waitForSelector(`${DRAFT} [data-comment-quote]`);
         await client.waitForAriaButton("Dictate comment");
         // Real trusted clicks open and stop the synthetic browser microphone.
         await client.clickAriaButtonWithPointer("Dictate comment");
         await client.waitForAriaButton("Stop dictating comment");
-        const targetMatches = await client.evaluate(`document.documentElement.dataset.bbTalkField === document.querySelector('.pages-comment-dictation').dataset.talkField`);
-        if (!targetMatches) throw new Error("Talk targeted another editor");
+        const targetMatches = await client.evaluate(`document.documentElement.dataset.bbTalkField === document.querySelector('${DRAFT} [data-talk-field]').dataset.talkField`);
+        if (!targetMatches) throw new Error("Talk targeted another field");
         await sleep(1300);
         await client.clickAriaButtonWithPointer("Stop dictating comment");
         await client.waitForSelector('html[data-bb-talk="idle"]', 60000);
         // Synthetic microphone audio contains no speech; deterministic transcripts
         // exercise the same delivery event without relying on ASR guesses.
-        await client.evaluate(`(() => { const editor = document.querySelector('.pages-comment-dictation [contenteditable="true"]'); editor.focus(); const range = document.createRange(); range.selectNodeContents(editor); const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range); })()`);
+        await client.evaluate(`document.querySelector('${DRAFT} textarea').focus()`);
         await client.command("Input.insertText", { text: "One more check:" });
-        await insert("Please test edits made offline before the beta release.\n\nAlso check reconnecting after a network change.");
-        await client.waitForText("One more check: Please test edits made offline before the beta release.");
-        await client.waitForText("Also check reconnecting after a network change.");
-        if ((await comments()).threads.length) throw new Error("Dictation posted a comment before Save");
-        await client.clickElementWithTextAndPointer(".bn-comment-actions button", "Save");
+        await insert("Please test edits made offline before the beta release.\n\nAlso check reconnecting after a network change.", DRAFT);
+        const drafted = await fieldValue(DRAFT);
+        if (!drafted.includes("One more check: Please test edits made offline before the beta release.") || !drafted.includes("Also check reconnecting after a network change.")) throw new Error(`Dictation didn't reach the draft: ${drafted}`);
+        if ((await comments()).threads.length) throw new Error("Dictation posted a comment before Comment was chosen");
+        await client.clickElementWithTextAndPointer(`${DRAFT} button`, "Comment");
         await waitForComments(1);
-        await selectThread();
-        await client.evaluate(`document.querySelector('.pages-comments .pages-comment-dictation [contenteditable="true"]').focus()`);
+        await showThread();
+        await client.evaluate(`document.querySelector('${THREAD} textarea').focus()`);
         await client.command("Input.insertText", { text: "And also:" });
-        await insert("Try turning Wi-Fi off during onboarding.", ".pages-comments .pages-comment-dictation");
-        await client.waitForText("And also: Try turning Wi-Fi off during onboarding.");
-        if ((await comments()).threads[0].comments.length !== 1) throw new Error("Dictation posted a reply before Save");
-        await client.clickElementWithTextAndPointer(".pages-comments .bn-comment-actions button", "Save");
+        await insert("Try turning Wi-Fi off during onboarding.", THREAD);
+        if (!(await fieldValue(THREAD)).includes("And also: Try turning Wi-Fi off during onboarding.")) throw new Error("Dictation didn't reach the reply");
+        if ((await comments()).threads[0].comments.length !== 1) throw new Error("Dictation posted a reply before Reply was chosen");
+        await client.clickElementWithTextAndPointer(`${THREAD} button`, "Reply");
         await waitForComments(2);
         const after = await pluginRpc("studio", "pages.markdown", { id: page.id });
         if (after.markdown !== original.markdown) throw new Error("Comment dictation changed the page body");
-        // The same comment sheet and microphone fit on phones.
+        // The same panel, as a bottom sheet, and its microphone fit on phones.
         await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         // Let the no-speech toast from the synthetic microphone dismiss before
         // clicking the mobile toolbar underneath it.
         await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1, y: 840, buttons: 0 });
         await sleep(4500);
-        await selectThread();
+        await showThread();
         const fits = await client.evaluate(`(() => {
-          const mic = document.querySelector('.pages-comments button[aria-label="Dictate comment"]');
+          const mic = document.querySelector('${THREAD} button[aria-label="Dictate comment"]');
           if (!mic) return false;
           const rect = mic.getBoundingClientRect();
           return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight;
@@ -138,7 +141,7 @@ export default ({ projectId, seedPages, pluginRpc, sleep }) => [
         await client.capture("packages/bb-studio/assets/pages-comments-mobile.png");
         await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
         await sleep(700);
-        await selectThread();
+        await showThread();
         await sleep(300);
       } catch (error) {
         await client.capture(`${process.env.TMPDIR ?? "/tmp/"}pages-comment-capture-error.png`);

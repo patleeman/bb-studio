@@ -30529,6 +30529,53 @@
                       "additionalProperties": false
                     }
                   },
+                  "resolvedComments": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "screenId": {
+                          "type": "string"
+                        },
+                        "step": {
+                          "type": "string"
+                        },
+                        "selector": {
+                          "type": "string"
+                        },
+                        "elementText": {
+                          "type": "string"
+                        },
+                        "body": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "number"
+                        },
+                        "sent": {
+                          "type": "boolean"
+                        },
+                        "resolvedAt": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "screenId",
+                        "step",
+                        "selector",
+                        "elementText",
+                        "body",
+                        "createdAt",
+                        "sent",
+                        "resolvedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
                   "review": {
                     "anyOf": [
                       {

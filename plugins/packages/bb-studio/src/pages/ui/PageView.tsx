@@ -290,6 +290,7 @@ export function PageView({
   const presence = usePresence(connection);
   const talk = useTalk(pageFieldKey(page.id));
   const [sidePanel, setSidePanel] = useState<SidePanel>(null);
+  const [panelSlot, setPanelSlot] = useState<HTMLDivElement | null>(null);
   const [dialog, setDialog] = useState<"history" | null>(null);
   const [requests, setRequests] = useState<RequestView[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
@@ -323,12 +324,13 @@ export function PageView({
   const shown = { ...page, title };
 
   return (
-    // Floating chrome, the comments card and the chat are placed against this box.
+    // Floating chrome and the chat are placed against this box; the comments panel splits it.
     <div className="pages-doc relative flex h-full min-h-0 flex-col bg-background text-foreground">
       <WhiteboardExpandHost>
       {persistenceVisible(connection) ? <div className="shrink-0 px-4 pt-3 pb-2"><PersistenceBadge connection={connection} /></div> : null}
-      <div className="min-h-0 flex-1 overflow-auto">
-        <PageColumn className={cn(sidePanel && "min-[1280px]:max-w-[1168px] min-[1280px]:pr-[340px]")}>
+      <div className="flex min-h-0 flex-1">
+      <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+        <PageColumn>
           <PageHeading page={page} rpc={rpc} titleSave={titleSave} />
           <PageBody missing={status === "missing"}>
             {connection && ready && status !== "missing" ? (
@@ -338,11 +340,14 @@ export function PageView({
                 bots={bots.bots}
                 pages={pages}
                 sidePanel={sidePanel}
-                onCloseSidePanel={() => setSidePanel(null)}
+                onSidePanel={setSidePanel}
+                panelSlot={panelSlot}
               />
             ) : null}
           </PageBody>
         </PageColumn>
+      </div>
+      <div ref={setPanelSlot} data-testid="page-side-panel" className="flex min-h-0 shrink-0 empty:hidden" />
       </div>
 
       <ItemHeader

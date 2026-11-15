@@ -50,6 +50,7 @@ export class PagesService {
   private readonly actorNames = new Map<string, string>();
   /** Called after every realtime event, e.g. to tell Studio. */
   onPublish: ((event: RealtimeEvent) => void) | null = null;
+  onOpened: ((page: LivePage) => void) | null = null;
 
   constructor(
     private readonly bb: BbPluginApi,
@@ -63,6 +64,7 @@ export class PagesService {
         this.publish({ type: "page", pageId });
       },
       saveError: (pageId, error) => this.bb.log.error(`Could not save page ${pageId}; retrying: ${String(error)}`),
+      opened: (page) => this.onOpened?.(page),
     });
   }
 

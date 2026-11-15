@@ -9,7 +9,7 @@ import { BarTitle, ICON_BUTTON, Icon, ItemHeader, cn } from "../../kit/app/index
 import { frameSize, designHref, screenUrl, frameKey, type CommentView, type DesignView, type RoundView, type ScreenStep, type ScreenView, isDeck } from "../shared";
 import { useDesign } from "./use-design";
 import { Canvas, type CanvasApi } from "./canvas";
-import { CommentPopover, DraftPopover, Pins, useComments, type Rect } from "./comments";
+import { DesignCommentsPanel, Pins, useComments, type Rect } from "./comments";
 import { PlayView } from "./play-view";
 
 /** The main-area view: Studio's item header over the full-screen canvas. */
@@ -45,6 +45,8 @@ type Layer = {
   comments: CommentView[];
   numbers: Map<string, number>;
   rects: Record<string, Record<string, Rect | null>>;
+  activeId: string | null;
+  pulse: number;
   openPin(id: string, pin: HTMLElement): void;
 };
 
@@ -68,22 +70,41 @@ export function DesignBoard({ design, leftTools, inThread = false }: {
   const fitKey = design.rounds.map((round) => `${round.round}:${round.screens.length}`).join(",");
   const comments = useComments(design, board, canvas);
   const numbers = new Map(design.comments.map((comment, index) => [comment.id, index + 1]));
-  const openComment = comments.open ? design.comments.find((comment) => comment.id === comments.open!.id) : undefined;
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [pulse, setPulse] = useState(0);
+  const activeId = comments.open?.id ?? null;
+  useEffect(() => {
+    if (comments.commenting || comments.draft) setPanelOpen(true);
+  }, [comments.commenting, comments.draft]);
+  const focusPin = (id: string) => {
+    comments.setOpen({ id, anchor: { x: 0, y: 0 } });
+    const pin = board.current?.querySelector<HTMLElement>(`[data-comment-pin="${CSS.escape(id)}"]`);
+    const box = board.current?.getBoundingClientRect();
+    if (pin && box) {
+      const at = pin.getBoundingClientRect();
+      const x = at.left + at.width / 2;
+      const y = at.top + at.height / 2;
+      canvas.current?.wheel({ deltaX: x - (box.left + box.width / 2), deltaY: y - (box.top + box.height / 2), zoom: false, clientX: x, clientY: y });
+    }
+    setPulse((count) => count + 1);
+  };
   const layer: Layer = {
     commenting: comments.commenting,
     register: comments.register,
     comments: design.comments,
     numbers,
     rects: comments.rects,
-    openPin: (id, pin) => {
-      const box = board.current?.getBoundingClientRect();
-      const at = pin.getBoundingClientRect();
-      if (box) comments.setOpen({ id, anchor: { x: at.right - box.left, y: at.top - box.top } });
+    activeId,
+    pulse,
+    openPin: (id) => {
+      setPanelOpen(true);
+      comments.setOpen({ id, anchor: { x: 0, y: 0 } });
     },
   };
 
   return (
-    <div ref={board} className="relative h-full">
+    <div className="flex h-full min-h-0">
+    <div ref={board} className="relative h-full min-w-0 flex-1">
     <Canvas
       api={canvas}
       fitKey={fitKey}
@@ -102,7 +123,7 @@ export function DesignBoard({ design, leftTools, inThread = false }: {
             <button type="button" aria-pressed={comments.editing} className={cn(MODE_BUTTON, comments.editing && MODE_ON)} onClick={() => comments.setEditing(true)}>
               <Icon name="EditFile" className="size-3.5" /> Edit text
             </button>
-            <button type="button" aria-pressed={comments.commenting} className={cn(MODE_BUTTON, comments.commenting && MODE_ON)} onClick={() => comments.setCommenting(true)}>
+            <button type="button" aria-pressed={comments.commenting} className={cn(MODE_BUTTON, comments.commenting && MODE_ON)} onClick={() => { comments.setCommenting(true); setPanelOpen(true); }}>
               <Icon name="MessageSquare" className="size-3.5" /> Comment
               {design.comments.length ? <span className="tabular-nums text-muted-foreground">{design.comments.length}</span> : null}
             </button>
@@ -131,9 +152,21 @@ export function DesignBoard({ design, leftTools, inThread = false }: {
         </div>
       )}
     </Canvas>
-    {comments.draft ? <DraftPopover key={`${comments.draft.screenId}:${comments.draft.selector}`} design={design} draft={comments.draft} board={board} inThread={inThread} onClose={() => comments.setDraft(null)} /> : null}
-    {openComment && comments.open ? <CommentPopover key={openComment.id} design={design} comment={openComment} number={numbers.get(openComment.id) ?? 0} anchor={comments.open.anchor} board={board} inThread={inThread} onClose={() => comments.setOpen(null)} /> : null}
     {playing && played ? <PlayView key={`${playing.id}:${played.step}:${playing.updatedAt}:${reloads}`} designId={design.id} screen={playing} step={played.step} onClose={() => setPlayed(null)} /> : null}
+    </div>
+    {panelOpen ? (
+      <DesignCommentsPanel
+        key={design.id}
+        design={design}
+        draft={comments.draft}
+        activeId={activeId}
+        numbers={numbers}
+        inThread={inThread}
+        onSelect={focusPin}
+        onDraftDone={() => comments.setDraft(null)}
+        onClose={() => { setPanelOpen(false); comments.setDraft(null); comments.setOpen(null); comments.setCommenting(false); }}
+      />
+    ) : null}
     </div>
   );
 }
@@ -236,7 +269,7 @@ function Frame({ designId, screen, step, index = 0, reloads, onPlay, layer }: {
             style={{ width, height }}
           />
         </div>
-        <Pins comments={layer.comments.filter((comment) => frameKey(comment.screenId, comment.step) === key)} numbers={layer.numbers} rects={layer.rects[key]} onOpen={layer.openPin} />
+        <Pins comments={layer.comments.filter((comment) => frameKey(comment.screenId, comment.step) === key)} numbers={layer.numbers} rects={layer.rects[key]} activeId={layer.activeId} pulse={layer.pulse} onOpen={layer.openPin} />
       </div>
     </figure>
   );

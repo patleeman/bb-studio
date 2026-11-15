@@ -357,6 +357,17 @@ export class DesignStore {
         createdAt: comment.created_at,
         sent: comment.sent_at !== null,
       })),
+      resolvedComments: this.comments(id, { includeResolved: true }).filter((comment) => comment.resolved_at !== null).map((comment) => ({
+        id: comment.id,
+        screenId: comment.screen_id,
+        step: comment.step,
+        selector: comment.selector,
+        elementText: comment.element_text,
+        body: comment.body,
+        createdAt: comment.created_at,
+        sent: comment.sent_at !== null,
+        resolvedAt: comment.resolved_at!,
+      })),
       review: null,
     };
   }

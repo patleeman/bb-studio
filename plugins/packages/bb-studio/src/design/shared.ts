@@ -189,6 +189,7 @@ export type DesignView = {
   rounds: RoundView[];
   /** Open comments, oldest first; their order numbers the pins. */
   comments: CommentView[];
+  resolvedComments?: (CommentView & { resolvedAt: number })[];
   /** The latest review, while the server remembers it. */
   review: ReviewView | null;
 };

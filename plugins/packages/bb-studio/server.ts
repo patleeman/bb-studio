@@ -321,6 +321,7 @@ export default async function plugin(bb: BbPluginApi) {
     linkThread: (thread) => services.linkThread(thread),
     replaceLinks: (ref, source, links) => services.replaceLinks(ref, source, links),
     recordActivity,
+    threads: (ref) => services.threads(ref),
   }, notifyBuiltin, {
     items: async () => {
       const { items, providers } = await hub.overview();

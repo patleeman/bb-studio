@@ -1,7 +1,7 @@
 // Comments pinned to elements of a design's screens, as in Claude Design.
 // In comment mode the screens' own script (src/server/screen-script.ts)
 // outlines the element under the pointer and reports the one clicked; the
-// canvas answers with a popover to add the comment or send it to the agent.
+// comments panel opens a draft for it, sent to the agent when there is one.
 // Open comments show as numbered pins on their elements.
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { toast } from "sonner";
@@ -11,6 +11,8 @@ import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../contract";
 import { frameSize, frameKey, type CommentView, type DesignView } from "../shared";
 import type { CanvasApi } from "./canvas";
+import { CommentAuthor } from "../../ui/comments/CommentAuthor";
+import { CommentsPanel, type CommentThread } from "../../ui/comments/CommentsPanel";
 import { createEditGate } from "./edit-gate";
 
 export type Rect = { x: number; y: number; width: number; height: number };
@@ -154,10 +156,12 @@ export function useComments(design: DesignView, board: RefObject<HTMLDivElement 
 }
 
 /** Numbered pins over one screen, in the screen's own pixels (the canvas scales them with it). */
-export function Pins({ comments, numbers, rects, onOpen }: {
+export function Pins({ comments, numbers, rects, activeId, pulse, onOpen }: {
   comments: CommentView[];
   numbers: Map<string, number>;
   rects: Record<string, Rect | null> | undefined;
+  activeId?: string | null;
+  pulse?: number;
   onOpen(id: string, pin: HTMLElement): void;
 }) {
   return (
@@ -165,21 +169,25 @@ export function Pins({ comments, numbers, rects, onOpen }: {
       {comments.map((comment) => {
         const rect = rects?.[comment.selector];
         if (!rect) return null;
+        const active = comment.id === activeId;
         return (
           <button
             key={comment.id}
             type="button"
+            data-comment-pin={comment.id}
+            data-active={active ? "true" : undefined}
             title={comment.sent ? `Sent to the agent: ${comment.body}` : comment.body}
             aria-label={`Comment ${numbers.get(comment.id)}${comment.sent ? ", sent to the agent" : ""}: ${comment.body}`}
             onClick={(event) => onOpen(comment.id, event.currentTarget)}
             className={cn(
-              "absolute z-10 flex size-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full rounded-bl-none text-xl font-semibold shadow-lg ring-4",
-              // Sent ones wait on the agent: hollow, until it resolves them.
+              "absolute z-10 flex size-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full rounded-bl-none text-xl font-semibold shadow-lg ring-4 transition-transform",
               comment.sent ? "bg-white text-[#4f7cff] ring-[#4f7cff]" : "bg-[#4f7cff] text-white ring-white/70",
+              active && "z-20 scale-125 ring-[#facc15]",
             )}
             style={{ left: rect.x + rect.width, top: Math.max(22, rect.y) }}
           >
-            {numbers.get(comment.id)}
+            {active && pulse ? <span key={pulse} aria-hidden className="absolute inset-0 rounded-full rounded-bl-none bg-[#facc15]/60 motion-safe:animate-ping [animation-iteration-count:2]" /> : null}
+            <span className="relative">{numbers.get(comment.id)}</span>
           </button>
         );
       })}
@@ -193,133 +201,87 @@ function useSentToast(threadId: string | null, inThread: boolean) {
   return () => toast.success("Sent to the agent", !inThread && threadId ? { action: { label: "Open chat", onClick: () => navigate.toThread(threadId) } } : undefined);
 }
 
-const POPOVER = "absolute z-30 w-80 rounded-lg border border-border bg-background p-3 text-sm text-foreground shadow-xl";
-
-/** Keeps a popover inside the board. */
-function place(anchor: Point, board: RefObject<HTMLDivElement | null>) {
-  const width = board.current?.clientWidth ?? 0;
-  return { left: Math.max(8, Math.min(anchor.x + 8, width - 328)), top: Math.max(56, anchor.y) };
-}
-
-export function DraftPopover({ design, draft, board, inThread, onClose }: { design: DesignView; draft: Pick; board: RefObject<HTMLDivElement | null>; inThread: boolean; onClose(): void }) {
-  const rpc = useRpc<typeof rpcContract>();
-  const sent = useSentToast(design.threadId, inThread);
-  const [body, setBody] = useState("");
-  const [busy, setBusy] = useState(false);
-  const canSend = Boolean(design.threadId);
-
-  async function submit(send: boolean) {
-    if (!body.trim() || busy) return;
-    setBusy(true);
-    try {
-      const result = await rpc.call("designs.addComment", { designId: design.id, screenId: draft.screenId, step: draft.step, selector: draft.selector, elementHtml: draft.html, elementText: draft.text, body: body.trim(), send });
-      if (result.sent) sent();
-      else if (send) toast.error("Saved the comment, but couldn't send it to the agent", { description: "Open its pin and choose Send to agent to try again." });
-      onClose();
-    } catch (error) {
-      toast.error(errorMessage(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div role="dialog" aria-label="New comment" className={POPOVER} style={place(draft.anchor, board)} onPointerDown={(event) => event.stopPropagation()}>
-      <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-        <span className="font-medium text-foreground">{draft.screenId}{draft.step ? ` · ${draft.step}` : ""}</span>
-        <span className="min-w-0 flex-1 truncate">{draft.text || draft.selector}</span>
-        <button type="button" aria-label="Cancel" className="rounded p-0.5 hover:bg-state-hover" onClick={onClose}><Icon name="X" className="size-3.5" /></button>
-      </div>
-      <textarea
-        autoFocus
-        value={body}
-        onChange={(event) => setBody(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") onClose();
-          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void submit(canSend);
-        }}
-        placeholder="Describe the issue or suggestion…"
-        rows={3}
-        className="w-full resize-none rounded-md border border-border bg-transparent px-2 py-1.5 outline-none focus:border-ring"
-      />
-      <div className="mt-2 flex items-center justify-end gap-2">
-        <button type="button" disabled={!body.trim() || busy} className="rounded-md border border-border px-2.5 py-1 hover:bg-state-hover disabled:opacity-50" onClick={() => void submit(false)}>
-          Add comment
-        </button>
-        <button
-          type="button"
-          disabled={!body.trim() || busy || !canSend}
-          title={canSend ? "Send to agent (⌘↩)" : "This design has no conversation yet. Start one with Chat first."}
-          className="rounded-md bg-primary px-2.5 py-1 text-primary-foreground hover:opacity-90 disabled:opacity-50"
-          onClick={() => void submit(true)}
-        >
-          Send to agent
-        </button>
-      </div>
-    </div>
-  );
-}
-
-export function CommentPopover({ design, comment, number, anchor, board, inThread, onClose }: {
+export function DesignCommentsPanel({ design, draft, activeId, numbers, inThread, onSelect, onDraftDone, onClose }: {
   design: DesignView;
-  comment: CommentView;
-  number: number;
-  anchor: Point;
-  board: RefObject<HTMLDivElement | null>;
+  draft: Pick | null;
+  activeId: string | null;
+  numbers: Map<string, number>;
   inThread: boolean;
+  onSelect(id: string): void;
+  onDraftDone(): void;
   onClose(): void;
 }) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const sent = useSentToast(design.threadId, inThread);
-  const [busy, setBusy] = useState(false);
-  async function act(work: () => Promise<unknown>, done?: () => void) {
-    setBusy(true);
-    try {
-      await work();
-      done?.();
-      onClose();
-    } catch (error) {
-      toast.error(errorMessage(error));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const where = (comment: { screenId: string; step: string }) => `${comment.screenId}${comment.step ? ` · ${comment.step}` : ""}`;
+  const threads: CommentThread[] = [
+    ...design.comments.map((comment) => ({
+      id: comment.id,
+      quote: comment.elementText || comment.selector,
+      resolved: false,
+      messages: [{ id: comment.id, authorId: "user", text: comment.body, at: comment.createdAt }],
+      note: `Pin ${numbers.get(comment.id) ?? ""} on ${where(comment)}${comment.sent ? " · Sent to the agent" : ""}`,
+    })),
+    ...(design.resolvedComments ?? []).map((comment) => ({
+      id: comment.id,
+      quote: comment.elementText || comment.selector,
+      resolved: true,
+      resolvedAt: comment.resolvedAt,
+      messages: [{ id: comment.id, authorId: "user", text: comment.body, at: comment.createdAt }],
+      note: `On ${where(comment)}${comment.sent ? " · Sent to the agent" : ""}`,
+    })),
+  ];
+  const open = new Map(design.comments.map((comment) => [comment.id, comment]));
+  const act = async (work: () => Promise<unknown>, done?: () => void) => {
+    try { await work(); done?.(); }
+    catch (error) { toast.error(errorMessage(error)); }
+  };
   return (
-    <div role="dialog" aria-label={`Comment ${number}`} className={POPOVER} style={place(anchor, board)} onPointerDown={(event) => event.stopPropagation()}>
-      <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-        <span className="flex size-5 items-center justify-center rounded-full bg-[#4f7cff] text-[11px] font-semibold text-white">{number}</span>
-        <span className="font-medium text-foreground">{comment.screenId}{comment.step ? ` · ${comment.step}` : ""}</span>
-        <span className="min-w-0 flex-1 truncate">{comment.elementText || comment.selector}</span>
-        <button type="button" aria-label="Close" className="rounded p-0.5 hover:bg-state-hover" onClick={onClose}><Icon name="X" className="size-3.5" /></button>
-      </div>
-      <p className="whitespace-pre-wrap [text-wrap:pretty]">{comment.body}</p>
-      <div className="mt-3 flex items-center gap-2">
-        <button type="button" disabled={busy} aria-label="Delete comment" title="Delete" className="rounded-md p-1 text-muted-foreground hover:bg-state-hover hover:text-foreground" onClick={() => void act(() => rpc.call("designs.deleteComment", { id: comment.id }))}>
-          <Icon name="Trash2" className="size-4" />
-        </button>
-        <span className="flex-1 text-xs text-muted-foreground">
-          {comment.sent ? (
-            !inThread && design.threadId ? (
-              <button type="button" className="underline-offset-2 hover:text-foreground hover:underline" onClick={() => navigate.toThread(design.threadId!)}>Sent to the agent · Open chat</button>
-            ) : "Sent to the agent"
-          ) : ""}
-        </span>
-        {comment.sent ? null : (
-          <button
-            type="button"
-            disabled={busy || !design.threadId}
-            title={design.threadId ? undefined : "This design has no conversation yet. Start one with Chat first."}
-            className="rounded-md border border-border px-2.5 py-1 hover:bg-state-hover disabled:opacity-50"
-            onClick={() => void act(() => rpc.call("designs.sendComment", { id: comment.id }), sent)}
-          >
-            Send to agent
-          </button>
-        )}
-        <button type="button" disabled={busy} className={cn("flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-primary-foreground hover:opacity-90 disabled:opacity-50")} onClick={() => void act(() => rpc.call("designs.resolveComment", { id: comment.id, resolved: true }))}>
-          <Icon name="Check" className="size-3.5" /> Resolve
-        </button>
-      </div>
-    </div>
+    <CommentsPanel
+      threads={threads}
+      activeId={activeId}
+      onSelect={onSelect}
+      onClose={onClose}
+      onResolve={async (id, resolved) => { await rpc.call("designs.resolveComment", { id, resolved }); }}
+      Author={CommentAuthor}
+      emptyHint="Choose Comment, then click an element on a screen."
+      draft={draft ? {
+        quote: `${draft.text || draft.selector}`,
+        onCancel: onDraftDone,
+        onSubmit: async (body) => {
+          const send = Boolean(design.threadId);
+          const result = await rpc.call("designs.addComment", { designId: design.id, screenId: draft.screenId, step: draft.step, selector: draft.selector, elementHtml: draft.html, elementText: draft.text, body, send });
+          if (result.sent) sent();
+          else if (send) toast.error("Saved the comment, but couldn't send it to the agent", { description: "Choose Send to agent on it to try again." });
+          onDraftDone();
+          onSelect(result.id);
+        },
+      } : null}
+      actions={(thread) => {
+        const comment = open.get(thread.id);
+        return (
+          <>
+            <button type="button" aria-label="Delete comment" title="Delete" className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground" onClick={() => void act(() => rpc.call("designs.deleteComment", { id: thread.id }))}>
+              <Icon name="Trash2" className="size-3.5" />
+            </button>
+            {comment && !comment.sent ? (
+              <button
+                type="button"
+                disabled={!design.threadId}
+                title={design.threadId ? undefined : "This design has no conversation yet. Start one with Chat first."}
+                className="h-7 rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:opacity-50"
+                onClick={() => void act(() => rpc.call("designs.sendComment", { id: thread.id }), sent)}
+              >
+                Send to agent
+              </button>
+            ) : comment?.sent && !inThread && design.threadId ? (
+              <button type="button" className="h-7 rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground" onClick={() => navigate.toThread(design.threadId!)}>Open chat</button>
+            ) : null}
+          </>
+        );
+      }}
+    />
   );
 }
+

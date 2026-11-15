@@ -58,7 +58,7 @@ function PanelEditor({ page, titleSave, pages, bots }: { page: PageMetaView; tit
         <PageHeading page={page} rpc={rpc} titleSave={titleSave} />
         <PageBody missing={status === "missing"}>
           {connection && ready && status !== "missing" ? (
-            <PageEditor connection={connection} page={page} bots={bots} pages={pages} sidePanel={null} onCloseSidePanel={() => {}} />
+            <PageEditor connection={connection} page={page} bots={bots} pages={pages} sidePanel={null} onSidePanel={() => {}} panelSlot={null} />
           ) : null}
         </PageBody>
       </PageColumn>

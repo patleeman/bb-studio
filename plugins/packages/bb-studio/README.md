@@ -1604,12 +1604,18 @@ stats block, a stacked bar chart of weekly active teams and a launch
 checklist, with Dictate, Version history, Comments and the page menu in the
 tab's row. Captured in a staged BB (stable BB 0.46.0). Recapture with `BB_CAPTURE_ONLY=pages`.
 
-![Page comments with dictation in the reply box](assets/pages-comments.png)
+`BB_CAPTURE_ONLY=pages-comments` captures the comments panel
+(`assets/pages-comments.png`, and its phone sheet as
+`assets/pages-comments-mobile.png`): an anchored comment and a reply, both
+dictated through Talk into the panel's fields and saved explicitly, with the
+page body unchanged.
 
-An anchored comment and a reply, both dictated through Talk into the comment
-drafts and saved explicitly; the page body is unchanged. The microphone also
-fits the [phone comment sheet](assets/pages-comments-mobile.png). Recapture
-with `BB_CAPTURE_ONLY=pages-comments`.
+When the user comments on a page an agent made, or replies in one of its
+threads, the conversation that made the page is told about it a second later
+(`src/pages/comment-notify.ts`), with the thread id, the commented text and
+the comment, so the agent answers in the same comment thread. The agent's own
+comments, resolving and reopening tell no one, and neither does a comment on
+a page the user made.
 
 ![The compact page header](assets/pages-compact-header.png)
 
@@ -1667,9 +1673,15 @@ The compact page header at 390 pixels, with **Item actions** open.
   write.
 - **Mentions.** Type `@` to mention another page, a BB thread, a
   Studio item, or a date. Page and thread mentions open where they point.
-- **Comments.** Select text to comment on it. Threads show in a floating
-  card where you can reply, react, edit, and resolve. Agents can read, start,
-  reply to, and resolve threads. Clients without the editor, like the BB
+- **Comments.** Select text and choose **Comment** in the toolbar: a draft
+  with the quote opens at the top of the **Comments** panel, a side panel that
+  splits the page (a bottom sheet on phones; `src/ui/comments`). Its header
+  has the open count and close; **Open** and **Resolved** list the threads,
+  each with its quote, the messages under the author (the Bot's name and face
+  for an agent's), an inline reply box with dictation, and **Resolve** or
+  **Reopen**. Clicking a thread scrolls to its highlight and pulses it;
+  clicking a highlight opens its thread; the active highlight is stronger.
+  Agents can read, start, reply to, and resolve threads. Clients without the editor, like the BB
   Studio phone app, use Studio's `pages.comments`, `pages.commentBlocks`,
   `pages.commentCreate`, `pages.commentReply` and `pages.commentResolve` RPCs,
   which write as you.
@@ -2193,8 +2205,11 @@ The same deck presented with Play and moved on with →: "Why it matters",
   **Download HTML**).
 - **Edit text and comments.** In **Edit text** mode, click text on a screen
   and type over it; the change is written into the screen's HTML. In
-  **Comment** mode, pin a note to an element; **Send to agent** posts it, with
-  the element's selector and markup, to the design's thread.
+  **Comment** mode, click an element: a draft opens in the same **Comments**
+  panel as pages, and the comment pins to the element and goes, with the
+  element's selector and markup, to the design's thread (**Send to agent**
+  sends one that wasn't). Clicking a comment pans to its pin; clicking a pin
+  opens its comment.
 - **Card in the agent's reply** (`::design{id="…"}`) with the newest round's
   first screens. It opens the design in the thread's **Studio** tab beside
   the chat; back from it, the tab lists the thread's items, designs among them.
