@@ -9,7 +9,7 @@ const NOW = new Date("2026-11-13T15:00:00Z").getTime();
 const base: Task = {
   id: "task_1", title: "Pick a backup provider", why: "The old plan ends Friday.", owner: "patrick", state: "todo", kind: "do", options: [], needs: null, priority: "normal",
   conversation: "thr_main", project: null, area: "Home", timing: { due: null, trigger: { type: "none" }, snoozed: false }, attention: { queue: "surfaced", push: false },
-  progress: { step: null, line: null }, workers: [], outputs: [], source: null, parentId: null, schedule: null, card: null, stale: false, origin: "task",
+  progress: { step: null, line: null }, workers: [], outputs: [], source: null, parentId: null, schedule: null, card: null, automation: null, stale: false, origin: "task",
   createdAt: NOW - 3_600_000, updatedAt: NOW - 60_000, closedAt: null, closedBy: null,
 };
 const state = vi.hoisted(() => ({
@@ -223,4 +223,23 @@ it("a card the agent closed offers Reopen for that agent, not Undo", async () =>
   expect(reopen.title).toBe("Reopens it and asks Fix the flaky test to carry on");
   await act(async () => reopen.click());
   expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "task_1", action: "reopen" });
+});
+
+it("a recurring task shows its schedule, Active or Paused, its latest runs and findings, and no Done or Hand off", async () => {
+  const link = (role: "schedule" | "run" | "finding", count = 1) => ({ id: "aut_silent", kind: "watcher" as const, role, thread: "thr_bot", keys: [], count, lastAt: NOW, mode: null, clearedAt: null });
+  const run = { ...base, id: "task_run1", title: "Silent heartbeat · Nov 13, 2:00 PM", owner: "cos", state: "done" as const, origin: "task" as const, progress: { step: null, line: "Nothing new" }, automation: link("run"), parentId: "task_auto-aut-silent", createdAt: NOW - 3_600_000, closedAt: NOW - 3_500_000, closedBy: "cos" };
+  const finding = { ...base, id: "task_find1", title: "Silent heartbeat: Kensico spend $5.80 today", owner: "cos", state: "in_progress" as const, origin: "task" as const, automation: link("finding", 3), parentId: "task_auto-aut-silent", createdAt: NOW - 7_200_000 };
+  put({ id: "task_auto-aut-silent", title: "Silent heartbeat", owner: "cos", state: "in_progress", origin: "task", schedule: { text: "Every 2 hours", cron: null, timeZone: null, automationId: "aut_silent", paused: false }, automation: link("schedule"), progress: { step: null, line: "Found: Kensico spend $5.80 today" } }, { runs: [run, finding] });
+  await render("loop", { id: "task_auto-aut-silent" });
+  expect(card().dataset.state).toBe("active");
+  expect(card().textContent).toContain("Watcher · Every 2 hours");
+  expect([...card().querySelectorAll('[data-testid="task-run"]')].map((each) => each.textContent)).toEqual([expect.stringContaining("DoneNothing new"), expect.stringContaining("Finding · RunningSilent heartbeat: Kensico spend $5.80 today")]);
+  const actions = card().querySelector('[data-testid="task-actions"]')!.textContent!;
+  for (const label of ["Done", "Hand off", "Take over"]) expect(actions).not.toContain(label);
+  put({ id: "task_auto-aut-silent", title: "Silent heartbeat", owner: "cos", state: "waiting", origin: "task", schedule: { text: "Every 2 hours", cron: null, timeZone: null, automationId: "aut_silent", paused: true }, automation: link("schedule") });
+  await render("loop", { id: "task_auto-aut-silent" });
+  expect(card().dataset.state).toBe("paused");
+  put(finding);
+  await render("loop", { id: "task_find1" });
+  expect(card().textContent).toContain("Finding · Found 3 times");
 });

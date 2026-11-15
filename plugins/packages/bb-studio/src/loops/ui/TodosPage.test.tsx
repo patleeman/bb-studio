@@ -20,6 +20,7 @@ const state = vi.hoisted(() => ({
   chatOpen: false,
   composer: { insert: vi.fn(), focus: vi.fn() },
   scheduled: [] as unknown[],
+  extraTasks: [] as unknown[],
   zone: null as string | null,
   listError: null as string | null,
   scheduledError: null as string | null,
@@ -37,7 +38,7 @@ vi.mock("../../ui/live", () => ({
     if (method === "loops.get" && state.getError) return { data: null, loading: false, error: state.getError, refresh: () => {} };
     if (method === "loops.get") return { data: found ? { loop: found, history: [] } : null, loading: false, error: found ? null : "Todo not found", refresh: () => {} };
     if (method === "tasks.get") return { data: null, loading: false, error: "Task not found", refresh: () => {} };
-    const data = method === "tasks.list" ? { tasks: Object.values(state.groups as Record<string, Loop[]>).flat().map(taskFromLoop), threads: [{ owner: "thread:thr_lead", name: "Larkspur lead", threadId: "thr_lead" }], held: [] }
+    const data = method === "tasks.list" ? { tasks: [...Object.values(state.groups as Record<string, Loop[]>).flat().map(taskFromLoop), ...state.extraTasks], threads: [{ owner: "thread:thr_lead", name: "Larkspur lead", threadId: "thr_lead" }], held: [] }
       : method === "loops.scheduled" ? { items: state.scheduled }
       : method === "bot_get" ? { bot: { id: "bot_1", name: "Chief of Staff", threadId: "thr_bot" } }
       : method === "bot_list" ? { bots: [{ id: "bot_1", name: "Chief of Staff", threadId: "thr_bot", primary: true, state: "active" }] }
@@ -61,7 +62,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   state.chatOpen = false; state.composer.insert.mockClear(); state.composer.focus.mockClear(); state.toThread.mockImplementation(() => { state.chatOpen = true; });
-  state.call.mockClear(); state.toThread.mockClear(); state.openLink.mockClear(); state.interactions = []; state.attention = null; state.zone = null;
+  state.call.mockClear(); state.toThread.mockClear(); state.openLink.mockClear(); state.interactions = []; state.attention = null; state.zone = null; state.extraTasks = [];
   state.groups = {
     ...empty,
     needsYouNow: [
@@ -334,6 +335,27 @@ it("lists the Bot's check-ins, reminders, watchers and runners under Scheduled &
   expect(rows.map((each) => each.textContent)).toEqual(["Morning brief4:00 PM", "Inbox watchPaused"]);
   expect(rows[0]!.getAttribute("data-row-link")).toBe("bb://automation/bot_1%3AMorning%20brief");
   state.scheduled = [];
+});
+
+it("shows each recurring task's last result beside its next run, once, and Runs opens its task", async () => {
+  state.groups = { ...empty };
+  const item = (key: string, over: Record<string, unknown>) => ({ key, source: "automation", id: key, botId: "bot_1", botName: "Chief of Staff", kind: "checkin", title: key, nextAt: null, state: "active", scheduleText: "Daily 8:00", threadId: "thr_bot", link: `bb://automation/bot_1%3A${key}`, ...over });
+  const parent = (automationId: string, title: string, line: string | null, paused = false) => ({
+    ...taskFromLoop(loop(`task_auto-${automationId}`, title, { owner: "cos", status: "in_progress" })), origin: "task", state: paused ? "waiting" : "in_progress",
+    schedule: { text: "Daily 1:00 PM", cron: null, timeZone: null, automationId, paused }, progress: { step: null, line },
+    automation: { id: automationId, kind: "checkin", role: "schedule", thread: "thr_bot", keys: [], count: 3, lastAt: NOW, mode: null, clearedAt: null },
+  });
+  state.scheduled = [item("aut_daily", { title: "Daily check-in", nextAt: NOW + 3_600_000 }), item("aut_silent", { title: "Silent heartbeat", kind: "watcher" }), item("aut_new", { title: "New one" })];
+  state.extraTasks = [parent("aut_daily", "Daily check-in", "Nothing new"), parent("aut_silent", "Silent heartbeat", "Needs you: Approve the budget raise"), parent("aut_orphan", "Not listed", "Ran")];
+  await render();
+  const rows = [...container.querySelectorAll<HTMLElement>("[data-testid=tasks-scheduled] [data-testid=scheduled-row]")];
+  expect(rows.map((each) => each.textContent)).toEqual(["Daily check-inNothing new4:00 PMRuns", "Silent heartbeatNeeds you: Approve the budget raiseDaily 8:00Runs", "New oneDaily 8:00"]);
+  expect(rows[1]!.querySelector("[data-testid=scheduled-last]")!.parentElement!.className).toContain("text-warning");
+  expect(titles(group("Scheduled & recurring"))).toEqual(["Not listed", "Daily check-in", "Silent heartbeat", "New one"]);
+  await act(async () => rows[0]!.querySelector<HTMLButtonElement>("[data-testid=scheduled-runs]")!.click());
+  expect(state.openLink).toHaveBeenCalledWith("bb://todo/task_auto-aut_daily", expect.objectContaining({ title: "Daily check-in" }));
+  state.scheduled = [];
+  state.extraTasks = [];
 });
 
 it("opens at the top, also as studio/automations: nothing scrolls the page to Scheduled", async () => {

@@ -3,6 +3,8 @@ import { handedBy, registerUserTasks } from "./src/tasks/user";
 import { isClosed as isTaskClosed } from "./src/tasks/contract";
 import { registerTasks, TASK_TOOLS } from "./src/tasks/register";
 import { adoptAtStart } from "./src/tasks/migrate";
+import { AutomationTasks, readSources } from "./src/tasks/automations";
+import { TaskStore, tasksUnavailable } from "./src/tasks/store";
 import { withToolLabel } from "./src/tool-labels";
 import { CONTINUE_TOOL, registerContinueNew } from "./src/continue-new";
 import { runWorkCli } from "./src/work/cli";
@@ -712,9 +714,29 @@ export default async function plugin(bb: BbPluginApi) {
     await userTasks.act({ id: x.id, action: x.action as 'choose' | 'done' | 'drop' | 'got_it', ...(x.option ? { option: x.option } : {}) });
     return loops.store.get(x.id);
   });
+  const automationTasks = new AutomationTasks(new TaskStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); }), {
+    sources: () => readSources(db, bots.list().map((bot) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, heartbeatKey: bots.heartbeatKey(bot.id) }))),
+    log: (message) => bb.log.warn(message),
+    zone: () => loopTimeZone(process.env, studioSettings.current().todosTimeZone),
+  });
+  const taskStep = <T,>(name: string, work: () => T): T | null => {
+    if (tasksUnavailable(db)) return null;
+    try { return work(); } catch (error) { bb.log.warn(`Automation tasks: ${name} failed: ${errorText(error)}`); return null; }
+  };
+  let automationSyncQueued = false;
+  const syncAutomationTasks = () => {
+    if (automationSyncQueued) return;
+    automationSyncQueued = true;
+    queueMicrotask(() => { automationSyncQueued = false; taskStep("sync", () => automationTasks.sync()); });
+  };
+  const automationsChanged = () => { tagsChanged(); syncAutomationTasks(); };
+  scheduler.onRunStart((key, threadId) => taskStep("run start", () => automationTasks.started(key, threadId)));
+  bb.events.on("thread.idle", ({ thread, lastAssistantText }) => { taskStep("run end", () => automationTasks.settle(thread.id, lastAssistantText, "succeeded")); });
+  bb.events.on("thread.failed", ({ thread, error }) => { taskStep("run end", () => automationTasks.settle(thread.id, typeof error === "string" ? error : null, "failed")); });
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
   const runners: Runners = new Runners({
-    db, sdk: bb.sdk, scheduler, changed: tagsChanged,
+    db, sdk: bb.sdk, scheduler, changed: automationsChanged,
+    reported: (runnerId, threadId, level, summary) => taskStep("report", () => automationTasks.report(runnerId, threadId, level, summary)),
     bot: (botId) => bots.stored(botId),
     startedThreads: (botId) => bots.started(botId),
     chain: (botId) => bots.chain(botId),
@@ -750,7 +772,8 @@ export default async function plugin(bb: BbPluginApi) {
   // A Bot's automations (src/automations.ts): check-ins, reminders, watchers, and its runners in the same list.
   const automationBot = (botId?: string) => { const bot = bots.stored(botId); return bot ? { id: bot.id, name: bot.name, threadId: bot.threadId, state: bot.state, primary: bot.primary !== false, kind: bot.kind ?? "studio" } : null; };
   const automations: Automations = new Automations({
-    db, sdk: bb.sdk, scheduler, changed: tagsChanged,
+    db, sdk: bb.sdk, scheduler, changed: automationsChanged,
+    findings: (watcherId, finding, raw, at) => (tasksUnavailable(db) ? null : automationTasks.watcherRun(watcherId, finding, raw, at)),
     copiedReminder: (id) => loops.enabled() && !!db.prepare("SELECT 1 FROM tasks WHERE id = ?").get(reminderLoopId(id)),
     bot: automationBot,
     // With bb's automations plugin off (a BB Studio copy), watchers run here and bb's rows are read from its data file (src/automation-table.ts).
@@ -778,6 +801,13 @@ export default async function plugin(bb: BbPluginApi) {
       run: async (botId) => { await maintenance.run(botId); },
     },
   });
+  taskStep("adopt", () => {
+    const moved = automationTasks.sync({ backup: true });
+    if (moved.created || moved.updated || moved.closed) bb.log.info(`Automation tasks: ${moved.created} made, ${moved.updated} updated, ${moved.closed} closed; backup at ${moved.backup ?? "none"}.`);
+    if (moved.backupError) bb.log.warn(`Automation tasks: the backup before mapping failed (${moved.backupError}); mapped anyway.`);
+  });
+  triggers.every("automation-tasks", 60_000, () => syncAutomationTasks());
+  triggers.every("automation-tasks-prune", 60 * 60_000, () => { taskStep("prune", () => automationTasks.prune()); });
   const restoreMainFailed = (error: unknown) => bb.log.warn(`Couldn't start a new Main: ${errorText(error)}`);
   bb.events.on("thread.deleted", ({ thread }) => {
     const bot = bots.list().find((each) => each.threadId === thread.id);

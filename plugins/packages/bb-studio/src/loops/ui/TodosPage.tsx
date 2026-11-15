@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent, type 
 import { errorMessage } from "../../kit/format";
 import { Button } from "../../kit/ui/button";
 import { Input } from "../../kit/ui/input";
+import { cn } from "../../kit/ui/utils";
 import type { BotView } from "../../contract";
 import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageMore, BotPageRow, BotPageToolbar, foldRows, noMatch, useBotPageQuery, useRowOpen } from "../../ui/bot-page";
 import { MenuSelect } from "../../ui/menu-select";
@@ -61,7 +62,10 @@ export function TodosPage({ view }: { view: BotView }) {
   const chatRows = showChat ? pending.length : 0;
   const scheduled = useMemo(() => (scheduledList.data?.items ?? []).filter((item) => item.source === "automation" && item.botId === bot.id && (!query.trim() || item.title.toLowerCase().includes(query.trim().toLowerCase())) && !filtered),
     [scheduledList.data, bot.id, query, filtered]);
-  const total = sections.today.length + sections.later.length + sections.agents.length + sections.waiting.length + sections.scheduled.length + chatRows;
+  const recurring = new Map(tasks.filter((t) => t.automation?.role === "schedule" && t.schedule?.automationId).map((t) => [t.schedule!.automationId!, t]));
+  const listedIds = new Set((scheduledList.data?.items ?? []).filter((item) => item.source === "automation").map((item) => item.id));
+  const scheduledTasks = sections.scheduled.filter((t) => !(t.automation?.role === "schedule" && listedIds.has(t.schedule?.automationId ?? "")));
+  const total = sections.today.length + sections.later.length + sections.agents.length + sections.waiting.length + scheduledTasks.filter((t) => t.automation?.role !== "schedule").length + chatRows;
   const add = (text: string) => call("loops.add", { text }).then(() => { setUnfolded((open) => new Set([...open, "today"])); list.refresh(); });
   const botChat = people.botThreadId ? rowOpen({ kind: "conversation", id: people.botThreadId }, people.botName) : null;
   const ready = ownsTasks ? !!list.data || !!list.error : !!scheduledList.data || !!scheduledList.error;
@@ -111,7 +115,7 @@ export function TodosPage({ view }: { view: BotView }) {
     : filtered ? { title: "No tasks match these filters", action: { label: "Show all", onClick: () => { setArea(ALL); setProject(ALL); setOwner(ALL); } } }
       : { title: "No tasks yet", hint: "Ask the Bot to take something on, or add a task.", action: adding ? null : { label: "New task", onClick: () => setAdding(true) } };
   const mine = sections.today.length + sections.later.length + chatRows;
-  const scheduledCount = scheduled.length + sections.scheduled.length;
+  const scheduledCount = scheduled.length + scheduledTasks.length;
   const scheduledRows = fold("scheduled", scheduled);
   const anyScheduled = (scheduledList.data?.items ?? []).some((item) => item.source === "automation" && item.botId === bot.id) || tasks.some((t) => taskSection(t, now, zone) === "scheduled");
   const doneRows = fold("done", sections.done);
@@ -146,11 +150,18 @@ export function TodosPage({ view }: { view: BotView }) {
           aside={<NewAutomationMenu kinds={newKinds(bot.kind === "external")} disabled={bot.state !== "active"} onPick={editor.openNew} />}>
           {editor.error ? <p role="alert" className="pb-2 text-xs text-destructive">{editor.error}</p> : null}
           {scheduledList.error && !scheduledList.data ? <p role="alert" data-testid="scheduled-error" className="pb-2 text-xs text-destructive">{scheduledList.error}</p> : null}
-          {sections.scheduled.map(row)}
-          {scheduledRows.shown.map((item) => (
-            <BotPageRow key={item.key} testId="scheduled-row" data={{ "data-scheduled": item.key }} icon={SCHEDULED_ICON[item.kind]} muted={item.state === "paused"}
-              title={item.title} titleText={item.title} meta={scheduledMeta(item, now, zone)} {...rowOpen(item.link, item.title)} />
-          ))}
+          {scheduledTasks.map(row)}
+          {scheduledRows.shown.map((item) => {
+            const parent = recurring.get(item.id);
+            const last = parent?.progress.line ?? null;
+            const runs = parent ? rowOpen({ kind: "todo", id: parent.id }, parent.title) : null;
+            return (
+              <BotPageRow key={item.key} testId="scheduled-row" data={{ "data-scheduled": item.key, ...(parent ? { "data-task": parent.id } : {}) }} icon={SCHEDULED_ICON[item.kind]} muted={item.state === "paused"}
+                title={item.title} titleText={last ? `${item.title} · Last: ${last}` : item.title} meta={scheduledMeta(item, now, zone)} {...rowOpen(item.link, item.title)}
+                columns={last ? [{ key: "last", content: <span data-testid="scheduled-last" title={last}>{last}</span>, className: cn("max-w-[40%]", /^Needs you/.test(last) ? "text-warning" : "text-subtle-foreground") }] : undefined}
+                actions={runs ? <Button type="button" variant="ghost" size="sm" data-testid="scheduled-runs" className="h-7 px-2 text-xs font-normal" aria-label={`Runs: ${item.title}`} onClick={(event) => runs.onOpen(event)}>Runs</Button> : undefined} />
+            );
+          })}
           {!scheduledCount && !(scheduledList.error && !scheduledList.data) ? <BotPageEmpty testId="scheduled-empty" {...(query.trim() ? { title: noMatch("scheduled items", query) } : filtered && anyScheduled ? { title: "No scheduled items match these filters" } : { title: "Nothing scheduled yet", hint: "Add a reminder or a check-in with New." })} /> : null}
           {moreLine("scheduled", "Scheduled", scheduledRows.more)}
         </BotPageGroup>

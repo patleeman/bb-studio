@@ -9,13 +9,25 @@ export type TaskStatus = { id: string; label: string; glyph: Glyph; tone: Tone; 
 
 const loopKindOf = (kind: TaskKind) => (kind === "waiting-outside" ? "waiting" : kind);
 
-export function taskKind(task: Pick<Task, "kind" | "card">): { label: string; icon: string } {
+const RECURRING: Record<NonNullable<Task["automation"]>["kind"], { label: string; icon: string }> = {
+  checkin: { label: "Check-in", icon: "Clock" },
+  heartbeat: { label: "Check-in", icon: "Clock" },
+  runner: { label: "Runner", icon: "Repeat" },
+  watcher: { label: "Watcher", icon: "Eye" },
+};
+
+export function taskKind(task: Pick<Task, "kind" | "card"> & { automation?: Task["automation"] }): { label: string; icon: string } {
+  const auto = task.automation;
+  if (auto?.role === "schedule") return RECURRING[auto.kind];
+  if (auto?.role === "run") return { label: "Run", icon: RECURRING[auto.kind].icon };
+  if (auto?.role === "finding") return { label: "Finding", icon: "Eye" };
   const card = task.card?.kind;
   if (card && card !== "todo" && card !== "task") return WORK_KIND[card];
   return LOOP_KIND[loopKindOf(task.kind)];
 }
 
 export function taskStatus(task: Task): TaskStatus {
+  if (task.automation?.role === "schedule" && !isClosed(task)) return task.schedule?.paused ? { id: "paused", label: "Paused", glyph: "waiting", tone: "muted" } : { id: "active", label: "Active", glyph: "running", tone: "default" };
   if (task.stale) return { id: "ended", label: "Ended", glyph: "done", tone: "muted", stale: true };
   if (task.state === "failed") return { id: "failed", label: "Failed", glyph: "failed", tone: "destructive" };
   if (task.state === "dropped") return { id: "dropped", label: "Dismissed", glyph: "dropped", tone: "muted" };
@@ -99,6 +111,8 @@ export function historyLines(history: readonly TaskEvent[], names: Names): Histo
       case "state": text = d.state === "waiting" ? "Waiting" : d.state === "in_progress" ? "In progress" : d.state === "todo" ? "To do" : null; break;
       case "progress": text = [str(d.step), str(d.line)].filter(Boolean).join(" · ") || null; if (text && d.kept) text += " (after it was closed)"; break;
       case "started": text = "Started"; break;
+      case "found_again": text = `Found again${typeof d.count === "number" ? ` (${d.count} times in all)` : ""}${str(d.line) ? `: ${str(d.line)}` : ""}`; break;
+      case "cleared": text = "Cleared: the watcher stopped finding it"; break;
       default: text = null;
     }
     if (text) out.push({ at: event.at, text, type: event.type });

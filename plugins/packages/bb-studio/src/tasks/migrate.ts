@@ -28,16 +28,16 @@ function pending(db: Database.Database): { loops: Legacy[]; cards: Legacy[] } {
   return { loops, cards };
 }
 
-export function backupPath(file: string, at: number): string {
+export function backupPath(file: string, at: number, label = "tasks"): string {
   const stamp = new Date(at).toISOString().replace(/[:.]/g, "-");
   const ext = extname(file);
-  return join(dirname(file), `${basename(file, ext)}.before-tasks-${stamp}${ext || ".db"}`);
+  return join(dirname(file), `${basename(file, ext)}.before-${label}-${stamp}${ext || ".db"}`);
 }
 
-export function backupDatabase(db: Database.Database, at: number): string | null {
+export function backupDatabase(db: Database.Database, at: number, label = "tasks"): string | null {
   const file = db.name;
   if (!file || file === ":memory:") return null;
-  const target = backupPath(file, at);
+  const target = backupPath(file, at, label);
   if (existsSync(target)) throw new Error(`${target} already exists`);
   try {
     db.prepare("VACUUM INTO ?").run(target);

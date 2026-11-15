@@ -119,6 +119,7 @@ export interface RunnerDeps {
   chain(botId?: string): string[];
   /** Every Bot's own thread and the ones it handed off from: never a runner's to hide (src/bot-owned.ts hides them). */
   botThreads?(): ReadonlySet<string>;
+  reported?(runnerId: string, threadId: string, level: RunnerLevel, summary: string): string | null;
 }
 
 /**
@@ -679,17 +680,19 @@ export class Runners {
     this.deps.db.prepare("INSERT INTO runner_reports(runner_id, summary) VALUES (?, ?)").run(row.id, summary);
     this.deps.db.prepare("DELETE FROM runner_reports WHERE runner_id = ? AND id NOT IN (SELECT id FROM runner_reports WHERE runner_id = ? ORDER BY id DESC LIMIT 3)").run(row.id, row.id);
     this.changedRow(row.id, { last_level: input.level, last_report: summary, last_report_at: now, last_run_at: now });
+    let extra: string | null = null;
+    try { extra = this.deps.reported?.(row.id, threadId, input.level, summary) ?? null; } catch (error) { console.warn(`[studio] runner ${row.id}: its report could not be kept on its run`, error); }
     if (input.level === "log") return "Logged. Then reply exactly [PASS].";
     const bot = this.deps.bot(row.bot_id);
     if (!bot?.threadId) return "Logged; the Bot has no thread to tell. Then reply exactly [PASS].";
-    await this.tell(row, input.level, summary, bot as RunnerBot & { threadId: string });
+    await this.tell(row, input.level, summary, bot as RunnerBot & { threadId: string }, extra);
     return input.level === "urgent" ? "Told the user and pushed to their phone. Then reply exactly [PASS]." : "Told the user. Then reply exactly [PASS].";
   }
 
   /** A tell or urgent report's line in the Bot's thread; urgent also pushes to the phone, and the Bot triages it. */
-  private async tell(row: RunnerRow, level: "tell" | "urgent", summary: string, bot: RunnerBot & { threadId: string }): Promise<void> {
+  private async tell(row: RunnerRow, level: "tell" | "urgent", summary: string, bot: RunnerBot & { threadId: string }, extra: string | null = null): Promise<void> {
     await alertBot(this.deps.sdk, {
-      botThreadId: bot.threadId, senderThreadId: row.thread_id, line: tellLine(row.name, level, summary), ...(level === "urgent" ? { note: TRIAGE_NOTE } : {}),
+      botThreadId: bot.threadId, senderThreadId: row.thread_id, line: tellLine(row.name, level, summary), ...(level === "urgent" ? { note: extra ? `${TRIAGE_NOTE} ${extra}` : TRIAGE_NOTE } : {}),
       push: level === "urgent" ? { botId: row.bot_id, title: `${bot.name} · ${row.name}`, body: summary, coalesceKey: `runner:${row.id}` } : null,
     });
   }

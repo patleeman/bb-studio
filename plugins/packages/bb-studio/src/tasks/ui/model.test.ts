@@ -1,12 +1,12 @@
 import { expect, it } from "vitest";
 import type { Task } from "../contract";
-import { ALL, everMine, ownerShort, filterChoices, handOffTargets, historyLines, inFlightDetail, matches, ownerLabel, rowNumber, sectionTasks, taskSection, taskStatus } from "./model";
+import { ALL, everMine, ownerShort, filterChoices, handOffTargets, historyLines, inFlightDetail, matches, ownerLabel, rowNumber, sectionTasks, taskKind, taskSection, taskStatus } from "./model";
 
 const NOW = new Date("2026-11-13T15:00:00Z").getTime();
 const t = (patch: Partial<Task> = {}): Task => ({
   id: "task_1", title: "A task", why: "", owner: "patrick", state: "todo", kind: "do", options: [], needs: null, priority: "normal", conversation: null, project: null, area: null,
   timing: { due: null, trigger: { type: "none" }, snoozed: false }, attention: { queue: "queued", push: false }, progress: { step: null, line: null }, workers: [], outputs: [],
-  source: null, parentId: null, schedule: null, card: null, stale: false, origin: "task", createdAt: NOW, updatedAt: NOW, closedAt: null, closedBy: null, ...patch,
+  source: null, parentId: null, schedule: null, card: null, automation: null, stale: false, origin: "task", createdAt: NOW, updatedAt: NOW, closedAt: null, closedBy: null, ...patch,
 });
 const names = { bot: "Chief of Staff", leads: new Map([["thr_lead", "Larkspur lead"]]), threads: [{ owner: "thread:thr_w", name: "Fix the flaky test", threadId: "thr_w" }] };
 
@@ -122,4 +122,16 @@ it("writes one history line per choice, and marks updates that came after the ta
     { type: "progress", at: 30, data: JSON.stringify({ step: "5/5", line: "Back on it", kept: true }) },
   ], names);
   expect(lines.map((l) => l.text)).toEqual(["5/5 · Back on it (after it was closed)", "You chose Taco Lab", "You chose Short", "You handed it to Fix the flaky test"]);
+});
+
+it("names a watcher's repeats and clearing in history, and a recurring task's kind", () => {
+  const lines = historyLines([
+    { type: "found_again", at: NOW, data: JSON.stringify({ count: 2, line: "Spend $5.61 today" }) },
+    { type: "cleared", at: NOW, data: "{}" },
+  ], names);
+  expect(lines.map((l) => l.text)).toEqual(["Cleared: the watcher stopped finding it", "Found again (2 times in all): Spend $5.61 today"]);
+  const link = { id: "run_1", kind: "runner" as const, role: "schedule" as const, thread: null, keys: [], count: 0, lastAt: null, mode: null, clearedAt: null };
+  expect(taskKind(t({ automation: link }))).toEqual({ label: "Runner", icon: "Repeat" });
+  expect(taskKind(t({ automation: { ...link, role: "run" } }))).toEqual({ label: "Run", icon: "Repeat" });
+  expect(taskStatus(t({ owner: "cos", state: "waiting", automation: link, schedule: { text: "Daily", cron: null, timeZone: null, automationId: "run_1", paused: true } })).label).toBe("Paused");
 });

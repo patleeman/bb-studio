@@ -7,7 +7,7 @@ export function taskFromLoop(loop) {
     options: loop.options ?? [], needs: null, priority: loop.priority ?? "normal", conversation: null, project: null, area: loop.area ?? null,
     timing: { due: loop.due ?? null, trigger: loop.trigger ?? { type: "none" }, snoozed: loop.status === "snoozed" },
     attention: { queue, push: loop.push ?? false }, progress: { step: null, line: null }, workers: [], outputs: [], source: loop.source ?? null,
-    parentId: null, schedule: null, card: null, stale: false, origin: "loop",
+    parentId: null, schedule: null, card: null, automation: null, stale: false, origin: "loop",
     createdAt: loop.createdAt, updatedAt: loop.updatedAt, closedAt: closed ? loop.closedAt ?? loop.updatedAt : null, closedBy: closed ? loop.closedBy ?? "cos" : null,
   };
 }

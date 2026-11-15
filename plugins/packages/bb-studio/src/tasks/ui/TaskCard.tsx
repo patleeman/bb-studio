@@ -105,7 +105,9 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
   const openThread = threadToOpen ? () => navigate.toThread(threadToOpen) : undefined;
   const due = task.timing.due !== null ? dueLabel(task.timing.due, now, zone) : null;
   const trigger = open && mine && task.timing.trigger.type !== "none" && !due ? triggerLabel(task.timing.trigger, now, null, zone) : null;
-  const step = open ? task.progress.step : null;
+  const recurring = task.automation?.role === "schedule";
+  const found = task.automation?.role === "finding" && task.automation.count > 1 ? `Found ${task.automation.count} times` : null;
+  const step = recurring ? task.schedule?.text ?? null : found ?? (open ? task.progress.step : null);
   const lines = historyLines(history, names);
   const targets = handOffTargets(task, people.targets, threads, people.botThreadId);
   const choose = (option: string) => void act({ id: task.id, action: "choose", option });
@@ -117,7 +119,9 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
   const takeBack = <button type="button" data-testid="task-take-back" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: task.id, action: "take_back" })}><Icon name="ArrowTurnBackward" />{task.origin === "loop" || everMine(history) ? "Take back" : "Take over"}</button>;
   const openButton = openThread ? <button type="button" data-testid="task-open-thread" className={CARD_GHOST} onClick={openThread}><Icon name="MessageSquare" />{task.owner === "cos" && !task.workers.length ? "Open chat" : "Open thread"}</button> : null;
   let actions: ReactNode;
-  if (closed) {
+  if (recurring) {
+    actions = openButton;
+  } else if (closed) {
     actions = <>
       {task.closedBy === null || task.closedBy === USER_OWNER
         ? <button type="button" data-testid="task-undo" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: task.id, action: "reopen" })}><Icon name="ArrowTurnBackward" />Undo</button>
@@ -188,6 +192,20 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
                 <span className="min-w-0 text-muted-foreground">{line.text}</span>
               </li>
             ))}
+          </ol>
+        ) : null}
+        {view.runs?.length ? (
+          <ol data-testid="task-runs" aria-label="Latest runs" className="flex flex-col gap-1 border-t border-border/70 pt-2 text-xs">
+            {view.runs.map((run) => {
+              const runStatus = taskStatus(run);
+              return (
+                <li key={run.id} data-testid="task-run" data-task-id={run.id} data-state={runStatus.id} className="flex min-w-0 items-baseline gap-2">
+                  <span className="w-16 shrink-0 tabular-nums text-subtle-foreground">{shortWhen(run.createdAt, now, zone)}</span>
+                  <span className={cn("shrink-0", TONE[runStatus.tone])}>{run.automation?.role === "finding" ? `Finding · ${runStatus.label}` : runStatus.label}</span>
+                  <span className="min-w-0 truncate text-muted-foreground">{run.automation?.role === "finding" ? run.title : run.progress.line ?? ""}</span>
+                </li>
+              );
+            })}
           </ol>
         ) : null}
         {view.todo && mine && open && now - task.updatedAt > STALE_MS ? (

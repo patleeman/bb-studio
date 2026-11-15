@@ -57,7 +57,7 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
       timing: { due: x.due ?? null, trigger: trigger ?? { type: "none" }, snoozed: false }, attention: { queue: toUser && x.card ? "surfaced" : null, push: x.push ?? false },
       progress: { step: x.step ?? null, line: x.line ?? null }, workers: x.workers ?? [], outputs: x.outputs ?? [], source: x.source ?? null,
       parentId: x.parentId ?? null, schedule: x.schedule ?? null, card: x.card ? { kind: "task", messageId: null, messageSeq: null, dismissedAt: null } : null,
-      stale: false, origin: "task", createdAt: now, updatedAt: now, closedAt: null, closedBy: null,
+      automation: null, stale: false, origin: "task", createdAt: now, updatedAt: now, closedAt: null, closedBy: null,
     };
     surfaceForUser(task);
     const saved = store.save(task);

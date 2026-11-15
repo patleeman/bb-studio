@@ -67,12 +67,13 @@ export class UserTasks {
   async view(id: string): Promise<TaskView> {
     const task = this.store.get(id);
     const history = this.store.history(id);
-    return { task, history, todo: inLoopView(task), threads: await this.names([task], history) };
+    const runs = task.automation?.role === "schedule" ? this.store.rows("SELECT record FROM tasks WHERE parent_id = ? ORDER BY created_at DESC, id LIMIT 10", id) : null;
+    return { task, history, todo: inLoopView(task), threads: await this.names([task, ...(runs ?? [])], history), ...(runs ? { runs } : {}) };
   }
 
   async list() {
     const since = this.store.now() - DONE_LIST_MS;
-    const tasks = this.store.all().filter((t) => !isClosed(t) || (t.closedAt ?? 0) > since);
+    const tasks = this.store.all().filter((t) => (!isClosed(t) || (t.closedAt ?? 0) > since) && !(t.automation?.role === "run" && t.owner !== USER_OWNER));
     return { tasks, threads: await this.names(tasks), held: this.deps.held() };
   }
 

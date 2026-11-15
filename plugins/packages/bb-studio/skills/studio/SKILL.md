@@ -221,6 +221,20 @@ job, keep it updated, and hand it over instead of posting status messages.
   time still ahead), you are told to stop too.
 - `::loop{id="…"}` and `::work{id="…"}` both draw the same task card; a
   morning row is `::loop{id="…" row="N"}`.
+- Each check-in, runner and watcher is a recurring task (Tasks → Scheduled &
+  recurring, with its next run and last result). Each run of a check-in or
+  runner is a child task: its prompt names it. Hand it to the user with
+  `task_handoff` only when they must act; otherwise it closes by itself when
+  the run ends ([PASS] reads as "Nothing new"). A runner's `runner_report`
+  lands on its run; `urgent` hands the run to the user.
+- A watcher's finding is one task. Its repeats update that task quietly (no
+  new post, no new wake-up) and it closes once the watcher stops finding it
+  for 30 hours. Leave it open while the problem lasts. Lines are compared
+  without their numbers, so "$5.42" and "$5.61" are the same finding. A
+  script can end with one JSON line to steer this: `{"key": "…"}` names the
+  finding, `{"clear": true}` (or a list of keys) closes them,
+  `{"owner": "thread:<id>"}` gives a new one to a lead, `{"each": true}`
+  makes every output a new run.
 - The older names keep working: `todos_*` and `loops_*` for the user's tasks,
   `work_card_*` for a card.
 
