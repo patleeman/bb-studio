@@ -7,8 +7,8 @@ import { registerWorkCards } from "../work/register";
 import { registerTasks } from "./register";
 import { tasksContract } from "./rpc-contract";
 import { guardTasks, markTasksUnavailable } from "./store";
-import { handedBy, inFlightOrder, registerUserTasks } from "./user";
-import { isClosed, type Task } from "./contract";
+import { handedBy, inFlightOrder, phoneActs, registerUserTasks } from "./user";
+import type { Task } from "./contract";
 
 const NOW = new Date("2026-11-13T15:00:00Z").getTime();
 let db: Database.Database;
@@ -49,12 +49,7 @@ function setup({ sendFails = false } = {}) {
     snoozeLoopUntil: (id, at) => loops.store.update(id, { status: "snoozed", trigger: { type: "time", at } }),
     held: () => loops.scheduler.held(),
   });
-  loops.routeActs(async (x) => {
-    const task = loops.store.tasks.find(x.id);
-    if (!task || task.owner !== "patrick" || isClosed(task) || !handedBy(loops.store.history(x.id))) return null;
-    await user.act({ id: x.id, action: x.action as "choose", ...(x.option ? { option: x.option } : {}) });
-    return loops.store.get(x.id);
-  });
+  loops.routeActs(phoneActs(user));
   const tool = async (name: string, input: unknown, threadId = "thr_worker") => JSON.parse(await tools[name]!.execute(input, { threadId }));
   return { handlers, tools, posts, sent, loops, agent, user, tool };
 }
@@ -375,4 +370,31 @@ it("Done then Undo on a decision an agent asked keeps its options and its place 
   await handlers["tasks.act"]!({ id: task.id, action: "done" });
   const back = await handlers["tasks.act"]!({ id: task.id, action: "reopen" });
   expect(back.task).toMatchObject({ owner: "patrick", state: "waiting", kind: "decide", options: ["Taco Lab", "Noodle Bar"], needs: "Which venue?", attention: { queue: "surfaced" } });
+});
+
+it("an older phone's push buttons work on a work card's task: loops.get reads it, and loops.act choose, done and snooze go through", async () => {
+  const { handlers, tools, sent } = setup();
+  const made = JSON.parse(await tools.work_card_create!.execute({ title: "Release 2.1", kind: "release" }, { threadId: "thr_main" }));
+  await tools.task_handoff!.execute({ id: made.id, to: "user", needs: "Ship today or Monday?", options: ["Today", "Monday"] }, { threadId: "thr_worker" });
+  expect((await handlers["loops.get"]!({ id: made.id })).loop).toMatchObject({ id: made.id, title: "Release 2.1", owner: "patrick", kind: "decide", options: ["Today", "Monday"] });
+  const snoozed = await handlers["loops.act"]!({ id: made.id, action: "snooze", snooze: "tonight" });
+  expect(snoozed).toMatchObject({ id: made.id, owner: "patrick" });
+  const chose = await handlers["loops.act"]!({ id: made.id, action: "choose", option: "Monday" });
+  expect(chose).toMatchObject({ id: made.id, owner: "thread:thr_main", status: "in_progress" });
+  expect(sent.at(-1)).toEqual({ threadId: "thr_main", text: expect.stringMatching(/chose "Monday"/) });
+  const other = JSON.parse(await tools.work_card_create!.execute({ title: "Release 2.2", kind: "release", state: "needs-you", needs: "Touch the key" }, { threadId: "thr_main" }));
+  const done = await handlers["loops.act"]!({ id: other.id, action: "done" });
+  expect(done).toMatchObject({ id: other.id, status: "done" });
+  await expect(handlers["loops.get"]!({ id: "wc_missing" })).rejects.toThrow(/not found/i);
+});
+
+it("an older phone's push buttons work on task_ ids, in the todo list or not", async () => {
+  const { handlers, tool, sent } = setup();
+  const { task } = await tool("task_create", { title: "Pick a provider", owner: "me", card: true, conversation: "thr_lead" });
+  await tool("task_handoff", { id: task.id, to: "user", options: ["Backblaze", "Wasabi"] });
+  expect(await handlers["loops.act"]!({ id: task.id, action: "choose", option: "Wasabi" })).toMatchObject({ owner: "thread:thr_worker", status: "in_progress" });
+  expect(sent.at(-1)).toEqual({ threadId: "thr_worker", text: expect.stringMatching(/chose "Wasabi"/) });
+  const { task: plain } = await tool("task_create", { title: "Renew the domain", owner: "user" });
+  expect(await handlers["loops.act"]!({ id: plain.id, action: "snooze", snooze: "tonight" })).toMatchObject({ status: "snoozed" });
+  expect(await handlers["loops.act"]!({ id: plain.id, action: "done" })).toMatchObject({ status: "done" });
 });

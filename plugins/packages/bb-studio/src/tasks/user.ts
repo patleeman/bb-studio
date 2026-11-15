@@ -8,7 +8,8 @@ import { SHOW_FINISHED_MS } from "../work/shared";
 import { isClosed, needsYou, USER_OWNER, type Task, type TaskEvent } from "./contract";
 import { tasksContract, type TaskActInput, type TaskView } from "./rpc-contract";
 import { guardTasks, TaskStore } from "./store";
-import { inLoopView } from "./views";
+import { inLoopView, toLoop } from "./views";
+import type { Loop } from "../loops/contract";
 
 type ThreadInfo = z.infer<typeof ownerInfo>;
 type ThreadLike = Parameters<typeof threadOwner>[1];
@@ -216,6 +217,27 @@ export class UserTasks {
     }
     return { task, note };
   }
+}
+
+type PhoneAct = z.infer<typeof loopAct>;
+
+export function phoneActs(tasks: UserTasks): (x: PhoneAct) => Promise<Loop | null> {
+  const store = tasks.store;
+  return async (x) => {
+    const task = store.find(x.id);
+    if (!task) return null;
+    if (!inLoopView(task)) {
+      if (x.action === "snooze" || x.action === "nudge" || x.action === "keep") {
+        store.event(x.id, x.action === "snooze" ? "snoozed" : "acted", { action: x.action, by: USER_OWNER, ...(x.snooze ? { snooze: x.snooze } : {}) });
+        return toLoop(store.get(x.id));
+      }
+      await tasks.act({ id: x.id, action: x.action === "hand_off" ? "hand_off" : x.action, ...(x.option ? { option: x.option } : {}), ...(x.owner && /^(cos|thread:.+)$/.test(x.owner) ? { to: x.owner } : {}) });
+      return toLoop(store.get(x.id));
+    }
+    if (!["choose", "done", "drop", "got_it"].includes(x.action) || task.owner !== USER_OWNER || isClosed(task) || !handedBy(store.history(x.id))) return null;
+    await tasks.act({ id: x.id, action: x.action as "choose" | "done" | "drop" | "got_it", ...(x.option ? { option: x.option } : {}) });
+    return toLoop(store.get(x.id));
+  };
 }
 
 export function registerUserTasks(bb: BbPluginApi, db: Database.Database, deps: UserTaskDeps) {

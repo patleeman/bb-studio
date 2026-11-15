@@ -1,6 +1,5 @@
 import { registerWorkCards, WORK_TOOLS } from "./src/work/register";
-import { handedBy, registerUserTasks } from "./src/tasks/user";
-import { isClosed as isTaskClosed } from "./src/tasks/contract";
+import { phoneActs, registerUserTasks } from "./src/tasks/user";
 import { handoffPush, loopPushInput } from "./src/tasks/handoff-push";
 import { registerTasks, TASK_TOOLS } from "./src/tasks/register";
 import { adoptAtStart } from "./src/tasks/migrate";
@@ -715,12 +714,7 @@ export default async function plugin(bb: BbPluginApi) {
     snoozeLoopUntil: (id, at) => loops.store.update(id, { status: 'snoozed', trigger: { type: 'time', at } }),
     held: () => loops.scheduler.held(),
   });
-  loops.routeActs(async (x) => {
-    const task = loops.store.tasks.find(x.id);
-    if (!task || task.owner !== 'patrick' || isTaskClosed(task) || !handedBy(loops.store.history(x.id))) return null;
-    await userTasks.act({ id: x.id, action: x.action as 'choose' | 'done' | 'drop' | 'got_it', ...(x.option ? { option: x.option } : {}) });
-    return loops.store.get(x.id);
-  });
+  loops.routeActs(phoneActs(userTasks));
   const automationTasks = new AutomationTasks(new TaskStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); }), {
     sources: () => readSources(db, bots.list().map((bot) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, heartbeatKey: bots.heartbeatKey(bot.id) }))),
     log: (message) => bb.log.warn(message),
