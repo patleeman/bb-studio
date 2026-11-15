@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { WorkCard } from "../contract";
 
 const NOW = new Date("2026-11-13T15:00:00Z").getTime();
-const card = (patch: Partial<WorkCard> = {}): WorkCard => ({ id: "wc_1", threadId: "thr_main", title: "Release 1.0.2", kind: "release", state: "running", step: "2/5 Sign", line: "Notarizing the DMG", needs: null, workerThreadId: null, messageId: "m_1", messageSeq: 41, createdAt: NOW - 60_000, updatedAt: NOW - 60_000, finishedAt: null, ...patch });
+const card = (patch: Partial<WorkCard> = {}): WorkCard => ({ id: "wc_1", threadId: "thr_main", title: "Release 1.0.2", kind: "release", state: "running", step: "2/5 Sign", line: "Notarizing the DMG", needs: null, workerThreadId: null, messageId: "m_1", messageSeq: 41, createdAt: NOW - 60_000, updatedAt: NOW - 60_000, finishedAt: null, stale: false, dismissedAt: null, ...patch });
 const state = vi.hoisted(() => ({
   get: null as WorkCard | null,
   getError: null as string | null,
@@ -113,4 +113,15 @@ it("ignores a bad id and says when the card was removed", async () => {
   state.get = null; state.getError = "Work card wc_1 not found";
   await renderCard();
   expect(text()).toBe("This work card was removed.");
+});
+
+it("says a card whose worker ended without a final update has ended, never Running", async () => {
+  state.get = card({ state: "done", stale: true, finishedAt: NOW, line: "Halfway through the tests" });
+  await renderCard();
+  expect(q('[data-testid="work-card"]')!.dataset.stale).toBe("true");
+  expect(q('[data-testid="work-state"]')!.textContent).toBe("Ended without a final update");
+  expect(q('[data-testid="state-ended"]')).not.toBeNull();
+  expect(q('[data-testid="work-line"]')!.textContent).toBe("Halfway through the tests");
+  expect(q('[data-testid="work-step"]')).toBeNull();
+  expect(text()).not.toContain("Running");
 });

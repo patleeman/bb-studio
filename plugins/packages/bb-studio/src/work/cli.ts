@@ -2,13 +2,13 @@ import { parseFlags, usage } from "../kit/cli";
 import { changes, createInput, type WorkCard } from "./contract";
 import type { registerWorkCards } from "./register";
 
-export const WORK_USAGE = "bb studio work <create|update|show|list> …\n  create --title <text> [--kind worker|lead|release|todo|task] [--state <state>] [--step <text>] [--line <text>] [--needs <text>] [--thread <thr_…>] [--worker <thr_…>]\n  update <wc_…> [--state running|waiting|needs-you|done|failed] [--step <text>] [--line <text>] [--needs <text>] [--title <text>]\n  show <wc_…>\n  list [--thread <thr_…>]\n  Add --json for JSON.";
+export const WORK_USAGE = "bb studio work <create|update|show|list|dismiss|clear> …\n  create --title <text> [--kind worker|lead|release|todo|task] [--state <state>] [--step <text>] [--line <text>] [--needs <text>] [--thread <thr_…>] [--worker <thr_…>]\n  update <wc_…> [--state running|waiting|needs-you|done|failed] [--step <text>] [--line <text>] [--needs <text>] [--title <text>]\n  show <wc_…>\n  list [--thread <thr_…>]\n  dismiss <wc_…>\n  clear [--thread <thr_…>]\n  Add --json for JSON.";
 
 type Result = { exitCode: number; stdout?: string; stderr?: string };
 type Work = ReturnType<typeof registerWorkCards>;
 
 export function workLine(card: WorkCard): string {
-  const parts = [card.id, card.state, card.title, card.step, card.line, card.state === "needs-you" ? card.needs : null].filter((part): part is string => !!part);
+  const parts = [card.id, card.stale ? "ended" : card.state, card.title, card.step, card.line, card.state === "needs-you" ? card.needs : null].filter((part): part is string => !!part);
   return parts.join("\t");
 }
 
@@ -46,6 +46,18 @@ export async function runWorkCli(argv: readonly string[], work: Work, ctx: { thr
         if (!threadId) return { exitCode: 1, stderr: "Pass --thread: the conversation whose cards to list.\n" };
         const { cards } = await work.list(threadId);
         return out(cards, cards.length ? cards.map(workLine).join("\n") : "No work in flight.");
+      }
+      case "dismiss": {
+        const id = positional[0];
+        if (!id) return usage(WORK_USAGE);
+        const card = work.store.dismiss(id);
+        return out(card, workLine(card));
+      }
+      case "clear": {
+        const threadId = values.thread || ctx.threadId;
+        if (!threadId) return { exitCode: 1, stderr: "Pass --thread: the conversation whose finished cards to clear.\n" };
+        const cleared = work.store.clearFinished(threadId);
+        return out({ cleared }, `Cleared ${cleared} finished ${cleared === 1 ? "card" : "cards"}.`);
       }
       default:
         return usage(WORK_USAGE);
