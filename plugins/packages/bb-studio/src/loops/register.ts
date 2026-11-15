@@ -5,6 +5,7 @@ import { rpcContract, add, act, update, filters, ownerInfo, type Loop } from './
 import { LoopStore, placeKey } from './store';
 import { assertTasksReady, guardTasks } from '../tasks/store';
 import { isClosed as isTaskClosed } from '../tasks/contract';
+import { inLoopView, toLoop } from '../tasks/views';
 import { LoopScheduler, defaults, snooze, systemTimeZone } from './scheduler';
 /** The lock-screen actions a todo's push offers, by kind (the app's BB_LOOP categories). */
 export function loopPushActions(kind:Loop['kind']):('done'|'snooze'|'got_it'|'choose')[]{return kind==='read'?['got_it','snooze']:kind==='decide'?['choose','snooze']:['done','snooze'];}
@@ -36,13 +37,13 @@ export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:str
  const owner=async(id:string):Promise<z.infer<typeof ownerInfo>|null>=>{if(!id.startsWith('thread:'))return null;const threadId=id.slice('thread:'.length);return threadOwner(id,await bb.sdk.threads.get({threadId}).catch(()=>null) as ThreadLike|null);};
  const list=async(x:z.infer<typeof filters>)=>{const g=store.groups(x);const ids=new Set([...g.needsYouNow,...g.comingUp,...g.agentsOnIt,...g.waitingOnOthers,...g.done].map(l=>l.owner));return {...g,held:scheduler.held(),areas:store.areas(),owners:(await Promise.all([...ids].map(owner))).filter((o):o is z.infer<typeof ownerInfo>=>!!o)};};
  let route:((x:z.infer<typeof act>)=>Promise<Loop|null>)|null=null;
- const action=async(x:z.infer<typeof act>)=>{if(route&&['choose','done','drop','got_it'].includes(x.action)){const routed=await route(x);if(routed)return routed;}return direct(x);};
+ const action=async(x:z.infer<typeof act>)=>{if(route){const routed=await route(x);if(routed)return routed;}return direct(x);};
  const direct=async(x:z.infer<typeof act>)=>{const l=store.act(x,p=>snooze(p,config));if(x.action==='nudge')await post(`Todo ${l.id}: nudge. Draft the nudge message and show it to the user in this chat for approval. Do not send it until they approve.`);else if(['hand_off','choose'].includes(x.action))await post(`Todo ${l.id}: ${x.action}. ${x.option??''} Owner: ${ownerText(l.owner)}. Use todos_list to review and carry out the next step.`);return l;};
  const change=(x:z.infer<typeof update>)=>store.update(x.id,{...x.changes,...(x.surfaceNow?{status:'queued' as const,trigger:{type:'none' as const}}:{})});
  // A spoken line becomes a draft todo the Bot fills in.
  const addLine=async(text:string)=>{const l=store.add({title:text,status:'in_progress',owner:'cos'});await post(`Fill in draft todo ${l.id} from this typed line using todos_update, then queue it: ${JSON.stringify(text)}`);return l;};
  const addTyped=(text:string)=>{const l=store.add({title:text,status:'surfaced',owner:'patrick'});store.event(l.id,'added_by_you');return l;};
- const get=async(id:string)=>{const l=store.get(id),o=await owner(l.owner);return {loop:l,history:store.history(id),...(o?{owner:o}:{})};};
+ const get=async(id:string)=>{const t=store.tasks.find(id);const l=t&&!inLoopView(t)?toLoop(t):store.get(id),o=await owner(l.owner);return {loop:l,history:store.history(id),...(o?{owner:o}:{})};};
  bb.rpc.register(rpcContract,guardTasks(db,{
  'loops.list':list,'loops.get':({id})=>get(id),
  'loops.add':({text})=>addTyped(text),
