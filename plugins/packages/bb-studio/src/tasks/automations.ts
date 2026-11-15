@@ -24,7 +24,6 @@ export type WatcherPlan = { post: string; note: string; taskId: string };
 export type SyncReport = { created: number; updated: number; closed: number; backup: string | null; backupError?: string };
 
 export const CLEAR_AFTER_MS = 30 * 3_600_000;
-export const SETTLE_AFTER_MS = 2_000;
 export const KEEP_RUNS = 20;
 export const KEEP_RUN_DAYS_MS = 14 * 86_400_000;
 const LINE_MAX = 300;
@@ -277,7 +276,7 @@ export class AutomationTasks {
   settle(threadId: string, text: string | null | undefined, status: "succeeded" | "failed"): number {
     const now = this.now();
     const runs = this.store.rows("SELECT record FROM tasks WHERE parent_id IS NOT NULL AND closed_at IS NULL AND json_extract(record, '$.automation.role') = 'run' ORDER BY created_at, id")
-      .filter((t) => t.automation?.role === "run" && t.automation.thread === threadId && now - t.createdAt >= SETTLE_AFTER_MS);
+      .filter((t) => t.automation?.role === "run" && t.automation.thread === threadId && t.createdAt <= now);
     let settled = 0;
     for (const run of runs) {
       if (run.owner === USER_OWNER) {
@@ -304,7 +303,7 @@ export class AutomationTasks {
       return null;
     }
     this.store.change(run.id, (t) => {
-      t.owner = USER_OWNER; t.state = "waiting"; t.needs = line; t.progress.line = line; t.attention.queue = "surfaced";
+      t.owner = USER_OWNER; t.state = "waiting"; t.needs = line; t.progress.line = null; t.attention.queue = "surfaced"; t.title = clip(`${src.name}: ${line}`, 160);
     }, src.owner);
     this.store.event(run.id, "handed_to_you", { by: src.owner });
     this.setParent(parent.id, (_, p) => { p.progress.line = clip(`Needs you: ${line}`); });

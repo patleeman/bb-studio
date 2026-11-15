@@ -241,5 +241,6 @@ it("a recurring task shows its schedule, Active or Paused, its latest runs and f
   expect(card().dataset.state).toBe("paused");
   put(finding);
   await render("loop", { id: "task_find1" });
-  expect(card().textContent).toContain("Finding · Found 3 times");
+  expect(card().querySelector('[data-testid="task-found"]')!.textContent).toBe("· Found 3 times");
+  expect(card().textContent).toContain("Finding");
 });

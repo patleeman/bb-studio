@@ -170,13 +170,25 @@ it("a check-in run is a child task the Bot owns; it closes quietly when the Bot'
   expect(started.prompt).toContain(`This run is task ${run!.id}.`);
   expect(started.prompt).toContain('task_handoff (to "user"');
   expect(store.get("task_auto-aut-daily").automation).toMatchObject({ count: 1, lastAt: NOW });
-  expect(tasks.settle("thr_main", "[PASS]", "succeeded")).toBe(0);
-  at(NOW + 90_000);
+  at(NOW + 680);
   expect(tasks.settle("thr_main", "[PASS]", "succeeded")).toBe(1);
   expect(store.get(run!.id)).toMatchObject({ state: "done", progress: { line: "Nothing new" }, closedBy: "cos" });
   expect(store.get("task_auto-aut-daily").progress.line).toBe("Nothing new");
   expect(posts).toEqual([]);
   expect(sent).toEqual([]);
+});
+
+it("a run that ends at once keeps its own result, and the next run's turn doesn't close it with its text", () => {
+  seed();
+  const { store, tasks } = setup();
+  tasks.started({ owner: "automation", ownerId: "aut_daily" }, "thr_main");
+  at(NOW + 680);
+  tasks.settle("thr_main", "[PASS]", "succeeded");
+  at(NOW + 60_000);
+  tasks.started({ owner: "automation", ownerId: "aut_daily" }, "thr_main");
+  at(NOW + 65_000);
+  tasks.settle("thr_main", "Handed off: the dentist date needs your pick.", "succeeded");
+  expect(children(store, "aut_daily").map((t) => t.progress.line)).toEqual(["Nothing new", "Handed off: the dentist date needs your pick."]);
 });
 
 it("a run's reply becomes its result; a failed run is Failed; the next run closes one left open", () => {
@@ -210,7 +222,7 @@ it("a check-in run that needs the user moves to them (Today and its card) and st
   tasks.started({ owner: "automation", ownerId: "aut_daily" }, "thr_main");
   const run = children(store, "aut_daily")[0]!;
   const out = await tool("task_handoff", { id: run.id, to: "user", needs: "Approve the Kensico budget raise" }, "thr_main");
-  expect(out.task).toMatchObject({ owner: "patrick", state: "waiting", attention: { queue: "surfaced" } });
+  expect(out.task).toMatchObject({ owner: "patrick", state: "waiting", title: "Daily check-in: Approve the Kensico budget raise", attention: { queue: "surfaced" } });
   expect(posts).toEqual([`Please post this card in your chat exactly once: ::loop{id="${run.id}"}`]);
   expect(loops.store.get(run.id)).toMatchObject({ status: "surfaced", owner: "patrick" });
   at(NOW + 60_000);
@@ -232,7 +244,7 @@ it("a runner's report lands on its run: log and tell close it quietly, urgent ha
   const note = tasks.report("run_staff", "thr_staff", "urgent", "The card was charged twice; call the bank today.");
   const urgent = children(store, "run_staff")[2]!;
   expect(note).toBe(URGENT_RUN_NOTE(urgent.id));
-  expect(urgent).toMatchObject({ owner: "patrick", state: "waiting", needs: "The card was charged twice; call the bank today.", attention: { queue: "surfaced" } });
+  expect(urgent).toMatchObject({ owner: "patrick", state: "waiting", title: "Staff: The card was charged twice; call the bank today.", needs: "The card was charged twice; call the bank today.", progress: { line: null }, attention: { queue: "surfaced" } });
   expect(loops.store.get(urgent.id).status).toBe("surfaced");
   expect(store.history(urgent.id).map((e) => e.type)).toContain("handed_to_you");
   expect(store.get("task_auto-run-staff").progress.line).toBe("Needs you: The card was charged twice; call the bank today.");
@@ -254,7 +266,7 @@ it("quiet runs fold away: the Tasks list and the phone's todo list leave them ou
   const listed = (await handlers["tasks.list"]!({})).tasks as Task[];
   expect(listed.filter((t) => t.automation?.role === "run").map((t) => t.owner)).toEqual(["patrick"]);
   expect(listed.filter((t) => t.automation?.role === "schedule")).toHaveLength(5);
-  expect(loops.store.all().filter((l) => l.id.startsWith("task_")).map((l) => l.title)).toEqual([expect.stringMatching(/^Staff · /)]);
+  expect(loops.store.all().filter((l) => l.id.startsWith("task_")).map((l) => l.title)).toEqual(["Staff: Act now"]);
   at(NOW + 40 * 86_400_000);
   expect(tasks.prune()).toBe(5);
   expect(children(store, "aut_daily")).toHaveLength(KEEP_RUNS);

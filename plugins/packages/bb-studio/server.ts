@@ -4,7 +4,7 @@ import { isClosed as isTaskClosed } from "./src/tasks/contract";
 import { registerTasks, TASK_TOOLS } from "./src/tasks/register";
 import { adoptAtStart } from "./src/tasks/migrate";
 import { AutomationTasks, readSources } from "./src/tasks/automations";
-import { TaskStore, tasksUnavailable } from "./src/tasks/store";
+import { TaskStore, taskTitle, tasksUnavailable } from "./src/tasks/store";
 import { withToolLabel } from "./src/tool-labels";
 import { CONTINUE_TOOL, registerContinueNew } from "./src/continue-new";
 import { runWorkCli } from "./src/work/cli";
@@ -1336,7 +1336,7 @@ export default async function plugin(bb: BbPluginApi) {
     });
   };
   entryTitle = async (kind, id) => {
-    if (kind === "todo") { try { return loops.store.get(id).title; } catch { return null; } }
+    if (kind === "todo") { try { return loops.store.get(id).title; } catch { return taskTitle(db, id); } }
     if (kind === "record") return memoryService.store.get(id)?.topic ?? null;
     const ref = parseAutomationRefId(id);
     if (!ref || !bots.list().some((bot) => bot.id === ref.botId)) return null;

@@ -107,7 +107,7 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
   const trigger = open && mine && task.timing.trigger.type !== "none" && !due ? triggerLabel(task.timing.trigger, now, null, zone) : null;
   const recurring = task.automation?.role === "schedule";
   const found = task.automation?.role === "finding" && task.automation.count > 1 ? `Found ${task.automation.count} times` : null;
-  const step = recurring ? task.schedule?.text ?? null : found ?? (open ? task.progress.step : null);
+  const step = recurring ? task.schedule?.text ?? null : found ? null : open ? task.progress.step : null;
   const lines = historyLines(history, names);
   const targets = handOffTargets(task, people.targets, threads, people.botThreadId);
   const choose = (option: string) => void act({ id: task.id, action: "choose", option });
@@ -171,6 +171,7 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
           <span aria-hidden className="text-muted-foreground">·</span>
           <TaskGlyph glyph={status.glyph} stale={status.stale} label={status.label} />
           <span data-testid="task-state" className={cn("shrink-0", TONE[status.tone])}>{status.stale ? "Ended without a final update" : status.label}</span>
+          {found ? <span data-testid="task-found" className="shrink-0 text-muted-foreground">· {found}</span> : null}
           {task.progress.line ? <span data-testid="task-line" className="min-w-0 truncate text-muted-foreground">{task.progress.line}</span> : null}
         </div>
         {needsYou(task) && task.needs ? (

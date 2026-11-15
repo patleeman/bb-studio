@@ -140,6 +140,7 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
       t.state = toUser ? "waiting" : "in_progress";
       t.needs = x.needs ?? (toUser ? t.needs : null);
       if (x.options?.length) { t.options = x.options; t.kind = "decide"; }
+      if (toUser && x.needs && t.automation?.role === "run") t.title = `${t.title.split(" · ")[0]}: ${x.needs}`.slice(0, 160);
       if (x.line !== undefined) t.progress.line = x.line || null;
       if (toUser && inLoopView(t)) t.attention.queue = "surfaced";
     }, caller(ctx));
