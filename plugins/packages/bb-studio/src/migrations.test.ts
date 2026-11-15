@@ -160,6 +160,9 @@ describe("reminders become todos", () => {
     const before = db.prepare("SELECT * FROM bot_automations ORDER BY id").all();
     db.exec(MIGRATIONS[copy]!);
     db.exec(MIGRATIONS[copy]!);
+    for (const sql of MIGRATIONS.slice(copy + 1)) db.exec(sql);
+    const { migrateToTasks } = await import("./tasks/migrate");
+    expect(migrateToTasks(db).adopted.loops).toBe(4);
     const todos = new LoopStore(db).all().sort((a, b) => a.id.localeCompare(b.id));
     expect(todos.map((todo) => [todo.id, todo.title, todo.owner, todo.status, todo.trigger, todo.closedAt, todo.source])).toEqual([
       ["loop_reminder_aut_done", "Ops check", "thread:thr_ops", "done", { type: "time", at: 7_000 }, 7_100, { kind: "automation", ref: "aut_done" }],

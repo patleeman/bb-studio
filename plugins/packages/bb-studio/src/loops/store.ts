@@ -2,22 +2,25 @@ import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { add, loop, type Loop, act } from './contract';
 import type { z } from 'zod';
+import { TaskStore } from '../tasks/store';
+import { applyLoop, inLoopView, taskFromLoop, toLoop } from '../tasks/views';
 /** A place trigger's key: the place name in lower case, as `place:<key>:arrive` events carry it. */
 export const placeKey=(name:string)=>name.trim().toLowerCase();
 /** Queued or snoozed: the todo waits for its trigger, whoever owns it. */
 export const waitsForTrigger=(l:Pick<Loop,'status'|'closedAt'>)=>!l.closedAt&&(l.status==='queued'||l.status==='snoozed');
 export class LoopStore {
- constructor(readonly db:Database.Database,readonly changed:()=>void=()=>{}) {}
- all():Loop[] { return this.db.prepare('SELECT record FROM bot_loops').all().map((r:any)=>loop.parse(JSON.parse(r.record))); }
- get(id:string):Loop { const r=this.db.prepare('SELECT record FROM bot_loops WHERE id=?').get(id) as any; if(!r)throw Error('Todo not found'); return loop.parse(JSON.parse(r.record)); }
+ readonly tasks:TaskStore;
+ constructor(readonly db:Database.Database,readonly changed:()=>void=()=>{}) { this.tasks=new TaskStore(db,changed); }
+ all():Loop[] { return this.tasks.all().filter(inLoopView).map(toLoop); }
+ get(id:string):Loop { const t=this.tasks.find(id); if(!t||!inLoopView(t))throw Error('Todo not found'); return toLoop(t); }
  save(l:Loop):Loop { l=loop.parse(l);
  if(l.trigger.type==='place'&&l.trigger.place)l={...l,trigger:{...l.trigger,place:placeKey(l.trigger.place)}};
  const t=l.trigger;if(t.type==='time'&&!Number.isFinite(t.at)||t.type==='event'&&!t.event||t.type==='place'&&(!t.place||!t.direction))throw Error('Trigger fields are incomplete');
  if(['done','dropped'].includes(l.status)&&!l.closedAt)l={...l,closedAt:Date.now(),closedBy:'cos'};
-  this.db.prepare('INSERT OR REPLACE INTO bot_loops VALUES (?,?)').run(l.id,JSON.stringify(l)); this.changed(); return l; }
+  const before=this.tasks.find(l.id); this.tasks.write(before&&inLoopView(before)?applyLoop(before,l):taskFromLoop(l)); this.changed(); return l; }
  add(input:z.infer<typeof add>):Loop { const x=add.parse(input), now=Date.now(); return this.save({why:'',source:null,kind:'do',options:[],owner:'patrick',trigger:{type:'none'},priority:'normal',push:false,status:'queued',due:null,area:null,...x,id:`loop_${randomUUID()}`,createdAt:now,updatedAt:now,closedAt:null,closedBy:null}); }
- event(id:string,type:string,data:unknown={}) { this.db.prepare('INSERT INTO loop_events(loop_id,type,at,data) VALUES (?,?,?,?)').run(id,type,Date.now(),JSON.stringify(data)); }
- history(id:string) { return this.db.prepare('SELECT type,at,data FROM loop_events WHERE loop_id=? ORDER BY seq').all(id) as {type:string;at:number;data:string}[]; }
+ event(id:string,type:string,data:unknown={}) { this.tasks.event(id,type,data); }
+ history(id:string) { return this.tasks.history(id); }
  // An open status on a closed todo reopens it (Undo on Done).
  update(id:string,changes:Partial<z.infer<typeof add>>) { const cur=this.get(id),x=add.partial().parse(changes); const reopen=!!cur.closedAt&&!!x.status&&!['done','dropped'].includes(x.status); if(reopen)this.event(id,'reopened',{status:x.status}); return this.save({...cur,...x,...(reopen?{closedAt:null,closedBy:null}:{}),updatedAt:Date.now()}); }
  act(input:z.infer<typeof act>,snooze:(preset:string)=>Loop['trigger']):Loop { const x=act.parse(input); return this.db.transaction(()=>{let l=this.get(x.id); if(l.closedAt)return l;

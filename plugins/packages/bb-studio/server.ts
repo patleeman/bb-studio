@@ -1,4 +1,6 @@
 import { registerWorkCards, WORK_TOOLS } from "./src/work/register";
+import { registerTasks, TASK_TOOLS } from "./src/tasks/register";
+import { migrateToTasks } from "./src/tasks/migrate";
 import { withToolLabel } from "./src/tool-labels";
 import { CONTINUE_TOOL, registerContinueNew } from "./src/continue-new";
 import { runWorkCli } from "./src/work/cli";
@@ -201,6 +203,11 @@ export default async function plugin(bb: BbPluginApi) {
   };
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
+  try {
+    const moved = migrateToTasks(db);
+    if (moved.backup) bb.log.info(`Tasks: adopted ${moved.adopted.loops} todo(s) and ${moved.adopted.cards} work card(s); backup at ${moved.backup}.`);
+    for (const skipped of moved.skipped) bb.log.warn(`Tasks: ${skipped.source} ${skipped.id} was not adopted: ${skipped.reason}`);
+  } catch (error) { bb.log.warn(`Tasks: adopting todos and work cards failed; retrying at the next start: ${error instanceof Error ? error.message : String(error)}`); }
   const themes = new ThemeStore(db);
   // Pages and Apps: the item index (src/item-index.ts). Triggers keep it in
   // step; this check puts right whatever one missed, before anything reads it.
@@ -438,7 +445,7 @@ export default async function plugin(bb: BbPluginApi) {
       bot: bot ? bots.instructions(bot) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
       pages: !off.has("page"), minis: !off.has("mini"), appCards, work: true, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
     });
-    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
+    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...TASK_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
   }));
   /** Which conversation a Bot's session is in (src/bot-threads.ts conversationInstructions); "" before Studio has placed it. */
   const conversationNote = (threadId: string): string => {
@@ -679,17 +686,19 @@ export default async function plugin(bb: BbPluginApi) {
     const found = all.find((bot) => bot.id === fallback) ?? all.find((bot) => bot.primary) ?? all[0]!;
     return { id: found.id, name: found.name };
   };
-  const loops = registerLoops(bb, db, async (text) => {
+  const postToBot = async (text: string) => {
     const bot = bots.stored();
     if (!bot?.threadId || bot.state !== 'active') throw new Error('An active Bot chat is required');
     await bb.sdk.threads.send({threadId:bot.threadId,mode:'auto',input:[{type:'text',text,mentions:[],visibility:'agent-only'}]} as never);
-  }, async (loop) => {
+  };
+  const loops = registerLoops(bb, db, postToBot, async (loop) => {
     const bot = bots.stored();
     if (!bot?.threadId) throw new Error('A Bot chat is required');
     await bb.sdk.plugins.callRpc({pluginId:'mobile',method:'notify',outputSchema:z.unknown(),input:{title:loop.title,body:loop.why,kind:'turn-finished',threadId:bot.threadId,botId:bot.id,conversationId:bot.threadId,projectId:PERSONAL_PROJECT_ID,category:'BB_LOOP',loopId:loop.id,loopKind:loop.kind,actions:loopPushActions(loop.kind),...(loop.kind==='decide'&&loop.options.length?{options:loop.options.slice(0,4).map(o=>o.slice(0,120))}:{}),coalesceKey:loop.id} as never});
   }, settings, () => loopTimeZone(process.env, studioSettings.current().todosTimeZone), (name, everyMs, work) => triggers.every(name, everyMs, work));
   loopsEnabled = loops.enabled;
   const work = registerWorkCards(bb, db);
+  registerTasks(bb, db, postToBot);
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
   const runners: Runners = new Runners({
     db, sdk: bb.sdk, scheduler, changed: tagsChanged,
@@ -729,7 +738,7 @@ export default async function plugin(bb: BbPluginApi) {
   const automationBot = (botId?: string) => { const bot = bots.stored(botId); return bot ? { id: bot.id, name: bot.name, threadId: bot.threadId, state: bot.state, primary: bot.primary !== false, kind: bot.kind ?? "studio" } : null; };
   const automations: Automations = new Automations({
     db, sdk: bb.sdk, scheduler, changed: tagsChanged,
-    copiedReminder: (id) => loops.enabled() && !!db.prepare("SELECT 1 FROM bot_loops WHERE id = ?").get(reminderLoopId(id)),
+    copiedReminder: (id) => loops.enabled() && !!db.prepare("SELECT 1 FROM tasks WHERE id = ?").get(reminderLoopId(id)),
     bot: automationBot,
     // With bb's automations plugin off (a BB Studio copy), watchers run here and bb's rows are read from its data file (src/automation-table.ts).
     bbFile: () => bbFromFile(join(bb.server.experimental_dataDir, "plugins", "automations", "data.db")),

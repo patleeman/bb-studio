@@ -42,6 +42,7 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   db = new Database(":memory:");
   db.exec(MIGRATIONS.find((sql) => sql.includes("CREATE TABLE work_cards"))!);
+  db.exec(MIGRATIONS.find((sql) => sql.includes("CREATE TABLE tasks"))!);
   work = new WorkCardStore(db);
   spawned = [];
   recorded = [];

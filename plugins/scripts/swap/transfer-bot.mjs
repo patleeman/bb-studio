@@ -23,7 +23,7 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 /** The tables the mirror skips (plugin-sync SKIPPED_TABLES.studio) plus the Bot's memory and todos. */
-export const BOT_TABLE = /^(bots|bot_.+|memory_records|memory_profiles|loop_events|loop_scheduler|automation_.+|runner_.+|space_retired_automations)$/u;
+export const BOT_TABLE = /^(bots|bot_.+|memory_records|memory_profiles|loop_events|loop_scheduler|tasks|task_events|task_legacy|automation_.+|runner_.+|space_retired_automations)$/u;
 /** Never copied: credentials, per-server warnings, and suggestions rebuilt on the new server. */
 export const NEVER = new Set(["mini_secrets", "account_warnings", "next_suggestions"]);
 /** Rows here also belong to the new server's own threads; keep its rows and add or update the source's. */

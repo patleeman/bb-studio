@@ -1125,4 +1125,23 @@ export const MIGRATIONS = [
    WHERE source_kind = 'conversation' AND topic <> 'Conversations'
      AND source_id IN (SELECT thread_id FROM bot_finishes)
      AND length(topic) > 0 AND substr(trim(source_title), 1, length(topic)) = topic;`,
+  `CREATE TABLE tasks (
+       id TEXT PRIMARY KEY,
+       record TEXT NOT NULL,
+       owner TEXT NOT NULL,
+       state TEXT NOT NULL,
+       origin TEXT NOT NULL,
+       conversation TEXT,
+       parent_id TEXT,
+       created_at INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL,
+       closed_at INTEGER
+     );
+   CREATE INDEX tasks_conversation ON tasks (conversation, closed_at);
+   CREATE INDEX tasks_owner ON tasks (owner, state);
+   CREATE INDEX tasks_parent ON tasks (parent_id);
+   CREATE TABLE task_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL, type TEXT NOT NULL, at INTEGER NOT NULL, data TEXT NOT NULL);
+   CREATE INDEX task_events_task ON task_events (task_id, seq);
+   CREATE INDEX task_events_type ON task_events (type, at);
+   CREATE TABLE task_legacy (id TEXT PRIMARY KEY, source TEXT NOT NULL, adopted_at INTEGER NOT NULL);`,
 ];
