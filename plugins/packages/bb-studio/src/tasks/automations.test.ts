@@ -443,30 +443,34 @@ it("P1: the check-in prompt lists the open findings", () => {
   expect(tasks.started({ owner: "runner", ownerId: "run_staff" }, "thr_staff")!.prompt).not.toContain("Open watcher findings");
 });
 
-it("P1: a finding nobody touched for a day gets one agent-only nudge, and another only when its output changes", async () => {
+it("P1: an untouched finding gets one agent-only nudge a day at most, only when what it says changes, and none once its owner answered", async () => {
   seed();
   const nudges: { threadId: string; text: string }[] = [];
   const { store, tasks, tool } = setup({ nudge: async (threadId, text) => { nudges.push({ threadId, text }); } });
-  tasks.watcherRun("aut_silent", "Spend $5.10 today", null, NOW);
-  tasks.watcherRun("aut_silent", "Spend $5.20 today", null, NOW + 2 * HOUR);
-  expect(nudges).toEqual([]);
-  tasks.watcherRun("aut_silent", "Spend $5.30 today", null, NOW + 25 * HOUR);
-  await Promise.resolve();
-  expect(nudges).toEqual([{ threadId: "thr_main", text: expect.stringMatching(/^Watcher finding task task_.*still happening: found 3 times.*Latest output: Spend \$5\.30 today.*reply exactly \[PASS\]/s) }]);
-  tasks.watcherRun("aut_silent", "Spend $5.30 today", null, NOW + 27 * HOUR);
-  await Promise.resolve();
+  for (let h = 0; h <= 48; h++) {
+    at(NOW + h * HOUR);
+    tasks.watcherRun("aut_silent", `timeline-sync last succeeded ${h + 5}h ago`, null, NOW + h * HOUR);
+    await Promise.resolve();
+  }
   expect(nudges).toHaveLength(1);
-  tasks.watcherRun("aut_silent", "Spend $5.90 today", null, NOW + 29 * HOUR);
+  expect(nudges[0]).toEqual({ threadId: "thr_main", text: expect.stringMatching(/^Watcher finding task task_.*still happening: found 25 times.*Latest output: timeline-sync last succeeded 29h ago.*reply exactly \[PASS\]/s) });
+  at(NOW + 49 * HOUR);
+  tasks.watcherRun("aut_silent", 'timeline-sync is failing: auth refused\n{"key": "timeline-sync last succeeded h ago"}', null, NOW + 49 * HOUR);
   await Promise.resolve();
   expect(nudges).toHaveLength(2);
+  expect(nudges[1]!.text).toContain("Latest output: timeline-sync is failing: auth refused");
+  at(NOW + 49 * HOUR + 60_000);
+  tasks.settle("thr_main", "[PASS]", "succeeded");
   const [finding] = children(store, "aut_silent");
-  await tool("task_update", { id: finding!.id, line: "Asked the Kensico lead" }, "thr_main");
-  tasks.watcherRun("aut_silent", "Spend $6.40 today", null, NOW + 31 * HOUR);
+  expect(store.history(finding!.id).at(-1)).toMatchObject({ type: "answered" });
+  at(NOW + 80 * HOUR);
+  tasks.watcherRun("aut_silent", 'timeline-sync is down for good\n{"key": "timeline-sync last succeeded h ago"}', null, NOW + 80 * HOUR);
   await Promise.resolve();
   expect(nudges).toHaveLength(2);
+  void tool;
 });
 
-it("P1: a repeat with different text records it on the task and in history; repeats of the same text add one history line an hour", () => {
+it("P1: a repeat with different text records it on the task; history adds a line when the text changes beyond numbers, or once an hour", () => {
   seed();
   const { store, tasks } = setup();
   tasks.watcherRun("aut_silent", "birdclaw answered 000", null, NOW);
@@ -475,8 +479,8 @@ it("P1: a repeat with different text records it on the task and in history; repe
   tasks.watcherRun("aut_silent", "birdclaw answered 401", null, NOW + 2 * HOUR);
   const [finding] = children(store, "aut_silent");
   expect(finding).toMatchObject({ why: "birdclaw answered 401", progress: { line: "birdclaw answered 401" }, automation: { count: 4 } });
-  const found = store.history(finding!.id).filter((e) => e.type === "found_again").map((e) => JSON.parse(e.data) as { count: number; changed: boolean });
-  expect(found.map((e) => [e.count, e.changed])).toEqual([[2, true], [4, false]]);
+  const found = () => store.history(finding!.id).filter((e) => e.type === "found_again").map((e) => JSON.parse(e.data) as { count: number; changed: boolean });
+  expect(found().map((e) => [e.count, e.changed])).toEqual([[2, false], [4, false]]);
 });
 
 it("severity: higher wakes again and raises it, the same or lower stays quiet, critical to the user pushes once, and clearing resets it", async () => {
@@ -550,4 +554,35 @@ it("P3: the Bot's own check-in matches its scheduled item; tools refuse to chang
   const run = children(store, "aut_daily")[0]!;
   const out = await tool("task_handoff", { id: run.id, to: "user", needs: "Pick a date" }, "thr_main");
   expect(out.task).toMatchObject({ owner: "patrick", state: "waiting", title: "Daily check-in: Pick a date" });
+});
+
+it("re-review: a dismissed finding that turns critical reopens and posts; [info] on a finding with no severity is not worse; a worse post goes to the finding's owner", async () => {
+  seed();
+  runner("run_lead", "Kensico lead", "thr_kensico");
+  const { store, tasks, handlers } = setup();
+  tasks.watcherRun("aut_silent", "[warn] Spend $5.10 over budget", null, NOW);
+  const [spend] = children(store, "aut_silent");
+  await handlers["tasks.act"]!({ id: spend!.id, action: "drop" });
+  expect(tasks.watcherRun("aut_silent", "[warn] Spend $5.40 over budget", null, NOW + HOUR)).toBe("quiet");
+  const critical = tasks.watcherRun("aut_silent", "[critical] Spend $9.90 over budget", null, NOW + 2 * HOUR);
+  expect(critical).toMatchObject({ post: "Spend $9.90 over budget", taskId: spend!.id });
+  expect(store.get(spend!.id)).toMatchObject({ state: "in_progress", automation: { severity: "critical" } });
+  tasks.watcherRun("aut_silent", "Disk 80% full", null, NOW + 3 * HOUR);
+  expect(tasks.watcherRun("aut_silent", "[info] Disk 81% full", null, NOW + 4 * HOUR)).toBe("quiet");
+  tasks.watcherRun("aut_silent", 'Inventory push failed\n{"key": "push", "owner": "thread:thr_kensico"}', null, NOW + 5 * HOUR);
+  const worse = tasks.watcherRun("aut_silent", 'Inventory push failed again\n{"key": "push", "severity": "critical"}', null, NOW + 6 * HOUR);
+  expect(worse).toMatchObject({ thread: "thr_kensico", note: expect.stringMatching(/is now critical/) });
+});
+
+it("re-review: past 20 open findings, new ones roll into one \"N more findings\" task", () => {
+  seed();
+  const { store, tasks } = setup();
+  for (let i = 0; i < 23; i++) tasks.watcherRun("aut_silent", `Problem ${String.fromCharCode(97 + i)}`, null, NOW + i * 1000);
+  const open = children(store, "aut_silent").filter((t) => !isClosed(t));
+  expect(open).toHaveLength(21);
+  const more = open.find((t) => t.source?.kind === "watcher-overflow")!;
+  expect(more).toMatchObject({ title: "Silent heartbeat: 3 more findings", automation: { keys: [findingKey("Problem u"), findingKey("Problem v"), findingKey("Problem w")] } });
+  expect(tasks.watcherRun("aut_silent", "Problem v", null, NOW + HOUR)).toBe("quiet");
+  expect(tasks.watcherRun("aut_silent", "Problem x", null, NOW + 2 * HOUR)).toMatchObject({ post: "Problem x", taskId: more.id });
+  expect(store.get(more.id).title).toBe("Silent heartbeat: 4 more findings");
 });

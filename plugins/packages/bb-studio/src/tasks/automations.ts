@@ -21,7 +21,7 @@ export type AutomationSource = {
   mode: "dedupe" | "each" | null;
   keys: string[];
 };
-export type WatcherPlan = { post: string; note: string; taskId: string; steer: boolean; done(posted: boolean): void };
+export type WatcherPlan = { post: string; note: string; taskId: string; steer: boolean; thread?: string; done(posted: boolean): void };
 export type RunStart = { prompt: string; sent(): void; failed(error: string): void };
 export type SyncReport = { created: number; updated: number; closed: number; backup: string | null; backupError?: string };
 export type AutomationTaskDeps = {
@@ -39,6 +39,8 @@ export const KEEP_RUNS = 20;
 export const KEEP_RUN_DAYS_MS = 14 * 86_400_000;
 export const KEEP_FINDINGS = 20;
 export const KEEP_FINDING_DAYS_MS = 30 * 86_400_000;
+export const MAX_OPEN_FINDINGS = 20;
+const OVERFLOW = "watcher-overflow";
 const LINE_MAX = 300;
 const RANK: Record<Severity, number> = { info: 1, warn: 2, critical: 3 };
 const rank = (severity: Severity | null | undefined) => (severity ? RANK[severity] : 0);
@@ -332,6 +334,7 @@ export class AutomationTasks {
     const now = this.now();
     const runs = this.store.rows("SELECT record FROM tasks WHERE parent_id IS NOT NULL AND closed_at IS NULL AND json_extract(record, '$.automation.role') = 'run' ORDER BY created_at, id")
       .filter((t) => t.automation?.role === "run" && t.automation.thread === threadId && t.automation.sentAt !== null && t.automation.sentAt <= now);
+    this.answered(threadId, now);
     let settled = 0;
     for (const run of runs) {
       if (run.owner === USER_OWNER) {
@@ -412,15 +415,21 @@ export class AutomationTasks {
     const unposted: Task[] = [];
     const worse: { task: Task; severity: Severity }[] = [];
     for (const { task, lines: own } of touched.values()) {
-      const again = this.foundAgain(task, own.map((line) => line.text), at);
-      if (isClosed(again)) continue;
+      let again = this.foundAgain(task, own.map((line) => line.text), at);
       const severity = highest(own.map((line) => line.severity));
+      const higher = !!severity && rank(severity) > rank(again.automation!.severity ?? "info");
+      if (isClosed(again)) {
+        if (severity !== "critical" || !higher) continue;
+        again = this.store.change(again.id, (t) => { t.state = "in_progress"; }, "cos");
+        worse.push({ task: again, severity });
+        continue;
+      }
       if (!again.automation!.posted) unposted.push(again);
-      else if (severity && rank(severity) > rank(again.automation!.severity)) worse.push({ task: again, severity });
+      else if (higher) worse.push({ task: again, severity: severity! });
       else this.maybeNudge(src, again, at);
     }
     this.ran(parent, lines.map((line) => line.key), at);
-    const made = fresh.length ? this.newFinding(src, parent, fresh, control?.owner ?? src.owner, at) : null;
+    const made = fresh.length ? this.addFinding(src, parent, fresh, control?.owner ?? src.owner, at) : null;
     this.setParent(parent.id, (link, p) => {
       link.count += 1; link.lastAt = at; p.progress.line = clip(`Found: ${lines[0]!.text}`);
       link.severity = highest(this.openFindings(parent.id).map((t) => t.automation!.severity));
@@ -429,8 +438,10 @@ export class AutomationTasks {
     const post = control?.key ? body : body.split("\n").map((line) => lineSeverity(line.trim()).text).join("\n");
     const lead = made ?? unposted[0] ?? worse[0]!.task;
     const note = made || unposted.length ? findingNote(lead.id) : worseNote(lead.id, worse[0]!.severity);
+    const owner = !made && !unposted.length ? this.store.get(lead.id).owner : null;
+    const thread = owner?.startsWith("thread:") ? owner.slice("thread:".length) : null;
     return {
-      post, note, taskId: lead.id, steer: false,
+      post, note, taskId: lead.id, steer: false, ...(thread && thread !== src.thread ? { thread } : {}),
       done: (posted) => {
         if (!posted) return;
         for (const t of [...(made ? [made] : []), ...unposted]) this.patch(t.id, (link) => { link.posted = true; });
@@ -453,29 +464,60 @@ export class AutomationTasks {
   private maybeNudge(src: AutomationSource, task: Task, at: number): void {
     if (!this.deps.nudge || at - task.createdAt < NUDGE_AFTER_MS || task.owner === USER_OWNER) return;
     const link = task.automation!;
-    if (link.nudgedAt !== null && link.nudged === task.why) return;
+    if (link.nudgedAt !== null && (link.nudged === findingKey(task.why) || at - link.nudgedAt < NUDGE_AFTER_MS)) return;
     if (this.store.history(task.id).some((e) => agentTouched(e.data))) return;
     const thread = task.owner === "cos" ? src.thread : task.owner.slice("thread:".length);
     if (!thread) return;
     const text = `Watcher finding task ${task.id} (${JSON.stringify(task.title)}) is still happening: found ${link.count} times since ${this.when(task.createdAt)}, and nobody has updated it in a day. Latest output: ${clip(task.why, 600)}\nLook into it and record what you do with task_update, or hand it to the user with task_handoff if they must act. Don't write to the user otherwise; reply exactly [PASS] if there is nothing to do.`;
-    const why = task.why;
+    const why = findingKey(task.why);
     void this.deps.nudge(thread, text).then(
       () => this.patch(task.id, (l) => { l.nudgedAt = this.now(); l.nudged = why; }),
       (error: unknown) => this.deps.log?.(`Automation tasks: nudge for ${task.id} failed: ${error instanceof Error ? error.message : String(error)}`),
     );
   }
 
+  private answered(threadId: string, now: number): void {
+    const nudged = this.store.rows("SELECT record FROM tasks WHERE parent_id IS NOT NULL AND closed_at IS NULL AND json_extract(record, '$.automation.role') = 'finding' AND json_extract(record, '$.automation.nudgedAt') IS NOT NULL");
+    for (const task of nudged) {
+      const thread = task.owner === "cos" ? task.automation!.thread : task.owner.startsWith("thread:") ? task.owner.slice("thread:".length) : null;
+      if (thread !== threadId || task.automation!.nudgedAt! > now) continue;
+      if (this.store.history(task.id).some((e) => e.type === "answered")) continue;
+      this.store.event(task.id, "answered", { by: `thread:${threadId}` });
+    }
+  }
+
+  private addFinding(src: AutomationSource, parent: Task, lines: { key: string; text: string; severity: Severity | null }[], owner: string, at: number): Task {
+    const open = this.openFindings(parent.id);
+    if (open.filter((t) => t.source?.kind !== OVERFLOW).length < MAX_OPEN_FINDINGS) return this.newFinding(src, parent, lines, owner, at);
+    const overflow = open.find((t) => t.source?.kind === OVERFLOW);
+    if (!overflow) {
+      const made = this.newFinding(src, parent, lines, owner, at, OVERFLOW);
+      this.patch(made.id, (link, t) => { t.title = clip(`${src.name}: ${link.keys.length} more finding${link.keys.length === 1 ? "" : "s"}`, 160); });
+      return this.store.get(made.id);
+    }
+    this.patch(overflow.id, (link, t) => {
+      link.keys = [...new Set([...link.keys, ...lines.map((line) => line.key)])];
+      link.count += 1; link.lastAt = at; link.posted = false;
+      link.severity = highest([link.severity, ...lines.map((line) => line.severity)]);
+      t.title = clip(`${src.name}: ${link.keys.length} more findings`, 160);
+      t.why = [...lines.map((line) => line.text), t.why].join("\n").slice(0, 4000);
+      t.progress.line = clip(lines[0]!.text);
+      t.updatedAt = at;
+    });
+    return this.store.get(overflow.id);
+  }
+
   private openFindings(parentId: string): Task[] {
     return this.openChildren(parentId).filter((t) => t.automation?.role === "finding");
   }
 
-  private newFinding(src: AutomationSource, parent: Task, lines: { key: string; text: string; severity: Severity | null }[], owner: string, at: number): Task {
+  private newFinding(src: AutomationSource, parent: Task, lines: { key: string; text: string; severity: Severity | null }[], owner: string, at: number, kind = "watcher"): Task {
     const text = lines.map((line) => line.text).join("\n");
     const task: Task = {
       id: this.store.newId("task"), title: clip(`${src.name}: ${lines[0]!.text}`, 160), why: text.slice(0, 4000), owner, state: "in_progress", kind: "do", options: [], needs: null,
       priority: "normal", conversation: owner === "cos" ? src.thread : owner.startsWith("thread:") ? owner.slice(7) : null, project: null, area: null,
       timing: { due: null, trigger: { type: "none" }, snoozed: false }, attention: { queue: null, push: false },
-      progress: { step: null, line: clip(lines[0]!.text) }, workers: [], outputs: [], source: { kind: "watcher", ref: src.id }, parentId: parent.id, schedule: null, card: null,
+      progress: { step: null, line: clip(lines[0]!.text) }, workers: [], outputs: [], source: { kind, ref: src.id }, parentId: parent.id, schedule: null, card: null,
       automation: { id: src.id, kind: "watcher", role: "finding", thread: src.thread, keys: lines.map((line) => line.key), count: 1, lastAt: at, mode: null, clearedAt: null, posted: false, sentAt: null, nudgedAt: null, nudged: null, severity: highest(lines.map((line) => line.severity)), pushedAt: null },
       stale: false, origin: "task", createdAt: at, updatedAt: at, closedAt: null, closedBy: null,
     };
@@ -488,7 +530,7 @@ export class AutomationTasks {
     const next = structuredClone(task);
     const link = next.automation!;
     const text = texts.join("\n").slice(0, 4000);
-    const changed = text !== next.why;
+    const changed = findingKey(text) !== findingKey(next.why);
     link.count += 1;
     link.lastAt = at;
     if (!isClosed(next)) {

@@ -62,9 +62,10 @@ export function TodosPage({ view }: { view: BotView }) {
   const chatRows = showChat ? pending.length : 0;
   const scheduled = useMemo(() => (scheduledList.data?.items ?? []).filter((item) => item.source === "automation" && item.botId === bot.id && (!query.trim() || item.title.toLowerCase().includes(query.trim().toLowerCase())) && !filtered),
     [scheduledList.data, bot.id, query, filtered]);
-  const recurring = new Map(tasks.filter((t) => t.automation?.role === "schedule" && t.schedule?.automationId).map((t) => [t.schedule!.automationId!, t]));
-  const listedIds = new Set((scheduledList.data?.items ?? []).filter((item) => item.source === "automation").map((item) => item.id));
-  const scheduledTasks = sections.scheduled.filter((t) => !(t.automation?.role === "schedule" && listedIds.has(t.schedule?.automationId ?? "")));
+  const itemKey = (item: { id: string; botId: string | null }) => (item.id === "heartbeat" ? `heartbeat:${item.botId}` : item.id);
+  const recurring = new Map(tasks.filter((t) => t.automation?.role === "schedule").map((t) => [t.automation!.id, t]));
+  const listedIds = new Set((scheduledList.data?.items ?? []).filter((item) => item.source === "automation").map(itemKey));
+  const scheduledTasks = sections.scheduled.filter((t) => !(t.automation?.role === "schedule" && listedIds.has(t.automation.id)));
   const total = sections.today.length + sections.later.length + sections.agents.length + sections.waiting.length + scheduledTasks.filter((t) => t.automation?.role !== "schedule").length + chatRows;
   const add = (text: string) => call("loops.add", { text }).then(() => { setUnfolded((open) => new Set([...open, "today"])); list.refresh(); });
   const botChat = people.botThreadId ? rowOpen({ kind: "conversation", id: people.botThreadId }, people.botName) : null;
@@ -152,7 +153,7 @@ export function TodosPage({ view }: { view: BotView }) {
           {scheduledList.error && !scheduledList.data ? <p role="alert" data-testid="scheduled-error" className="pb-2 text-xs text-destructive">{scheduledList.error}</p> : null}
           {scheduledTasks.map(row)}
           {scheduledRows.shown.map((item) => {
-            const parent = recurring.get(item.id);
+            const parent = recurring.get(itemKey(item));
             const severity = parent?.automation?.severity ?? null;
             const last = parent?.progress.line ? `${severity ? `${SEVERITY_LABEL[severity]} · ` : ""}${parent.progress.line}` : null;
             const runs = parent ? rowOpen({ kind: "todo", id: parent.id }, parent.title) : null;

@@ -343,16 +343,16 @@ it("shows each recurring task's last result beside its next run, once, and Runs 
   const parent = (automationId: string, title: string, line: string | null, paused = false, severity: string | null = null) => ({
     ...taskFromLoop(loop(`task_auto-${automationId}`, title, { owner: "cos", status: "in_progress" })), origin: "task", state: paused ? "waiting" : "in_progress",
     schedule: { text: "Daily 1:00 PM", cron: null, timeZone: null, automationId, paused }, progress: { step: null, line },
-    automation: { id: automationId, kind: "checkin", role: "schedule", thread: "thr_bot", keys: [], count: 3, lastAt: NOW, mode: null, clearedAt: null, posted: true, sentAt: null, nudgedAt: null, nudged: null, severity, pushedAt: null },
+    automation: { id: automationId === "heartbeat" ? "heartbeat:bot_1" : automationId, kind: "checkin", role: "schedule", thread: "thr_bot", keys: [], count: 3, lastAt: NOW, mode: null, clearedAt: null, posted: true, sentAt: null, nudgedAt: null, nudged: null, severity, pushedAt: null },
   });
-  state.scheduled = [item("aut_daily", { title: "Daily check-in", nextAt: NOW + 3_600_000 }), item("aut_silent", { title: "Silent heartbeat", kind: "watcher" }), item("aut_new", { title: "New one" })];
-  state.extraTasks = [parent("aut_daily", "Daily check-in", "Nothing new"), parent("aut_silent", "Silent heartbeat", "Needs you: Approve the budget raise"), parent("aut_new", "New one", "Found: Disk 99% full", false, "critical"), parent("aut_orphan", "Not listed", "Ran")];
+  state.scheduled = [item("aut_daily", { title: "Daily check-in", nextAt: NOW + 3_600_000 }), item("aut_silent", { title: "Silent heartbeat", kind: "watcher" }), item("aut_new", { title: "New one" }), item("heartbeat", { title: "Check-in" })];
+  state.extraTasks = [parent("aut_daily", "Daily check-in", "Nothing new"), parent("aut_silent", "Silent heartbeat", "Needs you: Approve the budget raise"), parent("aut_new", "New one", "Found: Disk 99% full", false, "critical"), parent("aut_orphan", "Not listed", "Ran"), parent("heartbeat", "Check-in", "Nothing new")];
   await render();
   const rows = [...container.querySelectorAll<HTMLElement>("[data-testid=tasks-scheduled] [data-testid=scheduled-row]")];
-  expect(rows.map((each) => each.textContent)).toEqual(["Daily check-inNothing new4:00 PMRuns", "Silent heartbeatNeeds you: Approve the budget raiseDaily 8:00Runs", "New oneCritical · Found: Disk 99% fullDaily 8:00Runs"]);
+  expect(rows.map((each) => each.textContent)).toEqual(["Daily check-inNothing new4:00 PMRuns", "Silent heartbeatNeeds you: Approve the budget raiseDaily 8:00Runs", "New oneCritical · Found: Disk 99% fullDaily 8:00Runs", "Check-inNothing newDaily 8:00Runs"]);
   expect(rows[2]!.querySelector("[data-testid=scheduled-last]")!.parentElement!.className).toContain("text-destructive");
   expect(rows[1]!.querySelector("[data-testid=scheduled-last]")!.parentElement!.className).toContain("text-warning");
-  expect(titles(group("Scheduled & recurring"))).toEqual(["Not listed", "Daily check-in", "Silent heartbeat", "New one"]);
+  expect(titles(group("Scheduled & recurring"))).toEqual(["Not listed", "Daily check-in", "Silent heartbeat", "New one", "Check-in"]);
   await act(async () => rows[0]!.querySelector<HTMLButtonElement>("[data-testid=scheduled-runs]")!.click());
   expect(state.openLink).toHaveBeenCalledWith("bb://todo/task_auto-aut_daily", expect.objectContaining({ title: "Daily check-in" }));
   state.scheduled = [];
