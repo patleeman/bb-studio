@@ -6,6 +6,7 @@ import { runWorkCli } from "./cli";
 import { rpcContract, SHOW_FINISHED_MS, type WorkCard } from "./contract";
 import { CREATE_DESCRIPTION, endsCard, findCardMessage, registerWorkCards, WORK_TOOLS, type TimelineReader, type WorkerThread } from "./register";
 import { inFlightOrder, WorkCardStore } from "./store";
+import { migrateToTasks } from "../tasks/migrate";
 
 const NOW = new Date("2026-11-13T15:00:00Z").getTime();
 let db: Database.Database;
@@ -16,6 +17,7 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   db = new Database(":memory:");
   db.exec(MIGRATIONS.find((sql) => sql.includes("CREATE TABLE work_cards"))!);
+  db.exec(MIGRATIONS.find((sql) => sql.includes("CREATE TABLE tasks"))!);
   store = new WorkCardStore(db);
 });
 afterEach(() => { db.close(); vi.useRealTimers(); });
@@ -35,7 +37,7 @@ it("updates in place: step, line, needs; clearing a field with an empty string",
   expect(next).toMatchObject({ id: card.id, step: "2/3 Tests", line: "412 passed", state: "needs-you", needs: "Approve the push", updatedAt: NOW + 1_000 });
   expect(store.update(card.id, { line: "" }).line).toBeNull();
   expect(store.update(card.id, { state: "running" }).needs).toBeNull();
-  expect(db.prepare("SELECT count(*) AS n FROM work_cards").get()).toEqual({ n: 1 });
+  expect(db.prepare("SELECT count(*) AS n FROM tasks").get()).toEqual({ n: 1 });
 });
 
 it("stamps finishedAt once and clears it when work restarts", () => {
@@ -253,8 +255,9 @@ it("still drops a finished or ended card from In flight after a day", () => {
 });
 
 it("reads cards saved before stale and dismissals existed", () => {
-  const { stale: _stale, dismissedAt: _dismissed, ...old } = store.create({ title: "Old", threadId: "thr_main" });
-  db.prepare("UPDATE work_cards SET record = ? WHERE id = ?").run(JSON.stringify(old), old.id);
+  const old = { id: "wc_old", threadId: "thr_main", title: "Old", kind: "task", state: "running", step: null, line: null, needs: null, workerThreadId: null, messageId: null, messageSeq: null, createdAt: NOW, updatedAt: NOW, finishedAt: null };
+  db.prepare("INSERT INTO work_cards (id, thread_id, record, finished_at) VALUES (?, ?, ?, NULL)").run(old.id, old.threadId, JSON.stringify(old));
+  expect(migrateToTasks(db).adopted.cards).toBe(1);
   expect(store.get(old.id)).toMatchObject({ stale: false, dismissedAt: null });
   expect(store.inFlight("thr_main")).toHaveLength(1);
 });

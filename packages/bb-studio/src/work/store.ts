@@ -1,8 +1,8 @@
 import type Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
+import { TaskStore } from "../tasks/store";
+import { agentOwner, applyWork, inWorkView, taskFromWork, toWork } from "../tasks/views";
 import { changes as changesSchema, createInput, isFinished, SHOW_FINISHED_MS, workCard, type CreateInput, type WorkCard, type WorkChanges } from "./contract";
-
-type Row = { record: string };
 
 const ORDER: Record<WorkCard["state"], number> = { "needs-you": 0, running: 1, waiting: 1, failed: 2, done: 2 };
 
@@ -13,12 +13,16 @@ export function inFlightOrder(cards: readonly WorkCard[]): WorkCard[] {
 }
 
 export class WorkCardStore {
-  constructor(readonly db: Database.Database, readonly changed: () => void = () => {}, readonly now: () => number = Date.now) {}
+  readonly tasks: TaskStore;
+
+  constructor(readonly db: Database.Database, readonly changed: () => void = () => {}, readonly now: () => number = Date.now) {
+    this.tasks = new TaskStore(db, changed, now);
+  }
 
   get(id: string): WorkCard {
-    const row = this.db.prepare("SELECT record FROM work_cards WHERE id = ?").get(id) as Row | undefined;
-    if (!row) throw new Error(`Work card ${id} not found`);
-    return workCard.parse(JSON.parse(row.record));
+    const task = this.tasks.find(id);
+    if (!task || !inWorkView(task)) throw new Error(`Work card ${id} not found`);
+    return toWork(task);
   }
 
   find(id: string): WorkCard | null {
@@ -86,13 +90,11 @@ export class WorkCardStore {
   }
 
   openWithWorker(): WorkCard[] {
-    const rows = this.db.prepare("SELECT record FROM work_cards WHERE finished_at IS NULL").all() as Row[];
-    return rows.map((row) => workCard.parse(JSON.parse(row.record))).filter((card) => card.workerThreadId !== null);
+    return this.cards("SELECT record FROM tasks WHERE closed_at IS NULL ORDER BY rowid").filter((card) => card.workerThreadId !== null);
   }
 
   forWorker(workerThreadId: string): WorkCard[] {
-    const rows = this.db.prepare("SELECT record FROM work_cards WHERE json_extract(record, '$.workerThreadId') = ?").all(workerThreadId) as Row[];
-    return rows.map((row) => workCard.parse(JSON.parse(row.record)));
+    return this.cards("SELECT record FROM tasks WHERE json_extract(record, '$.workers[0]') = ? ORDER BY rowid", workerThreadId);
   }
 
   anchor(id: string, threadId: string, messageId: string): WorkCard {
@@ -115,13 +117,18 @@ export class WorkCardStore {
 
   inFlight(threadId: string): WorkCard[] {
     const since = this.now() - SHOW_FINISHED_MS;
-    const rows = this.db.prepare("SELECT record FROM work_cards WHERE thread_id = ? AND (finished_at IS NULL OR finished_at > ?)").all(threadId, since) as Row[];
-    return inFlightOrder(rows.map((row) => workCard.parse(JSON.parse(row.record))).filter((card) => card.dismissedAt === null));
+    return inFlightOrder(this.cards("SELECT record FROM tasks WHERE conversation = ? AND (closed_at IS NULL OR closed_at > ?) ORDER BY rowid", threadId, since).filter((card) => card.dismissedAt === null));
+  }
+
+  private cards(sql: string, ...params: unknown[]): WorkCard[] {
+    return this.tasks.rows(sql, ...params).filter(inWorkView).map(toWork);
   }
 
   private write(card: WorkCard): WorkCard {
     const parsed = workCard.parse(card);
-    this.db.prepare("INSERT OR REPLACE INTO work_cards (id, thread_id, record, finished_at) VALUES (?, ?, ?, ?)").run(parsed.id, parsed.threadId, JSON.stringify(parsed), parsed.finishedAt);
+    const before = this.tasks.find(parsed.id);
+    const after = this.tasks.write(before && inWorkView(before) ? applyWork(before, parsed) : taskFromWork(parsed));
+    if (before) this.tasks.record(before, after, agentOwner(after));
     return parsed;
   }
 

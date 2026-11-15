@@ -3,6 +3,7 @@ import type Database from 'better-sqlite3';
 import { z } from 'zod';
 import { rpcContract, add, act, update, filters, ownerInfo, type Loop } from './contract';
 import { LoopStore, placeKey } from './store';
+import { assertTasksReady, guardTasks } from '../tasks/store';
 import { LoopScheduler, defaults, snooze, systemTimeZone } from './scheduler';
 /** The lock-screen actions a todo's push offers, by kind (the app's BB_LOOP categories). */
 export function loopPushActions(kind:Loop['kind']):('done'|'snooze'|'got_it'|'choose')[]{return kind==='read'?['got_it','snooze']:kind==='decide'?['choose','snooze']:['done','snooze'];}
@@ -35,16 +36,17 @@ export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:str
  const list=async(x:z.infer<typeof filters>)=>{const g=store.groups(x);const ids=new Set([...g.needsYouNow,...g.comingUp,...g.agentsOnIt,...g.waitingOnOthers,...g.done].map(l=>l.owner));return {...g,held:scheduler.held(),areas:store.areas(),owners:(await Promise.all([...ids].map(owner))).filter((o):o is z.infer<typeof ownerInfo>=>!!o)};};
  const action=async(x:z.infer<typeof act>)=>{const l=store.act(x,p=>snooze(p,config));if(x.action==='nudge')await post(`Todo ${l.id}: nudge. Draft the nudge message and show it to the user in this chat for approval. Do not send it until they approve.`);else if(['hand_off','choose'].includes(x.action))await post(`Todo ${l.id}: ${x.action}. ${x.option??''} Owner: ${ownerText(l.owner)}. Use todos_list to review and carry out the next step.`);return l;};
  const change=(x:z.infer<typeof update>)=>store.update(x.id,{...x.changes,...(x.surfaceNow?{status:'queued' as const,trigger:{type:'none' as const}}:{})});
- // A spoken or typed line becomes a draft todo the Bot fills in.
+ // A spoken line becomes a draft todo the Bot fills in.
  const addLine=async(text:string)=>{const l=store.add({title:text,status:'in_progress',owner:'cos'});await post(`Fill in draft todo ${l.id} from this typed line using todos_update, then queue it: ${JSON.stringify(text)}`);return l;};
+ const addTyped=(text:string)=>{const l=store.add({title:text,status:'surfaced',owner:'patrick'});store.event(l.id,'added_by_you');return l;};
  const get=async(id:string)=>{const l=store.get(id),o=await owner(l.owner);return {loop:l,history:store.history(id),...(o?{owner:o}:{})};};
- bb.rpc.register(rpcContract,{
+ bb.rpc.register(rpcContract,guardTasks(db,{
  'loops.list':list,'loops.get':({id})=>get(id),
- 'loops.add':({text})=>addLine(text),
+ 'loops.add':({text})=>addTyped(text),
  'loops.update':async(x:z.infer<typeof update>)=>{if(!x.surfaceNow)return change(x);if(x.changes)store.update(x.id,x.changes);return scheduler.surfaceNow(x.id);},'loops.act':action,'loops.fire':({event})=>scheduler.fire(event),'loops.place':({place,direction})=>scheduler.fire(`place:${placeKey(place)}:${direction}`),'loops.setPlaces':({names})=>({names:store.setPlaces(names)}),'loops.places':()=>({names:store.places()}),'loops.morning':()=>scheduler.morning(),
- });
+ }));
  // Each tool is registered twice: todos_x, and loops_x as its alias.
- const tool=<S extends z.ZodTypeAny>(verb:string,description:string,parameters:S,execute:(x:z.infer<S>)=>string|Promise<string>)=>{bb.agents.registerTool({name:`todos_${verb}`,description,parameters,execute});bb.agents.registerTool({name:`loops_${verb}`,description:`Alias of todos_${verb}.`,parameters,execute});};
+ const tool=<S extends z.ZodTypeAny>(verb:string,description:string,parameters:S,execute:(x:z.infer<S>)=>string|Promise<string>)=>{const run=(x:z.infer<S>)=>{assertTasksReady(db);return execute(x);};bb.agents.registerTool({name:`todos_${verb}`,description,parameters,execute:run});bb.agents.registerTool({name:`loops_${verb}`,description:`Alias of todos_${verb}.`,parameters,execute:run});};
  tool('add','Track an open obligation, decision or item to read. Set its owner and release trigger; give an event trigger a short label in words ("when Unraid fixes the PHP CVE"). Avoid duplicating pending chat questions.',add,x=>JSON.stringify(store.add(x)));
  tool('list','Review tracked todos, grouped by who needs to act. Filter by area or owner. When the user wants to go through their todos with you, post ::loops{open="pane"} once on its own line: a card that opens the Todos list beside your chat, so it stays up while you talk. '+LOOP_TOPIC_HINT,filters,async x=>JSON.stringify(await list(x)));
  tool('get','Read one todo by id: its record, history and owner. '+LOOP_TOPIC_HINT,z.object({id:z.string().min(1)}),async({id})=>JSON.stringify(await get(id)));
@@ -58,5 +60,5 @@ export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:str
   search:({query})=>{const q=query.trim().toLowerCase();const g=store.groups();return [...g.needsYouNow,...g.comingUp,...g.agentsOnIt,...g.waitingOnOthers,...g.done].filter(l=>!q||l.title.toLowerCase().includes(q)).map(l=>({id:l.id,title:l.title,subtitle:l.closedAt?'Done':KIND[l.kind].label,icon:KIND[l.kind].icon}));},
   resolve:(id)=>{try{return {context:loopContext(store.get(id))};}catch{return {context:`The user mentioned todo ${id}, which no longer exists.`};}}}));
  every('todos',60_000,tick);
- return {store,scheduler,act:action,add:addLine,enabled:()=>config.enabled,setSettings:(value:typeof defaults)=>{config=value;}};
+ return {store,scheduler,act:action,add:addLine,addTyped,enabled:()=>config.enabled,setSettings:(value:typeof defaults)=>{config=value;}};
 }

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { changes, createInput, directiveFor, isFinished, rpcContract, WORK_ID, type CreateInput, type WorkCard, type WorkChanges } from "./contract";
 import { WorkCardStore } from "./store";
+import { assertTasksReady, guardTasks } from "../tasks/store";
 
 type TimelineRow = { id: string; kind?: string; role?: string; text?: string; messageSeq?: number };
 type TimelinePage = { rows?: TimelineRow[]; timelinePage?: { olderCursor?: { anchorSeq: number; anchorId: string } | null } };
@@ -98,7 +99,7 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
   bb.events?.on("thread.active", ({ thread }) => { workerBack(thread.id); });
   const swept = sweep().catch((error: unknown) => { bb.log.warn(`Work cards: ${error instanceof Error ? error.message : String(error)}`); });
 
-  bb.rpc.register(rpcContract, {
+  bb.rpc.register(rpcContract, guardTasks(db, {
     "work.get": ({ id }) => store.get(id),
     "work.list": ({ threadId }) => list(threadId),
     "work.create": (input) => create(input),
@@ -106,13 +107,14 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     "work.anchor": async ({ id, threadId, messageId }) => await place(store.anchor(id, threadId, messageId)),
     "work.dismiss": ({ id }) => store.dismiss(id),
     "work.clear": ({ threadId }) => ({ cleared: store.clearFinished(threadId) }),
-  });
+  }));
 
   bb.agents.registerTool({
     name: "work_card_create",
     description: CREATE_DESCRIPTION,
     parameters: createInput,
     execute: async (input, ctx) => {
+      assertTasksReady(db);
       const threadId = input.threadId ?? ctx.threadId;
       if (!threadId) return "Pass threadId: the conversation the card goes in.";
       const { card, directive } = create({ ...input, threadId });
@@ -123,13 +125,13 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     name: "work_card_update",
     description: UPDATE_DESCRIPTION,
     parameters: changes.extend({ id: z.string().regex(WORK_ID) }),
-    execute: async ({ id, ...rest }) => JSON.stringify(update(id, rest)),
+    execute: async ({ id, ...rest }) => { assertTasksReady(db); return JSON.stringify(update(id, rest)); },
   });
   bb.agents.registerTool({
     name: "work_card_get",
     description: "Read a work card by id: its state, step, line and the conversation it is in.",
     parameters: z.object({ id: z.string().regex(WORK_ID) }),
-    execute: async ({ id }) => JSON.stringify(store.get(id)),
+    execute: async ({ id }) => { assertTasksReady(db); return JSON.stringify(store.get(id)); },
   });
 
   return { store, create, update, list, place, placeAll, sweep, swept };

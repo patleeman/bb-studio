@@ -8,6 +8,7 @@ const NOW = new Date("2026-11-13T15:00:00Z").getTime();
 const card = (patch: Partial<WorkCard> = {}): WorkCard => ({ id: "wc_1", threadId: "thr_main", title: "Release 1.0.2", kind: "release", state: "running", step: "2/5 Sign", line: "Notarizing the DMG", needs: null, workerThreadId: null, messageId: "m_1", messageSeq: 41, createdAt: NOW - 60_000, updatedAt: NOW - 60_000, finishedAt: null, stale: false, dismissedAt: null, ...patch });
 const state = vi.hoisted(() => ({
   list: [] as WorkCard[],
+  error: null as string | null,
   toThread: vi.fn(),
   toAppPath: vi.fn((_path: string, _options?: unknown) => true) as ((path: string, options?: unknown) => boolean) | null,
   pathname: "/threads/thr_main",
@@ -19,7 +20,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => (state.toAppPath ? { toThread: state.toThread, experimental_toAppPath: state.toAppPath } : { toThread: state.toThread }),
 }));
 vi.mock("../../ui/live", () => ({
-  useLive: (method: string) => ({ data: method === "work.list" ? { cards: state.list } : null, error: null, loading: false, refresh: state.refresh }),
+  useLive: (method: string) => ({ data: method === "work.list" && !state.error ? { cards: state.list } : null, error: state.error, loading: false, refresh: state.refresh }),
   useCall: () => state.call,
 }));
 vi.mock("../../kit/ui/index", async () => (await import("../../loops/ui/test-kit")).kitUi);
@@ -36,7 +37,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
   vi.setSystemTime(NOW);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  Object.assign(state, { list: [], pathname: "/threads/thr_main", composerThread: "thr_main" });
+  Object.assign(state, { list: [], error: null, pathname: "/threads/thr_main", composerThread: "thr_main" });
   state.toAppPath = vi.fn((_path: string, _options?: unknown) => true);
   state.toThread.mockClear();
   state.call.mockReset();
@@ -63,6 +64,15 @@ it("lists one row per card with its name, state and a needs-you marker", async (
   expect(rows()[1]!.querySelector('[data-testid="in-flight-needs-you"]')).toBeNull();
   expect(q('[data-testid="in-flight-count"]')!.textContent).toBe("3");
   expect(q('[data-testid="in-flight-needs"]')!.textContent).toBe("1 needs you");
+});
+
+it("says so when todos and work cards couldn't be moved to tasks, and stays quiet on any other error", async () => {
+  state.error = "Todos and work cards could not be moved to tasks, so they can't be shown: disk I/O error. Nothing was lost. Restart BB Studio to try again.";
+  await renderList();
+  expect(q('[data-testid="in-flight-error"]')!.textContent).toBe(state.error);
+  state.error = "Network error";
+  await renderList();
+  expect(container.innerHTML).toBe("");
 });
 
 it("shows nothing with no open work, finished cards included", async () => {
@@ -214,6 +224,22 @@ it("Clear done takes every finished row off the list at once and asks the server
   expect(rows().map((row) => row.title)).toEqual(["Live one", "Live two"]);
   expect(q('[data-testid="in-flight-done"]')).toBeNull();
   expect(q('[data-testid="in-flight-clear"]')).toBeNull();
+});
+
+it("shows a cleared card again once it comes back changed: reopened, or handed to the user", async () => {
+  state.list = many();
+  await renderList();
+  await act(async () => q('[data-testid="in-flight-clear"]')!.click());
+  state.list = many();
+  await renderList();
+  expect(rows().map((row) => row.title)).toEqual(["Live one", "Live two"]);
+  expect(q('[data-testid="in-flight-needs"]')!.textContent).toBe("1 needs you");
+  const live = many().filter((c) => c.state !== "done" && c.state !== "failed");
+  const d1 = many().find((c) => c.id === "wc_d1")!, d2 = many().find((c) => c.id === "wc_d2")!;
+  state.list = [...live, { ...d1, state: "running", finishedAt: null, updatedAt: NOW + 5_000 }, { ...d2, state: "needs-you", needs: "Look", finishedAt: null, updatedAt: NOW + 6_000 }];
+  await renderList();
+  expect(rows().map((row) => row.title).sort()).toEqual(["Done one", "Done two", "Live one", "Live two"]);
+  expect(q('[data-testid="in-flight-needs"]')!.textContent).toBe("2 need you");
 });
 
 it("puts the rows back when clearing fails", async () => {

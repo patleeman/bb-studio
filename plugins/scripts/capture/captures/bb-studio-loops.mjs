@@ -20,6 +20,7 @@ import { mkdir } from "node:fs/promises";
 import { readStagedInstance } from "../../staged-instance.mjs";
 import { BOT_PATH, dismissProblems } from "./bb-studio-bot.mjs";
 import { clickHeaderAction } from "../header-actions.mjs";
+import { deleteTasks, writeLoopTasks } from "../task-rows.mjs";
 
 const require = createRequire(import.meta.url);
 const BEFORE = process.env.BB_CAPTURE_LOOPS_BEFORE === "1";
@@ -70,11 +71,10 @@ function writeLoops(records) {
   const db = new Database(join(dataDir, "plugins/studio/data.db"), { timeout: 5000 });
   try {
     db.transaction(() => {
-      db.prepare("DELETE FROM loop_events WHERE loop_id LIKE 'loop_capture-%'").run();
-      db.prepare("DELETE FROM bot_loops WHERE id LIKE 'loop_capture-%'").run();
-      for (const loop of records) db.prepare("INSERT INTO bot_loops VALUES (?, ?)").run(loop.id, JSON.stringify(loop));
+      deleteTasks(db, "loop_capture-");
+      writeLoopTasks(db, records);
       for (const [key, events] of Object.entries(HISTORY)) {
-        for (const [type, ago, data] of events) db.prepare("INSERT INTO loop_events (loop_id, type, at, data) VALUES (?, ?, ?, ?)").run(`loop_capture-${key}`, type, Date.now() - ago, JSON.stringify(data));
+        for (const [type, ago, data] of events) db.prepare("INSERT INTO task_events (task_id, type, at, data) VALUES (?, ?, ?, ?)").run(`loop_capture-${key}`, type, Date.now() - ago, JSON.stringify(data));
       }
     })();
   } finally {

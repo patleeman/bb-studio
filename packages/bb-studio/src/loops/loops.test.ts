@@ -8,7 +8,7 @@ import { rpcContract } from './contract';
 import { LOOP_TOOLS, loopPushActions, registerLoops, threadOwner } from './register';
 const defaults={...baseDefaults,enabled:true,timeZone:'America/New_York'};
 let db:Database.Database,store:LoopStore,scheduler:LoopScheduler,post:ReturnType<typeof vi.fn<(text:string)=>Promise<void>>>,notify:ReturnType<typeof vi.fn<(loop:import('./contract').Loop)=>Promise<void>>>;
-beforeEach(()=>{vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-02T15:00:00Z'));db=new Database(':memory:');db.exec(MIGRATIONS.find((sql)=>sql.includes('CREATE TABLE bot_loops'))!);store=new LoopStore(db);post=vi.fn(async(_text:string)=>{});notify=vi.fn(async(_loop:import('./contract').Loop)=>{});scheduler=new LoopScheduler(store,()=>defaults,post,notify);});
+beforeEach(()=>{vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-02T15:00:00Z'));db=new Database(':memory:');db.exec(MIGRATIONS.find((sql)=>sql.includes('CREATE TABLE bot_loops'))!);db.exec(MIGRATIONS.find((sql)=>sql.includes('CREATE TABLE tasks'))!);store=new LoopStore(db);post=vi.fn(async(_text:string)=>{});notify=vi.fn(async(_loop:import('./contract').Loop)=>{});scheduler=new LoopScheduler(store,()=>defaults,post,notify);});
 afterEach(()=>{db.close();vi.useRealTimers();});
 it('persists and groups records with closure history',()=>{const l=store.add({title:'Call'});expect(store.get(l.id).title).toBe('Call');store.act({id:l.id,action:'done'},()=>({type:'none'}));expect(store.groups().done).toHaveLength(1);expect(store.history(l.id).map(e=>e.type)).toEqual(['closed','acted']);});
 it.each(['done','drop','got_it','choose','snooze','hand_off','nudge','keep'] as const)('records %s actions',action=>{const l=store.add({title:'Choose',kind:'decide',options:['A']});const result=store.act({id:l.id,action,option:'A',snooze:'home'},p=>snooze(p,defaults));expect(store.history(l.id).some(e=>e.type==='acted')).toBe(true);if(action==='hand_off')expect(result.owner).toBe('cos');if(action==='snooze')expect(result.trigger).toEqual({type:'place',place:'home',direction:'arrive'});});
@@ -116,7 +116,7 @@ it('releases the user\'s own Surface now at once, past the morning hold, the bud
  expect(store.groups().needsYouNow.map(l=>l.id)).toEqual(expect.arrayContaining([low.id,later.id]));
  // Pressing it again doesn't post a second card; it isn't counted against the budget.
  await handlers['loops.update']!({id:low.id,surfaceNow:true});expect(post).toHaveBeenCalledTimes(2);
- expect((db.prepare("SELECT count(*) n FROM loop_events WHERE type='surfaced'").get() as {n:number}).n).toBe(0);
+ expect((db.prepare("SELECT count(*) n FROM task_events WHERE type='surfaced'").get() as {n:number}).n).toBe(0);
  const cos=loops.store.add({title:'CoS job',owner:'cos'});await expect(handlers['loops.update']!({id:cos.id,surfaceNow:true})).rejects.toThrow('Only your own todos');
  loops.store.act({id:low.id,action:'done'},()=>({type:'none'}));await expect(handlers['loops.update']!({id:low.id,surfaceNow:true})).rejects.toThrow('already closed');
  onChange({loopsEnabled:false});const off=loops.store.add({title:'With reminders off',trigger:{type:'time',at:Date.now()+86400000}});expect(await handlers['loops.update']!({id:off.id,surfaceNow:true})).toMatchObject({status:'surfaced'});expect(post).toHaveBeenCalledTimes(3);expect(post.mock.calls[2]![0]).toContain(`::loop{id="${off.id}"}`);

@@ -1,0 +1,2560 @@
+[
+ {
+  "step": "added",
+  "value": [
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000001",
+    "title": "Call the plumber",
+    "why": "Leak under the sink",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "time",
+     "at": 1793635200000
+    },
+    "priority": "normal",
+    "push": true,
+    "status": "queued",
+    "due": 1793638800000,
+    "area": "Home",
+    "createdAt": 1793631600000,
+    "updatedAt": 1793631600000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000002",
+    "title": "Pick a venue",
+    "why": "",
+    "source": null,
+    "kind": "decide",
+    "options": [
+     "Hall",
+     "Park"
+    ],
+    "owner": "patrick",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "queued",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793631600000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000003",
+    "title": "Read the report",
+    "why": "",
+    "source": null,
+    "kind": "read",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "low",
+    "push": false,
+    "status": "queued",
+    "due": null,
+    "area": "Work",
+    "createdAt": 1793631600000,
+    "updatedAt": 1793631600000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000004",
+    "title": "Wait on Sam",
+    "why": "",
+    "source": null,
+    "kind": "waiting",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "event",
+     "event": "reply:sam",
+     "label": "when Sam replies"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "queued",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793631600000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000005",
+    "title": "Renew the domain",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "cos",
+    "trigger": {
+     "type": "time",
+     "at": 1793633400000
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "queued",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793631600000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000006",
+    "title": "Fix the faucet",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "thread:thr_a",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "in_progress",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793631600000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000007",
+    "title": "Server down",
+    "why": "",
+    "source": {
+     "kind": "email",
+     "ref": "msg-1",
+     "url": "https://example.com/m/1"
+    },
+    "kind": "do",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "urgent",
+    "push": true,
+    "status": "queued",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793631600000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000008",
+    "title": "Water the plants",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "place",
+     "place": "home",
+     "direction": "arrive"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "queued",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793631600000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000009",
+    "title": "Book the dentist",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "queued",
+    "due": 1793631599000,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793631600000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000010",
+    "title": "Pay the bill",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "queued",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793631600000,
+    "closedAt": null,
+    "closedBy": null
+   }
+  ]
+ },
+ {
+  "step": "voice add",
+  "value": {
+   "id": "loop_00000000-0000-4000-8000-000000000011",
+   "title": "Buy milk",
+   "why": "",
+   "source": null,
+   "kind": "do",
+   "options": [],
+   "owner": "cos",
+   "trigger": {
+    "type": "none"
+   },
+   "priority": "normal",
+   "push": false,
+   "status": "in_progress",
+   "due": null,
+   "area": null,
+   "createdAt": 1793631600000,
+   "updatedAt": 1793631600000,
+   "closedAt": null,
+   "closedBy": null
+  }
+ },
+ {
+  "step": "posts after voice add",
+  "value": [
+   "Fill in draft todo loop_00000000-0000-4000-8000-000000000011 from this typed line using todos_update, then queue it: \"Buy milk\""
+  ]
+ },
+ {
+  "step": "posts after tick",
+  "value": [
+   "Please post this card in your chat exactly once: ::loop{id=\"loop_00000000-0000-4000-8000-000000000007\"}",
+   "Please post this card in your chat exactly once: ::loop{id=\"loop_00000000-0000-4000-8000-000000000002\"}",
+   "Please post this card in your chat exactly once: ::loop{id=\"loop_00000000-0000-4000-8000-000000000009\"}"
+  ]
+ },
+ {
+  "step": "notified after tick",
+  "value": [
+   "loop_00000000-0000-4000-8000-000000000007"
+  ]
+ },
+ {
+  "step": "list",
+  "value": {
+   "needsYouNow": [
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000007",
+     "title": "Server down",
+     "why": "",
+     "source": {
+      "kind": "email",
+      "ref": "msg-1",
+      "url": "https://example.com/m/1"
+     },
+     "kind": "do",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "none"
+     },
+     "priority": "urgent",
+     "push": true,
+     "status": "surfaced",
+     "due": null,
+     "area": null,
+     "createdAt": 1793631600000,
+     "updatedAt": 1793631600000,
+     "closedAt": null,
+     "closedBy": null
+    },
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000002",
+     "title": "Pick a venue",
+     "why": "",
+     "source": null,
+     "kind": "decide",
+     "options": [
+      "Hall",
+      "Park"
+     ],
+     "owner": "patrick",
+     "trigger": {
+      "type": "none"
+     },
+     "priority": "normal",
+     "push": false,
+     "status": "surfaced",
+     "due": null,
+     "area": null,
+     "createdAt": 1793631600000,
+     "updatedAt": 1793631600000,
+     "closedAt": null,
+     "closedBy": null
+    },
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000009",
+     "title": "Book the dentist",
+     "why": "",
+     "source": null,
+     "kind": "do",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "none"
+     },
+     "priority": "normal",
+     "push": false,
+     "status": "surfaced",
+     "due": 1793631599000,
+     "area": null,
+     "createdAt": 1793631600000,
+     "updatedAt": 1793631600000,
+     "closedAt": null,
+     "closedBy": null
+    }
+   ],
+   "comingUp": [
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000001",
+     "title": "Call the plumber",
+     "why": "Leak under the sink",
+     "source": null,
+     "kind": "do",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "time",
+      "at": 1793635200000
+     },
+     "priority": "normal",
+     "push": true,
+     "status": "queued",
+     "due": 1793638800000,
+     "area": "Home",
+     "createdAt": 1793631600000,
+     "updatedAt": 1793631600000,
+     "closedAt": null,
+     "closedBy": null
+    },
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000003",
+     "title": "Read the report",
+     "why": "",
+     "source": null,
+     "kind": "read",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "none"
+     },
+     "priority": "low",
+     "push": false,
+     "status": "queued",
+     "due": null,
+     "area": "Work",
+     "createdAt": 1793631600000,
+     "updatedAt": 1793631600000,
+     "closedAt": null,
+     "closedBy": null
+    },
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000005",
+     "title": "Renew the domain",
+     "why": "",
+     "source": null,
+     "kind": "do",
+     "options": [],
+     "owner": "cos",
+     "trigger": {
+      "type": "time",
+      "at": 1793633400000
+     },
+     "priority": "normal",
+     "push": false,
+     "status": "queued",
+     "due": null,
+     "area": null,
+     "createdAt": 1793631600000,
+     "updatedAt": 1793631600000,
+     "closedAt": null,
+     "closedBy": null
+    },
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000008",
+     "title": "Water the plants",
+     "why": "",
+     "source": null,
+     "kind": "do",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "place",
+      "place": "home",
+      "direction": "arrive"
+     },
+     "priority": "normal",
+     "push": false,
+     "status": "queued",
+     "due": null,
+     "area": null,
+     "createdAt": 1793631600000,
+     "updatedAt": 1793631600000,
+     "closedAt": null,
+     "closedBy": null
+    },
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000010",
+     "title": "Pay the bill",
+     "why": "",
+     "source": null,
+     "kind": "do",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "none"
+     },
+     "priority": "normal",
+     "push": false,
+     "status": "queued",
+     "due": null,
+     "area": null,
+     "createdAt": 1793631600000,
+     "updatedAt": 1793631600000,
+     "closedAt": null,
+     "closedBy": null
+    }
+   ],
+   "agentsOnIt": [
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000006",
+     "title": "Fix the faucet",
+     "why": "",
+     "source": null,
+     "kind": "do",
+     "options": [],
+     "owner": "thread:thr_a",
+     "trigger": {
+      "type": "none"
+     },
+     "priority": "normal",
+     "push": false,
+     "status": "in_progress",
+     "due": null,
+     "area": null,
+     "createdAt": 1793631600000,
+     "updatedAt": 1793631600000,
+     "closedAt": null,
+     "closedBy": null
+    },
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000011",
+     "title": "Buy milk",
+     "why": "",
+     "source": null,
+     "kind": "do",
+     "options": [],
+     "owner": "cos",
+     "trigger": {
+      "type": "none"
+     },
+     "priority": "normal",
+     "push": false,
+     "status": "in_progress",
+     "due": null,
+     "area": null,
+     "createdAt": 1793631600000,
+     "updatedAt": 1793631600000,
+     "closedAt": null,
+     "closedBy": null
+    }
+   ],
+   "waitingOnOthers": [
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000004",
+     "title": "Wait on Sam",
+     "why": "",
+     "source": null,
+     "kind": "waiting",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "event",
+      "event": "reply:sam",
+      "label": "when Sam replies"
+     },
+     "priority": "normal",
+     "push": false,
+     "status": "queued",
+     "due": null,
+     "area": null,
+     "createdAt": 1793631600000,
+     "updatedAt": 1793631600000,
+     "closedAt": null,
+     "closedBy": null
+    }
+   ],
+   "done": [],
+   "held": [
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000010",
+     "reason": "budget"
+    },
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000003",
+     "reason": "morning"
+    }
+   ],
+   "areas": [
+    "Home",
+    "Work"
+   ],
+   "owners": [
+    {
+     "owner": "thread:thr_a",
+     "name": "Plumbing lead",
+     "threadId": "thr_a"
+    }
+   ]
+  }
+ },
+ {
+  "step": "list owner user",
+  "value": {
+   "needsYouNow": [],
+   "comingUp": [],
+   "agentsOnIt": [],
+   "waitingOnOthers": [],
+   "done": [],
+   "held": [
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000010",
+     "reason": "budget"
+    },
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000003",
+     "reason": "morning"
+    }
+   ],
+   "areas": [
+    "Home",
+    "Work"
+   ],
+   "owners": []
+  }
+ },
+ {
+  "step": "list area Home",
+  "value": {
+   "needsYouNow": [],
+   "comingUp": [
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000001",
+     "title": "Call the plumber",
+     "why": "Leak under the sink",
+     "source": null,
+     "kind": "do",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "time",
+      "at": 1793635200000
+     },
+     "priority": "normal",
+     "push": true,
+     "status": "queued",
+     "due": 1793638800000,
+     "area": "Home",
+     "createdAt": 1793631600000,
+     "updatedAt": 1793631600000,
+     "closedAt": null,
+     "closedBy": null
+    }
+   ],
+   "agentsOnIt": [],
+   "waitingOnOthers": [],
+   "done": [],
+   "held": [
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000010",
+     "reason": "budget"
+    },
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000003",
+     "reason": "morning"
+    }
+   ],
+   "areas": [
+    "Home",
+    "Work"
+   ],
+   "owners": []
+  }
+ },
+ {
+  "step": "posts after an hour",
+  "value": [
+   "Todo loop_00000000-0000-4000-8000-000000000005 is due: \"Renew the domain\". Owner: cos. Carry out the next step now, and record progress with todos_update or todos_act."
+  ]
+ },
+ {
+  "step": "notified after an hour",
+  "value": []
+ },
+ {
+  "step": "act choose",
+  "value": {
+   "id": "loop_00000000-0000-4000-8000-000000000002",
+   "title": "Pick a venue",
+   "why": "",
+   "source": null,
+   "kind": "decide",
+   "options": [
+    "Hall",
+    "Park"
+   ],
+   "owner": "patrick",
+   "trigger": {
+    "type": "none"
+   },
+   "priority": "normal",
+   "push": false,
+   "status": "done",
+   "due": null,
+   "area": null,
+   "createdAt": 1793631600000,
+   "updatedAt": 1793635200000,
+   "closedAt": 1793635200000,
+   "closedBy": "patrick"
+  }
+ },
+ {
+  "step": "act snooze",
+  "value": {
+   "id": "loop_00000000-0000-4000-8000-000000000003",
+   "title": "Read the report",
+   "why": "",
+   "source": null,
+   "kind": "read",
+   "options": [],
+   "owner": "patrick",
+   "trigger": {
+    "type": "time",
+    "at": 1793664000000
+   },
+   "priority": "low",
+   "push": false,
+   "status": "snoozed",
+   "due": null,
+   "area": "Work",
+   "createdAt": 1793631600000,
+   "updatedAt": 1793635200000,
+   "closedAt": null,
+   "closedBy": null
+  }
+ },
+ {
+  "step": "act hand_off",
+  "value": {
+   "id": "loop_00000000-0000-4000-8000-000000000004",
+   "title": "Wait on Sam",
+   "why": "",
+   "source": null,
+   "kind": "waiting",
+   "options": [],
+   "owner": "thread:thr_a",
+   "trigger": {
+    "type": "event",
+    "event": "reply:sam",
+    "label": "when Sam replies"
+   },
+   "priority": "normal",
+   "push": false,
+   "status": "in_progress",
+   "due": null,
+   "area": null,
+   "createdAt": 1793631600000,
+   "updatedAt": 1793635200000,
+   "closedAt": null,
+   "closedBy": null
+  }
+ },
+ {
+  "step": "act nudge",
+  "value": {
+   "id": "loop_00000000-0000-4000-8000-000000000006",
+   "title": "Fix the faucet",
+   "why": "",
+   "source": null,
+   "kind": "do",
+   "options": [],
+   "owner": "thread:thr_a",
+   "trigger": {
+    "type": "none"
+   },
+   "priority": "normal",
+   "push": false,
+   "status": "in_progress",
+   "due": null,
+   "area": null,
+   "createdAt": 1793631600000,
+   "updatedAt": 1793635200000,
+   "closedAt": null,
+   "closedBy": null
+  }
+ },
+ {
+  "step": "act keep",
+  "value": {
+   "id": "loop_00000000-0000-4000-8000-000000000009",
+   "title": "Book the dentist",
+   "why": "",
+   "source": null,
+   "kind": "do",
+   "options": [],
+   "owner": "patrick",
+   "trigger": {
+    "type": "none"
+   },
+   "priority": "normal",
+   "push": false,
+   "status": "surfaced",
+   "due": 1793631599000,
+   "area": null,
+   "createdAt": 1793631600000,
+   "updatedAt": 1793635200000,
+   "closedAt": null,
+   "closedBy": null
+  }
+ },
+ {
+  "step": "act got_it",
+  "value": {
+   "id": "loop_00000000-0000-4000-8000-000000000010",
+   "title": "Pay the bill",
+   "why": "",
+   "source": null,
+   "kind": "do",
+   "options": [],
+   "owner": "patrick",
+   "trigger": {
+    "type": "none"
+   },
+   "priority": "normal",
+   "push": false,
+   "status": "done",
+   "due": null,
+   "area": null,
+   "createdAt": 1793631600000,
+   "updatedAt": 1793635200000,
+   "closedAt": 1793635200000,
+   "closedBy": "patrick"
+  }
+ },
+ {
+  "step": "act drop",
+  "value": {
+   "id": "loop_00000000-0000-4000-8000-000000000011",
+   "title": "Buy milk",
+   "why": "",
+   "source": null,
+   "kind": "do",
+   "options": [],
+   "owner": "cos",
+   "trigger": {
+    "type": "none"
+   },
+   "priority": "normal",
+   "push": false,
+   "status": "dropped",
+   "due": null,
+   "area": null,
+   "createdAt": 1793631600000,
+   "updatedAt": 1793635200000,
+   "closedAt": 1793635200000,
+   "closedBy": "patrick"
+  }
+ },
+ {
+  "step": "act done",
+  "value": {
+   "id": "loop_00000000-0000-4000-8000-000000000007",
+   "title": "Server down",
+   "why": "",
+   "source": {
+    "kind": "email",
+    "ref": "msg-1",
+    "url": "https://example.com/m/1"
+   },
+   "kind": "do",
+   "options": [],
+   "owner": "patrick",
+   "trigger": {
+    "type": "none"
+   },
+   "priority": "urgent",
+   "push": true,
+   "status": "done",
+   "due": null,
+   "area": null,
+   "createdAt": 1793631600000,
+   "updatedAt": 1793635200000,
+   "closedAt": 1793635200000,
+   "closedBy": "patrick"
+  }
+ },
+ {
+  "step": "act on closed",
+  "value": {
+   "id": "loop_00000000-0000-4000-8000-000000000007",
+   "title": "Server down",
+   "why": "",
+   "source": {
+    "kind": "email",
+    "ref": "msg-1",
+    "url": "https://example.com/m/1"
+   },
+   "kind": "do",
+   "options": [],
+   "owner": "patrick",
+   "trigger": {
+    "type": "none"
+   },
+   "priority": "urgent",
+   "push": true,
+   "status": "done",
+   "due": null,
+   "area": null,
+   "createdAt": 1793631600000,
+   "updatedAt": 1793635200000,
+   "closedAt": 1793635200000,
+   "closedBy": "patrick"
+  }
+ },
+ {
+  "step": "posts after acts",
+  "value": [
+   "Todo loop_00000000-0000-4000-8000-000000000002: choose. Hall Owner: the user. Use todos_list to review and carry out the next step.",
+   "Todo loop_00000000-0000-4000-8000-000000000004: hand_off.  Owner: thread:thr_a. Use todos_list to review and carry out the next step.",
+   "Todo loop_00000000-0000-4000-8000-000000000006: nudge. Draft the nudge message and show it to the user in this chat for approval. Do not send it until they approve."
+  ]
+ },
+ {
+  "step": "update",
+  "value": {
+   "id": "loop_00000000-0000-4000-8000-000000000001",
+   "title": "Call the plumber",
+   "why": "Leak under the kitchen sink",
+   "source": null,
+   "kind": "do",
+   "options": [],
+   "owner": "patrick",
+   "trigger": {
+    "type": "time",
+    "at": 1793635200000
+   },
+   "priority": "normal",
+   "push": true,
+   "status": "queued",
+   "due": 1793638800000,
+   "area": "House",
+   "createdAt": 1793631600000,
+   "updatedAt": 1793635260000,
+   "closedAt": null,
+   "closedBy": null
+  }
+ },
+ {
+  "step": "update reopen",
+  "value": {
+   "id": "loop_00000000-0000-4000-8000-000000000007",
+   "title": "Server down",
+   "why": "",
+   "source": {
+    "kind": "email",
+    "ref": "msg-1",
+    "url": "https://example.com/m/1"
+   },
+   "kind": "do",
+   "options": [],
+   "owner": "patrick",
+   "trigger": {
+    "type": "none"
+   },
+   "priority": "urgent",
+   "push": true,
+   "status": "surfaced",
+   "due": null,
+   "area": null,
+   "createdAt": 1793631600000,
+   "updatedAt": 1793635260000,
+   "closedAt": null,
+   "closedBy": null
+  }
+ },
+ {
+  "step": "surface now",
+  "value": {
+   "id": "loop_00000000-0000-4000-8000-000000000008",
+   "title": "Water the plants",
+   "why": "",
+   "source": null,
+   "kind": "do",
+   "options": [],
+   "owner": "patrick",
+   "trigger": {
+    "type": "place",
+    "place": "home",
+    "direction": "arrive"
+   },
+   "priority": "normal",
+   "push": false,
+   "status": "surfaced",
+   "due": null,
+   "area": null,
+   "createdAt": 1793631600000,
+   "updatedAt": 1793635260000,
+   "closedAt": null,
+   "closedBy": null
+  }
+ },
+ {
+  "step": "tool update surfaceNow",
+  "value": {
+   "id": "loop_00000000-0000-4000-8000-000000000009",
+   "title": "Book the dentist",
+   "why": "",
+   "source": null,
+   "kind": "do",
+   "options": [],
+   "owner": "patrick",
+   "trigger": {
+    "type": "none"
+   },
+   "priority": "normal",
+   "push": false,
+   "status": "queued",
+   "due": 1793631599000,
+   "area": null,
+   "createdAt": 1793631600000,
+   "updatedAt": 1793635260000,
+   "closedAt": null,
+   "closedBy": null
+  }
+ },
+ {
+  "step": "posts after updates",
+  "value": [
+   "Please post this card in your chat exactly once: ::loop{id=\"loop_00000000-0000-4000-8000-000000000008\"}"
+  ]
+ },
+ {
+  "step": "fire",
+  "value": {
+   "matched": 0
+  }
+ },
+ {
+  "step": "place",
+  "value": {
+   "matched": 0
+  }
+ },
+ {
+  "step": "set places",
+  "value": {
+   "names": [
+    "Home",
+    "Office"
+   ]
+  }
+ },
+ {
+  "step": "places",
+  "value": {
+   "names": [
+    "Home",
+    "Office"
+   ]
+  }
+ },
+ {
+  "step": "morning",
+  "value": {
+   "date": "2026-11-02",
+   "items": [
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000009",
+     "title": "Book the dentist",
+     "why": "",
+     "source": null,
+     "kind": "do",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "none"
+     },
+     "priority": "normal",
+     "push": false,
+     "status": "queued",
+     "due": 1793631599000,
+     "area": null,
+     "createdAt": 1793631600000,
+     "updatedAt": 1793635260000,
+     "closedAt": null,
+     "closedBy": null
+    },
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000001",
+     "title": "Call the plumber",
+     "why": "Leak under the kitchen sink",
+     "source": null,
+     "kind": "do",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "time",
+      "at": 1793635200000
+     },
+     "priority": "normal",
+     "push": true,
+     "status": "queued",
+     "due": 1793638800000,
+     "area": "House",
+     "createdAt": 1793631600000,
+     "updatedAt": 1793635260000,
+     "closedAt": null,
+     "closedBy": null
+    }
+   ],
+   "more": 0,
+   "lowPriority": []
+  }
+ },
+ {
+  "step": "tool morning",
+  "value": {
+   "date": "2026-11-02",
+   "items": [
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000009",
+     "title": "Book the dentist",
+     "why": "",
+     "source": null,
+     "kind": "do",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "none"
+     },
+     "priority": "normal",
+     "push": false,
+     "status": "queued",
+     "due": 1793631599000,
+     "area": null,
+     "createdAt": 1793631600000,
+     "updatedAt": 1793635260000,
+     "closedAt": null,
+     "closedBy": null
+    },
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000001",
+     "title": "Call the plumber",
+     "why": "Leak under the kitchen sink",
+     "source": null,
+     "kind": "do",
+     "options": [],
+     "owner": "patrick",
+     "trigger": {
+      "type": "time",
+      "at": 1793635200000
+     },
+     "priority": "normal",
+     "push": true,
+     "status": "queued",
+     "due": 1793638800000,
+     "area": "House",
+     "createdAt": 1793631600000,
+     "updatedAt": 1793635260000,
+     "closedAt": null,
+     "closedBy": null
+    }
+   ],
+   "more": 0,
+   "lowPriority": []
+  }
+ },
+ {
+  "step": "tool list",
+  "value": {
+   "needsYouNow": [],
+   "comingUp": [],
+   "agentsOnIt": [],
+   "waitingOnOthers": [],
+   "done": [],
+   "held": [
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000001",
+     "reason": "budget"
+    },
+    {
+     "id": "loop_00000000-0000-4000-8000-000000000009",
+     "reason": "budget"
+    }
+   ],
+   "areas": [
+    "House",
+    "Work"
+   ],
+   "owners": []
+  }
+ },
+ {
+  "step": "tool fire",
+  "value": {
+   "matched": 0
+  }
+ },
+ {
+  "step": "get loop_00000000-0000-4000-8000-000000000001",
+  "value": {
+   "loop": {
+    "id": "loop_00000000-0000-4000-8000-000000000001",
+    "title": "Call the plumber",
+    "why": "Leak under the kitchen sink",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "time",
+     "at": 1793635200000
+    },
+    "priority": "normal",
+    "push": true,
+    "status": "queued",
+    "due": 1793638800000,
+    "area": "House",
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635260000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   "history": []
+  }
+ },
+ {
+  "step": "get loop_00000000-0000-4000-8000-000000000002",
+  "value": {
+   "loop": {
+    "id": "loop_00000000-0000-4000-8000-000000000002",
+    "title": "Pick a venue",
+    "why": "",
+    "source": null,
+    "kind": "decide",
+    "options": [
+     "Hall",
+     "Park"
+    ],
+    "owner": "patrick",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "done",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635200000,
+    "closedAt": 1793635200000,
+    "closedBy": "patrick"
+   },
+   "history": [
+    {
+     "type": "surfaced",
+     "at": 1793631600000,
+     "data": "{}"
+    },
+    {
+     "type": "closed",
+     "at": 1793635200000,
+     "data": "{\"action\":\"choose\",\"option\":\"Hall\"}"
+    },
+    {
+     "type": "acted",
+     "at": 1793635200000,
+     "data": "{\"action\":\"choose\",\"option\":\"Hall\"}"
+    }
+   ]
+  }
+ },
+ {
+  "step": "get loop_00000000-0000-4000-8000-000000000003",
+  "value": {
+   "loop": {
+    "id": "loop_00000000-0000-4000-8000-000000000003",
+    "title": "Read the report",
+    "why": "",
+    "source": null,
+    "kind": "read",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "time",
+     "at": 1793664000000
+    },
+    "priority": "low",
+    "push": false,
+    "status": "snoozed",
+    "due": null,
+    "area": "Work",
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635200000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   "history": [
+    {
+     "type": "snoozed",
+     "at": 1793635200000,
+     "data": "{\"until\":{\"type\":\"time\",\"at\":1793664000000}}"
+    },
+    {
+     "type": "acted",
+     "at": 1793635200000,
+     "data": "{\"action\":\"snooze\"}"
+    }
+   ]
+  }
+ },
+ {
+  "step": "get loop_00000000-0000-4000-8000-000000000004",
+  "value": {
+   "loop": {
+    "id": "loop_00000000-0000-4000-8000-000000000004",
+    "title": "Wait on Sam",
+    "why": "",
+    "source": null,
+    "kind": "waiting",
+    "options": [],
+    "owner": "thread:thr_a",
+    "trigger": {
+     "type": "event",
+     "event": "reply:sam",
+     "label": "when Sam replies"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "in_progress",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635200000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   "history": [
+    {
+     "type": "handed_off",
+     "at": 1793635200000,
+     "data": "{\"owner\":\"thread:thr_a\"}"
+    },
+    {
+     "type": "acted",
+     "at": 1793635200000,
+     "data": "{\"action\":\"hand_off\"}"
+    }
+   ],
+   "owner": {
+    "owner": "thread:thr_a",
+    "name": "Plumbing lead",
+    "threadId": "thr_a"
+   }
+  }
+ },
+ {
+  "step": "get loop_00000000-0000-4000-8000-000000000005",
+  "value": {
+   "loop": {
+    "id": "loop_00000000-0000-4000-8000-000000000005",
+    "title": "Renew the domain",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "cos",
+    "trigger": {
+     "type": "time",
+     "at": 1793633400000
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "in_progress",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635200000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   "history": [
+    {
+     "type": "started",
+     "at": 1793635200000,
+     "data": "{}"
+    }
+   ]
+  }
+ },
+ {
+  "step": "get loop_00000000-0000-4000-8000-000000000006",
+  "value": {
+   "loop": {
+    "id": "loop_00000000-0000-4000-8000-000000000006",
+    "title": "Fix the faucet",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "thread:thr_a",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "in_progress",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635200000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   "history": [
+    {
+     "type": "acted",
+     "at": 1793635200000,
+     "data": "{\"action\":\"nudge\"}"
+    }
+   ],
+   "owner": {
+    "owner": "thread:thr_a",
+    "name": "Plumbing lead",
+    "threadId": "thr_a"
+   }
+  }
+ },
+ {
+  "step": "get loop_00000000-0000-4000-8000-000000000007",
+  "value": {
+   "loop": {
+    "id": "loop_00000000-0000-4000-8000-000000000007",
+    "title": "Server down",
+    "why": "",
+    "source": {
+     "kind": "email",
+     "ref": "msg-1",
+     "url": "https://example.com/m/1"
+    },
+    "kind": "do",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "urgent",
+    "push": true,
+    "status": "surfaced",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635260000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   "history": [
+    {
+     "type": "surfaced",
+     "at": 1793631600000,
+     "data": "{}"
+    },
+    {
+     "type": "notified",
+     "at": 1793631600000,
+     "data": "{}"
+    },
+    {
+     "type": "closed",
+     "at": 1793635200000,
+     "data": "{\"action\":\"done\"}"
+    },
+    {
+     "type": "acted",
+     "at": 1793635200000,
+     "data": "{\"action\":\"done\"}"
+    },
+    {
+     "type": "reopened",
+     "at": 1793635260000,
+     "data": "{\"status\":\"surfaced\"}"
+    }
+   ]
+  }
+ },
+ {
+  "step": "get loop_00000000-0000-4000-8000-000000000008",
+  "value": {
+   "loop": {
+    "id": "loop_00000000-0000-4000-8000-000000000008",
+    "title": "Water the plants",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "place",
+     "place": "home",
+     "direction": "arrive"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "surfaced",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635260000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   "history": [
+    {
+     "type": "surfaced_by_you",
+     "at": 1793635260000,
+     "data": "{}"
+    }
+   ]
+  }
+ },
+ {
+  "step": "get loop_00000000-0000-4000-8000-000000000009",
+  "value": {
+   "loop": {
+    "id": "loop_00000000-0000-4000-8000-000000000009",
+    "title": "Book the dentist",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "queued",
+    "due": 1793631599000,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635260000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   "history": [
+    {
+     "type": "surfaced",
+     "at": 1793631600000,
+     "data": "{}"
+    },
+    {
+     "type": "acted",
+     "at": 1793635200000,
+     "data": "{\"action\":\"keep\"}"
+    }
+   ]
+  }
+ },
+ {
+  "step": "get loop_00000000-0000-4000-8000-000000000010",
+  "value": {
+   "loop": {
+    "id": "loop_00000000-0000-4000-8000-000000000010",
+    "title": "Pay the bill",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "done",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635200000,
+    "closedAt": 1793635200000,
+    "closedBy": "patrick"
+   },
+   "history": [
+    {
+     "type": "closed",
+     "at": 1793635200000,
+     "data": "{\"action\":\"got_it\"}"
+    },
+    {
+     "type": "acted",
+     "at": 1793635200000,
+     "data": "{\"action\":\"got_it\"}"
+    }
+   ]
+  }
+ },
+ {
+  "step": "get loop_00000000-0000-4000-8000-000000000011",
+  "value": {
+   "loop": {
+    "id": "loop_00000000-0000-4000-8000-000000000011",
+    "title": "Buy milk",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "cos",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "dropped",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635200000,
+    "closedAt": 1793635200000,
+    "closedBy": "patrick"
+   },
+   "history": [
+    {
+     "type": "closed",
+     "at": 1793635200000,
+     "data": "{\"action\":\"drop\"}"
+    },
+    {
+     "type": "acted",
+     "at": 1793635200000,
+     "data": "{\"action\":\"drop\"}"
+    }
+   ]
+  }
+ },
+ {
+  "step": "tool get",
+  "value": {
+   "loop": {
+    "id": "loop_00000000-0000-4000-8000-000000000006",
+    "title": "Fix the faucet",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "thread:thr_a",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "in_progress",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635200000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   "history": [
+    {
+     "type": "acted",
+     "at": 1793635200000,
+     "data": "{\"action\":\"nudge\"}"
+    }
+   ],
+   "owner": {
+    "owner": "thread:thr_a",
+    "name": "Plumbing lead",
+    "threadId": "thr_a"
+   }
+  }
+ },
+ {
+  "step": "get missing",
+  "value": "Todo not found"
+ },
+ {
+  "step": "mention search",
+  "value": [
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000007",
+    "title": "Server down",
+    "subtitle": "Do",
+    "icon": "Circle"
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000008",
+    "title": "Water the plants",
+    "subtitle": "Do",
+    "icon": "Circle"
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000003",
+    "title": "Read the report",
+    "subtitle": "Read",
+    "icon": "FileText"
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000001",
+    "title": "Call the plumber",
+    "subtitle": "Do",
+    "icon": "Circle"
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000009",
+    "title": "Book the dentist",
+    "subtitle": "Do",
+    "icon": "Circle"
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000005",
+    "title": "Renew the domain",
+    "subtitle": "Do",
+    "icon": "Circle"
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000006",
+    "title": "Fix the faucet",
+    "subtitle": "Do",
+    "icon": "Circle"
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000004",
+    "title": "Wait on Sam",
+    "subtitle": "Waiting on others",
+    "icon": "TimeSchedule"
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000002",
+    "title": "Pick a venue",
+    "subtitle": "Done",
+    "icon": "Fork"
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000010",
+    "title": "Pay the bill",
+    "subtitle": "Done",
+    "icon": "Circle"
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000011",
+    "title": "Buy milk",
+    "subtitle": "Done",
+    "icon": "Circle"
+   }
+  ]
+ },
+ {
+  "step": "mention resolve",
+  "value": {
+   "context": "The user brought this todo into the chat to discuss it; it is the topic of their message. Use todos_get for its history and todos_update or todos_act to change it.\nid: loop_00000000-0000-4000-8000-000000000001\ntitle: Call the plumber\nwhy: Leak under the kitchen sink\ntrigger: time, 2026-11-02T16:00:00.000Z, sends to iPhone\nkind: do · status: queued · owner: the user · priority: normal · area: House\ndue: 2026-11-02T17:00:00.000Z"
+  }
+ },
+ {
+  "step": "mention resolve missing",
+  "value": {
+   "context": "The user mentioned todo loop_missing, which no longer exists."
+  }
+ },
+ {
+  "step": "posts later",
+  "value": []
+ },
+ {
+  "step": "notified later",
+  "value": []
+ },
+ {
+  "step": "held",
+  "value": [
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000001",
+    "reason": "budget"
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000009",
+    "reason": "budget"
+   }
+  ]
+ },
+ {
+  "step": "all loops",
+  "value": [
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000001",
+    "title": "Call the plumber",
+    "why": "Leak under the kitchen sink",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "time",
+     "at": 1793635200000
+    },
+    "priority": "normal",
+    "push": true,
+    "status": "queued",
+    "due": 1793638800000,
+    "area": "House",
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635260000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000002",
+    "title": "Pick a venue",
+    "why": "",
+    "source": null,
+    "kind": "decide",
+    "options": [
+     "Hall",
+     "Park"
+    ],
+    "owner": "patrick",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "done",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635200000,
+    "closedAt": 1793635200000,
+    "closedBy": "patrick"
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000003",
+    "title": "Read the report",
+    "why": "",
+    "source": null,
+    "kind": "read",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "time",
+     "at": 1793664000000
+    },
+    "priority": "low",
+    "push": false,
+    "status": "snoozed",
+    "due": null,
+    "area": "Work",
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635200000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000004",
+    "title": "Wait on Sam",
+    "why": "",
+    "source": null,
+    "kind": "waiting",
+    "options": [],
+    "owner": "thread:thr_a",
+    "trigger": {
+     "type": "event",
+     "event": "reply:sam",
+     "label": "when Sam replies"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "in_progress",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635200000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000005",
+    "title": "Renew the domain",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "cos",
+    "trigger": {
+     "type": "time",
+     "at": 1793633400000
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "in_progress",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635200000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000006",
+    "title": "Fix the faucet",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "thread:thr_a",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "in_progress",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635200000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000007",
+    "title": "Server down",
+    "why": "",
+    "source": {
+     "kind": "email",
+     "ref": "msg-1",
+     "url": "https://example.com/m/1"
+    },
+    "kind": "do",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "urgent",
+    "push": true,
+    "status": "surfaced",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635260000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000008",
+    "title": "Water the plants",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "place",
+     "place": "home",
+     "direction": "arrive"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "surfaced",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635260000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000009",
+    "title": "Book the dentist",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "queued",
+    "due": 1793631599000,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635260000,
+    "closedAt": null,
+    "closedBy": null
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000010",
+    "title": "Pay the bill",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "patrick",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "done",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635200000,
+    "closedAt": 1793635200000,
+    "closedBy": "patrick"
+   },
+   {
+    "id": "loop_00000000-0000-4000-8000-000000000011",
+    "title": "Buy milk",
+    "why": "",
+    "source": null,
+    "kind": "do",
+    "options": [],
+    "owner": "cos",
+    "trigger": {
+     "type": "none"
+    },
+    "priority": "normal",
+    "push": false,
+    "status": "dropped",
+    "due": null,
+    "area": null,
+    "createdAt": 1793631600000,
+    "updatedAt": 1793635200000,
+    "closedAt": 1793635200000,
+    "closedBy": "patrick"
+   }
+  ]
+ },
+ {
+  "step": "work tool create",
+  "value": [
+   {
+    "id": "wc_00000000-0000-4000-8000-000000000012",
+    "directive": "::work{id=\"wc_00000000-0000-4000-8000-000000000012\"}",
+    "post": "Post this line once, on its own line, in thread thr_main: ::work{id=\"wc_00000000-0000-4000-8000-000000000012\"}"
+   },
+   {
+    "id": "wc_00000000-0000-4000-8000-000000000013",
+    "directive": "::work{id=\"wc_00000000-0000-4000-8000-000000000013\"}",
+    "post": "Post this line once, on its own line, in thread thr_main: ::work{id=\"wc_00000000-0000-4000-8000-000000000013\"}"
+   }
+  ]
+ },
+ {
+  "step": "work rpc create",
+  "value": {
+   "card": {
+    "id": "wc_00000000-0000-4000-8000-000000000014",
+    "threadId": "thr_main",
+    "title": "Lead check",
+    "kind": "lead",
+    "state": "waiting",
+    "step": null,
+    "line": null,
+    "needs": "ignored",
+    "workerThreadId": null,
+    "messageId": null,
+    "messageSeq": null,
+    "createdAt": 1793646060000,
+    "updatedAt": 1793646060000,
+    "finishedAt": null,
+    "stale": false,
+    "dismissedAt": null
+   },
+   "directive": "::work{id=\"wc_00000000-0000-4000-8000-000000000014\"}"
+  }
+ },
+ {
+  "step": "work update needs-you",
+  "value": {
+   "id": "wc_00000000-0000-4000-8000-000000000012",
+   "threadId": "thr_main",
+   "title": "Release 1.0.2",
+   "kind": "release",
+   "state": "needs-you",
+   "step": "2/3 Tests",
+   "line": null,
+   "needs": "Approve the push",
+   "workerThreadId": null,
+   "messageId": null,
+   "messageSeq": null,
+   "createdAt": 1793646060000,
+   "updatedAt": 1793646061000,
+   "finishedAt": null,
+   "stale": false,
+   "dismissedAt": null
+  }
+ },
+ {
+  "step": "work update running",
+  "value": {
+   "id": "wc_00000000-0000-4000-8000-000000000012",
+   "threadId": "thr_main",
+   "title": "Release 1.0.2",
+   "kind": "release",
+   "state": "running",
+   "step": "2/3 Tests",
+   "line": null,
+   "needs": null,
+   "workerThreadId": null,
+   "messageId": null,
+   "messageSeq": null,
+   "createdAt": 1793646060000,
+   "updatedAt": 1793646061000,
+   "finishedAt": null,
+   "stale": false,
+   "dismissedAt": null
+  }
+ },
+ {
+  "step": "work update clear line",
+  "value": {
+   "id": "wc_00000000-0000-4000-8000-000000000013",
+   "threadId": "thr_main",
+   "title": "Fix the flaky test",
+   "kind": "worker",
+   "state": "running",
+   "step": null,
+   "line": null,
+   "needs": null,
+   "workerThreadId": "thr_w",
+   "messageId": null,
+   "messageSeq": null,
+   "createdAt": 1793646060000,
+   "updatedAt": 1793646061000,
+   "finishedAt": null,
+   "stale": false,
+   "dismissedAt": null
+  }
+ },
+ {
+  "step": "work get tool",
+  "value": {
+   "id": "wc_00000000-0000-4000-8000-000000000013",
+   "threadId": "thr_main",
+   "title": "Fix the flaky test",
+   "kind": "worker",
+   "state": "running",
+   "step": null,
+   "line": null,
+   "needs": null,
+   "workerThreadId": "thr_w",
+   "messageId": null,
+   "messageSeq": null,
+   "createdAt": 1793646060000,
+   "updatedAt": 1793646061000,
+   "finishedAt": null,
+   "stale": false,
+   "dismissedAt": null
+  }
+ },
+ {
+  "step": "work anchor",
+  "value": {
+   "id": "wc_00000000-0000-4000-8000-000000000012",
+   "threadId": "thr_main",
+   "title": "Release 1.0.2",
+   "kind": "release",
+   "state": "running",
+   "step": "2/3 Tests",
+   "line": null,
+   "needs": null,
+   "workerThreadId": null,
+   "messageId": "m_7",
+   "messageSeq": 7,
+   "createdAt": 1793646060000,
+   "updatedAt": 1793646061000,
+   "finishedAt": null,
+   "stale": false,
+   "dismissedAt": null
+  }
+ },
+ {
+  "step": "work list",
+  "value": {
+   "cards": [
+    {
+     "id": "wc_00000000-0000-4000-8000-000000000014",
+     "threadId": "thr_main",
+     "title": "Lead check",
+     "kind": "lead",
+     "state": "waiting",
+     "step": null,
+     "line": null,
+     "needs": "ignored",
+     "workerThreadId": null,
+     "messageId": null,
+     "messageSeq": null,
+     "createdAt": 1793646060000,
+     "updatedAt": 1793646060000,
+     "finishedAt": null,
+     "stale": false,
+     "dismissedAt": null
+    },
+    {
+     "id": "wc_00000000-0000-4000-8000-000000000013",
+     "threadId": "thr_main",
+     "title": "Fix the flaky test",
+     "kind": "worker",
+     "state": "running",
+     "step": null,
+     "line": null,
+     "needs": null,
+     "workerThreadId": "thr_w",
+     "messageId": null,
+     "messageSeq": null,
+     "createdAt": 1793646060000,
+     "updatedAt": 1793646061000,
+     "finishedAt": null,
+     "stale": false,
+     "dismissedAt": null
+    },
+    {
+     "id": "wc_00000000-0000-4000-8000-000000000012",
+     "threadId": "thr_main",
+     "title": "Release 1.0.2",
+     "kind": "release",
+     "state": "running",
+     "step": "2/3 Tests",
+     "line": null,
+     "needs": null,
+     "workerThreadId": null,
+     "messageId": "m_7",
+     "messageSeq": 7,
+     "createdAt": 1793646060000,
+     "updatedAt": 1793646061000,
+     "finishedAt": null,
+     "stale": false,
+     "dismissedAt": null
+    }
+   ]
+  }
+ },
+ {
+  "step": "work after worker idle",
+  "value": {
+   "id": "wc_00000000-0000-4000-8000-000000000013",
+   "threadId": "thr_main",
+   "title": "Fix the flaky test",
+   "kind": "worker",
+   "state": "done",
+   "step": null,
+   "line": null,
+   "needs": null,
+   "workerThreadId": "thr_w",
+   "messageId": null,
+   "messageSeq": null,
+   "createdAt": 1793646060000,
+   "updatedAt": 1793646062000,
+   "finishedAt": 1793646062000,
+   "stale": true,
+   "dismissedAt": null
+  }
+ },
+ {
+  "step": "work after worker back",
+  "value": {
+   "id": "wc_00000000-0000-4000-8000-000000000013",
+   "threadId": "thr_main",
+   "title": "Fix the flaky test",
+   "kind": "worker",
+   "state": "running",
+   "step": null,
+   "line": null,
+   "needs": null,
+   "workerThreadId": "thr_w",
+   "messageId": null,
+   "messageSeq": null,
+   "createdAt": 1793646060000,
+   "updatedAt": 1793646062000,
+   "finishedAt": null,
+   "stale": false,
+   "dismissedAt": null
+  }
+ },
+ {
+  "step": "work done",
+  "value": {
+   "id": "wc_00000000-0000-4000-8000-000000000012",
+   "threadId": "thr_main",
+   "title": "Release 1.0.2",
+   "kind": "release",
+   "state": "done",
+   "step": "2/3 Tests",
+   "line": "Shipped",
+   "needs": null,
+   "workerThreadId": null,
+   "messageId": "m_7",
+   "messageSeq": 7,
+   "createdAt": 1793646060000,
+   "updatedAt": 1793646063000,
+   "finishedAt": 1793646063000,
+   "stale": false,
+   "dismissedAt": null
+  }
+ },
+ {
+  "step": "work failed",
+  "value": {
+   "id": "wc_00000000-0000-4000-8000-000000000013",
+   "threadId": "thr_main",
+   "title": "Fix the flaky test",
+   "kind": "worker",
+   "state": "failed",
+   "step": null,
+   "line": null,
+   "needs": null,
+   "workerThreadId": "thr_w",
+   "messageId": null,
+   "messageSeq": null,
+   "createdAt": 1793646060000,
+   "updatedAt": 1793646063000,
+   "finishedAt": 1793646063000,
+   "stale": false,
+   "dismissedAt": null
+  }
+ },
+ {
+  "step": "work dismiss",
+  "value": {
+   "id": "wc_00000000-0000-4000-8000-000000000013",
+   "threadId": "thr_main",
+   "title": "Fix the flaky test",
+   "kind": "worker",
+   "state": "failed",
+   "step": null,
+   "line": null,
+   "needs": null,
+   "workerThreadId": "thr_w",
+   "messageId": null,
+   "messageSeq": null,
+   "createdAt": 1793646060000,
+   "updatedAt": 1793646063000,
+   "finishedAt": 1793646063000,
+   "stale": false,
+   "dismissedAt": 1793646063000
+  }
+ },
+ {
+  "step": "work list after",
+  "value": {
+   "cards": [
+    {
+     "id": "wc_00000000-0000-4000-8000-000000000014",
+     "threadId": "thr_main",
+     "title": "Lead check",
+     "kind": "lead",
+     "state": "waiting",
+     "step": null,
+     "line": null,
+     "needs": "ignored",
+     "workerThreadId": null,
+     "messageId": null,
+     "messageSeq": null,
+     "createdAt": 1793646060000,
+     "updatedAt": 1793646060000,
+     "finishedAt": null,
+     "stale": false,
+     "dismissedAt": null
+    },
+    {
+     "id": "wc_00000000-0000-4000-8000-000000000012",
+     "threadId": "thr_main",
+     "title": "Release 1.0.2",
+     "kind": "release",
+     "state": "done",
+     "step": "2/3 Tests",
+     "line": "Shipped",
+     "needs": null,
+     "workerThreadId": null,
+     "messageId": "m_7",
+     "messageSeq": 7,
+     "createdAt": 1793646060000,
+     "updatedAt": 1793646063000,
+     "finishedAt": 1793646063000,
+     "stale": false,
+     "dismissedAt": null
+    }
+   ]
+  }
+ },
+ {
+  "step": "work clear",
+  "value": {
+   "cleared": 1
+  }
+ },
+ {
+  "step": "work list cleared",
+  "value": {
+   "cards": [
+    {
+     "id": "wc_00000000-0000-4000-8000-000000000014",
+     "threadId": "thr_main",
+     "title": "Lead check",
+     "kind": "lead",
+     "state": "waiting",
+     "step": null,
+     "line": null,
+     "needs": "ignored",
+     "workerThreadId": null,
+     "messageId": null,
+     "messageSeq": null,
+     "createdAt": 1793646060000,
+     "updatedAt": 1793646060000,
+     "finishedAt": null,
+     "stale": false,
+     "dismissedAt": null
+    }
+   ]
+  }
+ },
+ {
+  "step": "work reopen",
+  "value": {
+   "id": "wc_00000000-0000-4000-8000-000000000012",
+   "threadId": "thr_main",
+   "title": "Release 1.0.2",
+   "kind": "release",
+   "state": "running",
+   "step": "2/3 Tests",
+   "line": "Shipped",
+   "needs": null,
+   "workerThreadId": null,
+   "messageId": "m_7",
+   "messageSeq": 7,
+   "createdAt": 1793646060000,
+   "updatedAt": 1793646063000,
+   "finishedAt": null,
+   "stale": false,
+   "dismissedAt": null
+  }
+ },
+ {
+  "step": "work move",
+  "value": {
+   "id": "wc_00000000-0000-4000-8000-000000000012",
+   "threadId": "thr_other",
+   "title": "Release 1.0.2",
+   "kind": "release",
+   "state": "running",
+   "step": "2/3 Tests",
+   "line": "Shipped",
+   "needs": null,
+   "workerThreadId": null,
+   "messageId": null,
+   "messageSeq": null,
+   "createdAt": 1793646060000,
+   "updatedAt": 1793646063000,
+   "finishedAt": null,
+   "stale": false,
+   "dismissedAt": null
+  }
+ },
+ {
+  "step": "work openWithWorker",
+  "value": []
+ },
+ {
+  "step": "work forWorker",
+  "value": [
+   {
+    "id": "wc_00000000-0000-4000-8000-000000000013",
+    "threadId": "thr_main",
+    "title": "Fix the flaky test",
+    "kind": "worker",
+    "state": "failed",
+    "step": null,
+    "line": null,
+    "needs": null,
+    "workerThreadId": "thr_w",
+    "messageId": null,
+    "messageSeq": null,
+    "createdAt": 1793646060000,
+    "updatedAt": 1793646063000,
+    "finishedAt": 1793646063000,
+    "stale": false,
+    "dismissedAt": 1793646063000
+   }
+  ]
+ },
+ {
+  "step": "cli create",
+  "value": {
+   "exitCode": 0,
+   "stdout": "wc_00000000-0000-4000-8000-000000000015\nPost this line once in thr_main:\n::work{id=\"wc_00000000-0000-4000-8000-000000000015\"}\n"
+  }
+ },
+ {
+  "step": "cli create json",
+  "value": {
+   "exitCode": 0,
+   "stdout": "{\n  \"card\": {\n    \"id\": \"wc_00000000-0000-4000-8000-000000000016\",\n    \"threadId\": \"thr_main\",\n    \"title\": \"CLI json\",\n    \"kind\": \"task\",\n    \"state\": \"running\",\n    \"step\": null,\n    \"line\": null,\n    \"needs\": null,\n    \"workerThreadId\": null,\n    \"messageId\": null,\n    \"messageSeq\": null,\n    \"createdAt\": 1793646063000,\n    \"updatedAt\": 1793646063000,\n    \"finishedAt\": null,\n    \"stale\": false,\n    \"dismissedAt\": null\n  },\n  \"directive\": \"::work{id=\\\"wc_00000000-0000-4000-8000-000000000016\\\"}\"\n}\n"
+  }
+ },
+ {
+  "step": "cli update",
+  "value": {
+   "exitCode": 0,
+   "stdout": "wc_00000000-0000-4000-8000-000000000015\tneeds-you\tCLI card\t1/2\tLook\n"
+  }
+ },
+ {
+  "step": "cli update blank",
+  "value": {
+   "exitCode": 0,
+   "stdout": "wc_00000000-0000-4000-8000-000000000015\tneeds-you\tCLI card\tLook\n"
+  }
+ },
+ {
+  "step": "cli show",
+  "value": {
+   "exitCode": 0,
+   "stdout": "{\n  \"id\": \"wc_00000000-0000-4000-8000-000000000015\",\n  \"threadId\": \"thr_main\",\n  \"title\": \"CLI card\",\n  \"kind\": \"todo\",\n  \"state\": \"needs-you\",\n  \"step\": null,\n  \"line\": null,\n  \"needs\": \"Look\",\n  \"workerThreadId\": null,\n  \"messageId\": null,\n  \"messageSeq\": null,\n  \"createdAt\": 1793646063000,\n  \"updatedAt\": 1793646063000,\n  \"finishedAt\": null,\n  \"stale\": false,\n  \"dismissedAt\": null\n}\n"
+  }
+ },
+ {
+  "step": "cli list",
+  "value": {
+   "exitCode": 0,
+   "stdout": "wc_00000000-0000-4000-8000-000000000015\tneeds-you\tCLI card\tLook\nwc_00000000-0000-4000-8000-000000000014\twaiting\tLead check\nwc_00000000-0000-4000-8000-000000000016\trunning\tCLI json\n"
+  }
+ },
+ {
+  "step": "cli dismiss",
+  "value": {
+   "exitCode": 0,
+   "stdout": "wc_00000000-0000-4000-8000-000000000014\twaiting\tLead check\n"
+  }
+ },
+ {
+  "step": "cli clear",
+  "value": {
+   "exitCode": 0,
+   "stdout": "Cleared 0 finished cards.\n"
+  }
+ },
+ {
+  "step": "cli missing",
+  "value": {
+   "exitCode": 1,
+   "stderr": "Work card wc_missing not found\n"
+  }
+ },
+ {
+  "step": "work reopen worker",
+  "value": {
+   "id": "wc_00000000-0000-4000-8000-000000000013",
+   "threadId": "thr_main",
+   "title": "Fix the flaky test",
+   "kind": "worker",
+   "state": "running",
+   "step": null,
+   "line": null,
+   "needs": null,
+   "workerThreadId": "thr_w",
+   "messageId": null,
+   "messageSeq": null,
+   "createdAt": 1793646060000,
+   "updatedAt": 1793646063000,
+   "finishedAt": null,
+   "stale": false,
+   "dismissedAt": null
+  }
+ },
+ {
+  "step": "work after worker deleted",
+  "value": {
+   "id": "wc_00000000-0000-4000-8000-000000000013",
+   "threadId": "thr_main",
+   "title": "Fix the flaky test",
+   "kind": "worker",
+   "state": "done",
+   "step": null,
+   "line": null,
+   "needs": null,
+   "workerThreadId": "thr_w",
+   "messageId": null,
+   "messageSeq": null,
+   "createdAt": 1793646060000,
+   "updatedAt": 1793646063000,
+   "finishedAt": 1793646063000,
+   "stale": true,
+   "dismissedAt": null
+  }
+ },
+ {
+  "step": "work missing",
+  "value": "Work card wc_missing not found"
+ },
+ {
+  "step": "loops after work",
+  "value": [
+   "loop_00000000-0000-4000-8000-000000000001",
+   "loop_00000000-0000-4000-8000-000000000002",
+   "loop_00000000-0000-4000-8000-000000000003",
+   "loop_00000000-0000-4000-8000-000000000004",
+   "loop_00000000-0000-4000-8000-000000000005",
+   "loop_00000000-0000-4000-8000-000000000006",
+   "loop_00000000-0000-4000-8000-000000000007",
+   "loop_00000000-0000-4000-8000-000000000008",
+   "loop_00000000-0000-4000-8000-000000000009",
+   "loop_00000000-0000-4000-8000-000000000010",
+   "loop_00000000-0000-4000-8000-000000000011"
+  ]
+ }
+]

@@ -6,7 +6,7 @@
 // Done, folded. A group shows 8 rows, then "N more", as the Library's do. The
 // Bot chat's pending questions lead Today; a reply not read yet is the
 // chat's unread state, not a todo. Search and the
-// area pills filter it; New hands a typed line to the Bot to fill in. A row
+// area pills filter it; New adds a typed line to Today as the user's. A row
 // opens the todo as a tab in the workbench beside the page (TodoTab.tsx).
 // Todos are one list, the primary Bot's: under another Bot the page is that
 // Bot's Scheduled alone, titled Scheduled.

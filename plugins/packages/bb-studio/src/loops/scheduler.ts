@@ -31,7 +31,7 @@ export class LoopScheduler {
   * and only its push waits.
   */
  plan(now=Date.now()){const s=this.settings(),date=local(now,s.timeZone).date;
- let count=(this.store.db.prepare("SELECT at FROM loop_events WHERE type='surfaced'").all() as {at:number}[]).filter(e=>local(e.at,s.timeZone).date===date).length;
+ let count=(this.store.db.prepare("SELECT at FROM task_events WHERE type='surfaced'").all() as {at:number}[]).filter(e=>local(e.at,s.timeZone).date===date).length;
  return this.store.all().filter(l=>l.owner==='patrick'&&waitsForTrigger(l)&&isDue(l,now)).sort((a,b)=>RANK[a.priority]-RANK[b.priority]).map(loop=>{
   const held:Hold|null=loop.priority==='urgent'?null:loop.priority==='low'?'morning':count>=s.dailyBudget?'budget':null;
   if(!held)count++;return {loop,held};});}

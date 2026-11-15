@@ -99,7 +99,7 @@ export function OwnerMenu({ owner, label, people, onOwner, children }: { owner: 
   );
 }
 
-/** "Add a todo": a typed line the Bot fills in. `compact` for the narrow pane. */
+/** "Add a todo": a typed line becomes the user's todo in Today. `compact` for the narrow pane. */
 export function AddLoop({ onAdd, compact = false }: { onAdd(text: string): Promise<unknown>; compact?: boolean }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);

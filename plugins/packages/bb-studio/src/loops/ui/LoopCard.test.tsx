@@ -73,6 +73,21 @@ it("draws the todo while Todo reminders are off: the switch holds reminders, not
 it("draws nothing for a malformed id", async () => {
   await render({ id: "page_1" });
   expect(container.innerHTML).toBe("");
+  await render({ id: "wc_1" });
+  expect(container.innerHTML).toBe("");
+});
+
+it.each(["task_00000000-0000-4000-8000-000000000001", "loop_reminder_aut_1"])("draws the card for a %s id", async (id) => {
+  await render({ id }, { id, title: "Approve the budget" });
+  expect(container.querySelector("[data-testid=loop-card]")?.textContent).toContain("Approve the budget");
+});
+
+it("draws a morning row for a task the way it draws one for a todo", async () => {
+  const id = "task_00000000-0000-4000-8000-000000000002";
+  await render({ id, row: "1" }, { id, title: "Pick a venue", due: NOW });
+  const row = container.querySelector("[data-testid=loop-row] button") as HTMLButtonElement;
+  expect(row.textContent).toContain("Pick a venue");
+  expect(row.textContent).toContain("Due today");
 });
 
 it("draws a do card with its release label, source, due and the four actions", async () => {

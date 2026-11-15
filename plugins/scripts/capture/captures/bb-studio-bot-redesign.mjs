@@ -17,6 +17,7 @@ import { join } from "node:path";
 import { readStagedInstance } from "../../staged-instance.mjs";
 import { BOT_PATH, dismissProblems } from "./bb-studio-bot.mjs";
 import { clickHeaderAction } from "../header-actions.mjs";
+import { deleteTasks, writeLoopTasks } from "../task-rows.mjs";
 
 const require = createRequire(import.meta.url);
 const ALL = [0, 1, 2, 3, 4, 5, 6];
@@ -199,8 +200,8 @@ export default ({ pluginRpc, bbCli, sleep }) => {
     const bbDb = stagedDb("bb.db");
     try {
       studio.transaction(() => {
-        studio.prepare("DELETE FROM bot_loops WHERE id LIKE 'loop_capture-%'").run();
-        for (const each of loops) studio.prepare("INSERT INTO bot_loops VALUES (?, ?)").run(each.id, JSON.stringify(each));
+        deleteTasks(studio, "loop_capture-");
+        writeLoopTasks(studio, loops);
         studio.prepare("DELETE FROM bot_run_dismissals").run();
         // Last night's maintenance left three finished threads for the user to decide on.
         // The table is append-only: add the run once.

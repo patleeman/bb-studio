@@ -5,6 +5,7 @@ import { usePathname } from "../../kit/app/route";
 import { useComposerThread } from "../../kit/composer";
 import { Icon, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
+import { TASKS_UNAVAILABLE } from "../../tasks/contract";
 import type { WorkCard } from "../contract";
 import { inFlightRows, needsYouCount, rowDetail, splitRows } from "./in-flight-model";
 import { ENDED_DETAIL, stateLabel } from "./model";
@@ -34,26 +35,27 @@ export function InFlight({ threadId }: { threadId: string }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [showDone, setShowDone] = useState(false);
-  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
+  const [hidden, setHidden] = useState<ReadonlyMap<string, number>>(() => new Map());
   const onScreen = useCardsOnScreen();
   const cards = live.data?.cards ?? [];
-  const rows = inFlightRows(cards.filter((card) => !onScreen.has(card.id) && !hidden.has(card.id)));
+  const rows = inFlightRows(cards.filter((card) => !onScreen.has(card.id) && hidden.get(card.id) !== card.updatedAt));
+  if (!live.data && live.error?.includes(TASKS_UNAVAILABLE)) return <p role="alert" data-testid="in-flight-error" className="px-3 py-1.5 text-xs text-destructive">{live.error}</p>;
   if (!rows.length) return null;
   const { live: open, finished } = splitRows(rows);
   const needs = needsYouCount(rows);
   const toggle = () => { setCollapsed(!collapsed); writeCollapsed(!collapsed); };
   const reveal = (card: WorkCard) => revealCard({ id: card.id, threadId, messageSeq: card.messageSeq, pathname, toAppPath: toAppPathOf(navigate) });
-  const hide = (ids: readonly string[]) => setHidden((before) => new Set([...before, ...ids]));
-  const unhide = (ids: readonly string[]) => setHidden((before) => new Set([...before].filter((id) => !ids.includes(id))));
+  const hide = (gone: readonly WorkCard[]) => setHidden((before) => new Map([...before, ...gone.map((card) => [card.id, card.updatedAt] as const)]));
+  const unhide = (gone: readonly WorkCard[]) => setHidden((before) => new Map([...before].filter(([id]) => !gone.some((card) => card.id === id))));
   const dismiss = (card: WorkCard) => {
-    hide([card.id]);
-    void call("work.dismiss", { id: card.id }).then(() => live.refresh(), () => unhide([card.id]));
+    hide([card]);
+    void call("work.dismiss", { id: card.id }).then(() => live.refresh(), () => unhide([card]));
   };
   const clearDone = () => {
-    const ids = finished.map((card) => card.id);
-    hide(ids);
+    const gone = [...finished];
+    hide(gone);
     setShowDone(false);
-    void call("work.clear", { threadId }).then(() => live.refresh(), () => unhide(ids));
+    void call("work.clear", { threadId }).then(() => live.refresh(), () => unhide(gone));
   };
   const row = (card: WorkCard) => {
     const detail = rowDetail(card);
