@@ -16,7 +16,7 @@ final class RoomTests: XCTestCase {
         XCTAssertEqual(room.mode, .rest)
         XCTAssertEqual(room.handle(.tapOutside), .none)
         XCTAssertEqual(room.mode, .rest)
-        XCTAssertEqual(room.handle(.tapFloor), .none, "the floor stands the chat up to read, with no keyboard")
+        XCTAssertEqual(room.handle(.openChat), .none, "a swipe up opens the conversation to read, with no keyboard")
         XCTAssertTrue(room.standing)
     }
 
@@ -81,29 +81,91 @@ final class RoomTests: XCTestCase {
         return try! JSONDecoder().decode(TimelineRow.self, from: JSONSerialization.data(withJSONObject: json))
     }
 
-    func testTheDayLineTakesGoodToKnowFromTodaysMorningCard() {
+    func testTheHeaderSaysTheDateAndWeatherForMainAndTheRoleForOthers() {
         let now = Date(timeIntervalSince1970: 1_794_600_000)
+        let date = now.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
         let card = "## Friday, Nov 13\n**On today's list**\n::loop{id=\"loop_a\" row=\"1\"}\n**Good to know**\n- Light snow near 6, roads wet.\n- Second note."
         let today = row("mc", "assistant", card, at: now.timeIntervalSince1970 * 1000 - 3_600_000)
-        let line = RoomDay.line(rows: [today], todayCount: 2, status: "Idle", now: now)
-        XCTAssertEqual(line, RoomDay.Line(lead: "Two things today.", rest: "Light snow near 6, roads wet."))
+        XCTAssertEqual(RoomHeader.subline(main: true, title: "Juniper", rows: [today], now: now), date + " · Light snow near 6")
         let yesterday = row("mc", "assistant", card, at: now.timeIntervalSince1970 * 1000 - 2 * 86_400_000)
-        XCTAssertEqual(RoomDay.line(rows: [yesterday], todayCount: 1, status: "Working · 1 worker", now: now),
-                       RoomDay.Line(lead: "One thing today.", rest: "Working · 1 worker"))
-        XCTAssertEqual(RoomDay.countLine(0), "Nothing on today's list.")
-        XCTAssertEqual(RoomDay.countLine(nil), "Here's your day.")
-        XCTAssertEqual(RoomDay.countLine(14), "14 things today.")
+        XCTAssertEqual(RoomHeader.subline(main: true, title: "Juniper", rows: [yesterday], now: now), date, "no weather from an old card")
+        let note = card.replacingOccurrences(of: "Light snow near 6, roads wet.", with: "Dana's flight lands at 4.")
+        XCTAssertEqual(RoomHeader.subline(main: true, title: "Juniper", rows: [row("mc", "assistant", note, at: now.timeIntervalSince1970 * 1000)], now: now), date,
+                       "a note that isn't weather stays out")
+        XCTAssertEqual(RoomHeader.subline(main: false, title: "BB Studio lead", rows: [today], now: now), "Project lead")
+        XCTAssertEqual(RoomHeader.subline(main: false, title: "Launch prep", rows: [], now: now), "Conversation")
+        XCTAssertEqual(RoomHeader.weather("Sunny with a high near 50, cooling in the afternoon"), "Sunny with a high near 50")
+        XCTAssertNil(RoomHeader.weather("The plumber comes Tuesday"))
     }
 
-    func testShortScreensShowFewerCardsAndASmallerPresence() {
-        let phone = RoomDayView.fit(CGSize(width: 402, height: 708))
-        let large = RoomDayView.fit(CGSize(width: 440, height: 800))
-        let outer = RoomDayView.fit(CGSize(width: 466, height: 540))
-        XCTAssertEqual(phone.cards, 5)
-        XCTAssertEqual(RoomDayView.fit(CGSize(width: 402, height: 640)).cards, 3)
-        XCTAssertEqual(outer.cards, 2)
-        XCTAssertLessThan(outer.presence, phone.presence, "smaller on the Duo's outer screen")
-        XCTAssertGreaterThan(large.presence, phone.presence, "bigger on a large phone")
+    func testTheNowLineSaysWhatTheAgentIsDoingAndWhatItLastFinished() {
+        let start = Date(timeIntervalSince1970: 1_794_600_000)
+        let own = TaskItem(id: "t_own", title: "Launch prep", owner: "thread:thr_lead", state: .inProgress, conversation: "thr_lead",
+                           line: "Waiting on two workers", updatedAt: start)
+        let done = TaskItem(id: "t_done", title: "Book the room", owner: "thread:thr_w1", state: .done, conversation: "thr_lead",
+                            line: "Booked the room for Friday", closedAt: start)
+        let todo = Todos.Item(id: "1", text: "Mocking up the room", status: "in_progress")
+        let running = RoomNow.make(threadId: "thr_lead", main: false, running: true, tasks: [own, done], todos: [todo],
+                                   rows: [row("u", "user", "Mock it up", at: start.timeIntervalSince1970 * 1000)], workers: [], latest: nil)
+        XCTAssertEqual(running.text, "Mocking up the room", "a running turn says its current step")
+        XCTAssertEqual(running.since, start)
+        XCTAssertEqual(running.last, "Booked the room for Friday")
+        XCTAssertTrue(running.active)
+        let waiting = RoomNow.make(threadId: "thr_lead", main: false, running: false, tasks: [own, done], todos: [], rows: [], workers: [], latest: nil)
+        XCTAssertEqual(waiting.text, "Waiting on two workers", "its own task in progress")
+        let busy = RoomNow.make(threadId: "thr_main", main: true, running: false, tasks: [], todos: [], rows: [],
+                                workers: [worker("w1", "Theme stills", "running"), worker("w2", "Fork", "running")], latest: nil)
+        XCTAssertEqual(busy.text, "Waiting on two workers")
+        let idle = RoomNow.make(threadId: "thr_main", main: true, running: false, tasks: [], todos: [], rows: [], workers: [],
+                                latest: "**Sent** Dana the numbers")
+        XCTAssertEqual(idle, RoomNow(text: "Idle", since: nil, last: "Sent Dana the numbers", active: false))
+        XCTAssertEqual(idle.small(), "last: sent Dana the numbers")
+        XCTAssertEqual(RoomNow.lowered("BB Studio shipped"), "BB Studio shipped", "a name keeps its capitals")
+        XCTAssertEqual(RoomNow.elapsed(start, now: start.addingTimeInterval(20)), "just now")
+        XCTAssertEqual(RoomNow.elapsed(start, now: start.addingTimeInterval(14 * 60)), "14 min")
+        XCTAssertEqual(RoomNow.elapsed(start, now: start.addingTimeInterval(90 * 60)), "1 h 30 min")
+    }
+
+    func testOnItIsTheAgentsOpenTasksAndRunningWorkersOnceAndYoursIsTheUsers() {
+        let own = TaskItem(id: "t_own", title: "Launch prep", owner: "thread:thr_lead", state: .inProgress, conversation: "thr_lead")
+        let bank = TaskItem(id: "wc_bank", title: "Question bank", owner: "thread:thr_w1", state: .inProgress, conversation: "thr_lead",
+                            step: "Drafting answers", workers: ["thr_w1"])
+        let mine = TaskItem(id: "t_mine", title: "Pick the slides", state: .waiting, conversation: "thr_lead")
+        let closed = TaskItem(id: "t_done", title: "Old", owner: "thread:thr_w1", state: .done, conversation: "thr_lead")
+        let rows = RoomOnIt.rows(threadId: "thr_lead", tasks: [own, bank, mine, closed],
+                                 workers: [worker("thr_w1", "Question bank", "running"), worker("thr_w2", "Slides", "running"), worker("thr_w3", "Gone", "done")])
+        XCTAssertEqual(rows.map(\.id), ["wc_bank", "worker-thr_w2"], "its own task is the Now line; a worker with a task shows once")
+        XCTAssertEqual(rows.first?.trailing, "Drafting answers")
+        XCTAssertEqual(rows.last?.threadId, "thr_w2", "a worker without a task opens its thread")
+        XCTAssertEqual(RoomNow.yours([own, bank, mine, closed]).map(\.id), ["t_mine"])
+    }
+
+    func testShortScreensShowFewerRowsAndASmallerPresence() {
+        let phone = RoomFit.make(height: 760, width: 402, row: 44, fixed: 260, onIt: 3, yours: 4)
+        XCTAssertEqual(phone.onIt + phone.yours, 7, "a phone shows everything")
+        let small = RoomFit.make(height: 560, width: 375, row: 44, fixed: 260, onIt: 3, yours: 4)
+        XCTAssertGreaterThan(small.onItMore + small.yoursMore, 0, "a short screen says how many more")
+        XCTAssertGreaterThanOrEqual(small.yours, 1, "yours always has a row")
+        let empty = RoomFit.make(height: 560, width: 375, row: 44, fixed: 260, onIt: 6, yours: 0)
+        XCTAssertEqual(empty.yours, 0)
+        XCTAssertEqual(empty.yoursMore, 0, "the empty line takes the one row")
+        XCTAssertLessThan(RoomFit.presence(CGSize(width: 466, height: 540)), RoomFit.presence(CGSize(width: 402, height: 708)))
+        XCTAssertGreaterThan(RoomFit.presence(CGSize(width: 440, height: 860)), RoomFit.presence(CGSize(width: 402, height: 708)))
+    }
+
+    func testEachConversationHasItsOwnLightAndNeighboursDiffer() {
+        let order = ["thr_main", "thr_a", "thr_b", "thr_c", "thr_d", "thr_e"]
+        let lights = RoomLight.lights(order: order, main: "thr_main")
+        XCTAssertEqual(lights["thr_main"], .natural, "Main keeps the scene's own light")
+        for (a, b) in zip(order, order.dropFirst()) { XCTAssertNotEqual(lights[a], lights[b], "\(a) and \(b) look different") }
+        XCTAssertEqual(RoomLight.lights(order: order, main: "thr_main"), lights, "the same every time")
+        XCTAssertEqual(RoomLight.natural(for: "thr_a"), RoomLight.natural(for: "thr_a"))
+        XCTAssertNotEqual(RoomLight.natural(for: "thr_a"), .natural)
+    }
+
+    private func worker(_ id: String, _ title: String, _ status: String) -> BotWorker {
+        let json: [String: Any] = ["threadId": id, "title": title, "status": status, "updatedAt": 1_794_600_000_000.0, "mirrored": false, "sameTitle": 1]
+        return try! JSONDecoder().decode(BotWorker.self, from: JSONSerialization.data(withJSONObject: json))
     }
 
     func testAPlaceOpenedFromALinkOrACardClosesToTheRoom() {
@@ -129,15 +191,15 @@ final class RoomTests: XCTestCase {
             row("e", "assistant", "Tests: [PASS] on all three"),
             row("w", "assistant", "", kind: "work"),
         ]
-        let items = RoomFloor.clean(rows.map(TimelineItem.message))
+        let items = RoomText.clean(rows.map(TimelineItem.message))
         XCTAssertEqual(items.map(\.id), ["a", "p", "b", "c", "e", "w"], "a [PASS] stays for the relayed fold")
-        let shown = RoomFloor.rows(ThreadTranscriptRow.thread(items: items, hasOlder: false, unread: nil, match: nil, editableId: nil,
+        let shown = RoomText.rows(ThreadTranscriptRow.thread(items: items, hasOlder: false, unread: nil, match: nil, editableId: nil,
                                                               pending: [], interactions: [], working: false, thinking: nil))
         XCTAssertEqual(shown.map(\.id), ["a", "c", "e", "w"], "and the room still hides it")
         XCTAssertEqual(items.first { $0.id == "c" }?.rows.first?.text, "Done with the sweep.")
         XCTAssertEqual(items.first { $0.id == "e" }?.rows.first?.text, "Tests: [PASS] on all three", "a token inside a sentence stays")
-        XCTAssertTrue(RoomFloor.isStatusToken(" `[SKIPPED]` "))
-        XCTAssertFalse(RoomFloor.isStatusToken("[PASS] and more"))
+        XCTAssertTrue(RoomText.isStatusToken(" `[SKIPPED]` "))
+        XCTAssertFalse(RoomText.isStatusToken("[PASS] and more"))
     }
 
     func testTheRoomChatShowsBBsMessagesAsCardsAndHidesItsBareCheck() {
@@ -148,7 +210,7 @@ final class RoomTests: XCTestCase {
         let items: [TimelineItem] = [.message(row("u", "user", "Get the PRs moving")), .message(finished),
                                      .message(row("k", "assistant", "✓")), .message(row("n", "user", "Note", initiator: "system")),
                                      .message(row("a", "assistant", "On it."))]
-        let rows = RoomFloor.rows(ThreadTranscriptRow.thread(items: items, hasOlder: false, unread: nil, match: nil, editableId: nil,
+        let rows = RoomText.rows(ThreadTranscriptRow.thread(items: items, hasOlder: false, unread: nil, match: nil, editableId: nil,
                                                              pending: [], interactions: [], working: false, thinking: nil))
         XCTAssertEqual(rows.map(\.id), ["u", "child:s", "a"])
         guard case .bot(.child(let event, _), _) = rows[1] else { return XCTFail("BB's message is a card") }
@@ -177,30 +239,6 @@ final class RoomTests: XCTestCase {
         XCTAssertNil(DuoPages(window: CGSize(width: 468, height: 669), phone: true), "beside another app")
         XCTAssertNil(DuoPages(window: CGSize(width: 956, height: 440), phone: true), "a large iPhone in landscape")
         XCTAssertNil(DuoPages(window: CGSize(width: 1180, height: 820), phone: false), "an iPad keeps the split view")
-    }
-
-    @MainActor func testTheWorkbenchOpensEachThingOnceAndClosingPicksTheNeighbour() {
-        let defaults = UserDefaults(suiteName: "room-workbench-tests")!
-        defaults.removePersistentDomain(forName: "room-workbench-tests")
-        let bench = Workbench(defaults: defaults, keys: [])
-        XCTAssertTrue(bench.tabs.isEmpty)
-        bench.open(.place(.library))
-        bench.open(.thread("thr_a"))
-        bench.open(.place(.library))
-        XCTAssertEqual(bench.tabs.count, 2, "opened again, Library is selected, not added")
-        XCTAssertEqual(bench.current?.item, .place(.library))
-        bench.open(routes: [.thread(id: "thr_a"), .page(id: "pg_1")])
-        XCTAssertEqual(bench.current?.item, .thread("thr_a"))
-        XCTAssertEqual(bench.current?.path, [.page(id: "pg_1")], "the rest of the path is pushed inside the tab")
-        bench.open(routes: [.design(id: "dsn_1")])
-        XCTAssertEqual(bench.tabs.count, 3)
-        bench.close(bench.tabs[1].id)
-        XCTAssertEqual(bench.current?.item, .route(.design(id: "dsn_1")), "closing the selected tab selects the next")
-        XCTAssertEqual(defaults.stringArray(forKey: Workbench.key), ["place:library"], "tabs that can come back are kept")
-        let again = Workbench(defaults: defaults)
-        XCTAssertEqual(again.tabs.map(\.item), [.place(.library)])
-        XCTAssertEqual(WorkbenchItem(key: "thread:thr_b"), .thread("thr_b"))
-        XCTAssertNil(WorkbenchItem(key: "place:nowhere"))
     }
 
     func testAQuietThoughtIsHidden() {

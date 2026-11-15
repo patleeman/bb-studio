@@ -60,7 +60,7 @@ final class RelayedMessageTests: XCTestCase {
         }
     }
 
-    func testAPassReplyFoldsIntoTheRelayedRowAndStaysOffTheFloor() {
+    func testAPassReplyFoldsIntoTheRelayedRow() {
         let rows = [
             row("m1", "user", "[bb message from thread:thr_lead1]\n\nLEAD x: shipped.", initiator: "agent"),
             work("w1"),
@@ -70,7 +70,7 @@ final class RelayedMessageTests: XCTestCase {
             row("m5", "user", "Thanks", initiator: "user"),
         ]
         let items = TimelineItem.group(rows)
-        XCTAssertEqual(RoomFloor.clean(items).map(\.id), items.map(\.id), "the room keeps the [PASS] for the fold")
+        XCTAssertEqual(RoomText.clean(items).map(\.id), items.map(\.id), "the room keeps the [PASS] for the fold")
         let out = ThreadTranscriptRow.thread(items: items, hasOlder: false, unread: nil, match: nil, editableId: nil,
                                              pending: [], interactions: [], working: false, thinking: nil)
         let shown: [(String, Bool, Bool)] = out.compactMap {
@@ -80,11 +80,7 @@ final class RelayedMessageTests: XCTestCase {
         XCTAssertEqual(shown.map(\.0), ["m1", "m3", "m4", "m5"], "the work and the [PASS] fold into the relayed row")
         XCTAssertEqual(shown.map(\.1), [true, true, false, false])
         XCTAssertEqual(shown.map(\.2), [true, false, false, false], "a real reply shows after its row")
-        XCTAssertEqual(RoomFloor.rows(out, lying: true).compactMap { row -> String? in
-            if case .item(let item, _) = row { return item.id }
-            return nil
-        }, ["m4", "m5"], "relayed rows stay off the floor")
-        XCTAssertEqual(RoomFloor.rows(out, lying: false).count, out.count, "and show when the chat stands")
+        XCTAssertEqual(RoomText.rows(out).count, out.count, "the room's chat shows the relayed rows")
     }
 
     func testAnUrgentRowNeverFolds() {

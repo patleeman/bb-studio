@@ -59,6 +59,8 @@ struct MemoryPageView: View {
     let botId: String?
     var open: (BotShellItem) -> Void
     @EnvironmentObject private var app: AppModel
+    @Environment(\.showDetail) private var showDetail
+    @Environment(\.shownDetail) private var shownDetail
     @State private var overviewLoad = PageLoad<MemoryOverview>()
     @State private var recordsLoad = PageLoad<(records: [MemoryRecord], total: Int)>()
     @State private var query = ""
@@ -123,22 +125,15 @@ struct MemoryPageView: View {
                 }
             }
         }
-        .searchable(text: $query, prompt: MemoryPage.searchPrompt((overview?.current ?? 0) + (overview?.replaced ?? 0)))
-        .navigationTitle("Memory")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Picker("Sort", selection: $sort) { ForEach(MemoryPage.Sort.allCases) { Text($0.title).tag($0) } }
-                } label: { Image(systemName: "arrow.up.arrow.down") }
-                .accessibilityLabel("Sort")
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button { adding = true } label: { Image(systemName: "plus") }
-                    .accessibilityLabel("New record")
-                    .accessibilityIdentifier("memoryAdd")
-            }
-        }
+        .modifier(PageChrome(title: "Memory", query: $query, prompt: MemoryPage.searchPrompt((overview?.current ?? 0) + (overview?.replaced ?? 0))) {
+            Menu {
+                Picker("Sort", selection: $sort) { ForEach(MemoryPage.Sort.allCases) { Text($0.title).tag($0) } }
+            } label: { Image(systemName: "arrow.up.arrow.down") }
+            .accessibilityLabel("Sort")
+            Button { adding = true } label: { Image(systemName: "plus") }
+                .accessibilityLabel("New record")
+                .accessibilityIdentifier("memoryAdd")
+        })
         .sheet(isPresented: $adding) {
             MemoryRecordEditor(title: "New record", saveLabel: "Add", initial: (topic ?? "", ""), topics: overview?.topics.map(\.topic) ?? []) { topic, text in
                 try await app.client.memoryAdd(botId: botId, topic: topic, text: text)
@@ -202,10 +197,28 @@ struct MemoryPageView: View {
         }
     }
 
-    private func row(_ record: MemoryRecord) -> some View {
-        NavigationLink {
-            MemoryRecordScreen(record: record, topics: overview?.topics.map(\.topic) ?? [], open: open) { await reload() }
-        } label: {
+    @ViewBuilder private func row(_ record: MemoryRecord) -> some View {
+        if let showDetail {
+            Button {
+                showDetail(RoomDetail(id: record.id, view: AnyView(MemoryRecordScreen(record: record, topics: overview?.topics.map(\.topic) ?? [], open: open) { await reload() })))
+            } label: {
+                recordLabel(record).contentShape(.rect)
+            }
+            .tint(.primary)
+            .listRowBackground(shownDetail == record.id ? Color.accentColor.opacity(0.16) : nil)
+            .accessibilityAddTraits(shownDetail == record.id ? .isSelected : [])
+            .accessibilityIdentifier("memory-record-\(record.id)")
+        } else {
+            NavigationLink {
+                MemoryRecordScreen(record: record, topics: overview?.topics.map(\.topic) ?? [], open: open) { await reload() }
+            } label: {
+                recordLabel(record)
+            }
+            .accessibilityIdentifier("memory-record-\(record.id)")
+        }
+    }
+
+    private func recordLabel(_ record: MemoryRecord) -> some View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(record.text).lineLimit(2)
                     .foregroundStyle(record.isReplaced || record.archived ? .secondary : .primary)
@@ -216,8 +229,6 @@ struct MemoryPageView: View {
                 .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
             }
             .padding(.vertical, 2)
-        }
-        .accessibilityIdentifier("memory-record-\(record.id)")
     }
 
     private func schedule(after delay: Duration = .zero) {
@@ -657,8 +668,7 @@ struct ArchivePageView: View {
                 }
             }
         }
-        .searchable(text: $query, prompt: "Search the archive")
-        .navigationTitle("Archive")
+        .modifier(PageChrome(title: "Archive", query: $query, prompt: "Search the archive") { EmptyView() })
         .navigationBarTitleDisplayMode(.large)
         .refreshable { await load.reload() }
         .task(id: scope) { start() }

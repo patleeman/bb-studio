@@ -26,19 +26,23 @@ final class RoomSwipeUITests: ServerIsolatedUITestCase {
     }
 
     private var input: XCUIElement { app.buttons["roomInput"] }
-    private var floor: XCUIElement { app.descendants(matching: .any)["RoomFloor"].firstMatch }
+    private var floor: XCUIElement { app.descendants(matching: .any)["RoomStage"].firstMatch }
+    private var light: XCUIElement { app.descendants(matching: .any)["roomLight"].firstMatch }
 
-    func testSwipingTheFloorPagesThroughTheConversationsAndTheInputFollows() {
+    func testSwipingPagesThroughTheConversationsEachInItsOwnLightAndTheInputFollows() {
         launch()
-        XCTAssertEqual(input.label, "Message Juniper")
+        XCTAssertEqual(input.label, "Talk to Juniper")
         XCTAssertEqual(floor.value as? String, "Conversation 1 of 4")
         XCTAssertTrue(app.descendants(matching: .any)["roomPageDots"].exists, "page dots")
+        let mainLight = light.value as? String
         swipe(floor, by: 220, y: 0.8)
         pause(2)
         XCTAssertEqual(floor.value as? String, "Conversation 1 of 4", "Main is first: a swipe back rubber-bands")
         swipe(floor, by: -220, y: 0.8)
         XCTAssertTrue(input.waitForLabel("Message Launch prep"), "the input talks to the conversation shown")
         XCTAssertEqual(floor.value as? String, "Conversation 2 of 4")
+        XCTAssertTrue(app.descendants(matching: .any)["roomTitle"].label.hasPrefix("Launch prep"), "its name at the top")
+        XCTAssertNotEqual(light.value as? String, mainLight, "in its own light")
         pause(2)
         input.tap()
         XCTAssertTrue(app.textViews["composerField"].waitForExistence(timeout: 10), "the shown conversation stands up")
@@ -46,7 +50,7 @@ final class RoomSwipeUITests: ServerIsolatedUITestCase {
         pause(3)
         app.buttons["roomLayDown"].tap()
         XCTAssertTrue(input.waitForExistence(timeout: 10))
-        XCTAssertEqual(floor.value as? String, "Conversation 2 of 4", "and lies back down where it was")
+        XCTAssertEqual(floor.value as? String, "Conversation 2 of 4", "and goes back to the room where it was")
         pause(1)
         swipe(floor, by: -220, y: 0.8)
         XCTAssertTrue(floor.waitForValue("Conversation 3 of 4"))
@@ -56,7 +60,7 @@ final class RoomSwipeUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(floor.waitForValue("Conversation 2 of 4"))
         pause(1)
         swipe(floor, by: 220, y: 0.8)
-        XCTAssertTrue(input.waitForLabel("Message Juniper"), "back to Main")
+        XCTAssertTrue(input.waitForLabel("Talk to Juniper"), "back to Main")
         pause(2)
     }
 
@@ -79,7 +83,7 @@ final class RoomSwipeUITests: ServerIsolatedUITestCase {
         app.buttons["roomLayDown"].tap()
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         swipe(floor, by: 220, y: 0.8)
-        XCTAssertTrue(input.waitForLabel("Message Juniper"))
+        XCTAssertTrue(input.waitForLabel("Talk to Juniper"))
         input.tap()
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         let main = field.value as? String ?? ""
@@ -97,18 +101,18 @@ final class RoomSwipeUITests: ServerIsolatedUITestCase {
 
     func testSwipingThePresenceSwitchesBotsAndBack() {
         launch()
-        let presence = app.otherElements.matching(NSPredicate(format: "label BEGINSWITH 'Juniper, '")).firstMatch
+        let presence = app.descendants(matching: .any)["roomPresence"].firstMatch
         XCTAssertTrue(presence.waitForExistence(timeout: 10))
         swipe(presence, by: -200)
-        XCTAssertTrue(app.staticTexts["roomBotToast"].waitForExistence(timeout: 5) || app.descendants(matching: .any)["roomBotToast"].exists,
-                      "the next Bot's name shows")
-        XCTAssertTrue(input.waitForLabel("Message Home") || input.waitForLabel("Message Research"), "the room is the next Bot's")
+        let named = NSPredicate(format: "identifier == 'roomBotToast' OR (identifier == 'roomTitle' AND NOT label BEGINSWITH 'Juniper')")
+        XCTAssertTrue(app.descendants(matching: .any).matching(named).firstMatch.waitForExistence(timeout: 8), "the next Bot's name shows")
+        XCTAssertTrue(input.waitForLabel("Talk to Home") || input.waitForLabel("Talk to Research"), "the room is the next Bot's")
         let second = input.label
         pause(3)
-        let next = app.otherElements.matching(NSPredicate(format: "label CONTAINS ', '")).firstMatch
+        let next = app.descendants(matching: .any)["roomPresence"].firstMatch
         swipe(next, by: 200)
-        XCTAssertTrue(input.waitForLabel("Message Juniper"), "and back")
-        XCTAssertNotEqual(second, "Message Juniper")
+        XCTAssertTrue(input.waitForLabel("Talk to Juniper"), "and back")
+        XCTAssertNotEqual(second, "Talk to Juniper")
         pause(3)
     }
 }

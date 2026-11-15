@@ -208,9 +208,7 @@ final class TasksTests: XCTestCase {
         XCTAssertNil(NotificationActions.taskRoute(["threadId": "thr_main"]))
     }
 
-    func testOldWorkbenchTabsOpenTasks() {
-        XCTAssertEqual(WorkbenchItem(key: "place:todos"), .place(.tasks))
-        XCTAssertEqual(WorkbenchItem.place(.tasks).key, "place:tasks")
+    func testTheMenuPlaceIsTasks() {
         XCTAssertEqual(RoomPlace.tasks.title, "Tasks")
         XCTAssertEqual(RoomPlace.menu.first, .tasks)
     }
@@ -265,16 +263,5 @@ final class TasksTests: XCTestCase {
         let seen = await paths.paths.map { String($0.split(separator: "/").last ?? "") }
         XCTAssertEqual(seen, ["tasks.inFlight", "tasks.act", "tasks.get", "tasks.list", "tasks.inFlight"])
         XCTAssertEqual(model.supported, true)
-    }
-
-    func testTheRoomKeepsItsCardsToTheOldHeight() {
-        let plain = (0..<6).map { task("p\($0)", queue: "surfaced") }
-        XCTAssertEqual(RoomDayView.fitting(plain, count: 5).count, 5, "five one-line cards fit as before")
-        let tall = [task("a", kind: .decide, options: ["A", "B"]), task("b", state: .waiting, needs: "Pick"), task("c", kind: .decide, options: ["C", "D"]),
-                    task("d"), task("e")]
-        let shown = RoomDayView.fitting(tall, count: 5)
-        XCTAssertLessThan(shown.count, 5, "taller cards show fewer, so the floor keeps its room")
-        XCTAssertEqual(shown.first?.id, "a")
-        XCTAssertEqual(RoomDayView.fitting([task("x", kind: .decide, options: ["A", "B"])], count: 2).count, 1, "the first always shows")
     }
 }

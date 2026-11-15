@@ -35,6 +35,8 @@ struct BotAutomationsSheet: View {
         }
     }
 
+    @Environment(\.spreadInline) private var spreadInline
+
     var body: some View {
         if embedded { content } else { NavigationStack { content } }
     }
@@ -46,6 +48,17 @@ struct BotAutomationsSheet: View {
         .navigationTitle("Automations")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarItems }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if spreadInline {
+                HStack {
+                    Spacer()
+                    addMenu.font(.body.weight(.medium)).frame(width: 44, height: 44)
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 0)
+                .offset(y: -28)
+            }
+        }
         .sheet(item: $editing) { editing in
             BotAutomationEditor(kind: editing.kind, automation: editing.automation, botId: botId, runners: runners) { await load() }
         }
@@ -84,15 +97,17 @@ struct BotAutomationsSheet: View {
 
     @ToolbarContentBuilder private var toolbarItems: some ToolbarContent {
         if !embedded { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
-        ToolbarItem(placement: .primaryAction) {
-            Menu {
-                ForEach(BotAutomation.Kind.allCases) { kind in
-                    Button { editing = Editing(kind: kind, automation: nil) } label: { Label(kind.title, systemImage: kind.symbol) }
-                }
-            } label: { Image(systemName: "plus") }
-            .disabled(!active)
-            .accessibilityLabel("New automation")
-        }
+        ToolbarItem(placement: .primaryAction) { addMenu }
+    }
+
+    private var addMenu: some View {
+        Menu {
+            ForEach(BotAutomation.Kind.allCases) { kind in
+                Button { editing = Editing(kind: kind, automation: nil) } label: { Label(kind.title, systemImage: kind.symbol) }
+            }
+        } label: { Image(systemName: "plus") }
+        .disabled(!active)
+        .accessibilityLabel("New automation")
     }
 
     private var runners: [BotAutomation] { (automations ?? []).filter { $0.kind == .runner } }

@@ -14,10 +14,6 @@ final class TranscriptHandle {
 
     func jumpToLatest(animated: Bool = true) { controller?.jumpToLatest(animated: animated) }
 
-    func scroll(by delta: CGFloat) { controller?.scroll(by: delta) }
-
-    func endScroll() { controller?.endScroll() }
-
     func scrollTo<ID: Hashable>(_ id: ID, position: TranscriptRowPosition = .top, animated: Bool = false) {
         controller?.scrollTo(AnyHashable(id), position: position, animated: animated)
     }
