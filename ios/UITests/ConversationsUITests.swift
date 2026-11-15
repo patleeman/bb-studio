@@ -105,7 +105,8 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         launch("list")
         app.navigationBars.buttons["More"].tap()
         XCTAssertTrue(app.buttons["menuModel"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["menuFinish"].exists)
+        XCTAssertFalse(app.buttons["menuArchive"].exists)
+        XCTAssertFalse(app.buttons["menuDelete"].exists)
     }
 
     func testNewConversation() {

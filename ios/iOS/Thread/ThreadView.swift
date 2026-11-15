@@ -84,6 +84,7 @@ struct ThreadView: View {
     @State private var replyThread: ReplyThreadSheet?
     @State private var conversationModel: ConversationModel?
     @State private var finishing = false
+    @State private var confirmingDelete = false
     @State private var workerFetched: WorkerInfo?
     @State private var askingWorker = false
     @State private var workerAskError: String?
@@ -314,6 +315,13 @@ struct ThreadView: View {
             Button("Compact") { Task { await model.run { try await $0.compact(model.threadId) } } }
         } message: {
             Text("The agent summarizes the conversation so far to free up context.")
+        }
+        .alert(ConversationFinish.deleteTitle(conversation?.conversation?.title ?? ""), isPresented: $confirmingDelete) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) { delete() }
+                .accessibilityIdentifier("confirmDelete")
+        } message: {
+            Text(ConversationFinish.deleteMessage)
         }
         .confirmationDialog("Clear this thread's context?", isPresented: $confirmingClearContext, titleVisibility: .visible) {
             Button("Clear context", role: .destructive) {
@@ -585,48 +593,65 @@ struct ThreadView: View {
                     Label("Open \(sourcePage.displayTitle)", systemImage: "doc.richtext")
                 }
             }
-            if ConversationFinish.can(conversation?.conversation) {
+            if ConversationFinish.canRemove(conversation?.conversation, running: model.thread?.isRunning == true) {
                 Button { finish() } label: {
-                    Label(finishing ? "Finishing…" : "Finish conversation", systemImage: "checkmark.circle")
+                    Label(finishing ? "Archiving…" : "Archive", systemImage: "archivebox")
+                    Text(ConversationFinish.archiveHint)
                 }
-                .disabled(finishing || model.thread?.isRunning == true)
-                .accessibilityIdentifier("menuFinish")
+                .disabled(finishing)
+                .accessibilityIdentifier("menuArchive")
+                Button(role: .destructive) { confirmingDelete = true } label: {
+                    Label("Delete conversation…", systemImage: "trash")
+                }
+                .disabled(finishing)
+                .accessibilityIdentifier("menuDelete")
             }
-            Section {
-                if conversation == nil {
-                    Button {
-                        Task { if let id = await model.fork() { open(.thread(id: id)) } }
-                    } label: { Label("Fork thread", systemImage: "arrow.triangle.branch") }
-                }
-                Button { showingContext = true } label: {
-                    Label("Context usage", systemImage: "chart.bar")
-                }
-                Button { confirmingCompact = true } label: { Label("Compact context", systemImage: "rectangle.compress.vertical") }
-                Button { confirmingClearContext = true } label: { Label("Clear context", systemImage: "eraser") }
+            if compactHeader {
+                Menu { contextItems } label: { Label("Context", systemImage: "chart.bar") }
+                Menu { shareItems } label: { Label("Share & notifications", systemImage: "square.and.arrow.up") }
+            } else {
+                Section { contextItems }
+                shareItems
             }
-            let isMuted = muted.ids.contains(model.threadId)
-            Button {
-                Task {
-                    do {
-                        try await muted.set(model.threadId, muted: !isMuted)
-                    } catch {
-                        model.error = BBClient.describe(error, server: client.baseURL)
-                    }
-                }
-            } label: {
-                Label(isMuted ? "Unmute notifications" : "Mute notifications", systemImage: isMuted ? "bell" : "bell.slash")
-            }
-            Button { showingWeb = true } label: { Label("Open in BB web", systemImage: "safari") }
-            if let thread = model.thread {
-                ShareLink(item: client.webURL(forThread: thread).absoluteURL) {
-                    Label("Share link", systemImage: "square.and.arrow.up")
-                }
-            }
-            Button { UIPasteboard.general.string = model.threadId } label: { Label("Copy Thread ID", systemImage: "number") }
         } label: {
             Image(systemName: "ellipsis").modifier(DuoHeaderMenuLabel())
         }
         .accessibilityLabel("More")
+    }
+
+    @ViewBuilder private var contextItems: some View {
+        if conversation == nil {
+            Button {
+                Task { if let id = await model.fork() { open(.thread(id: id)) } }
+            } label: { Label("Fork thread", systemImage: "arrow.triangle.branch") }
+        }
+        Button { showingContext = true } label: {
+            Label("Context usage", systemImage: "chart.bar")
+        }
+        Button { confirmingCompact = true } label: { Label("Compact context", systemImage: "rectangle.compress.vertical") }
+        Button { confirmingClearContext = true } label: { Label("Clear context", systemImage: "eraser") }
+    }
+
+    @ViewBuilder private var shareItems: some View {
+        let isMuted = muted.ids.contains(model.threadId)
+        Button {
+            Task {
+                do {
+                    try await muted.set(model.threadId, muted: !isMuted)
+                } catch {
+                    model.error = BBClient.describe(error, server: client.baseURL)
+                }
+            }
+        } label: {
+            Label(isMuted ? "Unmute notifications" : "Mute notifications", systemImage: isMuted ? "bell" : "bell.slash")
+        }
+        Button { showingWeb = true } label: { Label("Open in BB web", systemImage: "safari") }
+        if let thread = model.thread {
+            ShareLink(item: client.webURL(forThread: thread).absoluteURL) {
+                Label("Share link", systemImage: "square.and.arrow.up")
+            }
+        }
+        Button { UIPasteboard.general.string = model.threadId } label: { Label("Copy Thread ID", systemImage: "number") }
     }
 
     /// The Bot's status line, for its header.
@@ -1511,6 +1536,21 @@ struct ThreadView: View {
                 shell?.showList()
             } catch {
                 model.error = BBClient.describe(error, plugin: "Studio", server: client.baseURL)
+            }
+            finishing = false
+        }
+    }
+
+    private func delete() {
+        finishing = true
+        let threadId = model.threadId
+        Task {
+            do {
+                try await client.delete(threadId, withChildren: true)
+                shell?.refresh()
+                shell?.showList()
+            } catch {
+                model.error = BBClient.describe(error, server: client.baseURL)
             }
             finishing = false
         }

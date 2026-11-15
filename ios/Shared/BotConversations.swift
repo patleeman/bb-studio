@@ -90,6 +90,18 @@ public enum ConversationFinish {
         guard let conversation else { return false }
         return !conversation.isMain
     }
+
+    public static func canRemove(_ conversation: BotConversation?, running: Bool = false) -> Bool {
+        guard let conversation, can(conversation) else { return false }
+        return !conversation.running && !running
+    }
+
+    public static func deleteTitle(_ title: String) -> String {
+        "Delete “\(title.isEmpty ? "Untitled" : title)”?"
+    }
+
+    public static let deleteMessage = "This can't be undone. Its workers and side threads are deleted with it."
+    public static let archiveHint = "Saves a summary to memory first"
 }
 
 extension BBClient {

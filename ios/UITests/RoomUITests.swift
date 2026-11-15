@@ -116,6 +116,35 @@ final class RoomUITests: ServerIsolatedUITestCase {
         shot("3-record-tapped")
     }
 
+    func testAMenuItemIsItsTextAndTheSpaceBesideItDoesNothing() {
+        launch()
+        app.buttons["roomMenuButton"].tap()
+        let menu = any("RoomMenu")
+        XCTAssertTrue(app.buttons["roomPlace-memory"].waitForExistence(timeout: 10))
+        sleep(1)
+        let column: CGFloat = 22
+        let titles = ["tasks": "Tasks", "conversations": "Conversations", "memory": "Memory", "library": "Library", "schedules": "Schedules"]
+        for (place, title) in titles {
+            let item = app.buttons["roomPlace-\(place)"]
+            XCTAssertGreaterThanOrEqual(item.frame.height, 44, "\(place): 44 points tall at least")
+            XCTAssertTrue(item.label.hasPrefix(title), item.label)
+            XCTAssertEqual(item.frame.minX, column - 12, accuracy: 1, "\(place): 12 points before its text")
+            XCTAssertLessThan(item.frame.width, menu.frame.width * 0.8, "\(place): not the whole row")
+        }
+        for id in ["roomTheme", "roomSettings"] {
+            XCTAssertGreaterThanOrEqual(app.buttons[id].frame.height, 44, id)
+            XCTAssertGreaterThanOrEqual(app.buttons[id].frame.width, 44, id)
+        }
+        let memory = app.buttons["roomPlace-memory"].frame
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: memory.maxX + 30, dy: memory.midY)).tap()
+        sleep(1)
+        XCTAssertFalse(any("RoomSheet-memory").exists, "a tap beside Memory opens nothing")
+        XCTAssertTrue(app.buttons["roomPlace-memory"].exists, "the menu stays")
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: memory.maxX - 4, dy: memory.midY)).tap()
+        XCTAssertTrue(any("RoomSheet-memory").waitForExistence(timeout: 10), "its padding still opens it")
+        shot("4-menu-hit")
+    }
+
     func testTheMenuOpensEachPlaceAsASheetAndPullingDownGoesBack() {
         launch()
         app.buttons["roomMenuButton"].tap()

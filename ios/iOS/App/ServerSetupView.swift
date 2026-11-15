@@ -2,13 +2,33 @@ import SwiftUI
 
 struct ServerGate: View {
     @EnvironmentObject private var model: AppModel
+    @State private var window = CGSize.zero
 
     var body: some View {
         if model.serverURL == ServerScope.unconfiguredURL {
             ServerSetupView()
+                .frame(width: ServerGate.page(window)?.width, height: ServerGate.page(window)?.height)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+                .background(WindowGeometry { size, _, _, _ in window = size })
         } else {
             RootView()
         }
+    }
+}
+
+extension ServerGate {
+    static let hinge: CGFloat = 32
+
+    @MainActor static func page(_ window: CGSize) -> CGSize? {
+        guard UIDevice.current.userInterfaceIdiom == .phone else { return nil }
+        if window.width >= 900, window.height >= 600, window.width > window.height {
+            return CGSize(width: (window.width - hinge) / 2, height: window.height)
+        }
+        if window.height >= 900, window.width >= 600 {
+            return CGSize(width: window.width, height: (window.height - hinge) / 2)
+        }
+        return nil
     }
 }
 
