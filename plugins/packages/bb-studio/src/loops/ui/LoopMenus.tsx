@@ -72,10 +72,10 @@ export function HandOffMenu({ targets, disabled, onHandOff, className = CARD_BUT
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className={className} disabled={disabled}><Icon name="ArrowTurnForward" />Give to<Icon name="ChevronDown" className="opacity-60" /></button>
+        <button type="button" className={className} disabled={disabled}><Icon name="ArrowTurnForward" />Hand off<Icon name="ChevronDown" className="opacity-60" /></button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-52">
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Give to</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Hand off to</DropdownMenuLabel>
         {targets.map((target) => (
           <DropdownMenuItem key={target.owner} onSelect={() => onHandOff(target.owner)}>
             <Icon name="Bot" />{target.name}
@@ -87,11 +87,11 @@ export function HandOffMenu({ targets, disabled, onHandOff, className = CARD_BUT
 }
 
 /** A decision's option as a two-line button: its name and the rest. */
-export function OptionButton({ option, disabled, onChoose }: { option: string; disabled?: boolean; onChoose(): void }) {
+export function OptionButton({ option, disabled, onChoose, stacked = false }: { option: string; disabled?: boolean; onChoose(): void; stacked?: boolean }) {
   const { label, detail } = optionParts(option);
   return (
     <button type="button" disabled={disabled} onClick={onChoose} title={option}
-      className="flex min-w-0 flex-1 basis-40 flex-col items-start rounded-md border border-border px-3 py-1.5 text-left hover:bg-state-hover disabled:pointer-events-none disabled:opacity-50 sm:max-w-64">
+      className={cn("flex min-w-0 flex-col items-start rounded-md border border-border px-3 py-1.5 text-left hover:bg-state-hover disabled:pointer-events-none disabled:opacity-50", stacked ? "w-full" : "flex-1 basis-40 sm:max-w-64")}>
       <span className="w-full truncate text-sm font-medium text-foreground">{label}</span>
       {detail ? <span className="w-full truncate text-xs text-muted-foreground">{detail}</span> : null}
     </button>
@@ -109,7 +109,7 @@ export function ChooseSheet({ loop, disabled, onChoose }: { loop: Loop; disabled
           <DialogContent className="max-w-md">
             <DialogHeader><DialogTitle>{loop.title}</DialogTitle></DialogHeader>
             <div className="flex flex-col gap-1.5">
-              {loop.options.map((option) => <OptionButton key={option} option={option} disabled={disabled} onChoose={() => { setOpen(false); onChoose(option); }} />)}
+              {loop.options.map((option) => <OptionButton key={option} option={option} disabled={disabled} stacked onChoose={() => { setOpen(false); onChoose(option); }} />)}
             </div>
           </DialogContent>
         </Dialog>

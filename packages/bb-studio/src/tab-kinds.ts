@@ -193,15 +193,15 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
     ...botPage("automations", "Scheduled", "ListTodo", TAB_IDS.automations),
     actions: [], recents: null,
     surfaces: {
-      newTab: { na: "The Todos page is the one entry; this address opens it." },
-      recent: { na: "Recent lists the Todos page once, under Todos." },
+      newTab: { na: "The Tasks page is the one entry; this address opens it." },
+      recent: { na: "Recent lists the Tasks page once, under Tasks." },
       sidebarDrag: "added", workbenchOpen: "added", chatLink: "had",
     },
   },
-  botPage("todos", "Todos", "ListTodo", TAB_IDS.todos),
+  botPage("todos", "Tasks", "ListTodo", TAB_IDS.todos),
   botPage("archive", "Archive", "Archive", TAB_IDS.archive),
   pageRow("automation", "Automation", "Automations", "Clock", TAB_IDS.automation, "Automations page"),
-  pageRow("todo", "Todo", "Todos", "ListTodo", TAB_IDS.todo, "Todos page"),
+  pageRow("todo", "Task", "Tasks", "ListTodo", TAB_IDS.todo, "Tasks page"),
   pageRow("record", "Memory record", "Memory records", "Brain", TAB_IDS.record, "Memory page"),
   {
     id: "vscode", name: "VS Code", plural: "VS Code", icon: CODE_ICON, owner: "studio", ref: "none", open: { via: "studio", tabId: CODE_TAB },
@@ -399,10 +399,12 @@ export function newTabFields(tabId: string): { experimental_newTabGroup?: NewTab
 }
 
 /** Kinds whose name or plural a search query names ("whiteboard", "todos"): their rows answer it. */
+const FORMER_NAMES: Partial<Record<TabKindId, readonly string[]>> = { todos: ["Todos"], todo: ["Todo", "Todos"] };
+
 export function kindsNamedBy(query: string): TabKindId[] {
   const text = query.trim().toLocaleLowerCase();
   if (text.length < 3) return [];
-  return TAB_KIND_REGISTRY.filter((entry) => [entry.name, entry.plural].some((name) => name.toLocaleLowerCase().startsWith(text) || text.startsWith(name.toLocaleLowerCase()))).map((entry) => entry.id);
+  return TAB_KIND_REGISTRY.filter((entry) => [entry.name, entry.plural, ...(FORMER_NAMES[entry.id] ?? [])].some((name) => name.toLocaleLowerCase().startsWith(text) || text.startsWith(name.toLocaleLowerCase()))).map((entry) => entry.id);
 }
 
 /** The audit table (docs/tab-kinds-audit.md), from the registry: rows are kinds, columns surfaces, each n/a with its footnote. */

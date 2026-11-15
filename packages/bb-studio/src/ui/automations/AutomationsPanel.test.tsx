@@ -35,7 +35,7 @@ it("shows the picked Bot, else the primary, else the first", () => {
   expect(shownBot([], null)).toBeNull();
 });
 
-it("with one Bot, is that Bot's Todos page opened at the top, full-page, with no switcher", async () => {
+it("with one Bot, is that Bot's Tasks page opened at the top, full-page, with no switcher", async () => {
   state.bots = [{ id: "bot_main", name: "Chief of Staff", avatar: "🤖", state: "active", primary: true }];
   await act(async () => root.render(<AutomationsPanel />));
   expect(section()?.dataset).toMatchObject({ bot: "bot_main", disabled: "false", external: "false" });
@@ -67,7 +67,7 @@ it("with no Bot, the template's header still names the page", async () => {
   state.bots = [];
   await act(async () => root.render(<AutomationsPanel />));
   expect(container.querySelectorAll("h1")).toHaveLength(1);
-  expect(container.querySelector("[data-testid=studio-bar] [data-testid=page-bar-title]")?.textContent).toBe("Todos");
+  expect(container.querySelector("[data-testid=studio-bar] [data-testid=page-bar-title]")?.textContent).toBe("Tasks");
 });
 
 it("hands the shown Bot's name to the page, whose header names it", async () => {

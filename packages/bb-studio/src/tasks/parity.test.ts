@@ -113,8 +113,9 @@ async function scenario() {
   log("place", await handlers["loops.place"]!({ place: "Home", direction: "arrive" }));
   log("set places", await handlers["loops.setPlaces"]!({ names: [" Home ", "Office", "home"] }));
   log("places", await handlers["loops.places"]!({}));
-  log("morning", await handlers["loops.morning"]!({}));
-  log("tool morning", parse(await tools["todos_morning"]!.execute({}, ctx)));
+  const added = (value: unknown) => { const { movedToYou, ...rest } = value as { movedToYou: unknown }; expect(movedToYou).toEqual([]); return rest; };
+  log("morning", added(await handlers["loops.morning"]!({})));
+  log("tool morning", added(parse(await tools["todos_morning"]!.execute({}, ctx))));
   log("tool list", parse(await tools["loops_list"]!.execute({ owner: "user" }, ctx)));
   log("tool fire", parse(await tools["todos_fire"]!.execute({ event: "nothing" }, ctx)));
   for (const id of [plumber.id, venue.id, report.id, sam.id, botJob.id, threadJob.id, urgent.id, home.id, extra.id, extra2.id, spoken.id]) log(`get ${id}`, await handlers["loops.get"]!({ id }));

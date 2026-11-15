@@ -64,7 +64,7 @@ describe("classify", () => {
   });
 
   it("asks one plain question per destructive action", () => {
-    expect(confirmPrompt("drop_loop", "Remove the stale Tailscale node")).toBe(`Drop the todo 'Remove the stale Tailscale node'? Say yes to drop.`);
+    expect(confirmPrompt("drop_loop", "Remove the stale Tailscale node")).toBe(`Drop the task 'Remove the stale Tailscale node'? Say yes to drop.`);
     expect(confirmPrompt("delete_automation", "Morning brief")).toBe(`Delete the automation 'Morning brief'? It can't be undone. Say yes to delete.`);
   });
 });

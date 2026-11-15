@@ -4,7 +4,7 @@ import { renameTabOf, workbenchOf } from "../../kit/app/host-sdk";
 import { STUDIO_PLUGIN_ID } from "../../kit/contract";
 import { LOOPS_PANE } from "./hooks";
 
-export const TODOS_TAB_TITLE = "Todos";
+export const TODOS_TAB_TITLE = "Tasks";
 export const RENAME_SETTLE_MS = 400;
 const AGAIN_ON = ["storage", "focus", "pointerup", "keyup", "popstate"] as const;
 

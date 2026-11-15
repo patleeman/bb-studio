@@ -35,10 +35,10 @@ as it).
 | Skills | added | added | added | added | added |
 | Library | added | added | added | added | had |
 | Scheduled | n/a [3] | n/a [4] | added | added | had |
-| Todos | added | added | added | added | had |
+| Tasks | added | added | added | added | had |
 | Archive | added | added | added | added | had |
 | Automation | added | n/a [5] | added | added | added |
-| Todo | added | n/a [6] | added | added | added |
+| Task | added | n/a [6] | added | added | added |
 | Memory record | added | n/a [7] | added | added | added |
 | VS Code | added | added | n/a [8] | added | had |
 | File (bb) | had | had | n/a [9] | had | had |
@@ -49,10 +49,10 @@ as it).
 
 [1] The Library lists no recordings; drag one from the New Tab page's Recent or search, or Talk's Recordings page.
 [2] Boards have no row in Studio's sidebar; drag one from the New Tab page's Recent or search.
-[3] The Todos page is the one entry; this address opens it.
-[4] Recent lists the Todos page once, under Todos.
+[3] The Tasks page is the one entry; this address opens it.
+[4] Recent lists the Tasks page once, under Tasks.
 [5] Automations change on their own and would crowd Recent; the New Tab search finds one.
-[6] Todos change on their own and would crowd Recent; the New Tab search finds one.
+[6] Tasks change on their own and would crowd Recent; the New Tab search finds one.
 [7] Memory records change on their own and would crowd Recent; the New Tab search finds one.
 [8] VS Code has no sidebar row; drag it from the New Tab page's Recent, or open it from the launcher or a file.
 [9] bb's own: files are dragged from Finder, which bb attaches to the composer.

@@ -72,10 +72,10 @@ registry doesn't know (Settings) parses to nothing and stays bb's.
 | Skills | `bb://skills/bot_main` | `/plugins/studio/studio/skills/bot_main` |  |
 | Library | `bb://library` | `/plugins/studio/studio` |  |
 | Scheduled | `bb://automations` | `/plugins/studio/automations` |  |
-| Todos | `bb://todos/bot_main` | `/plugins/studio/studio/bot/bot_main/loops` |  |
+| Tasks | `bb://todos/bot_main` | `/plugins/studio/studio/bot/bot_main/loops` |  |
 | Archive | `bb://archive/bot_main` | `/plugins/studio/studio/conversations/bot_main` |  |
 | Automation | `bb://automation/bot_main%3Aaut_0123456789abcdef` | `/plugins/studio/studio/automation/bot_main%3Aaut_0123456789abcdef` |  |
-| Todo | `bb://todo/loop_0123abcd` | `/plugins/studio/studio/todo/loop_0123abcd` |  |
+| Task | `bb://todo/loop_0123abcd` | `/plugins/studio/studio/todo/loop_0123abcd` |  |
 | Memory record | `bb://record/mem_0123456789abcdef` | `/plugins/studio/studio/record/mem_0123456789abcdef` |  |
 | VS Code | `bb://vscode` | `/plugins/studio/vscode` |  |
 | File (bb) | `bb://file/%2FUsers%2Fp%2Fsrc%2Fa.ts` |  |  |
@@ -105,10 +105,10 @@ the rule above; **n/a** says why it can't.
 | Skills | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Library | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Scheduled | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
-| Todos | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
+| Tasks | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Archive | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Automation | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
-| Todo | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
+| Task | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
 | Memory record | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
 | VS Code | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | File (bb) | routes | n/a [4] | n/a [2] | routes | routes | n/a [1] | routes | n/a [5] | n/a [5] | routes | routes | n/a [3] |

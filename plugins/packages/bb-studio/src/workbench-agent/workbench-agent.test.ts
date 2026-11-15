@@ -367,7 +367,7 @@ describe("workbench_open's types come from the tab kinds registry", () => {
     expect(await spec({ type: "board", id: "thr_b" })).toEqual({ kind: "tab", tab: { id: "board", pluginId: "studio-visual-chat" }, params: { threadId: "thr_b" }, title: "Election night" });
     expect(await spec({ type: "bot", id: "bot_main" })).toEqual({ kind: "tab", tab: { id: "bot" }, params: { botId: "bot_main" }, title: "Chief of Staff" });
     expect(await spec({ type: "archive", id: "bot_main" })).toEqual({ kind: "tab", tab: { id: "archive" }, params: { botId: "bot_main" }, title: "Archive" });
-    expect(await spec({ type: "todos" })).toEqual({ kind: "tab", tab: { id: "loops" }, title: "Todos" });
+    expect(await spec({ type: "todos" })).toEqual({ kind: "tab", tab: { id: "loops" }, title: "Tasks" });
     expect(await spec({ type: "vscode" })).toEqual({ kind: "tab", tab: { id: "code" }, title: "VS Code" });
     expect(await spec({ type: "workflow", id: "wfr_0123abcd" })).toEqual({ kind: "tab", tab: { id: "workflow-run", pluginId: "workflows" }, params: { runId: "wfr_0123abcd" }, title: "Workflow run" });
     expect(await spec({ type: "workflow", id: "nope" })).toBe("BB can't open that workflow run as a tab.");
@@ -376,7 +376,7 @@ describe("workbench_open's types come from the tab kinds registry", () => {
     expect(await spec({ type: "todo", id: "loop_1" })).toEqual({ kind: "tab", tab: { id: "todo" }, params: { id: "loop_1" }, title: "Pay the bill" });
     expect(await spec({ link: "bb://automation/bot_main%3Aheartbeat" })).toEqual({ kind: "tab", tab: { id: "automation" }, params: { id: "bot_main:heartbeat" }, title: "Check-in" });
     expect(await spec({ link: "/plugins/studio/studio/todo/loop_1" })).toEqual({ kind: "tab", tab: { id: "todo" }, params: { id: "loop_1" }, title: "Pay the bill" });
-    expect(await spec({ type: "todo", id: "loop_gone" })).toBe("No todo has id loop_gone.");
+    expect(await spec({ type: "todo", id: "loop_gone" })).toBe("No task has id loop_gone.");
     expect(await spec({ type: "record", id: "mem_gone" })).toBe("No memory record has id mem_gone.");
     expect(await spec({ type: "automation" })).toBe("Give the automation's id.");
   });

@@ -559,7 +559,7 @@ export class VoiceLive {
 
   private async loopAct(row: SessionRow, loopId: string, action: string, snooze: string, to: string): Promise<string> {
     const kind = classify("todos_act", { action });
-    if (kind === "unknown") return `Voice can mark a todo done, snooze it, hand it off or drop it. "${clip(action, 30)}" needs the Todos tab or ${row.bot_name}'s chat.`;
+    if (kind === "unknown") return `Voice can mark a task done, snooze it, hand it off or drop it. "${clip(action, 30)}" needs the Tasks tab or ${row.bot_name}'s chat.`;
     const loop = this.deps.loops.get(loopId);
     if (kind === "confirm") return this.ask(row, { action: "drop_loop", id: loopId, name: loop.title });
     if (action === "snooze" && snooze && !(VOICE_SNOOZES as readonly string[]).includes(snooze)) return `Snooze to ${VOICE_SNOOZES.join(", ")}.`;
@@ -594,7 +594,7 @@ export class VoiceLive {
     if (!target) return "There's nothing to undo.";
     const record = data<LoopAction>(target);
     if (events.some((event) => event.kind === "undone" && data<{ actionId: string }>(event).actionId === record.actionId)) return "That was already undone.";
-    if (this.now() - target.at > UNDO_MS) return `The undo window for "${record.title}" has closed. It's in the Todos tab if they want to change it.`;
+    if (this.now() - target.at > UNDO_MS) return `The undo window for "${record.title}" has closed. It's in the Tasks tab if they want to change it.`;
     this.deps.loops.restore(record.loopId, record.before);
     this.append(row.id, "undone", { data: { actionId: record.actionId } });
     return record.action === "add" ? `Undone: "${record.title}" is gone.` : `Undone: "${record.title}" is back as it was.`;
@@ -665,7 +665,7 @@ export class VoiceLive {
 
   private async carryOut(pending: Pending): Promise<string> {
     switch (pending.action) {
-      case "drop_loop": await this.deps.loops.act(pending.id, "drop"); return `Dropped the todo '${pending.name}'.`;
+      case "drop_loop": await this.deps.loops.act(pending.id, "drop"); return `Dropped the task '${pending.name}'.`;
       case "stop_thread": await this.deps.threads.stop(pending.id); return `Stopped '${pending.name}'.`;
       case "archive_thread": await this.deps.threads.archive(pending.id); return `Archived '${pending.name}'.`;
       case "pause_automation": await this.deps.automations.pause(pending.id); return `Paused the automation '${pending.name}'.`;
@@ -784,7 +784,7 @@ export class VoiceLive {
         case "interrupted": return ["_(interrupted)_"];
         case "sent": return [`→ **Sent to ${data<{ title: string }>(event).title}:** ${event.text}`];
         case "reply": return [`← **${data<{ title: string }>(event).title} answered:** ${speakable(event.text ?? "")}`];
-        case "loop_action": { const action = data<LoopAction>(event); return [`✓ **Todo ${action.action.replace("_", " ")}:** ${action.title}`]; }
+        case "loop_action": { const action = data<LoopAction>(event); return [`✓ **Task ${action.action.replace("_", " ")}:** ${action.title}`]; }
         case "undone": return ["↩ **Undone**"];
         case "confirmed": return [`⚠️ **Done after a spoken yes:** ${event.text}`];
         case "canvas": return [`▦ **Board:** ${event.text}`];

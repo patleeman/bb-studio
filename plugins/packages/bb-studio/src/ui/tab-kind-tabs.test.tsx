@@ -14,7 +14,7 @@ it("registers the Bot pages and the New … actions beside a conversation, named
     ["bot-automations", "Scheduled", "thread", "undefined"],
     ["archive", "Archive", "thread", "undefined"],
     ["automation", "Automation", "thread", "undefined"],
-    ["todo", "Todo", "thread", "undefined"],
+    ["todo", "Task", "thread", "undefined"],
     ["memory-record", "Memory record", "thread", "undefined"],
     ...NEW_TAB_ACTIONS.filter((action) => action.create).map((action) => [action.tabId, action.title, "thread", "function"]),
   ]);

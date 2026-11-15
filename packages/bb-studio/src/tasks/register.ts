@@ -6,7 +6,7 @@ import { ownerText } from "../loops/reference";
 import { placeKey } from "../loops/store";
 import type { Loop } from "../loops/contract";
 import { directiveFor } from "../work/shared";
-import { createInput, handoffInput, isClosed, listInput, needsYou, updateInput, USER_OWNER, type Task, type TaskCreateInput, type TaskHandoffInput, type TaskListInput, type TaskUpdateInput } from "./contract";
+import { closedByUser, KEPT_CLOSED, createInput, handoffInput, isClosed, listInput, needsYou, updateInput, USER_OWNER, type Task, type TaskCreateInput, type TaskHandoffInput, type TaskListInput, type TaskUpdateInput } from "./contract";
 import { guardTasks, surfaceForUser, TaskStore, toStoredOwner } from "./store";
 import { inLoopView, inWorkView } from "./views";
 
@@ -51,7 +51,7 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
     const toUser = owner === USER_OWNER;
     const now = store.now();
     const task: Task = {
-      id: store.newId("task"), title: x.title, why: x.why ?? "", owner, state: x.state ?? (toUser ? "todo" : "in_progress"), kind: x.kind ?? (x.options?.length ? "decide" : "do"),
+      id: store.newId("task"), title: x.title, why: x.why ?? "", owner, state: x.state ?? (toUser || (trigger && trigger.type !== "none") ? "todo" : "in_progress"), kind: x.kind ?? (x.options?.length ? "decide" : "do"),
       options: x.options ?? [], needs: x.needs ?? null, priority: x.priority ?? "normal", conversation, project: x.project ?? null, area: x.area ?? null,
       timing: { due: x.due ?? null, trigger: trigger ?? { type: "none" }, snoozed: false }, attention: { queue: toUser && x.card ? "surfaced" : null, push: x.push ?? false },
       progress: { step: x.step ?? null, line: x.line ?? null }, workers: x.workers ?? [], outputs: x.outputs ?? [], source: x.source ?? null,
@@ -65,18 +65,20 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
     return { task: saved, ...(saved.card ? { directive: directiveFor(saved.id) } : {}), ...(posted ? { note: posted } : {}) };
   };
 
+  const before = (id: string) => store.get(id);
   const update = (input: TaskUpdateInput, ctx: Ctx = {}) => {
     const x = updateInput.parse(input);
     if (x.parentId !== undefined) checkParent(x.parentId, x.id);
     const trigger = checkTrigger(x.trigger);
-    return store.change(x.id, (t) => {
-      if (t.stale) { t.stale = false; if (x.state === undefined) t.state = "in_progress"; }
+    const kept = closedByUser(store.get(x.id)) && !x.reopen;
+    const task = store.change(x.id, (t) => {
+      if (t.stale && !kept) { t.stale = false; if (x.state === undefined) t.state = "in_progress"; }
       if (x.title !== undefined) t.title = x.title;
       if (x.why !== undefined) t.why = x.why;
       if (x.state !== undefined) t.state = x.state;
       if (x.kind !== undefined) t.kind = x.kind;
       if (x.options !== undefined) t.options = x.options;
-      if (x.needs !== undefined) t.needs = x.needs || null;
+      if (x.needs !== undefined && !kept) t.needs = x.needs || null;
       if (x.priority !== undefined) t.priority = x.priority;
       if (x.conversation !== undefined) t.conversation = x.conversation;
       if (x.project !== undefined) t.project = x.project;
@@ -84,15 +86,19 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
       if (x.due !== undefined) t.timing.due = x.due;
       if (trigger !== undefined) { t.timing.trigger = trigger; t.timing.snoozed = false; }
       if (x.push !== undefined) t.attention.push = x.push;
-      if (x.step !== undefined) t.progress.step = x.step || null;
-      if (x.line !== undefined) t.progress.line = x.line || null;
+      if (x.step !== undefined && !kept) t.progress.step = x.step || null;
+      if (x.line !== undefined && !kept) t.progress.line = x.line || null;
       if (x.workers !== undefined) t.workers = x.workers;
       if (x.outputs !== undefined) t.outputs = x.outputs;
       if (x.source !== undefined) t.source = x.source;
       if (x.parentId !== undefined) t.parentId = x.parentId;
       if (x.schedule !== undefined) t.schedule = x.schedule;
       if (x.state !== undefined && !isClosed(t)) t.stale = false;
+      if (kept && !isClosed(t)) t.state = before(x.id).state;
     }, caller(ctx));
+    if (!kept) return task;
+    if (x.step !== undefined || x.line !== undefined) store.event(x.id, "progress", { step: x.step ?? null, line: x.line ?? null, by: caller(ctx), kept: true });
+    return { ...task, note: KEPT_CLOSED };
   };
 
   const get = (id: string) => {
@@ -138,7 +144,7 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
   };
 
   const tool = <S extends z.ZodTypeAny>(name: string, description: string, parameters: S, execute: (x: z.infer<S>, ctx: Ctx) => unknown) => {
-    const run = guardTasks(db, { execute: (x: z.infer<S>, c: Ctx) => execute(x, c) });
+    const run = guardTasks(db, { execute: (x: z.infer<S>, c: Ctx) => execute(x, c) }, true);
     bb.agents.registerTool({ name, description, parameters, execute: async (x: z.infer<S>, ctx: Ctx) => {
       try { return JSON.stringify(await run.execute(x as never, (ctx ?? {}) as never)); } catch (error) { return `Error: ${error instanceof Error ? error.message : String(error)}`; }
     } } as never);

@@ -33,7 +33,7 @@ export const openLoops = (botId: string | null | undefined) => openAppPath(botId
 
 /** The Todos pane's thread tab (app.tsx): the todo list beside a chat. */
 export const LOOPS_PANE = "loops";
-const LOOPS_OPEN: ThreadTabOpen = { actionId: LOOPS_PANE, title: "Todos" };
+const LOOPS_OPEN: ThreadTabOpen = { actionId: LOOPS_PANE, title: "Tasks" };
 
 /**
  * Asks the Bot chat `threadId` to open the Todos pane beside it, from outside
@@ -46,7 +46,7 @@ export function requestLoopsPane(threadId: string): Promise<boolean> {
 
 /** Says the Todos pane didn't open, with a way to the Todos page instead. */
 export function reportLoopsPaneFailed(botId: string | null | undefined): void {
-  toast.error("Couldn’t open Todos beside the chat.", { action: { label: "Open Todos", onClick: () => openLoops(botId) } });
+  toast.error("Couldn’t open Tasks beside the chat.", { action: { label: "Open Tasks", onClick: () => openLoops(botId) } });
 }
 
 /**
@@ -77,7 +77,7 @@ const chipLabel = (title: string) => { const line = title.replace(/\s+/g, " ").t
 export function useDiscussLoop(botThreadId: string | null, botName: string): (loop: Pick<Loop, "id" | "title">, options?: { focus?: boolean }) => Promise<boolean> {
   const navigate = useBbNavigate();
   return useCallback(async (loop, { focus = true } = {}) => {
-    if (!botThreadId) { toast.error(`Start a chat with ${botName} to discuss a todo.`); return false; }
+    if (!botThreadId) { toast.error(`Start a chat with ${botName} to discuss a task.`); return false; }
     let composer = threadComposer(botThreadId);
     if (!composer) {
       navigate.toThread(botThreadId);
@@ -118,6 +118,8 @@ export function loopDragProps(loop: Pick<Loop, "id" | "title">) {
 }
 
 let projectNames: Promise<Map<string, string>> | null = null;
+let projectNamesAt = 0;
+const PROJECT_NAMES_MS = 30_000;
 
 export interface LoopPeople {
   /** The primary Bot: todos belong to it (the Chief of Staff). */
@@ -128,6 +130,7 @@ export interface LoopPeople {
   leads: ReadonlyMap<string, string>;
   /** Hand off targets: the Bot, then each project's lead (decision 9). */
   targets: { owner: string; name: string }[];
+  projects?: ReadonlyMap<string, string>;
 }
 
 /** The Bot and the active project leads, named. */
@@ -136,14 +139,17 @@ export function useLoopPeople(): LoopPeople {
   const bot = useLive("bot_get", {}, { pollMs: 120_000 }).data?.bot ?? null;
   const leads = useLive("project_leads", {}, { pollMs: 120_000 }).data?.leads ?? [];
   const [projects, setProjects] = useState<Map<string, string>>(new Map());
+  const [tick, setTick] = useState(0);
+  useEffect(() => { const timer = setInterval(() => setTick((n) => n + 1), PROJECT_NAMES_MS); return () => clearInterval(timer); }, []);
   useEffect(() => {
     let live = true;
+    if (Date.now() - projectNamesAt > PROJECT_NAMES_MS) { projectNames = null; projectNamesAt = Date.now(); }
     projectNames ??= sdk.projects.list({ includePersonal: true })
       .then((list) => new Map((list as { id: string; name: string }[]).map(({ id, name }) => [id, name])))
       .catch(() => { projectNames = null; return new Map<string, string>(); });
     void projectNames.then((names) => { if (live) setProjects(names); });
     return () => { live = false; };
-  }, [sdk]);
+  }, [sdk, tick]);
   return useMemo(() => {
     const botName = bot?.name ?? "Chief of Staff";
     const named = leads
@@ -156,6 +162,7 @@ export function useLoopPeople(): LoopPeople {
       botThreadId: bot?.threadId ?? null,
       leads: new Map(named),
       targets: [{ owner: "cos", name: botName }, ...named.map(([threadId, name]) => ({ owner: `thread:${threadId}`, name }))],
+      projects,
     };
   }, [bot?.id, bot?.name, bot?.threadId, leads, projects]);
 }

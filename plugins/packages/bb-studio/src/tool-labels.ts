@@ -8,13 +8,13 @@ const WHITEBOARD: Record<string, Labels> = {
 };
 
 const TODOS: Record<string, Labels> = {
-  add: ["Adding a todo", "Added a todo"],
-  list: ["Reading todos", "Read todos"],
-  get: ["Reading a todo", "Read a todo"],
-  update: ["Updating a todo", "Updated a todo"],
-  act: ["Updating a todo", "Updated a todo"],
-  fire: ["Releasing todos", "Released todos"],
-  morning: ["Reading today's todos", "Read today's todos"],
+  add: ["Adding a task", "Added a task"],
+  list: ["Reading tasks", "Read tasks"],
+  get: ["Reading a task", "Read a task"],
+  update: ["Updating a task", "Updated a task"],
+  act: ["Updating a task", "Updated a task"],
+  fire: ["Releasing tasks", "Released tasks"],
+  morning: ["Reading today's tasks", "Read today's tasks"],
 };
 
 export const TOOL_LABELS: Readonly<Record<string, Labels>> = {

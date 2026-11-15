@@ -70,7 +70,7 @@ it("searches the same rows, best match first; a query naming a kind lists that k
   };
   const entries = await newTabSearch(search, { query: "night", threadId: null });
   expect(entries.map((entry) => entry.title)).toEqual(["Night shift", "Night owl", "Election night", "Night plan", "Book the night train", "Travel: sleeps badly at night"]);
-  expect(entries.slice(4).map((entry) => [entry.kind, entry.ref])).toEqual([["Todo", { kind: "todo", id: "loop_1" }], ["Memory record", { kind: "record", id: "mem_1" }]]);
+  expect(entries.slice(4).map((entry) => [entry.kind, entry.ref])).toEqual([["Task", { kind: "todo", id: "loop_1" }], ["Memory record", { kind: "record", id: "mem_1" }]]);
   expect((await newTabSearch(search, { query: "automations", threadId: null })).map((entry) => [entry.title, entry.kind])).toContainEqual(["Morning card", "Automation"]);
   expect(await newTabSearch(search, { query: "night", threadId: "thr_n" })).toHaveLength(5);
   expect((await newTabSearch(search, { query: "whiteboards", threadId: null })).map((entry) => [entry.title, entry.kind])).toContainEqual(["Floor plan", "Whiteboard"]);
@@ -142,6 +142,6 @@ it("registers only on a BB that has the New Tab slot", () => {
 });
 
 it("names a row's kind after its title only where the title doesn't already name it", () => {
-  expect(shownKind({ title: "Todos", kind: "Todos" })).toBe("");
+  expect(shownKind({ title: "Tasks", kind: "Tasks" })).toBe("");
   expect(shownKind({ title: "Plan", kind: "Page" })).toBe("Page");
 });

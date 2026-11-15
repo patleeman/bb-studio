@@ -10,8 +10,8 @@ export const PRIORITIES = ["urgent", "normal", "low"] as const;
 export const USER_OWNER = "patrick";
 export const TASK_ID = /^task_[A-Za-z0-9-]{1,80}$/;
 export const TODO_ID = /^(loop|task)_[A-Za-z0-9_-]{1,120}$/;
-export const TASKS_UNAVAILABLE = "Todos and work cards could not be moved to tasks";
-export const unavailableMessage = (reason: string) => `${TASKS_UNAVAILABLE}, so they can't be shown: ${reason}. Nothing was lost. Restart BB Studio to try again.`;
+export const TASKS_UNAVAILABLE = "Tasks could not be loaded";
+export const unavailableMessage = (reason?: string) => `${TASKS_UNAVAILABLE}${reason ? `: ${reason}` : ""}. Nothing was lost. Restart BB Studio to try again.`;
 
 export type TaskState = (typeof TASK_STATES)[number];
 export type TaskKind = (typeof TASK_KINDS)[number];
@@ -20,6 +20,8 @@ const OWNER = /^(patrick|cos|thread:.+)$/;
 export const storedOwner = z.string().regex(OWNER);
 export const ownerInput = z.string().regex(/^(user|patrick|cos|me|thread:.+)$/).describe('"user" (the user), "cos" (the Bot), "me" (the calling thread) or "thread:<id>"');
 export const isClosed = (task: { state: TaskState }) => CLOSED_STATES.includes(task.state);
+export const KEPT_CLOSED = "The user closed this task, so it stays closed and your update went only into its history. Ask them before reopening it (task_update with reopen: true).";
+export const closedByUser = (task: { state: TaskState; closedBy: string | null }) => isClosed(task) && task.closedBy === USER_OWNER;
 export const needsYou = (task: { owner: string; state: TaskState; kind: TaskKind }) => task.owner === USER_OWNER && task.state === "waiting" && task.kind !== "waiting-outside";
 
 const text = (max: number) => z.string().trim().max(max);
@@ -115,6 +117,7 @@ export const updateInput = z.object({
   id: z.string().min(1),
   title: text(500).min(1).optional(),
   state: z.enum(TASK_STATES).optional(),
+  reopen: z.boolean().optional().describe("Reopen a task the user closed; only when they asked for it"),
   conversation: z.string().min(1).nullable().optional(),
   ...fields,
 });

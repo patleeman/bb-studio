@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { WorkCard } from "../contract";
+import { taskFromWork } from "../../tasks/views";
 
 const NOW = new Date("2026-11-13T15:00:00Z").getTime();
 const card = (patch: Partial<WorkCard> = {}): WorkCard => ({ id: "wc_1", threadId: "thr_main", title: "Release 1.0.2", kind: "release", state: "running", step: "2/5 Sign", line: "Notarizing the DMG", needs: null, workerThreadId: null, messageId: "m_1", messageSeq: 41, createdAt: NOW - 60_000, updatedAt: NOW - 60_000, finishedAt: null, stale: false, dismissedAt: null, ...patch });
@@ -15,21 +16,24 @@ const state = vi.hoisted(() => ({
   composerThread: "thr_main" as string | null,
   call: vi.fn(async (_method: string, _input: unknown): Promise<unknown> => ({})),
   refresh: vi.fn(),
+  openLoops: vi.fn(),
 }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => (state.toAppPath ? { toThread: state.toThread, experimental_toAppPath: state.toAppPath } : { toThread: state.toThread }),
 }));
 vi.mock("../../ui/live", () => ({
-  useLive: (method: string) => ({ data: method === "work.list" && !state.error ? { cards: state.list } : null, error: state.error, loading: false, refresh: state.refresh }),
+  useLive: (method: string) => ({ data: method === "tasks.inFlight" && !state.error ? { tasks: state.list.map((x) => ("origin" in x ? x as never : taskFromWork(x))), threads: [{ owner: "thread:thr_w", name: "Fix the flaky test", threadId: "thr_w" }] } : null, error: state.error, loading: false, refresh: state.refresh }),
   useCall: () => state.call,
 }));
 vi.mock("../../kit/ui/index", async () => (await import("../../loops/ui/test-kit")).kitUi);
 vi.mock("../../kit/app/directive-card", () => ({ remember: (_key: string, value: unknown) => value }));
 vi.mock("../../kit/app/route", () => ({ usePathname: () => state.pathname }));
 vi.mock("../../kit/composer", () => ({ useComposerThread: () => state.composerThread }));
+vi.mock("../../loops/ui/hooks", () => ({ useLoopPeople: () => ({ botId: "bot_1", botName: "Chief of Staff", botThreadId: "thr_bot", leads: new Map(), targets: [] }), openLoops: state.openLoops, useTodosZone: () => undefined }));
 
 const { InFlightBanner } = await import("./InFlight");
-const { WorkCardView } = await import("./WorkCard");
+const { useCardOnScreen } = await import("./on-screen");
+function OnScreenCard({ id }: { id: string }) { const ref = useCardOnScreen(id); return <section ref={ref} data-work-card-id={id} />; }
 const { FLASH_CLASS } = await import("./reveal");
 
 let root: Root, container: HTMLDivElement;
@@ -67,7 +71,7 @@ it("lists one row per card with its name, state and a needs-you marker", async (
 });
 
 it("says so when todos and work cards couldn't be moved to tasks, and stays quiet on any other error", async () => {
-  state.error = "Todos and work cards could not be moved to tasks, so they can't be shown: disk I/O error. Nothing was lost. Restart BB Studio to try again.";
+  state.error = "Tasks could not be loaded. Nothing was lost. Restart BB Studio to try again.";
   await renderList();
   expect(q('[data-testid="in-flight-error"]')!.textContent).toBe(state.error);
   state.error = "Network error";
@@ -176,12 +180,12 @@ it("leaves out a card that is on screen, and lists it again once it scrolls away
     disconnect() {}
   });
   state.list = [card({ id: "wc_a", title: "Research" }), card({ id: "wc_b", title: "Release" })];
-  await act(async () => root.render(<><WorkCardView card={state.list[0]!} now={NOW} /><InFlightBanner /></>));
+  await act(async () => root.render(<><OnScreenCard id={state.list[0]!.id} /><InFlightBanner /></>));
   expect(rows().map((row) => row.textContent)).toEqual([expect.stringContaining("Research"), expect.stringContaining("Release")]);
   await act(async () => observers[0]!.callback([{ isIntersecting: true, intersectionRatio: 1 }]));
   expect(rows().map((row) => row.title)).toEqual(["Release"]);
   state.list = [state.list[0]!];
-  await act(async () => root.render(<><WorkCardView card={state.list[0]!} now={NOW} /><InFlightBanner /></>));
+  await act(async () => root.render(<><OnScreenCard id={state.list[0]!.id} /><InFlightBanner /></>));
   expect(q('[data-testid="in-flight"]')).toBeNull();
   await act(async () => observers.at(-1)!.callback([{ isIntersecting: false, intersectionRatio: 0 }]));
   expect(rows().map((row) => row.title)).toEqual(["Research"]);
@@ -275,4 +279,19 @@ it("shows an ended card as done with a question, never Running", async () => {
   expect(ended.textContent).not.toContain("Running");
   expect(ended.textContent).not.toContain("2/5 Sign");
   expect(ended.querySelector('[data-testid="state-ended"]')!.getAttribute("aria-label")).toBe("Ended without a final update");
+});
+
+it("names the agent on agents' rows, lists a cardless task of the user's without a remove button, and opens the agent's thread for a cardless one", async () => {
+  const mine = { ...taskFromWork(card({ id: "task_m", title: "Reply to the vendor" })), owner: "patrick", state: "todo" as const, card: null, attention: { queue: "surfaced" as const, push: false } };
+  const agents = { ...taskFromWork(card({ id: "task_a", title: "Run the suite", workerThreadId: "thr_w" })), card: null };
+  state.list = [mine as never, agents as never, card({ id: "wc_r", title: "Release" })];
+  await renderList();
+  expect(rows().map((row) => row.dataset.owner)).toEqual(["patrick", "thread:thr_w", "thread:thr_main"]);
+  expect(rows()[0]!.textContent).toContain("To do");
+  expect(rows()[1]!.querySelector('[data-testid="in-flight-owner"]')!.textContent).toBe("Fix the flaky test");
+  expect(container.querySelectorAll('[data-testid="in-flight-dismiss"]')).toHaveLength(1);
+  await act(async () => rows()[1]!.click());
+  expect(state.toThread).toHaveBeenCalledWith("thr_w");
+  await act(async () => rows()[0]!.click());
+  expect(state.openLoops).toHaveBeenCalledWith("bot_1");
 });

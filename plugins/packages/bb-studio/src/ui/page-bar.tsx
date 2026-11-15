@@ -33,7 +33,7 @@ export function PageBar({ icon, title, detail, actions, column = false }: PageBa
 }
 
 /** The name of an automation, a todo or a memory record opened as a page. */
-export const ENTRY_TITLE = { automation: "Automation", todo: "Todo", record: "Memory record" } as const;
+export const ENTRY_TITLE = { automation: "Automation", todo: "Task", record: "Memory record" } as const;
 export type EntryKind = keyof typeof ENTRY_TITLE;
 const isEntryKind = (segment: string): segment is EntryKind => Object.hasOwn(ENTRY_TITLE, segment);
 
@@ -70,7 +70,7 @@ export function botPageTitle(subPath: string): { title: string; windowTitle: str
     : parts[0] === "conversations" ? "Archive"
       : parts[0] === "new-conversation" ? "New conversation"
         : parts[0] === "bot" && parts.length === 2 && parts[1] === "new" ? "New Bot"
-          : parts[0] === "bot" && parts.length === 3 && parts[2] === "loops" ? "Todos"
+          : parts[0] === "bot" && parts.length === 3 && parts[2] === "loops" ? "Tasks"
             : parts[0] === "bot" && parts.length === 3 && parts[2] === "controls" ? "Bot settings"
             : parts.length === 2 && isEntryKind(parts[0]!) ? ENTRY_TITLE[parts[0]]
               : null;

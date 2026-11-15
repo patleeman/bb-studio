@@ -5,6 +5,7 @@ import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { changes, createInput, directiveFor, isFinished, rpcContract, WORK_ID, type CreateInput, type WorkCard, type WorkChanges } from "./contract";
 import { WorkCardStore } from "./store";
 import { assertTasksReady, guardTasks } from "../tasks/store";
+import { closedByUser, KEPT_CLOSED } from "../tasks/contract";
 
 type TimelineRow = { id: string; kind?: string; role?: string; text?: string; messageSeq?: number };
 type TimelinePage = { rows?: TimelineRow[]; timelinePage?: { olderCursor?: { anchorSeq: number; anchorId: string } | null } };
@@ -32,7 +33,7 @@ export async function findCardMessage(read: TimelineReader, card: Pick<WorkCard,
 
 export const WORK_TOOLS = ["work_card_create", "work_card_update", "work_card_get"];
 
-export const CREATE_DESCRIPTION = "Start a live work card for one piece of work (a worker's or lead's job, a release, a todo in progress). It returns a ::work{id=\"…\"} line: post it ONCE, on its own line, in the conversation where the user follows the work. The card stays put and redraws in place; it also shows in that conversation's In flight list above the composer. From then on report progress with work_card_update instead of posting status messages. Pass the card id to a worker you start so it can update the card itself. Link its thread with a bare @thread:thr_… mention or [text](/threads/thr_…), never [text](@thread:thr_…). A worker card with workerThreadId gives that thread the card's title, so both carry one name.";
+export const CREATE_DESCRIPTION = "Start a live work card for one piece of work (a worker's or lead's job, a release, a task in progress). It returns a ::work{id=\"…\"} line: post it ONCE, on its own line, in the conversation where the user follows the work. The card stays put and redraws in place; it also shows in that conversation's In flight list above the composer. From then on report progress with work_card_update instead of posting status messages. Pass the card id to a worker you start so it can update the card itself. Link its thread with a bare @thread:thr_… mention or [text](/threads/thr_…), never [text](@thread:thr_…). A worker card with workerThreadId gives that thread the card's title, so both carry one name.";
 export const UPDATE_DESCRIPTION = "Change a work card in place: state (running, waiting, needs-you, done, failed), step (e.g. \"3/5 Tests\"), line (the latest one-liner) and needs (what the user must do; with state needs-you). Use it for progress instead of posting a new message. A finished card (done or failed) leaves the In flight list after a day. A worker card still running when its worker thread ends or is archived shows as ended without a final update until the next update.";
 
 export function endsCard(card: WorkCard, thread: WorkerThread): boolean {
@@ -107,7 +108,7 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     "work.anchor": async ({ id, threadId, messageId }) => await place(store.anchor(id, threadId, messageId)),
     "work.dismiss": ({ id }) => store.dismiss(id),
     "work.clear": ({ threadId }) => ({ cleared: store.clearFinished(threadId) }),
-  }));
+  }, false, (message) => bb.log.warn(message)));
 
   bb.agents.registerTool({
     name: "work_card_create",
@@ -125,7 +126,7 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     name: "work_card_update",
     description: UPDATE_DESCRIPTION,
     parameters: changes.extend({ id: z.string().regex(WORK_ID) }),
-    execute: async ({ id, ...rest }) => { assertTasksReady(db); return JSON.stringify(update(id, rest)); },
+    execute: async ({ id, ...rest }) => { assertTasksReady(db); const t = store.tasks.find(id); const kept = !!t && closedByUser(t); const card = update(id, rest); return JSON.stringify(kept ? { ...card, note: KEPT_CLOSED } : card); },
   });
   bb.agents.registerTool({
     name: "work_card_get",

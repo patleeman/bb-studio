@@ -199,10 +199,30 @@ File not found.
   flight row jumps to it. The older **Fork conversation from here** copies
   the whole history; use it only when the user asks for a fork.
 
-### Work cards
+### Tasks and their card
 
-Progress on a piece of work (a worker's or lead's job, a release, a todo in
-progress) goes on ONE live card, not in new status messages.
+A task is one piece of work that the user or an agent owns. Use one task per
+job, keep it updated, and hand it over instead of posting status messages.
+
+- `task_create { title, owner, card?, ... }` (owner: "user", "cos", "me" or
+  "thread:<id>"). With `card: true` it returns a `::work{id="task_…"}` line:
+  post it once, on its own line, where the user follows the work. The card
+  redraws in place from live state (owner, state, step and line, what is
+  needed, Done, Hand off, Take back, Snooze, Open thread, and its history).
+- `task_update` records progress (`step`, `line`) and state; `task_handoff`
+  moves it to the user when you need a decision or an action (say what in
+  `needs`, give `options` for a decision) or to the Bot or a thread. When the
+  user hands a task to you, you get a message with it; when they choose an
+  option on a task you handed them, it comes back to you with their choice.
+- When the user closes a task you own, you are told; stop work on it. Your
+  later `task_update` is kept in its history but the task stays closed; pass
+  `reopen: true` only when the user asked you to reopen it. When they hand it
+  to someone else or take it back (it goes to their Today at once, even with a
+  time still ahead), you are told to stop too.
+- `::loop{id="…"}` and `::work{id="…"}` both draw the same task card; a
+  morning row is `::loop{id="…" row="N"}`.
+- The older names keep working: `todos_*` and `loops_*` for the user's tasks,
+  `work_card_*` for a card.
 
 - `work_card_create { title, kind, state?, step?, line? }` (kind: worker,
   lead, release, todo, task) returns a `::work{id="wc_…"}` line. Post it once,
@@ -245,8 +265,8 @@ commands, toggles Studio's settings, opens a typed URL, and asks the Bot
 opens the same omnibar from any app. Point the user there to find an item
 quickly.
 
-Name pages as the app does. The Todos page has the user's todos and, under
-**Scheduled**, your check-ins, reminders, watchers and runners: call those
+Name pages as the app does. The Tasks page has the user's tasks and, under
+**Scheduled & recurring**, your check-ins, reminders, watchers and runners: call those
 scheduled items, never automations. Bot settings is the Bot's settings page.
 
 ## Themes
@@ -323,11 +343,11 @@ change nothing.
   such as `::page{id="pg_…"}`, a `file:///…` URL or an http(s) URL)
   opens a conversation, worker, board (thread `id`), a page, whiteboard,
   design, app, artifact or recording (its `id`), a Bot (its `id`),
-  Memory, the Library, Todos (its Scheduled list holds your check-ins,
+  Memory, the Library, Tasks (its Scheduled & recurring list holds your check-ins,
   reminders, watchers and runners; `automations` opens it there), the Archive (a Bot `id`, or none for the Bot
   on screen), one automation (`type: "automation"`, `id`
-  `<botId>:<row id>`, or `bb://automation/<botId>:<row id>`), one todo
-  (`type: "todo"`, its `loop_…` id, or `bb://todo/loop_…`), one memory
+  `<botId>:<row id>`, or `bb://automation/<botId>:<row id>`), one task
+  (`type: "todo"`, its `loop_…` or `task_…` id, or `bb://todo/loop_…`), one memory
   record (`type: "record"`, its `mem_…` id, or `bb://record/mem_…`), VS Code, a workflow run (its `wfr_…` id), a file or
   a file's diff (`path`, full or
   relative to your working folder) or a URL (desktop app only) as a tab.

@@ -438,12 +438,12 @@ it("checks triggers like todos do: incomplete ones refused, place names lower-ca
 it("shows a clear error in Todos, In flight and the tools when adoption failed, instead of empty lists", async () => {
   const { call, handlers, tools } = setup();
   markTasksUnavailable(db, "disk I/O error");
-  await expect(Promise.resolve().then(() => handlers["loops.list"]!({}))).rejects.toThrow(/could not be moved to tasks.*disk I\/O error.*Nothing was lost/);
-  await expect(Promise.resolve().then(() => handlers["work.list"]!({ threadId: "thr_lead" }))).rejects.toThrow(/could not be moved to tasks/);
-  await expect(Promise.resolve().then(() => handlers["loops.add"]!({ text: "x" }))).rejects.toThrow(/could not be moved to tasks/);
-  await expect(Promise.resolve().then(() => tools.todos_list!.execute({}, {}))).rejects.toThrow(/could not be moved to tasks/);
-  await expect(Promise.resolve().then(() => tools.work_card_get!.execute({ id: "wc_x" }, {}))).rejects.toThrow(/could not be moved to tasks/);
-  expect((await call("task_list", {})).error).toMatch(/could not be moved to tasks/);
+  await expect(Promise.resolve().then(() => handlers["loops.list"]!({}))).rejects.toThrow(/^Tasks could not be loaded\. Nothing was lost\. Restart BB Studio to try again\.$/);
+  await expect(Promise.resolve().then(() => handlers["work.list"]!({ threadId: "thr_lead" }))).rejects.toThrow(/Tasks could not be loaded/);
+  await expect(Promise.resolve().then(() => handlers["loops.add"]!({ text: "x" }))).rejects.toThrow(/Tasks could not be loaded/);
+  await expect(Promise.resolve().then(() => tools.todos_list!.execute({}, {}))).rejects.toThrow(/Tasks could not be loaded: disk I\/O error\. Nothing was lost/);
+  await expect(Promise.resolve().then(() => tools.work_card_get!.execute({ id: "wc_x" }, {}))).rejects.toThrow(/Tasks could not be loaded/);
+  expect((await call("task_list", {})).error).toMatch(/Tasks could not be loaded/);
 });
 
 it("adopts even when the backup fails, says why, and leaves the file in the way alone", () => {
@@ -496,8 +496,8 @@ it.each([
   const { bb, handlers } = fakeBb();
   registerLoops(bb as never, file, async () => {}, async () => {}, { get: async () => ({}), onChange: () => {} }, () => "UTC", () => {});
   registerWorkCards(bb as never, file, { read: async () => ({ rows: [] }) });
-  await expect(Promise.resolve().then(() => handlers["loops.list"]!({}))).rejects.toThrow(/could not be moved to tasks.*database or disk is full/);
-  await expect(Promise.resolve().then(() => handlers["work.list"]!({ threadId: "thr_lead" }))).rejects.toThrow(/could not be moved to tasks/);
+  await expect(Promise.resolve().then(() => handlers["loops.list"]!({}))).rejects.toThrow(/^Tasks could not be loaded\. Nothing was lost/);
+  await expect(Promise.resolve().then(() => handlers["work.list"]!({ threadId: "thr_lead" }))).rejects.toThrow(/Tasks could not be loaded/);
   expect(adoptAtStart(file, log)).toBeNull();
   expect(readdirSync(dir).filter((name) => name.includes("before-tasks"))).toEqual([]);
   file.exec("DROP TRIGGER tasks_full");

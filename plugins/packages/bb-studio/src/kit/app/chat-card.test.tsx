@@ -11,7 +11,7 @@ const { CHAT_CARD, ChatCard, ChatCardAction, ChatCardFooter, ChatCardHeader, Cha
 const CARDS = [
   "src/kit/app/directive-card.tsx",
   "src/minis/ui/mini-card.tsx",
-  "src/work/ui/WorkCard.tsx",
+  "src/tasks/ui/TaskCard.tsx",
   "src/loops/ui/LoopCard.tsx",
   "src/ui/conversations/finish.tsx",
   "src/ui/conversations/ContinuedCard.tsx",

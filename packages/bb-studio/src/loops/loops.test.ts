@@ -117,7 +117,7 @@ it('releases the user\'s own Surface now at once, past the morning hold, the bud
  // Pressing it again doesn't post a second card; it isn't counted against the budget.
  await handlers['loops.update']!({id:low.id,surfaceNow:true});expect(post).toHaveBeenCalledTimes(2);
  expect((db.prepare("SELECT count(*) n FROM task_events WHERE type='surfaced'").get() as {n:number}).n).toBe(0);
- const cos=loops.store.add({title:'CoS job',owner:'cos'});await expect(handlers['loops.update']!({id:cos.id,surfaceNow:true})).rejects.toThrow('Only your own todos');
+ const cos=loops.store.add({title:'CoS job',owner:'cos'});await expect(handlers['loops.update']!({id:cos.id,surfaceNow:true})).rejects.toThrow('Only your own tasks');
  loops.store.act({id:low.id,action:'done'},()=>({type:'none'}));await expect(handlers['loops.update']!({id:low.id,surfaceNow:true})).rejects.toThrow('already closed');
  onChange({loopsEnabled:false});const off=loops.store.add({title:'With reminders off',trigger:{type:'time',at:Date.now()+86400000}});expect(await handlers['loops.update']!({id:off.id,surfaceNow:true})).toMatchObject({status:'surfaced'});expect(post).toHaveBeenCalledTimes(3);expect(post.mock.calls[2]![0]).toContain(`::loop{id="${off.id}"}`);
  // The Bot's own surfaceNow keeps the policy: queued, trigger none, held for the morning.

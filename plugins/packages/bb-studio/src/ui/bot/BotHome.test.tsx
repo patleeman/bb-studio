@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { useThreadTabRequests } from "../../kit/app/thread-panel";
 import { runsOn } from "./BotControls";
+import { taskFromLoop } from "../../tasks/views";
 
 const state = vi.hoisted(() => ({
   data: {} as Record<string, unknown>,
@@ -78,6 +79,11 @@ vi.mock("../../kit/app/index", () => ({
   PageColumn: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
   StudioBar: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
   openAppPath: vi.fn(), usePathname: () => state.pathname, Badge: ({ label }: { label: string }) => React.createElement("span", null, label), BAR_BUTTON: "", DANGER_BUTTON: "", GHOST_BUTTON: "", ICON_BUTTON: "", OUTLINE_BUTTON: "", PRIMARY_BUTTON: "",
+  Icon: ({ name }: { name: string }) => React.createElement("span", { "data-icon": name }),
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => children,
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => React.createElement("div", { role: "menu" }, children),
+  DropdownMenuItem: ({ children, onSelect }: { children: React.ReactNode; onSelect(): void }) => React.createElement("button", { type: "button", role: "menuitem", onClick: onSelect }, children),
 }));
 vi.mock("../../kit/ui/index", () => ({
   Icon: ({ name, className }: { name: string; className?: string }) => React.createElement("span", { "data-icon": name, className }),
@@ -1038,7 +1044,7 @@ const loop = (id: string, title: string, extra: Record<string, unknown> = {}) =>
 const loopGroups = { needsYouNow: [loop("loop_a", "Pay the property tax")], comingUp: [loop("loop_b", "Call the plumber", { status: "queued", trigger: { type: "place", place: "home", direction: "arrive" } })], agentsOnIt: [], waitingOnOthers: [], done: [] };
 
 test("Todos off: no Todos tab on the Bot page", async () => {
-  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "loops.list": loopGroups };
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "loops.list": loopGroups, "tasks.list": { tasks: Object.values(loopGroups).flat().map((l) => taskFromLoop(l as never)), threads: [], held: [] } };
   state.pathname = "/plugins/studio/studio/bot/bot_main/loops";
   await show(<BotPanel />);
   expect(container.querySelector("[role=tablist]")).toBeNull();
@@ -1047,7 +1053,7 @@ test("Todos off: no Todos tab on the Bot page", async () => {
 
 test("Todos on: no tabs; Needs you has the due todo with one action, and the Todos summary links to Todos at its own address", async () => {
   state.settings = { loopsEnabled: true };
-  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "loops.list": loopGroups };
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "loops.list": loopGroups, "tasks.list": { tasks: Object.values(loopGroups).flat().map((l) => taskFromLoop(l as never)), threads: [], held: [] } };
   await show(<BotPanel />);
   expect(container.querySelector("[role=tablist][aria-label='Bot page']")).toBeNull();
   const needs = container.querySelector('section[aria-label="Needs you"]')!;
@@ -1062,7 +1068,7 @@ test("Todos on: no tabs; Needs you has the due todo with one action, and the Tod
   state.pathname = "/plugins/studio/studio/bot/bot_main/loops";
   await show(<BotPanel />);
   expect(container.querySelector("[data-testid=todos-page]")?.textContent).toContain("Pay the property tax");
-  expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Todos·Dot");
+  expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Tasks·Dot");
   expect(container.querySelector("[data-testid=bot-page]")).toBeNull();
 });
 

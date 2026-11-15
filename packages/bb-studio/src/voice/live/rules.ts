@@ -47,7 +47,7 @@ export function classify(name: string, args: Record<string, unknown> = {}): Tool
 /** The question the voice asks before a destructive action. */
 export function confirmPrompt(action: DestructiveAction, name: string): string {
   switch (action) {
-    case "drop_loop": return `Drop the todo '${name}'? Say yes to drop.`;
+    case "drop_loop": return `Drop the task '${name}'? Say yes to drop.`;
     case "stop_thread": return `Stop the thread '${name}'? Say yes to stop.`;
     case "archive_thread": return `Archive the thread '${name}'? Say yes to archive.`;
     case "pause_automation": return `Pause the automation '${name}'? Say yes to pause.`;

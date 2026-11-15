@@ -5,13 +5,13 @@ import { usePathname } from "../../kit/app/route";
 import { useComposerThread } from "../../kit/composer";
 import { Icon, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
-import { TASKS_UNAVAILABLE } from "../../tasks/contract";
-import type { WorkCard } from "../contract";
-import { inFlightRows, needsYouCount, rowDetail, splitRows } from "./in-flight-model";
-import { ENDED_DETAIL, stateLabel } from "./model";
+import { isClosed, needsYou, TASKS_UNAVAILABLE, USER_OWNER, type Task } from "../../tasks/contract";
+import { inFlightDetail, ownerShort, ownerThreadId, taskStatus } from "../../tasks/ui/model";
+import { TaskGlyph } from "../../tasks/ui/TaskCard";
+import { openLoops, useLoopPeople } from "../../loops/ui/hooks";
+import { ENDED_DETAIL } from "./model";
 import { useCardsOnScreen } from "./on-screen";
 import { revealCard } from "./reveal";
-import { StateGlyph } from "./WorkCard";
 
 export const COLLAPSED_KEY = "bb.studio.in-flight.collapsed";
 
@@ -29,7 +29,8 @@ export function InFlightBanner() {
 }
 
 export function InFlight({ threadId }: { threadId: string }) {
-  const live = useLive("work.list", { threadId }, { pollMs: 60_000 });
+  const live = useLive("tasks.inFlight", { threadId }, { pollMs: 60_000 });
+  const people = useLoopPeople();
   const call = useCall();
   const navigate = useBbNavigate();
   const pathname = usePathname();
@@ -37,17 +38,26 @@ export function InFlight({ threadId }: { threadId: string }) {
   const [showDone, setShowDone] = useState(false);
   const [hidden, setHidden] = useState<ReadonlyMap<string, number>>(() => new Map());
   const onScreen = useCardsOnScreen();
-  const cards = live.data?.cards ?? [];
-  const rows = inFlightRows(cards.filter((card) => !onScreen.has(card.id) && hidden.get(card.id) !== card.updatedAt));
+  const tasks = live.data?.tasks ?? [];
+  const threads = live.data?.threads ?? [];
+  const names = { bot: people.botName, leads: people.leads, threads, botThreadId: people.botThreadId };
+  const visible = tasks.filter((task) => !onScreen.has(task.id) && hidden.get(task.id) !== task.updatedAt);
+  const rows = visible.some((task) => !isClosed(task)) ? visible : [];
   if (!live.data && live.error?.includes(TASKS_UNAVAILABLE)) return <p role="alert" data-testid="in-flight-error" className="px-3 py-1.5 text-xs text-destructive">{live.error}</p>;
   if (!rows.length) return null;
-  const { live: open, finished } = splitRows(rows);
-  const needs = needsYouCount(rows);
+  const open = rows.filter((task) => !isClosed(task));
+  const finished = rows.filter(isClosed);
+  const needs = rows.filter(needsYou).length;
   const toggle = () => { setCollapsed(!collapsed); writeCollapsed(!collapsed); };
-  const reveal = (card: WorkCard) => revealCard({ id: card.id, threadId, messageSeq: card.messageSeq, pathname, toAppPath: toAppPathOf(navigate) });
-  const hide = (gone: readonly WorkCard[]) => setHidden((before) => new Map([...before, ...gone.map((card) => [card.id, card.updatedAt] as const)]));
-  const unhide = (gone: readonly WorkCard[]) => setHidden((before) => new Map([...before].filter(([id]) => !gone.some((card) => card.id === id))));
-  const dismiss = (card: WorkCard) => {
+  const reveal = (task: Task) => {
+    if (task.card) { revealCard({ id: task.id, threadId, messageSeq: task.card.messageSeq, pathname, toAppPath: toAppPathOf(navigate) }); return; }
+    const owner = task.owner === USER_OWNER ? null : ownerThreadId(task.owner, people.botThreadId, threads);
+    if (owner && owner !== threadId) navigate.toThread(owner);
+    else openLoops(people.botId);
+  };
+  const hide = (gone: readonly Task[]) => setHidden((before) => new Map([...before, ...gone.map((card) => [card.id, card.updatedAt] as const)]));
+  const unhide = (gone: readonly Task[]) => setHidden((before) => new Map([...before].filter(([id]) => !gone.some((card) => card.id === id))));
+  const dismiss = (card: Task) => {
     hide([card]);
     void call("work.dismiss", { id: card.id }).then(() => live.refresh(), () => unhide([card]));
   };
@@ -57,21 +67,24 @@ export function InFlight({ threadId }: { threadId: string }) {
     setShowDone(false);
     void call("work.clear", { threadId }).then(() => live.refresh(), () => unhide(gone));
   };
-  const row = (card: WorkCard) => {
-    const detail = rowDetail(card);
+  const row = (card: Task) => {
+    const detail = inFlightDetail(card);
+    const status = taskStatus(card);
+    const agent = card.owner !== USER_OWNER;
     return (
       <li key={card.id} className="group flex min-w-0 items-center border-b border-border/35 last:border-b-0">
-        <button type="button" data-testid="in-flight-row" data-state={card.state} data-stale={card.stale || undefined} title={card.title} onClick={() => reveal(card)} className="flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 py-1 pl-3 pr-1 text-left text-xs transition-colors hover:bg-state-hover focus-visible:bg-state-hover focus-visible:outline-none">
-          <span className="flex w-3 shrink-0 justify-center"><StateGlyph state={card.state} stale={card.stale} /></span>
+        <button type="button" data-testid="in-flight-row" data-state={status.id} data-owner={card.owner} data-stale={card.stale || undefined} title={card.title} onClick={() => reveal(card)} className="flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 py-1 pl-3 pr-1 text-left text-xs transition-colors hover:bg-state-hover focus-visible:bg-state-hover focus-visible:outline-none">
+          <span className="flex w-3 shrink-0 justify-center"><TaskGlyph glyph={status.glyph} stale={status.stale} label={status.label} /></span>
           <span className="min-w-0 max-w-[45%] shrink-0 truncate text-foreground">{card.title}</span>
+          {agent ? <span data-testid="in-flight-owner" className="max-w-[25%] shrink-0 truncate text-muted-foreground">{ownerShort(card, names)}</span> : null}
           <span className="min-w-0 flex-1 truncate text-subtle-foreground">{detail}</span>
-          {card.state === "needs-you"
+          {status.id === "needs-you"
             ? <span data-testid="in-flight-needs-you" className="shrink-0 rounded bg-warning/15 px-1.5 py-px text-2xs font-medium text-warning">Needs you</span>
-            : <span className="shrink-0 text-2xs text-subtle-foreground" title={card.stale ? ENDED_DETAIL : undefined}>{stateLabel(card)}</span>}
+            : <span className="shrink-0 text-2xs text-subtle-foreground" title={card.stale ? ENDED_DETAIL : undefined}>{status.label}</span>}
         </button>
-        <button type="button" data-testid="in-flight-dismiss" aria-label={`Remove ${card.title} from In flight`} title="Remove from In flight" onClick={() => dismiss(card)} className="mr-1.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:opacity-100">
+        {card.card ? <button type="button" data-testid="in-flight-dismiss" aria-label={`Remove ${card.title} from In flight`} title="Remove from In flight" onClick={() => dismiss(card)} className="mr-1.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:opacity-100">
           <Icon name="X" className="size-3" />
-        </button>
+        </button> : <span className="mr-1.5 size-6 shrink-0" />}
       </li>
     );
   };

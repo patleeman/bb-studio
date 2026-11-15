@@ -15,7 +15,7 @@ export interface AddOn {
 }
 
 export const ADDONS: readonly AddOn[] = [
-  { id: "studio", displayName: "Studio", description: "The home of BB Studio: pages, whiteboards, recordings, designs and apps in one library, with Bots, Todos, Smart Queue and VS Code on each thread." },
+  { id: "studio", displayName: "Studio", description: "The home of BB Studio: pages, whiteboards, recordings, designs and apps in one library, with Bots, Tasks, Smart Queue and VS Code on each thread." },
   { id: "mobile", displayName: "Studio Mobile", description: "Part of BB Studio. The server side of the BB Studio iOS app: push notifications with lock-screen actions and muted threads." },
   { id: "studio-visual-chat", displayName: "BB Studio Visual Chat", description: "Part of BB Studio (prototype). Visual Chat: talk with an agent that answers on a board it designs each turn, with pictures, charts and numbers that animate as they change. Off unless you install it." },
 ];
