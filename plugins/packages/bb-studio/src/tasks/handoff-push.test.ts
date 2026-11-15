@@ -32,7 +32,7 @@ function setup({ quiet = false } = {}) {
   };
   const pushes: ReturnType<typeof loopPushInput>[] = [];
   const store = new TaskStore(db);
-  const push = async (loop: Loop) => { pushes.push(loopPushInput(loop, { id: "bot_main", threadId: "thr_main" }, store.find(loop.id)?.conversation ?? null, "proj_personal")); };
+  const push = async (loop: Loop) => { pushes.push(loopPushInput(loop, { id: "bot_main", threadId: "thr_main" }, store.find(loop.id), "proj_personal")); };
   const loops = registerLoops(bb as never, db, async () => {}, push, { get: async () => ({ loopsEnabled: true }), onChange: () => {} }, () => "UTC", () => {});
   const moved = handoffPush({ db, enabled: () => true, quiet: () => quiet, push });
   registerWorkCards(bb as never, db, { read: async () => ({ rows: [] }), thread: async () => ({ status: "active" }), moved });
@@ -52,7 +52,7 @@ it("a hand-off to the user pushes once, with the task's conversation, and the Bo
   expect(pushes).toEqual([]);
   await tool("task_handoff", { id: task.id, to: "user", needs: "Pick a date", options: ["Tue", "Thu"] });
   await Promise.resolve();
-  expect(pushes).toEqual([expect.objectContaining({ loopId: task.id, category: "BB_LOOP", conversationId: "thr_release", threadId: "thr_main", loopKind: "decide", options: ["Tue", "Thu"] })]);
+  expect(pushes).toEqual([expect.objectContaining({ title: "Pick a launch date", body: "Pick a date", loopId: task.id, category: "BB_LOOP", conversationId: "thr_release", threadId: "thr_main", loopKind: "decide", options: ["Tue", "Thu"] })]);
   expect(card(task.id, "work")).toBe(false);
   await tool("task_update", { id: task.id, line: "Waiting on the date", priority: "urgent", push: true });
   await loops.scheduler.tick();
@@ -70,7 +70,7 @@ it("a task made waiting for the user and a work card going needs-you push once e
   await tool("work_card_update", { id: made.id, state: "needs-you", needs: "Touch the YubiKey" }, "thr_main");
   await tool("work_card_update", { id: made.id, step: "4/5" }, "thr_main");
   await Promise.resolve();
-  expect(pushes.map((p) => [p.loopId, p.conversationId])).toEqual([[task.id, "thr_main"], [made.id, "thr_main"]]);
+  expect(pushes.map((p) => [p.loopId, p.conversationId, p.title, p.body])).toEqual([[task.id, "thr_main", "Approve the copy", "Approve it"], [made.id, "thr_main", "Release 2.1", "Touch the YubiKey"]]);
   await loops.scheduler.tick();
   expect(pushes).toHaveLength(2);
 });
@@ -87,4 +87,12 @@ it("no push for an agent's own task, a hand-on between agents, or the user's tak
   await quiet.tool("task_handoff", { id: late.id, to: "user", needs: "Sign it" });
   expect(quiet.pushes).toEqual([]);
   expect(store.get(late.id).attention.push).toBe(true);
+});
+
+it("a push's body is what the task needs, else why it matters, else New on your list", () => {
+  const loop = { id: "task_1", title: "Back up the laptop", why: "", kind: "do", options: [] } as unknown as Loop;
+  const bot = { id: "bot_main", threadId: "thr_main" };
+  expect(loopPushInput(loop, bot, { conversation: null, needs: "Pick the target drive for the backup" }, "proj_personal")).toMatchObject({ title: "Back up the laptop", body: "Pick the target drive for the backup" });
+  expect(loopPushInput({ ...loop, why: "The old one is failing" }, bot, { conversation: null, needs: null }, "proj_personal").body).toBe("The old one is failing");
+  expect(loopPushInput(loop, bot, null, "proj_personal").body).toBe("New on your list");
 });
