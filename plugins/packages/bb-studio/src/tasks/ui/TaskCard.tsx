@@ -2,9 +2,11 @@ import { useBbNavigate, type PluginMessageDirectiveProps } from "@get-bb/plugin-
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { remember } from "../../kit/app/directive-card";
 import { CHAT_CARD_BODY, CHAT_CARD_SKELETON, ChatCard, ChatCardHeader, ChatCardIconButton } from "../../kit/app/chat-card";
-import { errorMessage, relativeTime } from "../../kit/format";
+import { relativeTime } from "../../kit/format";
 import { Icon, cn } from "../../kit/ui/index";
-import { useCall, useLive, type RpcInput } from "../../ui/live";
+import { useCall, useLive } from "../../ui/live";
+import { useTaskActions } from "./actions";
+export { useTaskActions } from "./actions";
 import { BotAvatar } from "../../ui/bot/BotAvatar";
 import type { Loop } from "../../loops/contract";
 import { CARD_BUTTON, CARD_GHOST, CARD_PRIMARY, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu } from "../../loops/ui/LoopMenus";
@@ -14,7 +16,7 @@ import { useCardOnScreen } from "../../work/ui/on-screen";
 import { isClosed, needsYou, TODO_ID, USER_OWNER, type Task } from "../contract";
 import type { TaskView } from "../rpc-contract";
 import { WORK_ID } from "../../work/shared";
-import { handOffTargets, historyLines, isMine, ownerLabel, ownerThreadId, rowNumber, taskKind, taskStatus, type Glyph, type Names, type Tone } from "./model";
+import { everMine, handOffTargets, historyLines, isMine, ownerLabel, ownerThreadId, rowNumber, taskKind, taskStatus, type Glyph, type Names, type Tone } from "./model";
 
 const STALE_MS = 3 * 86_400_000;
 
@@ -66,19 +68,6 @@ export function LiveTask({ id, row, threadId, messageId }: { id: string; row: nu
   return row !== null ? <TaskRow view={view} people={people} refresh={live.refresh} /> : <TaskCardView view={view} people={people} refresh={live.refresh} chat />;
 }
 
-export function useTaskActions(refresh?: () => void) {
-  const call = useCall();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
-  const act = async (input: RpcInput<"tasks.act">) => {
-    setBusy(true); setError(null); setNote(null);
-    try { const out = await call("tasks.act", input); setNote(out.note); refresh?.(); return true; }
-    catch (cause) { setError(errorMessage(cause)); return false; }
-    finally { setBusy(false); }
-  };
-  return { act, busy, error, note };
-}
 
 function useBotFace() {
   const bot = useLive("bot_get", {}, { pollMs: 120_000 }).data?.bot ?? null;
@@ -104,7 +93,7 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
   const onScreen = useCardOnScreen(task.id);
   const { act, busy, error, note } = useTaskActions(refresh);
   const [showHistory, setShowHistory] = useState(false);
-  const names: Names = { bot: people.botName, leads: people.leads, threads };
+  const names: Names = { bot: people.botName, leads: people.leads, threads, botThreadId: people.botThreadId };
   const status = taskStatus(task);
   const kind = taskKind(task);
   const closed = isClosed(task);
@@ -125,7 +114,7 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
     : null;
   const handOff = open && targets.length ? <HandOffMenu targets={targets} disabled={busy} onHandOff={(to) => void act({ id: task.id, action: "hand_off", to })} /> : null;
   const done = (primary: boolean) => <button type="button" data-testid="task-done" className={primary ? CARD_PRIMARY : CARD_GHOST} disabled={busy} onClick={() => void act({ id: task.id, action: task.kind === "read" ? "got_it" : "done" })}><Icon name="CircleCheck" />{task.kind === "read" ? "Got it" : "Done"}</button>;
-  const takeBack = <button type="button" data-testid="task-take-back" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: task.id, action: "take_back" })}><Icon name="ArrowTurnBackward" />Take back</button>;
+  const takeBack = <button type="button" data-testid="task-take-back" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: task.id, action: "take_back" })}><Icon name="ArrowTurnBackward" />{task.origin === "loop" || everMine(history) ? "Take back" : "Take over"}</button>;
   const openButton = openThread ? <button type="button" data-testid="task-open-thread" className={CARD_GHOST} onClick={openThread}><Icon name="MessageSquare" />{task.owner === "cos" && !task.workers.length ? "Open chat" : "Open thread"}</button> : null;
   let actions: ReactNode;
   if (closed) {
@@ -223,7 +212,7 @@ export function TaskRow({ view, people, refresh }: { view: TaskView; people: Loo
   const closed = isClosed(task);
   const status = taskStatus(task);
   const due = task.timing.due !== null ? dueLabel(task.timing.due, now, zone) : null;
-  const names: Names = { bot: people.botName, leads: people.leads, threads: view.threads };
+  const names: Names = { bot: people.botName, leads: people.leads, threads: view.threads, botThreadId: people.botThreadId };
   const right = closed ? status.label
     : needsYou(task) ? status.label
       : !isMine(task) ? ownerLabel(task.owner, names)

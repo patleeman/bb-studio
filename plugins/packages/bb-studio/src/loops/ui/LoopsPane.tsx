@@ -21,7 +21,7 @@ import type { Loop } from "../contract";
 import { PickTime, TriggerForm } from "./LoopMenus";
 import { AddLoop, AreaChip, OwnerMenu, useLoopsBoard, type RowProps } from "./LoopsTab";
 import { areaChips, dueLabel, elapsed, fullWhen, KIND, optionParts, ownerName, ownerThread, shortWhen, SNOOZE, snoozeHint, sourceText, triggerLabel } from "./model";
-import { useTaskActions } from "../../tasks/ui/TaskCard";
+import { useTaskActions } from "../../tasks/ui/actions";
 import { focusDiscussed, LOOPS_PANE, loopDragProps, openLoops, useDiscussLoop, useLoopActions, useTodosZone } from "./hooks";
 
 export { LOOPS_PANE };

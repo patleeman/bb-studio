@@ -118,6 +118,8 @@ export function loopDragProps(loop: Pick<Loop, "id" | "title">) {
 }
 
 let projectNames: Promise<Map<string, string>> | null = null;
+let projectNamesAt = 0;
+const PROJECT_NAMES_MS = 30_000;
 
 export interface LoopPeople {
   /** The primary Bot: todos belong to it (the Chief of Staff). */
@@ -137,14 +139,17 @@ export function useLoopPeople(): LoopPeople {
   const bot = useLive("bot_get", {}, { pollMs: 120_000 }).data?.bot ?? null;
   const leads = useLive("project_leads", {}, { pollMs: 120_000 }).data?.leads ?? [];
   const [projects, setProjects] = useState<Map<string, string>>(new Map());
+  const [tick, setTick] = useState(0);
+  useEffect(() => { const timer = setInterval(() => setTick((n) => n + 1), PROJECT_NAMES_MS); return () => clearInterval(timer); }, []);
   useEffect(() => {
     let live = true;
+    if (Date.now() - projectNamesAt > PROJECT_NAMES_MS) { projectNames = null; projectNamesAt = Date.now(); }
     projectNames ??= sdk.projects.list({ includePersonal: true })
       .then((list) => new Map((list as { id: string; name: string }[]).map(({ id, name }) => [id, name])))
       .catch(() => { projectNames = null; return new Map<string, string>(); });
     void projectNames.then((names) => { if (live) setProjects(names); });
     return () => { live = false; };
-  }, [sdk]);
+  }, [sdk, tick]);
   return useMemo(() => {
     const botName = bot?.name ?? "Chief of Staff";
     const named = leads

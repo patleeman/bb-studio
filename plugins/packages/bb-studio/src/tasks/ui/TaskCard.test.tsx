@@ -102,14 +102,19 @@ it("needs you: the warning state and what is needed", async () => {
   expect(card().textContent).not.toContain("Snooze");
 });
 
-it("running with an agent: its name, the line, Open thread, Take back and Hand off", async () => {
+it("running with an agent: its name, the line, Open thread, Take over (never the user's) and Hand off", async () => {
   put({ owner: "thread:thr_w", state: "in_progress", workers: ["thr_w"], progress: { step: "2/5 Tests", line: "Running the suite" } });
   await render("work", { id: "task_1" });
   expect(card().dataset.state).toBe("running");
   expect(card().querySelector('[data-testid="task-owner"]')!.textContent).toBe("Fix the flaky test");
   expect(card().querySelector('[data-testid="task-line"]')!.textContent).toBe("Running the suite");
-  await click("Take back");
+  await click("Take over");
   expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "task_1", action: "take_back" });
+  put({ owner: "cos", state: "in_progress" }, { history: [{ type: "handed_off", at: NOW, data: JSON.stringify({ owner: "cos", from: "patrick", by: "patrick" }) }] });
+  await render("work", { id: "task_1" });
+  expect(container.textContent).toContain("Take back");
+  put({ owner: "thread:thr_w", state: "in_progress", workers: ["thr_w"], progress: { step: "2/5 Tests", line: "Running the suite" } });
+  await render("work", { id: "task_1" });
   await click("Open thread");
   expect(state.toThread).toHaveBeenCalledWith("thr_w");
 });
@@ -157,7 +162,8 @@ it("expands the history of hand-offs on the card", async () => {
   const lines = [...container.querySelectorAll('[data-testid="task-history"] li')].map((li) => li.textContent);
   expect(lines[0]).toContain("Fix the flaky test handed it to you: Pick one");
   expect(lines[1]).toContain("1/2 · Compared prices");
-  expect(lines[2]).toContain("Fix the flaky test created it for Fix the flaky test");
+  expect(lines[2]).toContain("Fix the flaky test created it");
+  expect(lines[2]).not.toContain(" for ");
 });
 
 it("draws every row=\"N\" as a compact row that opens the full card, not only row 1", async () => {

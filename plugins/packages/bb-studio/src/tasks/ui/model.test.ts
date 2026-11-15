@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { Task } from "../contract";
-import { ALL, filterChoices, handOffTargets, historyLines, inFlightDetail, matches, ownerLabel, rowNumber, sectionTasks, taskSection, taskStatus } from "./model";
+import { ALL, everMine, filterChoices, handOffTargets, historyLines, inFlightDetail, matches, ownerLabel, rowNumber, sectionTasks, taskSection, taskStatus } from "./model";
 
 const NOW = new Date("2026-11-13T15:00:00Z").getTime();
 const t = (patch: Partial<Task> = {}): Task => ({
@@ -79,4 +79,21 @@ it("an In flight row says what is needed, else the step and line", () => {
   expect(inFlightDetail(t({ state: "waiting", needs: "Approve" }))).toBe("Approve");
   expect(inFlightDetail(t({ owner: "cos", state: "in_progress", progress: { step: "2/5", line: "Tests" } }))).toBe("2/5 · Tests");
   expect(inFlightDetail(t({ state: "done", progress: { step: "5/5", line: "Shipped" } }))).toBe("Shipped");
+});
+
+it("says who took a task back and names the Bot's chat as the Bot", () => {
+  const withBot = { ...names, botThreadId: "thr_bot" };
+  const lines = historyLines([
+    { type: "handed_off", at: 1, data: JSON.stringify({ owner: "patrick", from: "thread:thr_bot", by: "thread:thr_bot" }) },
+    { type: "handed_off", at: 2, data: JSON.stringify({ owner: "thread:thr_w", from: "patrick", by: "patrick" }) },
+    { type: "handed_off", at: 3, data: JSON.stringify({ owner: "patrick", from: "thread:thr_w", by: "patrick" }) },
+    { type: "closed", at: 4, data: JSON.stringify({ action: "done", by: "thread:thr_w" }) },
+  ], withBot);
+  expect(lines.map((l) => l.text)).toEqual(["Done by Fix the flaky test", "You took it back from Fix the flaky test", "You handed it to Fix the flaky test", "Chief of Staff handed it to you"]);
+});
+
+it("knows whether a task was ever the user's", () => {
+  expect(everMine([{ type: "created", at: 1, data: JSON.stringify({ by: "thread:thr_w", owner: "thread:thr_w" }) }])).toBe(false);
+  expect(everMine([{ type: "added_by_you", at: 1, data: "{}" }])).toBe(true);
+  expect(everMine([{ type: "handed_off", at: 1, data: JSON.stringify({ owner: "cos", from: "patrick" }) }])).toBe(true);
 });

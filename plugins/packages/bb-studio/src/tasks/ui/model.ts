@@ -34,13 +34,14 @@ export function taskStatus(task: Task): TaskStatus {
 export const isMine = (task: Pick<Task, "owner">) => task.owner === USER_OWNER;
 
 export type ThreadName = { owner: string; name: string; threadId: string | null };
-export type Names = { bot: string; leads: ReadonlyMap<string, string>; threads?: readonly ThreadName[] };
+export type Names = { bot: string; leads: ReadonlyMap<string, string>; threads?: readonly ThreadName[]; botThreadId?: string | null };
 
 export function ownerLabel(owner: string | null | undefined, names: Names): string {
   if (!owner) return "";
   if (owner === USER_OWNER) return "You";
   if (owner === "cos") return names.bot;
   const id = owner.startsWith("thread:") ? owner.slice(7) : owner;
+  if (names.botThreadId && id === names.botThreadId) return names.bot;
   return names.leads.get(id) ?? names.threads?.find((t) => t.owner === `thread:${id}`)?.name ?? "A thread";
 }
 
@@ -76,12 +77,18 @@ export function historyLines(history: readonly TaskEvent[], names: Names): Histo
     const d = parse(event.data);
     let text: string | null = null;
     switch (event.type) {
-      case "created": text = `${who(d.by) ?? "An agent"} created it for ${ownerLabel(str(d.owner), names).replace(/^You$/, "you")}`; break;
+      case "created": {
+        const by = who(d.by) ?? "An agent";
+        const forWhom = ownerLabel(str(d.owner), names);
+        text = forWhom === by ? `${by} created it` : `${by} created it for ${forWhom === "You" ? "you" : forWhom}`;
+        break;
+      }
       case "added_by_you": text = "You added it"; break;
       case "handed_off": {
         const to = ownerLabel(str(d.owner), names);
         const by = who(d.by) ?? who(d.from);
-        text = `${by ? `${by} handed it to ` : "Handed to "}${to === "You" ? (by === "You" ? "yourself" : "you") : to}${str(d.needs) ? `: ${str(d.needs)}` : ""}`;
+        if (to === "You" && by === "You") { const from = who(d.from); text = from && from !== "You" ? `You took it back from ${from}` : "You took it back"; break; }
+        text = `${by ? `${by} handed it to ` : "Handed to "}${to === "You" ? "you" : to}${str(d.needs) ? `: ${str(d.needs)}` : ""}`;
         break;
       }
       case "closed": text = d.action === "drop" ? "Dismissed" : d.action === "failed" ? "Failed" : str(d.option) ? `Chose ${str(d.option)}` : "Done"; { const by = who(d.by); if (by && by !== "You") text += ` by ${by}`; } break;
@@ -172,3 +179,11 @@ export function inFlightDetail(task: Task): string | null {
 }
 
 export const TASKS_ERROR_HINT = "Tasks can't be shown right now. Nothing was lost. Restart BB Studio to try again.";
+
+export function everMine(history: readonly TaskEvent[]): boolean {
+  return history.some((e) => {
+    if (e.type === "added_by_you") return true;
+    const d = parse(e.data);
+    return (e.type === "created" || e.type === "handed_off") && (d.owner === USER_OWNER || d.from === USER_OWNER);
+  });
+}

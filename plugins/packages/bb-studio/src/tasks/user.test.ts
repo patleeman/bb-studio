@@ -97,9 +97,9 @@ it("refuses a hand-off of a closed task and a hand-off to the user through act",
 
 it("takes a task back from an agent: it lands in Today as the user's and the agent is told to stop", async () => {
   const { handlers, tool, sent } = setup();
-  const { task } = await tool("task_create", { title: "Draft the release notes", owner: "me", card: true });
+  const { task } = await tool("task_create", { title: "Draft the release notes", owner: "me", card: true, step: "2/4 Draft", line: "Writing the intro" });
   const out = await handlers["tasks.act"]!({ id: task.id, action: "take_back" });
-  expect(out.task).toMatchObject({ owner: "patrick", state: "todo", attention: { queue: "surfaced" } });
+  expect(out.task).toMatchObject({ owner: "patrick", state: "todo", attention: { queue: "surfaced" }, progress: { step: null, line: null } });
   expect(sent).toEqual([{ threadId: "thr_worker", text: expect.stringMatching(/took task "Draft the release notes".*back\. Stop working on it/) }]);
 });
 
@@ -111,7 +111,7 @@ it("an agent hands a decision to the user; choosing hands it back to that agent 
   expect(handed.task).toMatchObject({ owner: "patrick", state: "waiting", kind: "decide", needs: "Which provider?" });
   expect(handedBy(handed.history)).toBe("thread:thr_worker");
   const out = await handlers["tasks.act"]!({ id: task.id, action: "choose", option: "Wasabi" });
-  expect(out.task).toMatchObject({ owner: "thread:thr_worker", state: "in_progress", needs: null, progress: { line: "Chose: Wasabi" } });
+  expect(out.task).toMatchObject({ owner: "thread:thr_worker", state: "in_progress", needs: null, kind: "do", options: [], progress: { line: "Chose: Wasabi" } });
   expect(sent.at(-1)).toEqual({ threadId: "thr_worker", text: expect.stringMatching(/chose "Wasabi" for task "Pick a backup provider"/) });
   await expect(handlers["tasks.act"]!({ id: task.id, action: "choose", option: "Nope" })).rejects.toThrow(/existing option/);
 });
@@ -222,4 +222,20 @@ it("asks for every morning row as row=\"N\"", async () => {
   const description = (tools as unknown as Record<string, { description: string }>).todos_morning!.description;
   expect(description).toContain('::loop{id="<id>" row="N"}');
   expect(description).toContain("movedToYou");
+});
+
+it("an agent's task with a trigger and no state waits for it, so it files under Scheduled, not Agents on it", async () => {
+  const { tool } = setup();
+  const { task } = await tool("task_create", { title: "Check the deploy tonight", owner: "cos", trigger: { type: "time", at: NOW + 3_600_000 } });
+  expect(task).toMatchObject({ state: "todo", attention: { queue: "queued" } });
+  expect((await tool("task_create", { title: "Run now", owner: "cos" })).task.state).toBe("in_progress");
+});
+
+it("names every thread in the task's history, not only today's owner", async () => {
+  const { handlers, tool } = setup();
+  const { task } = await tool("task_create", { title: "Sort the receipts", owner: "me" }, "thr_lead");
+  await handlers["tasks.act"]!({ id: task.id, action: "hand_off", to: "thread:thr_worker" });
+  await handlers["tasks.act"]!({ id: task.id, action: "take_back" });
+  const view = await handlers["tasks.get"]!({ id: task.id });
+  expect(view.threads.map((t: { owner: string }) => t.owner).sort()).toEqual(["thread:thr_lead", "thread:thr_worker"]);
 });

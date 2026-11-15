@@ -7,8 +7,10 @@ import { BotItemDetail, BotItemError, type BotPageFact } from "../../ui/bot-page
 import { useLive } from "../../ui/live";
 import type { Loop } from "../contract";
 import { ChangeTrigger, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu, CARD_BUTTON, CARD_GHOST, CARD_PRIMARY } from "./LoopMenus";
-import { fullWhen, INLINE_OPTIONS, ownerName, ownerThread, safeUrl, sourceText, triggerLabel, type OwnerInfo } from "./model";
+import { fullWhen, INLINE_OPTIONS, shortWhen, ownerName, ownerThread, safeUrl, sourceText, triggerLabel, type OwnerInfo } from "./model";
 import { TaskCardView, useTaskActions } from "../../tasks/ui/TaskCard";
+import { historyLines, taskStatus } from "../../tasks/ui/model";
+import type { TaskView } from "../../tasks/rpc-contract";
 import { useDiscussLoop, useLoopActions, useLoopPeople, usePlaceNames, useTodosZone, type LoopPeople } from "./hooks";
 
 export const entryId = (params: JsonValue | null): string | null => {
@@ -22,20 +24,21 @@ export function TodoTab({ params }: { params: JsonValue | null }) {
   const places = usePlaceNames(true);
   const live = useLive("loops.get", { id: id ?? "" }, { enabled: !!id, pollMs: 60_000 });
   const gone = !!id && !!live.error && !live.data && /not found/i.test(live.error);
-  const task = useLive("tasks.get", { id: id ?? "" }, { enabled: gone, pollMs: 60_000 });
+  const task = useLive("tasks.get", { id: id ?? "" }, { enabled: !!id, pollMs: 60_000 });
   if (id && live.error && !live.data && !gone) return <BotItemError message={live.error} />;
   if (gone && task.data) return <div className="mx-auto w-full max-w-2xl p-4"><TaskCardView view={task.data} people={people} refresh={task.refresh} /></div>;
   if (gone && !task.error) return null;
   if (!id || (live.error && !live.data)) return <NotFoundTab params={{ kind: "todo", id, link: id ? linkFor({ kind: "todo", id }) : "bb://todo" }} />;
   if (!live.data) return null;
-  return <TodoDetail key={id} loop={live.data.loop} people={people} places={places} owner={live.data.owner} refresh={live.refresh} />;
+  return <TodoDetail key={id} loop={live.data.loop} people={people} places={places} owner={live.data.owner} refresh={() => { live.refresh(); task.refresh(); }} view={task.data ?? null} />;
 }
 
-export function TodoDetail({ loop, people, places, owner, refresh }: { loop: Loop; people: LoopPeople; places: string[]; owner: OwnerInfo | undefined; refresh(): void }) {
+export function TodoDetail({ loop, people, places, owner, refresh, view = null }: { loop: Loop; people: LoopPeople; places: string[]; owner: OwnerInfo | undefined; refresh(): void; view?: TaskView | null }) {
   const navigate = useBbNavigate();
   const zone = useTodosZone();
   const { act, update, busy, error } = useLoopActions(refresh);
   const tasks = useTaskActions(refresh);
+  const history = view ? historyLines(view.history, { bot: people.botName, leads: people.leads, threads: view.threads, botThreadId: people.botThreadId }) : [];
   const discuss = useDiscussLoop(people.botThreadId, people.botName);
   const [nudged, setNudged] = useState(false);
   const closed = loop.closedAt !== null;
@@ -54,6 +57,8 @@ export function TodoDetail({ loop, people, places, owner, refresh }: { loop: Loo
     ...(trigger && !whenIsDue ? [{ label: "When", value: withPush(trigger.text) }] : []),
     ...(loop.area ? [{ label: "Area", value: loop.area }] : []),
     { label: "Owner", value: ownerName(loop.owner, { bot: people.botName, leads: people.leads }, owner) },
+    ...(view ? [{ label: "State", value: taskStatus(view.task).label }] : []),
+    ...(view?.task.needs && !closed ? [{ label: "Needs", value: view.task.needs }] : []),
     ...(source ? [{ label: "Source", value: url ? <a href={url} target="_blank" rel="noreferrer" className="text-foreground underline decoration-border underline-offset-2 hover:decoration-foreground">{source}</a>
       : sourceThread ? <button type="button" className="underline decoration-border underline-offset-2 hover:decoration-foreground" onClick={() => navigate.toThread(sourceThread)}>{source}</button> : source }] : []),
     ...(closed && loop.closedAt ? [{ label: loop.status === "dropped" ? "Dismissed" : "Done", value: `${by ? `${by} · ` : ""}${fullWhen(loop.closedAt, Date.now(), zone)}` }] : []),
@@ -91,6 +96,19 @@ export function TodoDetail({ loop, people, places, owner, refresh }: { loop: Loo
       {error ?? tasks.error ? <p role="alert" className="w-full text-xs text-destructive">{error ?? tasks.error}</p> : null}
     </>}>
       {loop.why ? <p data-testid="todo-why" className="text-sm whitespace-pre-wrap text-foreground">{loop.why}</p> : null}
+      {history.length ? (
+        <section aria-label="History" data-testid="todo-history" className="flex flex-col gap-1 pt-2 text-xs">
+          <h3 className="text-xs font-medium text-subtle-foreground">History</h3>
+          <ol className="flex flex-col gap-1">
+            {history.slice(0, 20).map((line, i) => (
+              <li key={`${line.at}-${i}`} className="flex min-w-0 items-baseline gap-2">
+                <span className="w-16 shrink-0 tabular-nums text-subtle-foreground">{shortWhen(line.at, Date.now(), zone)}</span>
+                <span className="min-w-0 text-muted-foreground">{line.text}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
     </BotItemDetail>
   );
 }

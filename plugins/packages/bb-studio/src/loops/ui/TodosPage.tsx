@@ -54,7 +54,7 @@ export function TodosPage({ view }: { view: BotView }) {
   const moreLine = (id: string, title: string, count: number) => count ? <BotPageMore count={count} group={title} testId="tasks-more" onOpen={() => setUnfolded((open) => new Set([...open, id]))} /> : null;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(timer); }, []);
-  const names: Names = { bot: people.botName, leads: people.leads, threads: list.data?.threads ?? [] };
+  const names: Names = { bot: people.botName, leads: people.leads, threads: list.data?.threads ?? [], botThreadId: people.botThreadId };
   const sections = useMemo(() => sectionTasks(tasks, { area, project, owner, query }, now, zone), [tasks, area, project, owner, query, now, zone]);
   const filtered = area !== ALL || project !== ALL || owner !== ALL;
   const showChat = !query.trim() && area === ALL && project === ALL && (owner === ALL || owner === USER_OWNER);
@@ -62,7 +62,7 @@ export function TodosPage({ view }: { view: BotView }) {
   const scheduled = useMemo(() => (scheduledList.data?.items ?? []).filter((item) => item.source === "automation" && item.botId === bot.id && (!query.trim() || item.title.toLowerCase().includes(query.trim().toLowerCase())) && !filtered),
     [scheduledList.data, bot.id, query, filtered]);
   const total = sections.today.length + sections.later.length + sections.agents.length + sections.waiting.length + sections.scheduled.length + chatRows;
-  const add = (text: string) => call("loops.add", { text }).then(() => list.refresh());
+  const add = (text: string) => call("loops.add", { text }).then(() => { setUnfolded((open) => new Set([...open, "today"])); list.refresh(); });
   const botChat = people.botThreadId ? rowOpen({ kind: "conversation", id: people.botThreadId }, people.botName) : null;
   const ready = ownsTasks ? !!list.data || !!list.error : !!scheduledList.data || !!scheduledList.error;
   const projects = people.projects ?? new Map<string, string>();
@@ -135,7 +135,7 @@ export function TodosPage({ view }: { view: BotView }) {
             <BotPageRow key={item.key} testId="scheduled-row" data={{ "data-scheduled": item.key }} icon={SCHEDULED_ICON[item.kind]} muted={item.state === "paused"}
               title={item.title} titleText={item.title} meta={scheduledMeta(item, now, zone)} {...rowOpen(item.link, item.title)} />
           ))}
-          {!scheduledCount && !(scheduledList.error && !scheduledList.data) ? <BotPageEmpty testId="scheduled-empty" {...(query.trim() ? { title: noMatch("scheduled items", query) } : { title: "Nothing scheduled yet", hint: "Add a reminder or a check-in with New." })} /> : null}
+          {!scheduledCount && !(scheduledList.error && !scheduledList.data) ? <BotPageEmpty testId="scheduled-empty" {...(query.trim() ? { title: noMatch("scheduled items", query) } : filtered ? { title: "No scheduled items match these filters" } : { title: "Nothing scheduled yet", hint: "Add a reminder or a check-in with New." })} /> : null}
           {moreLine("scheduled", "Scheduled", scheduledRows.more)}
         </BotPageGroup>
       ) : null}

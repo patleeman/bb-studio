@@ -51,7 +51,7 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
     const toUser = owner === USER_OWNER;
     const now = store.now();
     const task: Task = {
-      id: store.newId("task"), title: x.title, why: x.why ?? "", owner, state: x.state ?? (toUser ? "todo" : "in_progress"), kind: x.kind ?? (x.options?.length ? "decide" : "do"),
+      id: store.newId("task"), title: x.title, why: x.why ?? "", owner, state: x.state ?? (toUser || (trigger && trigger.type !== "none") ? "todo" : "in_progress"), kind: x.kind ?? (x.options?.length ? "decide" : "do"),
       options: x.options ?? [], needs: x.needs ?? null, priority: x.priority ?? "normal", conversation, project: x.project ?? null, area: x.area ?? null,
       timing: { due: x.due ?? null, trigger: trigger ?? { type: "none" }, snoozed: false }, attention: { queue: toUser && x.card ? "surfaced" : null, push: x.push ?? false },
       progress: { step: x.step ?? null, line: x.line ?? null }, workers: x.workers ?? [], outputs: x.outputs ?? [], source: x.source ?? null,

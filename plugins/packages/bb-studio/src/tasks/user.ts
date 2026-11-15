@@ -46,8 +46,14 @@ export function inFlightOrder(tasks: readonly Task[]): Task[] {
 export class UserTasks {
   constructor(readonly store: TaskStore, readonly deps: UserTaskDeps) {}
 
-  async names(tasks: readonly Task[]): Promise<ThreadInfo[]> {
+  async names(tasks: readonly Task[], history: readonly TaskEvent[] = []): Promise<ThreadInfo[]> {
     const ids = new Set<string>();
+    for (const event of history) {
+      try {
+        const d = JSON.parse(event.data || "{}") as Record<string, unknown>;
+        for (const key of ["owner", "from", "by"]) { const v = d[key]; if (typeof v === "string" && v.startsWith("thread:")) ids.add(v.slice(7)); }
+      } catch { continue; }
+    }
     for (const t of tasks) {
       if (t.owner.startsWith("thread:")) ids.add(t.owner.slice(7));
       for (const w of t.workers) ids.add(w);
@@ -58,7 +64,8 @@ export class UserTasks {
 
   async view(id: string): Promise<TaskView> {
     const task = this.store.get(id);
-    return { task, history: this.store.history(id), todo: inLoopView(task), threads: await this.names([task]) };
+    const history = this.store.history(id);
+    return { task, history, todo: inLoopView(task), threads: await this.names([task], history) };
   }
 
   async list() {
@@ -116,6 +123,7 @@ export class UserTasks {
       t.state = t.kind === "waiting-outside" ? "waiting" : "todo";
       t.attention.queue = "surfaced";
       t.timing.snoozed = false;
+      t.progress = { step: null, line: null };
     }, USER_OWNER);
     const failed = await this.tell(before.owner, `The user took task ${this.brief(task)} back. Stop working on it; it is theirs now.`);
     return { task, note: failed };
@@ -129,6 +137,8 @@ export class UserTasks {
       t.state = "in_progress";
       t.needs = null;
       t.progress.line = `Chose: ${option}`.slice(0, 300);
+      t.options = [];
+      if (t.kind === "decide") t.kind = "do";
     }, USER_OWNER);
     this.store.event(id, "acted", { action: "choose", option });
     const failed = await this.tell(from, `The user chose ${JSON.stringify(option)} for task ${this.brief(before)} Carry on with that choice and record progress with task_update.`);
