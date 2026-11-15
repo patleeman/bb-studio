@@ -1,3 +1,4 @@
+import { sinceHandedToUser } from '../tasks/store';
 import type { Loop } from './contract';
 import { LoopStore, waitsForTrigger } from './store';
 import { isClosed } from '../tasks/contract';
@@ -71,7 +72,7 @@ export class LoopScheduler {
  await this.post(`Todo ${l.id} is due: ${JSON.stringify(l.title)}. Owner: ${l.owner}. ${l.owner==='cos'?'Carry out the next step now':'Ask that thread to carry out the next step'}, and record progress with todos_update or todos_act.`);
  this.store.update(l.id,{status:'in_progress'});this.store.event(l.id,'started');
  }
- for(const l of this.store.all().filter(l=>l.status==='surfaced'&&(l.push||l.priority==='urgent'))){if(!this.settings().enabled)return;if(quiet&&l.priority!=='urgent')continue;const notified=this.store.history(l.id).filter(e=>e.type==='notified');if(notified.length&&!(l.due!==null&&l.due<now&&local(notified.at(-1)!.at,s.timeZone).date!==p.date))continue;await this.notify(l);this.store.event(l.id,'notified');}
+ for(const l of this.store.all().filter(l=>l.status==='surfaced'&&(l.push||l.priority==='urgent'))){if(!this.settings().enabled)return;if(quiet&&l.priority!=='urgent')continue;const notified=sinceHandedToUser(this.store.history(l.id)).filter(e=>e.type==='notified');if(notified.length&&!(l.due!==null&&l.due<now&&local(notified.at(-1)!.at,s.timeZone).date!==p.date))continue;await this.notify(l);this.store.event(l.id,'notified');}
  if(this.settings().enabled&&p.weekday==='Mon'&&p.hour>=9&&!quiet){const key=`stale:${p.date}`;if(!this.store.db.prepare('SELECT key FROM loop_scheduler WHERE key=?').get(key)){const stale=this.store.all().filter(l=>!l.closedAt&&l.updatedAt<now-3*86400000);if(stale.length)await this.post('Weekly stale todos: offer Keep or Drop for '+stale.map(l=>`::loop{id="${l.id}"}`).join(' '));this.store.db.prepare('INSERT INTO loop_scheduler VALUES (?,?)').run(key,'sent');}}
  }finally{this.running=false;}}
 }

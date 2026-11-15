@@ -37,8 +37,22 @@ export function taskTitle(db: Database.Database, id: string): string | null {
   } catch { return null; }
 }
 
-export function cardNeedsUser(task: Task | null, kind: "work" | "loop"): boolean {
+export function sinceHandedToUser<E extends TaskEvent>(history: readonly E[]): E[] {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const e = history[i]!;
+    let d: { owner?: string; by?: string | null } = {};
+    try { d = JSON.parse(e.data || "{}") as typeof d; } catch { continue; }
+    if (d.by === USER_OWNER) continue;
+    if (e.type === "handed_off" && d.owner === USER_OWNER) return history.slice(i + 1);
+  }
+  return [...history];
+}
+
+export const notifiedSinceHandoff = (history: readonly TaskEvent[]) => sinceHandedToUser(history).some((e) => e.type === "notified");
+
+export function cardNeedsUser(task: Task | null, kind: "work" | "loop", history: readonly TaskEvent[] = []): boolean {
   if (!task) return true;
+  if (notifiedSinceHandoff(history)) return false;
   if (needsYou(task)) return true;
   return kind === "loop" && task.owner === USER_OWNER && !isClosed(task);
 }

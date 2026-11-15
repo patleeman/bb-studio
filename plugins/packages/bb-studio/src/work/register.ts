@@ -5,7 +5,7 @@ import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { changes, createInput, directiveFor, isFinished, rpcContract, WORK_ID, type CreateInput, type WorkCard, type WorkChanges } from "./contract";
 import { WorkCardStore } from "./store";
 import { assertTasksReady, guardTasks } from "../tasks/store";
-import { closedByUser, KEPT_CLOSED } from "../tasks/contract";
+import { closedByUser, KEPT_CLOSED, type Task } from "../tasks/contract";
 
 type TimelineRow = { id: string; kind?: string; role?: string; text?: string; messageSeq?: number };
 type TimelinePage = { rows?: TimelineRow[]; timelinePage?: { olderCursor?: { anchorSeq: number; anchorId: string } | null } };
@@ -42,7 +42,7 @@ export function endsCard(card: WorkCard, thread: WorkerThread): boolean {
   return card.state === "running" && card.kind !== "lead" && card.workerThreadId !== card.threadId && (thread.status === "idle" || thread.status === "error");
 }
 
-export function registerWorkCards(bb: BbPluginApi, db: Database.Database, options: { read?: TimelineReader; thread?: ThreadReader } = {}) {
+export function registerWorkCards(bb: BbPluginApi, db: Database.Database, options: { read?: TimelineReader; thread?: ThreadReader; moved?(task: Task): void } = {}) {
   const store = new WorkCardStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); });
   const read: TimelineReader = options.read ?? (async (threadId, cursor) => await bb.sdk.threads.timeline({ threadId, segmentLimit: 40, ...(cursor ? { beforeAnchorSeq: String(cursor.anchorSeq), beforeAnchorId: cursor.anchorId } : {}) } as never) as unknown as TimelinePage);
   const tried = new Map<string, number>();
@@ -62,15 +62,22 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     void Promise.resolve().then(() => bb.sdk.threads.update({ threadId: card.workerThreadId!, title: card.title } as never))
       .catch((error: unknown) => { bb.log.warn(`Work card ${card.id}: ${error instanceof Error ? error.message : String(error)}`); });
   };
+  const moved = (card: WorkCard, before: WorkCard | null) => {
+    if (card.state !== "needs-you" || before?.state === "needs-you") return;
+    const task = store.tasks.find(card.id);
+    if (task) options.moved?.(task);
+  };
   const create = (input: CreateInput & { threadId: string }) => {
     const card = store.create(input);
     name(card, null);
+    moved(card, null);
     return { card, directive: directiveFor(card.id) };
   };
   const update = (id: string, changes: WorkChanges, by: string | null = null) => {
     const before = store.find(id);
     const card = store.update(id, changes, by);
     name(card, before);
+    moved(card, before);
     return card;
   };
   const list = async (threadId: string) => ({ cards: await Promise.all(store.inFlight(threadId).map(place)) });

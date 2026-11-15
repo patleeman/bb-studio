@@ -24,7 +24,7 @@ const GET = "Read one task by id (task_…, loop_… or wc_…): its record, his
 const LIST = "List tasks, open ones by default, newest change first. Filter by owner (\"user\", \"cos\", \"me\", \"thread:<id>\"), state (a state, open or closed), conversation, area, project or parent.";
 const HANDOFF = "Hand a task to another owner and keep its history: to the user when you need a decision or an action from them (say what in needs, give options for a decision), or to the Bot or a thread to carry it on. The task's card updates; a task without a card handed to the user comes up in the Bot chat.";
 
-export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post, send: Send = async (threadId, text) => { await bb.sdk.threads.send({ threadId, mode: "auto", input: [{ type: "text", text, mentions: [], visibility: "agent-only" }] } as never); }) {
+export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post, send: Send = async (threadId, text) => { await bb.sdk.threads.send({ threadId, mode: "auto", input: [{ type: "text", text, mentions: [], visibility: "agent-only" }] } as never); }, moved: (task: Task) => void = () => {}) {
   const store = new TaskStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); });
   const caller = (ctx: Ctx) => (ctx.threadId ? `thread:${ctx.threadId}` : null);
 
@@ -64,6 +64,7 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
     surfaceForUser(task);
     const saved = store.save(task);
     store.event(saved.id, "created", { by: caller(ctx) ?? "cos", owner: saved.owner });
+    if (needsYou(saved)) moved(saved);
     const posted = needsYou(saved) && !inWorkView(saved) ? await tellUser(saved, ctx) : saved.card ? await postCard(saved, ctx) : null;
     return { task: saved, ...(saved.card ? { directive: directiveFor(saved.id) } : {}), ...(posted ? { note: posted } : {}) };
   };
@@ -149,6 +150,7 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
       if (x.line !== undefined) t.progress.line = x.line || null;
       if (toUser && inLoopView(t)) t.attention.queue = "surfaced";
     }, caller(ctx));
+    if (toUser && !(before.owner === USER_OWNER && needsYou(before))) moved(task);
     let note = task.card ? "The card shows the new owner." : "";
     const tell = async (text: string, done: string) => {
       try { await post(text); note = done; } catch (error) { note = `Handed off, but the Bot chat could not be told: ${error instanceof Error ? error.message : String(error)}`; }
