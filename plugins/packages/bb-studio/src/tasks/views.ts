@@ -1,7 +1,7 @@
 import { loop as loopSchema, type Loop } from "../loops/contract";
 import { workCard as workSchema, type WorkCard } from "../work/contract";
 import type { WorkState } from "../work/shared";
-import { isClosed, USER_OWNER, type Task, type TaskKind, type TaskState } from "./contract";
+import { isClosed, needsYou, USER_OWNER, type Task, type TaskKind, type TaskState } from "./contract";
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -76,7 +76,7 @@ export const agentOwner = (task: Pick<Task, "workers" | "conversation">) =>
 export function workState(task: Task): WorkState {
   if (task.state === "failed") return "failed";
   if (isClosed(task)) return "done";
-  if (task.owner === USER_OWNER && task.kind !== "waiting-outside") return "needs-you";
+  if (needsYou(task)) return "needs-you";
   return task.state === "in_progress" ? "running" : "waiting";
 }
 

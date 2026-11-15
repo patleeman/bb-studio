@@ -1,8 +1,25 @@
 import type Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
-import { isClosed, task as taskSchema, USER_OWNER, type Task, type TaskEvent, type TaskListInput } from "./contract";
+import { isClosed, needsYou, unavailableMessage, task as taskSchema, USER_OWNER, type Task, type TaskEvent, type TaskListInput } from "./contract";
 
 type Row = { record: string };
+
+const unavailable = new WeakMap<Database.Database, string>();
+export const markTasksUnavailable = (db: Database.Database, reason: string) => { unavailable.set(db, reason); };
+export const tasksUnavailable = (db: Database.Database) => unavailable.get(db) ?? null;
+
+export function assertTasksReady(db: Database.Database): void {
+  const reason = tasksUnavailable(db);
+  if (reason) throw new Error(unavailableMessage(reason));
+}
+
+export function guardTasks<T extends Record<string, (...args: never[]) => unknown>>(db: Database.Database, handlers: T): T {
+  return Object.fromEntries(Object.entries(handlers).map(([name, handler]) => [name, (...args: never[]) => { assertTasksReady(db); return handler(...args); }])) as T;
+}
+
+export function surfaceForUser(t: Task): void {
+  if (needsYou(t) && t.attention.queue === null) t.attention.queue = "surfaced";
+}
 
 export const toStoredOwner = (owner: string, caller?: string | null) => {
   if (owner === "user") return USER_OWNER;
@@ -109,6 +126,8 @@ export class TaskStore {
       const next: Task = structuredClone(before);
       patch(next);
       next.updatedAt = this.now();
+      surfaceForUser(next);
+      if (next.card && ((isClosed(before) && !isClosed(next)) || (next.owner === USER_OWNER && before.owner !== USER_OWNER))) next.card.dismissedAt = null;
       if (isClosed(next) && !isClosed(before)) { next.closedAt = this.now(); next.closedBy = by; }
       if (!isClosed(next) && isClosed(before) && before.stale) next.stale = false;
       const saved = this.write(next);

@@ -1,18 +1,19 @@
 import Database from "better-sqlite3";
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "../migrations";
 import { registerLoops } from "../loops/register";
 import { LoopStore } from "../loops/store";
+import { LoopScheduler } from "../loops/scheduler";
 import { registerWorkCards } from "../work/register";
 import { WORK_ID } from "../work/shared";
 import { WorkCardStore } from "../work/store";
 import { task as taskSchema, type Task } from "./contract";
-import { backupPath, migrateToTasks, summarizeTaskMigration, verifyTaskMigration } from "./migrate";
+import { backupPath, KEEP_BACKUPS, migrateToTasks, summarizeTaskMigration, verifyTaskMigration } from "./migrate";
 import { registerTasks, TASK_TOOLS } from "./register";
-import { normalizeTask, TaskStore } from "./store";
+import { markTasksUnavailable, normalizeTask, TaskStore } from "./store";
 import { applyLoop, applyWork, taskFromLoop, taskFromWork, toLoop, toWork } from "./views";
 import { taskFromLoop as captureTaskFromLoop } from "../../../../scripts/capture/task-rows.mjs";
 
@@ -129,7 +130,7 @@ it("models subtasks: children under a parent, and no cycles", async () => {
   const parent = (await call("task_create", { title: "Weekly check", owner: "cos", schedule: { text: "Mondays at 9", cron: "0 9 * * 1" } })).task;
   const child = (await call("task_create", { title: "Run 1", owner: "cos", parentId: parent.id })).task;
   expect(parent.schedule).toEqual({ text: "Mondays at 9", cron: "0 9 * * 1", timeZone: null, automationId: null, paused: false });
-  expect((await call("task_get", { id: parent.id })).children).toEqual([{ id: child.id, title: "Run 1", owner: "cos", state: "todo" }]);
+  expect((await call("task_get", { id: parent.id })).children).toEqual([{ id: child.id, title: "Run 1", owner: "cos", state: "in_progress" }]);
   expect((await call("task_update", { id: parent.id, parentId: child.id })).error).toMatch(/own parent/);
   expect((await call("task_list", { parentId: parent.id })).tasks.map((t: Task) => t.id)).toEqual([child.id]);
 });
@@ -369,4 +370,110 @@ it("reports counts before and after for the dry run", () => {
       taskEvents: 3,
     },
   });
+});
+
+it("starts an agent's task in progress, under Agents on it, never in the user's Later", async () => {
+  const { call, handlers, work } = setup();
+  const mine = (await call("task_create", { title: "Fix the build", owner: "me" })).task;
+  const bots = (await call("task_create", { title: "Renew the domain", owner: "cos" })).task;
+  const carded = (await call("task_create", { title: "Release", owner: "me", card: true })).task;
+  for (const t of [mine, bots, carded]) expect(t).toMatchObject({ state: "in_progress", attention: { queue: null } });
+  const list = await handlers["loops.list"]!({});
+  expect(list.agentsOnIt.map((l: { id: string }) => l.id).sort()).toEqual([mine.id, bots.id, carded.id].sort());
+  expect(list.comingUp).toEqual([]);
+  expect(work.store.get(carded.id).state).toBe("running");
+  expect((await call("task_create", { title: "Later", owner: "cos", state: "todo", trigger: { type: "time", at: NOW + 1000 } })).task).toMatchObject({ state: "todo", attention: { queue: "queued" } });
+});
+
+it("puts a task for the user that waits on them in Today, with or without a card, and shows one needs-you", async () => {
+  const { call, handlers, posts, work } = setup();
+  const asked = await call("task_create", { title: "Approve the budget", owner: "user", state: "waiting", needs: "Say yes or no" });
+  expect(asked.task.attention.queue).toBe("surfaced");
+  expect(posts).toEqual([`Please post this card in your chat exactly once: ::loop{id="${asked.task.id}"}`]);
+  const carded = (await call("task_create", { title: "Ship", owner: "me", card: true })).task;
+  await call("task_handoff", { id: carded.id, to: "user", needs: "Approve the push" });
+  expect(posts).toHaveLength(1);
+  const today = (await handlers["loops.list"]!({})).needsYouNow.map((l: { id: string }) => l.id);
+  expect(today.sort()).toEqual([asked.task.id, carded.id].sort());
+  expect(work.store.get(carded.id).state).toBe("needs-you");
+  const todo = (await call("task_create", { title: "Read it", owner: "user", card: true })).task;
+  expect(todo.attention.queue).toBe("surfaced");
+  expect(work.store.get(todo.id).state).toBe("waiting");
+});
+
+it("doesn't count hand-offs against the daily budget", async () => {
+  const { call, loops } = setup();
+  for (let i = 0; i < 6; i++) await call("task_handoff", { id: (await call("task_create", { title: `H${i}`, owner: "cos" })).task.id, to: "user" });
+  loops.store.add({ title: "Due now" });
+  const scheduler = new LoopScheduler(loops.store, () => ({ enabled: true, timeZone: "UTC", dailyBudget: 5, quietStart: 22, quietEnd: 7 }), async () => {}, async () => {});
+  expect(scheduler.held()).toEqual([]);
+  expect(db.prepare("SELECT count(*) AS n FROM task_events WHERE type = 'surfaced'").get()).toEqual({ n: 0 });
+});
+
+it("re-shows a cleared card when a task tool reopens it or hands it to the user, and revives an ended one", async () => {
+  const { call, work } = setup();
+  const card = work.create({ title: "Build", threadId: "thr_lead" }).card;
+  work.update(card.id, { state: "done" });
+  expect(work.store.clearFinished("thr_lead")).toBe(1);
+  expect((await work.list("thr_lead")).cards).toEqual([]);
+  await call("task_update", { id: card.id, state: "in_progress" });
+  expect((await work.list("thr_lead")).cards.map((c) => c.id)).toEqual([card.id]);
+  work.store.dismiss(card.id);
+  await call("task_handoff", { id: card.id, to: "user", needs: "Look" });
+  expect((await work.list("thr_lead")).cards.map((c) => [c.id, c.state])).toEqual([[card.id, "needs-you"]]);
+  const ended = work.create({ title: "Worker", kind: "worker", threadId: "thr_lead", workerThreadId: "thr_w" }).card;
+  work.store.markStale(ended.id);
+  expect(await call("task_update", { id: ended.id, line: "Back at it" })).toMatchObject({ state: "in_progress", stale: false });
+  expect(work.store.get(ended.id)).toMatchObject({ state: "running", stale: false, line: "Back at it" });
+});
+
+it("checks triggers like todos do: incomplete ones refused, place names lower-cased", async () => {
+  const { call } = setup();
+  expect((await call("task_create", { title: "X", owner: "user", trigger: { type: "time" } })).error).toMatch(/incomplete/);
+  const t = (await call("task_create", { title: "Plumber", owner: "user", trigger: { type: "place", place: "Home", direction: "arrive" } })).task;
+  expect(t.timing.trigger.place).toBe("home");
+  expect((await call("task_update", { id: t.id, trigger: { type: "event" } })).error).toMatch(/incomplete/);
+});
+
+it("shows a clear error in Todos, In flight and the tools when adoption failed, instead of empty lists", async () => {
+  const { call, handlers, tools } = setup();
+  markTasksUnavailable(db, "disk I/O error");
+  await expect(Promise.resolve().then(() => handlers["loops.list"]!({}))).rejects.toThrow(/could not be moved to tasks.*disk I\/O error.*Nothing was lost/);
+  await expect(Promise.resolve().then(() => handlers["work.list"]!({ threadId: "thr_lead" }))).rejects.toThrow(/could not be moved to tasks/);
+  await expect(Promise.resolve().then(() => handlers["loops.add"]!({ text: "x" }))).rejects.toThrow(/could not be moved to tasks/);
+  await expect(Promise.resolve().then(() => tools.todos_list!.execute({}, {}))).rejects.toThrow(/could not be moved to tasks/);
+  await expect(Promise.resolve().then(() => tools.work_card_get!.execute({ id: "wc_x" }, {}))).rejects.toThrow(/could not be moved to tasks/);
+  expect((await call("task_list", {})).error).toMatch(/could not be moved to tasks/);
+});
+
+it("adopts even when the backup fails, says why, and leaves the file in the way alone", () => {
+  dir = mkdtempSync(join(tmpdir(), "tasks-nobackup-"));
+  const path = join(dir, "data.db");
+  const file = new Database(path);
+  migrate(file);
+  legacy(file);
+  writeFileSync(backupPath(path, NOW), "someone else's file");
+  const report = migrateToTasks(file);
+  expect(report.backup).toBeNull();
+  expect(report.backupError).toMatch(/already exists/);
+  expect(report.adopted).toMatchObject({ loops: 8, cards: 7 });
+  expect(readFileSync(backupPath(path, NOW), "utf8")).toBe("someone else's file");
+  file.close();
+});
+
+it("keeps only the newest backups", () => {
+  dir = mkdtempSync(join(tmpdir(), "tasks-prune-"));
+  const path = join(dir, "data.db");
+  const older = [1, 2, 3, 4].map((day) => backupPath(path, NOW - day * 86400000));
+  for (const old of older) writeFileSync(old, "old");
+  writeFileSync(join(dir, "data.other.db"), "keep");
+  const file = new Database(path);
+  migrate(file);
+  legacy(file);
+  const report = migrateToTasks(file);
+  const left = readdirSync(dir).filter((name) => name.includes("before-tasks")).sort();
+  expect(left).toHaveLength(KEEP_BACKUPS);
+  expect(left).toEqual([older[1], older[0], report.backup].map((p) => p!.slice(dir!.length + 1)).sort());
+  expect(existsSync(join(dir, "data.other.db"))).toBe(true);
+  file.close();
 });

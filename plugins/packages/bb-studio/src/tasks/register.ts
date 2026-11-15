@@ -3,9 +3,11 @@ import type Database from "better-sqlite3";
 import { z } from "zod";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { ownerText } from "../loops/reference";
+import { placeKey } from "../loops/store";
+import type { Loop } from "../loops/contract";
 import { directiveFor } from "../work/shared";
-import { createInput, handoffInput, isClosed, listInput, updateInput, USER_OWNER, type Task, type TaskCreateInput, type TaskHandoffInput, type TaskListInput, type TaskUpdateInput } from "./contract";
-import { TaskStore, toStoredOwner } from "./store";
+import { createInput, handoffInput, isClosed, listInput, needsYou, updateInput, USER_OWNER, type Task, type TaskCreateInput, type TaskHandoffInput, type TaskListInput, type TaskUpdateInput } from "./contract";
+import { guardTasks, surfaceForUser, TaskStore, toStoredOwner } from "./store";
 import { inLoopView, inWorkView } from "./views";
 
 export const TASK_TOOLS = ["task_create", "task_update", "task_get", "task_list", "task_handoff"];
@@ -26,35 +28,49 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
   const checkParent = (id: string | null | undefined, self?: string) => {
     if (!id) return;
     for (let at: string | null = id, depth = 0; at; depth++) {
-      if (at === self || depth > 20) throw new Error("A task can't be its own parent.");
+      if (at === self) throw new Error("A task can't be its own parent.");
+      if (depth > 20) throw new Error("Subtasks go at most 20 levels deep.");
       at = store.get(at).parentId;
     }
   };
 
-  const create = (input: TaskCreateInput, ctx: Ctx = {}) => {
+  const checkTrigger = (t: Loop["trigger"] | undefined): Loop["trigger"] | undefined => {
+    if (!t) return t;
+    const next = t.type === "place" && t.place ? { ...t, place: placeKey(t.place) } : t;
+    if (next.type === "time" && !Number.isFinite(next.at) || next.type === "event" && !next.event || next.type === "place" && (!next.place || !next.direction)) throw new Error("Trigger fields are incomplete");
+    return next;
+  };
+
+  const create = async (input: TaskCreateInput, ctx: Ctx = {}) => {
     const x = createInput.parse(input);
     const owner = toStoredOwner(x.owner, ctx.threadId);
     const conversation = x.conversation ?? (x.card ? ctx.threadId ?? null : null);
     if (x.card && !conversation) throw new Error("Pass conversation: the thread the card goes in.");
     checkParent(x.parentId);
+    const trigger = checkTrigger(x.trigger);
+    const toUser = owner === USER_OWNER;
     const now = store.now();
     const task: Task = {
-      id: store.newId("task"), title: x.title, why: x.why ?? "", owner, state: x.state ?? "todo", kind: x.kind ?? (x.options?.length ? "decide" : "do"),
+      id: store.newId("task"), title: x.title, why: x.why ?? "", owner, state: x.state ?? (toUser ? "todo" : "in_progress"), kind: x.kind ?? (x.options?.length ? "decide" : "do"),
       options: x.options ?? [], needs: x.needs ?? null, priority: x.priority ?? "normal", conversation, project: x.project ?? null, area: x.area ?? null,
-      timing: { due: x.due ?? null, trigger: x.trigger ?? { type: "none" }, snoozed: false }, attention: { queue: null, push: x.push ?? false },
+      timing: { due: x.due ?? null, trigger: trigger ?? { type: "none" }, snoozed: false }, attention: { queue: toUser && x.card ? "surfaced" : null, push: x.push ?? false },
       progress: { step: x.step ?? null, line: x.line ?? null }, workers: x.workers ?? [], outputs: x.outputs ?? [], source: x.source ?? null,
       parentId: x.parentId ?? null, schedule: x.schedule ?? null, card: x.card ? { kind: "task", messageId: null, messageSeq: null, dismissedAt: null } : null,
       stale: false, origin: "task", createdAt: now, updatedAt: now, closedAt: null, closedBy: null,
     };
+    surfaceForUser(task);
     const saved = store.save(task);
     store.event(saved.id, "created", { by: caller(ctx) ?? "cos", owner: saved.owner });
-    return { task: saved, ...(saved.card ? { directive: directiveFor(saved.id) } : {}) };
+    const posted = needsYou(saved) && !inWorkView(saved) ? await tellUser(saved, ctx) : null;
+    return { task: saved, ...(saved.card ? { directive: directiveFor(saved.id) } : {}), ...(posted ? { note: posted } : {}) };
   };
 
   const update = (input: TaskUpdateInput, ctx: Ctx = {}) => {
     const x = updateInput.parse(input);
     if (x.parentId !== undefined) checkParent(x.parentId, x.id);
+    const trigger = checkTrigger(x.trigger);
     return store.change(x.id, (t) => {
+      if (t.stale) { t.stale = false; if (x.state === undefined) t.state = "in_progress"; }
       if (x.title !== undefined) t.title = x.title;
       if (x.why !== undefined) t.why = x.why;
       if (x.state !== undefined) t.state = x.state;
@@ -66,7 +82,7 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
       if (x.project !== undefined) t.project = x.project;
       if (x.area !== undefined) t.area = x.area;
       if (x.due !== undefined) t.timing.due = x.due;
-      if (x.trigger !== undefined) { t.timing.trigger = x.trigger; t.timing.snoozed = false; }
+      if (trigger !== undefined) { t.timing.trigger = trigger; t.timing.snoozed = false; }
       if (x.push !== undefined) t.attention.push = x.push;
       if (x.step !== undefined) t.progress.step = x.step || null;
       if (x.line !== undefined) t.progress.line = x.line || null;
@@ -89,6 +105,12 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
     return { tasks: store.list({ ...x, ...(x.owner ? { owner: toStoredOwner(x.owner, ctx.threadId) } : {}) }) };
   };
 
+  const tellUser = async (task: Task, ctx: Ctx) => {
+    store.event(task.id, "handed_to_you", { by: caller(ctx) });
+    try { await post(`Please post this card in your chat exactly once: ::loop{id="${task.id}"}`); return "It comes up in the Bot chat."; }
+    catch (error) { return `It is in Today, but the Bot chat could not be told: ${error instanceof Error ? error.message : String(error)}`; }
+  };
+
   const handoff = async (input: TaskHandoffInput, ctx: Ctx = {}) => {
     const x = handoffInput.parse(input);
     const to = toStoredOwner(x.to, ctx.threadId);
@@ -101,15 +123,14 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
       t.needs = x.needs ?? (toUser ? t.needs : null);
       if (x.options?.length) { t.options = x.options; t.kind = "decide"; }
       if (x.line !== undefined) t.progress.line = x.line || null;
-      if (toUser && !inWorkView(t) && inLoopView(t)) t.attention.queue = "surfaced";
+      if (toUser && inLoopView(t)) t.attention.queue = "surfaced";
     }, caller(ctx));
     let note = task.card ? "The card shows the new owner." : "";
     const tell = async (text: string, done: string) => {
       try { await post(text); note = done; } catch (error) { note = `Handed off, but the Bot chat could not be told: ${error instanceof Error ? error.message : String(error)}`; }
     };
     if (toUser && !inWorkView(task) && before.attention.queue !== "surfaced") {
-      store.event(task.id, "surfaced", { by: caller(ctx) });
-      await tell(`Please post this card in your chat exactly once: ::loop{id="${task.id}"}`, "It comes up in the Bot chat.");
+      note = await tellUser(task, ctx);
     } else if (!toUser && to !== caller(ctx)) {
       await tell(`Task ${task.id} was handed to ${ownerText(to)}: ${JSON.stringify(task.title)}.${task.needs ? ` Needs: ${task.needs}.` : ""} ${to === "cos" ? "Carry out the next step now" : "Ask that thread to carry out the next step"}; read it with task_get and record progress with task_update.`, "The Bot was told.");
     }
@@ -117,8 +138,9 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
   };
 
   const tool = <S extends z.ZodTypeAny>(name: string, description: string, parameters: S, execute: (x: z.infer<S>, ctx: Ctx) => unknown) => {
+    const run = guardTasks(db, { execute: (x: z.infer<S>, c: Ctx) => execute(x, c) });
     bb.agents.registerTool({ name, description, parameters, execute: async (x: z.infer<S>, ctx: Ctx) => {
-      try { return JSON.stringify(await execute(x, ctx ?? {})); } catch (error) { return `Error: ${error instanceof Error ? error.message : String(error)}`; }
+      try { return JSON.stringify(await run.execute(x as never, (ctx ?? {}) as never)); } catch (error) { return `Error: ${error instanceof Error ? error.message : String(error)}`; }
     } } as never);
   };
   tool("task_create", CREATE, createInput, (x, ctx) => create(x, ctx));

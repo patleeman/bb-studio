@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { existsSync, readdirSync, rmSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 import { loop as loopSchema } from "../loops/contract";
 import { workCard as workSchema } from "../work/contract";
@@ -11,6 +12,8 @@ type Row = { record: string };
 export type MigrationProblem = { id: string; source: "loop" | "work"; reason: string };
 export type TaskMigrationReport = {
   backup: string | null;
+  backupError?: string;
+  pruned?: string[];
   adopted: { loops: number; cards: number; events: number };
   skipped: MigrationProblem[];
   orphanEvents: number;
@@ -35,8 +38,24 @@ export function backupDatabase(db: Database.Database, at: number): string | null
   const file = db.name;
   if (!file || file === ":memory:") return null;
   const target = backupPath(file, at);
-  db.prepare("VACUUM INTO ?").run(target);
+  if (existsSync(target)) throw new Error(`${target} already exists`);
+  try {
+    db.prepare("VACUUM INTO ?").run(target);
+  } catch (error) {
+    try { rmSync(target, { force: true }); } catch { }
+    throw error;
+  }
   return target;
+}
+
+export const KEEP_BACKUPS = 3;
+
+export function pruneBackups(file: string, keep = KEEP_BACKUPS): string[] {
+  const ext = extname(file);
+  const prefix = `${basename(file, ext)}.before-tasks-`;
+  const old = readdirSync(dirname(file)).filter((name) => name.startsWith(prefix) && name.endsWith(ext || ".db")).sort().reverse().slice(keep);
+  for (const name of old) rmSync(join(dirname(file), name), { force: true });
+  return old;
 }
 
 export function migrateToTasks(db: Database.Database, options: { backup?: boolean; now?: () => number } = {}): TaskMigrationReport {
@@ -52,7 +71,14 @@ export function migrateToTasks(db: Database.Database, options: { backup?: boolea
     for (const row of todo.cards) report.skipped.push({ id: row.id, source: "work", reason: "the record does not read as a work card" });
     return report;
   }
-  if (options.backup !== false) report.backup = backupDatabase(db, now());
+  if (options.backup !== false) {
+    try {
+      report.backup = backupDatabase(db, now());
+      if (report.backup) report.pruned = pruneBackups(db.name);
+    } catch (error) {
+      report.backupError = message(error);
+    }
+  }
   const store = new TaskStore(db, () => {}, now);
   const exists = db.prepare("SELECT 1 FROM tasks WHERE id = ?");
   const ledger = db.prepare("INSERT OR IGNORE INTO task_legacy (id, source, adopted_at) VALUES (?, ?, ?)");
