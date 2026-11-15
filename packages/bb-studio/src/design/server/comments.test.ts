@@ -22,6 +22,10 @@ describe("design comments", () => {
     store.markSent(second.id);
     expect(store.view(row.id)!.comments).toEqual([expect.objectContaining({ id: second.id, body: "Bigger", sent: true })]);
     expect(store.comments(row.id, { includeResolved: true })).toHaveLength(2);
+    expect(store.view(row.id)!.resolvedComments).toEqual([expect.objectContaining({ id: first.id, body: "Warmer", resolvedAt: expect.any(Number) })]);
+    store.setResolved(first.id, false);
+    expect(store.view(row.id)!.resolvedComments).toEqual([]);
+    expect(store.view(row.id)!.comments.map((comment) => comment.id)).toEqual([first.id, second.id]);
   });
 
   it("goes with its design", () => {

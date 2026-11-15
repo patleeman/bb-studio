@@ -44,6 +44,17 @@ export const designViewSchema = z.object({
     createdAt: z.number(),
     sent: z.boolean(),
   })),
+  resolvedComments: z.array(z.object({
+    id: z.string(),
+    screenId: z.string(),
+    step: z.string(),
+    selector: z.string(),
+    elementText: z.string(),
+    body: z.string(),
+    createdAt: z.number(),
+    sent: z.boolean(),
+    resolvedAt: z.number(),
+  })).optional(),
   review: z.object({
     state: z.enum(["reviewing", "done", "needs_work", "failed"]),
     round: z.number().nullable(),

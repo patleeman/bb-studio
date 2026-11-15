@@ -17,7 +17,7 @@ import type { PageMetaView, RequestView } from "../contract";
 import { PageConnection } from "./connection";
 import { HistoryDialog } from "./dialogs";
 import { pagePath, REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
-import { PageEditor } from "./PageEditor";
+import { PageEditor, type SidePanel } from "./PageEditor";
 import { actorName, PageMenu, relativeTime, ICON_BUTTON, type BotsState, type Rpc } from "./shared";
 import { pageFieldKey, toggleTalk, useTalk, type TalkView } from "./talk";
 import { usePageTitle } from "./use-page-title";
@@ -232,7 +232,7 @@ function ActivityPill({
                 <span className="min-w-0 flex-1">
                   <span className="line-clamp-2">
                     {request.botName} {STATUS_VERB[request.status]}{" "}
-                    {request.kind === "refresh" ? "a refresh" : "a request"}
+                    {request.kind === "refresh" ? "a refresh" : request.kind === "comment" ? "a comment" : "a request"}
                     {request.summary && request.kind !== "refresh" ? `: “${request.summary}”` : ""}
                   </span>
                   {request.error ? <span className="line-clamp-2 text-xs text-red-500">{request.error}</span> : null}
@@ -289,6 +289,8 @@ export function PageView({
   const { connection, status, ready } = useConnection(page.id);
   const presence = usePresence(connection);
   const talk = useTalk(pageFieldKey(page.id));
+  const [sidePanel, setSidePanel] = useState<SidePanel>(null);
+  const [panelSlot, setPanelSlot] = useState<HTMLDivElement | null>(null);
   const [dialog, setDialog] = useState<"history" | null>(null);
   const [requests, setRequests] = useState<RequestView[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
@@ -322,19 +324,30 @@ export function PageView({
   const shown = { ...page, title };
 
   return (
-    // Floating chrome and the chat are placed against this box.
+    // Floating chrome and the chat are placed against this box; the comments panel splits it.
     <div className="pages-doc relative flex h-full min-h-0 flex-col bg-background text-foreground">
       <WhiteboardExpandHost>
       {persistenceVisible(connection) ? <div className="shrink-0 px-4 pt-3 pb-2"><PersistenceBadge connection={connection} /></div> : null}
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="flex min-h-0 flex-1">
+      <div className="min-h-0 min-w-0 flex-1 overflow-auto">
         <PageColumn>
           <PageHeading page={page} rpc={rpc} titleSave={titleSave} />
           <PageBody missing={status === "missing"}>
             {connection && ready && status !== "missing" ? (
-              <PageEditor connection={connection} page={page} pages={pages} />
+              <PageEditor
+                connection={connection}
+                page={page}
+                bots={bots.bots}
+                pages={pages}
+                sidePanel={sidePanel}
+                onSidePanel={setSidePanel}
+                panelSlot={panelSlot}
+              />
             ) : null}
           </PageBody>
         </PageColumn>
+      </div>
+      <div ref={setPanelSlot} data-testid="page-side-panel" className="flex min-h-0 shrink-0 empty:hidden" />
       </div>
 
       <ItemHeader
@@ -357,6 +370,16 @@ export function PageView({
           <DictateButton talk={talk} ready={Boolean(connection && ready && status !== "missing")} onToggle={() => toggleTalk(pageFieldKey(page.id))} />
           <button type="button" aria-label="Version history" title="Version history" className={cn(ICON_BUTTON, "max-md:hidden")} onClick={() => setDialog("history")}>
             <Icon name="Clock" className="size-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Comments"
+            title="Comments"
+            aria-pressed={sidePanel === "comments"}
+            className={ICON_BUTTON}
+            onClick={() => setSidePanel((panel) => (panel === "comments" ? null : "comments"))}
+          >
+            <Icon name="MessageCirclePlus" className="size-4" />
           </button>
           <PageMenu
             page={page}

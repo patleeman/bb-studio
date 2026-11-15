@@ -6,10 +6,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { BarTitle, ICON_BUTTON, Icon, ItemHeader, cn } from "../../kit/app/index";
-import { frameSize, designHref, screenUrl, frameKey, type DesignView, type RoundView, type ScreenStep, type ScreenView, isDeck } from "../shared";
+import { frameSize, designHref, screenUrl, frameKey, type CommentView, type DesignView, type RoundView, type ScreenStep, type ScreenView, isDeck } from "../shared";
 import { useDesign } from "./use-design";
 import { Canvas, type CanvasApi } from "./canvas";
-import { useScreenFrames } from "./screen-frames";
+import { DesignCommentsPanel, Pins, useComments, type Rect } from "./comments";
 import { PlayView } from "./play-view";
 
 /** The main-area view: Studio's item header over the full-screen canvas. */
@@ -38,13 +38,26 @@ export function DesignPage({ designId, backLabel, onBack }: { designId: string; 
   );
 }
 
-type Register = (key: string) => (frame: HTMLIFrameElement | null) => void;
+/** Comment-layer handles each option needs. */
+type Layer = {
+  commenting: boolean;
+  register(screenId: string): (frame: HTMLIFrameElement | null) => void;
+  comments: CommentView[];
+  numbers: Map<string, number>;
+  rects: Record<string, Record<string, Rect | null>>;
+  activeId: string | null;
+  pulse: number;
+  openPin(id: string, pin: HTMLElement): void;
+};
 
-/** The canvas with its floating controls and the player. */
-export function DesignBoard({ design, leftTools }: {
+/** The canvas with its floating controls, comments and the player. */
+export function DesignBoard({ design, leftTools, inThread = false }: {
   design: DesignView;
   leftTools?: ReactNode;
+  /** Shown beside its conversation, so sends need no "Open chat". */
+  inThread?: boolean;
 }) {
+  const board = useRef<HTMLDivElement>(null);
   const canvas = useRef<CanvasApi>(null);
   /** Bumped to reload every frame. */
   const [reloads, setReloads] = useState(0);
@@ -55,10 +68,43 @@ export function DesignBoard({ design, leftTools }: {
   const newest = design.rounds[0]?.screens[0];
   /** Changes when rounds or options are added, so the canvas places its view again until the user moves it. */
   const fitKey = design.rounds.map((round) => `${round.round}:${round.screens.length}`).join(",");
-  const frames = useScreenFrames(design, canvas);
+  const comments = useComments(design, board, canvas);
+  const numbers = new Map(design.comments.map((comment, index) => [comment.id, index + 1]));
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [pulse, setPulse] = useState(0);
+  const activeId = comments.open?.id ?? null;
+  useEffect(() => {
+    if (comments.commenting || comments.draft) setPanelOpen(true);
+  }, [comments.commenting, comments.draft]);
+  const focusPin = (id: string) => {
+    comments.setOpen({ id, anchor: { x: 0, y: 0 } });
+    const pin = board.current?.querySelector<HTMLElement>(`[data-comment-pin="${CSS.escape(id)}"]`);
+    const box = board.current?.getBoundingClientRect();
+    if (pin && box) {
+      const at = pin.getBoundingClientRect();
+      const x = at.left + at.width / 2;
+      const y = at.top + at.height / 2;
+      canvas.current?.wheel({ deltaX: x - (box.left + box.width / 2), deltaY: y - (box.top + box.height / 2), zoom: false, clientX: x, clientY: y });
+    }
+    setPulse((count) => count + 1);
+  };
+  const layer: Layer = {
+    commenting: comments.commenting,
+    register: comments.register,
+    comments: design.comments,
+    numbers,
+    rects: comments.rects,
+    activeId,
+    pulse,
+    openPin: (id) => {
+      setPanelOpen(true);
+      comments.setOpen({ id, anchor: { x: 0, y: 0 } });
+    },
+  };
 
   return (
-    <div className="relative h-full">
+    <div className="flex h-full min-h-0">
+    <div ref={board} className="relative h-full min-w-0 flex-1">
     <Canvas
       api={canvas}
       fitKey={fitKey}
@@ -71,11 +117,15 @@ export function DesignBoard({ design, leftTools }: {
           </button>
           <span aria-hidden className="mx-0.5 h-4 w-px bg-border" />
           <div role="group" aria-label="Mode" className="flex items-center gap-0.5">
-            <button type="button" aria-pressed={!frames.editing} className={cn(MODE_BUTTON, !frames.editing && MODE_ON)} onClick={() => frames.setEditing(false)}>
+            <button type="button" aria-pressed={!comments.commenting && !comments.editing} className={cn(MODE_BUTTON, !comments.commenting && !comments.editing && MODE_ON)} onClick={() => { comments.setCommenting(false); comments.setEditing(false); }}>
               Select
             </button>
-            <button type="button" aria-pressed={frames.editing} className={cn(MODE_BUTTON, frames.editing && MODE_ON)} onClick={() => frames.setEditing(true)}>
+            <button type="button" aria-pressed={comments.editing} className={cn(MODE_BUTTON, comments.editing && MODE_ON)} onClick={() => comments.setEditing(true)}>
               <Icon name="EditFile" className="size-3.5" /> Edit text
+            </button>
+            <button type="button" aria-pressed={comments.commenting} className={cn(MODE_BUTTON, comments.commenting && MODE_ON)} onClick={() => { comments.setCommenting(true); setPanelOpen(true); }}>
+              <Icon name="MessageSquare" className="size-3.5" /> Comment
+              {design.comments.length ? <span className="tabular-nums text-muted-foreground">{design.comments.length}</span> : null}
             </button>
           </div>
           <ReviewStatus review={design.review} />
@@ -98,11 +148,25 @@ export function DesignBoard({ design, leftTools }: {
         <p className="p-8 text-2xl text-muted-foreground">No screens yet</p>
       ) : (
         <div className="flex flex-col gap-40">
-          {design.rounds.map((round) => <Round key={round.round} designId={design.id} round={round} reloads={reloads} onPlay={play} register={frames.register} />)}
+          {design.rounds.map((round) => <Round key={round.round} designId={design.id} round={round} reloads={reloads} onPlay={play} layer={layer} />)}
         </div>
       )}
     </Canvas>
     {playing && played ? <PlayView key={`${playing.id}:${played.step}:${playing.updatedAt}:${reloads}`} designId={design.id} screen={playing} step={played.step} onClose={() => setPlayed(null)} /> : null}
+    </div>
+    {panelOpen ? (
+      <DesignCommentsPanel
+        key={design.id}
+        design={design}
+        draft={comments.draft}
+        activeId={activeId}
+        numbers={numbers}
+        inThread={inThread}
+        onSelect={focusPin}
+        onDraftDone={() => comments.setDraft(null)}
+        onClose={() => { setPanelOpen(false); comments.setDraft(null); comments.setOpen(null); comments.setCommenting(false); }}
+      />
+    ) : null}
     </div>
   );
 }
@@ -133,7 +197,7 @@ const MODE_ON = "bg-state-hover text-foreground";
 
 type Play = (id: string, step?: string) => void;
 
-function Round({ designId, round, reloads, onPlay, register }: { designId: string; round: RoundView; reloads: number; onPlay: Play; register: Register }) {
+function Round({ designId, round, reloads, onPlay, layer }: { designId: string; round: RoundView; reloads: number; onPlay: Play; layer: Layer }) {
   return (
     <section aria-labelledby={`round-${round.round}`} className="flex flex-col gap-16">
       <header className="flex max-w-[1600px] flex-col gap-4">
@@ -143,15 +207,15 @@ function Round({ designId, round, reloads, onPlay, register }: { designId: strin
         {round.intro ? <p className="text-3xl text-muted-foreground [text-wrap:pretty]">{round.intro}</p> : null}
       </header>
       <div className="flex items-start gap-16">
-        {round.screens.map((screen) => <Option key={screen.id} designId={designId} screen={screen} reloads={reloads} onPlay={onPlay} register={register} />)}
+        {round.screens.map((screen) => <Option key={screen.id} designId={designId} screen={screen} reloads={reloads} onPlay={onPlay} layer={layer} />)}
       </div>
     </section>
   );
 }
 
 /** One option: a single frame, or a row of frames when its prototype declares steps. */
-function Option({ designId, screen, reloads, onPlay, register }: { designId: string; screen: ScreenView; reloads: number; onPlay: Play; register: Register }) {
-  if (!screen.steps.length) return <Frame designId={designId} screen={screen} step={null} reloads={reloads} onPlay={onPlay} register={register} />;
+function Option({ designId, screen, reloads, onPlay, layer }: { designId: string; screen: ScreenView; reloads: number; onPlay: Play; layer: Layer }) {
+  if (!screen.steps.length) return <Frame designId={designId} screen={screen} step={null} reloads={reloads} onPlay={onPlay} layer={layer} />;
   const deck = isDeck(screen);
   return (
     <div className="flex shrink-0 flex-col gap-4">
@@ -163,21 +227,21 @@ function Option({ designId, screen, reloads, onPlay, register }: { designId: str
       </div>
       {/* A deck reads as a grid of slides, up to four to a row; a flow's steps sit in one row. */}
       <div className={deck ? "grid gap-10" : "flex items-start gap-10"} style={deck ? { gridTemplateColumns: `repeat(${Math.min(4, screen.steps.length)}, max-content)` } : undefined}>
-        {screen.steps.map((step, index) => <Frame key={step.id} designId={designId} screen={screen} step={step} index={index} reloads={reloads} onPlay={onPlay} register={register} />)}
+        {screen.steps.map((step, index) => <Frame key={step.id} designId={designId} screen={screen} step={step} index={index} reloads={reloads} onPlay={onPlay} layer={layer} />)}
       </div>
     </div>
   );
 }
 
 /** A live frame of a screen, opened at `step` when it has one. */
-function Frame({ designId, screen, step, index = 0, reloads, onPlay, register }: {
+function Frame({ designId, screen, step, index = 0, reloads, onPlay, layer }: {
   designId: string;
   screen: ScreenView;
   step: ScreenStep | null;
   index?: number;
   reloads: number;
   onPlay: Play;
-  register: Register;
+  layer: Layer;
 }) {
   const { width, height } = frameSize(screen.viewport);
   const key = frameKey(screen.id, step?.id ?? "");
@@ -196,15 +260,16 @@ function Frame({ designId, screen, step, index = 0, reloads, onPlay, register }:
         <div className="h-full overflow-hidden rounded-[28px] bg-white shadow-[0_0_0_2px_oklch(1_0_0/0.06),0_24px_64px_oklch(0_0_0/0.35)]">
           {/* Live: click and type right on the canvas. Gestures it doesn't use pan the canvas (see the screen script). */}
           <iframe
-            ref={register(key)}
+            ref={layer.register(key)}
             key={reloads}
             title={`Screen ${screen.id}${step ? `, ${step.label}` : ""}`}
             src={url}
             sandbox="allow-scripts allow-forms allow-modals allow-popups"
-            className="border-0"
+            className={cn("border-0", layer.commenting && "cursor-crosshair")}
             style={{ width, height }}
           />
         </div>
+        <Pins comments={layer.comments.filter((comment) => frameKey(comment.screenId, comment.step) === key)} numbers={layer.numbers} rects={layer.rects[key]} activeId={layer.activeId} pulse={layer.pulse} onOpen={layer.openPin} />
       </div>
     </figure>
   );

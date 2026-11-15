@@ -26,6 +26,7 @@ import { rpcContract } from "./contract";
 import { studioEmbeds, type EmbedServices } from "./embeds";
 import { fetchPreview } from "./unfurl";
 import { createThread, listThreads, reply, setResolved } from "./comments";
+import { userCommentMessage, watchUserComments, type UserComment } from "./comment-notify";
 import { readBlocks, readMarkdown, textBlocks } from "./doc";
 import type { Socket } from "./hub";
 import { errorText, pageUrl, PagesService, requestView, toView, truncate } from "./service";
@@ -70,10 +71,29 @@ export interface PagesSettingsAccess {
 }
 
 /** Registers pages' RPC, HTTP routes, agent tools, mention provider and thread events on Studio. Studio has run the migrations. */
-export function registerPages(bb: BbPluginApi, db: Database.Database, settings: PagesSettingsAccess, services: Pick<StudioServices, "created" | "linkThread" | "replaceLinks" | "recordActivity">, notify: StudioChanged, embedServices: EmbedServices): BuiltinPages {
+export function registerPages(bb: BbPluginApi, db: Database.Database, settings: PagesSettingsAccess, services: Pick<StudioServices, "created" | "linkThread" | "replaceLinks" | "recordActivity" | "threads">, notify: StudioChanged, embedServices: EmbedServices): BuiltinPages {
   const store = new PageStore(db, () => settings.snapshotsPerPage());
   const service = new PagesService(bb, store);
   const checklists = new Checklists(bb, db, service, store, services);
+
+  const madeBy = (pageId: string) =>
+    services.threads({ pluginId: PLUGIN_ID, id: pageId })
+      .filter((thread) => thread.role === "created" && thread.state !== "deleted")
+      .sort((a, b) => a.createdAt - b.createdAt)[0]?.threadId ?? null;
+  const tellAgent = async (pageId: string, comments: UserComment[]) => {
+    const meta = store.meta(pageId);
+    const threadId = meta ? madeBy(pageId) : null;
+    if (!meta || !threadId) return;
+    try {
+      await bb.sdk.threads.send({ threadId, input: [{ type: "text", text: userCommentMessage(meta, comments), mentions: [] }], mode: "queue-if-active" });
+    } catch (error) {
+      bb.log.warn(`Comment on page ${pageId} was saved but couldn't be sent to ${threadId}: ${errorText(error)}`);
+    }
+  };
+  service.onOpened = (page) => {
+    const stop = watchUserComments(page.doc, (comments) => void tellAgent(page.id, comments));
+    page.doc.on("destroy", stop);
+  };
 
   // Live sync -----------------------------------------------------------------
 

@@ -20,9 +20,9 @@ import { clickModifiers } from "../../links/open";
 import { useRpc, useSdk } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, type MouseEvent as ReactMouseEvent } from "react";
-import { Icon } from "../../kit/ui/index";
+import { Icon, cn } from "../../kit/ui/index";
 import { HTTP_ROOT, HUMAN_USER_ID, MAX_UPLOAD_BYTES, UPLOAD_PATH } from "../constants";
-import { type PageMetaView, type rpcContract } from "../contract";
+import { type BotView, type PageMetaView, type rpcContract } from "../contract";
 import { DOCUMENT_FRAGMENT, STUDIO_EMBEDS, THREADS_MAP, type StudioEmbedKind } from "../schema-config";
 import { linkEmbed, referenceContent } from "./links";
 import { handOffChecklist, PageSideMenu, placeEmbed } from "./block-menu";
@@ -30,8 +30,9 @@ import { insertDroppedItem, usePageItemDrop, type PageDropEditor } from "./item-
 import { pageSchema } from "./blocks";
 import { createHighlighter } from "./code";
 import type { PageConnection } from "./connection";
-import { usePagesUi } from "./context";
+import { authorInfo, usePagesUi } from "./context";
 import { useDarkMode } from "./shared";
+import { CommentsPortal, PageCommentButton, StartCommentProvider, usePageComments } from "./PageComments";
 import { editWhiteboardWhenShown } from "./whiteboard";
 import { studioFileUrl } from "../../kit/pages-contract";
 import {
@@ -60,10 +61,18 @@ const STUDIO_NEW: { kind: StudioEmbedKind; aliases: string[] }[] = [
   { kind: "mini", aliases: ["app", "widget", "interactive", "tracker", "form"] },
 ];
 
+export type SidePanel = "comments" | null;
+
 const FORMATTING_ITEMS = getFormattingToolbarItems().filter((item) => item.key !== "addCommentButton" && item.key !== "addTiptapCommentButton");
 
 function PageFormattingToolbar() {
-  return <FormattingToolbar>{FORMATTING_ITEMS}</FormattingToolbar>;
+  return <FormattingToolbar>{[...FORMATTING_ITEMS, <PageCommentButton key="pageCommentButton" />]}</FormattingToolbar>;
+}
+
+function avatarUrl(label: string, background: string): string {
+  const glyph = [...label.trim()][0] ?? "?";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="32" fill="${background}"/><text x="32" y="42" font-size="30" text-anchor="middle" font-family="system-ui,sans-serif" fill="white">${glyph.replace(/[<&>"]/g, "")}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 async function uploadFile(pageId: string, file: File): Promise<string> {
@@ -121,11 +130,19 @@ function uniqueTitles(items: DefaultReactSuggestionItem[]): DefaultReactSuggesti
 export function PageEditor({
   connection,
   page,
+  bots,
   pages,
+  sidePanel,
+  onSidePanel,
+  panelSlot,
 }: {
   connection: PageConnection;
   page: PageMetaView;
+  bots: BotView[];
   pages: PageMetaView[];
+  sidePanel: SidePanel;
+  onSidePanel(panel: SidePanel): void;
+  panelSlot: HTMLElement | null;
 }) {
   const sdk = useSdk();
   const rpc = useRpc<typeof rpcContract>();
@@ -133,6 +150,8 @@ export function PageEditor({
   const dark = useDarkMode();
   const uiRef = useRef(ui);
   uiRef.current = ui;
+  const botsRef = useRef(bots);
+  botsRef.current = bots;
   const pagesRef = useRef(pages);
   pagesRef.current = pages;
 
@@ -145,6 +164,7 @@ export function PageEditor({
       ),
     [connection],
   );
+
 
   const editor = useCreateBlockNote(
     withCollaboration({
@@ -160,7 +180,15 @@ export function PageEditor({
         SyntaxHighlightingExtension({ createHighlighter }),
         CommentsExtension({
           threadStore,
-          resolveUsers: async (ids: string[]) => ids.map((id) => ({ id, username: id, avatarUrl: "" })),
+          resolveUsers: async (ids: string[]) =>
+            ids.map((id) => {
+              const info = authorInfo(id, botsRef.current);
+              return {
+                id,
+                username: info.name,
+                avatarUrl: avatarUrl(info.avatar || info.name, id === HUMAN_USER_ID ? HUMAN_COLOR : "#7c3aed"),
+              };
+            }),
         }),
       ],
       // A link in the text opens by Studio's rule (src/ui/studio-open.tsx),
@@ -324,7 +352,7 @@ export function PageEditor({
   // Talk dictates at the cursor. Before the user has put the cursor in the
   // page, a dictation goes at the end instead of the top.
   const fieldRef = useRef<HTMLDivElement>(null);
-  // Links in the page go through the link router
+  // Links in the page and its comments go through the link router
   // (src/links/router.ts): the workbench, Mod-click the second pane, Shift a
   // window, a web URL in BB's browser. ItemGestures takes Mod- and
   // Shift-clicks on in-app links first, and cancels the click it takes.
@@ -452,7 +480,11 @@ export function PageEditor({
     return uniqueTitles(filterSuggestionItems([...pageItems, ...dates, ...threadItems, ...studioItems], query).slice(0, 30));
   }, [editor, sdk, ui, page.id, page.projectId]);
 
+  const onCommentsOpen = useCallback((open: boolean) => onSidePanel(open ? "comments" : null), [onSidePanel]);
+  const comments = usePageComments({ editor, threadStore, connection, open: sidePanel === "comments", onOpenChange: onCommentsOpen, pageTitle: page.title });
+
   return (
+    <StartCommentProvider start={comments.startDraft}>
     <BlockNoteView
       editor={editor}
       theme={dark ? "dark" : "light"}
@@ -465,7 +497,7 @@ export function PageEditor({
     >
       <div
         ref={fieldRef}
-        className="pages-main relative min-w-0 flex-1"
+        className={cn("pages-main relative min-w-0 flex-1", comments.pulse && "pages-comment-pulse")}
         {...itemDrop.handlers}
         {...{ [TALK_FIELD_ATTR]: fieldKey, [TALK_FIELD_LABEL_ATTR]: pageFieldLabel(page.title) }}
         onFocus={() => (cursorPlaced.current = true)}
@@ -474,10 +506,12 @@ export function PageEditor({
         <BlockNoteViewEditor />
         {itemDrop.indicator}
       </div>
+      <CommentsPortal slot={panelSlot}>{comments.panel}</CommentsPortal>
       <PageSideMenu pageId={page.id} />
       <SuggestionMenuController triggerCharacter="/" getItems={slashMenuItems} />
       <SuggestionMenuController triggerCharacter="@" getItems={mentionItems} />
       <FormattingToolbarController formattingToolbar={PageFormattingToolbar} />
     </BlockNoteView>
+    </StartCommentProvider>
   );
 }

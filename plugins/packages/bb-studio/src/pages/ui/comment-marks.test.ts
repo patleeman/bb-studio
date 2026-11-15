@@ -14,7 +14,7 @@ const { addCommentMark, seedMarkdown, textBlocks } = await import("../doc");
 const { DOCUMENT_FRAGMENT, THREADS_MAP } = await import("../schema-config");
 const { pageSchema } = await import("./blocks");
 
-it("opens a page whose text holds a comment mark and draws the mark as plain text", () => {
+it("opens a page whose text holds a comment mark and highlights the commented text", () => {
   const doc = new Y.Doc();
   seedMarkdown(doc, "First para with comment.\n");
   addCommentMark(doc, textBlocks(doc)[0]!.id, "thread-1", "First", "test");
@@ -40,7 +40,11 @@ it("opens a page whose text holds a comment mark and draws the mark as plain tex
     editor.unmount();
     element.remove();
   }
-  expect(readFileSync(join(process.cwd(), "src/pages/ui/PageEditor.tsx"), "utf8")).toContain("CommentsExtension({");
+  const source = readFileSync(join(process.cwd(), "src/pages/ui/PageEditor.tsx"), "utf8");
+  for (const part of ["CommentsExtension({", "<PageCommentButton", "<CommentsPortal slot={panelSlot}>", "formattingToolbar={false}"]) expect(source).toContain(part);
+  for (const gone of ["ThreadsSidebar", "FloatingComposerController", "FloatingThreadController"]) expect(source).not.toContain(gone);
   const css = readFileSync(join(process.cwd(), "src/pages/ui/styles.css"), "utf8");
-  expect(css).toMatch(/\.pages-editor \.bn-thread-mark[^{]*\{\s*background: none;/);
+  expect(css).toMatch(/\.pages-editor \.bn-thread-mark:not\(\[data-orphan="true"\]\) \{\s*background: color-mix\(in oklch, #facc15 22%, transparent\);/);
+  expect(css).not.toMatch(/\.bn-thread-mark[^{]*\{\s*background: none;/);
+  expect(css).toMatch(/\.pages-comment-pulse \.bn-thread-mark-selected \{\s*animation: pages-comment-pulse/);
 });

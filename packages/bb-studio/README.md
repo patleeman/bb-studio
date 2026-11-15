@@ -1587,7 +1587,7 @@ the desktop fork).
 
 Pages are built into Studio: collaborative documents you write together with
 your agents, in a Notion-style block editor with live multiplayer editing,
-charts, embeds, version history and ordinary agent chats. They used
+comments, charts, embeds, version history and ordinary agent chats. They used
 to be the separate Studio Pages plugin (`pages`). Pages keep that id as their
 namespace (`pages:<id>`), so tags, tabs, links, chats and backups carry over.
 A page opens as a Studio tab at `/plugins/studio/studio/pages/<id>`; links to
@@ -1601,8 +1601,21 @@ collection. If you still have the old plugin, see
 A seeded "Offline mode launch" page, opened from its old
 `/plugins/pages/pages/<id>` address, lands as a Studio tab: a tip callout, a
 stats block, a stacked bar chart of weekly active teams and a launch
-checklist, with Dictate, Version history and the page menu in the
+checklist, with Dictate, Version history, Comments and the page menu in the
 tab's row. Captured in a staged BB (stable BB 0.46.0). Recapture with `BB_CAPTURE_ONLY=pages`.
+
+`BB_CAPTURE_ONLY=pages-comments` captures the comments panel
+(`assets/pages-comments.png`, and its phone sheet as
+`assets/pages-comments-mobile.png`): an anchored comment and a reply, both
+dictated through Talk into the panel's fields and saved explicitly, with the
+page body unchanged.
+
+When the user comments on a page an agent made, or replies in one of its
+threads, the conversation that made the page is told about it a second later
+(`src/pages/comment-notify.ts`), with the thread id, the commented text and
+the comment, so the agent answers in the same comment thread. The agent's own
+comments, resolving and reopening tell no one, and neither does a comment on
+a page the user made.
 
 ![The compact page header](assets/pages-compact-header.png)
 
@@ -1660,9 +1673,15 @@ The compact page header at 390 pixels, with **Item actions** open.
   write.
 - **Mentions.** Type `@` to mention another page, a BB thread, a
   Studio item, or a date. Page and thread mentions open where they point.
-- **Comments.** Agents can read, start, reply to, and resolve comment
-  threads on a page. The desktop editor has no comment UI: text a thread is
-  anchored to reads as plain text. Clients without the editor, like the BB
+- **Comments.** Select text and choose **Comment** in the toolbar: a draft
+  with the quote opens at the top of the **Comments** panel, a side panel that
+  splits the page (a bottom sheet on phones; `src/ui/comments`). Its header
+  has the open count and close; **Open** and **Resolved** list the threads,
+  each with its quote, the messages under the author (the Bot's name and face
+  for an agent's), an inline reply box with dictation, and **Resolve** or
+  **Reopen**. Clicking a thread scrolls to its highlight and pulses it;
+  clicking a highlight opens its thread; the active highlight is stronger.
+  Agents can read, start, reply to, and resolve threads. Clients without the editor, like the BB
   Studio phone app, use Studio's `pages.comments`, `pages.commentBlocks`,
   `pages.commentCreate`, `pages.commentReply` and `pages.commentResolve` RPCs,
   which write as you.
@@ -2147,7 +2166,7 @@ the old plugin, see [docs/upgrade-unified-studio.md](../../docs/upgrade-unified-
 
 The seeded "Orbit onboarding" design: one round, "Welcome screen", with two
 live options side by side, `1a` (desktop) and `1b` (phone), and the floating
-pills for Reload, **Select** / **Edit text**, Present and zoom.
+pills for Reload, **Select** / **Edit text** / **Comment**, Present and zoom.
 Recapture with `BB_CAPTURE_ONLY=design`, which opens it from its old
 `/plugins/design/designs/<id>` address and checks that it lands as a Studio
 tab; the prototype and deck captures do the same.
@@ -2184,10 +2203,13 @@ The same deck presented with Play and moved on with →: "Why it matters",
   as one `slide` screen whose steps are its slides. **Play** presents it
   (←/→, Space, Page Up/Down, Home, End, **Full screen**, **Export PDF**,
   **Download HTML**).
-- **Edit text.** In **Edit text** mode, click text on a screen and type over
-  it; the change is written into the screen's HTML. The canvas has no comment
-  mode; agents read and resolve a design's existing comments with
-  `design_comments` and `design_resolve_comments`.
+- **Edit text and comments.** In **Edit text** mode, click text on a screen
+  and type over it; the change is written into the screen's HTML. In
+  **Comment** mode, click an element: a draft opens in the same **Comments**
+  panel as pages, and the comment pins to the element and goes, with the
+  element's selector and markup, to the design's thread (**Send to agent**
+  sends one that wasn't). Clicking a comment pans to its pin; clicking a pin
+  opens its comment.
 - **Card in the agent's reply** (`::design{id="…"}`) with the newest round's
   first screens. It opens the design in the thread's **Studio** tab beside
   the chat; back from it, the tab lists the thread's items, designs among them.
@@ -2198,7 +2220,7 @@ The same deck presented with Play and moved on with →: "Why it matters",
   beside the design's own. It loads each screen at its size with Browser
   Automation, checks layout, errors and the design rules, and reports back
   only when something needs work, in the design's thread. After 3 such
-  reviews in a row, automatic review pauses until you edit or ask.
+  reviews in a row, automatic review pauses until you edit, comment or ask.
 - **Agent tools and skill.** `design_list`, `design_create`, `design_rename`,
   `design_read`, `design_ask`, `design_ready`, `design_write_screen`,
   `design_edit_screen`, `design_comments`, `design_resolve_comments`,

@@ -22770,6 +22770,30 @@ public enum Studio {
     }
   }
 
+  public struct DesignsGetDesignOutputDesignResolvedCommentsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var screenId: String?
+    public var step: String?
+    public var selector: String?
+    public var elementText: String?
+    public var body: String?
+    public var createdAt: Double?
+    public var sent: Bool?
+    public var resolvedAt: Double?
+
+    public init(id: String? = nil, screenId: String? = nil, step: String? = nil, selector: String? = nil, elementText: String? = nil, body: String? = nil, createdAt: Double? = nil, sent: Bool? = nil, resolvedAt: Double? = nil) {
+      self.id = id
+      self.screenId = screenId
+      self.step = step
+      self.selector = selector
+      self.elementText = elementText
+      self.body = body
+      self.createdAt = createdAt
+      self.sent = sent
+      self.resolvedAt = resolvedAt
+    }
+  }
+
   public enum DesignsGetDesignOutputDesignReviewState: Sendable, Hashable, Codable {
     case reviewing
     case done
@@ -22824,9 +22848,10 @@ public enum Studio {
     public var updatedAt: Double?
     public var rounds: [DesignsGetDesignOutputDesignRoundsItem]?
     public var comments: [DesignsGetDesignOutputDesignCommentsItem]?
+    public var resolvedComments: [DesignsGetDesignOutputDesignResolvedCommentsItem]?
     public var review: DesignsGetDesignOutputDesignReview?
 
-    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, threadId: String? = nil, updatedAt: Double? = nil, rounds: [DesignsGetDesignOutputDesignRoundsItem]? = nil, comments: [DesignsGetDesignOutputDesignCommentsItem]? = nil, review: DesignsGetDesignOutputDesignReview? = nil) {
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, threadId: String? = nil, updatedAt: Double? = nil, rounds: [DesignsGetDesignOutputDesignRoundsItem]? = nil, comments: [DesignsGetDesignOutputDesignCommentsItem]? = nil, resolvedComments: [DesignsGetDesignOutputDesignResolvedCommentsItem]? = nil, review: DesignsGetDesignOutputDesignReview? = nil) {
       self.id = id
       self.name = name
       self.projectId = projectId
@@ -22834,6 +22859,7 @@ public enum Studio {
       self.updatedAt = updatedAt
       self.rounds = rounds
       self.comments = comments
+      self.resolvedComments = resolvedComments
       self.review = review
     }
   }
