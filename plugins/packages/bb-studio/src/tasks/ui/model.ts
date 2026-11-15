@@ -43,6 +43,9 @@ export function taskStatus(task: Task): TaskStatus {
   return { id: "waiting", label: "Waiting", glyph: "waiting", tone: "muted" };
 }
 
+export const SEVERITY_LABEL = { info: "Info", warn: "Warning", critical: "Critical" } as const;
+export const severityTone = (severity: keyof typeof SEVERITY_LABEL): Tone => (severity === "critical" ? "destructive" : severity === "warn" ? "warning" : "muted");
+
 export const isMine = (task: Pick<Task, "owner">) => task.owner === USER_OWNER;
 
 export type ThreadName = { owner: string; name: string; threadId: string | null };

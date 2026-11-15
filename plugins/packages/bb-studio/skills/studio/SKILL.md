@@ -228,13 +228,17 @@ job, keep it updated, and hand it over instead of posting status messages.
   the run ends ([PASS] reads as "Nothing new"). A runner's `runner_report`
   lands on its run; `urgent` hands the run to the user.
 - A watcher's finding is one task. Its repeats update that task quietly (no
-  new post, no new wake-up) and it closes once the watcher stops finding it
-  for 30 hours. Leave it open while the problem lasts. Lines are compared
-  without their numbers, so "$5.42" and "$5.61" are the same finding. A
-  script can end with one JSON line to steer this: `{"key": "…"}` names the
-  finding, `{"clear": true}` (or a list of keys) closes them,
-  `{"owner": "thread:<id>"}` gives a new one to a lead, `{"each": true}`
-  makes every output a new run.
+  new post, no new wake-up; the card shows the latest text) and it closes once
+  the watcher has run without it 30 hours after it was last seen. Leave it
+  open while the problem lasts; one you leave untouched for a day gets you one
+  reminder. Lines are compared without their numbers, so "$5.42" and "$5.61"
+  are the same finding. A script can end with one JSON line to steer this:
+  `{"key": "…"}` names the finding, `{"clear": true}` (or a list of keys)
+  closes them, `{"owner": "thread:<id>"}` gives a new one to a lead,
+  `{"each": true}` makes every output a new run (and keeps the watcher that
+  way), and `{"severity": "info" | "warn" | "critical"}` (or a line starting
+  `[warn]` or `[critical]`) wakes you again when the same finding gets worse.
+  Open findings are listed in each check-in's prompt.
 - The older names keep working: `todos_*` and `loops_*` for the user's tasks,
   `work_card_*` for a card.
 

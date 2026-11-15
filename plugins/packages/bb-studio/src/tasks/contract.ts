@@ -8,6 +8,8 @@ export const TASK_KINDS = ["do", "decide", "read", "waiting-outside"] as const;
 export const TASK_ORIGINS = ["loop", "work", "task"] as const;
 export const AUTOMATION_KINDS = ["checkin", "runner", "watcher", "heartbeat"] as const;
 export const AUTOMATION_ROLES = ["schedule", "run", "finding"] as const;
+export const SEVERITIES = ["info", "warn", "critical"] as const;
+export type Severity = (typeof SEVERITIES)[number];
 export type AutomationKind = (typeof AUTOMATION_KINDS)[number];
 export const PRIORITIES = ["urgent", "normal", "low"] as const;
 export const USER_OWNER = "patrick";
@@ -48,6 +50,12 @@ export const automationLink = z.object({
   lastAt: z.number().nullable().default(null),
   mode: z.enum(["dedupe", "each"]).nullable().default(null),
   clearedAt: z.number().nullable().default(null),
+  posted: z.boolean().default(true),
+  sentAt: z.number().nullable().default(null),
+  nudgedAt: z.number().nullable().default(null),
+  nudged: z.string().nullable().default(null),
+  severity: z.enum(SEVERITIES).nullable().default(null),
+  pushedAt: z.number().nullable().default(null),
 });
 export type AutomationLink = z.infer<typeof automationLink>;
 export const card = z.object({

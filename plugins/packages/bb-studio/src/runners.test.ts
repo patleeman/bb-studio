@@ -728,7 +728,7 @@ it("with runs as tasks: each run is a child task of the runner's task, a report 
   const prompt = sentTo(x, threadId!).at(-1)!.input[0]!.text;
   const store = new TaskStore(x.db);
   const [run] = store.children(parentIdOf(id));
-  expect(run).toMatchObject({ owner: `thread:${threadId}`, state: "in_progress", automation: { role: "run", thread: threadId } });
+  expect(run).toMatchObject({ owner: `thread:${threadId}`, state: "in_progress", automation: { role: "run", thread: threadId, sentAt: expect.any(Number) } });
   expect(prompt).toContain(`Your job: Check mail.`);
   expect(prompt).toContain(`This run is task ${run!.id}; runner_report records its result there.`);
   expect(await x.runners.report(threadId!, { level: "log", summary: "Two newsletters." })).toBe("Logged. Then reply exactly [PASS].");

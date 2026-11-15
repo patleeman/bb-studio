@@ -16,7 +16,7 @@ import { useCardOnScreen } from "../../work/ui/on-screen";
 import { isClosed, needsYou, TODO_ID, USER_OWNER, type Task } from "../contract";
 import type { TaskView } from "../rpc-contract";
 import { WORK_ID } from "../../work/shared";
-import { everMine, handOffTargets, historyLines, isMine, ownerLabel, ownerShort, ownerThreadId, rowNumber, taskKind, taskStatus, type Glyph, type Names, type Tone } from "./model";
+import { SEVERITY_LABEL, severityTone, everMine, handOffTargets, historyLines, isMine, ownerLabel, ownerShort, ownerThreadId, rowNumber, taskKind, taskStatus, type Glyph, type Names, type Tone } from "./model";
 
 const STALE_MS = 3 * 86_400_000;
 
@@ -172,6 +172,7 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
           <TaskGlyph glyph={status.glyph} stale={status.stale} label={status.label} />
           <span data-testid="task-state" className={cn("shrink-0", TONE[status.tone])}>{status.stale ? "Ended without a final update" : status.label}</span>
           {found ? <span data-testid="task-found" className="shrink-0 text-muted-foreground">· {found}</span> : null}
+          {task.automation?.severity && open ? <span data-testid="task-severity" className={cn("shrink-0 font-medium", TONE[severityTone(task.automation.severity)])}>· {SEVERITY_LABEL[task.automation.severity]}</span> : null}
           {task.progress.line ? <span data-testid="task-line" className="min-w-0 truncate text-muted-foreground">{task.progress.line}</span> : null}
         </div>
         {needsYou(task) && task.needs ? (

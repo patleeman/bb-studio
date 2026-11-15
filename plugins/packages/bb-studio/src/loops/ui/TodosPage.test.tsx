@@ -340,16 +340,17 @@ it("lists the Bot's check-ins, reminders, watchers and runners under Scheduled &
 it("shows each recurring task's last result beside its next run, once, and Runs opens its task", async () => {
   state.groups = { ...empty };
   const item = (key: string, over: Record<string, unknown>) => ({ key, source: "automation", id: key, botId: "bot_1", botName: "Chief of Staff", kind: "checkin", title: key, nextAt: null, state: "active", scheduleText: "Daily 8:00", threadId: "thr_bot", link: `bb://automation/bot_1%3A${key}`, ...over });
-  const parent = (automationId: string, title: string, line: string | null, paused = false) => ({
+  const parent = (automationId: string, title: string, line: string | null, paused = false, severity: string | null = null) => ({
     ...taskFromLoop(loop(`task_auto-${automationId}`, title, { owner: "cos", status: "in_progress" })), origin: "task", state: paused ? "waiting" : "in_progress",
     schedule: { text: "Daily 1:00 PM", cron: null, timeZone: null, automationId, paused }, progress: { step: null, line },
-    automation: { id: automationId, kind: "checkin", role: "schedule", thread: "thr_bot", keys: [], count: 3, lastAt: NOW, mode: null, clearedAt: null },
+    automation: { id: automationId, kind: "checkin", role: "schedule", thread: "thr_bot", keys: [], count: 3, lastAt: NOW, mode: null, clearedAt: null, posted: true, sentAt: null, nudgedAt: null, nudged: null, severity, pushedAt: null },
   });
   state.scheduled = [item("aut_daily", { title: "Daily check-in", nextAt: NOW + 3_600_000 }), item("aut_silent", { title: "Silent heartbeat", kind: "watcher" }), item("aut_new", { title: "New one" })];
-  state.extraTasks = [parent("aut_daily", "Daily check-in", "Nothing new"), parent("aut_silent", "Silent heartbeat", "Needs you: Approve the budget raise"), parent("aut_orphan", "Not listed", "Ran")];
+  state.extraTasks = [parent("aut_daily", "Daily check-in", "Nothing new"), parent("aut_silent", "Silent heartbeat", "Needs you: Approve the budget raise"), parent("aut_new", "New one", "Found: Disk 99% full", false, "critical"), parent("aut_orphan", "Not listed", "Ran")];
   await render();
   const rows = [...container.querySelectorAll<HTMLElement>("[data-testid=tasks-scheduled] [data-testid=scheduled-row]")];
-  expect(rows.map((each) => each.textContent)).toEqual(["Daily check-inNothing new4:00 PMRuns", "Silent heartbeatNeeds you: Approve the budget raiseDaily 8:00Runs", "New oneDaily 8:00"]);
+  expect(rows.map((each) => each.textContent)).toEqual(["Daily check-inNothing new4:00 PMRuns", "Silent heartbeatNeeds you: Approve the budget raiseDaily 8:00Runs", "New oneCritical · Found: Disk 99% fullDaily 8:00Runs"]);
+  expect(rows[2]!.querySelector("[data-testid=scheduled-last]")!.parentElement!.className).toContain("text-destructive");
   expect(rows[1]!.querySelector("[data-testid=scheduled-last]")!.parentElement!.className).toContain("text-warning");
   expect(titles(group("Scheduled & recurring"))).toEqual(["Not listed", "Daily check-in", "Silent heartbeat", "New one"]);
   await act(async () => rows[0]!.querySelector<HTMLButtonElement>("[data-testid=scheduled-runs]")!.click());

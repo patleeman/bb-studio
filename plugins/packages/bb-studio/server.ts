@@ -4,6 +4,8 @@ import { isClosed as isTaskClosed } from "./src/tasks/contract";
 import { registerTasks, TASK_TOOLS } from "./src/tasks/register";
 import { adoptAtStart } from "./src/tasks/migrate";
 import { AutomationTasks, readSources } from "./src/tasks/automations";
+import { toLoop } from "./src/tasks/views";
+import type { Loop } from "./src/loops/contract";
 import { TaskStore, taskTitle, tasksUnavailable } from "./src/tasks/store";
 import { withToolLabel } from "./src/tool-labels";
 import { CONTINUE_TOOL, registerContinueNew } from "./src/continue-new";
@@ -691,11 +693,12 @@ export default async function plugin(bb: BbPluginApi) {
     if (!bot?.threadId || bot.state !== 'active') throw new Error('An active Bot chat is required');
     await bb.sdk.threads.send({threadId:bot.threadId,mode:'auto',input:[{type:'text',text,mentions:[],visibility:'agent-only'}]} as never);
   };
-  const loops = registerLoops(bb, db, postToBot, async (loop) => {
+  const pushLoop = async (loop: Loop) => {
     const bot = bots.stored();
     if (!bot?.threadId) throw new Error('A Bot chat is required');
     await bb.sdk.plugins.callRpc({pluginId:'mobile',method:'notify',outputSchema:z.unknown(),input:{title:loop.title,body:loop.why,kind:'turn-finished',threadId:bot.threadId,botId:bot.id,conversationId:bot.threadId,projectId:PERSONAL_PROJECT_ID,category:'BB_LOOP',loopId:loop.id,loopKind:loop.kind,actions:loopPushActions(loop.kind),...(loop.kind==='decide'&&loop.options.length?{options:loop.options.slice(0,4).map(o=>o.slice(0,120))}:{}),coalesceKey:loop.id} as never});
-  }, settings, () => loopTimeZone(process.env, studioSettings.current().todosTimeZone), (name, everyMs, work) => triggers.every(name, everyMs, work));
+  };
+  const loops = registerLoops(bb, db, postToBot, pushLoop, settings, () => loopTimeZone(process.env, studioSettings.current().todosTimeZone), (name, everyMs, work) => triggers.every(name, everyMs, work));
   loopsEnabled = loops.enabled;
   const work = registerWorkCards(bb, db);
   registerTasks(bb, db, postToBot);
@@ -718,6 +721,8 @@ export default async function plugin(bb: BbPluginApi) {
     sources: () => readSources(db, bots.list().map((bot) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, heartbeatKey: bots.heartbeatKey(bot.id) }))),
     log: (message) => bb.log.warn(message),
     zone: () => loopTimeZone(process.env, studioSettings.current().todosTimeZone),
+    nudge: async (threadId, text) => { await bb.sdk.threads.send({ threadId, mode: "auto", input: [{ type: "text", text, mentions: [], visibility: "agent-only" }] } as never); },
+    push: async (task) => { await pushLoop(toLoop(task)); },
   });
   const taskStep = <T,>(name: string, work: () => T): T | null => {
     if (tasksUnavailable(db)) return null;
@@ -773,7 +778,7 @@ export default async function plugin(bb: BbPluginApi) {
   const automationBot = (botId?: string) => { const bot = bots.stored(botId); return bot ? { id: bot.id, name: bot.name, threadId: bot.threadId, state: bot.state, primary: bot.primary !== false, kind: bot.kind ?? "studio" } : null; };
   const automations: Automations = new Automations({
     db, sdk: bb.sdk, scheduler, changed: automationsChanged,
-    findings: (watcherId, finding, raw, at) => (tasksUnavailable(db) ? null : automationTasks.watcherRun(watcherId, finding, raw, at)),
+    findings: (watcherId, finding, raw, at, failed) => (tasksUnavailable(db) ? null : automationTasks.watcherRun(watcherId, finding, raw, at, failed)),
     copiedReminder: (id) => loops.enabled() && !!db.prepare("SELECT 1 FROM tasks WHERE id = ?").get(reminderLoopId(id)),
     bot: automationBot,
     // With bb's automations plugin off (a BB Studio copy), watchers run here and bb's rows are read from its data file (src/automation-table.ts).
@@ -2187,7 +2192,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
   runnerTool("automation_list", "List what you have scheduled: check-ins, reminders, watchers and runners, with schedule, state, next run and last outcome. The user sees them under Scheduled on the Tasks page; call them scheduled items, never automations.", z.object({}),
     async (_input: unknown, botId) => (await automations.list(botId)).map(describeAutomation).join("\n") || "Nothing scheduled yet.");
-  runnerTool("automation_create", "Schedule something for yourself. kind checkin: wakes your thread on a schedule with an instruction. reminder: once, with schedule.at or schedule.in (\"tomorrow 9:00 remind me…\", \"in 2h check the deploy\"); with Tasks on it becomes a task you own with that time, listed on the Tasks page. watcher: a script on a schedule that wakes you only when it prints something (zero tokens otherwise). runner: a recurring job in its own thread. The user sees these under Scheduled on the Tasks page; call them scheduled items, never automations.",
+  runnerTool("automation_create", "Schedule something for yourself. kind checkin: wakes your thread on a schedule with an instruction. reminder: once, with schedule.at or schedule.in (\"tomorrow 9:00 remind me…\", \"in 2h check the deploy\"); with Tasks on it becomes a task you own with that time, listed on the Tasks page. watcher: a script on a schedule that wakes you only when it prints something (zero tokens otherwise). A watcher folds repeats of the same output (numbers aside) into one finding with no new wake-up until it clears; its script can end with one JSON line: {\"each\": true} wakes you every run (a reminder), {\"key\": \"…\"} names the finding, {\"severity\": \"info\"|\"warn\"|\"critical\"} (or a line starting [warn]/[critical]) wakes you again when the same finding gets worse, {\"clear\": true} closes its findings. runner: a recurring job in its own thread. The user sees these under Scheduled on the Tasks page; call them scheduled items, never automations.",
     z.object({ kind: z.enum(["checkin", "reminder", "watcher", "runner"]), name: z.string().trim().min(1).max(60), ...automationFields, schedule: toolSchedule }),
     async (input: AutomationToolInput & { kind: "checkin" | "reminder" | "watcher" | "runner"; name: string }, botId) => {
       const schedule = toSchedule(input.schedule!);
@@ -2199,7 +2204,7 @@ export default async function plugin(bb: BbPluginApi) {
       }
       return `Made:\n${describeAutomation(await automations.create({ kind: input.kind, name: input.name, schedule, ...automationChanges(input) } as never, botId))}`;
     });
-  runnerTool("automation_update", "Change an automation's name, instruction, schedule, model or script.",
+  runnerTool("automation_update", "Change an automation's name, instruction, schedule, model or script. A watcher folds repeats of the same output (numbers aside) into one finding with no new wake-up until it clears; its script can end with one JSON line: {\"each\": true} wakes you every run (a reminder), {\"key\": \"…\"} names the finding, {\"severity\": \"info\"|\"warn\"|\"critical\"} (or a line starting [warn]/[critical]) wakes you again when the same finding gets worse, {\"clear\": true} closes its findings.",
     z.object({ id: z.string().min(1).describe("Automation id or name"), name: z.string().trim().min(1).max(60).optional(), ...automationFields }),
     async (input: AutomationToolInput & { id: string }, botId) => describeAutomation(await automations.update({ id: input.id, ...automationChanges(input) } as never, botId)));
   runnerTool("automation_pause", "Pause an automation.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => describeAutomation(await automations.setState(id, "paused", botId)));

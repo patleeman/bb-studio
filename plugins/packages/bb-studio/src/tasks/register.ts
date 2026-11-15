@@ -10,6 +10,8 @@ import { closedByUser, KEPT_CLOSED, createInput, handoffInput, isClosed, listInp
 import { guardTasks, surfaceForUser, TaskStore, toStoredOwner } from "./store";
 import { inLoopView, inWorkView } from "./views";
 
+const SCHEDULE_TASK = "This task is an automation's schedule; change it with automation_update, automation_pause or automation_resume (runner_* for a runner). Its runs and findings are its subtasks: update those instead.";
+
 export const TASK_TOOLS = ["task_create", "task_update", "task_get", "task_list", "task_handoff"];
 
 type Ctx = { threadId?: string | null };
@@ -82,7 +84,9 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
     const x = updateInput.parse(input);
     if (x.parentId !== undefined) checkParent(x.parentId, x.id);
     const trigger = checkTrigger(x.trigger);
-    const kept = closedByUser(store.get(x.id)) && !x.reopen;
+    const current = store.get(x.id);
+    if (current.automation?.role === "schedule") throw new Error(SCHEDULE_TASK);
+    const kept = closedByUser(current) && !x.reopen;
     const task = store.change(x.id, (t) => {
       if (t.stale && !kept) { t.stale = false; if (x.state === undefined) t.state = "in_progress"; }
       if (x.title !== undefined) t.title = x.title;
@@ -133,7 +137,8 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
     const x = handoffInput.parse(input);
     const to = toStoredOwner(x.to, ctx.threadId);
     const before = store.get(x.id);
-    if (isClosed(before)) throw new Error(`Task ${x.id} is closed; reopen it with task_update first.`);
+    if (before.automation?.role === "schedule") throw new Error(SCHEDULE_TASK);
+    if (isClosed(before) && !(before.automation?.role === "run" && before.closedBy !== USER_OWNER)) throw new Error(`Task ${x.id} is closed; reopen it with task_update first.`);
     const toUser = to === USER_OWNER;
     const task = store.change(x.id, (t) => {
       t.owner = to;

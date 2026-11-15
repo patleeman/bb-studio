@@ -130,7 +130,7 @@ it("names a watcher's repeats and clearing in history, and a recurring task's ki
     { type: "cleared", at: NOW, data: "{}" },
   ], names);
   expect(lines.map((l) => l.text)).toEqual(["Cleared: the watcher stopped finding it", "Found again (2 times in all): Spend $5.61 today"]);
-  const link = { id: "run_1", kind: "runner" as const, role: "schedule" as const, thread: null, keys: [], count: 0, lastAt: null, mode: null, clearedAt: null };
+  const link = { id: "run_1", kind: "runner" as const, role: "schedule" as const, thread: null, keys: [], count: 0, lastAt: null, mode: null, clearedAt: null, posted: true, sentAt: null, nudgedAt: null, nudged: null, severity: null, pushedAt: null };
   expect(taskKind(t({ automation: link }))).toEqual({ label: "Runner", icon: "Repeat" });
   expect(taskKind(t({ automation: { ...link, role: "run" } }))).toEqual({ label: "Run", icon: "Repeat" });
   expect(taskStatus(t({ owner: "cos", state: "waiting", automation: link, schedule: { text: "Daily", cron: null, timeZone: null, automationId: "run_1", paused: true } })).label).toBe("Paused");

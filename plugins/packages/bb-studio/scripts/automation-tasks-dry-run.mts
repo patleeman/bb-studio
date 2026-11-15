@@ -58,9 +58,10 @@ let replay: unknown = null;
 if (silent) {
   const at = Date.now();
   const bumped = silent.last_fire.replace(/\$(\d+)\.(\d+)/, (_, a: string, b: string) => `$${a}.${String((Number(b) + 19) % 100).padStart(2, "0")}`);
-  const one = tasks.watcherRun(silent.id, silent.last_fire, null, at);
-  const two = tasks.watcherRun(silent.id, bumped, null, at + 86_400_000);
-  const three = tasks.watcherRun(silent.id, silent.last_fire, null, at + 2 * 86_400_000);
+  const run = (text: string, when: number) => { const plan = tasks.watcherRun(silent.id, text, null, when); if (plan && plan !== "quiet") plan.done(true); return plan; };
+  const one = run(silent.last_fire, at);
+  const two = run(bumped, at + 86_400_000);
+  const three = run(silent.last_fire, at + 2 * 86_400_000);
   const findings = store.children(parentIdOf(silent.id)).filter((t) => t.automation?.role === "finding");
   replay = { first: one === "quiet" ? "quiet" : "posted", second: two === "quiet" ? "quiet" : "posted", third: three === "quiet" ? "quiet" : "posted", findings: findings.length, count: findings[0]?.automation?.count ?? 0 };
   if (findings.length !== 1 || two !== "quiet" || three !== "quiet") problems.push("the spend finding was not deduped");

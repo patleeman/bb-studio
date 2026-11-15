@@ -39,7 +39,7 @@ export interface SchedulerKey { owner: SchedulerOwner; ownerId: string }
 export interface RunTarget { threadId: string; prompt: string; permissionMode?: string }
 export type RunResolver = (ownerId: string) => RunTarget | null | Promise<RunTarget | null>;
 /** Runs an owner's script and says how it went; null when there is nothing to run any more. */
-export type RunStartHook = (key: SchedulerKey, threadId: string) => { prompt: string; failed(error: string): void } | null;
+export type RunStartHook = (key: SchedulerKey, threadId: string) => { prompt: string; sent?(): void; failed(error: string): void } | null;
 export type ScriptRunner = (ownerId: string) => Promise<{ status: "succeeded" | "failed"; output: string | null; error: string | null } | null>;
 export type RunStatus = "succeeded" | "failed" | "running" | "skipped";
 export interface RunView {
@@ -265,6 +265,7 @@ export class EngineScheduler {
     try { started = this.startHook?.(key, thread.id) ?? null; } catch (error) { this.deps.warn?.(`Run task for ${id} could not be made: ${errorText(error)}`); }
     try {
       await this.deps.sdk.threads.send({ threadId: thread.id, mode: "steer-if-active", input: [{ type: "text", text: dueMessage(id, started?.prompt ? `${target.prompt}\n${started.prompt}` : target.prompt), mentions: [] }], permissionMode } as never);
+      try { started?.sent?.(); } catch { }
     } catch (error) {
       try { started?.failed(errorText(error)); } catch { }
       this.deps.db.prepare("UPDATE trigger_runs SET status = 'failed', finished_at = ?, error = ? WHERE id = ?").run(this.now(), errorText(error), runId);

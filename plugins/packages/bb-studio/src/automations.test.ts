@@ -699,3 +699,19 @@ it("a watcher whose task step fails still posts its finding as before", async ()
   warn.mockRestore();
   expect(sent(x).map((each) => each.input[0]!.text)).toEqual(["[bb studio] Watcher Releases: v2.0.0 released"]);
 });
+
+it("with findings as tasks, a finding whose post fails is posted on the next tick, once", async () => {
+  const x = await withTasks();
+  const made = await x.auto.create({ ...watcher, schedule: { type: "interval", every: 15, unit: "minutes", days: [0, 1, 2, 3, 4, 5, 6] }, script: { body: "check || echo down", interpreter: "bash" } });
+  x.runs.set("a1", [{ id: "r1", status: "succeeded", output: "Red4 does not answer\n", exitCode: 0, finishedAt: Date.now() + 5 }]);
+  x.send.mockRejectedValueOnce(new Error("Bot thread restarting") as never);
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  await x.auto.tick();
+  warn.mockRestore();
+  expect(x.store.children(parentIdOf(made.id))[0]!.automation!.posted).toBe(false);
+  await x.auto.tick();
+  await x.auto.tick();
+  expect(sent(x).map((each) => each.input[0]!.text)).toEqual(["[bb studio] Watcher Releases: Red4 does not answer", "[bb studio] Watcher Releases: Red4 does not answer"]);
+  expect(x.store.children(parentIdOf(made.id))).toHaveLength(1);
+  expect(x.store.children(parentIdOf(made.id))[0]!.automation!.posted).toBe(true);
+});

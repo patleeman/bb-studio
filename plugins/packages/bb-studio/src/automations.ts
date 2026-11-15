@@ -167,7 +167,7 @@ export interface AutomationDeps {
   runScript?: RunWatcherScript;
   /** Where Studio-run watchers keep their files (one folder each). */
   watcherDir?: string;
-  findings?(watcherId: string, finding: string | null, raw: string | null, at: number): { post: string; note: string } | "quiet" | null;
+  findings?(watcherId: string, finding: string | null, raw: string | null, at: number, failed: string | null): { post: string; note: string; steer?: boolean; done?(posted: boolean): void } | "quiet" | null;
   /** Built-in daily Bot maintenance (src/bot-maintenance.ts); null for an external bot. */
   maintenance?: {
     get(botId: string): { paused: boolean; lastRunAt: number | null; lastOutcome: string | null; nextRunAt: number | null } | null;
@@ -327,11 +327,8 @@ export class Automations {
     });
     const status = result.exitCode === 0 ? "succeeded" as const : "failed" as const;
     const finding = watcherFinding({ status, output: result.output, exitCode: result.exitCode });
-    const plan = this.plan(row, finding, result.output || null, Date.now());
-    if (plan) {
-      await this.fire(row, plan.post, plan.note);
-      this.save(row.id, { last_fired_at: Date.now(), last_fire: plan.post.slice(0, 2000) });
-    }
+    const plan = this.plan(row, finding, result.output || null, Date.now(), status === "failed" ? result.error || result.output || "The script failed" : null);
+    if (plan && await this.post(row, plan)) this.save(row.id, { last_fired_at: Date.now(), last_fire: plan.post.slice(0, 2000) });
     return { status, output: result.output || null, error: result.error };
   }
 
@@ -957,9 +954,9 @@ export class Automations {
       let boundary = row.seen_until;
       let fired = 0;
       for (const run of runs) {
-        const plan = this.plan(row, watcherFinding(run), run.output ?? null, run.finishedAt!);
-        if (plan) {
-          await this.fire(row, plan.post, plan.note);
+        const failed = run.status === "failed" || (run.status === "succeeded" && (run.exitCode ?? 0) !== 0) ? run.error || run.output || "The script failed" : null;
+        const plan = this.plan(row, watcherFinding(run), run.output ?? null, run.finishedAt!, failed);
+        if (plan && await this.post(row, plan)) {
           fired++;
           this.save(row.id, { last_fired_at: run.finishedAt!, last_fire: plan.post.slice(0, 2000) });
         }
@@ -973,10 +970,10 @@ export class Automations {
     }
   }
 
-  private plan(row: Row, finding: string | null, raw: string | null, at: number): { post: string; note: string | null } | null {
+  private plan(row: Row, finding: string | null, raw: string | null, at: number, failed: string | null = null): { post: string; note: string | null; steer?: boolean; done?(posted: boolean): void } | null {
     if (this.deps.findings) {
       try {
-        const plan = this.deps.findings(row.id, finding, raw, at);
+        const plan = this.deps.findings(row.id, finding, raw, at, failed);
         if (plan === "quiet") return null;
         if (plan) return plan;
       } catch (error) {
@@ -986,15 +983,23 @@ export class Automations {
     return finding ? { post: finding, note: null } : null;
   }
 
-  private async fire(row: Row, output: string, extra: string | null = null): Promise<void> {
+  private async post(row: Row, plan: { post: string; note: string | null; steer?: boolean; done?(posted: boolean): void }): Promise<boolean> {
+    let posted = false;
+    try { posted = await this.fire(row, plan.post, plan.note, plan.steer ? "steer-if-active" : "auto"); }
+    finally { try { plan.done?.(posted); } catch (error) { console.warn(`[studio] watcher ${row.id}: its finding could not be marked`, error); } }
+    return posted;
+  }
+
+  private async fire(row: Row, output: string, extra: string | null = null, mode: "auto" | "steer-if-active" = "auto"): Promise<boolean> {
     const bot = this.bot(row.bot_id);
     const runner = row.target !== "main" ? this.deps.db.prepare("SELECT thread_id FROM bot_runners WHERE id = ?").get(row.target) as { thread_id: string | null } | undefined : undefined;
     const threadId = runner?.thread_id ?? bot.threadId;
-    if (!threadId) return;
+    if (!threadId) return false;
     const { text, note } = watcherMessage(row.name, output, row.instruction, !!runner?.thread_id);
     await this.deps.sdk.threads.send({
-      threadId, mode: "auto",
+      threadId, mode,
       input: [{ type: "text", text, mentions: [] }, { type: "text", text: extra ? `${note} ${extra}` : note, mentions: [], visibility: "agent-only" }],
     } as never);
+    return true;
   }
 }

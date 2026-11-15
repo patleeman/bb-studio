@@ -226,7 +226,7 @@ it("a card the agent closed offers Reopen for that agent, not Undo", async () =>
 });
 
 it("a recurring task shows its schedule, Active or Paused, its latest runs and findings, and no Done or Hand off", async () => {
-  const link = (role: "schedule" | "run" | "finding", count = 1) => ({ id: "aut_silent", kind: "watcher" as const, role, thread: "thr_bot", keys: [], count, lastAt: NOW, mode: null, clearedAt: null });
+  const link = (role: "schedule" | "run" | "finding", count = 1) => ({ id: "aut_silent", kind: "watcher" as const, role, thread: "thr_bot", keys: [], count, lastAt: NOW, mode: null, clearedAt: null, posted: true, sentAt: null, nudgedAt: null, nudged: null, severity: null, pushedAt: null });
   const run = { ...base, id: "task_run1", title: "Silent heartbeat · Nov 13, 2:00 PM", owner: "cos", state: "done" as const, origin: "task" as const, progress: { step: null, line: "Nothing new" }, automation: link("run"), parentId: "task_auto-aut-silent", createdAt: NOW - 3_600_000, closedAt: NOW - 3_500_000, closedBy: "cos" };
   const finding = { ...base, id: "task_find1", title: "Silent heartbeat: Kensico spend $5.80 today", owner: "cos", state: "in_progress" as const, origin: "task" as const, automation: link("finding", 3), parentId: "task_auto-aut-silent", createdAt: NOW - 7_200_000 };
   put({ id: "task_auto-aut-silent", title: "Silent heartbeat", owner: "cos", state: "in_progress", origin: "task", schedule: { text: "Every 2 hours", cron: null, timeZone: null, automationId: "aut_silent", paused: false }, automation: link("schedule"), progress: { step: null, line: "Found: Kensico spend $5.80 today" } }, { runs: [run, finding] });
@@ -242,5 +242,10 @@ it("a recurring task shows its schedule, Active or Paused, its latest runs and f
   put(finding);
   await render("loop", { id: "task_find1" });
   expect(card().querySelector('[data-testid="task-found"]')!.textContent).toBe("· Found 3 times");
+  expect(card().querySelector('[data-testid="task-severity"]')).toBeNull();
+  put({ ...finding, automation: { ...link("finding", 3), severity: "critical" } });
+  await render("loop", { id: "task_find1" });
+  expect(card().querySelector('[data-testid="task-severity"]')!.textContent).toBe("· Critical");
+  expect(card().querySelector('[data-testid="task-severity"]')!.className).toContain("text-destructive");
   expect(card().textContent).toContain("Finding");
 });

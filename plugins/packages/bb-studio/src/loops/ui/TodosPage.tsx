@@ -8,7 +8,7 @@ import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageMore, BotPageRow, Bot
 import { MenuSelect } from "../../ui/menu-select";
 import { useCall, useLive } from "../../ui/live";
 import { isClosed, needsYou, USER_OWNER, type Task } from "../../tasks/contract";
-import { ALL, filterChoices, ownerFilterOf, ownerLabel, ownerShort, sectionTasks, taskSection, taskKind, taskStatus, type Names, type SectionId } from "../../tasks/ui/model";
+import { SEVERITY_LABEL, ALL, filterChoices, ownerFilterOf, ownerLabel, ownerShort, sectionTasks, taskSection, taskKind, taskStatus, type Names, type SectionId } from "../../tasks/ui/model";
 import { SCHEDULED_ICON, scheduledMeta } from "./scheduled-model";
 import { NewAutomationMenu, newKinds, useAutomationEditor, useAutomations } from "../../ui/bot/Automations";
 import { useNeedsYou } from "./LoopsTab";
@@ -153,12 +153,13 @@ export function TodosPage({ view }: { view: BotView }) {
           {scheduledTasks.map(row)}
           {scheduledRows.shown.map((item) => {
             const parent = recurring.get(item.id);
-            const last = parent?.progress.line ?? null;
+            const severity = parent?.automation?.severity ?? null;
+            const last = parent?.progress.line ? `${severity ? `${SEVERITY_LABEL[severity]} · ` : ""}${parent.progress.line}` : null;
             const runs = parent ? rowOpen({ kind: "todo", id: parent.id }, parent.title) : null;
             return (
               <BotPageRow key={item.key} testId="scheduled-row" data={{ "data-scheduled": item.key, ...(parent ? { "data-task": parent.id } : {}) }} icon={SCHEDULED_ICON[item.kind]} muted={item.state === "paused"}
                 title={item.title} titleText={last ? `${item.title} · Last: ${last}` : item.title} meta={scheduledMeta(item, now, zone)} {...rowOpen(item.link, item.title)}
-                columns={last ? [{ key: "last", content: <span data-testid="scheduled-last" title={last}>{last}</span>, className: cn("max-w-[40%]", /^Needs you/.test(last) ? "text-warning" : "text-subtle-foreground") }] : undefined}
+                columns={last ? [{ key: "last", content: <span data-testid="scheduled-last" title={last}>{last}</span>, className: cn("max-w-[40%]", severity === "critical" ? "text-destructive" : /^Needs you/.test(parent?.progress.line ?? "") || severity === "warn" ? "text-warning" : "text-subtle-foreground") }] : undefined}
                 actions={runs ? <Button type="button" variant="ghost" size="sm" data-testid="scheduled-runs" className="h-7 px-2 text-xs font-normal" aria-label={`Runs: ${item.title}`} onClick={(event) => runs.onOpen(event)}>Runs</Button> : undefined} />
             );
           })}

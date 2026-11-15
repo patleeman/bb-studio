@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "../migrations";
 import { registerLoops } from "../loops/register";
-import { AutomationTasks, alwaysPrints, CLEAR_AFTER_MS, findingKey, KEEP_RUNS, parentIdOf, readSources, splitControl, URGENT_RUN_NOTE, type AutomationBotInfo } from "./automations";
+import { AutomationTasks, type AutomationTaskDeps, alwaysPrints, CLEAR_AFTER_MS, findingKey, KEEP_RUNS, parentIdOf, readSources, splitControl, URGENT_RUN_NOTE, type AutomationBotInfo } from "./automations";
 import { isClosed, type Task } from "./contract";
 import { registerTasks } from "./register";
 import { TaskStore } from "./store";
@@ -58,11 +58,17 @@ function seed() {
   db.prepare("INSERT INTO project_runs (project_id, enabled, cadence, time, lead_thread_id) VALUES ('proj_personal', 1, 'weekdays', '08:00', 'thr_main')").run();
 }
 
-function setup() {
+class Posting extends AutomationTasks {
+  override started(key: { owner: string; ownerId: string }, threadId: string) { const run = super.started(key, threadId); run?.sent(); return run; }
+  override watcherRun(...args: Parameters<AutomationTasks["watcherRun"]>) { const plan = super.watcherRun(...args); if (plan && plan !== "quiet") plan.done(true); return plan; }
+}
+
+function setup(deps: Partial<AutomationTaskDeps> = {}) {
   const posts: string[] = [];
   const sent: { threadId: string; text: string }[] = [];
   const store = new TaskStore(db, () => {});
-  const tasks = new AutomationTasks(store, { sources: () => readSources(db, BOTS), zone: () => "America/New_York" });
+  const tasks = new Posting(store, { sources: () => readSources(db, BOTS), zone: () => "America/New_York", ...deps });
+  const raw = new AutomationTasks(store, { sources: () => readSources(db, BOTS), zone: () => "America/New_York", ...deps });
   const tools: Record<string, { execute(input: unknown, ctx: unknown): Promise<string> }> = {};
   const handlers: Record<string, (input: any) => any> = {};
   const bb = {
@@ -80,7 +86,8 @@ function setup() {
     loopAct: (x) => loops.actDirect(x), reopenLoop: () => {}, snoozeLoopUntil: () => {}, held: () => [],
   });
   const tool = async (name: string, input: unknown, threadId: string) => JSON.parse(await tools[name]!.execute(input, { threadId }));
-  return { store, tasks, posts, sent, loops, handlers, tool };
+  const exec = (name: string, input: unknown, threadId: string) => tools[name]!.execute(input, { threadId });
+  return { store, tasks, raw, posts, sent, loops, handlers, tool, exec };
 }
 
 const all = (store: TaskStore) => store.all();
@@ -290,7 +297,7 @@ it("a watcher's finding is one task; the next finding for the same thing updates
   expect(kids[0]).toMatchObject({ id: finding!.id, state: "in_progress", automation: { count: 2, lastAt: NOW + 24 * HOUR }, progress: { line: expect.stringContaining("$5.61") } });
   expect(store.history(finding!.id).at(-1)).toMatchObject({ type: "found_again", data: expect.stringContaining("\"count\":2") });
   const both = tasks.watcherRun("aut_silent", "Kensico health rc=1: writer: Claude spend $5.80 today for write-ups and summaries (over $5/day)\nOpenCode Go 5-hour window: only 12% left", null, NOW + 26 * HOUR);
-  expect(both).toMatchObject({ post: "OpenCode Go 5-hour window: only 12% left" });
+  expect(both).toMatchObject({ post: "Kensico health rc=1: writer: Claude spend $5.80 today for write-ups and summaries (over $5/day)\nOpenCode Go 5-hour window: only 12% left" });
   expect(children(store, "aut_silent").map((t) => [t.automation!.count, t.title])).toEqual([[3, finding!.title], [1, "Silent heartbeat: OpenCode Go 5-hour window: only 12% left"]]);
   expect(store.get("task_auto-aut-silent").progress.line).toMatch(/^Found: Kensico health/);
 });
@@ -373,11 +380,174 @@ it("reads watcher keys, control lines and print-only scripts", () => {
   expect(findingKey("Claude spend $5.42 today (over $5/day)")).toBe(findingKey("Claude  spend $11.07 today (over $5/day)"));
   expect(findingKey("red4 down")).not.toBe(findingKey("mac down"));
   expect(splitControl('found it\n{"key":"k","clear":["a"],"owner":"thread:thr_1","each":true}')).toEqual({ body: "found it", control: { key: "k", clear: ["a"], owner: "thread:thr_1", each: true } });
-  expect(splitControl('{"wakeAgent": false}')).toEqual({ body: "", control: {} });
+  expect(splitControl('{"wakeAgent": false}')).toEqual({ body: '{"wakeAgent": false}', control: null });
+  expect(splitControl('{"status":"down","host":"red4"}')).toEqual({ body: '{"status":"down","host":"red4"}', control: null });
+  expect(splitControl('Red4 is down\n{"wakeAgent": true, "reason": "x"}')).toEqual({ body: 'Red4 is down\n{"wakeAgent": true, "reason": "x"}', control: null });
+  expect(splitControl('Red4 is down\n{"key": "red4", "status": 3}').control).toBeNull();
+  expect(splitControl('Red4 is down\n{"wakeAgent": true, "severity": "critical"}')).toEqual({ body: "Red4 is down", control: { severity: "critical" } });
   expect(splitControl("no control {here}")).toEqual({ body: "no control {here}", control: null });
   expect(alwaysPrints("#!/bin/bash\n# note\necho \"Write today's morning card.\"", "bash")).toBe(true);
   expect(alwaysPrints("echo \"$(date)\"", "bash")).toBe(false);
   expect(alwaysPrints(SILENT, "bash")).toBe(false);
   expect(alwaysPrints("print('hi')", "python3")).toBe(true);
   expect(alwaysPrints("", "bash")).toBe(false);
+});
+
+it("P0: a finding whose post failed is posted on the next run, and counts as posted only once it went out", () => {
+  seed();
+  const { store, raw } = setup();
+  const first = raw.watcherRun("aut_silent", "Red4 does not answer", null, NOW);
+  expect(first).toMatchObject({ post: "Red4 does not answer" });
+  (first as { done(posted: boolean): void }).done(false);
+  expect(children(store, "aut_silent")[0]!.automation!.posted).toBe(false);
+  const retry = raw.watcherRun("aut_silent", "Red4 does not answer", null, NOW + HOUR);
+  expect(retry).toMatchObject({ post: "Red4 does not answer", taskId: children(store, "aut_silent")[0]!.id });
+  (retry as { done(posted: boolean): void }).done(true);
+  expect(children(store, "aut_silent")).toHaveLength(1);
+  expect(children(store, "aut_silent")[0]!.automation!.posted).toBe(true);
+  expect(raw.watcherRun("aut_silent", "Red4 does not answer", null, NOW + 2 * HOUR)).toBe("quiet");
+});
+
+it("P1: a one-line JSON output, or one with unknown keys, is posted as output", () => {
+  seed();
+  const { tasks } = setup();
+  expect(tasks.watcherRun("aut_silent", '{"status":"down","host":"red4"}', null, NOW)).toMatchObject({ post: '{"status":"down","host":"red4"}' });
+});
+
+it("P1: a watcher's mode is kept once mapped: an edit never turns a reminder-style watcher into a quiet one, and {\"each\": true} sticks", () => {
+  seed();
+  const { store, tasks } = setup();
+  tasks.sync();
+  db.prepare("UPDATE bot_automations SET script = ? WHERE id = 'aut_morning'").run('[ "$(date +%u)" -lt 6 ] && echo "Write today\'s morning card."');
+  tasks.sync();
+  expect(store.get("task_auto-aut-morning").automation!.mode).toBe("each");
+  tasks.watcherRun("aut_morning", "Write today's morning card.", null, NOW);
+  at(NOW + 24 * HOUR);
+  expect(tasks.watcherRun("aut_morning", "Write today's morning card.", null, NOW + 24 * HOUR)).toMatchObject({ steer: true, post: "Write today's morning card." });
+  db.prepare("UPDATE bot_automations SET script = 'echo \"Stretch.\"' WHERE id = 'aut_silent'").run();
+  tasks.sync();
+  expect(store.get("task_auto-aut-silent").automation!.mode).toBe("each");
+  automation("aut_rem", "watcher", "Reminder", { script: "[ -f x ] && echo hi" });
+  tasks.sync();
+  tasks.watcherRun("aut_rem", 'Time to stretch\n{"each": true}', null, NOW);
+  expect(store.get("task_auto-aut-rem").automation!.mode).toBe("each");
+  expect(tasks.watcherRun("aut_rem", "Time to stretch", null, NOW + HOUR)).toMatchObject({ post: "Time to stretch", steer: true });
+});
+
+it("P1: the check-in prompt lists the open findings", () => {
+  seed();
+  const { tasks } = setup();
+  tasks.watcherRun("aut_silent", "[warn] Disk 91% full", null, NOW - 30 * HOUR);
+  const run = tasks.started({ owner: "automation", ownerId: "aut_daily" }, "thr_main")!;
+  expect(run.prompt).toMatch(/Open watcher findings .*\n- "Silent heartbeat: Disk 91% full" \(task_[^;]+; owner you; found 1 time; first Nov 14, 2:00 AM, last Nov 14, 2:00 AM; warn\)/);
+  expect(tasks.started({ owner: "runner", ownerId: "run_staff" }, "thr_staff")!.prompt).not.toContain("Open watcher findings");
+});
+
+it("P1: a finding nobody touched for a day gets one agent-only nudge, and another only when its output changes", async () => {
+  seed();
+  const nudges: { threadId: string; text: string }[] = [];
+  const { store, tasks, tool } = setup({ nudge: async (threadId, text) => { nudges.push({ threadId, text }); } });
+  tasks.watcherRun("aut_silent", "Spend $5.10 today", null, NOW);
+  tasks.watcherRun("aut_silent", "Spend $5.20 today", null, NOW + 2 * HOUR);
+  expect(nudges).toEqual([]);
+  tasks.watcherRun("aut_silent", "Spend $5.30 today", null, NOW + 25 * HOUR);
+  await Promise.resolve();
+  expect(nudges).toEqual([{ threadId: "thr_main", text: expect.stringMatching(/^Watcher finding task task_.*still happening: found 3 times.*Latest output: Spend \$5\.30 today.*reply exactly \[PASS\]/s) }]);
+  tasks.watcherRun("aut_silent", "Spend $5.30 today", null, NOW + 27 * HOUR);
+  await Promise.resolve();
+  expect(nudges).toHaveLength(1);
+  tasks.watcherRun("aut_silent", "Spend $5.90 today", null, NOW + 29 * HOUR);
+  await Promise.resolve();
+  expect(nudges).toHaveLength(2);
+  const [finding] = children(store, "aut_silent");
+  await tool("task_update", { id: finding!.id, line: "Asked the Kensico lead" }, "thr_main");
+  tasks.watcherRun("aut_silent", "Spend $6.40 today", null, NOW + 31 * HOUR);
+  await Promise.resolve();
+  expect(nudges).toHaveLength(2);
+});
+
+it("P1: a repeat with different text records it on the task and in history; repeats of the same text add one history line an hour", () => {
+  seed();
+  const { store, tasks } = setup();
+  tasks.watcherRun("aut_silent", "birdclaw answered 000", null, NOW);
+  tasks.watcherRun("aut_silent", "birdclaw answered 401", null, NOW + 60_000);
+  tasks.watcherRun("aut_silent", "birdclaw answered 401", null, NOW + 120_000);
+  tasks.watcherRun("aut_silent", "birdclaw answered 401", null, NOW + 2 * HOUR);
+  const [finding] = children(store, "aut_silent");
+  expect(finding).toMatchObject({ why: "birdclaw answered 401", progress: { line: "birdclaw answered 401" }, automation: { count: 4 } });
+  const found = store.history(finding!.id).filter((e) => e.type === "found_again").map((e) => JSON.parse(e.data) as { count: number; changed: boolean });
+  expect(found.map((e) => [e.count, e.changed])).toEqual([[2, true], [4, false]]);
+});
+
+it("severity: higher wakes again and raises it, the same or lower stays quiet, critical to the user pushes once, and clearing resets it", async () => {
+  seed();
+  const pushes: string[] = [];
+  const { store, tasks, tool, loops } = setup({ push: async (task) => { pushes.push(task.id); } });
+  expect(tasks.watcherRun("aut_silent", "[info] Disk 80% full", null, NOW)).toMatchObject({ post: "Disk 80% full" });
+  const [disk] = children(store, "aut_silent");
+  expect(disk!.automation!.severity).toBe("info");
+  const worse = tasks.watcherRun("aut_silent", "[warn] Disk 91% full", null, NOW + HOUR);
+  expect(worse).toMatchObject({ post: "Disk 91% full", taskId: disk!.id, note: expect.stringMatching(/is now warn: it got worse/) });
+  expect(store.get(disk!.id).automation!.severity).toBe("warn");
+  expect(store.get("task_auto-aut-silent").automation!.severity).toBe("warn");
+  expect(tasks.watcherRun("aut_silent", "[warn] Disk 92% full", null, NOW + 2 * HOUR)).toBe("quiet");
+  expect(tasks.watcherRun("aut_silent", "[info] Disk 85% full", null, NOW + 3 * HOUR)).toBe("quiet");
+  expect(store.get(disk!.id)).toMatchObject({ why: "Disk 85% full", automation: { severity: "warn" } });
+  await tool("task_handoff", { id: disk!.id, to: "user", needs: "Free some space on red4" }, "thr_main");
+  expect(tasks.watcherRun("aut_silent", 'Disk 99% full\n{"severity": "critical"}', null, NOW + 4 * HOUR)).toMatchObject({ post: "Disk 99% full" });
+  expect(pushes).toEqual([disk!.id]);
+  expect(loops.store.get(disk!.id).owner).toBe("patrick");
+  tasks.watcherRun("aut_silent", "[critical] Disk 99% full", null, NOW + 5 * HOUR);
+  expect(pushes).toHaveLength(1);
+  expect(store.history(disk!.id).filter((e) => e.type === "worse").map((e) => JSON.parse(e.data).severity)).toEqual(["warn", "critical"]);
+  tasks.watcherRun("aut_silent", null, '{"clear": true}', NOW + 6 * HOUR);
+  expect(store.get(disk!.id).automation!.severity).toBeNull();
+  expect(store.get("task_auto-aut-silent").automation!.severity).toBeNull();
+});
+
+it("P2: a run settles only on an idle after its prompt was sent", () => {
+  seed();
+  const { store, raw } = setup();
+  const run = raw.started({ owner: "automation", ownerId: "aut_daily" }, "thr_main")!;
+  expect(raw.settle("thr_main", "An earlier reply", "succeeded")).toBe(0);
+  run.sent();
+  at(NOW + 500);
+  expect(raw.settle("thr_main", "[PASS]", "succeeded")).toBe(1);
+  expect(children(store, "aut_daily")[0]!.progress.line).toBe("Nothing new");
+});
+
+it("P2: a failed or timed-out watcher run neither clears a finding nor reads Nothing found", () => {
+  seed();
+  const { store, tasks } = setup();
+  tasks.watcherRun("aut_silent", "Red4 does not answer", null, NOW);
+  expect(tasks.watcherRun("aut_silent", null, null, NOW + 40 * HOUR, "ssh: timed out\nmore")).toBe("quiet");
+  expect(children(store, "aut_silent")[0]!.state).toBe("in_progress");
+  expect(store.get("task_auto-aut-silent").progress.line).toBe("Failed: ssh: timed out");
+});
+
+it("P2: closed findings older than 30 days are pruned past the newest 20", () => {
+  seed();
+  const { store, tasks } = setup();
+  for (let i = 0; i < 25; i++) {
+    tasks.watcherRun("aut_silent", `Problem ${String.fromCharCode(97 + i)}`, null, NOW + i * 1000);
+    tasks.watcherRun("aut_silent", null, '{"clear": true}', NOW + i * 1000 + 500);
+  }
+  expect(children(store, "aut_silent")).toHaveLength(25);
+  expect(tasks.prune(NOW + 40 * 86_400_000)).toBe(5);
+  expect(children(store, "aut_silent")).toHaveLength(20);
+});
+
+it("P3: the Bot's own check-in matches its scheduled item; tools refuse to change a recurring task; a hand-off reopens a run that ended", async () => {
+  seed();
+  const { store, tasks, tool, exec } = setup();
+  tasks.sync();
+  expect(store.get("task_auto-heartbeat-bot-main").schedule!.automationId).toBe("heartbeat");
+  expect(await exec("task_update", { id: "task_auto-aut-daily", state: "done" }, "thr_main")).toMatch(/automation's schedule; change it with automation_update/);
+  expect(await exec("task_handoff", { id: "task_auto-aut-daily", to: "user" }, "thr_main")).toMatch(/automation's schedule/);
+  tasks.started({ owner: "automation", ownerId: "aut_daily" }, "thr_main");
+  at(NOW + 1000);
+  tasks.settle("thr_main", "Done for today", "succeeded");
+  const run = children(store, "aut_daily")[0]!;
+  const out = await tool("task_handoff", { id: run.id, to: "user", needs: "Pick a date" }, "thr_main");
+  expect(out.task).toMatchObject({ owner: "patrick", state: "waiting", title: "Daily check-in: Pick a date" });
 });
