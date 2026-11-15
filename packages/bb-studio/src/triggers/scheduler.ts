@@ -39,6 +39,7 @@ export interface SchedulerKey { owner: SchedulerOwner; ownerId: string }
 export interface RunTarget { threadId: string; prompt: string; permissionMode?: string }
 export type RunResolver = (ownerId: string) => RunTarget | null | Promise<RunTarget | null>;
 /** Runs an owner's script and says how it went; null when there is nothing to run any more. */
+export type RunStartHook = (key: SchedulerKey, threadId: string) => { prompt: string; sent?(): void; failed(error: string): void } | null;
 export type ScriptRunner = (ownerId: string) => Promise<{ status: "succeeded" | "failed"; output: string | null; error: string | null } | null>;
 export type RunStatus = "succeeded" | "failed" | "running" | "skipped";
 export interface RunView {
@@ -88,6 +89,7 @@ const notFound = (error: unknown) => (error as { status?: number })?.status === 
 export class EngineScheduler {
   private readonly resolvers = new Map<SchedulerOwner, RunResolver>();
   private readonly scripts = new Map<SchedulerOwner, ScriptRunner>();
+  private startHook: RunStartHook | null = null;
   /** Why the latest run-now of a trigger did not start. */
   private readonly refused = new Map<string, string>();
 
@@ -99,6 +101,8 @@ export class EngineScheduler {
 
   /** How a feature's runs find their thread and prompt. One resolver per owner. */
   resolve(owner: SchedulerOwner, resolver: RunResolver): void { this.resolvers.set(owner, resolver); }
+
+  onRunStart(hook: RunStartHook): void { this.startHook = hook; }
 
   /** How an owner's runs run a script instead of waking a thread. */
   script(owner: SchedulerOwner, runner: ScriptRunner): void { this.scripts.set(owner, runner); }
@@ -257,9 +261,13 @@ export class EngineScheduler {
       ?? (await Promise.resolve().then(() => this.deps.sdk.threads.defaultExecutionOptions({ threadId: target.threadId })).catch(() => null))?.permissionMode
       ?? "accept-edits";
     const runId = this.record(id, run, scheduledFor, { status: "running", threadId: thread.id });
+    let started: ReturnType<RunStartHook> = null;
+    try { started = this.startHook?.(key, thread.id) ?? null; } catch (error) { this.deps.warn?.(`Run task for ${id} could not be made: ${errorText(error)}`); }
     try {
-      await this.deps.sdk.threads.send({ threadId: thread.id, mode: "steer-if-active", input: [{ type: "text", text: dueMessage(id, target.prompt), mentions: [] }], permissionMode } as never);
+      await this.deps.sdk.threads.send({ threadId: thread.id, mode: "steer-if-active", input: [{ type: "text", text: dueMessage(id, started?.prompt ? `${target.prompt}\n${started.prompt}` : target.prompt), mentions: [] }], permissionMode } as never);
+      try { started?.sent?.(); } catch { }
     } catch (error) {
+      try { started?.failed(errorText(error)); } catch { }
       this.deps.db.prepare("UPDATE trigger_runs SET status = 'failed', finished_at = ?, error = ? WHERE id = ?").run(this.now(), errorText(error), runId);
       if (manual) { this.refused.set(id, errorText(error)); return; }
       throw error;

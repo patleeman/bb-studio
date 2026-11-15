@@ -9,6 +9,7 @@ import { isPassOutput } from "./kit/silent";
 import { isPingRequest } from "./bot-cache";
 
 export const MAIN_PUSH_DELAY_MS = 2_000;
+export const TASK_PUSH_QUIET_MS = 3 * 60_000;
 const APPROVAL_CARD = /^(?:\s*::approval\{[^}\n]*\}\s*)+$/u;
 const DIRECTIVE_LINE = /^\s{0,3}::[A-Za-z][\w-]*(?:\[[^\]]*\])?(?:\{.*\})?\s*$/u;
 const PREVIEW_MAX = 300;
@@ -20,6 +21,18 @@ export function isUserFacing(text: string | null | undefined): text is string {
 
 /** The push body: the reply's first lines as plain text; a card stands in for a reply that is only cards. */
 export function previewOf(text: string): string {
+  const joined = plainPreview(text);
+  if (joined) return joined;
+  if (/::loop\{/u.test(text)) return "New on your list";
+  if (/::work\{/u.test(text)) return "A work card needs you";
+  return "New message";
+}
+
+export function cardsIn(text: string): { kind: "work" | "loop"; id: string }[] {
+  return [...text.matchAll(/::(work|loop)\{[^}\n]*\bid="([^"]+)"[^}\n]*\}/gu)].map((m) => ({ kind: m[1] as "work" | "loop", id: m[2]! }));
+}
+
+function plainPreview(text: string): string {
   const lines: string[] = [];
   let fenced = false;
   for (const raw of text.split(/\r?\n/u)) {
@@ -34,10 +47,7 @@ export function previewOf(text: string): string {
     if (lines.join(" · ").length >= PREVIEW_MAX) break;
   }
   const joined = lines.join(" · ");
-  if (joined) return joined.length > PREVIEW_MAX ? `${joined.slice(0, PREVIEW_MAX - 1).trimEnd()}…` : joined;
-  if (/::loop\{/u.test(text)) return "New on your list";
-  if (/::work\{/u.test(text)) return "A work card needs you";
-  return "New message";
+  return joined.length > PREVIEW_MAX ? `${joined.slice(0, PREVIEW_MAX - 1).trimEnd()}…` : joined;
 }
 
 type Thread = { id: string; visibility?: string; projectId?: string | null; lastReadAt?: number | null; latestAttentionAt?: number };
@@ -52,6 +62,8 @@ export interface MainPushDeps {
   /** Whether BB's level for the thread lets a finished turn through (src/push-levels.ts). */
   allowed(threadId: string): Promise<boolean>;
   notify(input: MainPushInput): Promise<void>;
+  needsUser?(card: { kind: "work" | "loop"; id: string }): boolean;
+  pushedTaskSince?(botId: string, since: number): boolean;
   defaultProjectId: string;
   delayMs?: number;
   log?(message: string): void;
@@ -83,6 +95,9 @@ export class MainPushes {
     if (!thread || isPingRequest(request)) return false;
     if ((thread.lastReadAt ?? 0) >= (thread.latestAttentionAt ?? 0) && thread.latestAttentionAt !== undefined) return false;
     if (!(await this.deps.allowed(threadId))) return false;
+    const cards = plainPreview(reply) ? [] : cardsIn(reply);
+    if (cards.length && this.deps.needsUser && !cards.some((card) => this.deps.needsUser!(card))) return false;
+    if (this.deps.pushedTaskSince?.(bot.botId, Date.now() - TASK_PUSH_QUIET_MS)) return false;
     await this.deps.notify({
       title: bot.name, body: previewOf(reply), kind: "turn-finished", threadId,
       projectId: thread.projectId || this.deps.defaultProjectId, botId: bot.botId, conversationId: threadId,

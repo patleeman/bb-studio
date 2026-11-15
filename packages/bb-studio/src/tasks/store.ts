@@ -30,6 +30,19 @@ export function guardTasks<T extends Record<string, (...args: never[]) => unknow
   }])) as T;
 }
 
+export function taskTitle(db: Database.Database, id: string): string | null {
+  try {
+    const row = db.prepare("SELECT json_extract(record, '$.title') AS title FROM tasks WHERE id = ?").get(id) as { title: unknown } | undefined;
+    return typeof row?.title === "string" ? row.title : null;
+  } catch { return null; }
+}
+
+export function cardNeedsUser(task: Task | null, kind: "work" | "loop"): boolean {
+  if (!task) return true;
+  if (needsYou(task)) return true;
+  return kind === "loop" && task.owner === USER_OWNER && !isClosed(task);
+}
+
 export function surfaceForUser(t: Task): void {
   if (needsYou(t) && t.attention.queue === null) t.attention.queue = "surfaced";
 }

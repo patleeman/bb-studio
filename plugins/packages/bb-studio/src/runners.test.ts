@@ -1,10 +1,12 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it, vi } from "vitest";
+import { AutomationTasks, parentIdOf, readSources, URGENT_RUN_NOTE } from "./tasks/automations";
+import { TaskStore } from "./tasks/store";
 import { MIGRATIONS } from "./migrations";
 import { localZone } from "./schedule";
 import { nextRun } from "./triggers/next-run";
 import { testScheduler } from "./test/scheduler-fixture";
-import { ADOPT_NOTE, parseSchedule, runnerInstructions, runnerPrompt, Runners, tellLine, TRIAGE_NOTE } from "./runners";
+import { ADOPT_NOTE, parseSchedule, runnerInstructions, runnerPrompt, Runners, tellLine, TRIAGE_NOTE, type RunnerDeps } from "./runners";
 import { resolveRunnerMachine, runnerEnvironment, RunnerPreflightError } from "./runner-machines";
 import { Automations } from "./automations";
 import { heartbeatCron } from "./project-lead";
@@ -13,7 +15,7 @@ const dispose: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 type Thread = ReturnType<typeof makeThreadResponse>;
 
-async function setup() {
+async function setup(extra: Partial<RunnerDeps> = {}) {
   const threads = new Map<string, Thread>();
   let count = 0;
   const add = (fields: Partial<Thread> & { id: string }) => { const thread = makeThreadResponse({ projectId: "proj_personal", providerId: "codex", ...fields }); threads.set(thread.id, thread); return thread; };
@@ -67,7 +69,7 @@ async function setup() {
   const changed = vi.fn(() => bb.realtime.publish("studio-changed", { pluginId: "studio" }));
   const clock = { now: Date.now() };
   const { engine, scheduler } = testScheduler(db, bb.sdk, clock);
-  const runners = new Runners({ db, sdk: bb.sdk, scheduler, changed, bot: (botId) => botId === second.id ? second : !botId || botId === bot.id ? bot : null, startedThreads: async () => started, chain: () => ["bot1"] });
+  const runners = new Runners({ db, sdk: bb.sdk, scheduler, changed, bot: (botId) => botId === second.id ? second : !botId || botId === bot.id ? bot : null, startedThreads: async () => started, chain: () => ["bot1"], ...extra });
   return { clock, engine, scheduler, timeline, hosts, cli, providerStates, pathsExist, installProviderCli, environmentProviders, changed, harness, runners, threads, add, spawn, send, update, archive, automations, calls, callRpc, bot, started, db, sdk: bb.sdk };
 }
 
@@ -712,4 +714,32 @@ it("recovers pre-buffer reports from the old thread for migration", async () => 
   const text = (x.spawn.mock.calls.at(-1) as unknown as [{ input: { text: string }[] }])[0].input[0]!.text;
   expect(text).toContain("old 2\nold 3\nold 4");
   expect(text).not.toContain("old 1");
+});
+
+it("with runs as tasks: each run is a child task of the runner's task, a report lands on it, and runner_report says the same as before", async () => {
+  let tasks: AutomationTasks | null = null;
+  const x = await setup({ reported: (runnerId, threadId, level, summary) => tasks!.report(runnerId, threadId, level, summary) });
+  tasks = new AutomationTasks(new TaskStore(x.db, () => {}), { sources: () => readSources(x.db, [{ id: "bot_main", name: "Jarvis", threadId: "bot1", heartbeatKey: null }]) });
+  x.scheduler.onRunStart((key, threadId) => tasks!.started(key, threadId));
+  const { id, threadId } = await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });
+  expect(tasks.sync()).toMatchObject({ created: 1 });
+  x.send.mockClear();
+  await fire(x, id);
+  const prompt = sentTo(x, threadId!).at(-1)!.input[0]!.text;
+  const store = new TaskStore(x.db);
+  const [run] = store.children(parentIdOf(id));
+  expect(run).toMatchObject({ owner: `thread:${threadId}`, state: "in_progress", automation: { role: "run", thread: threadId, sentAt: expect.any(Number) } });
+  expect(prompt).toContain(`Your job: Check mail.`);
+  expect(prompt).toContain(`This run is task ${run!.id}; runner_report records its result there.`);
+  expect(await x.runners.report(threadId!, { level: "log", summary: "Two newsletters." })).toBe("Logged. Then reply exactly [PASS].");
+  expect(store.get(run!.id)).toMatchObject({ state: "done", progress: { line: "Two newsletters." } });
+  expect(await x.runners.report(threadId!, { level: "urgent", summary: "The payment failed." })).toBe("Told the user and pushed to their phone. Then reply exactly [PASS].");
+  const urgent = store.children(parentIdOf(id)).find((t) => t.owner === "patrick")!;
+  expect(urgent).toMatchObject({ state: "waiting", needs: "The payment failed.", attention: { queue: "surfaced" } });
+  const note = (x.send.mock.calls.at(-1) as unknown as [{ input: { text: string }[] }])[0].input[1]!.text;
+  expect(note).toBe(`${TRIAGE_NOTE} ${URGENT_RUN_NOTE(urgent.id)}`);
+  expect(x.calls.filter((call) => call.pluginId === "mobile")).toHaveLength(1);
+  await x.runners.setState(id, "paused");
+  tasks.sync();
+  expect(store.get(parentIdOf(id))).toMatchObject({ state: "waiting", schedule: { paused: true } });
 });

@@ -12,6 +12,7 @@ export const taskView = z.object({
   history: z.array(taskEvent),
   todo: z.boolean().describe("Whether the task is in the user's todo list, so todo actions (snooze, nudge) apply"),
   threads: z.array(ownerInfo).describe("The owner, workers and conversation, by name, when they are threads"),
+  runs: z.array(task).optional().describe("A recurring task's latest runs and findings, newest first"),
 });
 export type TaskView = z.infer<typeof taskView>;
 

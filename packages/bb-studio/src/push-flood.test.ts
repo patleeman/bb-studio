@@ -92,7 +92,7 @@ describe("push levels", () => {
 });
 
 describe("Main's pushes", () => {
-  type Setup = { request?: unknown; read?: boolean; allowed?: boolean };
+  type Setup = { request?: unknown; read?: boolean; allowed?: boolean; needs?: Record<string, boolean>; taskPushAt?: number };
   function main(options: Setup = {}) {
     vi.useFakeTimers();
     const sent: MainPushInput[] = [];
@@ -102,6 +102,8 @@ describe("Main's pushes", () => {
       lastRequest: async () => options.request ?? { initiator: "user", input: [{ type: "text", text: "[bb message from thread:thr_w] CI is green." }] },
       allowed: async () => options.allowed ?? true,
       notify: async (input) => { sent.push(input); },
+      ...(options.needs ? { needsUser: (card: { id: string }) => options.needs![card.id] ?? true } : {}),
+      ...(options.taskPushAt !== undefined ? { pushedTaskSince: (_botId: string, since: number) => options.taskPushAt! >= since } : {}),
       defaultProjectId: "proj_personal",
     });
     dispose.push(async () => pushes.dispose());
@@ -124,6 +126,25 @@ describe("Main's pushes", () => {
     await idle('::loop{id="loop_1" row="1"}');
     await idle('::work{id="wc_1"}');
     expect(sent.map((input) => input.body)).toEqual(["Saturday, Nov 14 · Calendar · 10:00 AM · Swim class", "New on your list", "A work card needs you"]);
+  });
+
+  it("pushes a reply that is only cards only when one of them needs the user: not a worker's running card", async () => {
+    const { sent, idle } = main({ needs: { task_running: false, task_needs: true, loop_mine: true } });
+    await idle('::work{id="task_running"}');
+    expect(sent).toEqual([]);
+    await idle('::work{id="task_needs"}');
+    await idle('::loop{id="loop_mine"}');
+    await idle('Started the build.\n::work{id="task_running"}');
+    expect(sent.map((input) => input.body)).toEqual(["A work card needs you", "New on your list", "Started the build."]);
+  });
+
+  it("pushes no Bot reply within a few minutes of a task push to the phone, so one event is one push", async () => {
+    const { sent, idle } = main({ taskPushAt: Date.now() });
+    await idle("Disk /var is 99% full; I put it in your Today.");
+    expect(sent).toEqual([]);
+    const later = main({ taskPushAt: Date.now() - 4 * 60_000 });
+    await later.idle("Disk /var is 99% full; I put it in your Today.");
+    expect(later.sent).toHaveLength(1);
   });
 
   it("pushes nothing for a quiet pass, a relayed message folded with [PASS], or an approval card alone", async () => {

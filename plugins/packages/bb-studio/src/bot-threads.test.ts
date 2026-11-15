@@ -276,6 +276,8 @@ it("shortens a reply to its first line and reads a repo tag only off a git check
   expect(latestLine("Report A: @thread:thr_rr855dubiq · Report B: done")).toBe("Report A: a conversation · Report B: done");
   expect(latestLine("See @thread:thr_ab12#msg=4 and @page:pg_0123abcd", (id) => (id === "thr_ab12" ? "Compare e-ink readers" : null))).toBe("See Compare e-ink readers and a page");
   expect(latestLine("Recap: The [Spring menu draft](bb://page/pg_1) has [3 items](/threads/thr_1).")).toBe("Recap: The Spring menu draft has 3 items.");
+  expect(latestLine("Started task_78baa6f6-1c2d-4e5f-8a9b-0c1d2e3f4a5b and used task_update.", () => null, (id) => (id === "task_78baa6f6-1c2d-4e5f-8a9b-0c1d2e3f4a5b" ? "Fix the flaky upload test" : null))).toBe("Started Fix the flaky upload test and used taskupdate.");
+  expect(latestLine("`wc_9f2a7c1e-0000-4000-8000-000000000001` is done")).toBe("a task is done");
   expect(repoTag({ environmentPath: "/a/b", environmentBranchName: null })).toBeNull();
   expect(repoTag({ environmentName: "larkspur", environmentBranchName: "main" })).toEqual({ tag: "larkspur", branch: "main" });
 });

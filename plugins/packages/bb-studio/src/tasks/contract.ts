@@ -6,6 +6,11 @@ export const TASK_STATES = ["todo", "in_progress", "waiting", "done", "dropped",
 export const CLOSED_STATES: readonly TaskState[] = ["done", "dropped", "failed"];
 export const TASK_KINDS = ["do", "decide", "read", "waiting-outside"] as const;
 export const TASK_ORIGINS = ["loop", "work", "task"] as const;
+export const AUTOMATION_KINDS = ["checkin", "runner", "watcher", "heartbeat"] as const;
+export const AUTOMATION_ROLES = ["schedule", "run", "finding"] as const;
+export const SEVERITIES = ["info", "warn", "critical"] as const;
+export type Severity = (typeof SEVERITIES)[number];
+export type AutomationKind = (typeof AUTOMATION_KINDS)[number];
 export const PRIORITIES = ["urgent", "normal", "low"] as const;
 export const USER_OWNER = "patrick";
 export const TASK_ID = /^task_[A-Za-z0-9-]{1,80}$/;
@@ -35,6 +40,24 @@ export const schedule = z.object({
   automationId: z.string().max(200).nullable().default(null),
   paused: z.boolean().default(false),
 });
+export const automationLink = z.object({
+  id: z.string().min(1).max(200),
+  kind: z.enum(AUTOMATION_KINDS),
+  role: z.enum(AUTOMATION_ROLES),
+  thread: z.string().nullable().default(null),
+  keys: z.array(z.string()).default([]),
+  count: z.number().int().min(0).default(0),
+  lastAt: z.number().nullable().default(null),
+  mode: z.enum(["dedupe", "each"]).nullable().default(null),
+  clearedAt: z.number().nullable().default(null),
+  posted: z.boolean().default(true),
+  sentAt: z.number().nullable().default(null),
+  nudgedAt: z.number().nullable().default(null),
+  nudged: z.string().nullable().default(null),
+  severity: z.enum(SEVERITIES).nullable().default(null),
+  pushedAt: z.number().nullable().default(null),
+});
+export type AutomationLink = z.infer<typeof automationLink>;
 export const card = z.object({
   kind: z.enum(WORK_KINDS),
   messageId: z.string().nullable().default(null),
@@ -71,6 +94,7 @@ export const task = z.object({
   parentId: z.string().nullable().default(null),
   schedule: schedule.nullable().default(null),
   card: card.nullable().default(null),
+  automation: automationLink.nullable().default(null),
   stale: z.boolean().default(false),
   origin: z.enum(TASK_ORIGINS),
   createdAt: z.number(),

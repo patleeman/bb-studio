@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent, type 
 import { errorMessage } from "../../kit/format";
 import { Button } from "../../kit/ui/button";
 import { Input } from "../../kit/ui/input";
+import { cn } from "../../kit/ui/utils";
 import type { BotView } from "../../contract";
 import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageMore, BotPageRow, BotPageToolbar, foldRows, noMatch, useBotPageQuery, useRowOpen } from "../../ui/bot-page";
 import { MenuSelect } from "../../ui/menu-select";
 import { useCall, useLive } from "../../ui/live";
 import { isClosed, needsYou, USER_OWNER, type Task } from "../../tasks/contract";
-import { ALL, filterChoices, ownerFilterOf, ownerLabel, ownerShort, sectionTasks, taskSection, taskKind, taskStatus, type Names, type SectionId } from "../../tasks/ui/model";
+import { SEVERITY_LABEL, ALL, filterChoices, ownerFilterOf, ownerLabel, ownerShort, sectionTasks, taskSection, taskKind, taskStatus, type Names, type SectionId } from "../../tasks/ui/model";
 import { SCHEDULED_ICON, scheduledMeta } from "./scheduled-model";
 import { NewAutomationMenu, newKinds, useAutomationEditor, useAutomations } from "../../ui/bot/Automations";
 import { useNeedsYou } from "./LoopsTab";
@@ -61,7 +62,11 @@ export function TodosPage({ view }: { view: BotView }) {
   const chatRows = showChat ? pending.length : 0;
   const scheduled = useMemo(() => (scheduledList.data?.items ?? []).filter((item) => item.source === "automation" && item.botId === bot.id && (!query.trim() || item.title.toLowerCase().includes(query.trim().toLowerCase())) && !filtered),
     [scheduledList.data, bot.id, query, filtered]);
-  const total = sections.today.length + sections.later.length + sections.agents.length + sections.waiting.length + sections.scheduled.length + chatRows;
+  const itemKey = (item: { id: string; botId: string | null }) => (item.id === "heartbeat" ? `heartbeat:${item.botId}` : item.id);
+  const recurring = new Map(tasks.filter((t) => t.automation?.role === "schedule").map((t) => [t.automation!.id, t]));
+  const listedIds = new Set((scheduledList.data?.items ?? []).filter((item) => item.source === "automation").map(itemKey));
+  const scheduledTasks = sections.scheduled.filter((t) => !(t.automation?.role === "schedule" && listedIds.has(t.automation.id)));
+  const total = sections.today.length + sections.later.length + sections.agents.length + sections.waiting.length + scheduledTasks.filter((t) => t.automation?.role !== "schedule").length + chatRows;
   const add = (text: string) => call("loops.add", { text }).then(() => { setUnfolded((open) => new Set([...open, "today"])); list.refresh(); });
   const botChat = people.botThreadId ? rowOpen({ kind: "conversation", id: people.botThreadId }, people.botName) : null;
   const ready = ownsTasks ? !!list.data || !!list.error : !!scheduledList.data || !!scheduledList.error;
@@ -95,11 +100,23 @@ export function TodosPage({ view }: { view: BotView }) {
       </BotPageGroup>
     );
   };
+  const subgroup = (id: SectionId, title: string, rows: readonly Task[], extra = 0, lead: ReactNode = null) => {
+    if (!rows.length && !extra) return null;
+    const { shown, more } = fold(id, rows);
+    return (
+      <section key={id} aria-label={title} data-testid={`tasks-${id}`} className="flex flex-col gap-px">
+        <h3 className="flex h-7 items-center gap-2 px-2 text-xs font-medium text-subtle-foreground">{title}<span data-testid="bot-page-group-count" className="tabular-nums">{rows.length + extra}</span></h3>
+        {lead}
+        {shown.map(row)}
+        {moreLine(id, title, more)}
+      </section>
+    );
+  };
   const empty = query.trim() ? { title: noMatch("tasks", query), action: { label: "Clear search", onClick: () => setQuery("") } }
     : filtered ? { title: "No tasks match these filters", action: { label: "Show all", onClick: () => { setArea(ALL); setProject(ALL); setOwner(ALL); } } }
       : { title: "No tasks yet", hint: "Ask the Bot to take something on, or add a task.", action: adding ? null : { label: "New task", onClick: () => setAdding(true) } };
   const mine = sections.today.length + sections.later.length + chatRows;
-  const scheduledCount = scheduled.length + sections.scheduled.length;
+  const scheduledCount = scheduled.length + scheduledTasks.length;
   const scheduledRows = fold("scheduled", scheduled);
   const anyScheduled = (scheduledList.data?.items ?? []).some((item) => item.source === "automation" && item.botId === bot.id) || tasks.some((t) => taskSection(t, now, zone) === "scheduled");
   const doneRows = fold("done", sections.done);
@@ -116,13 +133,16 @@ export function TodosPage({ view }: { view: BotView }) {
       {adding ? <AddTask onAdd={add} onClose={() => setAdding(false)} /> : null}
       {ownsTasks && list.error ? <p role="alert" data-testid="tasks-error" className="text-sm text-destructive">{list.error}</p> : null}
       {ownsTasks && list.data && total === 0 ? <BotPageEmpty testId="tasks-empty" {...empty} /> : null}
-      {ownsTasks && list.data && mine ? <h2 data-testid="tasks-mine" className="px-2 pt-1 text-xs font-medium text-subtle-foreground">Mine</h2> : null}
       {ownsTasks && list.data ? <>
-        {group("today", "Today", sections.today, chatRows, showChat ? pending.map((question) => (
-          <BotPageRow key={question.id} testId="todo-chat" icon="MessageQuestion" title={question.text ?? question.reason} titleText={question.text ?? question.reason}
-            meta={shortWhen(question.createdAt, now, zone)} onOpen={botChat?.onOpen} disabled={!botChat} />
-        )) : null)}
-        {group("later", "Later", sections.later)}
+        {mine ? (
+          <BotPageGroup title="Mine" count={mine} testId="tasks-mine">
+            {subgroup("today", "Today", sections.today, chatRows, showChat ? pending.map((question) => (
+              <BotPageRow key={question.id} testId="todo-chat" icon="MessageQuestion" title={question.text ?? question.reason} titleText={question.text ?? question.reason}
+                meta={shortWhen(question.createdAt, now, zone)} onOpen={botChat?.onOpen} disabled={!botChat} />
+            )) : null)}
+            {subgroup("later", "Later", sections.later)}
+          </BotPageGroup>
+        ) : null}
         {group("agents", "Agents on it", sections.agents)}
         {group("waiting", "Waiting", sections.waiting)}
       </> : null}
@@ -131,11 +151,19 @@ export function TodosPage({ view }: { view: BotView }) {
           aside={<NewAutomationMenu kinds={newKinds(bot.kind === "external")} disabled={bot.state !== "active"} onPick={editor.openNew} />}>
           {editor.error ? <p role="alert" className="pb-2 text-xs text-destructive">{editor.error}</p> : null}
           {scheduledList.error && !scheduledList.data ? <p role="alert" data-testid="scheduled-error" className="pb-2 text-xs text-destructive">{scheduledList.error}</p> : null}
-          {sections.scheduled.map(row)}
-          {scheduledRows.shown.map((item) => (
-            <BotPageRow key={item.key} testId="scheduled-row" data={{ "data-scheduled": item.key }} icon={SCHEDULED_ICON[item.kind]} muted={item.state === "paused"}
-              title={item.title} titleText={item.title} meta={scheduledMeta(item, now, zone)} {...rowOpen(item.link, item.title)} />
-          ))}
+          {scheduledTasks.map(row)}
+          {scheduledRows.shown.map((item) => {
+            const parent = recurring.get(itemKey(item));
+            const severity = parent?.automation?.severity ?? null;
+            const last = parent?.progress.line ? `${severity ? `${SEVERITY_LABEL[severity]} · ` : ""}${parent.progress.line}` : null;
+            const runs = parent ? rowOpen({ kind: "todo", id: parent.id }, parent.title) : null;
+            return (
+              <BotPageRow key={item.key} testId="scheduled-row" data={{ "data-scheduled": item.key, ...(parent ? { "data-task": parent.id } : {}) }} icon={SCHEDULED_ICON[item.kind]} muted={item.state === "paused"}
+                title={item.title} titleText={last ? `${item.title} · Last: ${last}` : item.title} meta={scheduledMeta(item, now, zone)} {...rowOpen(item.link, item.title)}
+                columns={last ? [{ key: "last", content: <span data-testid="scheduled-last" title={last}>{last}</span>, className: cn("max-w-[40%]", severity === "critical" ? "text-destructive" : /^Needs you/.test(parent?.progress.line ?? "") || severity === "warn" ? "text-warning" : "text-subtle-foreground") }] : undefined}
+                actions={runs ? <Button type="button" variant="ghost" size="sm" data-testid="scheduled-runs" className="h-7 px-2 text-xs font-normal" aria-label={`Runs: ${item.title}`} onClick={(event) => runs.onOpen(event)}>Runs</Button> : undefined} />
+            );
+          })}
           {!scheduledCount && !(scheduledList.error && !scheduledList.data) ? <BotPageEmpty testId="scheduled-empty" {...(query.trim() ? { title: noMatch("scheduled items", query) } : filtered && anyScheduled ? { title: "No scheduled items match these filters" } : { title: "Nothing scheduled yet", hint: "Add a reminder or a check-in with New." })} /> : null}
           {moreLine("scheduled", "Scheduled", scheduledRows.more)}
         </BotPageGroup>

@@ -4,7 +4,9 @@ import { MIGRATIONS } from "./migrations";
 import { fromHeartbeat, localZone, type Weekday } from "./schedule";
 import { nextRun } from "./triggers/next-run";
 import { testScheduler } from "./test/scheduler-fixture";
-import { Automations, checkinPrompt, watcherFinding, watcherMessage, type AutomationRunner } from "./automations";
+import { Automations, checkinPrompt, watcherFinding, watcherMessage, type AutomationDeps, type AutomationRunner } from "./automations";
+import { AutomationTasks, parentIdOf, readSources } from "./tasks/automations";
+import { TaskStore } from "./tasks/store";
 import type { HeartbeatRun } from "./contract";
 import type { BbEntry } from "./automation-table";
 import type { RunWatcherScript } from "./watcher-script";
@@ -16,7 +18,7 @@ type Off = { importedAt?: number | null; runScript?: RunWatcherScript; bbFile?: 
 /** `off`: bb's automations plugin is off (a BB Studio copy): every call to it fails as BB answers then. */
 const copiedReminders = new Set<string>();
 
-async function setup(off: Off | null = null) {
+async function setup(off: Off | null = null, extra: Partial<AutomationDeps> = {}) {
   const threads = new Map([["bot1", makeThreadResponse({ id: "bot1", projectId: "proj_personal", providerId: "codex" })], ["bot9", makeThreadResponse({ id: "bot9", projectId: "proj_personal", providerId: "codex" })]]);
   const send = vi.fn(async () => ({ ok: true }));
   const automations: Record<string, unknown>[] = [];
@@ -68,6 +70,7 @@ async function setup(off: Off | null = null) {
       list: listRunners, get: vi.fn() as never, create: vi.fn() as never, update: vi.fn() as never, setState: vi.fn() as never, runNow: vi.fn() as never, delete: vi.fn() as never, automation: () => null,
     },
     ...(off ? { importedAt: () => off.importedAt ?? null, ...(off.runScript ? { runScript: off.runScript } : {}), ...(off.bbFile ? { bbFile: off.bbFile } : {}) } : {}),
+    ...extra,
   });
   return { clock, engine, scheduler, auto, automations, runs, requests, calls, callRpc, send, bot, threads, listRunners, setHeartbeat, db, heartbeat: () => heartbeat };
 }
@@ -639,4 +642,76 @@ it("with the plugin on but not answering, still fails closed", async () => {
   await x.auto.create({ ...watcher, schedule: { type: "interval", every: 15, unit: "minutes", days: [0, 1, 2, 3, 4, 5, 6] } });
   x.callRpc.mockImplementation(async () => { throw new Error("offline"); });
   await expect(x.auto.list()).rejects.toThrow("offline");
+});
+
+async function withTasks(off: Off | null = null) {
+  let tasks: AutomationTasks | null = null;
+  const x = await setup(off, { findings: (id, finding, raw, at) => tasks!.watcherRun(id, finding, raw, at) });
+  tasks = new AutomationTasks(new TaskStore(x.db, () => {}), { sources: () => readSources(x.db, [{ id: "bot_main", name: "Dot", threadId: "bot1", heartbeatKey: null }]) });
+  return { ...x, tasks, store: new TaskStore(x.db) };
+}
+
+it("with findings as tasks, the same Kensico spend finding twice is one task updated twice and one post, and the list reads the same", async () => {
+  const x = await withTasks();
+  const plain = await setup();
+  const spec = { kind: "watcher" as const, name: "Silent heartbeat", instruction: "Fix it.", schedule: { type: "interval" as const, every: 2, unit: "hours" as const, days: [0, 1, 2, 3, 4, 5, 6] as Weekday[] }, script: { body: "check || echo problem", interpreter: "bash" as const } };
+  const made = await x.auto.create(spec);
+  await plain.auto.create(spec);
+  const t = Date.now() + 1000;
+  const runsOf = (later: number) => [
+    { id: "r3", status: "succeeded", output: "Kensico health rc=1: writer: Claude spend $5.80 today (over $5/day)\n", exitCode: 0, finishedAt: t + later + 3 },
+    { id: "r2", status: "succeeded", output: "Kensico health rc=1: writer: Claude spend $5.61 today (over $5/day)\n", exitCode: 0, finishedAt: t + later + 2 },
+    { id: "r1", status: "succeeded", output: "Kensico health rc=1: writer: Claude spend $5.42 today (over $5/day)\n", exitCode: 0, finishedAt: t + later + 1 },
+  ];
+  x.runs.set("a1", runsOf(0));
+  await x.auto.tick();
+  expect(sent(x)).toHaveLength(1);
+  expect(sent(x)[0]!.input[0]!.text).toBe("[bb studio] Watcher Silent heartbeat: Kensico health rc=1: writer: Claude spend $5.42 today (over $5/day)");
+  const findings = x.store.children(parentIdOf(made.id));
+  expect(findings).toHaveLength(1);
+  expect(findings[0]).toMatchObject({ owner: "cos", state: "in_progress", automation: { role: "finding", count: 3 }, progress: { line: "Kensico health rc=1: writer: Claude spend $5.80 today (over $5/day)" } });
+  expect(sent(x)[0]!.input[1]!.text).toContain(`This finding is task ${findings[0]!.id}.`);
+  expect(x.store.history(findings[0]!.id).filter((e) => e.type === "found_again")).toHaveLength(1);
+  plain.runs.set("a1", runsOf(0));
+  await plain.auto.tick();
+  expect(sent(plain)).toHaveLength(3);
+  const strip = (views: Awaited<ReturnType<typeof x.auto.list>>) => views.map(({ lastOutcome: _o, lastRunAt: _l, id: _i, ...rest }) => rest);
+  expect(strip(await x.auto.list())).toEqual(strip(await plain.auto.list()));
+  expect((await x.auto.list()).find((each) => each.id === made.id)?.lastOutcome).toBe("Woke it: Kensico health rc=1: writer: Claude spend $5.42 today (over $5/day)");
+});
+
+it("with findings as tasks, a Studio-run print-only watcher still wakes the Bot every run, each run its own task", async () => {
+  const runScript = vi.fn<RunWatcherScript>(async () => ({ exitCode: 0, output: "Write today's morning card.\n", error: null }));
+  const x = await withTasks({ importedAt: IMPORTED, runScript });
+  const made = await x.auto.create({ kind: "watcher", name: "Morning card", schedule: { type: "times", days: [0, 1, 2, 3, 4, 5, 6], times: ["07:45"] }, script: { body: "echo \"Write today's morning card.\"", interpreter: "bash" } });
+  await x.auto.runNow(made.id);
+  await x.auto.runNow(made.id);
+  expect(sent(x).map((each) => each.input[0]!.text)).toEqual(["[bb studio] Watcher Morning card: Write today's morning card.", "[bb studio] Watcher Morning card: Write today's morning card."]);
+  expect(x.store.children(parentIdOf(made.id)).map((each) => each.automation?.role)).toEqual(["run", "run"]);
+});
+
+it("a watcher whose task step fails still posts its finding as before", async () => {
+  const x = await setup(null, { findings: () => { throw new Error("tasks are down"); } });
+  await x.auto.create({ ...watcher, schedule: { type: "interval", every: 15, unit: "minutes", days: [0, 1, 2, 3, 4, 5, 6] } });
+  x.runs.set("a1", [{ id: "r1", status: "succeeded", output: "v2.0.0 released\n", exitCode: 0, finishedAt: Date.now() + 5 }]);
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  await x.auto.tick();
+  warn.mockRestore();
+  expect(sent(x).map((each) => each.input[0]!.text)).toEqual(["[bb studio] Watcher Releases: v2.0.0 released"]);
+});
+
+it("with findings as tasks, a finding whose post fails is posted on the next tick, once", async () => {
+  const x = await withTasks();
+  const made = await x.auto.create({ ...watcher, schedule: { type: "interval", every: 15, unit: "minutes", days: [0, 1, 2, 3, 4, 5, 6] }, script: { body: "check || echo down", interpreter: "bash" } });
+  x.runs.set("a1", [{ id: "r1", status: "succeeded", output: "Red4 does not answer\n", exitCode: 0, finishedAt: Date.now() + 5 }]);
+  x.send.mockRejectedValueOnce(new Error("Bot thread restarting") as never);
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  await x.auto.tick();
+  warn.mockRestore();
+  expect(x.store.children(parentIdOf(made.id))[0]!.automation!.posted).toBe(false);
+  await x.auto.tick();
+  await x.auto.tick();
+  expect(sent(x).map((each) => each.input[0]!.text)).toEqual(["[bb studio] Watcher Releases: Red4 does not answer", "[bb studio] Watcher Releases: Red4 does not answer"]);
+  expect(x.store.children(parentIdOf(made.id))).toHaveLength(1);
+  expect(x.store.children(parentIdOf(made.id))[0]!.automation!.posted).toBe(true);
 });

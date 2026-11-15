@@ -97,6 +97,27 @@ it("gives a task with a card a ::work line that the work card views read", async
   expect((await call("task_create", { title: "Nowhere", owner: "cos", card: true }, {})).error).toMatch(/conversation/);
 });
 
+it("a carded task made for another conversation is posted there by that conversation; one in the caller's own thread tells the caller to post it", async () => {
+  const { bb, tools } = fakeBb();
+  const sent: { threadId: string; text: string }[] = [];
+  registerTasks(bb as never, db, async () => {}, async (threadId, text) => { sent.push({ threadId, text }); });
+  const call = async (input: unknown, threadId: string) => JSON.parse(await tools.task_create!.execute(input, { threadId }));
+  const made = await call({ title: "Build the changelog", owner: "me", card: true, conversation: "thr_main", step: "1/2" }, "thr_worker");
+  expect(sent).toEqual([{ threadId: "thr_main", text: expect.stringContaining(`exactly once, on its own line: ::work{id="${made.task.id}"} (the task "Build the changelog", made by thread:thr_worker)`) }]);
+  expect(made.note).toMatch(/sent to that conversation/);
+  const own = await call({ title: "Ship it", owner: "me", card: true }, "thr_worker");
+  expect(sent).toHaveLength(1);
+  expect(own.note).toBe(`Post this line once, on its own line, in your reply: ::work{id="${own.task.id}"}`);
+});
+
+it("reads a task's title for a sidebar line, and null for an unknown id", async () => {
+  const { call } = setup();
+  const { task } = await call("task_create", { title: "Fix the flaky upload test", owner: "me" });
+  const { taskTitle } = await import("./store");
+  expect(taskTitle(db, task.id)).toBe("Fix the flaky upload test");
+  expect(taskTitle(db, "task_nope")).toBeNull();
+});
+
 it("keeps loop_, wc_ and task_ ids, and each resolves through task_get", async () => {
   const { call, loops, work } = setup();
   const loop = loops.store.add({ title: "Call Sam" });
@@ -526,4 +547,17 @@ it("names a deeper cycle as one", async () => {
   const sub = (await call("task_create", { title: "Sub", owner: "cos", parentId: top.id })).task;
   expect((await call("task_update", { id: top.id, parentId: top.id })).error).toMatch(/its own parent/);
   expect((await call("task_update", { id: top.id, parentId: sub.id })).error).toMatch(/own subtasks/);
+});
+
+it("a card needs the user only when its task does: a running worker card doesn't, a question handed over or the user's own list item does", async () => {
+  const { call } = setup();
+  const { cardNeedsUser } = await import("./store");
+  const store = new TaskStore(db);
+  const running = (await call("task_create", { title: "Build", owner: "me", card: true })).task;
+  expect(cardNeedsUser(store.find(running.id), "work")).toBe(false);
+  const asked = (await call("task_handoff", { id: running.id, to: "user", needs: "Approve" })).task;
+  expect(cardNeedsUser(store.find(asked.id), "work")).toBe(true);
+  const mine = (await call("task_create", { title: "Call mom", owner: "user" })).task;
+  expect(cardNeedsUser(store.find(mine.id), "loop")).toBe(true);
+  expect(cardNeedsUser(null, "work")).toBe(true);
 });

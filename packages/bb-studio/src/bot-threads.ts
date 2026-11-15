@@ -64,6 +64,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { overlayMirrorLive, type MirrorLive } from "./mirror-live";
 import { kindOf, type BotChange } from "./bot-signal";
+import { taskTitle } from "./tasks/store";
 
 type Sdk = BbPluginApi["sdk"];
 
@@ -89,6 +90,7 @@ export function threadRunning(thread: { status?: string | null; queuedMessageCou
   return !(thread.status === "pending" && !((thread.queuedMessageCount ?? 0) > 0));
 }
 const LATEST_MAX = 160;
+const TASK_ID_IN_TEXT = /\b(?:task|loop|wc)_[A-Za-z0-9_-]*\d[A-Za-z0-9_-]*/g;
 
 /** A fork's source conversation, and where it was cut: a reply's message id (side threads) or the last copied turn (BB's forks), when known. */
 export interface ForkedFrom { threadId: string; messageId: string | null; turnId: string | null }
@@ -325,9 +327,10 @@ export function repoTag(thread: Pick<ThreadFacts, "environmentName" | "environme
   return tag ? { tag, branch: thread.environmentBranchName } : null;
 }
 
-/** The first line of a reply, short, for a conversation's second line; null for a quiet "[PASS]". A thread mention reads as its title, else "a conversation"; a page mention as "a page". */
-export function latestLine(text: string | null | undefined, threadTitle: (threadId: string) => string | null = () => null): string | null {
+/** The first line of a reply, short, for a conversation's second line; null for a quiet "[PASS]". A thread mention reads as its title, else "a conversation"; a page mention as "a page"; a task id as its title, else "a task". */
+export function latestLine(text: string | null | undefined, threadTitle: (threadId: string) => string | null = () => null, taskTitle: (taskId: string) => string | null = () => null): string | null {
   const clean = (text ?? "").replace(/::[a-z-]+\{[^}]*\}/g, "").replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(TASK_ID_IN_TEXT, (id: string) => taskTitle(id)?.trim() || "a task")
     .replace(/@thread:(thr_[A-Za-z0-9_-]*[A-Za-z0-9])(?:#msg=\d+)?/g, (_, id: string) => threadTitle(id)?.trim() || "a conversation")
     .replace(/@page:pg_[A-Za-z0-9_-]*[A-Za-z0-9]/g, "a page")
     .replace(/[*_`#>]+/g, "").split("\n").map((line) => line.trim()).find((line) => line.length > 0) ?? "";
@@ -960,7 +963,7 @@ export class BotThreads {
   /** A conversation's turn ended: its latest reply becomes its second line. A quiet "[PASS]" changes nothing. */
   idle(threadId: string, lastAssistantText: string | null | undefined): void {
     this.touched(threadId);
-    const line = latestLine(lastAssistantText, (id) => this.mentionTitle(id));
+    const line = latestLine(lastAssistantText, (id) => this.mentionTitle(id), (id) => taskTitle(this.deps.db, id));
     if (!line) return;
     const result = this.deps.db.prepare("UPDATE bot_threads SET latest = ?, latest_at = ?, activity_at = ? WHERE thread_id = ? AND kind = 'conversation'").run(line, this.now(), this.now(), threadId);
     if (result.changes) this.deps.changed(rowChanges(null, this.get(threadId)));
@@ -979,7 +982,7 @@ export class BotThreads {
   /** Writes a conversation's latest line without a change notice (a lazy fill); "" marks it as having none. `overEmpty` also fills one marked "". */
   fillLatest(threadId: string, text: string | null, overEmpty = false): void {
     // Its time is the thread's activity, not now: a lazy fill isn't a new reply.
-    this.deps.db.prepare(`UPDATE bot_threads SET latest = ? WHERE thread_id = ? AND (latest IS NULL${overEmpty ? " OR latest = ''" : ""})`).run(latestLine(text, (id) => this.mentionTitle(id)) ?? "", threadId);
+    this.deps.db.prepare(`UPDATE bot_threads SET latest = ? WHERE thread_id = ? AND (latest IS NULL${overEmpty ? " OR latest = ''" : ""})`).run(latestLine(text, (id) => this.mentionTitle(id), (id) => taskTitle(this.deps.db, id)) ?? "", threadId);
   }
 
   /** What a thread mention in a latest line reads as: Main, or the thread's own title. */
