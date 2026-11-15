@@ -154,6 +154,39 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["archive-finished-thr_demo_speech"].waitForExistence(timeout: 15), "for the archive")
     }
 
+    func testArchivingTheShownConversationMovesTheRoomToItsNeighbour() {
+        launch()
+        let stage = app.buttons["RoomStage"]
+        let title = app.staticTexts["roomTitle"]
+        stage.swipeLeft()
+        XCTAssertTrue(title.waitForLabel(prefix: "Launch prep"), "on Launch prep")
+        stage.swipeUp()
+        openMore()
+        app.buttons["menuArchive"].tap()
+        backInTheRoom("the archived conversation closes")
+        XCTAssertTrue(title.waitForLabel(prefix: "Juniper"), "the room moves to the page before it: \(title.label)")
+        XCTAssertEqual(stage.value as? String, "Conversation 1 of 3", "and its dots")
+        stage.swipeLeft()
+        XCTAssertTrue(title.waitForLabel(prefix: "Tree truncation"), "swipes still work: \(title.label)")
+        shot("7-archived-shown")
+        stage.swipeLeft()
+        XCTAssertTrue(title.waitForLabel(prefix: "Train a model"), "on the last page: \(title.label)")
+
+        openConversations()
+        row("thr_demo_speech").swipeLeft()
+        app.buttons["roomConversationArchive-thr_demo_speech"].tap()
+        XCTAssertTrue(row("thr_demo_speech").waitForNonExistence(timeout: 10))
+        app.closeRoomSheet()
+        if app.buttons["roomMenuClose"].waitForExistence(timeout: 3) { app.buttons["roomMenuClose"].tap() }
+        XCTAssertTrue(title.waitForLabel(prefix: "Tree truncation"), "archived from Conversations, the room leaves it too: \(title.label)")
+        app.buttons["roomInput"].tap()
+        XCTAssertTrue(app.buttons["roomLayDown"].waitForExistence(timeout: 10))
+        app.buttons["roomLayDown"].tap()
+        app.openRoomPlace("conversations")
+        row("thr_botdemo01").tap()
+        XCTAssertTrue(title.waitForLabel(prefix: "Juniper") || app.buttons["roomLayDown"].exists, "Main opens")
+    }
+
     func testTheArchiveDeletesAndArchivesItsRows() {
         launch()
         openConversations()
@@ -173,5 +206,12 @@ final class ConversationRemoveUITests: ServerIsolatedUITestCase {
         app.buttons["archiveDelete-thr_demo_kitchen"].tap()
         app.buttons["confirmDelete"].firstMatch.tap()
         XCTAssertTrue(kitchen.waitForNonExistence(timeout: 10), "or deleted")
+    }
+}
+
+private extension XCUIElement {
+    func waitForLabel(prefix: String, timeout: TimeInterval = 10) -> Bool {
+        let done = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label BEGINSWITH %@", prefix), object: self)
+        return XCTWaiter.wait(for: [done], timeout: timeout) == .completed
     }
 }

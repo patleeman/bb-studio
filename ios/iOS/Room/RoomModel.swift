@@ -70,6 +70,10 @@ final class RoomModel {
         return effect
     }
 
+    func focusInput() {
+        focusRequests += 1
+    }
+
     func sync(talk: HoldToTalk.State) {
         mode = Self.mode(mode, talk: talk)
     }

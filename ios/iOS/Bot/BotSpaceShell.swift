@@ -68,10 +68,12 @@ struct BotSpacesRoot: View {
     private func routeRoom(_ item: BotShellItem?) {
         guard let item else { return }
         let pending = shell.takePendingPush()
+        let landing = shell.takeLanding()
         switch item {
-        case .conversation(let id) where id == shownMain:
+        case .conversation(let id):
             shell.detailPath = pending
-        case .conversation(let id), .worker(let id):
+            if !landing { shell.roomFocus = id }
+        case .worker(let id):
             shell.detailPath = [.thread(id: id)] + pending
         case .page(let page):
             shell.detailPath = []

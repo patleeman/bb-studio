@@ -165,6 +165,26 @@ struct RoomView: View {
             shell.roomOpen = nil
             open(page)
         }
+        .onChange(of: shell.roomFocus, initial: true) { _, id in
+            guard let id else { return }
+            shell.roomFocus = nil
+            focus(on: id, stand: id != mainThreadId)
+        }
+        .onChange(of: shell.detailPath) { _, path in
+            guard !path.isEmpty else { return }
+            settingsOpen = false
+            if room.place != nil || room.showsMenu { room.show(.rest) }
+        }
+        .onChange(of: order) { old, new in
+            guard !new.contains(pager.shown) else { return }
+            let before = old.firstIndex(of: pager.shown).map { Array(old[..<$0].reversed()) } ?? []
+            let next = before.first { new.contains($0) } ?? mainThreadId
+            slide = .leading
+            withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.45, dampingFraction: 0.9)) {
+                pageOffset = 0
+                pager.show(next)
+            }
+        }
         .task(id: phase) {
             guard phase == .active else { return }
             while !Task.isCancelled {
@@ -284,6 +304,10 @@ struct RoomView: View {
                         .containerBackground(.clear, for: .navigation)
                         .navigationDestination(for: Route.self) { route in destination(route) }
                 }
+                .environment(\.duoLayout, pages == .sideBySide && layout.twoPages ? layout : DuoLayout(size: .zero, innerScreen: layout.innerScreen))
+                .environment(nil as DuoPaneState?)
+                .ignoresSafeArea(.container, edges: pages == .sideBySide && layout.twoPages ? .trailing : [])
+                .padding(.trailing, pages == .sideBySide ? max(0, FoldedChrome.column - proxy.safeAreaInsets.trailing) : 0)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("roomConversation")
             }
@@ -596,7 +620,7 @@ struct RoomView: View {
 
     private func openChat() {
         guard room.mode == .rest else { return }
-        room.handle(pages == nil ? .openChat : .tapInput)
+        if pages == nil { room.handle(.openChat) } else { room.focusInput() }
     }
 
     private func layDown() {
@@ -627,18 +651,41 @@ struct RoomView: View {
 
     private func openItem(_ item: BotShellItem) {
         switch item {
-        case .conversation(let id) where id == mainThreadId:
+        case .conversation(let id) where order.contains(id):
             shell.detailPath = []
-            settingsOpen = false
-            room.show(.rest)
-            if pager.shown != mainThreadId { page(-(order.firstIndex(of: pager.shown) ?? 0)) }
-            room.handle(.tapInput)
+            focus(on: id, stand: true, keyboard: id == mainThreadId)
         case .conversation(let id), .worker(let id):
             settingsOpen = false
             room.show(.rest)
             shell.detailPath = [.thread(id: id)]
         case .page(let page):
             open(page)
+        }
+    }
+
+    private func show(_ id: String) {
+        guard pager.shown != id else { return }
+        let from = order.firstIndex(of: pager.shown) ?? 0
+        slide = (order.firstIndex(of: id) ?? 0) >= from ? .trailing : .leading
+        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.45, dampingFraction: 0.9)) {
+            pageOffset = 0
+            pager.show(id)
+        }
+    }
+
+    private func focus(on id: String, stand: Bool, keyboard: Bool = false) {
+        settingsOpen = false
+        if room.place != nil || room.showsMenu || room.mode.recording { room.show(.rest) }
+        guard order.contains(id) else {
+            shell.detailPath = [.thread(id: id)] + shell.detailPath
+            return
+        }
+        show(id)
+        guard stand, shell.detailPath.isEmpty else { return }
+        if pages == nil {
+            if room.mode == .rest { room.handle(keyboard ? .tapInput : .openChat) } else if keyboard { room.focusInput() }
+        } else if keyboard {
+            room.focusInput()
         }
     }
 
@@ -722,7 +769,7 @@ struct RoomView: View {
         if let id = RoomQA.value("-qaTaskFocus") { tasks.focus = id }
         if let id = RoomQA.value("-qaPushTask") {
             Task {
-                try? await Task.sleep(for: .seconds(1.5))
+                try? await Task.sleep(for: .seconds(RoomQA.value("-qaPushDelay").flatMap(Double.init) ?? 1.5))
                 if let route = NotificationActions.taskRoute(["loopId": id, "conversationId": RoomQA.value("-qaPushConversation") ?? "", "threadId": mainThreadId]) {
                     app.openTask(route.id, conversation: route.conversation)
                 }
