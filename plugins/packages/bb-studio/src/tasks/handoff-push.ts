@@ -32,9 +32,10 @@ export function handoffPush(deps: HandoffPushDeps): (task: Task) => void {
   };
 }
 
-export function loopPushInput(loop: Loop, bot: { id: string; threadId: string }, conversation: string | null, projectId: string) {
+export function loopPushInput(loop: Loop, bot: { id: string; threadId: string }, task: Pick<Task, "conversation" | "needs"> | null, projectId: string) {
+  const body = task?.needs?.trim() || loop.why.trim() || "New on your list";
   return {
-    title: loop.title, body: loop.why, kind: "turn-finished" as const, threadId: bot.threadId, botId: bot.id, conversationId: conversation ?? bot.threadId, projectId,
+    title: loop.title, body, kind: "turn-finished" as const, threadId: bot.threadId, botId: bot.id, conversationId: task?.conversation ?? bot.threadId, projectId,
     category: "BB_LOOP", loopId: loop.id, loopKind: loop.kind, actions: loopPushActions(loop.kind),
     ...(loop.kind === "decide" && loop.options.length ? { options: loop.options.slice(0, 4).map((o) => o.slice(0, 120)) } : {}), coalesceKey: loop.id,
   };

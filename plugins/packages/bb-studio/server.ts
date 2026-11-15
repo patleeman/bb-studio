@@ -698,7 +698,7 @@ export default async function plugin(bb: BbPluginApi) {
     const bot = bots.stored();
     if (!bot?.threadId) throw new Error('A Bot chat is required');
     taskPushedAt.set(bot.id, Date.now());
-    await bb.sdk.plugins.callRpc({ pluginId: 'mobile', method: 'notify', outputSchema: z.unknown(), input: loopPushInput(loop, { id: bot.id, threadId: bot.threadId }, new TaskStore(db).find(loop.id)?.conversation ?? null, PERSONAL_PROJECT_ID) as never });
+    await bb.sdk.plugins.callRpc({ pluginId: 'mobile', method: 'notify', outputSchema: z.unknown(), input: loopPushInput(loop, { id: bot.id, threadId: bot.threadId }, new TaskStore(db).find(loop.id), PERSONAL_PROJECT_ID) as never });
   };
   const loops = registerLoops(bb, db, postToBot, pushLoop, settings, () => loopTimeZone(process.env, studioSettings.current().todosTimeZone), (name, everyMs, work) => triggers.every(name, everyMs, work));
   loopsEnabled = loops.enabled;
