@@ -352,13 +352,17 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     // MARK: Hosted chrome
 
     /// The composer, under the transcript's bottom edge.
-    func setComposer(_ composer: AnyView) { composerHost.rootView = composer }
+    func setComposer(_ composer: AnyView) { composerHost.rootView = resizing(composer) }
+
+    private func resizing(_ content: AnyView) -> AnyView {
+        AnyView(content.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { [weak self] _ in self?.view.setNeedsLayout() })
+    }
 
     /// Above the transcript's top (a find bar, a header); rows scroll under it.
     func setTop(_ top: AnyView?) {
         if hasTop != (top != nil) { view.setNeedsLayout() }
         hasTop = top != nil
-        topHost.rootView = top ?? AnyView(EmptyView())
+        topHost.rootView = top.map(resizing) ?? AnyView(EmptyView())
         topHost.view.isHidden = top == nil
     }
 
@@ -992,8 +996,8 @@ final class TranscriptHost: UIHostingController<AnyView> {
         _ = view.accessibilityElementCount()
     }
 
-    /// Its intrinsic size changing (the composer grew a line) lays out the
-    /// container, which measures again at the real width.
+    /// Its content's height changing (the composer grew a line) lays out
+    /// the container, which measures again at the real width.
     func measure(width: CGFloat) -> CGFloat {
         guard width > 0 else { return 0 }
         return TranscriptListLayout.pixel(sizeThatFits(in: CGSize(width: width, height: .greatestFiniteMagnitude)).height)
