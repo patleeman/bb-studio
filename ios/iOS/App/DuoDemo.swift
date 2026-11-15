@@ -242,6 +242,9 @@ enum DuoDemo {
             }
             metadata["railCenter"] = pixel(image, x: 8, y: window.bounds.height / 2)
             metadata["railBottom"] = pixel(image, x: 8, y: window.bounds.height - 5)
+            metadata["hingeCenter"] = window.bounds.width > window.bounds.height
+                ? pixel(image, x: window.bounds.width / 2, y: window.bounds.height * 0.3)
+                : pixel(image, x: window.bounds.width * 0.3, y: window.bounds.height / 2)
             // Just inside the sidebar, left of its 16-point content margin.
             let sidebarX = window.safeAreaInsets.left + 64 + 6
             metadata["sidebarHeader"] = pixel(image, x: sidebarX, y: 20)

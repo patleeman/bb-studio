@@ -31,25 +31,29 @@ final class TasksUITests: ServerIsolatedUITestCase {
     }
 
     private func menuItem(_ label: String) -> XCUIElement {
-        app.collectionViews.buttons[label].exists ? app.collectionViews.buttons[label] : app.buttons[label].firstMatch
+        app.collectionViews.buttons[label].firstMatch.exists ? app.collectionViews.buttons[label].firstMatch : app.buttons[label].firstMatch
     }
 
-    func testTheRoomsCardsAreTodaysTasks() {
+    func testTheRoomsYoursAreTheUsersTasks() {
         launch()
         let quote = app.buttons["roomCard-task_demo_quote"]
-        XCTAssertTrue(quote.waitForExistence(timeout: 15), "what an agent handed over is a card")
+        XCTAssertTrue(quote.waitForExistence(timeout: 15), "what an agent handed over is a row under Yours")
         XCTAssertEqual(any("roomTask-task_demo_quote").value as? String, "needs-you", "it needs you")
         XCTAssertTrue(quote.label.contains("Needs you"), "VoiceOver says it needs you")
-        XCTAssertTrue(app.buttons["Choose Ace Plumbing · $480"].exists, "its options are on the card")
         XCTAssertFalse(app.buttons["Done: Approve the plumber's quote"].exists, "a decision has no Done; choosing is the Done")
         if app.buttons["roomCard-task_demo_spend"].exists {
             XCTAssertTrue(app.buttons["Done: Spend alert: Claude spend over the daily budget"].exists, "a to-do has its Done")
         }
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Seven things today'")).firstMatch.exists, "the day counts today's tasks")
-        shot("1-room-task-cards")
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label ENDSWITH 'things today.'")).firstMatch.exists, "no repeated counts")
+        shot("1-room-task-rows")
 
-        app.buttons["Choose Ace Plumbing · $480"].tap()
-        gone(quote, "choosing sends it back to the agent that asked")
+        quote.press(forDuration: 1.2)
+        let choice = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Ace Plumbing'")).firstMatch
+        XCTAssertTrue(choice.waitForExistence(timeout: 5), "its options are in the row's menu")
+        choice.tap()
+        let moved = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false OR label CONTAINS ' is on it'"), object: quote)
+        XCTAssertEqual(XCTWaiter().wait(for: [moved], timeout: 10), .completed, "choosing sends it back to the agent that asked: it leaves Yours")
+        XCTAssertFalse(any("roomTask-task_demo_quote").exists, "no longer under Yours")
         shot("2-room-after-choice")
     }
 
@@ -66,7 +70,7 @@ final class TasksUITests: ServerIsolatedUITestCase {
         menuItem("Juniper").tap()
         XCTAssertTrue(app.buttons["roomCard-task_demo_quote"].waitForExistence(timeout: 10))
         let onIt = NSPredicate(format: "label CONTAINS 'Juniper is on it'")
-        XCTAssertTrue(app.buttons.matching(onIt).firstMatch.waitForExistence(timeout: 10), "the card says who has it now")
+        XCTAssertTrue(app.buttons.matching(onIt).firstMatch.waitForExistence(timeout: 10), "it moves under On it, saying who has it now")
         shot("5-handed-off")
 
         app.buttons["roomCard-task_demo_quote"].press(forDuration: 1.2)
@@ -252,10 +256,9 @@ final class TasksUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(card.waitForExistence(timeout: 15))
         sleep(3)
         card.tap()
-        XCTAssertTrue(any("task-wc_demo_stills").waitForExistence(timeout: 10), "the card opens its task")
+        XCTAssertTrue(any("task-wc_demo_stills").waitForExistence(timeout: 10), "the row opens its task")
         sleep(3)
-        app.closeRoomSheet()
-        if app.buttons["roomMenuClose"].waitForExistence(timeout: 3) { app.buttons["roomMenuClose"].tap() }
+        app.buttons["task-sheet-close"].tap()
         XCTAssertTrue(card.waitForExistence(timeout: 10))
         sleep(1)
         card.press(forDuration: 1.2)

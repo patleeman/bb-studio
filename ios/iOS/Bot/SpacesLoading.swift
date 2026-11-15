@@ -98,19 +98,24 @@ private struct SpacesLoadingScene: View {
     @Environment(\.look) private var look
 
     var body: some View {
-        RoomColumn {
-            Color.clear.frame(height: 44)
-        } presence: { size in
-            PresenceView(bot: bot, state: .idle, workers: 0, size: size, room: PresenceSpec.roomHeadroom)
-                .roomPresenceSlot(size)
-        } below: { _ in
-            EmptyView()
+        GeometryReader { proxy in
+            let size = RoomFit.presence(proxy.size)
+            VStack(spacing: 0) {
+                Color.clear.frame(height: 50)
+                PresenceView(bot: bot, state: .idle, workers: 0, size: size, room: PresenceSpec.roomHeadroom)
+                    .roomPresenceSlot(size)
+                    .padding(.top, 4)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { Color.clear.frame(height: RoomDock.height(dots: dots)) }
         .background {
             ZStack {
                 SceneBackdrop(theme: look.theme)
-                Rectangle().fill(.black.opacity(0.18)).ignoresSafeArea()
+                RoomShade()
             }
             .allowsHitTesting(false)
         }

@@ -7,9 +7,8 @@ struct BotSpacesRoot: View {
     @ObservedObject private var looks = LookStore.shared
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.duoLayout) private var layout
-    @State private var workbench = Workbench()
 
-    private var compact: Bool { sizeClass != .regular && !Self.qaSplit }
+    private var compact: Bool { (sizeClass != .regular || FoldedChrome.foldedDuo) && !Self.qaSplit }
     private var pages: DuoPages? {
         Self.qaSplit ? nil : DuoPages(window: layout.windowSize, phone: UIDevice.current.userInterfaceIdiom == .phone)
     }
@@ -31,17 +30,10 @@ struct BotSpacesRoot: View {
     var body: some View {
         Group {
             if inRoom, let bot = shownBot, let main = shownMain {
-                RoomPages(pages: pages, layout: layout) {
-                    RoomView(store: store, shell: shell, bot: bot, mainThreadId: main, workbench: pages == nil ? nil : workbench)
-                        .lookRoot(bot: bot, theme: roomTheme(bot))
-                        .id(main)
-                } bench: {
-                    RoomWorkbench(workbench: workbench, bot: bot, store: store, mainThreadId: main,
-                                  openMain: { [shell] in shell.roomStandUp = true },
-                                  chooseTheme: { RoomView.chooseTheme($0, bot: bot, shell: shell, store: store, app: app) })
-                }
-                .transition(.opacity)
-                .lookRoot(bot: bot, theme: roomTheme(bot))
+                RoomView(store: store, shell: shell, bot: bot, mainThreadId: main, pages: pages)
+                    .id(main)
+                    .transition(.opacity)
+                    .lookRoot(bot: bot, theme: roomTheme(bot))
             } else {
                 split.lookRoot(bot: shownBot)
             }

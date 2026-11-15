@@ -13,6 +13,8 @@ struct TasksView: View {
     @FocusState private var addFocused: Bool
     @EnvironmentObject private var app: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.showTaskDetail) private var showDetail
+    @Environment(\.shownTaskDetail) private var shownDetail
 
     var body: some View {
         if model.supported == false {
@@ -174,10 +176,14 @@ struct TasksView: View {
 
     @ViewBuilder
     private func row(_ task: TaskItem) -> some View {
-        let open = expanded == task.id
+        let open = expanded == task.id && showDetail == nil
         VStack(alignment: .leading, spacing: 10) {
-            TaskRow(task: task, names: model.names, expanded: open) {
-                withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { expanded = open ? nil : task.id }
+            TaskRow(task: task, names: model.names, expanded: open || shownDetail == task.id) {
+                if let showDetail {
+                    showDetail(task.id)
+                } else {
+                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { expanded = open ? nil : task.id }
+                }
             }
             if open {
                 TaskCard(id: task.id, expanded: true)

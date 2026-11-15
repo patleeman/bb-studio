@@ -77,7 +77,7 @@ struct ThreadView: View {
     private let roomSession: RoomSession?
     private var inRoom: Bool { roomSession != nil }
     private var roomChat: RoomChat? { inRoom ? roomEnvironment : nil }
-    private var lying: Bool { roomChat?.lying == true }
+    private var lying: Bool { roomChat?.away == true }
     @State private var sideThreads: [String: BotSideThread] = [:]
     /// Forks made here this session, kept on their message until Studio lists them.
     @State private var madeForks: [String: String] = [:]
@@ -191,7 +191,7 @@ struct ThreadView: View {
             if let error { app.flash(error) }
         }
         .onChange(of: roomChat?.focusRequests, initial: true) { _, requests in
-            if let requests, requests > 0, roomChat?.lying == false { composerFocused = true }
+            if let requests, requests > 0, roomChat?.away == false { composerFocused = true }
         }
     }
 
@@ -2188,11 +2188,11 @@ extension ThreadView {
                 canLoadOlder: model.canLoadOlder, editableId: lastUserRowId, threadRows: model.rowIds, pending: pending,
                 typing: showsWorking, thinking: model.shelf.thinking)
         }
-        let items = inRoom ? RoomFloor.clean(model.shownItems) : model.shownItems
+        let items = inRoom ? RoomText.clean(model.shownItems) : model.shownItems
         let rows = ThreadTranscriptRow.thread(items: items, hasOlder: model.hasOlder, unread: unreadItem(in: items), match: currentMatch,
             editableId: worker == nil ? lastUserRowId : nil, pending: pending, interactions: shownInteractions,
             working: showsWorking, thinking: model.shelf.thinking, sideThreads: conversation != nil ? sideThreads : [:])
-        return inRoom ? RoomFloor.rows(rows, lying: lying) : rows
+        return inRoom ? RoomText.rows(rows) : rows
     }
 
     fileprivate var transcriptV2Actions: ThreadTranscriptActions {
@@ -2218,7 +2218,6 @@ extension ThreadView {
 
     fileprivate var transcriptV2Chrome: TranscriptChrome {
         var chrome = TranscriptChrome()
-        chrome.topClear = lying ? RoomChat.floorClear : 0
         // The composer's own 8 pt padding is the gap above the keyboard or the edge.
         chrome.composerGap = 0
         // The Duo's inner screen draws no home indicator (its 34-point inset is reported anyway).

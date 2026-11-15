@@ -279,6 +279,19 @@ enum TasksDemo {
                  schedule: ["text": "Every day at 1:00 PM", "cron": "0 13 * * *", "timeZone": "America/New_York", "automationId": "aut_demo_checkin", "paused": false],
                  created: now - 900_000_000),
         ]
+        if ProcessInfo.processInfo.arguments.contains("-qaRoomLead") {
+            let lead = "thr_demo_interview"
+            out += [
+                Store.task("task_demo_prep", "Launch prep", owner: "thread:\(lead)", state: "in_progress", conversation: lead,
+                     line: "Waiting on two workers", created: now - 840_000),
+                Store.task("wc_demo_prep_bank", "Question bank, part 3", owner: "thread:thr_demo_w5", state: "in_progress", conversation: lead,
+                     step: "Drafting answers", workers: ["thr_demo_w5"], card: "worker", origin: "work", created: now - 1_500_000),
+                Store.task("wc_demo_prep_slides", "Slides for Friday", owner: "thread:thr_demo_w6", state: "in_progress", conversation: lead,
+                     step: "2/3 Layout", workers: ["thr_demo_w6"], card: "worker", origin: "work", created: now - 900_000),
+                Store.task("wc_demo_prep_mock", "Book the mock interview room", owner: "thread:thr_demo_w6", state: "done", conversation: lead,
+                     line: "Booked the room for Friday 10:00", workers: ["thr_demo_w6"], card: "worker", origin: "work", created: now - 3_000_000, closed: now - 1_200_000),
+            ]
+        }
         return out
     }
 

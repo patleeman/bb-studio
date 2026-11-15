@@ -26,17 +26,38 @@ final class RoomUITests: ServerIsolatedUITestCase {
 
     private func any(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
 
-    func testTheRoomAtRestShowsTheDayAndMainLyingDown() {
+    func testTheRoomAtRestShowsTheNameWhatItsDoingAndTheTasks() {
         launch()
         XCTAssertTrue(app.buttons["roomMenuButton"].exists)
-        XCTAssertTrue(any("roomDayLine").waitForExistence(timeout: 10), "one line about the day")
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'roomCard-'")).firstMatch.waitForExistence(timeout: 15), "today's cards")
-        XCTAssertTrue(app.buttons["RoomFloor"].exists, "Main's messages lie behind them")
+        let title = any("roomTitle")
+        XCTAssertTrue(title.waitForExistence(timeout: 10), "the name at the top")
+        XCTAssertTrue(title.label.hasPrefix("Juniper"), "Main is the Bot's own name: \(title.label)")
+        let now = app.buttons["roomNow"]
+        XCTAssertTrue(now.waitForExistence(timeout: 10), "a live Now line")
+        XCTAssertTrue(now.label.hasPrefix("Now: "), now.label)
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'roomCard-wc_demo_fork'")).firstMatch.waitForExistence(timeout: 15),
+                      "on it: the agents' tasks")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier == 'roomCard-task_demo_quote'")).firstMatch.exists, "yours: the user's tasks")
+        let row = app.buttons["roomCard-wc_demo_fork"]
+        XCTAssertGreaterThanOrEqual(row.frame.height, 44, "rows are 44 points tall")
+        XCTAssertTrue(row.label.contains("3/5 Tests"), "with the step: \(row.label)")
+        XCTAssertTrue(any("RoomStage").exists)
         XCTAssertTrue(app.buttons["roomMic"].exists)
-        XCTAssertFalse(app.textViews["composerField"].isHittable, "the chat's input is put away while it lies down")
+        XCTAssertFalse(app.textViews["composerField"].isHittable, "the chat is put away")
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'reply-in-thread-'")).firstMatch.exists,
-                       "the resting chat is hidden from VoiceOver")
+                       "and hidden from VoiceOver")
         shot("1-rest")
+    }
+
+    func testAConversationWithNothingForYouSaysSo() {
+        launch(["-qaRoomLead", "-qaRoomConversation", "thr_demo_interview"])
+        XCTAssertTrue(any("roomYoursEmpty").waitForExistence(timeout: 15), "Nothing waiting on you")
+        XCTAssertTrue(any("roomTitle").label.hasPrefix("Launch prep"))
+        XCTAssertTrue(app.buttons["roomNow"].label.contains("Waiting on two workers"), app.buttons["roomNow"].label)
+        XCTAssertTrue(app.buttons["roomCard-wc_demo_prep_slides"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["roomCard-task_demo_prep"].exists, "its own task is the Now line, not a row")
+        XCTAssertNotEqual(any("roomLight").value as? String, "day", "its own light")
+        shot("1-lead-empty-yours")
     }
 
     func testTheInputStandsTheChatUpAndTheChevronLaysItDown() {
@@ -69,37 +90,15 @@ final class RoomUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["roomInput"].waitForExistence(timeout: 10), "a tap between messages lays it down")
     }
 
-    func testADragOnTheFloorScrollsItAndATapStandsItUp() {
+    func testASwipeUpOpensTheConversationToRead() {
         launch()
-        let floor = app.buttons["RoomFloor"]
-        XCTAssertTrue(floor.waitForExistence(timeout: 10))
-        let box = floor.frame
-        let strip = CGRect(x: box.minX, y: box.maxY - 160, width: box.width, height: 120)
-        func floorImage() -> Data {
-            let shot = XCUIScreen.main.screenshot().image
-            let scale = shot.scale
-            let crop = shot.cgImage!.cropping(to: CGRect(x: strip.minX * scale, y: strip.minY * scale, width: strip.width * scale, height: strip.height * scale))!
-            return UIImage(cgImage: crop).pngData()!
-        }
-        sleep(1)
-        let before = floorImage()
-        let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: box.midX, dy: box.maxY - 140))
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 220)))
-        sleep(1)
-        XCTAssertTrue(app.buttons["roomInput"].exists, "a drag doesn't stand it up")
-        XCTAssertNotEqual(floorImage(), before, "the drag scrolled the lying chat back")
-        shot("1-rest-scrolled")
-        app.standRoomChat()
-        XCTAssertTrue(app.buttons["roomLayDown"].waitForExistence(timeout: 10) || app.textViews["composerField"].isHittable, "a tap stands it up")
-    }
-
-    func testTheFloorStandsTheChatUpToo() {
-        launch()
-        app.standRoomChat()
-        XCTAssertTrue(app.textViews["composerField"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.keyboards.firstMatch.exists, "the floor opens the chat to read, without the keyboard")
+        any("RoomStage").swipeUp()
+        XCTAssertTrue(app.buttons["roomLayDown"].waitForExistence(timeout: 10), "the conversation opens")
+        XCTAssertTrue(app.textViews["composerField"].isHittable)
+        XCTAssertFalse(app.keyboards.firstMatch.exists, "to read, without the keyboard")
         app.buttons["roomLayDown"].tap()
         XCTAssertTrue(app.buttons["roomInput"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["roomNow"].isHittable, "back to the room")
     }
 
     func testRecordingShowsTheWaveAndHowToSend() {
@@ -143,13 +142,14 @@ final class RoomUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["roomInput"].waitForExistence(timeout: 10), "back to the room")
     }
 
-    func testACardOpensTasksAndAConversationOpensOverTheRoom() {
+    func testARowOpensItsTaskAndAConversationOpensOverTheRoom() {
         launch()
-        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'roomCard-'")).firstMatch
-        XCTAssertTrue(card.waitForExistence(timeout: 15))
-        card.tap()
-        XCTAssertTrue(any("tasks-screen").waitForExistence(timeout: 15), "a card opens Tasks")
-        app.closeRoomSheet()
+        let row = app.buttons["roomCard-task_demo_quote"]
+        XCTAssertTrue(row.waitForExistence(timeout: 15))
+        row.tap()
+        XCTAssertTrue(any("task-sheet").waitForExistence(timeout: 15), "a row opens its task")
+        app.buttons["task-sheet-close"].tap()
+        XCTAssertTrue(app.buttons["roomNow"].waitForExistence(timeout: 10))
         app.openRoomPlace("conversations")
         let other = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'roomConversation-' AND NOT identifier ENDSWITH %@", "thr_botdemo01")).firstMatch
         XCTAssertTrue(other.waitForExistence(timeout: 15))
@@ -169,12 +169,20 @@ final class RoomUITests: ServerIsolatedUITestCase {
         if let count = ProcessInfo.processInfo.environment["ROOM_MESSAGES"] { extra += ["-qaDemoMessages", count] }
         launch(extra)
         sleep(2)
-        let floor = app.buttons["RoomFloor"].frame
-        let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: floor.midX, dy: floor.maxY - 140))
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 240)))
+        let stage = any("RoomStage")
+        stage.swipeLeft()
+        sleep(2)
+        stage.swipeLeft()
+        sleep(2)
+        stage.swipeRight()
         sleep(1)
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -240)))
-        sleep(1)
+        stage.swipeRight()
+        sleep(2)
+        stage.swipeUp()
+        XCTAssertTrue(app.buttons["roomLayDown"].waitForExistence(timeout: 10))
+        sleep(2)
+        app.buttons["roomLayDown"].tap()
+        sleep(2)
         for _ in 0..<2 {
             app.buttons["roomInput"].tap()
             XCTAssertTrue(app.textViews["composerField"].waitForExistence(timeout: 10))

@@ -202,4 +202,6 @@ struct InFlightBar: View {
 
 extension EnvironmentValues {
     @Entry var openTaskThread: ((String) -> Void)?
+    @Entry var showTaskDetail: ((String) -> Void)?
+    @Entry var shownTaskDetail: String?
 }

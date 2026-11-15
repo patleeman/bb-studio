@@ -7,17 +7,27 @@ extension XCUIApplication {
 
     func openRoomPlace(_ place: String, file: StaticString = #filePath, line: UInt = #line) {
         let row = buttons["roomPlace-\(place)"]
+        let down = buttons["roomLayDown"]
+        if !row.exists, down.exists, down.isHittable {
+            down.tap()
+            _ = buttons["roomInput"].waitForExistence(timeout: 10)
+        }
         if !row.exists {
             let menu = buttons["roomMenuButton"]
             XCTAssertTrue(menu.waitForExistence(timeout: 15), "the room's menu button", file: file, line: line)
-            menu.tap()
+            for _ in 0..<3 where !row.exists {
+                let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: menu)
+                _ = XCTWaiter.wait(for: [hittable], timeout: 5)
+                menu.tap()
+                _ = row.waitForExistence(timeout: 3)
+            }
         }
         XCTAssertTrue(row.waitForExistence(timeout: 10), "\(place) in the menu", file: file, line: line)
         row.tap()
     }
 
     func standRoomChat() {
-        buttons["RoomFloor"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.92)).tap()
+        buttons["RoomStage"].swipeUp()
     }
 
     func closeRoomSheet() {

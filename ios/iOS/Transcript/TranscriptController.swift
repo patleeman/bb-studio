@@ -27,7 +27,6 @@ struct TranscriptChrome: Equatable {
     var pill = PillPlacement.trailing
     /// Rows fade softly under the header (iOS's scroll edge effect).
     var softTopEdge = false
-    var topClear: CGFloat = 0
     /// The pill shows while the end is further than this below the view.
     var nearEnd: CGFloat = 80
     /// `onNearTop` fires when the top of what the reader sees is this close to the first row.
@@ -392,7 +391,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     /// The insets come from where the header and composer are; only a real change is written.
     private func updateInsets() {
-        let top = (hasTop ? topHost.view.frame.maxY : view.safeAreaInsets.top) + chrome.topClear
+        let top = (hasTop ? topHost.view.frame.maxY : view.safeAreaInsets.top)
         var bottom = view.bounds.maxY - composerHost.view.frame.minY
         if chrome.pill == .center, pill.shown { bottom += pillHost.view.bounds.height }
         bottom = max(0, bottom)
@@ -501,25 +500,6 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     /// Goes to the end and stays there: from far up, a jump to a screen above
     /// the end (which lays the end out), then a short animation.
-    func scroll(by delta: CGFloat) {
-        guard let collectionView, delta != 0 else { return }
-        if !readerMoved { scrollViewWillBeginDragging(collectionView) }
-        let inset = collectionView.adjustedContentInset
-        let top = -inset.top
-        let bottom = max(top, collectionView.contentSize.height - collectionView.bounds.height + inset.bottom)
-        var offset = collectionView.contentOffset
-        offset.y = min(bottom, max(top, offset.y - delta))
-        collectionView.setContentOffset(offset, animated: false)
-        layout.readerRow = topRow()?.id
-        updatePill()
-        checkNearTop()
-    }
-
-    func endScroll() {
-        guard readerMoved else { return }
-        readerRested("drag")
-    }
-
     func jumpToLatest(animated: Bool = true) {
         loadViewIfNeeded()
         pendingScroll = nil

@@ -33,7 +33,7 @@ enum RoomMode: Equatable {
 }
 
 enum RoomEvent: Equatable {
-    case tapInput, tapFloor, chevron, tapOutside
+    case tapInput, openChat, chevron, tapOutside
     case menuButton, closeMenu
     case open(RoomPlace), closePlace
 }
@@ -107,7 +107,7 @@ final class RoomModel {
     nonisolated static func transition(_ mode: RoomMode, _ event: RoomEvent) -> (RoomMode, Effect) {
         switch (mode, event) {
         case (.rest, .tapInput): return (.talk, .focus)
-        case (.rest, .tapFloor): return (.talk, .none)
+        case (.rest, .openChat): return (.talk, .none)
         case (.talk, .tapInput): return (.talk, .focus)
         case (.talk, .chevron), (.talk, .tapOutside): return (.rest, .dismissKeyboard)
         case (.rest, .menuButton): return (.menu, .none)
@@ -131,7 +131,7 @@ enum RoomTheme {
     }
 }
 
-enum RoomFloor {
+enum RoomText {
     static func clean(_ items: [TimelineItem]) -> [TimelineItem] {
         items.compactMap { item in
             guard case .message(var row) = item, row.kind == "conversation", !row.isPassReply, let text = row.text, text.contains("["),
@@ -144,11 +144,11 @@ enum RoomFloor {
         }
     }
 
-    static func rows(_ rows: [ThreadTranscriptRow], lying: Bool = false) -> [ThreadTranscriptRow] {
+    static func rows(_ rows: [ThreadTranscriptRow]) -> [ThreadTranscriptRow] {
         rows.compactMap { row in
             guard case .item(.message(let message), let state) = row else { return row }
             if let event = BotChatEntry.childEvent(message) { return .bot(.child(event, id: message.id), .init()) }
-            if let relayed = state.relayed { return lying && !relayed.urgent ? nil : row }
+            if state.relayed != nil { return row }
             return BotChatEntry.shows(message) ? row : nil
         }
     }
@@ -170,27 +170,31 @@ enum RoomFloor {
     }
 }
 
-enum RoomDay {
-    struct Line: Equatable {
-        var lead: String
-        var rest: String?
+enum RoomHeader {
+    static func subline(main: Bool, title: String, rows: [TimelineRow], now: Date = Date(), calendar: Calendar = .current) -> String {
+        guard main else { return role(title) }
+        let date = now.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        guard let note = goodToKnow(rows: rows, now: now, calendar: calendar), let weather = weather(note) else { return date }
+        return date + " · " + weather
     }
 
-    static func line(rows: [TimelineRow], todayCount: Int?, status: String, now: Date = Date(), calendar: Calendar = .current) -> Line {
-        let lead = countLine(todayCount)
-        if let note = goodToKnow(rows: rows, now: now, calendar: calendar) { return Line(lead: lead, rest: note) }
-        return Line(lead: lead, rest: status)
+    static func role(_ title: String) -> String {
+        let words = title.lowercased().split { !$0.isLetter }
+        if words.contains("lead") { return "Project lead" }
+        if words.contains("worker") { return "Worker" }
+        return "Conversation"
     }
 
-    static func countLine(_ count: Int?) -> String {
-        switch count {
-        case nil: return "Here's your day."
-        case 0: return "Nothing on today's list."
-        case 1: return "One thing today."
-        case let n?:
-            let words = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"]
-            return (n < words.count ? words[n] : "\(n)") + " things today."
-        }
+    static let weatherWords = ["sunny", "sun", "cloudy", "clouds", "overcast", "rain", "rainy", "showers", "snow", "snowy", "fog", "foggy", "windy",
+                               "clear", "storm", "storms", "thunderstorms", "drizzle", "sleet", "hail", "humid", "high", "low", "°"]
+
+    static func weather(_ note: String) -> String? {
+        let lower = note.lowercased()
+        let words = Set(lower.split { !$0.isLetter && $0 != "°" }.map(String.init))
+        guard lower.contains("°") || !words.isDisjoint(with: weatherWords) else { return nil }
+        let clause = note.split(whereSeparator: { ",.;".contains($0) }).first.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? note
+        guard !clause.isEmpty else { return nil }
+        return clause.count > 42 ? String(clause.prefix(41)).trimmingCharacters(in: .whitespaces) + "…" : clause
     }
 
     static func goodToKnow(rows: [TimelineRow], now: Date, calendar: Calendar) -> String? {
@@ -201,7 +205,7 @@ enum RoomDay {
             let section = parsed.sections.first { $0.title.lowercased().hasPrefix("good to know") }
             for line in section?.lines ?? [] {
                 if case .text(let note) = line {
-                    let plain = RoomFloor.plain(note)
+                    let plain = RoomText.plain(note)
                     if !plain.isEmpty { return plain }
                 }
             }
@@ -211,10 +215,151 @@ enum RoomDay {
     }
 }
 
+struct RoomNow: Equatable {
+    var text: String
+    var since: Date?
+    var last: String?
+    var active: Bool
+
+    static func agentTasks(_ tasks: [TaskItem]) -> [TaskItem] {
+        tasks.filter { !$0.isMine && !$0.isClosed && !$0.isRecurring && $0.automation?.role != "finding" }
+            .sorted { ($0.state == .inProgress ? 0 : 1, $1.updatedAt) < ($1.state == .inProgress ? 0 : 1, $0.updatedAt) }
+    }
+
+    static func yours(_ tasks: [TaskItem]) -> [TaskItem] {
+        tasks.filter { $0.isMine && !$0.isClosed }.sorted { ($0.needsYou ? 0 : 1, $0.createdAt) < ($1.needsYou ? 0 : 1, $1.createdAt) }
+    }
+
+    static func make(threadId: String, main: Bool, running: Bool, tasks: [TaskItem], todos: [Todos.Item], rows: [TimelineRow],
+                     workers: [BotWorker], latest: String?) -> RoomNow {
+        let own = tasks.filter { task in
+            guard !task.isMine, task.automation == nil else { return false }
+            if let owner = task.ownerThreadId { return owner == threadId }
+            return main
+        }
+        let last = lastFinished(tasks: tasks, workers: workers, latest: latest)
+        if running {
+            let doing = todos.first { $0.status == "in_progress" }?.text
+                ?? own.first { $0.state == .inProgress }.map { $0.line ?? $0.title }
+                ?? rows.last { $0.isWorkRow && ["inProgress", "running", "pending"].contains($0.status ?? "") }.flatMap(\.nowTitle)
+                ?? "Writing a reply"
+            let turn = rows.last { $0.role == "user" }.flatMap { $0.createdAt ?? $0.startedAt }
+            return RoomNow(text: sentence(doing), since: turn.map { Date(timeIntervalSince1970: $0 / 1000) }, last: last, active: true)
+        }
+        if let task = own.first(where: { $0.state == .inProgress }) {
+            return RoomNow(text: sentence(task.line ?? task.title), since: task.updatedAt, last: last, active: true)
+        }
+        let busy = workers.filter { $0.status == .running }
+        if !busy.isEmpty {
+            let text = busy.count == 1 ? "Waiting on " + (busy[0].title.isEmpty ? "a worker" : busy[0].title) : "Waiting on \(number(busy.count)) workers"
+            return RoomNow(text: text, since: busy.map(\.updated).min(), last: last, active: true)
+        }
+        return RoomNow(text: "Idle", since: nil, last: last, active: false)
+    }
+
+    static func lastFinished(tasks: [TaskItem], workers: [BotWorker], latest: String?) -> String? {
+        if let done = tasks.filter({ !$0.isMine && $0.state == .done }).max(by: { ($0.closedAt ?? $0.updatedAt) < ($1.closedAt ?? $1.updatedAt) }) {
+            return sentence(done.line ?? done.title)
+        }
+        if let worker = workers.filter({ $0.status == .done }).max(by: { $0.updatedAt < $1.updatedAt }), !worker.title.isEmpty {
+            return "finished " + worker.title
+        }
+        guard let latest else { return nil }
+        let plain = RoomText.plain(latest)
+        return plain.isEmpty ? nil : plain
+    }
+
+    static func sentence(_ text: String) -> String {
+        let plain = RoomText.plain(text)
+        let line = plain.isEmpty ? text : plain
+        return line.count > 90 ? String(line.prefix(89)).trimmingCharacters(in: .whitespaces) + "…" : line
+    }
+
+    static func number(_ n: Int) -> String {
+        let words = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
+        return n < words.count ? words[n] : "\(n)"
+    }
+
+    static func elapsed(_ since: Date, now: Date = Date()) -> String {
+        let minutes = max(0, Int(now.timeIntervalSince(since) / 60))
+        if minutes < 1 { return "just now" }
+        if minutes < 60 { return "\(minutes) min" }
+        let hours = minutes / 60
+        if hours < 24 { return minutes % 60 == 0 || hours >= 6 ? "\(hours) h" : "\(hours) h \(minutes % 60) min" }
+        return "\(hours / 24) d"
+    }
+
+    func small(now: Date = Date()) -> String? {
+        let parts = [since.map { Self.elapsed($0, now: now) }, last.map { "last: " + Self.lowered($0) }].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    static func lowered(_ text: String) -> String {
+        guard let first = text.first, first.isUppercase else { return text }
+        let second = text.dropFirst().first
+        guard second.map({ $0.isLowercase || $0 == " " }) ?? true else { return text }
+        if text.hasPrefix("I ") { return text }
+        return first.lowercased() + text.dropFirst()
+    }
+}
+
+extension TimelineRow {
+    var isWorkRow: Bool { kind == "work" }
+
+    var nowTitle: String? {
+        let raw = title ?? command ?? toolName
+        guard let raw, !raw.isEmpty else { return nil }
+        return raw
+    }
+}
+
+enum RoomLight: Int, CaseIterable, Equatable {
+    case natural, dusk, night, dawn, morning
+
+    var name: String {
+        switch self {
+        case .natural: "day"
+        case .dusk: "dusk"
+        case .night: "night"
+        case .dawn: "dawn"
+        case .morning: "morning"
+        }
+    }
+
+    static func hash(_ id: String) -> UInt64 {
+        var value: UInt64 = 0xcbf29ce484222325
+        for byte in id.utf8 {
+            value ^= UInt64(byte)
+            value = value &* 0x100000001b3
+        }
+        return value
+    }
+
+    static func natural(for id: String) -> RoomLight {
+        let rest = allCases.filter { $0 != .natural }
+        return rest[Int(hash(id) % UInt64(rest.count))]
+    }
+
+    static func lights(order: [String], main: String) -> [String: RoomLight] {
+        var out: [String: RoomLight] = [:]
+        var previous: RoomLight?
+        for id in order {
+            var light = id == main ? .natural : natural(for: id)
+            if light == previous, id != main {
+                let rest = allCases.filter { $0 != .natural }
+                let at = rest.firstIndex(of: light) ?? 0
+                light = rest[(at + 1) % rest.count]
+            }
+            out[id] = light
+            previous = light
+        }
+        return out
+    }
+}
+
 struct RoomChat {
-    static let floorClear: CGFloat = 110
     var focusRequests: Int
-    var lying: Bool
+    var away: Bool
     var layDown: () -> Void
 }
 

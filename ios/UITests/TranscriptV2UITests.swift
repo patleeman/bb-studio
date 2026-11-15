@@ -497,8 +497,8 @@ final class TranscriptV2UITests: ServerIsolatedUITestCase {
     }
 
     private func standUpTheRoom() {
-        if inRoom { XCTAssertTrue(app.buttons["RoomFloor"].waitForExistence(timeout: 30), "the room shows on the folded Duo") }
-        guard app.buttons["RoomFloor"].waitForExistence(timeout: 10) else { return }
+        if inRoom { XCTAssertTrue(app.buttons["RoomStage"].waitForExistence(timeout: 30), "the room shows on the folded Duo") }
+        guard app.buttons["RoomStage"].waitForExistence(timeout: 10) else { return }
         app.standRoomChat()
         XCTAssertTrue(app.buttons["roomLayDown"].waitForExistence(timeout: 10), "the room's chat stands up")
     }

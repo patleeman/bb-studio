@@ -124,12 +124,25 @@ struct RoomPlaceSheet: View {
     var closeToRoom: () -> Void
     var theme: String = ""
     var chooseTheme: (String) -> Void = { _ in }
+    var path: Binding<[Route]>? = nil
+    var back: (() -> Void)? = nil
+    @State private var ownPath: [Route] = []
     @EnvironmentObject private var app: AppModel
     @Environment(\.look) private var look
 
     var body: some View {
-        NavigationStack {
-            content
+        NavigationStack(path: path ?? $ownPath) {
+            Group {
+                if let back {
+                    content
+                        .environment(\.spreadInline, true)
+                        .toolbar(.hidden, for: .navigationBar)
+                        .safeAreaInset(edge: .top, spacing: 0) { RoomSpreadHeader(title: place.title, back: back) }
+                        .containerBackground(.clear, for: .navigation)
+                } else {
+                    content
+                }
+            }
                 .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
         }
         .tint(look.accent)
@@ -240,15 +253,11 @@ struct RoomConversations: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .refreshable { await store.refresh() }
-        .navigationTitle("Conversations")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { starting = true } label: { Image(systemName: "plus") }
-                    .accessibilityLabel("New conversation")
-                    .accessibilityIdentifier("roomNewConversation")
-            }
-        }
+        .modifier(PageChrome(title: "Conversations") {
+            Button { starting = true } label: { Image(systemName: "plus") }
+                .accessibilityLabel("New conversation")
+                .accessibilityIdentifier("roomNewConversation")
+        })
         .sheet(isPresented: $starting) {
             NewConversationSheet(botName: bot.name) { text in
                 let id = try await BotShell.startConversation(text, bot: bot, view: view, client: app.client)

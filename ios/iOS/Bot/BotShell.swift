@@ -207,7 +207,6 @@ final class BotShellModel: ObservableObject {
     @Published var compactColumn: NavigationSplitViewColumn = .sidebar
     @Published var detailPath: [Route] = []
     @Published var roomOpen: BotPage?
-    @Published var roomStandUp = false
     @Published var themeOverride: [String: String] = [:]
     @Published var botToast: String?
     private(set) var landed = false

@@ -52,26 +52,26 @@ final class RoomQAUITests: ServerIsolatedUITestCase {
 
     func testOneBotRubberBandsAndShowsNoToast() {
         launch(["-qaOneBot"])
-        let presence = app.otherElements.matching(NSPredicate(format: "label BEGINSWITH 'Juniper, '")).firstMatch
+        let presence = app.descendants(matching: .any)["roomPresence"].firstMatch
         XCTAssertTrue(presence.waitForExistence(timeout: 10))
         let start = presence.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -200, dy: 0)))
         XCTAssertFalse(app.staticTexts["roomBotToast"].waitForExistence(timeout: 2), "no other Bot to switch to")
-        XCTAssertEqual(app.buttons["roomInput"].label, "Message Juniper")
+        XCTAssertEqual(app.buttons["roomInput"].label, "Talk to Juniper")
         shot("one-bot")
     }
 
     func testOneConversationHasNoPagesAndTalksToTheBot() {
         launch(["-qaOneConversation"])
-        let floor = app.descendants(matching: .any)["RoomFloor"].firstMatch
+        let floor = app.descendants(matching: .any)["RoomStage"].firstMatch
         XCTAssertTrue(floor.waitForExistence(timeout: 10))
         XCTAssertEqual(floor.value as? String ?? "", "", "no 'Conversation 1 of 1'")
         XCTAssertFalse(app.descendants(matching: .any)["roomPageDots"].exists, "no page dots")
-        XCTAssertEqual(app.buttons["roomInput"].label, "Message Juniper")
+        XCTAssertEqual(app.buttons["roomInput"].label, "Talk to Juniper")
         let start = floor.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.8))
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: -220, dy: 0)))
         sleep(1)
-        XCTAssertEqual(app.buttons["roomInput"].label, "Message Juniper", "a swipe has nowhere to go")
+        XCTAssertEqual(app.buttons["roomInput"].label, "Talk to Juniper", "a swipe has nowhere to go")
         XCTAssertEqual(floor.value as? String ?? "", "")
         shot("one-conversation")
     }
@@ -96,18 +96,19 @@ final class RoomQAUITests: ServerIsolatedUITestCase {
         shot("relayed-open")
     }
 
-    func testNoTodosLeavesTheDayQuiet() {
+    func testNoTasksSaysNothingWaiting() {
         launch(["-qaLoopsEmpty"])
-        XCTAssertTrue(app.descendants(matching: .any)["roomDayLine"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'roomCard-'")).firstMatch.exists, "no cards")
-        shot("no-todos")
+        XCTAssertTrue(app.descendants(matching: .any)["roomYoursEmpty"].waitForExistence(timeout: 10), "Nothing waiting on you")
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'roomCard-task'")).firstMatch.exists, "no rows of yours")
+        XCTAssertTrue(app.buttons["roomNow"].exists)
+        shot("no-tasks")
     }
 
-    func testLongMessagesAndCodeLieOnTheFloorAndStandUp() {
+    func testLongMessagesAndCodeOpenToRead() {
         launch(["-qaDemoMessages", "14"], loops: false)
         shot("long-rest")
-        app.buttons["RoomFloor"].tap()
-        waitHittable(app.buttons["roomLayDown"], "the chat stands up to read")
+        app.descendants(matching: .any)["RoomStage"].firstMatch.swipeUp()
+        waitHittable(app.buttons["roomLayDown"], "the conversation opens to read")
         shot("long-read")
     }
 
@@ -115,6 +116,8 @@ final class RoomQAUITests: ServerIsolatedUITestCase {
         launch(["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXL"])
         waitHittable(app.buttons["roomInput"], "the input")
         waitHittable(app.buttons["roomMenuButton"], "the menu")
+        waitHittable(app.buttons["roomNow"], "the Now line")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'roomCard-'")).firstMatch.isHittable, "a row")
         shot("xxl-rest")
         app.buttons["roomInput"].tap()
         XCTAssertTrue(app.textViews["composerField"].waitForExistence(timeout: 10))
@@ -202,20 +205,19 @@ final class RoomQAUITests: ServerIsolatedUITestCase {
         waitHittable(app.buttons["roomLayDown"], "back in portrait, still standing")
     }
 
-    func testUnfoldingDuringTheSwingUpLandsCleanly() throws {
+    func testUnfoldingWithTheConversationOpenLandsCleanly() throws {
         guard duo else { throw XCTSkip("needs the iPhone Duo simulator") }
         launch()
         app.buttons["roomInput"].tap()
         XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/landscape")!)
         sleep(4)
-        XCTAssertTrue(app.textViews["composerField"].exists, "the chat stood up")
-        XCTAssertTrue(app.otherElements["RoomWorkbench"].exists, "beside the workbench")
-        command("capture?qa-unfold-mid-swing")
-        app.buttons["roomLayDown"].tap()
+        XCTAssertTrue(app.textViews["composerField"].exists, "the conversation is on the right")
+        XCTAssertTrue(app.buttons["roomNow"].exists, "beside the room")
+        command("capture?qa-unfold-standing")
         XCUIDevice.shared.system.open(URL(string: "bbstudio://qa-duo/outer")!)
         sleep(4)
-        waitHittable(app.buttons["roomInput"], "folding mid-way lands at rest")
-        XCTAssertFalse(app.otherElements["RoomWorkbench"].exists)
-        command("capture?qa-fold-mid-lay")
+        waitHittable(app.buttons["roomInput"], "folding lands at rest")
+        XCTAssertFalse(app.descendants(matching: .any)["roomConversation"].exists)
+        command("capture?qa-fold-rest")
     }
 }
