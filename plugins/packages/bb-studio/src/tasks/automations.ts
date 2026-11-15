@@ -460,6 +460,7 @@ export class AutomationTasks {
     const task = this.store.get(id);
     if (task.owner === USER_OWNER && severity === "critical" && task.automation!.pushedAt === null && this.deps.push) {
       this.patch(id, (link) => { link.pushedAt = this.now(); });
+      this.store.event(id, "notified", { by: "watcher" });
       void this.deps.push(task).catch((error: unknown) => this.deps.log?.(`Automation tasks: push for ${id} failed: ${error instanceof Error ? error.message : String(error)}`));
     }
   }
