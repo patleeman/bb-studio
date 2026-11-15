@@ -21,6 +21,7 @@ import type { Loop } from "../contract";
 import { PickTime, TriggerForm } from "./LoopMenus";
 import { AddLoop, AreaChip, OwnerMenu, useLoopsBoard, type RowProps } from "./LoopsTab";
 import { areaChips, dueLabel, elapsed, fullWhen, KIND, optionParts, ownerName, ownerThread, shortWhen, SNOOZE, snoozeHint, sourceText, triggerLabel } from "./model";
+import { useTaskActions } from "../../tasks/ui/TaskCard";
 import { focusDiscussed, LOOPS_PANE, loopDragProps, openLoops, useDiscussLoop, useLoopActions, useTodosZone } from "./hooks";
 
 export { LOOPS_PANE };
@@ -223,6 +224,7 @@ function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed
   const navigate = useBbNavigate();
   const zone = useTodosZone();
   const { act, update, busy, error } = useLoopActions(refresh);
+  const tasks = useTaskActions(refresh);
   const discuss = useDiscussLoop(people.botThreadId, people.botName);
   // After Discuss the caret goes to the composer once the menu has closed, not back to ⋯.
   const discussing = useRef(false);
@@ -280,7 +282,7 @@ function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed
       <DropdownMenuSub>
         <DropdownMenuSubTrigger><Icon name="ArrowTurnForward" />Hand off</DropdownMenuSubTrigger>
         <DropdownMenuSubContent className="min-w-48">
-          {people.targets.map((target) => <DropdownMenuItem key={target.owner} onSelect={() => void act({ id: loop.id, action: "hand_off", owner: target.owner })}><Icon name="Bot" />{target.name}</DropdownMenuItem>)}
+          {people.targets.map((target) => <DropdownMenuItem key={target.owner} onSelect={() => void tasks.act({ id: loop.id, action: "hand_off", to: target.owner })}><Icon name="Bot" />{target.name}</DropdownMenuItem>)}
         </DropdownMenuSubContent>
       </DropdownMenuSub>
       {changeTrigger}<DropdownMenuSeparator />{drop}
@@ -306,7 +308,7 @@ function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed
   } else if (place === "agents") {
     items = <>
       {thread ? <DropdownMenuItem onSelect={() => navigate.toThread(thread)}><Icon name="MessageSquare" />{loop.owner === "cos" ? "Open chat" : "Open thread"}</DropdownMenuItem> : null}
-      <DropdownMenuItem onSelect={() => void update({ id: loop.id, changes: { owner: "patrick", status: "surfaced" } })}><Icon name="ArrowTurnBackward" />Take it back</DropdownMenuItem>
+      <DropdownMenuItem onSelect={() => void tasks.act({ id: loop.id, action: "take_back" })}><Icon name="ArrowTurnBackward" />Take back</DropdownMenuItem>
     </>;
     meta = <>
       {working ? <span className="size-1.5 rounded-full bg-success" aria-hidden /> : null}
@@ -351,7 +353,7 @@ function LoopLine({ loop, place, people, places, refresh, held, owners, onClosed
           </div>
         ) : null}
         {note ? <p role="status" className="px-8 pb-2 text-xs text-muted-foreground">{people.botName} is drafting a nudge in the chat.</p> : null}
-        {error ? <p role="alert" className="px-8 pb-2 text-xs text-destructive">{error}</p> : null}
+        {error ?? tasks.error ? <p role="alert" className="px-8 pb-2 text-xs text-destructive">{error ?? tasks.error}</p> : null}
       </>} />
     {picking ? <PickTime onClose={() => setPicking(false)} onPick={(at) => { setPicking(false); void update({ id: loop.id, changes: { status: "snoozed", trigger: { type: "time", at } } }); }} /> : null}
   </>;

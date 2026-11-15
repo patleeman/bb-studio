@@ -102,7 +102,7 @@ it("puts each row's actions in its ⋯ menu", async () => {
   await click(row("Reply to Sam"), "Done");
   expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_n", action: "done" });
   await click(row("Reply to Sam"), "Larkspur lead");
-  expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_n", action: "hand_off", owner: "thread:thr_lead" });
+  expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "loop_n", action: "hand_off", to: "thread:thr_lead" });
   await act(async () => ([...row("Reply to Sam").querySelectorAll("[role=menuitem]")].find((each) => each.textContent?.startsWith("Tomorrow")) as HTMLButtonElement).click());
   expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_n", action: "snooze", snooze: "tomorrow_morning" });
   await click(row("Choose the deck"), "Hudson — $21k");
@@ -111,8 +111,8 @@ it("puts each row's actions in its ⋯ menu", async () => {
   expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_c", surfaceNow: true });
   // Not the user's: no Remind me now.
   expect(actions("Book the car service")).toEqual(["Discuss", "Change when…"]);
-  await click(row("Draft the Larkspur"), "Take it back");
-  expect(state.call).toHaveBeenCalledWith("loops.update", { id: "loop_a", changes: { owner: "patrick", status: "surfaced" } });
+  await click(row("Draft the Larkspur"), "Take back");
+  expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "loop_a", action: "take_back" });
   await click(row("Draft the Larkspur"), "Open thread");
   expect(state.toThread).toHaveBeenCalledWith("thr_lead");
   await click(row("Signed lease"), "Nudge them");
