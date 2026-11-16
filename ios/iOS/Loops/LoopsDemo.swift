@@ -18,6 +18,11 @@ enum LoopsDemo {
     static let leadId = "thr_larkspur01"
     /// `-qaLoopsEmpty`: no loops at all.
     static var empty: Bool { ProcessInfo.processInfo.arguments.contains("-qaLoopsEmpty") }
+    static var missing: String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let at = arguments.firstIndex(of: "-qaLoopsMissing"), arguments.indices.contains(at + 1) else { return nil }
+        return arguments[at + 1]
+    }
 
     nonisolated(unsafe) private static var installed = false
 
@@ -91,7 +96,7 @@ enum LoopsDemo {
                 switch name {
                 case "list": return ok(groups())
                 case "get":
-                    guard let loop = find(input["id"] as? String) else { return (404, Data(#"{"ok":false,"error":{"message":"Loop not found"}}"#.utf8)) }
+                    guard input["id"] as? String != LoopsDemo.missing, let loop = find(input["id"] as? String) else { return (404, Data(#"{"ok":false,"error":{"message":"Loop not found"}}"#.utf8)) }
                     return ok(["loop": loop, "history": history[loop["id"] as! String] ?? []])
                 case "act": return act(input)
                 case "update": return update(input)
