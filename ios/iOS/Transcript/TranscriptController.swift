@@ -603,6 +603,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         let line = String(format: "v2 geo offset=%.1f content=%.1f container=%.1f insetTop=%.1f insetBottom=%.1f past=%.1f",
                           collectionView.contentOffset.y, b.content, b.height, b.top, b.bottom, -distanceToEnd)
             + " rows=\(visible.count) atEnd=\(atEnd) touching=\(touching) visible=\(ids.joined(separator: "…"))"
+            + (abs(collectionView.contentSize.height - b.content) > 0.5 ? String(format: " lag=%.1f", collectionView.contentSize.height - b.content) : "")
         guard line != lastGeometry else { return }
         lastGeometry = line
         log(line)
@@ -617,6 +618,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         // past the end after a row at the end shrank), which pulled the view
         // 3 pt off the end each frame for 0.3 s while this put it back.
         collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: target), animated: false)
+        if abs(collectionView.contentSize.height - layout.collectionViewContentSize.height) > 0.5 { collectionView.setNeedsLayout() }
     }
 
     /// "↓": a frame at a time toward the live end. UIKit's animated
