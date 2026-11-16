@@ -1485,9 +1485,9 @@ export function ThreadDetailPromptArea({
       onSubmit: handleSend,
       ...(isHandoffSelection && forkSignInRecovery == null
         ? {
-            submitLabel: "New thread",
+            submitLabel: "Send",
             submitIcon: "MessageSquarePlus",
-            submitTitle: "Create new thread (Enter)",
+            submitTitle: "Send in a new conversation (Enter)",
           }
         : {}),
       compactPromptPlaceholder,
