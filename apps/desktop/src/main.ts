@@ -2,6 +2,7 @@ import { studioAboutVersion } from "./studio-desktop.fork.js";
 import { resolveBbAppRuntimeState } from "../../../packages/bb-app/src/launcher.js";
 import { registerForkApprovalIpc } from "./fork-approvals.js";
 import { registerForkWindowIpc } from "./fork-windows.js";
+import { registerForkFinderIpc } from "./fork-finder.js";
 import { pathToFileURL } from "node:url";
 import { spawnHostProcess as spawn, hostToolchain } from "@bb/process-utils";
 import { openApplicationUrl } from "./application-url.js";
@@ -2526,6 +2527,7 @@ function registerDesktopUpdateIpc(): void {
   });
   registerForkApprovalIpc(ipcMain, dialog);
   registerForkWindowIpc(ipcMain);
+  registerForkFinderIpc(ipcMain, applicationWindowWebContentsIds);
   ipcMain.handle(BB_DESKTOP_GET_INFO_CHANNEL, () => {
     return getCurrentDesktopInfo();
   });
