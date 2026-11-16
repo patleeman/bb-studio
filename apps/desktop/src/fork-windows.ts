@@ -37,6 +37,16 @@ const MIN_SIZE = 120;
 const MAX_SIZE = 4000;
 const registered = new Map<string, Registered>();
 
+export function isForkWindowWebContents(webContentsId: number): boolean {
+  for (const entry of registered.values()) {
+    const window = entry.window;
+    if (window !== null && !window.isDestroyed()) {
+      if (window.webContents.id === webContentsId) return true;
+    }
+  }
+  return false;
+}
+
 function size(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.min(MAX_SIZE, Math.max(MIN_SIZE, Math.round(value)))

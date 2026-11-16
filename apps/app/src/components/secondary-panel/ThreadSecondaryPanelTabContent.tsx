@@ -1,3 +1,4 @@
+import { useForkLocalPath } from "./ForkFinder";
 import { useMemo } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import {
@@ -175,6 +176,7 @@ export function WorkspaceFilePreviewTabContent({
       markdownLinkRouting={markdownLinkRouting}
       onSelectionAddToChat={onSelectionAddToChat}
       onOpenInEditor={onOpenInEditor}
+      localPath={useForkLocalPath(environmentHostId, activePath, environmentRootPath)}
       statusLabel={
         source === null ? null : getEnvironmentFilePreviewSourceRef(source)
       }
@@ -226,6 +228,7 @@ export function ProjectFilePreviewTabContent({
         environmentId,
         hostId,
       })}
+      localPath={useForkLocalPath(hostId, activePath, rootPath)}
       lineRange={lineRange}
       markdownLinkRouting={markdownLinkRouting}
       onSelectionAddToChat={onSelectionAddToChat}
@@ -287,6 +290,7 @@ export function HostFilePreviewTabContent({
       activePath={activePath}
       copyPath={copyPath}
       htmlPreviewUrl={buildThreadHostFileContentUrl(threadId, activePath)}
+      localPath={useForkLocalPath(environmentHostId, activePath)}
       lineRange={lineRange}
       markdownLinkRouting={markdownLinkRouting}
       onSelectionAddToChat={onSelectionAddToChat}
@@ -333,6 +337,7 @@ export function HostScopedFilePreviewTabContent({
       activePath={activePath}
       copyPath={activePath}
       htmlPreviewUrl={hostFilePreviewQuery.data?.url ?? null}
+      localPath={useForkLocalPath(hostId, activePath)}
       lineRange={lineRange}
       markdownLinkRouting={markdownLinkRouting}
       onOpenInEditor={onOpenInEditor}
@@ -387,6 +392,7 @@ export function ThreadStorageFilePreviewTabContent({
       activePath={activePath}
       copyPath={copyPath}
       htmlPreviewUrl={buildThreadStorageRawContentUrl(threadId, activePath)}
+      localPath={useForkLocalPath(storageHostId, activePath, storageRootPath)}
       lineRange={lineRange}
       markdownLinkRouting={markdownLinkRouting}
       onSelectionAddToChat={onSelectionAddToChat}
