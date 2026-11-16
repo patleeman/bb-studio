@@ -34,7 +34,5 @@ export function forkFakeHooks(): ForkPluginHooks {
     experimental_threadForkPoint: () => Promise.resolve(null),
     experimental_requestApproval: () =>
       Promise.resolve({ approved: false, picked: [] }),
-    experimental_desktopControl: () =>
-      Promise.resolve({ ok: false, error: "no desktop app" }),
   };
 }

@@ -17,7 +17,6 @@ export interface StudioUpstream {
 export interface StudioUpdateTestInput {
   feedUrl: string;
   root: string;
-  label?: string | null;
   version: string | null;
 }
 
@@ -32,7 +31,6 @@ export interface StudioBuildInfo {
     root: string;
     serverPort: number;
     hostDaemonPort: number;
-    label?: string | null;
   } | null;
 }
 
@@ -48,20 +46,6 @@ export const STUDIO_UPDATE_TEST_IDENTITY: {
   serverPort: number;
 };
 
-export const DESKTOP_CONTROL_STAGE: string;
-export function applyDesktopControlResources<Config extends { mac?: { extraResources?: unknown[] } }>(
-  config: Config,
-  stage: string,
-  exists: (path: string) => boolean,
-): Config;
-export function studioTestIdentity(label: string | null): {
-  appId: string;
-  debugPort: number;
-  hostDaemonPort: number;
-  packageName: string;
-  productName: string;
-  serverPort: number;
-};
 export function assertStudioVersion(version: unknown, label: string): string;
 export function parseStudioRelease(text: string): StudioRelease;
 export function readStudioRelease(path?: string): StudioRelease;

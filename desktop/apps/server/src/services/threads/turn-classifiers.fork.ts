@@ -5,7 +5,6 @@ import type {
   ForkPluginHooks,
 } from "@get-bb/plugin-sdk";
 import { requestPluginApproval } from "../fork-approvals/index.js";
-import { callDesktopControl } from "../fork-desktop-control.js";
 import { registerSkillsRegistryPolicy } from "../skills/registry-policy.fork.js";
 import { registerBeforeThreadDelete } from "./thread-delete-hooks.fork.js";
 import { registerTurnContextProvider } from "./turn-context.fork.js";
@@ -80,10 +79,6 @@ export function forkPluginHooks(args: {
       args.disposeHooks.push(
         registerSkillsRegistryPolicy(args.pluginId, policy, args.db),
       );
-    },
-    experimental_desktopControl(call) {
-      args.assertLive();
-      return callDesktopControl(call);
     },
     experimental_turnContext(provider) {
       args.assertLive();
