@@ -37,7 +37,7 @@ import {
   type ThreadActionMenuSurface,
 } from "./ThreadActionMenuItems";
 
-const MENU_LABEL = "Thread actions";
+const MENU_LABEL = "Conversation actions";
 
 function ThreadActionsMenuItems({
   thread,

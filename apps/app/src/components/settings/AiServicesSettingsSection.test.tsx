@@ -110,7 +110,7 @@ describe("AiServicesSettingsSection", () => {
     const { wrapper } = createQueryClientTestHarness();
     render(<AiServicesSettingsSection />, { wrapper });
 
-    const titles = await screen.findByRole("button", { name: "Thread titles" });
+    const titles = await screen.findByRole("button", { name: "Conversation titles" });
     await vi.waitFor(() => expect(titles.textContent).toContain("Automatic"));
     expect(
       screen.getByRole("button", { name: "Commit messages" }).textContent,
@@ -156,7 +156,7 @@ describe("AiServicesSettingsSection", () => {
     render(<AiServicesSettingsSection />, { wrapper });
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "Test thread titles" }),
+      await screen.findByRole("button", { name: "Test conversation titles" }),
     );
     expect(
       await screen.findByText(
@@ -197,13 +197,13 @@ describe("AiServicesSettingsSection", () => {
     render(<AiServicesSettingsSection />, { wrapper });
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "Test thread titles" }),
+      await screen.findByRole("button", { name: "Test conversation titles" }),
     );
     expect(
       await screen.findByText(/Test failed: .*The sample prompt is empty/u),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Test thread titles" }).textContent,
+      screen.getByRole("button", { name: "Test conversation titles" }).textContent,
     ).toBe("Test");
   });
 });
