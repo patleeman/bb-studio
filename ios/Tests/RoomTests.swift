@@ -3,6 +3,22 @@ import XCTest
 
 @MainActor
 final class RoomTests: XCTestCase {
+    func testTheSceneLightSitsInTheTopCornerOfThePresencesPage() throws {
+        let phone = try XCTUnwrap(RoomSceneLight.spot(window: CGSize(width: 440, height: 956), safeTop: 62, safeTrailing: 0, pages: nil, rail: false))
+        XCTAssertEqual(phone, SceneLight(x: 440 - RoomSceneLight.phoneCorner, y: 62 + 80), "the phone: under the menu, in the top corner")
+        let folded = try XCTUnwrap(RoomSceneLight.spot(window: CGSize(width: 466, height: 678), safeTop: 0, safeTrailing: 0, pages: nil, rail: true))
+        XCTAssertEqual(folded, SceneLight(x: 466 - FoldedChrome.column - RoomSceneLight.corner, y: RoomSceneLight.corner), "the folded Duo: left of the rail")
+        let unfolded = try XCTUnwrap(RoomSceneLight.spot(window: CGSize(width: 951, height: 669), safeTop: 0, safeTrailing: 0, pages: .sideBySide, rail: true))
+        XCTAssertLessThan(unfolded.x, 951 / 2 - DuoPages.hinge / 2, "unfolded: on the presence's page, left of the hinge")
+        XCTAssertEqual(unfolded.y, RoomSceneLight.corner)
+        let portrait = try XCTUnwrap(RoomSceneLight.spot(window: CGSize(width: 669, height: 951), safeTop: 0, safeTrailing: 0, pages: .stacked, rail: true))
+        let page = RoomSceneLight.page(window: CGSize(width: 669, height: 951), safeLeading: 0, safeTrailing: 0, pages: .stacked, rail: true)
+        XCTAssertTrue(RoomPresenceScreen.wide(page.size), "portrait's top page shows the presence beside its rows")
+        XCTAssertLessThan(portrait.x, page.minX + 22 + (page.width - 72) / 2, "portrait: in the presence's column, not over the rows")
+        XCTAssertEqual(SceneLight.scale, 0.6, accuracy: 0.001, "smaller than desktop's")
+        XCTAssertNil(RoomSceneLight.spot(window: .zero, safeTop: 0, safeTrailing: 0, pages: nil, rail: false))
+    }
+
     func testTheFrostCoversTheConversationPageFromTheHinge() {
         let wide = RoomFrost.seam(951)
         XCTAssertEqual(wide, (951 / 2 + DuoPages.hinge / 2) / 951, accuracy: 0.0001)

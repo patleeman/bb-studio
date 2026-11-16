@@ -511,17 +511,18 @@ struct RoomLightLayer: View {
     let light: RoomLight
     let seed: String
     var showsOrb = true
+    var spot: SceneLight?
 
     var body: some View {
         GeometryReader { proxy in
             ZStack {
                 grade
                 if showsOrb, let orb {
-                    let spot = RoomLightLayer.spot(seed: seed, size: proxy.size)
+                    let size = spot == nil ? orb.size : orb.size * SceneLight.scale
                     Circle().fill(orb.color.opacity(orb.opacity))
-                        .frame(width: orb.size, height: orb.size)
-                        .shadow(color: orb.color.opacity(0.5), radius: orb.size * 1.4)
-                        .position(spot)
+                        .frame(width: size, height: size)
+                        .shadow(color: orb.color.opacity(0.5), radius: size * 1.4)
+                        .position(spot.map { CGPoint(x: $0.x, y: $0.y) } ?? RoomLightLayer.spot(seed: seed, size: proxy.size))
                 }
             }
         }
@@ -584,6 +585,7 @@ struct RoomFrost: View {
     let layout: DuoLayout
     let light: RoomLight
     let seed: String
+    var spot: SceneLight?
     var botId: String?
     var view: BotThreadsView?
     @Environment(\.look) private var look
@@ -592,7 +594,7 @@ struct RoomFrost: View {
 
     var body: some View {
         ZStack {
-            SceneBackdrop(theme: look.theme, botId: botId, view: view, stillOnly: true)
+            SceneBackdrop(theme: look.theme, botId: botId, view: view, stillOnly: true, light: spot)
             RoomLightLayer(light: light, seed: seed, showsOrb: false)
         }
         .blur(radius: Self.radius, opaque: true)
@@ -620,6 +622,58 @@ struct RoomFrost: View {
     static func seam(_ length: CGFloat) -> CGFloat {
         guard length > 0 else { return 0.5 }
         return min(0.98, max(0.02, (length / 2 + DuoPages.hinge / 2) / length))
+    }
+}
+
+#if DEBUG
+struct RoomLightMarker: View {
+    let spot: SceneLight
+
+    var body: some View {
+        GeometryReader { _ in
+            Color.clear
+                .frame(width: 18, height: 18)
+                .accessibilityElement()
+                .accessibilityLabel("Scene light")
+                .accessibilityIdentifier("roomLightSpot")
+                .position(x: spot.x, y: spot.y)
+        }
+        .ignoresSafeArea()
+    }
+}
+#endif
+
+enum RoomSceneLight {
+    static let corner: CGFloat = 48
+    static let phoneCorner: CGFloat = 58
+
+    static func spot(_ proxy: GeometryProxy, pages: DuoPages?, rail: Bool) -> SceneLight? {
+        let insets = proxy.safeAreaInsets
+        let window = CGSize(width: proxy.size.width + insets.leading + insets.trailing, height: proxy.size.height + insets.top + insets.bottom)
+        return spot(window: window, safeTop: insets.top, safeLeading: insets.leading, safeTrailing: insets.trailing, pages: pages, rail: rail)
+    }
+
+    static func page(window: CGSize, safeLeading: CGFloat, safeTrailing: CGFloat, pages: DuoPages?, rail: Bool) -> CGRect {
+        let railWidth = rail || pages != nil ? max(FoldedChrome.column, safeTrailing) : safeTrailing
+        switch pages {
+        case .sideBySide?:
+            return CGRect(x: safeLeading, y: 0, width: window.width / 2 - DuoPages.hinge / 2 - safeLeading, height: window.height)
+        case .stacked?:
+            return CGRect(x: safeLeading, y: 0, width: window.width - railWidth - safeLeading, height: window.height / 2 - DuoPages.hinge / 2)
+        case nil:
+            return CGRect(x: safeLeading, y: 0, width: window.width - railWidth - safeLeading, height: window.height)
+        }
+    }
+
+    static func spot(window: CGSize, safeTop: CGFloat, safeLeading: CGFloat = 0, safeTrailing: CGFloat, pages: DuoPages?, rail: Bool) -> SceneLight? {
+        guard window.width > 1, window.height > 1 else { return nil }
+        let page = page(window: window, safeLeading: safeLeading, safeTrailing: safeTrailing, pages: pages, rail: rail)
+        if RoomPresenceScreen.wide(page.size) {
+            let column = (page.width - 44 - 28) / 2
+            return SceneLight(x: page.minX + 22 + column - corner / 2, y: safeTop + corner)
+        }
+        if pages == nil && !rail { return SceneLight(x: page.maxX - phoneCorner, y: safeTop + 80) }
+        return SceneLight(x: page.maxX - corner, y: safeTop + corner)
     }
 }
 

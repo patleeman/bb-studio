@@ -138,13 +138,14 @@ void main() {
   vec2 sc = q * u_resolution.y;
   col += white * (0.8 * stars(sc / 6.0, 6.0) + 1.5 * stars(sc / 26.0, 26.0) * (0.75 + 0.25 * sin(u_time * 1.3 + 40.0 * nB))) * night * night * (1.0 - cloud) * smoothstep(0.52, 0.7, q.y);
 
-  vec2 mq = (q - vec2(focus - 0.08, 0.684)) / 0.027;
+  float mr = 0.027 * lightScale();
+  vec2 mq = (q - lightAt(vec2(focus - 0.08, 0.684))) / mr;
   float md = length(mq);
   float ph = u_sky.w * 6.2832;
   float moonUp = smoothstep(0.45, 0.9, night) * (1.0 - 0.8 * cloud);
   vec3 face = vec3(1.0, 0.98, 0.9) * (0.06 + 0.94 * smoothstep(-0.08, 0.12, dot(vec3(mq, sqrt(max(1.0 - md * md, 0.0))), vec3(sin(ph), 0.0, -cos(ph))))) * (0.8 + 0.2 * nB - 0.16 * smoothstep(0.45, 0.7, nA));
   col += vec3(0.5, 0.58, 0.8) * moonUp * (0.4 * exp(-md * 0.5) + 0.08 * exp(-md * 0.1));
-  col = mix(col, face, smoothstep(1.0 + px / 0.027, 1.0 - px / 0.027, md) * min(moonUp * 1.6, 1.0));
+  col = mix(col, face, smoothstep(1.0 + px / mr, 1.0 - px / mr, md) * min(moonUp * 1.6, 1.0));
 
   vec2 cq = vec2(q.x * 0.5 + u_time * 0.006, (q.y - 0.55) / 0.5);
   vec4 c1 = tile(${tileVec("clouds")}, vec2(fract(cq.x), cq.y)) * (0.5 + 0.5 * cloud);

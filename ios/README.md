@@ -534,6 +534,13 @@ sits above the stack while reading up and lands the last row above it; with
 `TEST_RUNNER_ROOM_THEME`. Behind a conversation the room shows the scene
 frosted (`RoomFrost`, no light orb), so a scene's moon or light never sits
 behind messages; on the unfolded Duo only the conversation's page is frosted.
+`RoomLightUITests` checks that a scene's moon or sun, and a conversation's
+light orb, sit small (0.6 of desktop's size) in the top corner of the
+presence's page, clear of the presence, the title, Now, the menu and every
+row, on the iPhone and (with `TEST_RUNNER_ROOM_DUO=1`) the folded Duo and the
+unfolded Duo in landscape and portrait. The phone passes that spot to the scene
+as `light` (`SceneLight`, part of the still's cache key); desktop never sets it,
+so its scenes keep their own placement. `TEST_RUNNER_ROOM_OUT` keeps the stills.
 `RoomQAUITests` covers the rest of the room's QA matrix (one Bot, no tasks,
 XXL, background, long messages, an accessibility audit, slow and offline
 servers, landscape, and unfolding with the conversation open on the Duo). The simulator stretches the window across the

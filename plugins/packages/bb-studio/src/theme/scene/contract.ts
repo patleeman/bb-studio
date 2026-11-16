@@ -4,7 +4,7 @@ export const RIPPLE_SECONDS = 2.6;
 
 export const ENGINE_UNIFORMS = [
   "u_resolution", "u_time", "u_intensity", "u_motion", "u_palette", "u_workers", "u_ripples", "u_needsYou",
-  "u_workerColor", "u_needsYouColor", "u_finishedColor", "u_errorColor", "u_clear", "u_open", "u_cards", "u_layer",
+  "u_workerColor", "u_needsYouColor", "u_finishedColor", "u_errorColor", "u_clear", "u_open", "u_cards", "u_layer", "u_lightSpot",
 ] as const;
 
 export type ClearRect = readonly [number, number, number, number];
@@ -81,6 +81,13 @@ uniform vec4 u_clear;
 uniform vec4 u_open;
 uniform vec4 u_cards[${MAX_CARDS}];
 uniform sampler2D u_layer;
+uniform vec4 u_lightSpot;
+vec2 lightAt(vec2 fallback) {
+  return u_lightSpot.w > 0.5 ? u_lightSpot.xy / u_resolution.y : fallback;
+}
+float lightScale() {
+  return u_lightSpot.w > 0.5 ? u_lightSpot.z : 1.0;
+}
 float openFade(vec2 at, float inset) {
   float fade = 1.0;
   for (int i = 0; i < ${MAX_CARDS}; i++) {
