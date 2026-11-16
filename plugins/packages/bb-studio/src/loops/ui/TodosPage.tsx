@@ -9,7 +9,7 @@ import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageMore, BotPageRow, Bot
 import { useCall, useLive } from "../../ui/live";
 import { isClosed, needsYou, USER_OWNER, type Task } from "../../tasks/contract";
 import { SEVERITY_LABEL, ALL, matches, ownerFilterOf, ownerShort, sectionTasks, taskSection, taskKind, taskStatus, type Names } from "../../tasks/ui/model";
-import { pageFlight, todoBox, type FlightNode } from "../../tasks/ui/board-model";
+import { areaAsks, pageFlight, todoBox, type FlightNode } from "../../tasks/ui/board-model";
 import { AreasSection, DoneBar, PageInFlight, TodoBoxView } from "../../tasks/ui/TasksNow";
 import { SCHEDULED_ICON, scheduledMeta } from "./scheduled-model";
 import { NewAutomationMenu, newKinds, useAutomationEditor, useAutomations } from "../../ui/bot/Automations";
@@ -82,6 +82,17 @@ export function TodosPage({ view, tab: initialTab = "now" }: { view: BotView; ta
     return all.filter((a) => words.every((w) => [a.name, a.covers, a.now ?? "", a.ownerName, ...a.open.map((i) => i.title)].join(" ").toLowerCase().includes(w)));
   }, [areas.data, query]); // eslint-disable-line react-hooks/exhaustive-deps
   const doneTasks = useMemo(() => (searching ? tasks.filter(match) : tasks), [tasks, query]); // eslint-disable-line react-hooks/exhaustive-deps
+  const asksFromAreas = useMemo(() => {
+    const all = areaAsks(areas.data?.areas ?? [], boardTasks);
+    if (!searching) return all;
+    const words = query.trim().toLowerCase().split(/\s+/);
+    return all.filter((a) => words.every((w) => `${a.title} ${a.area}`.toLowerCase().includes(w)));
+  }, [areas.data, boardTasks, query]); // eslint-disable-line react-hooks/exhaustive-deps
+  const openArea = (areaId: string) => {
+    const card = document.querySelector<HTMLElement>(`[data-testid=area-card][data-area="${areaId.replace(/["\\]/g, "")}"]`);
+    card?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    card?.focus({ preventScroll: true });
+  };
   const titles = useMemo(() => new Map(boardTasks.map((t) => [t.id, t.title])), [boardTasks]);
   const titleOf = (id: string) => titles.get(id) ?? null;
   const chat = searching ? [] : pending;
@@ -121,17 +132,17 @@ export function TodosPage({ view, tab: initialTab = "now" }: { view: BotView; ta
       toolbar={<BotPageToolbar search={{ value: query, onChange: setQuery, placeholder: tab === "now" ? "Search tasks" : "Search scheduled" }} filter={tabs}
         newAction={tab === "now" && ownsTasks ? undefined : <NewAutomationMenu kinds={newKinds(bot.kind === "external")} disabled={bot.state !== "active"} onPick={editor.openNew} />}
         onNew={tab === "now" && ownsTasks ? () => setAdding(true) : undefined} newLabel="New task" />}>
-      {tab === "now" && ownsTasks ? <>
+      {tab === "now" && ownsTasks ? <div data-studio-dense-cards="" data-testid="tasks-now" className="contents">
         {tasksError ? <p role="alert" data-testid="tasks-error" className="text-sm text-destructive">{tasksError}</p> : null}
         {board.data ? <div data-testid="tasks-top" className="grid grid-cols-1 items-start gap-5 @4xl/bot-page:grid-cols-[1fr_1.15fr]">
-          <TodoBoxView box={box} chat={chat} names={names} threads={threads} targets={people.targets} now={now} zone={zone} query={searching}
+          <TodoBoxView box={box} chat={chat} areaAsks={asksFromAreas} onOpenArea={openArea} names={names} threads={threads} targets={people.targets} now={now} zone={zone} query={searching}
             onOpen={openTask} onOpenChat={botChat ? () => botChat.onOpen(undefined as never) : null} refresh={refresh}
             adding={adding ? <AddTask onAdd={add} onClose={() => setAdding(false)} /> : null} />
           <PageInFlight nodes={flight} names={names} now={now} titleOf={titleOf} onOpen={openTask} onOpenThread={openThread} query={searching} />
         </div> : tasksError ? null : <TasksLoading />}
         <AreasSection areas={shownAreas} error={areas.error} query={searching} flight={flight} now={now} zone={zone} onOpenTask={(id, title) => openTask({ id, title })} onOpenThread={openThread} />
         {list.data ? <DoneBar tasks={doneTasks} names={names} query={searching} now={now} zone={zone} onOpen={openTask} /> : null}
-      </> : null}
+      </div> : null}
       {tab === "scheduled" && ready ? (
         <BotPageGroup title="Scheduled" count={scheduledCount} testId="tasks-scheduled">
           {editor.error ? <p role="alert" className="pb-2 text-xs text-destructive">{editor.error}</p> : null}

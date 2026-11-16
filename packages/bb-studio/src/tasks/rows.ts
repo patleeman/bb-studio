@@ -11,6 +11,7 @@ export type RowRef = {
   hasWorkers: boolean;
   needsYou: boolean;
   startedAt?: number;
+  stalled?: boolean;
 };
 
 export type RowCounts = { open: number; running: number; waiting: number; todo: number; needsYou: number; done: number; workers: number };

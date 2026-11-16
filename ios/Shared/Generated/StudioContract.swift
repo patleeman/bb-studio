@@ -36245,9 +36245,10 @@ public enum Studio {
     public var workers: [String]?
     public var hasWorkers: Bool?
     public var needsYou: Bool?
+    public var stalled: Bool?
     public var startedAt: Double?
 
-    public init(id: String? = nil, home: String? = nil, under: String? = nil, depth: Int? = nil, `open`: Bool? = nil, workers: [String]? = nil, hasWorkers: Bool? = nil, needsYou: Bool? = nil, startedAt: Double? = nil) {
+    public init(id: String? = nil, home: String? = nil, under: String? = nil, depth: Int? = nil, `open`: Bool? = nil, workers: [String]? = nil, hasWorkers: Bool? = nil, needsYou: Bool? = nil, stalled: Bool? = nil, startedAt: Double? = nil) {
       self.id = id
       self.home = home
       self.under = under
@@ -36256,6 +36257,7 @@ public enum Studio {
       self.workers = workers
       self.hasWorkers = hasWorkers
       self.needsYou = needsYou
+      self.stalled = stalled
       self.startedAt = startedAt
     }
   }
@@ -36926,9 +36928,10 @@ public enum Studio {
     public var workers: [String]?
     public var hasWorkers: Bool?
     public var needsYou: Bool?
+    public var stalled: Bool?
     public var startedAt: Double?
 
-    public init(id: String? = nil, home: String? = nil, under: String? = nil, depth: Int? = nil, `open`: Bool? = nil, workers: [String]? = nil, hasWorkers: Bool? = nil, needsYou: Bool? = nil, startedAt: Double? = nil) {
+    public init(id: String? = nil, home: String? = nil, under: String? = nil, depth: Int? = nil, `open`: Bool? = nil, workers: [String]? = nil, hasWorkers: Bool? = nil, needsYou: Bool? = nil, stalled: Bool? = nil, startedAt: Double? = nil) {
       self.id = id
       self.home = home
       self.under = under
@@ -36937,6 +36940,7 @@ public enum Studio {
       self.workers = workers
       self.hasWorkers = hasWorkers
       self.needsYou = needsYou
+      self.stalled = stalled
       self.startedAt = startedAt
     }
   }
@@ -37619,9 +37623,10 @@ public enum Studio {
     public var workers: [String]?
     public var hasWorkers: Bool?
     public var needsYou: Bool?
+    public var stalled: Bool?
     public var startedAt: Double?
 
-    public init(id: String? = nil, home: String? = nil, under: String? = nil, depth: Int? = nil, `open`: Bool? = nil, workers: [String]? = nil, hasWorkers: Bool? = nil, needsYou: Bool? = nil, startedAt: Double? = nil) {
+    public init(id: String? = nil, home: String? = nil, under: String? = nil, depth: Int? = nil, `open`: Bool? = nil, workers: [String]? = nil, hasWorkers: Bool? = nil, needsYou: Bool? = nil, stalled: Bool? = nil, startedAt: Double? = nil) {
       self.id = id
       self.home = home
       self.under = under
@@ -37630,6 +37635,7 @@ public enum Studio {
       self.workers = workers
       self.hasWorkers = hasWorkers
       self.needsYou = needsYou
+      self.stalled = stalled
       self.startedAt = startedAt
     }
   }
@@ -38294,6 +38300,7 @@ public enum Studio {
     case shown_twice
     case card_without_task
     case open_under_closed
+    case stalled
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
@@ -38303,6 +38310,7 @@ public enum Studio {
       case "shown-twice": self = .shown_twice
       case "card-without-task": self = .card_without_task
       case "open-under-closed": self = .open_under_closed
+      case "stalled": self = .stalled
       default: self = .unknown(value)
       }
     }
@@ -38314,6 +38322,7 @@ public enum Studio {
       case .shown_twice: try container.encode("shown-twice")
       case .card_without_task: try container.encode("card-without-task")
       case .open_under_closed: try container.encode("open-under-closed")
+      case .stalled: try container.encode("stalled")
       case .unknown(let value): try container.encode(value)
       }
     }

@@ -371,7 +371,8 @@ it("In flight: running rows first with a ring, the step and the owner's time, wa
   expect(polish.querySelector("[data-testid=flight-line]")?.textContent).toBe("Shots · Taking screenshots of the fixes");
   expect(texts(flight, "[data-look=waiting] [data-testid=flight-right]")).toEqual(["waiting on someone", "waiting on you", "waiting on a task"]);
   expect(rows[4]!.querySelector("[data-testid=flight-line]")?.textContent).toBe("Waiting on phone polish, then your OK");
-  expect(rows[3]!.querySelector("[data-testid=flight-line]")?.textContent).toBe("Waiting on you");
+  expect(rows[3]!.querySelector("[data-testid=flight-line]")).toBeNull();
+  expect(rows[3]!.querySelector("[data-testid=flight-right]")?.textContent).toBe("waiting on you");
   expect(rows[2]!.querySelector("[data-testid=flight-glyph]")?.getAttribute("data-look")).toBe("waiting");
   expect(flight.querySelectorAll("[data-testid=page-flight-row][data-task-id=task_shots]")).toHaveLength(0);
   const fold = polish.querySelector<HTMLButtonElement>("[data-testid=flight-fold]")!;
@@ -536,4 +537,40 @@ it("checking an own to-do that fails says why in the row, and the check is a 24 
   expect(check.className).toContain("size-6");
   await act(async () => check.click());
   expect(box("tasks-todo")!.querySelector("[data-task-id=loop_o] [data-testid=todo-error]")?.textContent).toBe("The task changed; reload to try again");
+});
+
+it("lists the areas' needs-you items in Your to-do as asks (not one that is already the user's task), counts them, and opens the area card", async () => {
+  const focus = vi.fn();
+  const original = HTMLElement.prototype.focus;
+  HTMLElement.prototype.focus = focus;
+  state.areas = [
+    area("Comms", { open: [{ title: "PR #14 review", since: null, sinceAt: NOW - 6 * DAY, needsUser: true, taskId: null }, { title: "Releases untagged", since: null, sinceAt: null, needsUser: false, taskId: null }] }),
+    area("House", { status: "broken", open: [{ title: "Pay the Con Edison bill", since: null, sinceAt: null, needsUser: true, taskId: "loop_o" }, { title: "Defrost the freezer", since: "2026-09-26", sinceAt: Date.UTC(2026, 8, 26), needsUser: true, taskId: null }] }),
+  ];
+  await render();
+  const todo = box("tasks-todo")!;
+  expect(todo.querySelector("[data-testid=box-detail]")?.textContent).toBe("2 asks · 3 today");
+  const asks = [...todo.querySelectorAll<HTMLElement>("[data-testid=todo-area-ask]")];
+  expect(asks.map((each) => each.textContent)).toEqual(["Defrost the freezerHouse · Sep 26", "PR #14 reviewComms · 6 days"]);
+  expect(asks[0]!.querySelector("button")!.getAttribute("aria-label")).toBe("Defrost the freezer, needs you, from House, Sep 26");
+  expect(todo.textContent!.match(/Pay the Con Edison bill/g)).toHaveLength(1);
+  await act(async () => asks[0]!.querySelector("button")!.click());
+  expect(focus).toHaveBeenCalled();
+  expect(focus.mock.contexts[0]).toBe(container.querySelector("[data-testid=area-card][data-area=House]"));
+  HTMLElement.prototype.focus = original;
+});
+
+it("keeps an area's name whole and shortens who looks after it, and draws the page's cards dense so a scene light can't read through", async () => {
+  state.areas = [area("Communications", { ownerName: "Comms runner", cadence: "4× daily: 7:05 AM, 12:05, 5:05, 10:05 PM" })];
+  await render();
+  const card = container.querySelector("[data-testid=area-card]")!;
+  expect(card.querySelector("[data-testid=area-name]")!.className).toContain("shrink-0");
+  expect(card.querySelector("[data-testid=area-who]")!.className).toContain("truncate");
+  expect(card.querySelector("[data-testid=area-who]")!.className).toContain("min-w-0");
+  const now = box("tasks-now")!;
+  expect(now.hasAttribute("data-studio-dense-cards")).toBe(true);
+  expect(now.querySelectorAll("[data-studio-card]").length).toBeGreaterThanOrEqual(4);
+  const { DENSE_CARD, STUDIO_CARD_CSS } = await import("../../theme/tokens");
+  expect(DENSE_CARD).toContain("[data-studio-dense-cards] [data-studio-card]");
+  expect(STUDIO_CARD_CSS).toContain(`${DENSE_CARD} { background: color-mix(in oklab, var(--canvas) 88%, transparent); -webkit-backdrop-filter: blur(28px)`);
 });

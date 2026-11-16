@@ -18,8 +18,8 @@ export function ProgressRing({ progress, size = 28, label }: { progress: Progres
   );
 }
 
-export function FlightGlyph({ task, needsYou = false, size = 28, label }: { task: Task; needsYou?: boolean; size?: number; label?: string }) {
-  const look = flightLook(task, needsYou);
+export function FlightGlyph({ task, needsYou = false, stalled = false, size = 28, label }: { task: Task; needsYou?: boolean; stalled?: boolean; size?: number; label?: string }) {
+  const look = flightLook(task, needsYou, stalled);
   const text = label ?? LOOK_LABEL[look];
   const box = { width: size, height: size };
   if (task.stale) return <span role="img" aria-label="Ended without a final update" data-testid="flight-glyph" data-look="ended" style={box} className="flex shrink-0 items-center justify-center rounded-full border-[1.5px] border-muted-foreground/50 text-muted-foreground"><Icon name="Check" className={size > 20 ? "size-3" : "size-2"} /></span>;
@@ -35,14 +35,14 @@ export type FlightText = { look: FlightLook; line: string | null; right: string;
 
 export function flightText(node: FlightNode, names: Names, now: number, titleOf: (id: string) => string | null): FlightText {
   const { task } = node;
-  const look = flightLook(task, node.row.needsYou);
+  const look = flightLook(task, node.row.needsYou, node.row.stalled);
   const owner = task.owner === USER_OWNER ? null : ownerShort(task, names);
   const progress = stepProgress(task.progress.step);
-  const wait = waitLabel(task, titleOf);
+  const wait = node.row.stalled && task.state === "in_progress" ? { short: "stalled", long: "Stalled: nothing has moved on it for over six hours" } : waitLabel(task, titleOf);
   const closed = isClosed(task);
   const line = look === "needs-you" && task.needs ? task.needs
     : look === "running" ? [progress ? progress.rest : task.progress.step, task.progress.line].filter(Boolean).join(" · ") || null
-      : look === "waiting" ? task.progress.line || wait.long
+      : look === "waiting" ? task.progress.line || (wait.long.toLowerCase() === wait.short.toLowerCase() ? null : wait.long)
         : task.progress.line;
   const right = closed ? LOOK_LABEL[look]
     : look === "running" ? progress?.label ?? "running"
@@ -105,7 +105,7 @@ function FlightChild({ node, names, now, titleOf, onOpenTask, onOpenThread, dept
     <li>
       <button type="button" data-testid="flight-subtask" data-task-id={node.task.id} data-look={text.look} onClick={() => onOpenTask(node.task)} aria-label={text.aria}
         style={{ paddingLeft: indent }} className="flex min-h-6 w-full min-w-0 cursor-pointer items-center gap-2 rounded-md pr-2 text-left text-xs hover:bg-state-hover focus-visible:bg-state-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-        <FlightGlyph task={node.task} needsYou={node.row.needsYou} size={12} />
+        <FlightGlyph task={node.task} needsYou={node.row.needsYou} stalled={node.row.stalled} size={12} />
         <span className={cn("min-w-0 max-w-[55%] shrink-0 truncate", isClosed(node.task) ? "text-muted-foreground" : "text-foreground")}>{node.task.title}</span>
         <span className="min-w-0 flex-1 truncate text-subtle-foreground">{text.line}</span>
         <span className={cn("shrink-0 text-2xs", text.look === "needs-you" ? "text-warning" : "text-subtle-foreground")}>{text.right}</span>
@@ -127,7 +127,7 @@ export function PageFlightRow({ node, names, now, titleOf, open, onToggle, onOpe
       <div className="flex min-w-0 items-center gap-2">
         <button type="button" onClick={() => onOpenTask(node.task)} aria-label={text.aria}
           className="flex min-w-0 flex-1 cursor-pointer items-center gap-3.5 rounded-md py-2.5 pr-1 text-left hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <FlightGlyph task={node.task} needsYou={node.row.needsYou} />
+          <FlightGlyph task={node.task} needsYou={node.row.needsYou} stalled={node.row.stalled} />
           <span className="flex min-w-0 flex-1 flex-col">
             <span data-testid="flight-title" className="truncate text-sm font-medium text-foreground">{node.task.title}</span>
             {text.line ? <span data-testid="flight-line" className="truncate text-xs text-muted-foreground">{text.line}</span> : null}

@@ -2,8 +2,9 @@ import type Database from "better-sqlite3";
 import { isClosed, type Task } from "./contract";
 import { linksThread, RUNNING, SPAWN_GRACE_MS, type ThreadFact } from "./links";
 import { boardRows, buildRows, flightRows, type RowContext } from "./rows";
+import { STALLED_MS, stalledTasks } from "./stalled";
 
-export const PROBLEM_KINDS = ["worker-without-task", "shown-twice", "card-without-task", "open-under-closed"] as const;
+export const PROBLEM_KINDS = ["worker-without-task", "shown-twice", "card-without-task", "open-under-closed", "stalled"] as const;
 export type ProblemKind = (typeof PROBLEM_KINDS)[number];
 export type TaskProblem = { kind: ProblemKind; text: string; taskIds: string[]; threadId: string | null };
 
@@ -58,5 +59,6 @@ export function checkTasks(all: readonly Task[], facts: readonly ThreadFact[], c
     if (!parent) problems.push({ kind: "open-under-closed", text: `The open task ${name(t)} has a parent that no longer exists.`, taskIds: [t.id], threadId: null });
     else if (isClosed(parent)) problems.push({ kind: "open-under-closed", text: `The open task ${name(t)} is under ${name(parent)}, which is ${parent.state}.`, taskIds: [t.id, parent.id], threadId: null });
   }
+  if (facts.length) for (const id of stalledTasks(all, facts, now)) problems.push({ kind: "stalled", text: `The running task ${name(byId.get(id)!)} has had no work on it for over ${STALLED_MS / 3_600_000} hours: its threads are idle or gone.`, taskIds: [id], threadId: null });
   return problems;
 }

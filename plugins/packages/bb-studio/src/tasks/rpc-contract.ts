@@ -25,6 +25,7 @@ export const rowRef = z.object({
   workers: z.array(z.string()).describe("Worker threads shown under this row (each worker once, at the deepest task it works on)"),
   hasWorkers: z.boolean(),
   needsYou: z.boolean().describe("It, or an open subtask, needs the user"),
+  stalled: z.boolean().optional().describe("Running, but every thread on it has been idle or gone for over six hours"),
   startedAt: z.number().optional().describe("When its current run of work began: the first move to in progress since it was last reopened"),
 });
 export const rowCounts = z.object({
@@ -40,7 +41,7 @@ const rowsOutput = z.object({
   workers: z.array(workerInfo),
 });
 export const problem = z.object({
-  kind: z.enum(["worker-without-task", "shown-twice", "card-without-task", "open-under-closed"]),
+  kind: z.enum(["worker-without-task", "shown-twice", "card-without-task", "open-under-closed", "stalled"]),
   text: z.string(),
   taskIds: z.array(z.string()),
   threadId: z.string().nullable(),

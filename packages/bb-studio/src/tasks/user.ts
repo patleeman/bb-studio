@@ -8,6 +8,7 @@ import { isClosed, needsYou, USER_OWNER, type Task, type TaskEvent } from "./con
 import { tasksContract, type TaskActInput, type TaskView } from "./rpc-contract";
 import { checkTasks, legacyCardsWithoutTask } from "./check";
 import { flightClearedAt } from "./cleared";
+import { stalledTasks } from "./stalled";
 import { ThreadDirectory, type ThreadFact } from "./links";
 import { boardRows, dayStart, flightRows, workerRows, type RowContext, type Rows } from "./rows";
 import { guardTasks, TaskStore } from "./store";
@@ -68,6 +69,17 @@ export class UserTasks {
     this.reads += 1;
     const value = this.deps.thread(id).catch(() => null);
     this.cache.set(id, { at: now, value });
+    return value;
+  }
+
+  private facts: { at: number; value: Promise<ThreadFact[]> } | null = null;
+
+  threadFacts(): Promise<ThreadFact[]> {
+    if (!this.deps.facts) return Promise.resolve([]);
+    const now = Date.now();
+    if (this.facts && now - this.facts.at < THREAD_CACHE_MS) return this.facts.value;
+    const value = this.deps.facts().catch(() => []);
+    this.facts = { at: now, value };
     return value;
   }
 
@@ -141,7 +153,8 @@ export class UserTasks {
   private async rowsView(rows: Rows) {
     const byId = new Map(rows.tasks.map((t) => [t.id, t]));
     const started = this.startedAt(rows.rows.filter((r) => r.open && byId.get(r.id)?.state === "in_progress").map((r) => r.id));
-    const withStart = rows.rows.map((r) => (started.has(r.id) ? { ...r, startedAt: started.get(r.id)! } : r));
+    const stalled = rows.rows.some((r) => r.open && byId.get(r.id)?.state === "in_progress") ? stalledTasks(rows.tasks, await this.threadFacts(), Date.now()) : new Set<string>();
+    const withStart = rows.rows.map((r) => ({ ...r, ...(started.has(r.id) ? { startedAt: started.get(r.id)! } : {}), ...(stalled.has(r.id) ? { stalled: true } : {}) }));
     return { ...rows, rows: withStart, threads: await this.names(rows.tasks), workers: await this.workerInfo(rows.rows.flatMap((r) => r.workers)) };
   }
 

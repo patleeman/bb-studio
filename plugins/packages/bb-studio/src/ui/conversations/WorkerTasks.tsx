@@ -10,7 +10,7 @@ const INK_55 = "text-[color-mix(in_oklab,var(--foreground)_55%,transparent)]";
 const ROW = "flex h-7 w-full min-w-0 items-center gap-1.5 rounded-md px-2 text-left text-[13px] text-foreground outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring aria-[current=page]:bg-state-active";
 
 function TaskGlyph({ node, slot }: { node: FlightNode; slot?: number }) {
-  const look = flightLook(node.task, node.row.needsYou);
+  const look = flightLook(node.task, node.row.needsYou, node.row.stalled);
   if (look === "running" && slot !== undefined) return <span role="img" aria-label="Running" data-status="running" data-testid="worker-dot" data-worker-slot={slot} className="mx-[2.5px] size-[7px] shrink-0 rounded-full bg-[var(--studio-worker)] shadow-[0_0_6px_var(--studio-worker)]" />;
   if (look === "running") return <span role="img" aria-label="Running" data-status="running" className="size-3 shrink-0 animate-spin rounded-full border-[1.5px] border-success border-r-transparent motion-reduce:animate-none" />;
   if (look === "needs-you") return <span role="img" aria-label="Needs you" data-status="needs-you" className="mx-[3px] size-1.5 shrink-0 rounded-full bg-warning" />;
@@ -38,7 +38,7 @@ export function WorkerTaskRow({ node, now, activeThreadId, onOpenThread, targetO
   const single = workers.length === 1 ? workers[0]! : null;
   const selected = workers.some((w) => w.threadId === activeThreadId);
   const slot = workers.map((w) => slotOf(w.threadId)).find((s) => s !== undefined);
-  const look = flightLook(node.task, node.row.needsYou);
+  const look = flightLook(node.task, node.row.needsYou, node.row.stalled);
   const label = `${node.task.title}, ${look === "needs-you" ? "needs you" : look}${workers.length > 1 ? `, ${plural(workers.length, "worker")}` : ""}`;
   const main = (
     <button type="button" data-testid="worker-task" data-task-id={node.task.id} data-look={look} aria-label={label} aria-current={selected && !open ? "page" : undefined}
