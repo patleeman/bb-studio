@@ -58,6 +58,14 @@ export const automationLink = z.object({
   pushedAt: z.number().nullable().default(null),
 });
 export type AutomationLink = z.infer<typeof automationLink>;
+export const WAITING_ON = ["user", "ci", "task", "outside"] as const;
+export type WaitingOnKind = (typeof WAITING_ON)[number];
+export const waitingOn = z.object({
+  kind: z.enum(WAITING_ON),
+  ref: z.string().max(500).nullable().default(null),
+  text: z.string().trim().max(200).nullable().default(null),
+}).describe('What a waiting task waits on: "user" (the user), "ci" (a build or check; ref the run or PR), "task" (another task; ref its id) or "outside" (someone outside; text says who)');
+export type WaitingOn = z.infer<typeof waitingOn>;
 export const card = z.object({
   kind: z.enum(WORK_KINDS),
   messageId: z.string().nullable().default(null),
@@ -95,6 +103,7 @@ export const task = z.object({
   schedule: schedule.nullable().default(null),
   card: card.nullable().default(null),
   automation: automationLink.nullable().default(null),
+  waitingOn: waitingOn.nullable().default(null),
   stale: z.boolean().default(false),
   origin: z.enum(TASK_ORIGINS),
   createdAt: z.number(),
@@ -125,6 +134,7 @@ const fields = {
   source: source.nullable().optional().describe("Where it came from: an email, URL, message or runner report"),
   parentId: z.string().nullable().optional().describe("The parent task, for a subtask"),
   schedule: schedule.nullable().optional().describe("A recurring schedule"),
+  waitingOn: waitingOn.nullable().optional(),
 };
 
 export const createInput = z.object({

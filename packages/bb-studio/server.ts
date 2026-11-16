@@ -3,10 +3,16 @@ import { phoneActs, registerUserTasks } from "./src/tasks/user";
 import { handoffPush, loopPushInput } from "./src/tasks/handoff-push";
 import { registerTasks, TASK_TOOLS } from "./src/tasks/register";
 import { adoptAtStart } from "./src/tasks/migrate";
+import { asFact, linkAtStart, listThreadFacts, ThreadDirectory } from "./src/tasks/links";
+import { SpawnLinks } from "./src/tasks/spawn";
 import { AutomationTasks, readSources } from "./src/tasks/automations";
+import { Areas, leadsFrom, runnersFrom, type AreaLead } from "./src/areas/areas";
+import { rpcErrorStatus } from "./src/kit/server/index";
+import { AreaStore } from "./src/areas/store";
+import { AREA_TOOLS, registerAreas } from "./src/areas/register";
 import { toLoop } from "./src/tasks/views";
 import type { Loop } from "./src/loops/contract";
-import { cardNeedsUser, TaskStore, taskTitle, tasksUnavailable } from "./src/tasks/store";
+import { assertTasksReady, cardNeedsUser, TaskStore, taskTitle, tasksUnavailable } from "./src/tasks/store";
 import { withToolLabel } from "./src/tool-labels";
 import { CONTINUE_TOOL, registerContinueNew } from "./src/continue-new";
 import { runWorkCli } from "./src/work/cli";
@@ -446,7 +452,7 @@ export default async function plugin(bb: BbPluginApi) {
       bot: bot ? bots.instructions(bot) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
       pages: !off.has("page"), minis: !off.has("mini"), appCards, work: true, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
     });
-    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...TASK_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
+    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...TASK_TOOLS, ...AREA_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
   }));
   /** Which conversation a Bot's session is in (src/bot-threads.ts conversationInstructions); "" before Studio has placed it. */
   const conversationNote = (threadId: string): string => {
@@ -703,8 +709,15 @@ export default async function plugin(bb: BbPluginApi) {
   loopsEnabled = loops.enabled;
   const movedToUser = handoffPush({ db, enabled: () => loops.scheduler.settings().enabled, quiet: () => loops.scheduler.quiet(), push: pushLoop, log: (message) => bb.log.warn(message) });
   const work = registerWorkCards(bb, db, { moved: movedToUser });
-  registerTasks(bb, db, postToBot, undefined, movedToUser);
+  const taskThreads = new ThreadDirectory(db);
+  const linkStore = new TaskStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); });
+  const spawnLinks = new SpawnLinks({ store: linkStore, dir: taskThreads, thread: async (threadId) => asFact(await bb.sdk.threads.get({ threadId }).catch(() => null)), log: (message) => bb.log.warn(message) });
+  const threadFacts = () => listThreadFacts(bb.sdk as never);
+  registerTasks(bb, db, postToBot, undefined, movedToUser, { links: spawnLinks, check: async () => (await userTasks.check()).problems });
   const userTasks = registerUserTasks(bb, db, {
+    zone: () => loopTimeZone(process.env, studioSettings.current().todosTimeZone),
+    dir: taskThreads,
+    facts: threadFacts,
     post: postToBot,
     send: async (threadId, text) => { await bb.sdk.threads.send({threadId,mode:'auto',input:[{type:'text',text,mentions:[],visibility:'agent-only'}]} as never); },
     thread: async (threadId) => (await bb.sdk.threads.get({ threadId })) as never,
@@ -733,12 +746,12 @@ export default async function plugin(bb: BbPluginApi) {
   };
   const automationsChanged = () => { tagsChanged(); syncAutomationTasks(); };
   scheduler.onRunStart((key, threadId) => taskStep("run start", () => automationTasks.started(key, threadId)));
-  bb.events.on("thread.idle", ({ thread, lastAssistantText }) => { taskStep("run end", () => automationTasks.settle(thread.id, lastAssistantText, "succeeded")); });
-  bb.events.on("thread.failed", ({ thread, error }) => { taskStep("run end", () => automationTasks.settle(thread.id, typeof error === "string" ? error : null, "failed")); });
+  bb.events.on("thread.idle", ({ thread, lastAssistantText }) => { if (taskStep("run end", () => automationTasks.settle(thread.id, lastAssistantText, "succeeded")) || runners.forThread(thread.id)) areaStep("run end", () => areas.sync()); });
+  bb.events.on("thread.failed", ({ thread, error }) => { if (taskStep("run end", () => automationTasks.settle(thread.id, typeof error === "string" ? error : null, "failed")) || runners.forThread(thread.id)) areaStep("run end", () => areas.sync()); });
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
   const runners: Runners = new Runners({
     db, sdk: bb.sdk, scheduler, changed: automationsChanged,
-    reported: (runnerId, threadId, level, summary) => taskStep("report", () => automationTasks.report(runnerId, threadId, level, summary)),
+    reported: (runnerId, threadId, level, summary) => { const note = taskStep("report", () => automationTasks.report(runnerId, threadId, level, summary)); areaStep("report", () => areas.reported(runnerId, level)); return note; },
     bot: (botId) => bots.stored(botId),
     startedThreads: (botId) => bots.started(botId),
     chain: (botId) => bots.chain(botId),
@@ -808,7 +821,47 @@ export default async function plugin(bb: BbPluginApi) {
     if (moved.created || moved.updated || moved.closed) bb.log.info(`Automation tasks: ${moved.created} made, ${moved.updated} updated, ${moved.closed} closed; backup at ${moved.backup ?? "none"}.`);
     if (moved.backupError) bb.log.warn(`Automation tasks: the backup before mapping failed (${moved.backupError}); mapped anyway.`);
   });
-  triggers.every("automation-tasks", 60_000, () => syncAutomationTasks());
+  void threadFacts().then((facts) => { taskStep("links", () => linkAtStart(linkStore, facts, taskThreads, bb.log)); }, (error) => bb.log.warn(`Task links: threads could not be listed: ${errorText(error)}`));
+  bb.events.on("thread.created", ({ thread }) => { if (!tasksUnavailable(db)) spawnLinks.spawned(asFact(thread)); });
+  bb.events.on("thread.idle", ({ thread }) => { taskStep("links", () => { spawnLinks.ensure(asFact(thread)); spawnLinks.settled(thread.id); }); });
+  bb.events.on("thread.failed", ({ thread }) => { taskStep("links", () => { spawnLinks.ensure(asFact(thread)); spawnLinks.settled(thread.id); }); });
+  bb.events.on("thread.archived", ({ thread }) => { taskStep("links", () => spawnLinks.settled(thread.id)); });
+  bb.events.on("thread.active", ({ thread }) => { taskStep("links", () => { spawnLinks.resumed(thread.id); spawnLinks.ensure(asFact(thread)); }); });
+  const areaStore = new AreaStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); });
+  const areas = new Areas(areaStore, new TaskStore(db), {
+    bot: () => { const bot = bots.stored(); return bot ? { id: bot.id, name: bot.name } : null; },
+    runners: () => runnersFrom(db),
+    caller: (threadId) => {
+      const runner = runners.forThread(threadId);
+      if (runner) return { kind: "runner", runnerId: runner.id };
+      const own = bots.forThread(threadId);
+      if (own) return { kind: "bot", botId: own.id, main: true };
+      const conversation = botThreads.store.conversationBot(threadId);
+      return conversation && bots.stored(conversation) ? { kind: "bot", botId: conversation, main: false } : { kind: "thread" };
+    },
+    zone: () => loopTimeZone(process.env, studioSettings.current().todosTimeZone),
+    leads: () => areaLeads,
+  });
+  let areaLeads: AreaLead[] = [];
+  let areaLeadsRead = false;
+  const areaStep = <T,>(name: string, work: () => T): T | null => (areaLeadsRead ? taskStep(`areas ${name}`, work) : null);
+  const syncAreas = (why: string) => areaStep(why, () => { const out = areas.sync(); if (out.created.length) bb.log.info(`Areas: made ${out.created.join(", ")}.${out.problems.length ? ` Notes: ${out.problems.join("; ")}` : ""}`); return out; });
+  registerAreas(bb, areas, (work) => { assertTasksReady(db); return work(); });
+  const readAreaLeads = async () => {
+    try {
+      const projects = await bb.sdk.projects.list();
+      const found = await Promise.all(leadsFrom(db, new Map(projects.map((p) => [p.id, p.name])), PERSONAL_PROJECT_ID).map(async (lead) => {
+        const thread = await bb.sdk.threads.get({ threadId: lead.thread }).catch((error: unknown) => { if (rpcErrorStatus(error) === 404) return null; throw error; });
+        return thread && !(thread as { archivedAt?: unknown }).archivedAt ? lead : null;
+      }));
+      areaLeads = found.filter((lead): lead is AreaLead => !!lead);
+    } catch (error) { bb.log.warn(`Areas: leads could not be read; kept the last list: ${errorText(error)}`); }
+    areaLeadsRead = true;
+    syncAreas("sync");
+  };
+  void readAreaLeads();
+  triggers.every("area-leads", 30 * 60_000, () => { void readAreaLeads(); });
+  triggers.every("automation-tasks", 60_000, () => { syncAutomationTasks(); areaStep("sync", () => areas.sync()); });
   triggers.every("automation-tasks-prune", 60 * 60_000, () => { taskStep("prune", () => automationTasks.prune()); });
   const restoreMainFailed = (error: unknown) => bb.log.warn(`Couldn't start a new Main: ${errorText(error)}`);
   bb.events.on("thread.deleted", ({ thread }) => {
@@ -1036,6 +1089,7 @@ export default async function plugin(bb: BbPluginApi) {
     automationDelete: (id, botId) => automations.delete(id, botId),
     adoptable: (id) => runners.adoptable(id),
     alert: async (id, line) => { const bot = bots.stored(id); if (bot?.threadId) await alertBot(bb.sdk, { botThreadId: bot.threadId, line, note: "Maintenance alert, already shown to the user. Do not repeat or acknowledge it. Reply exactly [PASS]. Details are in Bot info → Maintenance." }); },
+    taskProblems: async () => (tasksUnavailable(db) ? [] : (await userTasks.check()).problems),
   });
   bb.events.on("thread.idle", ({ thread }) => {
     const bot = bots.list().find((b) => b.threadId === thread.id);

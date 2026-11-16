@@ -188,7 +188,7 @@ export class AutomationTasks {
       id: parentIdOf(src.id), title: src.name, why: "", owner: src.owner, state: "in_progress", kind: "do", options: [], needs: null, priority: "normal",
       conversation: null, project: null, area: null, timing: { due: null, trigger: { type: "none" }, snoozed: false }, attention: { queue: null, push: false },
       progress: { step: null, line: null }, workers: [], outputs: [], source: { kind: "automation", ref: src.id }, parentId: null, schedule: null, card: null,
-      automation: null, stale: false, origin: "task", createdAt: now, updatedAt: now, closedAt: null, closedBy: null,
+      automation: null, waitingOn: null, stale: false, origin: "task", createdAt: now, updatedAt: now, closedAt: null, closedBy: null,
     };
     base.title = src.name;
     base.owner = src.owner;
@@ -290,7 +290,7 @@ export class AutomationTasks {
       id: this.store.newId("task"), title: `${src.name} · ${this.when(now, src.timeZone)}`, why: "", owner: src.owner, state: "in_progress", kind: "do", options: [], needs: null,
       priority: "normal", conversation: null, project: null, area: null, timing: { due: null, trigger: { type: "none" }, snoozed: false }, attention: { queue: null, push: false },
       progress: { step: null, line: null }, workers: [], outputs: [], source: { kind: "automation", ref: src.name }, parentId: parent.id, schedule: null, card: null,
-      automation: { id: src.id, kind: src.kind, role: "run", thread, keys: [], count: 0, lastAt: null, mode: null, clearedAt: null, posted: true, sentAt, nudgedAt: null, nudged: null, severity: null, pushedAt: null },
+      automation: { id: src.id, kind: src.kind, role: "run", thread, keys: [], count: 0, lastAt: null, mode: null, clearedAt: null, posted: true, sentAt, nudgedAt: null, nudged: null, severity: null, pushedAt: null }, waitingOn: null,
       stale: false, origin: "task", createdAt: now, updatedAt: now, closedAt: null, closedBy: null,
     };
     const saved = this.store.save(run);
@@ -526,7 +526,7 @@ export class AutomationTasks {
       priority: "normal", conversation: owner === "cos" ? src.thread : owner.startsWith("thread:") ? owner.slice(7) : null, project: null, area: null,
       timing: { due: null, trigger: { type: "none" }, snoozed: false }, attention: { queue: null, push: false },
       progress: { step: null, line: clip(lines[0]!.text) }, workers: [], outputs: [], source: { kind, ref: src.name }, parentId: parent.id, schedule: null, card: null,
-      automation: { id: src.id, kind: "watcher", role: "finding", thread: src.thread, keys: lines.map((line) => line.key), count: 1, lastAt: at, mode: null, clearedAt: null, posted: false, sentAt: null, nudgedAt: null, nudged: null, severity: highest(lines.map((line) => line.severity)), pushedAt: null },
+      automation: { id: src.id, kind: "watcher", role: "finding", thread: src.thread, keys: lines.map((line) => line.key), count: 1, lastAt: at, mode: null, clearedAt: null, posted: false, sentAt: null, nudgedAt: null, nudged: null, severity: highest(lines.map((line) => line.severity)), pushedAt: null }, waitingOn: null,
       stale: false, origin: "task", createdAt: at, updatedAt: at, closedAt: null, closedBy: null,
     };
     const saved = this.store.save(task);

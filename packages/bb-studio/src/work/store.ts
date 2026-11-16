@@ -66,17 +66,21 @@ export class WorkCardStore {
     return this.save(next);
   }
 
+  ownedByWorker(card: Pick<WorkCard, "id" | "workerThreadId">): boolean {
+    return !!card.workerThreadId && this.tasks.find(card.id)?.owner === `thread:${card.workerThreadId}`;
+  }
+
   markStale(id: string): WorkCard {
     const current = this.get(id);
-    if (isFinished(current)) return current;
-    const at = this.now();
-    return this.save({ ...current, state: "done", stale: true, needs: null, finishedAt: at, updatedAt: at });
+    if (isFinished(current) || current.stale || !this.ownedByWorker(current)) return current;
+    return this.save({ ...current, stale: true, updatedAt: this.now() });
   }
 
   revive(id: string): WorkCard {
     const current = this.get(id);
-    if (!current.stale) return current;
-    return this.save({ ...current, state: "running", stale: false, finishedAt: null, dismissedAt: null, updatedAt: this.now() });
+    if (!current.stale || !this.ownedByWorker(current)) return current;
+    const reopen = isFinished(current) ? { state: "running" as const, finishedAt: null } : {};
+    return this.save({ ...current, ...reopen, stale: false, dismissedAt: null, updatedAt: this.now() });
   }
 
   dismiss(id: string): WorkCard {
@@ -86,7 +90,7 @@ export class WorkCardStore {
   }
 
   clearFinished(threadId: string): number {
-    const finished = this.inFlight(threadId).filter(isFinished);
+    const finished = this.inFlight(threadId).filter((card) => isFinished(card) || card.stale);
     if (!finished.length) return 0;
     const at = this.now();
     this.db.transaction(() => { for (const card of finished) this.write({ ...card, dismissedAt: at }); })();
@@ -122,7 +126,7 @@ export class WorkCardStore {
 
   inFlight(threadId: string): WorkCard[] {
     const since = this.now() - SHOW_FINISHED_MS;
-    return inFlightOrder(this.cards("SELECT record FROM tasks WHERE conversation = ? AND (closed_at IS NULL OR closed_at > ?) ORDER BY rowid", threadId, since).filter((card) => card.dismissedAt === null));
+    return inFlightOrder(this.cards("SELECT record FROM tasks WHERE conversation = ? AND (closed_at IS NULL OR closed_at > ?) ORDER BY rowid", threadId, since).filter((card) => card.dismissedAt === null && !(card.stale && card.updatedAt <= since)));
   }
 
   private cards(sql: string, ...params: unknown[]): WorkCard[] {

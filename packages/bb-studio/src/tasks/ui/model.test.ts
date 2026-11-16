@@ -6,7 +6,7 @@ const NOW = new Date("2026-11-13T15:00:00Z").getTime();
 const t = (patch: Partial<Task> = {}): Task => ({
   id: "task_1", title: "A task", why: "", owner: "patrick", state: "todo", kind: "do", options: [], needs: null, priority: "normal", conversation: null, project: null, area: null,
   timing: { due: null, trigger: { type: "none" }, snoozed: false }, attention: { queue: "queued", push: false }, progress: { step: null, line: null }, workers: [], outputs: [],
-  source: null, parentId: null, schedule: null, card: null, automation: null, stale: false, origin: "task", createdAt: NOW, updatedAt: NOW, closedAt: null, closedBy: null, ...patch,
+  source: null, parentId: null, schedule: null, card: null, automation: null, waitingOn: null, stale: false, origin: "task", createdAt: NOW, updatedAt: NOW, closedAt: null, closedBy: null, ...patch,
 });
 const names = { bot: "Chief of Staff", leads: new Map([["thr_lead", "Larkspur lead"]]), threads: [{ owner: "thread:thr_w", name: "Fix the flaky test", threadId: "thr_w" }] };
 

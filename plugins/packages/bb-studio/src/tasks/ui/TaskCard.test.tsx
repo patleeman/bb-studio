@@ -9,7 +9,7 @@ const NOW = new Date("2026-11-13T15:00:00Z").getTime();
 const base: Task = {
   id: "task_1", title: "Pick a backup provider", why: "The old plan ends Friday.", owner: "patrick", state: "todo", kind: "do", options: [], needs: null, priority: "normal",
   conversation: "thr_main", project: null, area: "Home", timing: { due: null, trigger: { type: "none" }, snoozed: false }, attention: { queue: "surfaced", push: false },
-  progress: { step: null, line: null }, workers: [], outputs: [], source: null, parentId: null, schedule: null, card: null, automation: null, stale: false, origin: "task",
+  progress: { step: null, line: null }, workers: [], outputs: [], source: null, parentId: null, schedule: null, card: null, automation: null, waitingOn: null, stale: false, origin: "task",
   createdAt: NOW - 3_600_000, updatedAt: NOW - 60_000, closedAt: null, closedBy: null,
 };
 const state = vi.hoisted(() => ({

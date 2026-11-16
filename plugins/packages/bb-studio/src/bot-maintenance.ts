@@ -106,6 +106,7 @@ export interface MaintenanceDeps {
   automationDelete(id: string, botId: string): Promise<unknown>;
   adoptable(botId: string): Promise<{ threadId: string; title: string; automationId: string; cron: string | null }[]>;
   alert(botId: string, line: string): Promise<void>;
+  taskProblems?(): Promise<{ text: string; threadId: string | null }[]>;
 }
 const signatureOf = (value: unknown): string => JSON.stringify(value, (_key, part) => part && typeof part === "object" && !Array.isArray(part) ? Object.fromEntries(Object.keys(part).sort().map((key) => [key, part[key]])) : part);
 type LocalAutomation = { model: string | null; provider_id: string | null; reasoning: string | null; id: string; name: string; kind: string; state: string; instruction: string; target: string; target_thread_id: string | null; updated_at: number; last_fired_at: number | null; schedule_json: string; bb_ids: string; project_id: string };
@@ -301,6 +302,10 @@ export class BotMaintenance {
         if (memory && memoryNeedsTidy(memory.markdown, settings.memoryWords, memory.updatedAt, now)) await act("Memory tidy requested", () => this.deps.sdk.threads.send({ threadId: bot.threadId!, mode: "auto", input: [{ type: "text", text: `Maintenance: rewrite Memory page ${memory.id}. Merge duplicates, drop entries older than 60 days that are stale or contradicted, preserve useful facts, and stay under ${settings.memoryWords} words. Page history preserves the old version. Reply exactly [PASS].`, mentions: [], visibility: "agent-only" }] }));
       }
       if (settings.rules.skills) { const skills = await this.deps.curate(botId, dryRun); result.actions.push(`Skills: ${skills.result.replace(/^Dry run: /, "")}`); }
+      if (this.deps.taskProblems && bot.id === this.deps.bots()[0]?.id) {
+        try { for (const p of await this.deps.taskProblems()) result.suggestions.push({ text: `Tasks: ${p.text}`, ...(p.threadId ? { threadId: p.threadId } : {}) }); }
+        catch (error) { result.suggestions.push({ text: `Tasks: the check could not run (${error instanceof Error ? error.message : String(error)})` }); }
+      }
       if (settings.rules.adopt) for (const candidate of await this.deps.adoptable(botId)) if (candidate.cron) result.suggestions.push({ text: `Consider adopting ${candidate.title} as a runner`, threadId: candidate.threadId, automationId: candidate.automationId });
       result.summary = `${dryRun ? "Dry run: would archive" : "Archived"} ${count(archived, "finished thread")}, ${count(workers, "worker")}; ${result.actions.filter((a) => !a.startsWith("Archive")).join("; ") || "nothing else to tidy"}`;
       this.deps.db.prepare("INSERT INTO bot_maintenance_runs (bot_id, at, result) VALUES (?, ?, ?)").run(botId, now, JSON.stringify(result));

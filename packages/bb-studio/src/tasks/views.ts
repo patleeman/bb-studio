@@ -37,7 +37,7 @@ export function taskFromLoop(loop: Loop): Task {
     id: loop.id, title: loop.title, why: loop.why, owner: loop.owner, state: s.state, kind: taskKind(loop.kind), options: loop.options, needs: null,
     priority: loop.priority, conversation: null, project: null, area: loop.area,
     timing: { due: loop.due, trigger: loop.trigger, snoozed: s.snoozed }, attention: { queue: s.queue, push: loop.push },
-    progress: { step: null, line: null }, workers: [], outputs: [], source: loop.source, parentId: null, schedule: null, card: null, automation: null, stale: false,
+    progress: { step: null, line: null }, workers: [], outputs: [], source: loop.source, parentId: null, schedule: null, card: null, automation: null, waitingOn: null, stale: false,
     origin: "loop", createdAt: loop.createdAt, updatedAt: loop.updatedAt, closedAt: loop.closedAt, closedBy: loop.closedBy,
   };
 }
@@ -100,7 +100,7 @@ export function taskFromWork(card: WorkCard): Task {
     kind: "do", options: [], needs: card.needs, priority: "normal", conversation: card.threadId, project: null, area: null,
     timing: { due: null, trigger: { type: "none" }, snoozed: false }, attention: { queue: null, push: false },
     progress: { step: card.step, line: card.line }, workers: base.workers, outputs: [], source: null, parentId: null, schedule: null,
-    card: { kind: card.kind, messageId: card.messageId, messageSeq: card.messageSeq, dismissedAt: card.dismissedAt }, automation: null, stale: card.stale,
+    card: { kind: card.kind, messageId: card.messageId, messageSeq: card.messageSeq, dismissedAt: card.dismissedAt }, automation: null, waitingOn: null, stale: card.stale,
     origin: "work", createdAt: card.createdAt, updatedAt: card.updatedAt, closedAt: card.finishedAt, closedBy: finished ? agentOwner(base) : null,
   };
 }
