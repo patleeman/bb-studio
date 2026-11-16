@@ -71,4 +71,8 @@ export function applyStudioBuilderConfig<T extends Record<string, unknown>>(
   publish: Array<Record<string, unknown>>;
   appId?: string;
   productName?: string;
+  mac: Record<string, unknown> & {
+    entitlements: string;
+    extendInfo: Record<string, unknown>;
+  };
 };

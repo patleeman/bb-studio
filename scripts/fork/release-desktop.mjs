@@ -18,6 +18,12 @@ import {
   parseStudioRelease,
   STUDIO_UPDATE_TEST_ENV,
 } from "../../apps/desktop/scripts/studio-release.fork.mjs";
+import {
+  plistTrueKeys,
+  STUDIO_MAC_USAGE,
+  studioMacAppProblems,
+  UPSTREAM_MAC_ENTITLEMENTS,
+} from "../../apps/desktop/scripts/studio-mac-privacy.fork.mjs";
 import { bumpProblems, foldVersion } from "./release-bump.mjs";
 import {
   caffeinateArgs,
@@ -577,6 +583,33 @@ function verifyApp(files, version) {
     if (!updateConfig.includes(line)) fail(`app-update.yml lacks "${line}"`);
   }
   console.log(`  BB Studio.app is ${version}, ${bundleId}, feed github ${feed.owner}/${feed.repo}`);
+  verifyPrivacy(files.app);
+}
+
+function verifyPrivacy(app) {
+  const info = {};
+  for (const key of Object.keys(STUDIO_MAC_USAGE)) {
+    const value = run(
+      root,
+      "plutil",
+      ["-extract", key, "raw", "-o", "-", join(app, "Contents/Info.plist")],
+      { capture: true, allowFailure: true },
+    );
+    if (value.status === 0) info[key] = value.stdout.trim();
+  }
+  const signed = run(
+    root,
+    "codesign",
+    ["-d", "--entitlements", "-", "--xml", app],
+    { capture: true },
+  ).stdout;
+  const problems = studioMacAppProblems({
+    info,
+    entitlements: plistTrueKeys(signed),
+    upstreamText: git(root, "show", `desktop:apps/desktop/${UPSTREAM_MAC_ENTITLEMENTS}`),
+  });
+  if (problems.length > 0) fail(problems.join("; "));
+  console.log("  Reminders and Calendars usage texts and the calendars entitlement are in place");
 }
 
 function sign(files, version) {
@@ -798,7 +831,10 @@ async function main() {
     const dir = join(syncRoot, `build-v${version}`);
     const files = releaseFiles(join(dir, "apps/desktop"), version);
     build(dir, version);
-    if (!DRY) console.log(`\nBuilt ${files.app}\n  and ${files.dmg}`);
+    if (!DRY) {
+      verifyPrivacy(files.app);
+      console.log(`\nBuilt ${files.app}\n  and ${files.dmg}`);
+    }
     return;
   }
   const tags = studioTags();
