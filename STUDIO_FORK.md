@@ -388,6 +388,18 @@ Fork-only features with no core file of their own (`app-panes` goes through the 
 
 **End-to-end test.** `scripts/fork/updater-e2e.mjs --evidence <dir>` (in a built worktree, not the release one, with `CSC_NAME` set) builds N and N+1 as test builds (`BB_STUDIO_UPDATE_TEST={"root","feedUrl","version"}`): app id `nyc.plee.bbstudio.updatetest`, product "BB Studio Update Test", data dir, user data and ports 38996/38997 under the scratch dir, import from bb and onboarding off, DevTools protocol on port 9339 (so the harness reads the relaunched app's renderer), feed `http://127.0.0.1:<port>/`. The test values are baked into the build; release builds carry `test: null` and read no test switch. It runs N from `/tmp`, first against an empty feed (quiet 404s), then against N+1's zip, blockmap and `latest-mac.yml`, and checks that N downloads, installs and relaunches as N+1. `--github-feed` builds only N with the real feed and checks that it fails quietly. Results of the 12 Nov run: `~/workingdir/.bb-studio-plan/updater/`.
 
+## macOS privacy: Reminders and Calendars (15 Nov)
+
+Agents run as child processes of BB Studio: the server and the host daemon are `BB Studio` itself with `ELECTRON_RUN_AS_NODE=1` (`bb-process.ts`), and agent shells and the CLIs they start (such as `reminders`) descend from them. macOS counts BB Studio.app as the responsible app for all of them, so a Reminders or Calendars request from a shell is asked against BB Studio's Info.plist and the hardened-runtime entitlements of its main executable. Without a usage text macOS denies the request with no prompt and never lists the app under Privacy & Security; bb had none either.
+
+`applyStudioBuilderConfig` ends with `applyStudioMacPrivacy` (`apps/desktop/scripts/studio-mac-privacy.fork.mjs`), so there is no core edit:
+
+- `mac.extendInfo` gains `NSRemindersFullAccessUsageDescription` and `NSCalendarsFullAccessUsageDescription` (macOS 14 and later) and `NSRemindersUsageDescription` and `NSCalendarsUsageDescription` (macOS 13).
+- `mac.entitlements` is `build/entitlements.mac.fork.plist`: upstream's `build/entitlements.mac.plist` plus `com.apple.security.personal-information.calendars`, which covers Calendars and Reminders. The build fails when the two files differ by anything else, so an entitlement upstream adds must be copied in. `entitlementsInherit` stays upstream's: the Electron helpers (renderer, GPU, utility) never ask for Reminders or Calendars, and the processes that run agents are the main executable.
+- The release (`verifyApp`) and `--build-only` check the built app's Info.plist and its signed entitlements (`studioMacAppProblems`). Test: `apps/desktop/test/studio-mac-privacy.fork.test.ts`.
+
+A server moved to a launchd service (`apps/host-daemon/src/server-move`) is not a child of the app, so agents it runs are not covered by this.
+
 ## Import and one-way mirror of bb (10 Nov)
 
 BB Studio starts as a copy of the bb install on the same Mac and then follows it one way. All of it is in `apps/server/src/services/fork-import/` (seam `import-sync`). Core has small hooks in seven files: `server.ts` registers the routes (which also start the jobs), `start-server.ts` calls `forkBeforeDatabase`, `thread-send.ts` calls the fork's write guards, `thread-create.ts` asks the fork's host stand-ins before refusing a fork onto another machine, `dispatch-attempt.ts` lets an empty-input fork start without a turn while a limit is full, `apps/cli/src/commands/server.ts` registers the `bb server mirror` commands, and the CLI command index lists them.

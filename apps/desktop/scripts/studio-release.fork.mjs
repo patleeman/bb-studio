@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { applyStudioMacPrivacy } from "./studio-mac-privacy.fork.mjs";
 
 const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -168,5 +169,5 @@ export function applyStudioBuilderConfig(config, build) {
     config.appId = STUDIO_UPDATE_TEST_IDENTITY.appId;
     config.productName = STUDIO_UPDATE_TEST_IDENTITY.productName;
   }
-  return config;
+  return applyStudioMacPrivacy(config);
 }
