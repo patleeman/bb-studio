@@ -1,4 +1,6 @@
 import type Database from "better-sqlite3";
+import { readdirSync } from "node:fs";
+import { basename, dirname, extname } from "node:path";
 import { isClosed, USER_OWNER, type Task } from "./contract";
 import { backupDatabase } from "./migrate";
 import type { TaskStore } from "./store";
@@ -112,6 +114,16 @@ export function boundTask(all: readonly Task[], threadId: string, open = true): 
   return deepest.find((t) => !isPlaceholder(t)) ?? deepest[0]!;
 }
 
+export function leadThreads(all: readonly Task[]): Set<string> {
+  const count = new Map<string, number>();
+  for (const t of all) {
+    const owner = ownerThread(t);
+    if (!owner || automated(t) || isClosed(t) || t.parentId !== null) continue;
+    count.set(owner, (count.get(owner) ?? 0) + 1);
+  }
+  return new Set([...count].filter(([, n]) => n >= 2).map(([id]) => id));
+}
+
 export type Pairing = { parent: string; child: string; thread: string; parentTitle: string; childTitle: string };
 export type Ambiguous = { thread: string; tasks: string[]; reason: string };
 
@@ -126,11 +138,14 @@ export function pairFor(all: readonly Task[], threadId: string, options: { openO
   const rest = real.length ? real : group;
   const own = rest.filter((t) => ownedBy(t, threadId));
   const leads = rest.filter((t) => !ownedBy(t, threadId));
-  const loose: Task[] = [];
-  for (const child of own) {
-    if (child.parentId) continue;
+  const unparented = own.filter((t) => !t.parentId);
+  if (unparented.length > 1) {
+    out.ambiguous = { thread: threadId, tasks: unparented.map((t) => t.id), reason: "owns several separate tasks" };
+    return out;
+  }
+  for (const child of unparented) {
     const options2 = leads.filter((l) => !related(byId, l, child));
-    if (!options2.length) { if (leads.length === 0) loose.push(child); continue; }
+    if (!options2.length) continue;
     const tops = options2.filter((l) => !options2.some((o) => o.id !== l.id && ancestry(byId, o).some((a) => a.id === l.id)));
     if (tops.length !== 1) {
       out.ambiguous = { thread: threadId, tasks: [child.id, ...tops.map((t) => t.id)], reason: `${tops.length} tasks of other owners also list this thread` };
@@ -140,15 +155,15 @@ export function pairFor(all: readonly Task[], threadId: string, options: { openO
     const under = own.filter((o) => o.id !== child.id && ancestry(byId, o).some((a) => a.id === lead.id));
     const deepest = under.filter((o) => !under.some((d) => d.id !== o.id && ancestry(byId, d).some((a) => a.id === o.id)));
     const parent = deepest.length === 1 ? deepest[0]! : lead;
+    if (!isClosed(child) && isClosed(parent)) {
+      out.ambiguous = { thread: threadId, tasks: [child.id, parent.id], reason: "its open task would go under a closed one" };
+      continue;
+    }
     out.pairs.push({ parent: parent.id, child: child.id, thread: threadId, parentTitle: parent.title, childTitle: child.title });
   }
   if (!own.length && leads.length > 1) {
     const unrelated = leads.filter((l) => !leads.some((o) => o.id !== l.id && related(byId, o, l)));
     if (unrelated.length > 1) out.ambiguous = { thread: threadId, tasks: unrelated.map((t) => t.id), reason: "listed as a worker on several tasks, none of them its own" };
-  }
-  if (loose.length > 1 && !out.ambiguous) {
-    const tops = loose.filter((t) => !loose.some((o) => o.id !== t.id && related(byId, o, t)));
-    if (tops.length > 1) out.ambiguous = { thread: threadId, tasks: tops.map((t) => t.id), reason: "owns several separate tasks" };
   }
   return out;
 }
@@ -159,9 +174,18 @@ export type LinkPlan = { pairs: Pairing[]; drops: string[]; create: WorkerTaskPl
 const factTitle = (fact: ThreadFact) => (fact.title || fact.titleFallback || "").replace(/\s+/g, " ").trim().slice(0, 200) || "Worker thread";
 const factState = (fact: ThreadFact): Task["state"] => (fact.status === "error" || fact.status === "failed" ? "failed" : RUNNING.has(fact.status ?? "") ? "in_progress" : "done");
 
+export function deepestLinked(all: readonly Task[], threadId: string): Task[] {
+  const byId = new Map(all.map((t) => [t.id, t]));
+  const linked = all.filter((t) => !automated(t) && !isClosed(t) && linksThread(t, threadId));
+  return linked.filter((t) => !linked.some((o) => o.id !== t.id && ancestry(byId, o).some((a) => a.id === t.id)));
+}
+
 export function spawnerTask(all: readonly Task[], spawner: string, dir: ThreadDirectory): Task | null {
-  const bound = dir.isWorker(spawner) ? boundTask(all, spawner) : null;
-  if (bound && !isPlaceholder(bound)) return bound;
+  if (dir.isWorker(spawner)) {
+    const real = deepestLinked(all, spawner).filter((t) => !isPlaceholder(t));
+    if (real.length > 1) return null;
+    if (real.length === 1) return real[0]!;
+  }
   const owned = all.filter((t) => !automated(t) && !isClosed(t) && t.owner === `thread:${spawner}` && t.parentId === null && t.state !== "todo");
   return owned.length === 1 ? owned[0]! : null;
 }
@@ -205,7 +229,7 @@ export function planLinks(all: readonly Task[], facts: readonly ThreadFact[], di
   plan.pairs = plan.pairs.filter((p) => p.parent);
   const after = [...byId.values()];
   for (const fact of [...facts].sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))) {
-    if (now - fact.createdAt >= SPAWN_GRACE_MS && needsTask(fact, after, dir)) plan.create.push(workerTaskPlan(after, fact, dir));
+    if (RUNNING.has(fact.status ?? "") && now - fact.createdAt >= SPAWN_GRACE_MS && needsTask(fact, after, dir)) plan.create.push(workerTaskPlan(after, fact, dir));
   }
   return plan;
 }
@@ -223,15 +247,25 @@ export function workerTask(store: TaskStore, p: WorkerTaskPlan): Task {
 
 export type LinkReport = LinkPlan & { created: string[]; backup: string | null; backupError?: string };
 
-const hasLinked = (db: Database.Database) => !!db.prepare("SELECT 1 FROM task_events WHERE type = 'linked' LIMIT 1").get()
-  || !!db.prepare("SELECT 1 FROM tasks WHERE json_extract(record, '$.source.kind') = ? LIMIT 1").get(SPAWN_SOURCE);
+export const BACKUP_LABEL = "task-links";
+
+export function backedUp(db: Database.Database): boolean {
+  const file = db.name;
+  if (!file || file === ":memory:") return true;
+  const ext = extname(file);
+  const prefix = `${basename(file, ext)}.before-${BACKUP_LABEL}-`;
+  try { return readdirSync(dirname(file)).some((name) => name.startsWith(prefix)); } catch { return false; }
+}
 
 export function applyLinks(store: TaskStore, plan: LinkPlan, options: { backup?: boolean } = {}): LinkReport {
   const report: LinkReport = { ...plan, created: [], backup: null };
   if (!plan.pairs.length && !plan.drops.length && !plan.create.length) return report;
-  if (options.backup !== false && !hasLinked(store.db)) {
-    try { report.backup = backupDatabase(store.db, store.now(), "task-links"); }
-    catch (error) { report.backupError = error instanceof Error ? error.message : String(error); }
+  if (options.backup !== false && !backedUp(store.db)) {
+    try { report.backup = backupDatabase(store.db, store.now(), BACKUP_LABEL); }
+    catch (error) {
+      report.backupError = error instanceof Error ? error.message : String(error);
+      return { ...report, pairs: [], drops: [], create: [] };
+    }
   }
   store.db.transaction(() => {
     for (const p of plan.pairs) {
@@ -270,7 +304,7 @@ export function linkAtStart(store: TaskStore, facts: readonly ThreadFact[], dir:
   const plan = planLinks(store.all(), facts, dir, store.now());
   const report = applyLinks(store, plan);
   if (log && (report.pairs.length || report.drops.length || report.created.length)) log.info(`Task links: ${report.pairs.length} paired, ${report.drops.length} dropped, ${report.created.length} made for workers; backup at ${report.backup ?? "none"}.`);
-  if (log && report.backupError) log.warn(`Task links: the backup failed (${report.backupError}); linked anyway.`);
+  if (log && report.backupError) log.warn(`Task links: the backup failed (${report.backupError}); nothing was linked, and the next start tries again.`);
   if (log && report.ambiguous.length) log.warn(`Task links: left ${report.ambiguous.length} ambiguous: ${report.ambiguous.map((a) => `${a.thread} (${a.reason})`).join("; ")}`);
   return report;
 }

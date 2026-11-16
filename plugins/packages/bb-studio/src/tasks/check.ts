@@ -38,7 +38,7 @@ export function checkTasks(all: readonly Task[], facts: readonly ThreadFact[], c
   const rootOfRow = new Map<string, string>();
   for (const row of board.rows) rootOfRow.set(row.id, row.under === null ? row.id : rootOfRow.get(row.under) ?? row.id);
   const holders = new Map<string, string[]>();
-  for (const row of board.rows) for (const w of row.workers) holders.set(w, [...(holders.get(w) ?? []), row.id]);
+  for (const row of board.rows) if (row.open) for (const w of row.workers) holders.set(w, [...(holders.get(w) ?? []), row.id]);
   for (const [threadId, rows] of holders) {
     if (rows.length < 2) continue;
     const roots = new Set(rows.map((id) => rootOfRow.get(id)!));

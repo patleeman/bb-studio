@@ -30,6 +30,7 @@ export class SpawnLinks {
       const pairs = found.pairs.filter((p) => p.parent === taskId || p.child === taskId);
       const drops = found.drop.filter((id) => id !== taskId);
       if (pairs.length || drops.length) applyLinks(this.store, { pairs, drops, create: [], ambiguous: [] }, { backup: false });
+      this.dropStale(threadId);
       if (found.ambiguous && found.ambiguous.tasks.includes(taskId)) notes.push(`Thread ${threadId} is also on ${found.ambiguous.tasks.filter((id) => id !== taskId).join(", ")}; a worker belongs to one task, so take it off the other or make one a subtask (parentId).`);
     }
     return notes.length ? notes.join(" ") : null;
@@ -70,7 +71,18 @@ export class SpawnLinks {
   }
 
   private placeholders(threadId: string): Task[] {
-    return this.store.all().filter((t) => t.source?.kind === "spawn" && t.source.ref === threadId && isPlaceholder(t));
+    return this.store.all().filter((t) => t.source?.kind === "spawn" && t.source.ref === threadId && isPlaceholder(t) && t.state !== "dropped");
+  }
+
+  private hasRealTask(threadId: string): boolean {
+    return this.store.all().some((t) => !isClosed(t) && !isPlaceholder(t) && t.automation === null && t.schedule === null && linksThread(t, threadId));
+  }
+
+  dropStale(threadId: string): string[] {
+    if (!this.hasRealTask(threadId)) return [];
+    const stale = this.placeholders(threadId);
+    if (stale.length) applyLinks(this.store, { pairs: [], drops: stale.map((t) => t.id), create: [], ambiguous: [] }, { backup: false });
+    return stale.map((t) => t.id);
   }
 
   settled(threadId: string): void {
@@ -81,6 +93,7 @@ export class SpawnLinks {
   }
 
   resumed(threadId: string): void {
+    if (this.dropStale(threadId).length) return;
     for (const t of this.placeholders(threadId)) {
       if (t.state !== "done" || t.closedBy !== `thread:${threadId}`) continue;
       this.store.change(t.id, (next) => { next.state = "in_progress"; next.progress.line = null; }, `thread:${threadId}`);

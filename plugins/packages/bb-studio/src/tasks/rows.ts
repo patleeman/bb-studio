@@ -1,5 +1,5 @@
 import { isClosed, needsYou, USER_OWNER, type Task } from "./contract";
-import { ownerThread, rootOf, type ThreadDirectory } from "./links";
+import { leadThreads, ownerThread, rootOf, type ThreadDirectory } from "./links";
 
 export type RowRef = {
   id: string;
@@ -18,16 +18,24 @@ export type Rows = { rows: RowRef[]; tasks: Task[]; counts: RowCounts };
 
 export type RowContext = { since: number; dir: ThreadDirectory };
 
+function wallClock(at: number, zone: string): { y: number; m: number; d: number; ms: number } {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: zone, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" })
+    .formatToParts(new Date(at)).filter((p) => p.type !== "literal").map((p) => [p.type, Number(p.value)]));
+  const y = parts.year!, m = parts.month!, d = parts.day!;
+  return { y, m, d, ms: Date.UTC(y, m - 1, d, parts.hour! % 24, parts.minute!, parts.second!) };
+}
+
 export function dayStart(now: number, zone: string): number {
-  let parts: Record<string, number>;
-  try {
-    parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: zone, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" })
-      .formatToParts(new Date(now)).filter((p) => p.type !== "literal").map((p) => [p.type, Number(p.value)]));
-  } catch {
-    return dayStart(now, "UTC");
+  let today: ReturnType<typeof wallClock>;
+  try { today = wallClock(now, zone); } catch { return dayStart(now, "UTC"); }
+  const midnight = Date.UTC(today.y, today.m - 1, today.d);
+  let at = midnight;
+  for (let i = 0; i < 4; i++) {
+    const next = at + (midnight - wallClock(at, zone).ms);
+    if (next === at) break;
+    at = next;
   }
-  const sinceMidnight = ((parts.hour! % 24) * 3600 + parts.minute! * 60 + parts.second!) * 1000 + (now % 1000);
-  return now - sinceMidnight;
+  return Math.min(at, now);
 }
 
 export function shown(t: Task, since: number): boolean {
@@ -55,6 +63,7 @@ export function buildRows(all: readonly Task[], ctx: RowContext): { roots: Node[
   const byId = new Map(all.map((t) => [t.id, t]));
   const visible = all.filter((t) => shown(t, ctx.since));
   const visibleIds = new Set(visible.map((t) => t.id));
+  const leads = leadThreads(all);
   const isRoot = (t: Task) => {
     const parent = t.parentId ? byId.get(t.parentId) : undefined;
     if (!parent || !visibleIds.has(parent.id)) return true;
@@ -72,7 +81,7 @@ export function buildRows(all: readonly Task[], ctx: RowContext): { roots: Node[
     const children = (childrenOf.get(t.id) ?? []).filter((c) => !seen.has(c.id)).map((c) => make(c, home, seen)).sort(order);
     const deep = new Set(children.flatMap((c) => [...c.deep]));
     const own = [...new Set([...t.workers, ...(ownerThread(t) ? [ownerThread(t)!] : [])])]
-      .filter((id) => id !== home && id !== t.conversation && !deep.has(id) && ctx.dir.isWorker(id));
+      .filter((id) => id !== home && id !== t.conversation && !deep.has(id) && !leads.has(id) && ctx.dir.isWorker(id));
     for (const id of own) deep.add(id);
     return { task: t, children, workers: own, deep, needsYou: (!isClosed(t) && needsYou(t)) || children.some((c) => c.needsYou && !isClosed(c.task)), home };
   };

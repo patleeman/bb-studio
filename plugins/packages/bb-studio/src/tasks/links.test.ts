@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -378,7 +378,7 @@ it("migration on a populated database: one backup, tonight's pair nested, worker
   const threads = new ThreadDirectory(db);
   const ctx = { since: dayStart(NOW, "UTC"), dir: threads };
   const before = checkTasks(store.all(), MIGRATION_THREADS, ctx);
-  expect(before.map((p) => p.kind).sort()).toEqual(["shown-twice", "shown-twice", "worker-without-task"]);
+  expect(before.map((p) => [p.kind, p.threadId]).sort()).toEqual([["shown-twice", "thr_w5"], ["worker-without-task", "thr_w6"]]);
 
   const report = linkAtStart(store, MIGRATION_THREADS, threads);
   expect(report.backup).toBeTruthy();
@@ -392,11 +392,9 @@ it("migration on a populated database: one backup, tonight's pair nested, worker
   const made = report.created.map((id) => store.get(id));
   expect(made.map((t) => [t.title, t.state, t.owner, t.conversation])).toEqual([
     ["Worker with no task", "in_progress", "thread:thr_w6", "thr_main"],
-    ["Its helper, finished", "done", "thread:thr_w7", "thr_lead"],
   ]);
   expect(made[0]!.parentId).toBe("task_y");
-  expect(made[1]!.parentId).toBeNull();
-  expect(made[1]!.closedAt).toBe(NOW - 86_400_000);
+  expect(store.all().some((t) => t.workers.includes("thr_w7"))).toBe(false);
   expect(store.history(made[0]!.id).map((e) => e.type)).toEqual(["created"]);
   expect(store.history("wc_ios").map((e) => e.type)).toEqual(["linked"]);
 
@@ -459,4 +457,135 @@ it("the check also catches one worker on two rows of the same task", async () =>
   const problems = (await user.check()).problems;
   expect(problems.map((p) => [p.kind, p.threadId, [...p.taskIds].sort()])).toEqual([["shown-twice", "thr_w1", [a.id, b.id].sort()]]);
   expect(problems[0]!.text).toMatch(/rows of one task/);
+});
+
+it("a reused idle worker with a real task never gets its made-up task back (review P1-1)", async () => {
+  const { tool, links, store, user } = setup();
+  const made = links.ensure(fact("thr_w1", { parentThreadId: "thr_lead", status: "active" }))!;
+  links.settled("thr_w1");
+  expect(store.get(made.id).state).toBe("done");
+  const real = (await tool("task_create", { title: "Second job", owner: "me", conversation: "thr_main", workers: ["thr_w1"] })).task;
+  links.resumed("thr_w1");
+  expect(store.get(made.id).state).toBe("dropped");
+  expect(store.all().filter((t) => t.state !== "dropped" && t.state !== "done" && t.workers.includes("thr_w1")).map((t) => t.id)).toEqual([real.id]);
+  const rows = (await user.board()).rows;
+  expect(rows.filter((r) => r.workers.includes("thr_w1")).map((r) => r.id)).toEqual([real.id]);
+  expect((await user.check()).problems.filter((p) => p.threadId === "thr_w1")).toEqual([]);
+});
+
+it("resumed() drops a closed made-up task when a real task appeared some other way, and reopens it when there is none", () => {
+  const { links, store } = setup();
+  const made = links.ensure(fact("thr_w1", { parentThreadId: "thr_lead", status: "active" }))!;
+  links.settled("thr_w1");
+  links.resumed("thr_w1");
+  expect(store.get(made.id).state).toBe("in_progress");
+  links.settled("thr_w1");
+  const raw = store.get(made.id);
+  store.write({ ...raw, id: "task_real", title: "Real", source: null, state: "in_progress", closedAt: null, closedBy: null });
+  links.resumed("thr_w1");
+  expect(store.get(made.id).state).toBe("dropped");
+});
+
+it("adding a worker to a task nests its own task only when it has exactly one (review P2-2)", async () => {
+  const { tool, store } = setup();
+  const one = (await tool("task_create", { title: "Own job one", owner: "me" }, "thr_w1")).task;
+  const two = (await tool("task_create", { title: "Own job two", owner: "thread:thr_w1" })).task;
+  const lead = (await tool("task_create", { title: "Unrelated", owner: "cos", conversation: "thr_main", workers: ["thr_w1"] }, "thr_main")).task;
+  expect([store.get(one.id).parentId, store.get(two.id).parentId]).toEqual([null, null]);
+  expect(store.get(lead.id).parentId).toBeNull();
+});
+
+it("never puts an open worker task under a closed lead task at start (review P3-5)", () => {
+  seedThreads(db, THREADS);
+  const store = new TaskStore(db);
+  const mk = (id: string, patch: Partial<Task>): Task => ({
+    id, title: id, why: "", owner: "cos", state: "in_progress", kind: "do", options: [], needs: null, priority: "normal", conversation: "thr_main", project: null, area: null,
+    timing: { due: null, trigger: { type: "none" }, snoozed: false }, attention: { queue: null, push: false }, progress: { step: null, line: null }, workers: [], outputs: [],
+    source: null, parentId: null, schedule: null, card: null, automation: null, waitingOn: null, stale: false, origin: "task", createdAt: NOW, updatedAt: NOW, closedAt: null, closedBy: null, ...patch,
+  });
+  store.write(mk("task_lead_done", { owner: "thread:thr_lead", workers: ["thr_w1"], state: "done", closedAt: NOW - 1000, closedBy: "thread:thr_lead" }));
+  store.write(mk("task_own_open", { owner: "thread:thr_w1", workers: ["thr_w1"] }));
+  const plan = planLinks(store.all(), THREADS, new ThreadDirectory(db), NOW);
+  expect(plan.pairs).toEqual([]);
+  expect(plan.ambiguous.map((a) => a.reason)).toEqual(["its open task would go under a closed one"]);
+});
+
+it("a thread that owns two jobs is a lead: not drawn as a worker on each, not flagged (review P2-3)", async () => {
+  const { tool, user, store } = setup();
+  await tool("task_create", { title: "Build", owner: "thread:thr_w1", workers: ["thr_w1"] });
+  await tool("task_create", { title: "Keys", owner: "thread:thr_w3", workers: ["thr_w3"] });
+  const one = (await tool("task_create", { title: "Lead job one", owner: "thread:thr_w2" }, "thr_main")).task;
+  const two = (await tool("task_create", { title: "Lead job two", owner: "thread:thr_w2" }, "thr_main")).task;
+  const board = await user.board();
+  expect(board.rows.filter((r) => r.id === one.id || r.id === two.id).map((r) => r.workers)).toEqual([[], []]);
+  expect((await user.workers()).rows.map((r) => r.id)).not.toContain(one.id);
+  expect((await user.check()).problems).toEqual([]);
+  const reused = (await tool("task_create", { title: "Earlier", owner: "thread:thr_w1", workers: ["thr_w1"] })).task;
+  await tool("task_update", { id: reused.id, state: "done" });
+  expect(store.get(reused.id).state).toBe("done");
+  expect((await user.check()).problems).toEqual([]);
+});
+
+it("a nested spawner with two tasks gives its worker's made-up task no parent (review P3-1)", async () => {
+  const threads = [...THREADS, fact("thr_sub", { parentThreadId: "thr_w1", title: "Sub-worker", status: "active" })];
+  const { tool, links } = setup(threads);
+  await tool("task_create", { title: "A", owner: "cos", workers: ["thr_w1"] }, "thr_main");
+  await tool("task_create", { title: "B", owner: "me", workers: ["thr_w1"] });
+  const made = links.ensure(threads.at(-1)!)!;
+  expect(made.parentId).toBeNull();
+});
+
+it("takes the backup even when a live write landed first, and links nothing when the backup fails (review P3-2)", () => {
+  dir = mkdtempSync(join(tmpdir(), "task-links-"));
+  db.close();
+  db = new Database(join(dir, "data.db"));
+  for (const sql of MIGRATIONS) db.exec(sql);
+  seedThreads(db, MIGRATION_THREADS);
+  const store = new TaskStore(db);
+  seedTonight(store);
+  const links = new SpawnLinks({ store, dir: new ThreadDirectory(db), thread: async () => null });
+  links.ensure(fact("thr_w6", { parentThreadId: "thr_lead", status: "active" }));
+  const report = linkAtStart(store, MIGRATION_THREADS, new ThreadDirectory(db));
+  expect(report.pairs).toHaveLength(1);
+  expect(report.backup).toBeTruthy();
+
+  const other = mkdtempSync(join(tmpdir(), "task-links-ro-"));
+  const file = join(other, "data.db");
+  const second = new Database(file);
+  for (const sql of MIGRATIONS) second.exec(sql);
+  seedThreads(second, MIGRATION_THREADS);
+  const s2 = new TaskStore(second);
+  seedTonight(s2);
+  const before = JSON.stringify(s2.all());
+  chmodSync(other, 0o555);
+  try {
+    const failed = linkAtStart(s2, MIGRATION_THREADS, new ThreadDirectory(second));
+    expect(failed.backupError).toBeTruthy();
+    expect(failed.pairs).toEqual([]);
+    expect(JSON.stringify(s2.all())).toBe(before);
+  } finally {
+    chmodSync(other, 0o755);
+    second.close();
+    rmSync(other, { recursive: true, force: true });
+  }
+});
+
+it("work_card_create on a made-up task takes the caller's title, and a second call says the card is already posted (review P3-3)", async () => {
+  const { tools, links, store } = setup();
+  const made = links.ensure(fact("thr_w1", { parentThreadId: "thr_lead", status: "active", title: "thread title" }))!;
+  const first = JSON.parse(await tools.work_card_create!.execute({ title: "Phone build", kind: "worker", workerThreadId: "thr_w1" }, { threadId: "thr_main" }));
+  expect(first.id).toBe(made.id);
+  expect(first.post).toMatch(/Post this line once/);
+  expect(store.get(made.id)).toMatchObject({ title: "Phone build", conversation: "thr_main" });
+  const again = JSON.parse(await tools.work_card_create!.execute({ title: "Phone build 2", kind: "worker", workerThreadId: "thr_w1" }, { threadId: "thr_main" }));
+  expect(again.post).toBeUndefined();
+  expect(again.note).toMatch(/already has its card in thread thr_main; don't post it again/);
+  expect(store.get(made.id).title).toBe("Phone build");
+});
+
+it("starts the user's day at local midnight on daylight-saving days (review P3-6)", () => {
+  expect(new Date(dayStart(new Date("2026-11-01T12:00:00Z").getTime(), "America/New_York")).toISOString()).toBe("2026-11-01T04:00:00.000Z");
+  expect(new Date(dayStart(new Date("2026-03-08T16:00:00Z").getTime(), "America/New_York")).toISOString()).toBe("2026-03-08T05:00:00.000Z");
+  expect(new Date(dayStart(new Date("2026-03-08T04:30:00Z").getTime(), "America/New_York")).toISOString()).toBe("2026-03-07T05:00:00.000Z");
+  expect(new Date(dayStart(new Date("2026-10-25T09:00:00Z").getTime(), "Europe/London")).toISOString()).toBe("2026-10-24T23:00:00.000Z");
 });

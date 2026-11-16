@@ -6,7 +6,7 @@ import { changes, createInput, directiveFor, isFinished, rpcContract, WORK_ID, t
 import { WorkCardStore } from "./store";
 import { assertTasksReady, guardTasks } from "../tasks/store";
 import { closedByUser, KEPT_CLOSED, type Task } from "../tasks/contract";
-import { boundTask, ThreadDirectory } from "../tasks/links";
+import { boundTask, isPlaceholder, ThreadDirectory } from "../tasks/links";
 
 type TimelineRow = { id: string; kind?: string; role?: string; text?: string; messageSeq?: number };
 type TimelinePage = { rows?: TimelineRow[]; timelinePage?: { olderCursor?: { anchorSeq: number; anchorId: string } | null } };
@@ -83,7 +83,9 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     if (task.automation || task.schedule) throw new Error("That task is an automation's; it has no work card.");
     if (task.card && task.conversation) return store.get(task.id);
     const worker = input.workerThreadId ?? null;
+    const madeUp = isPlaceholder(task);
     store.tasks.change(task.id, (t) => {
+      if (madeUp) { t.title = input.title; t.conversation = input.threadId; }
       t.card = { kind: input.kind ?? "task", messageId: null, messageSeq: null, dismissedAt: null };
       if (t.conversation === null) t.conversation = input.threadId;
       if (worker) t.workers = [worker, ...t.workers.filter((w) => w !== worker)];
@@ -96,9 +98,10 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
   const create = (input: CreateInput & { threadId: string; taskId?: string }) => {
     const existing = target(input);
     if (existing) {
+      const posted = !!existing.card && !!existing.conversation;
       const card = attach(existing, input);
-      name(card, null);
-      return { card, directive: directiveFor(card.id) };
+      if (!posted) name(card, null);
+      return { card, directive: directiveFor(card.id), ...(posted ? { posted: card.threadId } : {}) };
     }
     const card = store.create(input);
     name(card, null);
@@ -157,7 +160,9 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
       assertTasksReady(db);
       const threadId = input.threadId ?? ctx.threadId;
       if (!threadId) return "Pass threadId: the conversation the card goes in.";
-      const { card, directive } = create({ ...input, threadId });
+      const made = create({ ...input, threadId });
+      const { card, directive } = made;
+      if ("posted" in made) return JSON.stringify({ id: card.id, directive, note: `This task already has its card in thread ${made.posted}; don't post it again. Update it with work_card_update or task_update.` });
       return JSON.stringify({ id: card.id, directive, post: `Post this line once, on its own line, in thread ${threadId}: ${directive}` });
     },
   });
