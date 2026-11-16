@@ -1,4 +1,10 @@
 import {
+  STUDIO_AUTO_UPDATE_FEED,
+  STUDIO_UPDATES_ENABLED,
+  STUDIO_VERSION_FEED_BASE_URL,
+  type StudioAutoUpdateFeed,
+} from "./studio-release.fork.js";
+import {
   createBbDesktopVersionFeedFileName,
   type BbDesktopVersionFeedPlatform,
 } from "@bb/desktop-contract";
@@ -6,8 +12,8 @@ import {
 type DesktopReleaseChannel = "latest" | "nightly";
 
 interface DesktopReleaseInfo {
-  appId: "dev.bb.desktop" | "dev.bb.desktop.nightly";
-  applicationName: "bb" | "bb Nightly";
+  appId: "nyc.plee.bbstudio" | "nyc.plee.bbstudio.nightly";
+  applicationName: "BB Studio" | "BB Studio Nightly";
   channel: DesktopReleaseChannel;
   iconFileName: "icon.png" | "icon-nightly.png";
   releaseTag: "desktop-latest" | "desktop-nightly";
@@ -21,12 +27,12 @@ export function createDesktopReleaseInfo(
   const releaseTag = nightly ? "desktop-nightly" : "desktop-latest";
 
   return {
-    appId: nightly ? "dev.bb.desktop.nightly" : "dev.bb.desktop",
-    applicationName: nightly ? "bb Nightly" : "bb",
+    appId: nightly ? "nyc.plee.bbstudio.nightly" : "nyc.plee.bbstudio",
+    applicationName: nightly ? "BB Studio Nightly" : "BB Studio",
     channel,
     iconFileName: nightly ? "icon-nightly.png" : "icon.png",
     releaseTag,
-    updateReleaseBaseUrl: `https://github.com/get-bb/bb/releases/download/${releaseTag}/`,
+    updateReleaseBaseUrl: STUDIO_VERSION_FEED_BASE_URL,
   };
 }
 
@@ -45,6 +51,8 @@ function resolveBuiltDesktopReleaseChannel(
   );
 }
 
+export const DESKTOP_UPDATES_ENABLED = STUDIO_UPDATES_ENABLED;
+
 export const DESKTOP_RELEASE_CHANNEL = resolveBuiltDesktopReleaseChannel(
   process.env.BB_DESKTOP_RELEASE_CHANNEL,
 );
@@ -60,16 +68,13 @@ export function createDesktopUpdateFeedUrl(
   return `${DESKTOP_UPDATE_RELEASE_BASE_URL}${createBbDesktopVersionFeedFileName(platform)}`;
 }
 
-export interface DesktopAutoUpdateFeedConfig {
+export type DesktopAutoUpdateFeedConfig = StudioAutoUpdateFeed & {
   channel: DesktopReleaseChannel;
-  provider: "generic";
-  url: string;
-}
+};
 
 export const DESKTOP_AUTO_UPDATE_FEED_CONFIG: DesktopAutoUpdateFeedConfig = {
   channel: DESKTOP_RELEASE_CHANNEL,
-  provider: "generic",
-  url: DESKTOP_UPDATE_RELEASE_BASE_URL,
+  ...STUDIO_AUTO_UPDATE_FEED,
 };
 
 interface DesktopUpdateSupport {
