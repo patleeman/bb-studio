@@ -11,8 +11,7 @@ import { STUDIO_KEY_SETTINGS } from "./keys";
 import { pluginSecretsDir, StudioKeyStore } from "./key-store";
 import { describeMigration, LEGACY_SETTINGS, migrateSettings, needsSettingsMigration } from "./migrate";
 import { StudioSettingsStore } from "./store";
-import { isHiddenSetting, SETTINGS_CHANNEL } from "./schema";
-import { desktopHudEnabled } from "../desktop/gate";
+import { SETTINGS_CHANNEL } from "./schema";
 import { loopTimeZone } from "./constants";
 
 const MOBILE_PLUGIN_ID = "mobile";
@@ -56,14 +55,13 @@ export async function registerSettings(bb: BbPluginApi, pluginId: string): Promi
   store.onChange(() => void bb.realtime.publish(SETTINGS_CHANNEL, {}));
   keys.onChange(() => void bb.realtime.publish(SETTINGS_CHANNEL, {}));
 
-  const desktopControl = desktopHudEnabled(process.env);
   const apiKeys = async () => {
     const set = await keys.status();
     return { keys: Object.entries(STUDIO_KEY_SETTINGS).map(([key, setting]) => ({ key, label: setting.label, description: setting.description, set: set[key] === true })) };
   };
   const answer = () => ({
-    values: { ...store.current(), desktopControl },
-    changed: Object.keys(store.explicit()).filter((key) => !isHiddenSetting(key)),
+    values: { ...store.current() },
+    changed: Object.keys(store.explicit()),
     timeZone: loopTimeZone(process.env, store.current().todosTimeZone),
     defaultTimeZone: loopTimeZone(process.env),
   });
@@ -78,7 +76,7 @@ export async function registerSettings(bb: BbPluginApi, pluginId: string): Promi
   bb.rpc.register(settingsContract, {
     "settings.get": async () => answer(),
     "settings.set": async ({ values }) => {
-      await store.set(Object.fromEntries(Object.entries(values).filter(([key]) => !isHiddenSetting(key))));
+      await store.set(values);
       return answer();
     },
     "settings.keys.get": () => apiKeys(),
