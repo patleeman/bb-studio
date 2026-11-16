@@ -1,7 +1,15 @@
+import UIKit
 import XCTest
 @testable import BBStudio
 
 final class ComposerTests: XCTestCase {
+    func testTheFieldsLineSharesTheButtonsCentre() {
+        let line = UIFont.preferredFont(forTextStyle: .body).lineHeight
+        let centre = ComposerRow.lift + ComposerField.verticalInset + line / 2
+        XCTAssertEqual(centre, ComposerRow.button / 2, accuracy: 0.5)
+        XCTAssertGreaterThanOrEqual(ComposerRow.button, 44)
+    }
+
     func testSmartReactionRules() {
         XCTAssertEqual(Directive.reactions(in: "Answer\n::reactions{items=\"👍 Ship it|🧪 Tests, then ship\"}"),
             ["👍 Ship it", "🧪 Tests, then ship"])

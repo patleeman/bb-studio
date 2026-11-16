@@ -166,6 +166,7 @@ struct SceneBackdrop: View {
     let theme: LookTheme
     var botId: String?
     var view: BotThreadsView?
+    var stillOnly = false
     @Environment(\.look) private var look
     @Environment(\.scenePhase) private var phase
     @Environment(\.displayScale) private var scale
@@ -185,7 +186,7 @@ struct SceneBackdrop: View {
             let shown = theme.kind == .scene ? SceneStills.shared.cached(SceneStills.key(theme: theme, mode: look.mode, size: size, scale: min(2, scale))) ?? image : image
             ZStack {
                 Color(lookHex: theme.scene?.fallback ?? look.tokens.canvas)
-                if store.liveSceneRuns(foreground: phase == .active) {
+                if !stillOnly, store.liveSceneRuns(foreground: phase == .active) {
                     LiveSceneView(theme: theme.id, mode: look.mode, size: geo.size, signals: SceneSignals.payload(botId: botId, view: view))
                 } else if let image = shown {
                     ParallaxImage(image: image, amount: Self.parallax)
@@ -242,6 +243,10 @@ struct ParallaxImage: UIViewRepresentable {
 
     func updateUIView(_ view: UIImageView, context: Context) {
         if view.image !== image { view.image = image }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIImageView, context: Context) -> CGSize? {
+        proposal.replacingUnspecifiedDimensions(by: image.size)
     }
 }
 

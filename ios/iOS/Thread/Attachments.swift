@@ -50,6 +50,7 @@ struct PendingAttachment: Identifiable, Equatable {
 struct AttachmentMenu: View {
     @Binding var items: [PendingAttachment]
     var symbol = "paperclip"
+    var tint: Color?
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var choosingPhotos = false
     @State private var usingCamera = false
@@ -63,7 +64,11 @@ struct AttachmentMenu: View {
             }
             Button { choosingFiles = true } label: { Label("Choose File", systemImage: "folder") }
         } label: {
-            Image(systemName: symbol).font(.title3).frame(width: 36, height: 36)
+            Image(systemName: symbol)
+                .font(tint == nil ? .title3 : .title3.weight(.medium))
+                .foregroundStyle(tint.map(AnyShapeStyle.init) ?? AnyShapeStyle(.tint))
+                .frame(width: ComposerRow.button, height: ComposerRow.button)
+                .contentShape(.rect)
         }
         .accessibilityLabel("Attach")
         .photosPicker(isPresented: $choosingPhotos, selection: $photoItems, maxSelectionCount: 6, matching: .images)

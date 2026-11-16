@@ -524,6 +524,16 @@ whole-window PNGs in the app's Documents, and `TEST_RUNNER_ROOM_RECORD=1` runs
 `testTheRecording` with `qa-duo/record?start` frames. `RoomSwipeUITests` pages
 the conversations (each in its own light) and swipes the presence between Bots
 (`TEST_RUNNER_ROOM_SWIPE_RECORD=1` slows it for a screen recording);
+`RoomBottomStackUITests` (iPhone, or the Duo with `TEST_RUNNER_ROOM_DUO=1`
+for the folded and unfolded pages) stands the room's conversation up with In
+flight showing and checks, from the app's own frames (`qa-duo/layout` reports
+each transcript's bottom stack, last row and ↓), that the last row ends above
+In flight and the composer with the keyboard down, up and with text, that the ↓
+sits above the stack while reading up and lands the last row above it; with
+`TEST_RUNNER_ROOM_OUT` it keeps the presence and conversation stills per
+`TEST_RUNNER_ROOM_THEME`. Behind a conversation the room shows the scene
+frosted (`RoomFrost`, no light orb), so a scene's moon or light never sits
+behind messages; on the unfolded Duo only the conversation's page is frosted.
 `RoomQAUITests` covers the rest of the room's QA matrix (one Bot, no tasks,
 XXL, background, long messages, an accessibility audit, slow and offline
 servers, landscape, and unfolding with the conversation open on the Duo). The simulator stretches the window across the

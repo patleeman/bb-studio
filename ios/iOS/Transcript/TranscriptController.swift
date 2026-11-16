@@ -898,6 +898,17 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     var composerFrame: CGRect { composerHost.view.frame }
     var isAnimating: Bool { animating }
+
+    #if DEBUG
+    var qaGeometry: [String: Any] {
+        func box(_ rect: CGRect) -> [String: Any] { ["x": rect.minX, "y": rect.minY, "width": rect.width, "height": rect.height] }
+        var out: [String: Any] = ["stack": box(composerHost.view.convert(composerHost.view.bounds, to: nil)), "atEnd": atEnd,
+                                  "insetBottom": collectionView.contentInset.bottom, "pillShown": pill.shown]
+        if pill.shown { out["pill"] = box(pillHost.view.convert(pillHost.view.bounds, to: nil)) }
+        if let last = layout.ids.last, let frame = layout.frame(of: last) { out["lastRow"] = box(collectionView.convert(frame, to: nil)) }
+        return out
+    }
+    #endif
 }
 
 /// A row's id as the diffable data source holds it. Swift 6 requires the
