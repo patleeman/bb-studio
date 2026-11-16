@@ -73,19 +73,28 @@ export function usePanelTabNativeDrag(
 }
 
 const WorkbenchPanelContext = createContext<string | null>(null);
+const WorkbenchPaneFocusContext = createContext(true);
 
 export function WorkbenchPanelScope({
   panelStateId,
+  isFocused = true,
   children,
 }: {
   panelStateId: string | undefined;
+  isFocused?: boolean;
   children: ReactNode;
 }) {
   return (
     <WorkbenchPanelContext.Provider value={panelStateId ?? null}>
-      {children}
+      <WorkbenchPaneFocusContext.Provider value={isFocused}>
+        {children}
+      </WorkbenchPaneFocusContext.Provider>
     </WorkbenchPanelContext.Provider>
   );
+}
+
+export function useWorkbenchPaneFocused(): boolean {
+  return useContext(WorkbenchPaneFocusContext);
 }
 
 export function isFixedPanelTab(tab: SecondaryPanelRenderableTab): boolean {
