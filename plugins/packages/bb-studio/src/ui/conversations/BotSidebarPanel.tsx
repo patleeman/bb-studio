@@ -10,12 +10,12 @@
 //   its time, then the latest reply (a spinner while it works), or, amber
 //   and outlined, why it needs the user. A fork made at a message has no row:
 //   it shows at that message, and its work and needs-you show on its parent's row.
-// - Workers: the running ones and those needing the user, one line each, a
-//   status glyph, the title, the repo it runs in
-//   and a short time. The five newest finished (the server's view; a run of
-//   one title folded into "×5") fold into one "N done" row that opens them in
-//   place; older ones are on the Archive page (the ··· menu). A worker never
-//   asks the user itself: the Bot raises it in the worker's conversation.
+// - Workers: the open tasks that have workers (tasks.workers), grouped by
+//   conversation, one line each with the task's title, its state and a short
+//   time; a task with several workers folds them underneath. Tasks done today
+//   fold into one "N done today" row. Without tasks it lists the worker
+//   threads as before. A worker never asks the user itself: the Bot raises it
+//   in the worker's conversation.
 // - At the bottom, each Bot's icon (the shown one highlighted, an amber mark
 //   when it needs the user) and + for a new Bot. A click, a two-finger swipe
 //   sideways on the sidebar or "Studio: Show Bot <n>" (Ctrl+Option+1…9)
@@ -52,6 +52,8 @@ import { SpaceHeader, spaceLine, spacePageAt, type SpacePage } from "./SpaceHead
 import { useAppMode } from "./app-mode";
 import { accentOf } from "../../theme/engine";
 import { publishSceneSignals, workerSlots } from "../../theme/signals";
+import { treeOf, workerGroups } from "../../tasks/ui/board-model";
+import { WorkerTasks } from "./WorkerTasks";
 import { shownAppearance, useAppearanceDraft, useThemeRegistry } from "../../theme/ui/state";
 import { NONE_ID, saveTheme, themeChoices, type ThemeChoice } from "../../theme/ui/quick";
 import { errorMessage } from "../../kit/format";
@@ -225,6 +227,12 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const [doneOpen, setDoneOpen] = useState(false);
   useEffect(() => { if (split.done.some((row) => row.selected)) setDoneOpen(true); }, [split]);
   const listed = useMemo(() => new Set([...conversations, ...workers].map((row) => row.threadId)), [conversations, workers]);
+  const taskWorkers = useLive("tasks.workers", {}, { enabled: !!bot, pollMs: 15_000 });
+  const taskBoard = useLive("tasks.board", {}, { enabled: !!bot && !!taskWorkers.data, pollMs: 30_000 });
+  const ownConversations = useMemo(() => new Set((data?.conversations ?? []).map((row) => row.threadId)), [data]);
+  const keepGroup = useCallback((conversation: string | null) => (bot?.primary ? true : conversation !== null && ownConversations.has(conversation)), [bot?.primary, ownConversations]);
+  const workerTaskGroups = useMemo(() => (taskWorkers.data ? workerGroups(taskWorkers.data, keepGroup) : []).map((group) => ({ ...group, name: data?.conversations.find((row) => row.threadId === group.conversation)?.title ?? group.name })), [taskWorkers.data, keepGroup, data]);
+  const workerTasksDone = useMemo(() => (taskBoard.data ? treeOf(taskBoard.data).filter((node) => !node.row.open && node.row.hasWorkers && keepGroup(node.row.home)) : []), [taskBoard.data, keepGroup]);
 
   // The thread on screen: remembered as this Bot's last one; a thread of another Bot shows that Bot.
   // A switch leaves the thread on screen (or lands on one) without following it back to its own Bot:
@@ -392,15 +400,20 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
       </section>
       <section aria-label="Workers" data-testid="workers" className="flex flex-col pb-2">
         <div className={SECTION_HEAD}><h3>Workers</h3></div>
-        {split.active.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} slot={slots?.get(row.threadId)} />)}
-        {split.done.length ? (
-          <button type="button" data-testid="workers-done" aria-expanded={doneOpen} onClick={() => setDoneOpen((open) => !open)}
-            className="flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none">
-            <Icon name={doneOpen ? "ChevronDown" : "ChevronRight"} className="size-3 shrink-0" />{doneLabel(split.done.length)}
-          </button>
-        ) : null}
-        {doneOpen ? split.done.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} />) : null}
-        {data && !workers.length ? <Note>No workers yet</Note> : null}
+        {taskWorkers.data ? (
+          <WorkerTasks groups={workerTaskGroups} done={workerTasksDone} now={now} activeThreadId={activeThreadId} onOpenThread={openThread}
+            targetOf={(id) => rowTargets.get(id) ?? null} slotOf={(id) => slots?.get(id)} showNames empty={<Note>No workers right now</Note>} />
+        ) : <>
+          {split.active.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} slot={slots?.get(row.threadId)} />)}
+          {split.done.length ? (
+            <button type="button" data-testid="workers-done" aria-expanded={doneOpen} onClick={() => setDoneOpen((open) => !open)}
+              className="flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none">
+              <Icon name={doneOpen ? "ChevronDown" : "ChevronRight"} className="size-3 shrink-0" />{doneLabel(split.done.length)}
+            </button>
+          ) : null}
+          {doneOpen ? split.done.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} />) : null}
+          {data && !workers.length ? <Note>No workers yet</Note> : null}
+        </>}
       </section>
       </>}
       <div className="flex-1" />

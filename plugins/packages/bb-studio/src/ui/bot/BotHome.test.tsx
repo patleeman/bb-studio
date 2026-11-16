@@ -1053,7 +1053,9 @@ test("Todos off: no Todos tab on the Bot page", async () => {
 
 test("Todos on: no tabs; Needs you has the due todo with one action, and the Todos summary links to Todos at its own address", async () => {
   state.settings = { loopsEnabled: true };
-  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "loops.list": loopGroups, "tasks.list": { tasks: Object.values(loopGroups).flat().map((l) => taskFromLoop(l as never)), threads: [], held: [] } };
+  const todoTasks = Object.values(loopGroups).flat().map((l) => taskFromLoop(l as never));
+  const boardRow = (t: { id: string; closedAt: number | null }) => ({ id: t.id, home: null, under: null, depth: 0, open: t.closedAt === null, workers: [], hasWorkers: false, needsYou: false });
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "loops.list": loopGroups, "tasks.list": { tasks: todoTasks, threads: [], held: [] }, "tasks.board": { rows: todoTasks.map(boardRow), tasks: todoTasks, threads: [], workers: [], counts: { open: 0, running: 0, waiting: 0, todo: 0, needsYou: 0, done: 0, workers: 0 } } };
   await show(<BotPanel />);
   expect(container.querySelector("[role=tablist][aria-label='Bot page']")).toBeNull();
   const needs = container.querySelector('section[aria-label="Needs you"]')!;

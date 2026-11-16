@@ -3,6 +3,9 @@ import { THEME_CSS } from "../../theme/tokens";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { task as taskSchema } from "../../tasks/contract";
+import { boardRows, workerRows } from "../../tasks/rows";
+import { pageFlight } from "../../tasks/ui/board-model";
 
 const state = vi.hoisted(() => ({
   live: {} as Record<string, unknown>,
@@ -619,4 +622,67 @@ it("shows No Bot yet only once first-run setup is over, not while it makes the s
   state.live.bot_welcome = { threadId: null, opened: true, pending: false, bot: null };
   await mount(null);
   expect(host.textContent).toContain("No Bot yet");
+});
+
+describe("Workers on tasks", () => {
+  const H = 3_600_000;
+  const mk = (id: string, patch: Record<string, unknown>) => taskSchema.parse({ id, title: id, owner: "patrick", state: "todo", origin: "task", createdAt: NOW - 5 * H, updatedAt: NOW - H, ...patch });
+  const dir = { isWorker: (id: string) => id.startsWith("thr_w"), conversationOf: (id: string) => id, main: () => "main" } as never;
+  const TASKS = () => [
+    mk("task_polish", { title: "Phone polish for the next build", owner: "thread:lead_thr", state: "in_progress", conversation: "fork", progress: { step: "3/5", line: null } }),
+    mk("task_shots", { title: "Screenshots", owner: "thread:thr_w1", state: "in_progress", parentId: "task_polish", workers: ["thr_w1"] }),
+    mk("task_review", { title: "Fresh review", owner: "thread:thr_w2", state: "waiting", parentId: "task_polish", workers: ["thr_w2"] }),
+    mk("task_vent", { title: "Clean the dryer vent", owner: "cos", state: "waiting", conversation: "main", workers: ["thr_w3"], waitingOn: { kind: "user", ref: null, text: null } }),
+    mk("task_solo", { title: "Untouched by workers", owner: "cos", state: "in_progress", conversation: "main" }),
+    mk("task_done", { title: "Intro email", owner: "cos", state: "done", conversation: "main", workers: ["thr_w4"], closedAt: NOW - H }),
+  ];
+  const seed = () => {
+    const tasks = TASKS();
+    const ctx = { since: NOW - 10 * H, dir };
+    const workers = [["thr_w1", "Screenshot worker", "active"], ["thr_w2", "Review worker", "idle"], ["thr_w3", "Vent worker", "idle"], ["thr_w4", "Intro worker", "idle"]].map(([threadId, name, status]) => ({ threadId, name, status, archived: false }));
+    const names: Record<string, string> = { fork: "Fork redesign", main: "Main" };
+    const w = workerRows(tasks, ctx);
+    state.live["tasks.workers"] = { ...w, threads: [], workers, groups: w.groups.map((g) => ({ ...g, name: names[g.conversation ?? ""] ?? "None" })) };
+    state.live["tasks.board"] = { ...boardRows(tasks, ctx), threads: [], workers };
+  };
+
+  it("lists the open tasks with workers by conversation, with task titles, folding several workers under their task; a task done today folds into one row", async () => {
+    seed();
+    await mount(null);
+    expect($$('[data-testid="worker-group-name"]').map((each) => each.textContent)).toEqual(["Fork redesign", "Main"]);
+    const rows = $$('[data-testid="worker-task"]');
+    expect(rows.map((row) => [row.querySelector('[data-testid="worker-title"]')?.textContent, row.dataset.look])).toEqual([["Phone polish for the next build", "running"], ["Clean the dryer vent", "waiting"]]);
+    expect(rows[0]!.querySelector('[data-testid="worker-count"]')?.textContent).toBe("×2");
+    expect(rows[0]!.getAttribute("aria-label")).toBe("Phone polish for the next build, running, 2 workers");
+    expect(host.textContent).not.toContain("Screenshot worker");
+    expect(host.textContent).not.toContain("Untouched by workers");
+    expect($$('[data-testid="worker-row"]')).toHaveLength(0);
+    await act(async () => { rows[0]!.click(); });
+    expect($$('[data-testid="worker-row"]').map((row) => [row.dataset.threadId, row.dataset.status])).toEqual([["thr_w2", "idle"], ["thr_w1", "running"]]);
+    await act(async () => { $$('[data-testid="worker-row"]')[1]!.click(); });
+    expect(state.navigate.toThread).toHaveBeenCalledWith("thr_w1");
+    await act(async () => { rows[1]!.click(); });
+    expect(state.navigate.toThread).toHaveBeenCalledWith("thr_w3");
+    const done = $('[data-testid="workers-done"]')!;
+    expect(done.textContent).toBe("1 done today");
+    await act(async () => { done.click(); });
+    expect($$('[data-testid="worker-task"]').map((row) => row.querySelector('[data-testid="worker-title"]')?.textContent)).toContain("Intro email");
+  });
+
+  it("shows the same tasks as the Tasks page's In flight rows with workers", async () => {
+    seed();
+    await mount(null);
+    const board = state.live["tasks.board"] as Parameters<typeof pageFlight>[0];
+    const withWorkers = pageFlight(board).filter((node) => node.row.hasWorkers).map((node) => node.task.id).sort();
+    expect($$('[data-testid="worker-task"]').map((row) => row.dataset.taskId).sort()).toEqual(withWorkers);
+  });
+
+  it("says No workers right now with none", async () => {
+    const counts = { open: 0, running: 0, waiting: 0, todo: 0, needsYou: 0, done: 0, workers: 0 };
+    state.live["tasks.workers"] = { rows: [], tasks: [], counts, threads: [], workers: [], groups: [] };
+    state.live["tasks.board"] = { rows: [], tasks: [], counts, threads: [], workers: [] };
+    await mount(null);
+    expect(host.querySelector('[data-testid="workers"]')?.textContent).toContain("No workers right now");
+    expect($('[data-testid="workers-done"]')).toBeNull();
+  });
 });
