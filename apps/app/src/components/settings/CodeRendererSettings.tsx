@@ -29,7 +29,7 @@ export function CodeRendererSettings() {
       <ReplacementProviderSetting
         label="Composer"
         triggerAriaLabel="Composer"
-        description="The prompt box in threads, the New thread screen, and message editors."
+        description="The prompt box in conversations, the New conversation screen, and message editors."
         preferenceAtom={composerRendererProviderAtom}
         slots={composers}
       />

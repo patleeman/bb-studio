@@ -315,7 +315,7 @@ describe("a plugin's replacement palette", () => {
       name: "New conversation",
     });
     expect(newThread.dataset.command).toBe("app:thread.new");
-    expect(newThread.dataset.group).toBe("Threads");
+    expect(newThread.dataset.group).toBe("Conversations");
     expect(newThread.dataset.shortcut).not.toBe("");
     expect(
       document.querySelector('[data-command^="settings:"]'),

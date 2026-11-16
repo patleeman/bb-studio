@@ -35,49 +35,49 @@ function paletteHiddenCommand(
 
 export const APP_COMMAND_GROUPS: readonly AppCommandGroup[] = [
   {
-    label: "Threads",
+    label: "Conversations",
     commands: [
       command(
         "thread.new",
-        "New thread",
-        "Start a thread in the active project.",
+        "New conversation",
+        "Start a conversation in the active project.",
       ),
       command(
         "thread.search",
-        "Search threads",
-        "Search threads in the quick palette.",
+        "Search",
+        "Search conversations and plugin items in the quick palette.",
       ),
-      command("thread.rename", "Rename thread", "Rename the focused thread."),
+      command("thread.rename", "Rename conversation", "Rename the focused conversation."),
       command(
         "thread.archive",
-        "Archive thread",
-        "Archive the focused thread.",
+        "Archive conversation",
+        "Archive the focused conversation.",
       ),
       command(
         "thread.markRead",
-        "Mark thread read or unread",
-        "Mark the focused thread read or unread.",
+        "Mark conversation read or unread",
+        "Mark the focused conversation read or unread.",
       ),
       command(
         "thread.pin",
-        "Pin or unpin thread",
-        "Pin or unpin the focused thread.",
+        "Pin or unpin conversation",
+        "Pin or unpin the focused conversation.",
       ),
       command(
         "thread.previous",
-        "Previous thread",
-        "Open the previous visible sidebar thread.",
+        "Previous conversation",
+        "Open the previous visible sidebar conversation.",
       ),
       command(
         "thread.next",
-        "Next thread",
-        "Open the next visible sidebar thread.",
+        "Next conversation",
+        "Open the next visible sidebar conversation.",
       ),
       ...THREAD_JUMP_APP_COMMAND_IDS.map((id, index) =>
         paletteHiddenCommand(
           id,
-          `Open thread ${index + 1}`,
-          `Open visible sidebar thread ${index + 1}.`,
+          `Open conversation ${index + 1}`,
+          `Open visible sidebar conversation ${index + 1}.`,
         ),
       ),
     ],
@@ -88,18 +88,18 @@ export const APP_COMMAND_GROUPS: readonly AppCommandGroup[] = [
       paletteHiddenCommand(
         "palette.open",
         "Open quick palette",
-        "Search and run bb commands from the keyboard.",
+        "Search and run commands from the keyboard.",
       ),
-      command("window.new", "New window", "Open another bb desktop window."),
+      command("window.new", "New window", "Open another BB Studio window."),
       command(
         "window.find",
         "Find in window",
-        "Search the text shown in the current bb desktop window.",
+        "Search the text shown in the current BB Studio window.",
       ),
       command(
         "window.reload",
         "Reload window",
-        "Reload the current bb desktop window.",
+        "Reload the current BB Studio window.",
       ),
       command("history.back", "Go back", "Go back in this window's history."),
       command(
@@ -112,11 +112,11 @@ export const APP_COMMAND_GROUPS: readonly AppCommandGroup[] = [
         "Back to app",
         "Return from Settings, Plugins, Skills, or a plugin page with its own sidebar to the app.",
       ),
-      command("settings.open", "Open settings", "Open bb settings."),
+      command("settings.open", "Open settings", "Open BB Studio settings."),
       command(
         "settings.openServers",
         "Open server settings",
-        "Open settings to add or manage bb servers.",
+        "Open settings to add or manage BB Studio servers.",
       ),
       command(
         "sidebar.toggle",
@@ -223,7 +223,7 @@ export const APP_COMMAND_GROUPS: readonly AppCommandGroup[] = [
       command(
         "dataDirectory.open",
         "Open data directory",
-        "Reveal the bb data directory in the system file manager.",
+        "Reveal the BB Studio data directory in the system file manager.",
       ),
       command(
         "notifications.open",
@@ -233,7 +233,7 @@ export const APP_COMMAND_GROUPS: readonly AppCommandGroup[] = [
       command(
         "plugins.enterSafeMode",
         "Turn on plugin safe mode",
-        "Stop every plugin you installed, keeping each plugin's enabled setting. Plugins included with bb keep running.",
+        "Stop every plugin you installed, keeping each plugin's enabled setting. Plugins included with BB Studio keep running.",
       ),
       command(
         "plugins.exitSafeMode",
@@ -243,7 +243,7 @@ export const APP_COMMAND_GROUPS: readonly AppCommandGroup[] = [
       command(
         "plugins.pruneCache",
         "Clean up plugin cache",
-        "Delete cached plugin versions that no installed plugin uses, such as versions left by earlier bb releases.",
+        "Delete cached plugin versions that no installed plugin uses, such as versions left by earlier releases.",
       ),
     ],
   },
@@ -344,7 +344,7 @@ export const APP_COMMAND_GROUPS: readonly AppCommandGroup[] = [
         paletteHiddenCommand(
           id,
           `Choose answer ${index + 1}`,
-          `Choose visible answer ${index + 1} when bb asks a question.`,
+          `Choose visible answer ${index + 1} when the agent asks a question.`,
         ),
       ),
       paletteHiddenCommand(
