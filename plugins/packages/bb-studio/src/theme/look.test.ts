@@ -9,7 +9,7 @@ import { contrastChecks } from "./checks";
 import { MIAMI } from "./builtin/miami";
 import { SCENE_THEMES } from "./registry";
 import { chosenAlpha, contrastReport, haloCoverage, HALO, HALO_LAYERS, mixLooks, openAreaMeasure, resolveLook, surfaceBackgrounds, backdropRange, TEXT_MIN, UI_MIN } from "./look";
-import { STUDIO_CARD, STUDIO_CARD_CSS, HEADER_CSS, CHROME_CSS, GUTTER_CSS, TABLE_CSS, BACKING_SELECTORS, PAGE_ROOTS, HALO_SELECTORS, lookTokens, PILL_SELECTOR, SCROLLER_SELECTORS, WORKBENCH, WORKBENCH_BODY, WORKBENCH_STRIP, SHADOW_CLIP_SELECTORS, THEME_CSS, HEADER_ROW, LIST_PAGE, RULES, RULE_CLASSES, TITLE_BOX, PAGE_BAR_BOX, PROMPT_CARDS, PROMPT_CARD_LINES, TOAST_CARD, GLASS_CHIPS, CLASSIC_FOOTER, STUDIO_RULE, GLASS_DIFF_CARD, GLASS_EDGE, GLASS_COMPOSER, diffBody } from "./tokens";
+import { STUDIO_CARD, STUDIO_CARD_CSS, HEADER_CSS, PAGE_HEADER, CHROME_CSS, GUTTER_CSS, TABLE_CSS, BACKING_SELECTORS, PAGE_ROOTS, HALO_SELECTORS, lookTokens, PILL_SELECTOR, SCROLLER_SELECTORS, WORKBENCH, WORKBENCH_BODY, WORKBENCH_STRIP, SHADOW_CLIP_SELECTORS, THEME_CSS, HEADER_ROW, LIST_PAGE, RULES, RULE_CLASSES, TITLE_BOX, PAGE_BAR_BOX, PROMPT_CARDS, PROMPT_CARD_LINES, TOAST_CARD, GLASS_CHIPS, CLASSIC_FOOTER, STUDIO_RULE, GLASS_DIFF_CARD, GLASS_EDGE, GLASS_COMPOSER, diffBody } from "./tokens";
 import { themeModes } from "./schema";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -314,7 +314,10 @@ describe("the title row under glass", () => {
     expect(HEADER_CSS).not.toContain("position: sticky");
     expect(HEADER_CSS).not.toContain("animation");
     expect(HEADER_CSS).not.toMatch(/--studio-row-[xyw]|translate:|anchor/);
-    expect(rule('html[data-studio-glass] [data-sidebar="inset"] header')).toContain("background: transparent; padding-inline: 0;");
+    expect(PAGE_HEADER).toBe('html[data-studio-glass] [data-sidebar="inset"] header:has(> [data-testid="app-page-header-content-row"])');
+    expect(rule(PAGE_HEADER)).toBe(" border-color: transparent; background: transparent; padding-inline: 0; ");
+    // Any other <header> in the pane, such as a chat card's, keeps its own padding, background and rule.
+    expect(rule('html[data-studio-glass] [data-sidebar="inset"] header')).not.toMatch(/padding|background|border/);
   });
 
   it("takes the card's own box: centered in the header of the same column, as wide as the card's content and inset like it, per kind of page", () => {
@@ -433,7 +436,7 @@ describe("bb's chrome under Studio", () => {
     expect(THEME_CSS).toContain(HEADER_CSS);
     expect(HEADER_CSS).not.toMatch(/anchor|position: fixed|50%|409|66px/);
     expect(HEADER_CSS).toContain(':is([data-fork-header-group], [data-sidebar="trigger"]) { background: transparent;');
-    expect(HEADER_CSS).toContain('html[data-studio-glass] [data-sidebar="inset"] header { border-color: transparent; background: transparent; padding-inline: 0;');
+    expect(HEADER_CSS).toContain(`${PAGE_HEADER} { border-color: transparent; background: transparent; padding-inline: 0; }`);
   });
 });
 

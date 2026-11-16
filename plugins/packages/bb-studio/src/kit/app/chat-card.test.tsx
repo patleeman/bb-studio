@@ -6,7 +6,9 @@ import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
 
 vi.mock("../ui/index", async () => (await import("../../loops/ui/test-kit")).kitUi);
-const { CHAT_CARD, ChatCard, ChatCardAction, ChatCardFooter, ChatCardHeader, ChatCardIconButton } = await import("./chat-card");
+const { CHAT_CARD, CHAT_CARD_BODY, CHAT_CARD_HEAD, ChatCard, ChatCardAction, ChatCardFooter, ChatCardHeader, ChatCardIconButton } = await import("./chat-card");
+
+const { GLASS_ATTRIBUTE, PAGE_HEADER, THEME_CSS } = await import("../../theme/tokens");
 
 const CARDS = [
   "src/kit/app/directive-card.tsx",
@@ -52,4 +54,51 @@ it("draws the header as icon, title, meta and actions, and the footer as actions
   await act(async () => (card.querySelector("[data-studio-card-head] button") as HTMLButtonElement).click());
   expect(opened).toHaveBeenCalled();
   await act(async () => root.unmount());
+});
+
+it("starts the header's icon on the body's text column, with no theme rule taking the padding back", async () => {
+  // The header and the body share one left inset.
+  const left = (classes: string) => classes.split(" ").filter((name) => /^p[lx]?-/.test(name) && !name.startsWith("py-"));
+  expect(left(CHAT_CARD_HEAD)).toContain("pl-3");
+  expect(left(CHAT_CARD_BODY)).toContain("px-3");
+
+  // Under the glass theme a card sits in the chat pane, below bb's page header. The theme's page header rule
+  // once matched every <header> there and set the card header's padding to 0 (the circle sat 3 px from the edge).
+  document.documentElement.setAttribute(GLASS_ATTRIBUTE, "");
+  const pane = document.createElement("div");
+  pane.setAttribute("data-sidebar", "inset");
+  pane.innerHTML = '<header data-testid="page-header"><div data-testid="app-page-header-content-row"></div></header>';
+  document.body.append(pane);
+  const host = document.createElement("div");
+  pane.append(host);
+  const root = createRoot(host);
+  await act(async () => root.render(
+    <ChatCard>
+      <ChatCardHeader icon="Circle" title="Defrost the freezer" meta="Do" divided />
+      <div data-testid="body" className={CHAT_CARD_BODY}>Overdue reminder.</div>
+    </ChatCard>,
+  ));
+  const style = document.createElement("style");
+  style.textContent = THEME_CSS;
+  document.head.append(style);
+  const rules: CSSStyleRule[] = [];
+  const walk = (list: CSSRuleList) => {
+    for (const rule of Array.from(list)) {
+      if (rule instanceof CSSStyleRule) rules.push(rule);
+      else if ("cssRules" in rule) walk((rule as CSSGroupingRule).cssRules);
+    }
+  };
+  walk(style.sheet!.cssRules);
+  const padded = (rule: CSSStyleRule) => /(^|;)\s*padding/.test(rule.style.cssText);
+  const matching = (element: Element) => rules.filter((rule) => padded(rule) && element.matches(rule.selectorText)).map((rule) => rule.selectorText);
+  try {
+    expect(matching(pane.querySelector('[data-testid="page-header"]')!)).toContain(PAGE_HEADER);
+    expect(matching(pane.querySelector("[data-studio-card-head]")!)).toEqual([]);
+    expect(matching(pane.querySelector('[data-testid="body"]')!)).toEqual([]);
+  } finally {
+    await act(async () => root.unmount());
+    style.remove();
+    pane.remove();
+    document.documentElement.removeAttribute(GLASS_ATTRIBUTE);
+  }
 });
