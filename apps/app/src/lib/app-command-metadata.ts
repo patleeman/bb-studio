@@ -168,6 +168,7 @@ export const APP_COMMAND_GROUPS: readonly AppCommandGroup[] = [
         "Close panel tab",
         "Close the active panel tab or terminal.",
       ),
+      command("panel.closeAll", "Close all panel tabs", "Close every tab in the focused panel pane that can be closed."),
       command(
         "panel.toggle",
         "Toggle panel",

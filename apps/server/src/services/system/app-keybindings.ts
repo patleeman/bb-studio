@@ -293,6 +293,7 @@ export const DEFAULT_APP_KEYBINDINGS: AppDefaultKeybindings = [
     },
   ),
   binding("panel.close", "w", { mod: true }, mainWithoutModal),
+  binding("panel.closeAll", "w", { mod: true, alt: true }, { ...mainWithoutModal, desktopOnly: true }),
   binding("panel.toggle", "j", { mod: true }, mainWithoutModal),
   unassignedBinding("panel.fullScreen.toggle", mainWithoutModal),
   binding("file.quickOpen", "p", { mod: true }, mainWithoutModal),
