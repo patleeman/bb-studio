@@ -150,7 +150,7 @@ export function MachineAccessSettingsContent({
       <div>
         <h2 className="text-sm font-semibold">{title}</h2>
         <p className="mt-1 text-xs text-subtle-foreground">
-          Choose how your devices reach this bb server.
+          Choose how your devices reach this BB Studio server.
         </p>
       </div>
       <div className="overflow-hidden rounded-lg border border-border bg-card">
