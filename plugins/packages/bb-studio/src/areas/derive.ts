@@ -139,7 +139,18 @@ const CALM = /\b(all ok|ok|nothing new|all clear|quiet)\b/i;
 
 export type NotesRead = { now: string | null; open: OpenItem[]; status: AreaOutcome | null; problems: string[] };
 
-export function readStatusNotes(text: string, now: number, userWords: readonly string[] = ["user", "you", "your"]): NotesRead {
+export const BASE_USER_WORDS = ["you", "your", "me", "user"] as const;
+
+export function nameWords(login: string | null | undefined, fullName: string | null | undefined): string[] {
+  const out = new Set<string>(BASE_USER_WORDS);
+  const first = (fullName ?? "").trim().split(/\s+/)[0] ?? "";
+  if (/^\p{L}{2,}$/u.test(first)) out.add(first);
+  const user = (login ?? "").trim();
+  if (/^\p{L}{3,}$/u.test(user) && !["root", "admin", "user", "runner", "ubuntu"].includes(user.toLowerCase())) out.add(user);
+  return [...out];
+}
+
+export function readStatusNotes(text: string, now: number, userWords: readonly string[] = BASE_USER_WORDS): NotesRead {
   const problems: string[] = [];
   const lines = text.split("\n");
   const lastRun = lines.find((line) => /^Last run:/i.test(line.trim()))?.trim().replace(/^Last run:\s*/i, "") ?? null;

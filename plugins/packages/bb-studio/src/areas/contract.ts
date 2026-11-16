@@ -56,6 +56,7 @@ export const area = z.object({
   links: z.array(z.string().min(1)).max(20),
   statusFile: z.string().nullable(),
   file: z.object({ readAt: z.number(), mtime: z.number().nullable(), error: z.string().nullable() }).nullable(),
+  notesMtime: z.number().nullable().default(null),
   levels: z.record(z.string(), z.enum(["log", "tell", "urgent"])),
   archived: z.boolean(),
   createdAt: z.number(),
