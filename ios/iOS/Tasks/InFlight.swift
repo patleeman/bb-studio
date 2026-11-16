@@ -341,7 +341,7 @@ struct FlightChildren: View {
             ForEach(node.workers, id: \.threadId) { worker in
                 Button { openThread(worker.threadId) } label: {
                     HStack(spacing: 8) {
-                        Circle().fill(worker.status == "running" || worker.status == "active" ? Color.green : Color.secondary.opacity(0.6)).frame(width: 6, height: 6)
+                        Circle().fill(worker.running ? Color.green : Color.secondary.opacity(0.6)).frame(width: 6, height: 6)
                         Image(systemName: "person.crop.circle").font(.caption2).foregroundStyle(.secondary)
                         Text(worker.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         Spacer(minLength: 0)
@@ -351,7 +351,7 @@ struct FlightChildren: View {
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Open worker \(worker.name)")
+                .accessibilityLabel("Open worker \(worker.spoken)")
                 .accessibilityIdentifier("in-flight-worker")
             }
             ForEach(node.children) { child in

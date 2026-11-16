@@ -308,6 +308,46 @@ final class TasksTests: XCTestCase {
         XCTAssertEqual(nodes[2].look, .done)
     }
 
+    private func nested(parent: String, child: String) -> (TasksBoardShape, [TaskItem]) {
+        var top = task("top", owner: parent, state: .inProgress)
+        top.parentId = nil
+        var sub = task("sub", owner: child, state: .inProgress)
+        sub.parentId = "top"
+        let board = TaskList(tasks: [top, sub], threads: [], rows: [TaskRowRef(id: "top"), TaskRowRef(id: "sub", under: "top", depth: 1)])
+        return (TasksBoardShape(TaskTree.nodes(board)), [top, sub])
+    }
+
+    func testANestedTaskHidesOnlyInsideItsTopTasksFold() {
+        let (tree, both) = nested(parent: "cos", child: "thread:thr_lead")
+        XCTAssertTrue(tree.folds(both[0]), "an agent's task folds its subtask under it")
+        XCTAssertEqual(tree.shown(both).map(\.id), ["top"], "the subtask is in the fold, not a row of its own")
+    }
+
+    func testAnAgentsSubtaskUnderYourToDoStillShows() {
+        let (tree, both) = nested(parent: TaskItem.user, child: "cos")
+        XCTAssertFalse(tree.folds(both[0]), "your own to-do draws no fold")
+        XCTAssertEqual(tree.shown(both).map(\.id), ["top", "sub"], "so the agent's subtask is its own row")
+    }
+
+    func testASubtaskWhoseTopTaskIsFilteredOutStillShows() {
+        let (tree, both) = nested(parent: "cos", child: "thread:thr_lead")
+        XCTAssertEqual(tree.shown([both[1]]).map(\.id), ["sub"], "an owner chip that leaves out the top task keeps its subtask")
+    }
+
+    func testAMissingFeedIsTriedAgainAfterAWhile() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertTrue(TasksModel.tries(nil, missingSince: nil, now: now), "a new server tries the feed")
+        XCTAssertTrue(TasksModel.tries(true, missingSince: nil, now: now))
+        XCTAssertFalse(TasksModel.tries(false, missingSince: now.addingTimeInterval(-60), now: now), "a 404 a minute ago keeps the old calls")
+        XCTAssertTrue(TasksModel.tries(false, missingSince: now.addingTimeInterval(-TasksModel.feedRetry), now: now), "a Studio that was reloading gets its feed back")
+    }
+
+    func testAWorkerRowSaysWhetherItRuns() {
+        XCTAssertEqual(TaskWorkerInfo(threadId: "thr_a", name: "Fork", status: "running").spoken, "Fork, running")
+        XCTAssertEqual(TaskWorkerInfo(threadId: "thr_a", name: "Fork", status: "idle").spoken, "Fork, idle")
+        XCTAssertEqual(TaskWorkerInfo(threadId: "thr_a", name: "Fork", status: nil, archived: true).spoken, "Fork, archived")
+    }
+
     func testTheOldFeedMakesFlatRows() {
         let list = TaskList(tasks: [task("a", owner: "cos", state: .inProgress), task("b", state: .waiting), task("c", owner: "cos", state: .done)], threads: [])
         let nodes = TaskTree.nodes(list)
@@ -430,7 +470,17 @@ final class TasksTests: XCTestCase {
         XCTAssertNotNil(model.flights["thr_main"]?.rows)
         await model.refresh()
         let after = await methods(paths)
-        XCTAssertEqual(Array(after.dropFirst(3)), ["tasks.flight", "tasks.board", "tasks.list", "areas.list"], "the Tasks screen keeps all three fresh once it has been opened")
+        XCTAssertEqual(Array(after.dropFirst(3)), ["tasks.flight", "tasks.board"], "with the Tasks screen closed, the room's poll asks only the board")
+        model.tasksShown = 1
+        await model.refresh()
+        let shown = await methods(paths)
+        XCTAssertEqual(Array(shown.dropFirst(5)), ["tasks.board", "tasks.list", "areas.list"], "while the Tasks screen shows, it keeps all three fresh")
+        model.tasksShown = 0
+        async let first: Void = model.refresh()
+        async let second: Void = model.refresh()
+        _ = await (first, second)
+        let shared = await methods(paths)
+        XCTAssertEqual(Array(shared.dropFirst(8)), ["tasks.board"], "two refreshes at once share one fetch")
     }
 
     func testAnOlderStudioFallsBackToTheOldFeedsAndRemembers() async {

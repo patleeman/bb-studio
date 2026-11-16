@@ -43,6 +43,10 @@ struct TaskWorkerInfo: Hashable, Sendable {
     var status: String?
     var archived = false
 
+    var running: Bool { status == "running" || status == "active" }
+
+    var spoken: String { "\(name), \(running ? "running" : archived ? "archived" : "idle")" }
+
     init(threadId: String, name: String, status: String? = nil, archived: Bool = false) {
         self.threadId = threadId
         self.name = name

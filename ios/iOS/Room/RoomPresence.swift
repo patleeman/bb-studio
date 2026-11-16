@@ -594,7 +594,7 @@ struct RoomFrost: View {
 
     var body: some View {
         ZStack {
-            SceneBackdrop(theme: look.theme, botId: botId, view: view, stillOnly: true, light: spot)
+            SceneBackdrop(theme: look.theme, botId: botId, view: view, stillOnly: true, light: spot, motion: false)
             RoomLightLayer(light: light, seed: seed, showsOrb: false)
         }
         .blur(radius: Self.radius, opaque: true)
@@ -645,7 +645,7 @@ struct RoomLightMarker: View {
 
 enum RoomSceneLight {
     static let corner: CGFloat = 48
-    static let phoneCorner: CGFloat = 58
+    static let phoneCorner: CGFloat = 70
 
     static func spot(_ proxy: GeometryProxy, pages: DuoPages?, rail: Bool) -> SceneLight? {
         let insets = proxy.safeAreaInsets
