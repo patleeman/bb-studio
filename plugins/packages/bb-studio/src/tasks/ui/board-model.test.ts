@@ -4,7 +4,7 @@ import { boardRows, flightRows, workerRows } from "../rows";
 import { zonedTime } from "../../loops/clock";
 import { areaOrder, itemAge, runBars } from "../../areas/ui/model";
 import type { AreaView } from "../../areas/contract";
-import { doneSummary, flightLook, moreLine, pageCounts, pageFlight, stepProgress, todoBox, todoHeader, todoShown, treeOf, waitLabel, weekStart, workerGroups } from "./board-model";
+import { doneSummary, startedAt, flightLook, moreLine, pageCounts, pageFlight, stepProgress, todoBox, todoHeader, todoShown, treeOf, waitLabel, weekStart, workerGroups } from "./board-model";
 
 const NOW = Date.UTC(2026, 10, 15, 22, 0);
 const H = 3_600_000;
@@ -145,4 +145,13 @@ it("builds the tree from flat rows, keeping a subtask after its parent", () => {
   expect(ids).not.toContain("dropped");
   expect(ids).not.toContain("schedule");
   expect(ids).not.toContain("done_yesterday");
+});
+
+it("counts a to-do checked a moment ago under Done at once, and times running work from when it began", () => {
+  const now = Date.UTC(2026, 10, 15, 22, 0);
+  const justNow = t("just_now", { state: "done", closedAt: now + 30_000 });
+  expect(doneSummary([justNow], now, "UTC").today).toBe(1);
+  const node = { task: t("running", { state: "in_progress", createdAt: now - 6 * 86_400_000 }), row: { id: "running", home: null, under: null, depth: 0, open: true, workers: [], hasWorkers: false, needsYou: false, startedAt: now - 5 * 60_000 } };
+  expect(startedAt(node)).toBe(now - 5 * 60_000);
+  expect(startedAt({ ...node, row: { ...node.row, startedAt: undefined } })).toBe(now - 6 * 86_400_000);
 });

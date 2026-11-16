@@ -644,6 +644,7 @@ describe("Workers on tasks", () => {
     const w = workerRows(tasks, ctx);
     state.live["tasks.workers"] = { ...w, threads: [], workers, groups: w.groups.map((g) => ({ ...g, name: names[g.conversation ?? ""] ?? "None" })) };
     state.live["tasks.board"] = { ...boardRows(tasks, ctx), threads: [], workers };
+    (state.live["bot_threads_view:cos"] as { workers: unknown[] }).workers = [];
   };
 
   it("lists the open tasks with workers by conversation, with task titles, folding several workers under their task; a task done today folds into one row", async () => {
@@ -681,8 +682,23 @@ describe("Workers on tasks", () => {
     const counts = { open: 0, running: 0, waiting: 0, todo: 0, needsYou: 0, done: 0, workers: 0 };
     state.live["tasks.workers"] = { rows: [], tasks: [], counts, threads: [], workers: [], groups: [] };
     state.live["tasks.board"] = { rows: [], tasks: [], counts, threads: [], workers: [] };
+    (state.live["bot_threads_view:cos"] as { workers: unknown[] }).workers = [];
     await mount(null);
     expect(host.querySelector('[data-testid="workers"]')?.textContent).toContain("No workers right now");
     expect($('[data-testid="workers-done"]')).toBeNull();
+  });
+
+  it("keeps a running worker that has no task yet (or is a lead) as a plain row after the task rows, and never repeats one a task covers", async () => {
+    seed();
+    const view = state.live["bot_threads_view:cos"] as { workers: unknown[] };
+    const thread = (threadId: string, title: string) => ({ threadId, title, status: "running", ownerConversationId: "main", ownerTitle: "Main", projectId: "p", updatedAt: NOW, tag: null, branch: null, mirrored: false, sameTitle: 1 });
+    view.workers = [thread("thr_new", "Just spawned"), thread("thr_w1", "Screenshot worker")];
+    await mount(null);
+    const loose = host.querySelector('[data-testid="worker-loose"]')!;
+    expect(loose.getAttribute("aria-label")).toBe("Working without a task");
+    expect([...loose.querySelectorAll<HTMLElement>('[data-testid="worker-row"]')].map((row) => row.dataset.threadId)).toEqual(["thr_new"]);
+    await act(async () => { loose.querySelector<HTMLElement>('[data-testid="worker-row"]')!.click(); });
+    expect(state.navigate.toThread).toHaveBeenCalledWith("thr_new");
+    expect(host.querySelector('[data-testid="workers"]')?.textContent).not.toContain("No workers right now");
   });
 });

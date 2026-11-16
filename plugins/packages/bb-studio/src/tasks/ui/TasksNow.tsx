@@ -112,18 +112,19 @@ export function TodoBoxView({ box, chat, names, threads, targets, now, zone, que
 }
 
 function OwnTodo({ task, sub, onOpen, refresh }: { task: Task; sub: string | null; onOpen: Open; refresh(): void }) {
-  const { act, busy } = useTaskActions(refresh);
+  const { act, busy, error } = useTaskActions(refresh);
   const waiting = task.kind === "waiting-outside";
   return (
-    <li data-testid="todo-own" data-task-id={task.id} className="flex min-w-0 items-center gap-3 border-t border-border/50 py-2 first:border-t-0">
+    <li data-testid="todo-own" data-task-id={task.id} className="flex min-w-0 flex-wrap items-center gap-x-3 border-t border-border/50 py-2 first:border-t-0">
       <button type="button" data-testid="todo-check" disabled={busy || waiting} aria-label={`Mark ${task.title} done`} onClick={() => void act({ id: task.id, action: task.kind === "read" ? "got_it" : "done" })}
-        className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default">
+        className="-mx-0.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default">
         <span className="size-4 rounded-full border-[1.5px] border-muted-foreground/80 hover:border-foreground" />
       </button>
       <button type="button" onClick={(event) => onOpen(task, event)} className="flex min-w-0 flex-1 cursor-pointer flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <span className="truncate text-sm text-foreground">{task.title}</span>
         {sub ? <span className="truncate text-xs text-subtle-foreground">{sub}</span> : null}
       </button>
+      {error ? <p role="alert" data-testid="todo-error" className="basis-full pl-9 text-xs text-destructive">{error}</p> : null}
     </li>
   );
 }

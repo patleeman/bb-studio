@@ -3,7 +3,7 @@ import { PRIORITY_RANK } from "../../loops/ui/model";
 import { isClosed, needsYou, USER_OWNER, type Task } from "../contract";
 import { taskDate, taskSection } from "./model";
 
-export type RowRef = { id: string; home: string | null; under: string | null; depth: number; open: boolean; workers: string[]; hasWorkers: boolean; needsYou: boolean };
+export type RowRef = { id: string; home: string | null; under: string | null; depth: number; open: boolean; workers: string[]; hasWorkers: boolean; needsYou: boolean; startedAt?: number };
 export type WorkerInfo = { threadId: string; name: string; status: string | null; archived: boolean };
 export type RowsData = { rows: readonly RowRef[]; tasks: readonly Task[]; workers?: readonly WorkerInfo[] };
 
@@ -125,8 +125,8 @@ export function age(since: number, now: number): string {
   return `${Math.floor(ms / (24 * 60 * MINUTE))}d`;
 }
 
-export function startedAt(task: Task): number {
-  return task.createdAt;
+export function startedAt(node: Pick<FlightNode, "task" | "row">): number {
+  return node.row.startedAt ?? node.task.createdAt;
 }
 
 export function weekStart(now: number, zone?: string): number {
@@ -144,7 +144,7 @@ export type DoneSummary = { today: number; week: number; latest: Task[]; groups:
 export function doneSummary(tasks: readonly Task[], now: number, zone?: string, latest = 4): DoneSummary {
   const today = todayStart(now, zone);
   const week = weekStart(now, zone);
-  const done = tasks.filter((t) => t.state === "done" && (t.closedAt ?? 0) >= week && (t.closedAt ?? 0) <= now && t.automation?.role !== "schedule");
+  const done = tasks.filter((t) => t.state === "done" && (t.closedAt ?? 0) >= week && t.automation?.role !== "schedule");
   const byId = new Map(done.map((t) => [t.id, t]));
   const topOf = (t: Task): Task => {
     let cur = t;

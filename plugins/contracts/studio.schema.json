@@ -49875,6 +49875,10 @@
                 "needsYou": {
                   "type": "boolean",
                   "description": "It, or an open subtask, needs the user"
+                },
+                "startedAt": {
+                  "description": "When its current run of work began: the first move to in progress since it was last reopened",
+                  "type": "number"
                 }
               },
               "required": [
@@ -50776,6 +50780,10 @@
                 "needsYou": {
                   "type": "boolean",
                   "description": "It, or an open subtask, needs the user"
+                },
+                "startedAt": {
+                  "description": "When its current run of work began: the first move to in progress since it was last reopened",
+                  "type": "number"
                 }
               },
               "required": [
@@ -51699,6 +51707,10 @@
                 "needsYou": {
                   "type": "boolean",
                   "description": "It, or an open subtask, needs the user"
+                },
+                "startedAt": {
+                  "description": "When its current run of work began: the first move to in progress since it was last reopened",
+                  "type": "number"
                 }
               },
               "required": [

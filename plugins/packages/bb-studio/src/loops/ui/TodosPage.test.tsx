@@ -28,6 +28,7 @@ const state = vi.hoisted(() => ({
   listError: null as string | null,
   scheduledError: null as string | null,
   areas: [] as unknown[],
+  boardLoading: false,
   areasError: null as string | null,
 }));
 vi.mock("../../kit/composer", () => ({ threadComposer: (threadId: string) => state.chatOpen && threadId === "thr_bot" ? state.composer : null }));
@@ -47,6 +48,7 @@ vi.mock("../../ui/live", () => ({
     const threads = [{ owner: "thread:thr_lead", name: "Larkspur lead", threadId: "thr_lead" }];
     const board = () => ({ ...boardRows(all, { since: NOW - 15 * 3_600_000, dir: { isWorker: (id: string) => id.startsWith("thr_w"), conversationOf: (id: string) => id, main: () => "thr_bot" } as never }), threads, workers: [{ threadId: "thr_w1", name: "Screenshot worker", status: "active", archived: false }] });
     if (method === "areas.list") return state.areasError ? { data: null, loading: false, error: state.areasError, refresh: () => {} } : { data: { areas: state.areas }, loading: false, error: null, refresh: () => {} };
+    if (method === "tasks.board" && state.boardLoading) return { data: null, loading: true, error: null, refresh: () => {} };
     if (method === "tasks.board" && state.listError) return { data: null, loading: false, error: state.listError, refresh: () => {} };
     const data = method === "tasks.list" ? { tasks: all, threads, held: [] }
       : method === "tasks.board" ? board()
@@ -73,7 +75,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   state.chatOpen = false; state.composer.insert.mockClear(); state.composer.focus.mockClear(); state.toThread.mockImplementation(() => { state.chatOpen = true; });
-  state.call.mockClear(); state.toThread.mockClear(); state.openLink.mockClear(); state.interactions = []; state.attention = null; state.zone = null; state.extraTasks = []; state.areas = []; state.areasError = null;
+  state.call.mockClear(); state.toThread.mockClear(); state.openLink.mockClear(); state.interactions = []; state.attention = null; state.zone = null; state.extraTasks = []; state.areas = []; state.areasError = null; state.boardLoading = false;
   state.groups = {
     ...empty,
     needsYouNow: [
@@ -409,7 +411,7 @@ it("Areas: one card each, problems first, with who, covers, where it stands, ope
   expect(house.querySelector("[data-testid=area-now]")?.textContent).toBe("Can't read the house Reminders list.");
   expect(house.querySelector("h4")?.textContent).toBe("Open · 4");
   const items = [...house.querySelectorAll<HTMLElement>("[data-testid=area-item]")];
-  expect(items.map((each) => [each.textContent, each.dataset.needsYou ?? null])).toEqual([["Defrost the freezerSep 26", "true"], ["Pest control visit due~Nov", null], ["Porch latch", null]]);
+  expect(items.map((each) => [each.textContent, each.dataset.needsYou ?? null])).toEqual([["Defrost the freezer, needs you, Sep 26", "true"], ["Pest control visit due, ~Nov", null], ["Porch latch", null]]);
   expect(house.querySelector("[data-testid=area-more]")?.textContent).toBe("+1 more");
   await act(async () => items[0]!.querySelector("button")!.click());
   expect(state.openLink).toHaveBeenLastCalledWith("bb://todo/loop_o", expect.objectContaining({ title: "Defrost the freezer" }));
@@ -492,6 +494,10 @@ it("shows the tasks error, and Scheduled's own error on its tab", async () => {
   await render();
   expect(container.querySelector("[data-testid=tasks-error]")?.textContent).toBe(state.listError);
   expect(container.textContent).not.toMatch(/SQLITE|disk/);
+  expect(box("tasks-top")).toBeNull();
+  expect(box("tasks-loading")).toBeNull();
+  expect(container.textContent).not.toContain("Nothing for you right now");
+  expect(container.textContent).not.toContain("Nothing in flight");
   await showScheduled();
   expect(container.querySelector("[data-testid=tasks-scheduled] [data-testid=scheduled-error]")?.textContent).toBe(state.scheduledError);
   expect(container.querySelector("[data-testid=scheduled-empty]")).toBeNull();
@@ -508,4 +514,26 @@ it("shows due times in the to-do list in Tasks' time zone, not the computer's", 
   state.zone = "America/New_York";
   await render();
   expect(box("tasks-todo")!.textContent).toContain("Due Fri, 12:00 PM");
+});
+
+it("while the tasks load, shows a loading state, not empty boxes", async () => {
+  state.boardLoading = true;
+  await render();
+  expect(box("tasks-loading")?.querySelectorAll("[aria-busy=true]")).toHaveLength(2);
+  expect(box("tasks-top")).toBeNull();
+  expect(container.textContent).not.toContain("Nothing for you right now");
+  expect(container.textContent).not.toContain("Nothing in flight");
+  state.boardLoading = false;
+  await render();
+  expect(box("tasks-loading")).toBeNull();
+  expect(box("tasks-todo")).not.toBeNull();
+});
+
+it("checking an own to-do that fails says why in the row, and the check is a 24 px target", async () => {
+  state.call.mockImplementationOnce(async () => { throw new Error("The task changed; reload to try again"); });
+  await render();
+  const check = box("tasks-todo")!.querySelector<HTMLButtonElement>("[data-task-id=loop_o] [data-testid=todo-check]")!;
+  expect(check.className).toContain("size-6");
+  await act(async () => check.click());
+  expect(box("tasks-todo")!.querySelector("[data-task-id=loop_o] [data-testid=todo-error]")?.textContent).toBe("The task changed; reload to try again");
 });

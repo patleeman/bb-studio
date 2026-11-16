@@ -50,7 +50,7 @@ export function flightText(node: FlightNode, names: Names, now: number, titleOf:
         : look === "todo" ? "to do"
           : wait.short;
   if (task.stale) return { look, line: task.progress.line ?? "Ended without a final update", right: "ended", owner, elapsed: null, aria: [task.title, "ended without a final update", owner].filter(Boolean).join(", ") };
-  const elapsed = look === "running" ? age(startedAt(task), now) : null;
+  const elapsed = look === "running" ? age(startedAt(node), now) : null;
   const aria = [task.title, look === "running" ? (progress ? `running, step ${progress.label}` : "running") : look === "needs-you" ? "needs you" : closed || look === "todo" ? LOOK_LABEL[look].toLowerCase() : wait.short, owner, elapsed ? `for ${elapsed}` : null].filter(Boolean).join(", ");
   return { look, line, right, owner, elapsed, aria };
 }

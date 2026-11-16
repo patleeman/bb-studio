@@ -87,7 +87,8 @@ function WorkerThreadRow({ worker, selected, onOpen, target }: { worker: WorkerI
   return <li>{target ? <ThreadActionsContextMenu thread={target}><div>{button}</div></ThreadActionsContextMenu> : button}</li>;
 }
 
-export function WorkerTasks({ groups, done, now, activeThreadId, onOpenThread, targetOf, slotOf, empty, showNames }: {
+export function WorkerTasks({ groups, done, now, activeThreadId, onOpenThread, targetOf, slotOf, empty, showNames, loose = null }: {
+  loose?: ReactNode;
   groups: readonly WorkerGroup[];
   done: readonly FlightNode[];
   now: number;
@@ -108,6 +109,7 @@ export function WorkerTasks({ groups, done, now, activeThreadId, onOpenThread, t
           <ul className="flex flex-col">{group.nodes.map(row)}</ul>
         </div>
       ))}
+      {loose}
       {done.length ? (
         <button type="button" data-testid="workers-done" aria-expanded={doneOpen} onClick={() => setDoneOpen(!doneOpen)}
           className="flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none">
@@ -115,7 +117,7 @@ export function WorkerTasks({ groups, done, now, activeThreadId, onOpenThread, t
         </button>
       ) : null}
       {doneOpen && done.length ? <ul aria-label="Done today" className="flex flex-col">{done.map(row)}</ul> : null}
-      {!groups.length && !done.length ? empty : null}
+      {!groups.length && !done.length && !loose ? empty : null}
     </>
   );
 }

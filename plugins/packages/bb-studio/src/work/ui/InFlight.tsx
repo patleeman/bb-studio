@@ -16,6 +16,7 @@ import { openLoops, useLoopPeople } from "../../loops/ui/hooks";
 import { ENDED_DETAIL } from "./model";
 import { useCardsOnScreen } from "./on-screen";
 import { revealCard } from "./reveal";
+import { openLinkFromAnywhere } from "../../links/open";
 
 export const COLLAPSED_KEY = "bb.studio.in-flight.collapsed";
 
@@ -67,6 +68,10 @@ export function InFlight({ threadId }: { threadId: string }) {
     else if (task.workers[0] && task.workers[0] !== threadId) navigate.toThread(task.workers[0]);
     else openLoops(people.botId);
   };
+  const openSub = (task: Task) => {
+    if (task.card) { reveal(task); return; }
+    void openLinkFromAnywhere(`bb://todo/${encodeURIComponent(task.id)}`, { source: "card", title: task.title });
+  };
   const hide = (gone: readonly Task[]) => setHidden((before) => new Map([...before, ...gone.map((card) => [card.id, card.updatedAt] as const)]));
   const unhide = (gone: readonly Task[]) => setHidden((before) => new Map([...before].filter(([id]) => !gone.some((card) => card.id === id))));
   const dismiss = (card: Task) => {
@@ -102,7 +107,7 @@ export function InFlight({ threadId }: { threadId: string }) {
             <Icon name="X" className="size-3" />
           </button> : <span className="mr-1.5 size-6 shrink-0" />}
         </div>
-        {folded ? <FlightChildren node={node} names={names} now={now} titleOf={titleOf} onOpenTask={reveal} onOpenThread={(id) => navigate.toThread(id)} /> : null}
+        {folded ? <FlightChildren node={node} names={names} now={now} titleOf={titleOf} onOpenTask={openSub} onOpenThread={(id) => navigate.toThread(id)} /> : null}
       </li>
     );
   };

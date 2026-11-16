@@ -36245,8 +36245,9 @@ public enum Studio {
     public var workers: [String]?
     public var hasWorkers: Bool?
     public var needsYou: Bool?
+    public var startedAt: Double?
 
-    public init(id: String? = nil, home: String? = nil, under: String? = nil, depth: Int? = nil, `open`: Bool? = nil, workers: [String]? = nil, hasWorkers: Bool? = nil, needsYou: Bool? = nil) {
+    public init(id: String? = nil, home: String? = nil, under: String? = nil, depth: Int? = nil, `open`: Bool? = nil, workers: [String]? = nil, hasWorkers: Bool? = nil, needsYou: Bool? = nil, startedAt: Double? = nil) {
       self.id = id
       self.home = home
       self.under = under
@@ -36255,6 +36256,7 @@ public enum Studio {
       self.workers = workers
       self.hasWorkers = hasWorkers
       self.needsYou = needsYou
+      self.startedAt = startedAt
     }
   }
 
@@ -36924,8 +36926,9 @@ public enum Studio {
     public var workers: [String]?
     public var hasWorkers: Bool?
     public var needsYou: Bool?
+    public var startedAt: Double?
 
-    public init(id: String? = nil, home: String? = nil, under: String? = nil, depth: Int? = nil, `open`: Bool? = nil, workers: [String]? = nil, hasWorkers: Bool? = nil, needsYou: Bool? = nil) {
+    public init(id: String? = nil, home: String? = nil, under: String? = nil, depth: Int? = nil, `open`: Bool? = nil, workers: [String]? = nil, hasWorkers: Bool? = nil, needsYou: Bool? = nil, startedAt: Double? = nil) {
       self.id = id
       self.home = home
       self.under = under
@@ -36934,6 +36937,7 @@ public enum Studio {
       self.workers = workers
       self.hasWorkers = hasWorkers
       self.needsYou = needsYou
+      self.startedAt = startedAt
     }
   }
 
@@ -37615,8 +37619,9 @@ public enum Studio {
     public var workers: [String]?
     public var hasWorkers: Bool?
     public var needsYou: Bool?
+    public var startedAt: Double?
 
-    public init(id: String? = nil, home: String? = nil, under: String? = nil, depth: Int? = nil, `open`: Bool? = nil, workers: [String]? = nil, hasWorkers: Bool? = nil, needsYou: Bool? = nil) {
+    public init(id: String? = nil, home: String? = nil, under: String? = nil, depth: Int? = nil, `open`: Bool? = nil, workers: [String]? = nil, hasWorkers: Bool? = nil, needsYou: Bool? = nil, startedAt: Double? = nil) {
       self.id = id
       self.home = home
       self.under = under
@@ -37625,6 +37630,7 @@ public enum Studio {
       self.workers = workers
       self.hasWorkers = hasWorkers
       self.needsYou = needsYou
+      self.startedAt = startedAt
     }
   }
 

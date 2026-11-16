@@ -52,7 +52,7 @@ import { SpaceHeader, spaceLine, spacePageAt, type SpacePage } from "./SpaceHead
 import { useAppMode } from "./app-mode";
 import { accentOf } from "../../theme/engine";
 import { publishSceneSignals, workerSlots } from "../../theme/signals";
-import { treeOf, workerGroups } from "../../tasks/ui/board-model";
+import { treeOf, workerGroups, workersUnder } from "../../tasks/ui/board-model";
 import { WorkerTasks } from "./WorkerTasks";
 import { shownAppearance, useAppearanceDraft, useThemeRegistry } from "../../theme/ui/state";
 import { NONE_ID, saveTheme, themeChoices, type ThemeChoice } from "../../theme/ui/quick";
@@ -232,6 +232,10 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const ownConversations = useMemo(() => new Set((data?.conversations ?? []).map((row) => row.threadId)), [data]);
   const keepGroup = useCallback((conversation: string | null) => (bot?.primary ? true : conversation !== null && ownConversations.has(conversation)), [bot?.primary, ownConversations]);
   const workerTaskGroups = useMemo(() => (taskWorkers.data ? workerGroups(taskWorkers.data, keepGroup) : []).map((group) => ({ ...group, name: data?.conversations.find((row) => row.threadId === group.conversation)?.title ?? group.name })), [taskWorkers.data, keepGroup, data]);
+  const looseWorkers = useMemo(() => {
+    const covered = new Set(workerTaskGroups.flatMap((group) => group.nodes.flatMap((node) => workersUnder(node).map((w) => w.threadId))));
+    return split.active.filter((row) => !covered.has(row.threadId));
+  }, [workerTaskGroups, split]);
   const workerTasksDone = useMemo(() => (taskBoard.data ? treeOf(taskBoard.data).filter((node) => !node.row.open && node.row.hasWorkers && keepGroup(node.row.home)) : []), [taskBoard.data, keepGroup]);
 
   // The thread on screen: remembered as this Bot's last one; a thread of another Bot shows that Bot.
@@ -402,7 +406,8 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
         <div className={SECTION_HEAD}><h3>Workers</h3></div>
         {taskWorkers.data ? (
           <WorkerTasks groups={workerTaskGroups} done={workerTasksDone} now={now} activeThreadId={activeThreadId} onOpenThread={openThread}
-            targetOf={(id) => rowTargets.get(id) ?? null} slotOf={(id) => slots?.get(id)} showNames empty={<Note>No workers right now</Note>} />
+            targetOf={(id) => rowTargets.get(id) ?? null} slotOf={(id) => slots?.get(id)} showNames empty={<Note>No workers right now</Note>}
+            loose={looseWorkers.length ? <div role="group" aria-label="Working without a task" data-testid="worker-loose">{looseWorkers.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} slot={slots?.get(row.threadId)} />)}</div> : null} />
         ) : <>
           {split.active.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} slot={slots?.get(row.threadId)} />)}
           {split.done.length ? (

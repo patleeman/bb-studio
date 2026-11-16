@@ -26,7 +26,9 @@ const state = vi.hoisted(() => ({
   call: vi.fn(async (_method: string, _input: unknown): Promise<unknown> => ({})),
   refresh: vi.fn(),
   openLoops: vi.fn(),
+  openLink: vi.fn(async (_link: string, _options: unknown) => ({ via: "workbench" })),
 }));
+vi.mock("../../links/open", () => ({ openLinkFromAnywhere: state.openLink }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => (state.toAppPath ? { toThread: state.toThread, experimental_toAppPath: state.toAppPath } : { toThread: state.toThread }),
 }));
@@ -341,6 +343,10 @@ it("folds a task's subtasks and workers under it, one row at the top, and opens 
   expect(fold.getAttribute("aria-expanded")).toBe("false");
   await act(async () => fold.click());
   expect([...container.querySelectorAll<HTMLElement>('[data-testid="flight-subtask"]')].map((row) => row.dataset.taskId)).toEqual(["task_sub"]);
+  state.openLoops.mockClear();
+  await act(async () => q('[data-testid="flight-subtask"]')!.click());
+  expect(state.openLink).toHaveBeenCalledWith("bb://todo/task_sub", { source: "card", title: "Take the screenshots" });
+  expect(state.openLoops).not.toHaveBeenCalled();
   const worker = q('[data-testid="flight-worker"]')!;
   expect(worker.getAttribute("aria-label")).toBe("Open worker Sub worker");
   await act(async () => worker.click());

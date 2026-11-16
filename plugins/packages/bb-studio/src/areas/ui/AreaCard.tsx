@@ -50,14 +50,14 @@ export function AreaCard({ area, now, zone, live = false, workers = 0, onOpenTas
       <ul data-testid="area-open" className="flex flex-col">
         {items.shown.length ? items.shown.map((item, i) => {
           const age = itemAge(item, now, zone);
-          const title = <><span className="min-w-0 flex-1 truncate">{item.needsUser ? <span aria-hidden className="mr-1.5 inline-block size-1.5 rounded-full bg-warning align-[1px]" /> : null}{item.title}</span>{age ? <span className="shrink-0 text-[11.5px] text-subtle-foreground">{age}</span> : null}</>;
+          const title = <><span className="min-w-0 flex-1 truncate">{item.needsUser ? <span aria-hidden className="mr-1.5 inline-block size-1.5 rounded-full bg-warning align-[1px]" /> : null}{item.title}{item.needsUser ? <span className="sr-only">, needs you</span> : null}</span>{age ? <span className="shrink-0 text-[11.5px] text-subtle-foreground"><span className="sr-only">, </span>{age}</span> : null}</>;
           const label = `${item.title}${item.needsUser ? ", needs you" : ""}${age ? `, ${age}` : ""}`;
           const row = cn("flex min-w-0 items-baseline gap-2.5 py-0.5 text-[12.5px]", item.needsUser ? "text-foreground" : "text-muted-foreground");
           return (
             <li key={`${item.title}-${i}`} data-testid="area-item" data-needs-you={item.needsUser || undefined}>
               {item.taskId && onOpenTask
                 ? <button type="button" onClick={() => onOpenTask(item.taskId!, item.title)} aria-label={label} className={cn(row, "w-full cursor-pointer rounded text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>{title}</button>
-                : <span aria-label={label} className={row}>{title}</span>}
+                : <span className={row}>{title}</span>}
             </li>
           );
         }) : <li className="py-0.5 text-[12.5px] text-subtle-foreground">Nothing open</li>}

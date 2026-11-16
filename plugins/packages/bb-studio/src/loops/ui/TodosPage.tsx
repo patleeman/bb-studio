@@ -123,12 +123,12 @@ export function TodosPage({ view, tab: initialTab = "now" }: { view: BotView; ta
         onNew={tab === "now" && ownsTasks ? () => setAdding(true) : undefined} newLabel="New task" />}>
       {tab === "now" && ownsTasks ? <>
         {tasksError ? <p role="alert" data-testid="tasks-error" className="text-sm text-destructive">{tasksError}</p> : null}
-        <div data-testid="tasks-top" className="grid grid-cols-1 items-start gap-5 @4xl/bot-page:grid-cols-[1fr_1.15fr]">
+        {board.data ? <div data-testid="tasks-top" className="grid grid-cols-1 items-start gap-5 @4xl/bot-page:grid-cols-[1fr_1.15fr]">
           <TodoBoxView box={box} chat={chat} names={names} threads={threads} targets={people.targets} now={now} zone={zone} query={searching}
             onOpen={openTask} onOpenChat={botChat ? () => botChat.onOpen(undefined as never) : null} refresh={refresh}
             adding={adding ? <AddTask onAdd={add} onClose={() => setAdding(false)} /> : null} />
           <PageInFlight nodes={flight} names={names} now={now} titleOf={titleOf} onOpen={openTask} onOpenThread={openThread} query={searching} />
-        </div>
+        </div> : tasksError ? null : <TasksLoading />}
         <AreasSection areas={shownAreas} error={areas.error} query={searching} flight={flight} now={now} zone={zone} onOpenTask={(id, title) => openTask({ id, title })} onOpenThread={openThread} />
         {list.data ? <DoneBar tasks={doneTasks} names={names} query={searching} now={now} zone={zone} onOpen={openTask} /> : null}
       </> : null}
@@ -156,6 +156,16 @@ export function TodosPage({ view, tab: initialTab = "now" }: { view: BotView; ta
       {editor.dialogs}
     </BotPageLayout>
   );
+}
+
+function TasksLoading() {
+  const box = (label: string) => (
+    <section aria-label={label} aria-busy="true" data-studio-card="" className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card px-5 py-4">
+      <span className="text-sm font-semibold text-foreground">{label}</span>
+      {[0, 1, 2].map((n) => <span key={n} className="h-4 w-full animate-pulse rounded bg-muted/50 motion-reduce:animate-none" />)}
+    </section>
+  );
+  return <div data-testid="tasks-loading" className="grid grid-cols-1 items-start gap-5 @4xl/bot-page:grid-cols-[1fr_1.15fr]">{box("Your to-do")}{box("In flight")}</div>;
 }
 
 export function AddTask({ onAdd, onClose }: { onAdd(text: string): Promise<unknown>; onClose(): void }) {
