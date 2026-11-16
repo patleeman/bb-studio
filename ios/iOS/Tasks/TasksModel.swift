@@ -45,7 +45,7 @@ struct TaskList: Decodable, Sendable, Equatable {
     }
 }
 
-private struct TaskGetPayload: Decodable {
+struct TaskGetPayload: Decodable {
     var view: TaskView?
 
     private enum CodingKeys: String, CodingKey { case task, history, todo, threads, runs }

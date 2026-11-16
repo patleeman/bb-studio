@@ -39,7 +39,7 @@ enum TasksDemo {
     final class Store: @unchecked Sendable {
         static let shared = Store()
         private let lock = NSLock()
-        private var tasks: [[String: Any]] = LoopsDemo.empty ? [] : TasksDemo.seed()
+        private var tasks: [[String: Any]] = LoopsDemo.empty ? [] : TasksDemo.seed().filter { $0["id"] as? String != LoopsDemo.missing }
         private var history: [String: [[String: Any]]] = TasksDemo.seedHistory()
         private var cleared: [String: Double] = [:]
         private(set) var requests: [(String, [String: Any])] = []
@@ -64,7 +64,7 @@ enum TasksDemo {
                     let list = tasks.filter { ($0["closedAt"] as? Double).map { $0 > since } ?? true }
                     return ok(["tasks": list, "threads": threads(), "held": []])
                 case "tasks.get":
-                    guard let task = find(input["id"] as? String) else { return (404, Data(#"{"ok":false,"error":{"message":"Task not found"}}"#.utf8)) }
+                    guard input["id"] as? String != LoopsDemo.missing, let task = find(input["id"] as? String) else { return (404, Data(#"{"ok":false,"error":{"message":"Task not found"}}"#.utf8)) }
                     let id = task["id"] as! String
                     let runs = tasks.filter { $0["parentId"] as? String == id }
                     return ok(["task": task, "history": history[id] ?? [], "todo": isTodo(task), "threads": threads(), "runs": runs])

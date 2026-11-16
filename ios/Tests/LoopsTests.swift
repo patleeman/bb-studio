@@ -6,6 +6,36 @@ import XCTest
 /// machine, lock-screen buttons, place monitoring and the `loops.*` bodies.
 @MainActor
 final class LoopsTests: XCTestCase {
+    private struct GetEnvelope: Decodable { let result: Studio.LoopsGetOutput }
+    private struct TaskEnvelope: Decodable { let result: TaskGetPayload }
+
+    static let liveGetJSON = #"{"ok":true,"result":{"loop":{"id":"loop_00000000-0000-4000-8000-000000000001","title":"Call the plumber about the quote","why":"Asked to follow up today.","source":null,"kind":"do","options":[],"owner":"patrick","trigger":{"type":"none"},"priority":"normal","push":false,"status":"surfaced","due":null,"area":"Home","createdAt":1800000000000,"updatedAt":1800000060000,"closedAt":null,"closedBy":null},"history":[{"type":"surfaced","at":1800000060000,"data":"{}"}]}}"#
+
+    private func replay(_ data: Data) throws -> LoopDetail {
+        try LoopDetail(JSONDecoder().decode(GetEnvelope.self, from: data).result)
+    }
+
+    func testACurrentLoopsGetPayloadDecodesIntoAMorningRow() throws {
+        let detail = try replay(Data(Self.liveGetJSON.utf8))
+        XCTAssertEqual(detail.loop.title, "Call the plumber about the quote")
+        XCTAssertEqual(detail.loop.kind, .do)
+        XCTAssertTrue(TaskItem.isYou(detail.loop.owner))
+        XCTAssertFalse(detail.loop.isClosed)
+        XCTAssertNil(LoopRowLine.trailing(detail.loop), "no due date, so nothing on the right")
+        guard let folder = ProcessInfo.processInfo.environment["LOOP_PAYLOADS"] else { return }
+        let files = try FileManager.default.contentsOfDirectory(atPath: folder).filter { $0.hasSuffix(".json") }
+        XCTAssertFalse(files.isEmpty, "payloads to replay")
+        for file in files {
+            let data = try Data(contentsOf: URL(fileURLWithPath: folder).appendingPathComponent(file))
+            if file.hasPrefix("tasks.get") {
+                let view = try XCTUnwrap(JSONDecoder().decode(TaskEnvelope.self, from: data).result.view, file)
+                XCTAssertFalse(view.task.title.isEmpty, file)
+            } else {
+                XCTAssertFalse(try replay(data).loop.title.isEmpty, file)
+            }
+        }
+    }
+
     // MARK: Directives
 
     func testParsesLoopDirectives() {

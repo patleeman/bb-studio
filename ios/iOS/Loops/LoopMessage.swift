@@ -175,37 +175,13 @@ private struct MorningSection: View {
 /// A morning card's compact loop: icon, title and when. A tap opens its card.
 struct LoopRowLine: View {
     let id: String
-    @State private var model = LoopsModel.shared
-    @State private var open = false
+    @State private var tasks = TasksModel.shared
 
     var body: some View {
-        let loop = model.detail(id)?.loop
-        Button { open = true } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Image(systemName: loop.map { LoopFormat.kindSymbol($0.kind) } ?? "circle.dotted")
-                    .foregroundStyle(.secondary)
-                Text(loop?.title ?? "…")
-                    .strikethrough(loop?.isClosed == true)
-                    .foregroundStyle(loop?.isClosed == true ? .secondary : .primary)
-                    .lineLimit(2)
-                    .layoutPriority(1)
-                Spacer(minLength: 8)
-                if let loop, let trailing = Self.trailing(loop) {
-                    Text(trailing).foregroundStyle(trailing == "Today" ? Color.accentColor : .secondary)
-                        .lineLimit(1)
-                        .fixedSize()
-                }
-            }
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .disabled(model.enabled != true)
-        .sheet(isPresented: $open) {
-            ScrollView { LoopCard(id: id).padding() }
-                .presentationDetents([.medium, .large])
-        }
-        .task(id: model.enabled) {
-            if model.enabled == true, model.detail(id) == nil { await model.load(id) }
+        if tasks.supported == false {
+            LegacyLoopRowLine(id: id)
+        } else {
+            TaskRowLine(id: id)
         }
     }
 
@@ -216,6 +192,160 @@ struct LoopRowLine: View {
         case .read: return "Read"
         default: return loop.due.map { LoopFormat.day($0) }
         }
+    }
+
+    static func trailing(_ task: TaskItem) -> String? {
+        if task.isClosed { return "Done" }
+        switch task.kind {
+        case .decide: return "\(task.options.count) options"
+        case .read: return "Read"
+        default: return task.due.map { LoopFormat.day($0) }
+        }
+    }
+
+    static func symbol(_ task: TaskItem) -> String {
+        switch task.kind {
+        case .do: "checkmark.circle"
+        case .decide: "arrow.triangle.branch"
+        case .read: "book"
+        case .waitingOutside: "hourglass"
+        }
+    }
+}
+
+private struct TaskRowLine: View {
+    let id: String
+    @State private var model = TasksModel.shared
+    @State private var open = false
+    @State private var retrying = false
+
+    var body: some View {
+        let task = model.task(id)
+        Group {
+            if task == nil, !retrying, let failure = model.failures[id] {
+                MorningRowFailure(message: failure) { retry() }
+            } else {
+                Button { open = true } label: {
+                    MorningRowLabel(symbol: task.map(LoopRowLine.symbol), title: task?.title, closed: task?.isClosed == true,
+                                    trailing: task.flatMap(LoopRowLine.trailing))
+                }
+                .buttonStyle(.plain)
+                .disabled(task == nil)
+                .accessibilityLabel(task.map { [$0.title, LoopRowLine.trailing($0)].compactMap { $0 }.joined(separator: ", ") } ?? "Loading a todo")
+                .accessibilityIdentifier("loop-row")
+                .sheet(isPresented: $open) {
+                    ScrollView { TaskCard(id: id).padding() }
+                        .presentationDetents([.medium, .large])
+                }
+            }
+        }
+        .task { if model.task(id) == nil { await model.load(id) } }
+    }
+
+    private func retry() {
+        retrying = true
+        Task {
+            await model.load(id)
+            retrying = false
+        }
+    }
+}
+
+private struct LegacyLoopRowLine: View {
+    let id: String
+    @State private var model = LoopsModel.shared
+    @State private var open = false
+    @State private var retrying = false
+
+    var body: some View {
+        let loop = model.detail(id)?.loop
+        Group {
+            if loop == nil, !retrying, let failure {
+                MorningRowFailure(message: failure) { retry() }
+            } else {
+                Button { open = true } label: {
+                    MorningRowLabel(symbol: loop.map { LoopFormat.kindSymbol($0.kind) }, title: loop?.title, closed: loop?.isClosed == true,
+                                    trailing: loop.flatMap(LoopRowLine.trailing))
+                }
+                .buttonStyle(.plain)
+                .disabled(loop == nil)
+                .accessibilityLabel(loop.map { [$0.title, LoopRowLine.trailing($0)].compactMap { $0 }.joined(separator: ", ") } ?? "Loading a todo")
+                .accessibilityIdentifier("loop-row")
+                .sheet(isPresented: $open) {
+                    ScrollView { LoopCard(id: id).padding() }
+                        .presentationDetents([.medium, .large])
+                }
+            }
+        }
+        .task(id: model.enabled) { await prepare() }
+    }
+
+    private var failure: String? {
+        if let message = model.failure(id) { return message }
+        return model.enabled == false ? "Todos are off in Studio." : nil
+    }
+
+    private func prepare() async {
+        if model.enabled == nil { await model.checkEnabled() }
+        if model.enabled == true, model.detail(id) == nil { await model.load(id) }
+    }
+
+    private func retry() {
+        retrying = true
+        Task {
+            await model.checkEnabled(force: true)
+            if model.enabled == true { await model.load(id) }
+            retrying = false
+        }
+    }
+}
+
+private struct MorningRowLabel: View {
+    let symbol: String?
+    let title: String?
+    let closed: Bool
+    let trailing: String?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: symbol ?? "circle.dotted")
+                .foregroundStyle(.secondary)
+            Text(title ?? "…")
+                .strikethrough(closed)
+                .foregroundStyle(closed ? .secondary : .primary)
+                .lineLimit(2)
+                .layoutPriority(1)
+            Spacer(minLength: 8)
+            if let trailing {
+                Text(trailing).foregroundStyle(trailing == "Today" ? Color.accentColor : .secondary)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+        }
+        .contentShape(.rect)
+    }
+}
+
+private struct MorningRowFailure: View {
+    let message: String
+    let retry: () -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: "exclamationmark.circle").foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Couldn't load this todo")
+                Text(message).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+            }
+            .layoutPriority(1)
+            Spacer(minLength: 8)
+            Button("Retry", action: retry)
+                .font(.subheadline.weight(.semibold))
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("loop-row-retry")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("loop-row-failed")
     }
 }
 
