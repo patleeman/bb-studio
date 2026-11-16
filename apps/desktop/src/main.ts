@@ -2215,8 +2215,8 @@ async function loadLoadingView(): Promise<void> {
     url: createLocalViewUrl({
       viewModel: {
         kind: "loading",
-        message: "Starting local services and opening the bb workspace.",
-        title: "Opening bb",
+        message: "Starting local services and opening BB Studio.",
+        title: "Opening BB Studio",
       },
     }),
   });

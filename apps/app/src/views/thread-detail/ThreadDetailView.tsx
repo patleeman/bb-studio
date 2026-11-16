@@ -1473,7 +1473,7 @@ function ThreadDetailViewInternal(
                   "data-[state=open]:bg-state-active data-[state=open]:text-foreground",
                   HEADER_ICON_BUTTON_CLASS,
                 )}
-                aria-label="Thread actions"
+                aria-label="Conversation actions"
                 onClick={(event) => {
                   triggerProps.onClick?.(event);
                   event.stopPropagation();
