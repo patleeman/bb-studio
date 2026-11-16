@@ -181,6 +181,8 @@ struct SceneBackdrop: View {
     var view: BotThreadsView?
     var stillOnly = false
     var light: SceneLight?
+    var paused = false
+    var motion = true
     @Environment(\.look) private var look
     @Environment(\.scenePhase) private var phase
     @Environment(\.displayScale) private var scale
@@ -202,9 +204,9 @@ struct SceneBackdrop: View {
             ZStack {
                 Color(lookHex: theme.scene?.fallback ?? look.tokens.canvas)
                 if !stillOnly, store.liveSceneRuns(foreground: phase == .active) {
-                    LiveSceneView(theme: theme.id, mode: look.mode, size: geo.size, light: light, signals: SceneSignals.payload(botId: botId, view: view))
+                    LiveSceneView(theme: theme.id, mode: look.mode, size: geo.size, light: light, paused: paused, signals: SceneSignals.payload(botId: botId, view: view))
                 } else if let image = shown {
-                    ParallaxImage(image: image, amount: Self.parallax)
+                    ParallaxImage(image: image, amount: motion ? Self.parallax : 0)
                         .frame(width: size.width, height: size.height)
                         .offset(x: -Self.parallax, y: -Self.parallax)
                 }
@@ -237,15 +239,7 @@ struct ParallaxImage: UIViewRepresentable {
         let view = UIImageView(image: image)
         view.contentMode = .scaleAspectFill
         view.clipsToBounds = true
-        let x = UIInterpolatingMotionEffect(keyPath: "center.x", type: .tiltAlongHorizontalAxis)
-        x.minimumRelativeValue = -amount
-        x.maximumRelativeValue = amount
-        let y = UIInterpolatingMotionEffect(keyPath: "center.y", type: .tiltAlongVerticalAxis)
-        y.minimumRelativeValue = -amount
-        y.maximumRelativeValue = amount
-        let group = UIMotionEffectGroup()
-        group.motionEffects = [x, y]
-        view.addMotionEffect(group)
+        Self.tilt(view, amount)
         #if DEBUG
         // UI tests find the still; VoiceOver never sees it in a release build.
         if ProcessInfo.processInfo.arguments.contains("-qaLookTheme") {
@@ -258,6 +252,21 @@ struct ParallaxImage: UIViewRepresentable {
 
     func updateUIView(_ view: UIImageView, context: Context) {
         if view.image !== image { view.image = image }
+        if (view.motionEffects.isEmpty) != (amount <= 0) { Self.tilt(view, amount) }
+    }
+
+    static func tilt(_ view: UIImageView, _ amount: CGFloat) {
+        view.motionEffects.forEach(view.removeMotionEffect)
+        guard amount > 0 else { return }
+        let x = UIInterpolatingMotionEffect(keyPath: "center.x", type: .tiltAlongHorizontalAxis)
+        x.minimumRelativeValue = -amount
+        x.maximumRelativeValue = amount
+        let y = UIInterpolatingMotionEffect(keyPath: "center.y", type: .tiltAlongVerticalAxis)
+        y.minimumRelativeValue = -amount
+        y.maximumRelativeValue = amount
+        let group = UIMotionEffectGroup()
+        group.motionEffects = [x, y]
+        view.addMotionEffect(group)
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIImageView, context: Context) -> CGSize? {
@@ -271,12 +280,14 @@ struct LiveSceneView: UIViewRepresentable {
     let mode: LookTheme.Mode
     let size: CGSize
     var light: SceneLight?
+    var paused = false
     let signals: [String: Any]
 
     final class Coordinator {
         var host: LookWebView?
         var key = ""
         var signalsJSON = ""
+        var paused = false
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -301,7 +312,15 @@ struct LiveSceneView: UIViewRepresentable {
             container.addSubview(host.webView)
             coordinator.host = host
             let options = PhoneSceneLayout(size: size, light: light).arguments(theme: theme, mode: mode, scale: scale, live: true, signals: signals)
-            Task { _ = try? await host.call("return BBLook.scene.start(options)", ["options": options]) }
+            let paused = paused
+            coordinator.paused = paused
+            Task {
+                _ = try? await host.call("return BBLook.scene.start(options)", ["options": options])
+                if paused { _ = try? await host.call("BBLook.scene.pause()") }
+            }
+        } else if let host = coordinator.host, coordinator.paused != paused {
+            coordinator.paused = paused
+            Task { _ = try? await host.call(paused ? "BBLook.scene.pause()" : "BBLook.scene.resume()") }
         } else if let host = coordinator.host,
                   let data = try? JSONSerialization.data(withJSONObject: signals, options: [.sortedKeys]),
                   let json = String(data: data, encoding: .utf8), json != coordinator.signalsJSON {

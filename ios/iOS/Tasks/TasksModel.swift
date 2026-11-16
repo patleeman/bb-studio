@@ -211,9 +211,17 @@ final class TasksModel {
     var botThreadId: String?
     private var server: URL?
     private var listed: TaskList?
-    private var full = false
+    var tasksShown = 0
+    private var running: (task: Task<Void, Never>, wide: Bool)?
     private var feeds: [URL: Bool] = [:]
     private var areaFeeds: [URL: Bool] = [:]
+    private var feedsMissing: [URL: Date] = [:]
+    private var areasMissing: [URL: Date] = [:]
+    static let feedRetry: TimeInterval = 300
+
+    static func tries(_ known: Bool?, missingSince: Date?, now: Date = .now) -> Bool {
+        known != false || missingSince.map { now.timeIntervalSince($0) >= feedRetry } ?? true
+    }
     private let fixed: BBClient?
 
     init(client: BBClient? = nil) {
@@ -233,7 +241,7 @@ final class TasksModel {
             board = nil
             areas = nil
             listed = nil
-            full = false
+            running = nil
             views = [:]
             failures = [:]
             flights = [:]
@@ -287,14 +295,25 @@ final class TasksModel {
     }
 
     func refresh(full: Bool = false) async {
+        let wide = full || tasksShown > 0
+        if let running, running.wide || !wide {
+            await running.task.value
+            return
+        }
+        let task = Task { await fetch(wide: wide) }
+        running = (task, wide)
+        await task.value
+        if running?.task == task { running = nil }
+    }
+
+    private func fetch(wide: Bool) async {
         let client = client
         let base = client.baseURL
-        if full { self.full = true }
-        let wide = self.full
-        if feeds[base] != false {
+        if Self.tries(feeds[base], missingSince: feedsMissing[base]) {
             do {
                 let next = try await client.tasksBoard()
                 feeds[base] = true
+                feedsMissing[base] = nil
                 guard base == server else { return }
                 reached()
                 if listError != nil { listError = nil }
@@ -311,6 +330,7 @@ final class TasksModel {
                 return
             } catch where BBClient.isUnknownRPC(error) {
                 feeds[base] = false
+                feedsMissing[base] = .now
                 guard base == server else { return }
             } catch {
                 failed(error)
@@ -338,17 +358,19 @@ final class TasksModel {
 
     private func loadAreas(_ client: BBClient) async {
         let base = client.baseURL
-        guard areaFeeds[base] != false else {
+        guard Self.tries(areaFeeds[base], missingSince: areasMissing[base]) else {
             if base == server, areas != [] { areas = [] }
             return
         }
         do {
             let next = try await client.areaList()
             areaFeeds[base] = true
+            areasMissing[base] = nil
             guard base == server else { return }
             if areas != next { areas = next }
         } catch where BBClient.isUnknownRPC(error) {
             areaFeeds[base] = false
+            areasMissing[base] = .now
             if base == server, areas != [] { areas = [] }
         } catch {
         }
@@ -398,12 +420,14 @@ final class TasksModel {
         let base = client.baseURL
         do {
             let next: TaskList
-            if feeds[base] != false {
+            if Self.tries(feeds[base], missingSince: feedsMissing[base]) {
                 do {
                     next = try await client.tasksFlight(threadId)
                     feeds[base] = true
+                    feedsMissing[base] = nil
                 } catch where BBClient.isUnknownRPC(error) {
                     feeds[base] = false
+                    feedsMissing[base] = .now
                     next = try await client.tasksInFlight(threadId)
                 }
             } else {

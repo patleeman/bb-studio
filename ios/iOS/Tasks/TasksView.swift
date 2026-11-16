@@ -29,7 +29,7 @@ struct TasksView: View {
     private var list: some View {
         let nodes = model.board.map(TaskTree.nodes) ?? []
         let tree = TasksBoardShape(nodes)
-        let shown = model.tasks.filter { owner.matches($0, botThreadId: model.botThreadId) && (tree.top($0) || $0.isMine) }
+        let shown = tree.shown(model.tasks.filter { owner.matches($0, botThreadId: model.botThreadId) })
         let sections = TaskRules.sections(shown)
         let asks = owner == .all || owner == .mine ? model.areaAsks : []
         return ScrollViewReader { proxy in
@@ -100,6 +100,8 @@ struct TasksView: View {
             .accessibilityIdentifier("tasks-screen")
             .refreshable { await reload() }
             .task { await reload() }
+            .onAppear { model.tasksShown += 1 }
+            .onDisappear { model.tasksShown = max(0, model.tasksShown - 1) }
             .onChange(of: model.focus, initial: true) { _, focus in
                 guard let focus else { return }
                 model.focus = nil
@@ -396,6 +398,13 @@ struct TasksBoardShape {
 
     func node(_ id: String) -> FlightNode? { nested.contains(id) ? nil : nodes[id] }
     func top(_ task: TaskItem) -> Bool { !nested.contains(task.id) }
+
+    func folds(_ task: TaskItem) -> Bool { top(task) && !task.isMine && node(task.id)?.belowText != nil }
+
+    func shown(_ tasks: [TaskItem]) -> [TaskItem] {
+        let folding = Set(tasks.filter(folds).map(\.id))
+        return tasks.filter { top($0) || $0.isMine || !folding.contains(top(of: $0.id) ?? "") }
+    }
 }
 
 struct AreaAskRow: View {
@@ -421,7 +430,6 @@ struct AreaAskRow: View {
         .accessibilityLabel(AreaRules.label(ask))
         .accessibilityHint(ask.ownerThread == nil ? "Opens the chat" : "Opens who looks after \(ask.area)")
         .accessibilityAddTraits(.isButton)
-        .accessibilityIdentifier("tasks-area-ask")
-        .accessibilityValue(ask.areaId)
+        .accessibilityIdentifier("tasks-area-ask-\(ask.areaId)")
     }
 }

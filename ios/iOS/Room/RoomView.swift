@@ -409,8 +409,9 @@ struct RoomView: View {
 
     private func backdrop(_ proxy: GeometryProxy) -> some View {
         let spot = RoomSceneLight.spot(proxy, pages: pages, rail: columnHeader)
+        let covered = pages == nil && room.standing
         return ZStack {
-            SceneBackdrop(theme: look.theme, botId: bot.id, view: view, light: spot)
+            SceneBackdrop(theme: look.theme, botId: bot.id, view: view, light: spot, paused: covered, motion: !covered)
                 .onGeometryChange(for: CGSize.self) { $0.size } action: { sceneSize = SceneBackdrop.stillSize($0) }
                 .onChange(of: spot, initial: true) { _, now in sceneLight = now }
             RoomLightLayer(light: light, seed: pager.shown, spot: spot)
