@@ -18,18 +18,30 @@ struct TaskView: Sendable, Equatable {
 struct TaskList: Decodable, Sendable, Equatable {
     var tasks: [TaskItem]
     var threads: [TaskThreadName]
+    var rows: [TaskRowRef]?
+    var workers: [TaskWorkerInfo] = []
+    var counts: TaskCounts?
+    var done: [String] = []
 
-    private enum CodingKeys: String, CodingKey { case tasks, threads }
+    private enum CodingKeys: String, CodingKey { case tasks, threads, rows, workers, counts, done }
 
-    init(tasks: [TaskItem], threads: [TaskThreadName]) {
+    init(tasks: [TaskItem], threads: [TaskThreadName], rows: [TaskRowRef]? = nil, workers: [TaskWorkerInfo] = [], counts: TaskCounts? = nil, done: [String] = []) {
         self.tasks = tasks
         self.threads = threads
+        self.rows = rows
+        self.workers = workers
+        self.counts = counts
+        self.done = done
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         tasks = (try c.decodeIfPresent([Studio.TasksGetOutputTask].self, forKey: .tasks) ?? []).map(TaskItem.init).filter { !$0.id.isEmpty }
         threads = (try c.decodeIfPresent([Studio.TasksGetOutputThreadsItem].self, forKey: .threads) ?? []).map(TaskThreadName.init)
+        rows = try c.decodeIfPresent([Studio.TasksFlightOutputRowsItem].self, forKey: .rows)?.map(TaskRowRef.init).filter { !$0.id.isEmpty }
+        workers = (try c.decodeIfPresent([Studio.TasksFlightOutputWorkersItem].self, forKey: .workers) ?? []).map(TaskWorkerInfo.init).filter { !$0.threadId.isEmpty }
+        counts = try c.decodeIfPresent(Studio.TasksFlightOutputCounts.self, forKey: .counts).map(TaskCounts.init)
+        done = try c.decodeIfPresent([String].self, forKey: .done) ?? []
     }
 }
 
@@ -124,6 +136,7 @@ extension Studio.TasksActInputSnooze {
 enum TaskRequests {
     static func get(_ id: String) -> JSONValue { json(Studio.TasksGetInput(id: id)) }
     static func inFlight(_ threadId: String) -> JSONValue { json(Studio.TasksInFlightInput(threadId: threadId)) }
+    static func flight(_ threadId: String) -> JSONValue { json(Studio.TasksFlightInput(threadId: threadId)) }
     static func dismiss(_ id: String) -> JSONValue { json(Studio.WorkDismissInput(id: id)) }
     static func clear(_ threadId: String) -> JSONValue { json(Studio.WorkClearInput(threadId: threadId)) }
 
@@ -158,6 +171,19 @@ extension BBClient {
         try await rpc("studio", Studio.Method.tasks_inFlight, TaskRequests.inFlight(threadId))
     }
 
+    func tasksFlight(_ threadId: String) async throws -> TaskList {
+        try await rpc("studio", Studio.Method.tasks_flight, TaskRequests.flight(threadId))
+    }
+
+    func tasksBoard() async throws -> TaskList {
+        try await rpc("studio", Studio.Method.tasks_board, .object([:]))
+    }
+
+    func areaList() async throws -> [AreaSummary] {
+        let list: AreaList = try await rpc("studio", "areas.list", .object([:]))
+        return list.areas
+    }
+
     func dismissWork(_ id: String) async throws {
         let _: JSONValue = try await rpc("studio", Studio.Method.work_dismiss, TaskRequests.dismiss(id))
     }
@@ -174,6 +200,8 @@ final class TasksModel {
     private(set) var supported: Bool?
     private(set) var list: TaskList?
     private(set) var listError: String?
+    private(set) var board: TaskList?
+    private(set) var areas: [AreaSummary]?
     private(set) var views: [String: TaskView] = [:]
     private(set) var failures: [String: String] = [:]
     private(set) var flights: [String: TaskList] = [:]
@@ -182,6 +210,10 @@ final class TasksModel {
     var focus: String?
     var botThreadId: String?
     private var server: URL?
+    private var listed: TaskList?
+    private var full = false
+    private var feeds: [URL: Bool] = [:]
+    private var areaFeeds: [URL: Bool] = [:]
     private let fixed: BBClient?
 
     init(client: BBClient? = nil) {
@@ -198,6 +230,10 @@ final class TasksModel {
             supported = nil
             list = nil
             listError = nil
+            board = nil
+            areas = nil
+            listed = nil
+            full = false
             views = [:]
             failures = [:]
             flights = [:]
@@ -207,7 +243,11 @@ final class TasksModel {
         return client
     }
 
+    var usesRows: Bool? { server.flatMap { feeds[$0] } }
+
     var tasks: [TaskItem] { list?.tasks ?? [] }
+
+    var areaAsks: [AreaAsk] { AreaRules.asks(areas ?? [], tasks: board?.tasks ?? tasks) }
 
     var names: TaskNames {
         var threads = list?.threads ?? []
@@ -217,7 +257,8 @@ final class TasksModel {
     }
 
     func task(_ id: String) -> TaskItem? {
-        views[id]?.task ?? list?.tasks.first { $0.id == id } ?? flights.values.lazy.compactMap { $0.tasks.first { $0.id == id } }.first
+        views[id]?.task ?? list?.tasks.first { $0.id == id } ?? board?.tasks.first { $0.id == id }
+            ?? flights.values.lazy.compactMap { $0.tasks.first { $0.id == id } }.first
     }
 
     var today: [TaskItem] { TaskRules.today(tasks) }
@@ -239,21 +280,77 @@ final class TasksModel {
         if supported != true { supported = true }
     }
 
-    func refresh() async {
+    private func failed(_ error: Error) {
+        learn(error)
+        let message = BBClient.describe(error)
+        if listError != message { listError = message }
+    }
+
+    func refresh(full: Bool = false) async {
         let client = client
+        let base = client.baseURL
+        if full { self.full = true }
+        let wide = self.full
+        if feeds[base] != false {
+            do {
+                let next = try await client.tasksBoard()
+                feeds[base] = true
+                guard base == server else { return }
+                reached()
+                if listError != nil { listError = nil }
+                if board != next { board = next }
+                publish(TaskTree.merge(board: next, list: listed))
+                guard wide else { return }
+                if let rest = try? await client.taskList(), base == server, listed != rest {
+                    listed = rest
+                    if let board { publish(TaskTree.merge(board: board, list: rest)) }
+                }
+                await loadAreas(client)
+                return
+            } catch where BBClient.isCancellation(error) {
+                return
+            } catch where BBClient.isUnknownRPC(error) {
+                feeds[base] = false
+                guard base == server else { return }
+            } catch {
+                failed(error)
+                return
+            }
+        }
+        if wide { await loadAreas(client) }
         do {
             let next = try await client.taskList()
             guard client.baseURL == server else { return }
             reached()
             if listError != nil { listError = nil }
-            guard next != list else { return }
-            list = next
-            for task in next.tasks where views[task.id].map({ $0.task != task }) == true { views[task.id]?.task = task }
+            publish(next)
         } catch where BBClient.isCancellation(error) {
         } catch {
-            learn(error)
-            let message = BBClient.describe(error)
-            if listError != message { listError = message }
+            failed(error)
+        }
+    }
+
+    private func publish(_ next: TaskList) {
+        guard next != list else { return }
+        list = next
+        for task in next.tasks where views[task.id].map({ $0.task != task }) == true { views[task.id]?.task = task }
+    }
+
+    private func loadAreas(_ client: BBClient) async {
+        let base = client.baseURL
+        guard areaFeeds[base] != false else {
+            if base == server, areas != [] { areas = [] }
+            return
+        }
+        do {
+            let next = try await client.areaList()
+            areaFeeds[base] = true
+            guard base == server else { return }
+            if areas != next { areas = next }
+        } catch where BBClient.isUnknownRPC(error) {
+            areaFeeds[base] = false
+            if base == server, areas != [] { areas = [] }
+        } catch {
         }
     }
 
@@ -298,9 +395,21 @@ final class TasksModel {
 
     func loadFlight(_ threadId: String) async {
         let client = client
+        let base = client.baseURL
         do {
-            let next = try await client.tasksInFlight(threadId)
-            guard client.baseURL == server else { return }
+            let next: TaskList
+            if feeds[base] != false {
+                do {
+                    next = try await client.tasksFlight(threadId)
+                    feeds[base] = true
+                } catch where BBClient.isUnknownRPC(error) {
+                    feeds[base] = false
+                    next = try await client.tasksInFlight(threadId)
+                }
+            } else {
+                next = try await client.tasksInFlight(threadId)
+            }
+            guard base == server else { return }
             reached()
             if flightErrors[threadId] != nil { flightErrors[threadId] = nil }
             if flights[threadId] != next { flights[threadId] = next }
@@ -327,6 +436,10 @@ final class TasksModel {
         if var list, let index = list.tasks.firstIndex(where: { $0.id == task.id }) {
             list.tasks[index] = task
             self.list = list
+        }
+        if var board, let index = board.tasks.firstIndex(where: { $0.id == task.id }) {
+            board.tasks[index] = task
+            self.board = board
         }
         for (threadId, var flight) in flights {
             guard let index = flight.tasks.firstIndex(where: { $0.id == task.id }) else { continue }

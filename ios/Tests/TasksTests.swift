@@ -261,7 +261,206 @@ final class TasksTests: XCTestCase {
         let note = try await model.perform("wc_1", .takeBack)
         XCTAssertEqual(note, "The Bot chat could not be told")
         let seen = await paths.paths.map { String($0.split(separator: "/").last ?? "") }
-        XCTAssertEqual(seen, ["tasks.inFlight", "tasks.act", "tasks.get", "tasks.list", "tasks.inFlight"])
+        XCTAssertEqual(seen, ["tasks.flight", "tasks.act", "tasks.get", "tasks.board", "tasks.flight"])
         XCTAssertEqual(model.supported, true)
+        XCTAssertEqual(model.usesRows, true)
+    }
+
+    private static func wire(_ id: String, owner: String = TaskItem.user, state: String = "todo", kind: String = "do", needs: String? = nil, step: String? = nil,
+                             line: String? = nil, parent: String? = nil, closedAt: Double? = nil, role: String? = nil, stale: Bool = false) -> String {
+        func text(_ value: String?) -> String { value.map { "\"\($0)\"" } ?? "null" }
+        let automation = role.map { #"{"id":"aut","kind":"checkin","role":"\#($0)","count":0}"# } ?? "null"
+        return #"{"id":"\#(id)","title":"T \#(id)","owner":"\#(owner)","state":"\#(state)","kind":"\#(kind)","needs":\#(text(needs)),"progress":{"step":\#(text(step)),"line":\#(text(line))},"parentId":\#(text(parent)),"automation":\#(automation),"stale":\#(stale),"conversation":"thr_main","createdAt":1000,"updatedAt":2000,"closedAt":\#(closedAt.map { "\($0)" } ?? "null"),"workers":[]}"#
+    }
+
+    private static let flightJSON = #"""
+    {"rows":[
+      {"id":"wc_lead","home":"thr_main","under":null,"depth":0,"open":true,"workers":["thr_w1"],"hasWorkers":true,"needsYou":true,"startedAt":1500},
+      {"id":"wc_sub","home":"thr_main","under":"wc_lead","depth":1,"open":true,"workers":["thr_w2"],"hasWorkers":true,"needsYou":true},
+      {"id":"wc_slow","home":"thr_main","under":null,"depth":0,"open":true,"workers":[],"hasWorkers":false,"needsYou":false,"stalled":true},
+      {"id":"wc_done","home":"thr_main","under":null,"depth":0,"open":false,"workers":[],"hasWorkers":false,"needsYou":false}],
+     "tasks":[\#(wire("wc_lead", owner: "thread:thr_lead", state: "waiting", step: "3/5 Tests")),\#(wire("wc_sub", state: "waiting", needs: "Light or dark?", parent: "wc_lead")),
+              \#(wire("wc_slow", owner: "cos", state: "in_progress", step: "Step 2 of 4: build")),\#(wire("wc_done", owner: "cos", state: "done", closedAt: 3000))],
+     "counts":{"open":2,"running":1,"waiting":1,"todo":0,"needsYou":1,"done":1,"workers":2},
+     "threads":[{"owner":"thread:thr_lead","name":"Launch lead","threadId":"thr_lead"}],
+     "workers":[{"threadId":"thr_w1","name":"Fork worker","status":"running","archived":false}],
+     "done":["wc_done"]}
+    """#
+
+    func testDecodesTheFlightFeedIntoATree() throws {
+        let flight = try JSONDecoder().decode(TaskList.self, from: Data(Self.flightJSON.utf8))
+        XCTAssertEqual(flight.rows?.map(\.id), ["wc_lead", "wc_sub", "wc_slow", "wc_done"])
+        XCTAssertEqual(flight.counts, TaskCounts(open: 2, running: 1, waiting: 1, needsYou: 1, done: 1, workers: 2))
+        XCTAssertEqual(flight.done, ["wc_done"])
+        XCTAssertEqual(flight.rows?.first?.startedAt, Date(milliseconds: 1500))
+        XCTAssertEqual(flight.rows?[2].stalled, true)
+        let nodes = TaskTree.nodes(flight)
+        XCTAssertEqual(nodes.map(\.id), ["wc_lead", "wc_slow", "wc_done"], "a subtask sits under its parent, not beside it")
+        let lead = nodes[0]
+        XCTAssertEqual(lead.children.map(\.id), ["wc_sub"])
+        XCTAssertEqual(lead.workers.map(\.name), ["Fork worker"])
+        XCTAssertEqual(lead.children[0].workers.map(\.name), ["A worker thread"], "an unnamed worker still shows")
+        XCTAssertEqual(lead.belowText, "1 subtask · 2 workers")
+        XCTAssertNil(nodes[1].belowText)
+        XCTAssertEqual(lead.look, .needsYou, "a waiting parent whose subtask needs you needs you")
+        XCTAssertEqual(nodes[1].look, .waiting, "a stalled running task reads as waiting")
+        XCTAssertFalse(nodes[1].isRunning)
+        XCTAssertEqual(nodes[2].look, .done)
+    }
+
+    func testTheOldFeedMakesFlatRows() {
+        let list = TaskList(tasks: [task("a", owner: "cos", state: .inProgress), task("b", state: .waiting), task("c", owner: "cos", state: .done)], threads: [])
+        let nodes = TaskTree.nodes(list)
+        XCTAssertEqual(nodes.map(\.id), ["a", "b", "c"])
+        XCTAssertEqual(nodes.map(\.row.open), [true, true, false])
+        XCTAssertEqual(nodes.map(\.row.needsYou), [false, true, false])
+        XCTAssertTrue(nodes.allSatisfy { $0.children.isEmpty && $0.workers.isEmpty })
+    }
+
+    func testFlightRowsSayWhatTheyAreDoingOrWaitingOn() throws {
+        let flight = try JSONDecoder().decode(TaskList.self, from: Data(Self.flightJSON.utf8))
+        let nodes = TaskTree.nodes(flight)
+        let lead = TaskTree.text(nodes[0], owner: "Launch lead", now: Date(milliseconds: 10_000))
+        XCTAssertEqual(lead.value, "needs-you")
+        XCTAssertEqual(lead.right, "Needs you")
+        let slow = TaskTree.text(nodes[1], owner: "Juniper")
+        XCTAssertEqual(slow.value, "stalled")
+        XCTAssertEqual(slow.right, "Stalled")
+        XCTAssertTrue(slow.aria.hasPrefix("T wc_slow, stalled, Juniper"), slow.aria)
+        var running = nodes[1]
+        running.row.stalled = false
+        let text = TaskTree.text(running, owner: nil, now: Date(milliseconds: 1000 + 5 * 60_000))
+        XCTAssertEqual(text.right, "2 of 4")
+        XCTAssertEqual(text.line, "build")
+        XCTAssertEqual(text.elapsed, "5m", "timed from startedAt, else when it was made")
+        XCTAssertEqual(text.aria, "T wc_slow, running, step 2 of 4, build, for 5m")
+        XCTAssertEqual(StepProgress("3/5 Tests")?.label, "3 of 5")
+        XCTAssertEqual(StepProgress("3/5 Tests")?.rest, "Tests")
+        XCTAssertNil(StepProgress("7/5"))
+        XCTAssertNil(StepProgress("Tests"))
+        var outside = task("w", owner: "cos", state: .waiting)
+        outside.waitingOn = .init(kind: "ci", ref: "#42", text: nil)
+        XCTAssertEqual(TaskTree.waitLabel(outside).long, "Waiting on CI: #42")
+        outside.waitingOn = .init(kind: "outside", ref: nil, text: "Sam")
+        XCTAssertEqual(TaskTree.waitLabel(outside).short, "waiting on Sam")
+        outside.waitingOn = .init(kind: "task", ref: "t2", text: nil)
+        XCTAssertEqual(TaskTree.waitLabel(outside, titleOf: { $0 == "t2" ? "Ship it" : nil }).long, "Waiting on Ship it")
+        outside.waitingOn = nil
+        outside.state = .todo
+        XCTAssertEqual(TaskTree.waitLabel(outside).short, "queued")
+        let ended = TaskTree.text(FlightNode(row: TaskRowRef(id: "e"), task: task("e", owner: "cos", state: .inProgress, stale: true)), owner: nil)
+        XCTAssertEqual(ended.value, "ended")
+        XCTAssertFalse(InFlightBar.live(FlightNode(row: TaskRowRef(id: "e"), task: task("e", owner: "cos", state: .inProgress, stale: true)), rowsFeed: true),
+                       "an ended task folds into done with the new feed")
+        XCTAssertTrue(InFlightBar.live(FlightNode(row: TaskRowRef(id: "e"), task: task("e", owner: "cos", state: .inProgress, stale: true)), rowsFeed: false),
+                      "and stays open with the old one, as before")
+    }
+
+    private static let areasJSON = #"""
+    {"areas":[
+      {"id":"area_ok","name":"Launch","covers":"","owner":{"kind":"lead","thread":"thr_lead"},"ownerName":"Launch lead","cadence":null,"status":"ok","reason":null,"now":null,
+       "open":[{"title":"Approve the quote","since":null,"sinceAt":null,"needsUser":true,"taskId":"task_mine"},
+               {"title":"Confirm the numbers","since":null,"sinceAt":1799913600000,"needsUser":true,"taskId":"task_agent"},
+               {"title":"Slides","since":null,"sinceAt":null,"needsUser":false,"taskId":null}],
+       "runs":[],"lastRun":null,"nextRun":null,"nextLabel":null,"paused":false,"links":[],"statusFile":null,"fileError":null,"updatedAt":1},
+      {"id":"area_home","name":"Home","covers":"","owner":{"kind":"bot","botId":"bot_1"},"ownerName":"Juniper","cadence":null,"status":"flagged","reason":null,"now":null,
+       "open":[{"title":"Renew the insurance","since":"last week","sinceAt":null,"needsUser":true,"taskId":null}],
+       "runs":[],"lastRun":null,"nextRun":null,"nextLabel":null,"paused":false,"links":[],"statusFile":null,"fileError":null,"updatedAt":1}]}
+    """#
+
+    func testAreaAsksAreTheOpenItemsThatNeedYouUnlessTheyAreAlreadyYourTask() throws {
+        let areas = try JSONDecoder().decode(AreaList.self, from: Data(Self.areasJSON.utf8)).areas
+        XCTAssertEqual(areas.map(\.id), ["area_ok", "area_home"])
+        XCTAssertEqual(areas[0].ownerThread, "thr_lead")
+        XCTAssertNil(areas[1].ownerThread)
+        let tasks = [task("task_mine"), task("task_agent", owner: "cos", state: .inProgress)]
+        let asks = AreaRules.asks(areas, tasks: tasks)
+        XCTAssertEqual(asks.map(\.title), ["Renew the insurance", "Confirm the numbers"], "problems first; the user's own task isn't asked twice; only items that need the user")
+        XCTAssertEqual(asks.map(\.area), ["Home", "Launch"])
+        XCTAssertEqual(asks[1].ownerThread, "thr_lead")
+        XCTAssertEqual(Set(asks.map(\.id)).count, 2)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        XCTAssertEqual(AreaRules.age(asks[0], now: now, calendar: calendar), "last week", "the notes' own words when there is no date")
+        XCTAssertEqual(AreaRules.age(asks[1], now: now, calendar: calendar), "1 day")
+        XCTAssertEqual(AreaRules.label(asks[1], now: now, calendar: calendar), "Confirm the numbers, needs you, from Launch, 1 day")
+        var ask = asks[1]
+        ask.sinceAt = now.addingTimeInterval(-600)
+        XCTAssertEqual(AreaRules.age(ask, now: now, calendar: calendar), "today")
+        ask.sinceAt = now.addingTimeInterval(-3 * 86_400)
+        XCTAssertEqual(AreaRules.age(ask, now: now, calendar: calendar), "3 days")
+        ask.sinceAt = Date(milliseconds: 1_799_000_000_000)
+        XCTAssertEqual(AreaRules.age(ask, now: now, calendar: calendar), "Jan 3")
+        XCTAssertEqual(AreaRules.asks(areas, tasks: [task("task_mine", owner: "cos")]).count, 3, "a task that is no longer yours is asked again")
+    }
+
+    private func server(_ name: String, unknown: Set<String>, paths: Paths) -> BBClient {
+        let client = BBClient(baseURL: URL(string: "https://\(name).invalid")!)
+        let board = #"{"rows":[{"id":"t_open","home":null,"under":null,"depth":0,"open":true,"workers":[],"hasWorkers":false,"needsYou":false}],"tasks":[\#(Self.wire("t_open", owner: "cos", state: "in_progress"))],"counts":{"open":1,"running":1,"waiting":0,"todo":0,"needsYou":0,"done":0,"workers":0},"threads":[],"workers":[]}"#
+        let list = #"{"tasks":[\#(Self.wire("t_open", owner: "cos", state: "in_progress")),\#(Self.wire("t_hidden", owner: "cos", state: "in_progress")),\#(Self.wire("t_old", state: "done", closedAt: 5)),\#(Self.wire("t_daily", owner: "cos", state: "in_progress", role: "schedule"))],"threads":[],"held":[]}"#
+        client.transport = { _, path, _ in
+            let method = String(path.split(separator: "/").last ?? "")
+            await paths.add(path)
+            if unknown.contains(method) { return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
+            let result: String = switch method {
+            case "tasks.board": board
+            case "tasks.flight": board.replacingOccurrences(of: #""workers":[]}"#, with: #""workers":[],"done":[]}"#)
+            case "areas.list": Self.areasJSON
+            default: list
+            }
+            return (200, Data(#"{"ok":true,"result":\#(result)}"#.utf8))
+        }
+        return client
+    }
+
+    private func methods(_ paths: Paths) async -> [String] {
+        await paths.paths.map { String($0.split(separator: "/").last ?? "") }
+    }
+
+    func testANewStudioFeedsTheTasksScreenFromTheBoard() async {
+        let paths = Paths()
+        let model = TasksModel(client: server("tasks-board", unknown: [], paths: paths))
+        await model.refresh(full: true)
+        let seen = await methods(paths)
+        XCTAssertEqual(seen, ["tasks.board", "tasks.list", "areas.list"])
+        XCTAssertEqual(model.usesRows, true)
+        XCTAssertEqual(model.tasks.map(\.id), ["t_open", "t_old", "t_daily"], "open tasks from the board, done and recurring from the list; a task the board leaves out stays out")
+        XCTAssertEqual(model.areaAsks.count, 3)
+        await model.loadFlight("thr_main")
+        XCTAssertNotNil(model.flights["thr_main"]?.rows)
+        await model.refresh()
+        let after = await methods(paths)
+        XCTAssertEqual(Array(after.dropFirst(3)), ["tasks.flight", "tasks.board", "tasks.list", "areas.list"], "the Tasks screen keeps all three fresh once it has been opened")
+    }
+
+    func testAnOlderStudioFallsBackToTheOldFeedsAndRemembers() async {
+        let paths = Paths()
+        let model = TasksModel(client: server("tasks-before-board", unknown: ["tasks.flight", "tasks.board", "areas.list"], paths: paths))
+        await model.loadFlight("thr_main")
+        XCTAssertEqual(model.usesRows, false)
+        XCTAssertNil(model.flights["thr_main"]?.rows, "the old feed's rows")
+        XCTAssertEqual(model.flights["thr_main"]?.tasks.count, 4)
+        await model.refresh(full: true)
+        await model.refresh(full: true)
+        await model.loadFlight("thr_main")
+        let seen = await methods(paths)
+        XCTAssertEqual(seen, ["tasks.flight", "tasks.inFlight", "areas.list", "tasks.list", "tasks.list", "tasks.inFlight"],
+                       "unknown methods are asked once per server")
+        XCTAssertEqual(model.supported, true)
+        XCTAssertEqual(model.areas, [])
+        XCTAssertEqual(model.tasks.count, 4, "today's behaviour: the whole list")
+    }
+
+    func testAMissingStudioIsNotMistakenForAnOlderOne() async {
+        let paths = Paths()
+        let model = TasksModel(client: server("tasks-board-down", unknown: [], paths: paths))
+        let client = BBClient(baseURL: URL(string: "https://tasks-board-down.invalid")!)
+        client.transport = { _, _, _ in (503, Data(#"{"ok":false,"error":{"message":"Studio is not running"}}"#.utf8)) }
+        let down = TasksModel(client: client)
+        await down.refresh()
+        XCTAssertNil(down.usesRows, "a 503 decides nothing")
+        XCTAssertNotNil(down.listError)
+        await model.refresh()
+        XCTAssertEqual(model.usesRows, true)
     }
 }

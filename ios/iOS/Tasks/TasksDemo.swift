@@ -4,6 +4,7 @@ import Foundation
 enum TasksDemo {
     static var enabled: Bool { LoopsDemo.enabled && !ProcessInfo.processInfo.arguments.contains("-qaTasksOld") }
     static var old: Bool { LoopsDemo.mode != nil && !enabled }
+    static let noBoard = ProcessInfo.processInfo.arguments.contains("-qaTasksNoBoard")
 
     nonisolated(unsafe) private static var installed = false
     static let offline = ProcessInfo.processInfo.arguments.contains("-qaTasksOffline")
@@ -15,6 +16,7 @@ enum TasksDemo {
         installed = true
         ThreadTitles.set("thr_demo_w1", "Studio-native BB fork")
         ThreadTitles.set("thr_demo_w3", "Mock question bank")
+        ThreadTitles.set("thr_demo_w7", "iPad UI suite")
         let previous = BBClient.demoTransport
         BBClient.demoTransport = { method, path, body in
             if offline, path.contains("/rpc/tasks."), ProcessInfo.processInfo.systemUptime - started < 45 { throw URLError(.notConnectedToInternet) }
@@ -39,6 +41,7 @@ enum TasksDemo {
         private let lock = NSLock()
         private var tasks: [[String: Any]] = LoopsDemo.empty ? [] : TasksDemo.seed()
         private var history: [String: [[String: Any]]] = TasksDemo.seedHistory()
+        private var cleared: [String: Double] = [:]
         private(set) var requests: [(String, [String: Any])] = []
 
         func respond(_ method: String, _ path: String, _ body: Data?) -> (Int, Data)? {
@@ -46,10 +49,12 @@ enum TasksDemo {
             let base = "/api/v1/plugins/studio/rpc/"
             guard path.hasPrefix(base) else { return nil }
             let name = String(path.dropFirst(base.count))
-            guard name.hasPrefix("tasks.") || name.hasPrefix("work.") || name == "loops.add" else { return nil }
+            guard name.hasPrefix("tasks.") || name.hasPrefix("work.") || name == "loops.add" || name == "areas.list" else { return nil }
+            let unknown = (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8))
             if TasksDemo.old {
-                return name == "loops.add" ? nil : (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8))
+                return name == "loops.add" ? nil : unknown
             }
+            if TasksDemo.noBoard, ["tasks.flight", "tasks.board", "areas.list"].contains(name) { return unknown }
             let input = body.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
             return lock.withLock {
                 requests.append((name, input))
@@ -74,6 +79,18 @@ enum TasksDemo {
                         return task["closedAt"] is NSNull
                     }
                     return ok(["tasks": rows, "threads": threads()])
+                case "tasks.flight":
+                    let threadId = input["threadId"] as? String ?? ""
+                    var out = Rows(tasks, since: Self.todayStart).view(home: threadId, cleared: cleared[threadId] ?? 0)
+                    out["threads"] = threads()
+                    return ok(out)
+                case "tasks.board":
+                    var out = Rows(tasks, since: Self.todayStart).view(home: nil, cleared: 0)
+                    out["threads"] = threads()
+                    out["done"] = nil
+                    return ok(out)
+                case "areas.list":
+                    return ok(["areas": LoopsDemo.empty ? [] : TasksDemo.areas()])
                 case "tasks.act": return act(input)
                 case "work.dismiss":
                     guard var task = find(input["id"] as? String), var card = task["card"] as? [String: Any] else { return (400, Data()) }
@@ -83,6 +100,7 @@ enum TasksDemo {
                     return ok(task)
                 case "work.clear":
                     let threadId = input["threadId"] as? String ?? ""
+                    self.cleared[threadId] = Self.now
                     var cleared = 0
                     for var task in tasks where task["conversation"] as? String == threadId && !(task["closedAt"] is NSNull) {
                         guard var card = task["card"] as? [String: Any], card["dismissedAt"] is NSNull else { continue }
@@ -112,6 +130,7 @@ enum TasksDemo {
         private func threads() -> [[String: Any]] {
             [["owner": "thread:thr_demo_w1", "name": "Studio-native BB fork", "threadId": "thr_demo_w1"],
              ["owner": "thread:thr_demo_w3", "name": "Mock question bank", "threadId": "thr_demo_w3"],
+             ["owner": "thread:thr_demo_w7", "name": "iPad UI suite", "threadId": "thr_demo_w7"],
              ["owner": "thread:\(LoopsDemo.leadId)", "name": "Larkspur lead", "threadId": LoopsDemo.leadId],
              ["owner": "thread:\(BotDemo.threadId)", "name": "Main", "threadId": BotDemo.threadId]]
         }
@@ -212,6 +231,7 @@ enum TasksDemo {
         }
 
         static var now: Double { (Date().timeIntervalSince1970 * 1000).rounded() }
+        static var todayStart: Double { (Calendar.current.startOfDay(for: .now).timeIntervalSince1970 * 1000).rounded() }
 
         static func task(_ id: String, _ title: String, why: String = "", owner: String = "patrick", state: String = "todo", kind: String = "do",
                          options: [String] = [], needs: String? = nil, conversation: String? = nil, area: String? = nil, due: Double? = nil,
@@ -264,6 +284,8 @@ enum TasksDemo {
                               "mode": "dedupe", "clearedAt": NSNull(), "severity": "critical"], parentId: "task_auto-aut_demo_spend", created: now - 600_000),
             Store.task("wc_demo_fork", "Studio-native BB fork", owner: "thread:thr_demo_w1", state: "in_progress", conversation: main, step: "3/5 Tests",
                  line: "Unit tests running", workers: ["thr_demo_w1"], card: "worker", origin: "work", created: now - 2_400_000),
+            Store.task("wc_demo_fork_ui", "Run the UI suite on the iPad", owner: "thread:thr_demo_w7", state: "in_progress", conversation: main, step: "2/6 Layout",
+                 workers: ["thr_demo_w7"], parentId: "wc_demo_fork", origin: "work", created: now - 3_000_000),
             Store.task("wc_demo_stills", "Theme stills renderer", state: "waiting", needs: "Light or dark set for the stills?", conversation: main, step: "2/4",
                  workers: ["thr_demo_w1"], card: "worker", origin: "work", created: now - 1_200_000),
             Store.task("wc_demo_bank", "Mock question bank", owner: "thread:thr_demo_w3", state: "in_progress", conversation: main, line: "Wrote 12 of 20 questions",
@@ -294,6 +316,156 @@ enum TasksDemo {
         }
         return out
     }
+
+    static func areas() -> [[String: Any]] {
+        let now = Store.now
+        func item(_ title: String, _ sinceAt: Double?, needsUser: Bool, taskId: String? = nil) -> [String: Any] {
+            ["title": title, "since": NSNull(), "sinceAt": (sinceAt as Any?) ?? NSNull(), "needsUser": needsUser, "taskId": (taskId as Any?) ?? NSNull()]
+        }
+        func area(_ id: String, _ name: String, _ covers: String, owner: [String: Any], ownerName: String, status: String, now line: String, open: [[String: Any]]) -> [String: Any] {
+            ["id": id, "name": name, "covers": covers, "owner": owner, "ownerName": ownerName, "cadence": "Every morning", "status": status, "reason": NSNull(),
+             "now": line, "open": open, "runs": [], "lastRun": now - 3_600_000, "nextRun": NSNull(), "nextLabel": NSNull(), "paused": false, "links": [],
+             "statusFile": NSNull(), "fileError": NSNull(), "updatedAt": now - 3_600_000]
+        }
+        return [
+            area("area_demo_launch", "Larkspur launch", "The Q4 launch plan and its workers", owner: ["kind": "lead", "thread": LoopsDemo.leadId],
+                 ownerName: "Larkspur lead", status: "ok", now: "On track for Friday.",
+                 open: [item("Approve the plumber's quote", now - 86_400_000, needsUser: true, taskId: "task_demo_quote"),
+                        item("Confirm the Q4 numbers with finance", now - 86_400_000, needsUser: true),
+                        item("Slides for the review", now - 172_800_000, needsUser: false)]),
+            area("area_demo_home", "Home", "The house, bills and repairs", owner: ["kind": "bot", "botId": "bot_demo"], ownerName: "Juniper",
+                 status: "flagged", now: "The insurance renewal is due this week.",
+                 open: [item("Renew the home insurance policy", now - 3 * 86_400_000, needsUser: true)]),
+        ]
+    }
+
+    struct Rows {
+        private let all: [[String: Any]]
+        private let byId: [String: [String: Any]]
+        private let since: Double
+
+        init(_ all: [[String: Any]], since: Double) {
+            self.all = all
+            self.since = since
+            var byId: [String: [String: Any]] = [:]
+            for task in all { if let id = task["id"] as? String, byId[id] == nil { byId[id] = task } }
+            self.byId = byId
+        }
+
+        private final class Node {
+            let task: [String: Any]
+            var children: [Node] = []
+            var workers: [String] = []
+            var deep: Set<String> = []
+            var needsYou = false
+            let home: String?
+            init(_ task: [String: Any], home: String?) { self.task = task; self.home = home }
+            var id: String { task["id"] as? String ?? "" }
+        }
+
+        private static func closed(_ t: [String: Any]) -> Bool { t["closedAt"] is Double }
+        private static func owner(_ t: [String: Any]) -> String { t["owner"] as? String ?? TaskItem.user }
+        private static func ownerThread(_ t: [String: Any]) -> String? {
+            let owner = owner(t)
+            return owner.hasPrefix("thread:") ? String(owner.dropFirst(7)) : nil
+        }
+        private static func needsYou(_ t: [String: Any]) -> Bool {
+            owner(t) == TaskItem.user && t["state"] as? String == "waiting" && t["kind"] as? String != "waiting-outside"
+        }
+
+        private func shown(_ t: [String: Any]) -> Bool {
+            let role = (t["automation"] as? [String: Any])?["role"] as? String
+            if role == "schedule" || (role == "run" && Self.owner(t) != TaskItem.user) || t["state"] as? String == "dropped" { return false }
+            if let card = t["card"] as? [String: Any], card["dismissedAt"] is Double { return false }
+            if t["stale"] as? Bool == true && !Self.closed(t) { return (t["updatedAt"] as? Double ?? 0) >= since }
+            return !Self.closed(t) || (t["closedAt"] as? Double ?? 0) >= since
+        }
+
+        private func home(_ t: [String: Any]) -> String? {
+            var root = t
+            var seen = Set<String>()
+            while let parent = (root["parentId"] as? String).flatMap({ byId[$0] }), let id = root["id"] as? String, seen.insert(id).inserted { root = parent }
+            if let conversation = root["conversation"] as? String { return conversation }
+            if let thread = Self.ownerThread(root) { return thread }
+            return Self.owner(root) == "cos" ? BotDemo.threadId : nil
+        }
+
+        private func rank(_ n: Node) -> Int { Self.closed(n.task) ? 3 : n.needsYou ? 0 : Self.owner(n.task) == TaskItem.user ? 1 : 2 }
+
+        private func before(_ a: Node, _ b: Node) -> Bool {
+            if rank(a) != rank(b) { return rank(a) < rank(b) }
+            if Self.closed(a.task) {
+                let ca = a.task["closedAt"] as? Double ?? 0, cb = b.task["closedAt"] as? Double ?? 0
+                if ca != cb { return ca > cb }
+            } else {
+                let ca = a.task["createdAt"] as? Double ?? 0, cb = b.task["createdAt"] as? Double ?? 0
+                if ca != cb { return ca < cb }
+            }
+            return a.id < b.id
+        }
+
+        private func roots() -> [Node] {
+            let visible = all.filter(shown)
+            let ids = Set(visible.compactMap { $0["id"] as? String })
+            func isRoot(_ t: [String: Any]) -> Bool {
+                guard let parent = (t["parentId"] as? String).flatMap({ byId[$0] }), let pid = parent["id"] as? String, ids.contains(pid) else { return true }
+                return !Self.closed(t) && Self.closed(parent)
+            }
+            var childrenOf: [String: [[String: Any]]] = [:]
+            for t in visible where !isRoot(t) { childrenOf[t["parentId"] as! String, default: []].append(t) }
+            var seen = Set<String>()
+            func make(_ t: [String: Any], home: String?) -> Node {
+                let node = Node(t, home: home)
+                seen.insert(node.id)
+                node.children = (childrenOf[node.id] ?? []).filter { !seen.contains($0["id"] as? String ?? "") }.map { make($0, home: home) }.sorted(by: before)
+                node.deep = Set(node.children.flatMap(\.deep))
+                let mine = (t["workers"] as? [String] ?? []) + [Self.ownerThread(t)].compactMap { $0 }
+                var own: [String] = []
+                for id in mine where !own.contains(id) && id != home && id != t["conversation"] as? String && !node.deep.contains(id)
+                    && id != LoopsDemo.leadId && id.hasPrefix("thr_demo_w") { own.append(id) }
+                node.workers = own
+                node.deep.formUnion(own)
+                node.needsYou = (!Self.closed(t) && Self.needsYou(t)) || node.children.contains { $0.needsYou && !Self.closed($0.task) }
+                return node
+            }
+            return visible.filter(isRoot).map { make($0, home: home($0)) }.sorted(by: before)
+        }
+
+        func view(home: String?, cleared: Double) -> [String: Any] {
+            var picked = roots()
+            if let home {
+                picked = picked.filter { node in
+                    guard node.home == home else { return false }
+                    let gone = Self.closed(node.task) || node.task["stale"] as? Bool == true
+                    let at = max(node.task["closedAt"] as? Double ?? 0, node.task["updatedAt"] as? Double ?? 0)
+                    return !(cleared > 0 && gone && at <= cleared)
+                }
+            }
+            var rows: [[String: Any]] = []
+            var tasks: [[String: Any]] = []
+            func walk(_ n: Node, under: String?, depth: Int) {
+                rows.append(["id": n.id, "home": (n.home as Any?) ?? NSNull(), "under": (under as Any?) ?? NSNull(), "depth": depth, "open": !Self.closed(n.task),
+                             "workers": n.workers, "hasWorkers": !n.deep.isEmpty, "needsYou": n.needsYou])
+                tasks.append(n.task)
+                for child in n.children { walk(child, under: n.id, depth: depth + 1) }
+            }
+            for root in picked { walk(root, under: nil, depth: 0) }
+            let open = picked.filter { !Self.closed($0.task) }
+            let counts: [String: Any] = [
+                "open": open.count, "running": open.filter { $0.task["state"] as? String == "in_progress" }.count,
+                "waiting": open.filter { $0.task["state"] as? String == "waiting" }.count, "todo": open.filter { $0.task["state"] as? String == "todo" }.count,
+                "needsYou": open.filter(\.needsYou).count, "done": picked.count - open.count, "workers": Set(open.flatMap(\.deep)).count,
+            ]
+            let names = Dictionary(TasksDemo.workerNames, uniquingKeysWith: { a, _ in a })
+            var workerIds: [String] = []
+            for row in rows { for id in row["workers"] as? [String] ?? [] where !workerIds.contains(id) { workerIds.append(id) } }
+            let workers: [[String: Any]] = workerIds.map { ["threadId": $0, "name": names[$0] ?? "A worker thread", "status": $0 == "thr_demo_w3" ? "idle" : "running", "archived": false] }
+            return ["rows": rows, "tasks": tasks, "counts": counts, "workers": workers,
+                    "done": picked.filter { Self.closed($0.task) }.map(\.id)]
+        }
+    }
+
+    static let workerNames = [("thr_demo_w1", "Studio-native BB fork"), ("thr_demo_w7", "iPad UI suite"), ("thr_demo_w3", "Mock question bank")]
 
     static func seedHistory() -> [String: [[String: Any]]] {
         let now = Store.now

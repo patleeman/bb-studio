@@ -11,6 +11,12 @@ struct TaskItem: Identifiable, Hashable, Sendable {
         var severity: String?
     }
 
+    struct WaitingOn: Hashable, Sendable {
+        var kind: String
+        var ref: String?
+        var text: String?
+    }
+
     var id: String
     var title: String
     var why: String
@@ -36,6 +42,7 @@ struct TaskItem: Identifiable, Hashable, Sendable {
     var cardKind: String?
     var cardDismissed: Bool
     var automation: Automation?
+    var waitingOn: WaitingOn?
     var stale: Bool
     var origin: String
     var createdAt: Date
@@ -46,8 +53,8 @@ struct TaskItem: Identifiable, Hashable, Sendable {
     init(id: String, title: String, why: String = "", owner: String = TaskItem.user, state: State = .todo, kind: Kind = .do,
          options: [String] = [], needs: String? = nil, priority: LoopItem.Priority = .normal, conversation: String? = nil,
          area: String? = nil, due: Date? = nil, trigger: LoopItem.Trigger = .none, snoozed: Bool = false, queue: String? = "surfaced",
-         step: String? = nil, line: String? = nil, workers: [String] = [], cardKind: String? = nil, automation: Automation? = nil,
-         stale: Bool = false, origin: String = "task", createdAt: Date = .now, updatedAt: Date? = nil, closedAt: Date? = nil, closedBy: String? = nil) {
+         step: String? = nil, line: String? = nil, workers: [String] = [], parentId: String? = nil, cardKind: String? = nil, automation: Automation? = nil,
+         waitingOn: WaitingOn? = nil, stale: Bool = false, origin: String = "task", createdAt: Date = .now, updatedAt: Date? = nil, closedAt: Date? = nil, closedBy: String? = nil) {
         self.id = id
         self.title = title
         self.why = why
@@ -67,12 +74,13 @@ struct TaskItem: Identifiable, Hashable, Sendable {
         self.step = step
         self.line = line
         self.workers = workers
-        self.parentId = nil
+        self.parentId = parentId
         self.scheduleText = nil
         self.schedulePaused = false
         self.cardKind = cardKind
         self.cardDismissed = false
         self.automation = automation
+        self.waitingOn = waitingOn
         self.stale = stale
         self.origin = origin
         self.createdAt = createdAt
@@ -116,6 +124,7 @@ struct TaskItem: Identifiable, Hashable, Sendable {
             guard let kind = auto.kind.map(Self.raw), let role = auto.role.map(Self.raw) else { return nil }
             return Automation(kind: kind, role: role, count: auto.count ?? 0, severity: auto.severity.map(Self.raw))
         }
+        waitingOn = task.waitingOn.flatMap { on in on.kind.map { WaitingOn(kind: Self.raw($0), ref: on.ref, text: on.text) } }
         stale = task.stale ?? false
         origin = task.origin.map(Self.raw) ?? "task"
         createdAt = Date(milliseconds: task.createdAt ?? 0)

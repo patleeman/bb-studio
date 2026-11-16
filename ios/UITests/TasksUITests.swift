@@ -177,6 +177,89 @@ final class TasksUITests: ServerIsolatedUITestCase {
         app.buttons["in-flight-toggle"].tap()
     }
 
+    func testInFlightReadsTheFlightFeed() {
+        launch(["-qaRoomMode", "read"], ready: "roomLayDown")
+        XCTAssertTrue(any("in-flight").waitForExistence(timeout: 20))
+        let rows = app.buttons.matching(identifier: "in-flight-row")
+        XCTAssertEqual(rows.element(boundBy: 0).value as? String, "needs-you", "needs you first")
+        XCTAssertTrue(any("in-flight-running").exists, "the header says how many are running")
+        XCTAssertTrue(app.buttons["in-flight-done"].label.contains("done today"), "ended and done rows fold into N done today")
+        XCTAssertFalse(rows.matching(NSPredicate(format: "label BEGINSWITH 'Run the UI suite'")).firstMatch.exists, "a subtask is not a row of its own")
+        let fold = app.buttons.matching(NSPredicate(format: "identifier == 'in-flight-fold' AND label CONTAINS 'under Studio-native BB fork'")).firstMatch
+        XCTAssertTrue(fold.exists, "the fork's subtask and workers fold under it")
+        XCTAssertTrue(fold.label.contains("1 subtask · 2 workers"), fold.label)
+        shot("20-in-flight-feed")
+        fold.tap()
+        let sub = app.buttons.matching(identifier: "in-flight-subtask").firstMatch
+        XCTAssertTrue(sub.waitForExistence(timeout: 5), "unfolded, the subtask shows under its task")
+        XCTAssertTrue(sub.label.hasPrefix("Run the UI suite on the iPad, running, step 2 of 6"), sub.label)
+        XCTAssertTrue(app.buttons["Open worker Studio-native BB fork"].exists, "with the worker on it")
+        XCTAssertTrue(app.buttons["Open worker iPad UI suite"].exists, "and the subtask's worker")
+        any("in-flight").swipeUp()
+        shot("21-in-flight-folded")
+        app.buttons["in-flight-done"].tap()
+        let ended = rows.matching(NSPredicate(format: "label BEGINSWITH 'Mock question bank'")).firstMatch
+        XCTAssertTrue(ended.waitForExistence(timeout: 5), "the ended worker is with the done ones")
+        XCTAssertEqual(ended.value as? String, "ended")
+        app.buttons["in-flight-clear"].tap()
+        gone(app.buttons["in-flight-done"], "Clear done clears the ended one too")
+    }
+
+    func testInFlightFallsBackOnAStudioWithoutTheFlightFeed() {
+        launch(["-qaTasksNoBoard", "-qaRoomMode", "read"], ready: "roomLayDown")
+        XCTAssertTrue(any("in-flight").waitForExistence(timeout: 20), "In flight still shows, from tasks.inFlight")
+        let rows = app.buttons.matching(identifier: "in-flight-row")
+        XCTAssertGreaterThanOrEqual(rows.count, 3)
+        XCTAssertEqual(rows.element(boundBy: 0).value as? String, "needs-you")
+        XCTAssertFalse(app.buttons.matching(identifier: "in-flight-fold").firstMatch.exists, "no rows to fold without the new feed")
+        XCTAssertTrue(rows.matching(NSPredicate(format: "label BEGINSWITH 'Run the UI suite'")).firstMatch.exists, "the subtask is a row, as before")
+        XCTAssertTrue(app.buttons["Remove Studio-native BB fork from In flight"].exists)
+        shot("23-in-flight-fallback")
+        app.buttons["in-flight-done"].tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Release notes'")).firstMatch.waitForExistence(timeout: 5))
+        app.buttons["in-flight-clear"].tap()
+        gone(app.buttons["in-flight-done"], "Clear done")
+    }
+
+    func testTheTasksScreenReadsTheBoardAndAsksFromAreas() {
+        launch()
+        app.openRoomPlace("tasks")
+        XCTAssertTrue(any("tasks-screen").waitForExistence(timeout: 15))
+        let asks = app.buttons.matching(identifier: "tasks-area-ask")
+        XCTAssertTrue(asks.firstMatch.waitForExistence(timeout: 10), "an area's open item that needs you is in your to-do")
+        XCTAssertEqual(asks.count, 2, "the item that is already your task isn't asked twice")
+        XCTAssertEqual(asks.element(boundBy: 0).label, "Renew the home insurance policy, needs you, from Home, 3 days", "problems first")
+        XCTAssertEqual(asks.element(boundBy: 0).value as? String, "area_demo_home")
+        XCTAssertTrue(asks.element(boundBy: 1).label.hasPrefix("Confirm the Q4 numbers with finance, needs you, from Larkspur launch"))
+        XCTAssertTrue(app.buttons["task-row-task_demo_quote"].exists)
+        shot("22-tasks-board")
+        let fold = app.buttons["tasks-fold-wc_demo_fork"]
+        for _ in 0..<6 where !fold.exists { app.swipeUp() }
+        XCTAssertTrue(fold.waitForExistence(timeout: 5), "the fork's subtask and workers fold under it")
+        XCTAssertFalse(app.buttons["task-row-wc_demo_fork_ui"].exists, "the subtask isn't its own row")
+        fold.tap()
+        XCTAssertTrue(app.buttons.matching(identifier: "in-flight-subtask").firstMatch.waitForExistence(timeout: 5))
+        shot("22b-tasks-board-folded")
+        for _ in 0..<4 { app.swipeDown() }
+        let home = asks.element(boundBy: 0)
+        XCTAssertTrue(home.waitForExistence(timeout: 5))
+        home.tap()
+        gone(any("tasks-screen"), "an ask from the Bot's area opens the chat")
+    }
+
+    func testTheTasksScreenFallsBackOnAStudioWithoutTheBoard() {
+        launch(["-qaTasksNoBoard"])
+        app.openRoomPlace("tasks")
+        XCTAssertTrue(any("tasks-screen").waitForExistence(timeout: 15), "the Tasks page, from tasks.list")
+        XCTAssertTrue(app.buttons["task-row-task_demo_quote"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons.matching(identifier: "tasks-area-ask").firstMatch.exists, "no area asks without areas.list")
+        shot("24-tasks-fallback")
+        let sub = app.buttons["task-row-wc_demo_fork_ui"]
+        for _ in 0..<6 where !sub.exists { app.swipeUp() }
+        XCTAssertTrue(sub.waitForExistence(timeout: 5), "the subtask is a row, as before")
+        XCTAssertFalse(app.buttons["tasks-fold-wc_demo_fork"].exists)
+    }
+
     func testTheTaskCardInTheChat() {
         launch(["-qaRoomMode", "read", "-qaTaskCards"], ready: "roomLayDown")
         let ended = any("task-wc_demo_bank")

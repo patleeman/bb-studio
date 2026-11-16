@@ -6,15 +6,22 @@ struct InFlightBar: View {
     @State private var model = TasksModel.shared
     @State private var showsDone = false
     @State private var hidden: [String: Date] = [:]
+    @State private var unfolded: Set<String> = []
     @AppStorage("inFlightCollapsed") private var collapsed = false
     @EnvironmentObject private var app: AppModel
     @Environment(\.openTaskThread) private var openThread
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.look) private var look
 
-    private var rows: [TaskItem] {
-        let visible = (model.flights[threadId]?.tasks ?? []).filter { hidden[$0.id] != $0.updatedAt }
-        return visible.contains { !$0.isClosed } ? visible : []
+    private var rows: [FlightNode] {
+        guard let flight = model.flights[threadId] else { return [] }
+        let visible = TaskTree.nodes(flight).filter { hidden[$0.task.id] != $0.task.updatedAt }
+        let rowsFeed = flight.rows != nil
+        return visible.contains { Self.live($0, rowsFeed: rowsFeed) } ? visible : []
+    }
+
+    static func live(_ node: FlightNode, rowsFeed: Bool) -> Bool {
+        node.row.open && !(rowsFeed && node.task.stale)
     }
 
     var body: some View {
@@ -37,79 +44,21 @@ struct InFlightBar: View {
         }
     }
 
-    private func bar(_ rows: [TaskItem]) -> some View {
-        let open = rows.filter { !$0.isClosed }
-        let finished = rows.filter(\.isClosed)
-        let needs = rows.filter(\.needsYou).count
+    private func bar(_ rows: [FlightNode]) -> some View {
+        let rowsFeed = model.flights[threadId]?.rows != nil
+        let open = rows.filter { Self.live($0, rowsFeed: rowsFeed) }
+        let finished = rows.filter { !Self.live($0, rowsFeed: rowsFeed) }
         let names = model.names
         return VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                Button {
-                    if typing {
-                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                        collapsed = false
-                        return
-                    }
-                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { collapsed.toggle() }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text("In flight").font(.footnote.weight(.semibold))
-                        if needs > 0 {
-                            HStack(spacing: 4) {
-                                Circle().fill(Color.orange).frame(width: 6, height: 6)
-                                Text("\(needs) \(needs == 1 ? "needs" : "need") you")
-                            }
-                            .font(.caption).foregroundStyle(.orange)
-                            .accessibilityIdentifier("in-flight-needs")
-                        }
-                        Spacer(minLength: 4)
-                        Text("\(open.count)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                            .accessibilityIdentifier("in-flight-count")
-                        Image(systemName: collapsed || typing ? "chevron.up" : "chevron.down").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 40)
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("In flight, \(open.count) open\(needs > 0 ? ", \(needs) \(needs == 1 ? "needs" : "need") you" : "")")
-                .accessibilityValue(collapsed || typing ? "Collapsed" : "Expanded")
-                .accessibilityHint(collapsed || typing ? "Shows the tasks" : "Hides the tasks")
-                .accessibilityIdentifier("in-flight-toggle")
-                if !finished.isEmpty {
-                    Divider().frame(height: 22)
-                    Button("Clear done") { clearDone(finished) }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 40)
-                        .accessibilityIdentifier("in-flight-clear")
-                }
-            }
+            header(open: open, finished: finished, rowsFeed: rowsFeed)
             if !collapsed && !typing {
                 Divider().opacity(0.5)
                 ScrollView {
                     VStack(spacing: 0) {
-                        ForEach(open) { row($0, names: names) }
+                        ForEach(open) { node in row(node, names: names) }
                         if !finished.isEmpty {
-                            Button {
-                                withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { showsDone.toggle() }
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Text("\(finished.count) done").monospacedDigit()
-                                    Image(systemName: showsDone ? "chevron.down" : "chevron.right").font(.caption2.weight(.semibold))
-                                    Spacer()
-                                }
-                                .font(.caption).foregroundStyle(.secondary)
-                                .padding(.horizontal, 12)
-                                .frame(minHeight: 36)
-                                .contentShape(.rect)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityValue(showsDone ? "Shown" : "Hidden")
-                            .accessibilityIdentifier("in-flight-done")
-                            if showsDone { ForEach(finished) { row($0, names: names) } }
+                            doneToggle(finished.count)
+                            if showsDone { ForEach(finished) { node in row(node, names: names) } }
                         }
                     }
                 }
@@ -124,52 +73,126 @@ struct InFlightBar: View {
         .accessibilityIdentifier("in-flight")
     }
 
-    private func row(_ task: TaskItem, names: TaskNames) -> some View {
-        let status = TaskRules.status(task)
+    private func header(open: [FlightNode], finished: [FlightNode], rowsFeed: Bool) -> some View {
+        let needs = open.filter(\.row.needsYou).count
+        let running = rowsFeed ? open.filter(\.isRunning).count : 0
+        let needsText = "\(needs) \(needs == 1 ? "needs" : "need") you"
+        let label = ["In flight, \(open.count) open", needs > 0 ? needsText : nil, running > 0 ? "\(running) running" : nil].compactMap { $0 }.joined(separator: ", ")
         return HStack(spacing: 0) {
-            Button { reveal(task, names: names) } label: {
-                HStack(spacing: 8) {
-                    TaskGlyph(status: status)
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 8) {
-                            Text(task.title).font(.footnote).lineLimit(1)
-                            if !task.isMine { Text(names.short(task)).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
-                            if let detail = TaskRules.detail(task) { Text(detail).font(.caption).foregroundStyle(.tertiary).lineLimit(1) }
+            Button {
+                if typing {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    collapsed = false
+                    return
+                }
+                withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { collapsed.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Text("In flight").font(.footnote.weight(.semibold))
+                    if needs > 0 {
+                        HStack(spacing: 4) {
+                            Circle().fill(Color.orange).frame(width: 6, height: 6)
+                            Text(needsText)
                         }
-                        HStack(spacing: 8) {
-                            Text(task.title).font(.footnote).lineLimit(1)
-                            if !task.isMine { Text(names.short(task)).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
-                        }
-                        Text(task.title).font(.footnote).lineLimit(1)
+                        .font(.caption).foregroundStyle(.orange)
+                        .accessibilityIdentifier("in-flight-needs")
+                    }
+                    if running > 0 {
+                        Text("\(running) running").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            .accessibilityIdentifier("in-flight-running")
                     }
                     Spacer(minLength: 4)
-                    if status.id == "needs-you" {
-                        TaskChip(text: "Needs you", tone: .warning).fixedSize()
-                    } else {
-                        Text(status.label).font(.caption2).foregroundStyle(.secondary).lineLimit(1).fixedSize()
-                    }
+                    Text("\(open.count)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("in-flight-count")
+                    Image(systemName: collapsed || typing ? "chevron.up" : "chevron.down").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                 }
-                .padding(.leading, 12).padding(.trailing, task.cardKind == nil ? 12 : 2)
+                .padding(.horizontal, 12)
                 .frame(minHeight: 40)
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel([task.title, task.isMine ? nil : names.short(task), status.label, TaskRules.detail(task)].compactMap { $0 }.joined(separator: ", "))
-            .accessibilityHint("Opens the task card")
-            .accessibilityIdentifier("in-flight-row")
-            .accessibilityValue(status.id)
-            if task.cardKind != nil {
-                Button { dismiss(task) } label: {
-                    Image(systemName: "xmark").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-                        .frame(width: 40, height: 40)
+            .accessibilityLabel(label)
+            .accessibilityValue(collapsed || typing ? "Collapsed" : "Expanded")
+            .accessibilityHint(collapsed || typing ? "Shows the tasks" : "Hides the tasks")
+            .accessibilityIdentifier("in-flight-toggle")
+            if !finished.isEmpty {
+                Divider().frame(height: 22)
+                Button("Clear done") { clearDone(finished.map(\.task)) }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 40)
+                    .accessibilityIdentifier("in-flight-clear")
+            }
+        }
+    }
+
+    private func doneToggle(_ count: Int) -> some View {
+        Button {
+            withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { showsDone.toggle() }
+        } label: {
+            HStack(spacing: 4) {
+                Text("\(count) done today").monospacedDigit()
+                Image(systemName: showsDone ? "chevron.down" : "chevron.right").font(.caption2.weight(.semibold))
+                Spacer()
+            }
+            .font(.caption).foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 36)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(showsDone ? "Shown" : "Hidden")
+        .accessibilityIdentifier("in-flight-done")
+    }
+
+    private func row(_ node: FlightNode, names: TaskNames) -> some View {
+        let task = node.task
+        let owner = task.isMine ? nil : names.short(task)
+        let text = TaskTree.text(node, owner: owner, titleOf: { id in model.task(id)?.title })
+        let folded = unfolded.contains(task.id)
+        return VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                Button { reveal(task, names: names) } label: {
+                    InFlightRowLabel(node: node, owner: owner, text: text)
+                        .padding(.leading, 12).padding(.trailing, task.cardKind == nil && node.belowText == nil ? 12 : 2)
+                        .frame(minHeight: 40)
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Remove \(task.title) from In flight")
-                .accessibilityIdentifier("in-flight-dismiss")
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(text.aria)
+                .accessibilityHint("Opens the task card")
+                .accessibilityIdentifier("in-flight-row")
+                .accessibilityValue(text.value)
+                if let below = node.belowText {
+                    FlightFoldButton(node: node, text: below, open: folded) {
+                        withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) {
+                            if folded { unfolded.remove(task.id) } else { unfolded.insert(task.id) }
+                        }
+                    }
+                    .accessibilityIdentifier("in-flight-fold")
+                }
+                if task.cardKind != nil {
+                    Button { dismiss(task) } label: {
+                        Image(systemName: "xmark").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                            .frame(width: 40, height: 40)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Remove \(task.title) from In flight")
+                    .accessibilityIdentifier("in-flight-dismiss")
+                }
+            }
+            if folded {
+                FlightChildren(node: node, names: names, depth: 1, openTask: { app.sheet = .task(id: $0) }, openThread: open)
             }
         }
+    }
+
+    private func open(_ thread: String) {
+        if let openThread { openThread(thread) } else { app.openTaskThread(thread) }
     }
 
     private func reveal(_ task: TaskItem, names: TaskNames) {
@@ -178,7 +201,7 @@ struct InFlightBar: View {
             return
         }
         if let owner = names.threadId(task.owner), owner != threadId {
-            if let openThread { openThread(owner) } else { app.openTaskThread(owner) }
+            open(owner)
         } else {
             app.sheet = .task(id: task.id)
         }
@@ -201,6 +224,175 @@ struct InFlightBar: View {
             do { try await model.clearDone(in: threadId) } catch {
                 for task in finished { hidden[task.id] = nil }
                 app.flash("Couldn't clear them: \(BBClient.describe(error))")
+            }
+        }
+    }
+}
+
+private struct InFlightRowLabel: View {
+    let node: FlightNode
+    let owner: String?
+    let text: FlightText
+
+    var body: some View {
+        let task = node.task
+        HStack(spacing: 8) {
+            FlightGlyph(node: node)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    Text(task.title).font(.footnote).lineLimit(1)
+                    if let owner { Text(owner).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                    if let line = text.line { Text(line).font(.caption).foregroundStyle(.tertiary).lineLimit(1) }
+                }
+                HStack(spacing: 8) {
+                    Text(task.title).font(.footnote).lineLimit(1)
+                    if let owner { Text(owner).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                }
+                Text(task.title).font(.footnote).lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            if text.look == .needsYou && !task.stale {
+                TaskChip(text: "Needs you", tone: .warning).fixedSize()
+            } else {
+                Text(text.right).font(.caption2).foregroundStyle(text.look == .running ? .primary : .secondary).lineLimit(1).fixedSize()
+            }
+        }
+    }
+}
+
+struct FlightGlyph: View {
+    let node: FlightNode
+    var size: CGFloat = 14
+
+    var body: some View {
+        let look = node.look
+        Group {
+            if node.task.stale {
+                TaskGlyph(status: TaskRules.status(node.task))
+            } else if look == .running {
+                FlightRing(progress: StepProgress(node.task.step), size: size - 2)
+            } else {
+                TaskGlyph(status: TaskStatus(id: look.rawValue, label: look.label, glyph: Self.glyph(look), tone: .plain))
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+
+    static func glyph(_ look: FlightLook) -> TaskStatus.Glyph {
+        switch look {
+        case .running: .running
+        case .waiting: .waiting
+        case .needsYou: .needsYou
+        case .todo: .todo
+        case .done: .done
+        case .failed: .failed
+        }
+    }
+}
+
+struct FlightRing: View {
+    let progress: StepProgress?
+    var size: CGFloat = 12
+
+    var body: some View {
+        let part = progress.map { max(0.04, $0.fraction) } ?? 0.25
+        ZStack {
+            Circle().stroke(Color.green.opacity(0.22), lineWidth: 2)
+            Circle().trim(from: 0, to: part).stroke(Color.green, style: StrokeStyle(lineWidth: 2, lineCap: .round)).rotationEffect(.degrees(-90))
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+struct FlightFoldButton: View {
+    let node: FlightNode
+    let text: String
+    let open: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        let below = node.below
+        Button(action: toggle) {
+            HStack(spacing: 3) {
+                Image(systemName: below.workers > 0 ? "person.2" : "list.bullet").font(.caption2)
+                Text("\(below.workers > 0 ? below.workers : below.subtasks)").font(.caption2.monospacedDigit())
+                Image(systemName: open ? "chevron.down" : "chevron.right").font(.caption2.weight(.semibold))
+            }
+            .foregroundStyle(.secondary)
+            .frame(minWidth: 44, minHeight: 40)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(open ? "Hide" : "Show") \(text) under \(node.task.title)")
+        .accessibilityValue(open ? "Shown" : "Hidden")
+    }
+}
+
+struct FlightChildren: View {
+    let node: FlightNode
+    let names: TaskNames
+    let depth: Int
+    let openTask: (String) -> Void
+    let openThread: (String) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(node.workers, id: \.threadId) { worker in
+                Button { openThread(worker.threadId) } label: {
+                    HStack(spacing: 8) {
+                        Circle().fill(worker.status == "running" || worker.status == "active" ? Color.green : Color.secondary.opacity(0.6)).frame(width: 6, height: 6)
+                        Image(systemName: "person.crop.circle").font(.caption2).foregroundStyle(.secondary)
+                        Text(worker.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.leading, 12 + CGFloat(depth) * 16).padding(.trailing, 12)
+                    .frame(minHeight: 32)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open worker \(worker.name)")
+                .accessibilityIdentifier("in-flight-worker")
+            }
+            ForEach(node.children) { child in
+                FlightChildRow(node: child, names: names, depth: depth, openTask: openTask, openThread: openThread)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Under \(node.task.title)")
+    }
+}
+
+private struct FlightChildRow: View {
+    let node: FlightNode
+    let names: TaskNames
+    let depth: Int
+    let openTask: (String) -> Void
+    let openThread: (String) -> Void
+
+    var body: some View {
+        let owner = node.task.isMine ? nil : names.short(node.task)
+        let text = TaskTree.text(node, owner: owner)
+        VStack(spacing: 0) {
+            Button { openTask(node.task.id) } label: {
+                HStack(spacing: 8) {
+                    FlightGlyph(node: node, size: 12)
+                    Text(node.task.title).font(.caption).foregroundStyle(node.task.isClosed ? .secondary : .primary).lineLimit(1)
+                    if let line = text.line { Text(line).font(.caption2).foregroundStyle(.tertiary).lineLimit(1) }
+                    Spacer(minLength: 4)
+                    Text(text.right).font(.caption2).foregroundStyle(text.look == .needsYou ? .orange : .secondary).lineLimit(1).fixedSize()
+                }
+                .padding(.leading, 12 + CGFloat(depth) * 16).padding(.trailing, 12)
+                .frame(minHeight: 32)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(text.aria)
+            .accessibilityValue(text.value)
+            .accessibilityIdentifier("in-flight-subtask")
+            if !node.workers.isEmpty || !node.children.isEmpty {
+                FlightChildren(node: node, names: names, depth: depth + 1, openTask: openTask, openThread: openThread)
             }
         }
     }
