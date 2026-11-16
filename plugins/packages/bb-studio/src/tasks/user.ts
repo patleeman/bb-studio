@@ -130,7 +130,7 @@ export class UserTasks {
   async inFlight(threadId: string) {
     const since = this.today();
     const rows = this.store.rows("SELECT record FROM tasks WHERE conversation = ? AND (closed_at IS NULL OR closed_at > ?) ORDER BY rowid", threadId, since)
-      .filter((t) => t.state !== "dropped" && (t.card ? t.card.dismissedAt === null : !isClosed(t)));
+      .filter((t) => t.state !== "dropped" && (t.card ? t.card.dismissedAt === null : !isClosed(t)) && !(t.stale && !isClosed(t) && t.updatedAt < since));
     const tasks = inFlightOrder(rows);
     return { tasks, threads: await this.names(tasks) };
   }

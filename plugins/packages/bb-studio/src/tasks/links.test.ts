@@ -36,7 +36,8 @@ afterEach(() => {
 const fact = (id: string, patch: Partial<ThreadFact> = {}): ThreadFact => ({ id, parentThreadId: null, title: id, status: "idle", archivedAt: null, deletedAt: null, createdAt: NOW - 3_600_000, updatedAt: NOW - 600_000, ...patch });
 
 function seedThreads(target: Database.Database, threads: ThreadFact[]) {
-  target.prepare("INSERT OR IGNORE INTO bots (id, name, avatar, state, thread_id, created_at, updated_at) VALUES ('bot_main', 'Chief', 'x', 'active', 'thr_main', 0, 0)").run();
+  target.prepare("INSERT OR IGNORE INTO bots (id, name, avatar, state, thread_id, created_at, updated_at) VALUES ('bot_main', 'Chief', 'x', 'active', NULL, 0, 0)").run();
+  target.prepare("INSERT OR REPLACE INTO project_leads (project_id, lead_thread_id, created_at, updated_at) VALUES ('proj_personal', 'thr_main', 0, 0)").run();
   const insert = target.prepare("INSERT OR REPLACE INTO bot_threads (thread_id, bot_id, kind, is_main, owner_conversation_id, title, source, created_at, updated_at) VALUES (?, 'bot_main', ?, ?, ?, ?, 'created', 0, 0)");
   const byId = new Map(threads.map((t) => [t.id, t]));
   const ownerOf = (t: ThreadFact): string | null => {
@@ -588,4 +589,18 @@ it("starts the user's day at local midnight on daylight-saving days (review P3-6
   expect(new Date(dayStart(new Date("2026-03-08T16:00:00Z").getTime(), "America/New_York")).toISOString()).toBe("2026-03-08T05:00:00.000Z");
   expect(new Date(dayStart(new Date("2026-03-08T04:30:00Z").getTime(), "America/New_York")).toISOString()).toBe("2026-03-07T05:00:00.000Z");
   expect(new Date(dayStart(new Date("2026-10-25T09:00:00Z").getTime(), "Europe/London")).toISOString()).toBe("2026-10-24T23:00:00.000Z");
+});
+
+it("finds Main where the Bot keeps it: the personal project's lead, not the bots row, fresh or stale (QA)", async () => {
+  const { tool, user } = setup();
+  const finding = (await tool("task_create", { title: "Spend went up", owner: "cos" }, "thr_main")).task;
+  expect(finding.conversation).toBeNull();
+  expect((await user.flight("thr_main")).rows.map((r) => r.id)).toEqual([finding.id]);
+  expect((await user.board()).rows.find((r) => r.id === finding.id)!.home).toBe("thr_main");
+  db.prepare("UPDATE bots SET thread_id = 'thr_old_main'").run();
+  expect((await user.flight("thr_main")).rows.map((r) => r.id)).toEqual([finding.id]);
+  expect((await user.flight("thr_old_main")).rows).toEqual([]);
+  expect(new ThreadDirectory(db).main()).toBe("thr_main");
+  db.prepare("DELETE FROM project_leads").run();
+  expect(new ThreadDirectory(db).main()).toBeNull();
 });

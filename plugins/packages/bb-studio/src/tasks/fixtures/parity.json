@@ -2287,7 +2287,7 @@
    "threadId": "thr_main",
    "title": "Fix the flaky test",
    "kind": "worker",
-   "state": "done",
+   "state": "running",
    "step": null,
    "line": null,
    "needs": null,
@@ -2296,7 +2296,7 @@
    "messageSeq": null,
    "createdAt": 1793646060000,
    "updatedAt": 1793646062000,
-   "finishedAt": 1793646062000,
+   "finishedAt": null,
    "stale": true,
    "dismissedAt": null
   }
@@ -2619,7 +2619,7 @@
    "threadId": "thr_main",
    "title": "Fix the flaky test",
    "kind": "worker",
-   "state": "done",
+   "state": "running",
    "step": null,
    "line": null,
    "needs": null,
@@ -2628,7 +2628,7 @@
    "messageSeq": null,
    "createdAt": 1793646060000,
    "updatedAt": 1793646063000,
-   "finishedAt": 1793646063000,
+   "finishedAt": null,
    "stale": true,
    "dismissedAt": null
   }

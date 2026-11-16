@@ -43,6 +43,7 @@ export function shown(t: Task, since: number): boolean {
   if (t.automation?.role === "run" && t.owner !== USER_OWNER) return false;
   if (t.state === "dropped") return false;
   if (t.card?.dismissedAt != null) return false;
+  if (t.stale && !isClosed(t)) return t.updatedAt >= since;
   return !isClosed(t) || (t.closedAt ?? 0) >= since;
 }
 

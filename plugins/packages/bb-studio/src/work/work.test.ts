@@ -262,12 +262,13 @@ it("reads cards saved before stale and dismissals existed", () => {
   expect(store.inFlight("thr_main")).toHaveLength(1);
 });
 
-it("marks a card ended as done with stale set, and the next real update takes over", () => {
+it("marks a card ended with the stale flag and leaves it open, and the next real update takes over", () => {
   const card = store.create({ title: "Worker", kind: "worker", threadId: "thr_main", workerThreadId: "thr_w", step: "2/4" });
   vi.setSystemTime(NOW + 1_000);
   const ended = store.markStale(card.id);
-  expect(ended).toMatchObject({ state: "done", stale: true, finishedAt: NOW + 1_000, step: "2/4" });
-  expect(rpcContract["work.get"].output.parse(ended).state).toBe("done");
+  expect(ended).toMatchObject({ state: "running", stale: true, finishedAt: null, step: "2/4" });
+  expect(store.tasks.get(card.id)).toMatchObject({ state: "in_progress", stale: true, closedAt: null });
+  expect(rpcContract["work.get"].output.parse(ended).state).toBe("running");
   vi.setSystemTime(NOW + 2_000);
   expect(store.update(card.id, { line: "Back at it" })).toMatchObject({ state: "running", stale: false, finishedAt: null, line: "Back at it" });
   store.markStale(card.id);
@@ -309,16 +310,16 @@ it("ends a running worker's card when its thread goes idle, fails or is archived
   on["thread.idle"]!({ thread: { id: "thr_a" } });
   on["thread.idle"]!({ thread: { id: "thr_b" } });
   on["thread.failed"]!({ thread: { id: "thr_c" } });
-  expect(store.get(a.id)).toMatchObject({ state: "done", stale: true });
+  expect(store.get(a.id)).toMatchObject({ state: "running", stale: true });
   expect(store.get(b.id)).toMatchObject({ state: "waiting", stale: false });
-  expect(store.get(c.id)).toMatchObject({ state: "done", stale: true });
+  expect(store.get(c.id)).toMatchObject({ state: "running", stale: true });
   on["thread.archived"]!({ thread: { id: "thr_b" } });
-  expect(store.get(b.id)).toMatchObject({ state: "done", stale: true });
+  expect(store.get(b.id)).toMatchObject({ state: "waiting", stale: true });
   on["thread.active"]!({ thread: { id: "thr_a" } });
   expect(store.get(a.id)).toMatchObject({ state: "running", stale: false, finishedAt: null });
   store.dismiss(c.id);
   on["thread.active"]!({ thread: { id: "thr_c" } });
-  expect(store.get(c.id)).toMatchObject({ state: "running", dismissedAt: null });
+  expect(store.get(c.id)).toMatchObject({ state: "running", stale: false, dismissedAt: null });
   const finished = work.create({ title: "D", kind: "worker", threadId: "thr_main", workerThreadId: "thr_d", state: "done" }).card;
   on["thread.idle"]!({ thread: { id: "thr_d" } });
   on["thread.active"]!({ thread: { id: "thr_d" } });
@@ -335,8 +336,8 @@ it("sweeps cards already stuck on Running when it loads", async () => {
   const { bb } = eventBb();
   const work = registerWorkCards(bb as never, db, { read: async () => page([]), thread: async (id) => { if (id === "thr_down") throw new Error("offline"); return threads[id] ?? null; } });
   await work.swept;
-  expect(store.get(stuck.id)).toMatchObject({ state: "done", stale: true });
-  expect(store.get(gone.id)).toMatchObject({ state: "done", stale: true, needs: null });
+  expect(store.get(stuck.id)).toMatchObject({ state: "running", stale: true });
+  expect(store.get(gone.id)).toMatchObject({ state: "needs-you", stale: false, needs: "Sign" });
   expect(store.get(live.id)).toMatchObject({ state: "running", stale: false });
   expect(store.get(lead.id)).toMatchObject({ state: "running", stale: false });
   expect(store.get(unknown.id)).toMatchObject({ state: "running", stale: false });
@@ -360,4 +361,23 @@ it("serves dismiss and clear over RPC and the CLI", async () => {
   const ended = work.create({ title: "E", kind: "worker", threadId: "thr_main", workerThreadId: "thr_e" }).card;
   store.markStale(ended.id);
   expect((await runWorkCli(["show", ended.id], work, {})).stdout).toContain("ended\tE");
+});
+
+it("never ends or closes a lead's or the user's carded task because a worker it lists went idle (QA)", async () => {
+  const garden = store.tasks.save({
+    ...store.tasks.get(store.create({ title: "Garden v2", kind: "task", threadId: "thr_main" }).id),
+    owner: "thread:thr_lead", workers: ["thr_w1", "thr_w2"],
+  });
+  const mine = store.tasks.save({ ...store.tasks.get(store.create({ title: "Mine", kind: "task", threadId: "thr_main", workerThreadId: "thr_w1" }).id), owner: "patrick", state: "todo" });
+  const own = store.create({ title: "W2's own", kind: "worker", threadId: "thr_main", workerThreadId: "thr_w2" });
+  const { bb, on } = eventBb();
+  const work = registerWorkCards(bb as never, db, { read: async () => page([]), thread: async () => ({ status: "idle", archivedAt: null }) });
+  await work.swept;
+  on["thread.idle"]!({ thread: { id: "thr_w1" } });
+  on["thread.archived"]!({ thread: { id: "thr_w1" } });
+  expect(store.tasks.get(garden.id)).toMatchObject({ state: "in_progress", stale: false, closedAt: null, closedBy: null });
+  expect(store.tasks.get(mine.id)).toMatchObject({ state: "todo", stale: false, closedAt: null });
+  expect(store.tasks.get(own.id)).toMatchObject({ state: "in_progress", stale: true, closedAt: null });
+  expect(store.tasks.history(garden.id).some((e) => e.type === "closed")).toBe(false);
+  expect(store.tasks.history(own.id).some((e) => e.type === "closed")).toBe(false);
 });

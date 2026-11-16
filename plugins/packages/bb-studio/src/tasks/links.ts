@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import { readdirSync } from "node:fs";
 import { basename, dirname, extname } from "node:path";
+import { primaryBotThread } from "../primary-thread";
 import { isClosed, USER_OWNER, type Task } from "./contract";
 import { backupDatabase } from "./migrate";
 import type { TaskStore } from "./store";
@@ -62,9 +63,7 @@ export class ThreadDirectory {
   }
 
   main(): string | null {
-    if (!hasTable(this.db, "bots")) return null;
-    const row = this.db.prepare("SELECT thread_id FROM bots WHERE thread_id IS NOT NULL ORDER BY created_at, id LIMIT 1").get() as { thread_id: string } | undefined;
-    return row?.thread_id ?? null;
+    return primaryBotThread(this.db);
   }
 
   private runners: { at: number; ids: Set<string> } | null = null;
