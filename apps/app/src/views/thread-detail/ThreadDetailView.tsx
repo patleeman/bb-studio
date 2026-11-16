@@ -1,3 +1,4 @@
+import { forkFinderLinkMenuItems } from "@/components/secondary-panel/ForkFinder";
 import { AppPanelTabsPublisher } from "@/lib/app-panel-tabs";
 import {
   getThreadFixedTabOwnerId,
@@ -1310,6 +1311,7 @@ function ThreadDetailViewInternal(
           })),
         );
       }
+      items.push(...forkFinderLinkMenuItems(link.path, threadEnvironmentIsLocal));
       if (items.length > 0) {
         items.push({ id: "copy-separator", type: "separator" });
       }
@@ -1342,6 +1344,7 @@ function ThreadDetailViewInternal(
       handleOpenTimelineLocalFileLink,
       openPathInFileTarget,
       pluginFileOpeners,
+      threadEnvironmentIsLocal,
     ],
   );
   const loadedThreadEnvironmentId = thread?.environmentId;
