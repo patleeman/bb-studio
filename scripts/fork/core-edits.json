@@ -322,14 +322,14 @@
       "budget": 6
     },
     "apps/desktop/src/main.ts": {
-      "seam": "approvals, windows, studio-release",
-      "intent": "Registers the fork's approval IPC handler (registerForkApprovalIpc, fork-approvals.ts) beside the desktop info handler. Importing that module also makes the per-launch signing key and puts its public half in the environment before the server is started. It also registers the fork's window IPC handler (registerForkWindowIpc, fork-windows.ts). Its first import is studio-desktop.fork.ts (a test build's scratch data dir, ports and user data are set there before anything reads them), and About shows the Studio version with its bb base (studioAboutVersion).",
-      "budget": 7
+      "seam": "approvals, windows, studio-release, finder",
+      "intent": "Registers the fork's approval IPC handler (registerForkApprovalIpc, fork-approvals.ts) beside the desktop info handler. Importing that module also makes the per-launch signing key and puts its public half in the environment before the server is started. It also registers the fork's window IPC handler (registerForkWindowIpc, fork-windows.ts). Its first import is studio-desktop.fork.ts (a test build's scratch data dir, ports and user data are set there before anything reads them), and About shows the Studio version with its bb base (studioAboutVersion). It also registers the fork's Show in Finder and folder listing IPC handlers (registerForkFinderIpc, fork-finder.ts) with applicationWindowWebContentsIds, so they answer only the main frame of an app window (or a fork window).",
+      "budget": 9
     },
     "apps/desktop/src/preload.ts": {
-      "seam": "approvals, windows, studio-release, launch-theme",
-      "intent": "Exposes experimental_answerApproval and experimental_window on window.bbDesktop; each invokes the main process. It also exposes experimental_studioBuild (the Studio version and its bb base, from studio-release.fork.ts). It spreads forkLaunchThemeApi(ipcRenderer) (fork-launch-theme-preload.ts) into the API: that paints the main window from the cached backdrop appearance before the page runs and adds experimental_launchAppearance and experimental_saveLaunchAppearance.",
-      "budget": 13
+      "seam": "approvals, windows, studio-release, launch-theme, finder",
+      "intent": "Exposes experimental_answerApproval and experimental_window on window.bbDesktop; each invokes the main process. It also exposes experimental_studioBuild (the Studio version and its bb base, from studio-release.fork.ts). It spreads forkLaunchThemeApi(ipcRenderer) (fork-launch-theme-preload.ts) into the API: that paints the main window from the cached backdrop appearance before the page runs and adds experimental_launchAppearance and experimental_saveLaunchAppearance. It spreads forkFinderApi(ipcRenderer) (fork-finder-preload.ts): experimental_finderLabel, experimental_showInFinder, experimental_listFolder and experimental_fileLinkMenu.",
+      "budget": 15
     },
     "packages/desktop-contract/src/info.ts": {
       "seam": "approvals, windows",
@@ -620,6 +620,26 @@
       "seam": "mention-links",
       "intent": "resolveMarkdownLocalFileTarget returns null for an href that is an @ mention (isMentionHref, markdown-mention-links.fork.ts, imported at the top of the file), so a mention is never opened as a file in the thread's workspace.",
       "budget": 2
+    },
+    "apps/app/src/components/secondary-panel/FilePreview.tsx": {
+      "seam": "finder",
+      "intent": "FilePreview and its header take an optional localPath (ForkLocalPath, ForkFinder.tsx, imported at the top of the file); the header draws ForkShowInFinderButton after Refresh, and the narrow File actions menu draws ForkShowInFinderMenuItem after Refresh file. Both draw nothing without a local path.",
+      "budget": 8
+    },
+    "apps/app/src/components/secondary-panel/ThreadStorageFilePreview.tsx": {
+      "seam": "finder",
+      "intent": "SecondaryPanelFilePreview takes an optional localPath, passes it to FilePreview and wraps it in ForkFolderFallback (ForkFinder.tsx, imported at the top of the file): when the preview is in its error state and the local path is a folder, a package or an unreadable folder, the folder listing is drawn instead; a local preview is marked data-fork-local-host for the fallback link menu.",
+      "budget": 6
+    },
+    "apps/app/src/components/secondary-panel/ThreadSecondaryPanelTabContent.tsx": {
+      "seam": "finder",
+      "intent": "The workspace, project, host, host-scoped and thread storage file tabs pass localPath={useForkLocalPath(hostId, path, rootPath)} (ForkFinder.tsx, imported at the top of the file): the absolute path when the tab's host is this desktop's local host, else null.",
+      "budget": 6
+    },
+    "apps/app/src/views/thread-detail/ThreadDetailView.tsx": {
+      "seam": "finder",
+      "intent": "The chat's file link menu (getLocalFileContextMenuItems) adds forkFinderLinkMenuItems(link.path, threadEnvironmentIsLocal) (ForkFinder.tsx, imported at the top of the file) after the open items, before the copy separator: Show in Finder when the thread's host is this Mac in the desktop app, else nothing.",
+      "budget": 3
     }
   }
 }

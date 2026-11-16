@@ -1,3 +1,4 @@
+import { ForkFolderFallback, type ForkLocalPath } from "./ForkFinder";
 import {
   FilePreview as FilePreviewSurface,
   type FilePreviewFile,
@@ -39,6 +40,7 @@ interface SecondaryPanelFilePreviewProps {
   onOpenInEditor?: (path: string) => void;
   onRefresh?: () => void;
   statusLabel?: string | null;
+  localPath?: ForkLocalPath | null;
 }
 
 interface BuildTextPreviewFileArgs {
@@ -185,6 +187,7 @@ export function SecondaryPanelFilePreview({
   onOpenInEditor,
   onRefresh,
   statusLabel = null,
+  localPath = null,
 }: SecondaryPanelFilePreviewProps) {
   const requestCodeWorkers = useRequestPierreWorkerPool();
   useEffect(() => {
@@ -200,7 +203,9 @@ export function SecondaryPanelFilePreview({
     lineRange,
   });
   return (
+    <ForkFolderFallback localPath={localPath} failed={state.kind === "error"}>
     <FilePreviewSurface
+      localPath={localPath}
       path={activePath}
       download={
         filePreview &&
@@ -226,5 +231,6 @@ export function SecondaryPanelFilePreview({
       statusLabel={statusLabel}
       state={state}
     />
+    </ForkFolderFallback>
   );
 }

@@ -2,6 +2,7 @@ import type { ExperimentalLinkClick } from "@get-bb/plugin-sdk";
 import { getPluginSlotSnapshot } from "./plugin-slots";
 import { resolveRouteHref } from "./route-paths";
 import { isMentionHref } from "@/components/ui/markdown-mention-links.fork";
+import "./fork-finder";
 
 const CONTENT_ROOT_SELECTOR = "[data-markdown-preview]";
 
