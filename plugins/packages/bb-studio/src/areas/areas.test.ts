@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "../migrations";
 import { AutomationTasks, parentIdOf, readSources, type AutomationBotInfo } from "../tasks/automations";
 import { TaskStore } from "../tasks/store";
-import { Areas, leadsFrom, runnersFrom, type AreaCaller } from "./areas";
+import { Areas, fileStat, leadsFrom, readText, runnersFrom, type AreaCaller, type AreaDeps, type AreaLead } from "./areas";
 import { area as areaSchema, KEEP_AREA_RUNS, type Area } from "./contract";
 import { areaFolder, coversFromAreaMd, deriveStatus, readStatusFile, readStatusNotes, runOutcome, sinceAt, sortAreas } from "./derive";
 import { registerAreas } from "./register";
@@ -55,7 +55,7 @@ function folder(name: string, files: { area?: string; status?: string; json?: un
 
 const jobFor = (name: string) => `You are the ${name} area runner. Each run: read ${join(dir, "staff", "areas", "COMMON.md")} and staff/areas/${name}/AREA.md, then do the run.`;
 
-function setup(callers: Record<string, AreaCaller> = {}) {
+function setup(callers: Record<string, AreaCaller> = {}, extra: Partial<AreaDeps> = {}) {
   const tasks = new TaskStore(db, () => {});
   const automation = new AutomationTasks(tasks, { sources: () => readSources(db, BOTS), zone: () => "America/New_York" });
   automation.sync({ backup: false });
@@ -65,6 +65,7 @@ function setup(callers: Record<string, AreaCaller> = {}) {
     runners: () => runnersFrom(db),
     caller: (threadId) => callers[threadId] ?? { kind: "thread" },
     zone: () => "America/New_York",
+    ...extra,
   });
   const run = (runnerId: string, thread: string, work: () => void = () => {}, reply = "[PASS]") => {
     automation.sync({ backup: false });
@@ -229,8 +230,8 @@ describe("runner changes", () => {
 describe("area_update", () => {
   it("lets a lead make and keep its own area, adds a run per status, and refuses other areas", () => {
     runner("run_sys", "Systems", "thr_sys", "Watch the server.");
-    const { areas } = setup({ thr_sys: { kind: "runner", runnerId: "run_sys" }, thr_main: { kind: "bot", botId: "bot_main", main: true } });
-    areas.sync();
+    const { areas } = setup({ thr_sys: { kind: "runner", runnerId: "run_sys" }, thr_main: { kind: "bot", botId: "bot_main", main: true } }, { leads: () => [{ thread: "thr_lead", name: "Studio" }] });
+    new Areas(areas.store, areas.tasks, { ...areas.deps, leads: () => [] }).sync();
     expect(() => areas.update({ status: "ok" }, "thr_lead")).toThrow(/give it a name/);
     const made = areas.update({ name: "Studio", covers: "The app", status: "ok", now: "Shipped a build.", open: [{ title: "Your OK on the release", needsUser: true, since: "2026-11-14" }] }, "thr_lead").area;
     expect(made).toMatchObject({ name: "Studio", owner: { kind: "lead", thread: "thr_lead" }, ownerName: "Studio lead", status: "ok", now: "Shipped a build.", runs: [{ outcome: "ok", line: "Shipped a build." }], open: [{ needsUser: true, sinceAt: Date.UTC(2026, 10, 14) }] });
@@ -329,5 +330,75 @@ describe("rpc and tools", () => {
     expect(JSON.parse(await tools.area_update!.execute({ status: "flagged", now: "Backup stuck." }, { threadId: "thr_sys" })).area).toMatchObject({ status: "flagged", now: "Backup stuck." });
     expect(await tools.area_get!.execute({ id: "nope" }, {})).toMatch(/^Error: No area/);
     expect(Object.keys(tools).sort()).toEqual(["area_get", "area_list", "area_update"]);
+  });
+});
+
+describe("review fixes", () => {
+  it("stats status.json first: an unchanged file isn't read again, and a large one is refused before reading", () => {
+    const path = folder("systems");
+    runner("run_sys", "Systems", "thr_sys", jobFor("systems"));
+    const reads: string[] = [];
+    const { areas } = setup({}, { readText: (file) => { reads.push(file); return readText(file); }, fileStat });
+    const file = join(path, "status.json");
+    writeFileSync(file, JSON.stringify(status()));
+    areas.sync();
+    areas.sync();
+    areas.sync();
+    expect(reads.filter((r) => r === file)).toHaveLength(1);
+    expect(areas.get("Systems")).toMatchObject({ now: "All quiet.", fileError: null });
+    writeFileSync(file, `{"status":"ok","now":"${"x".repeat(70 * 1024)}","open":[],"updatedAt":"2026-11-15T13:00:00Z"}`);
+    utimesSync(file, new Date(NOW + MIN), new Date(NOW + MIN));
+    areas.sync();
+    expect(reads.filter((r) => r === file)).toHaveLength(1);
+    expect(areas.get("Systems")).toMatchObject({ now: "All quiet.", fileError: "Larger than 64 KB" });
+  });
+
+  it("clamps a status.json updatedAt in the future to the file's time", () => {
+    const path = folder("comms");
+    runner("run_comms", "Comms", "thr_comms", jobFor("comms"));
+    const { areas } = setup({ thr_main: { kind: "bot", botId: "bot_main", main: true } });
+    writeFileSync(join(path, "status.json"), JSON.stringify(status({ status: "flagged", updatedAt: new Date(NOW + 24 * HOUR).toISOString() })));
+    utimesSync(join(path, "status.json"), new Date(NOW), new Date(NOW));
+    areas.sync();
+    expect(areas.store.find("area_run_comms")!.stated).toEqual({ status: "flagged", at: NOW + 5 * MIN, from: "file" });
+    at(NOW + HOUR);
+    expect(areas.update({ area: "Comms", status: "ok", now: "Fixed." }, "thr_main").area).toMatchObject({ status: "ok", now: "Fixed." });
+    areas.sync();
+    expect(areas.get("Comms")).toMatchObject({ status: "ok", now: "Fixed." });
+  });
+
+  it("adds a lead's area on any later sync, not only the first, and never remakes one that was archived or renamed", () => {
+    runner("run_sys", "Systems", "thr_sys", "Watch the server.");
+    let leads: AreaLead[] = [];
+    const { areas } = setup({ thr_main: { kind: "bot", botId: "bot_main", main: true } }, { leads: () => leads });
+    areas.sync();
+    expect(areas.list().map((a) => a.name)).toEqual(["Systems"]);
+    leads = [{ thread: "thr_lead", name: "Studio" }, { thread: "thr_two", name: "Site" }];
+    expect(areas.sync().created).toEqual(["Studio", "Site"]);
+    areas.update({ area: "Studio", archive: true }, "thr_main");
+    areas.update({ area: "Site", name: "Website" }, "thr_main");
+    expect(areas.sync().created).toEqual([]);
+    expect(areas.list().map((a) => a.name).sort()).toEqual(["Systems", "Website"]);
+  });
+
+  it("picks up an area folder a runner's job names later", () => {
+    runner("run_home", "Home", "thr_home", "Look after the home.");
+    const { areas } = setup();
+    areas.sync();
+    expect(areas.get("Home").statusFile).toBeNull();
+    const path = folder("home", { area: "# Home\n\nOwns: calendar and school.\n", json: status({ now: "School is closed Friday." }) });
+    db.prepare("UPDATE bot_runners SET job = ? WHERE id = 'run_home'").run(jobFor("home"));
+    areas.sync();
+    expect(areas.get("Home")).toMatchObject({ statusFile: join(path, "status.json"), covers: "calendar and school", now: "School is closed Friday.", fileError: null });
+  });
+
+  it("lets only the Bot or a registered lead make an area", () => {
+    const { areas } = setup({ thr_main: { kind: "bot", botId: "bot_main", main: true }, thr_conv: { kind: "bot", botId: "bot_main", main: false } }, { leads: () => [{ thread: "thr_lead", name: "Studio" }] });
+    expect(() => areas.update({ name: "Junk" }, "thr_worker")).toThrow(/Only the Bot or a project's lead/);
+    expect(() => areas.update({ area: "Unknown" }, "thr_worker")).toThrow(/Only the Bot or a project's lead/);
+    expect(areas.update({ name: "Studio" }, "thr_lead").area.owner).toEqual({ kind: "lead", thread: "thr_lead" });
+    expect(areas.update({ name: "Side project" }, "thr_conv").area.owner).toEqual({ kind: "lead", thread: "thr_conv" });
+    expect(areas.update({ name: "Job hunt" }, "thr_main").area.owner).toEqual({ kind: "bot", botId: "bot_main" });
+    expect(() => areas.update({ area: "Studio", now: "x" }, "thr_worker")).toThrow(/looked after by Studio lead/);
   });
 });

@@ -8,7 +8,7 @@ import { parentIdOf } from "../tasks/automations";
 import { isClosed, USER_OWNER, type Task } from "../tasks/contract";
 import type { TaskStore } from "../tasks/store";
 import { areaUpdateInput, STATUS_FILE, type Area, type AreaOwner, type AreaRun, type AreaUpdateInput, type AreaView, type OpenItem } from "./contract";
-import { addRuns, areaFolder, clip, coversFromAreaMd, coversFromJob, deriveStatus, FRESH_SLACK_MS, fileItems, MISSED_GRACE_MS, readStatusFile, readStatusNotes, reportOutcome, runOutcome, sinceAt, sortAreas, type ReportLevel } from "./derive";
+import { addRuns, areaFolder, clip, coversFromAreaMd, coversFromJob, deriveStatus, FRESH_SLACK_MS, fileItems, MISSED_GRACE_MS, MAX_FILE_BYTES, readStatusFile, readStatusNotes, reportOutcome, runOutcome, sinceAt, sortAreas, type ReportLevel } from "./derive";
 import type { AreaStore } from "./store";
 
 export type AreaRunner = { id: string; botId: string; name: string; thread: string | null; state: "active" | "paused"; job: string; last: { level: ReportLevel; summary: string; at: number } | null };
@@ -21,7 +21,8 @@ export type AreaDeps = {
   leads?(): AreaLead[];
   caller?(threadId: string): AreaCaller;
   schedule?(task: Task): Schedule | null;
-  readFile?(path: string): { text: string; mtime: number } | null;
+  fileStat?(path: string): { mtime: number; size: number } | null;
+  readText?(path: string): string | null;
   zone?(): string;
   userWords?(): string[];
   now?(): number;
@@ -31,12 +32,15 @@ export type SeedReport = { seeded: boolean; created: string[]; problems: string[
 const LEVEL_RANK: Record<ReportLevel, number> = { log: 0, tell: 1, urgent: 2 };
 const KEEP_LEVELS = 20;
 
-export function readFileWithTime(path: string): { text: string; mtime: number } | null {
+export function fileStat(path: string): { mtime: number; size: number } | null {
   try {
     const stat = statSync(path);
-    if (!stat.isFile()) return null;
-    return { text: readFileSync(path, "utf8"), mtime: stat.mtimeMs };
+    return stat.isFile() ? { mtime: stat.mtimeMs, size: stat.size } : null;
   } catch { return null; }
+}
+
+export function readText(path: string): string | null {
+  try { return readFileSync(path, "utf8"); } catch { return null; }
 }
 
 export function readSchedule(db: Database.Database, task: Task): Schedule | null {
@@ -60,7 +64,14 @@ export class Areas {
 
   private now() { return this.deps.now?.() ?? Date.now(); }
   private zone() { return this.deps.zone?.() ?? localZone(); }
-  private read(path: string) { return (this.deps.readFile ?? readFileWithTime)(path); }
+  private stat(path: string) { return (this.deps.fileStat ?? fileStat)(path); }
+  private text(path: string) { return (this.deps.readText ?? readText)(path); }
+  private read(path: string): { text: string; mtime: number } | null {
+    const stat = this.stat(path);
+    if (!stat || stat.size > MAX_FILE_BYTES) return null;
+    const text = this.text(path);
+    return text === null ? null : { text, mtime: stat.mtime };
+  }
   private schedule(task: Task) { return this.deps.schedule ? this.deps.schedule(task) : readSchedule(this.tasks.db, task); }
 
   private blank(id: string, name: string, owner: AreaOwner, ownerName: string, now: number): Area {
@@ -81,12 +92,6 @@ export class Areas {
     const now = this.now();
     const bot = this.deps.bot();
     this.store.db.transaction(() => {
-      for (const lead of this.deps.leads?.() ?? []) {
-        if (this.store.all().some((a) => a.name.toLowerCase() === lead.name.toLowerCase())) continue;
-        const area = this.blank(`area_lead-${lead.thread.replace(/[^A-Za-z0-9-]/g, "-")}`.slice(0, 60), lead.name, { kind: "lead", thread: lead.thread }, `${lead.name} lead`, now);
-        this.store.save(area);
-        report.created.push(area.name);
-      }
       for (const x of extra) {
         if (x.owner === "cos" && !bot) { report.problems.push(`${x.name}: no Bot to own it`); continue; }
         const owner: AreaOwner = x.owner === "cos" ? { kind: "bot", botId: bot!.id } : { kind: "lead", thread: x.owner.slice("thread:".length) };
@@ -110,6 +115,7 @@ export class Areas {
   sync(): { created: string[]; changed: number; problems: string[] } {
     const out = { created: [] as string[], changed: 0, problems: [] as string[] };
     this.store.db.transaction(() => {
+      this.ensureLeadAreas(out);
       this.ensureRunnerAreas(out);
       for (const area of this.store.all()) {
         if (area.archived) continue;
@@ -118,6 +124,18 @@ export class Areas {
     })();
     if (out.created.length || out.changed) this.store.changed();
     return out;
+  }
+
+  private ensureLeadAreas(out: { created: string[] }): void {
+    const now = this.now();
+    for (const lead of this.deps.leads?.() ?? []) {
+      const areas = this.store.all();
+      if (areas.some((a) => (a.owner.kind === "lead" && a.owner.thread === lead.thread) || a.name.toLowerCase() === lead.name.toLowerCase())) continue;
+      const area = this.blank(`area_lead-${lead.thread.replace(/[^A-Za-z0-9-]/g, "-")}`.slice(0, 60), lead.name, { kind: "lead", thread: lead.thread }, `${lead.name} lead`, now);
+      if (areas.some((a) => a.id === area.id)) continue;
+      this.store.save(area);
+      out.created.push(area.name);
+    }
   }
 
   private ensureRunnerAreas(out: { created: string[]; problems: string[] }): void {
@@ -161,8 +179,18 @@ export class Areas {
     if (area.owner.kind === "runner") {
       const runnerId = area.owner.runnerId;
       const runner = this.deps.runners().find((r) => r.id === runnerId);
-      if (runner) { area.ownerName = clip(`${runner.name} runner`, 120); area.owner = { ...area.owner, thread: runner.thread }; }
-      else { area.archived = true; return area; }
+      if (!runner) { area.archived = true; return area; }
+      area.ownerName = clip(`${runner.name} runner`, 120);
+      area.owner = { ...area.owner, thread: runner.thread };
+      const folder = areaFolder(runner.job);
+      const statusFile = folder ? join(folder.dir, STATUS_FILE) : null;
+      if (statusFile !== area.statusFile) {
+        area.statusFile = statusFile;
+        area.file = null;
+        const areaMd = folder ? this.read(join(folder.dir, "AREA.md")) : null;
+        const covers = areaMd ? coversFromAreaMd(areaMd.text) : null;
+        if (covers) area.covers = covers;
+      }
     } else if (area.owner.kind === "bot") {
       const bot = this.deps.bot();
       if (bot && bot.id === area.owner.botId) area.ownerName = clip(bot.name, 120);
@@ -192,16 +220,18 @@ export class Areas {
   }
 
   private readStatus(area: Area, now: number): void {
-    const found = this.read(area.statusFile!);
-    if (!found) {
-      if (area.file?.mtime !== null || area.file?.error !== "missing") area.file = { readAt: now, mtime: null, error: "missing" };
-      return;
-    }
-    if (area.file && area.file.mtime === found.mtime) return;
-    const read = readStatusFile(found.text);
-    if (!read.ok) { area.file = { readAt: now, mtime: found.mtime, error: clip(read.error, 300) }; return; }
-    area.file = { readAt: now, mtime: found.mtime, error: null };
-    const at = Date.parse(read.value.updatedAt);
+    const path = area.statusFile!;
+    const stat = this.stat(path);
+    const missing = () => { if (area.file?.mtime !== null || area.file?.error !== "missing") area.file = { readAt: now, mtime: null, error: "missing" }; };
+    if (!stat) return missing();
+    if (area.file && area.file.mtime === stat.mtime) return;
+    if (stat.size > MAX_FILE_BYTES) { area.file = { readAt: now, mtime: stat.mtime, error: `Larger than ${MAX_FILE_BYTES / 1024} KB` }; return; }
+    const text = this.text(path);
+    if (text === null) return missing();
+    const read = readStatusFile(text);
+    if (!read.ok) { area.file = { readAt: now, mtime: stat.mtime, error: clip(read.error, 300) }; return; }
+    area.file = { readAt: now, mtime: stat.mtime, error: null };
+    const at = Math.min(Date.parse(read.value.updatedAt), stat.mtime + FRESH_SLACK_MS, now + FRESH_SLACK_MS);
     if (area.stated && area.stated.from === "agent" && area.stated.at > at) return;
     area.stated = { status: read.value.status, at, from: "file" };
     area.now = clip(read.value.now, 400);
@@ -308,7 +338,7 @@ export class Areas {
       const name = x.name ?? x.area;
       if (!name) throw new Error("You have no area yet: give it a name (name).");
       if (all.some((a) => a.name.toLowerCase() === name.toLowerCase())) throw new Error(`An area named ${JSON.stringify(name)} exists; pass area: ${JSON.stringify(name)}.`);
-      if (!(who.kind === "bot" && who.main) && !threadId) throw new Error("A new area needs a calling thread or the Bot.");
+      if (who.kind !== "bot" && !(threadId && (this.deps.leads?.() ?? []).some((lead) => lead.thread === threadId))) throw new Error("Only the Bot or a project's lead can make an area; ask the Bot to make it for you.");
       const owner: AreaOwner = who.kind === "bot" && who.main && bot ? { kind: "bot", botId: bot.id } : { kind: "lead", thread: threadId! };
       area = this.blank(`area_${randomUUID().slice(0, 8)}`, name, owner, owner.kind === "bot" ? bot!.name : `${name} lead`, now);
       before = null;

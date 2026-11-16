@@ -6,7 +6,8 @@ import { adoptAtStart } from "./src/tasks/migrate";
 import { asFact, linkAtStart, listThreadFacts, ThreadDirectory } from "./src/tasks/links";
 import { SpawnLinks } from "./src/tasks/spawn";
 import { AutomationTasks, readSources } from "./src/tasks/automations";
-import { Areas, leadsFrom, runnersFrom } from "./src/areas/areas";
+import { Areas, leadsFrom, runnersFrom, type AreaLead } from "./src/areas/areas";
+import { rpcErrorStatus } from "./src/kit/server/index";
 import { AreaStore } from "./src/areas/store";
 import { AREA_TOOLS, registerAreas } from "./src/areas/register";
 import { toLoop } from "./src/tasks/views";
@@ -839,24 +840,27 @@ export default async function plugin(bb: BbPluginApi) {
       return conversation && bots.stored(conversation) ? { kind: "bot", botId: conversation, main: false } : { kind: "thread" };
     },
     zone: () => loopTimeZone(process.env, studioSettings.current().todosTimeZone),
+    leads: () => areaLeads,
   });
-  let areasSeeded = false;
-  const areaStep = <T,>(name: string, work: () => T): T | null => (areasSeeded || name === "seed" ? taskStep(`areas ${name}`, work) : null);
+  let areaLeads: AreaLead[] = [];
+  let areaLeadsRead = false;
+  const areaStep = <T,>(name: string, work: () => T): T | null => (areaLeadsRead ? taskStep(`areas ${name}`, work) : null);
+  const syncAreas = (why: string) => areaStep(why, () => { const out = areas.sync(); if (out.created.length) bb.log.info(`Areas: made ${out.created.join(", ")}.${out.problems.length ? ` Notes: ${out.problems.join("; ")}` : ""}`); return out; });
   registerAreas(bb, areas, (work) => { assertTasksReady(db); return work(); });
-  void (async () => {
-    const projects = await bb.sdk.projects.list().catch(() => []);
-    const alive = await Promise.all(leadsFrom(db, new Map(projects.map((p) => [p.id, p.name])), PERSONAL_PROJECT_ID).map(async (lead) => {
-      const thread = await bb.sdk.threads.get({ threadId: lead.thread }).catch(() => null);
-      return thread && !(thread as { archivedAt?: unknown }).archivedAt ? lead : null;
-    }));
-    const leads = alive.filter((lead): lead is NonNullable<typeof lead> => !!lead);
-    areaStep("seed", () => {
-      const seeded = new Areas(areaStore, new TaskStore(db), { ...areas.deps, leads: () => leads }).seed();
-      if (seeded.seeded) bb.log.info(`Areas: made ${seeded.created.length} (${seeded.created.join(", ")}).${seeded.problems.length ? ` Notes: ${seeded.problems.join("; ")}` : ""}`);
-      else areas.sync();
-    });
-    areasSeeded = true;
-  })().catch((error) => { areasSeeded = true; bb.log.warn(`Areas: seeding failed: ${errorText(error)}`); });
+  const readAreaLeads = async () => {
+    try {
+      const projects = await bb.sdk.projects.list();
+      const found = await Promise.all(leadsFrom(db, new Map(projects.map((p) => [p.id, p.name])), PERSONAL_PROJECT_ID).map(async (lead) => {
+        const thread = await bb.sdk.threads.get({ threadId: lead.thread }).catch((error: unknown) => { if (rpcErrorStatus(error) === 404) return null; throw error; });
+        return thread && !(thread as { archivedAt?: unknown }).archivedAt ? lead : null;
+      }));
+      areaLeads = found.filter((lead): lead is AreaLead => !!lead);
+    } catch (error) { bb.log.warn(`Areas: leads could not be read; kept the last list: ${errorText(error)}`); }
+    areaLeadsRead = true;
+    syncAreas("sync");
+  };
+  void readAreaLeads();
+  triggers.every("area-leads", 30 * 60_000, () => { void readAreaLeads(); });
   triggers.every("automation-tasks", 60_000, () => { syncAutomationTasks(); areaStep("sync", () => areas.sync()); });
   triggers.every("automation-tasks-prune", 60 * 60_000, () => { taskStep("prune", () => automationTasks.prune()); });
   const restoreMainFailed = (error: unknown) => bb.log.warn(`Couldn't start a new Main: ${errorText(error)}`);
