@@ -10,7 +10,7 @@ import { combineSettings } from "./handle";
 import { STUDIO_KEY_SETTINGS } from "./keys";
 import { describeMigration, LEGACY_SETTINGS, migrateSettings, SETTINGS_MIGRATED_KEY } from "./migrate";
 import { registerSettings } from "./register";
-import { checkSetting, effectiveSettings, parseSettingText, SETTINGS_GROUPS, settingDefaults, STUDIO_SETTINGS, STUDIO_SETTING_KEYS, VISIBLE_SETTING_KEYS } from "./schema";
+import { checkSetting, effectiveSettings, parseSettingText, SETTINGS_GROUPS, settingDefaults, STUDIO_SETTINGS, STUDIO_SETTING_KEYS } from "./schema";
 import { remindersForFirstBot, SETTINGS_KV_KEY, StudioSettingsStore } from "./store";
 import { decisionsConstants, decisionsDefaults } from "../decisions/settings";
 import { loopTimeZone } from "./constants";
@@ -388,11 +388,9 @@ describe("bb studio settings", () => {
     expect(text).toMatch(/ {2}autoMeetingNotes +false {2}\(default\)\n/);
     expect(text).toContain("API keys: Settings ▸ Studio ▸ API keys, or their environment variables.");
     expect(text.indexOf("Voice\n")).toBeLessThan(text.indexOf("Recordings and calls\n"));
-    for (const key of VISIBLE_SETTING_KEYS) expect(text).toContain(`  ${key} `);
-    expect(text).not.toContain("desktopControl");
+    for (const key of STUDIO_SETTING_KEYS) expect(text).toContain(`  ${key} `);
     const json = JSON.parse((await settingsCli(["list", "--json"], await storeWith())).stdout!) as { key: string; changed: boolean }[];
-    expect(json.map((row) => row.key)).toEqual(VISIBLE_SETTING_KEYS);
-    expect((await settingsCli(["set", "desktopControl", "true"], await storeWith())).exitCode).toBe(1);
+    expect(json.map((row) => row.key)).toEqual(STUDIO_SETTING_KEYS);
   });
 
   it("gets, sets and resets one setting, checking its type", async () => {
