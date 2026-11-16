@@ -47,6 +47,7 @@ export interface SceneStart {
   /** The open area for the scene's focal object. */
   open: Rect | null;
   cards: Rect[];
+  light?: { x: number; y: number; scale: number } | null;
   signals?: SceneSignals;
   intensity?: number;
   glass?: number;
@@ -142,6 +143,13 @@ class PhoneScene {
     return { clear, open, cards: cardData(this.options.cards.map((card) => clearFromRect(card, view, canvas))) };
   }
 
+  private light(): readonly [number, number, number, number] | null {
+    const light = this.options.light;
+    if (!light) return null;
+    const sx = this.canvas.width / Math.max(1, this.options.width), sy = this.canvas.height / Math.max(1, this.options.height);
+    return [light.x * sx, (this.options.height - light.y) * sy, light.scale, 1];
+  }
+
   private fillWorkers(still: boolean): void {
     this.workers.fill(0);
     const slots = workerSlots(this.signals.workers);
@@ -171,7 +179,7 @@ class PhoneScene {
       time: this.time, width: this.canvas.width, height: this.canvas.height, intensity: look.intensity, motion: look.motion, palette: look.palette,
       workers: this.workers, ripples: this.rippleData, needsYou: this.needsLevel,
       workerColor: look.worker, needsYouColor: look.needsYou, finishedColor: look.finished, errorColor: look.ripple,
-      ...this.clearRects(), uniforms: this.live, layer: this.image,
+      ...this.clearRects(), uniforms: this.live, layer: this.image, light: this.light(),
     });
     this.frames += 1;
     this.drawMs += performance.now() - started;

@@ -22,6 +22,7 @@ export interface SceneFrame {
   cards?: Float32Array | null;
   uniforms?: LiveUniforms | null;
   layer?: SceneLayer | null;
+  light?: readonly [number, number, number, number] | null;
 }
 
 export type CompiledScene = { ok: true; renderer: SceneRenderer } | { ok: false; error: string };
@@ -154,6 +155,8 @@ export class SceneRenderer {
     if (open) { const [x0, y0, x1, y1] = frame.open ?? defaultOpen(column, frame.width, frame.height); gl.uniform4f(open, x0, y0, x1, y1); }
     const cards = this.location("u_cards");
     if (cards) gl.uniform4fv(cards, frame.cards ?? defaultCards(column, frame.width));
+    const light = this.location("u_lightSpot");
+    if (light) { const [lx, ly, ls, on] = frame.light ?? [0, 0, 1, 0]; gl.uniform4f(light, lx, ly, ls, on); }
     for (const [name, value] of Object.entries(this.scene.uniforms)) this.setCustom(name, frame.uniforms?.[name] ?? value);
     this.bindLayer(frame.layer ?? null);
     gl.drawArrays(gl.TRIANGLES, 0, 3);

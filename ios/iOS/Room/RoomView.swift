@@ -73,6 +73,7 @@ struct RoomView: View {
     @State private var morning: LoopMorning?
     @State private var tasks = TasksModel.shared
     @State private var sceneSize: CGSize = .zero
+    @State private var sceneLight: SceneLight?
     @State private var presenceSize: CGFloat = 0
     @State private var presenceFrame: CGRect = .zero
     @State private var switching = false
@@ -312,7 +313,7 @@ struct RoomView: View {
             }
             .animation(reduceMotion ? .easeInOut(duration: 0.2) : room.standing ? .smooth(duration: 0.34) : .smooth(duration: 0.26), value: room.standing)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background { backdrop }
+            .background { backdrop(proxy) }
             .toolbar(room.standing && !columnHeader ? .automatic : .hidden, for: .navigationBar)
             .toolbar {
                 if room.standing && !columnHeader {
@@ -363,7 +364,7 @@ struct RoomView: View {
             }
             .background {
                 ZStack {
-                    backdrop
+                    backdrop(proxy)
                     duoScrim(pages)
                 }
             }
@@ -388,7 +389,7 @@ struct RoomView: View {
                             .id(place)
                     }
                 }
-                .background { backdrop.blur(radius: 6) }
+                .background { backdrop(proxy).blur(radius: 6) }
                 .transition(.opacity)
             }
         }
@@ -406,19 +407,22 @@ struct RoomView: View {
             .accessibilityHidden(true)
     }
 
-    private var backdrop: some View {
-        ZStack {
-            SceneBackdrop(theme: look.theme, botId: bot.id, view: view)
+    private func backdrop(_ proxy: GeometryProxy) -> some View {
+        let spot = RoomSceneLight.spot(proxy, pages: pages, rail: columnHeader)
+        return ZStack {
+            SceneBackdrop(theme: look.theme, botId: bot.id, view: view, light: spot)
                 .onGeometryChange(for: CGSize.self) { $0.size } action: { sceneSize = SceneBackdrop.stillSize($0) }
-            RoomLightLayer(light: light, seed: pager.shown)
+                .onChange(of: spot, initial: true) { _, now in sceneLight = now }
+            RoomLightLayer(light: light, seed: pager.shown, spot: spot)
                 .id(pager.shown)
                 .transition(.opacity)
-            RoomFrost(pages: pages, layout: layout, light: light, seed: pager.shown, botId: bot.id, view: view)
+            RoomFrost(pages: pages, layout: layout, light: light, seed: pager.shown, spot: spot, botId: bot.id, view: view)
                 .opacity(pages != nil || room.standing ? 1 : 0)
                 .animation(reduceMotion ? .easeInOut(duration: 0.2) : .smooth(duration: 0.34), value: room.standing)
             #if DEBUG
             Color.clear.frame(width: 1, height: 1).accessibilityElement().accessibilityIdentifier("roomScene").accessibilityValue(look.theme.id)
             Color.clear.frame(width: 1, height: 1).accessibilityElement().accessibilityIdentifier("roomLight").accessibilityValue(light.name)
+            if let spot { RoomLightMarker(spot: spot) }
             #endif
             RoomShade(standing: room.standing && pages == nil)
                 .animation(.easeInOut(duration: 0.35), value: room.mode)
@@ -594,7 +598,7 @@ struct RoomView: View {
         let looks = LookStore.shared
         let theme = RoomTheme.resolve(botThemeId: shell.themeOverride[next.id] ?? next.appearance?.themeId, phoneThemeId: looks.themeId, catalog: looks.catalog)
         let look = LookRoot.look(theme, store: looks, scheme: scheme)
-        _ = await SceneStills.shared.still(theme: theme, mode: look.mode, size: sceneSize, scale: min(2, displayScale))
+        _ = await SceneStills.shared.still(theme: theme, mode: look.mode, size: sceneSize, scale: min(2, displayScale), light: sceneLight?.shifted(by: SceneBackdrop.parallax))
         let live = store.view(for: next.id)
         var spec = PresenceSpec(bot: next, state: next.presenceState(live: live),
                                 workers: live?.workers.filter { $0.status == .running }.count ?? next.activity.workers,

@@ -379,6 +379,8 @@ public enum Studio {
     public static let work_anchor = "work.anchor"
     public static let work_dismiss = "work.dismiss"
     public static let work_clear = "work.clear"
+    public static let areas_list = "areas.list"
+    public static let areas_get = "areas.get"
   }
 
   public enum Channel {
@@ -1212,6 +1214,10 @@ public enum Studio {
   public typealias WorkDismiss = WorkDismissOutput
 
   public typealias WorkClear = WorkClearOutput
+
+  public typealias AreasList = AreasListOutput
+
+  public typealias AreasGet = AreasGetOutput
 
   public struct LoopsListInput: Sendable, Hashable, Codable {
     public var area: String?
@@ -39217,6 +39223,298 @@ public enum Studio {
 
     public init(cleared: Int? = nil) {
       self.cleared = cleared
+    }
+  }
+
+  public struct AreasListInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public enum AreasListOutputAreasItemStatus: Sendable, Hashable, Codable {
+    case ok
+    case flagged
+    case broken
+    case unknownValue
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ok": self = .ok
+      case "flagged": self = .flagged
+      case "broken": self = .broken
+      case "unknown": self = .unknownValue
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ok: try container.encode("ok")
+      case .flagged: try container.encode("flagged")
+      case .broken: try container.encode("broken")
+      case .unknownValue: try container.encode("unknown")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct AreasListOutputAreasItemOpenItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var since: String?
+    public var sinceAt: Double?
+    public var needsUser: Bool?
+    public var taskId: String?
+
+    public init(title: String? = nil, since: String? = nil, sinceAt: Double? = nil, needsUser: Bool? = nil, taskId: String? = nil) {
+      self.title = title
+      self.since = since
+      self.sinceAt = sinceAt
+      self.needsUser = needsUser
+      self.taskId = taskId
+    }
+  }
+
+  public enum AreasListOutputAreasItemRunsItemOutcome: Sendable, Hashable, Codable {
+    case ok
+    case flagged
+    case broken
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ok": self = .ok
+      case "flagged": self = .flagged
+      case "broken": self = .broken
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ok: try container.encode("ok")
+      case .flagged: try container.encode("flagged")
+      case .broken: try container.encode("broken")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct AreasListOutputAreasItemRunsItem: Sendable, Hashable, Codable {
+    public var at: Double?
+    public var outcome: AreasListOutputAreasItemRunsItemOutcome?
+    public var line: String?
+    public var taskId: String?
+
+    public init(at: Double? = nil, outcome: AreasListOutputAreasItemRunsItemOutcome? = nil, line: String? = nil, taskId: String? = nil) {
+      self.at = at
+      self.outcome = outcome
+      self.line = line
+      self.taskId = taskId
+    }
+  }
+
+  public struct AreasListOutputAreasItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var covers: String?
+    public var owner: StudioJSONValue?
+    public var ownerName: String?
+    public var cadence: String?
+    public var status: AreasListOutputAreasItemStatus?
+    public var reason: String?
+    public var now: String?
+    public var `open`: [AreasListOutputAreasItemOpenItem]?
+    public var runs: [AreasListOutputAreasItemRunsItem]?
+    public var lastRun: Double?
+    public var nextRun: Double?
+    public var nextLabel: String?
+    public var paused: Bool?
+    public var links: [String]?
+    public var statusFile: String?
+    public var fileError: String?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, covers: String? = nil, owner: StudioJSONValue? = nil, ownerName: String? = nil, cadence: String? = nil, status: AreasListOutputAreasItemStatus? = nil, reason: String? = nil, now: String? = nil, `open`: [AreasListOutputAreasItemOpenItem]? = nil, runs: [AreasListOutputAreasItemRunsItem]? = nil, lastRun: Double? = nil, nextRun: Double? = nil, nextLabel: String? = nil, paused: Bool? = nil, links: [String]? = nil, statusFile: String? = nil, fileError: String? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.covers = covers
+      self.owner = owner
+      self.ownerName = ownerName
+      self.cadence = cadence
+      self.status = status
+      self.reason = reason
+      self.now = now
+      self.`open` = `open`
+      self.runs = runs
+      self.lastRun = lastRun
+      self.nextRun = nextRun
+      self.nextLabel = nextLabel
+      self.paused = paused
+      self.links = links
+      self.statusFile = statusFile
+      self.fileError = fileError
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct AreasListOutput: Sendable, Hashable, Codable {
+    public var areas: [AreasListOutputAreasItem]?
+
+    public init(areas: [AreasListOutputAreasItem]? = nil) {
+      self.areas = areas
+    }
+  }
+
+  public struct AreasGetInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum AreasGetOutputAreaStatus: Sendable, Hashable, Codable {
+    case ok
+    case flagged
+    case broken
+    case unknownValue
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ok": self = .ok
+      case "flagged": self = .flagged
+      case "broken": self = .broken
+      case "unknown": self = .unknownValue
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ok: try container.encode("ok")
+      case .flagged: try container.encode("flagged")
+      case .broken: try container.encode("broken")
+      case .unknownValue: try container.encode("unknown")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct AreasGetOutputAreaOpenItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var since: String?
+    public var sinceAt: Double?
+    public var needsUser: Bool?
+    public var taskId: String?
+
+    public init(title: String? = nil, since: String? = nil, sinceAt: Double? = nil, needsUser: Bool? = nil, taskId: String? = nil) {
+      self.title = title
+      self.since = since
+      self.sinceAt = sinceAt
+      self.needsUser = needsUser
+      self.taskId = taskId
+    }
+  }
+
+  public enum AreasGetOutputAreaRunsItemOutcome: Sendable, Hashable, Codable {
+    case ok
+    case flagged
+    case broken
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ok": self = .ok
+      case "flagged": self = .flagged
+      case "broken": self = .broken
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ok: try container.encode("ok")
+      case .flagged: try container.encode("flagged")
+      case .broken: try container.encode("broken")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct AreasGetOutputAreaRunsItem: Sendable, Hashable, Codable {
+    public var at: Double?
+    public var outcome: AreasGetOutputAreaRunsItemOutcome?
+    public var line: String?
+    public var taskId: String?
+
+    public init(at: Double? = nil, outcome: AreasGetOutputAreaRunsItemOutcome? = nil, line: String? = nil, taskId: String? = nil) {
+      self.at = at
+      self.outcome = outcome
+      self.line = line
+      self.taskId = taskId
+    }
+  }
+
+  public struct AreasGetOutputArea: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var covers: String?
+    public var owner: StudioJSONValue?
+    public var ownerName: String?
+    public var cadence: String?
+    public var status: AreasGetOutputAreaStatus?
+    public var reason: String?
+    public var now: String?
+    public var `open`: [AreasGetOutputAreaOpenItem]?
+    public var runs: [AreasGetOutputAreaRunsItem]?
+    public var lastRun: Double?
+    public var nextRun: Double?
+    public var nextLabel: String?
+    public var paused: Bool?
+    public var links: [String]?
+    public var statusFile: String?
+    public var fileError: String?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, covers: String? = nil, owner: StudioJSONValue? = nil, ownerName: String? = nil, cadence: String? = nil, status: AreasGetOutputAreaStatus? = nil, reason: String? = nil, now: String? = nil, `open`: [AreasGetOutputAreaOpenItem]? = nil, runs: [AreasGetOutputAreaRunsItem]? = nil, lastRun: Double? = nil, nextRun: Double? = nil, nextLabel: String? = nil, paused: Bool? = nil, links: [String]? = nil, statusFile: String? = nil, fileError: String? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.covers = covers
+      self.owner = owner
+      self.ownerName = ownerName
+      self.cadence = cadence
+      self.status = status
+      self.reason = reason
+      self.now = now
+      self.`open` = `open`
+      self.runs = runs
+      self.lastRun = lastRun
+      self.nextRun = nextRun
+      self.nextLabel = nextLabel
+      self.paused = paused
+      self.links = links
+      self.statusFile = statusFile
+      self.fileError = fileError
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct AreasGetOutput: Sendable, Hashable, Codable {
+    public var area: AreasGetOutputArea?
+
+    public init(area: AreasGetOutputArea? = nil) {
+      self.area = area
     }
   }
 

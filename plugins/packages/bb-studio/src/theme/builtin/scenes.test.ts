@@ -174,6 +174,20 @@ describe("the built-in scene themes", () => {
     expect(THEME_TEMPLATE.scene.source).toMatch(/u_workerColor \* openFade\(gl_FragCoord\.xy\)/);
   });
 
+  it("puts the moon and sun where the phone asks, at its size, and leaves desktop's placement when it doesn't ask", () => {
+    expect(PRELUDE).toMatch(/uniform vec4 u_lightSpot;\s*vec2 lightAt\(vec2 fallback\) \{\s*return u_lightSpot\.w > 0\.5 \? u_lightSpot\.xy \/ u_resolution\.y : fallback;/);
+    expect(PRELUDE).toMatch(/float lightScale\(\) \{\s*return u_lightSpot\.w > 0\.5 \? u_lightSpot\.z : 1\.0;/);
+    const source = (id: string) => {
+      const theme = SCENE_THEMES.find((entry) => entry.id === id);
+      if (!theme || theme.scene.kind !== "shader") throw new Error(`${id} has a shader`);
+      return theme.scene.source;
+    };
+    expect(source("forest")).toMatch(/vec2 sunP = lightAt\(vec2\(open \* aspect, 0\.6 \+ 0\.35 \* u_sunHeight\)\);/);
+    expect(source("forest")).toMatch(/vec2 moonP = lightAt\(vec2\(open \* aspect, 0\.8\)\);/);
+    expect(source("forest")).toMatch(/length\(p - moonP\) \/ ls/);
+    expect(source("tonights-sky")).toMatch(/vec4 moon = u_lightSpot\.w > 0\.5 \? vec4\(lightAt\(u_moon\.xy\), u_moon\.z \* lightScale\(\), u_moon\.w\) : u_moon;/);
+  });
+
   it("gives the template moving rays and tells theme authors to add slow ambient motion", () => {
     if (THEME_TEMPLATE.scene.kind !== "shader") throw new Error("The template has a shader");
     expect(THEME_TEMPLATE.scene.source).toMatch(/float t = u_time \* 0\.25;[\s\S]*rays = [^;]*\+ t \* 0\.7\)/);
@@ -284,7 +298,7 @@ describe("the built-in scene themes", () => {
     expect(source).toMatch(/float spring = u_season\.x;\s*float summer = u_season\.y;\s*float autumn = u_season\.z;\s*float winter = u_season\.w;/);
     expect(source).toMatch(/vec2 q = mix\(vec2\(p\.x \+ haze, p\.y\), vec2\(g\.x \+ wv \* 0\.008, 0\.42 \+ \(0\.42 - g\.y\) \* 1\.1 \+ wv \* 0\.016\), pond\);/);
     expect(source).toMatch(/focus = \(strip > 0\.09 \* u_resolution\.x \? \(u_clear\.z \+ 0\.5 \* strip\) \/ u_resolution\.x : 0\.86\) \* aspect/);
-    expect(source).toMatch(/mq = \(q - vec2\(focus - 0\.08, 0\.684\)\) \/ 0\.027/);
+    expect(source).toMatch(/float mr = 0\.027 \* lightScale\(\);\s*vec2 mq = \(q - lightAt\(vec2\(focus - 0\.08, 0\.684\)\)\) \/ mr;/);
     expect(source).toMatch(/mu = vec2\(\(q\.x \+ sway \* \(0\.004 \+ 0\.02 \* rise\) - focus \+ 1\.0\) \/ 1\.44, \(q\.y - 0\.38\) \/ 0\.64\)/);
     expect(source).toMatch(/lq = \(vec2\(q\.x \+ sway \* 0\.004, q\.y\) - vec2\(focus - 0\.052, 0\.42\)\) \/ 0\.1/);
     expect(source).toMatch(/pu = vec2\(\(g\.x - focus \+ 1\.0\) \/ 1\.44, \(g\.y - 0\.07\) \/ 0\.38\)/);

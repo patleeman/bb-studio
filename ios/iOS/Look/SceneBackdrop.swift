@@ -4,8 +4,20 @@ import UIKit
 /// Rectangles in points for desktop's scene uniforms on the phone: the scene
 /// fades under the list (`column`), and its focal object sits in the open band
 /// above it, where design 10d puts Event Horizon's disk.
+struct SceneLight: Hashable {
+    var x: CGFloat
+    var y: CGFloat
+
+    static let scale: CGFloat = 0.6
+
+    var key: String { "-L\(Int(x.rounded()))x\(Int(y.rounded()))" }
+
+    func shifted(by amount: CGFloat) -> SceneLight { SceneLight(x: x + amount, y: y + amount) }
+}
+
 struct PhoneSceneLayout: Equatable {
     var size: CGSize
+    var light: SceneLight? = nil
     static let header: CGFloat = 186
     static let footer: CGFloat = 84
     static let margin: CGFloat = 16
@@ -25,6 +37,7 @@ struct PhoneSceneLayout: Equatable {
             "live": live, "fps": LookStore.liveFPS, "column": rect(column), "open": rect(open), "cards": [rect(column)],
         ]
         if let signals { out["signals"] = signals }
+        if let light { out["light"] = ["x": light.x, "y": light.y, "scale": SceneLight.scale] }
         return out
     }
 }
@@ -68,9 +81,9 @@ final class SceneStills {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
-    static func key(theme: LookTheme, mode: LookTheme.Mode, size: CGSize, scale: CGFloat, now: Date = Date()) -> String {
+    static func key(theme: LookTheme, mode: LookTheme.Mode, size: CGSize, scale: CGFloat, now: Date = Date(), light: SceneLight? = nil) -> String {
         let hour = theme.scene?.driver == true ? "-" + Self.hourStamp(now) : ""
-        return "\(theme.id)-\(mode.rawValue)-\(Int(size.width.rounded()))x\(Int(size.height.rounded()))@\(Int(scale))\(hour)"
+        return "\(theme.id)-\(mode.rawValue)-\(Int(size.width.rounded()))x\(Int(size.height.rounded()))@\(Int(scale))\(light?.key ?? "")\(hour)"
     }
 
     static func hourStamp(_ date: Date) -> String {
@@ -95,19 +108,19 @@ final class SceneStills {
         return image
     }
 
-    func still(theme: LookTheme, mode: LookTheme.Mode, size: CGSize, scale: CGFloat, now: Date = Date()) async -> UIImage? {
+    func still(theme: LookTheme, mode: LookTheme.Mode, size: CGSize, scale: CGFloat, now: Date = Date(), light: SceneLight? = nil) async -> UIImage? {
         guard theme.kind == .scene, size.width > 1, size.height > 1 else { return nil }
-        let key = Self.key(theme: theme, mode: mode, size: size, scale: scale, now: now)
+        let key = Self.key(theme: theme, mode: mode, size: size, scale: scale, now: now, light: light)
         if let image = cached(key) { return image }
         if let running = inFlight[key] { return await running.value }
-        let task = Task { @MainActor in await self.render(theme: theme, mode: mode, size: size, scale: scale, key: key) }
+        let task = Task { @MainActor in await self.render(theme: theme, mode: mode, size: size, scale: scale, light: light, key: key) }
         inFlight[key] = task
         let image = await task.value
         inFlight[key] = nil
         return image
     }
 
-    private func render(theme: LookTheme, mode: LookTheme.Mode, size: CGSize, scale: CGFloat, key: String) async -> UIImage? {
+    private func render(theme: LookTheme, mode: LookTheme.Mode, size: CGSize, scale: CGFloat, light: SceneLight?, key: String) async -> UIImage? {
         let host = LookWebView(page: .scene, frame: CGRect(origin: .zero, size: size))
         LookHosting.attach(host.webView)
         defer { host.tearDown() }
@@ -116,7 +129,7 @@ final class SceneStills {
             Self.chose(mode, theme: theme.id, key: key)
         }
         do {
-            let layout = PhoneSceneLayout(size: size)
+            let layout = PhoneSceneLayout(size: size, light: light)
             let started = try await host.call("return BBLook.scene.start(options)",
                                               ["options": layout.arguments(theme: theme.id, mode: mode, scale: scale, live: false, signals: nil)]) as? [String: Any]
             guard started?["ok"] as? Bool == true else {
@@ -167,6 +180,7 @@ struct SceneBackdrop: View {
     var botId: String?
     var view: BotThreadsView?
     var stillOnly = false
+    var light: SceneLight?
     @Environment(\.look) private var look
     @Environment(\.scenePhase) private var phase
     @Environment(\.displayScale) private var scale
@@ -183,24 +197,25 @@ struct SceneBackdrop: View {
     var body: some View {
         GeometryReader { geo in
             let size = Self.stillSize(geo.size)
-            let shown = theme.kind == .scene ? SceneStills.shared.cached(SceneStills.key(theme: theme, mode: look.mode, size: size, scale: min(2, scale))) ?? image : image
+            let spot = light?.shifted(by: Self.parallax)
+            let shown = theme.kind == .scene ? SceneStills.shared.cached(SceneStills.key(theme: theme, mode: look.mode, size: size, scale: min(2, scale), light: spot)) ?? image : image
             ZStack {
                 Color(lookHex: theme.scene?.fallback ?? look.tokens.canvas)
                 if !stillOnly, store.liveSceneRuns(foreground: phase == .active) {
-                    LiveSceneView(theme: theme.id, mode: look.mode, size: geo.size, signals: SceneSignals.payload(botId: botId, view: view))
+                    LiveSceneView(theme: theme.id, mode: look.mode, size: geo.size, light: light, signals: SceneSignals.payload(botId: botId, view: view))
                 } else if let image = shown {
                     ParallaxImage(image: image, amount: Self.parallax)
                         .frame(width: size.width, height: size.height)
                         .offset(x: -Self.parallax, y: -Self.parallax)
                 }
             }
-            .task(id: "\(theme.id)|\(look.mode)|\(Int(size.width))x\(Int(size.height))|\(hour)") {
-                let key = SceneStills.key(theme: theme, mode: look.mode, size: size, scale: min(2, scale))
+            .task(id: "\(theme.id)|\(look.mode)|\(Int(size.width))x\(Int(size.height))|\(hour)\(spot?.key ?? "")") {
+                let key = SceneStills.key(theme: theme, mode: look.mode, size: size, scale: min(2, scale), light: spot)
                 if let chosen = SceneStills.chosenMode(key: key), store.sceneModes[theme.id] != chosen { store.sceneModes[theme.id] = chosen }
                 if let cached = SceneStills.shared.cached(key) {
                     image = cached
                 } else {
-                    let rendered = await SceneStills.shared.still(theme: theme, mode: look.mode, size: size, scale: min(2, scale))
+                    let rendered = await SceneStills.shared.still(theme: theme, mode: look.mode, size: size, scale: min(2, scale), light: spot)
                     withAnimation(.easeOut(duration: 0.3)) { image = rendered }
                 }
             }
@@ -255,6 +270,7 @@ struct LiveSceneView: UIViewRepresentable {
     let theme: String
     let mode: LookTheme.Mode
     let size: CGSize
+    var light: SceneLight?
     let signals: [String: Any]
 
     final class Coordinator {
@@ -274,7 +290,7 @@ struct LiveSceneView: UIViewRepresentable {
 
     func updateUIView(_ container: UIView, context: Context) {
         let coordinator = context.coordinator
-        let key = "\(theme)|\(mode.rawValue)|\(Int(size.width))x\(Int(size.height))"
+        let key = "\(theme)|\(mode.rawValue)|\(Int(size.width))x\(Int(size.height))\(light?.key ?? "")"
         let scale = min(2, container.window?.screen.scale ?? 2)
         if coordinator.key != key {
             coordinator.key = key
@@ -284,7 +300,7 @@ struct LiveSceneView: UIViewRepresentable {
             host.webView.frame = container.bounds
             container.addSubview(host.webView)
             coordinator.host = host
-            let options = PhoneSceneLayout(size: size).arguments(theme: theme, mode: mode, scale: scale, live: true, signals: signals)
+            let options = PhoneSceneLayout(size: size, light: light).arguments(theme: theme, mode: mode, scale: scale, live: true, signals: signals)
             Task { _ = try? await host.call("return BBLook.scene.start(options)", ["options": options]) }
         } else if let host = coordinator.host,
                   let data = try? JSONSerialization.data(withJSONObject: signals, options: [.sortedKeys]),

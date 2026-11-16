@@ -10,11 +10,13 @@ struct TasksView: View {
     @State private var expanded: String?
     @State private var showsDone = false
     @State private var loading = false
+    @State private var unfolded: Set<String> = []
     @FocusState private var addFocused: Bool
     @EnvironmentObject private var app: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.showTaskDetail) private var showDetail
     @Environment(\.shownTaskDetail) private var shownDetail
+    @Environment(\.openTaskThread) private var openThread
 
     var body: some View {
         if model.supported == false {
@@ -25,8 +27,11 @@ struct TasksView: View {
     }
 
     private var list: some View {
-        let shown = model.tasks.filter { owner.matches($0, botThreadId: model.botThreadId) }
+        let nodes = model.board.map(TaskTree.nodes) ?? []
+        let tree = TasksBoardShape(nodes)
+        let shown = model.tasks.filter { owner.matches($0, botThreadId: model.botThreadId) && (tree.top($0) || $0.isMine) }
         let sections = TaskRules.sections(shown)
+        let asks = owner == .all || owner == .mine ? model.areaAsks : []
         return ScrollViewReader { proxy in
             List {
                 Section {
@@ -49,40 +54,10 @@ struct TasksView: View {
                 } else if model.list == nil {
                     Section { HStack { Spacer(); ProgressView(); Spacer() }.listRowBackground(Color.clear) }
                 }
-                let today = sections[.today] ?? [], later = sections[.later] ?? []
-                if !today.isEmpty || !later.isEmpty {
-                    if !today.isEmpty {
-                        Section {
-                            ForEach(today) { row($0) }
-                        } header: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Mine").font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
-                                Text("Today")
-                            }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel("Mine, Today")
-                        }
-                    }
-                    if !later.isEmpty {
-                        Section {
-                            ForEach(later) { row($0) }
-                        } header: {
-                            if today.isEmpty {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Mine").font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
-                                    Text("Later")
-                                }
-                                .accessibilityElement(children: .combine)
-                                .accessibilityLabel("Mine, Later")
-                            } else {
-                                Text("Later")
-                            }
-                        }
-                    }
-                }
+                mine(today: sections[.today] ?? [], later: sections[.later] ?? [], asks: asks, tree: tree)
                 ForEach([TaskSection.agents, .waiting, .scheduled], id: \.self) { section in
                     if let tasks = sections[section], !tasks.isEmpty {
-                        Section(section.title) { ForEach(tasks) { row($0) } }
+                        Section(section.title) { ForEach(tasks) { row($0, tree: tree) } }
                     }
                 }
                 if let done = sections[.done], !done.isEmpty {
@@ -102,7 +77,7 @@ struct TasksView: View {
                         .accessibilityValue(showsDone ? "Shown" : "Hidden")
                     }
                 }
-                if model.list != nil && sections.values.allSatisfy(\.isEmpty) {
+                if model.list != nil && sections.values.allSatisfy(\.isEmpty) && asks.isEmpty {
                     Section {
                         if model.tasks.isEmpty {
                             ContentUnavailableView("No tasks yet", systemImage: "checkmark.circle",
@@ -141,7 +116,59 @@ struct TasksView: View {
     }
 
     private func reload() async {
-        await model.refresh()
+        await model.refresh(full: true)
+    }
+
+    @ViewBuilder
+    private func mine(today: [TaskItem], later: [TaskItem], asks: [AreaAsk], tree: TasksBoardShape) -> some View {
+        if !today.isEmpty || !asks.isEmpty {
+            let needs = today.filter(\.needsYou), rest = today.filter { !$0.needsYou }
+            Section {
+                ForEach(needs) { row($0, tree: tree) }
+                ForEach(asks) { ask in AreaAskRow(ask: ask, open: { openArea(ask) }) }
+                ForEach(rest) { row($0, tree: tree) }
+            } header: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Mine").font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                    Text("Today")
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Mine, Today")
+            }
+        }
+        if !later.isEmpty {
+            Section {
+                ForEach(later) { row($0, tree: tree) }
+            } header: {
+                if today.isEmpty && asks.isEmpty {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Mine").font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                        Text("Later")
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Mine, Later")
+                } else {
+                    Text("Later")
+                }
+            }
+        }
+    }
+
+    private func openArea(_ ask: AreaAsk) {
+        if let thread = ask.ownerThread {
+            if let openThread { openThread(thread) } else { app.openTaskThread(thread) }
+        } else {
+            openChat()
+        }
+    }
+
+    private func openChild(_ id: String) {
+        if let showDetail { return showDetail(id) }
+        withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { expanded = expanded == id ? nil : id }
+    }
+
+    private func openThreadOf(_ id: String) {
+        if let openThread { openThread(id) } else { app.openTaskThread(id) }
     }
 
     private var addField: some View {
@@ -175,14 +202,32 @@ struct TasksView: View {
     }
 
     @ViewBuilder
-    private func row(_ task: TaskItem) -> some View {
+    private func row(_ task: TaskItem, tree: TasksBoardShape = TasksBoardShape([])) -> some View {
         let open = expanded == task.id && showDetail == nil
+        let node = task.isMine ? nil : tree.node(task.id)
+        let below = node?.belowText
+        let folded = unfolded.contains(task.id)
         VStack(alignment: .leading, spacing: 10) {
             TaskRow(task: task, names: model.names, expanded: open || shownDetail == task.id) {
                 if let showDetail {
                     showDetail(task.id)
                 } else {
                     withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { expanded = open ? nil : task.id }
+                }
+            }
+            if let node, let below {
+                FlightFoldButton(node: node, text: below, open: folded) {
+                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) {
+                        if folded { unfolded.remove(task.id) } else { unfolded.insert(task.id) }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("tasks-fold-\(task.id)")
+                if folded {
+                    FlightChildren(node: node, names: model.names, depth: 0, openTask: openChild, openThread: openThreadOf)
+                    if let child = expanded, child != task.id, tree.top(of: child) == task.id, showDetail == nil {
+                        TaskCard(id: child, expanded: true).padding(.bottom, 4)
+                    }
                 }
             }
             if open {
@@ -330,5 +375,53 @@ struct TaskMenu: View {
                 app.flash("Couldn't update the task: \(BBClient.describe(error))")
             }
         }
+    }
+}
+
+struct TasksBoardShape {
+    private var nodes: [String: FlightNode] = [:]
+    private var nested: Set<String> = []
+    private var tops: [String: String] = [:]
+
+    init(_ roots: [FlightNode]) {
+        func walk(_ node: FlightNode, top: String?) {
+            nodes[node.task.id] = node
+            if let top { nested.insert(node.task.id); tops[node.task.id] = top }
+            for child in node.children { walk(child, top: top ?? node.task.id) }
+        }
+        for root in roots { walk(root, top: nil) }
+    }
+
+    func top(of id: String) -> String? { tops[id] }
+
+    func node(_ id: String) -> FlightNode? { nested.contains(id) ? nil : nodes[id] }
+    func top(_ task: TaskItem) -> Bool { !nested.contains(task.id) }
+}
+
+struct AreaAskRow: View {
+    let ask: AreaAsk
+    let open: () -> Void
+
+    var body: some View {
+        let age = AreaRules.age(ask)
+        Button(action: open) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Circle().fill(Color.orange).frame(width: 8, height: 8).frame(width: 14).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ask.title).lineLimit(2).foregroundStyle(.primary)
+                    Text([ask.area, age].filter { !$0.isEmpty }.joined(separator: " · ")).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 6)
+                TaskChip(text: "Needs you", tone: .warning)
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(AreaRules.label(ask))
+        .accessibilityHint(ask.ownerThread == nil ? "Opens the chat" : "Opens who looks after \(ask.area)")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("tasks-area-ask")
+        .accessibilityValue(ask.areaId)
     }
 }

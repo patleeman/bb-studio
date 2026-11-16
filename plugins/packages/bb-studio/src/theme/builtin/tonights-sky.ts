@@ -69,10 +69,11 @@ void main() {
   float sunSin = u_sun.y * u_view.w + u_sun.z * u_view.z;
   float deep = smoothstep(0.0, -0.07, sunSin);
 
-  vec2 mq = (p - u_moon.xy) / u_moon.z;
+  vec4 moon = u_lightSpot.w > 0.5 ? vec4(lightAt(u_moon.xy), u_moon.z * lightScale(), u_moon.w) : u_moon;
+  vec2 mq = (p - moon.xy) / moon.z;
   float md = length(mq);
   float moonLit = 0.5 * (1.0 + u_moonLit.z);
-  float moonlight = u_moon.w * (0.12 + 0.88 * moonLit) * (1.0 - 0.85 * u_moonLit.w) * dark;
+  float moonlight = moon.w * (0.12 + 0.88 * moonLit) * (1.0 - 0.85 * u_moonLit.w) * dark;
   float veil = 1.0 - 0.45 * behindText;
 
   float side = exp(-(az + 0.8) * (az + 0.8) / 0.5);
@@ -147,7 +148,7 @@ void main() {
   vec3 face = vec3(0.93, 0.92, 0.86) * (0.03 + 0.97 * shade);
   face = mix(face, vec3(0.6, 0.17, 0.08), u_moonLit.w) * maria * (0.6 + 0.4 * mz) * veil;
   face = mix(face, col + vec3(0.6, 0.62, 0.66) * shade * maria, lit);
-  col = mix(col, face, smoothstep(1.0 + px / u_moon.z, 1.0 - px / u_moon.z, md) * u_moon.w);
+  col = mix(col, face, smoothstep(1.0 + px / moon.z, 1.0 - px / moon.z, md) * moon.w);
 
   for (int i = 0; i < 6; i++) {
     float fi = float(i);

@@ -77,7 +77,7 @@ function swiftSource(namespace, methods, itemSchema, events) {
     }
     if (schema.enum?.every((value) => typeof value === "string") && schema.enum.length > 0) {
       const type = unique(name);
-      const cases = schema.enum.map((value, index) => ({ value, name: identifier(value) === "_" ? `value${index}` : identifier(value) }));
+      const cases = schema.enum.map((value, index) => ({ value, name: identifier(value) === "_" ? `value${index}` : identifier(value) === "unknown" ? "unknownValue" : identifier(value) }));
       if (new Set(cases.map((entry) => entry.name)).size !== cases.length) return "String";
       declarations.push(`  public enum ${type}: Sendable, Hashable, Codable {\n${cases.map(({ name }) => `    case ${name}`).join("\n")}\n    case unknown(String)\n\n    public init(from decoder: Decoder) throws {\n      let value = try decoder.singleValueContainer().decode(String.self)\n      switch value {\n${cases.map(({ value, name }) => `      case ${quoted(value)}: self = .${name}`).join("\n")}\n      default: self = .unknown(value)\n      }\n    }\n\n    public func encode(to encoder: Encoder) throws {\n      var container = encoder.singleValueContainer()\n      switch self {\n${cases.map(({ value, name }) => `      case .${name}: try container.encode(${quoted(value)})`).join("\n")}\n      case .unknown(let value): try container.encode(value)\n      }\n    }\n  }`);
       return type;

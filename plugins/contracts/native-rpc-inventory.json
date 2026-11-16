@@ -1078,6 +1078,24 @@
     {
       "file": "ios/iOS/Tasks/TasksModel.swift",
       "plugin": "studio",
+      "method": "tasks.flight",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Tasks/TasksModel.swift",
+      "plugin": "studio",
+      "method": "tasks.board",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Tasks/TasksModel.swift",
+      "plugin": "studio",
+      "method": "areas.list",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Tasks/TasksModel.swift",
+      "plugin": "studio",
       "method": "work.dismiss",
       "coverage": "generated method"
     },

@@ -110,13 +110,14 @@ void main() {
 
   float strip = max(u_resolution.x - u_clear.z, 0.0);
   float open = strip > 0.09 * u_resolution.x ? (u_clear.z + 0.5 * strip) / u_resolution.x : 0.736;
-  vec2 sunP = vec2(open * aspect, 0.6 + 0.35 * u_sunHeight);
-  float sd = length(p - sunP);
+  float ls = lightScale();
+  vec2 sunP = lightAt(vec2(open * aspect, 0.6 + 0.35 * u_sunHeight));
+  float sd = length(p - sunP) / ls;
   col += vec3(1.0, 0.75, 0.55) * 0.35 * exp(-sd * 3.0) * u_twilight * (1.0 - u_cloud * 0.5);
   col += vec3(0.95, 0.92, 0.84) * smoothstep(0.019, 0.016, sd) * u_daylight * (1.0 - u_twilight) * (1.0 - u_cloud * 0.9) * step(0.0, u_sunHeight);
   col += vec3(1.0, 0.95, 0.85) * 0.25 * exp(-sd * 6.0) * u_daylight * (1.0 - u_cloud * 0.8);
-  vec2 moonP = vec2(open * aspect, 0.8);
-  col += vec3(0.85, 0.88, 0.95) * smoothstep(0.024, 0.02, length(p - moonP)) * dark * (1.0 - u_twilight) * (1.0 - u_cloud * 0.85);
+  vec2 moonP = lightAt(vec2(open * aspect, 0.8));
+  col += vec3(0.85, 0.88, 0.95) * smoothstep(0.024, 0.02, length(p - moonP) / ls) * dark * (1.0 - u_twilight) * (1.0 - u_cloud * 0.85);
 
   vec2 cp = vec2(p.x * 2.2 + u_time * 0.03, p.y * 5.0);
   float cn = noise(cp) * 0.55 + noise(cp * 2.1 + vec2(3.0 + u_time * 0.02, 3.0)) * 0.3 + noise(cp * 4.3 + 9.0) * 0.15;
