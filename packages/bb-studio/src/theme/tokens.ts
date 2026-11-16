@@ -136,6 +136,8 @@ export const LIST_PAGE = `${INSET} header + main > div:has([data-resource-collec
 export const RULE_CLASSES = ["border-b", "border-t", "border-y", "border-l", "border-r", "border-x"] as const;
 export const RULES = `${INSET} .studio-root :is(${RULE_CLASSES.map((each) => `[class~="${each}"]`).join(", ")}, [class*="divide-y"] > *, [class*="divide-x"] > *)`;
 export const HEADER_ROW = `${INSET} header > [data-testid="app-page-header-content-row"]`;
+/** bb's own page header, not any <header> in the pane: a chat card's header is one too, and must keep its padding and rule. */
+export const PAGE_HEADER = `${INSET} header:has(> [data-testid="app-page-header-content-row"])`;
 export const TITLE_BOX = `${HEADER_ROW} > div:has(> [data-fork-title-home]):not([data-studio-bar-label])`;
 export const PAGE_BAR_BOX = `${HEADER_ROW} [data-studio-page-bar="column"]`;
 const TITLE_BOXES = `:is(${TITLE_BOX}, ${PAGE_BAR_BOX})`;
@@ -180,7 +182,8 @@ ${SCROLLER_SELECTORS.map((each) => `${each}:hover`).join(", ")} { scrollbar-colo
 
 export const HEADER_CSS = `
 ${GLASS} { --studio-title-row-glass: color-mix(in oklab, var(--canvas) 40%, transparent); }
-${INSET} header { border-color: transparent; background: transparent; padding-inline: 0; --studio-title-width: var(--fork-cards-column, 808px); --studio-title-inset: var(--fork-cards-page-lead, 40px); }
+${PAGE_HEADER} { border-color: transparent; background: transparent; padding-inline: 0; }
+${INSET} header { --studio-title-width: var(--fork-cards-column, 808px); --studio-title-inset: var(--fork-cards-page-lead, 40px); }
 ${INSET} header:has(+ [data-thread-window]) { --studio-title-width: 760px; --studio-title-inset: 24px; }
 ${INSET} header:has(~ * [data-resource-collection-viewport]) { --studio-title-width: 64rem; --studio-title-inset: 1.25rem; }
 ${INSET} header:has(~ [data-pane-content]) { --studio-title-width: 100%; --studio-title-inset: 20px; }
