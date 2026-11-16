@@ -79,7 +79,7 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     const all = store.tasks.all();
     const bound = boundTask(all, worker);
     if (bound) return WORK_ID.test(bound.id) ? bound : null;
-    const madeUp = all.filter((t) => t.source?.kind === SPAWN_SOURCE && t.source.ref === worker && isPlaceholder(t) && t.state !== "dropped" && WORK_ID.test(t.id))
+    const madeUp = all.filter((t) => t.source?.kind === SPAWN_SOURCE && t.source.ref === worker && isPlaceholder(t) && t.state !== "dropped" && !closedByUser(t) && WORK_ID.test(t.id))
       .sort((a, b) => b.updatedAt - a.updatedAt)[0];
     return madeUp ?? null;
   };

@@ -630,3 +630,13 @@ it("work_card_create for an idle worker whose made-up task closed reopens and dr
 async function tool2(tools: Record<string, Tool>, name: string, input: unknown) {
   return JSON.parse(await tools[name]!.execute(input, { threadId: "thr_lead" }));
 }
+
+it("work_card_create never reopens a made-up task the user closed", async () => {
+  const { tools, links, store, handlers } = setup();
+  const made = links.ensure(fact("thr_w1", { parentThreadId: "thr_lead", status: "active" }))!;
+  await handlers["tasks.act"]!({ id: made.id, action: "done" });
+  expect(store.get(made.id)).toMatchObject({ state: "done", closedBy: "patrick" });
+  const out = JSON.parse(await tools.work_card_create!.execute({ title: "Second round", kind: "worker", workerThreadId: "thr_w1" }, { threadId: "thr_main" }));
+  expect(out.id).not.toBe(made.id);
+  expect(store.get(made.id)).toMatchObject({ state: "done", closedBy: "patrick", card: null });
+});
