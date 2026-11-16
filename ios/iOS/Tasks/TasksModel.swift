@@ -180,7 +180,7 @@ extension BBClient {
     }
 
     func areaList() async throws -> [AreaSummary] {
-        let list: AreaList = try await rpc("studio", "areas.list", .object([:]))
+        let list: AreaList = try await rpc("studio", Studio.Method.areas_list, .object([:]))
         return list.areas
     }
 
