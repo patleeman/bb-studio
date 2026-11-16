@@ -139,7 +139,27 @@ const CALM = /\b(all ok|ok|nothing new|all clear|quiet)\b/i;
 
 export type NotesRead = { now: string | null; open: OpenItem[]; status: AreaOutcome | null; problems: string[] };
 
-export const BASE_USER_WORDS = ["you", "your", "me", "user"] as const;
+export const BASE_USER_WORDS = ["you", "your", "user"] as const;
+const PRONOUNS = new Set<string>(BASE_USER_WORDS);
+const CUE = new RegExp(`(?:^|[^\\p{L}\\p{N}_])(?:for|with|to|on|ask|asks|asked|tell|tells|told|remind|reminds|reminded|need|needs|waiting\\s+on|wait\\s+for)\\s+$`, "u");
+const CLAUSE_START = /(?:^|[.;:!?(\u2013\u2014]\s*|\s[-\u2013\u2014]\s+)$/u;
+const ADDRESSED_AFTER = /^(?:['\u2019]s(?![\p{L}\p{N}_])|\s+\p{Ll})/u;
+const escape = (word: string) => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export function addressesUser(text: string, words: readonly string[]): boolean {
+  const clean = words.map((w) => w.trim()).filter(Boolean);
+  const pronouns = clean.filter((w) => PRONOUNS.has(w.toLowerCase()));
+  const whole = (list: string[], flags: string) => new RegExp(`(?<![\\p{L}\\p{N}_])(?:${list.map(escape).join("|")})(?![\\p{L}\\p{N}_])`, flags);
+  if (pronouns.length && whole(pronouns, "iu").test(text)) return true;
+  const names = clean.filter((w) => !PRONOUNS.has(w.toLowerCase())).map((w) => w[0]!.toLocaleUpperCase() + w.slice(1));
+  if (!names.length) return false;
+  for (const hit of text.matchAll(whole(names, "gu"))) {
+    const before = text.slice(0, hit.index);
+    const after = text.slice(hit.index + hit[0].length);
+    if (CUE.test(before.toLowerCase()) || (CLAUSE_START.test(before) && ADDRESSED_AFTER.test(after))) return true;
+  }
+  return false;
+}
 
 export function nameWords(login: string | null | undefined, fullName: string | null | undefined): string[] {
   const out = new Set<string>(BASE_USER_WORDS);
@@ -159,8 +179,6 @@ export function readStatusNotes(text: string, now: number, userWords: readonly s
   const open: OpenItem[] = [];
   if (start < 0) problems.push("no Open items section");
   else {
-    const words = userWords.map((w) => w.trim()).filter(Boolean).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-    const needs = words.length ? new RegExp(`\\b(${words.join("|")})\\b`, "i") : null;
     for (const raw of lines.slice(start + 1)) {
       const line = raw.trim();
       if (line.startsWith("## ")) break;
@@ -170,8 +188,7 @@ export function readStatusNotes(text: string, now: number, userWords: readonly s
       if (!title) continue;
       if (cells.length < 2) problems.push(`open item without columns: ${clip(title, 60)}`);
       const since = cells[1] && cells[1] !== "-" ? cells[1].slice(0, 40) : null;
-      const rest = cells.slice(2).join(" ");
-      open.push({ title: clip(title, 200), since, sinceAt: sinceAt(since, now), needsUser: !!needs?.test(rest), taskId: null });
+      open.push({ title: clip(title, 200), since, sinceAt: sinceAt(since, now), needsUser: cells.slice(2).some((cell) => addressesUser(cell, userWords)), taskId: null });
       if (open.length >= MAX_OPEN_ITEMS) break;
     }
   }
