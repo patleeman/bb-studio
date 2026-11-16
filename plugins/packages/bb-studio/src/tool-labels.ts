@@ -85,6 +85,7 @@ export const TOOL_LABELS: Readonly<Record<string, Labels>> = {
   task_get: ["Reading a task", "Read a task"],
   task_list: ["Listing tasks", "Listed tasks"],
   task_handoff: ["Handing off a task", "Handed off a task"],
+  task_check: ["Checking tasks", "Checked tasks"],
   memory_search: ["Searching memory", "Searched memory"],
   memory_add: ["Saving to memory", "Saved to memory"],
   memory_update: ["Updating memory", "Updated memory"],

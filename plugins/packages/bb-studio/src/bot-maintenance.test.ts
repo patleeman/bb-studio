@@ -302,3 +302,14 @@ it("keeps a lead a project heartbeat wakes out of the idle-thread cleanup", asyn
   await x.maintenance.run("bot", { now });
   expect(x.archive).not.toHaveBeenCalled();
 });
+it("reports the task check's orphans and duplicates as suggestions and changes nothing for them", async () => {
+  const x = await setup();
+  const deps = (x.maintenance as unknown as { deps: ConstructorParameters<typeof BotMaintenance>[0] }).deps;
+  const problems = vi.fn(async () => [{ text: "The worker \"Build\" is running with no task.", threadId: "thr_w" }, { text: "The open task \"A\" is under \"B\", which is done.", threadId: null }]);
+  const maintenance = new BotMaintenance({ ...deps, taskProblems: problems });
+  const result = await maintenance.run("bot", { now, dryRun: true });
+  expect(problems).toHaveBeenCalledOnce();
+  expect(result?.suggestions).toEqual(expect.arrayContaining([{ text: "Tasks: The worker \"Build\" is running with no task.", threadId: "thr_w" }, { text: "Tasks: The open task \"A\" is under \"B\", which is done." }]));
+  const failing = new BotMaintenance({ ...deps, taskProblems: async () => { throw new Error("no threads"); } });
+  expect((await failing.run("bot", { now: now + 1, dryRun: true }))?.suggestions).toEqual(expect.arrayContaining([{ text: "Tasks: the check could not run (no threads)" }]));
+});

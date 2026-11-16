@@ -220,7 +220,27 @@ job, keep it updated, and hand it over instead of posting status messages.
   to someone else or take it back (it goes to their Today at once, even with a
   time still ahead), you are told to stop too.
 - `::loop{id="…"}` and `::work{id="…"}` both draw the same task card; a
-  morning row is `::loop{id="…" row="N"}`.
+  morning row is `::loop{id="…" row="N"}`. A card is how a task is drawn:
+  `work_card_create` with `taskId` draws that task, and a worker card for a
+  worker that already has a task draws that task instead of a second one.
+- **Workers and their task.** Every worker thread belongs to exactly one
+  task. Before or right after you spawn a worker, make its task
+  (`task_create` with owner `"thread:<worker>"` or `workers: ["<worker>"]`,
+  and `parentId` your own task) and put `task:<id>` in the worker's first
+  message. Your job is the parent task and each worker's task is its
+  subtask; lists show the subtask once, nested under the parent, never as a
+  second row. As a worker, report only on your task: `step` and `line` as you
+  go, `outputs` and state `done` at the end. Your first `task_update` on a
+  task joins it when you have none yet; a worker with no task after 90
+  seconds gets one made from its thread title.
+- A task's conversation is set once, where it started: a task asked for in
+  Main stays Main's even when a lead's worker does it. When a task waits, say
+  on what with `waitingOn`: `user`, `ci` (ref the run or PR), `task` (ref
+  its id) or `outside` (text says who). Dropping a task takes it off every
+  list at once; a done one shows as done today until the day ends.
+  `task_check` reports orphans and duplicates (a running worker with no task,
+  a task or worker shown twice, a card with no task, an open subtask under a
+  closed parent) and changes nothing.
 - Each check-in, runner and watcher is a recurring task (Tasks → Scheduled &
   recurring, with its next run and last result). Each run of a check-in or
   runner is a child task: its prompt names it. Hand it to the user with

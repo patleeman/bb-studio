@@ -7,25 +7,37 @@ import { placeKey } from "../loops/store";
 import type { Loop } from "../loops/contract";
 import { directiveFor } from "../work/shared";
 import { closedByUser, KEPT_CLOSED, createInput, handoffInput, isClosed, listInput, needsYou, updateInput, USER_OWNER, type Task, type TaskCreateInput, type TaskHandoffInput, type TaskListInput, type TaskUpdateInput } from "./contract";
+import type { TaskProblem } from "./check";
+import { asFact, boundTask, isPlaceholder, rootOf, ThreadDirectory } from "./links";
+import { SpawnLinks } from "./spawn";
 import { guardTasks, surfaceForUser, TaskStore, toStoredOwner } from "./store";
 import { inLoopView, inWorkView } from "./views";
 
 const SCHEDULE_TASK = "This task is an automation's schedule; change it with automation_update, automation_pause or automation_resume (runner_* for a runner). Its runs and findings are its subtasks: update those instead.";
 
-export const TASK_TOOLS = ["task_create", "task_update", "task_get", "task_list", "task_handoff"];
+export const TASK_TOOLS = ["task_create", "task_update", "task_get", "task_list", "task_handoff", "task_check"];
+
+export const SPAWN_RULE = "Every worker thread belongs to exactly one task. Before or right after you spawn a worker, make its task (task_create with owner \"thread:<worker>\" or workers [<worker>], and parentId your own task so it nests under your job) and give the worker that task's id in its first message, written task:<id>. A worker reports only on that task: step and line as it goes, outputs and state done at the end. A worker's first task_update on a task joins it when it has none yet; a worker with no task after 90 seconds gets one made from its thread title.";
+export const CONVERSATION_SET = "The conversation is set once, where the task started; it was kept. A subtask shows under its parent's conversation.";
+export const WAITING_NOTE = "Say what it waits on with waitingOn: {kind: \"user\"}, {kind: \"ci\", ref: <run or PR>}, {kind: \"task\", ref: <task id>} or {kind: \"outside\", text: <who>}.";
 
 type Ctx = { threadId?: string | null };
 type Post = (text: string) => Promise<void>;
 type Send = (threadId: string, text: string) => Promise<void>;
 
-const CREATE = "Track one piece of work as a task: one task per job. Set its owner (\"user\", \"cos\" for the Bot, \"me\" for your own thread, or \"thread:<id>\"). With card true it returns a ::work{id=\"…\"} line to post once, on its own line, in the conversation; the card redraws in place. Report progress with task_update instead of posting status messages, and hand it to the user with task_handoff when you need them.";
-const UPDATE = "Change a task in place: state (todo, in_progress, waiting, done, dropped, failed), step (e.g. \"3/5 Tests\"), line (the latest one-liner), needs, timing, workers, outputs and the rest. Progress and state changes go into its history. Use task_handoff to change its owner.";
+const CREATE = `Track one piece of work as a task: one task per job. Set its owner ("user", "cos" for the Bot, "me" for your own thread, or "thread:<id>"). With card true it returns a ::work{id="…"} line to post once, on its own line, in the conversation; the card redraws in place. Report progress with task_update instead of posting status messages, and hand it to the user with task_handoff when you need them. ${SPAWN_RULE}`;
+const UPDATE = "Change a task in place: state (todo, in_progress, waiting, done, dropped, failed), step (e.g. \"3/5 Tests\"), line (the latest one-liner), needs, timing, workers, outputs and the rest. Progress and state changes go into its history. Use task_handoff to change its owner. When it waits, say on what with waitingOn (user, ci, task or outside). The conversation is set once, where the task started. A worker's first task_update on a task joins that task when the worker has none yet.";
+const CHECK = "Check tasks for orphans and duplicates and report them, changing nothing: a running worker thread with no task, a task or worker shown twice, a work card with no task, and an open subtask under a closed parent.";
 const GET = "Read one task by id (task_…, loop_… or wc_…): its record, history and subtasks.";
 const LIST = "List tasks, open ones by default, newest change first. Filter by owner (\"user\", \"cos\", \"me\", \"thread:<id>\"), state (a state, open or closed), conversation, area, project or parent.";
 const HANDOFF = "Hand a task to another owner and keep its history: to the user when you need a decision or an action from them (say what in needs, give options for a decision), or to the Bot or a thread to carry it on. The task's card updates; a task without a card handed to the user comes up in the Bot chat.";
 
-export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post, send: Send = async (threadId, text) => { await bb.sdk.threads.send({ threadId, mode: "auto", input: [{ type: "text", text, mentions: [], visibility: "agent-only" }] } as never); }, moved: (task: Task) => void = () => {}) {
+export type TaskToolOptions = { links?: SpawnLinks; check?: () => Promise<TaskProblem[]> };
+
+export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post, send: Send = async (threadId, text) => { await bb.sdk.threads.send({ threadId, mode: "auto", input: [{ type: "text", text, mentions: [], visibility: "agent-only" }] } as never); }, moved: (task: Task) => void = () => {}, options: TaskToolOptions = {}) {
   const store = new TaskStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); });
+  const links = options.links ?? new SpawnLinks({ store, dir: new ThreadDirectory(db), thread: async (threadId) => asFact(await bb.sdk.threads.get({ threadId } as never).catch(() => null)) });
+  const notes = (...parts: (string | null | undefined)[]) => parts.filter((p): p is string => !!p).join(" ") || null;
   const caller = (ctx: Ctx) => (ctx.threadId ? `thread:${ctx.threadId}` : null);
 
   const checkParent = (id: string | null | undefined, self?: string) => {
@@ -47,7 +59,11 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
   const create = async (input: TaskCreateInput, ctx: Ctx = {}) => {
     const x = createInput.parse(input);
     const owner = toStoredOwner(x.owner, ctx.threadId);
-    const conversation = x.conversation ?? (x.card ? ctx.threadId ?? null : null);
+    const parent = x.parentId ? store.get(x.parentId) : null;
+    const inherited = parent ? rootOf(new Map(store.all().map((t) => [t.id, t])), parent).conversation : null;
+    const conversation = x.conversation ?? (x.card ? ctx.threadId ?? null : inherited);
+    const unbound = (threadId: string) => { const bound = boundTask(store.all(), threadId); return !bound || isPlaceholder(bound); };
+    const selfWorker = !!ctx.threadId && owner === `thread:${ctx.threadId}` && !x.workers && unbound(ctx.threadId) && await links.isWorker(ctx.threadId);
     if (x.card && !conversation) throw new Error("Pass conversation: the thread the card goes in.");
     checkParent(x.parentId);
     const trigger = checkTrigger(x.trigger);
@@ -57,16 +73,19 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
       id: store.newId("task"), title: x.title, why: x.why ?? "", owner, state: x.state ?? (toUser || (trigger && trigger.type !== "none") ? "todo" : "in_progress"), kind: x.kind ?? (x.options?.length ? "decide" : "do"),
       options: x.options ?? [], needs: x.needs ?? null, priority: x.priority ?? "normal", conversation, project: x.project ?? null, area: x.area ?? null,
       timing: { due: x.due ?? null, trigger: trigger ?? { type: "none" }, snoozed: false }, attention: { queue: toUser && x.card ? "surfaced" : null, push: x.push ?? false },
-      progress: { step: x.step ?? null, line: x.line ?? null }, workers: x.workers ?? [], outputs: x.outputs ?? [], source: x.source ?? null,
+      progress: { step: x.step ?? null, line: x.line ?? null }, workers: x.workers ?? (selfWorker ? [ctx.threadId!] : []), outputs: x.outputs ?? [], source: x.source ?? null,
       parentId: x.parentId ?? null, schedule: x.schedule ?? null, card: x.card ? { kind: "task", messageId: null, messageSeq: null, dismissedAt: null } : null,
-      automation: null, stale: false, origin: "task", createdAt: now, updatedAt: now, closedAt: null, closedBy: null,
+      automation: null, waitingOn: x.waitingOn ?? null, stale: false, origin: "task", createdAt: now, updatedAt: now, closedAt: null, closedBy: null,
     };
     surfaceForUser(task);
-    const saved = store.save(task);
-    store.event(saved.id, "created", { by: caller(ctx) ?? "cos", owner: saved.owner });
+    const created = store.save(task);
+    store.event(created.id, "created", { by: caller(ctx) ?? "cos", owner: created.owner });
+    const linked = created.workers.length ? await links.joined(created.id, created.workers) : null;
+    const saved = store.get(created.id);
     if (needsYou(saved)) moved(saved);
     const posted = needsYou(saved) && !inWorkView(saved) ? await tellUser(saved, ctx) : saved.card ? await postCard(saved, ctx) : null;
-    return { task: saved, ...(saved.card ? { directive: directiveFor(saved.id) } : {}), ...(posted ? { note: posted } : {}) };
+    const note = notes(posted, linked, saved.state === "waiting" && !saved.waitingOn ? WAITING_NOTE : null);
+    return { task: saved, ...(saved.card ? { directive: directiveFor(saved.id) } : {}), ...(note ? { note } : {}) };
   };
 
   const postCard = async (task: Task, ctx: Ctx) => {
@@ -81,14 +100,16 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
   };
 
   const before = (id: string) => store.get(id);
-  const update = (input: TaskUpdateInput, ctx: Ctx = {}) => {
+  const update = async (input: TaskUpdateInput, ctx: Ctx = {}) => {
     const x = updateInput.parse(input);
     if (x.parentId !== undefined) checkParent(x.parentId, x.id);
     const trigger = checkTrigger(x.trigger);
     const current = store.get(x.id);
     if (current.automation?.role === "schedule") throw new Error(SCHEDULE_TASK);
     const kept = closedByUser(current) && !x.reopen;
-    const task = store.change(x.id, (t) => {
+    const joined = kept ? false : await links.touched(x.id, ctx.threadId);
+    const keepConversation = x.conversation !== undefined && current.conversation !== null && x.conversation !== current.conversation;
+    const changed = store.change(x.id, (t) => {
       if (t.stale && !kept) { t.stale = false; if (x.state === undefined) t.state = "in_progress"; }
       if (x.title !== undefined) t.title = x.title;
       if (x.why !== undefined) t.why = x.why;
@@ -97,7 +118,7 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
       if (x.options !== undefined) t.options = x.options;
       if (x.needs !== undefined && !kept) t.needs = x.needs || null;
       if (x.priority !== undefined) t.priority = x.priority;
-      if (x.conversation !== undefined) t.conversation = x.conversation;
+      if (x.conversation !== undefined && !keepConversation) t.conversation = x.conversation;
       if (x.project !== undefined) t.project = x.project;
       if (x.area !== undefined) t.area = x.area;
       if (x.due !== undefined) t.timing.due = x.due;
@@ -110,12 +131,19 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
       if (x.source !== undefined) t.source = x.source;
       if (x.parentId !== undefined) t.parentId = x.parentId;
       if (x.schedule !== undefined) t.schedule = x.schedule;
+      if (x.waitingOn !== undefined) t.waitingOn = x.waitingOn;
       if (x.state !== undefined && !isClosed(t)) t.stale = false;
       if (kept && !isClosed(t)) t.state = before(x.id).state;
     }, caller(ctx));
-    if (!kept) return task;
-    if (x.step !== undefined || x.line !== undefined) store.event(x.id, "progress", { step: x.step ?? null, line: x.line ?? null, by: caller(ctx), kept: true });
-    return { ...task, note: KEPT_CLOSED };
+    const added = x.workers ? changed.workers.filter((w) => !current.workers.includes(w)) : [];
+    const linked = added.length ? await links.joined(x.id, added) : null;
+    const task = added.length ? store.get(x.id) : changed;
+    if (kept) {
+      if (x.step !== undefined || x.line !== undefined) store.event(x.id, "progress", { step: x.step ?? null, line: x.line ?? null, by: caller(ctx), kept: true });
+      return { ...task, note: KEPT_CLOSED };
+    }
+    const note = notes(keepConversation ? CONVERSATION_SET : null, linked, joined ? `This thread joined task ${task.id}; report on it from now on.` : null, x.state === "waiting" && !task.waitingOn ? WAITING_NOTE : null);
+    return note ? { ...task, note } : task;
   };
 
   const get = (id: string) => {
@@ -174,6 +202,12 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
   tool("task_get", GET, z.object({ id: z.string().min(1) }), ({ id }) => get(id));
   tool("task_list", LIST, listInput, (x, ctx) => list(x, ctx));
   tool("task_handoff", HANDOFF, handoffInput, (x, ctx) => handoff(x, ctx));
+  const check = async () => {
+    if (!options.check) throw new Error("The task check isn't available here.");
+    const problems = await options.check();
+    return { problems, summary: problems.length ? `${problems.length} problem${problems.length === 1 ? "" : "s"} found; nothing was changed.` : "No orphans or duplicates." };
+  };
+  tool("task_check", CHECK, z.object({}), () => check());
 
-  return { store, create, update, get, list, handoff };
+  return { store, create, update, get, list, handoff, links, check };
 }

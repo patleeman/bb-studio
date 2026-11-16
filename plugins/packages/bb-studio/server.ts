@@ -3,6 +3,8 @@ import { phoneActs, registerUserTasks } from "./src/tasks/user";
 import { handoffPush, loopPushInput } from "./src/tasks/handoff-push";
 import { registerTasks, TASK_TOOLS } from "./src/tasks/register";
 import { adoptAtStart } from "./src/tasks/migrate";
+import { asFact, linkAtStart, listThreadFacts, ThreadDirectory } from "./src/tasks/links";
+import { SpawnLinks } from "./src/tasks/spawn";
 import { AutomationTasks, readSources } from "./src/tasks/automations";
 import { toLoop } from "./src/tasks/views";
 import type { Loop } from "./src/loops/contract";
@@ -703,8 +705,15 @@ export default async function plugin(bb: BbPluginApi) {
   loopsEnabled = loops.enabled;
   const movedToUser = handoffPush({ db, enabled: () => loops.scheduler.settings().enabled, quiet: () => loops.scheduler.quiet(), push: pushLoop, log: (message) => bb.log.warn(message) });
   const work = registerWorkCards(bb, db, { moved: movedToUser });
-  registerTasks(bb, db, postToBot, undefined, movedToUser);
+  const taskThreads = new ThreadDirectory(db);
+  const linkStore = new TaskStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); });
+  const spawnLinks = new SpawnLinks({ store: linkStore, dir: taskThreads, thread: async (threadId) => asFact(await bb.sdk.threads.get({ threadId }).catch(() => null)), log: (message) => bb.log.warn(message) });
+  const threadFacts = () => listThreadFacts(bb.sdk as never);
+  registerTasks(bb, db, postToBot, undefined, movedToUser, { links: spawnLinks, check: async () => (await userTasks.check()).problems });
   const userTasks = registerUserTasks(bb, db, {
+    zone: () => loopTimeZone(process.env, studioSettings.current().todosTimeZone),
+    dir: taskThreads,
+    facts: threadFacts,
     post: postToBot,
     send: async (threadId, text) => { await bb.sdk.threads.send({threadId,mode:'auto',input:[{type:'text',text,mentions:[],visibility:'agent-only'}]} as never); },
     thread: async (threadId) => (await bb.sdk.threads.get({ threadId })) as never,
@@ -808,6 +817,12 @@ export default async function plugin(bb: BbPluginApi) {
     if (moved.created || moved.updated || moved.closed) bb.log.info(`Automation tasks: ${moved.created} made, ${moved.updated} updated, ${moved.closed} closed; backup at ${moved.backup ?? "none"}.`);
     if (moved.backupError) bb.log.warn(`Automation tasks: the backup before mapping failed (${moved.backupError}); mapped anyway.`);
   });
+  void threadFacts().then((facts) => { taskStep("links", () => linkAtStart(linkStore, facts, taskThreads, bb.log)); }, (error) => bb.log.warn(`Task links: threads could not be listed: ${errorText(error)}`));
+  bb.events.on("thread.created", ({ thread }) => { if (!tasksUnavailable(db)) spawnLinks.spawned(asFact(thread)); });
+  bb.events.on("thread.idle", ({ thread }) => { taskStep("links", () => { spawnLinks.ensure(asFact(thread)); spawnLinks.settled(thread.id); }); });
+  bb.events.on("thread.failed", ({ thread }) => { taskStep("links", () => { spawnLinks.ensure(asFact(thread)); spawnLinks.settled(thread.id); }); });
+  bb.events.on("thread.archived", ({ thread }) => { taskStep("links", () => spawnLinks.settled(thread.id)); });
+  bb.events.on("thread.active", ({ thread }) => { taskStep("links", () => { spawnLinks.resumed(thread.id); spawnLinks.ensure(asFact(thread)); }); });
   triggers.every("automation-tasks", 60_000, () => syncAutomationTasks());
   triggers.every("automation-tasks-prune", 60 * 60_000, () => { taskStep("prune", () => automationTasks.prune()); });
   const restoreMainFailed = (error: unknown) => bb.log.warn(`Couldn't start a new Main: ${errorText(error)}`);
@@ -1036,6 +1051,7 @@ export default async function plugin(bb: BbPluginApi) {
     automationDelete: (id, botId) => automations.delete(id, botId),
     adoptable: (id) => runners.adoptable(id),
     alert: async (id, line) => { const bot = bots.stored(id); if (bot?.threadId) await alertBot(bb.sdk, { botThreadId: bot.threadId, line, note: "Maintenance alert, already shown to the user. Do not repeat or acknowledge it. Reply exactly [PASS]. Details are in Bot info → Maintenance." }); },
+    taskProblems: async () => (tasksUnavailable(db) ? [] : (await userTasks.check()).problems),
   });
   bb.events.on("thread.idle", ({ thread }) => {
     const bot = bots.list().find((b) => b.threadId === thread.id);

@@ -84,7 +84,15 @@ export function normalizeTask(input: Task, now: number): Task {
     if (t.timing.snoozed && t.attention.queue === null) t.attention.queue = "queued";
   }
   t.workers = [...new Set(t.workers)];
+  t.waitingOn = waitingFor(t);
   return t;
+}
+
+export function waitingFor(t: Pick<Task, "state" | "owner" | "kind" | "waitingOn">): Task["waitingOn"] {
+  if (t.state !== "waiting") return null;
+  if (t.kind === "waiting-outside") return t.waitingOn?.kind === "outside" ? t.waitingOn : { kind: "outside", ref: null, text: t.waitingOn?.text ?? null };
+  if (t.owner === USER_OWNER) return t.waitingOn?.kind === "user" ? t.waitingOn : { kind: "user", ref: null, text: null };
+  return t.waitingOn;
 }
 
 export class TaskStore {

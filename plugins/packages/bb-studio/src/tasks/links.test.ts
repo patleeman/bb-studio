@@ -1,0 +1,462 @@
+import Database from "better-sqlite3";
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { MIGRATIONS } from "../migrations";
+import { registerLoops } from "../loops/register";
+import { registerWorkCards } from "../work/register";
+import { checkTasks } from "./check";
+import type { Task } from "./contract";
+import { applyLinks, linkAtStart, planLinks, SPAWN_GRACE_MS, ThreadDirectory, type ThreadFact } from "./links";
+import { registerTasks, TASK_TOOLS } from "./register";
+import { boardRows, dayStart } from "./rows";
+import { tasksContract } from "./rpc-contract";
+import { SpawnLinks } from "./spawn";
+import { TaskStore } from "./store";
+import { registerUserTasks } from "./user";
+
+const NOW = new Date("2026-11-13T15:00:00Z").getTime();
+let db: Database.Database;
+let dir: string | null = null;
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+  db = new Database(":memory:");
+  for (const sql of MIGRATIONS) db.exec(sql);
+});
+afterEach(() => {
+  if (db.open) db.close();
+  if (dir) rmSync(dir, { recursive: true, force: true });
+  dir = null;
+  vi.useRealTimers();
+});
+
+const fact = (id: string, patch: Partial<ThreadFact> = {}): ThreadFact => ({ id, parentThreadId: null, title: id, status: "idle", archivedAt: null, deletedAt: null, createdAt: NOW - 3_600_000, updatedAt: NOW - 600_000, ...patch });
+
+function seedThreads(target: Database.Database, threads: ThreadFact[]) {
+  target.prepare("INSERT OR IGNORE INTO bots (id, name, avatar, state, thread_id, created_at, updated_at) VALUES ('bot_main', 'Chief', 'x', 'active', 'thr_main', 0, 0)").run();
+  const insert = target.prepare("INSERT OR REPLACE INTO bot_threads (thread_id, bot_id, kind, is_main, owner_conversation_id, title, source, created_at, updated_at) VALUES (?, 'bot_main', ?, ?, ?, ?, 'created', 0, 0)");
+  const byId = new Map(threads.map((t) => [t.id, t]));
+  const ownerOf = (t: ThreadFact): string | null => {
+    let at = t.parentThreadId ? byId.get(t.parentThreadId) : undefined;
+    while (at?.parentThreadId) at = byId.get(at.parentThreadId);
+    return at?.id ?? null;
+  };
+  for (const t of threads) insert.run(t.id, t.parentThreadId ? "worker" : "conversation", t.id === "thr_main" ? 1 : 0, t.parentThreadId ? ownerOf(t) : null, t.title);
+}
+
+const THREADS = [
+  fact("thr_main", { title: "Main" }),
+  fact("thr_lead", { title: "Larkspur lead" }),
+  fact("thr_w1", { parentThreadId: "thr_lead", title: "Build the phone app", status: "active" }),
+  fact("thr_w2", { parentThreadId: "thr_lead", title: "Review the build" }),
+  fact("thr_w3", { parentThreadId: "thr_lead", title: "Fix the keyboard", status: "active" }),
+];
+
+type Tool = { name: string; execute(input: unknown, ctx: unknown): Promise<string> };
+
+function setup(threads: ThreadFact[] = THREADS) {
+  seedThreads(db, threads);
+  const facts = new Map(threads.map((t) => [t.id, t]));
+  const tools: Record<string, Tool> = {};
+  const handlers: Record<string, (input: any) => any> = {};
+  const bb = {
+    realtime: { publish: vi.fn() }, log: { warn: vi.fn(), info: vi.fn() }, onDispose: vi.fn(),
+    agents: { registerTool: (tool: Tool) => { tools[tool.name] = tool; } },
+    ui: { registerMentionProvider: vi.fn() },
+    rpc: { register: (_contract: unknown, map: typeof handlers) => Object.assign(handlers, map) },
+    sdk: { threads: { get: async ({ threadId }: { threadId: string }) => facts.get(threadId) ?? null, update: vi.fn(async () => ({})), timeline: vi.fn(async () => ({ rows: [] })) } },
+  };
+  const posts: string[] = [];
+  const post = async (text: string) => { posts.push(text); };
+  const loops = registerLoops(bb as never, db, post, async () => {}, { get: async () => ({ loopsEnabled: false }), onChange: () => {} }, () => "UTC", () => {});
+  const work = registerWorkCards(bb as never, db, { read: async () => ({ rows: [] }), thread: async () => ({ status: "active" }) });
+  const later: (() => void)[] = [];
+  const store = new TaskStore(db);
+  const links = new SpawnLinks({ store, dir: new ThreadDirectory(db), thread: async (id) => facts.get(id) ?? null, later: (_ms, fn) => { later.push(fn); } });
+  let user: ReturnType<typeof registerUserTasks> | null = null;
+  const agent = registerTasks(bb as never, db, post, async () => {}, () => {}, { links, check: async () => (await user!.check()).problems });
+  user = registerUserTasks(bb as never, db, {
+    post, send: async () => {}, thread: async (id) => (facts.get(id) ?? null) as never,
+    loopAct: (x) => loops.actDirect(x), reopenLoop: () => null, snoozeLoopUntil: () => null, held: () => [],
+    zone: () => "UTC", facts: async () => [...facts.values()],
+  });
+  const tool = async (name: string, input: unknown, threadId = "thr_lead") => {
+    const out = await tools[name]!.execute(input, { threadId });
+    if (out.startsWith("Error")) throw new Error(out);
+    return JSON.parse(out);
+  };
+  const ctx = () => ({ since: dayStart(Date.now(), "UTC"), dir: new ThreadDirectory(db) });
+  return { tools, handlers, tool, store, links, later, agent, user: user!, work, facts, ctx, posts };
+}
+
+const ids = (rows: { id: string; under: string | null }[]) => rows.map((r) => (r.under ? `  ${r.id}` : r.id));
+
+it("adds task_check to the task tools and documents the spawn rule in task_create", () => {
+  const { tools } = setup();
+  expect(TASK_TOOLS).toContain("task_check");
+  expect(tools.task_create!.name).toBe("task_create");
+  expect((tools.task_create as unknown as { description: string }).description).toMatch(/Every worker thread belongs to exactly one task.*task:<id>/);
+});
+
+it("says what a waiting task waits on: the user, the outside, or what the agent names", async () => {
+  const { tool } = setup();
+  const handed = (await tool("task_create", { title: "Approve the plan", owner: "me" })).task;
+  const toUser = (await tool("task_handoff", { id: handed.id, to: "user", needs: "Approve" })).task;
+  expect(toUser.waitingOn).toEqual({ kind: "user", ref: null, text: null });
+  const outside = (await tool("task_create", { title: "Wait for the vendor", owner: "user", kind: "waiting-outside", state: "waiting" })).task;
+  expect(outside.waitingOn).toMatchObject({ kind: "outside" });
+  const vague = await tool("task_create", { title: "Wait for CI", owner: "me", state: "waiting" });
+  expect(vague.task.waitingOn).toBeNull();
+  expect(vague.note).toMatch(/waitingOn/);
+  const ci = await tool("task_update", { id: vague.task.id, waitingOn: { kind: "ci", ref: "run 4411" } });
+  expect(ci.waitingOn).toEqual({ kind: "ci", ref: "run 4411", text: null });
+  expect(ci.note).toBeUndefined();
+  const moving = await tool("task_update", { id: vague.task.id, state: "in_progress" });
+  expect(moving.waitingOn).toBeNull();
+});
+
+it("sets the conversation once, where the task started, and a subtask takes its parent's", async () => {
+  const { tool } = setup();
+  const job = (await tool("task_create", { title: "Ship the phone build", owner: "me", conversation: "thr_main" })).task;
+  const moved = await tool("task_update", { id: job.id, conversation: "thr_lead" });
+  expect(moved.conversation).toBe("thr_main");
+  expect(moved.note).toMatch(/set once/);
+  const sub = (await tool("task_create", { title: "Build it", owner: "thread:thr_w1", parentId: job.id })).task;
+  expect(sub.conversation).toBe("thr_main");
+  const loose = (await tool("task_create", { title: "Loose", owner: "me" })).task;
+  expect((await tool("task_update", { id: loose.id, conversation: "thr_main" })).conversation).toBe("thr_main");
+});
+
+it("binds a spawned worker to the task its lead makes for it, and the worker's progress lands there", async () => {
+  const { tool, store } = setup();
+  const job = (await tool("task_create", { title: "Ship the phone build", owner: "me", conversation: "thr_main" })).task;
+  const sub = (await tool("task_create", { title: "Build the app", owner: "thread:thr_w1", workers: ["thr_w1"], parentId: job.id })).task;
+  const update = await tool("task_update", { id: sub.id, step: "2/4 Building", line: "Compiling" }, "thr_w1");
+  expect(update.progress).toEqual({ step: "2/4 Building", line: "Compiling" });
+  expect(store.get(sub.id).workers).toEqual(["thr_w1"]);
+  expect(store.get(job.id).workers).toEqual([]);
+});
+
+it("joins a worker to the task it first updates when it has none yet, and only then", async () => {
+  const { tool, store } = setup();
+  const job = (await tool("task_create", { title: "Review the build", owner: "me", conversation: "thr_main" })).task;
+  const first = await tool("task_update", { id: job.id, step: "1/2 Reading" }, "thr_w2");
+  expect(first.note).toMatch(/joined task/);
+  expect(store.get(job.id).workers).toEqual(["thr_w2"]);
+  const other = (await tool("task_create", { title: "Something else", owner: "me" })).task;
+  await tool("task_update", { id: other.id, line: "Peeked" }, "thr_w2");
+  expect(store.get(other.id).workers).toEqual([]);
+  const fromConversation = (await tool("task_create", { title: "Main's", owner: "cos" })).task;
+  await tool("task_update", { id: fromConversation.id, line: "hi" }, "thr_main");
+  expect(store.get(fromConversation.id).workers).toEqual([]);
+});
+
+it("a worker's own task_create binds it when it has no task", async () => {
+  const { tool } = setup();
+  const own = (await tool("task_create", { title: "Fix the keyboard", owner: "me" }, "thr_w3")).task;
+  expect(own.workers).toEqual(["thr_w3"]);
+  const second = (await tool("task_create", { title: "A side note", owner: "me" }, "thr_w3")).task;
+  expect(second.workers).toEqual([]);
+});
+
+it("gives a worker with no task one from its title after the grace period, nested under its lead's job", async () => {
+  const { tool, links, later, store, facts } = setup();
+  const job = (await tool("task_create", { title: "Ship the phone build", owner: "me", conversation: "thr_main" })).task;
+  const young = { ...facts.get("thr_w3")!, createdAt: NOW - 10_000 };
+  expect(links.ensure(young)).toBeNull();
+  links.spawned(young);
+  expect(later).toHaveLength(1);
+  vi.setSystemTime(NOW + SPAWN_GRACE_MS);
+  facts.set("thr_w3", young);
+  later[0]!();
+  await vi.waitFor(() => expect(store.all().some((t) => t.source?.kind === "spawn")).toBe(true));
+  const made = store.all().find((t) => t.source?.kind === "spawn")!;
+  expect(made).toMatchObject({ title: "Fix the keyboard", owner: "thread:thr_w3", workers: ["thr_w3"], state: "in_progress", parentId: job.id, conversation: "thr_main", origin: "work" });
+  expect(links.ensure(young)).toBeNull();
+});
+
+it("drops the made-up task when the lead names the worker's real task, so the worker is on one task", async () => {
+  const { tool, links, store, user } = setup();
+  const made = links.ensure(fact("thr_w3", { parentThreadId: "thr_lead", status: "active", title: "Fix the keyboard" }))!;
+  expect(made.state).toBe("in_progress");
+  const real = (await tool("task_create", { title: "Keyboard covers Send", owner: "thread:thr_w3", workers: ["thr_w3"], conversation: "thr_main" })).task;
+  expect(store.get(made.id)).toMatchObject({ state: "dropped", workers: [] });
+  expect((await user.board()).rows.map((r) => r.id)).toEqual([real.id]);
+  expect((await user.check()).problems.map((p) => [p.kind, p.threadId])).toEqual([["worker-without-task", "thr_w1"]]);
+});
+
+it("closes a made-up task when its worker goes idle and reopens it when the worker runs again", () => {
+  const { links, store } = setup();
+  const made = links.ensure(fact("thr_w1", { parentThreadId: "thr_lead", status: "active" }))!;
+  links.settled("thr_w1");
+  expect(store.get(made.id)).toMatchObject({ state: "done", progress: { line: "Its thread finished without a report" } });
+  links.resumed("thr_w1");
+  expect(store.get(made.id)).toMatchObject({ state: "in_progress", progress: { line: null } });
+  const idle = links.ensure(fact("thr_w2", { parentThreadId: "thr_lead", status: "idle" }))!;
+  expect(idle).toMatchObject({ state: "done", closedAt: NOW - 600_000, closedBy: "thread:thr_w2" });
+});
+
+it("a worker card for a worker that has a task draws that task instead of making a second one", async () => {
+  const { tool, tools, store } = setup();
+  const sub = (await tool("task_create", { title: "Build the app", owner: "thread:thr_w1", workers: ["thr_w1"], conversation: "thr_main" })).task;
+  const before = store.all().length;
+  const card = JSON.parse(await tools.work_card_create!.execute({ title: "Phone build", kind: "worker", workerThreadId: "thr_w1" }, { threadId: "thr_main" }));
+  expect(card.id).toBe(sub.id);
+  expect(store.all()).toHaveLength(before);
+  expect(store.get(sub.id).card).toMatchObject({ kind: "worker" });
+  const again = JSON.parse(await tools.work_card_create!.execute({ title: "Phone build", kind: "worker", workerThreadId: "thr_w1" }, { threadId: "thr_main" }));
+  expect(again.id).toBe(sub.id);
+  const named = (await tool("task_create", { title: "Plain", owner: "me", conversation: "thr_main" })).task;
+  const drawn = JSON.parse(await tools.work_card_create!.execute({ title: "x", taskId: named.id }, { threadId: "thr_main" }));
+  expect(drawn.id).toBe(named.id);
+  const lead = JSON.parse(await tools.work_card_create!.execute({ title: "Lead card", kind: "lead", workerThreadId: "thr_lead" }, { threadId: "thr_main" }));
+  expect(lead.id).toMatch(/^wc_/);
+  await expect(tools.work_card_create!.execute({ title: "x", taskId: "loop_abc" }, { threadId: "thr_main" })).rejects.toThrow(/Only a task_ or wc_ task/);
+});
+
+it("nests a worker's own task under the lead's task that lists the same worker (rule 2), live", async () => {
+  const { tool, tools, store, user } = setup();
+  const card = JSON.parse(await tools.work_card_create!.execute({ title: "iOS build", kind: "worker", workerThreadId: "thr_w1" }, { threadId: "thr_main" }));
+  const workerCard = store.get(card.id);
+  expect(workerCard.owner).toBe("thread:thr_w1");
+  const lead = (await tool("task_create", { title: "TestFlight", owner: "me", card: true, conversation: "thr_main", workers: ["thr_w1", "thr_w2"] })).task;
+  expect(store.get(card.id).parentId).toBe(lead.id);
+  const flight = await user.flight("thr_main");
+  expect(ids(flight.rows)).toEqual([lead.id, `  ${card.id}`]);
+  expect(flight.rows[0]!.workers).toEqual(["thr_w2"]);
+  expect(flight.rows[1]!.workers).toEqual(["thr_w1"]);
+  expect(flight.counts).toMatchObject({ open: 1, workers: 2 });
+  expect(store.history(card.id).some((e) => e.type === "linked")).toBe(true);
+});
+
+it("drops dismissed and dropped tasks from every list at once; done stays until the end of the user's day", async () => {
+  const { tool, handlers, user } = setup();
+  const keep = (await tool("task_create", { title: "Keep", owner: "me", card: true, conversation: "thr_main", workers: ["thr_w1"] })).task;
+  const drop = (await tool("task_create", { title: "Drop", owner: "me", card: true, conversation: "thr_main", workers: ["thr_w2"] })).task;
+  const done = (await tool("task_create", { title: "Done", owner: "me", card: true, conversation: "thr_main", workers: ["thr_w3"] })).task;
+  await handlers["tasks.act"]!({ id: drop.id, action: "drop" });
+  await tool("task_update", { id: done.id, state: "done" });
+  const titles = (tasks: Task[]) => tasks.map((t) => t.title).sort();
+  expect(titles((await handlers["tasks.inFlight"]!({ threadId: "thr_main" })).tasks)).toEqual(["Done", "Keep"]);
+  expect(titles((await handlers["tasks.list"]!({})).tasks)).toEqual(["Done", "Keep"]);
+  const flight = await user.flight("thr_main");
+  expect(flight.rows.map((r) => r.id)).toEqual([keep.id, done.id]);
+  expect(flight.done).toEqual([done.id]);
+  expect((await user.workers()).rows.map((r) => r.id)).toEqual([keep.id]);
+  expect((await user.board()).rows.map((r) => r.id)).toEqual([keep.id, done.id]);
+  vi.setSystemTime(new Date("2026-11-13T23:59:00Z").getTime());
+  expect((await user.flight("thr_main")).done).toEqual([done.id]);
+  vi.setSystemTime(new Date("2026-11-14T00:00:01Z").getTime());
+  expect((await user.flight("thr_main")).done).toEqual([]);
+  expect((await handlers["tasks.inFlight"]!({ threadId: "thr_main" })).tasks.map((t: Task) => t.title)).toEqual(["Keep"]);
+});
+
+it("ends 'done today' at the user's own midnight", () => {
+  const at = new Date("2026-11-14T03:30:00Z").getTime();
+  expect(new Date(dayStart(at, "America/New_York")).toISOString()).toBe("2026-11-13T05:00:00.000Z");
+  expect(new Date(dayStart(at, "UTC")).toISOString()).toBe("2026-11-14T00:00:00.000Z");
+  expect(new Date(dayStart(at, "Not/AZone")).toISOString()).toBe("2026-11-14T00:00:00.000Z");
+});
+
+it("In flight, Workers and the Tasks list agree on what is open, and each task shows once", async () => {
+  const { tool, handlers, user, store } = setup();
+  const job = (await tool("task_create", { title: "Ship", owner: "me", conversation: "thr_main" })).task;
+  vi.setSystemTime(NOW + 1000);
+  await tool("task_create", { title: "Build", owner: "thread:thr_w1", workers: ["thr_w1"], parentId: job.id });
+  vi.setSystemTime(NOW + 2000);
+  await tool("task_create", { title: "Review", owner: "thread:thr_w2", workers: ["thr_w2"], parentId: job.id });
+  await tool("task_create", { title: "Lead's own todo", owner: "me" });
+  await tool("task_create", { title: "Keyboard", owner: "thread:thr_w3", workers: ["thr_w3"] });
+  await handlers["loops.add"]!({ text: "Buy milk" });
+  const asked = (await tool("task_create", { title: "Pick a name", owner: "me", conversation: "thr_main", workers: ["thr_w1"], parentId: job.id })).task;
+  await tool("task_handoff", { id: asked.id, to: "user", needs: "Pick" });
+  const board = await user.board();
+  const workers = await user.workers();
+  const homes = [...new Set(board.rows.filter((r) => r.under === null && r.home).map((r) => r.home!))];
+  const flights = await Promise.all(homes.map((h) => user.flight(h)));
+  expect(homes.sort()).toEqual(["thr_lead", "thr_main"]);
+  const open = (rows: { under: string | null; open: boolean }[]) => rows.filter((r) => r.under === null && r.open).length;
+  expect(flights.reduce((n, f) => n + f.counts.open, 0)).toBe(open(board.rows.filter((r) => r.home)));
+  expect(board.counts.open).toBe(open(board.rows));
+  expect(workers.counts.open).toBe(flights.reduce((n, f) => n + f.rows.filter((r) => r.under === null && r.open && r.hasWorkers).length, 0));
+  expect(workers.counts.workers).toBe(board.counts.workers);
+  expect(workers.groups.map((g) => [g.conversation, g.name, g.ids.length])).toEqual([["thr_main", "Main", 1], ["thr_lead", "Larkspur lead", 1]]);
+  const main = flights.find((f) => f.rows[0]?.home === "thr_main")!;
+  expect(main.rows.map((r) => store.get(r.id).title)).toEqual(["Ship", "Pick a name", "Build", "Review"]);
+  expect(main.rows[0]).toMatchObject({ needsYou: true, hasWorkers: true });
+  for (const view of [board, workers, ...flights]) expect(new Set(view.rows.map((r) => r.id)).size).toBe(view.rows.length);
+  expect(tasksContract["tasks.flight"].output.parse(main)).toBeTruthy();
+  expect(tasksContract["tasks.workers"].output.parse(workers)).toBeTruthy();
+  expect(tasksContract["tasks.board"].output.parse(board)).toBeTruthy();
+  expect(await handlers["tasks.flight"]!({ threadId: "thr_main" })).toEqual(main);
+  expect(main.workers.map((w) => [w.threadId, w.name, w.status])).toEqual(expect.arrayContaining([["thr_w1", "Build the phone app", "active"], ["thr_w2", "Review the build", "idle"]]));
+});
+
+it("the check reports each kind of orphan and duplicate and changes nothing", async () => {
+  const { tool, store, user, ctx, handlers } = setup();
+  await tool("task_create", { title: "Build", owner: "thread:thr_w1", workers: ["thr_w1"] });
+  await tool("task_create", { title: "Keys", owner: "thread:thr_w3", workers: ["thr_w3"] });
+  expect((await user.check()).problems).toEqual([]);
+  db.prepare("UPDATE tasks SET record = json_set(record, '$.workers', json('[]'), '$.owner', 'cos'), owner = 'cos'").run();
+  const a = (await tool("task_create", { title: "Lead A", owner: "me", conversation: "thr_main", workers: ["thr_w2"] })).task;
+  const b = (await tool("task_create", { title: "Lead B", owner: "cos", conversation: "thr_main" })).task;
+  await tool("task_update", { id: b.id, workers: ["thr_w2"] }, "thr_main");
+  const parent = (await tool("task_create", { title: "Closed parent", owner: "me" })).task;
+  const child = (await tool("task_create", { title: "Open child", owner: "me", parentId: parent.id })).task;
+  await tool("task_update", { id: parent.id, state: "done" });
+  db.prepare("INSERT INTO work_cards (id, thread_id, record) VALUES ('wc_lost', 'thr_main', '{}')").run();
+  const raw = store.get(a.id);
+  store.write({ ...raw, id: "task_nowhere", card: { kind: "task", messageId: null, messageSeq: null, dismissedAt: null }, conversation: null, workers: [] });
+  const before = JSON.stringify(store.all());
+  const problems = (await user.check()).problems;
+  expect(problems.map((p) => p.kind).sort()).toEqual(["card-without-task", "card-without-task", "open-under-closed", "shown-twice", "worker-without-task", "worker-without-task"]);
+  expect(problems.find((p) => p.kind === "shown-twice")).toMatchObject({ threadId: "thr_w2", taskIds: expect.arrayContaining([a.id, b.id]) });
+  expect(problems.find((p) => p.kind === "open-under-closed")!.taskIds).toEqual([child.id, parent.id]);
+  expect(problems.filter((p) => p.kind === "worker-without-task").map((p) => p.threadId).sort()).toEqual(["thr_w1", "thr_w3"]);
+  expect(JSON.stringify(store.all())).toBe(before);
+  expect(await handlers["tasks.check"]!({})).toEqual({ problems });
+  expect(checkTasks(store.all(), [], ctx()).some((p) => p.kind === "worker-without-task")).toBe(false);
+});
+
+it("task_check answers through the tool", async () => {
+  const { tools } = setup();
+  const out = JSON.parse(await tools.task_check!.execute({}, { threadId: "thr_main" }));
+  expect(out.summary).toMatch(/2 problems found; nothing was changed/);
+  expect(out.problems.map((p: { threadId: string }) => p.threadId).sort()).toEqual(["thr_w1", "thr_w3"]);
+});
+
+function seedTonight(store: TaskStore) {
+  const base = (id: string, patch: Partial<Task>): Task => ({
+    id, title: id, why: "", owner: "cos", state: "done", kind: "do", options: [], needs: null, priority: "normal", conversation: "thr_main", project: null, area: null,
+    timing: { due: null, trigger: { type: "none" }, snoozed: false }, attention: { queue: null, push: false }, progress: { step: null, line: null }, workers: [], outputs: [],
+    source: null, parentId: null, schedule: null, card: null, automation: null, waitingOn: null, stale: false, origin: "task", createdAt: NOW - 9 * 3_600_000, updatedAt: NOW - 3_600_000,
+    closedAt: NOW - 3_600_000, closedBy: "cos", ...patch,
+  });
+  store.write(base("wc_ios", { title: "iOS build: phase 4", owner: "thread:thr_w1", workers: ["thr_w1"], card: { kind: "worker", messageId: null, messageSeq: null, dismissedAt: null }, origin: "work" }));
+  store.write(base("task_tf", { title: "TestFlight: new room", owner: "thread:thr_lead", workers: ["thr_w1", "thr_w2", "thr_w3"], card: { kind: "task", messageId: null, messageSeq: null, dismissedAt: null } }));
+  store.write(base("task_review", { title: "Fresh review", owner: "thread:thr_w2", workers: ["thr_w2"], parentId: "task_tf" }));
+  store.write(base("task_phone", { title: "Phone: tasks as cards", owner: "thread:thr_w1", workers: ["thr_w1"], parentId: "task_tf", createdAt: NOW - 8 * 3_600_000 }));
+  store.write(base("wc_lead", { title: "Lead card", owner: "thread:thr_lead", workers: ["thr_lead"], card: { kind: "lead", messageId: null, messageSeq: null, dismissedAt: null }, origin: "work" }));
+  store.write(base("task_old_a", { title: "Reused worker, job A", owner: "thread:thr_w4", workers: ["thr_w4"], closedAt: NOW - 9 * 86_400_000 }));
+  store.write(base("task_old_b", { title: "Reused worker, job B", owner: "thread:thr_w4", workers: ["thr_w4"], closedAt: NOW - 8 * 86_400_000 }));
+  store.write(base("task_x", { title: "Shared X", owner: "cos", workers: ["thr_w5"], state: "in_progress", closedAt: null, closedBy: null }));
+  store.write(base("task_y", { title: "Shared Y", owner: "thread:thr_lead", workers: ["thr_w5"], state: "in_progress", closedAt: null, closedBy: null }));
+  store.write(base("task_z", { title: "Its own", owner: "thread:thr_w5", workers: ["thr_w5"], state: "in_progress", closedAt: null, closedBy: null }));
+}
+
+const MIGRATION_THREADS = [
+  ...THREADS.map((t) => (t.id === "thr_w1" || t.id === "thr_w3" ? { ...t, status: "idle" } : t)),
+  fact("thr_w4", { parentThreadId: "thr_lead", title: "Reused worker" }),
+  fact("thr_w5", { parentThreadId: "thr_lead", title: "Shared worker", status: "active" }),
+  fact("thr_w6", { parentThreadId: "thr_lead", title: "Worker with no task", status: "active" }),
+  fact("thr_w7", { parentThreadId: "thr_w6", title: "Its helper, finished", updatedAt: NOW - 86_400_000 }),
+  fact("thr_gone", { parentThreadId: "thr_lead", title: "Archived", archivedAt: NOW - 1000 }),
+  fact("thr_new", { parentThreadId: "thr_lead", title: "Just spawned", status: "active", createdAt: NOW - 5_000 }),
+];
+
+it("migration on a fresh database does nothing and takes no backup", () => {
+  dir = mkdtempSync(join(tmpdir(), "task-links-"));
+  db.close();
+  db = new Database(join(dir, "data.db"));
+  for (const sql of MIGRATIONS) db.exec(sql);
+  const report = linkAtStart(new TaskStore(db), [], new ThreadDirectory(db));
+  expect(report).toMatchObject({ pairs: [], drops: [], create: [], created: [], backup: null });
+  expect(readdirSync(dir).filter((n) => n.includes(".before-"))).toEqual([]);
+});
+
+it("migration on a populated database: one backup, tonight's pair nested, workers given tasks, ambiguity left alone; a second run changes nothing", () => {
+  dir = mkdtempSync(join(tmpdir(), "task-links-"));
+  db.close();
+  db = new Database(join(dir, "data.db"));
+  for (const sql of MIGRATIONS) db.exec(sql);
+  seedThreads(db, MIGRATION_THREADS);
+  const store = new TaskStore(db);
+  seedTonight(store);
+  const threads = new ThreadDirectory(db);
+  const ctx = { since: dayStart(NOW, "UTC"), dir: threads };
+  const before = checkTasks(store.all(), MIGRATION_THREADS, ctx);
+  expect(before.map((p) => p.kind).sort()).toEqual(["shown-twice", "shown-twice", "worker-without-task"]);
+
+  const report = linkAtStart(store, MIGRATION_THREADS, threads);
+  expect(report.backup).toBeTruthy();
+  expect(existsSync(report.backup!)).toBe(true);
+  expect(report.pairs.map((p) => [p.parent, p.child, p.thread])).toEqual([["task_phone", "wc_ios", "thr_w1"]]);
+  expect(store.get("wc_ios").parentId).toBe("task_phone");
+  expect(store.get("task_review").parentId).toBe("task_tf");
+  expect(store.get("wc_lead").parentId).toBeNull();
+  expect(report.ambiguous.map((a) => [a.thread, a.tasks.sort()])).toEqual([["thr_w4", ["task_old_a", "task_old_b"]], ["thr_w5", ["task_x", "task_y", "task_z"].sort()]]);
+  for (const id of ["task_old_a", "task_old_b", "task_x", "task_y", "task_z"]) expect(store.get(id).parentId).toBeNull();
+  const made = report.created.map((id) => store.get(id));
+  expect(made.map((t) => [t.title, t.state, t.owner, t.conversation])).toEqual([
+    ["Worker with no task", "in_progress", "thread:thr_w6", "thr_main"],
+    ["Its helper, finished", "done", "thread:thr_w7", "thr_lead"],
+  ]);
+  expect(made[0]!.parentId).toBe("task_y");
+  expect(made[1]!.parentId).toBeNull();
+  expect(made[1]!.closedAt).toBe(NOW - 86_400_000);
+  expect(store.history(made[0]!.id).map((e) => e.type)).toEqual(["created"]);
+  expect(store.history("wc_ios").map((e) => e.type)).toEqual(["linked"]);
+
+  const rows = boardRows(store.all(), { ...ctx, since: 0 }).rows;
+  const tonight = rows.filter((r) => ["task_tf", "task_review", "task_phone", "wc_ios"].includes(r.id));
+  expect(tonight.map((r) => [r.id, r.under, r.depth])).toEqual([["task_tf", null, 0], ["task_phone", "task_tf", 1], ["wc_ios", "task_phone", 2], ["task_review", "task_tf", 1]]);
+  expect(tonight.map((r) => r.workers)).toEqual([["thr_w3"], [], ["thr_w1"], ["thr_w2"]]);
+  expect(rows.filter((r) => r.under === null).map((r) => r.id)).not.toContain("wc_ios");
+  expect(rows.filter((r) => r.id === "wc_ios")).toHaveLength(1);
+
+  const after = checkTasks(store.all(), MIGRATION_THREADS, ctx);
+  expect(after.map((p) => [p.kind, p.threadId])).toEqual([["shown-twice", "thr_w5"]]);
+
+  const snapshot = JSON.stringify(store.all());
+  const events = db.prepare("SELECT COUNT(*) AS n FROM task_events").get();
+  const second = linkAtStart(store, MIGRATION_THREADS, threads);
+  expect(second).toMatchObject({ pairs: [], drops: [], created: [], backup: null });
+  expect(JSON.stringify(store.all())).toBe(snapshot);
+  expect(db.prepare("SELECT COUNT(*) AS n FROM task_events").get()).toEqual(events);
+  expect(readdirSync(dir).filter((n) => n.includes(".before-task-links-"))).toHaveLength(1);
+
+  vi.setSystemTime(NOW + SPAWN_GRACE_MS);
+  const third = linkAtStart(store, MIGRATION_THREADS, threads);
+  expect(third.created.map((id) => store.get(id).title)).toEqual(["Just spawned"]);
+  expect(third.backup).toBeNull();
+});
+
+it("migration plans without writing, and a failed backup still links", () => {
+  seedThreads(db, MIGRATION_THREADS);
+  const store = new TaskStore(db);
+  seedTonight(store);
+  const snapshot = JSON.stringify(store.all());
+  const plan = planLinks(store.all(), MIGRATION_THREADS, new ThreadDirectory(db), NOW);
+  expect(plan.pairs).toHaveLength(1);
+  expect(JSON.stringify(store.all())).toBe(snapshot);
+  const report = applyLinks(store, plan);
+  expect(report.backup).toBeNull();
+  expect(store.get("wc_ios").parentId).toBe("task_phone");
+});
+
+it("never pairs a worker into a cycle and skips runner threads", () => {
+  seedThreads(db, MIGRATION_THREADS);
+  db.prepare("INSERT INTO bot_runners (id, bot_id, name, job, thread_id, project_id, state, cadence, time, created_at, updated_at) VALUES ('run_1', 'bot_main', 'Runner', 'job', 'thr_w6', 'proj', 'active', 'daily', '09:00', 0, 0)").run();
+  const store = new TaskStore(db);
+  seedTonight(store);
+  const raw = store.get("task_tf");
+  store.write({ ...raw, parentId: "wc_ios" });
+  const plan = planLinks(store.all(), MIGRATION_THREADS, new ThreadDirectory(db), NOW);
+  expect(plan.pairs.find((p) => p.child === "wc_ios")).toBeUndefined();
+  expect(store.get("task_tf").parentId).toBe("wc_ios");
+  expect(plan.create.map((c) => c.threadId)).not.toContain("thr_w6");
+});
+
+it("the check also catches one worker on two rows of the same task", async () => {
+  const { tool, user } = setup();
+  const job = (await tool("task_create", { title: "Ship", owner: "me", conversation: "thr_main" })).task;
+  const a = (await tool("task_create", { title: "Part A", owner: "thread:thr_w1", workers: ["thr_w1"], parentId: job.id })).task;
+  const b = (await tool("task_create", { title: "Part B", owner: "cos", workers: ["thr_w1"], parentId: job.id })).task;
+  await tool("task_create", { title: "Keys", owner: "thread:thr_w3", workers: ["thr_w3"] });
+  const problems = (await user.check()).problems;
+  expect(problems.map((p) => [p.kind, p.threadId, [...p.taskIds].sort()])).toEqual([["shown-twice", "thr_w1", [a.id, b.id].sort()]]);
+  expect(problems[0]!.text).toMatch(/rows of one task/);
+});

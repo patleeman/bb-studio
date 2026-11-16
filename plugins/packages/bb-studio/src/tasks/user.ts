@@ -4,9 +4,11 @@ import type { z } from "zod";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import type { act as loopAct, hold, ownerInfo } from "../loops/contract";
 import { threadOwner } from "../loops/register";
-import { SHOW_FINISHED_MS } from "../work/shared";
 import { isClosed, needsYou, USER_OWNER, type Task, type TaskEvent } from "./contract";
 import { tasksContract, type TaskActInput, type TaskView } from "./rpc-contract";
+import { checkTasks, legacyCardsWithoutTask } from "./check";
+import { ThreadDirectory, type ThreadFact } from "./links";
+import { boardRows, dayStart, flightRows, workerRows, type RowContext, type Rows } from "./rows";
 import { guardTasks, TaskStore } from "./store";
 import { inLoopView, toLoop } from "./views";
 import type { Loop } from "../loops/contract";
@@ -22,6 +24,9 @@ export type UserTaskDeps = {
   reopenLoop(id: string): unknown;
   snoozeLoopUntil(id: string, at: number): unknown;
   held(): z.infer<typeof hold>[];
+  zone?(): string;
+  dir?: ThreadDirectory;
+  facts?(): Promise<ThreadFact[]>;
 };
 
 const DONE_LIST_MS = 7 * 86_400_000;
@@ -74,14 +79,58 @@ export class UserTasks {
 
   async list() {
     const since = this.store.now() - DONE_LIST_MS;
-    const tasks = this.store.all().filter((t) => (!isClosed(t) || (t.closedAt ?? 0) > since) && !(t.automation?.role === "run" && t.owner !== USER_OWNER));
+    const tasks = this.store.all().filter((t) => t.state !== "dropped" && (!isClosed(t) || (t.closedAt ?? 0) > since) && !(t.automation?.role === "run" && t.owner !== USER_OWNER));
     return { tasks, threads: await this.names(tasks), held: this.deps.held() };
   }
 
+  today(): number {
+    return dayStart(this.store.now(), this.deps.zone?.() ?? "UTC");
+  }
+
+  context(): RowContext {
+    return { since: this.today(), dir: this.deps.dir ?? new ThreadDirectory(this.store.db) };
+  }
+
+  async workerInfo(ids: readonly string[]) {
+    return Promise.all([...new Set(ids)].map(async (threadId) => {
+      const thread = await this.deps.thread(threadId).catch(() => null) as (ThreadLike & { status?: string | null }) | null;
+      return { threadId, name: (thread?.title || thread?.titleFallback || "").trim() || "A worker thread", status: thread?.status ?? null, archived: !!thread?.archivedAt || !!thread?.deletedAt };
+    }));
+  }
+
+  private async rowsView(rows: Rows) {
+    return { ...rows, threads: await this.names(rows.tasks), workers: await this.workerInfo(rows.rows.flatMap((r) => r.workers)) };
+  }
+
+  async flight(threadId: string) {
+    const rows = flightRows(this.store.all(), threadId, this.context());
+    const done = rows.rows.filter((r) => r.under === null && !r.open).map((r) => r.id);
+    return { ...await this.rowsView(rows), done };
+  }
+
+  async workers() {
+    const out = workerRows(this.store.all(), this.context());
+    const view = await this.rowsView(out);
+    const groups = await Promise.all(out.groups.map(async (g) => ({
+      conversation: g.conversation, ids: g.ids,
+      name: g.conversation ? threadOwner(`thread:${g.conversation}`, await this.deps.thread(g.conversation).catch(() => null)).name : "No conversation",
+    })));
+    return { ...view, groups };
+  }
+
+  async board() {
+    return this.rowsView(boardRows(this.store.all(), this.context()));
+  }
+
+  async check() {
+    const facts = this.deps.facts ? await this.deps.facts() : [];
+    return { problems: checkTasks(this.store.all(), facts, this.context(), legacyCardsWithoutTask(this.store.db)) };
+  }
+
   async inFlight(threadId: string) {
-    const since = this.store.now() - SHOW_FINISHED_MS;
+    const since = this.today();
     const rows = this.store.rows("SELECT record FROM tasks WHERE conversation = ? AND (closed_at IS NULL OR closed_at > ?) ORDER BY rowid", threadId, since)
-      .filter((t) => (t.card ? t.card.dismissedAt === null : !isClosed(t)));
+      .filter((t) => t.state !== "dropped" && (t.card ? t.card.dismissedAt === null : !isClosed(t)));
     const tasks = inFlightOrder(rows);
     return { tasks, threads: await this.names(tasks) };
   }
@@ -248,6 +297,10 @@ export function registerUserTasks(bb: BbPluginApi, db: Database.Database, deps: 
     "tasks.list": () => tasks.list(),
     "tasks.inFlight": ({ threadId }: { threadId: string }) => tasks.inFlight(threadId),
     "tasks.act": (x: TaskActInput) => tasks.act(x),
+    "tasks.flight": ({ threadId }: { threadId: string }) => tasks.flight(threadId),
+    "tasks.workers": () => tasks.workers(),
+    "tasks.board": () => tasks.board(),
+    "tasks.check": () => tasks.check(),
   }, false, (message) => bb.log.warn(message)) as never);
   return tasks;
 }
