@@ -18,6 +18,7 @@ struct TranscriptChrome: Equatable {
     /// `restingBackdrop`, so rows don't scroll by under the composer.
     var composerRestDrop: CGFloat = 0
     var restingBackdrop: UIColor?
+    var stackBand: UIColor?
     /// The composer and pill run under the trailing safe area: the Duo's
     /// status column beside two pages.
     var composerIgnoresTrailingSafeArea = false
@@ -130,6 +131,9 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private var composerFloor: NSLayoutConstraint?
     /// Under the composer to the window's edge, while it rests on a home indicator's inset.
     private let backdrop = UIView()
+    private let band = UIView()
+    private var bandToComposer: NSLayoutConstraint!
+    private var bandToPill: NSLayoutConstraint!
     private var backdropTop: NSLayoutConstraint!
     /// The bottom safe area is a home indicator's alone (no keyboard, no tab bar).
     private var restsOnIndicator = false
@@ -225,6 +229,12 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         backdrop.translatesAutoresizingMaskIntoConstraints = false
         view.insertSubview(backdrop, belowSubview: pillHost.view)
         backdropTop = backdrop.topAnchor.constraint(equalTo: composerHost.view.bottomAnchor)
+        band.isUserInteractionEnabled = false
+        band.isHidden = true
+        band.translatesAutoresizingMaskIntoConstraints = false
+        view.insertSubview(band, aboveSubview: collectionView)
+        bandToComposer = band.topAnchor.constraint(equalTo: composerHost.view.topAnchor)
+        bandToPill = band.topAnchor.constraint(equalTo: pillHost.view.topAnchor)
 
         // The keyboard: the container's bottom is the keyboard's top. Its
         // host leaves the keyboard's safe area in (`TranscriptContainer`), so
@@ -254,6 +264,9 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             backdropTop, backdrop.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             backdrop.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             backdrop.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bandToComposer, band.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            band.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            band.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
         applyChrome()
         var snapshot = NSDiffableDataSourceSnapshot<Int, TranscriptRowID>()
@@ -305,6 +318,9 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         composerFloor?.constant = -(chrome.composerGap + simulatedKeyboard)
         collectionView.topEdgeEffect.style = chrome.softTopEdge ? .soft : .automatic
         applyRestingEdge()
+        band.backgroundColor = chrome.stackBand
+        band.isHidden = chrome.stackBand == nil
+        applyBandTop()
         NSLayoutConstraint.deactivate(composerEdges + pillPlacement)
         let guide = view.safeAreaLayoutGuide
         let trailing = chrome.composerIgnoresTrailingSafeArea ? view.trailingAnchor : guide.trailingAnchor
@@ -397,7 +413,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
     private func updateInsets() {
         let top = (hasTop ? topHost.view.frame.maxY : view.safeAreaInsets.top)
         var bottom = view.bounds.maxY - composerHost.view.frame.minY
-        if chrome.pill == .center, pill.shown { bottom += pillHost.view.bounds.height }
+        if pillHasLane, pill.shown { bottom += pillHost.view.bounds.height }
         bottom = max(0, bottom)
         let insets = collectionView.contentInset
         guard abs(insets.top - top) > 0.5 || abs(insets.bottom - bottom) > 0.5 else { return }
@@ -805,8 +821,20 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         pillHost.rootView = pillContent(next) { [weak self] in self?.jumpToLatest() }
         pillHost.view.isUserInteractionEnabled = next.shown
         UIView.animate(withDuration: 0.2) { self.pillHost.view.alpha = next.shown ? 1 : 0 }
-        if placementChanged, chrome.pill == .center { view.setNeedsLayout() }
+        if placementChanged, pillHasLane {
+            applyBandTop()
+            view.setNeedsLayout()
+        }
         onPillChange?(next)
+    }
+
+    private var pillHasLane: Bool { chrome.pill == .center || chrome.stackBand != nil }
+
+    private func applyBandTop() {
+        guard bandToComposer != nil else { return }
+        let lane = chrome.stackBand != nil && pill.shown
+        bandToComposer.isActive = !lane
+        bandToPill.isActive = lane
     }
 
     /// Something waiting at the end, for the pill ("Question"). It doesn't
@@ -907,6 +935,12 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         var out: [String: Any] = ["stack": box(composerHost.view.convert(composerHost.view.bounds, to: nil)), "atEnd": atEnd,
                                   "insetBottom": collectionView.contentInset.bottom, "pillShown": pill.shown]
         if pill.shown { out["pill"] = box(pillHost.view.convert(pillHost.view.bounds, to: nil)) }
+        if !band.isHidden {
+            out["band"] = box(band.convert(band.bounds, to: nil))
+            var alpha: CGFloat = 0
+            band.backgroundColor?.getWhite(nil, alpha: &alpha)
+            out["bandOpaque"] = band.alpha >= 1 && alpha >= 1
+        }
         if let last = layout.ids.last, let frame = layout.frame(of: last) { out["lastRow"] = box(collectionView.convert(frame, to: nil)) }
         return out
     }

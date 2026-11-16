@@ -542,6 +542,7 @@ sits above the stack while reading up and lands the last row above it; with
 `TEST_RUNNER_ROOM_THEME`. Behind a conversation the room shows the scene
 frosted (`RoomFrost`, no light orb), so a scene's moon or light never sits
 behind messages; on the unfolded Duo only the conversation's page is frosted.
+The chat's bottom stack (In flight, the worker pill, the shelf cards and the composer) sits on one opaque band (`TranscriptChrome.stackBand`) from its top to the screen's or keyboard's edge, and the ↓ gets its own lane at the band's top that the bottom inset includes: the chat ends above the band and scrolls under it, never between its parts. `RoomBottomStackUITests.testTheBottomStackIsOneOpaqueBandWithTheJumpInItsOwnLane` checks it with In flight open and folded, the keyboard down and up, at the end and reading up, and `testAConversationWithoutWorkersOrInFlightHasTheSameStack` without the pill or In flight.
 `RoomLightUITests` checks that a scene's moon or sun, and a conversation's
 light orb, sit small (0.6 of desktop's size) in the top corner of the
 presence's page, clear of the presence, the title, Now, the menu and every
