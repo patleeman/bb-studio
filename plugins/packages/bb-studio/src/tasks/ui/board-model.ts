@@ -1,9 +1,11 @@
 import { addDays, wall } from "../../loops/clock";
-import { PRIORITY_RANK } from "../../loops/ui/model";
+import { eventLabel, PRIORITY_RANK } from "../../loops/ui/model";
 import { isClosed, needsYou, USER_OWNER, type Task } from "../contract";
 import { taskDate, taskSection } from "./model";
+import { areaOrder } from "../../areas/ui/model";
+import type { AreaView } from "../../areas/contract";
 
-export type RowRef = { id: string; home: string | null; under: string | null; depth: number; open: boolean; workers: string[]; hasWorkers: boolean; needsYou: boolean; startedAt?: number };
+export type RowRef = { id: string; home: string | null; under: string | null; depth: number; open: boolean; workers: string[]; hasWorkers: boolean; needsYou: boolean; startedAt?: number; stalled?: boolean };
 export type WorkerInfo = { threadId: string; name: string; status: string | null; archived: boolean };
 export type RowsData = { rows: readonly RowRef[]; tasks: readonly Task[]; workers?: readonly WorkerInfo[] };
 
@@ -38,8 +40,7 @@ export const isUserTodo = (t: Task) => t.owner === USER_OWNER && t.kind !== "wai
 
 export function pageFlight(data: RowsData): FlightNode[] {
   const nodes = treeOf(data).filter((n) => n.row.open && !isUserTodo(n.task));
-  const running = (n: FlightNode) => n.task.state === "in_progress" && !n.task.stale;
-  return [...nodes.filter(running), ...nodes.filter((n) => !running(n))];
+  return [...nodes.filter(isRunning), ...nodes.filter((n) => !isRunning(n))];
 }
 
 export type TodoBox = { asks: Task[]; today: Task[]; later: Task[] };
@@ -56,26 +57,38 @@ export function todoBox(tasks: readonly Task[], now: number, zone?: string): Tod
 
 export const TODO_ROWS = 7;
 
-export function todoShown(box: TodoBox, chatAsks: number, expanded: boolean, rows = TODO_ROWS): { asks: number; today: number; later: number; moreToday: number; moreLater: number } {
-  if (expanded) return { asks: box.asks.length, today: box.today.length, later: box.later.length, moreToday: 0, moreLater: 0 };
-  const asks = Math.min(box.asks.length, Math.max(0, rows - chatAsks));
-  const today = Math.min(box.today.length, Math.max(0, rows - chatAsks - asks));
-  const askLeft = box.asks.length - asks;
-  return { asks, today, later: 0, moreToday: askLeft + box.today.length - today, moreLater: box.later.length };
+export type AreaAsk = { key: string; areaId: string; area: string; title: string; since: string | null; sinceAt: number | null; taskId: string | null };
+
+export function areaAsks(areas: readonly Pick<AreaView, "id" | "name" | "status" | "open">[], tasks: readonly Task[]): AreaAsk[] {
+  const mine = new Set(tasks.filter((t) => t.owner === USER_OWNER).map((t) => t.id));
+  return areaOrder(areas).flatMap((a) => a.open
+    .filter((item) => item.needsUser && !(item.taskId && mine.has(item.taskId)))
+    .map((item, n) => ({ key: `${a.id}:${n}:${item.title}`, areaId: a.id, area: a.name, title: item.title, since: item.since, sinceAt: item.sinceAt, taskId: item.taskId })));
+}
+
+export type TodoShown = { asks: number; areaAsks: number; today: number; later: number; moreAsks: number; moreToday: number; moreLater: number };
+
+export function todoShown(box: TodoBox, chatAsks: number, expanded: boolean, rows = TODO_ROWS, areaAskCount = 0): TodoShown {
+  if (expanded) return { asks: box.asks.length, areaAsks: areaAskCount, today: box.today.length, later: box.later.length, moreAsks: 0, moreToday: 0, moreLater: 0 };
+  let room = Math.max(0, rows - chatAsks);
+  const asks = Math.min(box.asks.length, room); room -= asks;
+  const area = Math.min(areaAskCount, room); room -= area;
+  const today = Math.min(box.today.length, room);
+  return { asks, areaAsks: area, today, later: 0, moreAsks: box.asks.length - asks + areaAskCount - area, moreToday: box.today.length - today, moreLater: box.later.length };
 }
 
 export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-export function todoHeader(box: TodoBox, chatAsks: number): string {
-  const asks = box.asks.length + chatAsks;
+export function todoHeader(box: TodoBox, chatAsks: number, areaAskCount = 0): string {
+  const asks = box.asks.length + chatAsks + areaAskCount;
   const parts = [asks ? plural(asks, "ask") : null, box.today.length ? `${box.today.length} today` : null];
   return parts.filter(Boolean).join(" · ") || (box.later.length ? `${box.later.length} later` : "");
 }
 
-export function moreLine(moreToday: number, moreLater: number): string | null {
-  const parts = [moreToday ? `${moreToday} more today` : null, moreLater ? `${moreLater} later` : null].filter(Boolean);
+export function moreLine(moreToday: number, moreLater: number, moreAsks = 0): string | null {
+  const parts = [moreAsks ? `${plural(moreAsks, "more ask")}` : null, moreToday ? `${moreToday} more today` : null, moreLater ? `${moreLater} later` : null].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
 }
 
@@ -93,18 +106,22 @@ export function stepProgress(step: string | null | undefined): Progress | null {
 
 export type FlightLook = "running" | "waiting" | "needs-you" | "todo" | "done" | "failed";
 
-export function flightLook(task: Task, rowNeedsYou = false): FlightLook {
+export const isRunning = (n: Pick<FlightNode, "task" | "row">) => n.task.state === "in_progress" && !n.task.stale && !n.row.stalled;
+
+export function flightLook(task: Task, rowNeedsYou = false, stalled = false): FlightLook {
   if (task.state === "failed") return "failed";
   if (task.stale) return "done";
   if (isClosed(task)) return "done";
   if (needsYou(task) || (rowNeedsYou && task.state !== "in_progress")) return "needs-you";
-  if (task.state === "in_progress") return "running";
+  if (task.state === "in_progress" && !stalled) return "running";
   if (task.state === "todo" && task.owner === USER_OWNER) return "todo";
   return "waiting";
 }
 
 export function waitLabel(task: Task, titleOf: (id: string) => string | null = () => null): { short: string; long: string } {
   const on = task.waitingOn ?? (task.kind === "waiting-outside" ? { kind: "outside" as const, ref: null, text: null } : needsYou(task) ? { kind: "user" as const, ref: null, text: null } : null);
+  const trigger = task.timing.trigger;
+  if (!on && trigger.type === "event" && trigger.event) return { short: "waiting on an event", long: `Waiting on: ${eventLabel(trigger.event, trigger.label)}` };
   if (!on) return task.state === "todo" ? { short: "queued", long: "Queued" } : { short: "waiting", long: "Waiting" };
   if (on.kind === "user") return { short: "waiting on you", long: "Waiting on you" };
   if (on.kind === "ci") return { short: "waiting on CI", long: on.text ? `Waiting on CI: ${on.text}` : on.ref ? `Waiting on CI: ${on.ref}` : "Waiting on CI" };
@@ -177,14 +194,14 @@ export function pageCounts(board: RowsData, now: number, zone?: string): PageCou
     todo: todoTop,
     flight: flight.length,
     open: tops.length,
-    running: flight.filter((n) => n.task.state === "in_progress").length,
-    waiting: flight.filter((n) => n.task.state !== "in_progress").length,
+    running: flight.filter(isRunning).length,
+    waiting: flight.filter((n) => !isRunning(n)).length,
     withWorkers: flight.filter((n) => n.row.hasWorkers).length,
   };
 }
 
 export function flightHeader(nodes: readonly FlightNode[]): string {
-  const running = nodes.filter((n) => n.task.state === "in_progress" && !n.task.stale).length;
+  const running = nodes.filter(isRunning).length;
   const ended = nodes.filter((n) => n.task.stale).length;
   const waiting = nodes.length - running - ended;
   return [running ? `${running} running` : null, waiting ? `${waiting} waiting` : null, ended ? `${ended} ended` : null].filter(Boolean).join(" · ");

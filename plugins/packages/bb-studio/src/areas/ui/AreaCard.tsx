@@ -34,11 +34,11 @@ export function AreaCard({ area, now, zone, live = false, workers = 0, onOpenTas
   const status = STATUS_LABEL[area.status];
   const headingId = `area-${area.id}`;
   return (
-    <article data-testid="area-card" data-area={area.id} data-status={area.status} data-studio-card="" aria-labelledby={headingId}
-      className={cn("flex min-w-0 flex-col rounded-2xl border bg-card px-4 py-3.5 text-sm", BORDER[area.status])}>
+    <article data-testid="area-card" data-area={area.id} data-status={area.status} data-studio-card="" aria-labelledby={headingId} tabIndex={-1}
+      className={cn("flex min-w-0 flex-col rounded-2xl border bg-card px-4 py-3.5 text-sm outline-none focus:ring-2 focus:ring-ring", BORDER[area.status])}>
       <header className="flex min-w-0 items-center gap-2">
         <span role="img" aria-label={live ? `${status}, working now` : status} data-testid="area-dot" className={cn("size-2.5 shrink-0 rounded-full", DOT[area.status], live && "shadow-[0_0_0_3px_color-mix(in_oklab,var(--success)_25%,transparent)]")} />
-        <h3 id={headingId} className="min-w-0 truncate text-[15px] font-semibold text-foreground">{area.name}</h3>
+        <h3 id={headingId} data-testid="area-name" className="max-w-full shrink-0 truncate text-[15px] font-semibold text-foreground">{area.name}</h3>
         {owner && onOpenOwner
           ? <button type="button" data-testid="area-who" onClick={() => onOpenOwner(owner)} aria-label={`Open ${area.ownerName}`} className="ml-auto min-w-0 truncate rounded text-xs text-subtle-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{who}</button>
           : <span data-testid="area-who" className="ml-auto min-w-0 truncate text-xs text-subtle-foreground">{who}</span>}

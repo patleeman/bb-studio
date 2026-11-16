@@ -49876,6 +49876,10 @@
                   "type": "boolean",
                   "description": "It, or an open subtask, needs the user"
                 },
+                "stalled": {
+                  "description": "Running, but every thread on it has been idle or gone for over six hours",
+                  "type": "boolean"
+                },
                 "startedAt": {
                   "description": "When its current run of work began: the first move to in progress since it was last reopened",
                   "type": "number"
@@ -50780,6 +50784,10 @@
                 "needsYou": {
                   "type": "boolean",
                   "description": "It, or an open subtask, needs the user"
+                },
+                "stalled": {
+                  "description": "Running, but every thread on it has been idle or gone for over six hours",
+                  "type": "boolean"
                 },
                 "startedAt": {
                   "description": "When its current run of work began: the first move to in progress since it was last reopened",
@@ -51708,6 +51716,10 @@
                   "type": "boolean",
                   "description": "It, or an open subtask, needs the user"
                 },
+                "stalled": {
+                  "description": "Running, but every thread on it has been idle or gone for over six hours",
+                  "type": "boolean"
+                },
                 "startedAt": {
                   "description": "When its current run of work began: the first move to in progress since it was last reopened",
                   "type": "number"
@@ -52572,7 +52584,8 @@
                     "worker-without-task",
                     "shown-twice",
                     "card-without-task",
-                    "open-under-closed"
+                    "open-under-closed",
+                    "stalled"
                   ]
                 },
                 "text": {

@@ -5,10 +5,10 @@ import { dueLabel, INLINE_OPTIONS, shortWhen } from "../../loops/ui/model";
 import type { Loop } from "../../loops/contract";
 import type { AreaView } from "../../areas/contract";
 import { AreaCard, ownerThreadOf } from "../../areas/ui/AreaCard";
-import { areaOrder } from "../../areas/ui/model";
+import { areaOrder, itemAge } from "../../areas/ui/model";
 import { needsYou, type Task } from "../contract";
 import { useTaskActions } from "./actions";
-import { countBelow, doneSummary, flightHeader, moreLine, todoHeader, todoShown, type FlightNode, type TodoBox } from "./board-model";
+import { countBelow, doneSummary, isRunning, type AreaAsk, flightHeader, moreLine, todoHeader, todoShown, type FlightNode, type TodoBox } from "./board-model";
 import { PageFlightRow, useFold } from "./Flight";
 import { handOffTargets, ownerLabel, type Names, type ThreadName } from "./model";
 import { TaskOutputs } from "./Outputs";
@@ -45,8 +45,10 @@ function AskActions({ task, targets, refresh }: { task: Task; targets: { owner: 
   );
 }
 
-export function TodoBoxView({ box, chat, names, threads, targets, now, zone, query, onOpen, onOpenChat, refresh, adding }: {
+export function TodoBoxView({ box, chat, areaAsks = [], names, threads, targets, now, zone, query, onOpen, onOpenChat, onOpenArea, refresh, adding }: {
   box: TodoBox;
+  areaAsks?: readonly AreaAsk[];
+  onOpenArea?(areaId: string): void;
   chat: readonly ChatAsk[];
   names: Names;
   threads: readonly ThreadName[];
@@ -60,9 +62,21 @@ export function TodoBoxView({ box, chat, names, threads, targets, now, zone, que
   adding?: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const shown = todoShown(box, chat.length, expanded);
-  const more = moreLine(shown.moreToday, shown.moreLater);
-  const empty = !box.asks.length && !box.today.length && !box.later.length && !chat.length;
+  const shown = todoShown(box, chat.length, expanded, undefined, areaAsks.length);
+  const more = moreLine(shown.moreToday, shown.moreLater, shown.moreAsks);
+  const empty = !box.asks.length && !box.today.length && !box.later.length && !chat.length && !areaAsks.length;
+  const areaRow = (ask: AreaAsk) => {
+    const age = itemAge(ask, now, zone);
+    return (
+      <li key={ask.key} data-testid="todo-area-ask" data-area={ask.areaId} className="flex min-w-0 items-center gap-3 border-t border-border/50 py-2 first:border-t-0">
+        <span aria-hidden className="flex size-5 shrink-0 items-center justify-center rounded-full border-[1.5px] border-warning bg-warning/15"><span className="size-1.5 rounded-full bg-warning" /></span>
+        <button type="button" onClick={() => onOpenArea?.(ask.areaId)} aria-label={`${ask.title}, needs you, from ${ask.area}${age ? `, ${age}` : ""}`} className="flex min-w-0 flex-1 cursor-pointer flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <span className="truncate text-sm font-medium text-foreground">{ask.title}</span>
+          <span className="truncate text-xs text-subtle-foreground">{[ask.area, age].filter(Boolean).join(" · ")}</span>
+        </button>
+      </li>
+    );
+  };
   const sub = (task: Task) => {
     if (needsYou(task)) return [task.area ?? task.project, task.needs ?? (task.why || null)].filter(Boolean).join(" · ") || null;
     const due = dueLabel(task.timing.due, now, zone);
@@ -90,12 +104,13 @@ export function TodoBoxView({ box, chat, names, threads, targets, now, zone, que
   const ownRow = (task: Task) => <OwnTodo key={task.id} task={task} sub={sub(task)} onOpen={onOpen} refresh={refresh} />;
   return (
     <section aria-labelledby="tasks-todo-head" data-testid="tasks-todo" data-studio-card="" className={BOX}>
-      <BoxHead id="tasks-todo-head" title="Your to-do" detail={todoHeader(box, chat.length)} />
+      <BoxHead id="tasks-todo-head" title="Your to-do" detail={todoHeader(box, chat.length, areaAsks.length)} />
       {adding}
       {empty ? <p data-testid="todo-empty" className="py-3 text-sm text-muted-foreground">{query ? "No to-dos match." : "Nothing for you right now."}</p> : null}
       <ul className="flex flex-col">
         {chat.map(chatRow)}
         {box.asks.slice(0, shown.asks).map(askRow)}
+        {areaAsks.slice(0, shown.areaAsks).map(areaRow)}
         {box.today.slice(0, shown.today).map(ownRow)}
       </ul>
       {expanded && box.later.length ? <>
@@ -150,7 +165,7 @@ export function AreasSection({ areas, error, flight, now, zone, query = false, o
     const thread = area.owner.kind === "lead" ? ownerThreadOf(area) : null;
     if (!thread) return { live: false, workers: 0 };
     const mine = flight.filter((n) => n.row.home === thread || n.task.owner === `thread:${thread}`);
-    return { live: mine.some((n) => n.task.state === "in_progress"), workers: mine.reduce((sum, n) => sum + countBelow(n).workers, 0) };
+    return { live: mine.some(isRunning), workers: mine.reduce((sum, n) => sum + countBelow(n).workers, 0) };
   };
   return (
     <section aria-labelledby="tasks-areas-head" data-testid="tasks-areas" className="flex flex-col gap-2.5">

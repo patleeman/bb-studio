@@ -7,7 +7,7 @@ import { Icon, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import { TASKS_UNAVAILABLE, USER_OWNER, type Task } from "../../tasks/contract";
 import { ownerShort, ownerThreadId, taskStatus } from "../../tasks/ui/model";
-import { stepProgress, treeOf, type FlightNode } from "../../tasks/ui/board-model";
+import { isRunning, stepProgress, treeOf, type FlightNode } from "../../tasks/ui/board-model";
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 import { FlightChildren, FlightGlyph, flightText, FoldToggle, useFold } from "../../tasks/ui/Flight";
@@ -59,7 +59,7 @@ export function InFlight({ threadId }: { threadId: string }) {
   const open = rows.filter(live);
   const finished = rows.filter((node) => !live(node));
   const needs = open.filter((node) => node.row.needsYou).length;
-  const running = open.filter((node) => node.task.state === "in_progress").length;
+  const running = open.filter(isRunning).length;
   const toggle = () => { setCollapsed(!collapsed); writeCollapsed(!collapsed); };
   const reveal = (task: Task) => {
     if (task.card) { revealCard({ id: task.id, threadId, messageSeq: task.card.messageSeq, pathname, toAppPath: toAppPathOf(navigate) }); return; }
@@ -94,7 +94,7 @@ export function InFlight({ threadId }: { threadId: string }) {
       <li key={card.id} className="border-b border-border/35 last:border-b-0">
         <div className="group flex min-w-0 items-center">
           <button type="button" data-testid="in-flight-row" data-state={status.id} data-look={text.look} data-owner={card.owner} data-stale={card.stale || undefined} title={card.title} aria-label={text.aria} onClick={() => reveal(card)} className="flex min-h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 py-1 pl-3 pr-1 text-left text-xs transition-colors hover:bg-state-hover focus-visible:bg-state-hover focus-visible:outline-none">
-            <span className="flex w-3.5 shrink-0 justify-center">{card.stale ? <TaskGlyph glyph={status.glyph} stale label={status.label} /> : <FlightGlyph task={card} needsYou={node.row.needsYou} size={14} />}</span>
+            <span className="flex w-3.5 shrink-0 justify-center">{card.stale ? <TaskGlyph glyph={status.glyph} stale label={status.label} /> : <FlightGlyph task={card} needsYou={node.row.needsYou} stalled={node.row.stalled} size={14} />}</span>
             <span className="min-w-0 max-w-[45%] shrink-0 truncate text-foreground">{card.title}</span>
             {agent ? <span data-testid="in-flight-owner" className="max-w-[25%] shrink-0 truncate text-muted-foreground">{ownerShort(card, names)}</span> : null}
             <span className="min-w-0 flex-1 truncate text-subtle-foreground">{text.line}</span>

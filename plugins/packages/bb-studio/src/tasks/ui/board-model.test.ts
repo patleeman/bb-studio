@@ -4,7 +4,7 @@ import { boardRows, flightRows, workerRows } from "../rows";
 import { zonedTime } from "../../loops/clock";
 import { areaOrder, itemAge, runBars } from "../../areas/ui/model";
 import type { AreaView } from "../../areas/contract";
-import { doneSummary, startedAt, flightLook, moreLine, pageCounts, pageFlight, stepProgress, todoBox, todoHeader, todoShown, treeOf, waitLabel, weekStart, workerGroups } from "./board-model";
+import { areaAsks, doneSummary, startedAt, flightLook, moreLine, pageCounts, pageFlight, stepProgress, todoBox, todoHeader, todoShown, treeOf, waitLabel, weekStart, workerGroups } from "./board-model";
 
 const NOW = Date.UTC(2026, 10, 15, 22, 0);
 const H = 3_600_000;
@@ -88,10 +88,14 @@ it("folds the to-do list to seven rows with N more today and N later, asks first
   const many = Array.from({ length: 9 }, (_, i) => t(`today_${i}`, { attention: { queue: "surfaced", push: false }, createdAt: NOW - 10 * H + i }));
   const box = todoBox([...DATA, ...many], NOW, "UTC");
   const shown = todoShown(box, 1, false);
-  expect(shown).toEqual({ asks: 2, today: 4, later: 0, moreToday: 6, moreLater: 1 });
+  expect(shown).toEqual({ asks: 2, areaAsks: 0, today: 4, later: 0, moreAsks: 0, moreToday: 6, moreLater: 1 });
   expect(moreLine(shown.moreToday, shown.moreLater)).toBe("6 more today · 1 later");
   expect(todoHeader(box, 1)).toBe("3 asks · 10 today");
-  expect(todoShown(box, 1, true)).toEqual({ asks: 2, today: 10, later: 1, moreToday: 0, moreLater: 0 });
+  expect(todoShown(box, 1, true)).toEqual({ asks: 2, areaAsks: 0, today: 10, later: 1, moreAsks: 0, moreToday: 0, moreLater: 0 });
+  const tight = todoShown(box, 1, false, 4, 3);
+  expect(tight).toEqual({ asks: 2, areaAsks: 1, today: 0, later: 0, moreAsks: 2, moreToday: 10, moreLater: 1 });
+  expect(moreLine(tight.moreToday, tight.moreLater, tight.moreAsks)).toBe("2 more asks · 10 more today · 1 later");
+  expect(todoHeader(box, 1, 3)).toBe("6 asks · 10 today");
 });
 
 it("counts done today and this week from the user's midnight and Monday, not the computer's, across midnight", () => {
@@ -154,4 +158,42 @@ it("counts a to-do checked a moment ago under Done at once, and times running wo
   const node = { task: t("running", { state: "in_progress", createdAt: now - 6 * 86_400_000 }), row: { id: "running", home: null, under: null, depth: 0, open: true, workers: [], hasWorkers: false, needsYou: false, startedAt: now - 5 * 60_000 } };
   expect(startedAt(node)).toBe(now - 5 * 60_000);
   expect(startedAt({ ...node, row: { ...node.row, startedAt: undefined } })).toBe(now - 6 * 86_400_000);
+});
+
+it("turns every area open item that needs the user into an ask, problems first, except one already among the user's own tasks", () => {
+  const item = (title: string, needsUser: boolean, taskId: string | null = null) => ({ title, since: null, sinceAt: null, needsUser, taskId });
+  const areas = [
+    { id: "area_comms", name: "Comms", status: "ok" as const, open: [item("PR #14 review", true), item("Releases untagged", false)] },
+    { id: "area_house", name: "House", status: "broken" as const, open: [item("Clean the dryer vent", true, "mine_today"), item("Defrost the freezer", true)] },
+    { id: "area_studio", name: "BB Studio", status: "ok" as const, open: [item("Next build: your OK", true, "testflight")] },
+  ];
+  expect(areaAsks(areas, DATA).map((a) => [a.area, a.title])).toEqual([["House", "Defrost the freezer"], ["BB Studio", "Next build: your OK"], ["Comms", "PR #14 review"]]);
+});
+
+it("marks a running task stalled when every thread on it has been quiet for six hours or is gone, and leaves schedules and fresh work alone", async () => {
+  const { stalledTasks } = await import("../stalled");
+  const fact = (id: string, status: string, idleH: number, extra: Record<string, unknown> = {}) => ({ id, parentThreadId: "thr_lead", title: id, status, archivedAt: null, createdAt: NOW - 48 * H, updatedAt: NOW - idleH * H, ...extra });
+  const tasks = [
+    t("quiet", { owner: "thread:thr_q", state: "in_progress", workers: ["thr_q"] }),
+    t("busy", { owner: "thread:thr_b", state: "in_progress", workers: ["thr_b"] }),
+    t("recent", { owner: "thread:thr_r", state: "in_progress", workers: ["thr_r"] }),
+    t("gone", { owner: "thread:thr_gone", state: "in_progress" }),
+    t("parent", { owner: "thread:thr_q", state: "in_progress" }),
+    t("child", { owner: "thread:thr_b", state: "in_progress", parentId: "parent" }),
+    t("sched", { owner: "thread:thr_q", state: "in_progress", automation: { id: "aut_1", kind: "runner", role: "schedule" }, schedule: { text: "Daily" } }),
+    t("nothread", { owner: "cos", state: "in_progress" }),
+  ];
+  const facts = [fact("thr_q", "idle", 7), fact("thr_b", "active", 9), fact("thr_r", "idle", 2)];
+  expect([...stalledTasks(tasks, facts, NOW)].sort()).toEqual(["gone", "quiet"]);
+  expect(stalledTasks(tasks, [], NOW).size).toBe(0);
+});
+
+it("tasks.check lists a stalled running task as a problem and changes nothing", async () => {
+  const { checkTasks } = await import("../check");
+  const tasks = [t("quiet", { owner: "thread:thr_w1", state: "in_progress", workers: ["thr_w1"], conversation: "thr_studio" })];
+  const before = JSON.stringify(tasks);
+  const facts = [{ id: "thr_w1", parentThreadId: "thr_lead", title: "Worker", status: "idle", archivedAt: null, createdAt: NOW - 48 * H, updatedAt: NOW - 7 * H }];
+  const problems = checkTasks(tasks, facts, ctx, [], NOW);
+  expect(problems.filter((p) => p.kind === "stalled").map((p) => p.taskIds)).toEqual([["quiet"]]);
+  expect(JSON.stringify(tasks)).toBe(before);
 });

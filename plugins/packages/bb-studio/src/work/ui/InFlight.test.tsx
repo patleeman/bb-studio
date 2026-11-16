@@ -6,11 +6,12 @@ import type { WorkCard } from "../contract";
 import { taskFromWork } from "../../tasks/views";
 import { isClosed, needsYou, type Task } from "../../tasks/contract";
 
+const STALLED = new Set<string>();
 const WORKERS = [{ threadId: "thr_sub_w", name: "Sub worker", status: "active", archived: false }];
 function flightOf(all: Task[]) {
   const tasks = all.filter((t) => t.state !== "dropped" && t.card?.dismissedAt == null);
   const ids = new Set(tasks.map((t) => t.id));
-  const rows = tasks.map((t) => ({ id: t.id, home: "thr_main", under: t.parentId && ids.has(t.parentId) ? t.parentId : null, depth: t.parentId && ids.has(t.parentId) ? 1 : 0, open: !isClosed(t), workers: t.workers.filter((w) => w === "thr_sub_w"), hasWorkers: t.workers.includes("thr_sub_w"), needsYou: needsYou(t) }));
+  const rows = tasks.map((t) => ({ id: t.id, home: "thr_main", under: t.parentId && ids.has(t.parentId) ? t.parentId : null, depth: t.parentId && ids.has(t.parentId) ? 1 : 0, open: !isClosed(t), workers: t.workers.filter((w) => w === "thr_sub_w"), hasWorkers: t.workers.includes("thr_sub_w"), needsYou: needsYou(t), ...(STALLED.has(t.id) ? { stalled: true } : {}) }));
   return { rows, tasks, threads: [{ owner: "thread:thr_w", name: "Fix the flaky test", threadId: "thr_w" }], workers: WORKERS, counts: { open: 0, running: 0, waiting: 0, todo: 0, needsYou: 0, done: 0, workers: 0 }, done: [] };
 }
 
@@ -366,4 +367,32 @@ it("an ended task stays open on the server but leaves the live rows: it folds wi
   await act(async () => q('[data-testid="in-flight-clear"]')!.click());
   expect(state.call).toHaveBeenCalledWith("work.clear", { threadId: "thr_main" });
   expect(rows().map((row) => row.title)).toEqual(["Live one"]);
+});
+
+it("a stalled running task draws as waiting with Stalled, not a ring; queued work says Queued once; outside and event waits say so", async () => {
+  const base = (id: string, title: string, patch: Record<string, unknown>) => ({ ...taskFromWork(card({ id, title, step: null, line: null })), card: null, ...patch });
+  STALLED.add("task_stall");
+  state.list = [
+    base("task_stall", "Visual Chat", { state: "in_progress" }),
+    base("task_live", "Live work", { state: "in_progress" }),
+    base("task_queued", "Pick up next", { owner: "cos", state: "todo" }),
+    base("task_outside", "Remove the PHP mitigation", { owner: "cos", state: "waiting", kind: "waiting-outside" }),
+    base("task_event", "After the reply", { owner: "cos", state: "todo", timing: { due: null, trigger: { type: "event", event: "reply:sam" }, snoozed: false } }),
+  ] as never;
+  await renderList();
+  const byTitle = (title: string) => rows().find((row) => row.title === title)!;
+  const stalled = byTitle("Visual Chat");
+  expect(stalled.dataset.look).toBe("waiting");
+  expect(stalled.querySelector('[data-testid="flight-ring"]')).toBeNull();
+  expect(stalled.querySelector('[data-testid="in-flight-right"]')!.textContent).toBe("Stalled");
+  expect(stalled.textContent).toContain("Stalled: nothing has moved on it for over six hours");
+  expect(q('[data-testid="in-flight-running"]')!.textContent).toBe("1 running");
+  const queued = byTitle("Pick up next");
+  expect(queued.querySelector('[data-testid="in-flight-right"]')!.textContent).toBe("Queued");
+  expect((queued.textContent!.match(/Queued/g) ?? []).length).toBe(1);
+  expect(byTitle("Remove the PHP mitigation").querySelector('[data-testid="in-flight-right"]')!.textContent).toBe("Waiting on someone");
+  const event = byTitle("After the reply");
+  expect(event.querySelector('[data-testid="in-flight-right"]')!.textContent).toBe("Waiting on an event");
+  expect(event.textContent).toContain("Waiting on: When Sam replies");
+  STALLED.clear();
 });
