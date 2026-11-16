@@ -121,12 +121,14 @@ it("counts done today and this week from the user's midnight and Monday, not the
   expect(utc.today).toBe(1);
 });
 
-it("orders areas problems first, draws the last seven runs newest first, as 6a does, and ages open items in the user's zone", () => {
+it("orders areas problems first, draws the last seven runs oldest to newest, so the newest sits beside Last, and ages open items in the user's zone", () => {
   const area = (name: string, status: AreaView["status"]) => ({ name, status }) as AreaView;
   expect(areaOrder([area("Comms", "ok"), area("Kensico", "flagged"), area("House", "broken"), area("Jobs", "unknown"), area("Systems", "flagged")]).map((a) => a.name))
     .toEqual(["House", "Kensico", "Systems", "Comms", "Jobs"]);
   const runs = Array.from({ length: 9 }, (_, i) => ({ at: NOW - i * H, outcome: i < 3 ? "broken" as const : "ok" as const, line: "", taskId: null }));
-  expect(runBars(runs).map((r) => r.outcome)).toEqual(["broken", "broken", "broken", "ok", "ok", "ok", "ok"]);
+  expect(runBars(runs).map((r) => r.outcome)).toEqual(["ok", "ok", "ok", "ok", "broken", "broken", "broken"]);
+  expect(runBars(runs).map((r) => r.at)).toEqual([...runs.slice(0, 7)].reverse().map((r) => r.at));
+  expect(runBars(runs.slice(0, 2)).map((r) => r.at)).toEqual([runs[1]!.at, runs[0]!.at]);
   expect(itemAge({ since: null, sinceAt: NOW - H }, NOW, "UTC")).toBe("today");
   expect(itemAge({ since: null, sinceAt: NOW - 6 * 24 * H }, NOW, "UTC")).toBe("6 days");
   expect(itemAge({ since: null, sinceAt: Date.UTC(2026, 9, 5, 12) }, NOW, "UTC")).toBe("Oct 5");

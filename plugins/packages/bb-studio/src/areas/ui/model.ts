@@ -14,7 +14,7 @@ export function areaOrder<T extends Pick<AreaView, "status" | "name">>(areas: re
 }
 
 export function runBars(runs: readonly AreaRun[], count = RUN_BARS): AreaRun[] {
-  return runs.slice(0, count);
+  return runs.slice(0, count).reverse();
 }
 
 export function openItems(items: readonly OpenItem[], shown = OPEN_SHOWN): { shown: OpenItem[]; more: number } {

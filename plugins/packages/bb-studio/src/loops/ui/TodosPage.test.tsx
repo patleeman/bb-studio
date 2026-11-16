@@ -413,8 +413,10 @@ it("Areas: one card each, problems first, with who, covers, where it stands, ope
   expect(house.querySelector("[data-testid=area-more]")?.textContent).toBe("+1 more");
   await act(async () => items[0]!.querySelector("button")!.click());
   expect(state.openLink).toHaveBeenLastCalledWith("bb://todo/loop_o", expect.objectContaining({ title: "Defrost the freezer" }));
-  expect([...house.querySelectorAll<HTMLElement>("[data-testid=area-run]")].map((each) => each.dataset.outcome)).toEqual(["broken", "broken", "broken", "ok", "ok", "ok", "ok"]);
-  expect(house.querySelector("[data-testid=area-runs]")?.getAttribute("aria-label")).toBe("Last 7 runs, newest first: broken, broken, broken, fine, fine, fine, fine");
+  expect([...house.querySelectorAll<HTMLElement>("[data-testid=area-run]")].map((each) => each.dataset.outcome)).toEqual(["ok", "ok", "ok", "ok", "broken", "broken", "broken"]);
+  expect(house.querySelector("[data-testid=area-runs]")?.getAttribute("aria-label")).toBe("Last 7 runs, oldest first, newest last: fine, fine, fine, fine, broken, broken, broken");
+  expect(house.querySelector("[data-testid=area-runs] li:last-child")?.getAttribute("title")).toBe(`${new Date(NOW).toLocaleString()}: run 0`);
+  expect(house.querySelector("[data-testid=area-runs]")?.nextElementSibling?.getAttribute("data-testid")).toBe("area-when");
   expect(house.querySelector("[data-testid=area-when]")?.textContent).toBe("Last 2:00 PM·Next Tue 7:00 AM");
   const studio = cards[2]!;
   expect(studio.querySelector("[data-testid=area-who]")?.textContent).toBe("BB Studio lead · 1 worker");

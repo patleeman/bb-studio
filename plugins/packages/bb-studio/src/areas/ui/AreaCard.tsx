@@ -65,7 +65,7 @@ export function AreaCard({ area, now, zone, live = false, workers = 0, onOpenTas
       </ul>
       <footer className="mt-auto flex min-w-0 flex-wrap items-center gap-x-3.5 gap-y-1 pt-3.5 text-[11.5px] text-subtle-foreground">
         {bars.length ? (
-          <ol data-testid="area-runs" aria-label={`Last ${bars.length} run${bars.length === 1 ? "" : "s"}, newest first: ${bars.map((run) => OUTCOME_LABEL[run.outcome]).join(", ")}`} className="mr-auto flex items-center gap-[3px]">
+          <ol data-testid="area-runs" aria-label={`Last ${bars.length} run${bars.length === 1 ? "" : "s"}, oldest first, newest last: ${bars.map((run) => OUTCOME_LABEL[run.outcome]).join(", ")}`} className="mr-auto flex items-center gap-[3px]">
             {bars.map((run, i) => <li key={`${run.at}-${i}`} data-testid="area-run" data-outcome={run.outcome} title={`${new Date(run.at).toLocaleString()}: ${run.line || OUTCOME_LABEL[run.outcome]}`} className={cn("h-3.5 w-2 rounded-[2px]", BAR[run.outcome])} />)}
           </ol>
         ) : <span className="mr-auto">No runs yet</span>}
