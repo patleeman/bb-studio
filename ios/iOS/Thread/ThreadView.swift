@@ -2267,6 +2267,7 @@ extension ThreadView {
         // the card rests on its inset: its own 8 pt padding goes inside it.
         chrome.composerRestDrop = 8
         chrome.restingBackdrop = .systemBackground
+        chrome.stackBand = look.showsScene ? UIColor(look.canvas) : .systemBackground
         chrome.composerIgnoresTrailingSafeArea = duoLayout.twoPages
         chrome.rows.margin = Self.margin(bot: botChrome != nil)
         chrome.rows.spacing = 10

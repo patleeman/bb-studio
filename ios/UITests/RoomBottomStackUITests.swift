@@ -148,4 +148,88 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
         shot("unfolded-right-keyboard-down")
         command("outer", wait: 3)
     }
+
+    private func assertOneOpaqueStack(_ when: String, reading: Bool, file: StaticString = #filePath, line: UInt = #line) throws {
+        Thread.sleep(forTimeInterval: 1.5)
+        let (_, transcript) = try transcript(when, file: file, line: line)
+        let stack = try XCTUnwrap(rect(transcript["stack"]), file: file, line: line)
+        let band = try XCTUnwrap(rect(transcript["band"]), "a band behind the bottom stack \(when)", file: file, line: line)
+        XCTAssertEqual(transcript["bandOpaque"] as? Bool, true, "the band is opaque, so no row shows between the stack's parts \(when)", file: file, line: line)
+        XCTAssertLessThanOrEqual(band.minY, stack.minY + 0.5, "the band starts at the stack's top \(when)", file: file, line: line)
+        XCTAssertGreaterThanOrEqual(band.maxY, stack.maxY - 0.5, "and runs under all of it \(when)", file: file, line: line)
+        let workers = any("conversationWorkers")
+        if workers.exists {
+            XCTAssertGreaterThanOrEqual(workers.frame.minY, band.minY - 0.5, "the worker pill (\(workers.frame)) is in the stack, not over the chat \(when)", file: file, line: line)
+        }
+        if reading {
+            let pill = try XCTUnwrap(rect(transcript["pill"]), "the ↓ shows while reading up \(when)", file: file, line: line)
+            XCTAssertGreaterThanOrEqual(pill.minY, band.minY - 0.5, "the ↓ (\(pill)) sits in the stack's own lane (band from \(band.minY)), over no row \(when)", file: file, line: line)
+            XCTAssertLessThanOrEqual(pill.maxY, stack.minY + 0.5, "and above the stack's parts \(when)", file: file, line: line)
+        } else {
+            let last = try XCTUnwrap(rect(transcript["lastRow"]), "the last row \(when)", file: file, line: line)
+            XCTAssertEqual(transcript["atEnd"] as? Bool, true, "at the end \(when)", file: file, line: line)
+            XCTAssertLessThanOrEqual(last.maxY, band.minY + 0.5, "the last row (to \(last.maxY)) ends above the stack (from \(band.minY)) \(when)", file: file, line: line)
+            XCTAssertNil(transcript["pill"], "no ↓ at the end \(when)", file: file, line: line)
+        }
+    }
+
+    private func setInFlight(collapsed: Bool) {
+        let toggle = app.buttons["in-flight-toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 20), "In flight")
+        if (toggle.value as? String == "Collapsed") != collapsed { toggle.tap() }
+        Thread.sleep(forTimeInterval: 1)
+    }
+
+    private func readUp() {
+        let window = app.windows.firstMatch.frame
+        let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: window.width / 2, dy: window.height * 0.2))
+        for _ in 0..<3 {
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: window.height * 0.25)), withVelocity: .slow, thenHoldForDuration: 0.2)
+        }
+        Thread.sleep(forTimeInterval: 1)
+    }
+
+    func testTheBottomStackIsOneOpaqueBandWithTheJumpInItsOwnLane() throws {
+        launch()
+        app.buttons["roomInput"].tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 10), "the chat stands up")
+        let tip = app.buttons["Continue"]
+        if tip.waitForExistence(timeout: 2) { tip.tap() }
+        command("dismiss")
+        for collapsed in [false, true] {
+            let state = collapsed ? "collapsed" : "expanded"
+            setInFlight(collapsed: collapsed)
+            command("bottom", wait: 2)
+            try assertOneOpaqueStack("In flight \(state), keyboard down, at the end", reading: false)
+            shot("stack-inflight-\(state)-end")
+            readUp()
+            try assertOneOpaqueStack("In flight \(state), keyboard down, reading up", reading: true)
+            shot("stack-inflight-\(state)-reading")
+            command("bottom", wait: 2)
+            field.tap()
+            XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "the keyboard is up")
+            try assertOneOpaqueStack("In flight \(state), keyboard up, at the end", reading: false)
+            shot("stack-inflight-\(state)-keyboard")
+            readUp()
+            if keyboard.exists {
+                try assertOneOpaqueStack("In flight \(state), keyboard up, reading up", reading: true)
+            }
+            command("dismiss")
+        }
+    }
+
+    func testAConversationWithoutWorkersOrInFlightHasTheSameStack() throws {
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaLoopsDemo", "-qaRoomTheme", theme,
+                                "-qaRoomConversation", "thr_demo_interview", "-qaRoomMode", "read"]
+        app.launchOffline()
+        if !field.waitForExistence(timeout: 30) {
+            app.terminate()
+            app.launchOffline()
+        }
+        XCTAssertTrue(field.waitForExistence(timeout: 60), "Launch prep stands up")
+        XCTAssertFalse(any("conversationWorkers").exists, "no worker pill here")
+        command("bottom", wait: 2)
+        try assertOneOpaqueStack("no pill, no In flight, at the end", reading: false)
+        shot("stack-plain-end")
+    }
 }
