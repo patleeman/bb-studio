@@ -72,9 +72,9 @@
       "budget": 10
     },
     "apps/app/src/components/secondary-panel/SecondaryPanelTabStrip.tsx": {
-      "seam": "workbench, item-drag",
-      "intent": "One row of tabs, with every rule in workbenchFork.tsx: fixedPanelTabsFirst sorts fixed plugin tabs to the front, useFixedPanelTabDisplay turns off dragging for them, FixedPanelTabGroupEnd draws the divider after the last fixed tab, and PanelTabActionMenuItems is the one line that puts the fork's pane move and pop-out items first in a tab's context menu. Tabs shrink instead of scrolling early, and the active tab always shows its close button. Every non-fixed tab is a native drag source: usePanelTabNativeDrag returns the draggable/onDragStart/onDragEnd props spread on the tab's wrapper (after dnd-kit's listeners), and when it does, the wrapper's onPointerDown skips bb's pane drag (onBeginTabDrag); the mouse sensor is InertMouseSensor so the mouse never starts dnd-kit's sort, while touch keeps dnd-kit's sensor, the sort and PanelTabItemDragSource (one line inside the DndContext, sending the item payload to whatever is under the pointer outside the strip).",
-      "budget": 45
+      "seam": "workbench, item-drag, close-all",
+      "intent": "One row of tabs, with every rule in workbenchFork.tsx: fixedPanelTabsFirst sorts fixed plugin tabs to the front, useFixedPanelTabDisplay turns off dragging for them, FixedPanelTabGroupEnd draws the divider after the last fixed tab, and PanelTabActionMenuItems is the one line that puts the fork's pane move and pop-out items first in a tab's context menu. Tabs shrink instead of scrolling early, and the active tab always shows its close button. Every non-fixed tab is a native drag source: usePanelTabNativeDrag returns the draggable/onDragStart/onDragEnd props spread on the tab's wrapper (after dnd-kit's listeners), and when it does, the wrapper's onPointerDown skips bb's pane drag (onBeginTabDrag); the mouse sensor is InertMouseSensor so the mouse never starts dnd-kit's sort, while touch keeps dnd-kit's sensor, the sort and PanelTabItemDragSource (one line inside the DndContext, sending the item payload to whatever is under the pointer outside the strip). Close all tabs: the close scope gains \"all\" (every tab but the pinned ones, and it does not select a tab first); ForkCloseAllTabsMenuItem (closeAllTabs.fork.tsx, imported at the top of the file) is the one line after Close tabs to the right, and useForkCloseAllTabsCommand(isPanelOpen, tabs, handleCloseTabs) is the one line that answers the panel.closeAll shortcut.",
+      "budget": 48
     },
     "apps/app/src/components/secondary-panel/SidebarSplitContainer.tsx": {
       "seam": "workbench-panes",
@@ -82,9 +82,9 @@
       "budget": 13
     },
     "apps/app/src/components/secondary-panel/ThreadSecondaryPanel.tsx": {
-      "seam": "workbench, workbench-panes",
-      "intent": "usePinnedFixedPanelTabs marks the fixed plugin tabs that apply to this panel as pinned, which is what removes their close button and keeps them out of Close other tabs and the mobile pager's close. WorkbenchPanelScope wraps the tab row so tab menu items know which panel they are in. PinnedIconTabsDivider follows bb's own icon tabs when no fixed plugin tab does. WORKBENCH_NEW_TAB_IN_EVERY_PANE gives every split pane its own New Tab button (one condition in each of the two new-tab lines of renderPane).",
-      "budget": 20
+      "seam": "workbench, workbench-panes, close-all",
+      "intent": "usePinnedFixedPanelTabs marks the fixed plugin tabs that apply to this panel as pinned, which is what removes their close button and keeps them out of Close other tabs and the mobile pager's close. WorkbenchPanelScope wraps the tab row so tab menu items know which panel they are in. PinnedIconTabsDivider follows bb's own icon tabs when no fixed plugin tab does. WORKBENCH_NEW_TAB_IN_EVERY_PANE gives every split pane its own New Tab button (one condition in each of the two new-tab lines of renderPane). renderPanelTabGroup takes the pane's isFocused (one field, one destructure, one argument) and passes it to WorkbenchPanelScope, so only the focused panel pane's strip answers the Close all tabs shortcut.",
+      "budget": 23
     },
     "apps/app/src/components/secondary-panel/usePanelTabPresenter.tsx": {
       "seam": "workbench",
@@ -640,6 +640,21 @@
       "seam": "finder",
       "intent": "The chat's file link menu (getLocalFileContextMenuItems) adds forkFinderLinkMenuItems(link.path, threadEnvironmentIsLocal) (ForkFinder.tsx, imported at the top of the file) after the open items, before the copy separator: Show in Finder when the thread's host is this Mac in the desktop app, else nothing.",
       "budget": 3
+    },
+    "packages/domain/src/app-keybindings.ts": {
+      "seam": "close-all",
+      "intent": "APP_COMMAND_IDS lists \"panel.closeAll\" right after \"panel.close\".",
+      "budget": 1
+    },
+    "apps/server/src/services/system/app-keybindings.ts": {
+      "seam": "close-all",
+      "intent": "The default keymap binds panel.closeAll to Mod+Alt+W (⌥⌘W on a Mac), desktop only, in the main surface without a modal, right after panel.close.",
+      "budget": 1
+    },
+    "apps/app/src/lib/app-command-metadata.ts": {
+      "seam": "close-all",
+      "intent": "panel.closeAll has a label (\"Close all panel tabs\") and a description for the shortcuts settings and the palette, right after panel.close.",
+      "budget": 1
     }
   }
 }
