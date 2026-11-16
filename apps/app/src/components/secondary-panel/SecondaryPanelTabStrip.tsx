@@ -1,3 +1,4 @@
+import { ForkCloseAllTabsMenuItem, useForkCloseAllTabsCommand } from "./closeAllTabs.fork";
 import {
   Fragment,
   type CSSProperties,
@@ -103,7 +104,7 @@ export interface SecondaryPanelTabStripProps {
   isPanelOpen: boolean;
 }
 
-export type SecondaryPanelTabCloseScope = "self" | "others" | "right";
+export type SecondaryPanelTabCloseScope = "self" | "others" | "right" | "all";
 
 export function secondaryPanelTabsToClose(
   tabs: readonly SecondaryPanelRenderableTab[],
@@ -119,7 +120,7 @@ export function secondaryPanelTabsToClose(
       ? tabs.slice(index, index + 1)
       : scope === "right"
         ? tabs.slice(index + 1)
-        : tabs.filter((tab) => tab.tab.id !== tabId);
+        : scope === "all" ? [...tabs] : tabs.filter((tab) => tab.tab.id !== tabId);
   return candidates.filter((tab) => !tab.isPinned);
 }
 
@@ -379,7 +380,7 @@ export function SecondaryPanelTabStrip({
       const closesActiveTab = tabsToClose.some(
         (tab) => tab.tab.id === activeTabId,
       );
-      if (scope !== "self" && closesActiveTab) {
+      if (scope !== "self" && scope !== "all" && closesActiveTab) {
         tabs.find((tab) => tab.tab.id === tabId)?.onSelect();
       }
       for (const tab of tabsToClose) {
@@ -388,6 +389,7 @@ export function SecondaryPanelTabStrip({
     },
     [activeTabId, tabs],
   );
+  useForkCloseAllTabsCommand(isPanelOpen, tabs, handleCloseTabs);
 
   const noDragClass = usesDesktopChrome ? MACOS_WINDOW_NO_DRAG_CLASS : null;
   const chevronNoDragClass = usesDesktopChrome
@@ -601,6 +603,7 @@ function SortablePanelTab({
         >
           Close tabs to the right
         </ContextMenuItem>
+        <ForkCloseAllTabsMenuItem tabs={tabs} onCloseAll={() => onCloseTabs(tabId, "all")} />
       </ContextMenuContent>
     </ContextMenu>
   );

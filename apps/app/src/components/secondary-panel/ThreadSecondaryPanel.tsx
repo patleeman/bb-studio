@@ -433,6 +433,7 @@ function ThreadSecondaryPanelContent({
     onSurfaceTabReorder: SecondaryPanelTabReorderHandler;
     reserveNewTabButton: boolean;
     showNewTabButton: boolean;
+    isFocused: boolean;
   }
 
   const renderHidePanelButton = () => (
@@ -555,6 +556,7 @@ function ThreadSecondaryPanelContent({
     onSurfaceTabReorder,
     reserveNewTabButton,
     showNewTabButton: showGroupNewTabButton,
+    isFocused,
   }: PanelTabGroupArgs) => {
     const activeSurfaceTab = surfaceTabs.find(
       (tab) => tab.tab.id === activeSurfaceTabId,
@@ -611,7 +613,7 @@ function ThreadSecondaryPanelContent({
     }
 
     return (
-      <WorkbenchPanelScope panelStateId={splitPanelStateId}>
+      <WorkbenchPanelScope panelStateId={splitPanelStateId} isFocused={isFocused}>
         {fixedSurfaceTabs.map((fixedTab) => (
           <PinnedIconTab
             key={fixedTab.tab.id}
@@ -765,6 +767,7 @@ function ThreadSecondaryPanelContent({
                 onSurfaceTabReorder,
                 reserveNewTabButton: reserveNewTabControl,
                 showNewTabButton: showNewTabControl,
+                isFocused,
               })}
             </div>
             {showOuterControls ||
