@@ -10,6 +10,7 @@ struct InFlightBar: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.openTaskThread) private var openThread
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.look) private var look
 
     private var rows: [TaskItem] {
         let visible = (model.flights[threadId]?.tasks ?? []).filter { hidden[$0.id] != $0.updatedAt }
@@ -117,7 +118,7 @@ struct InFlightBar: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .background(Color(uiColor: .secondarySystemBackground).opacity(0.92), in: .rect(cornerRadius: 14, style: .continuous))
+        .background(look.stackFill, in: .rect(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.separator.opacity(0.6), lineWidth: 0.5))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("in-flight")

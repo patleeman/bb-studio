@@ -99,14 +99,21 @@ struct BotChromeToolbar: ViewModifier {
 /// on the mic focused the field instead.
 struct BotComposerGlass: ViewModifier {
     let active: Bool
+    @Environment(\.look) private var look
 
     func body(content: Content) -> some View {
         if active {
-            content.glassEffect(.regular, in: .rect(cornerRadius: 24))
+            content
+                .background(look.stackFill, in: .rect(cornerRadius: 24))
+                .glassEffect(.regular, in: .rect(cornerRadius: 24))
         } else {
             content
         }
     }
+}
+
+extension Look {
+    var stackFill: Color { canvas.mix(with: ink, by: mode == .light ? 0.035 : 0.08) }
 }
 
 /// A send haptic, and word to the Bot tab when the chat starts or stops

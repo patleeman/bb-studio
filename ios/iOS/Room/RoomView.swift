@@ -413,6 +413,9 @@ struct RoomView: View {
             RoomLightLayer(light: light, seed: pager.shown)
                 .id(pager.shown)
                 .transition(.opacity)
+            RoomFrost(pages: pages, layout: layout, light: light, seed: pager.shown, botId: bot.id, view: view)
+                .opacity(pages != nil || room.standing ? 1 : 0)
+                .animation(reduceMotion ? .easeInOut(duration: 0.2) : .smooth(duration: 0.34), value: room.standing)
             #if DEBUG
             Color.clear.frame(width: 1, height: 1).accessibilityElement().accessibilityIdentifier("roomScene").accessibilityValue(look.theme.id)
             Color.clear.frame(width: 1, height: 1).accessibilityElement().accessibilityIdentifier("roomLight").accessibilityValue(light.name)

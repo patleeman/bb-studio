@@ -17,13 +17,15 @@ struct ComposerField: UIViewRepresentable {
     var probeWidth: CGFloat? = nil
     var onPasteImages: ([UIImage]) -> Void
 
+    static let verticalInset: CGFloat = 8
+
     func makeUIView(context: Context) -> PastingTextView {
         let view = PastingTextView()
         view.delegate = context.coordinator
         view.font = .preferredFont(forTextStyle: .body)
         view.adjustsFontForContentSizeCategory = true
         view.backgroundColor = .clear
-        view.textContainerInset = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
+        view.textContainerInset = UIEdgeInsets(top: Self.verticalInset, left: 12, bottom: Self.verticalInset, right: 12)
         view.textContainer.lineFragmentPadding = 0
         view.isScrollEnabled = false
         view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -186,9 +188,11 @@ struct ComposerBar<Settings: View, Send: View>: View {
             if compact {
                 // One field in the same place either way: rebuilt in another
                 // branch, its text view lost the keyboard it had just taken.
-                HStack(alignment: prominentMic ? .bottom : .center, spacing: 2) {
-                    if oneRow && attaches { AttachmentMenu(items: $attachments, symbol: "plus") }
+                HStack(alignment: .bottom, spacing: 2) {
+                    if oneRow && attaches { AttachmentMenu(items: $attachments, symbol: "plus", tint: micTint) }
                     field(top: oneRow ? 0 : 4)
+                        .padding(.bottom, oneRow ? ComposerRow.lift : 0)
+                        .frame(minHeight: oneRow ? ComposerRow.button : nil, alignment: .bottom)
                     if oneRow { micAndSend }
                 }
                 .padding(.leading, oneRow ? (attaches ? 6 : 4) : 0)
@@ -199,7 +203,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
             }
             if !oneRow {
                 HStack(spacing: 2) {
-                    if attaches { AttachmentMenu(items: $attachments, symbol: "plus") }
+                    if attaches { AttachmentMenu(items: $attachments, symbol: "plus", tint: micTint) }
                     settings()
                     Spacer(minLength: 4)
                     if let toPage {
@@ -264,7 +268,14 @@ struct ComposerBar<Settings: View, Send: View>: View {
             .accessibilityIdentifier("composerMic")
         }
         if let dictation { DictationSendStatus(gate: dictation) }
-        if !(prominentMic && empty) { send() }
+        if !(prominentMic && empty) { send().frame(minWidth: ComposerRow.button, minHeight: ComposerRow.button) }
+    }
+}
+
+enum ComposerRow {
+    static let button: CGFloat = 44
+    static var lift: CGFloat {
+        max(0, (button / 2 - ComposerField.verticalInset - UIFont.preferredFont(forTextStyle: .body).lineHeight / 2).rounded())
     }
 }
 

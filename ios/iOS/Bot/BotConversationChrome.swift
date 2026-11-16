@@ -159,6 +159,7 @@ struct ConversationTitle: View {
 struct WorkersLineView: View {
     let line: WorkersLine
     let open: (String) -> Void
+    @Environment(\.look) private var look
 
     var body: some View {
         Menu {
@@ -182,6 +183,7 @@ struct WorkersLineView: View {
             .padding(.leading, 12)
             .padding(.trailing, 14)
             .frame(height: 36)
+            .background(look.stackFill, in: .capsule)
             .glassEffect(.regular, in: .capsule)
             .contentShape(.capsule)
         }

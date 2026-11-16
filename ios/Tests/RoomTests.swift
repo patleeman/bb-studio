@@ -3,6 +3,14 @@ import XCTest
 
 @MainActor
 final class RoomTests: XCTestCase {
+    func testTheFrostCoversTheConversationPageFromTheHinge() {
+        let wide = RoomFrost.seam(951)
+        XCTAssertEqual(wide, (951 / 2 + DuoPages.hinge / 2) / 951, accuracy: 0.0001)
+        XCTAssertLessThan(wide + 0.02, 0.736, "the scene's moon (0.736 of the width) is under the frosted page")
+        XCTAssertGreaterThanOrEqual(wide - 0.02, (951 / 2 - DuoPages.hinge / 2) / 951, "the presence page stays sharp: the frost fades in inside the hinge")
+        XCTAssertEqual(RoomFrost.seam(0), 0.5)
+    }
+
     func testTheInputStandsTheChatUpAndTheChevronOrATapOutsideLaysItDown() {
         let room = RoomModel()
         XCTAssertEqual(room.mode, .rest)

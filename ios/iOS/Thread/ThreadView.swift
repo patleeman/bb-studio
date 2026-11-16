@@ -1430,7 +1430,7 @@ struct ThreadView: View {
                     Group {
                         if askingWorker { ProgressView() } else { Image(systemName: "arrow.up.circle.fill").font(.title) }
                     }
-                    .frame(width: 36, height: 36)
+                    .frame(width: ComposerRow.button, height: ComposerRow.button).contentShape(.rect)
                 }
                 .disabled(!WorkerInfo.canAsk(draft, busy: askingWorker) || dictation.blocksSend)
                 .keyboardShortcut(.return, modifiers: .command)
@@ -1749,7 +1749,7 @@ struct ThreadView: View {
                         .foregroundStyle(Color(uiColor: .systemBackground))
                         .frame(width: 32, height: 32)
                         .background(Color.primary.opacity(0.85), in: .circle)
-                        .frame(width: 36, height: 36)
+                        .frame(width: ComposerRow.button, height: ComposerRow.button).contentShape(.rect)
                     }
                     .disabled(model.stopping)
                     .accessibilityLabel("Stop \(botChrome.bot.name)")
@@ -1769,7 +1769,7 @@ struct ThreadView: View {
                                 .font(model.thread?.isRunning == true ? .body.weight(.semibold) : .title)
                         }
                     }
-                    .frame(width: 36, height: 36)
+                    .frame(width: ComposerRow.button, height: ComposerRow.button).contentShape(.rect)
                 }
                 .disabled(!canSend)
                 .keyboardShortcut(.return, modifiers: .command)
@@ -2349,6 +2349,7 @@ extension ThreadView {
             .padding(.horizontal, label != nil ? 10 : 0)
         }
         .buttonStyle(.glass(state.note != nil ? .regular.tint(.orange) : .regular))
+        .background(look.stackFill, in: .capsule)
         .clipShape(.capsule)
         .padding(12)
         .accessibilityLabel(label.map { "Jump to latest, \($0)" } ?? "Jump to latest")

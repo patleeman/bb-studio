@@ -70,8 +70,13 @@ enum DuoDemo {
             }
             return view.subviews.flatMap(composers)
         }
+        func transcripts(_ view: UIView) -> [[String: Any]] {
+            if let controller = view.next as? TranscriptController, view.window != nil { return [controller.qaGeometry] }
+            return view.subviews.flatMap(transcripts)
+        }
         return ["width": window.bounds.width, "height": window.bounds.height,
                 "composers": (window.windowScene?.windows ?? [window]).flatMap(composers),
+                "transcripts": transcripts(window),
                 "pane": DuoPaneState.shared.pane.rawValue,
                 "safeRight": window.safeAreaInsets.right, "safeBottom": window.safeAreaInsets.bottom,
                 "keyboardTop": keyboardTop ?? window.bounds.height,

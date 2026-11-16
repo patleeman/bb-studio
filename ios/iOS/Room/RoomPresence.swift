@@ -510,12 +510,13 @@ struct RoomYoursRow: View {
 struct RoomLightLayer: View {
     let light: RoomLight
     let seed: String
+    var showsOrb = true
 
     var body: some View {
         GeometryReader { proxy in
             ZStack {
                 grade
-                if let orb {
+                if showsOrb, let orb {
                     let spot = RoomLightLayer.spot(seed: seed, size: proxy.size)
                     Circle().fill(orb.color.opacity(orb.opacity))
                         .frame(width: orb.size, height: orb.size)
@@ -575,6 +576,50 @@ struct RoomLightLayer: View {
         case .dawn: (Color(red: 1, green: 0.8, blue: 0.75), 24, 0.6)
         case .morning: (Color(red: 1, green: 0.96, blue: 0.82), 28, 0.6)
         }
+    }
+}
+
+struct RoomFrost: View {
+    let pages: DuoPages?
+    let layout: DuoLayout
+    let light: RoomLight
+    let seed: String
+    var botId: String?
+    var view: BotThreadsView?
+    @Environment(\.look) private var look
+
+    static let radius: CGFloat = 24
+
+    var body: some View {
+        ZStack {
+            SceneBackdrop(theme: look.theme, botId: botId, view: view, stillOnly: true)
+            RoomLightLayer(light: light, seed: seed, showsOrb: false)
+        }
+        .blur(radius: Self.radius, opaque: true)
+        .mask { mask }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder private var mask: some View {
+        switch pages {
+        case nil:
+            Color.black
+        case .sideBySide?:
+            LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: Self.seam(layout.windowSize.width) - 0.02),
+                                   .init(color: .black, location: Self.seam(layout.windowSize.width) + 0.02), .init(color: .black, location: 1)],
+                           startPoint: .leading, endPoint: .trailing)
+        case .stacked?:
+            LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: Self.seam(layout.windowSize.height) - 0.02),
+                                   .init(color: .black, location: Self.seam(layout.windowSize.height) + 0.02), .init(color: .black, location: 1)],
+                           startPoint: .top, endPoint: .bottom)
+        }
+    }
+
+    static func seam(_ length: CGFloat) -> CGFloat {
+        guard length > 0 else { return 0.5 }
+        return min(0.98, max(0.02, (length / 2 + DuoPages.hinge / 2) / length))
     }
 }
 
