@@ -1,3 +1,4 @@
+import { ForkShowInFinderButton, ForkShowInFinderMenuItem, type ForkLocalPath } from "./ForkFinder";
 import { SourceLoadingSkeleton } from "@/components/code/code-loading-skeletons";
 import {
   type CSSProperties,
@@ -127,6 +128,7 @@ interface FilePreviewProps {
   isRefreshing?: boolean;
   markdownLinkRouting?: MarkdownLinkRouting;
   statusLabel?: string | null;
+  localPath?: ForkLocalPath | null;
 }
 
 interface FilePreviewBodyProps {
@@ -164,6 +166,7 @@ interface FilePreviewHeaderProps {
   onLineOverflowModeChange: CodeOverflowModeChangeHandler;
   viewMode: FilePreviewViewMode;
   onViewModeChange: (mode: FilePreviewViewMode) => void;
+  localPath?: ForkLocalPath | null;
 }
 
 interface FilePreviewLineWrapButtonProps {
@@ -463,6 +466,7 @@ export function FilePreview({
   isRefreshing = false,
   markdownLinkRouting,
   statusLabel = null,
+  localPath = null,
 }: FilePreviewProps) {
   const iframeTarget = state.kind === "html" ? state.iframe : null;
   const iframeKey = JSON.stringify([
@@ -585,6 +589,7 @@ export function FilePreview({
           onOpenInEditor={onOpenInEditor}
           onRefresh={onRefresh}
           isRefreshing={isRefreshing}
+          localPath={localPath}
           statusLabel={statusLabel}
           toggleKind={toggleKind}
           showLineOverflowToggle={showLineOverflowToggle}
@@ -704,6 +709,7 @@ function FilePreviewHeader({
   onLineOverflowModeChange,
   viewMode,
   onViewModeChange,
+  localPath,
 }: FilePreviewHeaderProps) {
   const openShortcut = useAppCommandShortcut("workspace.openPreferred");
   const { ref: headerRef, width } = useElementWidth();
@@ -755,6 +761,7 @@ function FilePreviewHeader({
                   </TooltipContent>
                 </Tooltip>
               ) : null}
+              <ForkShowInFinderButton localPath={localPath} />
               {download !== null ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -944,6 +951,7 @@ function FilePreviewHeader({
                       {isRefreshing ? "Refreshing file" : "Refresh file"}
                     </DropdownMenuItem>
                   ) : null}
+                  <ForkShowInFinderMenuItem localPath={localPath} />
                   {onOpenInEditor ? (
                     <DropdownMenuItem onSelect={() => onOpenInEditor(path)}>
                       <Icon name="ExternalLink" aria-hidden /> Open in editor
