@@ -10,6 +10,7 @@ export type RowRef = {
   workers: string[];
   hasWorkers: boolean;
   needsYou: boolean;
+  startedAt?: number;
 };
 
 export type RowCounts = { open: number; running: number; waiting: number; todo: number; needsYou: number; done: number; workers: number };
@@ -117,8 +118,10 @@ export function countRoots(roots: readonly Pick<Node, "task" | "needsYou" | "dee
   };
 }
 
-export function flightRows(all: readonly Task[], threadId: string, ctx: RowContext): Rows {
-  return flatten(buildRows(all, ctx).roots.filter((r) => r.home === threadId));
+export const clearedAway = (t: Task, clearedAt: number) => clearedAt > 0 && (isClosed(t) || t.stale) && Math.max(t.closedAt ?? 0, t.updatedAt) <= clearedAt;
+
+export function flightRows(all: readonly Task[], threadId: string, ctx: RowContext, clearedAt = 0): Rows {
+  return flatten(buildRows(all, ctx).roots.filter((r) => r.home === threadId && !clearedAway(r.task, clearedAt)));
 }
 
 export function workerRows(all: readonly Task[], ctx: RowContext): Rows & { groups: { conversation: string | null; ids: string[] }[] } {

@@ -6,7 +6,7 @@ import { adoptAtStart } from "./src/tasks/migrate";
 import { asFact, linkAtStart, listThreadFacts, ThreadDirectory } from "./src/tasks/links";
 import { SpawnLinks } from "./src/tasks/spawn";
 import { AutomationTasks, readSources } from "./src/tasks/automations";
-import { Areas, leadsFrom, runnersFrom, type AreaLead } from "./src/areas/areas";
+import { Areas, leadsFrom, ownNameWords, runnersFrom, type AreaLead } from "./src/areas/areas";
 import { rpcErrorStatus } from "./src/kit/server/index";
 import { AreaStore } from "./src/areas/store";
 import { AREA_TOOLS, registerAreas } from "./src/areas/register";
@@ -841,7 +841,9 @@ export default async function plugin(bb: BbPluginApi) {
     },
     zone: () => loopTimeZone(process.env, studioSettings.current().todosTimeZone),
     leads: () => areaLeads,
+    userWords: () => areaUserWords,
   });
+  const areaUserWords = ownNameWords();
   let areaLeads: AreaLead[] = [];
   let areaLeadsRead = false;
   const areaStep = <T,>(name: string, work: () => T): T | null => (areaLeadsRead ? taskStep(`areas ${name}`, work) : null);

@@ -398,3 +398,45 @@ it("an older phone's push buttons work on task_ ids, in the todo list or not", a
   expect(await handlers["loops.act"]!({ id: plain.id, action: "snooze", snooze: "tonight" })).toMatchObject({ status: "snoozed" });
   expect(await handlers["loops.act"]!({ id: plain.id, action: "done" })).toMatchObject({ status: "done" });
 });
+
+it("Clear done sticks for card-less rows: a finished made-up task and an ended one leave the conversation's In flight, also after a reload, and new work still shows", async () => {
+  const { handlers } = setup();
+  const { TaskStore } = await import("./store");
+  const { task: taskSchema } = await import("./contract");
+  const store = new TaskStore(db);
+  const put = (id: string, patch: Record<string, unknown>) => store.save(taskSchema.parse({ id, title: id, owner: "thread:thr_worker", state: "done", origin: "work", conversation: "thr_main", createdAt: NOW - 7_200_000, updatedAt: NOW - 3_600_000, closedAt: NOW - 3_600_000, ...patch }));
+  put("task_madeup", { source: { kind: "spawn", ref: "thr_worker" } });
+  put("task_ended", { state: "in_progress", closedAt: null, stale: true });
+  put("task_open", { state: "in_progress", closedAt: null });
+  const ids = async (h: typeof handlers) => (await h["tasks.flight"]!({ threadId: "thr_main" })).rows.map((r: { id: string }) => r.id).sort();
+  expect(await ids(handlers)).toEqual(["task_ended", "task_madeup", "task_open"]);
+  await handlers["work.clear"]!({ threadId: "thr_main" });
+  expect(await ids(handlers)).toEqual(["task_open"]);
+  const reloaded = setup().handlers;
+  expect(await ids(reloaded)).toEqual(["task_open"]);
+  expect((await reloaded["tasks.flight"]!({ threadId: "thr_other" })).rows).toEqual([]);
+  vi.setSystemTime(NOW + 60_000);
+  put("task_later", { closedAt: NOW + 60_000, updatedAt: NOW + 60_000 });
+  expect(await ids(reloaded)).toEqual(["task_later", "task_open"]);
+  expect((await reloaded["tasks.board"]!({})).rows.map((r: { id: string }) => r.id)).toContain("task_madeup");
+});
+
+it("views read each thread once within a short window, and rows carry when their current work began", async () => {
+  const { handlers, user, tool } = setup();
+  const made = await tool("task_create", { title: "Run the suite", owner: "me" }, "thr_worker");
+  const id = made.id ?? made.task?.id;
+  await tool("task_update", { id, state: "waiting", needs: "CI" }, "thr_worker");
+  vi.setSystemTime(NOW + 5 * 60_000);
+  await tool("task_update", { id, state: "in_progress" }, "thr_worker");
+  vi.setSystemTime(NOW + 10 * 60_000);
+  const first = await handlers["tasks.board"]!({});
+  const reads = user.reads;
+  await handlers["tasks.board"]!({});
+  await handlers["tasks.workers"]!({});
+  expect(user.reads).toBe(reads);
+  const row = first.rows.find((r: { id: string }) => r.id === id);
+  expect(row.startedAt).toBe(NOW + 5 * 60_000);
+  vi.setSystemTime(NOW + 10 * 60_000 + 11_000);
+  await handlers["tasks.board"]!({});
+  expect(user.reads).toBeGreaterThan(reads);
+});

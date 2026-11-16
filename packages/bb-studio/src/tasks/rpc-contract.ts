@@ -25,6 +25,7 @@ export const rowRef = z.object({
   workers: z.array(z.string()).describe("Worker threads shown under this row (each worker once, at the deepest task it works on)"),
   hasWorkers: z.boolean(),
   needsYou: z.boolean().describe("It, or an open subtask, needs the user"),
+  startedAt: z.number().optional().describe("When its current run of work began: the first move to in progress since it was last reopened"),
 });
 export const rowCounts = z.object({
   open: z.number().int(), running: z.number().int(), waiting: z.number().int(), todo: z.number().int(),

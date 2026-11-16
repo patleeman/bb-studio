@@ -33,10 +33,15 @@ export interface BotPageLayoutProps {
   /** The page's BotPageToolbar. */
   toolbar?: ReactNode;
   testId?: string;
+  /** A wider column, for a page of cards side by side (Tasks). */
+  wide?: boolean;
   children?: ReactNode;
 }
 
-export function BotPageLayout({ title, bot, botId, actions, toolbar, testId, children }: BotPageLayoutProps) {
+const WIDE_CARD = "pointer-events-none sticky top-0 -z-10 -mb-[100cqh] h-[100cqh] mx-auto w-full max-w-[1448px]";
+const WIDE_COLUMN = "mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-8 pt-5 pb-16 @max-2xl/bot-page:px-4";
+
+export function BotPageLayout({ title, bot, botId, actions, toolbar, testId, wide = false, children }: BotPageLayoutProps) {
   const botDetail = !bot ? undefined : botId
     ? <button type="button" data-testid="bot-page-bot" onClick={() => openAppPath(botPath(botId))} className="max-w-full truncate rounded hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">{bot}</button>
     : bot;
@@ -45,8 +50,8 @@ export function BotPageLayout({ title, bot, botId, actions, toolbar, testId, chi
       <PageBar title={title} actions={actions} detail={botDetail} column />
       <div className="relative flex min-h-0 flex-1 [container-type:size]">
         <div data-bot-page-scroll="" data-fork-overlay-scroll="" className="isolate min-h-0 min-w-0 flex-1 overflow-y-auto">
-          <div aria-hidden data-fork-card="main" data-testid="bot-page-card" className={BOT_PAGE_CARD} />
-          <div className={BOT_PAGE_COLUMN}>
+          <div aria-hidden data-fork-card="main" data-testid="bot-page-card" className={wide ? WIDE_CARD : BOT_PAGE_CARD} />
+          <div className={wide ? WIDE_COLUMN : BOT_PAGE_COLUMN}>
             {toolbar}
             {children}
           </div>

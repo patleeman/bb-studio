@@ -4,6 +4,15 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { WorkCard } from "../contract";
 import { taskFromWork } from "../../tasks/views";
+import { isClosed, needsYou, type Task } from "../../tasks/contract";
+
+const WORKERS = [{ threadId: "thr_sub_w", name: "Sub worker", status: "active", archived: false }];
+function flightOf(all: Task[]) {
+  const tasks = all.filter((t) => t.state !== "dropped" && t.card?.dismissedAt == null);
+  const ids = new Set(tasks.map((t) => t.id));
+  const rows = tasks.map((t) => ({ id: t.id, home: "thr_main", under: t.parentId && ids.has(t.parentId) ? t.parentId : null, depth: t.parentId && ids.has(t.parentId) ? 1 : 0, open: !isClosed(t), workers: t.workers.filter((w) => w === "thr_sub_w"), hasWorkers: t.workers.includes("thr_sub_w"), needsYou: needsYou(t) }));
+  return { rows, tasks, threads: [{ owner: "thread:thr_w", name: "Fix the flaky test", threadId: "thr_w" }], workers: WORKERS, counts: { open: 0, running: 0, waiting: 0, todo: 0, needsYou: 0, done: 0, workers: 0 }, done: [] };
+}
 
 const NOW = new Date("2026-11-13T15:00:00Z").getTime();
 const card = (patch: Partial<WorkCard> = {}): WorkCard => ({ id: "wc_1", threadId: "thr_main", title: "Release 1.0.2", kind: "release", state: "running", step: "2/5 Sign", line: "Notarizing the DMG", needs: null, workerThreadId: null, messageId: "m_1", messageSeq: 41, createdAt: NOW - 60_000, updatedAt: NOW - 60_000, finishedAt: null, stale: false, dismissedAt: null, ...patch });
@@ -17,12 +26,14 @@ const state = vi.hoisted(() => ({
   call: vi.fn(async (_method: string, _input: unknown): Promise<unknown> => ({})),
   refresh: vi.fn(),
   openLoops: vi.fn(),
+  openLink: vi.fn(async (_link: string, _options: unknown) => ({ via: "workbench" })),
 }));
+vi.mock("../../links/open", () => ({ openLinkFromAnywhere: state.openLink }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => (state.toAppPath ? { toThread: state.toThread, experimental_toAppPath: state.toAppPath } : { toThread: state.toThread }),
 }));
 vi.mock("../../ui/live", () => ({
-  useLive: (method: string) => ({ data: method === "tasks.inFlight" && !state.error ? { tasks: state.list.map((x) => ("origin" in x ? x as never : taskFromWork(x))), threads: [{ owner: "thread:thr_w", name: "Fix the flaky test", threadId: "thr_w" }] } : null, error: state.error, loading: false, refresh: state.refresh }),
+  useLive: (method: string) => ({ data: method === "tasks.flight" && !state.error ? flightOf(state.list.map((x) => ("origin" in x ? x as unknown as Task : taskFromWork(x)))) : null, error: state.error, loading: false, refresh: state.refresh }),
   useCall: () => state.call,
 }));
 vi.mock("../../kit/ui/index", async () => (await import("../../loops/ui/test-kit")).kitUi);
@@ -63,8 +74,15 @@ it("lists one row per card with its name, state and a needs-you marker", async (
   expect(rows()[0]!.textContent).toContain("Approve deploy");
   expect(rows()[0]!.textContent).toContain("Approve the prod push");
   expect(rows()[0]!.querySelector('[data-testid="in-flight-needs-you"]')!.textContent).toBe("Needs you");
-  expect(rows()[1]!.textContent).toContain("2/5 Sign · Notarizing the DMG");
-  expect(rows()[1]!.textContent).toContain("Running");
+  expect(rows()[1]!.textContent).toContain("Sign · Notarizing the DMG");
+  expect(rows()[1]!.querySelector('[data-testid="in-flight-right"]')!.textContent).toBe("2 of 5");
+  expect(rows()[1]!.querySelector('[data-testid="flight-ring"]')!.getAttribute("data-progress")).toBe("2/5");
+  expect(rows()[1]!.getAttribute("aria-label")).toBe("Release 1.0.2, running, step 2 of 5, A thread, for 1m");
+  expect(rows()[2]!.dataset.look).toBe("waiting");
+  expect(rows()[2]!.querySelector('[data-testid="flight-ring"]')).toBeNull();
+  expect(rows()[2]!.querySelector('[data-testid="flight-glyph"]')!.getAttribute("data-look")).toBe("waiting");
+  expect(rows()[2]!.textContent).toContain("Queued behind main");
+  expect(rows()[2]!.querySelector('[data-testid="in-flight-right"]')!.textContent).toBe("Waiting");
   expect(rows()[1]!.querySelector('[data-testid="in-flight-needs-you"]')).toBeNull();
   expect(q('[data-testid="in-flight-count"]')!.textContent).toBe("3");
   expect(q('[data-testid="in-flight-needs"]')!.textContent).toBe("1 needs you");
@@ -205,7 +223,7 @@ it("folds finished rows into one line under the live ones, and opens them on a c
   await renderList();
   expect(rows().map((row) => row.title)).toEqual(["Live one", "Live two"]);
   const fold = q('[data-testid="in-flight-done"]')!;
-  expect(fold.textContent).toBe("3 done");
+  expect(fold.textContent).toBe("3 done today");
   expect(fold.getAttribute("aria-expanded")).toBe("false");
   expect(q('[data-testid="in-flight-count"]')!.textContent).toBe("2");
   await act(async () => fold.click());
@@ -251,7 +269,7 @@ it("puts the rows back when clearing fails", async () => {
   state.call.mockRejectedValueOnce(new Error("offline"));
   await renderList();
   await act(async () => q('[data-testid="in-flight-clear"]')!.click());
-  expect(q('[data-testid="in-flight-done"]')!.textContent).toBe("3 done");
+  expect(q('[data-testid="in-flight-done"]')!.textContent).toBe("3 done today");
 });
 
 it("removes one row with its ×, live or done", async () => {
@@ -265,13 +283,13 @@ it("removes one row with its ×, live or done", async () => {
   await act(async () => dismissOf("Live one").click());
   expect(state.call).toHaveBeenLastCalledWith("work.dismiss", { id: "wc_live1" });
   expect(rows().map((row) => row.title)).toEqual(["Live two", "Done one", "Failed one"]);
-  expect(q('[data-testid="in-flight-done"]')!.textContent).toBe("2 done");
+  expect(q('[data-testid="in-flight-done"]')!.textContent).toBe("2 done today");
 });
 
 it("shows an ended card as done with a question, never Running", async () => {
   state.list = [card({ id: "wc_live" }), card({ id: "wc_end", title: "Stuck worker", state: "done", stale: true, finishedAt: NOW - 1_000 })];
   await renderList();
-  expect(q('[data-testid="in-flight-done"]')!.textContent).toBe("1 done");
+  expect(q('[data-testid="in-flight-done"]')!.textContent).toBe("1 done today");
   await act(async () => q('[data-testid="in-flight-done"]')!.click());
   const ended = rows()[1]!;
   expect(ended.dataset.stale).toBe("true");
@@ -294,4 +312,58 @@ it("names the agent on agents' rows, lists a cardless task of the user's without
   expect(state.toThread).toHaveBeenCalledWith("thr_w");
   await act(async () => rows()[0]!.click());
   expect(state.openLoops).toHaveBeenCalledWith("bot_1");
+});
+
+it("says what a waiting row waits on: you, CI, another task or someone outside", async () => {
+  const base = (id: string, title: string, waitingOn: Task["waitingOn"], line: string | null = null) => ({ ...taskFromWork(card({ id, title, state: "waiting", step: null, line })), card: null, waitingOn });
+  state.list = [
+    base("task_u", "Duo checks", { kind: "user", ref: null, text: null }),
+    base("task_c", "Release build", { kind: "ci", ref: "run 42", text: null }),
+    base("task_p", "Next TestFlight", { kind: "task", ref: "task_u", text: null }),
+    base("task_o", "Lease addendum", { kind: "outside", ref: null, text: "the landlord" }),
+  ] as never;
+  await renderList();
+  const right = rows().map((row) => row.querySelector('[data-testid="in-flight-right"]')?.textContent);
+  expect(right).toEqual(["Waiting on you", "Waiting on CI", "Waiting on a task", "Waiting on the landlord"]);
+  expect(rows()[1]!.textContent).toContain("Waiting on CI: run 42");
+  expect(rows()[2]!.textContent).toContain("Waiting on Duo checks");
+  expect(rows().every((row) => row.querySelector('[data-testid="flight-glyph"]')?.getAttribute("data-look") === "waiting")).toBe(true);
+});
+
+it("folds a task's subtasks and workers under it, one row at the top, and opens a worker's thread", async () => {
+  const lead = { ...taskFromWork(card({ id: "task_lead", title: "Phone polish", step: "3/5 Shots" })), card: null };
+  const sub = { ...taskFromWork(card({ id: "task_sub", title: "Take the screenshots", step: null, line: "Light theme" })), card: null, parentId: "task_lead", workers: ["thr_sub_w"] };
+  state.list = [lead, sub] as never;
+  await renderList();
+  expect(rows().map((row) => row.title)).toEqual(["Phone polish"]);
+  expect(q('[data-testid="in-flight-count"]')!.textContent).toBe("1");
+  const fold = q('[data-testid="flight-fold"]')!;
+  expect(fold.dataset.count).toBe("1 subtask · 1 worker");
+  expect(fold.textContent).toBe("1");
+  expect(fold.getAttribute("aria-expanded")).toBe("false");
+  await act(async () => fold.click());
+  expect([...container.querySelectorAll<HTMLElement>('[data-testid="flight-subtask"]')].map((row) => row.dataset.taskId)).toEqual(["task_sub"]);
+  state.openLoops.mockClear();
+  await act(async () => q('[data-testid="flight-subtask"]')!.click());
+  expect(state.openLink).toHaveBeenCalledWith("bb://todo/task_sub", { source: "card", title: "Take the screenshots" });
+  expect(state.openLoops).not.toHaveBeenCalled();
+  const worker = q('[data-testid="flight-worker"]')!;
+  expect(worker.getAttribute("aria-label")).toBe("Open worker Sub worker");
+  await act(async () => worker.click());
+  expect(state.toThread).toHaveBeenCalledWith("thr_sub_w");
+});
+
+it("an ended task stays open on the server but leaves the live rows: it folds with the done ones and goes with Clear done", async () => {
+  const ended = { ...taskFromWork(card({ id: "wc_end", title: "Ended worker" })), state: "in_progress" as const, stale: true };
+  state.list = [card({ id: "wc_live", title: "Live one" }), ended as never];
+  await renderList();
+  expect(rows().map((row) => row.title)).toEqual(["Live one"]);
+  expect(q('[data-testid="in-flight-count"]')!.textContent).toBe("1");
+  expect(q('[data-testid="in-flight-done"]')!.textContent).toBe("1 done today");
+  await act(async () => q('[data-testid="in-flight-done"]')!.click());
+  expect(rows()[1]!.textContent).toContain("Ended");
+  expect(rows()[1]!.textContent).not.toContain("Running");
+  await act(async () => q('[data-testid="in-flight-clear"]')!.click());
+  expect(state.call).toHaveBeenCalledWith("work.clear", { threadId: "thr_main" });
+  expect(rows().map((row) => row.title)).toEqual(["Live one"]);
 });

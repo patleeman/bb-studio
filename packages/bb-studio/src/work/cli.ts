@@ -1,3 +1,4 @@
+import { clearFlight } from "../tasks/cleared";
 import { parseFlags, usage } from "../kit/cli";
 import { changes, createInput, type WorkCard } from "./contract";
 import type { registerWorkCards } from "./register";
@@ -57,6 +58,8 @@ export async function runWorkCli(argv: readonly string[], work: Work, ctx: { thr
         const threadId = values.thread || ctx.threadId;
         if (!threadId) return { exitCode: 1, stderr: "Pass --thread: the conversation whose finished cards to clear.\n" };
         const cleared = work.store.clearFinished(threadId);
+        clearFlight(work.store.db, threadId, work.store.now());
+        work.store.changed();
         return out({ cleared }, `Cleared ${cleared} finished ${cleared === 1 ? "card" : "cards"}.`);
       }
       default:

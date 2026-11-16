@@ -4,7 +4,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MIGRATIONS } from "../src/migrations";
-import { Areas, leadsFrom, runnersFrom, type AreaExtra } from "../src/areas/areas";
+import { Areas, leadsFrom, ownNameWords, runnersFrom, type AreaExtra } from "../src/areas/areas";
 import { AreaStore } from "../src/areas/store";
 import { AutomationTasks, readSources, type AutomationBotInfo } from "../src/tasks/automations";
 import { TaskStore } from "../src/tasks/store";
@@ -40,7 +40,7 @@ const areas = new Areas(new AreaStore(copy), tasks, {
   runners: () => runnersFrom(copy),
   leads: () => leads.filter((lead) => !alive.size || alive.has(lead.thread)),
   zone: () => zone,
-  userWords: () => (flag("--user-words") ?? "user,you,your").split(","),
+  userWords: () => (flag("--user-words") ? flag("--user-words")!.split(",") : ownNameWords()),
 });
 const seeded = areas.seed(extra);
 const second = areas.sync();

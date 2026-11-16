@@ -604,3 +604,39 @@ it("finds Main where the Bot keeps it: the personal project's lead, not the bots
   db.prepare("DELETE FROM project_leads").run();
   expect(new ThreadDirectory(db).main()).toBeNull();
 });
+
+it("work_card_create for an idle worker whose made-up task closed reopens and draws that task, not a new card (QA note 3)", async () => {
+  const { tools, links, store, user } = setup();
+  const made = links.ensure(fact("thr_w1", { parentThreadId: "thr_lead", status: "active" }))!;
+  links.settled("thr_w1");
+  expect(store.get(made.id).state).toBe("done");
+  const before = store.all().length;
+  const out = JSON.parse(await tools.work_card_create!.execute({ title: "Second round", kind: "worker", workerThreadId: "thr_w1", line: "Starting" }, { threadId: "thr_main" }));
+  expect(out.id).toBe(made.id);
+  expect(out.post).toMatch(/Post this line once/);
+  expect(store.all()).toHaveLength(before);
+  expect(store.get(made.id)).toMatchObject({ state: "in_progress", title: "Second round", conversation: "thr_main", closedAt: null, progress: { line: "Starting" }, card: { kind: "worker" } });
+  expect(store.history(made.id).map((e) => e.type)).toContain("reopened");
+  const rows = (await user.board()).rows.filter((r) => r.workers.includes("thr_w1"));
+  expect(rows.map((r) => r.id)).toEqual([made.id]);
+  links.settled("thr_w1");
+  expect(store.get(made.id).state).toBe("in_progress");
+  const real = (await tool2(tools, "task_create", { title: "Real job", owner: "thread:thr_w2", workers: ["thr_w2"] }));
+  links.settled("thr_w2");
+  const again = JSON.parse(await tools.work_card_create!.execute({ title: "W2 card", kind: "worker", workerThreadId: "thr_w2" }, { threadId: "thr_main" }));
+  expect(again.id).toBe(real.task.id);
+});
+
+async function tool2(tools: Record<string, Tool>, name: string, input: unknown) {
+  return JSON.parse(await tools[name]!.execute(input, { threadId: "thr_lead" }));
+}
+
+it("work_card_create never reopens a made-up task the user closed", async () => {
+  const { tools, links, store, handlers } = setup();
+  const made = links.ensure(fact("thr_w1", { parentThreadId: "thr_lead", status: "active" }))!;
+  await handlers["tasks.act"]!({ id: made.id, action: "done" });
+  expect(store.get(made.id)).toMatchObject({ state: "done", closedBy: "patrick" });
+  const out = JSON.parse(await tools.work_card_create!.execute({ title: "Second round", kind: "worker", workerThreadId: "thr_w1" }, { threadId: "thr_main" }));
+  expect(out.id).not.toBe(made.id);
+  expect(store.get(made.id)).toMatchObject({ state: "done", closedBy: "patrick", card: null });
+});

@@ -6,9 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "../migrations";
 import { AutomationTasks, parentIdOf, readSources, type AutomationBotInfo } from "../tasks/automations";
 import { TaskStore } from "../tasks/store";
-import { Areas, fileStat, leadsFrom, readText, runnersFrom, type AreaCaller, type AreaDeps, type AreaLead } from "./areas";
+import { Areas, fileStat, leadsFrom, ownNameWords, readText, runnersFrom, type AreaCaller, type AreaDeps, type AreaLead } from "./areas";
 import { area as areaSchema, KEEP_AREA_RUNS, type Area } from "./contract";
-import { areaFolder, coversFromAreaMd, deriveStatus, readStatusFile, readStatusNotes, runOutcome, sinceAt, sortAreas } from "./derive";
+import { addressesUser, areaFolder, coversFromAreaMd, deriveStatus, nameWords, readStatusFile, readStatusNotes, runOutcome, sinceAt, sortAreas } from "./derive";
 import { registerAreas } from "./register";
 import { AreaStore } from "./store";
 
@@ -400,5 +400,65 @@ describe("review fixes", () => {
     expect(areas.update({ name: "Side project" }, "thr_conv").area.owner).toEqual({ kind: "lead", thread: "thr_conv" });
     expect(areas.update({ name: "Job hunt" }, "thr_main").area.owner).toEqual({ kind: "bot", botId: "bot_main" });
     expect(() => areas.update({ area: "Studio", now: "x" }, "thr_worker")).toThrow(/looked after by Studio lead/);
+  });
+});
+
+describe("the user's name in STATUS.md", () => {
+  it("counts a name only where the user is addressed, with Unicode word edges", () => {
+    const zoe = nameWords("zoe", "Zoë Ångström");
+    expect(addressesUser("Waiting on Zoë", zoe)).toBe(true);
+    expect(addressesUser("Zoë signs it", zoe)).toBe(true);
+    expect(addressesUser("Zoë's call", zoe)).toBe(true);
+    expect(addressesUser("Asked Zoë; no answer", zoe)).toBe(true);
+    expect(addressesUser("Ask Zoë", zoe)).toBe(true);
+    expect(addressesUser("Zoëlle signs it", zoe)).toBe(false);
+    expect(addressesUser("cleared by Zoë", zoe)).toBe(false);
+    expect(addressesUser("Skipped (Zoë, Nov 1: done herself)", zoe)).toBe(false);
+    expect(addressesUser("Recheck; Zoë to decide", zoe)).toBe(true);
+    const will = nameWords("will", "Will Park");
+    expect(addressesUser("Will check on the next run", will)).toBe(true);
+    expect(addressesUser("Recheck; will check next run", will)).toBe(false);
+    expect(addressesUser("The runner will ask later", will)).toBe(false);
+    expect(addressesUser("Remind Will before winter", will)).toBe(true);
+    expect(addressesUser("Ask me again tomorrow", will)).toBe(false);
+    expect(addressesUser("Your call", will)).toBe(true);
+    expect(addressesUser("yourself", will)).toBe(false);
+    expect(addressesUser("Up to the user", [])).toBe(false);
+  });
+
+  const NOTES = (stamp: string) => `Last run: ${stamp}\n\n## Open items (item | since | state | next)\n- Renew the permit | Oct 2 | Waiting on Alex | Alex signs it\n- Gutter cleaning | Oct 9 | Booked | none\n`;
+
+  it("takes the words from the account's full name and login, with you and me as the fallback", () => {
+    expect(nameWords("alexq", "Alex Quinn")).toEqual(["you", "your", "user", "Alex", "alexq"]);
+    expect(nameWords("root", "")).toEqual(["you", "your", "user"]);
+    expect(nameWords(null, null)).toEqual(["you", "your", "user"]);
+    expect(nameWords("a1", "System Administrator")).toEqual(["you", "your", "user", "System"]);
+    expect(nameWords("zoe", "Zoë Ångström")).toEqual(["you", "your", "user", "Zoë", "zoe"]);
+    expect(ownNameWords()).toEqual(expect.arrayContaining(["you", "your"]));
+    expect(ownNameWords()).not.toContain("me");
+    expect(readStatusNotes(NOTES("today"), NOW, nameWords("alexq", "Alex Quinn")).open.map((o) => o.needsUser)).toEqual([true, false]);
+    expect(readStatusNotes(NOTES("today"), NOW).open.map((o) => o.needsUser)).toEqual([false, false]);
+  });
+
+  it("rereads STATUS.md with the words until the runner writes status.json", () => {
+    const path = folder("house", { area: "# House\n\nOwns: the house.\n", status: NOTES("Sun 07:10, nothing new") });
+    runner("run_house", "House", "thr_house", jobFor("house"));
+    let words: string[] = [];
+    const { areas } = setup({}, { userWords: () => words });
+    areas.sync();
+    expect(areas.get("House").open.filter((o) => o.needsUser)).toHaveLength(0);
+    words = nameWords("alexq", "Alex Quinn");
+    areas.sync();
+    expect(areas.get("House").open.filter((o) => o.needsUser)).toHaveLength(0);
+    writeFileSync(join(path, "STATUS.md"), NOTES("Mon 07:10, nothing new"));
+    utimesSync(join(path, "STATUS.md"), new Date(NOW + MIN), new Date(NOW + MIN));
+    areas.sync();
+    expect(areas.get("House")).toMatchObject({ now: "Mon 07:10, nothing new", open: [expect.objectContaining({ title: "Renew the permit", needsUser: true }), expect.objectContaining({ needsUser: false })] });
+    writeFileSync(join(path, "status.json"), JSON.stringify(status({ now: "From the file.", open: [] })));
+    areas.sync();
+    writeFileSync(join(path, "STATUS.md"), NOTES("Tue 07:10, nothing new"));
+    utimesSync(join(path, "STATUS.md"), new Date(NOW + 2 * MIN), new Date(NOW + 2 * MIN));
+    areas.sync();
+    expect(areas.get("House")).toMatchObject({ now: "From the file.", open: [] });
   });
 });

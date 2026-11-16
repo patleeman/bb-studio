@@ -1,6 +1,8 @@
 import type Database from "better-sqlite3";
 import { readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { userInfo } from "node:os";
 import { randomUUID } from "node:crypto";
 import { fromHeartbeat, localZone, type Schedule } from "../schedule";
 import { nextRun } from "../triggers/next-run";
@@ -8,7 +10,7 @@ import { parentIdOf } from "../tasks/automations";
 import { isClosed, USER_OWNER, type Task } from "../tasks/contract";
 import type { TaskStore } from "../tasks/store";
 import { areaUpdateInput, STATUS_FILE, type Area, type AreaOwner, type AreaRun, type AreaUpdateInput, type AreaView, type OpenItem } from "./contract";
-import { addRuns, areaFolder, clip, coversFromAreaMd, coversFromJob, deriveStatus, FRESH_SLACK_MS, fileItems, MISSED_GRACE_MS, MAX_FILE_BYTES, readStatusFile, readStatusNotes, reportOutcome, runOutcome, sinceAt, sortAreas, type ReportLevel } from "./derive";
+import { addRuns, areaFolder, clip, coversFromAreaMd, coversFromJob, deriveStatus, FRESH_SLACK_MS, fileItems, MISSED_GRACE_MS, MAX_FILE_BYTES, nameWords, readStatusFile, readStatusNotes, reportOutcome, runOutcome, sinceAt, sortAreas, type ReportLevel } from "./derive";
 import type { AreaStore } from "./store";
 
 export type AreaRunner = { id: string; botId: string; name: string; thread: string | null; state: "active" | "paused"; job: string; last: { level: ReportLevel; summary: string; at: number } | null };
@@ -37,6 +39,18 @@ export function fileStat(path: string): { mtime: number; size: number } | null {
     const stat = statSync(path);
     return stat.isFile() ? { mtime: stat.mtimeMs, size: stat.size } : null;
   } catch { return null; }
+}
+
+export function ownNameWords(): string[] {
+  let login: string | null = null;
+  let fullName: string | null = null;
+  try { login = userInfo().username; } catch { login = null; }
+  if (process.platform === "darwin") {
+    try { fullName = execFileSync("/usr/bin/id", ["-F"], { encoding: "utf8", timeout: 2_000 }).trim(); } catch { fullName = null; }
+  } else {
+    try { fullName = (userInfo() as { gecos?: string }).gecos?.split(",")[0] ?? null; } catch { fullName = null; }
+  }
+  return nameWords(login, fullName);
 }
 
 export function readText(path: string): string | null {
@@ -75,7 +89,7 @@ export class Areas {
   private schedule(task: Task) { return this.deps.schedule ? this.deps.schedule(task) : readSchedule(this.tasks.db, task); }
 
   private blank(id: string, name: string, owner: AreaOwner, ownerName: string, now: number): Area {
-    return { id, name: clip(name, 80), covers: "", owner, ownerName: clip(ownerName, 120), cadence: null, stated: null, now: null, open: [], runs: [], links: [], statusFile: null, file: null, levels: {}, archived: false, createdAt: now, updatedAt: now };
+    return { id, name: clip(name, 80), covers: "", owner, ownerName: clip(ownerName, 120), cadence: null, stated: null, now: null, open: [], runs: [], links: [], statusFile: null, file: null, notesMtime: null, levels: {}, archived: false, createdAt: now, updatedAt: now };
   }
 
   private put(area: Area, before: Area | null): boolean {
@@ -158,14 +172,9 @@ export class Areas {
         const areaMd = this.read(join(folder.dir, "AREA.md"));
         const covers = areaMd ? coversFromAreaMd(areaMd.text) : null;
         if (covers) area.covers = covers; else out.problems.push(`${runner.name}: AREA.md ${areaMd ? "has no Owns: line" : "not found"}`);
-        const notes = this.read(join(folder.dir, "STATUS.md"));
-        if (notes) {
-          const read = readStatusNotes(notes.text, now, this.deps.userWords?.());
-          area.now = read.now;
-          area.open = read.open;
-          if (read.status) area.stated = { status: read.status, at: notes.mtime, from: "notes" };
-          for (const problem of read.problems) out.problems.push(`${runner.name}: STATUS.md ${problem}`);
-        } else out.problems.push(`${runner.name}: STATUS.md not found`);
+        const problems = this.readNotes(area, folder.dir, now);
+        if (problems) out.problems.push(...problems.map((problem) => `${runner.name}: STATUS.md ${problem}`));
+        else out.problems.push(`${runner.name}: STATUS.md not found`);
       } else out.problems.push(`${runner.name}: no area folder in its job; runner_report only`);
       if (runner.last) area.runs = [{ at: runner.last.at, outcome: reportOutcome(runner.last.level, runner.last.summary), line: clip(runner.last.summary), taskId: null }];
       this.store.save(area);
@@ -196,6 +205,7 @@ export class Areas {
       if (bot && bot.id === area.owner.botId) area.ownerName = clip(bot.name, 120);
     }
     if (area.statusFile) this.readStatus(area, now);
+    if (area.owner.kind === "runner" && area.statusFile && area.file?.mtime == null && (area.stated === null || area.stated.from === "notes")) this.readNotes(area, dirname(area.statusFile), now);
     const added: AreaRun[] = [];
     const cutoff = area.runs.length >= 30 ? area.runs.at(-1)!.at : -Infinity;
     const known = new Set(area.runs.map((r) => r.taskId).filter(Boolean));
@@ -217,6 +227,21 @@ export class Areas {
     const levels = Object.entries(area.levels);
     if (levels.length > KEEP_LEVELS) area.levels = Object.fromEntries(levels.slice(-KEEP_LEVELS));
     return area;
+  }
+
+  private readNotes(area: Area, dir: string, now: number): string[] | null {
+    const path = join(dir, "STATUS.md");
+    const stat = this.stat(path);
+    if (!stat) return null;
+    if (area.notesMtime === stat.mtime) return [];
+    const notes = this.read(path);
+    if (!notes) return null;
+    const read = readStatusNotes(notes.text, now, this.deps.userWords?.());
+    area.notesMtime = stat.mtime;
+    area.now = read.now;
+    area.open = read.open;
+    area.stated = read.status ? { status: read.status, at: notes.mtime, from: "notes" } : null;
+    return read.problems;
   }
 
   private readStatus(area: Area, now: number): void {

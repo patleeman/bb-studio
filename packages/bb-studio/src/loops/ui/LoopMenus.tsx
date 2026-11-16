@@ -68,11 +68,13 @@ export function PickTime({ onClose, onPick }: { onClose(): void; onPick(at: numb
 }
 
 /** Hand off ▾: the Bot, then each project's lead. */
-export function HandOffMenu({ targets, disabled, onHandOff, className = CARD_BUTTON }: { targets: { owner: string; name: string }[]; disabled?: boolean; onHandOff(owner: string): void; className?: string }) {
+export function HandOffMenu({ targets, disabled, onHandOff, className = CARD_BUTTON, label }: { targets: { owner: string; name: string }[]; disabled?: boolean; onHandOff(owner: string): void; className?: string; label?: string }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className={className} disabled={disabled}><Icon name="ArrowTurnForward" />Hand off<Icon name="ChevronDown" className="opacity-60" /></button>
+        {label
+          ? <button type="button" className={className} disabled={disabled} aria-label={label} title={label}><Icon name="ArrowTurnForward" /></button>
+          : <button type="button" className={className} disabled={disabled}><Icon name="ArrowTurnForward" />Hand off<Icon name="ChevronDown" className="opacity-60" /></button>}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-52">
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Hand off to</DropdownMenuLabel>

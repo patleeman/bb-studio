@@ -1,3 +1,4 @@
+import { clearFlight } from "../tasks/cleared";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
@@ -5,8 +6,8 @@ import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { changes, createInput, directiveFor, isFinished, rpcContract, WORK_ID, type CreateInput, type WorkCard, type WorkChanges } from "./contract";
 import { WorkCardStore } from "./store";
 import { assertTasksReady, guardTasks } from "../tasks/store";
-import { closedByUser, KEPT_CLOSED, type Task } from "../tasks/contract";
-import { boundTask, isPlaceholder, ThreadDirectory } from "../tasks/links";
+import { closedByUser, isClosed, KEPT_CLOSED, type Task } from "../tasks/contract";
+import { boundTask, isPlaceholder, SPAWN_SOURCE, ThreadDirectory } from "../tasks/links";
 
 type TimelineRow = { id: string; kind?: string; role?: string; text?: string; messageSeq?: number };
 type TimelinePage = { rows?: TimelineRow[]; timelinePage?: { olderCursor?: { anchorSeq: number; anchorId: string } | null } };
@@ -76,8 +77,12 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     }
     const worker = input.workerThreadId;
     if (!worker || input.kind === "lead" || !threads.isWorker(worker)) return null;
-    const bound = boundTask(store.tasks.all(), worker);
-    return bound && WORK_ID.test(bound.id) ? bound : null;
+    const all = store.tasks.all();
+    const bound = boundTask(all, worker);
+    if (bound) return WORK_ID.test(bound.id) ? bound : null;
+    const madeUp = all.filter((t) => t.source?.kind === SPAWN_SOURCE && t.source.ref === worker && isPlaceholder(t) && t.state !== "dropped" && !closedByUser(t) && WORK_ID.test(t.id))
+      .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    return madeUp ?? null;
   };
   const attach = (task: Task, input: CreateInput & { threadId: string }): WorkCard => {
     if (task.automation || task.schedule) throw new Error("That task is an automation's; it has no work card.");
@@ -86,6 +91,7 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     const madeUp = isPlaceholder(task);
     store.tasks.change(task.id, (t) => {
       if (madeUp) { t.title = input.title; t.conversation = input.threadId; }
+      if (madeUp && isClosed(t)) { t.state = input.state === "waiting" ? "waiting" : "in_progress"; t.progress.line = input.line || null; t.stale = false; }
       t.card = { kind: input.kind ?? "task", messageId: null, messageSeq: null, dismissedAt: null };
       if (t.conversation === null) t.conversation = input.threadId;
       if (worker) t.workers = [worker, ...t.workers.filter((w) => w !== worker)];
@@ -149,7 +155,7 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     "work.update": ({ id, ...rest }) => update(id, rest),
     "work.anchor": async ({ id, threadId, messageId }) => await place(store.anchor(id, threadId, messageId)),
     "work.dismiss": ({ id }) => store.dismiss(id),
-    "work.clear": ({ threadId }) => ({ cleared: store.clearFinished(threadId) }),
+    "work.clear": ({ threadId }) => { const cleared = store.clearFinished(threadId); clearFlight(db, threadId, store.now()); store.changed(); return { cleared }; },
   }, false, (message) => bb.log.warn(message)));
 
   bb.agents.registerTool({

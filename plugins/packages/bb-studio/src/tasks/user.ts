@@ -7,6 +7,7 @@ import { threadOwner } from "../loops/register";
 import { isClosed, needsYou, USER_OWNER, type Task, type TaskEvent } from "./contract";
 import { tasksContract, type TaskActInput, type TaskView } from "./rpc-contract";
 import { checkTasks, legacyCardsWithoutTask } from "./check";
+import { flightClearedAt } from "./cleared";
 import { ThreadDirectory, type ThreadFact } from "./links";
 import { boardRows, dayStart, flightRows, workerRows, type RowContext, type Rows } from "./rows";
 import { guardTasks, TaskStore } from "./store";
@@ -29,7 +30,7 @@ export type UserTaskDeps = {
   facts?(): Promise<ThreadFact[]>;
 };
 
-const DONE_LIST_MS = 7 * 86_400_000;
+const DONE_LIST_MS = 8 * 86_400_000;
 const AGENT = /^(cos|thread:.+)$/;
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -51,8 +52,47 @@ export function inFlightOrder(tasks: readonly Task[]): Task[] {
   return [...tasks].sort((a, b) => rank(a) - rank(b) || (isClosed(a) ? (b.closedAt ?? 0) - (a.closedAt ?? 0) : a.createdAt - b.createdAt) || a.id.localeCompare(b.id));
 }
 
+const THREAD_CACHE_MS = 10_000;
+
 export class UserTasks {
   constructor(readonly store: TaskStore, readonly deps: UserTaskDeps) {}
+
+  private cache = new Map<string, { at: number; value: Promise<ThreadLike | null> }>();
+  reads = 0;
+
+  lookup(id: string): Promise<ThreadLike | null> {
+    const now = Date.now();
+    const hit = this.cache.get(id);
+    if (hit && now - hit.at < THREAD_CACHE_MS) return hit.value;
+    if (this.cache.size > 500) for (const [key, entry] of this.cache) if (now - entry.at >= THREAD_CACHE_MS) this.cache.delete(key);
+    this.reads += 1;
+    const value = this.deps.thread(id).catch(() => null);
+    this.cache.set(id, { at: now, value });
+    return value;
+  }
+
+  startedAt(ids: readonly string[]): Map<string, number> {
+    const out = new Map<string, number>();
+    if (!ids.length) return out;
+    const marks = ids.map(() => "?").join(", ");
+    const events = this.store.db.prepare(`SELECT task_id AS id, type, at, data FROM task_events WHERE task_id IN (${marks}) AND type IN ('state', 'reopened', 'started', 'created') ORDER BY seq`).all(...ids) as { id: string; type: string; at: number; data: string }[];
+    const running = (e: { type: string; data: string }) => {
+      if (e.type === "started") return true;
+      if (e.type !== "state" && e.type !== "created") return false;
+      try { return (JSON.parse(e.data || "{}") as { state?: string }).state === "in_progress"; } catch { return false; }
+    };
+    const since = new Map<string, number>();
+    for (const e of events) {
+      if (e.type === "reopened") {
+        since.set(e.id, e.at);
+        out.delete(e.id);
+        try { if ((JSON.parse(e.data || "{}") as { status?: string }).status === "in_progress") out.set(e.id, e.at); } catch { continue; }
+        continue;
+      }
+      if (running(e) && !out.has(e.id) && e.at >= (since.get(e.id) ?? 0)) out.set(e.id, e.at);
+    }
+    return out;
+  }
 
   async names(tasks: readonly Task[], history: readonly TaskEvent[] = []): Promise<ThreadInfo[]> {
     const ids = new Set<string>();
@@ -67,7 +107,7 @@ export class UserTasks {
       for (const w of t.workers) ids.add(w);
       if (t.conversation) ids.add(t.conversation);
     }
-    return Promise.all([...ids].map(async (id) => threadOwner(`thread:${id}`, await this.deps.thread(id).catch(() => null))));
+    return Promise.all([...ids].map(async (id) => threadOwner(`thread:${id}`, await this.lookup(id))));
   }
 
   async view(id: string): Promise<TaskView> {
@@ -93,17 +133,20 @@ export class UserTasks {
 
   async workerInfo(ids: readonly string[]) {
     return Promise.all([...new Set(ids)].map(async (threadId) => {
-      const thread = await this.deps.thread(threadId).catch(() => null) as (ThreadLike & { status?: string | null }) | null;
+      const thread = await this.lookup(threadId) as (ThreadLike & { status?: string | null }) | null;
       return { threadId, name: (thread?.title || thread?.titleFallback || "").trim() || "A worker thread", status: thread?.status ?? null, archived: !!thread?.archivedAt || !!thread?.deletedAt };
     }));
   }
 
   private async rowsView(rows: Rows) {
-    return { ...rows, threads: await this.names(rows.tasks), workers: await this.workerInfo(rows.rows.flatMap((r) => r.workers)) };
+    const byId = new Map(rows.tasks.map((t) => [t.id, t]));
+    const started = this.startedAt(rows.rows.filter((r) => r.open && byId.get(r.id)?.state === "in_progress").map((r) => r.id));
+    const withStart = rows.rows.map((r) => (started.has(r.id) ? { ...r, startedAt: started.get(r.id)! } : r));
+    return { ...rows, rows: withStart, threads: await this.names(rows.tasks), workers: await this.workerInfo(rows.rows.flatMap((r) => r.workers)) };
   }
 
   async flight(threadId: string) {
-    const rows = flightRows(this.store.all(), threadId, this.context());
+    const rows = flightRows(this.store.all(), threadId, this.context(), flightClearedAt(this.store.db, threadId));
     const done = rows.rows.filter((r) => r.under === null && !r.open).map((r) => r.id);
     return { ...await this.rowsView(rows), done };
   }
@@ -113,7 +156,7 @@ export class UserTasks {
     const view = await this.rowsView(out);
     const groups = await Promise.all(out.groups.map(async (g) => ({
       conversation: g.conversation, ids: g.ids,
-      name: g.conversation ? threadOwner(`thread:${g.conversation}`, await this.deps.thread(g.conversation).catch(() => null)).name : "No conversation",
+      name: g.conversation ? threadOwner(`thread:${g.conversation}`, await this.lookup(g.conversation)).name : "No conversation",
     })));
     return { ...view, groups };
   }

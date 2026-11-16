@@ -249,3 +249,19 @@ it("a recurring task shows its schedule, Active or Paused, its latest runs and f
   expect(card().querySelector('[data-testid="task-severity"]')!.className).toContain("text-destructive");
   expect(card().textContent).toContain("Finding");
 });
+
+it("shows the task's outputs on the card: a PR, a page and a build, each opening where it lives", async () => {
+  const opened = vi.fn(async () => ({ via: "workbench" }));
+  const links = await import("../../links/open");
+  vi.spyOn(links, "openLinkFromAnywhere").mockImplementation(opened as never);
+  put({ owner: "thread:thr_w", state: "done", closedAt: NOW, outputs: [{ kind: "pr", ref: "https://github.com/example/app/pull/14" }, { kind: "page", ref: "pg_notes", title: "Release notes" }, { kind: "build", ref: "0115" }] });
+  await render("work", { id: "task_1" });
+  const chips = [...card().querySelectorAll<HTMLElement>('[data-testid="task-output"]')];
+  expect(chips.map((each) => [each.dataset.kind, each.textContent, each.tagName])).toEqual([["pr", "PR #14", "BUTTON"], ["page", "Release notes", "BUTTON"], ["build", "0115", "SPAN"]]);
+  expect(chips[0]!.getAttribute("aria-label")).toBe("Open pr PR #14");
+  await act(async () => chips[1]!.click());
+  expect(opened).toHaveBeenCalledWith("bb://page/pg_notes", expect.objectContaining({ source: "card", title: "Release notes" }));
+  put({ outputs: [] });
+  await render("work", { id: "task_1" });
+  expect(card().querySelector('[data-testid="task-outputs"]')).toBeNull();
+});

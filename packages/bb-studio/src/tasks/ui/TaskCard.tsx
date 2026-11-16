@@ -6,6 +6,7 @@ import { relativeTime } from "../../kit/format";
 import { Icon, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import { useTaskActions } from "./actions";
+import { TaskOutputs } from "./Outputs";
 export { useTaskActions } from "./actions";
 import { BotAvatar } from "../../ui/bot/BotAvatar";
 import type { Loop } from "../../loops/contract";
@@ -175,6 +176,7 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
           {task.automation?.severity && open ? <span data-testid="task-severity" className={cn("shrink-0 font-medium", TONE[severityTone(task.automation.severity)])}>· {SEVERITY_LABEL[task.automation.severity]}</span> : null}
           {task.progress.line ? <span data-testid="task-line" className="min-w-0 truncate text-muted-foreground">{task.progress.line}</span> : null}
         </div>
+        <TaskOutputs outputs={task.outputs} />
         {needsYou(task) && task.needs ? (
           <div data-testid="task-needs" className="rounded-md border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-warning/5 px-2.5 py-1.5 text-sm text-foreground">{task.needs}</div>
         ) : null}

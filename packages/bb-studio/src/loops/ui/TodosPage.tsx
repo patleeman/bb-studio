@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { errorMessage } from "../../kit/format";
 import { Button } from "../../kit/ui/button";
 import { Input } from "../../kit/ui/input";
 import { cn } from "../../kit/ui/utils";
 import type { BotView } from "../../contract";
 import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageMore, BotPageRow, BotPageToolbar, foldRows, noMatch, useBotPageQuery, useRowOpen } from "../../ui/bot-page";
-import { MenuSelect } from "../../ui/menu-select";
 import { useCall, useLive } from "../../ui/live";
 import { isClosed, needsYou, USER_OWNER, type Task } from "../../tasks/contract";
-import { SEVERITY_LABEL, ALL, filterChoices, ownerFilterOf, ownerLabel, ownerShort, sectionTasks, taskSection, taskKind, taskStatus, type Names, type SectionId } from "../../tasks/ui/model";
+import { SEVERITY_LABEL, ALL, matches, ownerFilterOf, ownerShort, sectionTasks, taskSection, taskKind, taskStatus, type Names } from "../../tasks/ui/model";
+import { pageFlight, todoBox, type FlightNode } from "../../tasks/ui/board-model";
+import { AreasSection, DoneBar, PageInFlight, TodoBoxView } from "../../tasks/ui/TasksNow";
 import { SCHEDULED_ICON, scheduledMeta } from "./scheduled-model";
 import { NewAutomationMenu, newKinds, useAutomationEditor, useAutomations } from "../../ui/bot/Automations";
 import { useNeedsYou } from "./LoopsTab";
@@ -31,124 +33,107 @@ export function taskMeta(task: Task, names: Names, now: number, zone?: string): 
   return null;
 }
 
-export function TodosPage({ view }: { view: BotView }) {
+export type TasksTab = "now" | "scheduled";
+
+export function TodosPage({ view, tab: initialTab = "now" }: { view: BotView; tab?: TasksTab }) {
   const bot = view.bot!;
   const call = useCall();
   const people = useLoopPeople();
   const zone = useTodosZone();
   const rowOpen = useRowOpen();
+  const navigate = useBbNavigate();
   const ownsTasks = bot.primary !== false;
+  const [tab, setTab] = useState<TasksTab>(ownsTasks ? initialTab : "scheduled");
+  const board = useLive("tasks.board", {}, { enabled: ownsTasks, pollMs: 30_000 });
   const list = useLive("tasks.list", {}, { enabled: ownsTasks, pollMs: 60_000 });
+  const areas = useLive("areas.list", {}, { enabled: ownsTasks, pollMs: 60_000 });
   const scheduledList = useLive("loops.scheduled", {}, { pollMs: 60_000 });
   const automationList = useAutomations(bot.id);
   const editor = useAutomationEditor(bot.id, automationList.data?.automations ?? [], () => { automationList.refresh(); scheduledList.refresh(); });
+  const boardTasks = useMemo(() => (ownsTasks ? board.data?.tasks ?? [] : []), [ownsTasks, board.data]);
   const tasks = useMemo(() => (ownsTasks ? list.data?.tasks ?? [] : []), [ownsTasks, list.data]);
-  const surfaced = useMemo(() => tasks.filter((t) => !isClosed(t) && t.owner === USER_OWNER && t.attention.queue === "surfaced") as unknown as Loop[], [tasks]);
+  const surfaced = useMemo(() => boardTasks.filter((t) => !isClosed(t) && t.owner === USER_OWNER && t.attention.queue === "surfaced") as unknown as Loop[], [boardTasks]);
   const { pending } = useNeedsYou(ownsTasks ? people.botThreadId : null, surfaced);
   const [query, setQuery] = useBotPageQuery();
-  const [area, setArea] = useState(ALL);
-  const [project, setProject] = useState(ALL);
-  const [owner, setOwner] = useState(ALL);
   const [adding, setAdding] = useState(false);
   const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(() => new Set());
   const fold = <T,>(id: string, rows: readonly T[]) => foldRows(rows, unfolded.has(id));
   const moreLine = (id: string, title: string, count: number) => count ? <BotPageMore count={count} group={title} testId="tasks-more" onOpen={() => setUnfolded((open) => new Set([...open, id]))} /> : null;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(timer); }, []);
-  const names: Names = { bot: people.botName, leads: people.leads, threads: list.data?.threads ?? [], botThreadId: people.botThreadId };
-  const sections = useMemo(() => sectionTasks(tasks, { area, project, owner, query, botThreadId: people.botThreadId }, now, zone), [tasks, area, project, owner, query, now, zone, people.botThreadId]);
-  const filtered = area !== ALL || project !== ALL || owner !== ALL;
-  const showChat = !query.trim() && area === ALL && project === ALL && (owner === ALL || owner === USER_OWNER);
-  const chatRows = showChat ? pending.length : 0;
-  const scheduled = useMemo(() => (scheduledList.data?.items ?? []).filter((item) => item.source === "automation" && item.botId === bot.id && (!query.trim() || item.title.toLowerCase().includes(query.trim().toLowerCase())) && !filtered),
-    [scheduledList.data, bot.id, query, filtered]);
+  const threads = useMemo(() => [...(board.data?.threads ?? []), ...(list.data?.threads ?? [])], [board.data, list.data]);
+  const names: Names = { bot: people.botName, leads: people.leads, threads, botThreadId: people.botThreadId };
+  const searching = !!query.trim();
+  const match = (t: Task) => matches(t, { area: ALL, project: ALL, owner: ALL, query, botThreadId: people.botThreadId });
+  const box = useMemo(() => {
+    const all = todoBox(boardTasks, now, zone);
+    return searching ? { asks: all.asks.filter(match), today: all.today.filter(match), later: all.later.filter(match) } : all;
+  }, [boardTasks, now, zone, query]); // eslint-disable-line react-hooks/exhaustive-deps
+  const flight = useMemo(() => {
+    const nodes = board.data ? pageFlight(board.data) : [];
+    if (!searching) return nodes;
+    const deep = (n: FlightNode): boolean => match(n.task) || n.children.some(deep) || n.workers.some((w) => w.name.toLowerCase().includes(query.trim().toLowerCase()));
+    return nodes.filter(deep);
+  }, [board.data, query]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shownAreas = useMemo(() => {
+    const all = areas.data?.areas ?? null;
+    if (!all || !searching) return all;
+    const words = query.trim().toLowerCase().split(/\s+/);
+    return all.filter((a) => words.every((w) => [a.name, a.covers, a.now ?? "", a.ownerName, ...a.open.map((i) => i.title)].join(" ").toLowerCase().includes(w)));
+  }, [areas.data, query]); // eslint-disable-line react-hooks/exhaustive-deps
+  const doneTasks = useMemo(() => (searching ? tasks.filter(match) : tasks), [tasks, query]); // eslint-disable-line react-hooks/exhaustive-deps
+  const titles = useMemo(() => new Map(boardTasks.map((t) => [t.id, t.title])), [boardTasks]);
+  const titleOf = (id: string) => titles.get(id) ?? null;
+  const chat = searching ? [] : pending;
+  const sections = useMemo(() => sectionTasks(tasks, { area: ALL, project: ALL, owner: ALL, query, botThreadId: people.botThreadId }, now, zone), [tasks, query, now, zone, people.botThreadId]);
+  const scheduled = useMemo(() => (scheduledList.data?.items ?? []).filter((item) => item.source === "automation" && item.botId === bot.id && (!query.trim() || item.title.toLowerCase().includes(query.trim().toLowerCase()))),
+    [scheduledList.data, bot.id, query]);
   const itemKey = (item: { id: string; botId: string | null }) => (item.id === "heartbeat" ? `heartbeat:${item.botId}` : item.id);
   const recurring = new Map(tasks.filter((t) => t.automation?.role === "schedule").map((t) => [t.automation!.id, t]));
   const listedIds = new Set((scheduledList.data?.items ?? []).filter((item) => item.source === "automation").map(itemKey));
   const scheduledTasks = sections.scheduled.filter((t) => !(t.automation?.role === "schedule" && listedIds.has(t.automation.id)));
-  const total = sections.today.length + sections.later.length + sections.agents.length + sections.waiting.length + scheduledTasks.filter((t) => t.automation?.role !== "schedule").length + chatRows;
-  const add = (text: string) => call("loops.add", { text }).then(() => { setUnfolded((open) => new Set([...open, "today"])); list.refresh(); });
+  const add = (text: string) => call("loops.add", { text }).then(() => { board.refresh(); list.refresh(); });
+  const refresh = () => { board.refresh(); list.refresh(); };
   const botChat = people.botThreadId ? rowOpen({ kind: "conversation", id: people.botThreadId }, people.botName) : null;
-  const ready = ownsTasks ? !!list.data || !!list.error : !!scheduledList.data || !!scheduledList.error;
-  const projects = people.projects ?? new Map<string, string>();
-  const choices = {
-    area: filterChoices(tasks, (t) => t.area),
-    project: filterChoices(tasks, (t) => t.project, (id) => projects.get(id) ?? id),
-    owner: [{ id: ALL, label: "Everyone" }, { id: USER_OWNER, label: "You" }, { id: "cos", label: people.botName }, { id: "agents", label: "Agents" },
-      ...[...new Set(tasks.map((t) => t.owner).filter((o) => o.startsWith("thread:") && o !== `thread:${people.botThreadId}`))].map((o) => ({ id: o, label: ownerLabel(o, names) }))],
-  };
-
-  const row = (task: Task) => {
-    const meta = taskMeta(task, names, now, zone);
-    const closed = isClosed(task);
-    const agent = task.owner !== USER_OWNER && task.kind !== "waiting-outside";
-    return (
-      <BotPageRow key={task.id} testId={closed ? "task-done-row" : "task-row"} data={{ "data-task": task.id, "data-owner": ownerFilterOf(task.owner, people.botThreadId) }} muted={closed}
-        icon={closed ? (task.state === "done" ? "CircleCheck" : "X") : agent ? "Bot" : taskKind(task).icon}
-        iconClassName={closed ? (task.state === "done" ? "text-success" : undefined) : task.state === "in_progress" ? "text-success" : needsYou(task) ? "text-warning" : undefined}
-        title={task.title} titleText={task.title} meta={meta?.text} metaTone={meta?.tone ?? "neutral"} {...rowOpen({ kind: "todo", id: task.id }, task.title)} />
-    );
-  };
-  const group = (id: SectionId, title: string, rows: readonly Task[], extra = 0, lead: ReactNode = null) => {
-    if (!rows.length && !extra) return null;
-    const { shown, more } = fold(id, rows);
-    return (
-      <BotPageGroup key={id} title={title} count={rows.length + extra} testId={`tasks-${id}`}>
-        {lead}
-        {shown.map(row)}
-        {moreLine(id, title, more)}
-      </BotPageGroup>
-    );
-  };
-  const subgroup = (id: SectionId, title: string, rows: readonly Task[], extra = 0, lead: ReactNode = null) => {
-    if (!rows.length && !extra) return null;
-    const { shown, more } = fold(id, rows);
-    return (
-      <section key={id} aria-label={title} data-testid={`tasks-${id}`} className="flex flex-col gap-px">
-        <h3 className="flex h-7 items-center gap-2 px-2 text-xs font-medium text-subtle-foreground">{title}<span data-testid="bot-page-group-count" className="tabular-nums">{rows.length + extra}</span></h3>
-        {lead}
-        {shown.map(row)}
-        {moreLine(id, title, more)}
-      </section>
-    );
-  };
-  const empty = query.trim() ? { title: noMatch("tasks", query), action: { label: "Clear search", onClick: () => setQuery("") } }
-    : filtered ? { title: "No tasks match these filters", action: { label: "Show all", onClick: () => { setArea(ALL); setProject(ALL); setOwner(ALL); } } }
-      : { title: "No tasks yet", hint: "Ask the Bot to take something on, or add a task.", action: adding ? null : { label: "New task", onClick: () => setAdding(true) } };
-  const mine = sections.today.length + sections.later.length + chatRows;
+  const openTask = (task: Pick<Task, "id" | "title">, event?: MouseEvent) => rowOpen({ kind: "todo", id: task.id }, task.title).onOpen(event as never);
+  const openThread = (threadId: string) => navigate.toThread(threadId);
+  const ready = !!scheduledList.data || !!scheduledList.error;
   const scheduledCount = scheduled.length + scheduledTasks.length;
   const scheduledRows = fold("scheduled", scheduled);
   const anyScheduled = (scheduledList.data?.items ?? []).some((item) => item.source === "automation" && item.botId === bot.id) || tasks.some((t) => taskSection(t, now, zone) === "scheduled");
-  const doneRows = fold("done", sections.done);
+  const row = (task: Task) => {
+    const meta = taskMeta(task, names, now, zone);
+    const agent = task.owner !== USER_OWNER && task.kind !== "waiting-outside";
+    return (
+      <BotPageRow key={task.id} testId="task-row" data={{ "data-task": task.id, "data-owner": ownerFilterOf(task.owner, people.botThreadId) }}
+        icon={agent ? "Bot" : taskKind(task).icon} iconClassName={task.state === "in_progress" ? "text-success" : needsYou(task) ? "text-warning" : undefined}
+        title={task.title} titleText={task.title} meta={meta?.text} metaTone={meta?.tone ?? "neutral"} {...rowOpen({ kind: "todo", id: task.id }, task.title)} />
+    );
+  };
+  const tabs = ownsTasks ? {
+    label: "View", value: tab, onChange: (next: TasksTab) => setTab(next),
+    options: [{ id: "now" as const, label: "Now" }, { id: "scheduled" as const, label: "Scheduled", ...(ready ? { count: scheduledCount } : {}) }],
+  } : undefined;
+  const tasksError = board.error && !board.data ? board.error : null;
 
   return (
-    <BotPageLayout testId="todos-page" title={ownsTasks ? "Tasks" : "Scheduled"} bot={bot.name} botId={bot.id}
-      toolbar={ownsTasks ? <BotPageToolbar search={{ value: query, onChange: setQuery, placeholder: "Search tasks" }} onNew={() => setAdding(true)}
-        menus={<>
-          {choices.area.length > 1 ? <MenuSelect label="Area" testId="tasks-filter-area" value={area} choices={choices.area} onChange={setArea} /> : null}
-          {choices.project.length > 1 ? <MenuSelect label="Project" testId="tasks-filter-project" value={project} choices={choices.project} onChange={setProject} /> : null}
-          <MenuSelect label="Owner" testId="tasks-filter-owner" value={owner} choices={choices.owner} onChange={setOwner} />
-        </>} />
-        : <BotPageToolbar search={{ value: query, onChange: setQuery, placeholder: "Search scheduled" }} />}>
-      {adding ? <AddTask onAdd={add} onClose={() => setAdding(false)} /> : null}
-      {ownsTasks && list.error ? <p role="alert" data-testid="tasks-error" className="text-sm text-destructive">{list.error}</p> : null}
-      {ownsTasks && list.data && total === 0 ? <BotPageEmpty testId="tasks-empty" {...empty} /> : null}
-      {ownsTasks && list.data ? <>
-        {mine ? (
-          <BotPageGroup title="Mine" count={mine} testId="tasks-mine">
-            {subgroup("today", "Today", sections.today, chatRows, showChat ? pending.map((question) => (
-              <BotPageRow key={question.id} testId="todo-chat" icon="MessageQuestion" title={question.text ?? question.reason} titleText={question.text ?? question.reason}
-                meta={shortWhen(question.createdAt, now, zone)} onOpen={botChat?.onOpen} disabled={!botChat} />
-            )) : null)}
-            {subgroup("later", "Later", sections.later)}
-          </BotPageGroup>
-        ) : null}
-        {group("agents", "Agents on it", sections.agents)}
-        {group("waiting", "Waiting", sections.waiting)}
+    <BotPageLayout testId="todos-page" title={ownsTasks ? "Tasks" : "Scheduled"} bot={bot.name} botId={bot.id} wide={ownsTasks && tab === "now"}
+      toolbar={<BotPageToolbar search={{ value: query, onChange: setQuery, placeholder: tab === "now" ? "Search tasks" : "Search scheduled" }} filter={tabs}
+        newAction={tab === "now" && ownsTasks ? undefined : <NewAutomationMenu kinds={newKinds(bot.kind === "external")} disabled={bot.state !== "active"} onPick={editor.openNew} />}
+        onNew={tab === "now" && ownsTasks ? () => setAdding(true) : undefined} newLabel="New task" />}>
+      {tab === "now" && ownsTasks ? <>
+        {tasksError ? <p role="alert" data-testid="tasks-error" className="text-sm text-destructive">{tasksError}</p> : null}
+        {board.data ? <div data-testid="tasks-top" className="grid grid-cols-1 items-start gap-5 @4xl/bot-page:grid-cols-[1fr_1.15fr]">
+          <TodoBoxView box={box} chat={chat} names={names} threads={threads} targets={people.targets} now={now} zone={zone} query={searching}
+            onOpen={openTask} onOpenChat={botChat ? () => botChat.onOpen(undefined as never) : null} refresh={refresh}
+            adding={adding ? <AddTask onAdd={add} onClose={() => setAdding(false)} /> : null} />
+          <PageInFlight nodes={flight} names={names} now={now} titleOf={titleOf} onOpen={openTask} onOpenThread={openThread} query={searching} />
+        </div> : tasksError ? null : <TasksLoading />}
+        <AreasSection areas={shownAreas} error={areas.error} query={searching} flight={flight} now={now} zone={zone} onOpenTask={(id, title) => openTask({ id, title })} onOpenThread={openThread} />
+        {list.data ? <DoneBar tasks={doneTasks} names={names} query={searching} now={now} zone={zone} onOpen={openTask} /> : null}
       </> : null}
-      {ready ? (
-        <BotPageGroup title={ownsTasks ? "Scheduled & recurring" : "Scheduled"} count={scheduledCount} testId="tasks-scheduled"
-          aside={<NewAutomationMenu kinds={newKinds(bot.kind === "external")} disabled={bot.state !== "active"} onPick={editor.openNew} />}>
+      {tab === "scheduled" && ready ? (
+        <BotPageGroup title="Scheduled" count={scheduledCount} testId="tasks-scheduled">
           {editor.error ? <p role="alert" className="pb-2 text-xs text-destructive">{editor.error}</p> : null}
           {scheduledList.error && !scheduledList.data ? <p role="alert" data-testid="scheduled-error" className="pb-2 text-xs text-destructive">{scheduledList.error}</p> : null}
           {scheduledTasks.map(row)}
@@ -164,19 +149,23 @@ export function TodosPage({ view }: { view: BotView }) {
                 actions={runs ? <Button type="button" variant="ghost" size="sm" data-testid="scheduled-runs" className="h-7 px-2 text-xs font-normal" aria-label={`Runs: ${item.title}`} onClick={(event) => runs.onOpen(event)}>Runs</Button> : undefined} />
             );
           })}
-          {!scheduledCount && !(scheduledList.error && !scheduledList.data) ? <BotPageEmpty testId="scheduled-empty" {...(query.trim() ? { title: noMatch("scheduled items", query) } : filtered && anyScheduled ? { title: "No scheduled items match these filters" } : { title: "Nothing scheduled yet", hint: "Add a reminder or a check-in with New." })} /> : null}
+          {!scheduledCount && !(scheduledList.error && !scheduledList.data) ? <BotPageEmpty testId="scheduled-empty" {...(query.trim() && anyScheduled ? { title: noMatch("scheduled items", query) } : { title: "Nothing scheduled yet", hint: "Add a reminder or a check-in with New." })} /> : null}
           {moreLine("scheduled", "Scheduled", scheduledRows.more)}
         </BotPageGroup>
       ) : null}
       {editor.dialogs}
-      {ownsTasks && sections.done.length ? (
-        <BotPageGroup title={`${sections.done.length} done`} label="Done" collapsible defaultOpen={false} testId="tasks-done">
-          {doneRows.shown.map(row)}
-          {moreLine("done", "Done", doneRows.more)}
-        </BotPageGroup>
-      ) : null}
     </BotPageLayout>
   );
+}
+
+function TasksLoading() {
+  const box = (label: string) => (
+    <section aria-label={label} aria-busy="true" data-studio-card="" className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card px-5 py-4">
+      <span className="text-sm font-semibold text-foreground">{label}</span>
+      {[0, 1, 2].map((n) => <span key={n} className="h-4 w-full animate-pulse rounded bg-muted/50 motion-reduce:animate-none" />)}
+    </section>
+  );
+  return <div data-testid="tasks-loading" className="grid grid-cols-1 items-start gap-5 @4xl/bot-page:grid-cols-[1fr_1.15fr]">{box("Your to-do")}{box("In flight")}</div>;
 }
 
 export function AddTask({ onAdd, onClose }: { onAdd(text: string): Promise<unknown>; onClose(): void }) {
