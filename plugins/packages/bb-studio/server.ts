@@ -6,9 +6,12 @@ import { adoptAtStart } from "./src/tasks/migrate";
 import { asFact, linkAtStart, listThreadFacts, ThreadDirectory } from "./src/tasks/links";
 import { SpawnLinks } from "./src/tasks/spawn";
 import { AutomationTasks, readSources } from "./src/tasks/automations";
+import { Areas, leadsFrom, runnersFrom } from "./src/areas/areas";
+import { AreaStore } from "./src/areas/store";
+import { AREA_TOOLS, registerAreas } from "./src/areas/register";
 import { toLoop } from "./src/tasks/views";
 import type { Loop } from "./src/loops/contract";
-import { cardNeedsUser, TaskStore, taskTitle, tasksUnavailable } from "./src/tasks/store";
+import { assertTasksReady, cardNeedsUser, TaskStore, taskTitle, tasksUnavailable } from "./src/tasks/store";
 import { withToolLabel } from "./src/tool-labels";
 import { CONTINUE_TOOL, registerContinueNew } from "./src/continue-new";
 import { runWorkCli } from "./src/work/cli";
@@ -448,7 +451,7 @@ export default async function plugin(bb: BbPluginApi) {
       bot: bot ? bots.instructions(bot) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
       pages: !off.has("page"), minis: !off.has("mini"), appCards, work: true, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
     });
-    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...TASK_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
+    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...TASK_TOOLS, ...AREA_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
   }));
   /** Which conversation a Bot's session is in (src/bot-threads.ts conversationInstructions); "" before Studio has placed it. */
   const conversationNote = (threadId: string): string => {
@@ -742,12 +745,12 @@ export default async function plugin(bb: BbPluginApi) {
   };
   const automationsChanged = () => { tagsChanged(); syncAutomationTasks(); };
   scheduler.onRunStart((key, threadId) => taskStep("run start", () => automationTasks.started(key, threadId)));
-  bb.events.on("thread.idle", ({ thread, lastAssistantText }) => { taskStep("run end", () => automationTasks.settle(thread.id, lastAssistantText, "succeeded")); });
-  bb.events.on("thread.failed", ({ thread, error }) => { taskStep("run end", () => automationTasks.settle(thread.id, typeof error === "string" ? error : null, "failed")); });
+  bb.events.on("thread.idle", ({ thread, lastAssistantText }) => { if (taskStep("run end", () => automationTasks.settle(thread.id, lastAssistantText, "succeeded")) || runners.forThread(thread.id)) areaStep("run end", () => areas.sync()); });
+  bb.events.on("thread.failed", ({ thread, error }) => { if (taskStep("run end", () => automationTasks.settle(thread.id, typeof error === "string" ? error : null, "failed")) || runners.forThread(thread.id)) areaStep("run end", () => areas.sync()); });
   // The Bot's runners (src/runners.ts): long-lived threads on their own schedules, quiet unless they report.
   const runners: Runners = new Runners({
     db, sdk: bb.sdk, scheduler, changed: automationsChanged,
-    reported: (runnerId, threadId, level, summary) => taskStep("report", () => automationTasks.report(runnerId, threadId, level, summary)),
+    reported: (runnerId, threadId, level, summary) => { const note = taskStep("report", () => automationTasks.report(runnerId, threadId, level, summary)); areaStep("report", () => areas.reported(runnerId, level)); return note; },
     bot: (botId) => bots.stored(botId),
     startedThreads: (botId) => bots.started(botId),
     chain: (botId) => bots.chain(botId),
@@ -823,7 +826,38 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.failed", ({ thread }) => { taskStep("links", () => { spawnLinks.ensure(asFact(thread)); spawnLinks.settled(thread.id); }); });
   bb.events.on("thread.archived", ({ thread }) => { taskStep("links", () => spawnLinks.settled(thread.id)); });
   bb.events.on("thread.active", ({ thread }) => { taskStep("links", () => { spawnLinks.resumed(thread.id); spawnLinks.ensure(asFact(thread)); }); });
-  triggers.every("automation-tasks", 60_000, () => syncAutomationTasks());
+  const areaStore = new AreaStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); });
+  const areas = new Areas(areaStore, new TaskStore(db), {
+    bot: () => { const bot = bots.stored(); return bot ? { id: bot.id, name: bot.name } : null; },
+    runners: () => runnersFrom(db),
+    caller: (threadId) => {
+      const runner = runners.forThread(threadId);
+      if (runner) return { kind: "runner", runnerId: runner.id };
+      const own = bots.forThread(threadId);
+      if (own) return { kind: "bot", botId: own.id, main: true };
+      const conversation = botThreads.store.conversationBot(threadId);
+      return conversation && bots.stored(conversation) ? { kind: "bot", botId: conversation, main: false } : { kind: "thread" };
+    },
+    zone: () => loopTimeZone(process.env, studioSettings.current().todosTimeZone),
+  });
+  let areasSeeded = false;
+  const areaStep = <T,>(name: string, work: () => T): T | null => (areasSeeded || name === "seed" ? taskStep(`areas ${name}`, work) : null);
+  registerAreas(bb, areas, (work) => { assertTasksReady(db); return work(); });
+  void (async () => {
+    const projects = await bb.sdk.projects.list().catch(() => []);
+    const alive = await Promise.all(leadsFrom(db, new Map(projects.map((p) => [p.id, p.name])), PERSONAL_PROJECT_ID).map(async (lead) => {
+      const thread = await bb.sdk.threads.get({ threadId: lead.thread }).catch(() => null);
+      return thread && !(thread as { archivedAt?: unknown }).archivedAt ? lead : null;
+    }));
+    const leads = alive.filter((lead): lead is NonNullable<typeof lead> => !!lead);
+    areaStep("seed", () => {
+      const seeded = new Areas(areaStore, new TaskStore(db), { ...areas.deps, leads: () => leads }).seed();
+      if (seeded.seeded) bb.log.info(`Areas: made ${seeded.created.length} (${seeded.created.join(", ")}).${seeded.problems.length ? ` Notes: ${seeded.problems.join("; ")}` : ""}`);
+      else areas.sync();
+    });
+    areasSeeded = true;
+  })().catch((error) => { areasSeeded = true; bb.log.warn(`Areas: seeding failed: ${errorText(error)}`); });
+  triggers.every("automation-tasks", 60_000, () => { syncAutomationTasks(); areaStep("sync", () => areas.sync()); });
   triggers.every("automation-tasks-prune", 60 * 60_000, () => { taskStep("prune", () => automationTasks.prune()); });
   const restoreMainFailed = (error: unknown) => bb.log.warn(`Couldn't start a new Main: ${errorText(error)}`);
   bb.events.on("thread.deleted", ({ thread }) => {

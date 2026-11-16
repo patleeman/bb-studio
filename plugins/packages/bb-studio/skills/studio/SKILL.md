@@ -247,6 +247,14 @@ job, keep it updated, and hand it over instead of posting status messages.
   `task_handoff` only when they must act; otherwise it closes by itself when
   the run ends ([PASS] reads as "Nothing new"). A runner's `runner_report`
   lands on its run; `urgent` hands the run to the user.
+- An area is a part of the user's life or work an agent looks after (a
+  runner's area, a lead's project, something the Bot keeps): one card on the
+  Tasks page with its status (ok, flagged, broken), where it stands, open
+  items and recent runs. A runner writes `status.json` beside its
+  STATUS.md each run (`status`, `now`, `open` [{title, since, needsUser}],
+  `updatedAt`); Studio reads it when the run ends. A lead or the Bot updates
+  its own with `area_update` (name it the first time); each status it sets
+  counts as a run. Read them with `area_list` and `area_get`.
 - A watcher's finding is one task. Its repeats update that task quietly (no
   new post, no new wake-up; the card shows the latest text) and it closes once
   the watcher has run without it 30 hours after it was last seen. Leave it

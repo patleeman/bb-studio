@@ -1144,4 +1144,5 @@ export const MIGRATIONS = [
    CREATE INDEX task_events_task ON task_events (task_id, seq);
    CREATE INDEX task_events_type ON task_events (type, at);
    CREATE TABLE task_legacy (id TEXT PRIMARY KEY, source TEXT NOT NULL, adopted_at INTEGER NOT NULL);`,
+  `CREATE TABLE areas (id TEXT PRIMARY KEY, record TEXT NOT NULL, updated_at INTEGER NOT NULL);`,
 ];
