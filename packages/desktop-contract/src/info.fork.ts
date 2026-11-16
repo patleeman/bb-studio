@@ -27,7 +27,45 @@ export interface ForkLaunchAppearance {
   attributes: [string, string][];
 }
 
+export type ForkFinderShowResult = "shown" | "opened" | "missing" | "invalid";
+
+export interface ForkFolderEntry {
+  name: string;
+  path: string;
+  kind: "directory" | "package" | "file";
+  sizeBytes: number | null;
+  modifiedAtMs: number | null;
+}
+
+export type ForkFolderListResult =
+  | {
+      kind: "folder";
+      path: string;
+      parent: string | null;
+      entries: ForkFolderEntry[];
+      totalCount: number;
+      hiddenCount: number;
+    }
+  | { kind: "unreadable"; path: string; parent: string | null }
+  | { kind: "package"; path: string }
+  | { kind: "file"; path: string }
+  | { kind: "missing" }
+  | { kind: "invalid" };
+
+export interface ForkFileLinkMenuRequest {
+  path: string;
+  href: string;
+  selectionText: string;
+  point: { x: number; y: number } | null;
+}
+
 export interface ForkDesktopApi {
+  experimental_finderLabel?: string;
+  experimental_showInFinder?(path: string): Promise<ForkFinderShowResult>;
+  experimental_listFolder?(path: string): Promise<ForkFolderListResult>;
+  experimental_fileLinkMenu?(
+    request: ForkFileLinkMenuRequest,
+  ): Promise<boolean>;
   experimental_studioBuild?: ForkStudioBuild | null;
   experimental_launchAppearance?: ForkLaunchAppearance | null;
   experimental_saveLaunchAppearance?(value: ForkLaunchAppearance | null): void;
