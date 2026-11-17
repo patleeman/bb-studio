@@ -192,7 +192,7 @@ struct ComposerBar<Settings: View, Send: View>: View {
                     if oneRow && attaches { AttachmentMenu(items: $attachments, symbol: "plus", tint: micTint) }
                     field(top: oneRow ? 0 : 4)
                         .padding(.bottom, oneRow ? ComposerRow.lift : 0)
-                        .frame(minHeight: oneRow ? ComposerRow.button : nil, alignment: .bottom)
+                        .padding(.top, oneRow ? ComposerRow.headroom : 0)
                     if oneRow { micAndSend }
                 }
                 .padding(.leading, oneRow ? (attaches ? 6 : 4) : 0)
@@ -276,6 +276,9 @@ enum ComposerRow {
     static let button: CGFloat = 44
     static var lift: CGFloat {
         max(0, (button / 2 - ComposerField.verticalInset - UIFont.preferredFont(forTextStyle: .body).lineHeight / 2).rounded())
+    }
+    static var headroom: CGFloat {
+        max(0, button - lift - 2 * ComposerField.verticalInset - UIFont.preferredFont(forTextStyle: .body).lineHeight)
     }
 }
 

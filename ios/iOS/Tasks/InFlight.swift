@@ -3,6 +3,7 @@ import SwiftUI
 struct InFlightBar: View {
     let threadId: String
     var typing = false
+    var chipFills = true
     @State private var model = TasksModel.shared
     @State private var showsDone = false
     @State private var hidden: [String: Date] = [:]
@@ -32,7 +33,13 @@ struct InFlightBar: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("in-flight-error")
             } else if !rows.isEmpty {
-                bar(rows)
+                if typing && chipFills {
+                    chip(rows).frame(maxWidth: .infinity, alignment: .leading)
+                } else if typing {
+                    chip(rows)
+                } else {
+                    bar(rows)
+                }
             }
         }
     }
@@ -69,6 +76,40 @@ struct InFlightBar: View {
         }
         .background(look.stackFill, in: .rect(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.separator.opacity(0.6), lineWidth: 0.5))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("in-flight")
+    }
+
+    private func chip(_ rows: [FlightNode]) -> some View {
+        let rowsFeed = model.flights[threadId]?.rows != nil
+        let open = rows.filter { Self.live($0, rowsFeed: rowsFeed) }
+        let needs = open.filter(\.row.needsYou).count
+        let label = ["In flight, \(open.count) open", needs > 0 ? "\(needs) \(needs == 1 ? "needs" : "need") you" : nil].compactMap { $0 }.joined(separator: ", ")
+        return Button {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            collapsed = false
+        } label: {
+            HStack(spacing: 6) {
+                if needs > 0 { Circle().fill(Color.orange).frame(width: 7, height: 7) }
+                Text("In flight")
+                Text("\(open.count)").monospacedDigit()
+                Image(systemName: "chevron.up").font(.caption2.weight(.semibold))
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .padding(.leading, 12)
+            .padding(.trailing, 14)
+            .frame(height: 36)
+            .background(look.stackFill, in: .capsule)
+            .overlay(Capsule().strokeBorder(.separator.opacity(0.6), lineWidth: 0.5))
+            .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .accessibilityLabel(label)
+        .accessibilityValue("Collapsed")
+        .accessibilityHint("Shows the tasks")
+        .accessibilityIdentifier("in-flight-toggle")
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("in-flight")
     }

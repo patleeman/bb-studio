@@ -56,12 +56,30 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
         return (layout, transcript)
     }
 
+    private func jumpFrame(_ transcript: [String: Any]) -> CGRect? {
+        if let pill = rect(transcript["pill"]) { return pill }
+        let button = app.buttons["jumpToLatest"]
+        return button.exists ? button.frame : nil
+    }
+
+    private func stackParts() -> [(String, CGRect)] {
+        [("In flight", any("in-flight")), ("the worker pill", any("conversationWorkers")), ("the composer", any("threadComposer"))]
+            .filter { $0.1.exists }.map { ($0.0, $0.1.frame) }
+    }
+
     private func assertTheJumpSitsAboveTheStack(_ when: String, file: StaticString = #filePath, line: UInt = #line) throws {
         Thread.sleep(forTimeInterval: 1.5)
         let (_, transcript) = try transcript(when, file: file, line: line)
         let stack = try XCTUnwrap(rect(transcript["stack"]), file: file, line: line)
-        let pill = try XCTUnwrap(rect(transcript["pill"]), "the ↓ shows while reading up \(when)", file: file, line: line)
-        XCTAssertLessThanOrEqual(pill.maxY, stack.minY + 0.5, "the ↓ (\(pill.minY)–\(pill.maxY)) sits above the stack (from \(stack.minY)) \(when)", file: file, line: line)
+        let jump = try XCTUnwrap(jumpFrame(transcript), "the ↓ shows while reading up \(when)", file: file, line: line)
+        if transcript["jumpInline"] as? Bool == true {
+            XCTAssertGreaterThanOrEqual(jump.minY, stack.minY - 0.5, "the ↓ (\(jump)) is in the stack (from \(stack.minY)), over no row \(when)", file: file, line: line)
+            for (name, frame) in stackParts() {
+                XCTAssertLessThanOrEqual(frame.intersection(jump).height, 0.5, "the ↓ (\(jump)) leaves \(name) (\(frame)) clear \(when)", file: file, line: line)
+            }
+        } else {
+            XCTAssertLessThanOrEqual(jump.maxY, stack.minY + 0.5, "the ↓ (\(jump.minY)–\(jump.maxY)) sits above the stack (from \(stack.minY)) \(when)", file: file, line: line)
+        }
     }
 
     private func assertClearOfTheStack(_ when: String, keyboardUp: Bool, file: StaticString = #filePath, line: UInt = #line) throws {
@@ -162,9 +180,11 @@ final class RoomBottomStackUITests: ServerIsolatedUITestCase {
             XCTAssertGreaterThanOrEqual(workers.frame.minY, band.minY - 0.5, "the worker pill (\(workers.frame)) is in the stack, not over the chat \(when)", file: file, line: line)
         }
         if reading {
-            let pill = try XCTUnwrap(rect(transcript["pill"]), "the ↓ shows while reading up \(when)", file: file, line: line)
-            XCTAssertGreaterThanOrEqual(pill.minY, band.minY - 0.5, "the ↓ (\(pill)) sits in the stack's own lane (band from \(band.minY)), over no row \(when)", file: file, line: line)
-            XCTAssertLessThanOrEqual(pill.maxY, stack.minY + 0.5, "and above the stack's parts \(when)", file: file, line: line)
+            let jump = try XCTUnwrap(jumpFrame(transcript), "the ↓ shows while reading up \(when)", file: file, line: line)
+            XCTAssertGreaterThanOrEqual(jump.minY, band.minY - 0.5, "the ↓ (\(jump)) is on the band (from \(band.minY)), over no row \(when)", file: file, line: line)
+            for (name, frame) in stackParts() {
+                XCTAssertLessThanOrEqual(frame.intersection(jump).height, 0.5, "the ↓ (\(jump)) leaves \(name) (\(frame)) clear \(when)", file: file, line: line)
+            }
         } else {
             let last = try XCTUnwrap(rect(transcript["lastRow"]), "the last row \(when)", file: file, line: line)
             XCTAssertEqual(transcript["atEnd"] as? Bool, true, "at the end \(when)", file: file, line: line)

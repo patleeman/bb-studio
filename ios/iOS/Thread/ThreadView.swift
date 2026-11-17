@@ -115,6 +115,7 @@ struct ThreadView: View {
     @State private var sends = 0
     /// The new chat transcript's requests, when it's on (Settings ▸ Diagnostics).
     @State private var transcriptV2 = TranscriptHandle()
+    @State private var jumpState = TranscriptPillState()
 
     init(threadId: String, hidesTabBar: Bool = true, botChrome: BotChrome? = nil, session: RoomSession? = nil) {
         self.hidesTabBar = hidesTabBar
@@ -1440,6 +1441,7 @@ struct ThreadView: View {
             .modifier(BotComposerGlass(active: true))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("workerAsk")
+            .modifier(InlineJump(state: duoLayout.twoPages ? nil : jumpState) { transcriptV2.jumpToLatest() })
         }
         .modifier(TalkDraft(talk: talk, draft: $draftText.value, typed: $talkTyped))
         .onChange(of: draft) { _, _ in draftText.saveSoon(saveDraftLocally) }
@@ -1617,6 +1619,15 @@ struct ThreadView: View {
         }
     }
 
+    private var typingStatusRow: some View {
+        HStack(spacing: 8) {
+            InFlightBar(threadId: model.threadId, typing: true, chipFills: false)
+            if let conversation {
+                WorkersLineView(line: conversation.workers) { conversation.push(.thread(id: $0)) }
+            }
+        }
+    }
+
     private var threadComposer: some View {
         VStack(spacing: 8) {
             if let botChrome {
@@ -1629,13 +1640,15 @@ struct ThreadView: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            if conversation != nil || botChrome != nil {
+            if composerFocused, let conversation, !conversation.workers.isEmpty {
+                typingStatusRow
+            } else if conversation != nil || botChrome != nil {
                 InFlightBar(threadId: model.threadId, typing: composerFocused)
             }
             if let conversation {
                 WorkerApprovalCards(approvals: approvals, openWorker: { conversation.push(.thread(id: $0)) }, decide: decideApproval)
             }
-            if let conversation, !conversation.workers.isEmpty {
+            if !composerFocused, let conversation, !conversation.workers.isEmpty {
                 WorkersLineView(line: conversation.workers) { conversation.push(.thread(id: $0)) }
             }
             ThreadShelf(model: model)
@@ -1793,6 +1806,7 @@ struct ThreadView: View {
             .modifier(BotComposerGlass(active: true))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("threadComposer")
+            .modifier(InlineJump(state: duoLayout.twoPages ? nil : jumpState) { transcriptV2.jumpToLatest() })
         }
         .animation(.smooth(duration: 0.25), value: model.interactions.first?.id)
         // Kept with the draft text, for when the thread opens again.
@@ -2128,6 +2142,10 @@ extension ThreadView {
             onNearTop: { transcriptV2LoadOlder() },
             onEmptyTap: roomChat?.layDown,
             rowsHidden: lying,
+            onPillChange: { state in
+                let next = TranscriptPillState(shown: state.shown, unseen: min(state.unseen, 1), note: state.note)
+                Task { @MainActor in if jumpState != next { jumpState = next } }
+            },
             log: ScrollLog.on ? { ScrollLog.request($0) } : nil,
             // Not while the window resizes, which reloads the keyboard mid-transition (crash 3).
             dismissKeyboard: { window in
@@ -2276,7 +2294,7 @@ extension ThreadView {
             chrome.rowsTrailingClear = RegularScrollingSurface.inset(column: duoLayout.statusColumn, width: duoLayout.detailWidth,
                 readableWidth: Self.readableWidth)
         }
-        chrome.pill = duoLayout.twoPages ? .center : .trailing
+        chrome.pill = duoLayout.twoPages ? .center : .inline
         chrome.nearEnd = 120
         chrome.softTopEdge = botChrome != nil
         return chrome
@@ -2375,5 +2393,41 @@ extension ThreadView {
                 try? await Task.sleep(for: delay)
             }
         }
+    }
+}
+
+struct InlineJump: ViewModifier {
+    let state: TranscriptPillState?
+    let jump: () -> Void
+    @Environment(\.look) private var look
+
+    func body(content: Content) -> some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            content
+            if let state, state.shown { button(state) }
+        }
+        .animation(.smooth(duration: 0.2), value: state?.shown == true)
+    }
+
+    private func button(_ state: TranscriptPillState) -> some View {
+        let label = state.note ?? (state.unseen > 0 ? "new messages" : nil)
+        return Button(action: jump) {
+            Image(systemName: state.note != nil ? "questionmark.bubble" : "arrow.down")
+                .font(.body.weight(.semibold))
+                .frame(width: 44, height: 44)
+                .background(look.stackFill, in: .circle)
+                .glassEffect(state.note != nil ? .regular.tint(.orange) : .regular, in: .circle)
+                .overlay(alignment: .topTrailing) {
+                    if state.unseen > 0, state.note == nil {
+                        Circle().fill(look.accent).frame(width: 9, height: 9).offset(x: -6, y: 6)
+                    }
+                }
+                .contentShape(.circle)
+        }
+        .buttonStyle(.plain)
+        .padding(.bottom, 4)
+        .transition(.opacity.combined(with: .scale(scale: 0.8)))
+        .accessibilityLabel(label.map { "Jump to latest, \($0)" } ?? "Jump to latest")
+        .accessibilityIdentifier("jumpToLatest")
     }
 }
