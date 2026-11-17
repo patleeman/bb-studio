@@ -1,3 +1,4 @@
+import { FOLLOW_SUCCESSOR_HELP, sendToLiveThread, sentToJson } from "./tell-successor.fork.js";
 import { Command } from "commander";
 import { randomUUID } from "node:crypto";
 import {
@@ -101,6 +102,7 @@ interface ThreadTellCommandOptions {
   image?: string[];
   sendAt?: string;
   compactFirst?: boolean;
+  followSuccessor?: boolean;
 }
 
 interface ThreadActionOptions {
@@ -581,6 +583,7 @@ export function registerActionsCommands(
       collectOption,
       [],
     )
+    .option("--follow-successor", FOLLOW_SUCCESSOR_HELP)
     .action(
       action(
         async (
@@ -594,16 +597,16 @@ export function registerActionsCommands(
             inline: inlineMessage,
             inlineLabel: "<message>",
           });
-          const response = await postThreadMessage({
+          const sent = await sendToLiveThread({ threadId: id, follow: opts.followSuccessor === true, getUrl }, (threadId) => postThreadMessage({
             getUrl,
-            threadId: id,
+            threadId,
             message,
             mode: resolveThreadMessageMode(opts.mode),
             model: opts.model,
             permissionMode: parsePermissionMode(opts.permissionMode),
             reasoningLevel: parseReasoningLevel(opts.reasoningLevel),
             serviceTier: parseServiceTier(opts.serviceTier),
-            senderThreadId: resolveSenderThreadId(id),
+            senderThreadId: resolveSenderThreadId(threadId),
             plan: opts.plan,
             files: opts.file,
             images: opts.image,
@@ -611,14 +614,15 @@ export function registerActionsCommands(
               ? {}
               : { sendAt: parseSendAt(opts.sendAt) }),
             compactFirst: opts.compactFirst === true,
-          });
-          if (outputJson(opts, { threadId: id, ...response })) return;
+          }));
+          const { response, threadId: sentTo } = sent;
+          if (outputJson(opts, { ...sentToJson(sent), ...response })) return;
           console.log(
             opts.compactFirst === true &&
               response.delivery === "queued" &&
               response.queuedMessage.waitingOn?.kind === "thread-busy"
-              ? `Thread ${id} compacting; the message sends when compaction finishes`
-              : describeThreadTellOutcome(id, response),
+              ? `Thread ${sentTo} compacting; the message sends when compaction finishes`
+              : describeThreadTellOutcome(sentTo, response),
           );
         },
       ),
