@@ -20,6 +20,7 @@ import type {
 import type {
   ForkPluginEventPayloads,
   ForkPluginHooks,
+  ForkProviderOptionsContext,
   ForkThreadIdlePayload,
 } from "./backend-contract.fork.js";
 
@@ -1538,7 +1539,7 @@ export interface PluginProviderExtensionKindDeclaration {
  * server builds one for every session and turn command it dispatches on a
  * thread of this provider.
  */
-export interface PluginProviderOptionsContext {
+export interface PluginProviderOptionsContext extends ForkProviderOptionsContext {
   threadId: string;
   projectId: string;
   /** The resolved model id for this command. */
