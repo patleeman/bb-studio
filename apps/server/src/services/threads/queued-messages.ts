@@ -1,3 +1,4 @@
+import { sendsAsQueuedMessage } from "./automation-notice.fork.js";
 import {
   isAppUpdateSendHoldSet,
   claimNextQueuedThreadMessageGroup,
@@ -498,7 +499,7 @@ async function sendClaimedQueuedMessageForThread(
   const outcome = await attemptDispatch(deps, {
     thread: args.thread,
     payload: {
-      ...(systemNotice === null
+      ...(sendsAsQueuedMessage(systemNotice)
         ? sendQueuedMessagePayload(
             { ...queuedMessage, content: input },
             mode,
