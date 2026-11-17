@@ -700,6 +700,11 @@
       "seam": "thread-notices",
       "intent": "toThreadQueuedMessage resolves a queued row's author with systemAuthored(its parsed systemNotice, senderThreadId) (automation-notice.fork.ts, imported at the top of the file), the same rule as at dispatch: an automated input from another thread stays that thread's.",
       "budget": 3
+    },
+    "apps/server/src/services/threads/queued-messages.ts": {
+      "seam": "thread-notices",
+      "intent": "sendClaimedQueuedMessageForThread sends a queued row as the message it was (sendQueuedMessagePayload: its sender, model, permission mode, reasoning level and service tier) when sendsAsQueuedMessage(systemNotice) (automation-notice.fork.ts, imported at the top of the file): no notice, or an automated input's. Only core's own notices go as { input, mode }, as upstream.",
+      "budget": 3
     }
   }
 }
