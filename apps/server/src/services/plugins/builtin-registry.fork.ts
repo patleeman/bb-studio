@@ -11,12 +11,6 @@ export const FORK_BUNDLED_PLUGINS: readonly BundledPluginDefinition[] = [
     autoInstall: true,
     defaultEnabled: true,
   },
-  {
-    name: "bb-studio-visual-chat",
-    pluginId: "studio-visual-chat",
-    autoInstall: true,
-    defaultEnabled: true,
-  },
 ];
 
 export function withForkBundledPlugins(
