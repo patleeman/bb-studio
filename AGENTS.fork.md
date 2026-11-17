@@ -37,6 +37,17 @@ Iterate without signing; notarize only when asked, or once at the end of a day's
 - Notarize and staple (`xcrun notarytool submit … --keychain-profile bbstudio-notary --wait`, then `xcrun stapler staple`) only on request or for the day's last build. If the keychain profile cannot be read, the Mac is probably locked: retry later, do not ask for it to be recreated.
 - If an unsigned or ad-hoc build loses keychain or permission access (microphone, accessibility, notifications), say which one.
 
+## Test isolation
+
+Every Codex, Claude Code, Pi and OpenCode session on the owner's Mac is kept as their history, and the live BB Studio holds their real data. Tests and staged runs touch neither.
+
+- **Staged copies only.** Never test against the installed app, its data folder (`~/.bb-studio`), the retired `~/.bb`, or the live port 38986. Give a staged copy its own data folder (not named `.bb-studio`; set `BB_STUDIO_IMPORT_FROM=off` so first run imports nothing), its own ports and `--user-data-dir`, and start it with `env -i` so it inherits nothing from the agent shell.
+- **Which copy.** `plugins/scripts/staged-bb.mjs` (in the monorepo) runs upstream bb with the Studio plugins from GitHub: use it for plugin work. To test the fork itself, use a packaged or dev build of this branch with the same isolation.
+- **Own provider homes.** Point `CODEX_HOME` and `CLAUDE_CONFIG_DIR` at folders in the test's temp directory (or the dedicated staged sign-in folders) and sign in there. Never copy or link `auth.json`, `~/.claude` or `~/.claude.json` into them. Prefer modes that save nothing (`codex exec --ephemeral`).
+- **Pi off.** Its sessions always land in the real history; don't run it in tests or staged copies.
+- **`--use-mock-keychain`** for every staged app; never touch `~/Library/Keychains`.
+- **The scratch server, explicitly.** The bb CLI calls only `BB_SERVER_URL`, and agent shells inherit the live `http://127.0.0.1:38986`. Before any bb CLI call, script or curl, export `BB_SERVER_URL` and `BB_DATA_DIR` for the scratch copy, then `. scripts/fork/staged-guard.sh || exit 1`. It refuses port 38986, `~/.bb` and `~/.bb-studio`, and either variable unset.
+
 ## Stack order
 
 Tooling and notes, then seams, then features, then the generated commits at the tip. New work goes below the generated commits, as a new commit or folded into the commit for its area.
