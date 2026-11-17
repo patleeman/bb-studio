@@ -78,5 +78,36 @@
     "dir": "side-chat",
     "package": "bb-plugin-side-chat",
     "pluginId": "side-chat"
+  },
+  {
+    "dir": "workflows",
+    "package": "bb-plugin-workflows",
+    "pluginId": "workflows"
+  },
+  {
+    "dir": "agent-annotations",
+    "package": "bb-plugin-agent-annotations",
+    "pluginId": "agent-annotations"
+  },
+  {
+    "dir": "bb-account",
+    "package": "bb-plugin-bb-account",
+    "pluginId": "bb-account"
+  },
+  {
+    "dir": "connect",
+    "package": "bb-plugin-connect",
+    "pluginId": "connect"
+  },
+  {
+    "dir": "storage-retention",
+    "package": "bb-plugin-bb--storage-retention",
+    "pluginId": "bb--storage-retention"
+  },
+  {
+    "dir": "plugin-api-docs",
+    "package": "bb-plugin-plugin-api-docs",
+    "pluginId": "plugin-api-docs",
+    "keepDir": true
   }
 ]

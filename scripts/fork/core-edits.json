@@ -401,11 +401,6 @@
       "intent": "The \"Open in split\" thread action is unavailable while MAIN_SPLITS_ENABLED is false (one condition, plus the import).",
       "budget": 4
     },
-    "plugins/workflows/src/app.tsx": {
-      "seam": "workbench-api",
-      "intent": "The workflow-run action tab is registered with experimental_openableByPlugins: true, so other plugins (Studio) open a run in a thread's side panel with experimental_workbench(...).open. One added line.",
-      "budget": 1
-    },
     "apps/app/src/hooks/useTheme.ts": {
       "seam": "app-backdrop",
       "intent": "An app backdrop's mode overrides this window's resolved light or dark: getPreferredTheme returns forkThemeModeOverride() (lib/fork-theme-mode.ts) before the preference or the system, and ensureThemeObserver subscribes emitTheme to subscribeForkThemeModeOverride, so .dark and usePreferredTheme follow it. The fork import sits at the top of the file.",

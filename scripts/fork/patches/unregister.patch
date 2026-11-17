@@ -14,18 +14,20 @@ index ef0d418bc7..7ba7598f4e 100644
  const noop = () => {};
  const noopAsync = async () => {};
 diff --git a/apps/app/src/components/onboarding/onboarding-model.ts b/apps/app/src/components/onboarding/onboarding-model.ts
-index f155833646..8848853b3e 100644
+index 3e495a5baa..e8400f5367 100644
 --- a/apps/app/src/components/onboarding/onboarding-model.ts
 +++ b/apps/app/src/components/onboarding/onboarding-model.ts
-@@ -28,8 +28,6 @@ export const ONBOARDING_PLUGIN_MARKETPLACE = "bb-official";
+@@ -27,10 +27,6 @@ export const ONBOARDING_PLUGIN_MARKETPLACE = "bb-official";
+ 
  export const ONBOARDING_PLUGIN_ENTRY_IDS: readonly string[] = [
    "browser-automation",
-   "workflows",
+-  "workflows",
 -  "monaco-editor",
 -  "prompt-library",
-   "agent-annotations",
+-  "agent-annotations",
    "ask-user-question",
  ];
+ 
 diff --git a/apps/app/src/components/pickers/EnvironmentPicker.stories.tsx b/apps/app/src/components/pickers/EnvironmentPicker.stories.tsx
 index b427084784..ff54ae9b2a 100644
 --- a/apps/app/src/components/pickers/EnvironmentPicker.stories.tsx
@@ -65,23 +67,40 @@ index 105c0bc6af..e4003065c4 100644
    title: "promptbox/banner/Machine Status",
  };
 diff --git a/apps/server/src/services/plugins/builtin-registry.ts b/apps/server/src/services/plugins/builtin-registry.ts
-index 7b8f53a390..0be860ba7e 100644
+index 7b8f53a390..dfb6691fcf 100644
 --- a/apps/server/src/services/plugins/builtin-registry.ts
 +++ b/apps/server/src/services/plugins/builtin-registry.ts
-@@ -65,21 +65,11 @@ export const BUILTIN_PLUGINS = [
-     pluginId: "bb-account",
+@@ -35,11 +35,6 @@ export function accountPoolDefaultEnabled(
+ const REPO_PLUGINS_DIRECTORY_NAME = "plugins";
+ 
+ export const BUILTIN_PLUGINS = [
+-  {
+-    name: "storage-retention",
+-    pluginId: "bb--storage-retention",
+-    defaultEnabled: false,
+-  },
+   {
+     name: "bb-guide",
+     pluginId: "bb-guide",
+@@ -60,26 +55,6 @@ export const BUILTIN_PLUGINS = [
+     pluginId: "automations",
      defaultEnabled: true,
    },
+-  {
+-    name: "bb-account",
+-    pluginId: "bb-account",
+-    defaultEnabled: true,
+-  },
 -  {
 -    name: "bb-ai",
 -    pluginId: "bb-ai",
 -    defaultEnabled: true,
 -  },
-   {
-     name: "connect",
-     pluginId: "connect",
-     defaultEnabled: true,
-   },
+-  {
+-    name: "connect",
+-    pluginId: "connect",
+-    defaultEnabled: true,
+-  },
 -  {
 -    name: "connect-next",
 -    pluginId: "bb--connect-next",
@@ -90,7 +109,7 @@ index 7b8f53a390..0be860ba7e 100644
    {
      name: "environment-project-checkout",
      pluginId: "environment-project-checkout",
-@@ -95,26 +85,6 @@ export const BUILTIN_PLUGINS = [
+@@ -95,26 +70,6 @@ export const BUILTIN_PLUGINS = [
      pluginId: "environment-personal-workspace",
      defaultEnabled: true,
    },
@@ -117,7 +136,19 @@ index 7b8f53a390..0be860ba7e 100644
    {
      name: "pdf-preview",
      pluginId: "pdf-preview",
-@@ -195,16 +165,6 @@ export const BUILTIN_PLUGINS = [
+@@ -150,11 +105,6 @@ export const BUILTIN_PLUGINS = [
+     pluginId: "keep-awake",
+     defaultEnabled: true,
+   },
+-  {
+-    name: "plugin-api-docs",
+-    pluginId: "plugin-api-docs",
+-    defaultEnabled: false,
+-  },
+   {
+     name: "provider-retry",
+     pluginId: "provider-retry",
+@@ -195,92 +145,32 @@ export const BUILTIN_PLUGINS = [
      pluginId: "navigation",
      defaultEnabled: true,
    },
@@ -134,7 +165,15 @@ index 7b8f53a390..0be860ba7e 100644
    {
      name: "scheduled-send",
      pluginId: "scheduled-send",
-@@ -220,11 +180,6 @@ export const BUILTIN_PLUGINS = [
+     defaultEnabled: true,
+   },
+-  {
+-    name: "agent-annotations",
+-    pluginId: "agent-annotations",
+-    defaultEnabled: false,
+-  },
+   {
+     name: "concurrency-limit",
      pluginId: "concurrency-limit",
      defaultEnabled: true,
    },
@@ -143,10 +182,13 @@ index 7b8f53a390..0be860ba7e 100644
 -    pluginId: "side-chat",
 -    defaultEnabled: true,
 -  },
+-  {
+-    name: "workflows",
+-    pluginId: "workflows",
+-    defaultEnabled: false,
+-  },
    {
-     name: "workflows",
-     pluginId: "workflows",
-@@ -235,52 +190,17 @@ export const BUILTIN_PLUGINS = [
+     name: "composer",
      pluginId: "bb--composer",
      defaultEnabled: true,
    },
@@ -200,18 +242,22 @@ index 7b8f53a390..0be860ba7e 100644
    ...plugin,
    autoInstall: false,
 diff --git a/apps/server/test/services/plugins/builtin-registry.test.ts b/apps/server/test/services/plugins/builtin-registry.test.ts
-index 8fed7050ef..a9f1a59440 100644
+index 8fed7050ef..3200acc709 100644
 --- a/apps/server/test/services/plugins/builtin-registry.test.ts
 +++ b/apps/server/test/services/plugins/builtin-registry.test.ts
-@@ -15,26 +15,18 @@ const UNPREFIXED_BUNDLED_PLUGIN_IDS = [
+@@ -11,30 +11,18 @@ import { resolveBundledMarketplaceDirectory } from "../../../src/services/plugin
+ 
+ const UNPREFIXED_BUNDLED_PLUGIN_IDS = [
+   "account-pool",
+-  "agent-annotations",
    "ask-user-question",
    "automations",
-   "bb-account",
+-  "bb-account",
 -  "bb-ai",
    "bb-guide",
    "browser-automation",
    "concurrency-limit",
-   "connect",
+-  "connect",
 -  "custom-instructions",
    "drafts",
    "environment-git-worktree",
@@ -225,12 +271,12 @@ index 8fed7050ef..a9f1a59440 100644
 -  "monaco-editor",
    "navigation",
    "pdf-preview",
-   "plugin-api-docs",
+-  "plugin-api-docs",
 -  "plugin-api-tester",
    "provider-acp",
    "provider-claude-code",
    "provider-codex",
-@@ -44,9 +36,6 @@ const UNPREFIXED_BUNDLED_PLUGIN_IDS = [
+@@ -44,11 +32,7 @@ const UNPREFIXED_BUNDLED_PLUGIN_IDS = [
    "scheduled-send",
    "secrets",
    "side-chat",
@@ -238,8 +284,10 @@ index 8fed7050ef..a9f1a59440 100644
 -  "tasks",
 -  "theme-preview",
    "thread-list",
-   "workflows",
+-  "workflows",
  ];
+ 
+ describe("bundled plugin ids", () => {
 diff --git a/apps/web/src/marketplace/bundled-marketplace.test.ts b/apps/web/src/marketplace/bundled-marketplace.test.ts
 index 0182b482d9..81bc29fd76 100644
 --- a/apps/web/src/marketplace/bundled-marketplace.test.ts
@@ -262,7 +310,7 @@ index 0182b482d9..81bc29fd76 100644
      const guide = bundledMarketplace().plugins.find(
        (entry) => entry.id === "bb-guide",
 diff --git a/apps/web/src/marketplace/bundled-marketplace.ts b/apps/web/src/marketplace/bundled-marketplace.ts
-index 0a0baadc44..a3f7e74b4c 100644
+index 0a0baadc44..1f0f846d3f 100644
 --- a/apps/web/src/marketplace/bundled-marketplace.ts
 +++ b/apps/web/src/marketplace/bundled-marketplace.ts
 @@ -11,7 +11,6 @@ export const UNLISTED_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
@@ -273,7 +321,7 @@ index 0a0baadc44..a3f7e74b4c 100644
    "provider-acp",
    "provider-claude-code",
    "provider-codex",
-@@ -20,22 +19,12 @@ export const UNLISTED_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
+@@ -20,24 +19,10 @@ export const UNLISTED_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
  
  export const INSTALL_ON_REQUEST_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
    "browser-automation",
@@ -286,24 +334,35 @@ index 0a0baadc44..a3f7e74b4c 100644
  ]);
  
  export const OFF_BY_DEFAULT_BUNDLED_PLUGINS: ReadonlySet<string> = new Set([
-   "agent-annotations",
+-  "agent-annotations",
    "ask-user-question",
 -  "connect-next",
 -  "mcp",
 -  "monaco-editor",
-   "plugin-api-docs",
+-  "plugin-api-docs",
 -  "prompt-library",
-   "storage-retention",
-   "workflows",
+-  "storage-retention",
+-  "workflows",
  ]);
+ 
+ export type BundledPluginSetup =
 diff --git a/plugins/plugin-api-docs/test/mobile-guide.test.ts b/plugins/plugin-api-docs/test/mobile-guide.test.ts
-index c3d5714694..62a9cb8408 100644
+index c3d5714694..a7db19b973 100644
 --- a/plugins/plugin-api-docs/test/mobile-guide.test.ts
 +++ b/plugins/plugin-api-docs/test/mobile-guide.test.ts
-@@ -184,20 +184,15 @@ it("pages mobile panes without using annotation selection as navigation", () =>
-         '[aria-label="Next example plugin"]',
-       )!;
-     expect(previousExample().disabled).toBe(true);
+@@ -175,37 +175,10 @@ it("pages mobile panes without using annotation selection as navigation", () =>
+     ).toBe("Full-page panels");
+     const examples = () =>
+       container.querySelector('[role="group"][aria-label="Example plugins"]')!;
+-    const previousExample = () =>
+-      examples().querySelector<HTMLButtonElement>(
+-        '[aria-label="Previous example plugin"]',
+-      )!;
+-    const nextExample = () =>
+-      examples().querySelector<HTMLButtonElement>(
+-        '[aria-label="Next example plugin"]',
+-      )!;
+-    expect(previousExample().disabled).toBe(true);
 -    for (const name of [
 -      "Automations",
 -      "Docs",
@@ -311,25 +370,25 @@ index c3d5714694..62a9cb8408 100644
 -      "Tasks",
 -      "Theme Preview",
 -    ]) {
-+    for (const name of ["Automations", "Storage & retention [Experimental]"]) {
-       expect(examples().textContent).toContain(name);
-       expect(
-         examples().querySelectorAll(
-           '[aria-live="polite"] > span:not(.sr-only)',
-         ),
-       ).toHaveLength(1);
+-      expect(examples().textContent).toContain(name);
+-      expect(
+-        examples().querySelectorAll(
+-          '[aria-live="polite"] > span:not(.sr-only)',
+-        ),
+-      ).toHaveLength(1);
 -      if (name !== "Theme Preview") act(() => nextExample().click());
-+      if (name !== "Storage & retention [Experimental]")
-+        act(() => nextExample().click());
-     }
-     expect(nextExample().disabled).toBe(true);
-     act(() => {
-@@ -205,7 +200,7 @@ it("pages mobile panes without using annotation selection as navigation", () =>
-         new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }),
-       );
-     });
+-    }
+-    expect(nextExample().disabled).toBe(true);
+-    act(() => {
+-      previousExample().dispatchEvent(
+-        new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }),
+-      );
+-    });
 -    expect(examples().textContent).toContain("Tasks");
 +    expect(examples().textContent).toContain("Automations");
++    expect(
++      examples().querySelectorAll('[aria-live="polite"] > span:not(.sr-only)'),
++    ).toHaveLength(1);
      expect(visiblePage()).toBe("Sidebar");
      expect(navigate).not.toHaveBeenCalled();
      act(() => {
@@ -346,18 +405,19 @@ index be5bfd5d01..538601f93e 100644
    ]);
    const queue = [...pluginDirs].sort(
 diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/src/surfaces.ts
+index 30c5f2d50a..3628d8f45e 100644
 --- a/plugins/plugin-api-docs/src/surfaces.ts
 +++ b/plugins/plugin-api-docs/src/surfaces.ts
-@@ -111,7 +111,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+@@ -113,7 +113,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
            "BbNavigate.toPluginPanel",
            "BbNavigate.experimental_openTerminal",
          ],
 -        firstParty: ["Automations", "Docs", "GitHub", "Tasks", "Theme Preview"],
-+        firstParty: ["Automations", "Storage & retention [Experimental]"],
++        firstParty: ["Automations"],
        },
        {
          id: "thread-row-status",
-@@ -332,13 +332,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+@@ -370,13 +370,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
            "PluginMessageDirectiveProps",
            "PluginMessageDirectiveOpenWorkspaceFile",
          ],
@@ -368,11 +428,11 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
 -          "Tasks",
 -          "Workflows",
 -        ],
-+        firstParty: ["Browser Automation", "Workflows"],
++        firstParty: ["Browser Automation"],
        },
        {
          id: "code-fence-renderers",
-@@ -373,7 +367,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+@@ -411,7 +405,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
            "PluginMessageActionContext",
            "ThreadChatMessageReference",
          ],
@@ -381,7 +441,16 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
        },
        {
          id: "message-metadata",
-@@ -527,14 +521,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+@@ -518,7 +512,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "ExperimentalPluginBrowserPageEvaluateOptions",
+           "ExperimentalPluginBrowserPageWorld",
+         ],
+-        firstParty: ["Agent Annotations"],
++        firstParty: [],
+         experimental: true,
+       },
+       {
+@@ -565,14 +559,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
            "PluginThreadActionItemInput.experimental_panel",
            "PluginNewThreadPanelActionContext.experimental_panel",
          ],
@@ -393,11 +462,11 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
 -          "Tasks",
 -          "Workflows",
 -        ],
-+        firstParty: ["Git", "Workflows"],
++        firstParty: ["Git"],
        },
        {
          id: "file-opener",
-@@ -552,7 +539,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+@@ -590,7 +577,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
            "PluginFileOpenerProps",
            "PluginFileOpenerSource",
          ],
@@ -406,7 +475,7 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
        },
        {
          id: "app-overlay",
-@@ -614,7 +601,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+@@ -652,7 +639,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
            "PluginCommandContext",
            "PluginCommandShortcut",
          ],
@@ -415,25 +484,37 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
        },
      ],
    },
-@@ -724,7 +711,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+@@ -734,7 +721,6 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         ],
+         firstParty: [
+           "Send later",
+-          "Workflows",
+           "GitHub PR Status",
+           "Codex provider",
+         ],
+@@ -762,7 +748,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
            "PluginComposerApi.insert",
            "ComposerMention",
          ],
 -        firstParty: ["Agent Annotations", "Docs", "Send later", "Workflows"],
-+        firstParty: ["Agent Annotations", "Send later", "Workflows"],
++        firstParty: ["Send later"],
        },
        {
          id: "mention-provider",
-@@ -741,7 +728,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+@@ -779,7 +765,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
            "PluginMentionSearchContext",
            "PluginMentionItem",
          ],
 -        firstParty: ["Agent Annotations", "Docs", "GitHub", "Tasks"],
-+        firstParty: ["Agent Annotations"],
++        firstParty: [],
        },
        {
          id: "composer-rich-text",
-@@ -914,9 +901,6 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+@@ -948,16 +934,11 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         ],
+         firstParty: [
+           "ACP providers",
+-          "bb connect",
            "BB guide",
            "Claude Code provider",
            "Codex provider",
@@ -442,9 +523,16 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
 -          "Modal Sandbox [Experimental]",
            "Provider retry",
            "Push notifications",
-           "Workflows",
-@@ -942,8 +926,6 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "bb connect",
+-          "Workflows",
+         ],
+       },
+       {
+@@ -976,12 +957,8 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         ],
+         firstParty: [
+           "Account Pooler [Experimental]",
+-          "bb account",
+-          "bb connect",
            "Concurrency limit",
            "Keep Awake",
 -          "Memory",
@@ -452,7 +540,7 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
            "Provider usage",
            "Push notifications",
          ],
-@@ -967,12 +949,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+@@ -1005,12 +982,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
            "Send them to Settings, then reload after they save",
          ],
          apiSymbols: ["PluginStatusApi"],
@@ -462,16 +550,17 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
 -          "Modal Sandbox [Experimental]",
 -          "Workflows",
 -        ],
-+        firstParty: ["Account Pooler [Experimental]", "Workflows"],
++        firstParty: ["Account Pooler [Experimental]"],
        },
      ],
    },
-@@ -1044,20 +1021,13 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+@@ -1081,23 +1053,13 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         firstParty: [
            "Account Pooler [Experimental]",
            "Automations",
-           "bb account",
+-          "bb account",
 -          "bb cloud AI",
-           "bb connect",
+-          "bb connect",
            "Browser Automation",
            "Concurrency limit",
 -          "Custom instructions",
@@ -485,14 +574,20 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
            "Secrets",
 -          "Tasks",
            "Thread list",
-           "Workflows",
+-          "Workflows",
          ],
-@@ -1086,23 +1056,15 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+       },
+       {
+@@ -1120,29 +1082,17 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         firstParty: [
+           "Account Pooler [Experimental]",
+           "ACP providers",
+-          "Agent Annotations",
            "Ask User Question",
            "Automations",
-           "bb account",
+-          "bb account",
 -          "bb cloud AI",
-           "bb connect",
+-          "bb connect",
            "BB guide",
            "Browser Automation",
            "Claude Code provider",
@@ -509,11 +604,16 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
 -          "Tasks",
 -          "Theme Preview",
            "Thread list",
-           "Workflows",
+-          "Workflows",
          ],
-@@ -1126,13 +1088,8 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "bb account",
-           "bb connect",
+       },
+       {
+@@ -1161,17 +1111,9 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "Account Pooler [Experimental]",
+           "ACP providers",
+           "Automations",
+-          "bb account",
+-          "bb connect",
            "Concurrency limit",
 -          "Docs",
 -          "GitHub",
@@ -522,15 +622,19 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
            "Push notifications",
 -          "Side chat",
 -          "Theme Preview",
-           "Workflows",
+-          "Workflows",
          ],
        },
-@@ -1206,25 +1163,15 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "Agent Annotations",
+       {
+@@ -1241,30 +1183,16 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         firstParty: [
+           "Account Pooler [Experimental]",
+           "ACP providers",
+-          "Agent Annotations",
            "Automations",
-           "bb account",
+-          "bb account",
 -          "bb cloud AI",
-           "bb connect",
+-          "bb connect",
            "Browser Automation",
            "Claude Code provider",
            "Codex provider",
@@ -549,10 +653,15 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
 -          "Tasks",
 -          "Theme Preview",
            "Thread list",
-           "Workflows",
+-          "Workflows",
            "Worktree",
-@@ -1252,11 +1199,9 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "bb connect",
+         ],
+       },
+@@ -1287,15 +1215,11 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         ],
+         firstParty: [
+           "Automations",
+-          "bb connect",
            "Browser Automation",
            "Concurrency limit",
 -          "Modal Sandbox [Experimental]",
@@ -560,10 +669,11 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
            "Provider usage",
            "Push notifications",
 -          "Tasks",
-           "Workflows",
+-          "Workflows",
          ],
        },
-@@ -1323,12 +1268,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+       {
+@@ -1361,12 +1285,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
            "PluginEnvironmentProviderRemoveContext",
            "PluginEnvironmentProviderRemoveResult",
          ],
@@ -577,7 +687,7 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
          experimental: true,
        },
        {
-@@ -1374,7 +1314,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+@@ -1412,7 +1331,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
            "PluginMachineProviderResource",
            "PluginMachineProviderRemoveResult",
          ],
@@ -586,12 +696,24 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
          experimental: true,
        },
        {
-@@ -1570,19 +1510,11 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
-           "Agent Annotations",
+@@ -1433,7 +1352,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "PluginHosts.ensureSharedPortTunnel",
+           "PluginSharedPortTunnelIdentity",
+         ],
+-        firstParty: ["bb connect"],
++        firstParty: [],
+         experimental: true,
+       },
+       {
+@@ -1605,24 +1524,12 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         apiSymbols: ["PluginStorage"],
+         firstParty: [
+           "Account Pooler [Experimental]",
+-          "Agent Annotations",
            "Automations",
-           "bb account",
+-          "bb account",
 -          "bb cloud AI",
-           "bb connect",
+-          "bb connect",
            "Browser Automation",
            "Concurrency limit",
 -          "Custom instructions",
@@ -604,14 +726,16 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
 -          "Side chat",
 -          "Tasks",
            "Thread list",
-           "Workflows",
+-          "Workflows",
          ],
-@@ -1638,27 +1570,18 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+       },
+       {
+@@ -1676,29 +1583,17 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
            "Account Pooler [Experimental]",
            "ACP providers",
            "Automations",
 -          "bb cloud AI",
-           "bb connect",
+-          "bb connect",
            "Browser Automation",
            "Claude Code provider",
            "Codex provider",
@@ -628,13 +752,24 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
            "Push notifications",
            "Secrets",
 -          "Side chat",
-           "Storage & retention [Experimental]",
+-          "Storage & retention [Experimental]",
 -          "Tasks",
 -          "Theme Preview",
            "Thread list",
-           "Workflows",
+-          "Workflows",
            "Worktree",
-@@ -1723,7 +1646,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         ],
+       },
+@@ -1720,7 +1615,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+           "ReadonlyJsonValue",
+           "BbPluginApi",
+         ],
+-        firstParty: ["Push notifications", "Workflows"],
++        firstParty: ["Push notifications"],
+       },
+       {
+         id: "desktop-browsers",
+@@ -1761,7 +1656,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
            "PluginAiServiceDeclaration",
            "PluginAiServiceStatus",
          ],
@@ -643,10 +778,12 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
          experimental: true,
        },
        {
-@@ -1793,13 +1716,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+@@ -1829,15 +1724,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         firstParty: [
+           "Account Pooler [Experimental]",
            "Automations",
-           "bb account",
-           "bb connect",
+-          "bb account",
+-          "bb connect",
 -          "Docs",
 -          "File Editor",
 -          "GitHub",
@@ -657,12 +794,16 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
            "Thread list",
          ],
        },
-@@ -1840,22 +1757,14 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+@@ -1874,26 +1761,15 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+         firstParty: [
+           "Account Pooler [Experimental]",
+           "ACP providers",
+-          "Agent Annotations",
            "Ask User Question",
            "Automations",
-           "bb account",
+-          "bb account",
 -          "bb cloud AI",
-           "bb connect",
+-          "bb connect",
            "BB guide",
            "Browser Automation",
            "Claude Code provider",
@@ -680,7 +821,7 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
            "PDF preview",
            "Personal workspace",
            "Pi provider",
-@@ -1865,9 +1774,6 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
+@@ -1903,11 +1779,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = withForkApiSymbols([
            "Push notifications",
            "Secrets",
            "Send later",
@@ -688,5 +829,96 @@ diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/s
 -          "Tasks",
 -          "Theme Preview",
            "Thread list",
-           "Workflows",
+-          "Workflows",
            "Worktree",
+         ],
+       },
+diff --git a/apps/app/.ladle/ladle.css b/apps/app/.ladle/ladle.css
+index 098b00286f..0efcde83a7 100644
+--- a/apps/app/.ladle/ladle.css
++++ b/apps/app/.ladle/ladle.css
+@@ -6,7 +6,6 @@
+    silently rendered unstyled here while working in the real app, which builds
+    the plugin's CSS separately. */
+ @source "../../../plugins/automations";
+-@source "../../../plugins/workflows";
+ @source "../../../plugins/provider-usage";
+ @source "../../../plugins/secrets";
+ @source "../../../plugins/provider-codex";
+diff --git a/packages/templates/src/templates/bb-guide-plugins.md b/packages/templates/src/templates/bb-guide-plugins.md
+index 0389267372..ce0ab60694 100644
+--- a/packages/templates/src/templates/bb-guide-plugins.md
++++ b/packages/templates/src/templates/bb-guide-plugins.md
+@@ -176,17 +176,9 @@ Each bundled plugin documents its commands and behavior in its own skill.
+ - MCP server (builtin, disabled by default): `bb plugin enable bb--mcp` lets
+   ChatGPT, Claude, or another MCP client control this bb; an approved app can
+   run any `bb` command. `bb mcp status|clients|revoke`; see the `mcp` skill.
+-- Storage & retention (builtin, disabled by default): enable with
+-  `bb plugin enable bb--storage-retention`. Owns thread retention policies
+-  and machine storage cleanup through its sidebar panel and `bb storage`
+-  commands; see the `storage-retention` skill.
+ - Automations (builtin): recurring or one-shot agent prompts and stored
+   server scripts. `bb automation create|list|show|update|pause|resume|run|runs|delete`;
+   see the `automations` skill.
+-- Workflows (builtin, off by default): durable JavaScript orchestration of
+-  worker threads. Run `bb plugin enable workflows`, then
+-  `bb workflows validate|run|status|history|list|stop`; see the `workflows`
+-  skill.
+ - Memory (official, `bb plugin install memory`): durable cross-provider
+   agent memory. `bb memory catalog|search|get|add|update|forget|history`;
+   see the `memory` skill.
+diff --git a/apps/app/src/components/plugin/management/BrowsePluginsTab.tsx b/apps/app/src/components/plugin/management/BrowsePluginsTab.tsx
+index 8ab26ea6b9..7e8014469c 100644
+--- a/apps/app/src/components/plugin/management/BrowsePluginsTab.tsx
++++ b/apps/app/src/components/plugin/management/BrowsePluginsTab.tsx
+@@ -6,7 +6,6 @@ import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
+ import { Icon } from "@bb/shared-ui/icon";
+ import { appToast } from "@/components/ui/app-toast";
+ import bbLogoUrl from "../../../../../../assets/bb-logo.svg";
+-import { OpenPluginGuideButton } from "./OpenPluginGuideButton";
+ import { cn } from "@bb/shared-ui/lib/utils";
+ import {
+   ResourceCollectionViewport,
+@@ -246,7 +245,6 @@ export function BrowsePluginsTab({
+               </ResourceTabDescription>
+             ) : (
+               <div className="flex items-center justify-between gap-3">
+-                <OpenPluginGuideButton />
+                 {createAction}
+               </div>
+             )}
+diff --git a/packages/templates/src/templates/bb-guide-machines.md b/packages/templates/src/templates/bb-guide-machines.md
+index 5e669b0ac0..fb50a6bbec 100644
+--- a/packages/templates/src/templates/bb-guide-machines.md
++++ b/packages/templates/src/templates/bb-guide-machines.md
+@@ -250,16 +250,6 @@ requests, including account-pool endpoints. A machine on bb connect access holds
+ a getbb.app machine credential that `bb machine remove` revokes; if that
+ revocation fails, revoke the machine in the getbb.app dashboard.
+ 
+-Remote access through getbb.app comes from the bundled bb account and Connect
+-plugins: `bb account login|status|logout` signs this server in (bb-account
+-skill), and `bb connect status|on|off|expose|unexpose|unexpose-all|shares`
+-serves it at `<handle>.getbb.app` and shares HTTP ports from any enrolled host
+-(share-server-links skill). `bb connect servers` lists every bb on the account.
+-`bb connect machine-code` mints a one-time, 10-minute code that pairs the bb
+-mobile app (also shown under Settings → Mobile → Add mobile device); `--json`
+-prints `{code, serverUrl, apex, expiresAt}`. Without an installed bb, pair a
+-dashboard code with `npx -p bb-app@latest bb connect --code <code>`.
+-
+ ## Move the server
+ 
+ Moving the server is experimental and off by default. Turn on the `serverMove`
+diff --git a/packages/templates/src/templates/bb-guide-threads.md b/packages/templates/src/templates/bb-guide-threads.md
+index 61d0ad6b4a..0d001ea66e 100644
+--- a/packages/templates/src/templates/bb-guide-threads.md
++++ b/packages/templates/src/templates/bb-guide-threads.md
+@@ -187,8 +187,7 @@ Editing a sent message:
+   replacement history. If the thread is running,
+   submission stops the current turn and waits for it to settle. Provider-owned
+   background commands, agents, and workflows are stopped before replacing the
+-  session, and retained task cards keep their terminal status. Durable runs
+-  managed by the Workflows plugin continue independently. It then
++  session, and retained task cards keep their terminal status. It then
+   replaces the selected turn and every later turn while retaining workspace
+   changes. Unsent queued messages remain in the queue and dispatch after the
+   replacement turn when their waits clear. An already-sending queued message
