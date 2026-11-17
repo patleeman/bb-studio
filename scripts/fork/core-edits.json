@@ -206,6 +206,11 @@
       "intent": "Calls forkBeforeDatabase right after refuseInterruptedServerImport and before initDb. It runs the first-run import (services/fork-import/first-run.ts) when the data dir has no database yet, and tells the fork module which data dir is active.",
       "budget": 2
     },
+    "apps/server/test/services/plugins/plugin-authoring-docs.test.ts": {
+      "seam": "sdk-tables",
+      "intent": "receivedFields reads only the object parts of a callback's first parameter, skipping primitives and arrays, so a fork callback that takes a JsonValue (experimental_tab's experimental_instanceIcon(params)) is not checked for String and Array prototype members. One line.",
+      "budget": 2
+    },
     "packages/domain/src/ui-preferences.ts": {
       "seam": "workbench-global-tabs",
       "intent": "Two lines at the top import and re-export ui-preferences.fork.ts, and two spreads put the fork's preference keys (FORK_UI_PREFERENCE_KEYS: the synced workbench.globalTabs, which stores the fixed plugin tabs) and their definitions FIRST in UI_PREFERENCE_KEYS and uiPreferenceDefinitions. All defaults are upstream's.",
