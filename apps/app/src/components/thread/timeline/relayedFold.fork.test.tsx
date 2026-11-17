@@ -481,3 +481,146 @@ describe("a compaction bb ran on its own, with a reason", () => {
     expect(result.rows.map((row) => row.id)).toContain("other_compacted");
   });
 });
+
+describe("an automated input sent with a notice", () => {
+  const ALERT_TEXT = "[bb studio] Watcher Kensico health: problems on red4: disk 91%";
+
+  function noticeTurn(
+    key: string,
+    reply: string | null,
+    options: {
+      by?: "system" | "user";
+      text?: string;
+      failed?: boolean;
+      subject?: boolean;
+    } = {},
+  ): TimelineRow[] {
+    const turnId = `turn_${key}`;
+    const at = (offset: number) => ({
+      sourceSeqStart: 8000 + offset,
+      sourceSeqEnd: 8000 + offset,
+      createdAt: 1_800_000_000_000 + offset,
+      threadId: "thr_main",
+      turnId,
+    });
+    const by = options.by ?? "system";
+    const rows: TimelineRow[] = [
+      conversationRow({
+        id: `${key}_alert`,
+        role: "user",
+        initiator: by,
+        text: options.text ?? ALERT_TEXT,
+        ...(by === "system" && options.subject !== false
+          ? {
+              systemMessageSubject: {
+                kind: "automation" as const,
+                source: "watcher",
+                label: "Kensico health",
+              },
+            }
+          : {}),
+        ...at(0),
+      }),
+      commandRow({ id: `${key}_command`, command: "df -h", exitCode: 0, ...at(1) }),
+    ];
+    if (options.failed) {
+      rows.push(
+        systemRow({
+          id: `${key}_error`,
+          systemKind: "error",
+          title: "Turn failed",
+          status: "error",
+          ...at(2),
+        }),
+      );
+    }
+    if (reply !== null) {
+      rows.push(conversationRow({ id: `${key}_reply`, role: "assistant", text: reply, ...at(3) }));
+    }
+    return rows;
+  }
+
+  const fold = (rows: TimelineRow[]) => foldRelayedRows(buildTimelineViewRows(rows), null);
+
+  it("folds a quiet [PASS] reply into one handled row, with no user bubble", () => {
+    registerStudioLike();
+    const { container } = renderRows(noticeTurn("pass", "[PASS]"));
+    const marker = container.querySelector("[data-quiet-turn]");
+    expect(marker?.getAttribute("data-quiet-turn")).toBe("done");
+    expect(marker?.textContent).toContain("Kensico health · handled");
+    expect(container.textContent).not.toContain("problems on red4");
+    expect(container.textContent).not.toContain("Quiet check");
+    expect(container.textContent).not.toContain("[PASS]");
+    expect(container.querySelector('[data-timeline-row-id="pass_reply"]')).toBeNull();
+    expect(container.querySelector('[data-timeline-row-id="pass_command"]')).toBeNull();
+  });
+
+  it("expands to the raw alert, what the Bot did and its short reply", () => {
+    registerStudioLike();
+    const { container } = renderRows(noticeTurn("open", "[PASS]"));
+    const button = container.querySelector("[data-quiet-turn] button");
+    expect(button?.getAttribute("aria-expanded")).toBe("false");
+    act(() => (button as HTMLButtonElement).click());
+    const details = container.querySelector("[data-quiet-turn-details]");
+    expect(details?.textContent).toContain("Watcher Kensico health: problems on red4: disk 91%");
+    expect(details?.textContent).not.toContain("[bb studio]");
+    expect(details?.textContent).toContain("df -h");
+    expect(details?.textContent).toContain("Replied: [PASS]");
+  });
+
+  it("shows a real reply as a message, with the alert as a quiet row above it", () => {
+    registerStudioLike();
+    const { container } = renderRows(noticeTurn("real", "red4's disk is at 91%; I cleared the cache."));
+    const marker = container.querySelector("[data-quiet-turn]");
+    expect(marker?.getAttribute("data-quiet-turn")).toBe("notice");
+    expect(marker?.textContent).toContain("Kensico health");
+    expect(marker?.textContent).not.toContain("handled");
+    expect(rowText(container, "real_reply")).toContain("I cleared the cache.");
+    act(() => (marker!.querySelector("button") as HTMLButtonElement).click());
+    const details = container.querySelector("[data-quiet-turn-details]");
+    expect(details?.textContent).toContain("problems on red4");
+    expect(details?.textContent).not.toContain("Replied:");
+    expect(container.querySelector('[data-timeline-row-id="real_command"]')).not.toBeNull();
+    expect(container.textContent).not.toContain("Message from");
+  });
+
+  it("keeps a failed turn visible, and doesn't call it handled", () => {
+    registerStudioLike();
+    const result = fold(noticeTurn("broken", "[PASS]", { failed: true }));
+    expect(result.folded.quiet.get("broken_alert")?.state).toBe("failed");
+    expect(result.rows.map((row) => row.id)).toEqual(
+      expect.arrayContaining(["broken_command", "broken_error", "broken_reply"]),
+    );
+  });
+
+  it("shows a running turn as running, with nothing folded yet", () => {
+    registerStudioLike();
+    const result = fold(noticeTurn("running", null));
+    expect(result.folded.quiet.get("running_alert")?.state).toBe("running");
+    expect(result.rows.map((row) => row.id)).toContain("running_command");
+    const streaming = foldRelayedRows(buildTimelineViewRows(noticeTurn("stream", "[PASS]")), "stream_reply");
+    expect(streaming.folded.quiet.get("stream_alert")?.state).toBe("running");
+  });
+
+  it("never folds an urgent (⚠) input", () => {
+    registerStudioLike();
+    const result = fold(noticeTurn("urgent", "[PASS]", { text: "[bb studio] ⚠️ Backups failed twice" }));
+    expect(result.folded.quiet.get("urgent_alert")?.state).toBe("notice");
+    expect(result.rows.map((row) => row.id)).toContain("urgent_reply");
+  });
+
+  it("leaves a typed message as the user's own bubble", () => {
+    registerStudioLike();
+    const { container } = renderRows(noticeTurn("typed", "Here you go.", { by: "user", text: "How is red4?" }));
+    expect(container.querySelector("[data-quiet-turn]")).toBeNull();
+    expect(rowText(container, "typed_alert")).toContain("How is red4?");
+    expect(rowText(container, "typed_alert")).not.toContain("Message from");
+  });
+
+  it("draws an input with no notice (an older host) as before", () => {
+    registerStudioLike();
+    const { container } = renderRows(noticeTurn("old", "[PASS]", { by: "user", text: "Watcher Morning card: kettle-ok-09" }));
+    expect(container.querySelector("[data-quiet-turn]")).toBeNull();
+    expect(rowText(container, "old_alert")).toContain("Message from");
+  });
+});

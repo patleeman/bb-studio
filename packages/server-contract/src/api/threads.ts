@@ -1,3 +1,4 @@
+import { forkSendMessageFields } from "./thread-notice.fork.js";
 import { z } from "zod";
 import {
   activeThinkingSchema,
@@ -308,7 +309,7 @@ const sendMessageRequestFieldsSchema = z.object({
   compactFirst: z.literal(true).optional(),
 });
 
-export const sendMessageRequestSchema = sendMessageRequestFieldsSchema;
+export const sendMessageRequestSchema = sendMessageRequestFieldsSchema.extend(forkSendMessageFields);
 export type SendMessageRequest = z.infer<typeof sendMessageRequestSchema>;
 
 /**
