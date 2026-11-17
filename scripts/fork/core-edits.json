@@ -675,6 +675,11 @@
       "seam": "system-compaction",
       "intent": "threads.compact takes an optional reason and sends it as the compact route's reason query.",
       "budget": 3
+    },
+    "apps/server/src/services/threads/turn-retry.ts": {
+      "seam": "system-compaction",
+      "intent": "dispatchRetry passes retrySystemCompactionNotice(db, { threadId, failed }) (system-compaction.fork.ts, imported at the top of the file) as the retry's systemNotice: a retried compaction bb ran on its own keeps its reason when it re-sends the same /compact; every other retry still has none.",
+      "budget": 3
     }
   }
 }

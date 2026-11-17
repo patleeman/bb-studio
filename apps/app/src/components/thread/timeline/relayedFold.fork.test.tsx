@@ -359,44 +359,54 @@ describe("two relayed lines in one turn", () => {
 describe("a compaction bb ran on its own, with a reason", () => {
   const AT = 1_800_000_000_000;
 
+  type Compaction = {
+    status?: "pending" | "completed" | "error" | "interrupted";
+    title?: string;
+    turnId?: string;
+  };
+
   function compactTurn(
     key: string,
     by: "system" | "user",
-    compaction: { status?: "pending" | "completed" | "error"; reason?: string } = {},
+    compaction: Compaction | null = {},
+    reason = "cache warming ended",
   ): TimelineRow[] {
     const turnId = `turn_${key}`;
-    const at = (offset: number) => ({
+    const at = (offset: number, turn = turnId) => ({
       sourceSeqStart: 7000 + offset,
       sourceSeqEnd: 7000 + offset,
       createdAt: AT + offset,
       threadId: "thr_main",
-      turnId,
+      turnId: turn,
     });
-    return [
+    const rows: TimelineRow[] = [
       conversationRow({
         id: `${key}_compact`,
         role: "user",
         initiator: by,
         text: "/compact",
         ...(by === "system"
-          ? {
-              systemMessageSubject: {
-                kind: "compaction" as const,
-                reason: compaction.reason ?? "cache warming ended",
-              },
-            }
+          ? { systemMessageSubject: { kind: "compaction" as const, reason } }
           : {}),
         ...at(0),
       }),
-      systemRow({
-        id: `${key}_compacted`,
-        title: "Context compacted",
-        operationKind: "compaction",
-        status: compaction.status ?? "completed",
-        ...at(1),
-      }),
-    ] as TimelineRow[];
+    ];
+    if (compaction !== null) {
+      rows.push(
+        systemRow({
+          id: `${key}_compacted`,
+          title: compaction.title ?? "Context compacted",
+          operationKind: "compaction",
+          status: compaction.status ?? "completed",
+          ...at(1, compaction.turnId ?? turnId),
+        }),
+      );
+    }
+    return rows;
   }
+
+  const fold = (rows: TimelineRow[]) =>
+    foldRelayedRows(buildTimelineViewRows(rows), null, []);
 
   it("draws one quiet row with the reason: no user bubble, no Context compacted", () => {
     const { container } = renderRows(compactTurn("auto", "system"));
@@ -405,12 +415,18 @@ describe("a compaction bb ran on its own, with a reason", () => {
     expect(text).not.toContain("Context compacted");
     expect(text).not.toContain("/compact");
     expect(container.querySelector('[data-timeline-row-id="auto_compacted"]')).toBeNull();
-    expect(container.querySelector("[data-quiet-turn]")?.getAttribute("title")).toBeTruthy();
+    const marker = container.querySelector("[data-quiet-turn]");
+    expect(marker?.getAttribute("data-quiet-turn")).toBe("done");
+    const expected = new Date(AT).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+    expect(marker?.getAttribute("title")).toBe(expected);
+    expect(marker?.getAttribute("title")).toContain(String(new Date(AT).getFullYear()));
   });
 
   it("needs no plugin: it reads the reason off the row", () => {
-    const fold = foldRelayedRows(buildTimelineViewRows(compactTurn("bare", "system")), null, []);
-    expect(fold.folded.quiet.get("bare_compact")?.label).toBe("Compacted · cache warming ended");
+    expect(fold(compactTurn("bare", "system")).folded.quiet.get("bare_compact")).toMatchObject({
+      label: "Compacted · cache warming ended",
+      state: "done",
+    });
   });
 
   it("leaves a typed /compact as the user's own message, with its Context compacted row", () => {
@@ -421,15 +437,47 @@ describe("a compaction bb ran on its own, with a reason", () => {
   });
 
   it("says just Compacted when the reason is blank", () => {
-    const fold = foldRelayedRows(buildTimelineViewRows(compactTurn("blank", "system", { reason: " " })), null);
-    expect(fold.folded.quiet.get("blank_compact")?.label).toBe("Compacted");
+    expect(fold(compactTurn("blank", "system", {}, " ")).folded.quiet.get("blank_compact")?.label).toBe("Compacted");
   });
 
-  it("keeps a compaction that is still running or failed visible", () => {
-    for (const status of ["pending", "error"] as const) {
-      const fold = foldRelayedRows(buildTimelineViewRows(compactTurn(`k_${status}`, "system", { status })), null);
-      expect(fold.folded.quiet.has(`k_${status}_compact`)).toBe(true);
-      expect(fold.rows.map((row) => row.id)).toContain(`k_${status}_compacted`);
+  it("shows a compaction that hasn't started or is still running as running, not done", () => {
+    for (const [key, compaction] of [["none", null], ["pending", { status: "pending", title: "Compacting context" }]] as const) {
+      const result = fold(compactTurn(key, "system", compaction));
+      expect(result.folded.quiet.get(`${key}_compact`)).toMatchObject({
+        label: "Compacting… · cache warming ended",
+        state: "running",
+      });
+      expect(result.rows.map((row) => row.id)).not.toContain(`${key}_compacted`);
     }
+    const { container } = renderRows(compactTurn("spin", "system", { status: "pending", title: "Compacting context" }));
+    expect(container.querySelector("[data-quiet-turn]")?.getAttribute("data-quiet-turn")).toBe("running");
+    expect(container.textContent).not.toContain("Compacted ·");
+  });
+
+  it("doesn't fold a compaction that failed or was interrupted: the rows stay as they are", () => {
+    for (const [status, title] of [["error", "Context compaction failed"], ["interrupted", "Context compaction interrupted"]] as const) {
+      const result = fold(compactTurn(`k_${status}`, "system", { status, title }));
+      expect(result.folded.quiet.size).toBe(0);
+      expect(result.rows.map((row) => row.id)).toEqual([`k_${status}_compact`, `k_${status}_compacted`]);
+      const { container } = renderRows(compactTurn(`r_${status}`, "system", { status, title }));
+      expect(container.querySelector("[data-quiet-turn]")).toBeNull();
+      expect(container.textContent).toContain(title);
+      cleanup();
+    }
+  });
+
+  it("says a skipped compaction was skipped, not compacted", () => {
+    const result = fold(compactTurn("skip", "system", { title: "Context compaction skipped" }));
+    expect(result.folded.quiet.get("skip_compact")).toMatchObject({
+      label: "Compaction skipped · cache warming ended",
+      state: "skipped",
+    });
+    expect(result.rows.map((row) => row.id)).not.toContain("skip_compacted");
+  });
+
+  it("only folds the compaction row of its own turn", () => {
+    const result = fold(compactTurn("other", "system", { turnId: "turn_provider_auto" }));
+    expect(result.folded.quiet.get("other_compact")?.state).toBe("running");
+    expect(result.rows.map((row) => row.id)).toContain("other_compacted");
   });
 });
