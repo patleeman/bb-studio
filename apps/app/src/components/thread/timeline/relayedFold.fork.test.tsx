@@ -489,10 +489,13 @@ describe("an automated input sent with a notice", () => {
     key: string,
     reply: string | null,
     options: {
-      by?: "system" | "user";
+      by?: "system" | "user" | "agent";
       text?: string;
       failed?: boolean;
       subject?: boolean;
+      source?: string;
+      label?: string;
+      steer?: boolean;
     } = {},
   ): TimelineRow[] {
     const turnId = `turn_${key}`;
@@ -510,14 +513,17 @@ describe("an automated input sent with a notice", () => {
         role: "user",
         initiator: by,
         text: options.text ?? ALERT_TEXT,
-        ...(by === "system" && options.subject !== false
+        ...(by !== "user" && options.subject !== false
           ? {
               systemMessageSubject: {
                 kind: "automation" as const,
-                source: "watcher",
-                label: "Kensico health",
+                source: options.source ?? "watcher",
+                label: options.label ?? "Kensico health",
               },
             }
+          : {}),
+        ...(options.steer
+          ? { turnRequest: { isGrouped: false, kind: "steer" as const, status: "accepted" as const } }
           : {}),
         ...at(0),
       }),
@@ -540,15 +546,16 @@ describe("an automated input sent with a notice", () => {
     return rows;
   }
 
-  const fold = (rows: TimelineRow[]) => foldRelayedRows(buildTimelineViewRows(rows), null);
+  const fold = (rows: TimelineRow[], active = false) =>
+    foldRelayedRows(buildTimelineViewRows(rows), null, undefined, active);
 
-  it("folds a quiet [PASS] reply into one handled row, with no user bubble", () => {
+  it("folds a quiet [PASS] reply into one handled row naming its source and first line, with no user bubble", () => {
     registerStudioLike();
     const { container } = renderRows(noticeTurn("pass", "[PASS]"));
     const marker = container.querySelector("[data-quiet-turn]");
     expect(marker?.getAttribute("data-quiet-turn")).toBe("done");
-    expect(marker?.textContent).toContain("Kensico health · handled");
-    expect(container.textContent).not.toContain("problems on red4");
+    expect(marker?.textContent).toContain("Watcher Kensico health · problems on red4: disk 91% · handled");
+    expect(container.textContent).not.toContain("[bb studio]");
     expect(container.textContent).not.toContain("Quiet check");
     expect(container.textContent).not.toContain("[PASS]");
     expect(container.querySelector('[data-timeline-row-id="pass_reply"]')).toBeNull();
@@ -573,7 +580,7 @@ describe("an automated input sent with a notice", () => {
     const { container } = renderRows(noticeTurn("real", "red4's disk is at 91%; I cleared the cache."));
     const marker = container.querySelector("[data-quiet-turn]");
     expect(marker?.getAttribute("data-quiet-turn")).toBe("notice");
-    expect(marker?.textContent).toContain("Kensico health");
+    expect(marker?.textContent).toContain("Watcher Kensico health · problems on red4: disk 91%");
     expect(marker?.textContent).not.toContain("handled");
     expect(rowText(container, "real_reply")).toContain("I cleared the cache.");
     act(() => (marker!.querySelector("button") as HTMLButtonElement).click());
@@ -584,29 +591,61 @@ describe("an automated input sent with a notice", () => {
     expect(container.textContent).not.toContain("Message from");
   });
 
-  it("keeps a failed turn visible, and doesn't call it handled", () => {
+  it("draws an urgent (⚠) or critical input in full and folds nothing", () => {
+    registerStudioLike();
+    for (const [key, text] of [
+      ["urgent", "[bb studio] ⚠️ From runner House: Backups failed twice\nCheck B2 auth."],
+      ["critical", "[bb studio] Watcher Backups: CRITICAL nightly backup failed\ndisk1 at 97%"],
+    ] as const) {
+      const result = fold(noticeTurn(key, "[PASS]", { text }));
+      expect(result.folded.quiet.get(`${key}_alert`)).toMatchObject({ state: "alert", details: { full: true } });
+      expect(result.rows.map((row) => row.id)).toEqual([`${key}_alert`, `${key}_command`, `${key}_reply`]);
+    }
+    const { container } = renderRows(noticeTurn("shown", "[PASS]", { text: "[bb studio] ⚠️ From runner House: Backups failed twice\nCheck B2 auth." }));
+    const full = container.querySelector("[data-quiet-turn-full]");
+    expect(full?.textContent?.match(/Backups failed twice/gu)).toHaveLength(1);
+    expect(full?.textContent).toContain("Check B2 auth.");
+  });
+
+  it("draws the input of a failed turn in full, and keeps the turn visible", () => {
     registerStudioLike();
     const result = fold(noticeTurn("broken", "[PASS]", { failed: true }));
-    expect(result.folded.quiet.get("broken_alert")?.state).toBe("failed");
+    expect(result.folded.quiet.get("broken_alert")).toMatchObject({ state: "failed", details: { full: true } });
     expect(result.rows.map((row) => row.id)).toEqual(
       expect.arrayContaining(["broken_command", "broken_error", "broken_reply"]),
     );
   });
 
-  it("shows a running turn as running, with nothing folded yet", () => {
+  it("shows the latest turn of an active thread as running, but a turn that ended with no text as finished", () => {
     registerStudioLike();
-    const result = fold(noticeTurn("running", null));
-    expect(result.folded.quiet.get("running_alert")?.state).toBe("running");
-    expect(result.rows.map((row) => row.id)).toContain("running_command");
-    const streaming = foldRelayedRows(buildTimelineViewRows(noticeTurn("stream", "[PASS]")), "stream_reply");
+    const running = fold(noticeTurn("running", null), true);
+    expect(running.folded.quiet.get("running_alert")?.state).toBe("running");
+    expect(running.rows.map((row) => row.id)).toContain("running_command");
+    const ended = fold(noticeTurn("ended", null), false);
+    expect(ended.folded.quiet.get("ended_alert")?.state).toBe("notice");
+    const streaming = foldRelayedRows(buildTimelineViewRows(noticeTurn("stream", "[PASS]")), "stream_reply", undefined, true);
     expect(streaming.folded.quiet.get("stream_alert")?.state).toBe("running");
   });
 
-  it("never folds an urgent (⚠) input", () => {
+  it("folds nothing for an input steered into another turn", () => {
     registerStudioLike();
-    const result = fold(noticeTurn("urgent", "[PASS]", { text: "[bb studio] ⚠️ Backups failed twice" }));
-    expect(result.folded.quiet.get("urgent_alert")?.state).toBe("notice");
-    expect(result.rows.map((row) => row.id)).toContain("urgent_reply");
+    const result = fold(noticeTurn("steered", "[PASS]", { steer: true }));
+    expect(result.folded.quiet.get("steered_alert")?.state).toBe("notice");
+    expect(result.rows.map((row) => row.id)).toEqual(["steered_alert", "steered_command", "steered_reply"]);
+  });
+
+  it("leaves no row for a quiet cache keepalive, but shows one the Bot answered", () => {
+    registerStudioLike();
+    const quiet = fold(noticeTurn("ka", "[PASS]", { source: "keepalive", label: "Cache keepalive", text: "[bb cache-keepalive] keep warm" }));
+    expect(quiet.rows.map((row) => row.id)).toEqual([]);
+    const answered = fold(noticeTurn("kb", "Something odd: the cache was cold.", { source: "keepalive", label: "Cache keepalive", text: "[bb cache-keepalive] keep warm" }));
+    expect(answered.folded.quiet.get("kb_alert")?.label).toBe("Cache keepalive · keep warm");
+  });
+
+  it("draws a runner's report (the runner's turn, not the system's) the same way", () => {
+    registerStudioLike();
+    const result = fold(noticeTurn("runner", "[PASS]", { by: "agent", source: "runner", label: "House", text: "From runner House: All clear on the boiler." }));
+    expect(result.folded.quiet.get("runner_alert")?.label).toBe("Runner House · All clear on the boiler. · handled");
   });
 
   it("leaves a typed message as the user's own bubble", () => {
