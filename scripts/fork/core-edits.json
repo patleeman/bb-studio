@@ -172,9 +172,9 @@
       "budget": 4
     },
     "apps/server/src/server.ts": {
-      "seam": "import-sync, approvals, skills-registry-policy",
-      "intent": "Registers the fork's import routes (/api/v1/fork/import/*) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts).",
-      "budget": 6
+      "seam": "import-sync, approvals, skills-registry-policy, thread-successor",
+      "intent": "Registers the fork's import routes (/api/v1/fork/import/*) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts). One fork import and registerForkThreadSuccessors(deps.db) after the registry gate, so archived-thread errors can look up the handoff chain.",
+      "budget": 8
     },
     "apps/server/src/services/plugins/plugin-service.ts": {
       "seam": "quiet-turns, plugin-events, bundled-studio",
@@ -192,9 +192,9 @@
       "budget": 4
     },
     "apps/server/src/services/threads/thread-send.ts": {
-      "seam": "import-sync",
-      "intent": "ensureThreadIsWritable ends with ensureForkThreadWritable(thread) (services/threads/thread-write-guards.fork.ts), which throws a 409 thread_read_only for the first registered fork guard that refuses; fork-import registers the mirrored-thread guard. This one call also covers the queue path.",
-      "budget": 2
+      "seam": "import-sync, thread-successor",
+      "intent": "ensureThreadIsWritable ends with ensureForkThreadWritable(thread) (services/threads/thread-write-guards.fork.ts), which throws a 409 thread_read_only for the first registered fork guard that refuses; fork-import registers the mirrored-thread guard. This one call also covers the queue path. The archived check calls throwArchivedThread(thread) (services/threads/thread-successor.fork.ts), the same 409 thread_not_writable that also names the live thread a handoff left (details.successorThreadId).",
+      "budget": 5
     },
     "apps/server/src/services/threads/thread-create.ts": {
       "seam": "import-sync, idle-thread",
@@ -685,6 +685,11 @@
       "seam": "codex-computer-use",
       "intent": "CodexSessionOptions has computerUseEnabled, and buildCodexConfig calls applyForkCodexConfig(config, args.options) (src/computer-use.fork.ts, imported at the top) last: with computerUseEnabled false it turns off the unified-computer-use plugin and adds a disabled cua_repl entry, so Codex's Computer Use server does not start in that thread. Without it the config is unchanged.",
       "budget": 3
+    },
+    "apps/cli/src/commands/thread/actions.ts": {
+      "seam": "thread-successor",
+      "intent": "`bb thread tell` sends through sendToLiveThread (commands/thread/tell-successor.fork.ts) and prints the thread it reached: an archived-thread 409 becomes an error that names the live successor or how to find one, and --follow-successor sends to the successor instead (JSON adds redirectedFrom).",
+      "budget": 18
     }
   }
 }
