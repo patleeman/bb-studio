@@ -103,20 +103,19 @@ describe("BB Studio's bundled plugins", () => {
     await rm(workDir, { recursive: true, force: true });
   });
 
-  it("adds Studio and Visual Chat to bb's bundled plugins once", () => {
+  it("adds Studio to bb's bundled plugins once", () => {
     const resolveRoot = (name: string) => join(bundledRoot, name);
     const once = withForkBundledPlugins([], resolveRoot);
     expect(once.map((plugin) => [plugin.pluginId, plugin.rootDir])).toEqual([
       ["studio", join(bundledRoot, "bb-studio")],
-      ["studio-visual-chat", join(bundledRoot, "bb-studio-visual-chat")],
     ]);
-    expect(withForkBundledPlugins(once, resolveRoot)).toHaveLength(2);
+    expect(withForkBundledPlugins(once, resolveRoot)).toHaveLength(1);
     expect(
       once.every((plugin) => plugin.autoInstall && plugin.defaultEnabled),
     ).toBe(true);
   });
 
-  it("installs and runs both on a fresh data dir", async () => {
+  it("installs and runs Studio on a fresh data dir", async () => {
     service = createService(
       db,
       join(workDir, "data"),
@@ -124,10 +123,7 @@ describe("BB Studio's bundled plugins", () => {
     );
     await service.start();
 
-    for (const [id, name] of [
-      ["studio", "bb-studio"],
-      ["studio-visual-chat", "bb-studio-visual-chat"],
-    ] as const) {
+    for (const [id, name] of [["studio", "bb-studio"]] as const) {
       expect(getInstalledPluginRegistration(db, id)).toMatchObject({
         source: `builtin:${name}`,
         provenance: "builtin",
@@ -136,10 +132,7 @@ describe("BB Studio's bundled plugins", () => {
         rootDir: join(bundledRoot, name),
       });
     }
-    expect(loads().sort()).toEqual([
-      "studio-visual-chat:bundled",
-      "studio:bundled",
-    ]);
+    expect(loads().sort()).toEqual(["studio:bundled"]);
   });
 
   it("keeps a path install of Studio over the bundled copy", async () => {
@@ -170,14 +163,6 @@ describe("BB Studio's bundled plugins", () => {
       rootDir: pathRoot,
       enabled: true,
     });
-    expect(
-      getInstalledPluginRegistration(db, "studio-visual-chat"),
-    ).toMatchObject({
-      sourceKind: "builtin",
-    });
-    expect(loads().sort()).toEqual([
-      "studio-visual-chat:bundled",
-      "studio:path",
-    ]);
+    expect(loads().sort()).toEqual(["studio:path"]);
   });
 });
