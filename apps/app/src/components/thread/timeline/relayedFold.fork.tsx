@@ -43,10 +43,19 @@ const ALERT_ICONS: ReadonlySet<IconName> = new Set<IconName>([
 
 const URGENT_BODY = /^(?:\[bb [^\]\n]*\]\s*)?(?:[^\n:]{0,80}:\s*)?⚠/u;
 
+export type QuietFoldState = "running" | "done" | "skipped";
+
 export interface QuietFold {
   label: string;
+  state: QuietFoldState;
   createdAt: number;
 }
+
+const QUIET_FOLD_PREFIX: Record<QuietFoldState, string> = {
+  running: "Compacting…",
+  done: "Compacted",
+  skipped: "Compaction skipped",
+};
 
 export class FoldedRows extends Set<string> {
   readonly quiet: ReadonlyMap<string, QuietFold>;
@@ -100,27 +109,81 @@ export function isAlertRow(row: ThreadTimelineViewRow): boolean {
   return URGENT_BODY.test(row.text.trimStart());
 }
 
-export function quietLabelOf(row: ThreadTimelineViewRow): string | null {
+function compactionReason(row: ThreadTimelineViewRow): string | null {
   if (row.kind !== "conversation" || row.role !== "user") return null;
   if (row.initiator !== "system") return null;
   const subject = row.systemMessageSubject;
-  if (subject?.kind !== "compaction") return null;
-  const reason = subject.reason.trim();
-  return reason.length > 0 ? `Compacted · ${reason}` : "Compacted";
+  return subject?.kind === "compaction" ? subject.reason.trim() : null;
 }
 
-function hiddenInQuietTurn(
+function isCompactionRow(row: ThreadTimelineViewRow): boolean {
+  return (
+    row.kind === "system" &&
+    row.systemKind === "operation" &&
+    row.operationKind === "compaction"
+  );
+}
+
+function inQuietTurn(
   message: ThreadTimelineViewRow,
   row: ThreadTimelineViewRow,
 ): boolean {
-  const sameTurn =
-    (message.turnId !== null && row.turnId === message.turnId) ||
-    (row.kind === "system" &&
-      row.systemKind === "operation" &&
-      row.operationKind === "compaction");
-  if (!sameTurn) return false;
-  if ("status" in row && row.status === "pending") return false;
+  return message.turnId !== null
+    ? row.turnId === message.turnId
+    : isCompactionRow(row);
+}
+
+function rowStatus(row: ThreadTimelineViewRow): string | null {
+  return "status" in row && typeof row.status === "string" ? row.status : null;
+}
+
+function quietFoldState(
+  compaction: ThreadTimelineViewRow | undefined,
+): QuietFoldState | null {
+  const status = compaction === undefined ? "pending" : rowStatus(compaction);
+  if (status === "error" || status === "interrupted") return null;
+  if (status === "pending") return "running";
+  return compaction !== undefined &&
+    "title" in compaction &&
+    /skipped/iu.test(compaction.title)
+    ? "skipped"
+    : "done";
+}
+
+function hiddenInQuietTurn(row: ThreadTimelineViewRow): boolean {
+  if (isCompactionRow(row)) return true;
+  const status = rowStatus(row);
+  if (status === "pending" || status === "interrupted") return false;
   return hiddenInFold(row);
+}
+
+export function quietFoldOf(
+  rows: readonly ThreadTimelineViewRow[],
+  index: number,
+): { fold: QuietFold; hidden: string[] } | null {
+  const message = rows[index];
+  if (message === undefined) return null;
+  const reason = compactionReason(message);
+  if (reason === null) return null;
+  const turn: ThreadTimelineViewRow[] = [];
+  for (
+    let later = index + 1;
+    later < rows.length && rows[later]!.kind !== "conversation";
+    later += 1
+  ) {
+    if (inQuietTurn(message, rows[later]!)) turn.push(rows[later]!);
+  }
+  const state = quietFoldState(turn.filter(isCompactionRow).at(-1));
+  if (state === null) return null;
+  const prefix = QUIET_FOLD_PREFIX[state];
+  return {
+    fold: {
+      label: reason.length > 0 ? `${prefix} · ${reason}` : prefix,
+      state,
+      createdAt: message.createdAt,
+    },
+    hidden: turn.filter(hiddenInQuietTurn).map((row) => row.id),
+  };
 }
 
 function hiddenInFold(row: ThreadTimelineViewRow): boolean {
@@ -157,16 +220,10 @@ export function foldRelayedRows(
   const folded = new Set<string>();
   const quietFolds = new Map<string, QuietFold>();
   for (const [index, row] of rows.entries()) {
-    const label = quietLabelOf(row);
-    if (label === null) continue;
-    quietFolds.set(row.id, { label, createdAt: row.createdAt });
-    for (
-      let later = index + 1;
-      later < rows.length && rows[later]!.kind !== "conversation";
-      later += 1
-    ) {
-      if (hiddenInQuietTurn(row, rows[later]!)) hidden.add(rows[later]!.id);
-    }
+    const quiet = quietFoldOf(rows, index);
+    if (quiet === null) continue;
+    quietFolds.set(row.id, quiet.fold);
+    for (const id of quiet.hidden) hidden.add(id);
   }
   for (let index = 0; index < rows.length; index += 1) {
     if (quietFolds.has(rows[index]!.id) || !relayed(rows[index])) continue;
@@ -234,7 +291,13 @@ export function RelayedRowFolded({
   const folds = useContext(RelayedFoldContext);
   const quiet = folds.quiet.get(rowId);
   if (quiet !== undefined) {
-    return <QuietTurnMarker label={quiet.label} at={quiet.createdAt} />;
+    return (
+      <QuietTurnMarker
+        label={quiet.label}
+        state={quiet.state}
+        at={quiet.createdAt}
+      />
+    );
   }
   const folded = folds.has(rowId);
   return (
