@@ -18,6 +18,7 @@ import {
   type PluginMessageClassification,
   type ReplyClassifiers,
 } from "@/lib/fork-reply-classifiers";
+import { QuietTurnMarker } from "./ForkQuietTurnMarker.js";
 
 const KEPT_OPERATIONS: ReadonlySet<string> = new Set([
   "warning",
@@ -42,14 +43,31 @@ const ALERT_ICONS: ReadonlySet<IconName> = new Set<IconName>([
 
 const URGENT_BODY = /^(?:\[bb [^\]\n]*\]\s*)?(?:[^\n:]{0,80}:\s*)?⚠/u;
 
-const NO_FOLDS: ReadonlySet<string> = new Set();
+export interface QuietFold {
+  label: string;
+  createdAt: number;
+}
 
-export const RelayedFoldContext = createContext<ReadonlySet<string>>(NO_FOLDS);
+export class FoldedRows extends Set<string> {
+  readonly quiet: ReadonlyMap<string, QuietFold>;
+
+  constructor(
+    ids: Iterable<string> = [],
+    quiet: ReadonlyMap<string, QuietFold> = new Map(),
+  ) {
+    super(ids);
+    this.quiet = quiet;
+  }
+}
+
+const NO_FOLDS = new FoldedRows();
+
+export const RelayedFoldContext = createContext<FoldedRows>(NO_FOLDS);
 export const RelayedRowFoldedContext = createContext(false);
 
 export interface RelayedFold {
   rows: readonly ThreadTimelineViewRow[];
-  folded: ReadonlySet<string>;
+  folded: FoldedRows;
 }
 
 export interface RelayedGeneratedSource {
@@ -80,6 +98,29 @@ export function isAlertRow(row: ThreadTimelineViewRow): boolean {
   if (row.kind !== "conversation" || row.role !== "user") return false;
   if (ALERT_MESSAGE_KINDS.has(row.systemMessageKind ?? "")) return true;
   return URGENT_BODY.test(row.text.trimStart());
+}
+
+export function quietLabelOf(row: ThreadTimelineViewRow): string | null {
+  if (row.kind !== "conversation" || row.role !== "user") return null;
+  if (row.initiator !== "system") return null;
+  const subject = row.systemMessageSubject;
+  if (subject?.kind !== "compaction") return null;
+  const reason = subject.reason.trim();
+  return reason.length > 0 ? `Compacted · ${reason}` : "Compacted";
+}
+
+function hiddenInQuietTurn(
+  message: ThreadTimelineViewRow,
+  row: ThreadTimelineViewRow,
+): boolean {
+  const sameTurn =
+    (message.turnId !== null && row.turnId === message.turnId) ||
+    (row.kind === "system" &&
+      row.systemKind === "operation" &&
+      row.operationKind === "compaction");
+  if (!sameTurn) return false;
+  if ("status" in row && row.status === "pending") return false;
+  return hiddenInFold(row);
 }
 
 function hiddenInFold(row: ThreadTimelineViewRow): boolean {
@@ -114,8 +155,21 @@ export function foldRelayedRows(
   };
   const hidden = new Set<string>();
   const folded = new Set<string>();
+  const quietFolds = new Map<string, QuietFold>();
+  for (const [index, row] of rows.entries()) {
+    const label = quietLabelOf(row);
+    if (label === null) continue;
+    quietFolds.set(row.id, { label, createdAt: row.createdAt });
+    for (
+      let later = index + 1;
+      later < rows.length && rows[later]!.kind !== "conversation";
+      later += 1
+    ) {
+      if (hiddenInQuietTurn(row, rows[later]!)) hidden.add(rows[later]!.id);
+    }
+  }
   for (let index = 0; index < rows.length; index += 1) {
-    if (!relayed(rows[index])) continue;
+    if (quietFolds.has(rows[index]!.id) || !relayed(rows[index])) continue;
     const group = new Set([index]);
     let reply = nextConversation(index + 1);
     while (relayed(rows[reply])) {
@@ -138,8 +192,13 @@ export function foldRelayedRows(
     }
     index = end;
   }
-  if (folded.size === 0) return { rows, folded: NO_FOLDS };
-  return { rows: rows.filter((row) => !hidden.has(row.id)), folded };
+  if (folded.size === 0 && quietFolds.size === 0) {
+    return { rows, folded: NO_FOLDS };
+  }
+  return {
+    rows: rows.filter((row) => !hidden.has(row.id)),
+    folded: new FoldedRows(folded, quietFolds),
+  };
 }
 
 export function useRelayedFold(
@@ -172,7 +231,12 @@ export function RelayedRowFolded({
   rowId: string;
   children: ReactNode;
 }) {
-  const folded = useContext(RelayedFoldContext).has(rowId);
+  const folds = useContext(RelayedFoldContext);
+  const quiet = folds.quiet.get(rowId);
+  if (quiet !== undefined) {
+    return <QuietTurnMarker label={quiet.label} at={quiet.createdAt} />;
+  }
+  const folded = folds.has(rowId);
   return (
     <RelayedRowFoldedContext.Provider value={folded}>
       {children}
