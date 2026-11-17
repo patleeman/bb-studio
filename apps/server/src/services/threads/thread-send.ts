@@ -1,4 +1,5 @@
 import { ensureForkThreadWritable } from "./thread-write-guards.fork.js";
+import { throwArchivedThread } from "./thread-successor.fork.js";
 import { getEnvironment, getThread } from "@bb/db";
 import type { DbConnection, DbTransaction, EnvironmentRow } from "@bb/db";
 import type {
@@ -200,7 +201,7 @@ export function ensureThreadIsWritable(
   allowStopping = false,
 ): void {
   if (thread.archivedAt) {
-    throwThreadNotWritable(thread, "archived", "Thread is archived");
+    throwArchivedThread(thread);
   }
   if (thread.status === "stopping" && !allowStopping) {
     throwThreadNotWritable(thread, "stopping", "Thread is stopping");
