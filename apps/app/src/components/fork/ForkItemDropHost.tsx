@@ -13,14 +13,14 @@ import {
   type ItemDropPane,
 } from "@/lib/fork-item-drag";
 import { openTabSpecIn, tabDropOutcome } from "@/lib/fork-tab-move";
-import { usePluginSlots } from "@/lib/plugin-slots";
+import { usePluginSlotKind } from "@/lib/plugin-slots";
 import { listPanes } from "@/lib/split-layout";
 import { splitLayoutAtom } from "@/lib/split-layout/atoms";
 
 const ITEM_DROP_STYLE = `[${ITEM_DROP_ATTRIBUTE}="over"] { outline: 2px solid var(--ring); outline-offset: -2px; }`;
 
 export function ForkItemDropHost({ threadId }: { threadId?: string }) {
-  const handlers = usePluginSlots().itemDrops;
+  const handlers = usePluginSlotKind("itemDrops");
   const routeState = useRouteState();
   const routeThreadId = threadId ?? routeState.threadId ?? null;
   const layout = useAtomValue(splitLayoutAtom);
