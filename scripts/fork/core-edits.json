@@ -206,11 +206,6 @@
       "intent": "Calls forkBeforeDatabase right after refuseInterruptedServerImport and before initDb. It runs the first-run import (services/fork-import/first-run.ts) when the data dir has no database yet, and tells the fork module which data dir is active.",
       "budget": 2
     },
-    "apps/server/test/services/plugins/plugin-authoring-docs.test.ts": {
-      "seam": "quiet-turns, plugin-events",
-      "intent": "The event field table lists experimental_quiet for thread.idle and the fields of the fork's four events (a type assertion requires every event name).",
-      "budget": 7
-    },
     "packages/domain/src/ui-preferences.ts": {
       "seam": "workbench-global-tabs",
       "intent": "Two lines at the top import and re-export ui-preferences.fork.ts, and two spreads put the fork's preference keys (FORK_UI_PREFERENCE_KEYS: the synced workbench.globalTabs, which stores the fixed plugin tabs) and their definitions FIRST in UI_PREFERENCE_KEYS and uiPreferenceDefinitions. All defaults are upstream's.",
@@ -308,7 +303,7 @@
     },
     "apps/server/src/services/threads/lifecycle-outcome.ts": {
       "seam": "plugin-events, quiet-turns",
-      "intent": "Both lifecycle apply functions take forkBefore = forkBeforeLifecycle(deps.db, args) next to previousStatus and call forkAfterLifecycle(deps, args, outcome, previousStatus, forkBefore) after announceTurnFailed (services/threads/lifecycle-outcome.fork.ts). It puts latestAttentionAt back after a quiet run.succeeded from active and calls announceTurnInterrupted (fork-plugin-events.ts). Every turn completion and interruption path goes through these two functions.",
+      "intent": "Both lifecycle apply functions take forkBefore = forkBeforeLifecycle(deps.db, args) before the apply (it reads the thread's previous status, which bb itself no longer reads) and call forkAfterLifecycle(deps, args, outcome, forkBefore) after announceTurnFailed (services/threads/lifecycle-outcome.fork.ts). It puts latestAttentionAt back after a quiet run.succeeded from active and calls announceTurnInterrupted (fork-plugin-events.ts). Every turn completion and interruption path goes through these two functions.",
       "budget": 5
     },
     "apps/server/src/ws/daemon-protocol.ts": {
