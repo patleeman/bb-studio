@@ -27,6 +27,7 @@ export function forkEventCounts(
 
 export function forkFakeHooks(): ForkPluginHooks {
   return {
+    experimental_features: { threadNotices: true },
     experimental_classifyTurns() {},
     experimental_beforeThreadDelete() {},
     experimental_turnContext() {},
