@@ -75,7 +75,7 @@ Run it in the desktop worktree. The Studio version is apps/desktop/studio-releas
                      signed when CSC_NAME is set, never notarized, tagged or
                      uploaded. For testing a fresh install.
 
-Studio and Visual Chat are bundled with the app as built-in plugins
+Studio is bundled with the app as a built-in plugin
 (scripts/fork/bundle-studio-plugins.mjs): plugins/ is taken from the
 monorepo's origin/main, installed with pnpm and built with the release
 worktree's CLI into bb-app's builtin-plugins before electron-builder runs.
@@ -544,7 +544,7 @@ function bundleStudioPlugins(dir) {
     "--out",
     join(dir, "packages", "bb-app", "server", "dist", "builtin-plugins"),
   ]);
-  console.log(`  bundled Studio and Visual Chat from origin/main ${target.slice(0, 10)}`);
+  console.log(`  bundled Studio from origin/main ${target.slice(0, 10)}`);
 }
 
 function releaseFiles(desktop, version) {
