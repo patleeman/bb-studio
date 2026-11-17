@@ -1,3 +1,4 @@
+import { systemCompactionNotice } from "./system-compaction.fork.js";
 import { startsNoTurn } from "./turnless-dispatch.fork.js";
 import {
   requestQueuedMachineReadiness,
@@ -349,6 +350,7 @@ async function runOperationDispatch(
     payload: args.payload,
     thread: args.thread,
     trigger: args.trigger,
+    ...(args.systemNotice !== null ? { systemNotice: args.systemNotice } : {}),
     ...(source.beforeAppendInTransaction !== undefined
       ? { beforeAppendInTransaction: source.beforeAppendInTransaction }
       : {}),
@@ -1028,6 +1030,7 @@ function resolveExecutionIntoPayload(
 export async function compactThreadContext(
   deps: LoggedPendingInteractionWorkSessionDeps,
   thread: Thread,
+  reason: string | null = null,
 ): Promise<void> {
   ensureThreadIsWritable(thread);
   if (!deps.providerRegistry.supportsManualCompaction(thread.providerId)) {
@@ -1055,7 +1058,7 @@ export async function compactThreadContext(
     source: { kind: "operation", environment },
     queuePayload: { kind: "inline" },
     pluginSubmission: null,
-    systemNotice: null,
+    systemNotice: systemCompactionNotice(reason),
     origin: null,
     originPluginId: null,
     startedOnBehalfOf: null,
