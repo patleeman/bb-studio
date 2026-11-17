@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import type { PluginNewConversationSlot } from "@/lib/fork-slots";
-import { usePluginSlots } from "@/lib/plugin-slots";
+import { usePluginSlotKind } from "@/lib/plugin-slots";
 
 export function runForkNewConversation(
   slots: readonly PluginNewConversationSlot[] | undefined,
@@ -22,6 +22,6 @@ export function runForkNewConversation(
 }
 
 export function useForkNewConversation(): () => boolean {
-  const slots = usePluginSlots().newConversations;
+  const slots = usePluginSlotKind("newConversations");
   return useCallback(() => runForkNewConversation(slots), [slots]);
 }
