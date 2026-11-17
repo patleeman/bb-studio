@@ -617,7 +617,7 @@ export interface ThreadsArea {
   archive(args: ThreadActionArgs): Promise<ThreadArchiveResult>;
   archiveAll(args: ThreadActionArgs): Promise<ThreadArchiveAllResult>;
   childSummary(args: ThreadStatusArgs): Promise<ThreadChildSummaryResult>;
-  compact(args: ThreadActionArgs): Promise<ThreadCompactResult>;
+  compact(args: ThreadActionArgs & { reason?: string }): Promise<ThreadCompactResult>;
   cancelPlan(args: ThreadActionArgs): Promise<ThreadBannerActionResult>;
   clearContext(args: ThreadActionArgs): Promise<ThreadBannerActionResult>;
   clearGoal(args: ThreadActionArgs): Promise<ThreadBannerActionResult>;
@@ -1618,6 +1618,7 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
       await transport.readVoid(
         transport.api.v1.threads[":id"].compact.$post({
           param: { id: input.threadId },
+          ...(input.reason === undefined ? {} : { query: { reason: input.reason } }),
         }),
       );
       return { ok: true };
