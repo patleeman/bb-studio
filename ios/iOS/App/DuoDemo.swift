@@ -180,6 +180,7 @@ enum DuoDemo {
             DuoPaneState.shared.set(pane)
             return true
         case "layout":
+            window.layoutIfNeeded()
             if let data = try? JSONSerialization.data(withJSONObject: layoutGeometry(window), options: .sortedKeys) {
                 window.accessibilityValue = String(data: data, encoding: .utf8)
             }

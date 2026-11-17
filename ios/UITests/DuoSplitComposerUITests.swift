@@ -48,7 +48,7 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
     /// One page (the Duo's outer screen, or any iPhone): the composer keeps
     /// its 12-point margins inside the safe area, rests on the home
     /// indicator's inset (8 points above a tab bar where one shows), and the
-    /// jump button floats in the corner above it.
+    /// jump button sits in the corner beside it.
     func testNarrowWindowKeepsItsComposerAndJumpButton() throws {
         app.launchArguments = ["-skipPushPrompt", "YES",
             "-qaBotDemo", "duo", "-qaDuoPhone", "-qaDark", "-openURL", "bbstudio://bot"]
@@ -66,11 +66,11 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         let layout = try geometry()
         print("NARROW width=\(layout.width) height=\(layout.height) safeRight=\(layout.safeRight) safeBottom=\(layout.safeBottom) composer=\(composer.frame) jump=\(jump.frame)")
         XCTAssertLessThan(layout.width, 900)
-        XCTAssertEqual(composer.frame.maxX, layout.width - layout.safeRight - 12, accuracy: 1)
+        XCTAssertEqual(jump.frame.minX - 8, composer.frame.maxX, accuracy: 1, "the composer makes room for the jump button beside it")
         XCTAssertGreaterThan(layout.safeBottom, 0, "A home indicator")
         assertResting(layout.height - layout.safeBottom - composer.frame.maxY, layout: layout, "narrow")
         XCTAssertEqual(jump.frame.maxX, layout.width - layout.safeRight - 12, accuracy: 2, "In the corner, as before")
-        XCTAssertLessThanOrEqual(jump.frame.maxY, composer.frame.minY + 1)
+        XCTAssertEqual(jump.frame.midY, composer.frame.midY, accuracy: 4, "on the composer's row: it adds no height and covers no row")
         command("capture?split-composer-narrow-\(Int(layout.width))")
     }
 

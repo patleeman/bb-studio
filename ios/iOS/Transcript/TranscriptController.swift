@@ -38,6 +38,7 @@ struct TranscriptChrome: Equatable {
         case trailing
         /// Centred in a band above the composer, which the bottom inset includes (beside two pages).
         case center
+        case inline
     }
 }
 
@@ -320,6 +321,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         applyRestingEdge()
         band.backgroundColor = chrome.stackBand
         band.isHidden = chrome.stackBand == nil
+        pillHost.view.isHidden = chrome.pill == .inline
         applyBandTop()
         NSLayoutConstraint.deactivate(composerEdges + pillPlacement)
         let guide = view.safeAreaLayoutGuide
@@ -329,7 +331,7 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
             composerHost.view.trailingAnchor.constraint(equalTo: trailing),
         ]
         switch chrome.pill {
-        case .trailing:
+        case .trailing, .inline:
             pillPlacement = [pillHost.view.trailingAnchor.constraint(equalTo: trailing)]
         case .center:
             // The band's width is the composer's: the pill is centred over it.
@@ -819,8 +821,9 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         let placementChanged = next.shown != pill.shown
         pill = next
         pillHost.rootView = pillContent(next) { [weak self] in self?.jumpToLatest() }
-        pillHost.view.isUserInteractionEnabled = next.shown
-        UIView.animate(withDuration: 0.2) { self.pillHost.view.alpha = next.shown ? 1 : 0 }
+        let drawn = next.shown && chrome.pill != .inline
+        pillHost.view.isUserInteractionEnabled = drawn
+        UIView.animate(withDuration: 0.2) { self.pillHost.view.alpha = drawn ? 1 : 0 }
         if placementChanged, pillHasLane {
             applyBandTop()
             view.setNeedsLayout()
@@ -828,11 +831,11 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         onPillChange?(next)
     }
 
-    private var pillHasLane: Bool { chrome.pill == .center || chrome.stackBand != nil }
+    private var pillHasLane: Bool { chrome.pill == .center || (chrome.stackBand != nil && chrome.pill != .inline) }
 
     private func applyBandTop() {
         guard bandToComposer != nil else { return }
-        let lane = chrome.stackBand != nil && pill.shown
+        let lane = chrome.stackBand != nil && pill.shown && chrome.pill != .inline
         bandToComposer.isActive = !lane
         bandToPill.isActive = lane
     }
@@ -934,7 +937,8 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         func box(_ rect: CGRect) -> [String: Any] { ["x": rect.minX, "y": rect.minY, "width": rect.width, "height": rect.height] }
         var out: [String: Any] = ["stack": box(composerHost.view.convert(composerHost.view.bounds, to: nil)), "atEnd": atEnd,
                                   "insetBottom": collectionView.contentInset.bottom, "pillShown": pill.shown]
-        if pill.shown { out["pill"] = box(pillHost.view.convert(pillHost.view.bounds, to: nil)) }
+        if pill.shown, chrome.pill != .inline { out["pill"] = box(pillHost.view.convert(pillHost.view.bounds, to: nil)) }
+        out["jumpInline"] = chrome.pill == .inline
         if !band.isHidden {
             out["band"] = box(band.convert(band.bounds, to: nil))
             var alpha: CGFloat = 0

@@ -8,6 +8,8 @@ final class ComposerTests: XCTestCase {
         let centre = ComposerRow.lift + ComposerField.verticalInset + line / 2
         XCTAssertEqual(centre, ComposerRow.button / 2, accuracy: 0.5)
         XCTAssertGreaterThanOrEqual(ComposerRow.button, 44)
+        XCTAssertEqual(ComposerRow.lift + 2 * ComposerField.verticalInset + line + ComposerRow.headroom, ComposerRow.button, accuracy: 0.5,
+                       "one line is a 44-point row from fixed padding, so the row grows with every line")
     }
 
     func testSmartReactionRules() {
