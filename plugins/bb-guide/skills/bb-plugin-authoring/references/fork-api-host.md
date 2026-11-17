@@ -218,3 +218,17 @@ page is not on screen, and for a page of another plugin.
   resolves false: a page's panel has no conversation beside it and no window
   of its own.
 - `experimental_workbench()` with no argument never returns a page's panel.
+
+## Codex Computer Use per thread
+
+To keep Codex's native Computer Use (its `cua_repl` server) out of one thread, write the flag into that thread's metadata under `provider-codex`:
+
+```ts
+await bb.sdk.threads.updatePluginMetadata({
+  threadId,
+  pluginId: "provider-codex",
+  set: { experimental_computerUse: false },
+});
+```
+
+It applies from the thread's next turn: bb rebuilds the thread's Codex session when the flag changes. Remove the key (`remove: ["experimental_computerUse"]`) to allow it again. Any API client or the thread's own agent can write the same metadata, so this is a default, not a lock. A provider reads its own thread metadata as `context.experimental_pluginMetadata` in `deriveProviderOptions`.
