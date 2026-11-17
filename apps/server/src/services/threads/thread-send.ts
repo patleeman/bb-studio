@@ -1,3 +1,4 @@
+import { escalationInitiator } from "./automation-notice.fork.js";
 import { ensureForkThreadWritable } from "./thread-write-guards.fork.js";
 import { throwArchivedThread } from "./thread-successor.fork.js";
 import { getEnvironment, getThread } from "@bb/db";
@@ -665,7 +666,7 @@ async function sendThreadMessageWithoutContextClear(
   // and an edited message's re-send are operations on the thread's existing
   // conversation, not new work a limiter admits.
   const permissionEscalation = resolvePermissionEscalation({
-    initiator,
+    initiator: escalationInitiator(initiator, args.systemNotice),
   });
 
   const reprovisionDispatch = await dispatchTurnDuringReprovision({
