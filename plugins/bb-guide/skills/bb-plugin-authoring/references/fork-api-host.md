@@ -131,6 +131,15 @@ finalOutput }) => ({ quiet }))`. bb asks it for every turn that finishes;
   <sender>", its preview starting at `previewStart`. With a quiet reply the
   row and the reply fold into that one row. Return null for anything else.
 
+## Compacting on your own
+
+- `bb.sdk.threads.compact({ threadId, reason })` compacts a thread as bb
+  does when you type `/compact`, but as the system's turn: no user message.
+  The thread view draws it as one quiet row, "✓ Compacted · <reason>"
+  (for example "cache warming ended"). Leave `reason` out for a compaction
+  the user asked for. An older bb ignores `reason` and draws it as the
+  user's.
+
 ## Title rows in cards
 
 `layout: { cards: { gap, radius, titleRow: true } }` in an app backdrop's
