@@ -324,7 +324,7 @@ const replacements = [
   ],
   [
     "apps/app/src/components/pickers/ModelReasoningMenu.tsx",
-    'label="Handoff to new thread"',
+    'label="Hand off to new thread"',
     'label="Continue in a new conversation"',
   ],
   [
@@ -362,7 +362,7 @@ const replacements = [
   ],
   [
     "apps/app/src/components/pickers/ModelReasoningPicker.test.tsx",
-    '"Handoff to new thread"',
+    '"Hand off to new thread"',
     '"Continue in a new conversation"',
     4,
   ],
@@ -855,7 +855,7 @@ const replacements = [
     "apps/app/src/views/thread-detail/ThreadDetailPromptArea.test.tsx",
     '.textContent).toBe("New thread");',
     '.textContent).toBe("Send");',
-    4,
+    6,
   ],
   [
     "apps/app/src/views/thread-detail/ThreadDetailPromptArea.test.tsx",
