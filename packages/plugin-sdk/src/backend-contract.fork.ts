@@ -1,4 +1,5 @@
 import type { Host } from "@bb/domain";
+import type { ReadonlyJsonValue } from "./json-value.js";
 import type { ThreadResponse } from "@bb/server-contract";
 
 /**
@@ -251,3 +252,17 @@ export const FORK_PLUGIN_EVENT_NAMES = [
   "experimental_host.disconnected",
   "experimental_thread.fileChanged",
 ] as const satisfies readonly (keyof ForkPluginEventPayloads)[];
+
+/**
+ * Fork fields of the context a provider's `deriveProviderOptions` receives.
+ */
+export interface ForkProviderOptionsContext {
+  /**
+   * The thread's metadata stored under the provider plugin's own id, or `{}`
+   * when it has none. Any plugin can write it for a thread with
+   * `bb.sdk.threads.updatePluginMetadata({ threadId, pluginId, set })`, and so
+   * can any API client or the thread's own agent, so treat values as
+   * untrusted. Experimental: see docs/api_to_audit.fork.md.
+   */
+  experimental_pluginMetadata?: { readonly [key: string]: ReadonlyJsonValue };
+}
