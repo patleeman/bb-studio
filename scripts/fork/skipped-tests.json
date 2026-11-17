@@ -601,6 +601,10 @@
       "title": "shows close on a compact plugin page"
     },
     {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "shows the destination thread in a split in the commit that changes the route"
+    },
+    {
       "file": "apps/app/src/components/commands/CommandPalette.cold-open.test.tsx",
       "title": "stays usable before its body downloads on first open and keeps typed text"
     },

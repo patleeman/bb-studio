@@ -859,6 +859,11 @@ const replacements = [
   ],
   [
     "apps/app/src/views/thread-detail/ThreadDetailPromptArea.test.tsx",
+    '.textContent).toBe(\n          "New thread",\n        ),',
+    '.textContent).toBe(\n          "Send",\n        ),',
+  ],
+  [
+    "apps/app/src/views/thread-detail/ThreadDetailPromptArea.test.tsx",
     '"Create new thread (Enter)",',
     '"Send in a new conversation (Enter)",',
   ],
