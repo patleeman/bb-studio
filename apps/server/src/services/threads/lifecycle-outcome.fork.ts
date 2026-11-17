@@ -13,8 +13,15 @@ import { isQuietTurn } from "./quiet-turn.fork.js";
 import { scheduleQueuedTitleRetry } from "./title-retry-queue.fork.js";
 
 export interface ForkLifecycleBefore {
-  quietAttentionAt: number;
+  previousStatus: ThreadStatus | undefined;
+  quietAttentionAt: number | null;
 }
+
+const READS_PREVIOUS_THREAD = new Set([
+  "run.succeeded",
+  "run.failed",
+  "stop.settled",
+]);
 
 function isConnection(db: DbConnection | DbTransaction): db is DbConnection {
   return "$client" in db;
@@ -24,22 +31,28 @@ export function forkBeforeLifecycle(
   db: DbConnection | DbTransaction,
   args: ApplyThreadLifecycleEventArgs,
 ): ForkLifecycleBefore | null {
-  if (args.event.type !== "run.succeeded" || !isConnection(db)) return null;
+  if (!READS_PREVIOUS_THREAD.has(args.event.type)) return null;
   const thread = getThread(db, args.threadId);
-  if (thread === null || thread.status !== "active") return null;
-  if (!isQuietTurn(db, { threadId: args.threadId })) return null;
-  return { quietAttentionAt: thread.latestAttentionAt };
+  const quiet =
+    args.event.type === "run.succeeded" &&
+    isConnection(db) &&
+    thread?.status === "active" &&
+    isQuietTurn(db, { threadId: args.threadId });
+  return {
+    previousStatus: thread?.status,
+    quietAttentionAt: quiet ? thread.latestAttentionAt : null,
+  };
 }
 
 export function forkAfterLifecycle(
   deps: { db: DbConnection | DbTransaction },
   args: ApplyThreadLifecycleEventArgs,
   outcome: ApplyThreadLifecycleEventOutcome,
-  previousStatus: ThreadStatus | undefined,
   before: ForkLifecycleBefore | null,
 ): void {
   if (
     before !== null &&
+    before.quietAttentionAt !== null &&
     outcome.applied &&
     outcome.thread.latestAttentionAt !== before.quietAttentionAt &&
     isConnection(deps.db)
@@ -50,7 +63,7 @@ export function forkAfterLifecycle(
       .where(eq(threads.id, args.threadId))
       .run();
   }
-  announceTurnInterrupted(args, outcome, previousStatus);
+  announceTurnInterrupted(args, outcome, before?.previousStatus);
   if (args.event.type === "run.succeeded" && outcome.applied) {
     scheduleQueuedTitleRetry(args.threadId);
   }
