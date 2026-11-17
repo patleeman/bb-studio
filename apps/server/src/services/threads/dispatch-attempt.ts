@@ -1,3 +1,4 @@
+import { systemCompactionNotice } from "./system-compaction.fork.js";
 import { startsNoTurn } from "./turnless-dispatch.fork.js";
 import {
   requestQueuedMachineReadiness,
@@ -349,6 +350,7 @@ async function runOperationDispatch(
     payload: args.payload,
     thread: args.thread,
     trigger: args.trigger,
+    ...(args.systemNotice !== null ? { systemNotice: args.systemNotice } : {}),
     ...(source.beforeAppendInTransaction !== undefined
       ? { beforeAppendInTransaction: source.beforeAppendInTransaction }
       : {}),
@@ -1076,6 +1078,7 @@ export function assertThreadCanCompact(
 export async function compactThreadContext(
   deps: LoggedPendingInteractionWorkSessionDeps,
   thread: Thread,
+  reason: string | null = null,
 ): Promise<void> {
   assertThreadCanCompact(deps, thread);
   const environment = await requireThreadCommandEnvironment(deps, { thread });
@@ -1088,7 +1091,7 @@ export async function compactThreadContext(
     source: { kind: "operation", environment },
     queuePayload: { kind: "inline" },
     pluginSubmission: null,
-    systemNotice: null,
+    systemNotice: systemCompactionNotice(reason),
     origin: null,
     originPluginId: null,
     startedOnBehalfOf: null,

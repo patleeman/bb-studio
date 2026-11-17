@@ -355,3 +355,81 @@ describe("two relayed lines in one turn", () => {
   });
 });
 
+
+describe("a compaction bb ran on its own, with a reason", () => {
+  const AT = 1_800_000_000_000;
+
+  function compactTurn(
+    key: string,
+    by: "system" | "user",
+    compaction: { status?: "pending" | "completed" | "error"; reason?: string } = {},
+  ): TimelineRow[] {
+    const turnId = `turn_${key}`;
+    const at = (offset: number) => ({
+      sourceSeqStart: 7000 + offset,
+      sourceSeqEnd: 7000 + offset,
+      createdAt: AT + offset,
+      threadId: "thr_main",
+      turnId,
+    });
+    return [
+      conversationRow({
+        id: `${key}_compact`,
+        role: "user",
+        initiator: by,
+        text: "/compact",
+        ...(by === "system"
+          ? {
+              systemMessageSubject: {
+                kind: "compaction" as const,
+                reason: compaction.reason ?? "cache warming ended",
+              },
+            }
+          : {}),
+        ...at(0),
+      }),
+      systemRow({
+        id: `${key}_compacted`,
+        title: "Context compacted",
+        operationKind: "compaction",
+        status: compaction.status ?? "completed",
+        ...at(1),
+      }),
+    ] as TimelineRow[];
+  }
+
+  it("draws one quiet row with the reason: no user bubble, no Context compacted", () => {
+    const { container } = renderRows(compactTurn("auto", "system"));
+    const text = container.textContent ?? "";
+    expect(text).toContain("Compacted · cache warming ended");
+    expect(text).not.toContain("Context compacted");
+    expect(text).not.toContain("/compact");
+    expect(container.querySelector('[data-timeline-row-id="auto_compacted"]')).toBeNull();
+    expect(container.querySelector("[data-quiet-turn]")?.getAttribute("title")).toBeTruthy();
+  });
+
+  it("needs no plugin: it reads the reason off the row", () => {
+    const fold = foldRelayedRows(buildTimelineViewRows(compactTurn("bare", "system")), null, []);
+    expect(fold.folded.quiet.get("bare_compact")?.label).toBe("Compacted · cache warming ended");
+  });
+
+  it("leaves a typed /compact as the user's own message, with its Context compacted row", () => {
+    const { container } = renderRows(compactTurn("typed", "user"));
+    expect(rowText(container, "typed_compact")).toContain("compact");
+    expect(container.querySelector("[data-quiet-turn]")).toBeNull();
+    expect(container.textContent).toContain("Context compacted");
+  });
+
+  it("says just Compacted when the reason is blank", () => {
+    const fold = foldRelayedRows(buildTimelineViewRows(compactTurn("blank", "system", { reason: " " })), null);
+    expect(fold.folded.quiet.get("blank_compact")?.label).toBe("Compacted");
+  });
+
+  it("keeps a compaction that is still running or failed visible", () => {
+    for (const status of ["pending", "error"] as const) {
+      const fold = foldRelayedRows(buildTimelineViewRows(compactTurn(`k_${status}`, "system", { status })), null);
+      expect(fold.folded.quiet.has(`k_${status}_compact`)).toBe(true);
+      expect(fold.rows.map((row) => row.id)).toContain(`k_${status}_compacted`);
+    }
+  });
+});
