@@ -104,7 +104,7 @@ function loadSdkTypes() {
         ...part.getConstructSignatures(),
       ])
       .flatMap((signature) => signature.getParameters().slice(0, 1))
-      .flatMap((parameter) => fields(checker.getTypeOfSymbol(parameter)));
+      .flatMap((parameter) => parts(checker.getTypeOfSymbol(parameter)).filter((part) => !(part.flags & (ts.TypeFlags.StringLike | ts.TypeFlags.NumberLike | ts.TypeFlags.BooleanLike)) && !checker.isArrayType(part)).flatMap(fields));
     return [...new Set(received)];
   }
 
