@@ -301,13 +301,13 @@ it("under a Bot that isn't the primary, is that Bot's Scheduled alone, titled Sc
   state.scheduled = [];
 });
 
-it("names itself Tasks, with Now and Scheduled tabs; Now shows Your to-do and In flight on top, Areas, then the Done bar", async () => {
+it("names itself Tasks, with Now and Scheduled tabs; Now shows Your to-do, In flight and Waiting on top, Areas, then the Done bar", async () => {
   state.extraTasks = [...ASKS(), ...FLIGHT()];
   await render();
   expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Tasks·Chief of Staff");
   expect(texts(container, "[data-testid=bot-page-pill]")).toEqual(["Now", "Scheduled0"]);
   expect(container.querySelector("[data-testid=bot-page-pill][data-value=now]")?.getAttribute("data-state")).toBe("on");
-  expect(texts(container, "h2")).toEqual(["Your to-do", "In flight", "Areas"]);
+  expect(texts(container, "h2")).toEqual(["Your to-do", "In flight", "Waiting", "Areas"]);
   expect(container.querySelector("[data-testid=tasks-top]")?.className).toContain("@4xl/bot-page:grid-cols-[1fr_1.15fr]");
   expect(box("tasks-done")).not.toBeNull();
   expect(box("tasks-scheduled")).toBeNull();
@@ -357,24 +357,29 @@ it("leads Your to-do with the Bot chat's pending questions, which open the chat"
   expect(state.openLink).toHaveBeenLastCalledWith("bb://conversation/thr_bot", expect.objectContaining({ title: "Chief of Staff" }));
 });
 
-it("In flight: running rows first with a ring, the step and the owner's time, waiting rows saying on what, workers folded under their task", async () => {
+it("In flight: running rows first with a ring, the step and the owner's time, waiting rows saying on what, workers folded under their task; what only waits is in Waiting", async () => {
   state.extraTasks = [...ASKS(), ...FLIGHT()];
   await render();
   const flight = box("tasks-flight")!;
-  expect(flight.querySelector("[data-testid=box-detail]")?.textContent).toBe("2 running · 3 waiting");
+  expect(flight.querySelector("[data-testid=box-detail]")?.textContent).toBe("2 running · 1 waiting");
   const rows = [...flight.querySelectorAll<HTMLElement>("[data-testid=page-flight-row]")];
-  expect(rows.map((each) => each.dataset.taskId)).toEqual(["loop_a", "task_polish", "loop_w", "task_duo", "task_tf"]);
+  expect(rows.map((each) => each.dataset.taskId)).toEqual(["loop_a", "task_polish", "task_duo"]);
+  const waiting = box("tasks-waiting")!;
+  expect(waiting.querySelector("[data-testid=box-detail]")?.textContent).toBe("2 on someone or something else");
+  const parked = [...waiting.querySelectorAll<HTMLElement>("[data-testid=page-flight-row]")];
+  expect(parked.map((each) => each.dataset.taskId)).toEqual(["loop_w", "task_tf"]);
+  expect(texts(waiting, "[data-testid=flight-right]")).toEqual(["waiting on someone", "waiting on a task"]);
+  expect(parked[1]!.querySelector("[data-testid=flight-line]")?.textContent).toBe("Waiting on phone polish, then your OK");
+  expect(parked[0]!.querySelector("[data-testid=flight-glyph]")?.getAttribute("data-look")).toBe("waiting");
   const polish = rows[1]!;
   expect(polish.dataset.look).toBe("running");
   expect(polish.querySelector("[data-testid=flight-ring]")?.getAttribute("data-progress")).toBe("3/5");
   expect(polish.querySelector("[data-testid=flight-right]")?.textContent).toBe("3 of 5");
   expect(polish.querySelector("[data-testid=flight-owner]")?.textContent).toBe("Larkspur lead · 50m");
   expect(polish.querySelector("[data-testid=flight-line]")?.textContent).toBe("Shots · Taking screenshots of the fixes");
-  expect(texts(flight, "[data-look=waiting] [data-testid=flight-right]")).toEqual(["waiting on someone", "waiting on you", "waiting on a task"]);
-  expect(rows[4]!.querySelector("[data-testid=flight-line]")?.textContent).toBe("Waiting on phone polish, then your OK");
-  expect(rows[3]!.querySelector("[data-testid=flight-line]")).toBeNull();
-  expect(rows[3]!.querySelector("[data-testid=flight-right]")?.textContent).toBe("waiting on you");
-  expect(rows[2]!.querySelector("[data-testid=flight-glyph]")?.getAttribute("data-look")).toBe("waiting");
+  expect(texts(flight, "[data-look=waiting] [data-testid=flight-right]")).toEqual(["waiting on you"]);
+  expect(rows[2]!.querySelector("[data-testid=flight-line]")).toBeNull();
+  expect(rows[2]!.querySelector("[data-testid=flight-right]")?.textContent).toBe("waiting on you");
   expect(flight.querySelectorAll("[data-testid=page-flight-row][data-task-id=task_shots]")).toHaveLength(0);
   const fold = polish.querySelector<HTMLButtonElement>("[data-testid=flight-fold]")!;
   expect(fold.dataset.count).toBe("1 subtask · 1 worker");
@@ -385,7 +390,7 @@ it("In flight: running rows first with a ring, the step and the owner's time, wa
   await act(async () => polish.querySelector<HTMLButtonElement>("[data-testid=flight-worker]")!.click());
   expect(state.toThread).toHaveBeenCalledWith("thr_w1");
   const todoRows = box("tasks-todo")!.querySelectorAll("[data-testid=todo-ask], [data-testid=todo-own]").length + 3;
-  expect(todoRows + rows.length).toBe(13);
+  expect(todoRows + rows.length + parked.length).toBe(13);
 });
 
 it("Areas: one card each, problems first, with who, covers, where it stands, open items and their age, the last runs and last and next", async () => {
@@ -722,4 +727,27 @@ it("marks the row whose task is open beside the page", async () => {
   expect(row().hasAttribute("aria-current")).toBe(false);
   await act(async () => row().click());
   expect(row().getAttribute("aria-current")).toBe("true");
+});
+
+it("the Waiting group's rows open the task like every row, with Enter too", async () => {
+  state.extraTasks = [...FLIGHT(), mk("task_red4", { title: "Remove the PHP upload-progress mitigation", owner: "cos", state: "waiting", waitingOn: { kind: "outside", ref: null, text: "Unraid shipping a fix" }, conversation: "thr_bot" })];
+  await render();
+  const waiting = box("tasks-waiting")!;
+  expect(waiting.querySelector("h2")?.textContent).toBe("Waiting");
+  expect(box("tasks-flight")!.querySelector("[data-task-id=task_red4]")).toBeNull();
+  const row = waiting.querySelector<HTMLButtonElement>("[data-task-id=task_red4] [data-testid=row-open]")!;
+  expect(row.getAttribute("aria-label")).toMatch(/^Remove the PHP upload-progress mitigation, waiting on Unraid shipping a fix/);
+  expect(row.querySelector("i[data-icon=ChevronRight]")).not.toBeNull();
+  expect(row.tabIndex).toBe(0);
+  await act(async () => row.click());
+  expect(state.openLink).toHaveBeenLastCalledWith("bb://todo/task_red4", expect.objectContaining({ title: "Remove the PHP upload-progress mitigation" }));
+  expect(row.getAttribute("aria-current")).toBe("true");
+});
+
+it("shows no Waiting group when nothing only waits", async () => {
+  state.groups = { ...(state.groups as Record<string, Loop[]>), waitingOnOthers: [] };
+  state.extraTasks = [mk("task_live", { title: "Live work", owner: "thread:thr_lead", state: "in_progress", conversation: "thr_lead" })];
+  await render();
+  expect(box("tasks-waiting")).toBeNull();
+  expect(box("tasks-flight")!.querySelector("[data-task-id=task_live]")).not.toBeNull();
 });

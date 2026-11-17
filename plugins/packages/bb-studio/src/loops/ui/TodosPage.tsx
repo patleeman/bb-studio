@@ -10,8 +10,8 @@ import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageMore, BotPageRow, Bot
 import { useCall, useLive } from "../../ui/live";
 import { isClosed, needsYou, USER_OWNER, type Task } from "../../tasks/contract";
 import { SEVERITY_LABEL, ALL, matches, ownerFilterOf, ownerShort, sectionTasks, taskSection, taskKind, taskStatus, type Names } from "../../tasks/ui/model";
-import { areaAsks, pageFlight, todoBox, type AreaAsk, type FlightNode } from "../../tasks/ui/board-model";
-import { AreasSection, DoneBar, PageInFlight, TodoBoxView } from "../../tasks/ui/TasksNow";
+import { areaAsks, pageFlight, splitWaiting, todoBox, type AreaAsk, type FlightNode } from "../../tasks/ui/board-model";
+import { AreasSection, DoneBar, PageInFlight, PageWaiting, TodoBoxView } from "../../tasks/ui/TasksNow";
 import { SCHEDULED_ICON, scheduledMeta } from "./scheduled-model";
 import { NewAutomationMenu, newKinds, useAutomationEditor, useAutomations } from "../../ui/bot/Automations";
 import { useNeedsYou } from "./LoopsTab";
@@ -76,6 +76,8 @@ export function TodosPage({ view, tab: initialTab = "now" }: { view: BotView; ta
     const deep = (n: FlightNode): boolean => match(n.task) || n.children.some(deep) || n.workers.some((w) => w.name.toLowerCase().includes(query.trim().toLowerCase()));
     return nodes.filter(deep);
   }, [board.data, query]); // eslint-disable-line react-hooks/exhaustive-deps
+  // In flight is work under way; what only waits on someone outside, another task or a trigger has its own group.
+  const inFlight = useMemo(() => splitWaiting(flight, now), [flight, now]);
   const shownAreas = useMemo(() => {
     const all = areas.data?.areas ?? null;
     if (!all || !searching) return all;
@@ -147,7 +149,10 @@ export function TodosPage({ view, tab: initialTab = "now" }: { view: BotView; ta
           <TodoBoxView box={box} chat={chat} areaAsks={asksFromAreas} onOpenAsk={openAsk} names={names} threads={threads} targets={people.targets} now={now} zone={zone} query={searching}
             onOpen={openTask} isOpen={isOpen} onOpenChat={botChat ? () => botChat.onOpen(undefined as never) : null} refresh={refresh}
             adding={adding ? <AddTask onAdd={add} onClose={() => setAdding(false)} /> : null} />
-          <PageInFlight nodes={flight} names={names} now={now} titleOf={titleOf} onOpen={openTask} isOpen={isOpen} onOpenThread={openThread} query={searching} />
+          <div className="flex min-w-0 flex-col gap-5">
+            <PageInFlight nodes={inFlight.active} names={names} now={now} titleOf={titleOf} onOpen={openTask} isOpen={isOpen} onOpenThread={openThread} query={searching} />
+            <PageWaiting nodes={inFlight.waiting} names={names} now={now} titleOf={titleOf} onOpen={openTask} isOpen={isOpen} onOpenThread={openThread} />
+          </div>
         </div> : tasksError ? null : <TasksLoading />}
         <AreasSection areas={shownAreas} error={areas.error} query={searching} flight={flight} now={now} zone={zone} onOpenTask={(id, title, event) => openTask({ id, title }, event)} isOpen={isOpen} onOpenThread={openThread} />
         {list.data ? <DoneBar tasks={doneTasks} names={names} query={searching} now={now} zone={zone} onOpen={openTask} isOpen={isOpen} /> : null}

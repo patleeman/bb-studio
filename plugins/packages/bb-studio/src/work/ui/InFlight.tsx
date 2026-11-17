@@ -7,7 +7,7 @@ import { Icon, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import { TASKS_UNAVAILABLE, USER_OWNER, type Task } from "../../tasks/contract";
 import { ownerShort, ownerThreadId, taskStatus } from "../../tasks/ui/model";
-import { isRunning, stepProgress, treeOf, type FlightNode } from "../../tasks/ui/board-model";
+import { isRunning, isWaitingOnly, stepProgress, treeOf, type FlightNode } from "../../tasks/ui/board-model";
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 import { FlightChildren, FlightGlyph, flightText, FoldToggle, useFold } from "../../tasks/ui/Flight";
@@ -41,6 +41,7 @@ export function InFlight({ threadId }: { threadId: string }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [showDone, setShowDone] = useState(false);
+  const [showWaiting, setShowWaiting] = useState(false);
   const [unfolded, toggleFold] = useFold();
   const [hidden, setHidden] = useState<ReadonlyMap<string, number>>(() => new Map());
   const [now, setNow] = useState(() => Date.now());
@@ -53,10 +54,13 @@ export function InFlight({ threadId }: { threadId: string }) {
   const titleOf = (id: string) => titles.get(id) ?? null;
   const visible = nodes.filter((node) => !onScreen.has(node.task.id) && hidden.get(node.task.id) !== node.task.updatedAt);
   const live = (node: FlightNode) => node.row.open && !node.task.stale;
-  const rows = visible.some(live) ? visible : [];
+  // What only waits (on someone outside, another task or a trigger) folds into "N waiting" and doesn't keep In flight up on its own.
+  const active = (node: FlightNode) => live(node) && !isWaitingOnly(node, now);
+  const rows = visible.some(active) ? visible : [];
   if (!flight.data && flight.error?.includes(TASKS_UNAVAILABLE)) return <p role="alert" data-testid="in-flight-error" className="px-3 py-1.5 text-xs text-destructive">{flight.error}</p>;
   if (!rows.length) return null;
-  const open = rows.filter(live);
+  const open = rows.filter(active);
+  const waiting = rows.filter((node) => live(node) && !active(node));
   const finished = rows.filter((node) => !live(node));
   const needs = open.filter((node) => node.row.needsYou).length;
   const running = open.filter(isRunning).length;
@@ -128,6 +132,15 @@ export function InFlight({ threadId }: { threadId: string }) {
       {collapsed ? null : (
         <ul className="py-0.5">
           {open.map(row)}
+          {waiting.length ? (
+            <li key="waiting" className="border-b border-border/35 last:border-b-0">
+              <button type="button" data-testid="in-flight-waiting" aria-expanded={showWaiting} onClick={() => setShowWaiting(!showWaiting)} className="flex min-h-7 w-full min-w-0 cursor-pointer items-center gap-1 px-3 py-1 text-left text-2xs text-subtle-foreground transition-colors hover:bg-state-hover hover:text-foreground focus-visible:bg-state-hover focus-visible:outline-none">
+                <span className="tabular-nums">{waiting.length} waiting</span>
+                <Icon name={showWaiting ? "ChevronDown" : "ChevronRight"} className="size-3 shrink-0" />
+              </button>
+            </li>
+          ) : null}
+          {showWaiting ? waiting.map(row) : null}
           {finished.length ? (
             <li key="done" className="border-b border-border/35 last:border-b-0">
               <button type="button" data-testid="in-flight-done" aria-expanded={showDone} onClick={() => setShowDone(!showDone)} className="flex min-h-7 w-full min-w-0 cursor-pointer items-center gap-1 px-3 py-1 text-left text-2xs text-subtle-foreground transition-colors hover:bg-state-hover hover:text-foreground focus-visible:bg-state-hover focus-visible:outline-none">
