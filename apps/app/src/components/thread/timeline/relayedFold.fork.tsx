@@ -48,7 +48,13 @@ const ALERT_ICONS: ReadonlySet<IconName> = new Set<IconName>([
 
 const URGENT_BODY = /^(?:\[bb [^\]\n]*\]\s*)?(?:[^\n:]{0,80}:\s*)?⚠/u;
 
-export type QuietFoldState = "running" | "done" | "skipped" | "notice" | "failed";
+export type QuietFoldState =
+  | "running"
+  | "done"
+  | "skipped"
+  | "notice"
+  | "failed"
+  | "alert";
 
 export interface QuietFold {
   label: string;
@@ -206,6 +212,7 @@ export function foldRelayedRows(
   rows: readonly ThreadTimelineViewRow[],
   streamingAssistantMessageId: string | null,
   classifiers: ReplyClassifiers = getPluginSlotSnapshot().replyClassifiers,
+  active: boolean = streamingAssistantMessageId !== null,
 ): RelayedFold {
   const relayed = (row: ThreadTimelineViewRow | undefined): boolean =>
     row !== undefined &&
@@ -235,15 +242,25 @@ export function foldRelayedRows(
     for (const id of quiet.hidden) hidden.add(id);
   }
   for (const [index, row] of rows.entries()) {
-    const notice = noticeFoldOf(rows, index, quiet, streamingAssistantMessageId);
+    const notice = noticeFoldOf(
+      rows,
+      index,
+      quiet,
+      streamingAssistantMessageId,
+      active,
+    );
     if (notice === null) continue;
+    for (const id of notice.hidden) hidden.add(id);
+    if (notice.hideRow) {
+      hidden.add(row.id);
+      continue;
+    }
     quietFolds.set(row.id, {
       label: notice.label,
       state: notice.state,
       createdAt: row.createdAt,
       details: notice.details,
     });
-    for (const id of notice.hidden) hidden.add(id);
   }
   for (let index = 0; index < rows.length; index += 1) {
     if (quietFolds.has(rows[index]!.id) || !relayed(rows[index])) continue;
@@ -269,7 +286,7 @@ export function foldRelayedRows(
     }
     index = end;
   }
-  if (folded.size === 0 && quietFolds.size === 0) {
+  if (folded.size === 0 && quietFolds.size === 0 && hidden.size === 0) {
     return { rows, folded: NO_FOLDS };
   }
   return {
@@ -296,6 +313,7 @@ export function useRelayedFold(
         rows,
         scopeActive ? findStreamingAssistantMessageId(rows) : null,
         slots.replyClassifiers,
+        scopeActive,
       ),
     [rows, scopeActive, findStreamingAssistantMessageId, slots.replyClassifiers],
   );
