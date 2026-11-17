@@ -1,3 +1,4 @@
+import { retrySystemCompactionNotice } from "./system-compaction.fork.js";
 import {
   getFirstUnclaimedQueuedRetry,
   hasQueuedRetryOfTurnRequest,
@@ -332,7 +333,7 @@ async function dispatchRetry(
         reason: request.reason,
       },
       pluginSubmission: null,
-      systemNotice: null,
+      systemNotice: retrySystemCompactionNotice(deps.db, { threadId: thread.id, failed }),
       retryOf: { requestId: originalRequestId, attempt },
       origin: null,
       originPluginId: null,

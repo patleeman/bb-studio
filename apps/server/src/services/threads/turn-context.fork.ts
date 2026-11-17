@@ -1,4 +1,8 @@
-import type { PromptInput } from "@bb/domain";
+import {
+  isStandaloneBuiltinClearCommand,
+  isStandaloneBuiltinCompactCommand,
+  type PromptInput,
+} from "@bb/domain";
 import type { ExperimentalTurnContextProvider } from "@get-bb/plugin-sdk";
 
 export const TURN_CONTEXT_TIMEOUT_MS = 500;
@@ -77,6 +81,12 @@ export async function withTurnContext<T extends TurnPrompt>(
   startsTurn = true,
 ): Promise<T> {
   if (!startsTurn || prompt.input.length === 0) return prompt;
+  if (
+    isStandaloneBuiltinCompactCommand(prompt.input) ||
+    isStandaloneBuiltinClearCommand(prompt.input)
+  ) {
+    return prompt;
+  }
   const context = await collectTurnContext(threadId);
   if (context.length === 0) return prompt;
   const groups = prompt.inputGroups;

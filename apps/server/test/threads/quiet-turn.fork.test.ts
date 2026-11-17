@@ -1,5 +1,10 @@
 import { getThread } from "@bb/db";
-import { turnScope } from "@bb/domain";
+import {
+  createStandaloneBuiltinCompactCommandInput,
+  encodeClientTurnRequestIdNumber,
+  threadScope,
+  turnScope,
+} from "@bb/domain";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { applyLoggedThreadLifecycleEvent } from "../../src/services/threads/lifecycle-outcome.js";
 import {
@@ -94,6 +99,112 @@ describe("quiet turns", () => {
         throw new Error("broken classifier");
       });
       expect(isQuietTurn(harness.db, { threadId: thread.id })).toBe(false);
+    });
+  });
+});
+
+function seedCompactionTurn(harness: TestAppHarness, by: "system" | "user") {
+  const { project, environment } = seedThreadFixture(harness);
+  const thread = seedThread(harness.deps, {
+    projectId: project.id,
+    environmentId: environment.id,
+    status: "active",
+    title: "Bot chat",
+  });
+  const requestId = encodeClientTurnRequestIdNumber({ value: 1 });
+  seedEvent(harness.deps, {
+    threadId: thread.id,
+    environmentId: environment.id,
+    sequence: 1,
+    type: "client/turn/requested",
+    scope: threadScope(),
+    data: {
+      direction: "outbound",
+      requestId,
+      input: createStandaloneBuiltinCompactCommandInput(),
+      target: { kind: "new-turn" },
+      execution: {
+        model: "claude-opus-5-5",
+        serviceTier: "default",
+        reasoningLevel: "medium",
+        permissionMode: "full",
+        source: "client/turn/requested",
+      },
+      initiator: by,
+      senderThreadId: null,
+      ...(by === "system"
+        ? {
+            systemMessageKind: "unlabeled",
+            systemMessageSubject: {
+              kind: "compaction",
+              reason: "cache warming ended",
+            },
+          }
+        : {}),
+      request: { method: "turn/start", params: {} },
+      source: "tell",
+    },
+  });
+  seedTurnStarted(harness.deps, {
+    threadId: thread.id,
+    environmentId: environment.id,
+    turnId: "turn-compact",
+    sequence: 2,
+  });
+  seedEvent(harness.deps, {
+    threadId: thread.id,
+    environmentId: environment.id,
+    providerThreadId: "provider-quiet",
+    scope: turnScope("turn-compact"),
+    sequence: 3,
+    type: "turn/input/accepted",
+    data: { providerThreadId: "provider-quiet", clientRequestId: requestId },
+  });
+  return thread;
+}
+
+describe("a compaction bb ran on its own", () => {
+  it("is quiet: no attention, and thread.idle says quiet, which skips the push", async () => {
+    dispose();
+    await withTestHarness(async (harness) => {
+      const thread = seedCompactionTurn(harness, "system");
+      const before = getThread(harness.db, thread.id)?.latestAttentionAt;
+      expect(isQuietTurn(harness.db, { threadId: thread.id })).toBe(true);
+      expect(
+        isQuietTurn(harness.db, {
+          threadId: thread.id,
+          turnId: "turn-compact",
+        }),
+      ).toBe(true);
+      applyLoggedThreadLifecycleEvent(harness.deps, {
+        event: { type: "run.succeeded" },
+        threadId: thread.id,
+      });
+      const after = getThread(harness.db, thread.id);
+      expect(after?.status).toBe("idle");
+      expect(after?.latestAttentionAt).toBe(before);
+      expect(forkIdleFields(harness.db, thread.id)).toEqual({
+        experimental_quiet: true,
+      });
+    });
+  });
+
+  it("is not quiet when the user typed /compact", async () => {
+    dispose();
+    await withTestHarness(async (harness) => {
+      const thread = seedCompactionTurn(harness, "user");
+      const before = getThread(harness.db, thread.id)?.latestAttentionAt;
+      expect(isQuietTurn(harness.db, { threadId: thread.id })).toBe(false);
+      applyLoggedThreadLifecycleEvent(harness.deps, {
+        event: { type: "run.succeeded" },
+        threadId: thread.id,
+      });
+      expect(getThread(harness.db, thread.id)?.latestAttentionAt).not.toBe(
+        before,
+      );
+      expect(forkIdleFields(harness.db, thread.id)).toEqual({
+        experimental_quiet: false,
+      });
     });
   });
 });
