@@ -605,6 +605,26 @@
       "title": "shows the destination thread in a split in the commit that changes the route"
     },
     {
+      "file": "apps/server/test/public/public-host-management.test.ts",
+      "title": "asks the connect plugin to revoke the removed host's cloud machine"
+    },
+    {
+      "file": "apps/server/test/services/plugin-catalog/plugin-catalog-service.test.ts",
+      "title": "serves a bundled entry's own compact icon from the catalog route"
+    },
+    {
+      "file": "apps/server/test/services/plugins/plugin-install.test.ts",
+      "title": "refuses a git plugin that shadows a builtin after materialization"
+    },
+    {
+      "file": "apps/server/test/services/plugins/plugin-install.test.ts",
+      "title": "refuses a path plugin whose manifest id shadows a builtin"
+    },
+    {
+      "file": "apps/server/test/services/plugins/plugin-install.test.ts",
+      "title": "refuses an npm package whose derived id shadows a builtin before install"
+    },
+    {
       "file": "apps/app/src/components/commands/CommandPalette.cold-open.test.tsx",
       "title": "stays usable before its body downloads on first open and keeps typed text"
     },
