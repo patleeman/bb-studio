@@ -1,3 +1,4 @@
+import { forkCodexProviderOptions } from "./src/computer-use.fork.js";
 import { registerCodexAiService } from "./src/ai-service.js";
 import { registerAsyncQuestions } from "./src/async-questions.js";
 import { registerUsageSource } from "./src/usage-source.js";
@@ -86,6 +87,7 @@ export default function plugin(bb: BbPluginApi) {
       return {
         memoryEnabled: context.settings.memoryEnabled !== false,
         providerSubagentsEnabled: context.settings.subagentsDisabled !== true,
+        ...forkCodexProviderOptions(context),
       };
     },
     extensionKinds: codexExtensionKinds,

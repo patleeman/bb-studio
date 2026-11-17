@@ -1,3 +1,4 @@
+import { applyForkCodexConfig } from "./computer-use.fork.js";
 import { experimental_selectedSkillMentions as selectedSkillMentions } from "@get-bb/plugin-sdk/provider-bridge";
 import {
   jsonValueSchema,
@@ -26,6 +27,7 @@ export type CodexSessionOptions = {
   reasoningLevel?: ReasoningLevel;
   memoryEnabled?: boolean;
   providerSubagentsEnabled?: boolean;
+  computerUseEnabled?: boolean;
   instructions?: string;
   envVars?: Record<string, string>;
 } & RuntimePermissionPolicy;
@@ -664,6 +666,7 @@ export function buildCodexConfig(
       config["sandbox_workspace_write.writable_roots"] = [...writableRoots];
     }
   }
+  applyForkCodexConfig(config, args.options);
   return Object.keys(config).length > 0 ? config : undefined;
 }
 

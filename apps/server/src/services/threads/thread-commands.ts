@@ -1,3 +1,4 @@
+import { forkProviderOptionsContext } from "../providers/provider-options-context.fork.js";
 import {
   getEnvironment,
   getThread,
@@ -222,6 +223,7 @@ function toRuntimeExecutionOptions(
       model: args.execution.model,
       permissionMode,
       ...(promptMode !== undefined ? { promptMode } : {}),
+      ...forkProviderOptionsContext(args.deps, args.providerId, args.threadId),
     }) ?? {};
   const sessionOptions = resolvePendingThreadSessionOptions(
     args.deps.db,

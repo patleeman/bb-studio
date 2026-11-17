@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { failFastOnAuthError } from "./auth-fail-fast.fork.js";
+import { forkCodexSessionOptions } from "../computer-use.fork.js";
 
 import { experimental_selectedSkillMentions as selectedSkillMentions } from "@get-bb/plugin-sdk/provider-bridge";
 import { createHash } from "node:crypto";
@@ -571,6 +572,7 @@ function decodeCodexOptions(
       ...(decoded.providerSubagentsEnabled !== undefined
         ? { providerSubagentsEnabled: decoded.providerSubagentsEnabled }
         : {}),
+      ...forkCodexSessionOptions(options.providerOptions),
     },
     additionalWorkspaceWriteRoots: decoded.additionalWorkspaceWriteRoots ?? [],
     daybreak: requestedDaybreak(options),
@@ -601,6 +603,7 @@ function constructionSignature(
     reasoningLevel: sessionOptions.reasoningLevel ?? null,
     memoryEnabled: sessionOptions.memoryEnabled ?? null,
     providerSubagentsEnabled: sessionOptions.providerSubagentsEnabled ?? null,
+    computerUseEnabled: sessionOptions.computerUseEnabled ?? null,
     envHash,
   });
 }
