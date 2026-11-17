@@ -1,3 +1,4 @@
+import { systemAuthored } from "./automation-notice.fork.js";
 import {
   promptInputSchema,
   queuedMessageSystemNoticeSchema,
@@ -185,7 +186,7 @@ export function toThreadQueuedMessage(
 ): ThreadQueuedMessage {
   const author = resolveDispatchAuthor({
     retrying: row.payloadKind === "retry",
-    systemNotice: row.systemNotice !== null,
+    systemNotice: systemAuthored(parseStoredQueuedThreadMessageSystemNotice(row), row.senderThreadId),
     senderThreadId: row.senderThreadId,
     startedOnBehalfOf: storedQueuedThreadMessageRequestedBy(row),
   });
