@@ -227,9 +227,9 @@
       "budget": 1
     },
     "packages/plugin-sdk/src/backend-contract.ts": {
-      "seam": "quiet-turns, plugin-events",
-      "intent": "Imports and re-exports backend-contract.fork.ts. PluginHooks extends ForkPluginHooks, PluginThreadEventPayloads extends ForkPluginEventPayloads (three events), and the thread.idle payload is intersected with ForkThreadIdlePayload on upstream's one line.",
-      "budget": 13
+      "seam": "quiet-turns, plugin-events, codex-computer-use",
+      "intent": "Imports and re-exports backend-contract.fork.ts. PluginHooks extends ForkPluginHooks, PluginThreadEventPayloads extends ForkPluginEventPayloads (three events), and the thread.idle payload is intersected with ForkThreadIdlePayload on upstream's one line. PluginProviderOptionsContext extends ForkProviderOptionsContext (experimental_pluginMetadata: the thread's metadata under the provider plugin's id), imported with the other fork types.",
+      "budget": 16
     },
     "packages/plugin-sdk/src/internal/composer-customization-validation.ts": {
       "seam": "composer-footer, composer-replace",
@@ -277,9 +277,9 @@
       "budget": 4
     },
     "apps/server/src/services/threads/thread-commands.ts": {
-      "seam": "turn-context",
-      "intent": "buildThreadStartCommand and prepareTurnSubmitCommandPayload (only for target.mode start, never a steer) pass their input through withTurnContext (turn-context.fork.ts), which appends each plugin's experimental_turnContext text as agent-only items to input and the last input group. Nothing is stored; no wire field changes.",
-      "budget": 3
+      "seam": "turn-context, codex-computer-use",
+      "intent": "buildThreadStartCommand and prepareTurnSubmitCommandPayload (only for target.mode start, never a steer) pass their input through withTurnContext (turn-context.fork.ts), which appends each plugin's experimental_turnContext text as agent-only items to input and the last input group. Nothing is stored; no wire field changes. toRuntimeExecutionOptions spreads forkProviderOptionsContext(deps, providerId, threadId) (services/providers/provider-options-context.fork.ts, imported at the top) into the deriveProviderOptions context, so a provider sees the thread's metadata under its own plugin id.",
+      "budget": 5
     },
     "apps/server/src/services/plugins/plugin-api.ts": {
       "seam": "quiet-turns, thread-delete-hook, plugin-events, turn-context, fork-point",
@@ -582,9 +582,9 @@
       "budget": 3
     },
     "plugins/provider-codex/src/bridge/bridge.ts": {
-      "seam": "sign-in-errors",
-      "intent": "handleChildNotification passes the translator's deltas through failFastOnAuthError (auth-fail-fast.fork.ts, imported right under the shebang): a reconnect whose error shows missing credentials, or the second 401 reconnect in a row, becomes the turn's final unauthorized error and the bridge interrupts that Codex turn (requestCodexTurnInterrupt), so a signed-out Codex fails at once instead of after its own reconnects, while a single 401 can still recover after a token refresh.",
-      "budget": 6
+      "seam": "sign-in-errors, codex-computer-use",
+      "intent": "handleChildNotification passes the translator's deltas through failFastOnAuthError (auth-fail-fast.fork.ts, imported right under the shebang): a reconnect whose error shows missing credentials, or the second 401 reconnect in a row, becomes the turn's final unauthorized error and the bridge interrupts that Codex turn (requestCodexTurnInterrupt), so a signed-out Codex fails at once instead of after its own reconnects, while a single 401 can still recover after a token refresh. decodeCodexOptions spreads forkCodexSessionOptions(options.providerOptions) (src/computer-use.fork.ts, imported under the shebang), which carries computerUseEnabled: false into the session options, and constructionSignature includes computerUseEnabled, so a change rebuilds the session on the next turn.",
+      "budget": 9
     },
     "apps/app/src/views/thread-detail/ThreadDetailPromptArea.tsx": {
       "seam": "host-copy, sign-in-errors",
@@ -674,6 +674,16 @@
     "apps/server/src/services/threads/turn-retry.ts": {
       "seam": "system-compaction",
       "intent": "dispatchRetry passes retrySystemCompactionNotice(db, { threadId, failed }) (system-compaction.fork.ts, imported at the top of the file) as the retry's systemNotice: a retried compaction bb ran on its own keeps its reason when it re-sends the same /compact; every other retry still has none.",
+      "budget": 3
+    },
+    "plugins/provider-codex/server.ts": {
+      "seam": "codex-computer-use",
+      "intent": "deriveProviderOptions spreads forkCodexProviderOptions(context) (src/computer-use.fork.ts, imported at the top): computerUseEnabled: false when the thread's provider-codex metadata has experimental_computerUse === false.",
+      "budget": 2
+    },
+    "plugins/provider-codex/src/session-params.ts": {
+      "seam": "codex-computer-use",
+      "intent": "CodexSessionOptions has computerUseEnabled, and buildCodexConfig calls applyForkCodexConfig(config, args.options) (src/computer-use.fork.ts, imported at the top) last: with computerUseEnabled false it turns off the unified-computer-use plugin and adds a disabled cua_repl entry, so Codex's Computer Use server does not start in that thread. Without it the config is unchanged.",
       "budget": 3
     }
   }
