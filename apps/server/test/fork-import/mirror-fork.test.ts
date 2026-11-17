@@ -1,6 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { getEnvironment, getThread, listEvents } from "@bb/db";
+import { getEnvironment, getThread } from "@bb/db";
+import { listEvents } from "@bb/db/testing";
 import {
   encodeClientTurnRequestIdNumber,
   threadScope,
