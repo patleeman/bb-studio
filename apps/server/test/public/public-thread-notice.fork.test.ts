@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { listEvents } from "@bb/db/testing";
-import { turnRequestEventDataSchema } from "@bb/domain";
+import { getLatestThreadSequence, listQueuedThreadMessages } from "@bb/db";
+import { applyTurnCompletedEvent } from "../../src/internal/turn-completed-events.js";
+import { sendNextQueuedMessageIfPresent } from "../../src/services/threads/queued-messages.js";
+import { turnRequestEventDataSchema, turnScope } from "@bb/domain";
 import {
   registerHostRpcResponder,
   type HostRpcHandlerResult,
@@ -9,6 +12,8 @@ import {
 import { readJson } from "../helpers/json.js";
 import { automationNotice } from "../../src/services/threads/automation-notice.fork.js";
 import {
+  seedEvent,
+  seedTurnStarted,
   seedEnvironment,
   seedHostSession,
   seedProjectWithSource,
@@ -17,7 +22,10 @@ import {
 } from "../helpers/seed.js";
 import { withTestHarness, type TestAppHarness } from "../helpers/test-app.js";
 
-function seedIdleThread(harness: TestAppHarness) {
+function seedIdleThread(
+  harness: TestAppHarness,
+  status: "idle" | "active" = "idle",
+) {
   const { host, session } = seedHostSession(harness.deps);
   const { project } = seedProjectWithSource(harness.deps, { hostId: host.id });
   const environment = seedEnvironment(harness.deps, {
@@ -28,7 +36,7 @@ function seedIdleThread(harness: TestAppHarness) {
     environmentId: environment.id,
     projectId: project.id,
     providerId: "claude-code",
-    status: "idle",
+    status,
   });
   seedThreadRuntimeState(harness.deps, {
     environmentId: environment.id,
@@ -192,7 +200,6 @@ describe("an automated input sent with a notice (BB Studio)", () => {
     ["a bidi label", { source: "watcher", label: "a \u202eb" }],
     ["a long label", { source: "watcher", label: "x".repeat(121) }],
     ["no source", { label: "Kensico" }],
-    ["an unknown source", { source: "studio", label: "Kensico" }],
   ])("refuses %s", async (_label, notice) => {
     await withTestHarness(async (harness) => {
       const { thread, responder } = seedIdleThread(harness);
@@ -209,4 +216,124 @@ describe("an automated input sent with a notice (BB Studio)", () => {
       ).toHaveLength(0);
     });
   });
+
+  it("delivers a notice with a source BB doesn't know as an ordinary message, so no alert is lost", async () => {
+    await withTestHarness(async (harness) => {
+      const { thread, responder } = seedIdleThread(harness);
+      const response = await send(harness, thread.id, {
+        mode: "auto",
+        input: ALERT,
+        experimental_notice: { source: "studio", label: "Kensico" },
+      });
+      expect(response.status).toBe(200);
+      const request = lastRequest(harness, thread.id);
+      expect(request?.initiator).toBe("user");
+      expect(request?.systemMessageSubject ?? null).toBeNull();
+      expect(
+        responder.requests.filter(
+          ({ command }) => command.type === "turn.submit",
+        ),
+      ).toHaveLength(1);
+    });
+  });
 });
+
+describe("a queued automated input (BB Studio)", () => {
+  async function queueThenDrain(
+    harness: TestAppHarness,
+    body: (runnerId: string) => object,
+  ) {
+    const { thread, responder } = seedIdleThread(harness, "active");
+    const runner = seedThread(harness.deps, {
+      environmentId: thread.environmentId,
+      projectId: thread.projectId,
+      providerId: "claude-code",
+      status: "idle",
+    });
+    const turnId = "turn-busy";
+    seedTurnStarted(harness.deps, {
+      environmentId: thread.environmentId,
+      providerThreadId: "provider-thread-1",
+      threadId: thread.id,
+      turnId,
+    });
+    const response = await send(harness, thread.id, body(runner.id));
+    expect(response.status, JSON.stringify(await readJson(response.clone()))).toBe(200);
+    expect(listQueuedThreadMessages(harness.db, thread.id)).toHaveLength(1);
+    seedEvent(harness.deps, {
+      threadId: thread.id,
+      environmentId: thread.environmentId,
+      providerThreadId: "provider-thread-1",
+      sequence: getLatestThreadSequence(harness.db, { threadId: thread.id }) + 1,
+      type: "turn/completed",
+      scope: turnScope(turnId),
+      data: { providerThreadId: "provider-thread-1", status: "completed" },
+    });
+    applyTurnCompletedEvent(harness.deps, {
+      afterIdle: null,
+      payload: {
+        threadId: thread.id,
+        providerThreadId: "provider-thread-1",
+        type: "turn/completed",
+        scope: turnScope(turnId),
+        status: "completed",
+      },
+    });
+    expect(
+      await sendNextQueuedMessageIfPresent(harness.deps, { threadId: thread.id }),
+    ).toBe(true);
+    await expect
+      .poll(
+        () =>
+          responder.requests.filter(({ command }) => command.type === "turn.submit")
+            .length,
+      )
+      .toBe(1);
+    const submit = responder.requests.find(
+      ({ command }) => command.type === "turn.submit",
+    )!.command;
+    return { thread, runnerId: runner.id, submit };
+  }
+
+  it("stays the runner's turn: sender and header kept, approvals denied", async () => {
+    await withTestHarness(async (harness) => {
+      const { thread, runnerId, submit } = await queueThenDrain(harness, (runnerId) => ({
+        mode: "queue-if-active",
+        permissionMode: "accept-edits",
+        senderThreadId: runnerId,
+        input: ALERT,
+        experimental_notice: { source: "runner", label: "House" },
+      }));
+      expect(lastRequest(harness, thread.id)).toMatchObject({
+        initiator: "agent",
+        senderThreadId: runnerId,
+        systemMessageSubject: { kind: "automation", source: "runner", label: "House" },
+      });
+      const text = JSON.stringify(submit);
+      expect(text).toContain(`[bb message from thread:${runnerId}`);
+      expect(text).toContain('"permissionEscalation":"deny"');
+    });
+  });
+
+  it("keeps a Studio check-in's stored model and settings, and its notice", async () => {
+    await withTestHarness(async (harness) => {
+      const { thread, submit } = await queueThenDrain(harness, () => ({
+        mode: "queue-if-active",
+        model: "gpt-5-mini",
+        reasoningLevel: "high",
+        permissionMode: "accept-edits",
+        input: ALERT,
+        experimental_notice: { source: "check-in", label: "Morning card" },
+      }));
+      expect(lastRequest(harness, thread.id)).toMatchObject({
+        initiator: "system",
+        systemMessageSubject: { kind: "automation", source: "check-in", label: "Morning card" },
+        execution: { model: "gpt-5-mini", reasoningLevel: "high", permissionMode: "accept-edits" },
+      });
+      expect(submit).toMatchObject({
+        options: { model: "gpt-5-mini", reasoningLevel: "high", permissionMode: "accept-edits", permissionEscalation: "ask" },
+      });
+    });
+  });
+});
+
