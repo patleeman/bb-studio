@@ -1543,3 +1543,15 @@ and the middleware; `server.ts` mounts it before the registry routes.
    app's shape. Only the fork's approval dialog proves a person.
 2. Skills installed outside bb (a harness's own installer, a shell command)
    are not covered.
+
+## `PluginProviderOptionsContext.experimental_pluginMetadata`
+
+**Behavior.** The context `deriveProviderOptions` receives carries the thread's metadata under the provider plugin's own id (`{}` when it has none), read when the server builds the session or turn command. provider-codex reads `experimental_computerUse === false` from it and turns Codex's Computer Use (`cua_repl`) off for that thread.
+
+**Core callers.** `toRuntimeExecutionOptions` in `apps/server/src/services/threads/thread-commands.ts`, the only caller of `deriveProviderOptions`, adds it through `forkProviderOptionsContext` (`services/providers/provider-options-context.fork.ts`).
+
+**Audit before stabilizing.**
+
+1. Thread metadata is writable by any plugin, API client or the thread's agent, so the flag is a default, not a policy. Decide whether provider options need a source only plugins (or only the user) can set.
+2. It takes effect when the session is built; provider-codex puts the flag in its session signature, so a change rebuilds the session on the next turn, not mid-turn.
+3. The Codex side depends on the bundled plugin name `unified-computer-use@openai-bundled` and the server name `cua_repl`; check both on Codex updates.
