@@ -208,3 +208,109 @@ describe("a compaction bb ran on its own", () => {
     });
   });
 });
+
+function seedAutomationTurn(harness: TestAppHarness, reply: string) {
+  const { project, environment } = seedThreadFixture(harness);
+  const thread = seedThread(harness.deps, {
+    projectId: project.id,
+    environmentId: environment.id,
+    status: "active",
+    title: "Bot chat",
+  });
+  const requestId = encodeClientTurnRequestIdNumber({ value: 1 });
+  seedEvent(harness.deps, {
+    threadId: thread.id,
+    environmentId: environment.id,
+    sequence: 1,
+    type: "client/turn/requested",
+    scope: threadScope(),
+    data: {
+      direction: "outbound",
+      requestId,
+      input: [
+        {
+          type: "text",
+          text: "[bb studio] Watcher Kensico health: problems on red4",
+          mentions: [],
+        },
+      ],
+      target: { kind: "new-turn" },
+      execution: {
+        model: "claude-opus-5-5",
+        serviceTier: "default",
+        reasoningLevel: "medium",
+        permissionMode: "full",
+        source: "client/turn/requested",
+      },
+      initiator: "system",
+      senderThreadId: null,
+      systemMessageKind: "unlabeled",
+      systemMessageSubject: {
+        kind: "automation",
+        source: "watcher",
+        label: "Kensico health",
+      },
+      request: { method: "turn/start", params: {} },
+      source: "tell",
+    },
+  });
+  seedTurnStarted(harness.deps, {
+    threadId: thread.id,
+    environmentId: environment.id,
+    turnId: "turn-alert",
+    sequence: 2,
+  });
+  seedEvent(harness.deps, {
+    threadId: thread.id,
+    environmentId: environment.id,
+    providerThreadId: "provider-quiet",
+    scope: turnScope("turn-alert"),
+    sequence: 3,
+    type: "turn/input/accepted",
+    data: { providerThreadId: "provider-quiet", clientRequestId: requestId },
+  });
+  seedEvent(harness.deps, {
+    threadId: thread.id,
+    environmentId: environment.id,
+    providerThreadId: "provider-quiet",
+    scope: turnScope("turn-alert"),
+    sequence: 4,
+    type: "item/completed",
+    data: { item: { type: "agentMessage", id: "msg-1", text: reply } },
+  });
+  return thread;
+}
+
+describe("an automated input with a notice", () => {
+  it("raises no attention and no push when the Bot passes", async () => {
+    await withTestHarness(async (harness) => {
+      const thread = seedAutomationTurn(harness, "[PASS]");
+      const before = getThread(harness.db, thread.id)?.latestAttentionAt;
+      applyLoggedThreadLifecycleEvent(harness.deps, {
+        event: { type: "run.succeeded" },
+        threadId: thread.id,
+      });
+      expect(getThread(harness.db, thread.id)?.latestAttentionAt).toBe(before);
+      expect(forkIdleFields(harness.db, thread.id)).toEqual({
+        experimental_quiet: true,
+      });
+    });
+  });
+
+  it("raises attention and may push when the Bot writes something", async () => {
+    await withTestHarness(async (harness) => {
+      const thread = seedAutomationTurn(harness, "red4's disk is at 91%.");
+      const before = getThread(harness.db, thread.id)?.latestAttentionAt;
+      applyLoggedThreadLifecycleEvent(harness.deps, {
+        event: { type: "run.succeeded" },
+        threadId: thread.id,
+      });
+      expect(getThread(harness.db, thread.id)?.latestAttentionAt).not.toBe(
+        before,
+      );
+      expect(forkIdleFields(harness.db, thread.id)).toEqual({
+        experimental_quiet: false,
+      });
+    });
+  });
+});

@@ -1555,3 +1555,21 @@ and the middleware; `server.ts` mounts it before the registry routes.
 1. Thread metadata is writable by any plugin, API client or the thread's agent, so the flag is a default, not a policy. Decide whether provider options need a source only plugins (or only the user) can set.
 2. It takes effect when the session is built; provider-codex puts the flag in its session signature, so a change rebuilds the session on the next turn, not mid-turn.
 3. The Codex side depends on the bundled plugin name `unified-computer-use@openai-bundled` and the server name `cua_repl`; check both on Codex updates.
+
+## Automated inputs (`experimental_notice`, `experimental_features`)
+
+**What it does.** `threads.send` takes `experimental_notice: { source, label }`
+(`api/thread-notice.fork.ts`). The send dispatches with a system notice
+(`automation-notice.fork.ts`): the turn is the system's, its request carries
+`{ kind: "automation", source, label }`, and permission escalation stays the
+user's. `relayedFold.fork.tsx` and `noticeFold.fork.ts` draw the input as one
+quiet row. `bb.experimental_hooks.experimental_features.threadNotices` (true)
+lets a plugin keep an older bb's behaviour.
+
+**Core callers.** `thread-send-request.ts` (the notice), `thread-send.ts` (the
+escalation), the SDK's `sendJson`.
+
+**Audit before stabilizing.** Decide whether the notice belongs on the queued
+message API too, whether `source` should be an enum, and whether
+`experimental_features` should become a general capability list.
+

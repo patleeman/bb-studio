@@ -102,6 +102,14 @@ export type ExperimentalSkillsRegistryPolicy = (request: {
 /** Hooks the fork adds to `bb.experimental_hooks`. */
 export interface ForkPluginHooks {
   /**
+   * Fork features this bb has, for a plugin that keeps an older bb's
+   * behaviour without them. `threadNotices`: `sdk.threads.send` takes
+   * `experimental_notice: { source, label }`, which makes the message the
+   * system's and draws it as one quiet row. Experimental: see
+   * docs/api_to_audit.fork.md.
+   */
+  readonly experimental_features: { readonly threadNotices: true };
+  /**
    * Answer "what kind of turn was this?" for every turn that finishes. One
    * classifier per plugin; a second call replaces the first. A turn is quiet
    * when any plugin's classifier says so. Experimental: see

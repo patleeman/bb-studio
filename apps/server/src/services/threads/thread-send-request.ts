@@ -1,3 +1,4 @@
+import { automationNotice } from "./automation-notice.fork.js";
 import {
   isStandaloneBuiltinClearCommand,
   isStandaloneBuiltinCompactCommand,
@@ -29,7 +30,7 @@ export async function acceptThreadSendRequest(
     input: args.payload.input,
     providerId: args.thread.providerId,
   });
-  const { compactFirst, ...request } = args.payload;
+  const { compactFirst, experimental_notice, ...request } = args.payload;
   if (isStandaloneBuiltinClearCommand(request.input)) {
     if (compactFirst) throwInvalidCompactFirst("cannot clear the context");
     const environment = await requireThreadCommandEnvironment(deps, {
@@ -81,7 +82,7 @@ export async function acceptThreadSendRequest(
         source: { kind: "inline" },
         queuePayload: { kind: "inline" },
         pluginSubmission: payload.pluginSubmission ?? null,
-        systemNotice: null,
+        systemNotice: automationNotice(experimental_notice),
         origin: payload.originPluginId === undefined ? null : "plugin",
         originPluginId: payload.originPluginId ?? null,
         startedOnBehalfOf: null,
