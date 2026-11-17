@@ -1,3 +1,4 @@
+import { systemAuthored } from "./automation-notice.fork.js";
 import { systemCompactionNotice } from "./system-compaction.fork.js";
 import { startsNoTurn } from "./turnless-dispatch.fork.js";
 import {
@@ -443,7 +444,7 @@ async function runDispatchAttempt(
         };
   const author = resolveDispatchAuthor({
     retrying: args.retryOf !== undefined,
-    systemNotice: systemNotice !== null,
+    systemNotice: systemAuthored(systemNotice, senderThreadId),
     senderThreadId,
     startedOnBehalfOf: args.startedOnBehalfOf,
   });
