@@ -462,3 +462,83 @@ describe("the user's name in STATUS.md", () => {
     expect(areas.get("House")).toMatchObject({ now: "From the file.", open: [] });
   });
 });
+
+describe("an area item's task", () => {
+  const write = (path: string, when: number, open: unknown[]) => {
+    const file = join(path, "status.json");
+    writeFileSync(file, JSON.stringify(status({ status: "flagged", now: "Two things need you.", open, updatedAt: new Date(when).toISOString() })));
+    utimesSync(file, new Date(when), new Date(when));
+  };
+  const ITEMS = [{ title: "bb-plugins releases: tag 4 plugins", since: "2026-10-04", needsUser: true }, { title: "Discord digest unread", needsUser: false }];
+
+  it("is made once, on the first open; the link survives the runner rewriting status.json; the owner follows needsUser", () => {
+    const path = folder("comms", { area: "# Comms\n\nOwns: inbound mail and GitHub.\n" });
+    runner("run_comms", "Comms", "thr_comms", jobFor("comms"));
+    const { areas, run, tasks } = setup();
+    at(NOW + HOUR);
+    run("run_comms", "thr_comms", () => write(path, NOW + HOUR, ITEMS));
+    expect(areas.get("Comms").open.map((o) => o.taskId)).toEqual([null, null]);
+
+    const first = areas.itemTask("Comms", "bb-plugins releases: tag 4 plugins");
+    expect(first.created).toBe(true);
+    expect(first.task).toMatchObject({ title: "bb-plugins releases: tag 4 plugins", owner: "patrick", state: "waiting", area: "Comms", attention: { queue: "surfaced" }, source: { kind: "area-item" } });
+    const again = areas.itemTask(areas.get("Comms").id, "  BB-plugins releases:   tag 4 plugins ");
+    expect(again).toMatchObject({ created: false, task: { id: first.task.id } });
+    expect(tasks.rows("SELECT record FROM tasks WHERE json_extract(record, '$.source.kind') = 'area-item'")).toHaveLength(1);
+    expect(areas.get("Comms").open.map((o) => o.taskId)).toEqual([first.task.id, null]);
+
+    // Not the user's to act on: queued for whoever looks after the area.
+    const agent = areas.itemTask("Comms", "Discord digest unread");
+    expect(agent.task).toMatchObject({ owner: "thread:thr_comms", state: "todo", conversation: "thr_comms" });
+
+    // The next run rewrites status.json with the same items and no task ids: the links stay, and nothing new is made.
+    at(NOW + 2 * HOUR);
+    run("run_comms", "thr_comms", () => write(path, NOW + 2 * HOUR, ITEMS));
+    expect(areas.get("Comms").open.map((o) => o.taskId)).toEqual([first.task.id, agent.task.id]);
+    expect(areas.itemTask("Comms", "bb-plugins releases: tag 4 plugins")).toMatchObject({ created: false, task: { id: first.task.id } });
+    expect(tasks.rows("SELECT record FROM tasks WHERE json_extract(record, '$.source.kind') = 'area-item'")).toHaveLength(2);
+  });
+
+  it("keeps an item the user closed off the list until a newer report still lists it, and never makes a second task", () => {
+    const path = folder("comms", { area: "# Comms\n\nOwns: inbound mail.\n" });
+    runner("run_comms", "Comms", "thr_comms", jobFor("comms"));
+    const { areas, run, tasks } = setup();
+    at(NOW + HOUR);
+    run("run_comms", "thr_comms", () => write(path, NOW + HOUR, ITEMS));
+    const { task } = areas.itemTask("Comms", "bb-plugins releases: tag 4 plugins");
+    at(NOW + 90 * MIN);
+    tasks.change(task.id, (t) => { t.state = "done"; }, "patrick");
+    expect(areas.get("Comms").open.map((o) => o.title)).toEqual(["Discord digest unread"]);
+    expect(() => areas.itemTask("Comms", "bb-plugins releases: tag 4 plugins")).toThrow(/no longer open/);
+
+    at(NOW + 2 * HOUR);
+    run("run_comms", "thr_comms", () => write(path, NOW + 2 * HOUR, ITEMS));
+    expect(areas.get("Comms").open[0]).toMatchObject({ title: "bb-plugins releases: tag 4 plugins", taskId: task.id });
+    expect(areas.itemTask("Comms", "bb-plugins releases: tag 4 plugins")).toMatchObject({ created: false, task: { id: task.id } });
+  });
+
+  it("uses the item's own task id when status.json gives one, and refuses an item that isn't open or an unknown area", () => {
+    const path = folder("comms", { area: "# Comms\n\nOwns: inbound mail.\n" });
+    runner("run_comms", "Comms", "thr_comms", jobFor("comms"));
+    const { areas, run, tasks } = setup();
+    tasks.save({ ...tasks.rows("SELECT record FROM tasks LIMIT 1")[0]!, id: "task_given", title: "Given", parentId: null, automation: null, schedule: null });
+    at(NOW + HOUR);
+    run("run_comms", "thr_comms", () => write(path, NOW + HOUR, [{ title: "Given", needsUser: true, taskId: "task_given" }]));
+    expect(areas.itemTask("Comms", "Given")).toMatchObject({ created: false, task: { id: "task_given" } });
+    expect(() => areas.itemTask("Comms", "Not there")).toThrow(/no longer open/);
+    expect(() => areas.itemTask("Nowhere", "Given")).toThrow(/No area/);
+  });
+
+  it("is reachable over areas.itemTask", async () => {
+    const path = folder("comms", { area: "# Comms\n\nOwns: inbound mail.\n" });
+    runner("run_comms", "Comms", "thr_comms", jobFor("comms"));
+    const { areas, run } = setup();
+    at(NOW + HOUR);
+    run("run_comms", "thr_comms", () => write(path, NOW + HOUR, ITEMS));
+    const handlers: Record<string, (input: unknown) => Promise<unknown>> = {};
+    registerAreas({ rpc: { register: (_c: unknown, map: typeof handlers) => Object.assign(handlers, map) }, agents: { registerTool: () => {} } } as never, areas);
+    const out = await handlers["areas.itemTask"]!({ area: "Comms", title: "bb-plugins releases: tag 4 plugins" }) as { taskId: string; created: boolean };
+    expect(out).toMatchObject({ title: "bb-plugins releases: tag 4 plugins", created: true });
+    expect(await handlers["areas.itemTask"]!({ area: "Comms", title: "bb-plugins releases: tag 4 plugins" })).toMatchObject({ taskId: out.taskId, created: false });
+  });
+});

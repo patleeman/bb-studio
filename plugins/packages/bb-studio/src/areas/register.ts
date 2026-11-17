@@ -13,6 +13,7 @@ export function registerAreas(bb: BbPluginApi, areas: Areas, guard: <T>(work: ()
   bb.rpc.register(areasContract, {
     "areas.list": async () => guard(() => ({ areas: areas.list() })),
     "areas.get": async ({ id }) => guard(() => ({ area: areas.get(id) })),
+    "areas.itemTask": async ({ area, title }) => guard(() => { const out = areas.itemTask(area, title); return { taskId: out.task.id, title: out.task.title, created: out.created }; }),
   });
   const tool = <S extends z.ZodTypeAny>(name: string, description: string, parameters: S, execute: (x: z.infer<S>, threadId: string | null) => unknown) => {
     bb.agents.registerTool({ name, description, parameters, execute: async (x: z.infer<S>, ctx: { threadId?: string | null }) => {

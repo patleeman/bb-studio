@@ -1,5 +1,6 @@
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
+import { toast } from "sonner";
 import { errorMessage } from "../../kit/format";
 import { Button } from "../../kit/ui/button";
 import { Input } from "../../kit/ui/input";
@@ -9,7 +10,7 @@ import { BotPageEmpty, BotPageGroup, BotPageLayout, BotPageMore, BotPageRow, Bot
 import { useCall, useLive } from "../../ui/live";
 import { isClosed, needsYou, USER_OWNER, type Task } from "../../tasks/contract";
 import { SEVERITY_LABEL, ALL, matches, ownerFilterOf, ownerShort, sectionTasks, taskSection, taskKind, taskStatus, type Names } from "../../tasks/ui/model";
-import { areaAsks, pageFlight, todoBox, type FlightNode } from "../../tasks/ui/board-model";
+import { areaAsks, pageFlight, todoBox, type AreaAsk, type FlightNode } from "../../tasks/ui/board-model";
 import { AreasSection, DoneBar, PageInFlight, TodoBoxView } from "../../tasks/ui/TasksNow";
 import { SCHEDULED_ICON, scheduledMeta } from "./scheduled-model";
 import { NewAutomationMenu, newKinds, useAutomationEditor, useAutomations } from "../../ui/bot/Automations";
@@ -88,11 +89,6 @@ export function TodosPage({ view, tab: initialTab = "now" }: { view: BotView; ta
     const words = query.trim().toLowerCase().split(/\s+/);
     return all.filter((a) => words.every((w) => `${a.title} ${a.area}`.toLowerCase().includes(w)));
   }, [areas.data, boardTasks, query]); // eslint-disable-line react-hooks/exhaustive-deps
-  const openArea = (areaId: string) => {
-    const card = document.querySelector<HTMLElement>(`[data-testid=area-card][data-area="${areaId.replace(/["\\]/g, "")}"]`);
-    card?.scrollIntoView?.({ block: "center", behavior: "smooth" });
-    card?.focus({ preventScroll: true });
-  };
   const titles = useMemo(() => new Map(boardTasks.map((t) => [t.id, t.title])), [boardTasks]);
   const titleOf = (id: string) => titles.get(id) ?? null;
   const chat = searching ? [] : pending;
@@ -109,6 +105,17 @@ export function TodosPage({ view, tab: initialTab = "now" }: { view: BotView; ta
   // Every task row on the page opens the same detail: the task's tab in the page's side panel.
   const openTask = (task: Pick<Task, "id" | "title">, event?: MouseEvent) => rowOpen({ kind: "todo", id: task.id }, task.title).onOpen(event as never);
   const isOpen = (id: string) => rowOpen({ kind: "todo", id }).selected;
+  // An area's ask with no task gets one on its first open (Studio keeps the link, so the area's next report keeps it), then opens like any task.
+  const openAsk = async (ask: AreaAsk, event?: MouseEvent) => {
+    if (ask.taskId) return openTask({ id: ask.taskId, title: ask.title }, event);
+    try {
+      const made = await call("areas.itemTask", { area: ask.areaId, title: ask.title });
+      openTask({ id: made.taskId, title: made.title }, event);
+      board.refresh(); areas.refresh();
+    } catch (cause) {
+      toast.error(`Couldn't open ${ask.title}. ${errorMessage(cause)}`);
+    }
+  };
   const openThread = (threadId: string) => navigate.toThread(threadId);
   const ready = !!scheduledList.data || !!scheduledList.error;
   const scheduledCount = scheduled.length + scheduledTasks.length;
@@ -137,7 +144,7 @@ export function TodosPage({ view, tab: initialTab = "now" }: { view: BotView; ta
       {tab === "now" && ownsTasks ? <div data-studio-dense-cards="" data-testid="tasks-now" className="contents">
         {tasksError ? <p role="alert" data-testid="tasks-error" className="text-sm text-destructive">{tasksError}</p> : null}
         {board.data ? <div data-testid="tasks-top" className="grid grid-cols-1 items-start gap-5 @4xl/bot-page:grid-cols-[1fr_1.15fr]">
-          <TodoBoxView box={box} chat={chat} areaAsks={asksFromAreas} onOpenArea={openArea} names={names} threads={threads} targets={people.targets} now={now} zone={zone} query={searching}
+          <TodoBoxView box={box} chat={chat} areaAsks={asksFromAreas} onOpenAsk={openAsk} names={names} threads={threads} targets={people.targets} now={now} zone={zone} query={searching}
             onOpen={openTask} isOpen={isOpen} onOpenChat={botChat ? () => botChat.onOpen(undefined as never) : null} refresh={refresh}
             adding={adding ? <AddTask onAdd={add} onClose={() => setAdding(false)} /> : null} />
           <PageInFlight nodes={flight} names={names} now={now} titleOf={titleOf} onOpen={openTask} isOpen={isOpen} onOpenThread={openThread} query={searching} />

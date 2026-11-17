@@ -381,6 +381,7 @@ public enum Studio {
     public static let work_clear = "work.clear"
     public static let areas_list = "areas.list"
     public static let areas_get = "areas.get"
+    public static let areas_itemTask = "areas.itemTask"
   }
 
   public enum Channel {
@@ -1218,6 +1219,8 @@ public enum Studio {
   public typealias AreasList = AreasListOutput
 
   public typealias AreasGet = AreasGetOutput
+
+  public typealias AreasItemTask = AreasItemTaskOutput
 
   public struct LoopsListInput: Sendable, Hashable, Codable {
     public var area: String?
@@ -39515,6 +39518,28 @@ public enum Studio {
 
     public init(area: AreasGetOutputArea? = nil) {
       self.area = area
+    }
+  }
+
+  public struct AreasItemTaskInput: Sendable, Hashable, Codable {
+    public var area: String?
+    public var title: String?
+
+    public init(area: String? = nil, title: String? = nil) {
+      self.area = area
+      self.title = title
+    }
+  }
+
+  public struct AreasItemTaskOutput: Sendable, Hashable, Codable {
+    public var taskId: String?
+    public var title: String?
+    public var created: Bool?
+
+    public init(taskId: String? = nil, title: String? = nil, created: Bool? = nil) {
+      self.taskId = taskId
+      self.title = title
+      self.created = created
     }
   }
 

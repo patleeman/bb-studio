@@ -540,10 +540,7 @@ it("checking an own to-do that fails says why in the row, and the check is a 24 
   expect(box("tasks-todo")!.querySelector("[data-task-id=loop_o] [data-testid=todo-error]")?.textContent).toBe("The task changed; reload to try again");
 });
 
-it("lists the areas' needs-you items in Your to-do as asks (not one that is already the user's task), counts them, and opens the area card", async () => {
-  const focus = vi.fn();
-  const original = HTMLElement.prototype.focus;
-  HTMLElement.prototype.focus = focus;
+it("lists the areas' needs-you items in Your to-do as asks (not one that is already the user's task), counts them, and every one is a button that opens a task", async () => {
   state.areas = [
     area("Comms", { open: [{ title: "PR #14 review", since: null, sinceAt: NOW - 6 * DAY, needsUser: true, taskId: null }, { title: "Releases untagged", since: null, sinceAt: null, needsUser: false, taskId: null }] }),
     area("House", { status: "broken", open: [{ title: "Pay the Con Edison bill", since: null, sinceAt: null, needsUser: true, taskId: "loop_o" }, { title: "Defrost the freezer", since: "2026-09-26", sinceAt: Date.UTC(2026, 8, 26), needsUser: true, taskId: null }] }),
@@ -554,11 +551,42 @@ it("lists the areas' needs-you items in Your to-do as asks (not one that is alre
   const asks = [...todo.querySelectorAll<HTMLElement>("[data-testid=todo-area-ask]")];
   expect(asks.map((each) => each.textContent)).toEqual(["Defrost the freezerHouse · Sep 26", "PR #14 reviewComms · 6 days"]);
   expect(asks[0]!.querySelector("button")!.getAttribute("aria-label")).toBe("Defrost the freezer, needs you, from House, Sep 26");
+  expect(asks.every((each) => each.querySelector("button[data-testid=row-open]"))).toBe(true);
   expect(todo.textContent!.match(/Pay the Con Edison bill/g)).toHaveLength(1);
-  await act(async () => asks[0]!.querySelector("button")!.click());
-  expect(focus).toHaveBeenCalled();
-  expect(focus.mock.contexts[0]).toBe(container.querySelector("[data-testid=area-card][data-area=House]"));
-  HTMLElement.prototype.focus = original;
+});
+
+// An area's ask with no task: the first open makes the task (areas.itemTask), then opens it in the detail.
+const COMMS_ASK = () => [area("Comms", { open: [{ title: "bb-plugins releases: tag 4 plugins", since: null, sinceAt: NOW - 40 * DAY, needsUser: true, taskId: null }] })];
+const askButton = () => box("tasks-todo")!.querySelector<HTMLButtonElement>("[data-testid=todo-area-ask] [data-testid=row-open]")!;
+
+it("an area's ask with no task makes its task on the first click and opens it; the next click opens the same task", async () => {
+  state.areas = COMMS_ASK();
+  state.call.mockImplementation(async (method: string) => (method === "areas.itemTask" ? { taskId: "task_made", title: "bb-plugins releases: tag 4 plugins", created: true } : {}) as never);
+  await render();
+  expect(box("tasks-todo")!.querySelector("[data-testid=todo-area-ask]")!.getAttribute("data-task-id")).toBeNull();
+  await act(async () => askButton().click());
+  expect(state.call).toHaveBeenCalledWith("areas.itemTask", { area: "Comms", title: "bb-plugins releases: tag 4 plugins" });
+  expect(opened()).toEqual(["bb://todo/task_made"]);
+  // The server now links the item to its task (areas.list gives its taskId): the next click opens it without making another.
+  state.call.mockClear();
+  state.areas = [area("Comms", { open: [{ title: "bb-plugins releases: tag 4 plugins", since: null, sinceAt: NOW - 40 * DAY, needsUser: true, taskId: "task_made" }] })];
+  await render();
+  await act(async () => askButton().click());
+  expect(state.call).not.toHaveBeenCalledWith("areas.itemTask", expect.anything());
+  expect(opened()).toEqual(["bb://todo/task_made", "bb://todo/task_made"]);
+  state.call.mockImplementation(async () => ({}) as never);
+});
+
+it("when the task can't be made, the ask says so in a toast and opens nothing", async () => {
+  const { toast } = await import("sonner");
+  vi.mocked(toast.error).mockClear();
+  state.areas = COMMS_ASK();
+  state.call.mockImplementation(async (method: string) => { if (method === "areas.itemTask") throw new Error("\"bb-plugins releases: tag 4 plugins\" is no longer open in Comms."); return {} as never; });
+  await render();
+  await act(async () => askButton().click());
+  expect(opened()).toEqual([]);
+  expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/^Couldn't open bb-plugins releases: tag 4 plugins\. .*no longer open in Comms/));
+  state.call.mockImplementation(async () => ({}) as never);
 });
 
 it("keeps an area's name whole and shortens who looks after it, and draws the page's cards dense so a scene light can't read through", async () => {

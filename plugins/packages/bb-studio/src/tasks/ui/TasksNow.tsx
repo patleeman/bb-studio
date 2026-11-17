@@ -48,11 +48,12 @@ function AskActions({ task, targets, refresh }: { task: Task; targets: { owner: 
   );
 }
 
-export function TodoBoxView({ box, chat, areaAsks = [], names, threads, targets, now, zone, query, onOpen, onOpenChat, onOpenArea, refresh, adding, isOpen = noneOpen }: {
+export function TodoBoxView({ box, chat, areaAsks = [], names, threads, targets, now, zone, query, onOpen, onOpenChat, onOpenAsk, refresh, adding, isOpen = noneOpen }: {
   box: TodoBox;
   isOpen?: IsOpen;
   areaAsks?: readonly AreaAsk[];
-  onOpenArea?(areaId: string): void;
+  /** Opens an area's ask as a task, making the task first when the area keeps none for it. Resolves when it has opened or failed. */
+  onOpenAsk?(ask: AreaAsk, event?: MouseEvent): Promise<void>;
   chat: readonly ChatAsk[];
   names: Names;
   threads: readonly ThreadName[];
@@ -69,26 +70,7 @@ export function TodoBoxView({ box, chat, areaAsks = [], names, threads, targets,
   const shown = todoShown(box, chat.length, expanded, undefined, areaAsks.length);
   const more = moreLine(shown.moreToday, shown.moreLater, shown.moreAsks);
   const empty = !box.asks.length && !box.today.length && !box.later.length && !chat.length && !areaAsks.length;
-  // An area's ask opens its task; one the area keeps no task for takes you to the area's card.
-  const areaRow = (ask: AreaAsk) => {
-    const age = itemAge(ask, now, zone);
-    const selected = !!ask.taskId && isOpen(ask.taskId);
-    const open = (event: MouseEvent) => (ask.taskId ? onOpen({ id: ask.taskId, title: ask.title }, event) : onOpenArea?.(ask.areaId));
-    return (
-      <li key={ask.key} data-testid="todo-area-ask" data-area={ask.areaId} data-task-id={ask.taskId ?? undefined} className="flex min-w-0 items-center border-t border-border/50 py-1 first:border-t-0">
-        <button type="button" data-testid="row-open" onClick={open} aria-current={selected || undefined}
-          aria-label={`${ask.title}, needs you, from ${ask.area}${age ? `, ${age}` : ""}`}
-          className={openRowClass(selected, "-mx-2 flex min-w-0 flex-1 items-center gap-3 px-2 py-1")}>
-          {ASK_DOT}
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-sm font-medium text-foreground">{ask.title}</span>
-            <span className="truncate text-xs text-subtle-foreground">{[ask.area, age].filter(Boolean).join(" · ")}</span>
-          </span>
-          <OpenChevron selected={selected} />
-        </button>
-      </li>
-    );
-  };
+  const areaRow = (ask: AreaAsk) => <AreaAskRow key={ask.key} ask={ask} now={now} zone={zone} selected={!!ask.taskId && isOpen(ask.taskId)} onOpen={onOpenAsk ?? null} />;
   const sub = (task: Task) => {
     if (needsYou(task)) return [task.area ?? task.project, task.needs ?? (task.why || null)].filter(Boolean).join(" · ") || null;
     const due = dueLabel(task.timing.due, now, zone);
@@ -146,6 +128,38 @@ export function TodoBoxView({ box, chat, areaAsks = [], names, threads, targets,
         </button>
       ) : null}
     </section>
+  );
+}
+
+// An area's ask opens its task like every to-do. When the area keeps no task
+// for it, the first open makes one (areas.itemTask) and opens that; a row
+// that can't open (no handler) is plain text, not a button.
+function AreaAskRow({ ask, now, zone, selected, onOpen }: { ask: AreaAsk; now: number; zone?: string; selected: boolean; onOpen: ((ask: AreaAsk, event?: MouseEvent) => Promise<void>) | null }) {
+  const [busy, setBusy] = useState(false);
+  const age = itemAge(ask, now, zone);
+  const body = <>
+    {ASK_DOT}
+    <span className="flex min-w-0 flex-1 flex-col">
+      <span className="truncate text-sm font-medium text-foreground">{ask.title}</span>
+      <span className="truncate text-xs text-subtle-foreground">{[ask.area, age].filter(Boolean).join(" · ")}</span>
+    </span>
+  </>;
+  const open = async (event: MouseEvent) => {
+    if (busy || !onOpen) return;
+    setBusy(true);
+    try { await onOpen(ask, event); } finally { setBusy(false); }
+  };
+  return (
+    <li data-testid="todo-area-ask" data-area={ask.areaId} data-task-id={ask.taskId ?? undefined} className="flex min-w-0 items-center border-t border-border/50 py-1 first:border-t-0">
+      {onOpen ? (
+        <button type="button" data-testid="row-open" onClick={(event) => void open(event)} aria-busy={busy || undefined} aria-current={selected || undefined}
+          aria-label={`${ask.title}, needs you, from ${ask.area}${age ? `, ${age}` : ""}`}
+          className={openRowClass(selected, "-mx-2 flex min-w-0 flex-1 items-center gap-3 px-2 py-1", busy && "cursor-progress")}>
+          {body}
+          <OpenChevron selected={selected} />
+        </button>
+      ) : <div data-testid="todo-area-ask-text" className="-mx-2 flex min-w-0 flex-1 items-center gap-3 px-2 py-1">{body}</div>}
+    </li>
   );
 }
 
