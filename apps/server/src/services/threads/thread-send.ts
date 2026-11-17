@@ -1,4 +1,4 @@
-import { escalationInitiator } from "./automation-notice.fork.js";
+import { escalationInitiator, systemAuthored } from "./automation-notice.fork.js";
 import { ensureForkThreadWritable } from "./thread-write-guards.fork.js";
 import { throwArchivedThread } from "./thread-successor.fork.js";
 import { getEnvironment, getThread } from "@bb/db";
@@ -624,7 +624,7 @@ async function sendThreadMessageWithoutContextClear(
   // however many times the provider happened to be rate limited.
   const { initiator } = resolveDispatchAuthor({
     retrying: args.retryOf !== undefined,
-    systemNotice: args.systemNotice !== undefined,
+    systemNotice: systemAuthored(args.systemNotice, senderThreadId),
     senderThreadId,
     startedOnBehalfOf: null,
   });
