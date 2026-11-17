@@ -44,6 +44,7 @@ export function forkPluginHooks(args: {
   db: DbConnection;
 }): ForkPluginHooks {
   return {
+    experimental_features: { threadNotices: true },
     experimental_classifyTurns(classifier) {
       args.assertLive();
       if (typeof classifier !== "function") {
