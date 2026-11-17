@@ -7,6 +7,7 @@ import { createPluginUpdateJobs } from "./services/plugins/plugin-update-jobs.js
 import { registerForkApprovalRoutes } from "./services/fork-approvals/index.js";
 import { registerForkImportRoutes } from "./services/fork-import/index.js";
 import { registerSkillsRegistryGate } from "./services/skills/registry-policy.fork.js";
+import { registerForkThreadSuccessors } from "./services/threads/thread-successor.fork.js";
 import { registerPluginUpdateJobRoutes } from "./routes/plugin-update-jobs.js";
 import {
   recheckEnvironmentProvisioning,
@@ -941,6 +942,7 @@ export function createApp(
     upgradeWebSocket,
   );
   registerSkillsRegistryGate(publicApi, deps.db);
+  registerForkThreadSuccessors(deps.db);
   registerSkillsRegistryRoutes(publicApi, deps);
   registerServerMoveRoutes(publicApi, deps, serverMove);
   registerServerSweepRoutes(publicApi, deps);
