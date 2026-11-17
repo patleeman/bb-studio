@@ -148,8 +148,9 @@ finalOutput }) => ({ quiet }))`. bb asks it for every turn that finishes;
 - `bb.sdk.threads.send({ …, experimental_notice: { source, label } })`
   sends an automated input the user did not type. `source` is one of
   `watcher`, `runner`, `check-in`, `reminder`, `maintenance`, `resume`,
-  `schedule`, `handoff`, `keepalive`; `label` is one line, at most 120
-  characters; anything else is refused with 400. The model gets the input
+  `schedule`, `handoff`, `keepalive`; another source is ignored (the
+  message arrives as an ordinary one). `label` is one line, at most 120
+  characters; a label that isn't is refused with 400. The model gets the input
   as is.
 - Your own input is the system's turn and may still ask for approvals. One
   sent with `senderThreadId` stays that thread's turn (approvals denied). To
