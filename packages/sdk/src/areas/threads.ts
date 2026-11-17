@@ -838,6 +838,7 @@ function sendJson(args: ThreadSendArgs): SendMessageRequest {
     // of attempting now; the response reports `delivery: "queued"`.
     sendAt: args.sendAt,
     compactFirst: args.compactFirst,
+    experimental_notice: args.experimental_notice,
   };
 }
 
