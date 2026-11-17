@@ -1092,17 +1092,15 @@ Any other target (not marked, unknown tab id, unknown or empty plugin id, a
 fixed tab, a plugin page tab) resolves null and opens nothing. A plugin id
 equal to the caller's own is the same as leaving it out. The check reads the
 plugin slot snapshot at the time of the call. The target tab gets the
-opener's params, so it must validate them. Studio's callers open the
-Workflows plugin's "workflow-run" tab (`{ runId }`), which carries the flag,
-and Visual Chat's board tab, which needs it in Visual Chat's own
-repository.
+opener's params, so it must validate them. Studio's caller opens
+Visual Chat's board tab, which needs it in Visual Chat's own repository.
+The Workflows plugin's "workflow-run" tab carried the flag until the fork
+stopped bundling Workflows (Nov 16).
 
 **Core callers.** The open goes through `createPluginPanelController(owner,
 …).openTab`, the path the target plugin's own `openTab` uses, with the
 owner swapped for the target plugin.
-`workbenchTabOwner` in `lib/fork-workbench.ts` applies the rule. The
-Workflows plugin's registration carries the flag (one line in
-`plugins/workflows/src/app.tsx`).
+`workbenchTabOwner` in `lib/fork-workbench.ts` applies the rule.
 
 **Audit before stabilizing.**
 

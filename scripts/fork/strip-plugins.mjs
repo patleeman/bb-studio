@@ -9,7 +9,13 @@ const removed = JSON.parse(
   readFileSync(resolve(root, "scripts/fork/removed-plugins.json"), "utf8"),
 );
 const dirs = new Set(removed.map((plugin) => plugin.dir));
+const deletedDirs = new Set(
+  removed.filter((plugin) => !plugin.keepDir).map((plugin) => plugin.dir),
+);
 const packages = new Set(removed.map((plugin) => plugin.package));
+const deletedPackages = new Set(
+  removed.filter((plugin) => !plugin.keepDir).map((plugin) => plugin.package),
+);
 const pluginIds = new Set(removed.map((plugin) => plugin.pluginId));
 const skipInstall = process.argv.includes("--no-install");
 
@@ -39,7 +45,7 @@ function dropDependencies(manifest) {
 
 function removeTaskBlocks(text) {
   let output = text;
-  for (const name of packages) {
+  for (const name of deletedPackages) {
     for (;;) {
       const start = output.search(
         new RegExp(`^[ \\t]*"${name.replace(/[-]/g, "\\-")}#[^"]+": \\{`, "m"),
@@ -61,7 +67,7 @@ function removeTaskBlocks(text) {
   return output;
 }
 
-for (const dir of dirs) {
+for (const dir of deletedDirs) {
   const relativePath = `plugins/${dir}`;
   if (git("ls-files", "--", relativePath).length > 0) {
     git("rm", "-r", "-q", "--", relativePath);
@@ -104,7 +110,9 @@ const turboAfter = removeTaskBlocks(turboBefore)
   .split("\n")
   .filter(
     (line) =>
-      ![...dirs].some((dir) => line.includes(`$TURBO_ROOT$/plugins/${dir}/`)),
+      ![...deletedDirs].some((dir) =>
+        line.includes(`$TURBO_ROOT$/plugins/${dir}/`),
+      ),
   )
   .join("\n");
 if (turboAfter !== turboBefore) {
@@ -132,6 +140,7 @@ const unregisterPatch = "scripts/fork/patches/unregister.patch";
 const extraFiles = [
   "apps/app/src/components/plugin/theme-preview-fixture-anatomy.test.ts",
   "apps/server/test/connect-next/tunnel-ingress.test.ts",
+  "apps/app/.ladle/workflows.stories.tsx",
 ];
 for (const file of extraFiles) {
   if (existsSync(resolve(root, file))) {
