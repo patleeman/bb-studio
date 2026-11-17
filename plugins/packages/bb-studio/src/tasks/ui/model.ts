@@ -110,7 +110,7 @@ export function historyLines(history: readonly TaskEvent[], names: Names): Histo
       case "reopened": text = "Reopened"; break;
       case "snoozed": text = "Snoozed"; break;
       case "surfaced": case "surfaced_by_you": text = "Came up in Today"; break;
-      case "acted": text = d.action === "choose" && str(d.option) ? `You chose ${str(d.option)}` : d.action === "nudge" ? "You asked for a nudge" : null; break;
+      case "acted": text = d.action === "choose" && str(d.option) ? `You chose ${str(d.option)}` : d.action === "nudge" ? "You asked for a nudge" : d.action === "start" ? "You asked to start it" : null; break;
       case "state": text = d.state === "waiting" ? "Waiting" : d.state === "in_progress" ? "In progress" : d.state === "todo" ? "To do" : null; break;
       case "progress": text = [str(d.step), str(d.line)].filter(Boolean).join(" · ") || null; if (text && d.kept) text += " (after it was closed)"; break;
       case "started": text = "Started"; break;

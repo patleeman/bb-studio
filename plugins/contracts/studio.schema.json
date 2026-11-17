@@ -54310,6 +54310,51 @@
         ],
         "additionalProperties": false
       }
+    },
+    "areas.itemTask": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "area": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The area's id or name"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The open item's title"
+          }
+        },
+        "required": [
+          "area",
+          "title"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "created": {
+            "type": "boolean",
+            "description": "True when this call made the task"
+          }
+        },
+        "required": [
+          "taskId",
+          "title",
+          "created"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "events": {

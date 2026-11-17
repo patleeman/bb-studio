@@ -331,7 +331,7 @@ enum TasksDemo {
             area("area_demo_launch", "Larkspur launch", "The Q4 launch plan and its workers", owner: ["kind": "lead", "thread": LoopsDemo.leadId],
                  ownerName: "Larkspur lead", status: "ok", now: "On track for Friday.",
                  open: [item("Approve the plumber's quote", now - 86_400_000, needsUser: true, taskId: "task_demo_quote"),
-                        item("Confirm the Q4 numbers with finance", now - 86_400_000, needsUser: true),
+                        item("Confirm the Q4 numbers with finance", now - 86_400_000, needsUser: true, taskId: "wc_demo_fork"),
                         item("Slides for the review", now - 172_800_000, needsUser: false)]),
             area("area_demo_home", "Home", "The house, bills and repairs", owner: ["kind": "bot", "botId": "bot_demo"], ownerName: "Juniper",
                  status: "flagged", now: "The insurance renewal is due this week.",

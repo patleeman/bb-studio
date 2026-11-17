@@ -12,6 +12,9 @@ import { countBelow, doneSummary, isRunning, type AreaAsk, flightHeader, moreLin
 import { PageFlightRow, useFold } from "./Flight";
 import { handOffTargets, ownerLabel, type Names, type ThreadName } from "./model";
 import { TaskOutputs } from "./Outputs";
+import { noneOpen, OpenChevron, openRowClass, type IsOpen } from "./open-row";
+
+const ASK_DOT = <span aria-hidden className="flex size-5 shrink-0 items-center justify-center rounded-full border-[1.5px] border-warning bg-warning/15"><span className="size-1.5 rounded-full bg-warning" /></span>;
 
 export const BOX = "flex min-w-0 flex-col rounded-2xl border border-border/70 bg-card px-5 py-4";
 
@@ -26,7 +29,7 @@ export function BoxHead({ title, detail, id, aside }: { title: string; detail?: 
 }
 
 export type ChatAsk = { id: string; text?: string | null; reason: string; createdAt: number };
-type Open = (task: Task, event?: MouseEvent) => void;
+type Open = (task: Pick<Task, "id" | "title">, event?: MouseEvent) => void;
 const asLoop = (task: Task) => ({ id: task.id, title: task.title, options: task.options }) as unknown as Loop;
 
 function AskActions({ task, targets, refresh }: { task: Task; targets: { owner: string; name: string }[]; refresh(): void }) {
@@ -45,10 +48,12 @@ function AskActions({ task, targets, refresh }: { task: Task; targets: { owner: 
   );
 }
 
-export function TodoBoxView({ box, chat, areaAsks = [], names, threads, targets, now, zone, query, onOpen, onOpenChat, onOpenArea, refresh, adding }: {
+export function TodoBoxView({ box, chat, areaAsks = [], names, threads, targets, now, zone, query, onOpen, onOpenChat, onOpenAsk, refresh, adding, isOpen = noneOpen }: {
   box: TodoBox;
+  isOpen?: IsOpen;
   areaAsks?: readonly AreaAsk[];
-  onOpenArea?(areaId: string): void;
+  /** Opens an area's ask as a task, making the task first when the area keeps none for it. Resolves when it has opened or failed. */
+  onOpenAsk?(ask: AreaAsk, event?: MouseEvent): Promise<void>;
   chat: readonly ChatAsk[];
   names: Names;
   threads: readonly ThreadName[];
@@ -65,43 +70,43 @@ export function TodoBoxView({ box, chat, areaAsks = [], names, threads, targets,
   const shown = todoShown(box, chat.length, expanded, undefined, areaAsks.length);
   const more = moreLine(shown.moreToday, shown.moreLater, shown.moreAsks);
   const empty = !box.asks.length && !box.today.length && !box.later.length && !chat.length && !areaAsks.length;
-  const areaRow = (ask: AreaAsk) => {
-    const age = itemAge(ask, now, zone);
-    return (
-      <li key={ask.key} data-testid="todo-area-ask" data-area={ask.areaId} className="flex min-w-0 items-center gap-3 border-t border-border/50 py-2 first:border-t-0">
-        <span aria-hidden className="flex size-5 shrink-0 items-center justify-center rounded-full border-[1.5px] border-warning bg-warning/15"><span className="size-1.5 rounded-full bg-warning" /></span>
-        <button type="button" onClick={() => onOpenArea?.(ask.areaId)} aria-label={`${ask.title}, needs you, from ${ask.area}${age ? `, ${age}` : ""}`} className="flex min-w-0 flex-1 cursor-pointer flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <span className="truncate text-sm font-medium text-foreground">{ask.title}</span>
-          <span className="truncate text-xs text-subtle-foreground">{[ask.area, age].filter(Boolean).join(" · ")}</span>
-        </button>
-      </li>
-    );
-  };
+  const areaRow = (ask: AreaAsk) => <AreaAskRow key={ask.key} ask={ask} now={now} zone={zone} selected={!!ask.taskId && isOpen(ask.taskId)} onOpen={onOpenAsk ?? null} />;
   const sub = (task: Task) => {
     if (needsYou(task)) return [task.area ?? task.project, task.needs ?? (task.why || null)].filter(Boolean).join(" · ") || null;
     const due = dueLabel(task.timing.due, now, zone);
     return [task.area, due?.text].filter(Boolean).join(" · ") || null;
   };
-  const askRow = (task: Task) => (
-    <li key={task.id} data-testid="todo-ask" data-task-id={task.id} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-border/50 py-2 first:border-t-0">
-      <span aria-hidden className="flex size-5 shrink-0 items-center justify-center rounded-full border-[1.5px] border-warning bg-warning/15"><span className="size-1.5 rounded-full bg-warning" /></span>
-      <button type="button" onClick={(event) => onOpen(task, event)} aria-label={`${task.title}, needs you${task.needs ? `: ${task.needs}` : ""}`} className="flex min-w-48 flex-1 basis-48 cursor-pointer flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <span className="truncate text-sm font-medium text-foreground">{task.title}</span>
-        {sub(task) ? <span className="truncate text-xs text-subtle-foreground">{sub(task)}</span> : null}
-      </button>
-      <AskActions task={task} targets={handOffTargets(task, targets, threads, names.botThreadId ?? null)} refresh={refresh} />
-    </li>
-  );
+  const askRow = (task: Task) => {
+    const selected = isOpen(task.id);
+    return (
+      <li key={task.id} data-testid="todo-ask" data-task-id={task.id} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-border/50 py-1 first:border-t-0">
+        <button type="button" data-testid="row-open" onClick={(event) => onOpen(task, event)} aria-current={selected || undefined} aria-label={`${task.title}, needs you${task.needs ? `: ${task.needs}` : ""}`}
+          className={openRowClass(selected, "-mx-2 flex min-w-48 flex-1 basis-48 items-center gap-3 px-2 py-1")}>
+          {ASK_DOT}
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-sm font-medium text-foreground">{task.title}</span>
+            {sub(task) ? <span className="truncate text-xs text-subtle-foreground">{sub(task)}</span> : null}
+          </span>
+          <OpenChevron selected={selected} />
+        </button>
+        <AskActions task={task} targets={handOffTargets(task, targets, threads, names.botThreadId ?? null)} refresh={refresh} />
+      </li>
+    );
+  };
   const chatRow = (ask: ChatAsk) => (
-    <li key={ask.id} data-testid="todo-chat" className="flex min-w-0 items-center gap-3 border-t border-border/50 py-2 first:border-t-0">
-      <span aria-hidden className="flex size-5 shrink-0 items-center justify-center rounded-full border-[1.5px] border-warning bg-warning/15"><span className="size-1.5 rounded-full bg-warning" /></span>
-      <button type="button" disabled={!onOpenChat} onClick={() => onOpenChat?.()} aria-label={`${ask.text ?? ask.reason}, a question in ${names.bot}'s chat`} className="flex min-w-0 flex-1 cursor-pointer flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <span className="truncate text-sm font-medium text-foreground">{ask.text ?? ask.reason}</span>
-        <span className="truncate text-xs text-subtle-foreground">{names.bot} · {shortWhen(ask.createdAt, now, zone)}</span>
+    <li key={ask.id} data-testid="todo-chat" className="flex min-w-0 items-center border-t border-border/50 py-1 first:border-t-0">
+      <button type="button" disabled={!onOpenChat} onClick={() => onOpenChat?.()} aria-label={`${ask.text ?? ask.reason}, a question in ${names.bot}'s chat`}
+        className={openRowClass(false, "-mx-2 flex min-w-0 flex-1 items-center gap-3 px-2 py-1 disabled:cursor-default")}>
+        {ASK_DOT}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-medium text-foreground">{ask.text ?? ask.reason}</span>
+          <span className="truncate text-xs text-subtle-foreground">{names.bot} · {shortWhen(ask.createdAt, now, zone)}</span>
+        </span>
+        <OpenChevron />
       </button>
     </li>
   );
-  const ownRow = (task: Task) => <OwnTodo key={task.id} task={task} sub={sub(task)} onOpen={onOpen} refresh={refresh} />;
+  const ownRow = (task: Task) => <OwnTodo key={task.id} task={task} sub={sub(task)} onOpen={onOpen} refresh={refresh} selected={isOpen(task.id)} />;
   return (
     <section aria-labelledby="tasks-todo-head" data-testid="tasks-todo" data-studio-card="" className={BOX}>
       <BoxHead id="tasks-todo-head" title="Your to-do" detail={todoHeader(box, chat.length, areaAsks.length)} />
@@ -126,39 +131,75 @@ export function TodoBoxView({ box, chat, areaAsks = [], names, threads, targets,
   );
 }
 
-function OwnTodo({ task, sub, onOpen, refresh }: { task: Task; sub: string | null; onOpen: Open; refresh(): void }) {
+// An area's ask opens its task like every to-do. When the area keeps no task
+// for it, the first open makes one (areas.itemTask) and opens that; a row
+// that can't open (no handler) is plain text, not a button.
+function AreaAskRow({ ask, now, zone, selected, onOpen }: { ask: AreaAsk; now: number; zone?: string; selected: boolean; onOpen: ((ask: AreaAsk, event?: MouseEvent) => Promise<void>) | null }) {
+  const [busy, setBusy] = useState(false);
+  const age = itemAge(ask, now, zone);
+  const body = <>
+    {ASK_DOT}
+    <span className="flex min-w-0 flex-1 flex-col">
+      <span className="truncate text-sm font-medium text-foreground">{ask.title}</span>
+      <span className="truncate text-xs text-subtle-foreground">{[ask.area, age].filter(Boolean).join(" · ")}</span>
+    </span>
+  </>;
+  const open = async (event: MouseEvent) => {
+    if (busy || !onOpen) return;
+    setBusy(true);
+    try { await onOpen(ask, event); } finally { setBusy(false); }
+  };
+  return (
+    <li data-testid="todo-area-ask" data-area={ask.areaId} data-task-id={ask.taskId ?? undefined} className="flex min-w-0 items-center border-t border-border/50 py-1 first:border-t-0">
+      {onOpen ? (
+        <button type="button" data-testid="row-open" onClick={(event) => void open(event)} aria-busy={busy || undefined} aria-current={selected || undefined}
+          aria-label={`${ask.title}, needs you, from ${ask.area}${age ? `, ${age}` : ""}`}
+          className={openRowClass(selected, "-mx-2 flex min-w-0 flex-1 items-center gap-3 px-2 py-1", busy && "cursor-progress")}>
+          {body}
+          <OpenChevron selected={selected} />
+        </button>
+      ) : <div data-testid="todo-area-ask-text" className="-mx-2 flex min-w-0 flex-1 items-center gap-3 px-2 py-1">{body}</div>}
+    </li>
+  );
+}
+
+function OwnTodo({ task, sub, onOpen, refresh, selected = false }: { task: Task; sub: string | null; onOpen: Open; refresh(): void; selected?: boolean }) {
   const { act, busy, error } = useTaskActions(refresh);
   const waiting = task.kind === "waiting-outside";
   return (
-    <li data-testid="todo-own" data-task-id={task.id} className="flex min-w-0 flex-wrap items-center gap-x-3 border-t border-border/50 py-2 first:border-t-0">
+    <li data-testid="todo-own" data-task-id={task.id} className="flex min-w-0 flex-wrap items-center gap-x-1.5 border-t border-border/50 py-1 first:border-t-0">
       <button type="button" data-testid="todo-check" disabled={busy || waiting} aria-label={`Mark ${task.title} done`} onClick={() => void act({ id: task.id, action: task.kind === "read" ? "got_it" : "done" })}
         className="-mx-0.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default">
         <span className="size-4 rounded-full border-[1.5px] border-muted-foreground/80 hover:border-foreground" />
       </button>
-      <button type="button" onClick={(event) => onOpen(task, event)} className="flex min-w-0 flex-1 cursor-pointer flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <span className="truncate text-sm text-foreground">{task.title}</span>
-        {sub ? <span className="truncate text-xs text-subtle-foreground">{sub}</span> : null}
+      <button type="button" data-testid="row-open" onClick={(event) => onOpen(task, event)} aria-current={selected || undefined} aria-label={sub ? `${task.title}, ${sub}` : task.title}
+        className={openRowClass(selected, "flex min-w-0 flex-1 items-center gap-3 px-1.5 py-1")}>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm text-foreground">{task.title}</span>
+          {sub ? <span className="truncate text-xs text-subtle-foreground">{sub}</span> : null}
+        </span>
+        <OpenChevron selected={selected} />
       </button>
       {error ? <p role="alert" data-testid="todo-error" className="basis-full pl-9 text-xs text-destructive">{error}</p> : null}
     </li>
   );
 }
 
-export function PageInFlight({ nodes, names, now, titleOf, onOpen, onOpenThread, query }: { nodes: readonly FlightNode[]; names: Names; now: number; titleOf(id: string): string | null; onOpen: Open; onOpenThread(threadId: string): void; query: boolean }) {
+export function PageInFlight({ nodes, names, now, titleOf, onOpen, onOpenThread, query, isOpen = noneOpen }: { nodes: readonly FlightNode[]; names: Names; now: number; titleOf(id: string): string | null; onOpen: Open; onOpenThread(threadId: string): void; query: boolean; isOpen?: IsOpen }) {
   const [open, toggle] = useFold();
   return (
     <section aria-labelledby="tasks-flight-head" data-testid="tasks-flight" data-studio-card="" className={BOX}>
       <BoxHead id="tasks-flight-head" title="In flight" detail={flightHeader(nodes)} />
       {nodes.length ? (
         <ul className="flex flex-col">
-          {nodes.map((node) => <PageFlightRow key={node.task.id} node={node} names={names} now={now} titleOf={titleOf} open={open.has(node.task.id)} onToggle={() => toggle(node.task.id)} onOpenTask={(task) => onOpen(task)} onOpenThread={onOpenThread} />)}
+          {nodes.map((node) => <PageFlightRow key={node.task.id} node={node} names={names} now={now} titleOf={titleOf} open={open.has(node.task.id)} onToggle={() => toggle(node.task.id)} onOpenTask={(task, event) => onOpen(task, event)} onOpenThread={onOpenThread} isOpen={isOpen} />)}
         </ul>
       ) : <p data-testid="flight-empty" className="py-3 text-sm text-muted-foreground">{query ? "Nothing in flight matches." : "Nothing in flight. Agents' work shows here while it runs or waits."}</p>}
     </section>
   );
 }
 
-export function AreasSection({ areas, error, flight, now, zone, query = false, onOpenTask, onOpenThread }: { areas: readonly AreaView[] | null; query?: boolean; error: string | null; flight: readonly FlightNode[]; now: number; zone?: string; onOpenTask(id: string, title: string): void; onOpenThread(threadId: string): void }) {
+export function AreasSection({ areas, error, flight, now, zone, query = false, onOpenTask, onOpenThread, isOpen = noneOpen }: { areas: readonly AreaView[] | null; query?: boolean; error: string | null; flight: readonly FlightNode[]; now: number; zone?: string; onOpenTask(id: string, title: string, event?: MouseEvent): void; onOpenThread(threadId: string): void; isOpen?: IsOpen }) {
   const ordered = areas ? areaOrder(areas) : [];
   const problems = ordered.filter((a) => a.status === "broken" || a.status === "flagged").length;
   const workOf = (area: AreaView) => {
@@ -177,14 +218,14 @@ export function AreasSection({ areas, error, flight, now, zone, query = false, o
       {areas && !ordered.length ? <p data-testid="areas-empty" className="rounded-2xl border border-dashed border-border px-5 py-6 text-sm text-muted-foreground">{query ? "No areas match." : "No areas yet. Each runner and project lead gets a card here once it reports how its part is doing."}</p> : null}
       {ordered.length ? (
         <div data-testid="areas-grid" className="grid grid-cols-1 gap-3.5 @2xl/bot-page:grid-cols-2 @5xl/bot-page:grid-cols-3">
-          {ordered.map((area) => { const work = workOf(area); return <AreaCard key={area.id} area={area} now={now} zone={zone} live={work.live} workers={work.workers} onOpenTask={onOpenTask} onOpenOwner={onOpenThread} />; })}
+          {ordered.map((area) => { const work = workOf(area); return <AreaCard key={area.id} area={area} now={now} zone={zone} live={work.live} workers={work.workers} onOpenTask={onOpenTask} onOpenOwner={onOpenThread} isOpen={isOpen} />; })}
         </div>
       ) : null}
     </section>
   );
 }
 
-export function DoneBar({ tasks, names, now, zone, query = false, onOpen }: { query?: boolean; tasks: readonly Task[]; names: Names; now: number; zone?: string; onOpen: Open }) {
+export function DoneBar({ tasks, names, now, zone, query = false, onOpen, isOpen = noneOpen }: { query?: boolean; tasks: readonly Task[]; names: Names; now: number; zone?: string; onOpen: Open; isOpen?: IsOpen }) {
   const [open, setOpen] = useState(false);
   const summary = doneSummary(tasks, now, zone);
   const nothing = summary.week === 0;
@@ -206,13 +247,18 @@ export function DoneBar({ tasks, names, now, zone, query = false, onOpen }: { qu
               <ul className="flex flex-col">
                 {group.tasks.map(({ task, folded }) => {
                   const outputs = [...task.outputs, ...folded.flatMap((t) => t.outputs)].filter((o, i, all) => all.findIndex((x) => x.kind === o.kind && x.ref === o.ref) === i);
+                  const selected = isOpen(task.id);
+                  const subtasks = folded.length ? `with ${folded.length} subtask${folded.length === 1 ? "" : "s"}` : null;
+                  const when = task.closedAt ? shortWhen(task.closedAt, now, zone) : "";
                   return (
-                    <li key={task.id} data-testid="done-item" data-task-id={task.id} className="flex min-w-0 flex-col gap-1 border-t border-border/40 py-1.5 first:border-t-0">
-                      <div className="flex min-w-0 items-baseline gap-2">
-                        <button type="button" onClick={(event) => onOpen(task, event)} className="min-w-0 flex-1 cursor-pointer truncate rounded text-left text-sm text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{task.title}</button>
-                        {folded.length ? <span className="shrink-0 text-xs text-subtle-foreground">with {folded.length} subtask{folded.length === 1 ? "" : "s"}</span> : null}
-                        <span className="shrink-0 text-xs tabular-nums text-subtle-foreground">{task.closedAt ? shortWhen(task.closedAt, now, zone) : ""}</span>
-                      </div>
+                    <li key={task.id} data-testid="done-item" data-task-id={task.id} className="flex min-w-0 flex-col gap-1 border-t border-border/40 py-1 first:border-t-0">
+                      <button type="button" data-testid="row-open" onClick={(event) => onOpen(task, event)} aria-current={selected || undefined} aria-label={[task.title, "done", subtasks, when].filter(Boolean).join(", ")}
+                        className={openRowClass(selected, "-mx-2 flex min-w-0 items-baseline gap-2 px-2 py-0.5")}>
+                        <span className="min-w-0 flex-1 truncate text-sm text-foreground">{task.title}</span>
+                        {subtasks ? <span className="shrink-0 text-xs text-subtle-foreground">{subtasks}</span> : null}
+                        <span className="shrink-0 text-xs tabular-nums text-subtle-foreground">{when}</span>
+                        <OpenChevron selected={selected} className="self-center" />
+                      </button>
                       <TaskOutputs outputs={outputs} source="botPage" />
                     </li>
                   );

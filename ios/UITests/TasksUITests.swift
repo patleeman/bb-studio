@@ -248,6 +248,38 @@ final class TasksUITests: ServerIsolatedUITestCase {
         gone(any("tasks-screen"), "an ask from the Bot's area opens the chat")
     }
 
+    func testEveryTaskRowOpensItsTaskIncludingAnAreasAskWithATask() {
+        launch()
+        app.openRoomPlace("tasks")
+        XCTAssertTrue(any("tasks-screen").waitForExistence(timeout: 15))
+        let ask = app.buttons["tasks-area-ask-area_demo_launch"]
+        XCTAssertTrue(ask.waitForExistence(timeout: 10), "the launch area's ask with a task is in your to-do")
+        XCTAssertTrue(ask.label.hasPrefix("Confirm the Q4 numbers with finance"))
+        ask.tap()
+        XCTAssertTrue(any("task-wc_demo_fork").waitForExistence(timeout: 10), "an area's ask with a task opens that task's card")
+        XCTAssertTrue(any("tasks-screen").exists, "it stays on the Tasks page")
+        shot("25-tasks-area-ask-opens-task")
+        ask.tap()
+        gone(any("task-wc_demo_fork"), "a second tap folds the card away")
+        // Every other kind of row opens its card too: yours, an agent's, a subtask.
+        for id in ["task_demo_quote", "wc_demo_stills"] {
+            let row = app.buttons["task-row-\(id)"]
+            for _ in 0..<6 where !row.exists { app.swipeUp() }
+            XCTAssertTrue(row.waitForExistence(timeout: 5), "\(id) is a row")
+            row.tap()
+            XCTAssertTrue(any("task-\(id)").waitForExistence(timeout: 10), "\(id) opens its card")
+            row.tap()
+        }
+        let fold = app.buttons["tasks-fold-wc_demo_fork"]
+        for _ in 0..<6 where !fold.exists { app.swipeUp() }
+        XCTAssertTrue(fold.waitForExistence(timeout: 5))
+        fold.tap()
+        let sub = app.buttons.matching(identifier: "in-flight-subtask").firstMatch
+        XCTAssertTrue(sub.waitForExistence(timeout: 5))
+        sub.tap()
+        XCTAssertTrue(any("task-wc_demo_fork_ui").waitForExistence(timeout: 10), "a subtask opens its card")
+    }
+
     func testTheTasksScreenFallsBackOnAStudioWithoutTheBoard() {
         launch(["-qaTasksNoBoard"])
         app.openRoomPlace("tasks")

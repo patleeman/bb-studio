@@ -31,6 +31,10 @@ export type AreaDeps = {
 };
 export type SeedReport = { seeded: boolean; created: string[]; problems: string[] };
 
+/** The source an area item's task carries: the area and the item's title, so the task outlives every rewrite of the area's status. */
+export const AREA_ITEM_SOURCE = "area-item";
+export const areaItemRef = (areaId: string, title: string) => `${areaId}:${title.toLowerCase().replace(/\s+/g, " ").trim()}`;
+
 const LEVEL_RANK: Record<ReportLevel, number> = { log: 0, tell: 1, urgent: 2 };
 const KEEP_LEVELS = 20;
 
@@ -311,7 +315,7 @@ export class Areas {
       }
     }
     const derived = deriveStatus(area, paused ? null : missed);
-    const open: OpenItem[] = [...area.open];
+    const open: OpenItem[] = this.linkItems(area);
     const linked = new Set(open.map((o) => o.taskId).filter(Boolean));
     for (const task of schedules) {
       for (const child of this.tasks.rows("SELECT record FROM tasks WHERE parent_id = ? AND closed_at IS NULL ORDER BY created_at, id", task.id)) {
@@ -327,6 +331,74 @@ export class Areas {
       lastRun, nextRun: nextAt, nextLabel, paused, links: area.links, statusFile: area.statusFile,
       fileError: area.file?.error === "missing" ? `${STATUS_FILE} not found` : area.file?.error ?? null, updatedAt: area.updatedAt,
     };
+  }
+
+  /** The newest task made for each of an area's items, by item. */
+  private itemTasks(areaId: string): Map<string, Task> {
+    const prefix = `${areaId}:`;
+    const out = new Map<string, Task>();
+    const rows = this.tasks.rows("SELECT record FROM tasks WHERE json_extract(record, '$.source.kind') = ? AND substr(json_extract(record, '$.source.ref'), 1, ?) = ? ORDER BY created_at, id", AREA_ITEM_SOURCE, prefix.length, prefix);
+    for (const task of rows) out.set(task.source!.ref, task);
+    return out;
+  }
+
+  /**
+   * The area's open items, each with the task Studio made for it when the
+   * item names none (the runner's next status.json doesn't know it). An item
+   * whose task the user closed after the area's last report is left out
+   * until a newer report still lists it.
+   */
+  private linkItems(area: Area): OpenItem[] {
+    if (!area.open.some((o) => !o.taskId)) return [...area.open];
+    const made = this.itemTasks(area.id);
+    const reportedAt = area.stated?.at ?? 0;
+    return area.open.flatMap((item) => {
+      if (item.taskId) return [item];
+      const task = made.get(areaItemRef(area.id, item.title));
+      if (!task) return [item];
+      if (isClosed(task) && (task.closedAt ?? 0) > reportedAt) return [];
+      return [{ ...item, taskId: task.id }];
+    });
+  }
+
+  private itemOwner(area: Area, needsUser: boolean): string {
+    if (needsUser) return USER_OWNER;
+    if (area.owner.kind === "lead") return `thread:${area.owner.thread}`;
+    if (area.owner.kind === "runner" && area.owner.thread) return `thread:${area.owner.thread}`;
+    return "cos";
+  }
+
+  /**
+   * The task for one of an area's open items, made the first time the user
+   * opens the item: the item's own task, else the one made for it before,
+   * else a new one. One that needs the user is theirs and waits on them;
+   * otherwise it is queued for whoever looks after the area.
+   */
+  itemTask(idOrName: string, title: string): { task: Task; created: boolean } {
+    return this.tasks.db.transaction(() => {
+      const area = this.find(idOrName);
+      if (!area) throw new Error(`No area ${JSON.stringify(idOrName)}.`);
+      const ref = areaItemRef(area.id, title);
+      const item = this.linkItems(area).find((o) => areaItemRef(area.id, o.title) === ref);
+      if (!item) throw new Error(`${JSON.stringify(title)} is no longer open in ${area.name}.`);
+      const own = item.taskId ? this.tasks.find(item.taskId) : null;
+      if (own) return { task: own, created: false };
+      const before = this.itemTasks(area.id).get(ref);
+      if (before) return { task: before, created: false };
+      const now = this.now();
+      const owner = this.itemOwner(area, item.needsUser);
+      const conversation = owner.startsWith("thread:") ? owner.slice(7) : null;
+      const made = this.tasks.save({
+        id: this.tasks.newId("task"), title: item.title, why: "", owner,
+        state: item.needsUser ? "waiting" : "todo", kind: "do", options: [], needs: null, priority: "normal", conversation, project: null, area: area.name,
+        timing: { due: null, trigger: { type: "none" }, snoozed: false }, attention: { queue: item.needsUser ? "surfaced" : null, push: false },
+        progress: { step: null, line: null }, workers: [], outputs: [], source: { kind: AREA_ITEM_SOURCE, ref },
+        parentId: null, schedule: null, card: null, automation: null, waitingOn: null, stale: false, origin: "task",
+        createdAt: now, updatedAt: now, closedAt: null, closedBy: null,
+      });
+      this.tasks.event(made.id, "created", { by: USER_OWNER, owner, area: area.id });
+      return { task: made, created: true };
+    })();
   }
 
   list(): AreaView[] {

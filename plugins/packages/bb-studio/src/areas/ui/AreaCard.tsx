@@ -1,4 +1,6 @@
+import type { MouseEvent } from "react";
 import { Icon, cn } from "../../kit/ui/index";
+import { noneOpen, OpenChevron, openRowClass, type IsOpen } from "../../tasks/ui/open-row";
 import type { AreaStatus, AreaView } from "../contract";
 import { areaWhen, areaWho, itemAge, OUTCOME_LABEL, openItems, runBars, STATUS_LABEL } from "./model";
 
@@ -17,15 +19,17 @@ export type AreaCardProps = {
   zone?: string;
   live?: boolean;
   workers?: number;
-  onOpenTask?(id: string, title: string): void;
+  onOpenTask?(id: string, title: string, event?: MouseEvent): void;
   onOpenOwner?(threadId: string): void;
+  /** Which task is open beside the page. */
+  isOpen?: IsOpen;
 };
 
 export function ownerThreadOf(area: Pick<AreaView, "owner">): string | null {
   return area.owner.kind === "lead" ? area.owner.thread : area.owner.kind === "runner" ? area.owner.thread : null;
 }
 
-export function AreaCard({ area, now, zone, live = false, workers = 0, onOpenTask, onOpenOwner }: AreaCardProps) {
+export function AreaCard({ area, now, zone, live = false, workers = 0, onOpenTask, onOpenOwner, isOpen = noneOpen }: AreaCardProps) {
   const items = openItems(area.open);
   const bars = runBars(area.runs);
   const when = areaWhen(area, now, zone);
@@ -53,11 +57,14 @@ export function AreaCard({ area, now, zone, live = false, workers = 0, onOpenTas
           const title = <><span className="min-w-0 flex-1 truncate">{item.needsUser ? <span aria-hidden className="mr-1.5 inline-block size-1.5 rounded-full bg-warning align-[1px]" /> : null}{item.title}{item.needsUser ? <span className="sr-only">, needs you</span> : null}</span>{age ? <span className="shrink-0 text-[11.5px] text-subtle-foreground"><span className="sr-only">, </span>{age}</span> : null}</>;
           const label = `${item.title}${item.needsUser ? ", needs you" : ""}${age ? `, ${age}` : ""}`;
           const row = cn("flex min-w-0 items-baseline gap-2.5 py-0.5 text-[12.5px]", item.needsUser ? "text-foreground" : "text-muted-foreground");
+          // An item with a task opens it; one without is the area's own note, plain text that opens nothing.
+          const selected = !!item.taskId && isOpen(item.taskId);
           return (
-            <li key={`${item.title}-${i}`} data-testid="area-item" data-needs-you={item.needsUser || undefined}>
+            <li key={`${item.title}-${i}`} data-testid="area-item" data-needs-you={item.needsUser || undefined} data-task-id={item.taskId ?? undefined}>
               {item.taskId && onOpenTask
-                ? <button type="button" onClick={() => onOpenTask(item.taskId!, item.title)} aria-label={label} className={cn(row, "w-full cursor-pointer rounded text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>{title}</button>
-                : <span className={row}>{title}</span>}
+                ? <button type="button" data-testid="row-open" onClick={(event) => onOpenTask(item.taskId!, item.title, event)} aria-label={label} aria-current={selected || undefined}
+                    className={openRowClass(selected, row, "-mx-1.5 w-[calc(100%+0.75rem)] px-1.5 hover:text-foreground")}>{title}<OpenChevron selected={selected} className="size-3 self-center" /></button>
+                : <span data-testid="area-item-text" className={row}>{title}</span>}
             </li>
           );
         }) : <li className="py-0.5 text-[12.5px] text-subtle-foreground">Nothing open</li>}

@@ -8,7 +8,8 @@ import { useLive } from "../../ui/live";
 import type { Loop } from "../contract";
 import { ChangeTrigger, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu, CARD_BUTTON, CARD_GHOST, CARD_PRIMARY } from "./LoopMenus";
 import { fullWhen, INLINE_OPTIONS, shortWhen, ownerName, ownerThread, safeUrl, sourceText, triggerLabel, type OwnerInfo } from "./model";
-import { TaskCardView, useTaskActions } from "../../tasks/ui/TaskCard";
+import { useTaskActions } from "../../tasks/ui/TaskCard";
+import { TaskDetail } from "../../tasks/ui/TaskDetail";
 import { historyLines, taskStatus } from "../../tasks/ui/model";
 import { needsYou } from "../../tasks/contract";
 import type { TaskView } from "../../tasks/rpc-contract";
@@ -19,19 +20,41 @@ export const entryId = (params: JsonValue | null): string | null => {
   return typeof params.id === "string" && params.id ? params.id : null;
 };
 
+// Every task opens here, from every row on the Tasks page and from a link:
+// one detail, the task's card with its facts (TaskDetail). A to-do the user
+// owns also keeps its to-do actions (Remind me now, change when, Discuss).
+// A legacy to-do with no task record falls back to TodoDetail.
 export function TodoTab({ params }: { params: JsonValue | null }) {
   const id = entryId(params);
   const people = useLoopPeople();
   const places = usePlaceNames(true);
+  const task = useLive("tasks.get", { id: id ?? "" }, { enabled: !!id, pollMs: 60_000 });
   const live = useLive("loops.get", { id: id ?? "" }, { enabled: !!id, pollMs: 60_000 });
   const gone = !!id && !!live.error && !live.data && /not found/i.test(live.error);
-  const task = useLive("tasks.get", { id: id ?? "" }, { enabled: !!id, pollMs: 60_000 });
-  if (id && live.error && !live.data && !gone) return <BotItemError message={live.error} />;
-  if (gone && task.data) return <div className="mx-auto w-full max-w-2xl p-4"><TaskCardView view={task.data} people={people} refresh={task.refresh} /></div>;
-  if (gone && !task.error) return null;
-  if (!id || (live.error && !live.data)) return <NotFoundTab params={{ kind: "todo", id, link: id ? linkFor({ kind: "todo", id }) : "bb://todo" }} />;
-  if (!live.data) return null;
-  return <TodoDetail key={id} loop={live.data.loop} people={people} places={places} owner={live.data.owner} refresh={() => { live.refresh(); task.refresh(); }} view={task.data ?? null} />;
+  const refresh = () => { task.refresh(); live.refresh(); };
+  if (!id) return <NotFoundTab params={{ kind: "todo", id, link: "bb://todo" }} />;
+  if (task.data) {
+    const loop = live.data?.loop ?? null;
+    const extra = loop && loop.owner === "patrick" && loop.closedAt === null ? <LoopExtras loop={loop} people={people} places={places} refresh={refresh} /> : null;
+    return <TaskDetail key={id} view={task.data} people={people} refresh={refresh} extra={extra} />;
+  }
+  if (!task.error) return null;
+  if (live.data) return <TodoDetail key={id} loop={live.data.loop} people={people} places={places} owner={live.data.owner} refresh={refresh} view={null} />;
+  if (live.error && !gone) return <BotItemError message={live.error} />;
+  if (!live.error) return null;
+  return <NotFoundTab params={{ kind: "todo", id, link: linkFor({ kind: "todo", id }) }} />;
+}
+
+/** The to-do actions a task's card doesn't have: Remind me now, change when, Discuss. */
+function LoopExtras({ loop, people, places, refresh }: { loop: Loop; people: LoopPeople; places: string[]; refresh(): void }) {
+  const { update, busy, error } = useLoopActions(refresh);
+  const discuss = useDiscussLoop(people.botThreadId, people.botName);
+  return <>
+    {loop.status === "surfaced" ? null : <button type="button" data-testid="todo-remind" className={CARD_GHOST} disabled={busy} onClick={() => void update({ id: loop.id, surfaceNow: true })}><Icon name="ArrowUp" />Remind me now</button>}
+    <ChangeTrigger loop={loop} places={places} disabled={busy} onSave={(changes) => void update({ id: loop.id, changes: loop.status === "surfaced" ? { ...changes, status: "queued" } : changes })} />
+    <button type="button" data-testid="todo-discuss" className={CARD_GHOST} disabled={busy} aria-label={`Discuss: ${loop.title}`} title={`Discuss with ${people.botName}`} onClick={() => void discuss(loop)}><Icon name="MessageCirclePlus" />Discuss</button>
+    {error ? <p role="alert" className="w-full text-xs text-destructive">{error}</p> : null}
+  </>;
 }
 
 export function TodoDetail({ loop, people, places, owner, refresh, view = null }: { loop: Loop; people: LoopPeople; places: string[]; owner: OwnerInfo | undefined; refresh(): void; view?: TaskView | null }) {

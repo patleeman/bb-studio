@@ -389,7 +389,8 @@ In flight reads `tasks.flight` and the Tasks page `tasks.board` (open tasks;
 done and recurring ones still from `tasks.list`) and `areas.list`, like the
 desktop: running and waiting rows, subtasks and workers folded under their
 task, ended and done rows in "N done today", and area open items that need you
-in Mine, Today (title, area, age; tapping opens whoever looks after the area,
+in Mine, Today (title, area, age; tapping one with a task opens that task's
+card, like every task row; one without opens whoever looks after the area,
 else the Bot's chat). The demo answers all three; `-qaTasksNoBoard` makes them
 unknown, so the phone falls back to `tasks.inFlight` and `tasks.list` as before
 and remembers that for the server until the app quits.

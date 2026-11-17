@@ -8,6 +8,8 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({ experimental_usePanelTabs: () => stat
 vi.mock("../../links/open", () => ({ openLinkFromAnywhere: state.openLink, clickModifiers: (event?: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean }) => ({ meta: !!event?.metaKey, ctrl: !!event?.ctrlKey, shift: !!event?.shiftKey }) }));
 vi.mock("../../kit/app/nav", () => ({ openAppPath: state.openPath }));
 vi.mock("../../kit/ui/icon", () => ({ Icon: () => null }));
+const toast = vi.hoisted(() => ({ error: vi.fn() }));
+vi.mock("sonner", () => ({ toast }));
 
 const { BotPageRow } = await import("./BotPageRow");
 const { focusClosedRow, openLinksOf, rowLink, useRowOpen } = await import("./open-row");
@@ -84,4 +86,14 @@ it("closing an item's tab returns focus to its row, unless focus is somewhere el
   expect(document.activeElement).toBe(field);
   field.remove();
   expect(focusClosedRow(["bb://todo/loop_other"])).toBe(false);
+});
+
+it("a row never does nothing: when the open goes nowhere, a toast says so", async () => {
+  render();
+  toast.error.mockClear();
+  state.openLink.mockResolvedValueOnce({ via: "none", reason: "Studio is still starting." } as never);
+  await act(async () => row("todo").querySelector("button")!.click());
+  expect(toast.error).toHaveBeenCalledWith("Couldn't open Pay the bill. Studio is still starting.");
+  await act(async () => row("todo").querySelector("button")!.click());
+  expect(toast.error).toHaveBeenCalledTimes(1);
 });

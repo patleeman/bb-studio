@@ -440,3 +440,19 @@ it("views read each thread once within a short window, and rows carry when their
   await handlers["tasks.board"]!({});
   expect(user.reads).toBeGreaterThan(reads);
 });
+
+it("Start work: handing a queued task to the owner it already has starts it and tells that owner; a running one stays as it is", async () => {
+  const { handlers, tool, sent } = setup();
+  const { task } = await tool("task_create", { title: "Desktop leftovers", owner: "thread:thr_lead", state: "todo" });
+  expect(task).toMatchObject({ owner: "thread:thr_lead", state: "todo" });
+  const out = await handlers["tasks.act"]!({ id: task.id, action: "hand_off", to: "thread:thr_lead" });
+  expect(out.task).toMatchObject({ owner: "thread:thr_lead", state: "in_progress" });
+  expect(out.note).toBeNull();
+  expect(sent).toEqual([{ threadId: "thr_lead", text: expect.stringMatching(/^The user asked you to start task "Desktop leftovers".* now\..*task_get.*task_update/) }]);
+  const view = await handlers["tasks.get"]!({ id: task.id });
+  expect(view.history.some((e: { type: string; data: string }) => e.type === "acted" && JSON.parse(e.data).action === "start")).toBe(true);
+  sent.length = 0;
+  const again = await handlers["tasks.act"]!({ id: task.id, action: "hand_off", to: "thread:thr_lead" });
+  expect(again.task.state).toBe("in_progress");
+  expect(sent).toEqual([]);
+});
