@@ -37,19 +37,6 @@ const edits = [
     ],
   ],
   [
-    "apps/server/src/services/plugins/builtin-registry.ts",
-    [
-      [
-        '    name: "bb-account",\n    pluginId: "bb-account",\n    defaultEnabled: true,',
-        '    name: "bb-account",\n    pluginId: "bb-account",\n    defaultEnabled: false,',
-      ],
-      [
-        '    name: "connect",\n    pluginId: "connect",\n    defaultEnabled: true,',
-        '    name: "connect",\n    pluginId: "connect",\n    defaultEnabled: false,',
-      ],
-    ],
-  ],
-  [
     "packages/domain/src/feature-flags.ts",
     [
       [

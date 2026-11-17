@@ -213,7 +213,10 @@ describe("BB Studio's default marketplaces", () => {
     const stored = JSON.parse(row?.manifestJson ?? "{}") as {
       plugins: { id: string; source: unknown }[];
     };
-    expect(stored.plugins.map((entry) => entry.id)).toEqual(["mobile"]);
+    expect(stored.plugins.map((entry) => entry.id)).toEqual([
+      "mobile",
+      "studio-visual-chat",
+    ]);
     expect(stored.plugins[0]?.source).toEqual({
       git: {
         url: "https://github.com/patleeman/bb-studio.git",
