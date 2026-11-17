@@ -143,6 +143,19 @@ finalOutput }) => ({ quiet }))`. bb asks it for every turn that finishes;
   notice. Leave `reason` out for a compaction the user asked for. An older
   bb ignores `reason` and draws it as the user's.
 
+## Automated inputs
+
+- `bb.sdk.threads.send({ …, experimental_notice: { source, label } })`
+  sends an automated input (a watcher, a report, a check-in) that the user
+  did not type. The model gets the input as is; the turn is the system's
+  but may still ask for approvals. The thread view draws it as one quiet
+  row named by `label`: with a quiet reply (`[PASS]`) "✓ <label> ·
+  handled", which expands to the input, the steps and the reply; with a
+  real reply a quiet row above it. `source` (≤ 40) and `label` (≤ 120) are
+  one line of plain text; anything else is refused with 400.
+- Check `bb.experimental_hooks.experimental_features?.threadNotices` first:
+  an older bb ignores the notice and draws the input as the user's.
+
 ## Title rows in cards
 
 `layout: { cards: { gap, radius, titleRow: true } }` in an app backdrop's
