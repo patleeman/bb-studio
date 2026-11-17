@@ -470,9 +470,9 @@ export function registerThreadActionRoutes(
     });
   });
 
-  post(routes.compact, async (context) => {
+  post(routes.compact, async (context, query) => {
     const thread = requirePublicThread(deps.db, context.req.param("id"));
-    await compactThreadContext(deps, thread);
+    await compactThreadContext(deps, thread, query.reason ?? null);
     return context.json(operationInProgress());
   });
 

@@ -1,3 +1,4 @@
+import { threadCompactQuerySchema, type ThreadCompactQuery } from "./api/thread-compact.fork.js";
 import {
   machineEnvironmentSetSchema,
   machineEnvironmentDeleteSchema,
@@ -1679,7 +1680,7 @@ export const publicApiRoutes = {
     compact: defineRoute({
       path: "/threads/:id/compact",
       method: "post",
-      request: noRequest<PathId>(),
+      request: optionalQueryRequest<PathId, ThreadCompactQuery>(threadCompactQuerySchema),
       response: jsonResponse<OperationResponse>(),
     }),
     clearContext: defineRoute({
