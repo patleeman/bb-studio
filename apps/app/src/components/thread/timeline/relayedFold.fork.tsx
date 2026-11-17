@@ -19,6 +19,11 @@ import {
   type ReplyClassifiers,
 } from "@/lib/fork-reply-classifiers";
 import { QuietTurnMarker } from "./ForkQuietTurnMarker.js";
+import {
+  noticeFoldOf,
+  noticeOf,
+  type QuietFoldDetails,
+} from "./noticeFold.fork.js";
 
 const KEPT_OPERATIONS: ReadonlySet<string> = new Set([
   "warning",
@@ -43,15 +48,16 @@ const ALERT_ICONS: ReadonlySet<IconName> = new Set<IconName>([
 
 const URGENT_BODY = /^(?:\[bb [^\]\n]*\]\s*)?(?:[^\n:]{0,80}:\s*)?⚠/u;
 
-export type QuietFoldState = "running" | "done" | "skipped";
+export type QuietFoldState = "running" | "done" | "skipped" | "notice" | "failed";
 
 export interface QuietFold {
   label: string;
   state: QuietFoldState;
   createdAt: number;
+  details?: QuietFoldDetails;
 }
 
-const QUIET_FOLD_PREFIX: Record<QuietFoldState, string> = {
+const QUIET_FOLD_PREFIX: Record<"running" | "done" | "skipped", string> = {
   running: "Compacting…",
   done: "Compacted",
   skipped: "Compaction skipped",
@@ -139,7 +145,7 @@ function rowStatus(row: ThreadTimelineViewRow): string | null {
 
 function quietFoldState(
   compaction: ThreadTimelineViewRow | undefined,
-): QuietFoldState | null {
+): keyof typeof QUIET_FOLD_PREFIX | null {
   const status = compaction === undefined ? "pending" : rowStatus(compaction);
   if (status === "error" || status === "interrupted") return null;
   if (status === "pending") return "running";
@@ -202,7 +208,10 @@ export function foldRelayedRows(
   classifiers: ReplyClassifiers = getPluginSlotSnapshot().replyClassifiers,
 ): RelayedFold {
   const relayed = (row: ThreadTimelineViewRow | undefined): boolean =>
-    row !== undefined && isRelayedRow(row, classifiers) && !isAlertRow(row);
+    row !== undefined &&
+    noticeOf(row) === null &&
+    isRelayedRow(row, classifiers) &&
+    !isAlertRow(row);
   const quiet = (row: ThreadTimelineViewRow | undefined): boolean =>
     row !== undefined &&
     row.kind === "conversation" &&
@@ -224,6 +233,17 @@ export function foldRelayedRows(
     if (quiet === null) continue;
     quietFolds.set(row.id, quiet.fold);
     for (const id of quiet.hidden) hidden.add(id);
+  }
+  for (const [index, row] of rows.entries()) {
+    const notice = noticeFoldOf(rows, index, quiet, streamingAssistantMessageId);
+    if (notice === null) continue;
+    quietFolds.set(row.id, {
+      label: notice.label,
+      state: notice.state,
+      createdAt: row.createdAt,
+      details: notice.details,
+    });
+    for (const id of notice.hidden) hidden.add(id);
   }
   for (let index = 0; index < rows.length; index += 1) {
     if (quietFolds.has(rows[index]!.id) || !relayed(rows[index])) continue;
@@ -296,6 +316,7 @@ export function RelayedRowFolded({
         label={quiet.label}
         state={quiet.state}
         at={quiet.createdAt}
+        details={quiet.details}
       />
     );
   }
