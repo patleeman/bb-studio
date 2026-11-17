@@ -192,9 +192,9 @@
       "budget": 4
     },
     "apps/server/src/services/threads/thread-send.ts": {
-      "seam": "import-sync, thread-successor",
-      "intent": "ensureThreadIsWritable ends with ensureForkThreadWritable(thread) (services/threads/thread-write-guards.fork.ts), which throws a 409 thread_read_only for the first registered fork guard that refuses; fork-import registers the mirrored-thread guard. This one call also covers the queue path. The archived check calls throwArchivedThread(thread) (services/threads/thread-successor.fork.ts), the same 409 thread_not_writable that also names the live thread a handoff left (details.successorThreadId).",
-      "budget": 5
+      "seam": "import-sync, thread-successor, thread-notices",
+      "intent": "ensureThreadIsWritable ends with ensureForkThreadWritable(thread) (services/threads/thread-write-guards.fork.ts), which throws a 409 thread_read_only for the first registered fork guard that refuses; fork-import registers the mirrored-thread guard. This one call also covers the queue path. The archived check calls throwArchivedThread(thread) (services/threads/thread-successor.fork.ts), the same 409 thread_not_writable that also names the live thread a handoff left (details.successorThreadId). Permission escalation is resolved for escalationInitiator(initiator, systemNotice) (automation-notice.fork.ts, imported at the top of the file): an automated input keeps the user's escalation (ask), every other system turn keeps upstream's.",
+      "budget": 8
     },
     "apps/server/src/services/threads/thread-create.ts": {
       "seam": "import-sync, idle-thread",
@@ -452,9 +452,9 @@
       "budget": 3
     },
     "packages/server-contract/src/api/threads.ts": {
-      "seam": "idle-thread",
-      "intent": "createThreadRequestSchema accepts empty input for origin \"plugin\" (an idle thread a plugin makes, started by its first message); every other origin still needs input for a root thread.",
-      "budget": 2
+      "seam": "idle-thread, thread-notices",
+      "intent": "createThreadRequestSchema accepts empty input for origin \"plugin\" (an idle thread a plugin makes, started by its first message); every other origin still needs input for a root thread. sendMessageRequestSchema extends the send fields with forkSendMessageFields (api/thread-notice.fork.ts, imported at the top of the file): experimental_notice { source, label }; the edit-message schema does not take it.",
+      "budget": 5
     },
     "apps/app/src/components/sidebar/SidebarNavigationModel.tsx": {
       "seam": "host-entries",
@@ -657,9 +657,9 @@
       "budget": 4
     },
     "packages/domain/src/system-message.ts": {
-      "seam": "system-compaction",
-      "intent": "systemMessageSubjectSchema has a { kind: \"compaction\", reason } member: the subject of a compaction bb ran on its own, which the thread view folds into one quiet row (relayedFold.fork.tsx).",
-      "budget": 1
+      "seam": "system-compaction, thread-notices",
+      "intent": "systemMessageSubjectSchema has a { kind: \"compaction\", reason } member: the subject of a compaction bb ran on its own, which the thread view folds into one quiet row (relayedFold.fork.tsx). It also has a { kind: \"automation\", source, label } member: the subject of an automated input sent with experimental_notice, which the thread view draws as one quiet row (noticeFold.fork.ts).",
+      "budget": 2
     },
     "packages/server-contract/src/public-api.ts": {
       "seam": "system-compaction",
@@ -667,9 +667,9 @@
       "budget": 3
     },
     "packages/sdk/src/areas/threads.ts": {
-      "seam": "system-compaction",
-      "intent": "threads.compact takes an optional reason and sends it as the compact route's reason query.",
-      "budget": 3
+      "seam": "system-compaction, thread-notices",
+      "intent": "threads.compact takes an optional reason and sends it as the compact route's reason query. sendJson forwards experimental_notice.",
+      "budget": 4
     },
     "apps/server/src/services/threads/turn-retry.ts": {
       "seam": "system-compaction",
@@ -690,6 +690,11 @@
       "seam": "thread-successor",
       "intent": "`bb thread tell` sends through sendToLiveThread (commands/thread/tell-successor.fork.ts) and prints the thread it reached: an archived-thread 409 becomes an error that names the live successor or how to find one, and --follow-successor sends to the successor instead (JSON adds redirectedFrom).",
       "budget": 18
+    },
+    "apps/server/src/services/threads/thread-send-request.ts": {
+      "seam": "thread-notices",
+      "intent": "acceptThreadSendRequest takes experimental_notice off the payload and dispatches the inline send with automationNotice(experimental_notice) (automation-notice.fork.ts, imported at the top of the file) as its systemNotice: the turn is the system's with the subject { kind: \"automation\", source, label }. Without a notice the send is unchanged.",
+      "budget": 5
     }
   }
 }

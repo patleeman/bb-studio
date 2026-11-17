@@ -73,5 +73,6 @@ export const systemMessageSubjectSchema = z.discriminatedUnion("kind", [
     path: z.string(),
   }),
   z.object({ kind: z.literal("compaction"), reason: z.string() }),
+  z.object({ kind: z.literal("automation"), source: z.string(), label: z.string() }),
 ]);
 export type SystemMessageSubject = z.infer<typeof systemMessageSubjectSchema>;
