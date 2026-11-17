@@ -11,7 +11,7 @@ import {
   setForkThemeModeOverride,
   type ForkThemeMode,
 } from "@/lib/fork-theme-mode";
-import { usePluginSlots } from "@/lib/plugin-slots";
+import { usePluginSlotKind } from "@/lib/plugin-slots";
 import {
   clearLaunchAppearance,
   hasLaunchAppearance,
@@ -305,7 +305,7 @@ function firstBackdrop(
 }
 
 export function ForkAppBackdropHost() {
-  const backdrops = usePluginSlots().appBackdrops ?? NO_BACKDROPS;
+  const backdrops = usePluginSlotKind("appBackdrops") ?? NO_BACKDROPS;
   const slot = useMemo(() => firstBackdrop(backdrops), [backdrops]);
   useLaunchAppearanceTimeout();
   if (slot === null || isBareWindow()) return null;
