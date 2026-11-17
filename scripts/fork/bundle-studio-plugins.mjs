@@ -12,7 +12,7 @@ import {
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const STUDIO_BUNDLED_PLUGINS = ["bb-studio", "bb-studio-visual-chat"];
+export const STUDIO_BUNDLED_PLUGINS = ["bb-studio"];
 
 const SKIPPED = new Set(["node_modules", ".turbo"]);
 
@@ -87,11 +87,11 @@ function main(argv) {
     .map((arg, index) => (arg === "--out" ? argv[index + 1] : null))
     .filter((value) => value !== null);
   if (packages === null || outs.length === 0 || argv.includes("--help")) {
-    console.log(`Build Studio and Visual Chat with this checkout's CLI and write their bundled copies.
+    console.log(`Build Studio with this checkout's CLI and write its bundled copy.
 
   node scripts/fork/bundle-studio-plugins.mjs --packages <monorepo plugins/packages> --out <dir> [--out <dir>]
 
-Each --out gets <dir>/bb-studio and <dir>/bb-studio-visual-chat: the package without
+Each --out gets <dir>/bb-studio: the package without
 node_modules, its dist/ from \`bb plugin build\`, a package.json whose entries
 point at dist/, and under dist/runtime the files its package.json lists in
 studioRuntimeFiles (files the server reads at run time, which esbuild does not
