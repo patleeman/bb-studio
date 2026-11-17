@@ -7,12 +7,14 @@ const ICONS = {
   skipped: { name: "Info", className: "size-3 shrink-0" },
   notice: { name: "Info", className: "size-3 shrink-0" },
   failed: { name: "AlertTriangle", className: "size-3 shrink-0" },
+  alert: { name: "AlertTriangle", className: "size-3 shrink-0" },
 } as const;
 
 export interface QuietMarkerDetails {
   text: string;
   steps: string[];
   reply: string | null;
+  full?: boolean;
 }
 
 function when(at: number | undefined): string | undefined {
@@ -43,6 +45,21 @@ export function QuietTurnMarker({
       <span className="min-w-0 truncate">{label}</span>
     </>
   );
+  if (details?.full) {
+    return (
+      <div
+        className="px-2 py-0.5 text-xs text-subtle-foreground"
+        data-quiet-turn={state}
+        data-quiet-turn-full=""
+        title={when(at)}
+      >
+        <div className="flex items-center gap-1.5">{head}</div>
+        <p className="mt-1 ml-[1.125rem] whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+          {details.text}
+        </p>
+      </div>
+    );
+  }
   if (details === undefined) {
     return (
       <div

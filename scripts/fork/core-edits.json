@@ -182,9 +182,9 @@
       "budget": 13
     },
     "apps/server/src/services/threads/dispatch-attempt.ts": {
-      "seam": "import-sync, system-compaction",
-      "intent": "When startsNoTurn(thread, input) (services/threads/turnless-dispatch.fork.ts) says the attempt is the first dispatch of a pending fork with an empty input, runDispatchAttempt skips the message.dispatch hook pass and waitOn returns dispatched without writing a queued row. An empty-input fork (Reply in thread) then starts as an idle fork even when the concurrency limit is full, and never stores an empty queued message. compactThreadContext takes an optional reason; with one it dispatches with systemCompactionNotice(reason) (system-compaction.fork.ts, imported at the top of the file), so the compaction turn is the system's and its request carries { kind: \"compaction\", reason }, and runOperationDispatch passes the attempt's systemNotice on to sendThreadMessage. Without a reason the compaction is the user's, as upstream.",
-      "budget": 10
+      "seam": "import-sync, system-compaction, thread-notices",
+      "intent": "When startsNoTurn(thread, input) (services/threads/turnless-dispatch.fork.ts) says the attempt is the first dispatch of a pending fork with an empty input, runDispatchAttempt skips the message.dispatch hook pass and waitOn returns dispatched without writing a queued row. An empty-input fork (Reply in thread) then starts as an idle fork even when the concurrency limit is full, and never stores an empty queued message. compactThreadContext takes an optional reason; with one it dispatches with systemCompactionNotice(reason) (system-compaction.fork.ts, imported at the top of the file), so the compaction turn is the system's and its request carries { kind: \"compaction\", reason }, and runOperationDispatch passes the attempt's systemNotice on to sendThreadMessage. Without a reason the compaction is the user's, as upstream. resolveDispatchAuthor is told systemAuthored(systemNotice, senderThreadId) (automation-notice.fork.ts, imported at the top of the file): an automated input another thread sent stays that thread's turn; every other notice is the system's, as upstream.",
+      "budget": 12
     },
     "apps/server/src/services/threads/thread-lifecycle.ts": {
       "seam": "fork-transcript",
@@ -193,8 +193,8 @@
     },
     "apps/server/src/services/threads/thread-send.ts": {
       "seam": "import-sync, thread-successor, thread-notices",
-      "intent": "ensureThreadIsWritable ends with ensureForkThreadWritable(thread) (services/threads/thread-write-guards.fork.ts), which throws a 409 thread_read_only for the first registered fork guard that refuses; fork-import registers the mirrored-thread guard. This one call also covers the queue path. The archived check calls throwArchivedThread(thread) (services/threads/thread-successor.fork.ts), the same 409 thread_not_writable that also names the live thread a handoff left (details.successorThreadId). Permission escalation is resolved for escalationInitiator(initiator, systemNotice) (automation-notice.fork.ts, imported at the top of the file): an automated input keeps the user's escalation (ask), every other system turn keeps upstream's.",
-      "budget": 8
+      "intent": "ensureThreadIsWritable ends with ensureForkThreadWritable(thread) (services/threads/thread-write-guards.fork.ts), which throws a 409 thread_read_only for the first registered fork guard that refuses; fork-import registers the mirrored-thread guard. This one call also covers the queue path. The archived check calls throwArchivedThread(thread) (services/threads/thread-successor.fork.ts), the same 409 thread_not_writable that also names the live thread a handoff left (details.successorThreadId). Permission escalation is resolved for escalationInitiator(initiator, systemNotice) (automation-notice.fork.ts, imported at the top of the file): an automated input keeps the user's escalation (ask), every other system turn keeps upstream's. The author is resolved with systemAuthored(systemNotice, senderThreadId), the same rule as at dispatch.",
+      "budget": 10
     },
     "apps/server/src/services/threads/thread-create.ts": {
       "seam": "import-sync, idle-thread",
@@ -693,8 +693,13 @@
     },
     "apps/server/src/services/threads/thread-send-request.ts": {
       "seam": "thread-notices",
-      "intent": "acceptThreadSendRequest takes experimental_notice off the payload and dispatches the inline send with automationNotice(experimental_notice) (automation-notice.fork.ts, imported at the top of the file) as its systemNotice: the turn is the system's with the subject { kind: \"automation\", source, label }. Without a notice the send is unchanged.",
+      "intent": "acceptThreadSendRequest takes experimental_notice off the payload and dispatches the inline send with automationNotice(experimental_notice, thread) (automation-notice.fork.ts, imported at the top of the file) as its systemNotice: the turn is the system's with the subject { kind: \"automation\", source, label }. Without a notice the send is unchanged. A thread that hasn't started (pending, or no environment) gets no notice, so the message starts it as before.",
       "budget": 5
+    },
+    "apps/server/src/services/threads/thread-queued-messages.ts": {
+      "seam": "thread-notices",
+      "intent": "toThreadQueuedMessage resolves a queued row's author with systemAuthored(its parsed systemNotice, senderThreadId) (automation-notice.fork.ts, imported at the top of the file), the same rule as at dispatch: an automated input from another thread stays that thread's.",
+      "budget": 3
     }
   }
 }

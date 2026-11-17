@@ -7,6 +7,7 @@ import {
   EMPTY_WORKSPACE_AGENT_CONTEXT,
 } from "../helpers/host-rpc.js";
 import { readJson } from "../helpers/json.js";
+import { automationNotice } from "../../src/services/threads/automation-notice.fork.js";
 import {
   seedEnvironment,
   seedHostSession,
@@ -115,9 +116,9 @@ describe("an automated input sent with a notice (BB Studio)", () => {
     });
   });
 
-  it("is the system's even when another thread sent it (a runner report)", async () => {
+  it("stays another thread's turn when that thread sent it (a runner report): its sender kept, approvals denied", async () => {
     await withTestHarness(async (harness) => {
-      const { thread } = seedIdleThread(harness);
+      const { thread, responder } = seedIdleThread(harness);
       const runner = seedThread(harness.deps, {
         environmentId: thread.environmentId,
         projectId: thread.projectId,
@@ -126,15 +127,44 @@ describe("an automated input sent with a notice (BB Studio)", () => {
       });
       const response = await send(harness, thread.id, {
         mode: "auto",
+        permissionMode: "accept-edits",
         senderThreadId: runner.id,
         input: ALERT,
         experimental_notice: { source: "runner", label: "House" },
       });
       expect(response.status).toBe(200);
       expect(lastRequest(harness, thread.id)).toMatchObject({
-        initiator: "system",
-        systemMessageSubject: { kind: "automation", label: "House" },
+        initiator: "agent",
+        senderThreadId: runner.id,
+        systemMessageSubject: {
+          kind: "automation",
+          source: "runner",
+          label: "House",
+        },
       });
+      expect(JSON.stringify(responder.requests.at(-1)?.command)).toContain(
+        '"permissionEscalation":"deny"',
+      );
+    });
+  });
+
+  it("drops the notice for a thread that is pending or has no environment", () => {
+    const notice = { source: "watcher" as const, label: "Kensico health" };
+    expect(
+      automationNotice(notice, { status: "pending", environmentId: "env_1" }),
+    ).toBeNull();
+    expect(
+      automationNotice(notice, { status: "idle", environmentId: null }),
+    ).toBeNull();
+    expect(
+      automationNotice(notice, { status: "idle", environmentId: "env_1" }),
+    ).toEqual({
+      kind: "unlabeled",
+      subject: {
+        kind: "automation",
+        source: "watcher",
+        label: "Kensico health",
+      },
     });
   });
 
@@ -162,6 +192,7 @@ describe("an automated input sent with a notice (BB Studio)", () => {
     ["a bidi label", { source: "watcher", label: "a \u202eb" }],
     ["a long label", { source: "watcher", label: "x".repeat(121) }],
     ["no source", { label: "Kensico" }],
+    ["an unknown source", { source: "studio", label: "Kensico" }],
   ])("refuses %s", async (_label, notice) => {
     await withTestHarness(async (harness) => {
       const { thread, responder } = seedIdleThread(harness);
