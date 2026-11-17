@@ -480,7 +480,7 @@ async function runDispatchAttempt(
     waitingOn: QueuedMessageWaitingOn,
     sendAt: number | null,
   ): DispatchAttemptOutcome => {
-    if (startsNoTurn(thread, queuedMessage.input)) return { kind: "dispatched" };
+    if (startsNoTurn(thread, queuedMessage.input)) return { kind: "dispatched", messageSequence: null };
     const entry = recordQueuedMessageWait(deps, {
       thread,
       message: queuedMessage,
