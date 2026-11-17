@@ -106,7 +106,9 @@ export function TodosPage({ view, tab: initialTab = "now" }: { view: BotView; ta
   const add = (text: string) => call("loops.add", { text }).then(() => { board.refresh(); list.refresh(); });
   const refresh = () => { board.refresh(); list.refresh(); };
   const botChat = people.botThreadId ? rowOpen({ kind: "conversation", id: people.botThreadId }, people.botName) : null;
+  // Every task row on the page opens the same detail: the task's tab in the page's side panel.
   const openTask = (task: Pick<Task, "id" | "title">, event?: MouseEvent) => rowOpen({ kind: "todo", id: task.id }, task.title).onOpen(event as never);
+  const isOpen = (id: string) => rowOpen({ kind: "todo", id }).selected;
   const openThread = (threadId: string) => navigate.toThread(threadId);
   const ready = !!scheduledList.data || !!scheduledList.error;
   const scheduledCount = scheduled.length + scheduledTasks.length;
@@ -136,12 +138,12 @@ export function TodosPage({ view, tab: initialTab = "now" }: { view: BotView; ta
         {tasksError ? <p role="alert" data-testid="tasks-error" className="text-sm text-destructive">{tasksError}</p> : null}
         {board.data ? <div data-testid="tasks-top" className="grid grid-cols-1 items-start gap-5 @4xl/bot-page:grid-cols-[1fr_1.15fr]">
           <TodoBoxView box={box} chat={chat} areaAsks={asksFromAreas} onOpenArea={openArea} names={names} threads={threads} targets={people.targets} now={now} zone={zone} query={searching}
-            onOpen={openTask} onOpenChat={botChat ? () => botChat.onOpen(undefined as never) : null} refresh={refresh}
+            onOpen={openTask} isOpen={isOpen} onOpenChat={botChat ? () => botChat.onOpen(undefined as never) : null} refresh={refresh}
             adding={adding ? <AddTask onAdd={add} onClose={() => setAdding(false)} /> : null} />
-          <PageInFlight nodes={flight} names={names} now={now} titleOf={titleOf} onOpen={openTask} onOpenThread={openThread} query={searching} />
+          <PageInFlight nodes={flight} names={names} now={now} titleOf={titleOf} onOpen={openTask} isOpen={isOpen} onOpenThread={openThread} query={searching} />
         </div> : tasksError ? null : <TasksLoading />}
-        <AreasSection areas={shownAreas} error={areas.error} query={searching} flight={flight} now={now} zone={zone} onOpenTask={(id, title) => openTask({ id, title })} onOpenThread={openThread} />
-        {list.data ? <DoneBar tasks={doneTasks} names={names} query={searching} now={now} zone={zone} onOpen={openTask} /> : null}
+        <AreasSection areas={shownAreas} error={areas.error} query={searching} flight={flight} now={now} zone={zone} onOpenTask={(id, title, event) => openTask({ id, title }, event)} isOpen={isOpen} onOpenThread={openThread} />
+        {list.data ? <DoneBar tasks={doneTasks} names={names} query={searching} now={now} zone={zone} onOpen={openTask} isOpen={isOpen} /> : null}
       </div> : null}
       {tab === "scheduled" && ready ? (
         <BotPageGroup title="Scheduled" count={scheduledCount} testId="tasks-scheduled">

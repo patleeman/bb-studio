@@ -11,7 +11,7 @@ export { useTaskActions } from "./actions";
 import { BotAvatar } from "../../ui/bot/BotAvatar";
 import type { Loop } from "../../loops/contract";
 import { CARD_BUTTON, CARD_GHOST, CARD_PRIMARY, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu } from "../../loops/ui/LoopMenus";
-import { dueLabel, elapsed, INLINE_OPTIONS, shortWhen, triggerLabel } from "../../loops/ui/model";
+import { dueLabel, elapsed, fullWhen, INLINE_OPTIONS, shortWhen, triggerLabel } from "../../loops/ui/model";
 import { useLoopPeople, useTodosZone, type LoopPeople } from "../../loops/ui/hooks";
 import { useCardOnScreen } from "../../work/ui/on-screen";
 import { isClosed, needsYou, TODO_ID, USER_OWNER, type Task } from "../contract";
@@ -86,7 +86,39 @@ export function OwnerBadge({ owner, names, className, task }: { owner: string; n
 
 const asLoop = (task: Task) => ({ id: task.id, title: task.title, options: task.options }) as unknown as Loop;
 
-export function TaskCardView({ view, people, refresh, chat = false, bare = false }: { view: TaskView; people: LoopPeople; refresh(): void; chat?: boolean; bare?: boolean }) {
+/** A task's facts in its detail: what it is, where it belongs, who has it, when, and the thread it lives in. */
+export function taskFacts(task: Task, names: Names, now: number, zone?: string): { label: string; value: string; testId: string }[] {
+  const status = taskStatus(task);
+  const due = task.timing.due !== null ? fullWhen(task.timing.due, now, zone) : null;
+  return [
+    { label: "Status", value: status.stale ? "Ended without a final update" : status.label, testId: "fact-status" },
+    { label: "Kind", value: taskKind(task).label, testId: "fact-kind" },
+    ...(task.area ? [{ label: "Area", value: task.area, testId: "fact-area" }] : []),
+    ...(task.project && task.project !== task.area ? [{ label: "Project", value: task.project, testId: "fact-project" }] : []),
+    { label: "Owner", value: ownerLabel(task.owner, names), testId: "fact-owner" },
+    ...(due ? [{ label: "Due", value: due, testId: "fact-due" }] : []),
+    { label: "Created", value: fullWhen(task.createdAt, now, zone), testId: "fact-created" },
+    { label: "Updated", value: fullWhen(task.updatedAt, now, zone), testId: "fact-updated" },
+    ...(task.closedAt ? [{ label: task.state === "dropped" ? "Dropped" : "Closed", value: fullWhen(task.closedAt, now, zone), testId: "fact-closed" }] : []),
+  ];
+}
+
+/** The thread a task lives in: its worker, else the thread that owns it, else the conversation it started in (the Bot's chat for the Bot's own). */
+export function linkedThread(task: Pick<Task, "owner" | "workers" | "conversation">, threads: TaskView["threads"], botThreadId: string | null, botName: string): { threadId: string; name: string } | null {
+  const ownerThread = task.owner.startsWith("thread:") ? ownerThreadId(task.owner, botThreadId, threads) : null;
+  const id = task.workers[0] ?? ownerThread ?? task.conversation ?? (task.owner === "cos" ? botThreadId : null);
+  if (!id) return null;
+  const named = threads.find((t) => t.threadId === id || t.owner === `thread:${id}`);
+  return { threadId: id, name: named?.name ?? (id === botThreadId ? `${botName}'s chat` : "Thread") };
+}
+
+/**
+ * One task, as a card. In a chat it is the task's card; in its detail (the
+ * task's side-panel tab, which every task row on the Tasks page opens) it
+ * also shows its notes in full, its facts and linked thread, and Drop and
+ * Start work. `extra` adds actions the caller owns.
+ */
+export function TaskCardView({ view, people, refresh, chat = false, bare = false, detail = false, extra }: { view: TaskView; people: LoopPeople; refresh(): void; chat?: boolean; bare?: boolean; detail?: boolean; extra?: ReactNode }) {
   const { task, history, threads } = view;
   const navigate = useBbNavigate();
   const now = useNow();
@@ -118,7 +150,12 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
   const handOff = open && targets.length ? <HandOffMenu targets={targets} disabled={busy} onHandOff={(to) => void act({ id: task.id, action: "hand_off", to })} /> : null;
   const done = (primary: boolean) => <button type="button" data-testid="task-done" className={primary ? CARD_PRIMARY : CARD_GHOST} disabled={busy} onClick={() => void act({ id: task.id, action: task.kind === "read" ? "got_it" : "done" })}><Icon name="CircleCheck" />{task.kind === "read" ? "Got it" : "Done"}</button>;
   const takeBack = <button type="button" data-testid="task-take-back" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: task.id, action: "take_back" })}><Icon name="ArrowTurnBackward" />{task.origin === "loop" || everMine(history) ? "Take back" : "Take over"}</button>;
-  const openButton = openThread ? <button type="button" data-testid="task-open-thread" className={CARD_GHOST} onClick={openThread}><Icon name="MessageSquare" />{task.owner === "cos" && !task.workers.length ? "Open chat" : "Open thread"}</button> : null;
+  const openButton = openThread && !detail ? <button type="button" data-testid="task-open-thread" className={CARD_GHOST} onClick={openThread}><Icon name="MessageSquare" />{task.owner === "cos" && !task.workers.length ? "Open chat" : "Open thread"}</button> : null;
+  const linked = detail ? linkedThread(task, threads, people.botThreadId, people.botName) : null;
+  // Start work: a queued task goes to its owner (or whoever it's handed to) through hand_off, which starts it.
+  const queued = open && !mine && task.state === "todo" && /^(cos|thread:.+)$/.test(task.owner);
+  const startWork = detail && queued ? <button type="button" data-testid="task-start" className={CARD_PRIMARY} disabled={busy} onClick={() => void act({ id: task.id, action: "hand_off", to: task.owner })}><Icon name="Play" />Start work</button> : null;
+  const drop = detail && open && !recurring ? <button type="button" data-testid="task-drop" className={CARD_GHOST} disabled={busy} onClick={() => void act({ id: task.id, action: "drop" })}><Icon name="X" />Drop</button> : null;
   let actions: ReactNode;
   if (recurring) {
     actions = openButton;
@@ -140,20 +177,23 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
       {snooze}
       {handOff}
       {openButton}
+      {drop}
     </>;
   } else {
     actions = <>
+      {startWork}
       {openButton}
       {takeBack}
       {handOff}
       {done(false)}
+      {drop}
     </>;
   }
   const stamp = closed && task.closedAt ? task.closedAt : task.updatedAt;
   return (
     <ChatCard ref={chat ? onScreen : undefined} data-testid="task-card" data-work-card-id={task.id} data-task-id={task.id} data-state={status.id} data-kind={task.kind} data-stale={task.stale || undefined}
       className={cn("studio-work-card", bare && "my-0")}>
-      <ChatCardHeader icon={kind.icon} iconClassName={closed ? TONE[status.tone] : undefined} title={task.title} onOpen={openThread}
+      <ChatCardHeader icon={kind.icon} iconClassName={closed ? TONE[status.tone] : undefined} title={detail ? <span data-testid="task-title" className="whitespace-normal [overflow-wrap:anywhere]">{task.title}</span> : task.title} onOpen={openThread}
         meta={<>
           {kind.label}
           {step ? <> · <span data-testid="task-step">{step}</span></> : null}
@@ -166,7 +206,7 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
           {openThread ? <ChatCardIconButton icon="ArrowUpRight" label={`Open ${ownerLabel(task.owner, names)}`} onClick={openThread} /> : null}
         </>} />
       <div className={cn(CHAT_CARD_BODY, "flex flex-col gap-2 pt-0")}>
-        {task.why ? <p data-testid="task-why" className="line-clamp-2 text-sm text-muted-foreground">{task.why}</p> : null}
+        {task.why ? <p data-testid="task-why" className={cn("text-sm text-muted-foreground", detail ? "whitespace-pre-wrap text-foreground/90" : "line-clamp-2")}>{task.why}</p> : null}
         <div className="flex min-w-0 items-center gap-2 text-sm">
           <OwnerBadge owner={task.owner} names={names} task={task} />
           <span aria-hidden className="text-muted-foreground">·</span>
@@ -180,8 +220,28 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
         {needsYou(task) && task.needs ? (
           <div data-testid="task-needs" className="rounded-md border border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-warning/5 px-2.5 py-1.5 text-sm text-foreground">{task.needs}</div>
         ) : null}
+        {detail ? (
+          <dl data-testid="task-facts" className="grid grid-cols-[88px_minmax(0,1fr)] gap-x-3 gap-y-1.5 border-t border-border/70 pt-2.5 text-sm">
+            {taskFacts(task, names, now, zone).map((fact) => (
+              <div key={fact.label} className="contents">
+                <dt className="text-muted-foreground">{fact.label}</dt>
+                <dd data-testid={fact.testId} className="min-w-0 text-foreground [overflow-wrap:anywhere]">{fact.value}</dd>
+              </div>
+            ))}
+            {linked ? (
+              <div className="contents">
+                <dt className="self-center text-muted-foreground">Thread</dt>
+                <dd data-testid="fact-thread" className="flex min-w-0 items-center gap-2">
+                  <span className="min-w-0 truncate text-foreground">{linked.name}</span>
+                  <button type="button" data-testid="task-open-linked" className={CARD_GHOST} aria-label={`Open ${linked.name}`} onClick={() => navigate.toThread(linked.threadId)}><Icon name="ArrowUpRight" />Open</button>
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        ) : null}
         <div data-testid="task-actions" className="flex flex-wrap items-center gap-1.5">
           {actions}
+          {extra}
           {lines.length ? (
             <button type="button" data-testid="task-history-toggle" aria-expanded={showHistory} onClick={() => setShowHistory(!showHistory)} className={cn(CARD_GHOST, "ml-auto")}>
               <Icon name={showHistory ? "ChevronDown" : "ChevronRight"} />History<span className="tabular-nums">{lines.length}</span>
@@ -256,3 +316,4 @@ export function TaskRow({ view, people, refresh }: { view: TaskView; people: Loo
     </div>
   );
 }
+

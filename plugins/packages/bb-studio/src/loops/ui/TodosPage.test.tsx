@@ -30,6 +30,7 @@ const state = vi.hoisted(() => ({
   areas: [] as unknown[],
   boardLoading: false,
   areasError: null as string | null,
+  views: {} as Record<string, unknown>,
 }));
 vi.mock("../../kit/composer", () => ({ threadComposer: (threadId: string) => state.chatOpen && threadId === "thr_bot" ? state.composer : null }));
 vi.mock("../../links/open", () => ({ openLinkFromAnywhere: state.openLink, clickModifiers: (event?: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean }) => ({ meta: !!event?.metaKey, ctrl: !!event?.ctrlKey, shift: !!event?.shiftKey }) }));
@@ -43,7 +44,7 @@ vi.mock("../../ui/live", () => ({
     const found = method === "loops.get" ? Object.values(state.groups as Record<string, Loop[]>).flat().find((each) => each.id === input?.id) : undefined;
     if (method === "loops.get" && state.getError) return { data: null, loading: false, error: state.getError, refresh: () => {} };
     if (method === "loops.get") return { data: found ? { loop: found, history: [] } : null, loading: false, error: found ? null : "Todo not found", refresh: () => {} };
-    if (method === "tasks.get") return { data: null, loading: false, error: "Task not found", refresh: () => {} };
+    if (method === "tasks.get") return state.views[input?.id ?? ""] ? { data: state.views[input!.id!], loading: false, error: null, refresh: () => {} } : { data: null, loading: false, error: "Task not found", refresh: () => {} };
     const all = [...Object.values(state.groups as Record<string, Loop[]>).flat().map(taskFromLoop), ...state.extraTasks] as Task[];
     const threads = [{ owner: "thread:thr_lead", name: "Larkspur lead", threadId: "thr_lead" }];
     const board = () => ({ ...boardRows(all, { since: NOW - 15 * 3_600_000, dir: { isWorker: (id: string) => id.startsWith("thr_w"), conversationOf: (id: string) => id, main: () => "thr_bot" } as never }), threads, workers: [{ threadId: "thr_w1", name: "Screenshot worker", status: "active", archived: false }] });
@@ -75,7 +76,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW);
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   state.chatOpen = false; state.composer.insert.mockClear(); state.composer.focus.mockClear(); state.toThread.mockImplementation(() => { state.chatOpen = true; });
-  state.call.mockClear(); state.toThread.mockClear(); state.openLink.mockClear(); state.interactions = []; state.attention = null; state.zone = null; state.extraTasks = []; state.areas = []; state.areasError = null; state.boardLoading = false;
+  state.call.mockClear(); state.toThread.mockClear(); state.openLink.mockClear(); state.interactions = []; state.attention = null; state.zone = null; state.extraTasks = []; state.areas = []; state.areasError = null; state.boardLoading = false; state.views = {};
   state.groups = {
     ...empty,
     needsYouNow: [
@@ -573,4 +574,124 @@ it("keeps an area's name whole and shortens who looks after it, and draws the pa
   const { DENSE_CARD, STUDIO_CARD_CSS } = await import("../../theme/tokens");
   expect(DENSE_CARD).toContain("[data-studio-dense-cards] [data-studio-card]");
   expect(STUDIO_CARD_CSS).toContain(`${DENSE_CARD} { background: color-mix(in oklab, var(--canvas) 88%, transparent); -webkit-backdrop-filter: blur(28px)`);
+});
+
+// Every task row on the Tasks page opens the task (one detail: its side-panel tab).
+const QUEUED = () => mk("task_queued", { title: "Desktop leftovers", owner: "thread:thr_lead", state: "todo", why: "Small fixes from 1.0.7.", area: "BB Studio", conversation: "thr_lead", timing: { due: NOW + 2 * DAY, trigger: { type: "none" }, snoozed: false } });
+const ENDED = () => mk("task_ended", { title: "Visual Chat rename: last checks", owner: "thread:thr_lead", state: "in_progress", stale: true, conversation: "thr_lead" });
+const DONE = () => mk("task_done", { title: "Reminders fix", owner: "thread:thr_lead", state: "done", closedAt: NOW - H, closedBy: "thread:thr_lead", conversation: "thr_lead" });
+const opened = () => state.openLink.mock.calls.map(([link]) => link as string);
+const viewOf = (task: Task, todo = false) => ({ task, history: [], todo, threads: [{ owner: "thread:thr_lead", name: "Larkspur lead", threadId: "thr_lead" }] });
+
+it("every task row opens the task: asks, own to-dos, an area's ask with a task, In flight (running, waiting, queued, ended, subtasks), area items and Done", async () => {
+  state.extraTasks = [...ASKS(), ...FLIGHT(), QUEUED(), ENDED(), DONE()];
+  state.areas = [
+    area("House", { open: [{ title: "Pay the Con Edison bill", since: null, sinceAt: null, needsUser: false, taskId: "loop_o" }, { title: "Porch door latch", since: null, sinceAt: null, needsUser: false, taskId: null }] }),
+    area("Studio", { open: [{ title: "Next TestFlight: your OK", since: null, sinceAt: null, needsUser: true, taskId: "task_tf" }, { title: "Desktop leftovers", since: null, sinceAt: null, needsUser: false, taskId: "task_queued" }] }),
+  ];
+  await render();
+  await act(async () => box("tasks-todo")!.querySelector<HTMLButtonElement>("[data-testid=todo-more]")!.click());
+  await act(async () => box("tasks-flight")!.querySelector<HTMLButtonElement>("[data-testid=flight-fold]")!.click());
+  await act(async () => box("tasks-done")!.querySelector<HTMLButtonElement>("[data-testid=done-toggle]")!.click());
+  const rows = [...container.querySelectorAll<HTMLButtonElement>("[data-testid=row-open], [data-testid=flight-subtask]")];
+  for (const row of rows) {
+    expect(row.tagName).toBe("BUTTON");
+    expect(row.type).toBe("button");
+    expect(row.className).toContain("hover:bg-state-hover");
+    expect(row.querySelector("[data-testid=row-open-chevron], i[data-icon=ChevronRight]")).not.toBeNull();
+    await act(async () => row.click());
+  }
+  const link = (id: string) => `bb://todo/${id}`;
+  const expected = {
+    ask: "task_ask", ownToday: "loop_n", ownLater: "loop_p", running: "task_polish", subtask: "task_shots", waitingOnTask: "task_tf", waitingOnYou: "task_duo",
+    queued: "task_queued", ended: "task_ended", areaItem: "loop_o", areaQueued: "task_queued", areaAsk: "task_tf", done: "task_done",
+  };
+  for (const [kind, id] of Object.entries(expected)) expect(opened(), kind).toContain(link(id));
+  // The area's ask with a task opens the task (not the area); every open names the task.
+  expect(state.openLink).toHaveBeenCalledWith(link("task_tf"), expect.objectContaining({ title: "Next TestFlight: your OK" }));
+  expect(state.openLink).toHaveBeenCalledWith(link("task_queued"), expect.objectContaining({ title: "Desktop leftovers" }));
+  // An area item with no task is plain text: not a button, no chevron.
+  const latch = [...container.querySelectorAll("[data-testid=area-item]")].find((each) => each.textContent?.includes("Porch door latch"))!;
+  expect(latch.querySelector("button")).toBeNull();
+  expect(latch.querySelector("[data-testid=area-item-text]")).not.toBeNull();
+});
+
+it("an In flight row opens with Enter and is a button named by the task's title; its fold toggle doesn't look like an open chevron", async () => {
+  state.extraTasks = [...FLIGHT(), QUEUED()];
+  await render();
+  const queued = box("tasks-flight")!.querySelector<HTMLElement>("[data-testid=page-flight-row][data-task-id=task_queued]")!;
+  const button = queued.querySelector<HTMLButtonElement>("[data-testid=row-open]")!;
+  expect(button.getAttribute("aria-label")).toMatch(/^Desktop leftovers, /);
+  // A button is in the tab order, and the browser turns Enter on it into a click.
+  expect(button.tabIndex).toBe(0);
+  expect(button.disabled).toBe(false);
+  await act(async () => button.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 })));
+  expect(opened()).toEqual(["bb://todo/task_queued"]);
+  const fold = box("tasks-flight")!.querySelector("[data-testid=flight-fold]")!;
+  expect(fold.querySelector("i[data-icon=ChevronRight]")).toBeNull();
+  expect(fold.querySelector("i[data-icon=ChevronDown]")).not.toBeNull();
+});
+
+it("a row with no thread still opens, and its detail shows the task's facts without a thread", async () => {
+  const own = mk("task_photos", { title: "Sort the summer photos", why: "Before the album order.", area: "Home", attention: { queue: "surfaced", push: false } });
+  state.extraTasks = [own];
+  state.views = { task_photos: viewOf(own, true) };
+  await render();
+  const row = box("tasks-todo")!.querySelector<HTMLElement>("[data-testid=todo-own][data-task-id=task_photos]")!;
+  await act(async () => row.querySelector<HTMLButtonElement>("[data-testid=row-open]")!.click());
+  expect(opened()).toEqual(["bb://todo/task_photos"]);
+  await openTab("task_photos");
+  const detail = tabHost.querySelector<HTMLElement>("[data-testid=task-detail]")!;
+  expect(detail).not.toBeNull();
+  expect(detail.textContent).toContain("Sort the summer photos");
+  expect(detail.querySelector("[data-testid=task-why]")!.textContent).toBe("Before the album order.");
+  expect(detail.querySelector("[data-testid=fact-status]")!.textContent).toBe("To do");
+  expect(detail.querySelector("[data-testid=fact-kind]")!.textContent).toBeTruthy();
+  expect(detail.querySelector("[data-testid=fact-area]")!.textContent).toBe("Home");
+  expect(detail.querySelector("[data-testid=fact-owner]")!.textContent).toBe("You");
+  expect(detail.querySelector("[data-testid=fact-created]")).not.toBeNull();
+  expect(detail.querySelector("[data-testid=fact-updated]")).not.toBeNull();
+  expect(detail.querySelector("[data-testid=fact-thread]")).toBeNull();
+});
+
+it("the detail's actions: Start work hands a queued task to its owner, Hand off to the Bot, Drop, Done, and Open goes to its thread", async () => {
+  const queued = QUEUED();
+  state.views = { task_queued: viewOf(queued) };
+  await openTab("task_queued");
+  const detail = tabHost.querySelector<HTMLElement>("[data-testid=task-detail]")!;
+  expect(detail.querySelector("[data-testid=fact-due]")).not.toBeNull();
+  expect(detail.querySelector("[data-testid=fact-thread]")!.textContent).toContain("Larkspur lead");
+  await act(async () => detail.querySelector<HTMLButtonElement>("[data-testid=task-start]")!.click());
+  expect(state.call).toHaveBeenLastCalledWith("tasks.act", { id: "task_queued", action: "hand_off", to: "thread:thr_lead" });
+  await act(async () => [...detail.querySelectorAll<HTMLButtonElement>("[role=menuitem]")].find((each) => each.textContent === "Chief of Staff")!.click());
+  expect(state.call).toHaveBeenLastCalledWith("tasks.act", { id: "task_queued", action: "hand_off", to: "cos" });
+  await act(async () => detail.querySelector<HTMLButtonElement>("[data-testid=task-drop]")!.click());
+  expect(state.call).toHaveBeenLastCalledWith("tasks.act", { id: "task_queued", action: "drop" });
+  await act(async () => detail.querySelector<HTMLButtonElement>("[data-testid=task-done]")!.click());
+  expect(state.call).toHaveBeenLastCalledWith("tasks.act", { id: "task_queued", action: "done" });
+  await act(async () => detail.querySelector<HTMLButtonElement>("[data-testid=task-open-linked]")!.click());
+  expect(state.toThread).toHaveBeenCalledWith("thr_lead");
+});
+
+it("the detail of the user's own to-do: Done, Snooze, Drop, and no Start work", async () => {
+  const own = mk("task_tax", { title: "Pay the property tax", attention: { queue: "surfaced", push: false } });
+  state.views = { task_tax: viewOf(own, true) };
+  await openTab("task_tax");
+  const detail = tabHost.querySelector<HTMLElement>("[data-testid=task-detail]")!;
+  expect(detail.querySelector("[data-testid=task-start]")).toBeNull();
+  await act(async () => detail.querySelector<HTMLButtonElement>("[data-testid=task-done]")!.click());
+  expect(state.call).toHaveBeenLastCalledWith("tasks.act", { id: "task_tax", action: "done" });
+  await act(async () => [...detail.querySelectorAll<HTMLButtonElement>("[role=menuitem]")].find((each) => each.textContent?.startsWith("Later today"))!.click());
+  expect(state.call).toHaveBeenLastCalledWith("tasks.act", { id: "task_tax", action: "snooze", snooze: "later_today" });
+  await act(async () => detail.querySelector<HTMLButtonElement>("[data-testid=task-drop]")!.click());
+  expect(state.call).toHaveBeenLastCalledWith("tasks.act", { id: "task_tax", action: "drop" });
+});
+
+it("marks the row whose task is open beside the page", async () => {
+  state.extraTasks = [QUEUED()];
+  await render();
+  const row = () => box("tasks-flight")!.querySelector<HTMLButtonElement>("[data-task-id=task_queued] [data-testid=row-open]")!;
+  expect(row().hasAttribute("aria-current")).toBe(false);
+  await act(async () => row().click());
+  expect(row().getAttribute("aria-current")).toBe("true");
 });

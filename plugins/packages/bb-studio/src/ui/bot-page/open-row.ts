@@ -1,6 +1,7 @@
 import * as sdkApp from "@get-bb/plugin-sdk/app";
 import type { JsonValue } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { refDragItem, type DragItem } from "../../kit/app/item-drag";
 import { openAppPath } from "../../kit/app/nav";
 import { clickModifiers, openLinkFromAnywhere, type CardClick } from "../../links/open";
@@ -79,7 +80,9 @@ export function useRowOpen(): (target: TabRef | string, title?: string | null) =
       onOpen: (event) => {
         if (!ref) { if (link.startsWith("/")) openAppPath(link); return; }
         setLast(link);
-        void openLinkFromAnywhere(link, { source: "botPage", title: title ?? null, modifiers: clickModifiers(event) });
+        // A row never does nothing: when the open goes nowhere (Studio still starting, an error), say so.
+        void openLinkFromAnywhere(link, { source: "botPage", title: title ?? null, modifiers: clickModifiers(event) })
+          .then((outcome) => { if (outcome.via === "none") toast.error(`Couldn't open ${title?.trim() || "it"}. ${outcome.reason}`); });
       },
     };
   }, [selected]);

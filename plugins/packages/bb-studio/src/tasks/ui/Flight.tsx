@@ -1,8 +1,11 @@
-import { useState, type ReactNode } from "react";
+import { useState, type MouseEvent, type ReactNode } from "react";
 import { Icon, cn } from "../../kit/ui/index";
 import { isClosed, USER_OWNER, type Task } from "../contract";
 import { age, countBelow, flightLook, plural, startedAt, stepProgress, waitLabel, type FlightLook, type FlightNode, type Progress, type WorkerInfo } from "./board-model";
 import { ownerShort, type Names } from "./model";
+import { noneOpen, OpenChevron, openRowClass, type IsOpen } from "./open-row";
+
+type OpenTask = (task: Task, event?: MouseEvent) => void;
 
 const LOOK_LABEL: Record<FlightLook, string> = { running: "Running", waiting: "Waiting", "needs-you": "Needs you", todo: "To do", done: "Done", failed: "Failed" };
 
@@ -83,34 +86,36 @@ export function FoldToggle({ node, open, onToggle, className }: { node: FlightNo
       className={cn("flex h-6 shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 text-2xs tabular-nums text-subtle-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring", className)}>
       <Icon name={below.workers ? "Bot" : "ListTodo"} aria-hidden className="size-3" />
       <span>{below.workers || below.subtasks}</span>
-      <Icon name={open ? "ChevronDown" : "ChevronRight"} aria-hidden className="size-3" />
+      <Icon name={open ? "ChevronUp" : "ChevronDown"} aria-hidden className="size-3" />
     </button>
   );
 }
 
-export function FlightChildren({ node, names, now, titleOf, onOpenTask, onOpenThread, depth = 1 }: { node: FlightNode; names: Names; now: number; titleOf(id: string): string | null; onOpenTask(task: Task): void; onOpenThread(threadId: string): void; depth?: number }) {
+export function FlightChildren({ node, names, now, titleOf, onOpenTask, onOpenThread, depth = 1, isOpen = noneOpen }: { node: FlightNode; names: Names; now: number; titleOf(id: string): string | null; onOpenTask: OpenTask; onOpenThread(threadId: string): void; depth?: number; isOpen?: IsOpen }) {
   const indent = 12 + depth * 16;
   return (
     <ul data-testid="flight-children" aria-label={`Under ${node.task.title}`} className="flex flex-col pb-1">
       {node.workers.map((w) => <WorkerLink key={w.threadId} worker={w} onOpen={onOpenThread} indent={indent} />)}
-      {node.children.map((child) => <FlightChild key={child.task.id} node={child} names={names} now={now} titleOf={titleOf} onOpenTask={onOpenTask} onOpenThread={onOpenThread} depth={depth} />)}
+      {node.children.map((child) => <FlightChild key={child.task.id} node={child} names={names} now={now} titleOf={titleOf} onOpenTask={onOpenTask} onOpenThread={onOpenThread} depth={depth} isOpen={isOpen} />)}
     </ul>
   );
 }
 
-function FlightChild({ node, names, now, titleOf, onOpenTask, onOpenThread, depth }: { node: FlightNode; names: Names; now: number; titleOf(id: string): string | null; onOpenTask(task: Task): void; onOpenThread(threadId: string): void; depth: number }) {
+function FlightChild({ node, names, now, titleOf, onOpenTask, onOpenThread, depth, isOpen }: { node: FlightNode; names: Names; now: number; titleOf(id: string): string | null; onOpenTask: OpenTask; onOpenThread(threadId: string): void; depth: number; isOpen: IsOpen }) {
   const text = flightText(node, names, now, titleOf);
+  const selected = isOpen(node.task.id);
   const indent = 12 + depth * 16;
   return (
     <li>
-      <button type="button" data-testid="flight-subtask" data-task-id={node.task.id} data-look={text.look} onClick={() => onOpenTask(node.task)} aria-label={text.aria}
-        style={{ paddingLeft: indent }} className="flex min-h-6 w-full min-w-0 cursor-pointer items-center gap-2 rounded-md pr-2 text-left text-xs hover:bg-state-hover focus-visible:bg-state-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+      <button type="button" data-testid="flight-subtask" data-task-id={node.task.id} data-look={text.look} onClick={(event) => onOpenTask(node.task, event)} aria-label={text.aria} aria-current={selected || undefined}
+        style={{ paddingLeft: indent }} className={openRowClass(selected, "flex min-h-6 w-full min-w-0 items-center gap-2 pr-1.5 text-xs")}>
         <FlightGlyph task={node.task} needsYou={node.row.needsYou} stalled={node.row.stalled} size={12} />
         <span className={cn("min-w-0 max-w-[55%] shrink-0 truncate", isClosed(node.task) ? "text-muted-foreground" : "text-foreground")}>{node.task.title}</span>
         <span className="min-w-0 flex-1 truncate text-subtle-foreground">{text.line}</span>
         <span className={cn("shrink-0 text-2xs", text.look === "needs-you" ? "text-warning" : "text-subtle-foreground")}>{text.right}</span>
+        <OpenChevron selected={selected} className="size-3" />
       </button>
-      {node.workers.length || node.children.length ? <FlightChildren node={node} names={names} now={now} titleOf={titleOf} onOpenTask={onOpenTask} onOpenThread={onOpenThread} depth={depth + 1} /> : null}
+      {node.workers.length || node.children.length ? <FlightChildren node={node} names={names} now={now} titleOf={titleOf} onOpenTask={onOpenTask} onOpenThread={onOpenThread} depth={depth + 1} isOpen={isOpen} /> : null}
     </li>
   );
 }
@@ -120,13 +125,14 @@ export function useFold(): [ReadonlySet<string>, (id: string) => void] {
   return [open, (id) => setOpen((before) => { const next = new Set(before); if (next.has(id)) next.delete(id); else next.add(id); return next; })];
 }
 
-export function PageFlightRow({ node, names, now, titleOf, open, onToggle, onOpenTask, onOpenThread, aside }: { node: FlightNode; names: Names; now: number; titleOf(id: string): string | null; open: boolean; onToggle(): void; onOpenTask(task: Task): void; onOpenThread(threadId: string): void; aside?: ReactNode }) {
+export function PageFlightRow({ node, names, now, titleOf, open, onToggle, onOpenTask, onOpenThread, aside, isOpen = noneOpen }: { node: FlightNode; names: Names; now: number; titleOf(id: string): string | null; open: boolean; onToggle(): void; onOpenTask: OpenTask; onOpenThread(threadId: string): void; aside?: ReactNode; isOpen?: IsOpen }) {
   const text = flightText(node, names, now, titleOf);
+  const selected = isOpen(node.task.id);
   return (
     <li data-testid="page-flight-row" data-task-id={node.task.id} data-look={text.look} className="border-t border-border/50 first:border-t-0">
       <div className="flex min-w-0 items-center gap-2">
-        <button type="button" onClick={() => onOpenTask(node.task)} aria-label={text.aria}
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-3.5 rounded-md py-2.5 pr-1 text-left hover:bg-state-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <button type="button" data-testid="row-open" onClick={(event) => onOpenTask(node.task, event)} aria-label={text.aria} aria-current={selected || undefined}
+          className={openRowClass(selected, "-ml-2 flex min-w-0 flex-1 items-center gap-3.5 py-2.5 pr-1.5 pl-2")}>
           <FlightGlyph task={node.task} needsYou={node.row.needsYou} stalled={node.row.stalled} />
           <span className="flex min-w-0 flex-1 flex-col">
             <span data-testid="flight-title" className="truncate text-sm font-medium text-foreground">{node.task.title}</span>
@@ -136,11 +142,12 @@ export function PageFlightRow({ node, names, now, titleOf, open, onToggle, onOpe
             <span data-testid="flight-right" className={cn("font-medium", text.look === "needs-you" ? "text-warning" : "text-muted-foreground")}>{text.right}</span>
             <span data-testid="flight-owner" className="max-w-40 truncate">{[text.owner, text.elapsed].filter(Boolean).join(" · ")}</span>
           </span>
+          <OpenChevron selected={selected} />
         </button>
         <FoldToggle node={node} open={open} onToggle={onToggle} />
         {aside}
       </div>
-      {open ? <FlightChildren node={node} names={names} now={now} titleOf={titleOf} onOpenTask={onOpenTask} onOpenThread={onOpenThread} /> : null}
+      {open ? <FlightChildren node={node} names={names} now={now} titleOf={titleOf} onOpenTask={onOpenTask} onOpenThread={onOpenThread} isOpen={isOpen} /> : null}
     </li>
   );
 }

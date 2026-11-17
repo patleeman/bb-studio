@@ -219,7 +219,14 @@ export class UserTasks {
     if (!AGENT.test(to)) throw new Error("Hand a task to the Bot (cos) or a thread (thread:<id>).");
     const before = this.store.get(id);
     if (isClosed(before)) throw new Error("This task is closed. Reopen it first.");
-    if (before.owner === to) return { task: before, note: null };
+    if (before.owner === to && before.state !== "todo") return { task: before, note: null };
+    if (before.owner === to) {
+      // Start work: a queued task handed to the owner it already has starts now.
+      const task = this.store.change(id, (t) => { t.state = "in_progress"; t.attention.queue = null; t.timing.snoozed = false; }, USER_OWNER);
+      this.store.event(id, "acted", { action: "start" });
+      const failed = await this.tell(to, `The user asked you to start task ${this.brief(task)} now. Read it with task_get, record progress with task_update (not status messages), close it with task_update state "done", and hand it back with task_handoff to "user" when you need them.`);
+      return { task, note: failed };
+    }
     if (to.startsWith("thread:")) {
       const thread = await this.deps.thread(to.slice(7)).catch(() => null);
       if (!thread || thread.deletedAt || thread.archivedAt) throw new Error("That thread is gone or archived. Hand the task to someone else.");
