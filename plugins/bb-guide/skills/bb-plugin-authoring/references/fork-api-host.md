@@ -146,13 +146,20 @@ finalOutput }) => ({ quiet }))`. bb asks it for every turn that finishes;
 ## Automated inputs
 
 - `bb.sdk.threads.send({ …, experimental_notice: { source, label } })`
-  sends an automated input (a watcher, a report, a check-in) that the user
-  did not type. The model gets the input as is; the turn is the system's
-  but may still ask for approvals. The thread view draws it as one quiet
-  row named by `label`: with a quiet reply (`[PASS]`) "✓ <label> ·
-  handled", which expands to the input, the steps and the reply; with a
-  real reply a quiet row above it. `source` (≤ 40) and `label` (≤ 120) are
-  one line of plain text; anything else is refused with 400.
+  sends an automated input the user did not type. `source` is one of
+  `watcher`, `runner`, `check-in`, `reminder`, `maintenance`, `resume`,
+  `schedule`, `handoff`, `keepalive`; `label` is one line, at most 120
+  characters; anything else is refused with 400. The model gets the input
+  as is.
+- Your own input is the system's turn and may still ask for approvals. One
+  sent with `senderThreadId` stays that thread's turn (approvals denied). To
+  a thread that hasn't started, the notice is dropped and the message
+  starts the thread as before.
+- The thread view draws it as one quiet row, "<source> <label> · <first
+  line>". A quiet reply (`[PASS]`) folds into it ("… · handled", which
+  expands to the input, the steps and the reply). A real reply stays a
+  message under it. An urgent (⚠) or critical input, or a failed turn, is
+  drawn in full. A quiet keepalive leaves no row.
 - Check `bb.experimental_hooks.experimental_features?.threadNotices` first:
   an older bb ignores the notice and draws the input as the user's.
 

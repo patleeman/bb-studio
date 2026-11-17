@@ -34,5 +34,5 @@ it("keeps the plugins' classifiers as a cache key of the compiled fold, so a lat
     chunk.code.indexOf("function RelayedRowFolded"),
   );
   expect(hook).toMatch(/\$\[\d+\] !== \w+\.replyClassifiers/u);
-  expect(hook).toMatch(/foldRelayedRows\([^;]*\.replyClassifiers\)/u);
+  expect(hook).toMatch(/foldRelayedRows\([^;]*\.replyClassifiers\s*[,)]/u);
 }, 60_000);
