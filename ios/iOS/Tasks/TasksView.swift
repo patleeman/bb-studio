@@ -11,6 +11,7 @@ struct TasksView: View {
     @State private var showsDone = false
     @State private var loading = false
     @State private var unfolded: Set<String> = []
+    @State private var askOpen: String?
     @FocusState private var addFocused: Bool
     @EnvironmentObject private var app: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -127,7 +128,7 @@ struct TasksView: View {
             let needs = today.filter(\.needsYou), rest = today.filter { !$0.needsYou }
             Section {
                 ForEach(needs) { row($0, tree: tree) }
-                ForEach(asks) { ask in AreaAskRow(ask: ask, open: { openArea(ask) }) }
+                ForEach(asks) { areaAsk($0) }
                 ForEach(rest) { row($0, tree: tree) }
             } header: {
                 VStack(alignment: .leading, spacing: 2) {
@@ -154,6 +155,23 @@ struct TasksView: View {
                 }
             }
         }
+    }
+
+    // An area's ask with a task opens the task's card, like every task row; one with no task opens who looks after the area.
+    @ViewBuilder
+    private func areaAsk(_ ask: AreaAsk) -> some View {
+        let open = ask.taskId != nil && askOpen == ask.id && showDetail == nil
+        VStack(alignment: .leading, spacing: 10) {
+            AreaAskRow(ask: ask, expanded: open || (ask.taskId != nil && shownDetail == ask.taskId)) {
+                guard let id = ask.taskId else { return openArea(ask) }
+                if let showDetail { return showDetail(id) }
+                withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { askOpen = open ? nil : ask.id }
+            }
+            if open, let id = ask.taskId {
+                TaskCard(id: id, expanded: true).padding(.bottom, 4)
+            }
+        }
+        .id(ask.id)
     }
 
     private func openArea(_ ask: AreaAsk) {
@@ -409,6 +427,7 @@ struct TasksBoardShape {
 
 struct AreaAskRow: View {
     let ask: AreaAsk
+    var expanded = false
     let open: () -> Void
 
     var body: some View {
@@ -428,7 +447,8 @@ struct AreaAskRow: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(AreaRules.label(ask))
-        .accessibilityHint(ask.ownerThread == nil ? "Opens the chat" : "Opens who looks after \(ask.area)")
+        .accessibilityHint(ask.taskId != nil ? (expanded ? "Hides the task card" : "Shows the task card")
+                           : ask.ownerThread == nil ? "Opens the chat" : "Opens who looks after \(ask.area)")
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier("tasks-area-ask-\(ask.areaId)")
     }
