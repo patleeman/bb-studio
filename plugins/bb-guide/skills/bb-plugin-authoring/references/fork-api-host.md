@@ -136,9 +136,12 @@ finalOutput }) => ({ quiet }))`. bb asks it for every turn that finishes;
 - `bb.sdk.threads.compact({ threadId, reason })` compacts a thread as bb
   does when you type `/compact`, but as the system's turn: no user message.
   The thread view draws it as one quiet row, "✓ Compacted · <reason>"
-  (for example "cache warming ended"). Leave `reason` out for a compaction
-  the user asked for. An older bb ignores `reason` and draws it as the
-  user's.
+  (for example "cache warming ended"), with a spinner and "Compacting…"
+  while it runs. The reason is one line of plain text, at most 200
+  characters (no line breaks, control, format or bidi characters); anything
+  else is refused with 400. The turn is quiet: no attention, push or parent
+  notice. Leave `reason` out for a compaction the user asked for. An older
+  bb ignores `reason` and draws it as the user's.
 
 ## Title rows in cards
 
