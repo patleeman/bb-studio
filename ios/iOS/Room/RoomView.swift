@@ -247,7 +247,7 @@ struct RoomView: View {
         guard phase == .active else { return }
         while !Task.isCancelled {
             await loadMorning()
-            try? await Task.sleep(for: .seconds(60))
+            try? await Task.sleep(for: EnergyGate.shared.pollDelay(.seconds(60)))
         }
     }
 
@@ -255,7 +255,7 @@ struct RoomView: View {
         guard phase == .active, tasks.supported != false else { return }
         while !Task.isCancelled {
             await tasks.loadFlight(pager.shown)
-            try? await Task.sleep(for: .seconds(20))
+            try? await Task.sleep(for: EnergyGate.shared.pollDelay(.seconds(20)))
         }
     }
 

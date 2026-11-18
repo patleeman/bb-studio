@@ -34,7 +34,7 @@ struct PhoneSceneLayout: Equatable {
     func arguments(theme: String, mode: LookTheme.Mode, scale: CGFloat, live: Bool, signals: [String: Any]?) -> [String: Any] {
         var out: [String: Any] = [
             "themeId": theme, "mode": mode.rawValue, "width": size.width, "height": size.height, "dpr": scale,
-            "live": live, "fps": LookStore.liveFPS, "column": rect(column), "open": rect(open), "cards": [rect(column)],
+            "live": live, "fps": LookStore.sceneFPS, "column": rect(column), "open": rect(open), "cards": [rect(column)],
         ]
         if let signals { out["signals"] = signals }
         if let light { out["light"] = ["x": light.x, "y": light.y, "scale": SceneLight.scale] }
@@ -174,7 +174,8 @@ enum LookHosting {
 /// The scene behind the Bot's list: a cached still that shifts a few points
 /// with tilt (a system motion effect, so it costs the app nothing while idle),
 /// or, when Live scene is on and allowed, desktop's renderer running live at a
-/// capped frame rate. Never put this behind a transcript.
+/// capped frame rate. It pauses (keeping its frame) while the app is idle or the
+/// keyboard is up. Never put this behind a transcript.
 struct SceneBackdrop: View {
     let theme: LookTheme
     var botId: String?
@@ -187,6 +188,7 @@ struct SceneBackdrop: View {
     @Environment(\.scenePhase) private var phase
     @Environment(\.displayScale) private var scale
     @ObservedObject private var store = LookStore.shared
+    @ObservedObject private var gate = EnergyGate.shared
     @State private var image: UIImage?
     @State private var hour = SceneStills.hourStamp(Date())
 
@@ -204,7 +206,7 @@ struct SceneBackdrop: View {
             ZStack {
                 Color(lookHex: theme.scene?.fallback ?? look.tokens.canvas)
                 if !stillOnly, store.liveSceneRuns(foreground: phase == .active) {
-                    LiveSceneView(theme: theme.id, mode: look.mode, size: geo.size, light: light, paused: paused, signals: SceneSignals.payload(botId: botId, view: view))
+                    LiveSceneView(theme: theme.id, mode: look.mode, size: geo.size, light: light, paused: paused || gate.idle || gate.typing, signals: SceneSignals.payload(botId: botId, view: view))
                 } else if let image = shown {
                     ParallaxImage(image: image, amount: motion ? Self.parallax : 0)
                         .frame(width: size.width, height: size.height)

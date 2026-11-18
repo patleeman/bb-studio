@@ -83,6 +83,8 @@ public final class BBClient: @unchecked Sendable {
     #if DEBUG
     /// Debug fixtures (`StateDemo`): answers for every client without its own `transport`.
     nonisolated(unsafe) public static var demoTransport: Transport?
+    /// `-qaEnergyProbe` counts every request by path.
+    nonisolated(unsafe) public static var requestProbe: (@Sendable (String) -> Void)?
     #endif
     fileprivate let session: URLSession
     fileprivate let decoder = JSONDecoder()
@@ -100,6 +102,9 @@ public final class BBClient: @unchecked Sendable {
 
     /// One raw request. Also the unit the Watch relay forwards through the phone.
     public func raw(method: String, path: String, body: Data?) async throws -> (Int, Data) {
+        #if DEBUG
+        Self.requestProbe?(path)
+        #endif
         if let transport { return try await transport(method, path, body) }
         #if DEBUG
         if let demo = Self.demoTransport { return try await demo(method, path, body) }

@@ -220,7 +220,7 @@ struct ThreadView: View {
             guard conversation != nil else { return }
             while !Task.isCancelled {
                 await loadSideThreads()
-                try? await Task.sleep(for: .seconds(10))
+                try? await Task.sleep(for: EnergyGate.shared.pollDelay(.seconds(10)))
             }
         }
         .task(id: shell == nil ? nil : model.threadId) {
@@ -233,14 +233,14 @@ struct ThreadView: View {
                 } catch where BBClient.isCancellation(error) {
                     return
                 } catch {}
-                try? await Task.sleep(for: .seconds(30))
+                try? await Task.sleep(for: EnergyGate.shared.pollDelay(.seconds(30)))
             }
         }
         .task(id: approvalsKey) {
             guard let source = approvalsSource else { return }
             while !Task.isCancelled {
                 await approvals.load(source, client: client)
-                try? await Task.sleep(for: approvals.waiting ? .seconds(5) : .seconds(30))
+                try? await Task.sleep(for: approvals.waiting ? .seconds(5) : EnergyGate.shared.pollDelay(.seconds(30)))
             }
         }
         .task(id: "\(conversation?.threadId ?? "") \(choosingModel)") {

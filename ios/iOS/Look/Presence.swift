@@ -196,7 +196,8 @@ final class PresenceStills {
 
 /// A Bot's presence. A still (rendered once and cached) while the Bot is idle or
 /// motion isn't allowed; desktop's form running live, at a capped frame rate,
-/// while it thinks, works or needs you.
+/// while it thinks, works or needs you. The live form holds still while the app
+/// is idle (`EnergyGate`) and moves again at the next touch.
 struct PresenceView: View {
     let bot: BotSpace
     let state: BotPresenceState
@@ -209,6 +210,7 @@ struct PresenceView: View {
     @Environment(\.scenePhase) private var phase
     @ObservedObject private var store = LookStore.shared
     @ObservedObject private var catalog = PresenceCatalog.shared
+    @ObservedObject private var gate = EnergyGate.shared
     @State private var image: UIImage?
     @State private var liveShown = false
 
@@ -231,7 +233,7 @@ struct PresenceView: View {
                 Circle().fill(Color(lookHex: look.tokens.presence.palette.first ?? look.tokens.accent).opacity(0.35)).padding(size * 0.2)
             }
             if live {
-                LivePresenceView(spec: spec, running: !paused) {
+                LivePresenceView(spec: spec, running: !paused && !gate.idle, fps: store.presenceFPS) {
                     withAnimation(.easeOut(duration: 0.25)) { liveShown = true }
                 }
             }
@@ -254,12 +256,14 @@ struct PresenceView: View {
 struct LivePresenceView: UIViewRepresentable {
     let spec: PresenceSpec
     var running = true
+    var fps = LookStore.liveFPS
     var shown: () -> Void = {}
 
     final class Coordinator {
         var host: LookWebView?
         var mounted: PresenceSpec?
         var running: Bool?
+        var fps: Int?
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -281,19 +285,22 @@ struct LivePresenceView: UIViewRepresentable {
         let coordinator = context.coordinator
         guard let host = coordinator.host else { return }
         let running = running
-        if coordinator.mounted != nil, coordinator.running != running {
+        let fps = fps
+        if coordinator.mounted != nil, coordinator.running != running || coordinator.fps != fps {
             coordinator.running = running
-            Task { _ = try? await host.call("BBLook.presence.setLive(live, fps)", ["live": running, "fps": LookStore.liveFPS]) }
+            coordinator.fps = fps
+            Task { _ = try? await host.call("BBLook.presence.setLive(live, fps)", ["live": running, "fps": fps]) }
         }
         guard coordinator.mounted != spec else { return }
         let reveal = coordinator.mounted == nil
         let first = reveal || coordinator.mounted?.form != spec.form || coordinator.mounted?.code != spec.code || coordinator.mounted?.size != spec.size || coordinator.mounted?.room != spec.room
         coordinator.mounted = spec
         coordinator.running = running
+        coordinator.fps = fps
         let arguments = spec.arguments
         let shown = shown
         Task { @MainActor in
-            if first { _ = try? await host.call("BBLook.presence.mount(spec, live, fps)", ["spec": arguments, "live": running, "fps": LookStore.liveFPS]) }
+            if first { _ = try? await host.call("BBLook.presence.mount(spec, live, fps)", ["spec": arguments, "live": running, "fps": fps]) }
             else { _ = try? await host.call("BBLook.presence.update(spec)", ["spec": arguments]) }
             guard reveal else { return }
             try? await Task.sleep(for: .milliseconds(120))

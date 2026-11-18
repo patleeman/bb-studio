@@ -305,9 +305,22 @@ run `node scripts/build-look.mjs` after a desktop theme or presence change
   theme's `still` time, once per theme, mode and size (and once an hour for the
   clock- and weather-driven ones), then cached (`SceneStills`). It shifts with
   tilt through a system motion effect, so an idle still costs the app nothing.
-  "Live scene" is opt-in: foreground only, never in Low Power Mode, at serious
-  thermal state or with Reduce Motion, at most 30 frames a second. A driver's
-  chosen mode (Tonight's Sky by day) switches the look, as on desktop.
+  "Live scene" is opt-in: foreground only, never in Low Power Mode, once the
+  phone is warm (thermal state fair or above) or with Reduce Motion, at 15
+  frames a second. A driver's chosen mode (Tonight's Sky by day) switches the
+  look, as on desktop.
+- **Energy.** `EnergyGate` watches touches and typing. After 30 s without
+  either the live scene and the live presence hold their frame until the next
+  touch, the scene also holds while the keyboard is up, and the room's and a
+  conversation's polls wait 3 times longer (at most 3 minutes). The scene and
+  presence loops wake once per frame they draw (`FrameClock` in
+  `Look/web/runtime.ts`), not at the display's rate. The live presence runs at
+  30 frames a second, 15 on a warm phone, and stops at serious thermal state.
+  Small looping motion (the room's spinners and Now pulse, the workers sheet's
+  spinner) are Core Animation animations at 30 fps (`LayerMotion`), so they cost
+  the app nothing per frame. Debug builds with `-qaEnergyProbe` log main-thread
+  wakeups, look web view frames and requests per minute every 10 s to stderr
+  and `Documents/energy-probe.txt`.
 - **Glass.** Liquid Glass (`glassEffect`) tinted by the theme's surface color at
   desktop's glass opacity; bare text over a scene gets desktop's halo.
 - **Presence.** All 8 forms and agent-made ones (their code from

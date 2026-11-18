@@ -36,8 +36,8 @@ struct LookSettingsView: View {
     }
 
     private var liveFooter: String {
-        var text = "Runs the scene's own animation while the app is open, at up to \(LookStore.liveFPS) frames a second. It stops in Low Power Mode, when the phone runs hot and with Reduce Motion."
-        if store.liveScene, !store.motionAllowed { text += " It is stopped now." }
+        var text = "Runs the scene's own animation while the app is open, at up to \(LookStore.sceneFPS) frames a second. It holds still after \(Int(EnergyGate.idleAfter)) seconds without a touch and while you type, and stops in Low Power Mode, once the phone gets warm and with Reduce Motion."
+        if store.liveScene, !store.liveSceneRuns(foreground: true) { text += " It is stopped now." }
         return text
     }
 

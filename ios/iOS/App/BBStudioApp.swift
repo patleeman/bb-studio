@@ -14,6 +14,8 @@ struct BBStudioApp: App {
             ServerGate()
                 .id(model.serverURL)
                 .environmentObject(model)
+                // Sees touches and typing, so idle motion and polls can rest.
+                .background(EnergyGateWatcher().accessibilityHidden(true))
                 .onOpenURL { url in
                     #if DEBUG
                     if DuoDemo.handle(url) { return }
@@ -39,6 +41,7 @@ struct BBStudioApp: App {
                 }
                 .task {
                     #if DEBUG
+                    EnergyProbe.start()
                     if BotDemo.variant == "duo" {
                         Drafts.save(BotDemo.threadId, text: "", mentions: [], serverURL: model.serverURL)
                     }
