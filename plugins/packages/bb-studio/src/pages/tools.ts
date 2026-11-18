@@ -4,6 +4,8 @@ import { z } from "zod";
 import { createThread, listThreads, reply, setResolved, type ThreadView } from "./comments";
 import { readMarkdown, type EditOp } from "./doc";
 import { shortId } from "./markdown";
+import { threadImageReader } from "./local-image-reader";
+import { skippedNote } from "./local-images";
 import { errorText, pageUrl, truncate, type PagesService } from "./service";
 import type { PageMeta } from "./store";
 
@@ -26,6 +28,7 @@ export const AGENT_INSTRUCTIONS = [
   "Pages Markdown supports GFM plus: ```chart / ```stats / ```embed fenced JSON blocks, ```mermaid diagrams, ```html blocks, `> [!NOTE]` callouts (NOTE, TIP, WARNING, CAUTION, IMPORTANT), `<details><summary>Title</summary>` … `</details>` toggles (a `## ` summary makes a toggle heading), and mentions like @[Title](page:pg_id), @[Title](item:plugin:id), @[2026-10-01](date:2026-10-01).",
   'Chart JSON: {"type":"bar|line|area|pie","title":"…","x":"label","series":["Revenue"],"unit":"$","data":[{"label":"Q1","Revenue":10}]}. Stats JSON: [{"label":"ARR","value":"$1.2M","delta":"+8%","trend":"up"}] (1–6 items). Embed JSON: {"kind":"bookmark|thread|page|drawing|artifact|recording|mini|table|item","target":"https://… or an id","title":"…"}; item targets are plugin:id from studio_list_items; a table target may be <table id>/view/<view id>; a drawing (whiteboard) embed may set "height" in pixels (160–1200).',
   "An ```html block renders its HTML in a sandboxed iframe: scripts run, but with no same-origin access (no cookies, storage or BB APIs), and don't assume network access. Keep it self-contained with inline <style> and <script>, follow light and dark with prefers-color-scheme, and keep it under 200,000 characters (longer ones show as code). Use ```html only for something to render; show HTML source as code with ```html source (or another language such as ```xml).",
+  "Images: prefer an artifact embed (save the image as an artifact, then ```embed {\"kind\":\"artifact\",\"target\":\"art_…\"}). Local image paths (`![](/…/chart.png)`) are imported into the page when supported: PNG, JPEG, GIF or WebP up to 10 MB from your thread's workspace or thread storage. The tool result names any image it couldn't import.",
   "Answer comments with pages_comment_reply in the same thread; start new threads with pages_comment on the text you are discussing.",
   'When you create or change a page, put its card on its own line in your reply, `::page{id="pg_…"}`, so the user can open it beside the chat.',
 ].join("\n");
@@ -122,7 +125,7 @@ export function registerTools(
   bb.agents.registerTool({
     name: "pages_create",
     description:
-      "Create a BB Page from Markdown (GFM plus chart/stats/embed JSON fences, mermaid, sandboxed ```html blocks, callouts and mentions). Pages belong to the current project unless global is true; set parent to nest it.",
+      "Create a BB Page from Markdown (GFM plus chart/stats/embed JSON fences, mermaid, sandboxed ```html blocks, callouts and mentions). Pages belong to the current project unless global is true; set parent to nest it. For images, prefer an artifact embed; local image paths in your thread's workspace or thread storage are imported into the page when supported (PNG, JPEG, GIF, WebP, up to 10 MB), and the result names any it couldn't import.",
     parameters: z.object({
       title: z.string().min(1).max(200),
       markdown: z.string().max(200_000).optional(),
@@ -133,23 +136,23 @@ export function registerTools(
     async execute(params, ctx) {
       const { actor } = await service.actorForThread(ctx.threadId);
       const parent = params.parent ? service.requirePage(params.parent, ctx.projectId) : null;
-      const page = service.createPage({
+      const { page, skipped } = await service.createPageImporting({
         projectId: params.global ? null : ctx.projectId,
         parentId: parent?.id ?? null,
         title: params.title,
         icon: params.icon,
         markdown: params.markdown,
         actor: actor.key,
-      });
+      }, threadImageReader(bb, ctx.threadId));
       created(page.id, ctx.threadId);
-      return `Created page "${page.title}" (id ${page.id}). The user can open it at ${pageUrl(page.id)}.\n${pageCard(page.id)}`;
+      return [`Created page "${page.title}" (id ${page.id}). The user can open it at ${pageUrl(page.id)}.`, skippedNote(skipped), pageCard(page.id)].filter(Boolean).join("\n");
     },
   });
 
   bb.agents.registerTool({
     name: "pages_edit",
     description:
-      "Edit a BB Page live with targeted operations: insert_after/insert_before/replace/delete/set_checked by block id, append/prepend, replace_text (keeps formatting), or replace_all. Markdown may use the Pages extensions, including sandboxed ```html blocks. Optionally set the title or icon. Ops apply in order as one change.",
+      "Edit a BB Page live with targeted operations: insert_after/insert_before/replace/delete/set_checked by block id, append/prepend, replace_text (keeps formatting), or replace_all. Markdown may use the Pages extensions, including sandboxed ```html blocks. Optionally set the title or icon. Ops apply in order as one change. Local image paths in the Markdown are imported into the page as with pages_create.",
     parameters: z.object({
       page: ref,
       ops: z.array(opSchema).max(100).default([]),
@@ -160,7 +163,9 @@ export function registerTools(
       const meta = service.requirePage(params.page, ctx.projectId);
       const { actor } = await service.actorForThread(ctx.threadId);
       try {
-        const result = params.ops.length ? service.edit(meta.id, params.ops as EditOp[], actor) : { changed: false, touched: [] };
+        const result = params.ops.length
+          ? await service.editImporting(meta.id, params.ops as EditOp[], actor, threadImageReader(bb, ctx.threadId))
+          : { changed: false, touched: [], skipped: [] };
         if (params.title !== undefined || params.icon !== undefined) {
           store.update(meta.id, { title: params.title, icon: params.icon }, actor.key);
           service.publish({ type: "tree", projectId: meta.project_id });
@@ -169,9 +174,9 @@ export function registerTools(
         const header = params.title !== undefined || params.icon !== undefined;
         if (!result.changed && !header) return "Nothing changed; the page already matched.";
         if (ctx.threadId) edited(meta.id, ctx.threadId);
-        return `${result.changed
+        return [result.changed
           ? `Updated "${params.title ?? meta.title}".${touched ? ` Changed blocks: ${touched}.` : ""}`
-          : "Updated the page header; the content was already as requested."}\n${pageCard(meta.id)}`;
+          : "Updated the page header; the content was already as requested.", skippedNote(result.skipped), pageCard(meta.id)].filter(Boolean).join("\n");
       } catch (error) {
         return { content: [{ type: "text", text: `Edit failed, nothing was changed: ${errorText(error)}` }], isError: true };
       }

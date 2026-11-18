@@ -1749,7 +1749,15 @@ Pages, versions, uploads, notes' threads (`page_notes`), and historical requests
 database in the BB data directory. Uploads are limited to 15 MB each and are
 served back at `/api/v1/plugins/studio/http/pages/files`; a page saved before
 the merge, with `/api/v1/plugins/pages/http/files` addresses in it, shows its
-files from Studio too. Live editing syncs over Studio's `/pages/sync`
+files from Studio too. When an agent writes a page (`pages_create`,
+`pages_edit`, `bb studio pages create|append`), each Markdown image with a
+local path inside its thread's workspace or thread storage (PNG, JPEG, GIF or
+WebP, up to 10 MB; not SVG) is copied into the page's files and its src
+rewritten to that address; the tool result names any it left as written. A
+local path left in an older page loads through `/pages/local-image`, which
+serves it only if the page names it and a thread that made, edited or chatted
+about the page can read it, and otherwise shows "Image not available".
+Live editing syncs over Studio's `/pages/sync`
 WebSocket. The editor (BlockNote, Yjs, Mermaid, Shiki, Recharts) loads the
 first time a page opens, not with Studio; the server loads pdf-lib only for a
 PDF export.

@@ -6,6 +6,7 @@ import SwiftUI
 struct MarkdownImage: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.threadId) private var threadId
+    @Environment(\.pageId) private var pageId
     let alt: String
     let src: String
     @State private var url: URL?
@@ -54,7 +55,7 @@ struct MarkdownImage: View {
 
     private func resolve() async -> URL? {
         let source = src.removingPercentEncoding ?? src
-        if let url = URL(string: src), ["http", "https"].contains(url.scheme?.lowercased()) { return url }
+        if let url = app.client.serverImageURL(src: src, pageId: pageId) { return url }
         guard let threadId else { return nil }
         if source.hasPrefix("file://") {
             return URL(string: src).flatMap { app.client.hostFileURL(threadId: threadId, path: $0.path) }
@@ -72,6 +73,25 @@ struct MarkdownImage: View {
 }
 
 extension BBClient {
+    /// An image src the server answers without a thread: a web URL; one of
+    /// its own `/api/…` addresses, such as a page's imported image; or, in a
+    /// page, a local path an older page names, which Studio resolves through
+    /// the page's threads or shows as "Image not available". Nil otherwise.
+    func serverImageURL(src: String, pageId: String?) -> URL? {
+        let trimmed = src.trimmingCharacters(in: .whitespaces)
+        if let url = URL(string: trimmed), ["http", "https"].contains(url.scheme?.lowercased()) { return url }
+        if trimmed.hasPrefix("/api/") { return URL(string: trimmed, relativeTo: baseURL)?.absoluteURL }
+        guard let pageId, trimmed.lowercased().hasPrefix("file://") || (trimmed.hasPrefix("/") && !trimmed.hasPrefix("//")) else { return nil }
+        return URL(string: Self.pageLocalImagePath(pageId: pageId, path: trimmed), relativeTo: baseURL)?.absoluteURL
+    }
+
+    /// Studio's route for a local image path in a page (plugins/…/pages/local-images.ts).
+    static func pageLocalImagePath(pageId: String, path: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
+        let encode = { (value: String) in value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value }
+        return "/api/v1/plugins/studio/http/pages/local-image?page=\(encode(pageId))&path=\(encode(path))"
+    }
+
     /// Any file on the thread's host, as BB web loads a reply's images.
     func hostFileURL(threadId: String, path: String) -> URL? {
         let name = path.split(separator: "/").last ?? ""

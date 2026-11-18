@@ -469,6 +469,16 @@ like `@[Title](page:pg_id)`, `@[Title](item:plugin:id)`,
   be `<table id>/view/<view id>`; a drawing (whiteboard) embed may set
   `"height"` in pixels (160–1200).
 
+Images: prefer an artifact embed. Save the image as an artifact
+(`apps_create` with type `"artifact"`), then embed it with
+` ```embed {"kind":"artifact","target":"art_…"} `. A Markdown image with a
+local path (`![Chart](/…/chart.png)`) is imported into the page when Studio
+supports it: a PNG, JPEG, GIF or WebP of up to 10 MB inside your thread's
+workspace or thread storage is copied into the page, so it keeps working after
+the file is gone and on the phone. Any other path stays as written and may not
+show; the `pages_create` / `pages_edit` result names each image it couldn't
+import and why.
+
 An ```html block renders its HTML in a sandboxed iframe: scripts run, but
 with no same-origin access (no cookies, storage or BB APIs), and don't assume
 network access. Keep it self-contained with inline `<style>` and `<script>`,

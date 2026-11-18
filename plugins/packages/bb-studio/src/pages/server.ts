@@ -34,6 +34,8 @@ import { PageStore } from "./store";
 import { pageProvider } from "./studio";
 import { outgoingStudioLinks } from "./studio-links";
 import { registerTools } from "./tools";
+import { pageLocalImage, threadImageReader } from "./local-image-reader";
+import { LOCAL_IMAGE_PATH } from "./local-images";
 import { Checklists } from "./checklists";
 import { pagesCli } from "./cli";
 import { registerNotes } from "./notes";
@@ -173,6 +175,28 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
         "content-type": inline ? file.mime : "application/octet-stream",
         "content-disposition": `${inline ? "inline" : "attachment"}; filename="${file.name.replace(/["\\\r\n]/g, "_")}"`,
         "content-security-policy": "sandbox",
+      });
+    },
+    { auth: "local" },
+  );
+
+  // A local image path in a page saved before imports. It is served only if
+  // the page names it and a thread that made, edited or chatted about the
+  // page can read it (its workspace or thread storage); else a placeholder.
+  bb.http.route(
+    "GET",
+    LOCAL_IMAGE_PATH,
+    async (c) => {
+      const pageId = c.req.query("page") ?? "";
+      const threads = () => [
+        ...services.threads({ pluginId: PLUGIN_ID, id: pageId }).filter((thread) => thread.state !== "deleted").map((thread) => thread.threadId),
+        ...store.chats(pageId).map((chat) => chat.thread_id),
+      ];
+      return pageLocalImage({
+        path: c.req.query("path") ?? "",
+        markdown: store.meta(pageId) ? service.currentMarkdown(pageId) : null,
+        threads,
+        reader: (threadId) => threadImageReader(bb, threadId),
       });
     },
     { auth: "local" },
@@ -445,7 +469,7 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
     resolve: (itemId) => ({ context: mentionContext(itemId) }),
   }));
 
-  const cli = pagesCli(service, created);
+  const cli = pagesCli(service, created, bb);
 
   // Notes: a thread's draft expanded into a page beside it (notes.ts).
   registerNotes(bb, {

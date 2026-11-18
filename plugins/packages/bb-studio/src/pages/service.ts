@@ -7,6 +7,7 @@ import type { PageMetaView, RequestView } from "./contract";
 import { applyEdits, commentAnchors, readMarkdown, replaceContent, restoreFromState, seedMarkdown, type EditOp, type EditResult } from "./doc";
 import { editDocument } from "./document-edit";
 import { PageHub, type Actor, type LivePage } from "./hub";
+import { loadLocalImages, replaceImageSrcs, storeImages, type ImageReader, type LoadedImage, type SkippedImage } from "./local-images";
 import { PageStore, type PageMeta, type RequestRow } from "./store";
 
 const SNAPSHOT_GAP_MS = 10 * 60_000;
@@ -106,6 +107,8 @@ export class PagesService {
     icon?: string;
     markdown?: string;
     actor: string;
+    /** Local images already read, stored as the new page's files with their srcs rewritten. */
+    images?: readonly LoadedImage[];
   }): PageMeta {
     if (input.parentId) {
       const parent = this.store.meta(input.parentId);
@@ -113,13 +116,24 @@ export class PagesService {
       input.projectId = parent.project_id;
     }
     const meta = this.store.create(input);
+    const urls = input.images?.length ? storeImages(meta.id, input.images, (...args) => this.store.addFile(...args)) : null;
     const doc = new Y.Doc();
-    seedMarkdown(doc, input.markdown ?? "");
+    seedMarkdown(doc, urls ? replaceImageSrcs(input.markdown ?? "", urls) : (input.markdown ?? ""));
     this.store.saveContent(meta.id, Y.encodeStateAsUpdate(doc), readMarkdown(doc), null);
     doc.destroy();
     this.publish({ type: "tree", projectId: meta.project_id });
     this.publish({ type: "page", pageId: meta.id });
     return this.store.meta(meta.id)!;
+  }
+
+  /**
+   * Creates a page as an agent: first copies the local images in its Markdown
+   * that `read` may read into the page's files. The rest are left as written
+   * and returned in `skipped`.
+   */
+  async createPageImporting(input: Parameters<PagesService["createPage"]>[0], read: ImageReader): Promise<{ page: PageMeta; skipped: SkippedImage[] }> {
+    const { loaded, skipped } = await loadLocalImages([input.markdown ?? ""], read);
+    return { page: this.createPage({ ...input, images: loaded }), skipped };
   }
 
   /** Reparent and move a whole subtree together, regardless of the caller. */
@@ -186,6 +200,33 @@ export class PagesService {
       this.hub.showPresence(page, actor, result.touched[0] ?? null);
     }
     return result;
+  }
+
+  /**
+   * `edit` as an agent: first copies the local images in the ops' Markdown
+   * that `read` may read into the page's files. If the edit fails, the copies
+   * go too.
+   */
+  async editImporting(pageId: string, ops: EditOp[], actor: Actor, read: ImageReader): Promise<EditResult & { skipped: SkippedImage[] }> {
+    const markdowns = ops.flatMap((op) => ("markdown" in op && typeof op.markdown === "string" ? [op.markdown] : []));
+    const { loaded, skipped } = markdowns.length ? await loadLocalImages(markdowns, read) : { loaded: [], skipped: [] };
+    if (!loaded.length) return { ...this.edit(pageId, ops, actor), skipped };
+    if (!this.store.meta(pageId)) throw new Error("Page not found.");
+    const added: string[] = [];
+    const urls = storeImages(pageId, loaded, (...args) => {
+      const id = this.store.addFile(...args);
+      added.push(id);
+      return id;
+    });
+    const rewritten = ops.map((op) => ("markdown" in op && typeof op.markdown === "string" ? { ...op, markdown: replaceImageSrcs(op.markdown, urls) } : op));
+    try {
+      const result = this.edit(pageId, rewritten, actor);
+      if (!result.changed) this.store.deleteFiles(added);
+      return { ...result, skipped };
+    } catch (error) {
+      this.store.deleteFiles(added);
+      throw error;
+    }
   }
 
   /** Applies the whole page as plain Markdown, rewriting only the blocks that changed. */

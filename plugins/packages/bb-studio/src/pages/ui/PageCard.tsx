@@ -31,7 +31,7 @@ function usePageMarkdown(id: string | null, updatedAt: number | undefined): stri
     let current = true;
     rpc.call("pages.markdown", { id }).then(
       (result) => {
-        const next = chatMarkdown(result.markdown);
+        const next = chatMarkdown(result.markdown, window.location.origin, id);
         markdowns.set(id, { updatedAt, markdown: next });
         if (current) setMarkdown(next);
       },

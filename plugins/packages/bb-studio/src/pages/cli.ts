@@ -4,10 +4,12 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { actorColor } from "./actors";
 import { HUMAN_USER_ID } from "./constants";
 import { readMarkdown } from "./doc";
+import { threadImageReader } from "./local-image-reader";
+import { skippedNote } from "./local-images";
 import { errorText, type PagesService } from "./service";
 
 /** `bb studio pages` (`bb pages` before Pages was built into Studio). `created` tells Studio an agent made a page. */
-export function pagesCli(service: PagesService, created: (pageId: string, threadId: string) => void): Parameters<BbPluginApi["cli"]["register"]>[0] {
+export function pagesCli(service: PagesService, created: (pageId: string, threadId: string) => void, bb?: Pick<BbPluginApi, "sdk">): Parameters<BbPluginApi["cli"]["register"]>[0] {
   return {
     name: "pages",
     summary: "Read and write BB Pages (collaborative documents)",
@@ -43,15 +45,20 @@ export function pagesCli(service: PagesService, created: (pageId: string, thread
             const markdown = option("--markdown")?.replace(/\\n/g, "\n");
             const title = rest.join(" ").trim();
             if (!title) return { exitCode: 1, stderr: "usage: bb studio pages create <title> [--global] [--markdown <text>]\n" };
-            const page = service.createPage({
+            const input = {
               projectId: global ? null : (ctx.projectId ?? null),
               parentId: null,
               title,
               markdown,
               actor: ctx.threadId ? `agent:${ctx.threadId}` : HUMAN_USER_ID,
-            });
+            };
+            // From a thread, its local images go into the page, as with pages_create.
+            const { page, skipped } = ctx.threadId && bb
+              ? await service.createPageImporting(input, threadImageReader(bb, ctx.threadId))
+              : { page: service.createPage(input), skipped: [] };
             if (ctx.threadId) created(page.id, ctx.threadId);
-            return { exitCode: 0, stdout: `${page.id}\n` };
+            const note = skippedNote(skipped);
+            return { exitCode: 0, stdout: `${page.id}\n`, ...(note ? { stderr: `${note}\n` } : {}) };
           }
           case "append": {
             const [ref, ...words] = rest;
@@ -60,8 +67,12 @@ export function pagesCli(service: PagesService, created: (pageId: string, thread
             const meta = service.requirePage(ref, ctx.projectId);
             // Like pages_edit: a version before the actor's first edit in a while, and its cursor.
             const actor = ctx.threadId ? (await service.actorForThread(ctx.threadId)).actor : { key: "cli", name: "CLI", color: actorColor("cli") };
-            service.edit(meta.id, [{ op: "append", markdown }], actor);
-            return { exitCode: 0, stdout: `Appended to ${meta.id}.\n` };
+            const ops = [{ op: "append" as const, markdown }];
+            const { skipped } = ctx.threadId && bb
+              ? await service.editImporting(meta.id, ops, actor, threadImageReader(bb, ctx.threadId))
+              : { ...service.edit(meta.id, ops, actor), skipped: [] };
+            const note = skippedNote(skipped);
+            return { exitCode: 0, stdout: `Appended to ${meta.id}.\n`, ...(note ? { stderr: `${note}\n` } : {}) };
           }
           default:
             return usage("bb studio pages <list|show|create|append|explore> …");

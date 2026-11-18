@@ -313,5 +313,28 @@ export function studioFileUrl(url: string): string {
   return url.startsWith(`${LEGACY_PAGE_FILES_URL}?`) ? `${PAGE_FILES_URL}${url.slice(LEGACY_PAGE_FILES_URL.length)}` : url;
 }
 
+/** Where Studio resolves a local image path in a page saved before images were imported (src/pages/local-images.ts). */
+export const PAGE_LOCAL_IMAGE_URL = "/api/v1/plugins/studio/http/pages/local-image";
+
+/**
+ * Whether an image src is an absolute local path (`/Users/…`, `file:///…`)
+ * rather than a URL or one of the app's own root-relative `/api/…` addresses.
+ */
+export function isLocalImageSrc(src: string): boolean {
+  const raw = src.trim();
+  if (/^file:\/\//i.test(raw)) return true;
+  return raw.startsWith("/") && !raw.startsWith("//") && !raw.startsWith("/api/");
+}
+
+/**
+ * The URL a page's image loads from: Studio's address for an old page file,
+ * and for a local path left in an older page, Studio's route that resolves it
+ * through the page's threads or shows "Image not available".
+ */
+export function pageImageUrl(pageId: string, src: string): string {
+  if (!isLocalImageSrc(src)) return studioFileUrl(src);
+  return `${PAGE_LOCAL_IMAGE_URL}?page=${encodeURIComponent(pageId)}&path=${encodeURIComponent(src.trim())}`;
+}
+
 /** The Next row's default preferred quick replies. */
 export const DEFAULT_REPLIES = ["👍 Looks good", "🔁 Try another way", "❓ Explain more"];
