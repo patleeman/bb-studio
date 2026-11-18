@@ -25383,6 +25383,300 @@
         "additionalProperties": false
       }
     },
+    "bot_conversations_all": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "conversations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "threadId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "isMain": {
+                  "type": "boolean"
+                },
+                "forkedFrom": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "threadId": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "threadId",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "projectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "archivedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "summary": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "latest": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "running": {
+                  "type": "boolean"
+                },
+                "needsYou": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "reason": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "reason",
+                        "at"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "failed": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "threadId",
+                "title",
+                "isMain",
+                "forkedFrom",
+                "projectId",
+                "updatedAt",
+                "archivedAt",
+                "summary",
+                "latest",
+                "running",
+                "needsYou",
+                "failed"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "workers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "threadId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "running",
+                    "needs-you",
+                    "failed",
+                    "done"
+                  ]
+                },
+                "ownerConversationId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ownerTitle": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "projectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "tag": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "branch": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "mirrored": {
+                  "type": "boolean"
+                },
+                "sameTitle": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "threadId",
+                "title",
+                "status",
+                "ownerConversationId",
+                "ownerTitle",
+                "projectId",
+                "updatedAt",
+                "tag",
+                "branch",
+                "mirrored",
+                "sameTitle"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "botId",
+          "conversations",
+          "workers"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bot_conversations_search": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "hits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "threadId": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "conversation",
+                    "worker"
+                  ]
+                },
+                "field": {
+                  "type": "string",
+                  "enum": [
+                    "title",
+                    "summary",
+                    "message"
+                  ]
+                },
+                "snippet": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "threadId",
+                "kind",
+                "field",
+                "snippet"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "indexing": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "hits",
+          "indexing"
+        ],
+        "additionalProperties": false
+      }
+    },
     "bot_thread_info": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

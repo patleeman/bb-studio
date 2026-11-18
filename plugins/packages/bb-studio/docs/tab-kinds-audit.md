@@ -36,7 +36,7 @@ as it).
 | Library | added | added | added | added | had |
 | Scheduled | n/a [3] | n/a [4] | added | added | had |
 | Tasks | added | added | added | added | had |
-| Archive | added | added | added | added | had |
+| Conversations | added | added | added | added | had |
 | Automation | added | n/a [5] | added | added | added |
 | Task | added | n/a [6] | added | added | added |
 | Memory record | added | n/a [7] | added | added | added |
@@ -77,7 +77,7 @@ as it).
   New Tab search lists them under Automations, Todos and Memory records
   (one heading per plural, shared with the page of that name); they are
   dragged from their page's rows.
-- Memory, Library, Automations, Todos, the Archive and VS Code are one page
+- Memory, Library, Automations, Todos, Conversations and VS Code are one page
   each. Their Recent rows are this window's record of when they were last
   opened (`src/ui/opened-tabs.ts`); the server keeps no recency for them.
 - A Visual Chat board is Visual Chat's own tab (`board`) and a workflow run
@@ -92,7 +92,7 @@ as it).
   not.
 - The New Tab Actions sit under two headings (`experimental_newTabGroup`):
   **New** (Conversation, Page, Whiteboard, Design, App) and
-  **Open** (Conversation, Page, Memory, Library, Automations, Todos, Archive,
+  **Open** (Conversation, Page, Memory, Library, Automations, Todos, Conversations,
   VS Code), titled by the kind's name. bb's action search lists matches under
   its own Actions heading, where each tooltip says "New page" or "Open page".
 - Nothing here was checked in a running BB.

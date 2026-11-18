@@ -171,6 +171,8 @@ public enum Studio {
     public static let bot_spaces = "bot_spaces"
     public static let bot_threads_view = "bot_threads_view"
     public static let bot_threads_older = "bot_threads_older"
+    public static let bot_conversations_all = "bot_conversations_all"
+    public static let bot_conversations_search = "bot_conversations_search"
     public static let bot_thread_info = "bot_thread_info"
     public static let bot_landing = "bot_landing"
     public static let bot_focus = "bot_focus"
@@ -773,6 +775,10 @@ public enum Studio {
   public typealias BotThreadsView = BotThreadsViewOutput
 
   public typealias BotThreadsOlder = BotThreadsOlderOutput
+
+  public typealias BotConversationsAll = BotConversationsAllOutput
+
+  public typealias BotConversationsSearch = BotConversationsSearchOutput
 
   public typealias BotThreadInfo = BotThreadInfoOutput
 
@@ -19413,6 +19419,219 @@ public enum Studio {
       self.conversations = conversations
       self.workers = workers
       self.finished = finished
+    }
+  }
+
+  public struct BotConversationsAllInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct BotConversationsAllOutputConversationsItemForkedFrom: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+
+    public init(threadId: String? = nil, title: String? = nil) {
+      self.threadId = threadId
+      self.title = title
+    }
+  }
+
+  public struct BotConversationsAllOutputConversationsItemNeedsYou: Sendable, Hashable, Codable {
+    public var reason: String?
+    public var at: Double?
+
+    public init(reason: String? = nil, at: Double? = nil) {
+      self.reason = reason
+      self.at = at
+    }
+  }
+
+  public struct BotConversationsAllOutputConversationsItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var isMain: Bool?
+    public var forkedFrom: BotConversationsAllOutputConversationsItemForkedFrom?
+    public var projectId: String?
+    public var updatedAt: Double?
+    public var archivedAt: Double?
+    public var summary: String?
+    public var latest: String?
+    public var running: Bool?
+    public var needsYou: BotConversationsAllOutputConversationsItemNeedsYou?
+    public var failed: Bool?
+
+    public init(threadId: String? = nil, title: String? = nil, isMain: Bool? = nil, forkedFrom: BotConversationsAllOutputConversationsItemForkedFrom? = nil, projectId: String? = nil, updatedAt: Double? = nil, archivedAt: Double? = nil, summary: String? = nil, latest: String? = nil, running: Bool? = nil, needsYou: BotConversationsAllOutputConversationsItemNeedsYou? = nil, failed: Bool? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.isMain = isMain
+      self.forkedFrom = forkedFrom
+      self.projectId = projectId
+      self.updatedAt = updatedAt
+      self.archivedAt = archivedAt
+      self.summary = summary
+      self.latest = latest
+      self.running = running
+      self.needsYou = needsYou
+      self.failed = failed
+    }
+  }
+
+  public enum BotConversationsAllOutputWorkersItemStatus: Sendable, Hashable, Codable {
+    case running
+    case needs_you
+    case failed
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "running": self = .running
+      case "needs-you": self = .needs_you
+      case "failed": self = .failed
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .running: try container.encode("running")
+      case .needs_you: try container.encode("needs-you")
+      case .failed: try container.encode("failed")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotConversationsAllOutputWorkersItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var status: BotConversationsAllOutputWorkersItemStatus?
+    public var ownerConversationId: String?
+    public var ownerTitle: String?
+    public var projectId: String?
+    public var updatedAt: Double?
+    public var tag: String?
+    public var branch: String?
+    public var mirrored: Bool?
+    public var sameTitle: Int?
+
+    public init(threadId: String? = nil, title: String? = nil, status: BotConversationsAllOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.status = status
+      self.ownerConversationId = ownerConversationId
+      self.ownerTitle = ownerTitle
+      self.projectId = projectId
+      self.updatedAt = updatedAt
+      self.tag = tag
+      self.branch = branch
+      self.mirrored = mirrored
+      self.sameTitle = sameTitle
+    }
+  }
+
+  public struct BotConversationsAllOutput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var conversations: [BotConversationsAllOutputConversationsItem]?
+    public var workers: [BotConversationsAllOutputWorkersItem]?
+
+    public init(botId: String? = nil, conversations: [BotConversationsAllOutputConversationsItem]? = nil, workers: [BotConversationsAllOutputWorkersItem]? = nil) {
+      self.botId = botId
+      self.conversations = conversations
+      self.workers = workers
+    }
+  }
+
+  public struct BotConversationsSearchInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var query: String?
+
+    public init(botId: String? = nil, query: String? = nil) {
+      self.botId = botId
+      self.query = query
+    }
+  }
+
+  public enum BotConversationsSearchOutputHitsItemKind: Sendable, Hashable, Codable {
+    case conversation
+    case worker
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "conversation": self = .conversation
+      case "worker": self = .worker
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .conversation: try container.encode("conversation")
+      case .worker: try container.encode("worker")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotConversationsSearchOutputHitsItemField: Sendable, Hashable, Codable {
+    case title
+    case summary
+    case message
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "title": self = .title
+      case "summary": self = .summary
+      case "message": self = .message
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .title: try container.encode("title")
+      case .summary: try container.encode("summary")
+      case .message: try container.encode("message")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotConversationsSearchOutputHitsItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var kind: BotConversationsSearchOutputHitsItemKind?
+    public var field: BotConversationsSearchOutputHitsItemField?
+    public var snippet: String?
+
+    public init(threadId: String? = nil, kind: BotConversationsSearchOutputHitsItemKind? = nil, field: BotConversationsSearchOutputHitsItemField? = nil, snippet: String? = nil) {
+      self.threadId = threadId
+      self.kind = kind
+      self.field = field
+      self.snippet = snippet
+    }
+  }
+
+  public struct BotConversationsSearchOutput: Sendable, Hashable, Codable {
+    public var hits: [BotConversationsSearchOutputHitsItem]?
+    public var indexing: Bool?
+
+    public init(hits: [BotConversationsSearchOutputHitsItem]? = nil, indexing: Bool? = nil) {
+      self.hits = hits
+      self.indexing = indexing
     }
   }
 

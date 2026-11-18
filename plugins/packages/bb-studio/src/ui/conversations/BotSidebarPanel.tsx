@@ -1,8 +1,9 @@
 // The Bot sidebar (round 7, "the Bot as a space"): one Bot per sidebar.
 // - Top, sticky: the Bot's space header (SpaceHeader.tsx): avatar, name, its
 //   status (running count, Paused), a ··· menu (Edit <name>…, Bot settings…, Default model
-//   with bb's model picker, Archive: the older page, New Bot), and
-//   its pages as rows (Memory, Skills, Library, Todos). Edit space
+//   with bb's model picker, New Bot), and its pages as rows (Memory,
+//   Skills, Library, Todos, Conversations: every conversation, active and
+//   archived, with search; OlderPage.tsx). Edit space
 //   (EditSpace.tsx) covers the main view, or takes the lists' place where
 //   BB has none.
 // - Conversations, with "+ New" (BB's ghost button; BB's new-thread composer on
@@ -36,7 +37,7 @@ import { cn } from "../../kit/ui/utils";
 import { usePathname } from "../../kit/app/route";
 import { BotPresence } from "../../presence/ui/BotPresence";
 import { useCall, useLive } from "../live";
-import { conversationLines, doneLabel, hiddenThreadTarget, isOlderPage, landingThread, olderLabel, olderPath, secondLine, shortAge, spaceDots, splitWorkers, swipeStep, switchTarget, SWIPE_START, workerLines, type ConversationLine, type LiveThread, type WorkerLine } from "./model";
+import { conversationLines, doneLabel, hiddenThreadTarget, landingThread, olderPath, secondLine, shortAge, spaceDots, splitWorkers, swipeStep, switchTarget, SWIPE_START, workerLines, type ConversationLine, type LiveThread, type WorkerLine } from "./model";
 import { currentBot, hasLanded, isLaunchPage, lastConversation, markLanded, newThreadAsked, rememberConversation, setBotSwitcher, setCurrentBot, setConversationStarter, setFocusHandler, setThreadOpener, useCurrentBot, watchNewThreadArrivals } from "./state";
 
 import { MEMORY_SUBPATH } from "../../memory/shared";
@@ -189,7 +190,6 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const view = useLive("bot_threads_view", bot ? { botId: bot.id } : {}, { enabled: !!bot, pollMs: 15_000 });
   const sidebar = experimental_useSidebarThreads();
   const pathname = usePathname();
-  const olderOpen = isOlderPage(pathname);
   const page = spacePageAt(pathname);
   const list = useLive("bot_list", {}, { pollMs: 60_000 });
   const welcome = useLive("bot_welcome", {}, { enabled: !!spaces.data && !bots.length, pollMs: 2_000 });
@@ -360,6 +360,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
     else if (next === "skills") toPanel(skillsPagePath(bot.id));
     else if (next === "library") toPanel();
     else if (next === "automations") { navigate.toPluginPanel("automations"); onNavigate(); }
+    else if (next === "conversations") toPanel(olderPath(bot.id));
     else openAppPathTo(loopsPath(bot.id));
   };
   const openAppPathTo = (path: string) => { navigate.toPluginPanel("studio", { subPath: path.replace(/^\/plugins\/studio\/studio\/?/, "") }); onNavigate(); };
@@ -386,7 +387,6 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
           editSpace: () => { if (bot) setEditing(bot.id); },
           botSettings: () => { if (bot) toPanel(`bot/${encodeURIComponent(bot.id)}/controls`); },
           defaultModel: () => { if (bot) setPickingModel(bot.id); },
-          archive: () => { if (bot) toPanel(olderPath(bot.id)); },
           newBot: () => toPanel("bot/new"),
         }} />
       {editingBot ? <EditSpace key={editingBot.id} bot={editingBot} bots={bots} stage={stage} onClose={() => setEditing(null)} /> : null}
@@ -399,7 +399,6 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
         </div>
         {conversations.map((row) => <ConversationRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} />)}
         {data && !conversations.length ? <Note>No conversations yet</Note> : null}
-        {data && olderLabel(data.olderConversations, "conversation") ? <OlderRow testId="older-conversations" open={olderOpen} label={olderLabel(data.olderConversations, "conversation")!} onOpen={() => toPanel(olderPath(bot?.id ?? null))} botId={bot?.id ?? null} /> : null}
         {!data && view.error ? <Note>{view.error}</Note> : null}
       </section>
       <section aria-label="Workers" data-testid="workers" className="flex flex-col pb-2">
@@ -428,15 +427,6 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
         <SpaceDots bots={bots} current={bot?.id ?? null} onSwitch={switchTo} onNew={() => toPanel("bot/new")} onEdit={(botId) => { switchTo(botId); setEditing(botId); }} accents={accents} themes={themes} themeOf={themeOf} onTheme={applyTheme} />
       </footer>}
     </nav>
-  );
-}
-
-/** The quiet last row of a list: "N older conversations", opening the list in the main view; selected while that list is open. */
-/** "N older conversations": the Archive's row, which drags as the Archive (src/tab-kinds.ts). */
-function OlderRow({ testId, label, open, onOpen, botId }: { testId: string; label: string; open: boolean; onOpen(): void; botId: string | null }) {
-  return (
-    <button type="button" data-testid={testId} onClick={onOpen} aria-current={open ? "page" : undefined} {...dragSourceProps(refDragItem({ kind: "archive", id: botId }, "Archive"))}
-      className="flex h-7 w-full items-center rounded-md px-2 text-left text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none aria-[current=page]:bg-state-active aria-[current=page]:text-foreground">{label}</button>
   );
 }
 

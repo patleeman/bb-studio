@@ -390,7 +390,7 @@ change nothing.
   opens a conversation, worker, board (thread `id`), a page, whiteboard,
   design, app, artifact or recording (its `id`), a Bot (its `id`),
   Memory, the Library, Tasks (its Scheduled & recurring list holds your check-ins,
-  reminders, watchers and runners; `automations` opens it there), the Archive (a Bot `id`, or none for the Bot
+  reminders, watchers and runners; `automations` opens it there), the Conversations page (`archive`: a Bot `id`, or none for the Bot
   on screen), one automation (`type: "automation"`, `id`
   `<botId>:<row id>`, or `bb://automation/<botId>:<row id>`), one task
   (`type: "todo"`, its `loop_…` or `task_…` id, or `bb://todo/loop_…`), one memory

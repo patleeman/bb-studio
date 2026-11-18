@@ -504,14 +504,14 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   nothing; and **···**: **Edit <name>…**, **Bot settings…** (the Bot's
   Controls page), **Default model** (bb's provider
   and model picker in a small dialog, see Default model below),
-  **Archive** (the older page, `/plugins/studio/studio/conversations/<botId>`),
   then New Bot. Bot info and
   Controls are on the Info tab's Bot block (Pause, Resume and Stop in its
   icon group). Under it, the Bot's pages as rows:
   **Memory** (`/plugins/studio/studio/memory/<botId>`), **Library**
   (`/plugins/studio/studio`) and, for the primary Bot with Todos on, **Todos**
   (`/plugins/studio/studio/bot/<botId>/loops`) with what needs you now and,
-  under **Scheduled**, what runs when. The
+  under **Scheduled**, what runs when, then **Conversations**
+  (`/plugins/studio/studio/conversations/<botId>`, below). The
   row of the page on screen is selected. The header is clickable in the
   desktop app (no window drag).
 - **Conversations**, with **+ New** (BB's own new-thread composer,
@@ -525,8 +525,7 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   "Needs you: <reason>" on its second line. The row on screen is
   highlighted; right-click for BB's thread menu (**Archive** keeps a summary;
   see Archiving a conversation). Listed: Main always, and the others active in the last
-  14 days, working, or needing you; the rest are counted in a quiet last row,
-  "N older conversations".
+  14 days, working, or needing you; the rest are on the Conversations page.
 - **Workers**: the running ones and those waiting on you (up to 30), one
   line each: a status glyph, the title (at least 60% of the row), the repo
   or worktree it runs in as a small chip (72px at most) and a short time.
@@ -534,20 +533,29 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   last 2; workers of one title folded into one row, "×5") fold into one
   row, "N done", which opens them in place and closes them again (it opens
   by itself when the worker on screen is one of them). Older workers have no
-  row: they are on the Archive page (the ··· menu); "No workers" with none. A worker
+  row: they are on the Conversations page; "No workers" with none. A worker
   never asks you itself: the Bot raises it in the worker's conversation.
 - A worker or conversation mirrored from bb shows bb's live state (running,
   waiting for an approval or an answer, failed, done): BB Studio reads it,
   read-only, from bb's database (`src/mirror-live.ts`), since the copy here
   is always idle.
-- **Archive** (the ··· menu) and the "N older conversations" row open the **Archive** in the main view
-  (`/plugins/studio/studio/conversations/<botId>`), newest first: the older
-  and finished conversations (finished ones with **Reopen**) and the older
-  workers (a failure older than 7 days is grey, not red), one line each with
-  its status and age. Search and the pills (Conversations, Workers, Failed)
-  narrow it. A row opens its thread as a conversation tab in the workbench
-  beside the Archive (Shift-click: a window). The row that opened it stays
-  selected while it is open.
+- **Conversations** (the row under the Bot's pages) opens the
+  **Conversations** page in the main view
+  (`/plugins/studio/studio/conversations/<botId>`): every conversation of the
+  Bot, under **Active** (Main, then by last activity) and **Archived** (by
+  last activity, each with **Reopen**), then its workers (a failure older
+  than 7 days is grey, not red). A conversation's row has its title and age,
+  then its summary's first line or two (what finishing it wrote, or the
+  summary it saved to memory), else why it needs you, else its latest reply.
+  The pills (All, Active, Archived, Workers, Failed) narrow it. **Search**
+  matches titles at once and, after a short pause, the conversations'
+  summaries and messages (`bot_conversations_search`): every word, by its
+  start; a hit shows the matching line in place of the summary, the words
+  set off. Studio keeps the conversations' messages itself
+  (`src/conversation-text.ts`): BB's thread search skips hidden threads,
+  and a Bot's Main is hidden. A row opens its thread as a conversation tab
+  in the workbench beside the page (Shift-click: a window). The row stays
+  selected while the page is open.
 - **At the bottom**, pinned however long the lists are (the panel grows
   with its rows and the footer is sticky in BB's scrolling sidebar): each
   Bot's own icon, the shown one highlighted, an amber mark on a Bot with a
@@ -1055,7 +1063,7 @@ result open the document in the workbench beside the conversation.
 
 ### Library
 
-A Bot's pages (Todos, Memory, Library and the Archive) share
+A Bot's pages (Todos, Memory, Library and Conversations) share
 one template (`src/ui/bot-page`): one header row, "<Page> · <Bot>", in BB's
 title bar in place of the panel's "Library" label (`src/ui/page-bar.tsx`),
 where the Bot's name opens the Bot's page; then one column of the same width
@@ -1113,7 +1121,7 @@ Search page of its own.
 **Tab kinds.** Everything that can be a tab beside a conversation is one
 registry, `src/tab-kinds.ts`: Conversation, Worker, Bot; Page, Whiteboard,
 Design, App, Artifact, Recording; Visual Chat board; Memory,
-Library, Scheduled (the Todos page), Todos, Archive; VS Code; and bb's own File, Diff,
+Library, Scheduled (the Todos page), Todos, Conversations; VS Code; and bb's own File, Diff,
 Browser, Terminal and Workflow run. Each kind has its name, icon, the tab that
 shows it, its address, where its recent rows come from and whether it has a
 sidebar row. The New Tab page, Recent, drag and drop, the agent's
@@ -1139,15 +1147,14 @@ The page's Actions are Studio's action tabs under two headings
 Conversation, Page, Whiteboard, Design, App (a conversation starts
 in the main view on the Bot's + New page; the rest open as a tab). **Open**:
 Conversation (a picker for any thread, Bot or item), Page (the item list),
-Memory, Library, Todos, Archive and VS Code. Each tooltip says
+Memory, Library, Todos, Conversations and VS Code. Each tooltip says
 "New page" or "Open page", for bb's action search, which lists matches under
 its own Actions heading. Bot, Side thread, New thread and the thread's
 own Scheduled tab stay off the list (`experimental_showInNewTab: false`);
 other controls open them.
 
 **Drag and drop into the workbench.** Conversation and worker rows, the Bot
-page rows (Memory, Library, Todos, and the Archive's "older"
-row), the Bot switcher's icons, Library rows and links in replies carry the
+page rows (Memory, Library, Todos, Conversations), the Bot switcher's icons, Library rows and links in replies carry the
 shared drag payload, and so does every New Tab Recent and search row
 (`experimental_dragItem`, which bb writes). Dropped on a pane's tab strip, the thing opens as a tab
 at that place; dropped on the workbench's right edge, it opens in a second
@@ -1226,7 +1233,7 @@ BB's rail holds only global things (round 7): Threads, Search, Skills,
 Plugins, Settings. Studio adds nothing to it. Its pages are nav panels with
 BB's `experimental_hideFromNavigation: true`: a route, and no rail icon,
 More entry, Customize row or command palette entry. They are the Library and the Bot's pages
-under it (`studio/studio`: Memory, Bot info, Controls, Todos, Archive),
+under it (`studio/studio`: Memory, Bot info, Controls, Todos, Conversations),
 the Todos page (`studio/automations`, titled Todos) and VS Code (`studio/vscode`); Visual
 Chat's page is off the rail too. The Bot sidebar's page rows open them. Only
 the BB Studio fork gets the field: stock BB refuses a nav panel with an
@@ -1364,6 +1371,20 @@ once, since signals sent while the socket was down are lost.
   what `bot_threads_view` leaves out (including a folded row's older
   namesakes), newest first, and the finished conversations, newest first
   (up to 200).
+- `bot_conversations_all({ botId? })` → `{ botId, conversations:
+  PageConversation[], workers: Worker[] }`: the Conversations page. Every
+  conversation, the active ones first (Main, then by activity), then the
+  archived ones by activity (up to 500), and the workers that aren't
+  archived. `PageConversation` is `{ threadId, title, isMain, forkedFrom: {
+  threadId, title } | null, projectId, updatedAt, archivedAt, summary,
+  latest, running, needsYou, failed }`; `summary` is the first line or two
+  of its summary, null without one.
+- `bot_conversations_search({ botId?, query })` → `{ hits: { threadId,
+  kind: "conversation" | "worker", field: "title" | "summary" | "message",
+  snippet }[], indexing }`: the conversations whose title, summary or
+  messages have every word of `query` (each a prefix), with one line around
+  the match; and the workers whose messages BB's search finds. `indexing`:
+  some conversations' messages aren't read yet.
 - `bot_thread_info({ threadId })` → `{ info: Info | null }`. `Info` is `{
   threadId, botId, botName, kind: "conversation" | "worker", isMain, title,
   forkedFrom, owner: { threadId, title } | null, status, waitingOn: "approval" |
@@ -3310,7 +3331,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
 
   ![Staged Bot info → Skills with the system-report skill's history expanded and Revert visible. Saves apply immediately; there is no Waiting for approval state.](assets/bot-skills.png)
 - **Recall**: `bot_history_search` searches BB's thread search, keeping
-  only the Bot's threads (its handoff chain and threads it started).
+  only the Bot's threads (its handoff chain and threads it started). BB's
+  search skips hidden threads; the Conversations page's search reads the
+  conversations' messages itself.
 - **Phone**: questions and approvals it, or a thread it started, raises push
   with Answer / Approve as before; every finished turn, the Bot's messages
   included, now pushes with **Reply**, which sends to the thread
