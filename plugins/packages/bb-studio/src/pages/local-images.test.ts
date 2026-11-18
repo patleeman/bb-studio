@@ -3,10 +3,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isLocalImageSrc, PAGE_FILES_URL, PAGE_LOCAL_IMAGE_URL, pageImageUrl } from "../kit/pages-contract";
 import { HUMAN_USER_ID } from "./constants";
-import { pageLocalImage, threadImageReader } from "./local-image-reader";
+import { OlderPageImages, readFromRoots, threadImageReader, writerThreads } from "./local-image-reader";
 import {
   LOCAL_IMAGE_URL,
   MAX_IMAGE_BYTES,
@@ -269,31 +269,123 @@ describe("older pages with local paths", () => {
     expect(pageImageUrl("pg_a", "/api/v1/plugins/pages/http/files?id=file_1")).toBe(`${PAGE_FILES_URL}?id=file_1`);
   });
 
-  it("serves an image the page names through a thread linked to the page, else a placeholder", async () => {
-    const { sdk } = fakeSdk({ thr_other: { workspace: null, storage: join(dir, "other") }, thr_writer: { workspace, storage } });
+  const unavailable = async (response: Response) => {
+    expect(response.headers.get("x-bb-image")).toBe("unavailable");
+    expect(response.headers.get("content-type")).toBe("image/svg+xml");
+    expect(await response.text()).toContain("Image not available");
+  };
+
+  /** An OlderPageImages over real files, counting folder lookups and reads, on a clock the test moves. */
+  function older(folders: Record<string, { projectId: string | null; workspace: string | null; storage: string }>) {
+    const { sdk } = fakeSdk();
+    const calls = { folders: 0, reads: 0 };
+    let now = 1_000_000;
+    const images = new OlderPageImages({
+      folders: async (threadId) => {
+        calls.folders++;
+        const thread = folders[threadId];
+        if (!thread) throw new Error("no such thread");
+        return { projectId: thread.projectId, roots: [
+          ...(thread.workspace ? [{ kind: "workspace" as const, hostId: "host_a", path: thread.workspace }] : []),
+          { kind: "storage" as const, hostId: "host_a", path: thread.storage },
+        ] };
+      },
+      read: (roots, path) => {
+        calls.reads++;
+        return readFromRoots({ sdk } as never, roots, path);
+      },
+      now: () => now,
+    });
+    return { images, calls, tick: (ms: number) => { now += ms; } };
+  }
+
+  it("uses only the threads that made or edited the page", () => {
+    expect(writerThreads([
+      { threadId: "thr_made", role: "created", state: "idle" },
+      { threadId: "thr_edit", role: "edited", state: "working" },
+      { threadId: "thr_chat", role: "chat", state: "idle" },
+      { threadId: "thr_check", role: "checklist", state: "idle" },
+      { threadId: "thr_notes", role: "notes", state: "idle" },
+      { threadId: "thr_gone", role: "edited", state: "deleted" },
+      { threadId: "thr_made", role: "edited", state: "idle" },
+    ])).toEqual(["thr_made", "thr_edit"]);
+  });
+
+  it("serves an image the page names through a writer thread in the page's project, else a placeholder", async () => {
     const source = join(storage, "old.png");
     writeFileSync(source, PNG);
     writeFileSync(join(outside, "secret.png"), PNG);
-    const reader = (threadId: string) => threadImageReader({ sdk } as never, threadId);
     const markdown = `![Old](${source})\n\n![Secret](${join(outside, "secret.png")})\n`;
-    const serve = (path: string, threads: string[], page: string | null = markdown) => pageLocalImage({ path, markdown: page, threads: () => threads, reader });
+    const { images } = older({
+      thr_writer: { projectId: "proj_a", workspace, storage },
+      thr_other_project: { projectId: "proj_b", workspace, storage },
+      thr_empty: { projectId: "proj_a", workspace: null, storage: join(dir, "other") },
+    });
+    const serve = (path: string, threads: string[], extra: { projectId?: string | null; markdown?: string | null; pageId?: string } = {}) =>
+      images.serve({ pageId: extra.pageId ?? "pg_a", projectId: extra.projectId === undefined ? "proj_a" : extra.projectId, path, markdown: extra.markdown === undefined ? markdown : extra.markdown, threads });
 
-    const ok = await serve(source, ["thr_other", "thr_writer"]);
+    const ok = await serve(source, ["thr_empty", "thr_writer"]);
     expect(ok.headers.get("content-type")).toBe("image/png");
     expect(new Uint8Array(await ok.arrayBuffer())).toEqual(PNG);
+    // A global page has no project to match.
+    expect((await serve(source, ["thr_other_project"], { pageId: "pg_global", projectId: null })).headers.get("content-type")).toBe("image/png");
 
-    const unavailable = async (response: Response) => {
-      expect(response.headers.get("x-bb-image")).toBe("unavailable");
-      expect(response.headers.get("content-type")).toBe("image/svg+xml");
-      expect(await response.text()).toContain("Image not available");
-    };
-    // No linked thread can read it, the page doesn't name it, or there's no page.
-    await unavailable(await serve(source, ["thr_other"]));
+    // A thread in another project, one that can't read it, a path the page doesn't name, or no page.
+    await unavailable(await serve(source, ["thr_other_project"], { pageId: "pg_b" }));
+    await unavailable(await serve(source, ["thr_empty"], { pageId: "pg_c" }));
     await unavailable(await serve(join(outside, "secret.png"), ["thr_writer"]));
     await unavailable(await serve(join(storage, "unnamed.png"), ["thr_writer"]));
-    await unavailable(await serve(source, ["thr_writer"], null));
+    await unavailable(await serve(source, ["thr_writer"], { pageId: "pg_d", markdown: null }));
     rmSync(source);
-    await unavailable(await serve(source, ["thr_writer"]));
+    await unavailable(await serve(source, ["thr_writer"], { pageId: "pg_e" }));
+  });
+
+  it("keeps each thread's folders for a minute and a miss for 30 seconds", async () => {
+    const source = join(storage, "old.png");
+    writeFileSync(source, PNG);
+    const missing = join(storage, "gone.png");
+    const markdown = `![Old](${source}) ![Gone](${missing})`;
+    const threads = Array.from({ length: 12 }, (_, index) => `thr_${index}`);
+    const { images, calls, tick } = older(Object.fromEntries(threads.map((id) => [id, { projectId: "proj_a", workspace: null, storage }])));
+    const serve = (path: string) => images.serve({ pageId: "pg_a", projectId: "proj_a", path, markdown, threads });
+
+    // A miss tries at most 10 threads, once.
+    await unavailable(await serve(missing));
+    expect(calls).toEqual({ folders: 10, reads: 10 });
+    await unavailable(await serve(missing));
+    expect(calls).toEqual({ folders: 10, reads: 10 });
+
+    // A hit reuses the folders it already found.
+    expect((await serve(source)).headers.get("content-type")).toBe("image/png");
+    expect(calls).toEqual({ folders: 10, reads: 11 });
+
+    // After 30 seconds the miss is tried again, with the cached folders.
+    tick(31_000);
+    writeFileSync(missing, PNG);
+    expect((await serve(missing)).headers.get("content-type")).toBe("image/png");
+    expect(calls).toEqual({ folders: 10, reads: 12 });
+
+    // After a minute the folders are looked up again.
+    tick(30_000);
+    await serve(source);
+    expect(calls.folders).toBe(11);
+  });
+
+  it("creates the page and its image files in one transaction", async () => {
+    const { store, service } = setup();
+    const source = join(storage, "chart.png");
+    writeFileSync(source, PNG);
+    const save = vi.spyOn(store, "saveContent").mockImplementationOnce(() => { throw new Error("disk full"); });
+    await expect(service.createPageImporting({ projectId: "proj_a", parentId: null, title: "Report", markdown: `![Chart](${source})`, actor: "agent:thr_writer" },
+      threadImageReader({ sdk: fakeSdk().sdk } as never, "thr_writer"))).rejects.toThrow("disk full");
+    expect(store.list({})).toHaveLength(0);
+    expect(store.hasFile("file_any")).toBe(false);
+    const db = (store as unknown as { db: Database.Database }).db;
+    expect(db.prepare("SELECT COUNT(*) AS n FROM files").get()).toEqual({ n: 0 });
+    save.mockRestore();
+    const { page } = await service.createPageImporting({ projectId: "proj_a", parentId: null, title: "Report", markdown: `![Chart](${source})`, actor: "agent:thr_writer" },
+      threadImageReader({ sdk: fakeSdk().sdk } as never, "thr_writer"));
+    expect(store.files(page.id)).toHaveLength(1);
   });
 
   it("leaves pages a person writes alone", () => {

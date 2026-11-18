@@ -34,7 +34,8 @@ import { PageStore } from "./store";
 import { pageProvider } from "./studio";
 import { outgoingStudioLinks } from "./studio-links";
 import { registerTools } from "./tools";
-import { pageLocalImage, threadImageReader } from "./local-image-reader";
+import { threadRoots } from "../kit/server/thread-files";
+import { OlderPageImages, readFromRoots, writerThreads } from "./local-image-reader";
 import { LOCAL_IMAGE_PATH } from "./local-images";
 import { Checklists } from "./checklists";
 import { pagesCli } from "./cli";
@@ -180,23 +181,25 @@ export function registerPages(bb: BbPluginApi, db: Database.Database, settings: 
     { auth: "local" },
   );
 
-  // A local image path in a page saved before imports. It is served only if
-  // the page names it and a thread that made, edited or chatted about the
-  // page can read it (its workspace or thread storage); else a placeholder.
+  // A local image path in a page saved before imports: served only if the
+  // page names it and a thread that made or edited the page, in its project,
+  // can read it (its workspace or thread storage); else a placeholder.
+  const olderImages = new OlderPageImages({
+    folders: (threadId) => threadRoots(bb, threadId),
+    read: (roots, path) => readFromRoots(bb, roots, path),
+  });
   bb.http.route(
     "GET",
     LOCAL_IMAGE_PATH,
     async (c) => {
       const pageId = c.req.query("page") ?? "";
-      const threads = () => [
-        ...services.threads({ pluginId: PLUGIN_ID, id: pageId }).filter((thread) => thread.state !== "deleted").map((thread) => thread.threadId),
-        ...store.chats(pageId).map((chat) => chat.thread_id),
-      ];
-      return pageLocalImage({
+      const meta = store.meta(pageId);
+      return olderImages.serve({
+        pageId,
+        projectId: meta?.project_id ?? null,
         path: c.req.query("path") ?? "",
-        markdown: store.meta(pageId) ? service.currentMarkdown(pageId) : null,
-        threads,
-        reader: (threadId) => threadImageReader(bb, threadId),
+        markdown: meta ? service.currentMarkdown(pageId) : null,
+        threads: meta ? writerThreads(services.threads({ pluginId: PLUGIN_ID, id: pageId })) : [],
       });
     },
     { auth: "local" },

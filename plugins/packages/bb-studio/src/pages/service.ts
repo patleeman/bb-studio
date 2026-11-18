@@ -115,12 +115,19 @@ export class PagesService {
       if (!parent) throw new Error(`No parent page "${input.parentId}".`);
       input.projectId = parent.project_id;
     }
-    const meta = this.store.create(input);
-    const urls = input.images?.length ? storeImages(meta.id, input.images, (...args) => this.store.addFile(...args)) : null;
-    const doc = new Y.Doc();
-    seedMarkdown(doc, urls ? replaceImageSrcs(input.markdown ?? "", urls) : (input.markdown ?? ""));
-    this.store.saveContent(meta.id, Y.encodeStateAsUpdate(doc), readMarkdown(doc), null);
-    doc.destroy();
+    // One transaction: a page that fails to save leaves no row and no image files behind.
+    const meta = this.store.transaction(() => {
+      const meta = this.store.create(input);
+      const urls = input.images?.length ? storeImages(meta.id, input.images, (...args) => this.store.addFile(...args)) : null;
+      const doc = new Y.Doc();
+      try {
+        seedMarkdown(doc, urls ? replaceImageSrcs(input.markdown ?? "", urls) : (input.markdown ?? ""));
+        this.store.saveContent(meta.id, Y.encodeStateAsUpdate(doc), readMarkdown(doc), null);
+      } finally {
+        doc.destroy();
+      }
+      return meta;
+    });
     this.publish({ type: "tree", projectId: meta.project_id });
     this.publish({ type: "page", pageId: meta.id });
     return this.store.meta(meta.id)!;

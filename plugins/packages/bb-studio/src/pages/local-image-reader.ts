@@ -33,30 +33,92 @@ export function threadImageReader(bb: Sdk, threadId: string): ImageReader {
   };
 }
 
+/** A thread's project and the folders its images may come from. */
+export interface ThreadFolders {
+  projectId: string | null;
+  roots: SourceRoot[];
+}
+
 /**
- * The response for a local image path in a page saved before imports: the
- * image, if the page's Markdown names that path and one of the page's threads
- * (the ones that made, edited or chatted about it) can read it; otherwise an
- * "Image not available" picture.
+ * The threads that could have written a page's local paths: those that made
+ * or edited it. Chat, checklist and notes threads only talk about a page.
  */
-export async function pageLocalImage(input: {
-  path: string;
-  /** The page's Markdown, or null when there's no such page. */
-  markdown: string | null;
-  threads: () => readonly string[];
-  reader: (threadId: string) => ImageReader;
-}): Promise<Response> {
-  const path = localImagePath(input.path);
-  const named = path !== null && input.markdown !== null && localImageSrcs(input.markdown).some((src) => localImagePath(src) === path);
-  if (named) {
-    for (const threadId of [...new Set(input.threads())].slice(0, 10)) {
-      const image = await loadLocalImage(path, path, input.reader(threadId));
-      if (!("reason" in image)) {
-        return serveBytes(new Uint8Array(image.bytes), { "content-type": image.mime, "cache-control": "private, max-age=300", "content-security-policy": "sandbox" });
+export function writerThreads(links: readonly { threadId: string; role: string; state: string }[]): string[] {
+  return [...new Set(links.filter((link) => (link.role === "created" || link.role === "edited") && link.state !== "deleted").map((link) => link.threadId))];
+}
+
+const FOLDERS_TTL_MS = 60_000;
+const MISS_TTL_MS = 30_000;
+const MAX_CACHED = 500;
+const MAX_THREADS = 10;
+
+/**
+ * Serves local image paths in pages saved before imports: the image, if the
+ * page's Markdown names that path and a thread that made or edited the page,
+ * in the page's project, can read it; otherwise an "Image not available"
+ * picture. Each thread's folders are kept for a minute, and a recent miss for
+ * half that, so a page full of old paths, or a caller in a loop, doesn't cost
+ * a host round trip per thread per request.
+ */
+export class OlderPageImages {
+  private readonly folders = new Map<string, { at: number; value: Promise<ThreadFolders | null> }>();
+  private readonly misses = new Map<string, number>();
+
+  constructor(private readonly deps: {
+    folders(threadId: string): Promise<ThreadFolders>;
+    read(roots: readonly SourceRoot[], path: string): Promise<ImageRead>;
+    now?: () => number;
+  }) {}
+
+  private now(): number {
+    return this.deps.now?.() ?? Date.now();
+  }
+
+  private threadFolders(threadId: string): Promise<ThreadFolders | null> {
+    const now = this.now();
+    const cached = this.folders.get(threadId);
+    if (cached && now - cached.at < FOLDERS_TTL_MS) return cached.value;
+    const value = this.deps.folders(threadId).catch(() => null);
+    remember(this.folders, threadId, { at: now, value });
+    return value;
+  }
+
+  async serve(input: {
+    pageId: string;
+    /** The page's project; null for a global page, which any project's writer may have written. */
+    projectId: string | null;
+    path: string;
+    /** The page's Markdown, or null when there's no such page. */
+    markdown: string | null;
+    /** From `writerThreads`. */
+    threads: readonly string[];
+  }): Promise<Response> {
+    const path = localImagePath(input.path);
+    const key = `${input.pageId}\n${path}`;
+    const missed = this.misses.get(key);
+    const fresh = missed !== undefined && this.now() - missed < MISS_TTL_MS;
+    if (path && !fresh && input.markdown !== null && localImageSrcs(input.markdown).some((src) => localImagePath(src) === path)) {
+      for (const threadId of [...new Set(input.threads)].slice(0, MAX_THREADS)) {
+        const folders = await this.threadFolders(threadId);
+        if (!folders?.roots.length) continue;
+        if (input.projectId !== null && folders.projectId !== input.projectId) continue;
+        const image = await loadLocalImage(path, path, (file) => this.deps.read(folders.roots, file));
+        if (!("reason" in image)) {
+          this.misses.delete(key);
+          return serveBytes(new Uint8Array(image.bytes), { "content-type": image.mime, "cache-control": "private, max-age=300", "content-security-policy": "sandbox" });
+        }
       }
     }
+    if (path && !fresh) remember(this.misses, key, this.now());
+    return new Response(unavailableSvg(), {
+      headers: { "content-type": "image/svg+xml", "cache-control": "no-store", "x-content-type-options": "nosniff", "content-security-policy": "sandbox", "x-bb-image": "unavailable" },
+    });
   }
-  return new Response(unavailableSvg(), {
-    headers: { "content-type": "image/svg+xml", "cache-control": "no-store", "x-content-type-options": "nosniff", "content-security-policy": "sandbox", "x-bb-image": "unavailable" },
-  });
+}
+
+/** Sets a key as the newest, dropping the oldest past `MAX_CACHED`. */
+function remember<V>(map: Map<string, V>, key: string, value: V): void {
+  map.delete(key);
+  map.set(key, value);
+  while (map.size > MAX_CACHED) map.delete(map.keys().next().value!);
 }

@@ -1755,8 +1755,9 @@ local path inside its thread's workspace or thread storage (PNG, JPEG, GIF or
 WebP, up to 10 MB; not SVG) is copied into the page's files and its src
 rewritten to that address; the tool result names any it left as written. A
 local path left in an older page loads through `/pages/local-image`, which
-serves it only if the page names it and a thread that made, edited or chatted
-about the page can read it, and otherwise shows "Image not available".
+serves it only if the page names it and a thread that made or edited the page,
+in the page's project, can read it, and otherwise shows "Image not available".
+It keeps each thread's folders for a minute and a miss for 30 seconds.
 Live editing syncs over Studio's `/pages/sync`
 WebSocket. The editor (BlockNote, Yjs, Mermaid, Shiki, Recharts) loads the
 first time a page opens, not with Studio; the server loads pdf-lib only for a
