@@ -55,7 +55,7 @@ describe("SidebarThreadListSetting", () => {
 
     expect(store.get(threadListProviderAtom)).toBe("__automatic__");
     const trigger = screen.getByRole("button", {
-      name: "Sidebar thread list",
+      name: "Sidebar conversation list",
     });
     expect(trigger.textContent).toContain("Automatic");
 
