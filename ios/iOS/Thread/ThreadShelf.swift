@@ -4,6 +4,7 @@ import SwiftUI
 /// background work, todos and queued messages. Each shows only when it applies.
 struct ThreadShelf: View {
     @ObservedObject var model: ThreadModel
+    var showsBackground = true
     @EnvironmentObject private var app: AppModel
     @AppStorage(ServerScope.key("dismissedFallbacks")) private var dismissedFallbacks = ""
     @State private var editing: QueuedMessage?
@@ -41,7 +42,7 @@ struct ThreadShelf: View {
                     dismiss("Clear goal") { Task { await model.perform { try await $0.clearGoal($1) } } }
                 }
             }
-            if let first = shelf.background.first {
+            if showsBackground, let first = shelf.background.first {
                 ShelfCard(icon: first.workflowName != nil ? "flowchart" : "terminal", tint: .green) {
                     HStack(spacing: 4) {
                         Text(first.workflowName ?? first.description ?? "Background work").lineLimit(1)

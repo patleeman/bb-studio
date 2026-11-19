@@ -1441,7 +1441,7 @@ struct ThreadView: View {
             .modifier(BotComposerGlass(active: true))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("workerAsk")
-            .modifier(InlineJump(state: duoLayout.twoPages ? nil : jumpState) { transcriptV2.jumpToLatest() })
+            .modifier(InlineJump(state: jumpState) { transcriptV2.jumpToLatest() })
         }
         .modifier(TalkDraft(talk: talk, draft: $draftText.value, typed: $talkTyped))
         .onChange(of: draft) { _, _ in draftText.saveSoon(saveDraftLocally) }
@@ -1619,14 +1619,22 @@ struct ThreadView: View {
         }
     }
 
-    private var typingStatusRow: some View {
-        HStack(spacing: 8) {
-            InFlightBar(threadId: model.threadId, typing: true, chipFills: false)
-            if let conversation {
-                WorkersLineView(line: conversation.workers) { conversation.push(.thread(id: $0)) }
-            }
-        }
+    private var liveStep: String? {
+        model.shelf.background.first.map { $0.workflowName ?? $0.description ?? "Background work" }
     }
+
+    private func unlistedWorkers(_ line: WorkersLine) -> WorkersLine? {
+        var line = line
+        if InFlightBar.shows(model.threadId) {
+            let listed = InFlightBar.listedWorkers(model.threadId)
+            line.workers.removeAll { listed.contains($0.threadId) }
+        }
+        return line.isEmpty ? nil : line
+    }
+
+    private var stackLine: Bool { conversation != nil || botChrome != nil }
+
+    private var stackClear: CGFloat { duoLayout.twoPages ? duoLayout.statusColumn : 0 }
 
     private var threadComposer: some View {
         VStack(spacing: 8) {
@@ -1635,23 +1643,27 @@ struct ThreadView: View {
                                 resolve: { await model.resolve($0, $1) }, cancel: { await model.cancel($0) },
                                 openWeb: { showingWeb = true })
                 let replies = BotQuickReplies.items(in: model.shownRows)
-                if model.interactions.isEmpty, model.thread?.isRunning != true, !replies.isEmpty, draft.isEmpty {
+                if model.interactions.isEmpty, model.thread?.isRunning != true, !replies.isEmpty, draft.isEmpty, !composerFocused {
                     BotQuickReplies(items: replies, tint: BotPalette.color(botChrome.bot.color)) { send(text: $0) }
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            if composerFocused, let conversation, !conversation.workers.isEmpty {
-                typingStatusRow
-            } else if conversation != nil || botChrome != nil {
-                InFlightBar(threadId: model.threadId, typing: composerFocused)
+            if stackLine {
+                InFlightBar(threadId: model.threadId, typing: composerFocused, liveStep: liveStep,
+                            workers: conversation?.workers.workers.count ?? 0)
+                    .padding(.trailing, stackClear)
             }
             if let conversation {
                 WorkerApprovalCards(approvals: approvals, openWorker: { conversation.push(.thread(id: $0)) }, decide: decideApproval)
             }
-            if !composerFocused, let conversation, !conversation.workers.isEmpty {
-                WorkersLineView(line: conversation.workers) { conversation.push(.thread(id: $0)) }
+            if !composerFocused, let conversation, let workers = unlistedWorkers(conversation.workers) {
+                WorkersLineView(line: workers) { conversation.push(.thread(id: $0)) }
+                    .padding(.trailing, stackClear)
             }
-            ThreadShelf(model: model)
+            if !(composerFocused && stackLine) {
+                ThreadShelf(model: model, showsBackground: !(stackLine && InFlightBar.shows(model.threadId)))
+                    .padding(.trailing, stackClear)
+            }
             if let error = outbox.storageError {
                 ShelfCard(icon: "exclamationmark.triangle", tint: .red) {
                     Text(error).lineLimit(3)
@@ -1806,7 +1818,7 @@ struct ThreadView: View {
             .modifier(BotComposerGlass(active: true))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("threadComposer")
-            .modifier(InlineJump(state: duoLayout.twoPages ? nil : jumpState) { transcriptV2.jumpToLatest() })
+            .modifier(InlineJump(state: jumpState) { transcriptV2.jumpToLatest() })
         }
         .animation(.smooth(duration: 0.25), value: model.interactions.first?.id)
         // Kept with the draft text, for when the thread opens again.
@@ -2294,7 +2306,7 @@ extension ThreadView {
             chrome.rowsTrailingClear = RegularScrollingSurface.inset(column: duoLayout.statusColumn, width: duoLayout.detailWidth,
                 readableWidth: Self.readableWidth)
         }
-        chrome.pill = duoLayout.twoPages ? .center : .inline
+        chrome.pill = .inline
         chrome.nearEnd = 120
         chrome.softTopEdge = botChrome != nil
         return chrome
