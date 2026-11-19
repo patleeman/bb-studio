@@ -8,6 +8,8 @@ import UIKit
 ///   off at the next one. The live scene and the live presence pause while
 ///   idle (they keep their last frame), and polls wait longer.
 /// - `typing` is on while the keyboard is up: the live scene pauses behind it.
+/// - Polls wait through `pollWait`, which also holds them while the app is in
+///   the background and lets them run again when it comes back.
 @MainActor
 final class EnergyGate: ObservableObject {
     static let shared = EnergyGate()
@@ -22,6 +24,9 @@ final class EnergyGate: ObservableObject {
     private var check: Task<Void, Never>?
     private var observers: [NSObjectProtocol] = []
     private var watched: Set<ObjectIdentifier> = []
+    /// In the background: polls hold until the app is back.
+    private(set) var background = false
+    private var waitingForForeground: [CheckedContinuation<Void, Never>] = []
 
     init(watchKeyboard: Bool = true) {
         guard watchKeyboard else { return }
@@ -37,6 +42,8 @@ final class EnergyGate: ObservableObject {
             on(UITextView.textDidChangeNotification) { $0.touched() },
             on(UITextField.textDidChangeNotification) { $0.touched() },
             on(UIApplication.didBecomeActiveNotification) { $0.touched() },
+            on(UIApplication.didEnterBackgroundNotification) { $0.setBackground(true) },
+            on(UIApplication.willEnterForegroundNotification) { $0.setBackground(false) },
         ]
     }
 
@@ -53,6 +60,23 @@ final class EnergyGate: ObservableObject {
 
     func pollDelay(_ base: Duration) -> Duration { Self.pollDelay(base, idle: idle) }
 
+    /// A poll loop's wait between rounds: `pollDelay(base)` (just `base` when it
+    /// mustn't back off), then, while the app is in the background, until it comes back.
+    func pollWait(_ base: Duration, backsOff: Bool = true) async {
+        try? await Task.sleep(for: backsOff ? pollDelay(base) : base)
+        while background, !Task.isCancelled {
+            await withCheckedContinuation { waitingForForeground.append($0) }
+        }
+    }
+
+    func setBackground(_ now: Bool) {
+        background = now
+        guard !now else { return }
+        let waiting = waitingForForeground
+        waitingForForeground = []
+        waiting.forEach { $0.resume() }
+    }
+
     /// A touch or keystroke: wake now, and look again when it would turn idle.
     func touched(at now: Date = Date()) {
         lastActivity = now
@@ -67,6 +91,10 @@ final class EnergyGate: ObservableObject {
             }
             guard let self, !Task.isCancelled else { return }
             self.check = nil
+            #if DEBUG
+            // `-qaEnergyAwake`: measure the app as if in use.
+            if ProcessInfo.processInfo.arguments.contains("-qaEnergyAwake") { return }
+            #endif
             if Self.isIdle(lastActivity: self.lastActivity, now: Date()) { self.idle = true }
         }
     }

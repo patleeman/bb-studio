@@ -304,15 +304,17 @@ run `node scripts/build-look.mjs` after a desktop theme or presence change
   conversation. The still is rendered on the phone by desktop's renderer at the
   theme's `still` time, once per theme, mode and size (and once an hour for the
   clock- and weather-driven ones), then cached (`SceneStills`). It shifts with
-  tilt through a system motion effect, so an idle still costs the app nothing.
+  tilt through a system motion effect, which wakes the app at the display's
+  rate, so the tilt rests while the app is idle.
   "Live scene" is opt-in: foreground only, never in Low Power Mode, once the
   phone is warm (thermal state fair or above) or with Reduce Motion, at 15
   frames a second. A driver's chosen mode (Tonight's Sky by day) switches the
   look, as on desktop.
 - **Energy.** `EnergyGate` watches touches and typing. After 30 s without
   either the live scene and the live presence hold their frame until the next
-  touch, the scene also holds while the keyboard is up, and the room's and a
-  conversation's polls wait 3 times longer (at most 3 minutes). The scene and
+  touch and the still's tilt rests; the scene also holds while the keyboard is
+  up; and the room's and a conversation's polls wait 3 times longer (at most 3
+  minutes). Those polls also hold while the app is in the background. The scene and
   presence loops wake once per frame they draw (`FrameClock` in
   `Look/web/runtime.ts`), not at the display's rate. The live presence runs at
   30 frames a second, 15 on a warm phone, and stops at serious thermal state.

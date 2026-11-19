@@ -49,6 +49,10 @@ struct BBStudioApp: App {
                     TalkOutbox.shared.kick()
                     // `-openURL bbstudio://…` drives headless simulator runs.
                     if let url = UserDefaults.standard.string(forKey: "openURL").flatMap(URL.init(string:)) {
+                        #if DEBUG
+                        // `qa-duo/…` too, without the "Open in BB Studio?" prompt `simctl openurl` brings.
+                        if DuoDemo.handle(url) { return }
+                        #endif
                         model.handle(url)
                     }
                 }

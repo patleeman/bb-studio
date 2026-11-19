@@ -172,7 +172,8 @@ enum LookHosting {
 }
 
 /// The scene behind the Bot's list: a cached still that shifts a few points
-/// with tilt (a system motion effect, so it costs the app nothing while idle),
+/// with tilt (a system motion effect; it wakes the app at the display's rate,
+/// so it rests while the app is idle),
 /// or, when Live scene is on and allowed, desktop's renderer running live at a
 /// capped frame rate. It pauses (keeping its frame) while the app is idle or the
 /// keyboard is up. Never put this behind a transcript.
@@ -208,7 +209,8 @@ struct SceneBackdrop: View {
                 if !stillOnly, store.liveSceneRuns(foreground: phase == .active) {
                     LiveSceneView(theme: theme.id, mode: look.mode, size: geo.size, light: light, paused: paused || gate.idle || gate.typing, signals: SceneSignals.payload(botId: botId, view: view))
                 } else if let image = shown {
-                    ParallaxImage(image: image, amount: motion ? Self.parallax : 0)
+                    // The tilt engine wakes the app at the display's rate: it rests while idle.
+                    ParallaxImage(image: image, amount: motion && !gate.idle ? Self.parallax : 0)
                         .frame(width: size.width, height: size.height)
                         .offset(x: -Self.parallax, y: -Self.parallax)
                 }
@@ -254,7 +256,8 @@ struct ParallaxImage: UIViewRepresentable {
 
     func updateUIView(_ view: UIImageView, context: Context) {
         if view.image !== image { view.image = image }
-        if (view.motionEffects.isEmpty) != (amount <= 0) { Self.tilt(view, amount) }
+        // Eases to and from the tilted spot rather than jumping.
+        if (view.motionEffects.isEmpty) != (amount <= 0) { UIView.animate(withDuration: 0.6) { Self.tilt(view, amount) } }
     }
 
     static func tilt(_ view: UIImageView, _ amount: CGFloat) {

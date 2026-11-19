@@ -107,6 +107,21 @@ final class LookTests: XCTestCase {
         XCTAssertEqual(EnergyGate.pollDelay(.seconds(300), idle: true), .seconds(300))
     }
 
+    func testPollsHoldInTheBackgroundAndRunWhenTheAppIsBack() async throws {
+        let gate = EnergyGate(watchKeyboard: false)
+        gate.setBackground(true)
+        var rounds = 0
+        let poll = Task { @MainActor in
+            await gate.pollWait(.milliseconds(10))
+            rounds += 1
+        }
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(rounds, 0, "No poll round while in the background")
+        gate.setBackground(false)
+        await poll.value
+        XCTAssertEqual(rounds, 1, "The poll runs again once the app is back")
+    }
+
     func testATouchWakesTheGate() async throws {
         let gate = EnergyGate(watchKeyboard: false)
         XCTAssertFalse(gate.idle)
