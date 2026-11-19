@@ -29,6 +29,8 @@ export interface SettingItem {
   detail: string;
   secret: boolean;
   count: number;
+  names?: string[];
+  alreadyHere?: string[];
 }
 
 const SKIPPED_APP_SETTING_KEYS = new Set([
@@ -57,6 +59,18 @@ async function readJsonObject(
   }
 }
 
+async function envNamesHere(
+  dataDir: string,
+  names: readonly string[],
+): Promise<string[]> {
+  const mine = await readJsonObject(join(dataDir, "env.json"));
+  const env =
+    typeof mine?.env === "object" && mine.env !== null
+      ? (mine.env as Record<string, unknown>)
+      : {};
+  return names.filter((name) => name in env).sort();
+}
+
 async function isLink(path: string): Promise<boolean> {
   const stats = await lstat(path).catch(() => null);
   return stats?.isSymbolicLink() === true;
@@ -73,6 +87,7 @@ function count(source: Sqlite, sql: string): number {
 export async function listSettings(
   source: Sqlite,
   sourceDataDir: string,
+  dataDir: string | null = null,
 ): Promise<SettingItem[]> {
   const items: SettingItem[] = [];
   const preferences = count(
@@ -164,6 +179,9 @@ export async function listSettings(
         "Values bb passes to agents. May hold API keys and tokens. Used after BB Studio restarts.",
       secret: true,
       count: variables.length,
+      names: [...variables].sort(),
+      alreadyHere:
+        dataDir === null ? [] : await envNamesHere(dataDir, variables),
     });
   }
   return items;
