@@ -327,14 +327,14 @@
       "budget": 6
     },
     "apps/desktop/src/main.ts": {
-      "seam": "approvals, windows, studio-release, finder",
-      "intent": "Registers the fork's approval IPC handler (registerForkApprovalIpc, fork-approvals.ts) beside the desktop info handler. Importing that module also makes the per-launch signing key and puts its public half in the environment before the server is started. It also registers the fork's window IPC handler (registerForkWindowIpc, fork-windows.ts). Its first import is studio-desktop.fork.ts (a test build's scratch data dir, ports and user data are set there before anything reads them), and About shows the Studio version with its bb base (studioAboutVersion). It also registers the fork's Show in Finder and folder listing IPC handlers (registerForkFinderIpc, fork-finder.ts) with applicationWindowWebContentsIds, so they answer only the main frame of an app window (or a fork window).",
-      "budget": 9
+      "seam": "approvals, windows, studio-release, finder, activity",
+      "intent": "Registers the fork's approval IPC handler (registerForkApprovalIpc, fork-approvals.ts) beside the desktop info handler. Importing that module also makes the per-launch signing key and puts its public half in the environment before the server is started. It also registers the fork's window IPC handler (registerForkWindowIpc, fork-windows.ts). Its first import is studio-desktop.fork.ts (a test build's scratch data dir, ports and user data are set there before anything reads them), and About shows the Studio version with its bb base (studioAboutVersion). It also registers the fork's Show in Finder and folder listing IPC handlers (registerForkFinderIpc, fork-finder.ts) with applicationWindowWebContentsIds, so they answer only the main frame of an app window (or a fork window). It also registers the fork's system activity IPC (registerForkActivityIpc, fork-activity.ts) with applicationWindowWebContentsIds: the Mac's idle seconds and lock state for Studio's at-the-desk heartbeat, answered only to an app window's main frame, with lock and unlock pushed to app windows.",
+      "budget": 11
     },
     "apps/desktop/src/preload.ts": {
-      "seam": "approvals, windows, studio-release, launch-theme, finder",
-      "intent": "Exposes experimental_answerApproval and experimental_window on window.bbDesktop; each invokes the main process. It also exposes experimental_studioBuild (the Studio version and its bb base, from studio-release.fork.ts). It spreads forkLaunchThemeApi(ipcRenderer) (fork-launch-theme-preload.ts) into the API: that paints the main window from the cached backdrop appearance before the page runs and adds experimental_launchAppearance and experimental_saveLaunchAppearance. It spreads forkFinderApi(ipcRenderer) (fork-finder-preload.ts): experimental_finderLabel, experimental_showInFinder, experimental_listFolder and experimental_fileLinkMenu.",
-      "budget": 15
+      "seam": "approvals, windows, studio-release, launch-theme, finder, activity",
+      "intent": "Exposes experimental_answerApproval and experimental_window on window.bbDesktop; each invokes the main process. It also exposes experimental_studioBuild (the Studio version and its bb base, from studio-release.fork.ts). It spreads forkLaunchThemeApi(ipcRenderer) (fork-launch-theme-preload.ts) into the API: that paints the main window from the cached backdrop appearance before the page runs and adds experimental_launchAppearance and experimental_saveLaunchAppearance. It spreads forkFinderApi(ipcRenderer) (fork-finder-preload.ts): experimental_finderLabel, experimental_showInFinder, experimental_listFolder and experimental_fileLinkMenu. It spreads forkActivityApi(ipcRenderer) (fork-activity-preload.ts): experimental_systemActivity and experimental_onSystemActivity.",
+      "budget": 17
     },
     "packages/desktop-contract/src/info.ts": {
       "seam": "approvals, windows",
