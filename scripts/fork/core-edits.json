@@ -271,6 +271,11 @@
       "intent": "No push is sent for a quiet thread.idle event.",
       "budget": 3
     },
+    "plugins/provider-pi/vitest.config.ts": {
+      "seam": "test-tmpdir",
+      "intent": "Runs the Pi plugin's tests in upstream's per-run temp root (vitest.global-tmpdir.ts), removed at the end, so the bridge channel and fake host folders the tests leave go with it.",
+      "budget": 1
+    },
     "vitest.shared.ts": {
       "seam": "test-skips",
       "intent": "Adds scripts/fork/vitest-skips.ts as a setup file in the shared base config, so tests listed in skipped-tests.json are skipped at run time.",
