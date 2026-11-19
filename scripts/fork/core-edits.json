@@ -168,7 +168,7 @@
     },
     "apps/server/src/server.ts": {
       "seam": "import-sync, approvals, skills-registry-policy, thread-successor",
-      "intent": "Registers the fork's import routes (/api/v1/fork/import/*) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts). One fork import and registerForkThreadSuccessors(deps.db) after the registry gate, so archived-thread errors can look up the handoff chain.",
+      "intent": "Registers the fork's import routes (/api/v1/fork/import/* and /api/v1/fork/bring-over/*, given the plugin service so a plugin from bb can be added) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts). One fork import and registerForkThreadSuccessors(deps.db) after the registry gate, so archived-thread errors can look up the handoff chain.",
       "budget": 8
     },
     "apps/server/src/services/plugins/plugin-service.ts": {
