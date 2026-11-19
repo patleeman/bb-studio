@@ -1,4 +1,4 @@
-import { forkOpenWithinRoot, forkReadWithinRoot } from "./file-read.fork.js";
+import { forkOpenWithinRoot, forkReadError, forkReadWithinRoot } from "./file-read.fork.js";
 import { constants, type BigIntStats } from "node:fs";
 import { isUtf8 } from "node:buffer";
 import fs from "node:fs/promises";
@@ -289,7 +289,7 @@ export async function readFileFromGitRef(
 export async function readFileForTransport(
   args: ReadFileForTransportArgs,
 ): Promise<ReadFileForTransportResult> {
-  const readablePath = await resolveReadablePath(args);
+  const readablePath = await resolveReadablePath(args).catch(forkReadError(args));
   const mimeType = mimeTypes.lookup(args.resultPath) || undefined;
   const { stat, fileContents } = await forkReadWithinRoot(
     readablePath,
@@ -337,7 +337,7 @@ export async function readFileChunkForTransport(
     knownRevisions: readonly string[];
   },
 ) {
-  const readablePath = await resolveReadablePath(args);
+  const readablePath = await resolveReadablePath(args).catch(forkReadError(args));
   const file = await forkOpenWithinRoot(
     readablePath,
     args,
