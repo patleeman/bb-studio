@@ -163,6 +163,10 @@ function insideFolder(path: unknown, folder: string): boolean {
   return target === root || target.startsWith(`${root}${sep}`);
 }
 
+function safePathId(id: string): boolean {
+  return /^[A-Za-z0-9_-]+$/u.test(id);
+}
+
 export function managedByBb(row: Row, sourceDataDir: string): boolean {
   return (
     (row.environment_provider_id !== null &&
@@ -275,6 +279,27 @@ export function referencedFirst(
   return ordered;
 }
 
+export const eventChunking = { threshold: 5_000, size: 2_000 };
+
+function removeThreadRows(target: Sqlite, threadId: string): void {
+  target.transaction(() => {
+    target.pragma("defer_foreign_keys = ON");
+    for (const table of [
+      "project_attachment_threads",
+      "retained_event_outputs",
+      ...THREAD_ROW_TABLES,
+      "events",
+    ]) {
+      try {
+        target
+          .prepare(`DELETE FROM ${quote(table)} WHERE thread_id = ?`)
+          .run(threadId);
+      } catch {}
+    }
+    target.prepare("DELETE FROM threads WHERE id = ?").run(threadId);
+  })();
+}
+
 export async function importThread(
   context: ThreadImportContext,
   threadId: string,
@@ -308,6 +333,9 @@ export async function importThread(
         throwIfCancelled(context.signal);
         const parts = attachment.stored_path.split("/");
         if (parts.some((part) => part === ".." || part === "")) continue;
+        if (!safePathId(attachment.project_id) || !safePathId(targetProject)) {
+          continue;
+        }
         const to = join(
           context.dataDir,
           "attachments",
@@ -330,17 +358,50 @@ export async function importThread(
       }
     }
     throwIfCancelled(context.signal);
+    const chunked =
+      (source
+        .prepare<[string], { count: number }>(
+          "SELECT COUNT(*) AS count FROM events WHERE thread_id = ?",
+        )
+        .get(threadId)?.count ?? 0) > eventChunking.threshold;
+    const environmentIds = new Map<string, string | null>();
+    let projectId = targetProject;
+    const environmentFor = (id: unknown): string | null => {
+      if (typeof id !== "string") return null;
+      if (!environmentIds.has(id)) {
+        environmentIds.set(id, ensureEnvironment(context, id, projectId));
+      }
+      return environmentIds.get(id) ?? null;
+    };
+    const withEnvironment = (row: Row): Row => ({
+      ...row,
+      environment_id: environmentFor(row.environment_id),
+    });
+    const finishRows = () => {
+      copyRowsFor(context, "retained_event_outputs", threadId);
+      if (context.attachments) {
+        const attachmentColumns = sharedColumns(
+          source,
+          target,
+          "project_attachments",
+        );
+        for (const attachment of attachmentsOf(source, threadId)) {
+          const row = source
+            .prepare<[string], Row>(
+              `SELECT ${selectList(attachmentColumns)} FROM project_attachments WHERE id = ?`,
+            )
+            .get(attachment.id);
+          if (row === undefined) continue;
+          insertIfMissing(target, "project_attachments", attachmentColumns, [
+            { ...row, project_id: projectId, deletion_claimed_at: null },
+          ]);
+        }
+        copyRowsFor(context, "project_attachment_threads", threadId);
+      }
+    };
     target.transaction(() => {
       target.pragma("defer_foreign_keys = ON");
-      const projectId = ensureProject(context, String(thread.project_id));
-      const environmentIds = new Map<string, string | null>();
-      const environmentFor = (id: unknown): string | null => {
-        if (typeof id !== "string") return null;
-        if (!environmentIds.has(id)) {
-          environmentIds.set(id, ensureEnvironment(context, id, projectId));
-        }
-        return environmentIds.get(id) ?? null;
-      };
+      projectId = ensureProject(context, String(thread.project_id));
       const sectionId = thread.section_id;
       if (
         typeof sectionId === "string" &&
@@ -368,6 +429,7 @@ export async function importThread(
           rowExists(target, "thread_sections", sectionId)
             ? sectionId
             : null,
+        deleted_at: chunked ? Date.now() : thread.deleted_at,
       };
       for (const column of THREAD_REFERENCE_COLUMNS) {
         const reference = prepared[column];
@@ -379,36 +441,57 @@ export async function importThread(
         }
       }
       insertIfMissing(target, "threads", threadColumns, [prepared]);
-      copyRowsFor(context, "events", threadId, (row) => ({
-        ...row,
-        environment_id: environmentFor(row.environment_id),
-      }));
       const withProject = (row: Row): Row =>
         "project_id" in row ? { ...row, project_id: projectId } : row;
       for (const table of THREAD_ROW_TABLES) {
         copyRowsFor(context, table, threadId, withProject);
       }
-      copyRowsFor(context, "retained_event_outputs", threadId);
-      if (context.attachments) {
-        const attachmentColumns = sharedColumns(
-          source,
-          target,
-          "project_attachments",
-        );
-        for (const attachment of attachmentsOf(source, threadId)) {
-          const row = source
-            .prepare<[string], Row>(
-              `SELECT ${selectList(attachmentColumns)} FROM project_attachments WHERE id = ?`,
-            )
-            .get(attachment.id);
-          if (row === undefined) continue;
-          insertIfMissing(target, "project_attachments", attachmentColumns, [
-            { ...row, project_id: projectId, deletion_claimed_at: null },
-          ]);
-        }
-        copyRowsFor(context, "project_attachment_threads", threadId);
+      if (!chunked) {
+        copyRowsFor(context, "events", threadId, withEnvironment);
+        finishRows();
       }
     })();
+    if (chunked) {
+      try {
+        const columns = sharedColumns(source, target, "events");
+        const page = source.prepare<
+          [string, number, number],
+          Row & { _rowid: number }
+        >(
+          `SELECT rowid AS _rowid, ${selectList(columns)} FROM events WHERE thread_id = ? AND rowid > ? ORDER BY rowid LIMIT ?`,
+        );
+        let after = 0;
+        for (;;) {
+          throwIfCancelled(context.signal);
+          const rows = page.all(threadId, after, eventChunking.size);
+          if (rows.length === 0) break;
+          after = rows[rows.length - 1]!._rowid;
+          target.transaction(() => {
+            target.pragma("defer_foreign_keys = ON");
+            insertIfMissing(
+              target,
+              "events",
+              columns,
+              rows.map(withEnvironment),
+            );
+          })();
+          await new Promise<void>((resolve) => {
+            setImmediate(resolve);
+          });
+        }
+        throwIfCancelled(context.signal);
+        target.transaction(() => {
+          target.pragma("defer_foreign_keys = ON");
+          finishRows();
+          target
+            .prepare("UPDATE threads SET deleted_at = ? WHERE id = ?")
+            .run(thread.deleted_at ?? null, threadId);
+        })();
+      } catch (error) {
+        removeThreadRows(target, threadId);
+        throw error;
+      }
+    }
   } catch (error) {
     await removeCreated(created);
     throw error;
