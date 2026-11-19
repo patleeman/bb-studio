@@ -190,7 +190,7 @@ export class DeskHold {
       }
       const messages = awayMessages(unseen);
       if (messages.length > 0) await this.deps.send(messages);
-      this.deps.log?.(`desk: away; ${pushes.length} held, ${unseen.length} unseen, ${messages.length} sent`);
+      this.deps.log?.(`desk: away; ${pushes.length} held, ${unseen.length} unseen, sent ${messages.length}${messages.length ? `: ${messages.map((message) => JSON.stringify(message.title ?? "")).join(", ")}` : ""}`);
     }).catch((error: unknown) => this.deps.log?.(`desk: release failed: ${error instanceof Error ? error.message : String(error)}`));
     this.releasing = task;
     return task;
