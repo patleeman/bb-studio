@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { mkdir, rename, rm, stat } from "node:fs/promises";
+import { chmod, mkdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { readPrimaryHostIdFromDataDir } from "../../hosts/primary-host.js";
 import { resolveForkImportSource } from "../import-source.js";
@@ -36,7 +36,8 @@ export async function takeSourceSnapshot(args: {
   signal?: AbortSignal;
 }): Promise<SourceSnapshot> {
   const directory = join(args.dataDir, BRING_OVER_DIR_NAME);
-  await mkdir(directory, { recursive: true });
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  await chmod(directory, 0o700);
   const temp = join(directory, `${SNAPSHOT_FILE_NAME}.${String(args.now)}.tmp`);
   await rm(temp, { force: true });
   try {
@@ -54,6 +55,7 @@ export async function takeSourceSnapshot(args: {
     for (const suffix of ["-wal", "-shm"]) {
       await rm(`${target}${suffix}`, { force: true });
     }
+    await chmod(temp, 0o600);
     await rename(temp, target);
   } catch (error) {
     await rm(temp, { force: true });
@@ -69,13 +71,27 @@ export async function takeSourceSnapshot(args: {
   };
 }
 
+const SNAPSHOT_MAX_AGE_MS = 60 * 60_000;
+
+export async function forgetSourceSnapshot(dataDir: string): Promise<void> {
+  const path = snapshotPath(dataDir);
+  for (const suffix of ["", "-wal", "-shm", "-journal"]) {
+    await rm(`${path}${suffix}`, { force: true });
+  }
+}
+
 export async function existingSourceSnapshot(
   dataDir: string,
   sourceDataDir: string,
+  now = Date.now(),
 ): Promise<SourceSnapshot | null> {
   const path = snapshotPath(dataDir);
   const stats = await stat(path).catch(() => null);
   if (stats === null) return null;
+  if (now - stats.mtimeMs > SNAPSHOT_MAX_AGE_MS) {
+    await forgetSourceSnapshot(dataDir);
+    return null;
+  }
   return {
     sourceDataDir,
     snapshotPath: path,
