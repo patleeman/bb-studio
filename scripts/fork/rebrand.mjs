@@ -241,6 +241,7 @@ const replacements = [
     "apps/app/src/components/sidebar/SidebarUpdatesBadge.test.tsx",
     '{ name: "bb update" }',
     `{ name: "${NAME} update" }`,
+    2,
   ],
   [
     "apps/app/src/components/sidebar/SidebarUpdatesBadge.test.tsx",
@@ -545,11 +546,6 @@ const replacements = [
     "apps/app/src/views/SettingsView.tsx",
     "`bb puts this in front of every branch",
     `\`${NAME} puts this in front of every branch`,
-  ],
-  [
-    "apps/app/src/views/SettingsView.tsx",
-    "Clear notifications once a thread is read",
-    "Clear notifications once a conversation is read",
   ],
   [
     "apps/app/src/components/settings/AiServicesSettingsSection.tsx",
