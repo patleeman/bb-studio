@@ -1777,11 +1777,44 @@ describe("bring-over API and review fixes", () => {
     env("env_bb_old", join(f.source, "worktrees", "env_1", "repo"));
     env("env_mine", join(f.target, "worktrees", "env_2", "repo"));
     env("env_gone", join(f.source, "worktrees", "env_3", "repo"), "destroyed");
+    env(
+      "env_pending",
+      join(f.source, "worktrees", "env_4", "repo"),
+      "destroyed",
+    );
+    env(
+      "env_claimed",
+      join(f.source, "worktrees", "env_5", "repo"),
+      "destroyed",
+    );
     db.prepare(
       "UPDATE environments SET retire_at = 1, teardown_status = 'running' WHERE id = 'env_bb_old'",
     ).run();
+    db.prepare(
+      "UPDATE environments SET teardown_status = 'removed' WHERE id = 'env_gone'",
+    ).run();
+    db.prepare(
+      "UPDATE environments SET teardown_status = 'failed', teardown_message = 'x', teardown_attempt = 3 WHERE id = 'env_pending'",
+    ).run();
+    db.prepare(
+      "UPDATE environments SET teardown_status = 'running', claim_path = path, path = NULL WHERE id = 'env_claimed'",
+    ).run();
+    expect(
+      listProviderLifecycleEnvironments(memory, "git-worktree", {
+        pluginId: "environment-git-worktree",
+        teardownMessage: "y",
+      })
+        .map((row) => row.id)
+        .sort(),
+    ).toEqual([
+      "env_bb",
+      "env_bb_old",
+      "env_claimed",
+      "env_mine",
+      "env_pending",
+    ]);
 
-    expect(releaseBbEnvironments(db, [f.source])).toBe(2);
+    expect(releaseBbEnvironments(db, [f.source])).toBe(4);
     expect(releaseBbEnvironments(db, [f.source])).toBe(0);
 
     const rows = db
@@ -1805,11 +1838,18 @@ describe("bring-over API and review fixes", () => {
         teardown_status: null,
       },
       {
+        id: "env_claimed",
+        environment_provider_id: null,
+        provider_owns_path: 0,
+        retire_at: null,
+        teardown_status: null,
+      },
+      {
         id: "env_gone",
         environment_provider_id: "git-worktree",
         provider_owns_path: 1,
         retire_at: null,
-        teardown_status: null,
+        teardown_status: "removed",
       },
       {
         id: "env_mine",
@@ -1818,15 +1858,20 @@ describe("bring-over API and review fixes", () => {
         retire_at: null,
         teardown_status: null,
       },
+      {
+        id: "env_pending",
+        environment_provider_id: null,
+        provider_owns_path: 0,
+        retire_at: null,
+        teardown_status: null,
+      },
     ]);
     expect(
       listProviderLifecycleEnvironments(memory, "git-worktree", {
         pluginId: "environment-git-worktree",
-        teardownMessage: "x",
-      })
-        .map((row) => row.id)
-        .filter((id) => id.startsWith("env_bb")),
-    ).toEqual([]);
+        teardownMessage: "y",
+      }).map((row) => row.id),
+    ).toEqual(["env_mine"]);
     db.close();
   });
 });
