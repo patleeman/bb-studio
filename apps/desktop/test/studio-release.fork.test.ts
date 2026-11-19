@@ -77,6 +77,30 @@ describe("Studio version line", () => {
     );
     const version = formatStudioAboutVersion("1.0.0", build);
     expect(version).toBe("1.0.0 (based on bb 0.49.0 @ 030b1b7)");
+    expect(
+      formatStudioAboutVersion(
+        "1.0.0",
+        injected(
+          createStudioBuild({
+            release,
+            upstream: { ...upstream, ahead: 59 },
+            test: null,
+          }),
+        ),
+      ),
+    ).toBe("1.0.0 (based on bb 0.49.0 + 59 commits @ 030b1b7)");
+    expect(
+      formatStudioAboutVersion(
+        "1.0.0",
+        injected(
+          createStudioBuild({
+            release,
+            upstream: { ...upstream, version: "0.50.1", ahead: 0 },
+            test: null,
+          }),
+        ),
+      ),
+    ).toBe("1.0.0 (based on bb 0.50.1 @ 030b1b7)");
     const details = buildDesktopAboutDetails(
       {
         applicationName: "BB Studio",
@@ -107,7 +131,9 @@ describe("Studio version line", () => {
 
 describe("Studio update feed", () => {
   it("reads updates from bb-studio's GitHub releases with no token", () => {
-    const build = injected(createStudioBuild({ release, upstream, test: null }));
+    const build = injected(
+      createStudioBuild({ release, upstream, test: null }),
+    );
     expect(build.updateFeed).toEqual({
       provider: "github",
       owner: "patleeman",
