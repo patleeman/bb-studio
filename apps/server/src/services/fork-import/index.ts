@@ -1,6 +1,5 @@
 import { readServerImportFile } from "@bb/server-archive";
 import type { Hono } from "hono";
-import { runForkPluginSync } from "./plugin-sync.js";
 import { ApiError } from "../../errors.js";
 import type { AppDeps } from "../../types.js";
 import { defineSingleItemSweep } from "../system/item-sweep.js";
@@ -43,7 +42,6 @@ import {
 } from "../threads/thread-fork-hosts.fork.js";
 
 const SYNC_CADENCE_MS = 60_000;
-const PLUGIN_SYNC_CADENCE_MS = 5 * 60_000;
 
 let activeDataDir: string | null = null;
 let sweepsStarted = false;
@@ -136,20 +134,6 @@ const FORK_SWEEP_JOBS: readonly ForkSweepJob[] = [
             dataDir: activeDataDir,
             logger: deps.logger,
           });
-        },
-      }),
-  },
-  {
-    cadenceMs: PLUGIN_SYNC_CADENCE_MS,
-    category: "maintenance",
-    name: "fork-import-plugin-sync",
-    background: true,
-    sweep: () =>
-      defineSingleItemSweep({
-        name: "fork-import-plugin-sync",
-        process: () => {
-          if (activeDataDir === null || !hasForkImport(activeDataDir)) return;
-          runForkPluginSync({ dataDir: activeDataDir });
         },
       }),
   },
@@ -248,10 +232,7 @@ export function registerForkImportRoutes(app: Hono, deps: AppDeps): void {
     if (summary === null) {
       throw new ApiError(409, "invalid_request", "Nothing was imported here");
     }
-    return context.json({
-      ...summary,
-      plugins: runForkPluginSync({ dataDir: requireDataDir() }),
-    });
+    return context.json(summary);
   });
 
   app.post("/fork/import/pause", (context) => {
