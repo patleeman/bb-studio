@@ -63,7 +63,7 @@ export function StudioDataRow({ token, jobRunning, onJob }: { token: string | nu
   const discard = (label = "Cancel") => <Button size="sm" variant="outline" disabled={busy || jobRunning} onClick={() => void act(() => discardStudioData(token ?? ""))}>{label}</Button>;
 
   if (state === null || state === "staging") {
-    if (own) lines.push(`BB Studio already has data of its own (${own}), so bb's can't replace it.`);
+    if (own) lines.push(`BB Studio already has data of its own (${own}), so bb's can't replace it. bb's Bots, pages and tasks can only replace a new install's; bb's projects and threads can still come over below.`);
     else if (status === null) lines.push("Studio isn't answering, so this can't be offered now.");
     if (state === "staging") lines.push("bb's Studio data is being copied, or the copy was cut off.");
     if (gated && !own && status !== null) buttons = state === "staging" ? discard("Discard") : <Button size="sm" variant="outline" disabled={busy || jobRunning} onClick={() => void copy()}>{busy ? "Copying…" : "Bring over…"}</Button>;
@@ -81,7 +81,7 @@ export function StudioDataRow({ token, jobRunning, onJob }: { token: string | nu
         </span>
       );
     }
-  } else if (state === "ready" || state === "applying") {
+  } else if (state === "ready" || state === "applying" || state === "rolling-back") {
     lines.push("bb's Studio data is ready. Quit and reopen BB Studio to finish.");
     if (gated && state === "ready") buttons = discard();
   } else if (state === "applied") {
@@ -113,6 +113,7 @@ export function StudioDataRow({ token, jobRunning, onJob }: { token: string | nu
         <Button size="sm" disabled={busy} onClick={() => void act(() => deleteOldStudioData(token ?? ""))}>Delete it</Button>
       </span>
     ) : <Button size="sm" variant="outline" disabled={busy} onClick={() => setAsk("delete")}>Delete bb's copy…</Button>;
+    if (ask === "delete") lines.push("Deletes bb's Studio data and anything you made in Studio while it was in use. This can't be undone.");
   } else {
     lines.push(journalError ?? "Bringing over bb's Studio data didn't finish.");
     if (gated && (state === "refused" || state === "failed")) buttons = discard("Discard");

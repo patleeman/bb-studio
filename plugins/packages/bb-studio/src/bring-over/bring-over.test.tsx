@@ -218,7 +218,7 @@ describe("BB Studio data row", () => {
   const text = () => $('[data-testid="bring-over-studio-data"]')?.textContent ?? "";
   const preview = { bots: 3, pages: 14, tasks: 6, memories: 40, threads: { required: ["thr_main"], wanted: ["thr_main", "thr_conv", "thr_worker"] }, minisWithSecrets: 1, watchersWithEnv: 2, problem: null };
   const server = (journal: BringOverStudioData["journal"]): BringOverStudioData => ({ inBb: true, bots: 3, pages: 14, tasks: 6, journal });
-  const journal = (state: StudioImportState, extra: object = {}) => ({ state, error: null, stagedAt: 1, ...extra });
+  const journal = (state: Exclude<StudioImportState, "unreadable">, extra: object = {}) => ({ state, error: null, stagedAt: 1, ...extra });
   let calls: { url: string; method: string; body: unknown; token: string | null }[] = [];
   function serve(read: () => BringOverStudioData) {
     calls = [];
@@ -255,7 +255,7 @@ describe("BB Studio data row", () => {
     await act(async () => { button("Bring over…")!.click(); });
     await settle();
     expect(calls.filter((call) => call.method === "POST").map((call) => [call.url, call.token])).toEqual([["/api/v1/fork/bring-over/studio-data", "token-from-the-app"]]);
-    for (const words of ["Replaces everything in BB Studio's Studio", "3 Bots, 14 pages, 6 tasks, 40 memories, and 3 threads", "kept in a folder, not deleted", "arrive stopped", "stop it in bb so it doesn't run twice", "1 mini app' API keys and 2 watchers' environment values", "quit and reopen BB Studio"]) expect(text()).toContain(words);
+    for (const words of ["Project leads' heartbeats are off too", "Replaces everything in BB Studio's Studio", "3 Bots, 14 pages, 6 tasks, 40 memories, and 3 threads", "kept in a folder, not deleted", "arrive stopped", "stop it in bb so it doesn't run twice", "1 mini app' API keys and 2 watchers' environment values", "quit and reopen BB Studio"]) expect(text()).toContain(words);
     await act(async () => { button("Bring over")!.click(); });
     await settle();
     expect(calls.find((call) => call.url.endsWith("/jobs"))).toMatchObject({ method: "POST", token: "token-from-the-app", body: { picks: [{ kind: "thread", id: "thr_main" }, { kind: "thread", id: "thr_conv" }, { kind: "thread", id: "thr_worker" }], settings: [], studioData: { required: ["thr_main"] } } });
@@ -268,6 +268,7 @@ describe("BB Studio data row", () => {
     await act(async () => { root.render(<BringOverSection />); });
     await settle();
     expect(text()).toContain("already has data of its own (it has 2 pages)");
+    expect(text()).toContain("bb's projects and threads can still come over below");
     expect(button("Bring over…")).toBeUndefined();
   });
 
@@ -291,6 +292,18 @@ describe("BB Studio data row", () => {
     expect(text()).toContain("next time BB Studio starts");
     await act(async () => { button("Put it back")!.click(); });
     expect(calls.find((call) => call.url.endsWith("/studio-data/put-back"))).toMatchObject({ method: "POST", token: "token-from-the-app" });
+  });
+
+  it("says what deleting bb's copy takes with it after a put-back", async () => {
+    rpc.status = { ownData: { has: false }, journal: journal("restored"), keptIn: "/data/plugins/studio/import-staged/replaced", preview: null };
+    serve(() => server(journal("restored")));
+    await act(async () => { root.render(<BringOverSection />); });
+    await settle();
+    expect(text()).toContain("Your old Studio data is back");
+    act(() => { button("Delete bb's copy…")!.click(); });
+    expect(text()).toContain("anything you made in Studio while it was in use");
+    await act(async () => { button("Delete it")!.click(); });
+    expect(calls.find((call) => call.url.endsWith("/studio-data/forget"))).toMatchObject({ method: "POST" });
   });
 
   it("shows a failure and offers to discard the copy", async () => {

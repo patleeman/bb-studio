@@ -28,7 +28,7 @@ export interface BringOverState {
   job?: BringOverJob | null;
   studioData?: BringOverStudioData;
 }
-export type StudioImportState = "staging" | "staged" | "ready" | "applying" | "applied" | "refused" | "failed" | "rollback-failed" | "restore-requested" | "restoring" | "restored";
+export type StudioImportState = "staging" | "staged" | "ready" | "applying" | "applied" | "refused" | "failed" | "rolling-back" | "rollback-failed" | "restore-requested" | "restoring" | "restored" | "unreadable";
 /** bb's Studio data as the server sees it: in bb, its size, and where a bring-over of it is (the journal). */
 export interface BringOverStudioData {
   inBb: boolean;
@@ -156,6 +156,7 @@ export function studioDataConfirm(preview: StudioDataPreview): string[] {
     "Your current Studio data is kept in a folder, not deleted, and you can put it back. Your Assistant's chat stays as a thread with no Bot.",
     "The threads come over first, like any thread you bring over, and stay here even if you put your old data back.",
     "bb's Bots arrive stopped, with their check-ins, runners and watchers off, and Task reminders off. If you resume a Bot here, stop it in bb so it doesn't run twice.",
+    "Project leads' heartbeats are off too; turn each back on in its lead's settings.",
     "Approvals you gave in bb (mini apps, dashboard scripts, the public skill registry) are asked for again here.",
   ];
   const secrets = [preview.minisWithSecrets > 0 ? `${plural(preview.minisWithSecrets, "mini app")}' API keys` : null, preview.watchersWithEnv > 0 ? `${plural(preview.watchersWithEnv, "watcher")}' environment values` : null].filter(Boolean);

@@ -25,7 +25,7 @@ import { BB_KV_FILE, BEFORE_DIR, BEFORE_KV_FILE, REPLACED_DIR, STAGED_DIR, impor
 import { studioOwnData } from "./own-data";
 import { previewStaged, studioDataStatus } from "./preview";
 import { stopImportedStudio } from "./stop";
-import { finishStudioImport, prepareKv } from "./start";
+import { claimFirstLoad, finishStudioImport, prepareKv } from "./start";
 import type { StudioKv } from "./swap";
 import { studioThreads } from "./threads";
 
@@ -355,7 +355,7 @@ async function staged(options: { own?: boolean } = {}) {
   writeJournal(dataDir, journal);
   const kv = memoryKv(OUR_KV);
   const log = { info: vi.fn(), warn: vi.fn() };
-  const start = (extra: Partial<Parameters<typeof finishStudioImport>[0]> = {}) => finishStudioImport({ dataDir, kv, migrate: (database, statements) => h.bb.storage.migrate(database, statements), migrations: MIGRATIONS, log, ...extra });
+  const start = (extra: Partial<Parameters<typeof finishStudioImport>[0]> = {}) => finishStudioImport({ dataDir, kv, migrate: (database, statements) => h.bb.storage.migrate(database, statements), migrations: MIGRATIONS, log, firstLoad: true, ...extra });
   return { dataDir, studio, stagedDir, kv, log, start, h };
 }
 
@@ -454,15 +454,51 @@ describe("applying bb's Studio data at Studio's start", () => {
     mkdirSync(before, { recursive: true, mode: 0o700 });
     writeFileSync(importPath(y.dataDir, BEFORE_KV_FILE), JSON.stringify({ plugin_kv: [] }), { mode: 0o600 });
     for (const name of readdirSync(y.studio)) if (name !== "secrets" && name !== "import-staged") renameFile(join(y.studio, name), join(before, name));
-    // Something made talk/ in Studio's folder after this install's data moved out.
-    mkdirSync(join(y.studio, "talk"));
+    // Something made artifacts/ in Studio's folder after this install's data moved out, and the kv step then fails.
+    mkdirSync(join(y.studio, "artifacts"));
     writeJournal(y.dataDir, { ...journal, state: "applying", phase: "in", incoming: ["data.db", "onboarding.json", "talk"] });
-    const done = await y.start();
-    expect(done).toMatchObject({ state: "rollback-failed", error: expect.stringContaining(before) });
-    expect(readdirSync(before).length + readdirSync(y.studio).length).toBeGreaterThan(2);
-    expect(existsSync(join(before, "artifacts")) || existsSync(join(y.studio, "artifacts"))).toBe(true);
+    const done = await y.start({ kv: memoryKv(OUR_KV, "link:pages:pg_1") });
+    expect(done).toMatchObject({ state: "rollback-failed", undoing: "applying", error: expect.stringContaining(before) });
+    expect(readFileSync(join(before, "artifacts", "ours.bin"), "utf8")).toBe("ours");
+    expect(existsSync(join(y.stagedDir, "talk", "rec.txt"))).toBe(true);
     // Not touched again at the next start.
     expect(await y.start()).toMatchObject({ state: "rollback-failed" });
+  });
+
+  it("resumes a rollback a crash cut short, moving back only what the swap moved in", async () => {
+    const x = await staged();
+    const journal = readJournal(x.dataDir) as ImportJournal;
+    const before = importPath(x.dataDir, BEFORE_DIR);
+    mkdirSync(before, { recursive: true, mode: 0o700 });
+    writeFileSync(importPath(x.dataDir, BEFORE_KV_FILE), JSON.stringify({ plugin_kv: [{ key: "rail:layout", value: '["ours"]' }] }), { mode: 0o600 });
+    for (const name of readdirSync(x.studio)) if (name !== "secrets" && name !== "import-staged") renameFile(join(x.studio, name), join(before, name));
+    for (const name of ["data.db", "talk"]) renameFile(join(x.stagedDir, name), join(x.studio, name));
+    // This install's artifacts/ was already moved back before the crash; Studio also wrote a file of its own.
+    renameFile(join(before, "artifacts"), join(x.studio, "artifacts"));
+    writeFileSync(join(x.studio, "data.before-x.db"), "studio's own");
+    writeJournal(x.dataDir, { ...journal, state: "rolling-back", undoing: "applying", phase: "kv", incoming: ["data.db", "onboarding.json", "talk"] });
+    const kv = memoryKv({ [SETTINGS_KV_KEY]: { loopsEnabled: false, theme: "bb" } });
+    expect(await x.start({ kv })).toMatchObject({ state: "failed", error: expect.stringContaining("back as it was") });
+    expect(readFileSync(join(x.studio, "artifacts", "ours.bin"), "utf8")).toBe("ours");
+    expect(readFileSync(join(x.studio, "data.before-x.db"), "utf8")).toBe("studio's own");
+    expect(existsSync(join(x.stagedDir, "talk", "rec.txt"))).toBe(true);
+    expect(existsSync(join(x.stagedDir, "data.db"))).toBe(true);
+    const db = openStudio(x.dataDir);
+    expect(rows(db, "SELECT COUNT(*) AS n FROM bots")).toEqual([{ n: 1 }]);
+    db.close();
+    expect(Object.fromEntries(kv.values)).toEqual({ "rail:layout": ["ours"] });
+    expect(existsSync(before)).toBe(false);
+  });
+
+  it("leaves the journal alone when Studio is only reloaded, and applies it at the next real start", async () => {
+    const x = await staged();
+    expect(await x.start({ firstLoad: false })).toMatchObject({ state: "ready" });
+    expect(readFileSync(join(x.studio, "artifacts", "ours.bin"), "utf8")).toBe("ours");
+    expect(Object.fromEntries(x.kv.values)).toEqual(OUR_KV);
+    expect(x.log.info).toHaveBeenCalledWith(expect.stringContaining("reloaded, not restarted"));
+    expect(await x.start()).toMatchObject({ state: "applied" });
+    const scope: Record<symbol, unknown> = {};
+    expect([claimFirstLoad(scope), claimFirstLoad(scope)]).toEqual([true, false]);
   });
 });
 

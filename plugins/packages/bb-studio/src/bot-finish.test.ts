@@ -135,6 +135,23 @@ it("falls back after the timeout too, without a second memory record when the Bo
   expect(x.store.get("prep")!.finishedSummary).toMatch(/^\*\*Last replies\*\*/);
 });
 
+it("holds a finish while its Bot is paused or stopped, so nothing starts a turn in Main, and finishes it after Resume", async () => {
+  const x = await setup();
+  await x.finish.rpc.bot_finish({ threadId: "prep" });
+  // Like bb's Studio data brought over: the Bot arrives stopped with this finish still pending.
+  x.db.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, created_at, updated_at) VALUES ('dot', 'Dot', 'D', 'stopped', 'thr_main', 0, 1, 1)").run();
+  x.send.mockClear();
+  x.tick(FINISH_TIMEOUT_MS * 3);
+  await x.finish.finish.sweep();
+  await x.harness.emitThreadEvent("thread.idle", { thread: x.threads.get("prep") as never, lastAssistantText: "" } as never);
+  expect(x.send).not.toHaveBeenCalled();
+  expect(x.store.get("prep")!.archivedAt).toBeNull();
+  expect(x.db.prepare("SELECT state FROM bot_finishes WHERE thread_id = 'prep'").get()).toEqual({ state: "finishing" });
+  x.db.prepare("UPDATE bots SET state = 'active'").run();
+  await x.finish.finish.sweep();
+  expect(x.store.get("prep")!.archivedAt).not.toBeNull();
+});
+
 it("archiving a conversation in BB starts the same summary step; Main, a worker and a quiet archive don't", async () => {
   const x = await setup();
   await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never });

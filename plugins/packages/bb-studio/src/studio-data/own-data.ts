@@ -38,6 +38,8 @@ export const HOUSEKEEPING_TABLES: ReadonlySet<string> = new Set([
   "bot_nudges",
   "bot_run_dismissals",
   "thread_auto_resumes",
+  "trigger_runs",
+  "next_suggestions",
   "automation_auto_resumes",
   "thread_seeds",
   "tabs",

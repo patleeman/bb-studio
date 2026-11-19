@@ -193,7 +193,7 @@ import { BackupService, formatBackup, formatRestore, restoreFailed } from "./src
 import { studioDataBackup } from "./src/backup/studio-data";
 import { backupFileName, registerBackup } from "./src/backup/register";
 import { readFile as readTextFile, stat as statPath } from "node:fs/promises";
-import { finishStudioImport } from "./src/studio-data/start";
+import { claimFirstLoad, finishStudioImport } from "./src/studio-data/start";
 import { studioDataStatus } from "./src/studio-data/preview";
 import { studioDataContract } from "./src/studio-data/contract";
 import { isAbsolute, resolve as resolvePath } from "node:path";
@@ -207,7 +207,7 @@ export default async function plugin(bb: BbPluginApi) {
   // "Bring over BB Studio data" from bb is applied here, before Studio opens
   // its database (src/studio-data/start.ts). A failure leaves the journal for
   // the next start and this install's data as it was.
-  await finishStudioImport({ dataDir: bb.server.experimental_dataDir, kv: bb.storage.kv, migrate: (database, statements) => bb.storage.migrate(database, statements), migrations: MIGRATIONS, log: bb.log })
+  await finishStudioImport({ dataDir: bb.server.experimental_dataDir, kv: bb.storage.kv, migrate: (database, statements) => bb.storage.migrate(database, statements), migrations: MIGRATIONS, log: bb.log, firstLoad: claimFirstLoad() })
     .catch((error) => bb.log.warn(`BB Studio data from bb could not be applied; this install's data is unchanged: ${errorText(error)}`));
   registerQuietTurnClassifier(bb);
   await registerChat(bb);

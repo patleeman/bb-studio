@@ -339,10 +339,21 @@ export class BotFinish {
     return this.done(threadId, summary, "fallback");
   }
 
+  /**
+   * A Bot that is paused or stopped finishes nothing on its own: Studio's
+   * summary would start a turn in its Main. Its finishes wait for Resume
+   * (bb's Bots arrive stopped with the finishes they had in bb).
+   */
+  private held(botId: string): boolean {
+    const bot = this.deps.db.prepare("SELECT state FROM bots WHERE id = ?").get(botId) as { state: string } | undefined;
+    return !!bot && bot.state !== "active";
+  }
+
   /** A conversation's turn ended: a finish still waiting gets Studio's summary; a finished one is archived in BB. */
   async ended(threadId: string): Promise<void> {
     const row = this.row(threadId);
     if (!row) return;
+    if (row.state === "finishing" && this.held(row.bot_id)) return;
     if (row.state === "finishing" && this.now() - row.requested_at >= IDLE_GRACE_MS) await this.fallback(threadId);
     else if (row.state === "finished") await this.archiveIfIdle(threadId);
   }
@@ -351,6 +362,7 @@ export class BotFinish {
   async sweep(): Promise<void> {
     const rows = this.deps.db.prepare("SELECT * FROM bot_finishes WHERE (state = 'finishing' AND deadline_at <= ?) OR (state = 'finished' AND bb_archive_pending = 1)").all(this.now()) as Row[];
     for (const row of rows) {
+      if (row.state === "finishing" && this.held(row.bot_id)) continue;
       try {
         if (row.state === "finishing") await this.fallback(row.thread_id);
         else await this.archiveIfIdle(row.thread_id);

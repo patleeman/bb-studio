@@ -8,10 +8,12 @@
 //   kv   the kv rows are replaced by the incoming ones.
 // Every step can run again: a resumed phase moves only what is left.
 //
-// A failure rolls back: kv rows from the aside file, the placed files back to
-// the incoming folder, the aside files back into place. Each step is tried on
-// its own. If any fails, nothing is deleted and the journal says where the
-// files are (state "rollback-failed").
+// A failure rolls back: the journal says "rolling-back" first, so a crash
+// during the rollback resumes the rollback, not the swap. Then kv rows from
+// the aside file, the files the swap moved in back to the incoming folder,
+// the aside files back into place. Each step is tried on its own. If any
+// fails, nothing is deleted and the journal says where the files are (state
+// "rollback-failed").
 import { existsSync, readdirSync, renameSync, rmdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { KEPT_HERE, privateDir, readJson, studioDir, writeJournal, writePrivateJson, type ImportJournal, type SwapPhase } from "./journal";
@@ -82,13 +84,20 @@ export async function runSwap(plan: SwapPlan, journal: ImportJournal, kv: Studio
     }
     return current;
   } catch (error) {
+    current = { ...current, state: "rolling-back", undoing: current.state === "restoring" ? "restoring" : "applying", updatedAt: now() };
+    writeJournal(plan.dataDir, current);
     throw await rollBack(plan, current, kv, error);
   }
 }
 
 export interface RolledBack { error: unknown; journal: ImportJournal; clean: boolean; problems: string[] }
 
-async function rollBack(plan: SwapPlan, journal: ImportJournal, kv: StudioKv, error: unknown): Promise<RolledBack> {
+/**
+ * Undoes a swap from the phase it reached; also run at the next start for a
+ * journal left in "rolling-back". Moves back only the names the swap moved in
+ * (journal.incoming), then every entry of the aside folder.
+ */
+export async function rollBack(plan: SwapPlan, journal: ImportJournal, kv: StudioKv, error: unknown): Promise<RolledBack> {
   const target = studioDir(plan.dataDir);
   const problems: string[] = [];
   const attempt = async (what: string, step: () => unknown) => {
@@ -98,11 +107,10 @@ async function rollBack(plan: SwapPlan, journal: ImportJournal, kv: StudioKv, er
     await attempt("key-value rows", async () => replaceKv(kv, readJson<KvFile>(plan.asideKvFile)));
   }
   if (journal.phase === "in" || journal.phase === "kv") {
-    for (const name of names(target)) {
-      await attempt(name, () => {
-        if (existsSync(join(plan.incomingDir, name))) throw new Error("already back");
-        renameSync(join(target, name), join(plan.incomingDir, name));
-      });
+    for (const name of journal.incoming ?? []) {
+      if (KEPT_HERE.has(name) || !existsSync(join(target, name))) continue;
+      if (existsSync(join(plan.incomingDir, name))) continue;
+      await attempt(name, () => renameSync(join(target, name), join(plan.incomingDir, name)));
     }
   }
   for (const name of names(plan.asideDir)) {

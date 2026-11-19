@@ -15,7 +15,8 @@
 //      bb's come in, and the journal ends "applied".
 // "restore-requested" ("Put my old Studio data back") swaps back: bb's go to
 // replaced/, before/ comes back. "applying" and "restoring" left by a crash
-// are finished, or rolled back.
+// are finished, or rolled back. All of this happens only on Studio's first
+// load in a server process: a reload leaves the journal for the next start.
 import Database from "better-sqlite3";
 import { existsSync, readdirSync, rmdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -27,7 +28,7 @@ import {
 } from "./journal";
 import { studioOwnData, type OwnData } from "./own-data";
 import { stopImportedStudio } from "./stop";
-import { isRolledBack, runSwap, type KvFile, type StudioKv, type SwapPlan } from "./swap";
+import { isRolledBack, rollBack, runSwap, type KvFile, type RolledBack, type StudioKv, type SwapPlan } from "./swap";
 
 export interface StartDeps {
   dataDir: string;
@@ -37,7 +38,25 @@ export interface StartDeps {
   migrations: string[];
   log: { info(message: string): void; warn(message: string): void };
   now?: () => number;
+  /**
+   * Whether this is Studio's first load in this server process. A reload
+   * runs the new Studio while the old one still runs on the same files and
+   * key-value rows, so a swap waits for the next real start.
+   */
+  firstLoad: boolean;
 }
+
+const LOADED = Symbol.for("bb-studio.studio-data.loaded");
+
+/** True the first time Studio loads in this server process; reloads see false. */
+export function claimFirstLoad(scope: Record<symbol, unknown> = globalThis as unknown as Record<symbol, unknown>): boolean {
+  if (scope[LOADED]) return false;
+  scope[LOADED] = true;
+  return true;
+}
+
+/** States that change files or key-value rows when Studio starts. */
+const ACTS_AT_START = new Set(["ready", "restore-requested", "applying", "restoring", "rolling-back"]);
 
 /** bb's kv file as the server writes it; `prepared` once start.ts turned things off in it. */
 interface BbKvFile extends KvFile { plugin_settings?: unknown[]; prepared?: boolean }
@@ -135,7 +154,7 @@ function removeIfEmpty(path: string): void {
   try { rmdirSync(path); } catch { /* missing or not empty: kept */ }
 }
 
-type Ending = { done(journal: ImportJournal): ImportJournal; undone(journal: ImportJournal, reason: string): ImportJournal };
+type Ending = { done(journal: ImportJournal): ImportJournal; undone(journal: ImportJournal, reason: string): ImportJournal; where: string };
 
 /** How an apply ends: done, or undone with this install's data back. */
 function applyEnding(deps: StartDeps, plan: SwapPlan): Ending {
@@ -147,6 +166,7 @@ function applyEnding(deps: StartDeps, plan: SwapPlan): Ending {
       return { ...journal, state: "applied", appliedAt: now(), error: null };
     },
     undone: (journal, reason) => ({ ...journal, state: "failed", error: `bb's Studio data could not be put in place (${reason}). This install's Studio data is back as it was.` }),
+    where: `this install's Studio data is in ${plan.asideDir}, bb's in ${plan.incomingDir}`,
   };
 }
 
@@ -160,6 +180,7 @@ function restoreEnding(deps: StartDeps, plan: SwapPlan): Ending {
       return { ...journal, state: "restored", restoredAt: now(), error: null };
     },
     undone: (journal, reason) => ({ ...journal, state: "applied", error: `The old Studio data could not be put back (${reason}). bb's Studio data is still in use.` }),
+    where: `bb's Studio data is in ${plan.asideDir}, this install's old data in ${plan.incomingDir}`,
   };
 }
 
@@ -170,12 +191,18 @@ async function swapOrRollBack(deps: StartDeps, plan: SwapPlan, journal: ImportJo
     return settle(deps.dataDir, ending.done({ ...finished, phase: null, updatedAt: now() }), deps.log);
   } catch (thrown) {
     if (!isRolledBack(thrown)) throw thrown;
-    const reason = errorText(thrown.error);
-    if (!thrown.clean) {
-      return settle(deps.dataDir, { ...thrown.journal, state: "rollback-failed", phase: thrown.journal.phase ?? null, updatedAt: now(), error: `The swap failed (${reason}) and could not be fully undone (${thrown.problems.slice(0, 3).join("; ")}). Nothing was deleted: this install's Studio data is in ${plan.asideDir}, bb's in ${plan.incomingDir}.` }, deps.log);
-    }
-    return settle(deps.dataDir, ending.undone({ ...thrown.journal, phase: null, updatedAt: now() }, reason), deps.log);
+    return settleRollBack(deps, ending, thrown);
   }
+}
+
+/** Where a rollback leaves things: undone as the ending says, or "rollback-failed" with every file kept. */
+function settleRollBack(deps: StartDeps, ending: Ending, thrown: RolledBack): ImportJournal {
+  const now = deps.now ?? Date.now;
+  const reason = errorText(thrown.error);
+  if (!thrown.clean) {
+    return settle(deps.dataDir, { ...thrown.journal, state: "rollback-failed", phase: thrown.journal.phase ?? null, updatedAt: now(), error: `The swap failed (${reason}) and could not be fully undone (${thrown.problems.slice(0, 3).join("; ")}). Nothing was deleted: ${ending.where}.` }, deps.log);
+  }
+  return settle(deps.dataDir, ending.undone({ ...thrown.journal, phase: null, undoing: undefined, updatedAt: now() }, reason), deps.log);
 }
 
 async function apply(deps: StartDeps, journal: ImportJournal): Promise<ImportJournal> {
@@ -234,6 +261,10 @@ export async function finishStudioImport(deps: StartDeps): Promise<ImportJournal
     deps.log.warn(`BB Studio data from bb: the journal in ${importPath(deps.dataDir, "")} can't be read, so nothing was applied.`);
     return null;
   }
+  if (!deps.firstLoad && ACTS_AT_START.has(journal.state)) {
+    deps.log.info(`BB Studio data from bb: ${journal.state}; Studio was reloaded, not restarted, so this waits for BB Studio to be quit and reopened.`);
+    return journal;
+  }
   switch (journal.state) {
     case "ready": return apply(deps, journal);
     case "restore-requested": return restore(deps, journal);
@@ -244,6 +275,12 @@ export async function finishStudioImport(deps: StartDeps): Promise<ImportJournal
     case "restoring": {
       const plan = restorePlan(deps.dataDir);
       return swapOrRollBack(deps, plan, journal, journal.phase ?? "out", restoreEnding(deps, plan));
+    }
+    case "rolling-back": {
+      const restoring = journal.undoing === "restoring";
+      const plan = restoring ? restorePlan(deps.dataDir) : applyPlan(deps.dataDir);
+      const ending = restoring ? restoreEnding(deps, plan) : applyEnding(deps, plan);
+      return settleRollBack(deps, ending, await rollBack(plan, journal, deps.kv, new Error("BB Studio stopped while undoing a swap")));
     }
     default: return journal;
   }

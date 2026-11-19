@@ -15,10 +15,13 @@
 //   server:  staging -> staged -> ready (once the Bots' threads came over);
 //            applied -> restore-requested ("Put my old Studio data back");
 //            Discard and Delete remove the folder.
-//   plugin:  ready -> applying -> applied | refused | failed | rollback-failed;
-//            restore-requested -> restoring -> restored | applied (with error).
-// A journal left in applying or restoring is finished, or rolled back, at the
-// next start. A rollback that fails keeps every file and says where they are.
+//   plugin:  ready -> applying -> applied | refused | rolling-back;
+//            restore-requested -> restoring -> restored | rolling-back;
+//            rolling-back -> failed (apply undone) | applied (put-back undone)
+//            | rollback-failed.
+// A journal left in applying or restoring is finished at the next start; one
+// left in rolling-back is rolled back. A rollback that fails keeps every file
+// and says where they are.
 import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -35,7 +38,7 @@ export const REPLACED_KV_FILE = "replaced-kv.json";
 /** What stays this install's at a swap: secrets, logs, host and bridge data, backup sessions, and this folder. */
 export const KEPT_HERE: ReadonlySet<string> = new Set(["secrets", "logs", "host-data", "bridge-data", "backup-sessions", IMPORT_DIR_NAME]);
 
-export const IMPORT_STATES = ["staging", "staged", "ready", "applying", "applied", "refused", "failed", "rollback-failed", "restore-requested", "restoring", "restored"] as const;
+export const IMPORT_STATES = ["staging", "staged", "ready", "applying", "applied", "refused", "failed", "rolling-back", "rollback-failed", "restore-requested", "restoring", "restored"] as const;
 export type ImportState = (typeof IMPORT_STATES)[number];
 export type SwapPhase = "out" | "in" | "kv";
 
@@ -53,6 +56,8 @@ export interface ImportJournal {
   phase?: SwapPhase | null;
   /** The names that were in the incoming folder when the swap began. */
   incoming?: string[];
+  /** While rolling back: the swap being undone. */
+  undoing?: "applying" | "restoring";
   appliedAt?: number | null;
   restoredAt?: number | null;
   /** The thread ids the Bots can't do without (their Main threads). */

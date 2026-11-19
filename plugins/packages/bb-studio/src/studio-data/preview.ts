@@ -66,8 +66,8 @@ export function previewStaged(dataDir: string, migrations: readonly string[]): S
 export function studioDataStatus(dataDir: string, liveDb: Database.Database, migrations: readonly string[]): StudioDataStatus {
   const journal = readJournal(dataDir);
   const known = journal === null || journal === "unreadable" ? null : journal;
-  const keptIn = known?.state === "applied" || known?.state === "restore-requested" || known?.state === "rollback-failed" ? importPath(dataDir, BEFORE_DIR)
-    : known?.state === "restored" ? importPath(dataDir, REPLACED_DIR)
+  const keptIn = known?.state === "applied" || known?.state === "restore-requested" || (known?.state === "rollback-failed" && known.undoing !== "restoring") ? importPath(dataDir, BEFORE_DIR)
+    : known?.state === "restored" || (known?.state === "rollback-failed" && known.undoing === "restoring") ? importPath(dataDir, REPLACED_DIR)
     : null;
   const staged = known && (known.state === "staged" || known.state === "ready" || known.state === "refused" || known.state === "failed");
   return {
