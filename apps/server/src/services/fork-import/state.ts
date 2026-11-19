@@ -64,6 +64,13 @@ export function openForkImportDatabase(dataDir: string): ForkImportDatabase {
   return database;
 }
 
+export function closeForkImportDatabase(dataDir: string): void {
+  const path = join(dataDir, FORK_IMPORT_DATABASE_FILE_NAME);
+  const database = connections.get(path);
+  connections.delete(path);
+  if (database?.open) database.close();
+}
+
 export function closeForkImportDatabases(): void {
   for (const database of connections.values()) {
     if (database.open) database.close();
