@@ -1,4 +1,10 @@
-import { useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 import type { ExperimentalComposerReplace } from "@get-bb/plugin-sdk";
 import { PluginSlotMount } from "@/components/plugin/PluginSlotMount";
 import {
@@ -40,6 +46,32 @@ export function composerReplacements(
     );
 }
 
+interface ActiveProbeProps {
+  entryKey: string;
+  threadId: string;
+  onReport: ActiveReport;
+}
+
+const activeHosts = new WeakMap<
+  ExperimentalComposerReplace,
+  { Probe: ComponentType<ActiveProbeProps> }
+>();
+
+function activeHost(replace: ExperimentalComposerReplace) {
+  const existing = activeHosts.get(replace);
+  if (existing !== undefined) return existing;
+  function ActiveHost(props: ActiveProbeProps) {
+    const active = replace.useActive({ threadId: props.threadId });
+    if (typeof active !== "boolean") {
+      throw new Error("experimental_replace.useActive must return a boolean");
+    }
+    return <ActiveReporter {...props} active={active} />;
+  }
+  const host = { Probe: ActiveHost };
+  activeHosts.set(replace, host);
+  return host;
+}
+
 function ActiveProbe({
   entry,
   threadId,
@@ -49,13 +81,21 @@ function ActiveProbe({
   threadId: string;
   onReport: ActiveReport;
 }) {
-  const active = entry.replace.useActive({ threadId });
-  if (typeof active !== "boolean") {
-    throw new Error("experimental_replace.useActive must return a boolean");
-  }
+  const host = activeHost(entry.replace);
+  return (
+    <host.Probe entryKey={entry.key} threadId={threadId} onReport={onReport} />
+  );
+}
+
+function ActiveReporter({
+  entryKey,
+  threadId,
+  onReport,
+  active,
+}: ActiveProbeProps & { active: boolean }) {
   useLayoutEffect(() => {
-    onReport(entry.key, threadId, active);
-  }, [entry.key, threadId, active, onReport]);
+    onReport(entryKey, threadId, active);
+  }, [entryKey, threadId, active, onReport]);
   return null;
 }
 
