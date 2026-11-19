@@ -1,4 +1,4 @@
-import { withForkBundledPlugins } from "./builtin-registry.fork.js";
+import { forkReplacedInstallNote, releaseDeadBundledInstalls, withForkBundledPlugins } from "./builtin-registry.fork.js";
 import {
   capturePluginUse,
   forgetPluginRecommendation,
@@ -1129,7 +1129,7 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
             null,
           iconUrl: brandingSet?.compactIcon?.url ?? null,
           status: runtime.status,
-          statusDetail: runtime.detail,
+          statusDetail: runtime.detail ?? forkReplacedInstallNote(row.id),
           handlerStats: stats
             ? { ...stats }
             : { count: 0, totalMs: 0, maxMs: 0, errorCount: 0 },
@@ -1591,6 +1591,7 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
           await recoverIncompletePluginRollbacks();
         });
         await handOverRetiredBuiltins();
+        await releaseDeadBundledInstalls({ db: deps.db, bundledPlugins, logger });
         await reconcileBundled();
         await removeUnbundledBuiltins();
         await loadAll();
