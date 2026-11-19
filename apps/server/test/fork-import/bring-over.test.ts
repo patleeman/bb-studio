@@ -1,3 +1,12 @@
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { registerBringOverRoutes } from "../../src/services/fork-import/bring-over/routes.js";
+import { resetUiTokenForTests } from "../../src/services/fork-import/bring-over/ui-token.js";
+import { eventChunking } from "../../src/services/fork-import/bring-over/threads.js";
+import { applySetting } from "../../src/services/fork-import/bring-over/settings.js";
+import { existingSourceSnapshot } from "../../src/services/fork-import/bring-over/source.js";
+import { lstatSync, symlinkSync, statSync } from "node:fs";
+import type { AppDeps } from "../../src/types.js";
 import Database from "better-sqlite3";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -1443,5 +1452,348 @@ describe("BB Studio data from bb", () => {
       { id: "bot_new" },
     ]);
     expect(existsSync(join(f.ours, "artifacts"))).toBe(false);
+  });
+});
+
+describe("bring-over API and review fixes", () => {
+  const TOKEN = "t".repeat(40);
+  afterEach(() => {
+    resetUiTokenForTests();
+    delete process.env.BB_STUDIO_IMPORT_FROM;
+    eventChunking.threshold = 5_000;
+    eventChunking.size = 2_000;
+  });
+
+  function app(f: Fixture, lines: unknown[] = []) {
+    process.env.BB_STUDIO_IMPORT_FROM = f.source;
+    const hono = new Hono();
+    hono.onError((error) =>
+      error instanceof HTTPException
+        ? error.getResponse()
+        : new Response(String(error), { status: 500 }),
+    );
+    const deps = {
+      db: { $client: f.db },
+      logger: {
+        info: (...args: unknown[]) => lines.push(args),
+        warn: () => {},
+        error: () => {},
+        debug: () => {},
+      },
+      config: { appVersion: "1.0.0" },
+    } as unknown as AppDeps;
+    const installer = {
+      install: async () => ({ id: "x" }),
+      installPath: async () => ({ id: "x" }),
+      reload: async () => undefined,
+      remove: async () => true,
+      setEnabled: async () => undefined,
+      listOpenPluginDatabases: () => [],
+    };
+    registerBringOverRoutes(hono, deps, () => f.target, installer);
+    return hono;
+  }
+  const post = (body: unknown, headers: Record<string, string> = {}) => ({
+    method: "POST",
+    headers: { "content-type": "application/json", ...headers },
+    body: JSON.stringify(body),
+  });
+
+  it("takes the app's token once, and refuses agents and calls without it", async () => {
+    const f = await fixture();
+    const lines: unknown[] = [];
+    const api = app(f, lines);
+    expect(
+      (await api.request("/fork/bring-over/ui-token", post({ token: "short" })))
+        .status,
+    ).toBe(409);
+    expect(
+      (await api.request("/fork/bring-over/ui-token", post({ token: TOKEN })))
+        .status,
+    ).toBe(204);
+    expect(
+      (
+        await api.request(
+          "/fork/bring-over/ui-token",
+          post({ token: "u".repeat(40) }),
+        )
+      ).status,
+    ).toBe(409);
+    const pick = { picks: [{ kind: "project", id: f.ids.p1 }] };
+
+    expect(
+      (await api.request("/fork/bring-over/jobs", post(pick))).status,
+    ).toBe(403);
+    expect(
+      (
+        await api.request(
+          "/fork/bring-over/jobs",
+          post(pick, { "x-bb-studio-ui-token": "u".repeat(40) }),
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await api.request(
+          "/fork/bring-over/jobs",
+          post(pick, {
+            "x-bb-studio-ui-token": TOKEN,
+            "x-bb-caller-thread": "thr_agent",
+          }),
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await api.request(
+          "/fork/bring-over/jobs",
+          post(pick, { "x-bb-studio-ui-token": TOKEN, "x-bb-cli": "1" }),
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (await api.request("/fork/bring-over/plugins/acme-tool/add", post({})))
+        .status,
+    ).toBe(403);
+    expect(
+      (await api.request("/fork/bring-over/studio-data", post({}))).status,
+    ).toBe(403);
+    expect(count(f.db, "SELECT COUNT(*) AS n FROM threads")).toBe(0);
+    expect(
+      lines.filter(
+        (line) => (line as [unknown, string])[1] === "Bring-over request",
+      ),
+    ).toHaveLength(6);
+    expect((lines[0] as [{ allowed: boolean }])[0].allowed).toBe(false);
+
+    expect(
+      (
+        await api.request(
+          "/fork/bring-over/jobs",
+          post({ picks: "all" }, { "x-bb-studio-ui-token": TOKEN }),
+        )
+      ).status,
+    ).toBe(400);
+    const [first, second] = await Promise.all([
+      api.request(
+        "/fork/bring-over/jobs",
+        post(pick, { "x-bb-studio-ui-token": TOKEN }),
+      ),
+      api.request(
+        "/fork/bring-over/jobs",
+        post(pick, { "x-bb-studio-ui-token": TOKEN }),
+      ),
+    ]);
+    expect([first.status, second.status].sort()).toEqual([202, 409]);
+    await bringOverJobFinished(f.target);
+    expect(count(f.db, "SELECT COUNT(*) AS n FROM threads")).toBe(2);
+  });
+
+  it("answers a light summary without reading bb's listing", async () => {
+    const f = await fixture();
+    const body = (await (
+      await app(f).request("/fork/bring-over?summary=1")
+    ).json()) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      available: true,
+      sourceDataDir: f.source,
+      job: null,
+    });
+    expect(body.projects).toBeUndefined();
+  });
+
+  it("fails a job whose copy of bb can't be opened, and lets the next one start", async () => {
+    const f = await fixture();
+    await rm(f.snapshot.snapshotPath, { force: true });
+    const job = startBringOverJob({
+      dataDir: f.target,
+      snapshot: f.snapshot,
+      target: f.db,
+      request: { picks: [], attachments: true, settings: [] },
+      logger,
+      now: 1,
+    });
+    await bringOverJobFinished(f.target);
+    expect(job).toMatchObject({ state: "failed" });
+    expect(job!.failures[0]!.detail).toMatch(/could not be opened/u);
+    const next = await run(f, { picks: [{ kind: "thread", id: f.ids.t1 }] });
+    expect(next.state).toBe("done");
+  });
+
+  it("keeps the copy of bb's database private and short-lived", async () => {
+    const f = await fixture();
+    expect(statSync(f.snapshot.snapshotPath).mode & 0o777).toBe(0o600);
+    expect(statSync(join(f.target, "fork-bring-over")).mode & 0o777).toBe(
+      0o700,
+    );
+    expect(
+      await existingSourceSnapshot(
+        f.target,
+        f.source,
+        Date.now() + 2 * 60 * 60_000,
+      ),
+    ).toBeNull();
+    expect(existsSync(f.snapshot.snapshotPath)).toBe(false);
+    const again = await takeSourceSnapshot({
+      dataDir: f.target,
+      sourceDataDir: f.source,
+      now: 2,
+    });
+    await run(
+      { ...f, snapshot: again },
+      { picks: [{ kind: "thread", id: f.ids.t1 }] },
+    );
+    expect(existsSync(again.snapshotPath)).toBe(false);
+  });
+
+  it("copies a large thread's events in chunks, and takes a failed one back out", async () => {
+    eventChunking.threshold = 1;
+    eventChunking.size = 1;
+    const f = await fixture();
+    await run(f, { picks: [{ kind: "thread", id: f.ids.t1 }] });
+    expect(
+      count(
+        f.db,
+        "SELECT COUNT(*) AS n FROM events WHERE thread_id = ?",
+        f.ids.t1,
+      ),
+    ).toBe(3);
+    expect(
+      f.db.prepare("SELECT deleted_at FROM threads WHERE id = ?").get(f.ids.t1),
+    ).toEqual({ deleted_at: null });
+
+    const g = await fixture();
+    const sequence = (g.db.prepare("SELECT 1").get(), 2);
+    g.db.exec(
+      `CREATE TRIGGER fail_late BEFORE INSERT ON events WHEN NEW.thread_id = '${g.ids.t1}' AND NEW.sequence = ${String(sequence)} BEGIN SELECT RAISE(ABORT, 'boom'); END;`,
+    );
+    const job = await run(g, { picks: [{ kind: "thread", id: g.ids.t1 }] });
+    expect(job.state).toBe("failed");
+    expect(
+      count(g.db, "SELECT COUNT(*) AS n FROM threads WHERE id = ?", g.ids.t1),
+    ).toBe(0);
+    expect(
+      count(
+        g.db,
+        "SELECT COUNT(*) AS n FROM events WHERE thread_id = ?",
+        g.ids.t1,
+      ),
+    ).toBe(0);
+    expect(
+      existsSync(join(g.target, "thread-storage", g.ids.t1, "note.txt")),
+    ).toBe(false);
+  });
+
+  it("skips an attachment whose project id would leave the attachments folder", async () => {
+    const f = await fixture();
+    const bb = new Database(join(f.source, "bb.db"));
+    bb.pragma("foreign_keys = OFF");
+    insertRow(bb, "project_attachments", {
+      id: "att_bad",
+      project_id: "../../escape",
+      stored_path: "x.png",
+      size_bytes: 1,
+      deletion_claimed_at: null,
+    });
+    insertRow(bb, "project_attachment_threads", {
+      attachment_id: "att_bad",
+      thread_id: f.ids.t1,
+    });
+    bb.close();
+    await mkdir(join(f.source, "escape"), { recursive: true });
+    await writeFile(join(f.source, "escape", "x.png"), "x");
+    const snapshot = await takeSourceSnapshot({
+      dataDir: f.target,
+      sourceDataDir: f.source,
+      now: 3,
+    });
+    await run(
+      { ...f, snapshot },
+      { picks: [{ kind: "thread", id: f.ids.t1 }] },
+    );
+    expect(
+      existsSync(join(f.target, "attachments", "..", "..", "escape", "x.png")),
+    ).toBe(false);
+    expect(
+      readFileSync(join(f.target, "attachments", f.ids.p1, "one.png"), "utf8"),
+    ).toBe("png");
+  });
+
+  it("brings only well-formed custom models and leaves this Mac's update and safe-mode state", async () => {
+    const f = await fixture();
+    await writeFile(
+      join(f.source, "config.json"),
+      JSON.stringify({
+        customModels: [
+          { providerId: "codex", model: "gpt-x" },
+          { providerId: "codex", model: "gpt-y", apiKey: "sk-nope" },
+        ],
+      }),
+    );
+    const bb = new Database(join(f.source, "bb.db"));
+    insertRow(bb, "app_settings_values", {
+      key: "pluginSafeMode",
+      value: "true",
+      updated_at: 1,
+    });
+    insertRow(bb, "app_settings_values", {
+      key: "keybindingOverrides",
+      value: "{}",
+      updated_at: 1,
+    });
+    bb.close();
+    const snapshot = await takeSourceSnapshot({
+      dataDir: f.target,
+      sourceDataDir: f.source,
+      now: 4,
+    });
+    const snap = openSnapshot(snapshot);
+    open.push(snap);
+    for (const id of ["custom-models", "app-settings"] as const) {
+      await applySetting({
+        id,
+        replace: false,
+        source: snap,
+        target: f.db,
+        sourceDataDir: f.source,
+        dataDir: f.target,
+      });
+    }
+    expect(
+      JSON.parse(readFileSync(join(f.target, "config.json"), "utf8"))
+        .customModels,
+    ).toEqual([{ providerId: "codex", model: "gpt-x" }]);
+    expect(
+      f.db
+        .prepare(
+          "SELECT key FROM app_settings_values WHERE key IN ('pluginSafeMode', 'keybindingOverrides')",
+        )
+        .all(),
+    ).toEqual([{ key: "keybindingOverrides" }]);
+  });
+
+  it("says a linked skills folder is not copied, and copies nothing from it", async () => {
+    const f = await fixture();
+    const elsewhere = join(f.root, "my-skills");
+    await mkdir(join(elsewhere, "one"), { recursive: true });
+    await writeFile(join(elsewhere, "one", "SKILL.md"), "s");
+    symlinkSync(elsewhere, join(f.source, "skills"));
+    expect(lstatSync(join(f.source, "skills")).isSymbolicLink()).toBe(true);
+    const snap = openSnapshot(f.snapshot);
+    open.push(snap);
+    expect(
+      (await listSettings(snap, f.source)).find((item) => item.id === "skills"),
+    ).toMatchObject({ count: 0, detail: expect.stringContaining("is a link") });
+    await expect(
+      applySetting({
+        id: "skills",
+        replace: false,
+        source: snap,
+        target: f.db,
+        sourceDataDir: f.source,
+        dataDir: f.target,
+      }),
+    ).rejects.toThrow(/is a link/u);
+    expect(existsSync(join(f.target, "skills"))).toBe(false);
   });
 });
