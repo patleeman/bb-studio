@@ -3,52 +3,78 @@ import { resetForkRailPreferences } from "./fork-rail-reset.js";
 import { recordPluginBaselines } from "./plugin-sync.js";
 import { setForkImportDataDir } from "./index.js";
 import {
+  closeForkImportDatabase,
+  FORK_IMPORT_DATABASE_FILE_NAME,
   FORK_IMPORT_STATE_FILE_NAME,
   openForkImportDatabase,
   type ForkImportState,
 } from "./state.js";
-import { createHash } from "node:crypto";
 import {
-  createReadStream,
-  constants as fsConstants,
-  readFileSync,
-} from "node:fs";
+  copyFilesInParallel,
+  FIRST_RUN_FAILED_FILE_NAME,
+  firstRunFailureMessage,
+  FirstRunImportTimeoutError,
+  ImportDeadline,
+  moveIntoDataDir,
+  recoverInterruptedFirstRunImport,
+  stagingDirPrefix,
+  sweepFirstRunStaging,
+  writeFirstRunFailure,
+} from "./first-run-install.js";
+import { snapshotDatabases, type SnapshotJob } from "./first-run-snapshot.js";
+import { readFileSync } from "node:fs";
 import {
-  copyFile,
   mkdir,
   mkdtemp,
+  readFile,
+  rename,
   rm,
   stat,
   writeFile,
 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { HOST_DAEMON_PROTOCOL_VERSION } from "@bb/host-daemon-contract";
 import {
-  discardImportBackups,
-  installImportedServerFiles,
+  bbAppManagedEnvFileSchema,
+  parseBbAppManagedConfig,
+} from "@bb/config/bb-app-managed-config";
+import {
   listServerOwnedEntries,
-  removeServerImportJournalFile,
-  rollBackServerImport,
+  mergeImportedManagedConfig,
+  SERVER_CONNECT_HOLD_FILE_NAME,
+  SERVER_IMPORT_FILE_NAME,
+  SERVER_IMPORT_JOURNAL_FILE_NAME,
   writeServerConnectHoldFile,
   writeServerImportFile,
-  type ServerArchiveManifest,
 } from "@bb/server-archive";
 import type { ServerLogger } from "../../types.js";
 import { readPrimaryHostIdFromDataDir } from "../hosts/primary-host.js";
 
 export const FORK_IMPORT_SOURCE_ENV = "BB_STUDIO_IMPORT_FROM";
+export const FORK_IMPORT_TIMEOUT_ENV = "BB_STUDIO_IMPORT_TIMEOUT_MS";
+
+const DEFAULT_IMPORT_TIMEOUT_MS = 30_000;
 
 const DATABASE_FILE_NAME = "bb.db";
+const MANAGED_CONFIG_FILE_NAME = "config.json";
+const MANAGED_ENV_FILE_NAME = "env.json";
 const PRODUCTION_DATA_DIR_NAME = ".bb-studio";
 const DEFAULT_SOURCE_DIR_NAME = ".bb";
+
+type ImportedManagedConfig = Parameters<
+  typeof mergeImportedManagedConfig
+>[0]["importedConfig"];
 
 const EXCLUDED_PATHS = [
   "telemetry-id",
   "plugins/mobile",
   "plugins/push-notifications",
   "plugins/account-pool/secrets",
+  "plugins/snapshots",
 ];
+const JUNK_FILE_NAMES = new Set([".DS_Store"]);
+
+const AFTER_START_PATHS = ["attachments"];
 
 const DATABASE_SCRUB_STATEMENTS = [
   "DELETE FROM plugin_kv WHERE plugin_id IN ('push-notifications', 'mobile')",
@@ -65,6 +91,7 @@ const DATABASE_SCRUB_STATEMENTS = [
   "UPDATE plugins SET provenance = 'direct', catalog_entry_id = NULL, catalog_marketplace_name = NULL, updated_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000 WHERE provenance = 'catalog' AND catalog_marketplace_name = 'bb-community' AND removed_at IS NULL",
   "DELETE FROM plugin_marketplace_icons WHERE marketplace_name = 'bb-community'",
   "DELETE FROM plugin_marketplaces WHERE name = 'bb-community'",
+  "DELETE FROM plugin_state_snapshots",
 ];
 
 const PLUGIN_DATABASE_SCRUB_STATEMENTS: Readonly<
@@ -90,12 +117,17 @@ export interface RunForkFirstRunImportArgs {
   logger: Pick<ServerLogger, "info" | "warn">;
   now: number;
   appVersion: string;
+  timeoutMs?: number;
 }
 
 function isExcluded(path: string): boolean {
   return EXCLUDED_PATHS.some(
     (excluded) => path === excluded || path.startsWith(`${excluded}/`),
   );
+}
+
+function isJunk(path: string): boolean {
+  return JUNK_FILE_NAMES.has(basename(path));
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -254,31 +286,8 @@ export function resolveForkImportSource(args: {
     : null;
 }
 
-async function sha256OfFile(path: string): Promise<string> {
-  const hash = createHash("sha256");
-  for await (const chunk of createReadStream(path)) {
-    hash.update(chunk as Buffer);
-  }
-  return hash.digest("hex");
-}
-
-async function snapshotDatabase(
-  sourcePath: string,
-  destinationPath: string,
-  scrub: readonly string[],
-): Promise<void> {
-  await mkdir(dirname(destinationPath), { recursive: true });
-  const source = new Database(sourcePath, {
-    fileMustExist: true,
-    readonly: true,
-  });
-  try {
-    await source.backup(destinationPath);
-  } finally {
-    source.close();
-  }
-  if (scrub.length === 0) return;
-  const snapshot = new Database(destinationPath, { fileMustExist: true });
+function scrubDatabase(path: string, scrub: readonly string[]): void {
+  const snapshot = new Database(path, { fileMustExist: true });
   try {
     for (const statement of scrub) {
       try {
@@ -321,14 +330,67 @@ function readSnapshotFacts(databasePath: string): {
   }
 }
 
+function importTimeoutMs(args: RunForkFirstRunImportArgs): number {
+  if (args.timeoutMs !== undefined) return args.timeoutMs;
+  const configured = Number(args.env[FORK_IMPORT_TIMEOUT_ENV]);
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : DEFAULT_IMPORT_TIMEOUT_MS;
+}
+
+function parseManagedConfig(value: unknown): ImportedManagedConfig {
+  const config: ImportedManagedConfig = { ...parseBbAppManagedConfig(value) };
+  const raw = value as { customModels?: unknown };
+  if (Array.isArray(raw.customModels)) config.customModels = raw.customModels;
+  return config;
+}
+
+async function readJson(path: string): Promise<unknown> {
+  return JSON.parse(await readFile(path, "utf8")) as unknown;
+}
+
+async function mergeManagedFiles(
+  dataDir: string,
+  filesDir: string,
+): Promise<void> {
+  const config = join(dataDir, MANAGED_CONFIG_FILE_NAME);
+  const stagedConfig = join(filesDir, MANAGED_CONFIG_FILE_NAME);
+  if ((await exists(config)) && (await exists(stagedConfig))) {
+    const merged = mergeImportedManagedConfig({
+      importedConfig: parseManagedConfig(await readJson(stagedConfig)),
+      existingConfig: parseManagedConfig(await readJson(config)),
+      localServerUrl: null,
+    });
+    await writeFile(stagedConfig, `${JSON.stringify(merged, null, 2)}\n`);
+  }
+  const env = join(dataDir, MANAGED_ENV_FILE_NAME);
+  const stagedEnv = join(filesDir, MANAGED_ENV_FILE_NAME);
+  if ((await exists(env)) && (await exists(stagedEnv))) {
+    const existing = bbAppManagedEnvFileSchema.parse(await readJson(env));
+    const imported = bbAppManagedEnvFileSchema.parse(await readJson(stagedEnv));
+    const merged = { ...existing.env, ...imported.env };
+    await writeFile(
+      stagedEnv,
+      `${JSON.stringify(Object.keys(merged).length > 0 ? { env: merged } : {}, null, 2)}\n`,
+    );
+  }
+}
+
 export async function runForkFirstRunImport(
   args: RunForkFirstRunImportArgs,
 ): Promise<ForkImportState | null> {
   const dataDir = resolve(args.dataDir);
+  await recoverInterruptedFirstRunImport(dataDir, args.logger);
   const sourceDataDir = resolveForkImportSource(args);
   if (sourceDataDir === null || sourceDataDir === dataDir) return null;
-  if (await exists(join(dataDir, DATABASE_FILE_NAME))) return null;
-  if (await exists(join(dataDir, FORK_IMPORT_STATE_FILE_NAME))) return null;
+  for (const name of [
+    DATABASE_FILE_NAME,
+    FORK_IMPORT_STATE_FILE_NAME,
+    FIRST_RUN_FAILED_FILE_NAME,
+    SERVER_IMPORT_JOURNAL_FILE_NAME,
+  ]) {
+    if (await exists(join(dataDir, name))) return null;
+  }
   if (!(await exists(join(sourceDataDir, DATABASE_FILE_NAME)))) {
     args.logger.info(
       { sourceDataDir },
@@ -337,123 +399,150 @@ export async function runForkFirstRunImport(
     return null;
   }
 
+  const startedAt = Date.now();
+  const deadline = new ImportDeadline(importTimeoutMs(args), startedAt);
   args.logger.info({ sourceDataDir, dataDir }, "First-run import started");
-  await mkdir(dirname(dataDir), { recursive: true });
+  await mkdir(dataDir, { recursive: true });
   const stagingDir = await mkdtemp(
-    join(dirname(dataDir), `.${basename(dataDir)}-first-run-import-`),
+    join(dirname(dataDir), stagingDirPrefix(dataDir)),
   );
   const filesDir = join(stagingDir, "files");
+  let finished = false;
   try {
+    const inventory = await listServerOwnedEntries(sourceDataDir);
+    deadline.check();
+    const snapshots: SnapshotJob[] = [
+      {
+        from: join(sourceDataDir, DATABASE_FILE_NAME),
+        to: join(filesDir, DATABASE_FILE_NAME),
+      },
+    ];
+    const scrubs = new Map<string, readonly string[]>([
+      [DATABASE_FILE_NAME, DATABASE_SCRUB_STATEMENTS],
+    ]);
+    const copies: { from: string; to: string }[] = [];
+    const roots: string[] = [];
+    const excluded: string[] = [];
+    let afterStart = 0;
+    for (const entry of inventory.entries) {
+      if (entry.path === DATABASE_FILE_NAME) continue;
+      if (isExcluded(entry.path)) {
+        excluded.push(entry.path);
+        continue;
+      }
+      if (AFTER_START_PATHS.includes(entry.path)) {
+        afterStart += entry.files.length;
+        continue;
+      }
+      let kept = 0;
+      for (const file of entry.files) {
+        if (isExcluded(file.path) || isJunk(file.path)) continue;
+        const to = join(filesDir, ...file.path.split("/"));
+        if (file.sqliteDatabase) {
+          snapshots.push({ from: file.absolutePath, to });
+          const scrub = PLUGIN_DATABASE_SCRUB_STATEMENTS[file.path];
+          if (scrub !== undefined) scrubs.set(file.path, scrub);
+        } else {
+          copies.push({ from: file.absolutePath, to });
+        }
+        kept += 1;
+      }
+      if (kept > 0) roots.push(entry.path);
+    }
+
+    for (const job of snapshots) {
+      await mkdir(dirname(job.to), { recursive: true });
+    }
+    await snapshotDatabases(snapshots, deadline);
+    for (const [path, statements] of scrubs) {
+      scrubDatabase(join(filesDir, ...path.split("/")), statements);
+    }
     const databaseSnapshotPath = join(filesDir, DATABASE_FILE_NAME);
-    await snapshotDatabase(
-      join(sourceDataDir, DATABASE_FILE_NAME),
-      databaseSnapshotPath,
-      DATABASE_SCRUB_STATEMENTS,
-    );
     applyPluginOptions(databaseSnapshotPath, readForkImportOptions(dataDir));
     const facts = readSnapshotFacts(databaseSnapshotPath);
-    const inventory = await listServerOwnedEntries(sourceDataDir);
-    const paths = [DATABASE_FILE_NAME];
-    for (const entry of inventory.entries) {
-      for (const file of entry.files) {
-        if (file.path === DATABASE_FILE_NAME || isExcluded(file.path)) continue;
-        const stagedPath = join(filesDir, ...file.path.split("/"));
-        if (file.sqliteDatabase) {
-          await snapshotDatabase(
-            file.absolutePath,
-            stagedPath,
-            PLUGIN_DATABASE_SCRUB_STATEMENTS[file.path] ?? [],
-          );
-        } else {
-          await mkdir(dirname(stagedPath), { recursive: true });
-          await copyFile(
-            file.absolutePath,
-            stagedPath,
-            fsConstants.COPYFILE_FICLONE,
-          );
-        }
-        paths.push(file.path);
-      }
-    }
-    const entries: ServerArchiveManifest["entries"] = [];
-    for (const path of paths) {
-      const stagedPath = join(filesDir, ...path.split("/"));
-      entries.push({
-        path,
-        size: (await stat(stagedPath)).size,
-        sha256: await sha256OfFile(stagedPath),
-      });
-    }
-    const manifest: ServerArchiveManifest = {
-      format: "bb-server-archive",
-      version: 2,
-      createdAt: args.now,
-      bbVersion: args.appVersion,
-      protocolVersion: HOST_DAEMON_PROTOCOL_VERSION,
-      migrationCount: facts.migrationCount,
-      sourceDataDir,
-      sourceServerHostId: readPrimaryHostIdFromDataDir({
-        dataDir: sourceDataDir,
-      }),
-      serverMoveExperiment: true,
-      entries,
-    };
-    const installed = await installImportedServerFiles({
-      stagingDir,
-      dataDir,
-      manifest,
-      localServerUrl: null,
+    deadline.check();
+    await copyFilesInParallel(copies, deadline);
+    deadline.check();
+    await mergeManagedFiles(dataDir, filesDir);
+
+    const sourceServerHostId = readPrimaryHostIdFromDataDir({
+      dataDir: sourceDataDir,
     });
+    await writeServerConnectHoldFile(filesDir, {
+      version: 1,
+      reason: "manual-import",
+      createdAt: args.now,
+    });
+    await writeServerImportFile(filesDir, {
+      version: 1,
+      kind: "manual",
+      moveId: null,
+      activationToken: null,
+      sourceDataDir,
+      sourceServerHostId,
+      targetHostId: null,
+      serverUrl: null,
+      importedEntries: [...roots, DATABASE_FILE_NAME],
+      createdAt: args.now,
+      fixupsAppliedAt: null,
+    });
+    seedMirroredThreads(filesDir, join(sourceDataDir, DATABASE_FILE_NAME));
+    recordPluginBaselines(filesDir);
+    closeForkImportDatabase(filesDir);
+    const forkDatabaseFiles = [
+      FORK_IMPORT_DATABASE_FILE_NAME,
+      `${FORK_IMPORT_DATABASE_FILE_NAME}-wal`,
+      `${FORK_IMPORT_DATABASE_FILE_NAME}-shm`,
+    ];
+    const forkDatabasePaths: string[] = [];
+    for (const name of forkDatabaseFiles) {
+      if (await exists(join(filesDir, name))) forkDatabasePaths.push(name);
+    }
+    deadline.check();
+
     const state: ForkImportState = {
       version: 1,
       sourceDataDir,
-      sourceServerHostId: manifest.sourceServerHostId,
+      sourceServerHostId,
       importedAt: args.now,
       sourceEventRowid: facts.eventRowid,
     };
-    try {
-      await writeServerConnectHoldFile(dataDir, {
-        version: 1,
-        reason: "manual-import",
-        createdAt: args.now,
-      });
-      await writeServerImportFile(dataDir, {
-        version: 1,
-        kind: "manual",
-        moveId: null,
-        activationToken: null,
-        sourceDataDir,
-        sourceServerHostId: manifest.sourceServerHostId,
-        targetHostId: null,
-        serverUrl: null,
-        importedEntries: installed.importedEntries,
-        createdAt: args.now,
-        fixupsAppliedAt: null,
-      });
-      await writeFile(
-        join(dataDir, FORK_IMPORT_STATE_FILE_NAME),
-        `${JSON.stringify(state, null, 2)}\n`,
-      );
-    } catch (error) {
-      await rollBackServerImport(dataDir);
-      throw error;
-    }
-    await removeServerImportJournalFile(dataDir);
-    await discardImportBackups(dataDir);
-    seedMirroredThreads(dataDir, join(sourceDataDir, DATABASE_FILE_NAME));
-    recordPluginBaselines(dataDir);
-
+    await moveIntoDataDir({
+      dataDir,
+      stagingDir,
+      filesDir,
+      paths: [
+        ...roots,
+        SERVER_CONNECT_HOLD_FILE_NAME,
+        SERVER_IMPORT_FILE_NAME,
+        ...forkDatabasePaths,
+        DATABASE_FILE_NAME,
+      ],
+      replaceable: new Set([MANAGED_CONFIG_FILE_NAME, MANAGED_ENV_FILE_NAME]),
+      commit: async () => {
+        const path = join(dataDir, FORK_IMPORT_STATE_FILE_NAME);
+        await writeFile(`${path}.tmp`, `${JSON.stringify(state, null, 2)}\n`);
+        await rename(`${path}.tmp`, path);
+      },
+    });
+    finished = true;
     args.logger.info(
       {
         sourceDataDir,
-        files: entries.length,
+        files: copies.length + snapshots.length,
+        excluded,
+        attachmentsAfterStart: afterStart,
         skippedPaths: inventory.skippedPaths.length,
+        durationMs: Date.now() - startedAt,
       },
       "First-run import finished",
     );
     return state;
   } finally {
-    await rm(stagingDir, { force: true, recursive: true });
+    closeForkImportDatabase(filesDir);
+    const removal = rm(stagingDir, { force: true, recursive: true });
+    if (finished) await removal;
+    else void removal.catch(() => undefined);
   }
 }
 
@@ -461,16 +550,47 @@ export async function forkBeforeDatabase(
   serverConfig: { BB_DATA_DIR: string; BB_APP_VERSION: string },
   logger: Pick<ServerLogger, "info" | "warn">,
 ): Promise<void> {
-  setForkImportDataDir(serverConfig.BB_DATA_DIR);
-  await runForkFirstRunImport({
-    dataDir: serverConfig.BB_DATA_DIR,
-    env: process.env,
-    logger,
-    now: Date.now(),
-    appVersion: serverConfig.BB_APP_VERSION,
-  });
+  const dataDir = serverConfig.BB_DATA_DIR;
+  setForkImportDataDir(dataDir);
   try {
-    resetForkRailPreferences(serverConfig.BB_DATA_DIR, Date.now());
+    await runForkFirstRunImport({
+      dataDir,
+      env: process.env,
+      logger,
+      now: Date.now(),
+      appVersion: serverConfig.BB_APP_VERSION,
+    });
+  } catch (error) {
+    const sourceDataDir =
+      resolveForkImportSource({ dataDir, env: process.env }) ?? "";
+    const reason =
+      error instanceof FirstRunImportTimeoutError ? "timed-out" : "error";
+    const message = firstRunFailureMessage(sourceDataDir, reason);
+    logger.warn({ err: error, sourceDataDir }, message);
+    try {
+      await writeFirstRunFailure(dataDir, {
+        version: 1,
+        sourceDataDir,
+        failedAt: Date.now(),
+        reason,
+        detail: error instanceof Error ? error.message : String(error),
+        message,
+      });
+    } catch (writeError) {
+      logger.warn({ err: writeError }, "could not record the failed import");
+    }
+  }
+  void sweepFirstRunStaging(dataDir)
+    .then((removed) => {
+      if (removed > 0) {
+        logger.info({ removed }, "Removed staging left by a stopped import");
+      }
+    })
+    .catch((error: unknown) => {
+      logger.warn({ err: error }, "could not remove old import staging");
+    });
+  try {
+    resetForkRailPreferences(dataDir, Date.now());
   } catch (error) {
     logger.warn({ error }, "fork rail preferences were not reset");
   }
