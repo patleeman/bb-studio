@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { readPrimaryHostIdFromDataDir } from "../../hosts/primary-host.js";
 import { resolveForkImportSource } from "../import-source.js";
 import { BringOverError, exists } from "./files.js";
-import { snapshotDatabases } from "./snapshot.js";
+import { snapshotDatabases, type SnapshotJob } from "./snapshot.js";
 
 export const BRING_OVER_DIR_NAME = "fork-bring-over";
 const SNAPSHOT_FILE_NAME = "bb.db";
@@ -34,6 +34,7 @@ export async function takeSourceSnapshot(args: {
   sourceDataDir: string;
   now: number;
   signal?: AbortSignal;
+  alsoCopy?: readonly SnapshotJob[];
 }): Promise<SourceSnapshot> {
   const directory = join(args.dataDir, BRING_OVER_DIR_NAME);
   await mkdir(directory, { recursive: true, mode: 0o700 });
@@ -42,7 +43,10 @@ export async function takeSourceSnapshot(args: {
   await rm(temp, { force: true });
   try {
     await snapshotDatabases(
-      [{ from: join(args.sourceDataDir, "bb.db"), to: temp }],
+      [
+        { from: join(args.sourceDataDir, "bb.db"), to: temp },
+        ...(args.alsoCopy ?? []),
+      ],
       args.signal,
     );
     const copy = new Database(temp, { fileMustExist: true });
