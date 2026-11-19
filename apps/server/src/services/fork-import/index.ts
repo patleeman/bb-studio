@@ -13,7 +13,9 @@ import {
   readForkImportState,
   writeCursor,
 } from "./state.js";
+import { readFirstRunFailure } from "./first-run-install.js";
 import {
+  copyMissingAttachments,
   copyMissingThreadStorage,
   runForkImportSync,
   type ForkSyncSummary,
@@ -115,6 +117,23 @@ const FORK_SWEEP_JOBS: readonly ForkSweepJob[] = [
       }),
   },
   {
+    cadenceMs: SYNC_CADENCE_MS,
+    category: "maintenance",
+    name: "fork-import-attachments",
+    background: true,
+    sweep: (deps) =>
+      defineSingleItemSweep({
+        name: "fork-import-attachments",
+        process: async () => {
+          if (activeDataDir === null || !hasForkImport(activeDataDir)) return;
+          await copyMissingAttachments({
+            dataDir: activeDataDir,
+            logger: deps.logger,
+          });
+        },
+      }),
+  },
+  {
     cadenceMs: PLUGIN_SYNC_CADENCE_MS,
     category: "maintenance",
     name: "fork-import-plugin-sync",
@@ -154,7 +173,18 @@ function lastSummary(dataDir: string): ForkSyncSummary | null {
 function importStatus(deps: AppDeps) {
   const state = readForkImportState(requireDataDir());
   if (state === null || !hasForkImport(requireDataDir())) {
-    return { imported: false as const };
+    const failure = readFirstRunFailure(requireDataDir());
+    return failure === null
+      ? { imported: false as const }
+      : {
+          imported: false as const,
+          failure: {
+            sourceDataDir: failure.sourceDataDir,
+            failedAt: failure.failedAt,
+            reason: failure.reason,
+            message: failure.message,
+          },
+        };
   }
   const fork = openForkImportDatabase(requireDataDir());
   const counts = fork
