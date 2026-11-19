@@ -1530,6 +1530,44 @@ describe("BB Studio data from bb", () => {
     );
   });
 
+  it("changes nothing in a Studio data folder whose journal it can't read, or that still holds set-aside data", async () => {
+    const f = await studioFixture();
+    const api = await withToken(f);
+    const dir = join(f.ours, "import-staged");
+    await mkdir(join(dir, "before"), { recursive: true });
+    await writeFile(join(dir, "before", "data.db"), "this install's data");
+    for (const journal of [
+      JSON.stringify({ version: 1, id: "x", state: "a-later-state" }),
+      "{ not json",
+    ]) {
+      await writeFile(join(dir, "journal.json"), journal);
+      for (const path of ["", "/discard", "/put-back", "/forget"]) {
+        const response = await api.request(
+          `/fork/bring-over/studio-data${path}`,
+          post({}),
+        );
+        expect(response.status).toBe(409);
+        expect(await response.text()).toContain("import-staged");
+      }
+      expect(
+        await (await api.request("/fork/bring-over/studio-data")).json(),
+      ).toMatchObject({ journal: { state: "unreadable" } });
+    }
+    await writeFile(
+      join(dir, "journal.json"),
+      JSON.stringify({ version: 1, id: "x", state: "staged", stagedAt: 1 }),
+    );
+    for (const path of ["", "/discard"]) {
+      expect(
+        (await api.request(`/fork/bring-over/studio-data${path}`, post({})))
+          .status,
+      ).toBe(409);
+    }
+    expect(readFileSync(join(dir, "before", "data.db"), "utf8")).toBe(
+      "this install's data",
+    );
+  });
+
   it("puts the old data back or deletes it only from the right state, and needs BB Studio's window for every change", async () => {
     const f = await studioFixture();
     const api = await withToken(f);
