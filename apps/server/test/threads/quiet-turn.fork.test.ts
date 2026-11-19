@@ -1,4 +1,4 @@
-import { getThread } from "@bb/db";
+import { findLastRootStoredTurnStarted, getThread } from "@bb/db";
 import {
   createStandaloneBuiltinCompactCommandInput,
   encodeClientTurnRequestIdNumber,
@@ -6,7 +6,7 @@ import {
   turnScope,
 } from "@bb/domain";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { applyLoggedThreadLifecycleEvent } from "../../src/services/threads/lifecycle-outcome.js";
+import { runThreadLifecycleTransaction } from "../../src/services/threads/lifecycle/run.js";
 import {
   forkIdleFields,
   isQuietTurn,
@@ -45,6 +45,17 @@ function seedFinishedTurn(harness: TestAppHarness, reply: string) {
   return thread;
 }
 
+function completeTurn(harness: TestAppHarness, threadId: string) {
+  const turnId = findLastRootStoredTurnStarted(harness.db, {
+    threadId,
+  })!.turnId;
+  return runThreadLifecycleTransaction(harness.deps, threadId, {
+    type: "turn.completed",
+    turnId,
+    status: "completed",
+  });
+}
+
 let dispose = () => {};
 
 beforeEach(() => {
@@ -61,11 +72,8 @@ describe("quiet turns", () => {
       const thread = seedFinishedTurn(harness, "[PASS]");
       const before = getThread(harness.db, thread.id)?.latestAttentionAt;
       expect(isQuietTurn(harness.db, { threadId: thread.id })).toBe(true);
-      const outcome = applyLoggedThreadLifecycleEvent(harness.deps, {
-        event: { type: "run.succeeded" },
-        threadId: thread.id,
-      });
-      expect(outcome.applied).toBe(true);
+      const outcome = completeTurn(harness, thread.id);
+      expect(outcome.statusChanged).toBe(true);
       const after = getThread(harness.db, thread.id);
       expect(after?.status).toBe("idle");
       expect(after?.latestAttentionAt).toBe(before);
@@ -80,10 +88,7 @@ describe("quiet turns", () => {
       const thread = seedFinishedTurn(harness, "The backup finished.");
       const before = getThread(harness.db, thread.id)?.latestAttentionAt;
       expect(isQuietTurn(harness.db, { threadId: thread.id })).toBe(false);
-      applyLoggedThreadLifecycleEvent(harness.deps, {
-        event: { type: "run.succeeded" },
-        threadId: thread.id,
-      });
+      completeTurn(harness, thread.id);
       expect(getThread(harness.db, thread.id)?.latestAttentionAt).not.toBe(
         before,
       );
@@ -176,10 +181,7 @@ describe("a compaction bb ran on its own", () => {
           turnId: "turn-compact",
         }),
       ).toBe(true);
-      applyLoggedThreadLifecycleEvent(harness.deps, {
-        event: { type: "run.succeeded" },
-        threadId: thread.id,
-      });
+      completeTurn(harness, thread.id);
       const after = getThread(harness.db, thread.id);
       expect(after?.status).toBe("idle");
       expect(after?.latestAttentionAt).toBe(before);
@@ -195,10 +197,7 @@ describe("a compaction bb ran on its own", () => {
       const thread = seedCompactionTurn(harness, "user");
       const before = getThread(harness.db, thread.id)?.latestAttentionAt;
       expect(isQuietTurn(harness.db, { threadId: thread.id })).toBe(false);
-      applyLoggedThreadLifecycleEvent(harness.deps, {
-        event: { type: "run.succeeded" },
-        threadId: thread.id,
-      });
+      completeTurn(harness, thread.id);
       expect(getThread(harness.db, thread.id)?.latestAttentionAt).not.toBe(
         before,
       );
@@ -286,10 +285,7 @@ describe("an automated input with a notice", () => {
     await withTestHarness(async (harness) => {
       const thread = seedAutomationTurn(harness, "[PASS]");
       const before = getThread(harness.db, thread.id)?.latestAttentionAt;
-      applyLoggedThreadLifecycleEvent(harness.deps, {
-        event: { type: "run.succeeded" },
-        threadId: thread.id,
-      });
+      completeTurn(harness, thread.id);
       expect(getThread(harness.db, thread.id)?.latestAttentionAt).toBe(before);
       expect(forkIdleFields(harness.db, thread.id)).toEqual({
         experimental_quiet: true,
@@ -301,10 +297,7 @@ describe("an automated input with a notice", () => {
     await withTestHarness(async (harness) => {
       const thread = seedAutomationTurn(harness, "red4's disk is at 91%.");
       const before = getThread(harness.db, thread.id)?.latestAttentionAt;
-      applyLoggedThreadLifecycleEvent(harness.deps, {
-        event: { type: "run.succeeded" },
-        threadId: thread.id,
-      });
+      completeTurn(harness, thread.id);
       expect(getThread(harness.db, thread.id)?.latestAttentionAt).not.toBe(
         before,
       );
