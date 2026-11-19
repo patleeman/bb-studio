@@ -1,6 +1,6 @@
 # Daily fork sync: brief for the agent
 
-You keep the BB Studio fork in step with upstream bb. Work in `~/workingdir/bb-studio-app-desktop`, the worktree of the BB Studio repository that has the `desktop` branch checked out; never in `desktop/` on `main`. Read `AGENTS.fork.md` first.
+You keep the BB Studio fork in step with upstream bb. Work in `~/workingdir/bb-studio-public-desktop`, the worktree of the BB Studio repository that has the `desktop` branch checked out; never in `desktop/` on `main`. Read `AGENTS.fork.md` first.
 
 ## Hard limits
 
