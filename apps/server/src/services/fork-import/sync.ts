@@ -3,7 +3,6 @@ import { cpSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { cp, readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ServerLogger } from "../../types.js";
-import { copyMissingFiles } from "./first-run-install.js";
 import {
   openForkImportDatabase,
   readCursor,
@@ -29,7 +28,6 @@ const THREAD_REFERENCE_COLUMNS = [
   "lifecycle_owner_thread_id",
 ];
 const DELETION_CHECK_INTERVAL_MS = 10 * 60_000;
-const ATTACHMENT_COPY_MAX_ATTEMPTS = 5;
 
 export interface ForkSyncSummary {
   skipped: string | null;
@@ -67,7 +65,7 @@ function primaryKeyOf(database: Sqlite, table: string): string[] {
     .map((row) => row.name);
 }
 
-function quote(name: string): string {
+export function quote(name: string): string {
   return `"${name.replaceAll('"', '""')}"`;
 }
 
@@ -112,11 +110,11 @@ export function upsertRows(
   return written;
 }
 
-function selectList(columns: readonly string[]): string {
+export function selectList(columns: readonly string[]): string {
   return columns.map(quote).join(", ");
 }
 
-function readHostId(dataDir: string): string | null {
+export function readHostId(dataDir: string): string | null {
   try {
     const value = readFileSync(join(dataDir, "host-id"), "utf8").trim();
     return value.length > 0 ? value : null;
@@ -125,7 +123,11 @@ function readHostId(dataDir: string): string | null {
   }
 }
 
-function rowExists(database: Sqlite, table: string, id: string): boolean {
+export function rowExists(
+  database: Sqlite,
+  table: string,
+  id: string,
+): boolean {
   return (
     database
       .prepare<[string], { found: number }>(
@@ -175,7 +177,7 @@ function syncUpdatedTable(
   return written;
 }
 
-function ensureHosts(source: Sqlite, target: Sqlite): void {
+export function ensureHosts(source: Sqlite, target: Sqlite): void {
   const columns = sharedColumns(source, target, "hosts");
   const rows = source
     .prepare<[], Row>(`SELECT ${selectList(columns)} FROM hosts`)
@@ -668,31 +670,4 @@ export async function copyMissingThreadStorage(args: {
   writeCursor(fork, "threadStorageCopied", "2");
   args.logger.info({ copied }, "Import copied thread storage");
   return copied;
-}
-
-export async function copyMissingAttachments(args: {
-  dataDir: string;
-  logger: Pick<ServerLogger, "info" | "warn">;
-}): Promise<{ copied: number; failed: number } | null> {
-  const state = readForkImportState(args.dataDir);
-  if (state === null) return null;
-  const fork = openForkImportDatabase(args.dataDir);
-  if (readCursor(fork, "attachmentsCopied") === "1") return null;
-  const result = await copyMissingFiles(
-    join(state.sourceDataDir, "attachments"),
-    join(args.dataDir, "attachments"),
-  );
-  const attempts = Number(readCursor(fork, "attachmentsAttempts") ?? 0) + 1;
-  writeCursor(fork, "attachmentsAttempts", String(attempts));
-  if (result.failed === 0 || attempts >= ATTACHMENT_COPY_MAX_ATTEMPTS) {
-    writeCursor(fork, "attachmentsCopied", "1");
-  }
-  if (result.failed > 0) {
-    args.logger.warn(
-      { ...result, attempts },
-      "Import could not copy some attachments",
-    );
-  }
-  args.logger.info(result, "Import copied attachments");
-  return result;
 }
