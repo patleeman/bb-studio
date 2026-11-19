@@ -6,8 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const welcome = vi.hoisted(() => ({ threadId: "thr_first" as string | null }));
 vi.mock("../ui/live", () => ({ useLive: () => ({ data: { threadId: welcome.threadId, opened: true, pending: false, bot: { id: "bot_1" } } }) }));
 vi.mock("../kit/app/nav", () => ({ openAppPath: vi.fn() }));
+const rpc = vi.hoisted(() => {
+  const state = { status: null as import("../studio-data/contract").StudioDataStatusView | null, client: null as unknown };
+  state.client = { call: async () => state.status };
+  return state;
+});
+vi.mock("@get-bb/plugin-sdk/app", async (original) => ({ ...(await original<object>()), useRpc: () => rpc.client }));
 
-import { jobLine, readBringOver, resetUiTokenForTests, secretLine, type BringOverJob, type BringOverState } from "./api";
+import { jobLine, readBringOver, resetUiTokenForTests, secretLine, type BringOverJob, type BringOverState, type BringOverStudioData, type StudioImportState } from "./api";
 import { BringOverSection, requestFrom } from "./ui/BringOverSection";
 import { BringOverLink, resetBringOverOfferForTests } from "./ui/FirstChatLink";
 
@@ -27,7 +33,6 @@ const listing: BringOverState = {
     { id: "future-tool", version: null, source: "/src/future", sourceKind: "path", enabled: true, hasData: false, here: false, sourceMissing: false, needsNewer: ">=99.0.0" },
   ],
   job: null,
-  studioData: { inBb: true, offered: true, reason: null, bots: 2, pages: 14, tasks: 1 },
 };
 
 const job: BringOverJob = { id: "j", state: "running", threadsTotal: 40, threadsDone: 12, threadsImported: 9, threadsSkipped: 3, files: 0, settingsApplied: [], failures: [] };
@@ -210,6 +215,23 @@ describe("BB Studio data row", () => {
   let host: HTMLDivElement;
   const $ = (selector: string) => host.querySelector<HTMLElement>(selector);
   const button = (text: string) => [...host.querySelectorAll("button")].find((each) => each.textContent === text);
+  const text = () => $('[data-testid="bring-over-studio-data"]')?.textContent ?? "";
+  const preview = { bots: 3, pages: 14, tasks: 6, memories: 40, threads: { required: ["thr_main"], wanted: ["thr_main", "thr_conv", "thr_worker"] }, minisWithSecrets: 1, watchersWithEnv: 2, problem: null };
+  const server = (journal: BringOverStudioData["journal"]): BringOverStudioData => ({ inBb: true, bots: 3, pages: 14, tasks: 6, journal });
+  const journal = (state: StudioImportState, extra: object = {}) => ({ state, error: null, stagedAt: 1, ...extra });
+  let calls: { url: string; method: string; body: unknown; token: string | null }[] = [];
+  function serve(read: () => BringOverStudioData) {
+    calls = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : null, token: new Headers(init?.headers).get("x-bb-studio-ui-token") });
+      if (url.endsWith("/studio-data") && method === "GET") return new Response(JSON.stringify(read()), { status: 200 });
+      if (url.endsWith("/studio-data")) return new Response(JSON.stringify({ studioData: read() }), { status: 200 });
+      if (url.includes("/studio-data/")) return new Response(null, { status: 204 });
+      if (url.endsWith("/jobs")) return new Response(JSON.stringify({ ...job, threadsTotal: 3, threadsDone: 0 }), { status: 202 });
+      return new Response(JSON.stringify({ available: true, sourceDataDir: "/b", readAt: null, job: null }), { status: 200 });
+    }));
+  }
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     resetUiTokenForTests();
@@ -219,32 +241,66 @@ describe("BB Studio data row", () => {
     root = createRoot(host);
   });
   afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
+  const settle = async () => { for (let i = 0; i < 3; i++) await act(async () => { await Promise.resolve(); }); };
 
-  it("asks before replacing, then brings it over", async () => {
-    const posts: string[] = [];
-    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
-      if (init?.method === "POST") posts.push(url);
-      if (url.endsWith("/studio-data")) return new Response(JSON.stringify({ threads: 3, threadsHere: 0, bots: 2 }), { status: 200 });
-      return new Response(JSON.stringify(listing), { status: 200 });
-    }));
+  it("copies bb's Studio data, says plainly what it replaces, then brings the Bots' threads over as a job", async () => {
+    let state = server(null);
+    rpc.status = { ownData: { has: false }, journal: null, keptIn: null, preview: null };
+    serve(() => state);
     await act(async () => { root.render(<BringOverSection />); });
-    await act(async () => { await Promise.resolve(); });
-    expect($('[data-testid="bring-over-studio-data"]')?.textContent).toContain("2 Bots · 14 pages · 1 task");
-    act(() => { button("Bring over…")!.click(); });
-    expect(posts).toEqual([]);
-    expect($('[data-testid="bring-over-studio-data"]')?.textContent).toContain("Replaces this install's Assistant");
-    const row = $('[data-testid="bring-over-studio-data"]')!;
-    await act(async () => { [...row.querySelectorAll("button")].find((each) => each.textContent === "Bring over")!.click(); });
-    expect(posts).toEqual(["/api/v1/fork/bring-over/studio-data"]);
-    expect($('[data-testid="bring-over-studio-data"]')?.textContent).toContain("Brought over with 3 of its threads");
+    await settle();
+    expect(text()).toContain("3 Bots · 14 pages · 6 tasks");
+    state = server(journal("staged"));
+    rpc.status = { ...rpc.status!, journal: journal("staged"), preview };
+    await act(async () => { button("Bring over…")!.click(); });
+    await settle();
+    expect(calls.filter((call) => call.method === "POST").map((call) => [call.url, call.token])).toEqual([["/api/v1/fork/bring-over/studio-data", "token-from-the-app"]]);
+    for (const words of ["Replaces everything in BB Studio's Studio", "3 Bots, 14 pages, 6 tasks, 40 memories, and 3 threads", "kept in a folder, not deleted", "arrive stopped", "stop it in bb so it doesn't run twice", "1 mini app' API keys and 2 watchers' environment values", "quit and reopen BB Studio"]) expect(text()).toContain(words);
+    await act(async () => { button("Bring over")!.click(); });
+    await settle();
+    expect(calls.find((call) => call.url.endsWith("/jobs"))).toMatchObject({ method: "POST", token: "token-from-the-app", body: { picks: [{ kind: "thread", id: "thr_main" }, { kind: "thread", id: "thr_conv" }, { kind: "thread", id: "thr_worker" }], settings: [], studioData: { required: ["thr_main"] } } });
+    expect($('[data-testid="bring-over-job"]')?.textContent).toContain("0 of 3 threads");
   });
 
-  it("shows why when it is not offered", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...listing, studioData: { inBb: true, offered: false, reason: "BB Studio already has Bots, pages or tasks of its own", bots: 1, pages: 0, tasks: 0 } }), { status: 200 })));
+  it("is not offered while this install's Studio has data of its own, and says why", async () => {
+    rpc.status = { ownData: { has: true, reason: "it has 2 pages" }, journal: null, keptIn: null, preview: null };
+    serve(() => server(null));
     await act(async () => { root.render(<BringOverSection />); });
-    await act(async () => { await Promise.resolve(); });
-    expect($('[data-testid="bring-over-studio-data"]')?.textContent).toContain("of its own");
+    await settle();
+    expect(text()).toContain("already has data of its own (it has 2 pages)");
     expect(button("Bring over…")).toBeUndefined();
+  });
+
+  it("asks for a restart once ready, then offers to put the old data back or delete it, asking first", async () => {
+    let state = server(journal("ready"));
+    rpc.status = { ownData: { has: false }, journal: journal("ready"), keptIn: null, preview: null };
+    serve(() => state);
+    await act(async () => { root.render(<BringOverSection />); });
+    await settle();
+    expect(text()).toContain("Quit and reopen BB Studio to finish");
+    act(() => root.unmount());
+    root = createRoot(host);
+    state = server(journal("applied", { appliedAt: Date.now() }));
+    rpc.status = { ownData: { has: false }, journal: journal("applied"), keptIn: "/data/plugins/studio/import-staged/before", preview: null };
+    await act(async () => { root.render(<BringOverSection />); });
+    await settle();
+    expect(text()).toContain("bb's Bots are stopped here");
+    expect(text()).toContain("kept in /data/plugins/studio/import-staged/before");
+    act(() => { button("Put my old Studio data back…")!.click(); });
+    expect(calls.some((call) => call.url.includes("put-back"))).toBe(false);
+    expect(text()).toContain("next time BB Studio starts");
+    await act(async () => { button("Put it back")!.click(); });
+    expect(calls.find((call) => call.url.endsWith("/studio-data/put-back"))).toMatchObject({ method: "POST", token: "token-from-the-app" });
+  });
+
+  it("shows a failure and offers to discard the copy", async () => {
+    rpc.status = { ownData: { has: false }, journal: journal("refused"), keptIn: null, preview: null };
+    serve(() => server(journal("refused", { error: "bb runs a newer BB Studio than this one" })));
+    await act(async () => { root.render(<BringOverSection />); });
+    await settle();
+    expect(text()).toContain("newer BB Studio");
+    await act(async () => { button("Discard")!.click(); });
+    expect(calls.find((call) => call.url.endsWith("/studio-data/discard"))).toMatchObject({ method: "POST" });
   });
 });
 

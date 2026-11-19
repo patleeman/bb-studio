@@ -28,11 +28,21 @@ export interface BringOverState {
   job?: BringOverJob | null;
   studioData?: BringOverStudioData;
 }
-export interface BringOverStudioData { inBb: boolean; offered: boolean; reason: string | null; bots: number; pages: number; tasks: number }
+export type StudioImportState = "staging" | "staged" | "ready" | "applying" | "applied" | "refused" | "failed" | "rollback-failed" | "restore-requested" | "restoring" | "restored";
+/** bb's Studio data as the server sees it: in bb, its size, and where a bring-over of it is (the journal). */
+export interface BringOverStudioData {
+  inBb: boolean;
+  bots: number;
+  pages: number;
+  tasks: number;
+  journal: { state: StudioImportState; error: string | null; stagedAt: number; appliedAt?: number | null; restoredAt?: number | null } | null;
+}
 export interface BringOverRequest {
   picks: { kind: "project" | "thread"; id: string }[];
   attachments: boolean;
   settings: { id: string; replace: boolean }[];
+  /** Bringing over BB Studio data: the Bots' own threads, which must all come over. */
+  studioData?: { required: string[] };
 }
 
 const BASE = "/api/v1/fork/bring-over";
@@ -109,12 +119,49 @@ export async function readGate(token: string, load: typeof fetch = fetch): Promi
   }
 }
 
-export const bringOverStudioData = (token: string, load: typeof fetch = fetch) => send<{ threads: number; threadsHere: number; bots: number }>("/studio-data", gatedPost(token), load);
+async function sendEmpty(path: string, init: RequestInit, load: typeof fetch): Promise<void> {
+  const response = await load(`${BASE}${path}`, init);
+  if (!response.ok) throw new Error(await errorOf(response));
+}
+
+/** bb's Studio data and where a bring-over of it is; null on a BB without the route. */
+export async function readStudioData(load: typeof fetch = fetch): Promise<BringOverStudioData | null> {
+  try {
+    const response = await load(`${BASE}/studio-data`);
+    return response.ok ? ((await response.json()) as BringOverStudioData) : null;
+  } catch {
+    return null;
+  }
+}
+/** Copies bb's Studio data into a staging folder; nothing here changes yet. */
+export const copyStudioData = (token: string, load: typeof fetch = fetch) => send<{ studioData: BringOverStudioData }>("/studio-data", gatedPost(token), load);
+export const discardStudioData = (token: string, load: typeof fetch = fetch) => sendEmpty("/studio-data/discard", gatedPost(token), load);
+export const putBackStudioData = (token: string, load: typeof fetch = fetch) => sendEmpty("/studio-data/put-back", gatedPost(token), load);
+export const deleteOldStudioData = (token: string, load: typeof fetch = fetch) => sendEmpty("/studio-data/forget", gatedPost(token), load);
+
+const plural = (count: number, word: string, many = `${word}s`) => `${String(count)} ${count === 1 ? word : many}`;
 
 /** "2 Bots · 14 pages · 6 tasks". */
-export function studioDataLine(data: BringOverStudioData): string {
-  const plural = (count: number, word: string) => `${String(count)} ${word}${count === 1 ? "" : "s"}`;
+export function studioDataLine(data: Pick<BringOverStudioData, "bots" | "pages" | "tasks">): string {
   return [plural(data.bots, "Bot"), plural(data.pages, "page"), plural(data.tasks, "task")].join(" · ");
+}
+
+/** What a staged copy holds (Studio's studioData.status preview). */
+export interface StudioDataPreview { bots: number; pages: number; tasks: number; memories: number; threads: { required: string[]; wanted: string[] }; minisWithSecrets: number; watchersWithEnv: number; problem: string | null }
+
+/** The confirm step, in plain words: what is replaced, what comes over, what happens next. */
+export function studioDataConfirm(preview: StudioDataPreview): string[] {
+  const lines = [
+    `Replaces everything in BB Studio's Studio (your Assistant, its chats, pages, memory, tasks and Studio settings) with bb's: ${[plural(preview.bots, "Bot"), plural(preview.pages, "page"), plural(preview.tasks, "task"), plural(preview.memories, "memory", "memories")].join(", ")}, and ${plural(preview.threads.wanted.length, "thread")}.`,
+    "Your current Studio data is kept in a folder, not deleted, and you can put it back. Your Assistant's chat stays as a thread with no Bot.",
+    "The threads come over first, like any thread you bring over, and stay here even if you put your old data back.",
+    "bb's Bots arrive stopped, with their check-ins, runners and watchers off, and Task reminders off. If you resume a Bot here, stop it in bb so it doesn't run twice.",
+    "Approvals you gave in bb (mini apps, dashboard scripts, the public skill registry) are asked for again here.",
+  ];
+  const secrets = [preview.minisWithSecrets > 0 ? `${plural(preview.minisWithSecrets, "mini app")}' API keys` : null, preview.watchersWithEnv > 0 ? `${plural(preview.watchersWithEnv, "watcher")}' environment values` : null].filter(Boolean);
+  if (secrets.length > 0) lines.push(`Secrets kept in Studio's data come along: ${secrets.join(" and ")}.`);
+  lines.push("Then quit and reopen BB Studio to finish. Open windows and the phone app reconnect after that.");
+  return lines;
 }
 
 export const addOldPlugin = (id: string, token: string, load: typeof fetch = fetch) => send<{ id: string; data: boolean }>(`/plugins/${encodeURIComponent(id)}/add`, gatedPost(token), load);
