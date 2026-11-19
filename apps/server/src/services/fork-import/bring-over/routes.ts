@@ -9,6 +9,7 @@ import {
   cancelBringOverJob,
   currentBringOverJob,
   startBringOverJob,
+  type BringOverJob,
 } from "./job.js";
 import { listProjects, listThreads } from "./listing.js";
 import { addPlugin, listPlugins, type PluginInstaller } from "./plugins.js";
@@ -18,6 +19,15 @@ import {
   uiTokenConfigured,
   uiTokenMatches,
 } from "./ui-token.js";
+import {
+  checkStudioJob,
+  discardStudioData,
+  finishStudioJob,
+  forgetStudioData,
+  requestStudioPutBack,
+  stageStudioData,
+  studioDataState,
+} from "./studio-data.js";
 import {
   bringOverSource,
   existingSourceSnapshot,
@@ -52,6 +62,9 @@ const requestSchema = z.object({
       }),
     )
     .default([]),
+  studioData: z
+    .object({ required: z.array(z.string().min(1)).max(10_000) })
+    .optional(),
 });
 
 export { bringOverJobFinished };
@@ -218,13 +231,66 @@ export function registerBringOverRoutes(
         "Expected { picks, attachments, settings }",
       );
     }
+    const snap = await snapshot();
+    const { studioData, ...request } = parsed.data;
+    if (studioData !== undefined) {
+      if (studioDataStaging) {
+        throw new ApiError(
+          409,
+          "invalid_request",
+          "bb's Studio data is still being copied",
+        );
+      }
+      const db = openSnapshot(snap);
+      try {
+        const { missing } = checkStudioJob({
+          dataDir: dataDir(),
+          snapshot: snap,
+          source: db,
+          required: studioData.required,
+        });
+        if (missing.length > 0) {
+          throw new ApiError(
+            422,
+            "invalid_request",
+            `${String(missing.length)} of the Bots' own threads are not in bb, so its Studio data can't come over`,
+          );
+        }
+      } catch (error) {
+        if (error instanceof BringOverError) {
+          throw new ApiError(409, "invalid_request", error.message);
+        }
+        throw error;
+      } finally {
+        db.close();
+      }
+      const picked = new Set(
+        request.picks
+          .filter((pick) => pick.kind === "thread")
+          .map((pick) => pick.id),
+      );
+      for (const id of studioData.required) {
+        if (!picked.has(id)) request.picks.push({ kind: "thread", id });
+      }
+    }
     const job = startBringOverJob({
       dataDir: dataDir(),
-      snapshot: await snapshot(),
+      snapshot: snap,
       target: deps.db.$client,
-      request: parsed.data,
+      request,
       logger: deps.logger,
       now: Date.now(),
+      ...(studioData === undefined
+        ? {}
+        : {
+            onFinished: (finished: BringOverJob) =>
+              finishStudioJob({
+                dataDir: dataDir(),
+                target: deps.db.$client,
+                job: finished,
+                required: studioData.required,
+              }),
+          }),
     });
     if (job === null) {
       throw new ApiError(
@@ -243,6 +309,80 @@ export function registerBringOverRoutes(
   app.post("/fork/bring-over/jobs/current/cancel", (context) => {
     requireUi(context, "cancel");
     return context.json({ job: cancelBringOverJob(dataDir()) });
+  });
+
+  let studioDataStaging = false;
+  const studioError = (error: unknown): never => {
+    if (error instanceof BringOverError) {
+      throw new ApiError(409, "invalid_request", error.message);
+    }
+    throw error;
+  };
+
+  app.get("/fork/bring-over/studio-data", async (context) => {
+    const sourceDataDir = await bringOverSource(dataDir(), process.env);
+    return context.json(
+      sourceDataDir === null
+        ? { inBb: false, bots: 0, pages: 0, tasks: 0, journal: null }
+        : await studioDataState(dataDir(), sourceDataDir),
+    );
+  });
+
+  app.post("/fork/bring-over/studio-data", async (context) => {
+    requireUi(context, "studio-data");
+    const sourceDataDir = await source();
+    if (currentBringOverJob(dataDir())?.state === "running") {
+      throw new ApiError(
+        409,
+        "invalid_request",
+        "Wait for the bring-over that is running to finish",
+      );
+    }
+    if (studioDataStaging || snapshotting !== null) {
+      throw new ApiError(409, "invalid_request", "bb is being read already");
+    }
+    studioDataStaging = true;
+    try {
+      const staged = await stageStudioData({
+        dataDir: dataDir(),
+        sourceDataDir,
+        now: Date.now(),
+      }).catch(studioError);
+      return context.json({
+        journal: staged.journal,
+        studioData: await studioDataState(dataDir(), sourceDataDir),
+      });
+    } finally {
+      studioDataStaging = false;
+    }
+  });
+
+  app.post("/fork/bring-over/studio-data/discard", async (context) => {
+    requireUi(context, "studio-data/discard");
+    if (studioDataStaging) {
+      throw new ApiError(409, "invalid_request", "bb is being read");
+    }
+    if (currentBringOverJob(dataDir())?.state === "running") {
+      throw new ApiError(
+        409,
+        "invalid_request",
+        "Wait for the bring-over that is running to finish",
+      );
+    }
+    await discardStudioData(dataDir()).catch(studioError);
+    return context.body(null, 204);
+  });
+
+  app.post("/fork/bring-over/studio-data/put-back", async (context) => {
+    requireUi(context, "studio-data/put-back");
+    await requestStudioPutBack(dataDir()).catch(studioError);
+    return context.body(null, 204);
+  });
+
+  app.post("/fork/bring-over/studio-data/forget", async (context) => {
+    requireUi(context, "studio-data/forget");
+    await forgetStudioData(dataDir()).catch(studioError);
+    return context.body(null, 204);
   });
 
   app.post("/fork/bring-over/plugins/:pluginId/add", async (context) => {
