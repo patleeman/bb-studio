@@ -6,7 +6,12 @@ import { getBbDesktopInfo } from "@/lib/bb-desktop";
 type StudioBuild = NonNullable<BbDesktopApi["experimental_studioBuild"]>;
 
 export function formatStudioBase(build: StudioBuild): string {
-  return `based on bb ${build.upstreamVersion} @ ${build.upstreamCommit.slice(0, 7)}`;
+  const ahead = build.upstreamAhead ?? null;
+  const past =
+    ahead === null || ahead === 0
+      ? ""
+      : ` + ${ahead} ${ahead === 1 ? "commit" : "commits"}`;
+  return `based on bb ${build.upstreamVersion}${past} @ ${build.upstreamCommit.slice(0, 7)}`;
 }
 
 export function ForkStudioBase({ version }: { version: string | null }) {
