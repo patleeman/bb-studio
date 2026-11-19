@@ -173,8 +173,8 @@
     },
     "apps/server/src/services/plugins/plugin-service.ts": {
       "seam": "quiet-turns, plugin-events, bundled-studio",
-      "intent": "The thread.idle plugin event spreads forkIdleFields (quiet-turn.fork.ts: experimental_quiet) as its first field, on its own line. The events object also registers the fork's event wiring (registerForkPluginEvents: emitThreadEvent, the database, buildThreadDto, toHostRecord) so fork-plugin-events.ts can emit its three events. The bundled plugin list is withForkBundledPlugins(listBundledPluginRegistrations()) (builtin-registry.fork.ts, imported at the top of the file), so Studio and Visual Chat reconcile as built-ins when their bundles are in the app; an existing install of the same id from another source (a path install) is left alone.",
-      "budget": 13
+      "intent": "The thread.idle plugin event spreads forkIdleFields (quiet-turn.fork.ts: experimental_quiet) as its first field, on its own line. The events object also registers the fork's event wiring (registerForkPluginEvents: emitThreadEvent, the database, buildThreadDto, toHostRecord) so fork-plugin-events.ts can emit its three events. The bundled plugin list is withForkBundledPlugins(listBundledPluginRegistrations()) (builtin-registry.fork.ts, imported at the top of the file), so Studio reconciles as a built-in when its bundle is in the app; an existing install of the same id from another source (a path install) is left alone while its folder is there. Just before reconcileBundled, releaseDeadBundledInstalls (builtin-registry.fork.ts) drops a bundled id's path row whose folder is gone, or its removed non-builtin row, so the bundled copy takes the id; the list's statusDetail falls back to forkReplacedInstallNote(row.id) so the dropped source shows on the plugin until restart.",
+      "budget": 16
     },
     "apps/server/src/services/threads/dispatch-attempt.ts": {
       "seam": "import-sync, system-compaction, thread-notices",
