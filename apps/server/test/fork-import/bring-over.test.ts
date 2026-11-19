@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { turnScope } from "@bb/domain";
+import { createConnection, listProviderLifecycleEnvironments } from "@bb/db";
 import { createMigratedConnection } from "@bb/db/testing";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -201,6 +202,8 @@ async function fixture(): Promise<Fixture> {
     ["gone-tool", "path", join(root, "nowhere")],
     ["remote-thing", "git", "github:acme/remote-thing"],
     ["future-tool", "path", join(root, "plugins-src", "future-tool")],
+    ["pinned-git", "git", "github:acme/pinned"],
+    ["pinned-npm", "npm", "npm:acme-np"],
     ["studio", "path", "/old/studio"],
     ["bundled-x", "builtin", "builtin:x"],
   ] as const) {
@@ -215,6 +218,12 @@ async function fixture(): Promise<Fixture> {
       removed_at: null,
     });
   }
+  bb.prepare(
+    "UPDATE plugins SET source_git_url = 'https://github.com/acme/pinned', git_resolved_commit = 'abc1234567890abc1234567890abc1234567890a' WHERE id = 'pinned-git'",
+  ).run();
+  bb.prepare(
+    "UPDATE plugins SET source_npm_package = 'acme-np', npm_resolved_version = '2.1.0' WHERE id = 'pinned-npm'",
+  ).run();
   insertRow(bb, "plugin_kv", {
     plugin_id: "acme-tool",
     key: "k",
@@ -280,9 +289,16 @@ async function fixture(): Promise<Fixture> {
 }
 
 async function run(f: Fixture, request: Partial<BringOverRequest>) {
+  const snapshot = existsSync(f.snapshot.snapshotPath)
+    ? f.snapshot
+    : await takeSourceSnapshot({
+        dataDir: f.target,
+        sourceDataDir: f.source,
+        now: 6000,
+      });
   const job = startBringOverJob({
     dataDir: f.target,
-    snapshot: f.snapshot,
+    snapshot,
     target: f.db,
     request: { picks: [], attachments: true, settings: [], ...request },
     logger,
@@ -365,6 +381,20 @@ describe("bring things over from bb", () => {
         id: "gone-tool",
         hasData: false,
         sourceMissing: true,
+        here: false,
+        needsNewer: null,
+      },
+      {
+        id: "pinned-git",
+        hasData: false,
+        sourceMissing: false,
+        here: false,
+        needsNewer: null,
+      },
+      {
+        id: "pinned-npm",
+        hasData: false,
+        sourceMissing: false,
         here: false,
         needsNewer: null,
       },
@@ -472,7 +502,13 @@ describe("bring things over from bb", () => {
       ),
     ).toMatchObject({ id: again.id, threadsSkipped: 2 });
     expect(count(f.db, "SELECT COUNT(*) AS n FROM events")).toBe(events);
-    const snap = openSnapshot(f.snapshot);
+    const snap = openSnapshot(
+      await takeSourceSnapshot({
+        dataDir: f.target,
+        sourceDataDir: f.source,
+        now: 7000,
+      }),
+    );
     open.push(snap);
     expect(
       listThreads(snap, f.db, f.ids.p1).every((thread) => thread.here),
@@ -658,6 +694,7 @@ describe("bring things over from bb", () => {
         return { id: "acme-tool" };
       },
       reload: async () => undefined,
+      remove: async () => true,
     };
     const args = {
       source: snap,
@@ -672,7 +709,7 @@ describe("bring things over from bb", () => {
       /not found here/u,
     );
     await expect(addPlugin({ ...args, id: "remote-thing" })).rejects.toThrow(
-      /could not be installed from github:acme\/remote-thing: repository not found/u,
+      /did not record which commit of remote-thing/u,
     );
     expect(existsSync(join(f.target, "plugins"))).toBe(false);
     await expect(addPlugin({ ...args, id: "studio" })).rejects.toThrow(
@@ -731,6 +768,7 @@ describe("bring things over from bb", () => {
       install: async () => ({ id: "x" }),
       installPath: async () => ({ id: "x" }),
       reload: async () => undefined,
+      remove: async () => true,
     };
     for (const id of [
       "studio",
@@ -791,6 +829,7 @@ describe("bring things over from bb", () => {
         return { id: "x" };
       },
       reload: async () => undefined,
+      remove: async () => true,
     };
     const args = {
       source: snap,
@@ -855,6 +894,248 @@ describe("bring things over from bb", () => {
       readFileSync(join(f.source, "pi-bridge-sessions", "thr_x.json"), "utf8"),
     ).toBe("pi");
     expect(existsSync(join(f.target, "pi-bridge-sessions"))).toBe(false);
+  });
+
+  it("never hands BB Studio bb's worktrees, so its cleanup can't touch them", async () => {
+    const f = await fixture();
+    const worktree = join(
+      f.source,
+      "plugins",
+      "environment-git-worktree",
+      "host-data",
+      "worktrees",
+      "k1",
+      "repo",
+    );
+    await mkdir(worktree, { recursive: true });
+    await writeFile(join(worktree, "work.txt"), "unsaved work");
+    const bb = new Database(join(f.source, "bb.db"));
+    const env = bb
+      .prepare("SELECT * FROM environments WHERE id = ?")
+      .get(f.ids.env1) as Record<string, unknown>;
+    const managed = {
+      ...env,
+      id: "env_worktree",
+      path: worktree,
+      is_worktree: 1,
+      provider_owns_path: 1,
+      environment_provider_id: "git-worktree",
+      environment_provider_plugin_id: "environment-git-worktree",
+      owner_thread_id: f.ids.t3,
+    };
+    const names = Object.keys(managed);
+    bb.prepare(
+      `INSERT INTO environments (${names.join(", ")}) VALUES (${names.map((name) => `@${name}`).join(", ")})`,
+    ).run(managed);
+    bb.prepare(
+      "UPDATE threads SET environment_id = 'env_worktree', archived_at = 1 WHERE id = ?",
+    ).run(f.ids.t3);
+    bb.prepare(
+      "UPDATE events SET environment_id = 'env_worktree' WHERE thread_id = ?",
+    ).run(f.ids.t3);
+    bb.close();
+    const snapshot = await takeSourceSnapshot({
+      dataDir: f.target,
+      sourceDataDir: f.source,
+      now: 9000,
+    });
+
+    await run(
+      { ...f, snapshot },
+      { picks: [{ kind: "thread", id: f.ids.t3 }] },
+    );
+
+    expect(
+      f.db
+        .prepare("SELECT environment_id FROM threads WHERE id = ?")
+        .get(f.ids.t3),
+    ).toEqual({ environment_id: null });
+    expect(
+      count(
+        f.db,
+        "SELECT COUNT(*) AS n FROM events WHERE thread_id = ? AND environment_id IS NOT NULL",
+        f.ids.t3,
+      ),
+    ).toBe(0);
+    expect(
+      count(
+        f.db,
+        "SELECT COUNT(*) AS n FROM environments WHERE path LIKE ?",
+        `${f.source}%`,
+      ),
+    ).toBe(0);
+    const connection = createConnection(join(f.target, "bb.db"));
+    try {
+      for (const providerId of ["git-worktree", "environment-git-worktree"]) {
+        expect(
+          listProviderLifecycleEnvironments(connection, providerId, {
+            pluginId: "environment-git-worktree",
+            teardownMessage: "x",
+          }),
+        ).toEqual([]);
+      }
+    } finally {
+      connection.$client.close();
+    }
+    expect(readFileSync(join(worktree, "work.txt"), "utf8")).toBe(
+      "unsaved work",
+    );
+  });
+
+  it("brings a plain project folder over as a folder BB Studio does not manage", async () => {
+    const f = await fixture();
+    await run(f, { picks: [{ kind: "thread", id: f.ids.t1 }] });
+    expect(
+      f.db
+        .prepare(
+          "SELECT environment_provider_id, provider_owns_path, owner_thread_id, retire_at, teardown_status FROM environments WHERE id = ?",
+        )
+        .get(f.ids.env1),
+    ).toEqual({
+      environment_provider_id: null,
+      provider_owns_path: 0,
+      owner_thread_id: null,
+      retire_at: null,
+      teardown_status: null,
+    });
+  });
+
+  it("installs bb's exact git commit or npm version, and checks the manifest that was installed", async () => {
+    const f = await fixture();
+    const snap = openSnapshot(f.snapshot);
+    open.push(snap);
+    const fresh = join(f.root, "installed");
+    await mkdir(fresh, { recursive: true });
+    await writeFile(
+      join(fresh, "package.json"),
+      JSON.stringify({ engines: { bb: ">=0.1.0" } }),
+    );
+    const later = join(f.root, "installed-later");
+    await mkdir(later, { recursive: true });
+    await writeFile(
+      join(later, "package.json"),
+      JSON.stringify({ engines: { bb: ">=99.0.0" } }),
+    );
+    const sources: string[] = [];
+    const removed: string[] = [];
+    let answer: { id: string; rootDir: string } = {
+      id: "pinned-git",
+      rootDir: fresh,
+    };
+    let fail: Error | null = null;
+    const installer = {
+      install: async (source: string) => {
+        if (fail) throw fail;
+        sources.push(source);
+        return answer;
+      },
+      installPath: async () => ({ id: "x" }),
+      reload: async () => undefined,
+      remove: async (id: string) => {
+        removed.push(id);
+        return true;
+      },
+    };
+    const args = {
+      source: snap,
+      target: f.db,
+      sourceDataDir: f.source,
+      dataDir: f.target,
+      installer,
+      appVersion: "1.0.0",
+    };
+
+    expect(await addPlugin({ ...args, id: "pinned-git" })).toMatchObject({
+      id: "pinned-git",
+    });
+    answer = { id: "pinned-npm", rootDir: fresh };
+    expect(await addPlugin({ ...args, id: "pinned-npm" })).toMatchObject({
+      id: "pinned-npm",
+    });
+    expect(sources).toEqual([
+      "git:https://github.com/acme/pinned@abc1234567890abc1234567890abc1234567890a",
+      "npm:acme-np@2.1.0",
+    ]);
+
+    const g = await fixture();
+    const gsnap = openSnapshot(g.snapshot);
+    open.push(gsnap);
+    const gargs = {
+      ...args,
+      source: gsnap,
+      target: g.db,
+      sourceDataDir: g.source,
+      dataDir: g.target,
+    };
+    answer = { id: "pinned-git", rootDir: later };
+    await expect(addPlugin({ ...gargs, id: "pinned-git" })).rejects.toThrow(
+      /was not added: it needs a newer BB Studio/u,
+    );
+    answer = { id: "tasks", rootDir: fresh };
+    await expect(addPlugin({ ...gargs, id: "pinned-npm" })).rejects.toThrow(
+      /installs as tasks, not pinned-npm/u,
+    );
+    expect(removed).toEqual(["pinned-git", "tasks"]);
+    fail = new Error("reference is not a tree");
+    await expect(addPlugin({ ...gargs, id: "pinned-git" })).rejects.toThrow(
+      /bb's version of pinned-git \(commit abc123456789\) can't be installed: reference is not a tree/u,
+    );
+  });
+
+  it("keeps BB Studio's own values for a plugin it had before, even when adding fails", async () => {
+    const f = await fixture();
+    const snap = openSnapshot(f.snapshot);
+    open.push(snap);
+    insertRow(f.db, "plugin_kv", {
+      plugin_id: "acme-tool",
+      key: "k",
+      value: '"mine"',
+      updated_at: 1,
+    });
+    insertRow(f.db, "plugin_kv", {
+      plugin_id: "acme-tool",
+      key: "only-mine",
+      value: '"x"',
+      updated_at: 1,
+    });
+    let release!: () => void;
+    const gate = new Promise<void>((done) => {
+      release = done;
+    });
+    const installer = {
+      install: async () => ({ id: "x" }),
+      installPath: async () => {
+        await gate;
+        throw new Error("offline");
+      },
+      reload: async () => undefined,
+      remove: async () => true,
+    };
+    const args = {
+      source: snap,
+      target: f.db,
+      sourceDataDir: f.source,
+      dataDir: f.target,
+      installer,
+      appVersion: "1.0.0",
+      id: "acme-tool",
+    };
+
+    const first = addPlugin(args);
+    await expect(addPlugin(args)).rejects.toThrow(/already being added/u);
+    release();
+    await expect(first).rejects.toThrow(/offline/u);
+
+    expect(
+      f.db
+        .prepare(
+          "SELECT key, value FROM plugin_kv WHERE plugin_id = 'acme-tool' ORDER BY key",
+        )
+        .all(),
+    ).toEqual([
+      { key: "k", value: '"mine"' },
+      { key: "only-mine", value: '"x"' },
+    ]);
   });
 
   it("hides every plugin the fork removed", () => {

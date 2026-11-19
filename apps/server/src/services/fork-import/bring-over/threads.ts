@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import { join } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { quote, rowExists, selectList, sharedColumns } from "../sync.js";
 import {
   copyFileIfMissing,
@@ -156,6 +156,23 @@ function ensureHost(context: ThreadImportContext, hostId: string): boolean {
   return true;
 }
 
+function insideFolder(path: unknown, folder: string): boolean {
+  if (typeof path !== "string" || path.length === 0) return false;
+  const root = resolve(folder);
+  const target = resolve(path);
+  return target === root || target.startsWith(`${root}${sep}`);
+}
+
+export function managedByBb(row: Row, sourceDataDir: string): boolean {
+  return (
+    (row.environment_provider_id !== null &&
+      row.environment_provider_id !== undefined) ||
+    row.provider_owns_path === 1 ||
+    row.is_worktree === 1 ||
+    insideFolder(row.path, sourceDataDir)
+  );
+}
+
 function ensureEnvironment(
   context: ThreadImportContext,
   environmentId: string,
@@ -170,6 +187,7 @@ function ensureEnvironment(
     )
     .get(environmentId);
   if (row === undefined) return null;
+  if (managedByBb(row, context.sourceDataDir)) return null;
   let hostId = String(row.host_id);
   if (hostId === context.sourceHostId && context.ourHostId !== null) {
     hostId = context.ourHostId;
@@ -181,18 +199,22 @@ function ensureEnvironment(
     if (twin !== undefined) return twin.id;
   }
   if (!ensureHost(context, hostId)) return null;
-  const owner = row.owner_thread_id;
-  insertIfMissing(target, "environments", columns, [
-    {
-      ...row,
-      host_id: hostId,
-      project_id: projectId,
-      owner_thread_id:
-        typeof owner === "string" && rowExists(target, "threads", owner)
-          ? owner
-          : null,
-    },
-  ]);
+  const unmanaged: Row = {
+    ...row,
+    host_id: hostId,
+    project_id: projectId,
+    owner_thread_id: null,
+    environment_provider_id: null,
+    environment_provider_plugin_id: null,
+    environment_provider_selection: null,
+    environment_provider_instance_key: null,
+    provider_owns_path: 0,
+    retire_at: null,
+    teardown_status: null,
+    teardown_message: null,
+    teardown_attempt: 0,
+  };
+  insertIfMissing(target, "environments", columns, [unmanaged]);
   return environmentId;
 }
 
