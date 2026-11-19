@@ -13,6 +13,7 @@ import {
 } from "node:fs/promises";
 import { dirname, join, resolve, win32 } from "node:path";
 import { CLI_LAUNCHER_MARKER } from "@bb/config/cli-command";
+import { pointsAtOwnLauncher } from "./cli-command.fork.js";
 import type {
   SystemCliCommandShadow,
   SystemCliCommandStatus,
@@ -187,7 +188,7 @@ async function shadowingCommand(
   context: CliCommandContext,
 ): Promise<SystemCliCommandShadow | null> {
   const first = await firstCommandOnPath(context);
-  if (first === null || (await isBbLauncherLink(first))) {
+  if (first === null || ((await isBbLauncherLink(first)) && (await pointsAtOwnLauncher(first, context.launcherPath)))) {
     return null;
   }
   if (await isBbAppPackageCommand(first)) {
@@ -206,7 +207,7 @@ async function findInstalledLink(
     context.platform,
   )) {
     const link = join(directory, CLI_COMMAND_NAME);
-    if (await isBbLauncherLink(link)) {
+    if ((await isBbLauncherLink(link)) && (await pointsAtOwnLauncher(link, context.launcherPath))) {
       return link;
     }
   }
@@ -356,7 +357,7 @@ async function removeUnix(context: CliCommandContext): Promise<void> {
     context.platform,
   )) {
     const link = join(directory, CLI_COMMAND_NAME);
-    if (await isBbLauncherLink(link)) {
+    if ((await isBbLauncherLink(link)) && (await pointsAtOwnLauncher(link, context.launcherPath))) {
       try {
         await rm(link);
       } catch {
