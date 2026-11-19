@@ -28,7 +28,7 @@ function pluginDirs(argv) {
 
 function monorepoPluginDirs() {
   const packages = [
-    resolve(root, "..", "bb-studio-app", "plugins", "packages"),
+    resolve(root, "..", "bb-studio-public", "plugins", "packages"),
     resolve(root, "..", "plugins", "packages"),
   ].find((dir) => existsSync(dir));
   if (packages === undefined) return [];
