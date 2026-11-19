@@ -33,7 +33,6 @@ import { openBugReport, REPORT_BUG_FOOTER_ID } from "./src/ui/footer/report-bug"
 import { askAboutItemHandler, askBotNameOf } from "./src/ui/ask-about-item";
 import { setAskAboutItem } from "./src/kit/app/item-header";
 import { registerReadOnlyComposer } from "./src/ui/conversations/ReadOnlyComposer";
-import { registerImportNotice } from "./src/ui/import-notice";
 import { FinishedCard } from "./src/ui/conversations/finish";
 import { ContinuedCard } from "./src/ui/conversations/ContinuedCard";
 import { CONTINUED_DIRECTIVE } from "./src/continue-shared";
@@ -352,8 +351,6 @@ export default definePluginApp((app) => {
   // this worker…" where the composer goes; a conversation shows its workers
   // above its composer (src/ui/conversations/ReadOnlyComposer.tsx).
   registerReadOnlyComposer(app);
-  // When the first start could not copy bb, the first chat says so (src/ui/import-notice.tsx).
-  registerImportNotice(app);
   // Archiving a conversation writes its summary (src/bot-finish.ts); the card
   // the Bot posts in Main is `::finished{thread="thr_…"}`.
   app.slots.messageDirective({ id: "finished", component: FinishedCard });
