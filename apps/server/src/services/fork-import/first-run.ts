@@ -1,6 +1,5 @@
 import Database from "better-sqlite3";
 import { resetForkRailPreferences } from "./fork-rail-reset.js";
-import { recordPluginBaselines } from "./plugin-sync.js";
 import { setForkImportDataDir } from "./index.js";
 import {
   closeForkImportDatabase,
@@ -28,7 +27,12 @@ import {
   writeFirstRunFailure,
 } from "./first-run-install.js";
 import { snapshotDatabases, type SnapshotJob } from "./first-run-snapshot.js";
-import { readFileSync } from "node:fs";
+import {
+  OLD_PLUGINS_FILE_NAME,
+  type OldPlugin,
+  type OldPluginsRecord,
+} from "./old-plugins.js";
+import { existsSync, readFileSync } from "node:fs";
 import {
   mkdir,
   mkdtemp,
@@ -81,53 +85,29 @@ type ImportedManagedConfig = Parameters<
   typeof mergeImportedManagedConfig
 >[0]["importedConfig"];
 
-const EXCLUDED_PATHS = [
-  "auth-secret",
-  "telemetry-id",
-  "plugins/mobile",
-  "plugins/push-notifications",
-  "plugins/account-pool/secrets",
-  "plugins/snapshots",
-];
+const EXCLUDED_PATHS = ["auth-secret", "telemetry-id", "plugins"];
 const JUNK_FILE_NAMES = new Set([".DS_Store"]);
 
 const AFTER_START_PATHS = ["attachments"];
 
 const DATABASE_SCRUB_STATEMENTS = [
-  "DELETE FROM plugin_kv WHERE plugin_id IN ('push-notifications', 'mobile')",
-  "DELETE FROM plugin_kv WHERE plugin_id = 'account-pool' AND (key LIKE 'rejected-refresh:%' OR key LIKE 'routed:%' OR key LIKE 'retry-route:%')",
   "DELETE FROM host_daemon_sessions",
   "DELETE FROM queued_thread_messages",
   "DELETE FROM pending_interactions",
   "DELETE FROM terminal_sessions",
   "DELETE FROM ui_preferences WHERE key IN ('sidebar.pluginPanelOrder', 'sidebar.visiblePluginPanels', 'sidebar.hiddenFooterItems', 'sidebar.footerOrder')",
-  "UPDATE plugin_settings SET value = 'false' WHERE plugin_id = 'studio' AND key = 'loopsEnabled'",
-  "UPDATE plugins SET enabled = 0 WHERE id IN ('mobile', 'push-notifications', 'automations', 'storage-retention', 'bb--storage-retention', 'bb-account', 'connect')",
-  "UPDATE plugins SET enabled_follows_default = 0 WHERE id IN ('mobile', 'push-notifications', 'automations', 'storage-retention', 'bb--storage-retention', 'bb-account', 'connect')",
   "UPDATE threads SET status = 'idle' WHERE status IN ('starting', 'active', 'stopping')",
-  "UPDATE plugins SET provenance = 'direct', catalog_entry_id = NULL, catalog_marketplace_name = NULL, updated_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000 WHERE provenance = 'catalog' AND catalog_marketplace_name = 'bb-community' AND removed_at IS NULL",
+  "DELETE FROM thread_plugin_metadata",
+  "DELETE FROM plugin_kv",
+  "DELETE FROM plugin_settings",
+  "DELETE FROM plugin_schedules",
+  "DELETE FROM plugin_state_snapshots",
+  "DELETE FROM plugin_artifacts",
+  "DELETE FROM plugins",
   "DELETE FROM plugin_marketplace_icons WHERE marketplace_name = 'bb-community'",
   "DELETE FROM plugin_marketplaces WHERE name = 'bb-community'",
-  "DELETE FROM plugin_state_snapshots",
   "DELETE FROM apikey",
 ];
-
-const PLUGIN_DATABASE_SCRUB_STATEMENTS: Readonly<
-  Record<string, readonly string[]>
-> = {
-  "plugins/automations/data.db": ["UPDATE automations SET enabled = 0"],
-  "plugins/account-pool/data.db": [
-    "DELETE FROM account_quota",
-    "DELETE FROM pool_affinity",
-    "DELETE FROM pool_active_account",
-  ],
-  "plugins/studio/data.db": [
-    "UPDATE bots SET state = 'stopped', heartbeat_was_on = 0",
-    "UPDATE bot_runners SET state = 'paused'",
-    "UPDATE bot_automations SET state = 'paused'",
-    "UPDATE bot_cache_settings SET enabled = 0",
-  ],
-};
 
 export interface RunForkFirstRunImportArgs {
   dataDir: string;
@@ -198,8 +178,6 @@ function seedMirroredThreads(
 }
 
 export interface ForkImportOptions {
-  keepPlugins: string[] | null;
-  pluginPaths: Record<string, string>;
   uiPreferences: Record<string, unknown>;
 }
 
@@ -209,11 +187,7 @@ export function forkImportOptionsPath(dataDir: string): string {
 }
 
 export function readForkImportOptions(dataDir: string): ForkImportOptions {
-  const options: ForkImportOptions = {
-    keepPlugins: null,
-    pluginPaths: {},
-    uiPreferences: {},
-  };
+  const options: ForkImportOptions = { uiPreferences: {} };
   let raw: unknown;
   try {
     raw = JSON.parse(readFileSync(forkImportOptionsPath(dataDir), "utf8"));
@@ -221,48 +195,20 @@ export function readForkImportOptions(dataDir: string): ForkImportOptions {
     return options;
   }
   if (typeof raw !== "object" || raw === null) return options;
-  const { keepPlugins, pluginPaths, uiPreferences } = raw as Record<
-    string,
-    unknown
-  >;
+  const { uiPreferences } = raw as Record<string, unknown>;
   if (typeof uiPreferences === "object" && uiPreferences !== null) {
     options.uiPreferences = { ...(uiPreferences as Record<string, unknown>) };
-  }
-  if (Array.isArray(keepPlugins)) {
-    options.keepPlugins = keepPlugins.filter(
-      (id): id is string => typeof id === "string",
-    );
-  }
-  if (typeof pluginPaths === "object" && pluginPaths !== null) {
-    for (const [id, path] of Object.entries(pluginPaths)) {
-      if (typeof path === "string" && path.startsWith("/")) {
-        options.pluginPaths[id] = path;
-      }
-    }
   }
   return options;
 }
 
-function applyPluginOptions(
+function applyImportOptions(
   databasePath: string,
   options: ForkImportOptions,
 ): void {
-  if (
-    options.keepPlugins === null &&
-    Object.keys(options.pluginPaths).length === 0 &&
-    Object.keys(options.uiPreferences).length === 0
-  ) {
-    return;
-  }
+  if (Object.keys(options.uiPreferences).length === 0) return;
   const snapshot = new Database(databasePath, { fileMustExist: true });
   try {
-    for (const [id, path] of Object.entries(options.pluginPaths)) {
-      snapshot
-        .prepare(
-          "UPDATE plugins SET root_dir = ?, source_path = ?, source = ? WHERE id = ? AND source_kind = 'path'",
-        )
-        .run(path, path, path, id);
-    }
     const setPreference = snapshot.prepare(
       `INSERT INTO ui_preferences (key, value_json, revision, updated_at) VALUES (?, ?, 1, ?)
        ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, revision = revision + 1, updated_at = excluded.updated_at`,
@@ -270,21 +216,54 @@ function applyPluginOptions(
     for (const [key, value] of Object.entries(options.uiPreferences)) {
       setPreference.run(key, JSON.stringify(value), Date.now());
     }
-    if (options.keepPlugins !== null) {
-      const keep = new Set(options.keepPlugins);
-      const rows = snapshot
-        .prepare<[], { id: string }>(
-          "SELECT id FROM plugins WHERE source_kind != 'builtin' AND enabled = 1",
-        )
-        .all();
-      const disable = snapshot.prepare(
-        "UPDATE plugins SET enabled = 0, enabled_follows_default = 0 WHERE id = ?",
-      );
-      for (const row of rows) {
-        if (!keep.has(row.id)) disable.run(row.id);
-      }
-    }
     snapshot.pragma("journal_mode = DELETE");
+  } finally {
+    snapshot.close();
+  }
+}
+
+function readOldPlugins(
+  databasePath: string,
+  sourceDataDir: string,
+): OldPlugin[] {
+  const snapshot = new Database(databasePath, {
+    fileMustExist: true,
+    readonly: true,
+  });
+  try {
+    const rows = snapshot
+      .prepare<
+        [],
+        {
+          id: string;
+          version: string | null;
+          source: string;
+          source_kind: string;
+          enabled: number;
+          catalog_marketplace_name: string | null;
+          catalog_entry_id: string | null;
+        }
+      >(
+        "SELECT id, version, source, source_kind, enabled, catalog_marketplace_name, catalog_entry_id FROM plugins WHERE removed_at IS NULL ORDER BY id",
+      )
+      .all();
+    return rows.map((row) => ({
+      id: row.id,
+      version: row.version,
+      source: row.source,
+      sourceKind: row.source_kind,
+      enabled: row.enabled === 1,
+      catalog:
+        row.catalog_marketplace_name === null
+          ? null
+          : {
+              marketplace: row.catalog_marketplace_name,
+              entryId: row.catalog_entry_id,
+            },
+      hadData: existsSync(join(sourceDataDir, "plugins", row.id)),
+    }));
+  } catch {
+    return [];
   } finally {
     snapshot.close();
   }
@@ -307,6 +286,7 @@ export function resolveForkImportSource(args: {
 function scrubDatabase(path: string, scrub: readonly string[]): void {
   const snapshot = new Database(path, { fileMustExist: true });
   try {
+    snapshot.pragma("foreign_keys = OFF");
     for (const statement of scrub) {
       try {
         snapshot.exec(statement);
@@ -525,8 +505,6 @@ export async function runForkFirstRunImport(
         const to = join(filesDir, ...file.path.split("/"));
         if (file.sqliteDatabase) {
           snapshots.push({ from: file.absolutePath, to });
-          const scrub = PLUGIN_DATABASE_SCRUB_STATEMENTS[file.path];
-          if (scrub !== undefined) scrubs.set(file.path, scrub);
         } else {
           copies.push({ from: file.absolutePath, to });
         }
@@ -539,11 +517,19 @@ export async function runForkFirstRunImport(
       await mkdir(dirname(job.to), { recursive: true });
     }
     await snapshotDatabases(snapshots, deadline);
+    const oldPlugins = readOldPlugins(
+      join(filesDir, DATABASE_FILE_NAME),
+      sourceDataDir,
+    );
+    await writeFile(
+      join(filesDir, OLD_PLUGINS_FILE_NAME),
+      `${JSON.stringify({ version: 1, sourceDataDir, plugins: oldPlugins } satisfies OldPluginsRecord, null, 2)}\n`,
+    );
     for (const [path, statements] of scrubs) {
       scrubDatabase(join(filesDir, ...path.split("/")), statements);
     }
     const databaseSnapshotPath = join(filesDir, DATABASE_FILE_NAME);
-    applyPluginOptions(databaseSnapshotPath, readForkImportOptions(dataDir));
+    applyImportOptions(databaseSnapshotPath, readForkImportOptions(dataDir));
     const facts = readSnapshotFacts(databaseSnapshotPath);
     deadline.check();
     await copyFilesInParallel(copies, deadline);
@@ -572,7 +558,6 @@ export async function runForkFirstRunImport(
       fixupsAppliedAt: null,
     });
     seedMirroredThreads(filesDir, join(sourceDataDir, DATABASE_FILE_NAME));
-    recordPluginBaselines(filesDir);
     closeForkImportDatabase(filesDir);
     const forkDatabaseFiles = [
       FORK_IMPORT_DATABASE_FILE_NAME,
@@ -600,6 +585,7 @@ export async function runForkFirstRunImport(
         ...roots,
         SERVER_CONNECT_HOLD_FILE_NAME,
         SERVER_IMPORT_FILE_NAME,
+        OLD_PLUGINS_FILE_NAME,
         ...forkDatabasePaths,
         DATABASE_FILE_NAME,
       ],
