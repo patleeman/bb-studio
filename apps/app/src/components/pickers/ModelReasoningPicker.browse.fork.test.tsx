@@ -122,6 +122,7 @@ function renderPicker(
         onModelChange={onModelChange}
         reasoningValue="medium"
         reasoningOptions={reasoningOptions}
+        reasoningIsLoading={false}
         onReasoningChange={onReasoningChange}
         serviceTierValue={undefined}
         serviceTierOptions={[]}

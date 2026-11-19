@@ -347,6 +347,7 @@ html[data-fork-cards]
 html[data-fork-cards]
   [data-sidebar="inset"]
   [data-page-scroll-viewport].flex-1
+  > div
   > div::before,
 html[data-fork-cards]
   [data-sidebar="inset"]
@@ -399,6 +400,7 @@ html[data-fork-cards]
 html[data-fork-cards]
   [data-sidebar="inset"]
   [data-page-scroll-viewport].flex-1
+  > div
   > div::before,
 html[data-fork-cards]
   [data-sidebar="inset"]
@@ -612,6 +614,7 @@ html[data-fork-cards]
 html[data-fork-cards]
   [data-sidebar="inset"]
   [data-page-scroll-viewport].flex-1
+  > div
   > div {
   isolation: isolate;
 }
@@ -619,6 +622,7 @@ html[data-fork-cards]
 html[data-fork-cards]
   [data-sidebar="inset"]
   [data-page-scroll-viewport].flex-1
+  > div
   > div::before {
   content: "";
   position: sticky;
@@ -891,7 +895,7 @@ html[data-fork-title-rows] [data-fork-title-host="page"]::before {
 
 html[data-fork-title-rows]
   [data-page-scroll-viewport]
-  > div:has(> [data-fork-title-host="page"]:not(:empty)) {
+  div:has(> [data-fork-title-host="page"]:not(:empty)) {
   padding-top: 0;
 }
 
