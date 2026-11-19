@@ -60,6 +60,10 @@ function ProjectRow({ project, picks, onChange }: { project: BringOverProject; p
     setOpen(!open);
     if (!open && threads === null) void listProjectThreads(project.id).then(setThreads, (cause: unknown) => setError(errorMessage(cause)));
   };
+  const loaded = threads !== null;
+  useEffect(() => {
+    if (loaded) void listProjectThreads(project.id).then(setThreads, () => {});
+  }, [project.threadsHere, project.id, loaded]);
   const whole = picks.projects.has(project.id);
   const details = [
     `${String(project.threads)} threads`,
