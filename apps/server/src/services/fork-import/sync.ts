@@ -30,6 +30,7 @@ const THREAD_REFERENCE_COLUMNS = [
   "lifecycle_owner_thread_id",
 ];
 const DELETION_CHECK_INTERVAL_MS = 10 * 60_000;
+const ATTACHMENT_COPY_MAX_ATTEMPTS = 5;
 
 export interface ForkSyncSummary {
   skipped: string | null;
@@ -682,10 +683,17 @@ export async function copyMissingAttachments(args: {
     join(state.sourceDataDir, "attachments"),
     join(args.dataDir, "attachments"),
   );
-  if (result.failed > 0) {
-    args.logger.warn(result, "Import could not copy some attachments");
+  const attempts = Number(readCursor(fork, "attachmentsAttempts") ?? 0) + 1;
+  writeCursor(fork, "attachmentsAttempts", String(attempts));
+  if (result.failed === 0 || attempts >= ATTACHMENT_COPY_MAX_ATTEMPTS) {
+    writeCursor(fork, "attachmentsCopied", "1");
   }
-  writeCursor(fork, "attachmentsCopied", "1");
+  if (result.failed > 0) {
+    args.logger.warn(
+      { ...result, attempts },
+      "Import could not copy some attachments",
+    );
+  }
   args.logger.info(result, "Import copied attachments");
   return result;
 }
