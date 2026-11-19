@@ -100,7 +100,12 @@ export function registerBringOverRoutes(
         readAt: snap.takenAt,
         projects: listProjects(db, deps.db.$client, hosts(snap)),
         settings: await listSettings(db, snap.sourceDataDir),
-        plugins: await listPlugins(db, deps.db.$client, snap.sourceDataDir),
+        plugins: await listPlugins(
+          db,
+          deps.db.$client,
+          snap.sourceDataDir,
+          deps.config.appVersion,
+        ),
         job: currentBringOverJob(dataDir()),
       };
     } finally {
@@ -211,6 +216,7 @@ export function registerBringOverRoutes(
           sourceDataDir: snap.sourceDataDir,
           dataDir: dataDir(),
           installer,
+          appVersion: deps.config.appVersion,
         }),
       );
     } catch (error) {
