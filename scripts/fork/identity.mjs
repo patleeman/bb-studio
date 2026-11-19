@@ -1,5 +1,11 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -12,6 +18,8 @@ import {
   readCommitIdentity,
   readTreeIdentity,
 } from "./identity-overlap.mjs";
+import { formatStudioUpstream } from "../../apps/desktop/scripts/studio-release.fork.mjs";
+import { describeUpstreamBase } from "./upstream-base.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const source = join(root, "scripts/fork/brand/icon.png");
@@ -235,6 +243,8 @@ const edits = [
   ],
 ];
 
+const upstreamPath = join(root, "apps/desktop/studio-upstream.json");
+const freshTree = !existsSync(upstreamPath);
 let failed = false;
 for (const [file, pairs] of edits) {
   const target = join(root, file);
@@ -242,7 +252,7 @@ for (const [file, pairs] of edits) {
   for (const [from, to] of pairs) {
     const found =
       from instanceof RegExp ? from.test(text) : text.includes(from);
-    if (to === "" ? !found : text.includes(to)) continue;
+    if (to === "" ? !found && !freshTree : text.includes(to)) continue;
     if (!found) {
       console.error(`NOT FOUND ${file}: ${from}`);
       failed = true;
@@ -325,13 +335,19 @@ const upstreamBase = execFileSync(
   ["merge-base", "HEAD", "upstream/main"],
   { cwd: root, encoding: "utf8" },
 ).trim();
-const upstreamVersion = JSON.parse(
-  readFileSync(join(root, "apps/desktop/package.json"), "utf8"),
-).version;
-writeFileSync(
-  join(root, "apps/desktop/studio-upstream.json"),
-  `${JSON.stringify({ version: upstreamVersion, commit: upstreamBase }, null, 2)}\n`,
-);
+const upstream = describeUpstreamBase(root, upstreamBase) ?? {
+  version: JSON.parse(
+    readFileSync(join(root, "apps/desktop/package.json"), "utf8"),
+  ).version,
+  commit: upstreamBase,
+  ahead: null,
+};
+if (upstream.ahead === null) {
+  console.warn(
+    `no upstream desktop-v* tag at or before ${upstreamBase.slice(0, 7)}: the label uses apps/desktop/package.json's version (fetch upstream's tags to fix)`,
+  );
+}
+writeFileSync(upstreamPath, `${JSON.stringify(upstream, null, 2)}\n`);
 
 const bbIdentity = readCommitIdentity(root, upstreamBase);
 const studioIdentity = readTreeIdentity(root);
@@ -344,5 +360,5 @@ for (const key of overlaps) {
 
 if (failed) process.exitCode = 1;
 console.log(
-  `identity applied: BB Studio, nyc.plee.bbstudio, ~/.bb-studio, ports 38986 and 38987, updates from ${studioIdentity.updateFeed}, no usage telemetry, no bb Community catalog, bb account and connect off, based on bb ${upstreamVersion} @ ${upstreamBase.slice(0, 7)}`,
+  `identity applied: BB Studio, nyc.plee.bbstudio, ~/.bb-studio, ports 38986 and 38987, updates from ${studioIdentity.updateFeed}, no usage telemetry, no bb Community catalog, ${formatStudioUpstream(upstream)}`,
 );

@@ -14,6 +14,7 @@ export interface ForkDesktopWindowRequest {
 }
 
 export interface ForkStudioBuild {
+  upstreamAhead?: number | null;
   upstreamCommit: string;
   upstreamVersion: string;
   version: string;

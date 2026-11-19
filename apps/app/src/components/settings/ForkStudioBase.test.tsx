@@ -3,7 +3,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { SystemAppUpdateStatus } from "@bb/server-contract";
-import { STUDIO_RELEASES_URL } from "./ForkStudioBase";
+import { formatStudioBase, STUDIO_RELEASES_URL } from "./ForkStudioBase";
 import { BbAppUpdateRows } from "./UpdatesSettingsSection";
 
 const studioBuild = {
@@ -44,6 +44,22 @@ describe("ForkStudioBase", () => {
       view.container.querySelector("[data-version-metadata]")?.textContent,
     ).toBe("1.0.0");
     expect(screen.getByText("based on bb 0.49.0 @ 030b1b7")).toBeTruthy();
+  });
+
+  it("names the commits past the release tag, and none on the tag", () => {
+    expect(formatStudioBase({ ...studioBuild, upstreamAhead: 59 })).toBe(
+      "based on bb 0.49.0 + 59 commits @ 030b1b7",
+    );
+    expect(formatStudioBase({ ...studioBuild, upstreamAhead: 1 })).toBe(
+      "based on bb 0.49.0 + 1 commit @ 030b1b7",
+    );
+    expect(
+      formatStudioBase({
+        ...studioBuild,
+        upstreamVersion: "0.50.1",
+        upstreamAhead: 0,
+      }),
+    ).toBe("based on bb 0.50.1 @ 030b1b7");
   });
 
   it("shows no base next to a version that is not the Studio build's", () => {
