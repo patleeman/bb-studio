@@ -241,6 +241,56 @@ const edits = [
       ],
     ],
   ],
+  [
+    "apps/host-daemon/src/server-move/service.ts",
+    [
+      [
+        'const STANDALONE_DATA_DIR_NAME = ".bb";',
+        'const STANDALONE_DATA_DIR_NAME = ".bb-studio";',
+      ],
+    ],
+  ],
+  [
+    "apps/cli/src/commands/machine-enrollment.ts",
+    [
+      [
+        'dataDir === resolve(home, ".bb") &&',
+        'dataDir === resolve(home, ".bb-studio") &&',
+      ],
+    ],
+  ],
+  [
+    "apps/server/src/assets/install-machine.sh",
+    [
+      [
+        '[ "$host_daemon_port" -eq 38886 ] || [ "$host_daemon_port" -eq 38887 ]',
+        '[ "$host_daemon_port" -eq 38986 ] || [ "$host_daemon_port" -eq 38987 ]',
+      ],
+      ["  candidate_port=38888\n", "  candidate_port=38988\n"],
+    ],
+  ],
+  [
+    "apps/server/src/assets/install-machine-windows.mjs",
+    [
+      [
+        "const FIRST_HOST_DAEMON_PORT = 38888;",
+        "const FIRST_HOST_DAEMON_PORT = 38988;",
+      ],
+    ],
+  ],
+  [
+    "packages/templates/src/templates/bb-guide-overview.md",
+    [
+      [
+        "Outside a thread the CLI targets http://127.0.0.1:38886;",
+        "Outside a thread the CLI targets http://127.0.0.1:38986;",
+      ],
+    ],
+  ],
+  [
+    "plugins/bb-guide/skills/bb-plugin-authoring/references/backend-foundation.md",
+    [["(e.g. `http://127.0.0.1:38886`)", "(e.g. `http://127.0.0.1:38986`)"]],
+  ],
 ];
 
 const upstreamPath = join(root, "apps/desktop/studio-upstream.json");
