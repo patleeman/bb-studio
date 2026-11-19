@@ -1,11 +1,17 @@
 import type Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ServerLogger } from "../../../types.js";
 import { readHostId } from "../sync.js";
 import { BringOverCancelledError, errorDetail } from "./files.js";
 import { threadIdsOfProject } from "./listing.js";
 import { applySetting, type SettingId } from "./settings.js";
-import { openSnapshot, type SourceSnapshot } from "./source.js";
+import {
+  BRING_OVER_DIR_NAME,
+  openSnapshot,
+  type SourceSnapshot,
+} from "./source.js";
 import { importThread, referencedFirst } from "./threads.js";
 
 type Sqlite = Database.Database;
@@ -43,8 +49,39 @@ interface RunningJob {
 const running = new Map<string, RunningJob>();
 const last = new Map<string, BringOverJob>();
 
+const LAST_JOB_FILE_NAME = "last-job.json";
+
+function readLastJob(dataDir: string): BringOverJob | null {
+  try {
+    const value = JSON.parse(
+      readFileSync(
+        join(dataDir, BRING_OVER_DIR_NAME, LAST_JOB_FILE_NAME),
+        "utf8",
+      ),
+    ) as BringOverJob;
+    return typeof value?.id === "string" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLastJob(dataDir: string, job: BringOverJob): void {
+  try {
+    const directory = join(dataDir, BRING_OVER_DIR_NAME);
+    mkdirSync(directory, { recursive: true });
+    const path = join(directory, LAST_JOB_FILE_NAME);
+    writeFileSync(`${path}.tmp`, `${JSON.stringify(job)}\n`);
+    renameSync(`${path}.tmp`, path);
+  } catch {}
+}
+
 export function currentBringOverJob(dataDir: string): BringOverJob | null {
-  return running.get(dataDir)?.job ?? last.get(dataDir) ?? null;
+  const job =
+    running.get(dataDir)?.job ?? last.get(dataDir) ?? readLastJob(dataDir);
+  if (job !== null && !last.has(dataDir) && !running.has(dataDir)) {
+    last.set(dataDir, job);
+  }
+  return job;
 }
 
 export function cancelBringOverJob(dataDir: string): BringOverJob | null {
@@ -165,6 +202,7 @@ export function startBringOverJob(args: {
       job.finishedAt = Date.now();
       running.delete(args.dataDir);
       last.set(args.dataDir, job);
+      writeLastJob(args.dataDir, job);
       args.logger.info(
         {
           state: job.state,
