@@ -11,7 +11,10 @@ import {
   isMirroredReadOnly,
   openForkImportDatabase,
 } from "../../src/services/fork-import/state.js";
-import { runForkImportSync } from "../../src/services/fork-import/sync.js";
+import {
+  copyMissingThreadStorage,
+  runForkImportSync,
+} from "../../src/services/fork-import/sync.js";
 import { takeOverMirroredThread } from "../../src/services/fork-import/takeover.js";
 import { seedEvent, seedThread, seedThreadFixture } from "../helpers/seed.js";
 import { withTestHarness } from "../helpers/test-app.js";
@@ -292,5 +295,20 @@ describe("one-way sync from the source bb", () => {
         .prepare("SELECT host_id FROM environments WHERE id = ?")
         .get(environment.id),
     ).toEqual({ host_id: "host_ours" });
+  });
+
+  it("stops quietly when bb's folder is gone", async () => {
+    const { dataDir } = await importedPair();
+    const state = JSON.parse(
+      readFileSync(join(dataDir, "fork-import.json"), "utf8"),
+    ) as { sourceDataDir: string };
+    await rm(state.sourceDataDir, { recursive: true, force: true });
+    const target = new Database(join(dataDir, "bb.db"));
+    open.push(target);
+    expect(
+      runForkImportSync({ dataDir, database: target, logger, now: 9000 })
+        ?.skipped,
+    ).toBe("The source database is not there");
+    expect(await copyMissingThreadStorage({ dataDir, logger })).toBe(0);
   });
 });
