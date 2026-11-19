@@ -783,6 +783,26 @@
     {
       "file": "apps/server/test/system/cli-command.test.ts",
       "title": "repoints a link left by a bb that used another data directory"
+    },
+    {
+      "file": "apps/host-daemon/src/server-move/service.test.ts",
+      "title": "abort stops the pending server, restores config backups, and un-archives standalone data"
+    },
+    {
+      "file": "apps/host-daemon/src/server-move/service.test.ts",
+      "title": "refuses to archive ~/.bb while bb is running from it"
+    },
+    {
+      "file": "apps/host-daemon/src/server-move/service.test.ts",
+      "title": "hides ~/.bb when it is this daemon's data dir and refuses to archive it"
+    },
+    {
+      "file": "apps/host-daemon/src/server-move/service.test.ts",
+      "title": "reports the target machine's server-move readiness"
+    },
+    {
+      "file": "apps/cli/src/commands/machine-enrollment.test.ts",
+      "title": "uses the default BB data directory only when it already holds this machine"
     }
   ],
   "removeLines": [
