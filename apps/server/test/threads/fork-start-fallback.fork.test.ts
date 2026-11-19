@@ -2,6 +2,7 @@ import {
   getLatestThreadSequence,
   getThread,
   listStoredEventRows,
+  readThreadRunState,
   threads,
 } from "@bb/db";
 import { eq } from "drizzle-orm";
@@ -204,6 +205,13 @@ describe("a fork whose parent session can't be copied", () => {
         listQueuedThreadCommands(harness, "thread.start", created.id).length,
       ).toBeGreaterThanOrEqual(1);
       expect(getThread(harness.db, created.id)?.status).not.toBe("error");
+      await reportQueuedCommandSuccess(harness, retry, {
+        providerThreadId: "provider-retry",
+      });
+      await expect
+        .poll(() => getThread(harness.db, created.id)?.status)
+        .toBe("active");
+      expect(readThreadRunState(harness.db, created.id).requests).toEqual([]);
     });
   });
 
@@ -269,8 +277,8 @@ describe("a fork whose parent session can't be copied", () => {
       const { parent } = seedParent(harness);
       const { created, start } = await forkWithInput(harness, parent.id);
       await reportQueuedCommandError(harness, start, {
-        errorCode: "command_timeout",
-        errorMessage: "The host did not answer in time",
+        errorCode: "provider_error",
+        errorMessage: "The provider refused to start",
       });
       await new Promise((settle) => setTimeout(settle, 50));
       expect(

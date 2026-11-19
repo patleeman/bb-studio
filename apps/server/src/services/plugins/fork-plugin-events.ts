@@ -2,14 +2,12 @@ import {
   getHost,
   getLatestStoredThreadEventOfTypes,
   getThread,
-  type ApplyThreadLifecycleEventArgs,
-  type ApplyThreadLifecycleEventOutcome,
   type DbConnection,
 } from "@bb/db";
 import {
   systemThreadInterruptedEventDataSchema,
   type Host,
-  type ThreadStatus,
+  type Thread,
 } from "@bb/domain";
 import type { ThreadResponse } from "@bb/server-contract";
 import {
@@ -81,20 +79,20 @@ function interruptionReason(
 }
 
 export function announceTurnInterrupted(
-  args: ApplyThreadLifecycleEventArgs,
-  outcome: ApplyThreadLifecycleEventOutcome,
-  previousStatus: ThreadStatus | undefined,
+  before: Pick<Thread, "status">,
+  after: Pick<Thread, "id" | "status">,
+  completed: boolean,
 ): void {
-  if (wiring === null || !outcome.applied) return;
-  if (previousStatus !== "active" && previousStatus !== "stopping") return;
-  const eventType = args.event.type;
-  if (eventType !== "stop.settled" && eventType !== "run.failed") return;
+  if (wiring === null || before.status === after.status) return;
+  if (before.status !== "active" && before.status !== "stopping") return;
+  const failed = after.status === "error";
+  if (!failed && (after.status !== "idle" || completed)) return;
   const { db, emit, buildThreadDto } = wiring;
   emit("experimental_turn.interrupted", () => {
-    const thread = getThread(db, args.threadId);
+    const thread = getThread(db, after.id);
     if (thread === null) return null;
-    const reason = interruptionReason(db, args.threadId);
-    if (reason === null && eventType === "run.failed") return null;
+    const reason = interruptionReason(db, after.id);
+    if (reason === null && failed) return null;
     return { thread: buildThreadDto(thread), reason: reason ?? "provider" };
   });
 }
