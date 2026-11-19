@@ -10,7 +10,7 @@ const source = readFileSync(
 describe("plugin rows in the search palette", () => {
   it("resets the highlight after the effect that sets it from the active index", () => {
     const setsKeyFromActiveIndex = source.indexOf(
-      "setHighlightedKey(activeIndex < 0 ? null : optionKey(options[activeIndex]))",
+      "setHighlightedKey(syncedHighlightedKey);",
     );
     const resetsForLeadingPluginRows = source.indexOf(
       "usePluginPaletteHighlightReset({",
@@ -23,7 +23,7 @@ describe("plugin rows in the search palette", () => {
   it("merges plugin rows before the highlight state is derived from the options", () => {
     const mergesOptions = source.indexOf("usePluginPaletteOptions({");
     const derivesActiveIndex = source.indexOf(
-      "setHighlightedIndex(Math.max(activeIndex, 0))",
+      "const syncedHighlightedIndex = Math.max(activeIndex, 0);",
     );
 
     expect(mergesOptions).toBeGreaterThan(-1);

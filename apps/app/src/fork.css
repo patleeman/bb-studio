@@ -480,9 +480,11 @@ html[data-fork-cards] [data-sidebar="content"]:not(:hover) {
   scrollbar-color: transparent transparent;
 }
 
-html[data-fork-cards]
-  [data-sidebar="content"]:not(:hover)::-webkit-scrollbar-thumb {
-  background-color: transparent;
+@media (pointer: fine) {
+  html[data-fork-cards]
+    [data-sidebar="content"]:not(:hover)::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
 }
 
 html[data-fork-cards]
@@ -748,10 +750,12 @@ html[data-fork-cards] [data-sidebar="inset"] :not(:hover, .thread-scrollbar) {
   scrollbar-color: transparent transparent;
 }
 
-html[data-fork-cards]
-  [data-sidebar="inset"]
-  :not(:hover, .thread-scrollbar)::-webkit-scrollbar-thumb {
-  background-color: transparent;
+@media (pointer: fine) {
+  html[data-fork-cards]
+    [data-sidebar="inset"]
+    :not(:hover, .thread-scrollbar)::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
 }
 
 html[data-fork-cards]
