@@ -7,5 +7,6 @@ export default defineConfig({
     name: "bb-plugin-provider-pi",
     include: ["*.test.ts", "*.test.tsx", "src/**/*.test.ts"],
     exclude: ["node_modules/**"],
+    globalSetup: ["../../vitest.global-tmpdir.ts"],
   },
 });
