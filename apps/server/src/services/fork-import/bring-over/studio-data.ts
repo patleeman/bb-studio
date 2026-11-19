@@ -30,6 +30,7 @@ const STAGED_DIR_NAME = "staged";
 const JOURNAL_FILE_NAME = "journal.json";
 const BB_KV_FILE_NAME = "bb-kv.json";
 const BEFORE_DIR_NAME = "before";
+const REPLACED_DIR_NAME = "replaced";
 const ONBOARDING_FILE_NAME = "onboarding.json";
 
 const NOT_COPIED = new Set([
@@ -53,6 +54,7 @@ export const STUDIO_IMPORT_STATES = [
   "applied",
   "refused",
   "failed",
+  "rolling-back",
   "rollback-failed",
   "restore-requested",
   "restoring",
@@ -89,10 +91,12 @@ export interface StudioDataState {
   bots: number;
   pages: number;
   tasks: number;
-  journal: Pick<
-    StudioImportJournal,
-    "state" | "error" | "stagedAt" | "appliedAt" | "restoredAt"
-  > | null;
+  journal:
+    | (Pick<
+        StudioImportJournal,
+        "error" | "stagedAt" | "appliedAt" | "restoredAt"
+      > & { state: StudioImportState | "unreadable" })
+    | null;
 }
 
 function studioDir(root: string): string {
@@ -107,19 +111,44 @@ function journalPath(dataDir: string): string {
   return join(studioImportDir(dataDir), JOURNAL_FILE_NAME);
 }
 
-export function readStudioJournal(dataDir: string): StudioImportJournal | null {
+export function readStudioJournal(
+  dataDir: string,
+): StudioImportJournal | "unreadable" | null {
+  let text: string;
   try {
-    const value = JSON.parse(
-      readFileSync(journalPath(dataDir), "utf8"),
-    ) as Partial<StudioImportJournal>;
+    text = readFileSync(journalPath(dataDir), "utf8");
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ENOENT"
+      ? null
+      : "unreadable";
+  }
+  try {
+    const value = JSON.parse(text) as Partial<StudioImportJournal>;
     return value?.version === 1 &&
       typeof value.id === "string" &&
       STUDIO_IMPORT_STATES.includes(value.state as StudioImportState)
       ? (value as StudioImportJournal)
-      : null;
+      : "unreadable";
   } catch {
-    return null;
+    return "unreadable";
   }
+}
+
+function knownJournal(dataDir: string): StudioImportJournal | null {
+  const journal = readStudioJournal(dataDir);
+  if (journal === "unreadable") {
+    throw new BringOverError(
+      `The journal in ${studioImportDir(dataDir)} can't be read, so nothing there is changed. It may hold BB Studio's set-aside Studio data`,
+    );
+  }
+  return journal;
+}
+
+async function holdsSetAsideData(dataDir: string): Promise<boolean> {
+  for (const name of [BEFORE_DIR_NAME, REPLACED_DIR_NAME]) {
+    if (await exists(join(studioImportDir(dataDir), name))) return true;
+  }
+  return false;
 }
 
 function writeStudioJournal(
@@ -178,13 +207,21 @@ export async function studioDataState(
     journal:
       journal === null
         ? null
-        : {
-            state: journal.state,
-            error: journal.error,
-            stagedAt: journal.stagedAt,
-            appliedAt: journal.appliedAt ?? null,
-            restoredAt: journal.restoredAt ?? null,
-          },
+        : journal === "unreadable"
+          ? {
+              state: "unreadable",
+              error: `The journal in ${studioImportDir(dataDir)} can't be read, so nothing there is changed`,
+              stagedAt: 0,
+              appliedAt: null,
+              restoredAt: null,
+            }
+          : {
+              state: journal.state,
+              error: journal.error,
+              stagedAt: journal.stagedAt,
+              appliedAt: journal.appliedAt ?? null,
+              restoredAt: journal.restoredAt ?? null,
+            },
   };
 }
 
@@ -218,7 +255,12 @@ export async function stageStudioData(args: {
   sourceDataDir: string;
   now: number;
 }): Promise<{ journal: StudioImportJournal; snapshot: SourceSnapshot }> {
-  const existing = readStudioJournal(args.dataDir);
+  const existing = knownJournal(args.dataDir);
+  if (await holdsSetAsideData(args.dataDir)) {
+    throw new BringOverError(
+      `${studioImportDir(args.dataDir)} still holds set-aside Studio data. Put it back or delete it first`,
+    );
+  }
   if (existing !== null && !DISCARDABLE.has(existing.state)) {
     throw new BringOverError(
       existing.state === "applied" || existing.state === "restored"
@@ -304,7 +346,7 @@ export function checkStudioJob(args: {
   source: Sqlite;
   required: readonly string[];
 }): { missing: string[] } {
-  const journal = readStudioJournal(args.dataDir);
+  const journal = knownJournal(args.dataDir);
   if (journal?.state !== "staged") {
     throw new BringOverError("Copy bb's Studio data first");
   }
@@ -328,7 +370,7 @@ export function finishStudioJob(args: {
   required: readonly string[];
 }): void {
   const journal = readStudioJournal(args.dataDir);
-  if (journal?.state !== "staged") return;
+  if (journal === "unreadable" || journal?.state !== "staged") return;
   const here = args.target.prepare<[string], { found: number }>(
     "SELECT 1 AS found FROM threads WHERE id = ?",
   );
@@ -349,17 +391,22 @@ export function finishStudioJob(args: {
 }
 
 export async function discardStudioData(dataDir: string): Promise<void> {
-  const journal = readStudioJournal(dataDir);
+  const journal = knownJournal(dataDir);
   if (journal !== null && !DISCARDABLE.has(journal.state)) {
     throw new BringOverError(
       "This Studio data is in use and can't be discarded",
+    );
+  }
+  if (await holdsSetAsideData(dataDir)) {
+    throw new BringOverError(
+      `${studioImportDir(dataDir)} still holds set-aside Studio data, so it is not discarded`,
     );
   }
   await rm(studioImportDir(dataDir), { force: true, recursive: true });
 }
 
 export async function forgetStudioData(dataDir: string): Promise<void> {
-  const journal = readStudioJournal(dataDir);
+  const journal = knownJournal(dataDir);
   if (journal === null || !FORGETTABLE.has(journal.state)) {
     throw new BringOverError("There is no set-aside Studio data to delete");
   }
@@ -367,7 +414,7 @@ export async function forgetStudioData(dataDir: string): Promise<void> {
 }
 
 export async function requestStudioPutBack(dataDir: string): Promise<void> {
-  const journal = readStudioJournal(dataDir);
+  const journal = knownJournal(dataDir);
   if (journal?.state !== "applied") {
     throw new BringOverError("There is no old Studio data to put back");
   }
