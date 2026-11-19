@@ -166,11 +166,6 @@
       "intent": "Registers the `bb server mirror` commands (commands/fork-import.ts).",
       "budget": 2
     },
-    "apps/server/src/internal/events.ts": {
-      "seam": "quiet-turns",
-      "intent": "No completion notice is queued to the parent thread when a plugin's turn classifier called the turn quiet (isQuietTurn).",
-      "budget": 4
-    },
     "apps/server/src/server.ts": {
       "seam": "import-sync, approvals, skills-registry-policy, thread-successor",
       "intent": "Registers the fork's import routes (/api/v1/fork/import/*) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts). One fork import and registerForkThreadSuccessors(deps.db) after the registry gate, so archived-thread errors can look up the handoff chain.",
@@ -188,7 +183,7 @@
     },
     "apps/server/src/services/threads/thread-lifecycle.ts": {
       "seam": "fork-transcript",
-      "intent": "settleThreadStartCommandResult's failure branch first asks restartForkFromTranscript(args) (services/threads/fork-start-fallback.fork.ts, imported at the top of the file) and returns its result when it handles a failed thread.start that carried a fork whose session copy failed (the error names the source session and the thread is still starting); otherwise settleThreadCommandFailure runs as upstream. A fork whose session copy fails then starts from the transcript and writes no error row.",
+      "intent": "settleThreadStartCommandResult first asks restartForkFromTranscript(args) (services/threads/fork-start-fallback.fork.ts, imported at the top of the file) and returns its result when it handles a failed thread.start that carried a fork whose session copy failed (the error names the source session and the thread is still starting); otherwise the answer goes to the lifecycle machine as upstream. A fork whose session copy fails then starts from the transcript and writes no error row: with input it resends the start without the fork under the same request id, without input it settles the start request and moves the thread to idle through the lifecycle machine.",
       "budget": 4
     },
     "apps/server/src/services/threads/thread-send.ts": {
@@ -311,10 +306,15 @@
       "intent": "Before bb opens a clicked link by the user's preference, it asks plugin link handlers (openUrlWithPlugin, lib/fork-link-handlers.ts); a handler that returns true has opened it. InAppBrowserUrlOpenContext is exported so the workbench seam (fork-workbench.ts) opens a URL in the thread view's in-app browser.",
       "budget": 4
     },
-    "apps/server/src/services/threads/lifecycle-outcome.ts": {
-      "seam": "plugin-events, quiet-turns",
-      "intent": "Both lifecycle apply functions take forkBefore = forkBeforeLifecycle(deps.db, args) before the apply (it reads the thread's previous status, which bb itself no longer reads) and call forkAfterLifecycle(deps, args, outcome, forkBefore) after announceTurnFailed (services/threads/lifecycle-outcome.fork.ts). It puts latestAttentionAt back after a quiet run.succeeded from active and calls announceTurnInterrupted (fork-plugin-events.ts). Every turn completion and interruption path goes through these two functions.",
-      "budget": 5
+    "apps/server/src/services/threads/lifecycle/run.ts": {
+      "seam": "plugin-events, quiet-turns, title-service",
+      "intent": "runThreadLifecycleInTransaction, the one place every lifecycle input is applied, returns thread: forkAfterLifecycle(deps.db, thread, written.thread, transition.effects) (services/threads/lifecycle-outcome.fork.ts, imported at the top of the file). It puts latestAttentionAt back after a quiet completed turn from active (and returns the row with it), calls announceTurnInterrupted (fork-plugin-events.ts) for a turn that ended from active or stopping without completing, and schedules the queued title retry after a completed turn.",
+      "budget": 3
+    },
+    "apps/server/src/services/threads/turn-end-follow-ups.ts": {
+      "seam": "quiet-turns",
+      "intent": "planTurnEnd queues no completion notice to the parent thread when a plugin's turn classifier called the turn quiet (isQuietTurn, quiet-turn.fork.ts, imported at the top of the file). It decides the parent notice for every turn end, held or not.",
+      "budget": 4
     },
     "apps/server/src/ws/daemon-protocol.ts": {
       "seam": "plugin-events",
@@ -508,7 +508,7 @@
     },
     "apps/server/src/services/threads/thread-metadata-inference.ts": {
       "seam": "title-service",
-      "intent": "inferThreadMetadata calls noteTitleOutcome(deps, args, outcome) (title-retry.fork.ts, imported at the top of the file) right after the first title attempt, so a title that failed because no service was signed in, timed out or failed is tried again after the conversation's next finished turns (lifecycle-outcome.fork.ts runs it on run.succeeded, up to three times).",
+      "intent": "inferThreadMetadata calls noteTitleOutcome(deps, args, outcome) (title-retry.fork.ts, imported at the top of the file) right after the first title attempt, so a title that failed because no service was signed in, timed out or failed is tried again after the conversation's next finished turns (lifecycle-outcome.fork.ts runs it after a completed turn, up to three times).",
       "budget": 2
     },
     "plugins/provider-claude-code/server.ts": {
