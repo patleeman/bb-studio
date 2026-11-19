@@ -13,7 +13,13 @@ import {
   readForkImportState,
   writeCursor,
 } from "./state.js";
-import { readFirstRunFailure } from "./first-run-install.js";
+import {
+  cleanStartHasUserContent,
+  failureAttempts,
+  firstRunRetryPending,
+  readFirstRunFailure,
+  writeFirstRunFailure,
+} from "./first-run-install.js";
 import {
   copyMissingAttachments,
   copyMissingThreadStorage,
@@ -183,6 +189,9 @@ function importStatus(deps: AppDeps) {
             failedAt: failure.failedAt,
             reason: failure.reason,
             message: failure.message,
+            attempts: failureAttempts(failure),
+            canRetry: !cleanStartHasUserContent(requireDataDir()),
+            retryPending: firstRunRetryPending(requireDataDir(), failure),
           },
         };
   }
@@ -211,6 +220,23 @@ function importStatus(deps: AppDeps) {
 export function registerForkImportRoutes(app: Hono, deps: AppDeps): void {
   if (activeDataDir !== null) void startForkImportSweeps(deps, activeDataDir);
   app.get("/fork/import", (context) => context.json(importStatus(deps)));
+
+  app.post("/fork/import/retry", async (context) => {
+    const dataDir = requireDataDir();
+    const failure = readFirstRunFailure(dataDir);
+    if (failure === null) {
+      throw new ApiError(409, "invalid_request", "No import failed here");
+    }
+    if (cleanStartHasUserContent(dataDir)) {
+      throw new ApiError(
+        409,
+        "invalid_request",
+        "BB Studio has threads of its own now, so the import won't replace them",
+      );
+    }
+    await writeFirstRunFailure(dataDir, { ...failure, retryRequested: true });
+    return context.json(importStatus(deps));
+  });
 
   app.post("/fork/import/sync", (context) => {
     const summary = runForkImportSync({
