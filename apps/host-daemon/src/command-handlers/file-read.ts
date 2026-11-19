@@ -1,3 +1,4 @@
+import { forkReadWithinRoot } from "./file-read.fork.js";
 import { constants, type BigIntStats } from "node:fs";
 import { isUtf8 } from "node:buffer";
 import fs from "node:fs/promises";
@@ -289,8 +290,7 @@ export async function readFileForTransport(
   args: ReadFileForTransportArgs,
 ): Promise<ReadFileForTransportResult> {
   const readablePath = await resolveReadablePath(args);
-  const stat = await fs
-    .stat(readablePath)
+  const { stat, fileContents } = await forkReadWithinRoot(readablePath, args, getFileSizeLimitBytes(mimeTypes.lookup(args.resultPath) || undefined))
     .catch((error: unknown) => throwMissingTargetOrRethrow(args, error));
   if (stat.isDirectory()) {
     throw new CommandDispatchError(
@@ -308,9 +308,6 @@ export async function readFileForTransport(
   const mimeType = mimeTypes.lookup(args.resultPath) || undefined;
   assertFileWithinSizeLimit(stat.size, mimeType);
 
-  const fileContents = await fs
-    .readFile(readablePath)
-    .catch((error: unknown) => throwMissingTargetOrRethrow(args, error));
   return createReadFileForTransportResult({
     contents: fileContents,
     ifNoneMatch: args.ifNoneMatch,
