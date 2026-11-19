@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3";
+import { randomBytes } from "node:crypto";
 import { join, resolve, sep } from "node:path";
 import { quote, rowExists, selectList, sharedColumns } from "../sync.js";
 import {
@@ -281,25 +282,6 @@ export function referencedFirst(
 
 export const eventChunking = { threshold: 5_000, size: 2_000 };
 
-function removeThreadRows(target: Sqlite, threadId: string): void {
-  target.transaction(() => {
-    target.pragma("defer_foreign_keys = ON");
-    for (const table of [
-      "project_attachment_threads",
-      "retained_event_outputs",
-      ...THREAD_ROW_TABLES,
-      "events",
-    ]) {
-      try {
-        target
-          .prepare(`DELETE FROM ${quote(table)} WHERE thread_id = ?`)
-          .run(threadId);
-      } catch {}
-    }
-    target.prepare("DELETE FROM threads WHERE id = ?").run(threadId);
-  })();
-}
-
 export async function importThread(
   context: ThreadImportContext,
   threadId: string,
@@ -399,66 +381,23 @@ export async function importThread(
         copyRowsFor(context, "project_attachment_threads", threadId);
       }
     };
-    target.transaction(() => {
-      target.pragma("defer_foreign_keys = ON");
-      projectId = ensureProject(context, String(thread.project_id));
-      const sectionId = thread.section_id;
-      if (
-        typeof sectionId === "string" &&
-        !rowExists(target, "thread_sections", sectionId)
-      ) {
-        const sectionColumns = sharedColumns(source, target, "thread_sections");
-        const section = source
-          .prepare<[string], Row>(
-            `SELECT ${selectList(sectionColumns)} FROM thread_sections WHERE id = ?`,
-          )
-          .get(sectionId);
-        if (section !== undefined) {
-          insertIfMissing(target, "thread_sections", sectionColumns, [section]);
-        }
-      }
-      const prepared: Row = {
-        ...thread,
-        project_id: projectId,
-        environment_id: environmentFor(thread.environment_id),
-        status: RUNNING_STATUSES.has(String(thread.status))
-          ? "idle"
-          : thread.status,
-        section_id:
-          typeof sectionId === "string" &&
-          rowExists(target, "thread_sections", sectionId)
-            ? sectionId
-            : null,
-        deleted_at: chunked ? Date.now() : thread.deleted_at,
-      };
-      for (const column of THREAD_REFERENCE_COLUMNS) {
-        const reference = prepared[column];
-        if (
-          typeof reference === "string" &&
-          !rowExists(target, "threads", reference)
-        ) {
-          prepared[column] = null;
-        }
-      }
-      insertIfMissing(target, "threads", threadColumns, [prepared]);
-      const withProject = (row: Row): Row =>
-        "project_id" in row ? { ...row, project_id: projectId } : row;
-      for (const table of THREAD_ROW_TABLES) {
-        copyRowsFor(context, table, threadId, withProject);
-      }
-      if (!chunked) {
-        copyRowsFor(context, "events", threadId, withEnvironment);
-        finishRows();
-      }
-    })();
-    if (chunked) {
-      try {
-        const columns = sharedColumns(source, target, "events");
+    const eventColumns = sharedColumns(source, target, "events");
+    const staging = chunked
+      ? `bring_over_events_${randomBytes(6).toString("hex")}`
+      : null;
+    try {
+      if (staging !== null) {
+        target.exec(
+          `CREATE TEMP TABLE ${staging} AS SELECT ${selectList(eventColumns)} FROM main.events WHERE 0`,
+        );
+        const stage = target.prepare(
+          `INSERT INTO temp.${staging} (${selectList(eventColumns)}) VALUES (${eventColumns.map((column) => `@${column}`).join(", ")})`,
+        );
         const page = source.prepare<
           [string, number, number],
           Row & { _rowid: number }
         >(
-          `SELECT rowid AS _rowid, ${selectList(columns)} FROM events WHERE thread_id = ? AND rowid > ? ORDER BY rowid LIMIT ?`,
+          `SELECT rowid AS _rowid, ${selectList(eventColumns)} FROM events WHERE thread_id = ? AND rowid > ? ORDER BY rowid LIMIT ?`,
         );
         let after = 0;
         for (;;) {
@@ -467,30 +406,96 @@ export async function importThread(
           if (rows.length === 0) break;
           after = rows[rows.length - 1]!._rowid;
           target.transaction(() => {
-            target.pragma("defer_foreign_keys = ON");
-            insertIfMissing(
-              target,
-              "events",
-              columns,
-              rows.map(withEnvironment),
-            );
+            for (const row of rows) {
+              const values: Row = {};
+              for (const column of eventColumns)
+                values[column] = row[column] ?? null;
+              stage.run(values);
+            }
           })();
           await new Promise<void>((resolve) => {
             setImmediate(resolve);
           });
         }
         throwIfCancelled(context.signal);
-        target.transaction(() => {
-          target.pragma("defer_foreign_keys = ON");
-          finishRows();
-          target
-            .prepare("UPDATE threads SET deleted_at = ? WHERE id = ?")
-            .run(thread.deleted_at ?? null, threadId);
-        })();
-      } catch (error) {
-        removeThreadRows(target, threadId);
-        throw error;
       }
+      target.transaction(() => {
+        target.pragma("defer_foreign_keys = ON");
+        projectId = ensureProject(context, String(thread.project_id));
+        const sectionId = thread.section_id;
+        if (
+          typeof sectionId === "string" &&
+          !rowExists(target, "thread_sections", sectionId)
+        ) {
+          const sectionColumns = sharedColumns(
+            source,
+            target,
+            "thread_sections",
+          );
+          const section = source
+            .prepare<[string], Row>(
+              `SELECT ${selectList(sectionColumns)} FROM thread_sections WHERE id = ?`,
+            )
+            .get(sectionId);
+          if (section !== undefined) {
+            insertIfMissing(target, "thread_sections", sectionColumns, [
+              section,
+            ]);
+          }
+        }
+        const prepared: Row = {
+          ...thread,
+          project_id: projectId,
+          environment_id: environmentFor(thread.environment_id),
+          status: RUNNING_STATUSES.has(String(thread.status))
+            ? "idle"
+            : thread.status,
+          section_id:
+            typeof sectionId === "string" &&
+            rowExists(target, "thread_sections", sectionId)
+              ? sectionId
+              : null,
+        };
+        for (const column of THREAD_REFERENCE_COLUMNS) {
+          const reference = prepared[column];
+          if (
+            typeof reference === "string" &&
+            !rowExists(target, "threads", reference)
+          ) {
+            prepared[column] = null;
+          }
+        }
+        insertIfMissing(target, "threads", threadColumns, [prepared]);
+        const withProject = (row: Row): Row =>
+          "project_id" in row ? { ...row, project_id: projectId } : row;
+        for (const table of THREAD_ROW_TABLES) {
+          copyRowsFor(context, table, threadId, withProject);
+        }
+        if (staging === null) {
+          copyRowsFor(context, "events", threadId, withEnvironment);
+        } else {
+          for (const row of target
+            .prepare<[], { environment_id: string }>(
+              `SELECT DISTINCT environment_id FROM temp.${staging} WHERE environment_id IS NOT NULL`,
+            )
+            .all()) {
+            const mapped = environmentFor(row.environment_id);
+            if (mapped !== row.environment_id) {
+              target
+                .prepare(
+                  `UPDATE temp.${staging} SET environment_id = ? WHERE environment_id = ?`,
+                )
+                .run(mapped, row.environment_id);
+            }
+          }
+          target.exec(
+            `INSERT OR IGNORE INTO main.events (${selectList(eventColumns)}) SELECT ${selectList(eventColumns)} FROM temp.${staging}`,
+          );
+        }
+        finishRows();
+      })();
+    } finally {
+      if (staging !== null) target.exec(`DROP TABLE IF EXISTS temp.${staging}`);
     }
   } catch (error) {
     await removeCreated(created);

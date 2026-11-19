@@ -353,6 +353,14 @@ async function addPluginOnce(
       `${row.id}'s data could not be copied: ${errorDetail(error)}`,
     );
   }
+  const installedBefore = new Set(
+    target
+      .prepare<[], { id: string }>(
+        "SELECT id FROM plugins WHERE removed_at IS NULL",
+      )
+      .all()
+      .map((plugin) => plugin.id),
+  );
   let installed: InstalledPluginInfo;
   try {
     installed =
@@ -376,7 +384,9 @@ async function addPluginOnce(
         ? `installs as ${installed.id}, which BB Studio bundles or removed`
         : await installedEnginesProblem(installed, args.appVersion);
   if (problem !== null) {
-    await args.installer.remove(installed.id).catch(() => undefined);
+    if (!installedBefore.has(installed.id)) {
+      await args.installer.remove(installed.id).catch(() => undefined);
+    }
     await undo();
     throw new BringOverError(`${row.id} was not added: it ${problem}`);
   }

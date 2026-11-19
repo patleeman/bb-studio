@@ -1,7 +1,14 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { registerBringOverRoutes } from "../../src/services/fork-import/bring-over/routes.js";
-import { resetUiTokenForTests } from "../../src/services/fork-import/bring-over/ui-token.js";
+import {
+  adoptUiTokenHash,
+  resetUiTokenForTests,
+  uiTokenMatches,
+} from "../../src/services/fork-import/bring-over/ui-token.js";
+import { forkBeforeDatabase } from "../../src/services/fork-import/first-run.js";
+import { PERIODIC_SWEEP_JOBS } from "../../src/services/system/periodic-sweeps.js";
+import { releaseBbEnvironments } from "../../src/services/fork-import/bb-environments.js";
 import { eventChunking } from "../../src/services/fork-import/bring-over/threads.js";
 import { applySetting } from "../../src/services/fork-import/bring-over/settings.js";
 import { existingSourceSnapshot } from "../../src/services/fork-import/bring-over/source.js";
@@ -1271,18 +1278,19 @@ describe("bring-over API and review fixes", () => {
     body: JSON.stringify(body),
   });
 
-  it("takes the app's token once, and refuses agents and calls without it", async () => {
+  const tokenHash = (token: string) =>
+    createHash("sha256").update(token).digest("hex");
+
+  it("trusts only the token whose hash the app's launcher passed, across server restarts, and refuses agents", async () => {
     const f = await fixture();
     const lines: unknown[] = [];
+    const launcherEnv = { BB_STUDIO_UI_TOKEN_SHA256: tokenHash(TOKEN) };
+    const serverEnv: Record<string, string | undefined> = { ...launcherEnv };
+    adoptUiTokenHash(serverEnv);
+    expect(serverEnv.BB_STUDIO_UI_TOKEN_SHA256).toBeUndefined();
+    resetUiTokenForTests();
+    adoptUiTokenHash({ ...launcherEnv });
     const api = app(f, lines);
-    expect(
-      (await api.request("/fork/bring-over/ui-token", post({ token: "short" })))
-        .status,
-    ).toBe(409);
-    expect(
-      (await api.request("/fork/bring-over/ui-token", post({ token: TOKEN })))
-        .status,
-    ).toBe(204);
     expect(
       (
         await api.request(
@@ -1290,7 +1298,23 @@ describe("bring-over API and review fixes", () => {
           post({ token: "u".repeat(40) }),
         )
       ).status,
-    ).toBe(409);
+    ).toBe(404);
+    expect(uiTokenMatches("u".repeat(40))).toBe(false);
+    expect(uiTokenMatches(TOKEN)).toBe(true);
+    expect(
+      await (
+        await api.request("/fork/bring-over/gate", {
+          headers: { "x-bb-studio-ui-token": TOKEN },
+        })
+      ).json(),
+    ).toEqual({ fromApp: true, matches: true });
+    expect(
+      await (
+        await api.request("/fork/bring-over/gate", {
+          headers: { "x-bb-studio-ui-token": "u".repeat(40) },
+        })
+      ).json(),
+    ).toEqual({ fromApp: true, matches: false });
     const pick = { picks: [{ kind: "project", id: f.ids.p1 }] };
 
     expect(
@@ -1336,6 +1360,13 @@ describe("bring-over API and review fixes", () => {
         (line) => (line as [unknown, string])[1] === "Bring-over request",
       ),
     ).toHaveLength(5);
+    expect(
+      (await api.request("/fork/bring-over/snapshot", post({}))).status,
+    ).toBe(403);
+    expect(
+      (await api.request("/fork/bring-over/jobs/current/cancel", post({})))
+        .status,
+    ).toBe(403);
     expect((lines[0] as [{ allowed: boolean }])[0].allowed).toBe(false);
 
     expect(
@@ -1567,5 +1598,235 @@ describe("bring-over API and review fixes", () => {
       }),
     ).rejects.toThrow(/is a link/u);
     expect(existsSync(join(f.target, "skills"))).toBe(false);
+  });
+
+  it("takes the hash out of the server's own environment at start, so nothing it spawns sees it", async () => {
+    const f = await fixture();
+    process.env.BB_STUDIO_UI_TOKEN_SHA256 = tokenHash(TOKEN);
+    process.env.BB_STUDIO_IMPORT_FROM = "off";
+    await forkBeforeDatabase(
+      { BB_DATA_DIR: f.target, BB_APP_VERSION: "1.0.0" },
+      logger,
+    );
+    expect(process.env.BB_STUDIO_UI_TOKEN_SHA256).toBeUndefined();
+    expect(uiTokenMatches(TOKEN)).toBe(true);
+  });
+
+  it("an attached or CLI-started server, with no hash from the app, refuses everyone", async () => {
+    const f = await fixture();
+    adoptUiTokenHash({});
+    const api = app(f);
+    expect(
+      await (
+        await api.request("/fork/bring-over/gate", {
+          headers: { "x-bb-studio-ui-token": TOKEN },
+        })
+      ).json(),
+    ).toEqual({ fromApp: false, matches: false });
+    expect(
+      (
+        await api.request(
+          "/fork/bring-over/jobs",
+          post({ picks: [] }, { "x-bb-studio-ui-token": TOKEN }),
+        )
+      ).status,
+    ).toBe(403);
+  });
+
+  it("keeps a large thread out of the threads table until it is complete, so the deletion sweep never sees it", async () => {
+    eventChunking.threshold = 1;
+    eventChunking.size = 1;
+    const f = await fixture();
+    const snap = openSnapshot(f.snapshot);
+    open.push(snap);
+    const sweepJob = PERIODIC_SWEEP_JOBS.find(
+      (job) => job.name === "deleted-thread-finalization",
+    );
+    expect(sweepJob).toBeDefined();
+    const sweepConnection = createConnection(join(f.target, "bb.db"));
+    const finalized: string[] = [];
+    const sweepDeps = {
+      db: sweepConnection,
+      logger: {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+        debug: () => {},
+      },
+      terminalSessions: {
+        closeDeletedThreadTerminals: ({ threadId }: { threadId: string }) => {
+          finalized.push(threadId);
+        },
+      },
+    } as unknown as Parameters<
+      (typeof PERIODIC_SWEEP_JOBS)[number]["sweep"]
+    >[0];
+    const seen: number[] = [];
+    let sweeps = Promise.resolve();
+    const watcher = setInterval(() => {
+      seen.push(
+        count(f.db, "SELECT COUNT(*) AS n FROM threads WHERE id = ?", f.ids.t1),
+      );
+      sweeps = sweeps.then(() =>
+        sweepJob!.sweep(sweepDeps, Date.now()).run(sweepDeps, Date.now()),
+      );
+    }, 0);
+    try {
+      await run(f, { picks: [{ kind: "thread", id: f.ids.t1 }] });
+    } finally {
+      clearInterval(watcher);
+      await sweeps;
+      sweepConnection.$client.close();
+    }
+    expect(finalized).toEqual([]);
+    expect(
+      f.db.prepare("SELECT deleted_at FROM threads WHERE id = ?").get(f.ids.t1),
+    ).toEqual({ deleted_at: null });
+    expect(
+      count(
+        f.db,
+        "SELECT COUNT(*) AS n FROM events WHERE thread_id = ?",
+        f.ids.t1,
+      ),
+    ).toBe(3);
+    expect(count(f.db, "SELECT COUNT(*) AS n FROM thread_purges")).toBe(0);
+    expect(
+      f.db
+        .prepare(
+          "SELECT name FROM temp.sqlite_master WHERE name LIKE 'bring_over_events_%'",
+        )
+        .all(),
+    ).toEqual([]);
+  });
+
+  it("never removes a plugin BB Studio already had when bb's row installs under its id", async () => {
+    const f = await fixture();
+    const snap = openSnapshot(f.snapshot);
+    open.push(snap);
+    insertRow(f.db, "plugins", {
+      id: "acme-renamed",
+      source: "/x",
+      root_dir: "/x",
+      enabled: 1,
+      source_kind: "path",
+      source_path: "/x",
+      removed_at: null,
+    });
+    const removed: string[] = [];
+    const installer = {
+      install: async () => ({ id: "x" }),
+      installPath: async () => ({ id: "acme-renamed" }),
+      reload: async () => undefined,
+      remove: async (id: string) => {
+        removed.push(id);
+        return true;
+      },
+    };
+    await expect(
+      addPlugin({
+        id: "acme-tool",
+        source: snap,
+        target: f.db,
+        sourceDataDir: f.source,
+        dataDir: f.target,
+        installer,
+        appVersion: "1.0.0",
+      }),
+    ).rejects.toThrow(/installs as acme-renamed/u);
+    expect(removed).toEqual([]);
+  });
+
+  it("stops managing environments inside bb's folder, so BB Studio's cleanup leaves bb's worktrees alone", async () => {
+    const f = await fixture();
+    const memory = createMigratedConnection();
+    const db = memory.$client;
+    insertRow(db, "hosts", { id: "host_a", name: "A", type: "persistent" });
+    insertRow(db, "projects", {
+      id: "proj_a",
+      name: "a",
+      kind: "standard",
+      deleted_at: null,
+    });
+    const env = (id: string, path: string, status = "ready") =>
+      insertRow(db, "environments", {
+        id,
+        project_id: "proj_a",
+        host_id: "host_a",
+        path,
+        status,
+        is_worktree: 1,
+        provider_owns_path: 1,
+        environment_provider_id: "git-worktree",
+        environment_provider_plugin_id: "environment-git-worktree",
+        owner_thread_id: null,
+        teardown_status: null,
+        retire_at: null,
+      });
+    env(
+      "env_bb",
+      join(
+        f.source,
+        "plugins",
+        "environment-git-worktree",
+        "host-data",
+        "worktrees",
+        "k",
+        "repo",
+      ),
+    );
+    env("env_bb_old", join(f.source, "worktrees", "env_1", "repo"));
+    env("env_mine", join(f.target, "worktrees", "env_2", "repo"));
+    env("env_gone", join(f.source, "worktrees", "env_3", "repo"), "destroyed");
+    db.prepare(
+      "UPDATE environments SET retire_at = 1, teardown_status = 'running' WHERE id = 'env_bb_old'",
+    ).run();
+
+    expect(releaseBbEnvironments(db, [f.source])).toBe(2);
+    expect(releaseBbEnvironments(db, [f.source])).toBe(0);
+
+    const rows = db
+      .prepare(
+        "SELECT id, environment_provider_id, provider_owns_path, retire_at, teardown_status FROM environments ORDER BY id",
+      )
+      .all();
+    expect(rows).toEqual([
+      {
+        id: "env_bb",
+        environment_provider_id: null,
+        provider_owns_path: 0,
+        retire_at: null,
+        teardown_status: null,
+      },
+      {
+        id: "env_bb_old",
+        environment_provider_id: null,
+        provider_owns_path: 0,
+        retire_at: null,
+        teardown_status: null,
+      },
+      {
+        id: "env_gone",
+        environment_provider_id: "git-worktree",
+        provider_owns_path: 1,
+        retire_at: null,
+        teardown_status: null,
+      },
+      {
+        id: "env_mine",
+        environment_provider_id: "git-worktree",
+        provider_owns_path: 1,
+        retire_at: null,
+        teardown_status: null,
+      },
+    ]);
+    expect(
+      listProviderLifecycleEnvironments(memory, "git-worktree", {
+        pluginId: "environment-git-worktree",
+        teardownMessage: "x",
+      })
+        .map((row) => row.id)
+        .filter((id) => id.startsWith("env_bb")),
+    ).toEqual([]);
+    db.close();
   });
 });
