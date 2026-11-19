@@ -79,8 +79,6 @@ export interface PluginInstaller {
   installPath(path: string): Promise<InstalledPluginInfo>;
   remove(id: string): Promise<unknown>;
   reload(id?: string): Promise<unknown>;
-  setEnabled(id: string, enabled: boolean): Promise<unknown>;
-  listOpenPluginDatabases(): { pluginId: string }[];
 }
 
 function sourceRows(source: Sqlite): SourcePluginRow[] {
