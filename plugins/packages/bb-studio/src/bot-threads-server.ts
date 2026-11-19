@@ -31,7 +31,7 @@ import { familyHref, itemType } from "./item-model";
 import type { Recording } from "./kit/talk-contract";
 import { PLUGIN_ID as TALK_PLUGIN_ID, recordingHref } from "./talk/shared/format";
 
-type Bb = Pick<BbPluginApi, "events" | "sdk" | "agents">;
+type Bb = Pick<BbPluginApi, "events" | "sdk" | "agents" | "onDispose">;
 
 export interface SpaceBot {
   id: string; name: string; avatar: string; shape?: string | null; color?: string | null; primary?: boolean; threadId: string | null; appearance?: Appearance | null; presence?: Presence;
@@ -180,14 +180,17 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     if (point) store.forkedAt(threadId, { sourceThreadId: point.sourceThreadId, turnId: point.sourceTurnId });
   };
 
-  // Thread events.
+  // Thread events. A reload stops the reconciles still waiting: the old instance's handles are stale.
+  const reconciles = new Set<ReturnType<typeof setTimeout>>();
+  bb.onDispose(() => { for (const timer of reconciles) clearTimeout(timer); reconciles.clear(); });
   bb.events.on("thread.created", ({ thread }) => {
     void store.created(thread as ThreadFacts).then(() => {
       const rec = store.get(thread.id);
       if (rec?.kind === "conversation" && rec.forkedFrom && !rec.forkedFrom.messageId) return lookUpForkPoint(thread.id);
     });
     // A side chat learns its reply a moment later, a runner its thread: apply them.
-    setTimeout(() => { try { store.reconcile(); } catch { /* the next sweep */ } }, 8_000);
+    const later = setTimeout(() => { reconciles.delete(later); try { store.reconcile(); } catch { /* the next sweep */ } }, 8_000);
+    reconciles.add(later);
   });
   bb.events.on("thread.archived", ({ thread }) => store.archived(thread.id, true));
   bb.events.on("thread.unarchived", ({ thread }) => { if (known(thread.id)) store.archived(thread.id, false); else void store.created(thread as ThreadFacts); });

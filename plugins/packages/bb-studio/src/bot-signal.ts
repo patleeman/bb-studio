@@ -12,10 +12,12 @@ export function kindOf(rec: { kind: "conversation" | "worker" }): BotChangeKind 
 export class BotSignal {
   private pending = new Map<string, Set<BotChangeKind>>();
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private disposed = false;
 
   constructor(private readonly publish: (event: BotThreadsChanged) => void, private readonly delayMs: number) {}
 
   add(changes: readonly BotChange[]): void {
+    if (this.disposed) return;
     for (const change of changes) {
       if (!change.kinds.length) continue;
       const kinds = this.pending.get(change.botId) ?? new Set<BotChangeKind>();
@@ -34,7 +36,9 @@ export class BotSignal {
     }
   }
 
+  /** Clears what is pending; changes added after it are dropped (a reload's new instance publishes its own). */
   dispose(): void {
+    this.disposed = true;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     this.pending.clear();
