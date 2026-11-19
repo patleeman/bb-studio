@@ -26,7 +26,9 @@ export interface BringOverState {
   settings?: BringOverSetting[];
   plugins?: BringOverPlugin[];
   job?: BringOverJob | null;
+  studioData?: BringOverStudioData;
 }
+export interface BringOverStudioData { inBb: boolean; offered: boolean; reason: string | null; bots: number; pages: number; tasks: number }
 export interface BringOverRequest {
   picks: { kind: "project" | "thread"; id: string }[];
   attachments: boolean;
@@ -66,6 +68,14 @@ export const listProjectThreads = (projectId: string, load: typeof fetch = fetch
 export const startBringOver = (request: BringOverRequest, load: typeof fetch = fetch) => send<BringOverJob>("/jobs", post(request), load);
 export const currentJob = (load: typeof fetch = fetch) => send<{ job: BringOverJob | null }>("/jobs/current", undefined, load);
 export const cancelBringOver = (load: typeof fetch = fetch) => send<{ job: BringOverJob | null }>("/jobs/current/cancel", post(), load);
+export const bringOverStudioData = (load: typeof fetch = fetch) => send<{ threads: number; threadsHere: number; bots: number }>("/studio-data", post(), load);
+
+/** "2 Bots · 14 pages · 6 tasks". */
+export function studioDataLine(data: BringOverStudioData): string {
+  const plural = (count: number, word: string) => `${String(count)} ${word}${count === 1 ? "" : "s"}`;
+  return [plural(data.bots, "Bot"), plural(data.pages, "page"), plural(data.tasks, "task")].join(" · ");
+}
+
 export const addOldPlugin = (id: string, load: typeof fetch = fetch) => send<{ id: string; data: boolean }>(`/plugins/${encodeURIComponent(id)}/add`, post(), load);
 
 /** The job's one line: "12 of 40 threads · 3 already here · 1 failed". */
