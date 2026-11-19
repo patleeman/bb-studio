@@ -361,6 +361,19 @@ describe("bring things over from bb", () => {
       secret: true,
       count: 1,
     });
+    expect(settings.find((item) => item.id === "env")).toMatchObject({
+      names: ["OPENAI_API_KEY"],
+      alreadyHere: [],
+    });
+    await writeFile(
+      join(f.target, "env.json"),
+      JSON.stringify({ env: { OPENAI_API_KEY: "mine" } }),
+    );
+    expect(
+      (await listSettings(snap, f.source, f.target)).find(
+        (item) => item.id === "env",
+      ),
+    ).toMatchObject({ alreadyHere: ["OPENAI_API_KEY"] });
     expect(settings.map((item) => item.id)).toContain("instructions");
     const plugins = await listPlugins(snap, f.db, f.source, "1.0.0");
     expect(

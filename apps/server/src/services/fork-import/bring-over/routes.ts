@@ -145,7 +145,7 @@ export function registerBringOverRoutes(
         sourceDataDir: snap.sourceDataDir,
         readAt: snap.takenAt,
         projects: listProjects(db, deps.db.$client, hosts(snap)),
-        settings: await listSettings(db, snap.sourceDataDir),
+        settings: await listSettings(db, snap.sourceDataDir, dataDir()),
         plugins: await listPlugins(
           db,
           deps.db.$client,
