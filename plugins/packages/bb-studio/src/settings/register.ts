@@ -5,7 +5,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { errorMessage } from "../kit/format";
-import { settingsContract, pushStatusSchema, pushTestSchema, type PushStatus } from "./contract";
+import { deskHoldSchema, settingsContract, pushStatusSchema, pushTestSchema, type PushStatus } from "./contract";
 import { combineSettings, type StudioSettingsHandle } from "./handle";
 import { STUDIO_KEY_SETTINGS } from "./keys";
 import { pluginSecretsDir, StudioKeyStore } from "./key-store";
@@ -65,11 +65,11 @@ export async function registerSettings(bb: BbPluginApi, pluginId: string): Promi
     timeZone: loopTimeZone(process.env, store.current().todosTimeZone),
     defaultTimeZone: loopTimeZone(process.env),
   });
-  const mobile = async <T>(method: string, outputSchema: z.ZodType<T>): Promise<T | null> => {
+  const mobile = async <T>(method: string, outputSchema: z.ZodType<T>, input: unknown = null): Promise<T | null> => {
     const { plugins } = await bb.sdk.plugins.list();
     const plugin = plugins.find((each) => each.id === MOBILE_PLUGIN_ID) as { id: string; enabled?: boolean } | undefined;
     if (!plugin || plugin.enabled === false) return null;
-    return bb.sdk.plugins.callRpc({ pluginId: MOBILE_PLUGIN_ID, method, input: null, outputSchema, signal: AbortSignal.timeout(20_000) });
+    return bb.sdk.plugins.callRpc({ pluginId: MOBILE_PLUGIN_ID, method, input: input as never, outputSchema, signal: AbortSignal.timeout(20_000) });
   };
   const notInstalled: PushStatus = { installed: false, ready: false, problem: "Install the Studio Mobile plugin to send pushes to the BB Studio app.", devices: 0, lastDelivery: null };
 
@@ -91,6 +91,13 @@ export async function registerSettings(bb: BbPluginApi, pluginId: string): Promi
       } catch (error) {
         return { installed: true, ready: false, problem: `The Mobile plugin didn't answer: ${errorMessage(error)}`, devices: 0, lastDelivery: null };
       }
+    },
+    // A Mobile plugin without the desk hold answers "unknown method": null, and the overlay backs off.
+    "mobile.desk.beat": async (beat) => mobile("desk_beat", deskHoldSchema, beat).catch(() => null),
+    "mobile.desk.hold": async ({ enabled }) => {
+      const status = await mobile("desk_hold_set", deskHoldSchema, { enabled });
+      if (!status) throw new Error(notInstalled.problem!);
+      return status;
     },
     "mobile.push.test": async () => {
       try {

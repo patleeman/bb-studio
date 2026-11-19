@@ -355,6 +355,8 @@ public enum Studio {
     public static let settings_keys_get = "settings.keys.get"
     public static let settings_keys_set = "settings.keys.set"
     public static let mobile_push_status = "mobile.push.status"
+    public static let mobile_desk_beat = "mobile.desk.beat"
+    public static let mobile_desk_hold = "mobile.desk.hold"
     public static let mobile_push_test = "mobile.push.test"
     public static let memory_get = "memory.get"
     public static let memory_overview = "memory.overview"
@@ -1165,6 +1167,10 @@ public enum Studio {
   public typealias MobilePushStatusInput = StudioJSONValue
 
   public typealias MobilePushStatus = MobilePushStatusOutput
+
+  public typealias MobileDeskBeat = MobileDeskBeatOutput
+
+  public typealias MobileDeskHold = MobileDeskHoldOutput
 
   public typealias MobilePushTestInput = StudioJSONValue
 
@@ -31948,19 +31954,125 @@ public enum Studio {
     }
   }
 
+  public struct MobilePushStatusOutputDeskHold: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var atDesk: Bool?
+    public var held: Int?
+
+    public init(enabled: Bool? = nil, atDesk: Bool? = nil, held: Int? = nil) {
+      self.enabled = enabled
+      self.atDesk = atDesk
+      self.held = held
+    }
+  }
+
   public struct MobilePushStatusOutput: Sendable, Hashable, Codable {
     public var installed: Bool?
     public var ready: Bool?
     public var problem: String?
     public var devices: Int?
     public var lastDelivery: MobilePushStatusOutputLastDelivery?
+    public var deskHold: MobilePushStatusOutputDeskHold?
 
-    public init(installed: Bool? = nil, ready: Bool? = nil, problem: String? = nil, devices: Int? = nil, lastDelivery: MobilePushStatusOutputLastDelivery? = nil) {
+    public init(installed: Bool? = nil, ready: Bool? = nil, problem: String? = nil, devices: Int? = nil, lastDelivery: MobilePushStatusOutputLastDelivery? = nil, deskHold: MobilePushStatusOutputDeskHold? = nil) {
       self.installed = installed
       self.ready = ready
       self.problem = problem
       self.devices = devices
       self.lastDelivery = lastDelivery
+      self.deskHold = deskHold
+    }
+  }
+
+  public enum MobileDeskBeatInputState: Sendable, Hashable, Codable {
+    case active
+    case away
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "away": self = .away
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .away: try container.encode("away")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum MobileDeskBeatInputSource: Sendable, Hashable, Codable {
+    case system
+    case window
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "system": self = .system
+      case "window": self = .window
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .system: try container.encode("system")
+      case .window: try container.encode("window")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct MobileDeskBeatInput: Sendable, Hashable, Codable {
+    public var clientId: String?
+    public var state: MobileDeskBeatInputState?
+    public var source: MobileDeskBeatInputSource?
+
+    public init(clientId: String? = nil, state: MobileDeskBeatInputState? = nil, source: MobileDeskBeatInputSource? = nil) {
+      self.clientId = clientId
+      self.state = state
+      self.source = source
+    }
+  }
+
+  public struct MobileDeskBeatOutput: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var atDesk: Bool?
+    public var held: Int?
+
+    public init(enabled: Bool? = nil, atDesk: Bool? = nil, held: Int? = nil) {
+      self.enabled = enabled
+      self.atDesk = atDesk
+      self.held = held
+    }
+  }
+
+  public struct MobileDeskHoldInput: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+
+    public init(enabled: Bool? = nil) {
+      self.enabled = enabled
+    }
+  }
+
+  public struct MobileDeskHoldOutput: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var atDesk: Bool?
+    public var held: Int?
+
+    public init(enabled: Bool? = nil, atDesk: Bool? = nil, held: Int? = nil) {
+      self.enabled = enabled
+      self.atDesk = atDesk
+      self.held = held
     }
   }
 

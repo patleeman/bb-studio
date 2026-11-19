@@ -7,6 +7,12 @@ import { z } from "zod";
 const value = z.union([z.boolean(), z.number(), z.string().max(10_000)]);
 export const settingsValuesSchema = z.record(z.string(), value);
 
+/** "Hold phone notifications while I'm at my Mac": the switch, whether the user is at the desk (null: no client says), and how many pushes wait. */
+export const deskHoldSchema = z.object({ enabled: z.boolean(), atDesk: z.boolean().nullable(), held: z.number().int().min(0) });
+export type DeskHoldStatus = z.infer<typeof deskHoldSchema>;
+export const deskBeatSchema = z.strictObject({ clientId: z.string().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/), state: z.enum(["active", "away"]), source: z.enum(["system", "window"]) });
+export type DeskBeat = z.infer<typeof deskBeatSchema>;
+
 export const pushStatusSchema = z.object({
   /** False when the Mobile plugin isn't installed or running. */
   installed: z.boolean(),
@@ -15,6 +21,8 @@ export const pushStatusSchema = z.object({
   problem: z.string().nullable(),
   devices: z.number().int().min(0),
   lastDelivery: z.object({ at: z.number(), sent: z.number().int().min(0) }).nullable(),
+  /** Missing when the Mobile plugin predates the desk hold. */
+  deskHold: deskHoldSchema.optional(),
 });
 export type PushStatus = z.infer<typeof pushStatusSchema>;
 
@@ -58,6 +66,16 @@ export const settingsContract = defineRpcContract({
     experimental_description: "Whether the Mobile plugin can send pushes, to how many phones, and the last delivery.",
     input: z.null(),
     output: pushStatusSchema,
+  },
+  "mobile.desk.beat": {
+    experimental_description: "Studio's overlay on a desktop or web client says whether the user is at the desk; the Mobile plugin holds phone pushes while they are. Null when the Mobile plugin can't take it.",
+    input: deskBeatSchema,
+    output: deskHoldSchema.nullable(),
+  },
+  "mobile.desk.hold": {
+    experimental_description: "Turns \"Hold phone notifications while I'm at my Mac\" on or off in the Mobile plugin.",
+    input: z.strictObject({ enabled: z.boolean() }),
+    output: deskHoldSchema,
   },
   "mobile.push.test": {
     experimental_description: "Send a test push to every phone the Mobile plugin knows.",

@@ -84,7 +84,7 @@ describe("push status and the test push (Studio shows them on BB's Mobile page)"
     await host.bb.storage.kv.set(MOBILE_MIGRATED_KEY, { at: 1 });
     await plugin(host.bb);
     try {
-      expect(await host.harness.behavior.callRpc("push_status", null)).toEqual({ ready: false, problem: "APNs key is not set", devices: 0, lastDelivery: null });
+      expect(await host.harness.behavior.callRpc("push_status", null)).toEqual({ ready: false, problem: "APNs key is not set", devices: 0, lastDelivery: null, deskHold: { enabled: true, atDesk: null, held: 0 } });
       expect(await host.harness.behavior.callRpc("push_test", null)).toEqual({ ok: false, sent: 0, message: "APNs key is not set" });
     } finally { await host.harness.lifecycle.dispose(); }
   });

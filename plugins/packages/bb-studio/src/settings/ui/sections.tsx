@@ -23,6 +23,7 @@ import { botPath } from "../../ui/bot/selection";
 import { SETTINGS_GROUPS, STUDIO_SETTINGS } from "../schema";
 import { Card, Disclosure, Row, SectionState, Segmented, SettingControl, SettingRow, SubHeading } from "./controls";
 import { ApiKeysSection } from "./ApiKeysSection";
+import { DeskPresenceOverlay } from "./DeskPresenceOverlay";
 import { PushSection } from "./PushSection";
 import { SkillsRegistrySection } from "./SkillsRegistrySection";
 import { useStudioSettings } from "./use-settings";
@@ -232,5 +233,7 @@ export function registerSettingsApp(app: PluginAppBuilder, windows: boolean = ha
   }
   app.slots.settingsSection({ id: "skills-registry", title: "Skill registry", component: SkillsRegistrySection });
   app.slots.settingsSection({ id: "mobile-push", title: "Phone notifications", component: PushSection });
+  // "At the desk" heartbeat for the Mobile plugin's "Hold phone notifications while I'm at my Mac".
+  app.slots.experimental_appOverlay?.({ id: "desk-presence", component: DeskPresenceOverlay });
   app.slots.settingsSection({ id: "api-keys", title: "API keys", component: ApiKeysSection });
 }

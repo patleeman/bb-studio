@@ -541,6 +541,31 @@
                 "type": "null"
               }
             ]
+          },
+          "deskHold": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "atDesk": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "held": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "enabled",
+              "atDesk",
+              "held"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -548,6 +573,107 @@
           "problem",
           "devices",
           "lastDelivery"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "desk_beat": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "away"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "system",
+              "window"
+            ]
+          }
+        },
+        "required": [
+          "clientId",
+          "state",
+          "source"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "atDesk": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "held": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "enabled",
+          "atDesk",
+          "held"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "desk_hold_set": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "atDesk": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "held": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "enabled",
+          "atDesk",
+          "held"
         ],
         "additionalProperties": false
       }

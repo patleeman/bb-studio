@@ -30,7 +30,8 @@ import {
   type ExpoMessage,
   type ExpoTicket,
 } from "./apns.js";
-import { CLEAR_BATCH, clearPayload, keptWorkers, noteNotified, noteWorkers, partition, type Notified, type NotifiedWorkers, type ThreadReadState } from "./clear.js";
+import { CLEAR_BATCH, clearPayload, keptWorkers, noteNotified, noteWorkers, partition, settled, type Notified, type NotifiedWorkers, type ThreadReadState } from "./clear.js";
+import { DeskHold, holdable } from "./desk.js";
 import { isQuietCompletion, triggerOf, turnPushAllowed, type TurnTrigger } from "./notifications.js";
 import { collapseIdFor, PushWindows, summaryBody, windowKey } from "./push-window.js";
 import { StudioApprovals } from "./studio-approvals.js";
@@ -53,6 +54,9 @@ const DEVICES_KEY = "devices";
 /** Threads the app has notifications for; see clear.ts. */
 const NOTIFIED_KEY = "notified-threads";
 const NOTIFIED_WORKERS_KEY = "notified-workers";
+/** The "Hold phone notifications while I'm at my Mac" switch (desk.ts); on unless set false. */
+const DESK_HOLD_KEY = "desk-hold";
+const deskOutput = z.object({ enabled: z.boolean(), atDesk: z.boolean().nullable(), held: z.number().int().min(0) });
 const STUDIO_PLUGIN_ID = "studio";
 const pushIdsOutput = z.object({ botId: z.string().optional(), conversationId: z.string().optional(), workerId: z.string().optional() }).passthrough();
 /** Reading a thread has no event, so notified threads are checked this often. */
@@ -121,7 +125,18 @@ export const mobileContract = defineRpcContract({
       problem: z.string().nullable(),
       devices: z.number().int().min(0),
       lastDelivery: z.object({ at: z.number(), sent: z.number().int().min(0) }).nullable(),
+      deskHold: deskOutput.optional(),
     }),
+  },
+  desk_beat: {
+    experimental_description: "A client says whether the user is at the desk: \"active\" every 30 to 60 seconds while they are, \"away\" when the Mac goes idle or locks. While any client is active, phone pushes about threads wait.",
+    input: z.strictObject({ clientId: z.string().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/), state: z.enum(["active", "away"]), source: z.enum(["system", "window"]) }),
+    output: deskOutput,
+  },
+  desk_hold_set: {
+    experimental_description: "Turns \"Hold phone notifications while I'm at my Mac\" on or off. Off sends what is waiting now.",
+    input: z.strictObject({ enabled: z.boolean() }),
+    output: deskOutput,
   },
   push_test: {
     experimental_description: "Send a test push to every phone the relay has delivered to.",
@@ -339,7 +354,22 @@ export default async function plugin(bb: BbPluginApi) {
   });
   bb.onDispose(() => windows.dispose());
 
-  async function deliver(messages: ExpoMessage[], options: { windowed?: boolean } = {}): Promise<ExpoTicket[]> {
+  let deskHoldEnabled = (await bb.storage.kv.get<{ enabled: boolean }>(DESK_HOLD_KEY))?.enabled !== false;
+  const desk = new DeskHold({
+    seen: async ({ threadId, workerId }) => {
+      const state = await readState(threadId, workerId ? [workerId] : []);
+      return state === undefined ? undefined : settled(state);
+    },
+    send: async (messages) => { await deliver(messages, { windowed: false, held: false }); },
+    log: (message) => bb.log.info(message),
+  });
+  bb.onDispose(() => desk.dispose());
+  const deskStatus = () => {
+    const { atDesk, held } = desk.status();
+    return { enabled: deskHoldEnabled, atDesk, held };
+  };
+
+  async function deliver(messages: ExpoMessage[], options: { windowed?: boolean; held?: boolean } = {}): Promise<ExpoTicket[]> {
     const tickets: ExpoTicket[] = new Array(messages.length);
     const expoIndexes: number[] = [];
     const apnsIndexes: number[] = [];
@@ -365,6 +395,15 @@ export default async function plugin(bb: BbPluginApi) {
           tickets[index] = { status: "ok" };
           apnsIndexes.splice(position, 1);
         }
+      }
+    }
+
+    // While the user is at the desk, pushes about threads wait (desk.ts).
+    if (deskHoldEnabled && options.held !== false && apnsIndexes.length > 0) {
+      const holding = apnsIndexes.filter((index) => holdable(messages[index]!));
+      if (desk.hold(holding.map((index) => messages[index]!))) {
+        for (const index of holding) tickets[index] = { status: "ok" };
+        apnsIndexes.splice(0, apnsIndexes.length, ...apnsIndexes.filter((index) => !holding.includes(index)));
       }
     }
 
@@ -630,7 +669,18 @@ export default async function plugin(bb: BbPluginApi) {
         problem: "missing" in apns ? apns.missing : null,
         devices,
         lastDelivery: last ? { at: Date.parse(last.at) || 0, sent: Math.max(0, last.apns + last.expo - last.errors.length) } : null,
+        deskHold: deskStatus(),
       };
+    },
+    desk_beat(input) {
+      desk.beat(input);
+      return deskStatus();
+    },
+    async desk_hold_set({ enabled }) {
+      deskHoldEnabled = enabled;
+      await bb.storage.kv.set(DESK_HOLD_KEY, { enabled });
+      if (!enabled) await desk.releaseNow();
+      return deskStatus();
     },
     async push_test() {
       const apns = await apnsConfig();
@@ -736,6 +786,7 @@ export default async function plugin(bb: BbPluginApi) {
         environment: "missing" in apns ? null : apns.config.environment,
         relayPath: "/api/v1/plugins/mobile/http/push?token=<bb plugin token mobile>",
         lastDelivery: last ?? null,
+        deskHold: deskStatus(),
       };
       if (argv.includes("--json")) return { exitCode: 0, stdout: JSON.stringify(status) };
       return {
@@ -746,6 +797,7 @@ export default async function plugin(bb: BbPluginApi) {
           last
             ? `Last delivery ${last.at}: ${last.apns} APNs, ${last.expo} Expo${last.categories?.length ? ` (categories: ${last.categories.join(", ")})` : ""}${last.errors.length ? `; errors: ${last.errors.join("; ")}` : ""}`
             : "No deliveries yet.",
+          `Hold while at the desk: ${status.deskHold.enabled ? "on" : "off"}; at the desk: ${status.deskHold.atDesk === null ? "unknown" : status.deskHold.atDesk ? "yes" : "no"}; held: ${status.deskHold.held}`,
         ].join("\n"),
       };
     },
