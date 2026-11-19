@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
+import semver from "semver";
 import { join } from "node:path";
 import { BringOverError, errorDetail, exists } from "./files.js";
 import { snapshotDatabases } from "./snapshot.js";
@@ -46,6 +47,7 @@ export interface PluginItem {
   hasData: boolean;
   here: boolean;
   sourceMissing: boolean;
+  needsNewer: string | null;
 }
 
 interface SourcePluginRow {
@@ -55,6 +57,7 @@ interface SourcePluginRow {
   source_kind: string;
   source_path: string | null;
   source_git_subdirectory: string | null;
+  root_dir: string | null;
   enabled: number;
 }
 
@@ -71,12 +74,37 @@ function sourceRows(source: Sqlite): SourcePluginRow[] {
   try {
     return source
       .prepare<[], SourcePluginRow>(
-        "SELECT id, version, source, source_kind, source_path, source_git_subdirectory, enabled FROM plugins WHERE removed_at IS NULL ORDER BY id",
+        "SELECT id, version, source, source_kind, source_path, source_git_subdirectory, root_dir, enabled FROM plugins WHERE removed_at IS NULL ORDER BY id",
       )
       .all();
   } catch {
     return [];
   }
+}
+
+async function requiredBb(row: SourcePluginRow): Promise<string | null> {
+  const directory =
+    row.source_kind === "path" ? (row.source_path ?? row.source) : row.root_dir;
+  if (directory === null) return null;
+  try {
+    const manifest = JSON.parse(
+      await readFile(join(directory, "package.json"), "utf8"),
+    ) as { engines?: { bb?: unknown } };
+    return typeof manifest.engines?.bb === "string"
+      ? manifest.engines.bb
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function fitsBb(range: string | null, appVersion: string): boolean {
+  if (range === null || semver.validRange(range) === null) return true;
+  const version = semver.coerce(appVersion);
+  return (
+    version === null ||
+    semver.satisfies(version, range, { includePrerelease: true })
+  );
 }
 
 function installedHere(target: Sqlite, id: string): boolean {
@@ -103,6 +131,7 @@ export async function listPlugins(
   source: Sqlite,
   target: Sqlite,
   sourceDataDir: string,
+  appVersion: string,
 ): Promise<PluginItem[]> {
   const items: PluginItem[] = [];
   for (const row of sourceRows(source)) {
@@ -113,6 +142,7 @@ export async function listPlugins(
     ) {
       continue;
     }
+    const range = await requiredBb(row);
     items.push({
       id: row.id,
       version: row.version,
@@ -124,6 +154,7 @@ export async function listPlugins(
       sourceMissing:
         row.source_kind === "path" &&
         !(await exists(row.source_path ?? row.source)),
+      needsNewer: fitsBb(range, appVersion) ? null : range,
     });
   }
   return items;
@@ -155,6 +186,7 @@ export async function addPlugin(args: {
   sourceDataDir: string;
   dataDir: string;
   installer: PluginInstaller;
+  appVersion: string;
 }): Promise<{ id: string; data: boolean }> {
   const { source, target } = args;
   const row = sourceRows(source).find((plugin) => plugin.id === args.id);
@@ -171,7 +203,13 @@ export async function addPlugin(args: {
   const path = row.source_path ?? row.source;
   if (row.source_kind === "path" && !(await exists(path))) {
     throw new BringOverError(
-      `${row.id} was installed from ${path}, which is not there any more`,
+      `${row.id} was installed from ${path}, which is not found here`,
+    );
+  }
+  const range = await requiredBb(row);
+  if (!fitsBb(range, args.appVersion)) {
+    throw new BringOverError(
+      `${row.id} needs a newer BB Studio (it asks for bb ${String(range)})`,
     );
   }
   const pluginDir = join(args.dataDir, "plugins", row.id);
