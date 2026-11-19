@@ -40,6 +40,7 @@ import {
   bringOverJobFinished,
   cancelBringOverJob,
   startBringOverJob,
+  type BringOverJob,
   type BringOverRequest,
 } from "../../src/services/fork-import/bring-over/job.js";
 import {
@@ -52,6 +53,11 @@ import {
   listPlugins,
 } from "../../src/services/fork-import/bring-over/plugins.js";
 import { listSettings } from "../../src/services/fork-import/bring-over/settings.js";
+import {
+  finishStudioJob,
+  stageStudioData,
+  studioDataState,
+} from "../../src/services/fork-import/bring-over/studio-data.js";
 import { snapshotChildSource } from "../../src/services/fork-import/bring-over/snapshot.js";
 import {
   openSnapshot,
@@ -1244,6 +1250,358 @@ describe("bring things over from bb", () => {
   });
 });
 
+describe("BB Studio data from bb", () => {
+  const TOKEN = "s".repeat(40);
+  afterEach(() => {
+    resetUiTokenForTests();
+    delete process.env.BB_STUDIO_IMPORT_FROM;
+  });
+
+  async function studioFixture() {
+    const f = await fixture();
+    const bbStudio = join(f.source, "plugins", "studio");
+    for (const dir of [
+      "artifacts",
+      "secrets",
+      "logs",
+      "host-data",
+      "bridge-data",
+      "backup-sessions",
+    ]) {
+      await mkdir(join(bbStudio, dir), { recursive: true });
+      await writeFile(join(bbStudio, dir, "file"), `bb ${dir}`);
+    }
+    const studio = new Database(join(bbStudio, "data.db"));
+    studio.pragma("journal_mode = WAL");
+    studio.exec(
+      "CREATE TABLE bots (id TEXT PRIMARY KEY, thread_id TEXT); CREATE TABLE pages (id TEXT PRIMARY KEY, archived_at INTEGER); CREATE TABLE tasks (id TEXT PRIMARY KEY)",
+    );
+    studio.prepare("INSERT INTO bots VALUES ('bot_main', ?)").run(f.ids.t1);
+    studio.exec(
+      "INSERT INTO pages VALUES ('pg_1', NULL), ('pg_2', 5); INSERT INTO tasks VALUES ('task_1')",
+    );
+    open.push(studio);
+    const sourceDb = new Database(join(f.source, "bb.db"));
+    for (const [table, key, value] of [
+      ["plugin_kv", "settings:values", '{"loopsEnabled":true}'],
+      ["plugin_kv", "link:pages:pg_1", `{"threadId":"${f.ids.t2}"}`],
+      ["plugin_settings", "openaiKey", '"not-copied-by-studio"'],
+    ] as const) {
+      insertRow(sourceDb, table, {
+        plugin_id: "studio",
+        key,
+        value,
+        updated_at: 1,
+      });
+    }
+    sourceDb.close();
+    const ours = join(f.target, "plugins", "studio");
+    await mkdir(join(ours, "secrets"), { recursive: true });
+    await writeFile(join(ours, "secrets", "key"), "studio-secret");
+    return { ...f, bbStudio, ours, studio };
+  }
+
+  function app(f: Fixture) {
+    process.env.BB_STUDIO_IMPORT_FROM = f.source;
+    const hono = new Hono();
+    hono.onError((error) =>
+      error instanceof HTTPException
+        ? error.getResponse()
+        : new Response(String(error), { status: 500 }),
+    );
+    const deps = {
+      db: { $client: f.db },
+      logger: {
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+        debug: () => {},
+      },
+      config: { appVersion: "1.0.0" },
+    } as unknown as AppDeps;
+    registerBringOverRoutes(hono, deps, () => f.target, null);
+    return hono;
+  }
+  const post = (body: unknown, token: string | null = TOKEN) => ({
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(token === null ? {} : { "x-bb-studio-ui-token": token }),
+    },
+    body: JSON.stringify(body),
+  });
+  async function withToken(f: Fixture) {
+    adoptUiTokenHash({
+      BB_STUDIO_UI_TOKEN_SHA256: createHash("sha256")
+        .update(TOKEN)
+        .digest("hex"),
+    });
+    return app(f);
+  }
+  const journalOf = (target: string) =>
+    JSON.parse(
+      readFileSync(
+        join(target, "plugins", "studio", "import-staged", "journal.json"),
+        "utf8",
+      ),
+    ) as Record<string, unknown>;
+
+  it("copies bb's Studio data with bb's database in one run, privately, without secrets, logs or host data", async () => {
+    const f = await studioFixture();
+    f.studio.prepare("INSERT INTO pages VALUES ('pg_wal', NULL)").run();
+    const before = hashOf(join(f.source, "bb.db"));
+    const staged = await stageStudioData({
+      dataDir: f.target,
+      sourceDataDir: f.source,
+      now: 7000,
+    });
+    const dir = join(f.ours, "import-staged");
+    expect(staged.journal).toMatchObject({ state: "staged", stagedAt: 7000 });
+    expect(staged.journal.snapshotAt).toBe(
+      (await existingSourceSnapshot(f.target, f.source))?.takenAt,
+    );
+    expect(statSync(dir).mode & 0o777).toBe(0o700);
+    expect(statSync(join(dir, "staged")).mode & 0o777).toBe(0o700);
+    expect(statSync(join(dir, "journal.json")).mode & 0o777).toBe(0o600);
+    expect(statSync(join(dir, "bb-kv.json")).mode & 0o777).toBe(0o600);
+    expect(statSync(join(dir, "staged", "data.db")).mode & 0o777).toBe(0o600);
+    expect(readdirSync(join(dir, "staged")).sort()).toEqual([
+      "artifacts",
+      "data.db",
+      "onboarding.json",
+    ]);
+    const copy = new Database(join(dir, "staged", "data.db"), {
+      readonly: true,
+    });
+    open.push(copy);
+    expect(copy.pragma("journal_mode", { simple: true })).toBe("delete");
+    expect(count(copy, "SELECT COUNT(*) AS n FROM pages")).toBe(3);
+    const kv = JSON.parse(readFileSync(join(dir, "bb-kv.json"), "utf8")) as {
+      plugin_kv: { key: string }[];
+      plugin_settings: { key: string }[];
+    };
+    expect(kv.plugin_kv.map((row) => row.key)).toEqual([
+      "link:pages:pg_1",
+      "settings:values",
+    ]);
+    expect(kv.plugin_settings.map((row) => row.key)).toEqual(["openaiKey"]);
+    expect(readFileSync(join(f.ours, "secrets", "key"), "utf8")).toBe(
+      "studio-secret",
+    );
+    expect(hashOf(join(f.source, "bb.db"))).toBe(before);
+    expect(await studioDataState(f.target, f.source)).toMatchObject({
+      inBb: true,
+      bots: 1,
+      pages: 2,
+      tasks: 1,
+      journal: { state: "staged" },
+    });
+  });
+
+  it("brings the Bots' threads over as an ordinary job, and the copy is ready only when each Bot's own thread is here", async () => {
+    const f = await studioFixture();
+    const api = await withToken(f);
+    const staged = await api.request("/fork/bring-over/studio-data", post({}));
+    expect(staged.status).toBe(200);
+    expect(
+      (
+        await api.request(
+          "/fork/bring-over/jobs",
+          post({ picks: [], studioData: { required: ["thr_missing"] } }),
+        )
+      ).status,
+    ).toBe(422);
+    const started = await api.request(
+      "/fork/bring-over/jobs",
+      post({
+        picks: [{ kind: "thread", id: f.ids.t2 }],
+        studioData: { required: [f.ids.t1] },
+      }),
+    );
+    expect(started.status).toBe(202);
+    await bringOverJobFinished(f.target);
+    expect(
+      f.db
+        .prepare("SELECT id FROM threads ORDER BY id")
+        .all()
+        .map((row) => (row as { id: string }).id)
+        .sort(),
+    ).toEqual([f.ids.t1, f.ids.t2].sort());
+    expect(journalOf(f.target)).toMatchObject({
+      state: "ready",
+      required: [f.ids.t1],
+      error: null,
+    });
+    expect(
+      (await api.request("/fork/bring-over/studio-data/discard", post({})))
+        .status,
+    ).toBe(204);
+    expect(existsSync(join(f.ours, "import-staged"))).toBe(false);
+  });
+
+  it("refuses a job for Studio data read from an older copy of bb, and keeps a cancelled one staged", async () => {
+    const f = await studioFixture();
+    const api = await withToken(f);
+    await api.request("/fork/bring-over/studio-data", post({}));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(
+      (await api.request("/fork/bring-over/snapshot", post({}))).status,
+    ).toBe(200);
+    expect(
+      (
+        await api.request(
+          "/fork/bring-over/jobs",
+          post({ picks: [], studioData: { required: [f.ids.t1] } }),
+        )
+      ).status,
+    ).toBe(409);
+    finishStudioJob({
+      dataDir: f.target,
+      target: f.db,
+      job: { id: "job_x", state: "cancelled" } as BringOverJob,
+      required: [f.ids.t1],
+    });
+    expect(journalOf(f.target)).toMatchObject({
+      state: "staged",
+      error: expect.stringContaining("cancelled"),
+    });
+  });
+
+  it("never hands BB Studio the worktree of a Bot's worker", async () => {
+    const f = await studioFixture();
+    const worktree = join(f.source, "worktrees", "env_w", "repo");
+    await mkdir(worktree, { recursive: true });
+    await writeFile(join(worktree, "work.txt"), "unsaved work");
+    const bb = new Database(join(f.source, "bb.db"));
+    const env = bb
+      .prepare("SELECT * FROM environments WHERE id = ?")
+      .get(f.ids.env1) as Record<string, unknown>;
+    const managed = {
+      ...env,
+      id: "env_worker",
+      path: worktree,
+      is_worktree: 1,
+      provider_owns_path: 1,
+      environment_provider_id: "git-worktree",
+      environment_provider_plugin_id: "environment-git-worktree",
+    };
+    const names = Object.keys(managed);
+    bb.prepare(
+      `INSERT INTO environments (${names.join(", ")}) VALUES (${names.map((name) => `@${name}`).join(", ")})`,
+    ).run(managed);
+    bb.prepare(
+      "UPDATE threads SET environment_id = 'env_worker', archived_at = 1 WHERE id = ?",
+    ).run(f.ids.t3);
+    bb.close();
+    f.studio.exec(
+      "CREATE TABLE bot_threads (thread_id TEXT PRIMARY KEY, kind TEXT)",
+    );
+    f.studio
+      .prepare("INSERT INTO bot_threads VALUES (?, 'worker')")
+      .run(f.ids.t3);
+    const api = await withToken(f);
+    await api.request("/fork/bring-over/studio-data", post({}));
+    expect(
+      (
+        await api.request(
+          "/fork/bring-over/jobs",
+          post({
+            picks: [{ kind: "thread", id: f.ids.t3 }],
+            studioData: { required: [f.ids.t1] },
+          }),
+        )
+      ).status,
+    ).toBe(202);
+    await bringOverJobFinished(f.target);
+    expect(
+      f.db
+        .prepare("SELECT environment_id FROM threads WHERE id = ?")
+        .get(f.ids.t3),
+    ).toEqual({ environment_id: null });
+    expect(
+      count(
+        f.db,
+        "SELECT COUNT(*) AS n FROM environments WHERE path LIKE ?",
+        `${f.source}%`,
+      ),
+    ).toBe(0);
+    expect(readFileSync(join(worktree, "work.txt"), "utf8")).toBe(
+      "unsaved work",
+    );
+  });
+
+  it("puts the old data back or deletes it only from the right state, and needs BB Studio's window for every change", async () => {
+    const f = await studioFixture();
+    const api = await withToken(f);
+    for (const path of ["", "/discard", "/put-back", "/forget"]) {
+      expect(
+        (
+          await api.request(
+            `/fork/bring-over/studio-data${path}`,
+            post({}, null),
+          )
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await api.request(`/fork/bring-over/studio-data${path}`, {
+            ...post({}),
+            headers: {
+              "content-type": "application/json",
+              "x-bb-studio-ui-token": TOKEN,
+              "x-bb-caller-thread": "thr_agent",
+            },
+          })
+        ).status,
+      ).toBe(403);
+    }
+    await api.request("/fork/bring-over/studio-data", post({}));
+    expect(
+      (await api.request("/fork/bring-over/studio-data/put-back", post({})))
+        .status,
+    ).toBe(409);
+    expect(
+      (await api.request("/fork/bring-over/studio-data/forget", post({})))
+        .status,
+    ).toBe(409);
+    const dir = join(f.ours, "import-staged");
+    const journal = journalOf(f.target);
+    await mkdir(join(dir, "before"), { recursive: true });
+    await writeFile(
+      join(dir, "journal.json"),
+      JSON.stringify({ ...journal, state: "applied" }),
+    );
+    expect(
+      (await api.request("/fork/bring-over/studio-data", post({}))).status,
+    ).toBe(409);
+    expect(
+      (await api.request("/fork/bring-over/studio-data/discard", post({})))
+        .status,
+    ).toBe(409);
+    expect(
+      (await api.request("/fork/bring-over/studio-data/put-back", post({})))
+        .status,
+    ).toBe(204);
+    expect(journalOf(f.target)).toMatchObject({ state: "restore-requested" });
+    expect(
+      (await api.request("/fork/bring-over/studio-data/forget", post({})))
+        .status,
+    ).toBe(409);
+    await writeFile(
+      join(dir, "journal.json"),
+      JSON.stringify({ ...journal, state: "restored" }),
+    );
+    expect(
+      (await api.request("/fork/bring-over/studio-data/forget", post({})))
+        .status,
+    ).toBe(204);
+    expect(existsSync(dir)).toBe(false);
+    expect(
+      await (await api.request("/fork/bring-over/studio-data")).json(),
+    ).toMatchObject({ inBb: true, journal: null });
+  });
+});
+
 describe("bring-over API and review fixes", () => {
   const TOKEN = "t".repeat(40);
   afterEach(() => {
@@ -1363,13 +1721,13 @@ describe("bring-over API and review fixes", () => {
     ).toBe(403);
     expect(
       (await api.request("/fork/bring-over/studio-data", post({}))).status,
-    ).toBe(404);
+    ).toBe(403);
     expect(count(f.db, "SELECT COUNT(*) AS n FROM threads")).toBe(0);
     expect(
       lines.filter(
         (line) => (line as [unknown, string])[1] === "Bring-over request",
       ),
-    ).toHaveLength(5);
+    ).toHaveLength(6);
     expect(
       (await api.request("/fork/bring-over/snapshot", post({}))).status,
     ).toBe(403);

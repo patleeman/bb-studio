@@ -127,6 +127,7 @@ export function startBringOverJob(args: {
   request: BringOverRequest;
   logger: Pick<ServerLogger, "info" | "warn">;
   now: number;
+  onFinished?: (job: BringOverJob) => void;
 }): BringOverJob | null {
   if (running.has(args.dataDir)) return null;
   const control = new AbortController();
@@ -203,6 +204,11 @@ export function startBringOverJob(args: {
       source?.close();
       await forgetSourceSnapshot(args.dataDir).catch(() => undefined);
       job.finishedAt = Date.now();
+      try {
+        args.onFinished?.(job);
+      } catch (error) {
+        job.failures.push({ item: "finish", detail: errorDetail(error) });
+      }
       running.delete(args.dataDir);
       last.set(args.dataDir, job);
       writeLastJob(args.dataDir, job);
