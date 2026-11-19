@@ -67,9 +67,10 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("Studio's settings sections", () => {
-  it("registers Voice, Recordings and calls, Agent replies, Threads, Smart Queue model and Advanced in order, then Skill registry, Phone notifications and API keys last", () => {
-    expect(order).toEqual(["settings-voice", "settings-recordings", "settings-replies", "settings-threads", "settings-jev", "settings-advanced", "skills-registry", "mobile-push", "api-keys"]);
+  it("registers Voice, Recordings and calls, Agent replies, Threads, Smart Queue model and Advanced in order, then Skill registry, Phone notifications, API keys and Bring things over from bb last", () => {
+    expect(order).toEqual(["settings-voice", "settings-recordings", "settings-replies", "settings-threads", "settings-jev", "settings-advanced", "skills-registry", "mobile-push", "api-keys", "bring-over"]);
     expect(sections.get("api-keys")).toMatchObject({ title: "API keys" });
+    expect(sections.get("bring-over")).toMatchObject({ title: "Bring things over from bb" });
     expect([...sections.values()].slice(0, 6).map((section) => section.title)).toEqual(["Voice", "Recordings and calls", "Agent replies", "Threads", "Smart Queue model", "Advanced"]);
     // Stable BB draws experimental_page "mobile" sections only for the machine-access plugin, so it's on Studio's page.
     expect(sections.get("mobile-push")).toMatchObject({ title: "Phone notifications" });

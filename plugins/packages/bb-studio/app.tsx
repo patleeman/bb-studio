@@ -2,6 +2,7 @@ import { useStudioPageTitle } from "./src/ui/page-bar";
 import { ApprovalCard } from "./src/ui/conversations/ApprovalCard";
 import { registerCodeApp } from "./src/code/register";
 import { registerSettingsApp } from "./src/settings/ui/sections";
+import { registerBringOverLink } from "./src/bring-over/ui/FirstChatLink";
 import { lazy, Suspense, useEffect, useLayoutEffect, type ComponentType } from "react";
 import { StudioWorkspace, WorkspaceBridge } from "./src/ui/Workspace";
 import { forkOnly, hasGlobalWorkbench, registerCommandPalette, registerFirstRun, registerModelPickerGate, registerNewConversation, registerNewTabItems, registerPaletteSearch, registerSidebarSection } from "./src/kit/app/host-sdk";
@@ -270,6 +271,8 @@ export default definePluginApp((app) => {
   // Studio's settings sections (src/settings/ui), first so they keep their
   // order after BB's API key fields; and push status on BB's Mobile page.
   registerSettingsApp(app);
+  // The first chat links to Settings → Bring things over from bb while bb is on this Mac (src/bring-over).
+  registerBringOverLink(app);
   hideBbSkills(app.slots);
   hideBbChrome(app.slots);
   registerCodeApp(app);
