@@ -8,7 +8,7 @@ This repository holds BB Studio. Read [docs/MONOREPO.md](docs/MONOREPO.md) for t
 
 ## Rules
 
-1. **Never edit `desktop/` on `main`.** `scripts/import-desktop.mjs` generates it from the `desktop` branch, and the next import overwrites any edit. Change the desktop app in the desktop worktree (`~/workingdir/bb-studio-app-desktop`, branch `desktop`), following `AGENTS.md` and `AGENTS.fork.md` there: commit below the generated commits, regenerate, then run `node scripts/import-desktop.mjs` here.
+1. **Never edit `desktop/` on `main`.** `scripts/import-desktop.mjs` generates it from the `desktop` branch, and the next import overwrites any edit. Change the desktop app in the desktop worktree (`~/workingdir/bb-studio-public-desktop`, branch `desktop`), following `AGENTS.md` and `AGENTS.fork.md` there: commit below the generated commits, regenerate, then run `node scripts/import-desktop.mjs` here.
 2. **The invariant:** `git rev-parse main:desktop` equals `git rev-parse 'desktop^{tree}'`. `node scripts/import-desktop.mjs --check` tests it.
 3. **Push only to `origin` (`patleeman/bb-studio`):** `main`, `desktop` (with `--force-with-lease`), and `v*` tags. `stable` is pushed by hand once, when the repository is created; after that only CI moves it. Never push to `get-bb/bb`, `patleeman/bb` or the private archive `patleeman/bb-studio-app`. Open no pull requests or issues upstream. Prepare nothing for upstream. `scripts/git-hooks/pre-push` enforces the targets; do not bypass it with `--no-verify`.
 4. **`main` is never rewritten.** No force-push, no rebase of pushed commits. `desktop` is rewritten by each upstream sync; every past stack stays reachable as the second parent of an import commit on `main`.

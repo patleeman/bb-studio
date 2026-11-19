@@ -54,7 +54,7 @@ To make them again (from the repository root; raw captures stay out of git):
 ```sh
 npm i --prefix /tmp/bbsite-tools playwright@1.64.1   # once; uses the cached Chromium
 # A built (unsigned, `pnpm build`) checkout of the desktop branch, outside /tmp:
-export DESKTOP=~/workingdir/bb-studio-public-desktop BB_CLI=~/workingdir/bb-studio-app-desktop/apps/cli/dist/index.js
+export DESKTOP=~/workingdir/bb-studio-public-desktop BB_CLI=~/workingdir/bb-studio-public-desktop/apps/cli/dist/index.js
 RAW=/tmp/bbsite-shots/raw   # any folder outside the repository
 site/scripts/demo.sh                                 # scratch server, seeded, left running
 node site/scripts/capture.mjs /tmp/bbsite/ids.json "$RAW"   # Chromium runs with --use-mock-keychain
@@ -64,7 +64,7 @@ node site/scripts/build.mjs
 site/scripts/scratch.sh stop && site/scripts/scratch.sh wipe
 ```
 
-`DESKTOP` is a built desktop tree (default `~/workingdir/bb-studio-app-desktop`); `BB_CLI` is the bb CLI the scripts call (default `$DESKTOP/apps/cli/dist/index.js`); `SCRATCH` is the scratch dir (default `/tmp/bbsite`). The scripts refuse a data dir under `~/.bb` or `~/.bb-studio`.
+`DESKTOP` is a built desktop tree (default `~/workingdir/bb-studio-public-desktop`); `BB_CLI` is the bb CLI the scripts call (default `$DESKTOP/apps/cli/dist/index.js`); `SCRATCH` is the scratch dir (default `/tmp/bbsite`). The scripts refuse a data dir under `~/.bb` or `~/.bb-studio`.
 
 ## Copy
 
