@@ -12,7 +12,9 @@ import {
   readForkImportState,
   writeCursor,
 } from "./state.js";
+import { releaseBbEnvironments } from "./bb-environments.js";
 import { currentBringOverJob } from "./bring-over/job.js";
+import { resolveForkImportSource } from "./import-source.js";
 import type { PluginInstaller } from "./bring-over/plugins.js";
 import { registerBringOverRoutes } from "./bring-over/routes.js";
 import {
@@ -169,13 +171,38 @@ function importStatus(deps: AppDeps) {
   };
 }
 
+function releaseEnvironmentsFromBb(deps: AppDeps, dataDir: string): void {
+  const roots = [
+    resolveForkImportSource({ dataDir, env: process.env }),
+    readForkImportState(dataDir)?.sourceDataDir ?? null,
+  ].filter((root): root is string => root !== null && root !== dataDir);
+  if (roots.length === 0) return;
+  try {
+    const released = releaseBbEnvironments(deps.db.$client, roots);
+    if (released > 0) {
+      deps.logger.info(
+        { released },
+        "Environments in bb's folder are no longer managed here",
+      );
+    }
+  } catch (error) {
+    deps.logger.warn(
+      { error: String(error) },
+      "Could not release bb's environments",
+    );
+  }
+}
+
 export function registerForkImportRoutes(
   app: Hono,
   deps: AppDeps,
   plugins: PluginInstaller | null = null,
 ): void {
   registerBringOverRoutes(app, deps, requireDataDir, plugins);
-  if (activeDataDir !== null) void startForkImportSweeps(deps, activeDataDir);
+  if (activeDataDir !== null) {
+    releaseEnvironmentsFromBb(deps, activeDataDir);
+    void startForkImportSweeps(deps, activeDataDir);
+  }
   app.get("/fork/import", (context) => context.json(importStatus(deps)));
 
   app.post("/fork/import/sync", (context) => {

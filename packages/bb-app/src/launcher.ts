@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { withoutForkUiTokenHash } from "./fork-ui-token-env.js";
 import {
   hostToolchain,
   nodeNetworkArgs,
@@ -2594,7 +2595,9 @@ export function createServerEnv(args: CreateServerEnvArgs): NodeJS.ProcessEnv {
 
 export function createDaemonEnv(args: CreateDaemonEnvArgs): NodeJS.ProcessEnv {
   return {
-    ...hostToolchain.environment(stripThreadContextEnv(args.env)),
+    ...hostToolchain.environment(
+      withoutForkUiTokenHash(stripThreadContextEnv(args.env)),
+    ),
     BB_APP_VERSION: args.context.appVersion,
     BB_BRIDGE_DIR: args.context.daemonBundleDir,
     BB_CLI_DIR: args.context.daemonBundleDir,
@@ -2607,7 +2610,7 @@ export function createDaemonEnv(args: CreateDaemonEnvArgs): NodeJS.ProcessEnv {
 
 function createCliEnv(args: CreateCliEnvArgs): NodeJS.ProcessEnv {
   const cliEnv: NodeJS.ProcessEnv = {
-    ...args.env,
+    ...withoutForkUiTokenHash(args.env),
     BB_APP_VERSION: args.context.appVersion,
     BB_HOST_DAEMON_PORT: String(args.context.daemonPort),
     [MACHINE_INSTALLER_ENV_NAME]: join(

@@ -1,9 +1,11 @@
+import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FORK_UI_TOKEN_GET_CHANNEL } from "../src/fork-ui-token-ipc.js";
 import { forkUiTokenApi } from "../src/fork-ui-token-preload.js";
 import {
+  FORK_UI_TOKEN_HASH_ENV,
   forkUiToken,
-  registerForkUiToken,
+  forkUiTokenEnv,
   registerForkUiTokenIpc,
   resetForkUiTokenForTests,
 } from "../src/fork-ui-token.js";
@@ -37,28 +39,16 @@ describe("the bring-over token", () => {
     expect(invoke).toHaveBeenCalledWith(FORK_UI_TOKEN_GET_CHANNEL);
   });
 
-  it("hands the token to the server once it answers", async () => {
-    const load = vi.fn(async () => new Response(null, { status: 204 }));
-    expect(
-      await registerForkUiToken("http://127.0.0.1:1234/", load as never),
-    ).toBe(true);
-    expect(load).toHaveBeenCalledWith(
-      "http://127.0.0.1:1234/api/v1/fork/bring-over/ui-token",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ token: forkUiToken() }),
-      }),
-    );
-    expect(
-      await registerForkUiToken("http://127.0.0.1:1234", (async () => {
-        throw new Error("down");
-      }) as never),
-    ).toBe(false);
-    expect(
-      await registerForkUiToken(
-        "http://127.0.0.1:1234",
-        (async () => new Response(null, { status: 409 })) as never,
-      ),
-    ).toBe(false);
+  it("gives bb-app only the token's hash, the same one for every server start of this launch", () => {
+    const env = forkUiTokenEnv();
+    expect(env).toEqual({
+      [FORK_UI_TOKEN_HASH_ENV]: createHash("sha256")
+        .update(forkUiToken())
+        .digest("hex"),
+    });
+    expect(Object.values(env)).not.toContain(forkUiToken());
+    expect(forkUiTokenEnv()).toEqual(env);
+    resetForkUiTokenForTests();
+    expect(forkUiTokenEnv()).not.toEqual(env);
   });
 });
