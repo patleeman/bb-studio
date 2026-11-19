@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   BringOverError,
@@ -267,7 +267,8 @@ export async function bringOverStudioData(args: {
   const staged = join(work, "staged");
   const aside = join(work, "before");
   await rm(work, { force: true, recursive: true });
-  await mkdir(staged, { recursive: true });
+  await mkdir(staged, { recursive: true, mode: 0o700 });
+  await chmod(work, 0o700);
   let swapped = false;
   try {
     await snapshotDatabases([
