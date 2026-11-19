@@ -6,12 +6,18 @@ import UIKit
 /// - The theme is the phone's own choice, On Air by default. "Follow each Bot"
 ///   uses the shown Bot's desktop theme instead (`appearance.themeId`).
 /// - A scene theme shows a still with parallax. "Live scene" is opt-in and runs
-///   only in the foreground, never in Low Power Mode, at serious or critical
-///   thermal state or with Reduce Motion, at `LookStore.liveFPS` at most.
+///   only in the foreground, never in Low Power Mode, with Reduce Motion or once
+///   the phone is warm (thermal state fair or above), at `LookStore.sceneFPS`.
+/// - A live presence runs at `presenceFPS` (half that when the phone is warm)
+///   and stops at serious or critical thermal state.
+/// - Both pause, keeping their frame, while `EnergyGate` says the app is idle.
 @MainActor
 final class LookStore: ObservableObject {
     static let shared = LookStore()
-    static let liveFPS = 30
+    /// The live presence's frame rate on a cool phone.
+    nonisolated static let liveFPS = 30
+    /// The live scene's frame rate: its motion is slow, so 15 looks the same.
+    nonisolated static let sceneFPS = 15
 
     enum Key {
         static let theme = "look.theme"
@@ -65,11 +71,25 @@ final class LookStore: ObservableObject {
     /// Motion of any kind (live scene, live presence) is allowed in this state.
     var motionAllowed: Bool { Self.motionAllowed(lowPower: lowPower, thermal: thermal, reduceMotion: reduceMotion) }
 
-    /// A live scene runs: opted in, in the foreground, and motion is allowed.
-    func liveSceneRuns(foreground: Bool) -> Bool { liveScene && foreground && motionAllowed }
+    /// A live scene runs: opted in, in the foreground, and the phone is cool.
+    func liveSceneRuns(foreground: Bool) -> Bool {
+        liveScene && foreground && Self.sceneAllowed(lowPower: lowPower, thermal: thermal, reduceMotion: reduceMotion)
+    }
+
+    /// The live presence's frame rate now.
+    var presenceFPS: Int { Self.presenceFPS(thermal: thermal) }
 
     nonisolated static func motionAllowed(lowPower: Bool, thermal: ProcessInfo.ThermalState, reduceMotion: Bool) -> Bool {
         !lowPower && !reduceMotion && thermal != .serious && thermal != .critical
+    }
+
+    /// The live scene is the costliest motion: it stops as soon as the phone is warm.
+    nonisolated static func sceneAllowed(lowPower: Bool, thermal: ProcessInfo.ThermalState, reduceMotion: Bool) -> Bool {
+        motionAllowed(lowPower: lowPower, thermal: thermal, reduceMotion: reduceMotion) && thermal == .nominal
+    }
+
+    nonisolated static func presenceFPS(thermal: ProcessInfo.ThermalState) -> Int {
+        thermal == .nominal ? liveFPS : liveFPS / 2
     }
 }
 

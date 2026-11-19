@@ -327,11 +327,13 @@ export function repoTag(thread: Pick<ThreadFacts, "environmentName" | "environme
   return tag ? { tag, branch: thread.environmentBranchName } : null;
 }
 
+const THREAD_MENTION = /@thread:(thr_[A-Za-z0-9_-]*[A-Za-z0-9])(?:#msg=\d+)?/g;
+
 /** The first line of a reply, short, for a conversation's second line; null for a quiet "[PASS]". A thread mention reads as its title, else "a conversation"; a page mention as "a page"; a task id as its title, else "a task". */
 export function latestLine(text: string | null | undefined, threadTitle: (threadId: string) => string | null = () => null, taskTitle: (taskId: string) => string | null = () => null): string | null {
   const clean = (text ?? "").replace(/::[a-z-]+\{[^}]*\}/g, "").replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(TASK_ID_IN_TEXT, (id: string) => taskTitle(id)?.trim() || "a task")
-    .replace(/@thread:(thr_[A-Za-z0-9_-]*[A-Za-z0-9])(?:#msg=\d+)?/g, (_, id: string) => threadTitle(id)?.trim() || "a conversation")
+    .replace(THREAD_MENTION, (_, id: string) => threadTitle(id)?.trim() || "a conversation")
     .replace(/@page:pg_[A-Za-z0-9_-]*[A-Za-z0-9]/g, "a page")
     .replace(/[*_`#>]+/g, "").split("\n").map((line) => line.trim()).find((line) => line.length > 0) ?? "";
   if (!clean || /^\[PASS\]$/i.test(clean)) return null;
@@ -980,15 +982,40 @@ export class BotThreads {
   }
 
   /** Writes a conversation's latest line without a change notice (a lazy fill); "" marks it as having none. `overEmpty` also fills one marked "". */
-  fillLatest(threadId: string, text: string | null, overEmpty = false): void {
+  fillLatest(threadId: string, text: string | null, overEmpty = false, titles: ReadonlyMap<string, string> = new Map()): void {
     // Its time is the thread's activity, not now: a lazy fill isn't a new reply.
-    this.deps.db.prepare(`UPDATE bot_threads SET latest = ? WHERE thread_id = ? AND (latest IS NULL${overEmpty ? " OR latest = ''" : ""})`).run(latestLine(text, (id) => this.mentionTitle(id), (id) => taskTitle(this.deps.db, id)) ?? "", threadId);
+    this.deps.db.prepare(`UPDATE bot_threads SET latest = ? WHERE thread_id = ? AND (latest IS NULL${overEmpty ? " OR latest = ''" : ""})`).run(latestLine(text, (id) => this.mentionTitle(id) ?? titles.get(id) ?? null, (id) => taskTitle(this.deps.db, id)) ?? "", threadId);
   }
 
-  /** What a thread mention in a latest line reads as: Main, or the thread's own title. */
+  /** What a thread mention in a latest line reads as: Main, or the title Studio keeps (one the user gave). */
   private mentionTitle(threadId: string): string | null {
     const rec = this.get(threadId);
     return rec?.isMain ? "Main" : rec?.title?.trim() || null;
+  }
+
+  /** BB's titles for the threads a reply mentions that Studio has no title for (Studio keeps only the ones the user gave). */
+  async mentionTitles(text: string | null | undefined): Promise<Map<string, string>> {
+    const ids = [...new Set([...(text ?? "").matchAll(THREAD_MENTION)].map((match) => match[1]!))].filter((id) => !this.mentionTitle(id));
+    const titles = new Map<string, string>();
+    if (!ids.length) return titles;
+    const read = await this.facts(ids).catch(() => new Map<string, ThreadFacts>());
+    for (const [id, thread] of read) {
+      const title = thread.title?.trim();
+      if (title) titles.set(id, title);
+    }
+    return titles;
+  }
+
+  /** The latest line `idle` just wrote, again with BB's titles for the threads it mentions; only while it is still that line. */
+  async nameMentions(threadId: string, lastAssistantText: string | null | undefined): Promise<void> {
+    const titles = await this.mentionTitles(lastAssistantText);
+    if (!titles.size) return;
+    const task = (id: string) => taskTitle(this.deps.db, id);
+    const written = latestLine(lastAssistantText, (id) => this.mentionTitle(id), task);
+    const named = latestLine(lastAssistantText, (id) => this.mentionTitle(id) ?? titles.get(id) ?? null, task);
+    if (!written || !named || written === named) return;
+    const result = this.deps.db.prepare("UPDATE bot_threads SET latest = ? WHERE thread_id = ? AND kind = 'conversation' AND latest = ?").run(named, threadId, written);
+    if (result.changes) this.deps.changed(rowChanges(null, this.get(threadId)));
   }
 
   /** Marks a conversation as needing the user (`reason`), or clears it (null). `source` names who raised it (a worker's id, or "bot"). */

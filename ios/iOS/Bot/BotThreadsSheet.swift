@@ -390,14 +390,9 @@ struct BotRowMark: View {
                     .overlay(Circle().stroke(Color(uiColor: .systemBackground), lineWidth: 1))
                     .offset(x: 5.5, y: 5.5)
             } else {
-                Circle().stroke(Self.running.opacity(0.25), lineWidth: 1.5).frame(width: 14.5, height: 14.5)
-                TimelineView(.animation) { context in
-                    let turn = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.6) / 1.6
-                    Circle().trim(from: 0, to: 0.25)
-                        .stroke(Self.running, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                        .frame(width: 14, height: 14)
-                        .rotationEffect(.degrees(turn * 360))
-                }
+                // Core Animation turns the arc: no SwiftUI update per frame.
+                LayerSpinner(tint: Self.running, track: 0.25, lineWidth: 2, trackWidth: 1.5, period: 1.6)
+                    .frame(width: 14.5, height: 14.5)
             }
         case .waiting:
             Circle().stroke(Color.orange, lineWidth: 1.5).frame(width: 14.5, height: 14.5)

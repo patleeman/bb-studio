@@ -21,9 +21,11 @@ Plugins stay out of desktop's pnpm workspace because desktop's `pnpm-workspace.y
 
 | Path | Branch |
 |---|---|
-| `~/workingdir/bb-studio-app` | `main` |
-| `~/workingdir/bb-studio-app-desktop` | `desktop` |
+| `~/workingdir/bb-studio-public` | `main` |
+| `~/workingdir/bb-studio-public-desktop` | `desktop` |
 | `~/workingdir/.bb-studio-fork-sync/<stamp>` | throwaway sync worktrees and reports (override with `BB_STUDIO_SYNC_DIR`) |
+
+`~/workingdir/bb-studio-app` and `~/workingdir/bb-studio-app-desktop` are checkouts of the private archive, from before the move. Do not work in them. The fork scripts `build-plugins.mjs` and `release-desktop.mjs` still look for the monorepo at `../bb-studio-app`, so give them the plugin folders or `BB_STUDIO_MONOREPO` (see below).
 
 - `origin` is `patleeman/bb-studio` (public). `archive` is `patleeman/bb-studio-app`, the private history before the move, read-only. `upstream` is `get-bb/bb`, fetch only: its push URL is `DISABLED`, only `main` is fetched, and tags are not fetched, so `v*` tags are BB Studio's own.
 - `core.hooksPath` points at `scripts/git-hooks`. `pre-commit` refuses a newly added image or video file outside an `assets/`, `public/`, `brand/`, `icons/`, `textures/` or `fonts/` folder or an `.xcassets` catalog; on `main` it skips `desktop/`, which is an import. `pre-push` refuses any remote but `patleeman/bb-studio` and any ref but `main`, `desktop` and `v*` tags. When `main` is pushed, it also runs `pnpm check:contracts` in `plugins/` on the working tree (under a second), which fails when `ios/Shared/Generated` or `plugins/contracts` is stale or `ios/` is missing.
@@ -31,22 +33,24 @@ Plugins stay out of desktop's pnpm workspace because desktop's `pnpm-workspace.y
 
 ## Daily flows
 
-**Plugin change.** Edit under `plugins/packages/*` on `main`. `cd plugins && pnpm typecheck && pnpm test`. Build bundles with `node scripts/fork/build-plugins.mjs` in the desktop worktree (with no arguments and no `~/.bb-studio-import.json` it builds every package under `bb-studio-app/plugins/packages`). Quit and reopen BB Studio.
+**Plugin change.** Edit under `plugins/packages/*` on `main`. `cd plugins && pnpm typecheck && pnpm test`. Build bundles with `node scripts/fork/build-plugins.mjs <plugin dir ...>` in the desktop worktree, naming folders under `~/workingdir/bb-studio-public/plugins/packages`. With no arguments it builds the `pluginPaths` in `~/.bb-studio-import.json`, or, without that file, every package under `../bb-studio-app/plugins/packages`, which is the archive while that folder exists. Quit and reopen BB Studio.
 
 **Desktop change.** In the desktop worktree, commit below the three generated commits (see `AGENTS.fork.md` there), run `node scripts/fork/check-core-diff.mjs`, regenerate the generated commits with `sync.mjs` (`docs/REIMPORT.md` has the commands), then on `main` run `node scripts/import-desktop.mjs`.
 
 **Upstream sync.**
 
 1. In the desktop worktree: `node scripts/fork/sync.mjs --fetch`. It replays the hand commits onto `upstream/main` in a throwaway worktree and moves only `desktop-candidate`. Conflicts are resolved as `scripts/fork/sync-agent.md` says.
-2. Promote: `git -C ~/workingdir/bb-studio-app-desktop reset --hard desktop-candidate` (clean tree required).
+2. Promote: `git -C ~/workingdir/bb-studio-public-desktop reset --hard desktop-candidate` (clean tree required).
 3. On `main`: `node scripts/import-desktop.mjs`.
 4. `git push origin main && git push --force-with-lease origin desktop`.
 
 **Desktop release.** BB Studio has its own version line (1.0.0 and up, in `apps/desktop/studio-release.fork.json` on `desktop`), and About and Updates show it with the bb base ("based on bb 0.49.0 @ 030b1b7"). In the desktop worktree, with `CSC_NAME` set and an App Store Connect API key for notarization (`BB_STUDIO_NOTARY_KEY_PATH`, `_KEY_ID`, `_ISSUER`, else the `ASC_*` values in `~/.config/bbgo/testflight.env`; with neither, the `bbstudio-notary` keychain profile). It runs on a locked Mac: it holds `caffeinate -i` for the whole run and stops before the build if the login keychain is locked or `CSC_NAME` is not a listed identity. `ios/scripts/testflight.sh` does the same.
 
+Set `BB_STUDIO_MONOREPO=~/workingdir/bb-studio-public` for every step: without it the script uses `../bb-studio-app`, the archive.
+
 1. `node scripts/fork/release-desktop.mjs --bump patch` writes the next version into `desktop-candidate` and prints the promote, import and push commands. Run them.
 2. `node scripts/fork/release-desktop.mjs --no-bump --notes-only` drafts the notes from the commits since the last `v*` Studio tag; edit the file it names.
-3. `node scripts/fork/release-desktop.mjs --no-bump --notes <file>` builds, signs, notarizes and staples, makes the DMG, the zip, their blockmaps, `latest-mac.yml` and `desktop-version.json`, tags `v<version>` on `origin/main`, pushes the tag to the remote for `--repo` (default `patleeman/bb-studio`) and creates a DRAFT release there with all of them. `--dry-run` prints the plan; `--from sign|publish` resumes. The 1.0.0 draft is on this repository (`--repo patleeman/bb-studio-app`).
+3. `node scripts/fork/release-desktop.mjs --no-bump --notes <file>` builds, signs, notarizes and staples, makes the DMG, the zip, their blockmaps, `latest-mac.yml` and `desktop-version.json`, tags `v<version>` on `origin/main`, pushes the tag to the remote for `--repo` (default `patleeman/bb-studio`) and creates a DRAFT release there with all of them. `--dry-run` prints the plan; `--from sign|publish` resumes. The 1.0.0 draft is on the private archive (`--repo patleeman/bb-studio-app`).
 
 Installed copies update from the GitHub releases of the public repository `patleeman/bb-studio` (electron-updater's GitHub provider, no token), which is to hold this monorepo. They see a release only when one with the update files is published there by hand; until then their checks fail quietly (logged; Settings, Updates says it couldn't check). `STUDIO_FORK.md` on `desktop` has the details and the local end-to-end test (`scripts/fork/updater-e2e.mjs`).
 
@@ -69,8 +73,10 @@ Installed copies update from the GitHub releases of the public repository `patle
 
 ```sh
 git fetch upstream main && git fetch origin
-node scripts/publish/make-public-history.mjs --out ~/workingdir/bb-studio-public --force
+node scripts/publish/make-public-history.mjs --out <new empty dir> --force
 ```
+
+The script is only in the private archive (`~/workingdir/bb-studio-app`); run it there. `--force` deletes `--out` first, so never point it at `~/workingdir/bb-studio-public`, the live `main` worktree. Its public-tree edits expect the archive's wording and fail on this repository's files.
 
 - **`main`**: one root commit with the tree of `main` minus `desktop/`, then the import merge that `scripts/import-desktop.mjs` would make, with the rewritten `desktop` tip as its second parent. So `import-desktop.mjs --check` holds, and later imports work unchanged.
 - **`desktop`**: `git filter-repo --refs desktop ^upstream/main` rewrites only Studio's commits above the upstream base. Upstream's signed commits keep their hashes, so `sync.mjs` and `check-core-diff.mjs` work as before. The rewrite drops `Fork-Source:` trailers (they name commits of the private history), maps the old work address to the personal one, and applies the replace list to blobs and messages.

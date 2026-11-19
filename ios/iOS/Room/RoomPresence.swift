@@ -339,16 +339,12 @@ struct RoomPulse: View {
     let active: Bool
     let tint: Color
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
-    @State private var on = false
 
     var body: some View {
-        Circle().fill(tint.opacity(active ? 1 : 0.5))
+        // Core Animation breathes the halo: no SwiftUI update per frame.
+        LayerPulse(tint: tint, dotOpacity: active ? 1 : 0.5, from: active ? 0.22 : 0, to: 0.08,
+                   pulsing: active && !(systemReduceMotion || RoomQA.reduceMotion))
             .frame(width: 6, height: 6)
-            .background(Circle().fill(tint.opacity(active ? (on ? 0.08 : 0.22) : 0)).frame(width: 14, height: 14))
-            .onAppear {
-                guard active, !(systemReduceMotion || RoomQA.reduceMotion) else { return }
-                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { on = true }
-            }
             .accessibilityHidden(true)
     }
 }
@@ -358,17 +354,10 @@ struct RoomSpinner: View {
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
 
     var body: some View {
-        let still = systemReduceMotion || RoomQA.reduceMotion
-        TimelineView(.animation(paused: still)) { context in
-            let turn = still ? 0 : context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.1) / 1.1 * 360
-            ZStack {
-                Circle().stroke(tint.opacity(0.25), lineWidth: 1.5)
-                Circle().trim(from: 0, to: 0.25).stroke(tint, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
-                    .rotationEffect(.degrees(turn))
-            }
-        }
-        .frame(width: 14, height: 14)
-        .accessibilityHidden(true)
+        // Core Animation turns the arc: no SwiftUI update per frame.
+        LayerSpinner(tint: tint, track: 0.25, lineWidth: 1.5, period: 1.1, still: systemReduceMotion || RoomQA.reduceMotion)
+            .frame(width: 14, height: 14)
+            .accessibilityHidden(true)
     }
 }
 

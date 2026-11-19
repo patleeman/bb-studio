@@ -43,10 +43,10 @@ Uncommitted work in the old worktrees was not imported. Commit it there first.
 
 The old branch keeps the same shape: hand commits on a base, three generated commits on top. Rebuild `desktop` from its hand commits plus the tooling commit, and let `sync.mjs` regenerate. This is only correct while nobody has committed on `desktop` itself; if someone has, cherry-pick those commits onto `desktop-work` too, after the tooling commit.
 
-In the desktop worktree (`~/workingdir/bb-studio-app-desktop`, clean, branch `desktop`):
+In the desktop worktree (`~/workingdir/bb-studio-public-desktop`, clean, branch `desktop`):
 
 ```sh
-cd ~/workingdir/bb-studio-app-desktop
+cd ~/workingdir/bb-studio-public-desktop
 git status --short                                        # must be empty
 git fetch --no-tags ~/workingdir/bb +exp/studio-native:refs/import/fork
 base=$(git -C ~/workingdir/bb merge-base exp/studio-native upstream/main)
@@ -67,7 +67,7 @@ git switch desktop
 git reset --hard desktop-candidate
 git branch -D desktop-work
 git update-ref -d refs/import/fork
-cd ~/workingdir/bb-studio-app
+cd ~/workingdir/bb-studio-public
 node scripts/import-desktop.mjs
 node scripts/import-desktop.mjs --check
 ```
@@ -81,7 +81,7 @@ If the old branch was synced onto a newer upstream, `$base` is newer than `deskt
 On `main` (clean):
 
 ```sh
-cd ~/workingdir/bb-studio-app
+cd ~/workingdir/bb-studio-public
 new=$(git -C ~/workingdir/bb-studio rev-parse exp/studio-native)
 work=/tmp/bbs-import-$(echo "$new" | cut -c1-8)
 scripts/filter-plugins.sh ~/workingdir/bb-studio "$new" "$work"
@@ -99,7 +99,7 @@ After a later import, use that import's filtered tip in the `--is-ancestor` line
 If `--is-ancestor` fails, the old branch was rewritten (rebased or amended) and a merge would duplicate history. Do not merge. Bring in the new commits as patches instead, from the last imported source commit:
 
 ```sh
-cd ~/workingdir/bb-studio-app
+cd ~/workingdir/bb-studio-public
 old=13eb99267d514f2029088425a1412e4d778682e8               # last imported source commit
 git -C ~/workingdir/bb-studio format-patch --stdout "$old..$new" -- . \
   ':!apps' ':!docs/ios' ':!docs/ui-redo' ':!docs/attention-router' \
@@ -116,7 +116,7 @@ git am --directory=plugins --empty=drop /tmp/bbs-plugins.mbox
 On `main` (clean):
 
 ```sh
-cd ~/workingdir/bb-studio-app
+cd ~/workingdir/bb-studio-public
 new=$(git -C ~/workingdir/bb-studio rev-parse main)
 work=/tmp/bbs-ios-$(echo "$new" | cut -c1-8)
 scripts/filter-ios.sh ~/workingdir/bb-studio "$new" "$work"

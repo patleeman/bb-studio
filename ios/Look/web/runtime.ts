@@ -59,6 +59,42 @@ export interface SceneStart {
 interface Ripple { x: number; y: number; start: number; kind: number }
 const NEEDS_YOU_RATE = 1.6;
 
+/**
+ * Calls `frame` at `fps`, waking only for the frames it draws. A
+ * requestAnimationFrame loop wakes at the display's rate (60 or 120 Hz) just
+ * to skip most of its frames; here one timer per frame, on a schedule that
+ * corrects its own drift, keeps an even pace (30 fps is every second frame of
+ * a 60 Hz display) and the page asleep in between.
+ */
+class FrameClock {
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private due = 0;
+
+  constructor(private readonly frame: (now: number) => void, public fps: number) {}
+
+  get running(): boolean { return this.timer !== null; }
+
+  start(): void {
+    if (this.running) return;
+    this.due = performance.now();
+    this.timer = setTimeout(this.tick, 0);
+  }
+
+  stop(): void {
+    if (this.timer !== null) clearTimeout(this.timer);
+    this.timer = null;
+  }
+
+  private readonly tick = (): void => {
+    const now = performance.now();
+    const interval = 1000 / Math.max(1, Math.min(60, this.fps || 30));
+    // The next frame one interval after this one was due; after a stall, from now.
+    this.due = this.due + interval > now ? this.due + interval : now + interval;
+    this.timer = setTimeout(this.tick, this.due - now);
+    this.frame(now);
+  };
+}
+
 class PhoneScene {
   readonly canvas: HTMLCanvasElement;
   private renderer: SceneRenderer | null = null;
@@ -75,9 +111,8 @@ class PhoneScene {
   private appeared = new Map<string, number>();
   private needsLevel = 0;
   private signals: SceneSignals;
-  private handle: number | null = null;
+  private readonly clock = new FrameClock((now) => this.tick(now), 30);
   private last: number | null = null;
-  private lastDraw = 0;
   private published = 0;
   private lastPublish = 0;
   frames = 0;
@@ -109,7 +144,7 @@ class PhoneScene {
       this.published += 1;
       this.lastPublish = performance.now();
       if (mode !== undefined) post({ kind: "scene-mode", mode });
-      if (this.handle === null && !this.options.live) this.drawOnce();
+      if (!this.clock.running && !this.options.live) this.drawOnce();
     }, { layout, onLayout: () => () => {} });
   }
 
@@ -207,37 +242,34 @@ class PhoneScene {
   }
 
   start(): void {
-    if (!this.options.live || this.handle !== null || !this.renderer) { this.drawOnce(); return; }
+    if (!this.options.live || this.clock.running || !this.renderer) { this.drawOnce(); return; }
     this.last = null;
-    this.handle = requestAnimationFrame(this.tick);
+    this.clock.fps = this.options.fps || 30;
+    this.clock.start();
   }
 
   pause(): void {
-    if (this.handle !== null) cancelAnimationFrame(this.handle);
-    this.handle = null;
+    this.clock.stop();
     this.last = null;
   }
 
   setLive(live: boolean, fps?: number): void {
     this.options = { ...this.options, live, fps: fps ?? this.options.fps };
+    this.clock.fps = this.options.fps || 30;
     if (live) this.start(); else { this.pause(); this.drawOnce(); }
   }
 
-  private readonly tick = (now: number): void => {
-    this.handle = requestAnimationFrame(this.tick);
-    const interval = 1000 / Math.max(1, Math.min(60, this.options.fps || 30));
-    if (now - this.lastDraw < interval - 2) return;
-    this.lastDraw = now;
+  private tick(now: number): void {
     const dt = this.last === null ? 0 : Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
     this.time += dt * this.look.rate;
     const target = needsYou(this.signals) ? 1 : 0;
     this.needsLevel = target > this.needsLevel ? Math.min(target, this.needsLevel + dt * NEEDS_YOU_RATE) : Math.max(target, this.needsLevel - dt * NEEDS_YOU_RATE);
     this.draw(false);
-  };
+  }
 
   stats(): { frames: number; drawMs: number; live: boolean; running: boolean } {
-    return { frames: this.frames, drawMs: this.drawMs, live: this.options.live, running: this.handle !== null };
+    return { frames: this.frames, drawMs: this.drawMs, live: this.options.live, running: this.clock.running };
   }
 
   dispose(): void {
@@ -353,15 +385,15 @@ class LivePresence {
   private sandbox: PresenceSandbox | null = null;
   private holder: HTMLElement | null = null;
   private clock = { real: 0, form: START_TIME, due: 0 };
-  private handle: number | null = null;
+  private readonly frameClock: FrameClock;
   private last: number | null = null;
-  private lastDraw = 0;
   private palette: Palette;
   private light: boolean;
   frames = 0;
   drawMs = 0;
 
-  constructor(spec: PresenceSpec, private live: boolean, private fps: number) {
+  constructor(spec: PresenceSpec, private live: boolean, fps: number) {
+    this.frameClock = new FrameClock((now) => this.tick(now), fps);
     this.spec = spec;
     ({ palette: this.palette, light: this.light } = lookFor(spec));
     document.documentElement.style.setProperty("--ink", spec.ink);
@@ -424,26 +456,23 @@ class LivePresence {
 
   setLive(live: boolean, fps?: number): void {
     this.live = live;
-    if (fps) this.fps = fps;
+    if (fps) this.frameClock.fps = fps;
     if (live) this.start(); else this.pause();
   }
 
   private start(): void {
-    if (this.handle !== null) return;
+    if (this.frameClock.running) return;
     this.last = null;
-    this.handle = requestAnimationFrame(this.tick);
+    this.frameClock.start();
   }
 
   pause(): void {
-    if (this.handle !== null) cancelAnimationFrame(this.handle);
-    this.handle = null;
+    this.frameClock.stop();
   }
 
-  private readonly tick = (now: number): void => {
-    this.handle = requestAnimationFrame(this.tick);
-    if (now - this.lastDraw < 1000 / Math.max(1, Math.min(60, this.fps)) - 2) return;
-    this.lastDraw = now;
-    const dt = this.last === null ? 0 : Math.min(0.05, (now - this.last) / 1000);
+  private tick(now: number): void {
+    // Up to a 10 fps step, so the form keeps its speed at a lower frame rate.
+    const dt = this.last === null ? 0 : Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
     this.clock.real += dt;
     this.clock.form += dt * STATE_SPEED[this.spec.state] * (this.spec.motion ?? 1);
@@ -453,10 +482,10 @@ class LivePresence {
       this.clock.due = 0;
     }
     this.paint();
-  };
+  }
 
   stats(): { frames: number; drawMs: number; running: boolean } {
-    return { frames: this.frames, drawMs: this.drawMs, running: this.handle !== null };
+    return { frames: this.frames, drawMs: this.drawMs, running: this.frameClock.running };
   }
 
   dispose(): void {

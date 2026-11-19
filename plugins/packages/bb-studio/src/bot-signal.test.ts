@@ -89,6 +89,30 @@ it("merges a burst into one event per Bot, its changes in a fixed order, after t
   signal.dispose();
 });
 
+it("publishes nothing after dispose: a reload's old instance has a stale handle", () => {
+  vi.useFakeTimers();
+  const published: unknown[] = [];
+  const signal = new BotSignal((event) => published.push(event), 250);
+  signal.add([{ botId: "dot", kinds: ["needs-you"] }]);
+  signal.dispose();
+  signal.add([{ botId: "dot", kinds: ["workers"] }]);
+  vi.advanceTimersByTime(1000);
+  expect(published).toEqual([]);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it("a thread made just before a reload leaves no reconcile timer behind", async () => {
+  vi.useFakeTimers();
+  const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: { threads: { list: (async () => []) as never, get: (async () => { throw new Error("Not found"); }) as never } } });
+  const db = bb.storage.database();
+  bb.storage.migrate(db, MIGRATIONS);
+  registerBotThreads(bb, db, { bots: () => [], changed: () => {} } as never);
+  await harness.emitThreadEvent("thread.created", { thread: { id: "thr_new" } as never });
+  expect(vi.getTimerCount()).toBeGreaterThan(0);
+  await harness.lifecycle.dispose();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
 it("conversation start and fork each emit once for their Bot", async () => {
   const x = await setup();
   await x.server.rpc.bot_conversation_start({ botId: "home", request: { projectId: "proj_personal", providerId: "claude", model: "m", reasoningLevel: "low", permissionMode: "auto", executionInputSources: {}, environment: {}, input: [{ type: "text", text: "hi" }] } as never });

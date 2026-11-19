@@ -6,7 +6,7 @@
 set -eu
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-DESKTOP="${DESKTOP:-$HOME/workingdir/bb-studio-app-desktop}"
+DESKTOP="${DESKTOP:-$HOME/workingdir/bb-studio-public-desktop}"
 SCRATCH="${SCRATCH:-/tmp/bbsite}"
 export DESKTOP SCRATCH
 S="$HERE/scratch.sh"

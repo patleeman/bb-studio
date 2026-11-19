@@ -5,10 +5,10 @@
 #
 #   scratch.sh start | stop | bb <cli args...> | wipe
 #
-# Env: DESKTOP (a built bb-studio-app-desktop tree), SCRATCH (default /tmp/bbsite),
+# Env: DESKTOP (a built checkout of the desktop branch), SCRATCH (default /tmp/bbsite),
 # BB_CLI (the bb CLI to call, default $DESKTOP/apps/cli/dist/index.js).
 set -eu
-DESKTOP="${DESKTOP:-$HOME/workingdir/bb-studio-app-desktop}"
+DESKTOP="${DESKTOP:-$HOME/workingdir/bb-studio-public-desktop}"
 SCRATCH="${SCRATCH:-/tmp/bbsite}"
 BB_CLI="${BB_CLI:-$DESKTOP/apps/cli/dist/index.js}"
 DATA="$SCRATCH/data"

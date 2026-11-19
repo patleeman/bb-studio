@@ -1126,6 +1126,8 @@ export default async function plugin(bb: BbPluginApi) {
   let botThreadsSignal: ReturnType<typeof setTimeout> | null = null;
   bb.onDispose(() => { if (botThreadsSignal) clearTimeout(botThreadsSignal); });
   const botThreadsChanged = (changes: readonly BotChange[]) => {
+    // Work that finishes after a reload changes nothing on screen: the new instance publishes.
+    if (disposed) return;
     botThreadsSignal ??= setTimeout(() => { botThreadsSignal = null; bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }); }, 250);
     botSignal.add(changes);
   };

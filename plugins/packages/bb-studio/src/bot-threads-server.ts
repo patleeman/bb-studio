@@ -31,7 +31,7 @@ import { familyHref, itemType } from "./item-model";
 import type { Recording } from "./kit/talk-contract";
 import { PLUGIN_ID as TALK_PLUGIN_ID, recordingHref } from "./talk/shared/format";
 
-type Bb = Pick<BbPluginApi, "events" | "sdk" | "agents">;
+type Bb = Pick<BbPluginApi, "events" | "sdk" | "agents" | "onDispose">;
 
 export interface SpaceBot {
   id: string; name: string; avatar: string; shape?: string | null; color?: string | null; primary?: boolean; threadId: string | null; appearance?: Appearance | null; presence?: Presence;
@@ -180,14 +180,17 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     if (point) store.forkedAt(threadId, { sourceThreadId: point.sourceThreadId, turnId: point.sourceTurnId });
   };
 
-  // Thread events.
+  // Thread events. A reload stops the reconciles still waiting: the old instance's handles are stale.
+  const reconciles = new Set<ReturnType<typeof setTimeout>>();
+  bb.onDispose(() => { for (const timer of reconciles) clearTimeout(timer); reconciles.clear(); });
   bb.events.on("thread.created", ({ thread }) => {
     void store.created(thread as ThreadFacts).then(() => {
       const rec = store.get(thread.id);
       if (rec?.kind === "conversation" && rec.forkedFrom && !rec.forkedFrom.messageId) return lookUpForkPoint(thread.id);
     });
     // A side chat learns its reply a moment later, a runner its thread: apply them.
-    setTimeout(() => { try { store.reconcile(); } catch { /* the next sweep */ } }, 8_000);
+    const later = setTimeout(() => { reconciles.delete(later); try { store.reconcile(); } catch { /* the next sweep */ } }, 8_000);
+    reconciles.add(later);
   });
   bb.events.on("thread.archived", ({ thread }) => store.archived(thread.id, true));
   bb.events.on("thread.unarchived", ({ thread }) => { if (known(thread.id)) store.archived(thread.id, false); else void store.created(thread as ThreadFacts); });
@@ -197,6 +200,8 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     store.idle(thread.id, lastAssistantText);
     void store.repliedSince(thread.id).catch(() => false);
     threadChanged(thread.id);
+    // A mention of a thread Studio keeps no title for reads as its BB title once BB answers.
+    void store.nameMentions(thread.id, lastAssistantText).catch(() => {});
   });
   // A turn starting or failing, or a question, is real activity (BB's updated_at isn't: the importer moves it).
   for (const event of ["thread.active", "thread.failed"] as const) bb.events.on(event, ({ thread }) => { if (known(thread.id)) { store.touched(thread.id); threadChanged(thread.id); } });
@@ -235,9 +240,9 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
       rechecked.add(threadId);
       const events = await bb.sdk.threads.events.list({ threadId, order: "desc", limit: "60", types: ["item/completed"] } as never).catch(() => []) as { data?: { item?: { type?: string; text?: string } } }[];
       const reply = events.map((event) => event.data?.item).find((item) => item?.type === "agentMessage" && !!latestLine(item.text))?.text ?? null;
-      if (reply) { store.fillLatest(threadId, reply, true); return; }
+      if (reply) { store.fillLatest(threadId, reply, true, await store.mentionTitles(reply)); return; }
       const output = await bb.sdk.threads.output({ threadId }).catch(() => null) as { output?: string | null } | null;
-      store.fillLatest(threadId, output?.output ?? null);
+      store.fillLatest(threadId, output?.output ?? null, false, await store.mentionTitles(output?.output));
     }));
   };
   const rechecked = new Set<string>();

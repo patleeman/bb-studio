@@ -79,6 +79,59 @@ final class LookTests: XCTestCase {
         XCTAssertEqual(LookStore(defaults: defaults).liveScene, true)
     }
 
+    /// The live scene stops as soon as the phone is warm; the presence slows down, then stops.
+    func testLiveSceneStopsWhenWarmAndThePresenceSlows() {
+        XCTAssertTrue(LookStore.sceneAllowed(lowPower: false, thermal: .nominal, reduceMotion: false))
+        XCTAssertFalse(LookStore.sceneAllowed(lowPower: false, thermal: .fair, reduceMotion: false))
+        XCTAssertFalse(LookStore.sceneAllowed(lowPower: false, thermal: .serious, reduceMotion: false))
+        XCTAssertFalse(LookStore.sceneAllowed(lowPower: true, thermal: .nominal, reduceMotion: false))
+        XCTAssertFalse(LookStore.sceneAllowed(lowPower: false, thermal: .nominal, reduceMotion: true))
+        XCTAssertEqual(LookStore.presenceFPS(thermal: .nominal), LookStore.liveFPS)
+        XCTAssertEqual(LookStore.presenceFPS(thermal: .fair), LookStore.liveFPS / 2)
+        XCTAssertLessThanOrEqual(LookStore.sceneFPS, 15)
+    }
+
+    func testIdleAfterThirtySecondsWithoutATouch() {
+        let touched = Date(timeIntervalSince1970: 1_000)
+        XCTAssertFalse(EnergyGate.isIdle(lastActivity: touched, now: touched))
+        XCTAssertFalse(EnergyGate.isIdle(lastActivity: touched, now: touched + 29))
+        XCTAssertTrue(EnergyGate.isIdle(lastActivity: touched, now: touched + 30))
+        XCTAssertTrue(EnergyGate.isIdle(lastActivity: touched, now: touched + 600))
+    }
+
+    func testPollsWaitLongerWhileIdle() {
+        XCTAssertEqual(EnergyGate.pollDelay(.seconds(20), idle: false), .seconds(20))
+        XCTAssertEqual(EnergyGate.pollDelay(.seconds(20), idle: true), .seconds(60))
+        XCTAssertEqual(EnergyGate.pollDelay(.seconds(60), idle: true), .seconds(180))
+        XCTAssertEqual(EnergyGate.pollDelay(.seconds(120), idle: true), .seconds(180))
+        XCTAssertEqual(EnergyGate.pollDelay(.seconds(300), idle: true), .seconds(300))
+    }
+
+    func testPollsHoldInTheBackgroundAndRunWhenTheAppIsBack() async throws {
+        let gate = EnergyGate(watchKeyboard: false)
+        gate.setBackground(true)
+        var rounds = 0
+        let poll = Task { @MainActor in
+            await gate.pollWait(.milliseconds(10))
+            rounds += 1
+        }
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(rounds, 0, "No poll round while in the background")
+        gate.setBackground(false)
+        await poll.value
+        XCTAssertEqual(rounds, 1, "The poll runs again once the app is back")
+    }
+
+    func testATouchWakesTheGate() async throws {
+        let gate = EnergyGate(watchKeyboard: false)
+        XCTAssertFalse(gate.idle)
+        gate.touched(at: Date(timeIntervalSinceNow: -EnergyGate.idleAfter - 1))
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertTrue(gate.idle)
+        gate.touched()
+        XCTAssertFalse(gate.idle)
+    }
+
     func testFollowBotUsesTheBotsDesktopTheme() throws {
         let defaults = UserDefaults(suiteName: "LookTests-\(UUID())")!
         let store = LookStore(defaults: defaults)
@@ -295,16 +348,43 @@ final class LookTests: XCTestCase {
         XCTAssertEqual(still?["running"] as? Bool, false, "A still has no frame loop")
         let stillFrames = still?["frames"] as? Int ?? -1
         XCTAssertLessThanOrEqual(stillFrames, 2)
-        try await host.call("BBLook.scene.setLive(true, 30)")
+        let fps = LookStore.sceneFPS
+        try await host.call("BBLook.scene.setLive(true, fps)", ["fps": fps])
         await pause(2)
         try await host.call("BBLook.scene.setLive(false)")
         let stats = try await host.call("return BBLook.scene.stats()")
         let live = try XCTUnwrap(stats as? [String: Any])
         let frames = (live["frames"] as? Int ?? 0) - stillFrames - 1
         let ms = (live["drawMs"] as? Double ?? 0) / Double(max(1, frames))
-        print("LOOK-PERF live scene: \(frames) frames in 2 s (cap 30/s), \(String(format: "%.2f", ms)) ms of JS per frame (the GPU draws asynchronously)")
-        XCTAssertLessThanOrEqual(frames, 66, "Live scenes are capped at 30 frames a second")
+        print("LOOK-PERF live scene: \(frames) frames in 2 s (cap \(fps)/s), \(String(format: "%.2f", ms)) ms of JS per frame (the GPU draws asynchronously)")
+        XCTAssertLessThanOrEqual(frames, 2 * fps + 6, "Live scenes are capped at \(fps) frames a second")
         XCTAssertGreaterThan(frames, 0, "Live mode draws")
+        XCTAssertEqual(live["running"] as? Bool, false, "A paused scene has no frame loop")
+    }
+
+    /// The live presence draws at its frame rate and holds still, with no loop, when paused.
+    func testLivePresencePausesWithNoFrameLoop() async throws {
+        let host = LookWebView(page: .presence, frame: CGRect(x: 0, y: 0, width: 64, height: 64))
+        LookHosting.attach(host.webView)
+        defer { host.tearDown() }
+        let spec: [String: Any] = ["form": "tesseract", "themeId": "aurora-fjord", "mode": "dark", "motion": 1, "state": "working",
+                                   "workers": 2, "size": 48, "room": 1, "dpr": 2, "ink": "#ffffff", "surfaceLight": false]
+        try await host.call("BBLook.presence.mount(spec, true, fps)", ["spec": spec, "fps": LookStore.presenceFPS(thermal: .fair)])
+        await pause(2)
+        let runningStats = try await host.call("return BBLook.presence.stats()")
+        let running = try XCTUnwrap(runningStats as? [String: Any])
+        let drawn = running["frames"] as? Int ?? 0
+        XCTAssertEqual(running["running"] as? Bool, true)
+        XCTAssertGreaterThan(drawn, 5, "A live presence draws")
+        XCTAssertLessThanOrEqual(drawn, 2 * LookStore.presenceFPS(thermal: .fair) + 6, "A warm phone's presence runs at half rate")
+        try await host.call("BBLook.presence.setLive(false)")
+        let stoppedStats = try await host.call("return BBLook.presence.stats()")
+        let stopped = try XCTUnwrap(stoppedStats as? [String: Any])
+        await pause(1)
+        let pausedStats = try await host.call("return BBLook.presence.stats()")
+        let paused = try XCTUnwrap(pausedStats as? [String: Any])
+        XCTAssertEqual(paused["running"] as? Bool, false, "A paused presence has no frame loop")
+        XCTAssertEqual(paused["frames"] as? Int, stopped["frames"] as? Int, "A paused presence draws nothing")
     }
 
     static func edgeAlpha(_ image: UIImage) -> UInt8 {

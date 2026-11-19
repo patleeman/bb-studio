@@ -45,6 +45,11 @@ final class LookWebView: NSObject {
         webView = WKWebView(frame: frame, configuration: config)
         super.init()
         config.userContentController.add(WeakMessageHandler(self), name: "bbLook")
+        #if DEBUG
+        if EnergyProbe.enabled {
+            config.userContentController.addUserScript(WKUserScript(source: EnergyProbe.frameCounterScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
+        #endif
         webView.navigationDelegate = self
         webView.isOpaque = page == .scene
         webView.backgroundColor = .clear
@@ -76,6 +81,9 @@ final class LookWebView: NSObject {
 
     fileprivate func received(_ body: Any) {
         guard let message = body as? [String: Any] else { return }
+        #if DEBUG
+        if message["kind"] as? String == "probe-frames" { return EnergyProbe.frames(page.rawValue, message["frames"] as? Int ?? 0, drawn: message["drawn"] as? Int ?? 0) }
+        #endif
         if message["kind"] as? String == "ready" {
             ready = true
             let waiting = waiters

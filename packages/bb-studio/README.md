@@ -3462,7 +3462,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
 - **No Bot yet**: the page is a centered welcome, **Meet your Bot**, with
   one question, **What should your Bot help with?** (ideas such as **Watch
   my projects** and **Morning brief** fill it in; Talk can dictate it).
-  **Create Bot** (or Enter) makes it as "Chief of Staff", a drawn blob,
+  **Create Bot** (or Enter) makes it as "Assistant" (onboarding's name), a drawn blob,
   starts its chat in your personal project and opens that as BB's thread
   page with the Bots list. Its first message is the setup (`bot_create`'s
   `setup`, `setupInput` in `src/bot.ts`): a short hello with what you asked
