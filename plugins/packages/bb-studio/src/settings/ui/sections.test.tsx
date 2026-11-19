@@ -241,6 +241,27 @@ describe("Studio's settings sections", () => {
     await click([...host.querySelectorAll("button")].find((button) => button.textContent === "Send a test push"));
     expect(state.rpc).toHaveBeenCalledWith("mobile.push.test", null);
     expect(text()).toContain("Sent to 2 phones.");
+    expect($("mobile-desk-hold")).toBeNull();
+  });
+
+  it("Phone notifications: the hold-while-at-my-Mac switch, on a Mobile plugin that has it", async () => {
+    const base = { installed: true, ready: true, problem: null, devices: 1, lastDelivery: null };
+    state.rpc.mockImplementation(async (method: string, input: unknown) => {
+      if (method === "mobile.push.status") return { ...base, deskHold: { enabled: true, atDesk: true, held: 2 } };
+      if (method === "mobile.desk.hold") return { enabled: (input as { enabled: boolean }).enabled, atDesk: true, held: 0 };
+      return null;
+    });
+    await render("mobile-push");
+    await act(async () => {});
+    const row = $("mobile-desk-hold")!;
+    expect(row.textContent).toContain("Hold phone notifications while I'm at my Mac");
+    expect(row.textContent).toContain("At your Mac · 2 waiting");
+    const toggle = row.querySelector('[role="switch"]')!;
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    await click(toggle);
+    expect(state.rpc).toHaveBeenCalledWith("mobile.desk.hold", { enabled: false });
+    expect($("mobile-desk-hold")!.textContent).toContain("Off");
+    expect($("mobile-desk-hold")!.querySelector('[role="switch"]')!.getAttribute("aria-checked")).toBe("false");
   });
 });
 

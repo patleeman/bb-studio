@@ -8,8 +8,8 @@ import { useCallback, useEffect, useState } from "react";
 import { openAppPath } from "../../kit/app/nav";
 import { errorMessage } from "../../kit/format";
 import { Button, cn } from "../../kit/ui/index";
-import type { PushStatus, PushTest, settingsContract } from "../contract";
-import { Card, Row } from "./controls";
+import type { DeskHoldStatus, PushStatus, PushTest, settingsContract } from "../contract";
+import { Card, Row, Switch } from "./controls";
 
 const MOBILE_SETTINGS = "/settings/plugins/mobile";
 
@@ -31,6 +31,17 @@ export function pushWords(status: PushStatus): { headline: string; detail: strin
   return { headline: status.devices ? `Sending to ${phones}` : "Ready", detail: status.devices ? last : "No phone has received a push yet. Open the BB Studio app and allow notifications.", ok: true };
 }
 
+export const DESK_HOLD_LABEL = "Hold phone notifications while I'm at my Mac";
+
+/** The switch row's status line. */
+export function deskWords(desk: DeskHoldStatus): string {
+  if (!desk.enabled) return "Off";
+  const held = desk.held ? ` · ${desk.held} waiting` : "";
+  if (desk.atDesk === true) return `At your Mac${held}`;
+  if (desk.atDesk === false) return `Away from your Mac${held}`;
+  return "No signal from your Mac";
+}
+
 export function PushSection() {
   const rpc = useRpc<typeof settingsContract>();
   const [status, setStatus] = useState<PushStatus | null>(null);
@@ -50,12 +61,28 @@ export function PushSection() {
     }
     load();
   };
+  const [desk, setDesk] = useState<{ saving: boolean; error: string | null }>({ saving: false, error: null });
+  const setHold = async (enabled: boolean) => {
+    setDesk({ saving: true, error: null });
+    try {
+      const deskHold = await rpc.call("mobile.desk.hold", { enabled });
+      setStatus((current) => (current ? { ...current, deskHold } : current));
+      setDesk({ saving: false, error: null });
+    } catch (cause) {
+      setDesk({ saving: false, error: errorMessage(cause) });
+    }
+  };
   const words = status ? pushWords(status) : null;
   return (
     <Card>
       <Row label="Push status" description={error ?? words?.detail ?? "Checking…"} testId="mobile-push-status">
         {words ? <span className={cn("text-sm", words.ok ? "text-success" : "text-muted-foreground")}>{words.headline}</span> : null}
       </Row>
+      {status?.deskHold ? (
+        <Row label={DESK_HOLD_LABEL} description={desk.error ?? deskWords(status.deskHold)} testId="mobile-desk-hold">
+          <Switch checked={status.deskHold.enabled} label={DESK_HOLD_LABEL} disabled={desk.saving} onChange={(next) => void setHold(next)} />
+        </Row>
+      ) : null}
       <Row label="Send a test push" description={test.result?.message}>
         <Button type="button" size="sm" variant="outline" disabled={!status?.ready || test.running} onClick={() => void send()}>{test.running ? "Sending…" : "Send a test push"}</Button>
       </Row>

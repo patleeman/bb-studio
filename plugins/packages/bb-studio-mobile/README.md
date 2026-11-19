@@ -39,6 +39,20 @@ settings, see [`skills/mobile-push/SKILL.md`](skills/mobile-push/SKILL.md).
   "N new · …", with the collapse id `conversation:<id>`, so it replaces the
   earlier one. A conversation read before then gets none. Approvals,
   questions, errors, loops and keyed alerts are never held.
+- **At the desk.** "Hold phone notifications while I'm at my Mac" (Studio's
+  settings, Phone notifications; on by default; `desk_hold_set`). Studio's
+  overlay on the desktop app and on computer browsers calls `desk_beat`:
+  "active" every 45 seconds while the user is there, "away" once when they
+  leave. Here means the Mac is unlocked and had keyboard or mouse input in the
+  last 2 minutes (the desktop app's `experimental_systemActivity`; older apps
+  report only their own window's input and focus). While any client's last
+  beat is "active" and under 2 minutes old, replies, asks and errors about a
+  thread are held, not sent. When every client is away or silent, the held
+  pushes whose thread is still unread (or whose ask is still open) go out: the
+  newest one when it is one conversation, else one summary, "N updates while
+  you were away", that opens the newest. Held over 10 minutes: dropped. No
+  beat at all, or a stale one: pushes go out as before. Test pushes, loops and
+  keyed alerts are never held. Held pushes live in memory; a reload drops them.
 - **Muted threads.** A muted thread sends nothing to the app. Other
   subscribers still get it.
 - **Collapse ids.** A `notify` call with `coalesceKey` sets `apns-collapse-id`,
