@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { listEvents } from "@bb/db/testing";
 import { getLatestThreadSequence, listQueuedThreadMessages } from "@bb/db";
-import { applyTurnCompletedEvent } from "../../src/internal/turn-completed-events.js";
+import { runThreadLifecycleTransaction } from "../../src/services/threads/lifecycle/run.js";
 import { sendNextQueuedMessageIfPresent } from "../../src/services/threads/queued-messages.js";
 import { turnRequestEventDataSchema, turnScope } from "@bb/domain";
 import {
@@ -269,15 +269,10 @@ describe("a queued automated input (BB Studio)", () => {
       scope: turnScope(turnId),
       data: { providerThreadId: "provider-thread-1", status: "completed" },
     });
-    applyTurnCompletedEvent(harness.deps, {
-      afterIdle: null,
-      payload: {
-        threadId: thread.id,
-        providerThreadId: "provider-thread-1",
-        type: "turn/completed",
-        scope: turnScope(turnId),
-        status: "completed",
-      },
+    runThreadLifecycleTransaction(harness.deps, thread.id, {
+      type: "turn.completed",
+      turnId,
+      status: "completed",
     });
     expect(
       await sendNextQueuedMessageIfPresent(harness.deps, { threadId: thread.id }),
