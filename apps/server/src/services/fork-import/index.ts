@@ -121,7 +121,7 @@ async function startForkImportSweeps(
   deps: AppDeps,
   dataDir: string,
 ): Promise<void> {
-  if (sweepsStarted) return;
+  if (sweepsStarted || !hasForkImport(dataDir)) return;
   sweepsStarted = true;
   const marker = await readServerImportFile(dataDir).catch(() => null);
   if (marker?.kind === "move") return;

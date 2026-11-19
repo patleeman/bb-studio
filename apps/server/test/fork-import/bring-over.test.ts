@@ -196,6 +196,7 @@ async function fixture(): Promise<Fixture> {
     ["acme-tool", "path", toolDir],
     ["gone-tool", "path", join(root, "nowhere")],
     ["remote-thing", "git", "github:acme/remote-thing"],
+    ["future-tool", "path", join(root, "plugins-src", "future-tool")],
     ["studio", "path", "/old/studio"],
     ["bundled-x", "builtin", "builtin:x"],
   ] as const) {
@@ -237,6 +238,18 @@ async function fixture(): Promise<Fixture> {
   );
   toolData.close();
   await writeFile(join(source, "AGENTS.md"), "rules");
+  await mkdir(join(root, "plugins-src", "future-tool"), { recursive: true });
+  await writeFile(
+    join(root, "plugins-src", "future-tool", "package.json"),
+    JSON.stringify({
+      name: "bb-plugin-future-tool",
+      engines: { bb: ">=99.0.0" },
+    }),
+  );
+  for (const name of ["auth-secret", "auth.json", "telemetry-id"])
+    await writeFile(join(source, name), `bb-${name}`);
+  await mkdir(join(source, "pi-bridge-sessions"), { recursive: true });
+  await writeFile(join(source, "pi-bridge-sessions", "thr_x.json"), "pi");
   await writeFile(
     join(source, "env.json"),
     JSON.stringify({ env: { OPENAI_API_KEY: "sk-test" } }),
@@ -320,18 +333,44 @@ describe("bring things over from bb", () => {
       count: 1,
     });
     expect(settings.map((item) => item.id)).toContain("instructions");
-    const plugins = await listPlugins(snap, f.db, f.source);
+    const plugins = await listPlugins(snap, f.db, f.source, "1.0.0");
     expect(
-      plugins.map(({ id, hasData, sourceMissing, here }) => ({
+      plugins.map(({ id, hasData, sourceMissing, here, needsNewer }) => ({
         id,
         hasData,
         sourceMissing,
         here,
+        needsNewer,
       })),
     ).toEqual([
-      { id: "acme-tool", hasData: true, sourceMissing: false, here: false },
-      { id: "gone-tool", hasData: false, sourceMissing: true, here: false },
-      { id: "remote-thing", hasData: false, sourceMissing: false, here: false },
+      {
+        id: "acme-tool",
+        hasData: true,
+        sourceMissing: false,
+        here: false,
+        needsNewer: null,
+      },
+      {
+        id: "future-tool",
+        hasData: false,
+        sourceMissing: false,
+        here: false,
+        needsNewer: ">=99.0.0",
+      },
+      {
+        id: "gone-tool",
+        hasData: false,
+        sourceMissing: true,
+        here: false,
+        needsNewer: null,
+      },
+      {
+        id: "remote-thing",
+        hasData: false,
+        sourceMissing: false,
+        here: false,
+        needsNewer: null,
+      },
     ]);
   });
 
@@ -622,10 +661,11 @@ describe("bring things over from bb", () => {
       sourceDataDir: f.source,
       dataDir: f.target,
       installer,
+      appVersion: "1.0.0",
     };
 
     await expect(addPlugin({ ...args, id: "gone-tool" })).rejects.toThrow(
-      /not there any more/u,
+      /not found here/u,
     );
     await expect(addPlugin({ ...args, id: "remote-thing" })).rejects.toThrow(
       /could not be installed from github:acme\/remote-thing: repository not found/u,
@@ -679,7 +719,9 @@ describe("bring things over from bb", () => {
         .get(),
     ).toEqual({ source_kind: "path", source_path: "/old/studio" });
     expect(
-      (await listPlugins(snap, f.db, f.source)).map((plugin) => plugin.id),
+      (await listPlugins(snap, f.db, f.source, "1.0.0")).map(
+        (plugin) => plugin.id,
+      ),
     ).not.toContain("studio");
     const installer = {
       install: async () => ({ id: "x" }),
@@ -701,6 +743,7 @@ describe("bring things over from bb", () => {
           sourceDataDir: f.source,
           dataDir: f.target,
           installer,
+          appVersion: "1.0.0",
         }),
       ).rejects.toThrow(/no plugin/u);
     }
@@ -727,6 +770,87 @@ describe("bring things over from bb", () => {
       count(f.db, "SELECT COUNT(*) AS n FROM thread_plugin_metadata"),
     ).toBe(0);
     expect(existsSync(join(f.target, "plugins"))).toBe(false);
+  });
+
+  it("adds no row for a folder plugin whose folder is not here, or one that needs a newer BB Studio", async () => {
+    const f = await fixture();
+    const snap = openSnapshot(f.snapshot);
+    open.push(snap);
+    let calls = 0;
+    const installer = {
+      install: async () => {
+        calls += 1;
+        return { id: "x" };
+      },
+      installPath: async () => {
+        calls += 1;
+        return { id: "x" };
+      },
+      reload: async () => undefined,
+    };
+    const args = {
+      source: snap,
+      target: f.db,
+      sourceDataDir: f.source,
+      dataDir: f.target,
+      installer,
+      appVersion: "1.0.0",
+    };
+    await expect(addPlugin({ ...args, id: "gone-tool" })).rejects.toThrow(
+      /not found here/u,
+    );
+    await expect(addPlugin({ ...args, id: "future-tool" })).rejects.toThrow(
+      /needs a newer BB Studio \(it asks for bb >=99\.0\.0\)/u,
+    );
+    expect(calls).toBe(0);
+    expect(
+      count(
+        f.db,
+        "SELECT COUNT(*) AS n FROM plugins WHERE id IN ('gone-tool', 'future-tool')",
+      ),
+    ).toBe(0);
+    expect(
+      await addPlugin({
+        ...args,
+        id: "future-tool",
+        appVersion: "99.1.0",
+      }).then(
+        () => "added",
+        (error: Error) => error.message,
+      ),
+    ).not.toMatch(/newer/u);
+  });
+
+  it("never copies bb's identity, sign-in secret or telemetry id, and leaves bb's files where they are", async () => {
+    const f = await fixture();
+    for (const name of ["auth-secret", "auth.json", "telemetry-id"]) {
+      await writeFile(join(f.target, name), `studio-${name}`);
+    }
+
+    await run(f, {
+      picks: [
+        { kind: "project", id: f.ids.p1 },
+        { kind: "project", id: f.ids.p2 },
+      ],
+      settings: [
+        "preferences",
+        "app-settings",
+        "theme",
+        "instructions",
+        "skills",
+        "custom-models",
+        "env",
+      ].map((id) => ({ id: id as "preferences", replace: true })),
+    });
+
+    for (const name of ["auth-secret", "auth.json", "telemetry-id"]) {
+      expect(readFileSync(join(f.target, name), "utf8")).toBe(`studio-${name}`);
+    }
+    expect(readFileSync(join(f.target, "host-id"), "utf8")).toBe("host_here\n");
+    expect(
+      readFileSync(join(f.source, "pi-bridge-sessions", "thr_x.json"), "utf8"),
+    ).toBe("pi");
+    expect(existsSync(join(f.target, "pi-bridge-sessions"))).toBe(false);
   });
 
   it("hides every plugin the fork removed", () => {
