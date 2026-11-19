@@ -1,3 +1,4 @@
+import { releaseBbEnvironments } from "./bb-environments.js";
 import Database from "better-sqlite3";
 import { cpSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { cp, readdir } from "node:fs/promises";
@@ -622,6 +623,7 @@ export function runForkImportSync(
     writeCursor(fork, "threads.updated_at", String(newestThread));
     writeCursor(fork, "events.rowid", String(newestEvent));
     deleteThreadsRemovedAtSource(context, args.now);
+    releaseBbEnvironments(target, [state.sourceDataDir]);
     writeCursor(fork, "lastSyncAt", String(args.now));
     writeCursor(fork, "lastSummary", JSON.stringify(summary));
     if (summary.conflicts.length > 0) {
