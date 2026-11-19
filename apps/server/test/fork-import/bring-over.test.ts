@@ -659,6 +659,68 @@ describe("bring things over from bb", () => {
     );
   });
 
+  it("never brings a plugin row for an id BB Studio bundles or removes, such as a dead path install of studio", async () => {
+    const f = await fixture();
+    const snap = openSnapshot(f.snapshot);
+    open.push(snap);
+    expect(
+      snap
+        .prepare(
+          "SELECT source_kind, source_path FROM plugins WHERE id = 'studio'",
+        )
+        .get(),
+    ).toEqual({ source_kind: "path", source_path: "/old/studio" });
+    expect(
+      (await listPlugins(snap, f.db, f.source)).map((plugin) => plugin.id),
+    ).not.toContain("studio");
+    const installer = {
+      install: async () => ({ id: "x" }),
+      installPath: async () => ({ id: "x" }),
+      reload: async () => undefined,
+    };
+    for (const id of [
+      "studio",
+      "studio-visual-chat",
+      "mobile",
+      "workflows",
+      "bundled-x",
+    ]) {
+      await expect(
+        addPlugin({
+          id,
+          source: snap,
+          target: f.db,
+          sourceDataDir: f.source,
+          dataDir: f.target,
+          installer,
+        }),
+      ).rejects.toThrow(/no plugin/u);
+    }
+
+    await run(f, {
+      picks: [
+        { kind: "project", id: f.ids.p1 },
+        { kind: "project", id: f.ids.p2 },
+      ],
+      settings: [
+        "preferences",
+        "app-settings",
+        "theme",
+        "instructions",
+        "skills",
+        "custom-models",
+        "env",
+      ].map((id) => ({ id: id as "preferences", replace: true })),
+    });
+
+    expect(count(f.db, "SELECT COUNT(*) AS n FROM plugins")).toBe(0);
+    expect(count(f.db, "SELECT COUNT(*) AS n FROM plugin_kv")).toBe(0);
+    expect(
+      count(f.db, "SELECT COUNT(*) AS n FROM thread_plugin_metadata"),
+    ).toBe(0);
+    expect(existsSync(join(f.target, "plugins"))).toBe(false);
+  });
+
   it("hides every plugin the fork removed", () => {
     const removed = JSON.parse(
       readFileSync(
