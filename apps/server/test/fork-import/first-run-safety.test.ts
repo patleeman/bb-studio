@@ -60,6 +60,7 @@ async function makeSource(): Promise<{ root: string; source: string }> {
     "config.json": '{"config":{"BB_LOG_LEVEL":"info"}}\n',
     "AGENTS.md": "rules\n",
     "telemetry-id": "source-telemetry",
+    "auth-secret": "bb-auth-secret",
     ".DS_Store": "junk",
     "skills/one/SKILL.md": "skill",
     "skills/one/.DS_Store": "junk",
@@ -161,6 +162,7 @@ describe("first-run import safety", () => {
       ]),
     );
     for (const left of [
+      "auth-secret",
       ".DS_Store",
       "skills/one/.DS_Store",
       "telemetry-id",
@@ -179,6 +181,9 @@ describe("first-run import safety", () => {
     expect(
       db.prepare("SELECT COUNT(*) AS n FROM plugin_state_snapshots").get(),
     ).toEqual({ n: 0 });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM apikey").get()).toEqual({
+      n: 0,
+    });
     db.close();
     expect(stagingDirs(root, "target")).toEqual([]);
 
