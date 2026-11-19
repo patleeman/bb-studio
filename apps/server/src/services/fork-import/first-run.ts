@@ -82,6 +82,7 @@ type ImportedManagedConfig = Parameters<
 >[0]["importedConfig"];
 
 const EXCLUDED_PATHS = [
+  "auth-secret",
   "telemetry-id",
   "plugins/mobile",
   "plugins/push-notifications",
@@ -108,6 +109,7 @@ const DATABASE_SCRUB_STATEMENTS = [
   "DELETE FROM plugin_marketplace_icons WHERE marketplace_name = 'bb-community'",
   "DELETE FROM plugin_marketplaces WHERE name = 'bb-community'",
   "DELETE FROM plugin_state_snapshots",
+  "DELETE FROM apikey",
 ];
 
 const PLUGIN_DATABASE_SCRUB_STATEMENTS: Readonly<
