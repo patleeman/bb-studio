@@ -143,6 +143,7 @@ function useRefreshOnFocus(enabled: boolean): void {
 }
 
 function useLiveCommandActions(enabled: boolean): readonly PaletteAction[] {
+  "use no memo";
   useRefreshOnFocus(enabled);
   const runner = useAppCommandRunner();
   const shortcuts = useAppCommandShortcuts(PALETTE_COMMAND_IDS);

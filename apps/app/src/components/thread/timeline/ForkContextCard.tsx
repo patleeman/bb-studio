@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ComponentType,
+} from "react";
 import type { ExperimentalContextCard } from "@get-bb/plugin-sdk";
 import { PluginSlotMount } from "@/components/plugin/PluginSlotMount";
 import type { PluginContextCardRowSlot } from "@/lib/fork-slots";
@@ -75,8 +81,37 @@ export function usePluginContextCard(): ExperimentalContextCard {
   );
 }
 
+type ContextCardRow = ReturnType<PluginContextCardRowSlot["useRow"]>;
+
+const rowHosts = new WeakMap<
+  PluginContextCardRowSlot,
+  { Row: ComponentType }
+>();
+
+function rowHost(slot: PluginContextCardRowSlot) {
+  const existing = rowHosts.get(slot);
+  if (existing !== undefined) return existing;
+  function RowHost() {
+    const row = slot.useRow();
+    return <ForkContextCardRowView slot={slot} row={row} />;
+  }
+  const host = { Row: RowHost };
+  rowHosts.set(slot, host);
+  return host;
+}
+
 function ForkContextCardRow({ slot }: { slot: PluginContextCardRowSlot }) {
-  const row = slot.useRow();
+  const host = rowHost(slot);
+  return <host.Row />;
+}
+
+function ForkContextCardRowView({
+  slot,
+  row,
+}: {
+  slot: PluginContextCardRowSlot;
+  row: ContextCardRow;
+}) {
   const [busy, setBusy] = useState<string | null>(null);
   if (row === null) return null;
   return (

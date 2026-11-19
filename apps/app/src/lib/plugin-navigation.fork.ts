@@ -1,4 +1,10 @@
-import { useCallback, useContext, useMemo, type RefObject } from "react";
+import {
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type RefObject,
+} from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useStore } from "jotai";
 import type {
@@ -81,10 +87,10 @@ export function useForkNavigate(pluginId: string): ForkBbNavigate {
   );
 }
 
-export function forkLatestNavigate(
+export function useForkLatestNavigate(
   latest: RefObject<BbNavigate>,
 ): ForkBbNavigate {
-  return {
+  const [stable] = useState<ForkBbNavigate>(() => ({
     experimental_toAppPath: (...args) =>
       latest.current.experimental_toAppPath(...args),
     experimental_renameTab: (...args) =>
@@ -95,5 +101,6 @@ export function forkLatestNavigate(
       latest.current.experimental_workbench(...args),
     experimental_closeFixedTab: (...args) =>
       latest.current.experimental_closeFixedTab(...args),
-  };
+  }));
+  return stable;
 }

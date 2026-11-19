@@ -1,6 +1,7 @@
 import {
   memo,
   useCallback,
+  type ComponentType,
   useLayoutEffect,
   useMemo,
   useState,
@@ -26,26 +27,62 @@ function slotKey(slot: PluginThreadHeaderSlot): string {
   return `${slot.pluginId}/${slot.id}/${slot.generation}`;
 }
 
+interface DecorationProbeProps {
+  threadId: string;
+  report: ReportDecoration;
+}
+
+const decorationHosts = new WeakMap<
+  PluginThreadHeaderSlot,
+  { Probe: ComponentType<DecorationProbeProps> }
+>();
+
+function decorationHost(slot: PluginThreadHeaderSlot) {
+  const existing = decorationHosts.get(slot);
+  if (existing !== undefined) return existing;
+  function DecorationHost({ threadId, report }: DecorationProbeProps) {
+    const decoration = slot.useDecoration({ threadId });
+    return (
+      <DecorationReport
+        slotKey={slotKey(slot)}
+        threadId={threadId}
+        report={report}
+        decoration={decoration ?? null}
+      />
+    );
+  }
+  const host = { Probe: DecorationHost };
+  decorationHosts.set(slot, host);
+  return host;
+}
+
 const ForkThreadHeaderProbe = memo(function ForkThreadHeaderProbe({
   slot,
   threadId,
   report,
-}: {
-  slot: PluginThreadHeaderSlot;
-  threadId: string;
-  report: ReportDecoration;
+}: DecorationProbeProps & { slot: PluginThreadHeaderSlot }) {
+  const host = decorationHost(slot);
+  return <host.Probe threadId={threadId} report={report} />;
+});
+
+function DecorationReport({
+  slotKey: key,
+  threadId,
+  report,
+  decoration,
+}: DecorationProbeProps & {
+  slotKey: string;
+  decoration: ExperimentalThreadHeaderDecoration | null;
 }) {
-  const decoration = slot.useDecoration({ threadId });
-  const key = slotKey(slot);
   useLayoutEffect(() => {
-    report(key, threadId, decoration ?? null);
+    report(key, threadId, decoration);
   }, [report, key, threadId, decoration]);
   useLayoutEffect(
     () => () => report(key, threadId, null),
     [report, key, threadId],
   );
   return null;
-});
+}
 
 export interface ForkThreadHeader {
   title: string;
