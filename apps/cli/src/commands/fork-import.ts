@@ -36,7 +36,12 @@ function when(value: unknown): string {
 
 function printStatus(status: Record<string, unknown>): void {
   if (status.imported !== true) {
-    console.log("Nothing was imported into this server.");
+    const failure = status.failure as { message?: unknown } | undefined;
+    console.log(
+      typeof failure?.message === "string"
+        ? failure.message
+        : "Nothing was imported into this server.",
+    );
     return;
   }
   console.log(`Imported from  ${String(status.sourceDataDir)}`);
