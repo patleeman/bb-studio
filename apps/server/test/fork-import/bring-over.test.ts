@@ -35,10 +35,6 @@ import {
   listPlugins,
 } from "../../src/services/fork-import/bring-over/plugins.js";
 import { listSettings } from "../../src/services/fork-import/bring-over/settings.js";
-import {
-  bringOverStudioData,
-  studioDataState,
-} from "../../src/services/fork-import/bring-over/studio-data.js";
 import { snapshotChildSource } from "../../src/services/fork-import/bring-over/snapshot.js";
 import {
   openSnapshot,
@@ -1231,243 +1227,6 @@ describe("bring things over from bb", () => {
   });
 });
 
-describe("BB Studio data from bb", () => {
-  const STUDIO_SCHEMA = `
-    CREATE TABLE bots (id TEXT PRIMARY KEY, name TEXT, state TEXT, heartbeat_was_on INTEGER, thread_id TEXT, memory_page_id TEXT);
-    CREATE TABLE pages (id TEXT PRIMARY KEY, title TEXT);
-    CREATE TABLE bot_runners (id TEXT PRIMARY KEY, state TEXT, thread_id TEXT);
-    CREATE TABLE bot_automations (id TEXT PRIMARY KEY, state TEXT);
-    CREATE TABLE bot_cache_settings (bot_id TEXT PRIMARY KEY, enabled INTEGER);
-    CREATE TABLE memory_records (id TEXT PRIMARY KEY, text TEXT);
-  `;
-
-  async function studioFixture() {
-    const f = await fixture();
-    const bbStudio = join(f.source, "plugins", "studio");
-    await mkdir(join(bbStudio, "artifacts"), { recursive: true });
-    await mkdir(join(bbStudio, "secrets"), { recursive: true });
-    await writeFile(join(bbStudio, "artifacts", "chart.png"), "png");
-    await writeFile(join(bbStudio, "secrets", "key"), "bb-secret");
-    const bb = new Database(join(bbStudio, "data.db"));
-    bb.exec(STUDIO_SCHEMA);
-    bb.prepare(
-      "INSERT INTO bots VALUES ('bot_bb', 'Ada', 'active', 1, ?, 'pg_core_bb')",
-    ).run(f.ids.t1);
-    bb.prepare("INSERT INTO bot_runners VALUES ('run_1', 'active', ?)").run(
-      f.ids.t2,
-    );
-    bb.exec(
-      "INSERT INTO pages VALUES ('pg_core_bb', 'Ada core'), ('pg_notes', 'Notes'); INSERT INTO bot_automations VALUES ('auto_1', 'active'); INSERT INTO bot_cache_settings VALUES ('bot_bb', 1); INSERT INTO memory_records VALUES ('mem_1', 'likes tea')",
-    );
-    bb.close();
-    const sourceDb = new Database(join(f.source, "bb.db"));
-    insertRow(sourceDb, "plugin_kv", {
-      plugin_id: "studio",
-      key: "theme",
-      value: '"forest"',
-      updated_at: 1,
-    });
-    insertRow(sourceDb, "plugin_settings", {
-      plugin_id: "studio",
-      key: "loopsEnabled",
-      value: "true",
-      updated_at: 1,
-    });
-    sourceDb.close();
-    const ours = join(f.target, "plugins", "studio");
-    await mkdir(join(ours, "secrets"), { recursive: true });
-    await writeFile(join(ours, "secrets", "key"), "studio-secret");
-    const fresh = new Database(join(ours, "data.db"));
-    fresh.exec(STUDIO_SCHEMA);
-    fresh.exec(
-      "INSERT INTO bots VALUES ('bot_new', 'Assistant', 'active', 0, NULL, 'pg_core_new'); INSERT INTO pages VALUES ('pg_core_new', 'Assistant core')",
-    );
-    fresh.close();
-    insertRow(f.db, "plugin_kv", {
-      plugin_id: "studio",
-      key: "theme",
-      value: '"default"',
-      updated_at: 1,
-    });
-    const snapshot = await takeSourceSnapshot({
-      dataDir: f.target,
-      sourceDataDir: f.source,
-      now: 8000,
-    });
-    const calls: string[] = [];
-    let open = true;
-    const controller = {
-      setEnabled: async (id: string, enabled: boolean) => {
-        calls.push(`${id}:${String(enabled)}`);
-        open = enabled;
-      },
-      databaseOpen: () => open,
-    };
-    return { ...f, snapshot, ours, calls, controller, bbStudio };
-  }
-
-  const studioRows = (path: string, sql: string) => {
-    const db = new Database(path, { readonly: true });
-    try {
-      return db.prepare(sql).all();
-    } finally {
-      db.close();
-    }
-  };
-
-  it("is offered only while BB Studio has no Bots, pages or tasks of its own", async () => {
-    const f = await studioFixture();
-    expect(await studioDataState(f.target, f.source)).toMatchObject({
-      inBb: true,
-      offered: true,
-      reason: null,
-      bots: 1,
-      pages: 2,
-    });
-    const ours = new Database(join(f.ours, "data.db"));
-    ours.exec("INSERT INTO pages VALUES ('pg_mine', 'Mine')");
-    ours.close();
-    expect(await studioDataState(f.target, f.source)).toMatchObject({
-      offered: false,
-      reason: "BB Studio already has Bots, pages or tasks of its own",
-    });
-    await expect(
-      bringOverStudioData({
-        dataDir: f.target,
-        snapshot: f.snapshot,
-        target: f.db,
-        ourHostId: "host_here",
-        controller: f.controller,
-        now: 9000,
-      }),
-    ).rejects.toThrow(/of its own/u);
-    expect(f.calls).toEqual([]);
-  });
-
-  it("brings bb's Studio data over whole, with its Bots' threads, stopped, and keeps BB Studio's secrets", async () => {
-    const f = await studioFixture();
-
-    const result = await bringOverStudioData({
-      dataDir: f.target,
-      snapshot: f.snapshot,
-      target: f.db,
-      ourHostId: "host_here",
-      controller: f.controller,
-      now: 9000,
-    });
-
-    expect(result).toEqual({ threads: 2, threadsHere: 0, bots: 1 });
-    expect(f.calls).toEqual(["studio:false", "studio:true"]);
-    const db = join(f.ours, "data.db");
-    expect(
-      studioRows(db, "SELECT id, state, heartbeat_was_on FROM bots"),
-    ).toEqual([{ id: "bot_bb", state: "stopped", heartbeat_was_on: 0 }]);
-    expect(studioRows(db, "SELECT state FROM bot_runners")).toEqual([
-      { state: "paused" },
-    ]);
-    expect(studioRows(db, "SELECT state FROM bot_automations")).toEqual([
-      { state: "paused" },
-    ]);
-    expect(studioRows(db, "SELECT enabled FROM bot_cache_settings")).toEqual([
-      { enabled: 0 },
-    ]);
-    expect(readFileSync(join(f.ours, "artifacts", "chart.png"), "utf8")).toBe(
-      "png",
-    );
-    expect(readFileSync(join(f.ours, "secrets", "key"), "utf8")).toBe(
-      "studio-secret",
-    );
-    expect(
-      JSON.parse(readFileSync(join(f.ours, "onboarding.json"), "utf8")),
-    ).toMatchObject({ state: "done" });
-    for (const id of [f.ids.t1, f.ids.t2]) {
-      expect(
-        count(f.db, "SELECT COUNT(*) AS n FROM threads WHERE id = ?", id),
-      ).toBe(1);
-    }
-    expect(
-      f.db
-        .prepare("SELECT key, value FROM plugin_kv WHERE plugin_id = 'studio'")
-        .all(),
-    ).toEqual([{ key: "theme", value: '"forest"' }]);
-    expect(
-      f.db
-        .prepare(
-          "SELECT value FROM plugin_settings WHERE plugin_id = 'studio' AND key = 'loopsEnabled'",
-        )
-        .get(),
-    ).toEqual({ value: "false" });
-    const before = readdirSync(join(f.target, "fork-bring-over")).find((name) =>
-      name.startsWith("studio-"),
-    )!;
-    expect(
-      studioRows(
-        join(f.target, "fork-bring-over", before, "before", "data.db"),
-        "SELECT id FROM bots",
-      ),
-    ).toEqual([{ id: "bot_new" }]);
-    expect(await studioDataState(f.target, f.source)).toMatchObject({
-      offered: false,
-    });
-  });
-
-  it("changes nothing when BB Studio's data does not close, and turns Studio back on", async () => {
-    const f = await studioFixture();
-    const stuck = { ...f.controller, databaseOpen: () => true };
-
-    await expect(
-      bringOverStudioData({
-        dataDir: f.target,
-        snapshot: f.snapshot,
-        target: f.db,
-        ourHostId: "host_here",
-        controller: stuck,
-        now: 9000,
-      }),
-    ).rejects.toThrow(/did not close in time/u);
-
-    expect(f.calls).toEqual(["studio:false", "studio:true"]);
-    expect(studioRows(join(f.ours, "data.db"), "SELECT id FROM bots")).toEqual([
-      { id: "bot_new" },
-    ]);
-    expect(existsSync(join(f.ours, "artifacts"))).toBe(false);
-    expect(
-      f.db
-        .prepare("SELECT value FROM plugin_kv WHERE plugin_id = 'studio'")
-        .all(),
-    ).toEqual([{ value: '"default"' }]);
-    expect(
-      readdirSync(join(f.target, "fork-bring-over")).filter((name) =>
-        name.startsWith("studio-"),
-      ),
-    ).toEqual([]);
-  }, 20_000);
-
-  it("changes nothing in Studio when a Bot's thread can't come over", async () => {
-    const f = await studioFixture();
-    f.db.exec(
-      `CREATE TRIGGER fail_bot_thread BEFORE INSERT ON events WHEN NEW.thread_id = '${f.ids.t1}' BEGIN SELECT RAISE(ABORT, 'boom'); END;`,
-    );
-
-    await expect(
-      bringOverStudioData({
-        dataDir: f.target,
-        snapshot: f.snapshot,
-        target: f.db,
-        ourHostId: "host_here",
-        controller: f.controller,
-        now: 9000,
-      }),
-    ).rejects.toThrow(/could not be brought over/u);
-
-    expect(f.calls).toEqual([]);
-    expect(studioRows(join(f.ours, "data.db"), "SELECT id FROM bots")).toEqual([
-      { id: "bot_new" },
-    ]);
-    expect(existsSync(join(f.ours, "artifacts"))).toBe(false);
-  });
-});
-
 describe("bring-over API and review fixes", () => {
   const TOKEN = "t".repeat(40);
   afterEach(() => {
@@ -1570,13 +1329,13 @@ describe("bring-over API and review fixes", () => {
     ).toBe(403);
     expect(
       (await api.request("/fork/bring-over/studio-data", post({}))).status,
-    ).toBe(403);
+    ).toBe(404);
     expect(count(f.db, "SELECT COUNT(*) AS n FROM threads")).toBe(0);
     expect(
       lines.filter(
         (line) => (line as [unknown, string])[1] === "Bring-over request",
       ),
-    ).toHaveLength(6);
+    ).toHaveLength(5);
     expect((lines[0] as [{ allowed: boolean }])[0].allowed).toBe(false);
 
     expect(
