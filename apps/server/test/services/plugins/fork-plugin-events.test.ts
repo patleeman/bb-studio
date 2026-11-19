@@ -1,4 +1,3 @@
-import { getThread } from "@bb/db";
 import { threadScope, turnScope } from "@bb/domain";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -46,12 +45,6 @@ function seedIdleThread(harness: TestAppHarness) {
   return { thread, environment };
 }
 
-function applied(harness: TestAppHarness, threadId: string) {
-  const thread = getThread(harness.db, threadId);
-  if (thread === null) throw new Error("thread missing");
-  return { applied: true as const, thread };
-}
-
 afterEach(() => {
   registerForkPluginEvents({
     emit: () => {},
@@ -77,9 +70,9 @@ describe("fork plugin events", () => {
       });
 
       announceTurnInterrupted(
-        { threadId: thread.id, event: { type: "stop.settled" } },
-        applied(harness, thread.id),
-        "stopping",
+        { status: "stopping" },
+        { id: thread.id, status: "idle" },
+        false,
       );
 
       expect(emitted).toEqual([
@@ -97,19 +90,19 @@ describe("fork plugin events", () => {
       const { thread } = seedIdleThread(harness);
 
       announceTurnInterrupted(
-        { threadId: thread.id, event: { type: "run.failed" } },
-        applied(harness, thread.id),
-        "active",
+        { status: "active" },
+        { id: thread.id, status: "error" },
+        false,
       );
       announceTurnInterrupted(
-        { threadId: thread.id, event: { type: "run.succeeded" } },
-        applied(harness, thread.id),
-        "active",
+        { status: "active" },
+        { id: thread.id, status: "idle" },
+        true,
       );
       announceTurnInterrupted(
-        { threadId: thread.id, event: { type: "stop.settled" } },
-        applied(harness, thread.id),
-        "idle",
+        { status: "idle" },
+        { id: thread.id, status: "idle" },
+        false,
       );
 
       expect(emitted).toEqual([]);

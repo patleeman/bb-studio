@@ -298,7 +298,7 @@ export function runThreadLifecycleInTransaction(
     refusal: null,
     statusChanged: written.statusChanged,
     stopRoute: transition.stopRoute,
-    thread: forkAfterLifecycle(deps.db, input, thread, written.thread, transition.effects),
+    thread: forkAfterLifecycle(deps.db, thread, written.thread, transition.effects),
     threadId,
   };
 }

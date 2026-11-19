@@ -222,10 +222,10 @@ reply of exactly `[PASS]`).
   its `src/kit/relayed.ts`.
 
 **Core callers.** `services/threads/turn-classifiers.fork.ts` is the registry;
-`services/threads/quiet-turn.fork.ts` asks it. `lifecycle-outcome.ts` calls
-`forkBeforeLifecycle`/`forkAfterLifecycle` (`lifecycle-outcome.fork.ts`),
-which keep `latestAttentionAt` after a quiet `run.succeeded`;
-`internal/events.ts` adds one condition to the parent notice, and
+`services/threads/quiet-turn.fork.ts` asks it. `lifecycle/run.ts` calls
+`forkAfterLifecycle` (`lifecycle-outcome.fork.ts`) for every lifecycle input,
+which keeps `latestAttentionAt` after a quiet completed turn;
+`turn-end-follow-ups.ts` adds one condition to the parent notice, and
 `plugin-service.ts` spreads `forkIdleFields` into the event.
 push-notifications' `sender.ts` returns early on the flag. On the client,
 `lib/fork-reply-classifiers.ts` reads the slot for `ThreadTimelineRows`;
@@ -415,8 +415,8 @@ thread after a server start only carries changes from the last ten seconds.
 
 **Core callers.** `services/plugins/fork-plugin-events.ts` builds and emits
 all of them through the plugin service's own `emitThreadEvent`.
-`lifecycle-outcome.ts` calls `announceTurnInterrupted` through
-`forkAfterLifecycle`, after `announceTurnFailed`; `ws/daemon-protocol.ts` emits the connect;
+`lifecycle/run.ts` calls `announceTurnInterrupted` through
+`forkAfterLifecycle`, inside the lifecycle transaction; `ws/daemon-protocol.ts` emits the connect;
 `internal/session-owner-side-effects.ts` emits the disconnect.
 
 **Audit before stabilizing.**
