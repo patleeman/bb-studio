@@ -720,6 +720,11 @@
       "seam": "thread-notices",
       "intent": "sendClaimedQueuedMessageForThread sends a queued row as the message it was (sendQueuedMessagePayload: its sender, model, permission mode, reasoning level and service tier) when sendsAsQueuedMessage(systemNotice) (automation-notice.fork.ts, imported at the top of the file): no notice, or an automated input's. Only core's own notices go as { input, mode }, as upstream.",
       "budget": 3
+    },
+    "apps/host-daemon/src/command-handlers/file-read.ts": {
+      "seam": "host-read-root",
+      "intent": "readFileForTransport takes stat and fileContents from forkReadWithinRoot(readablePath, args, limit) (file-read.fork.ts, imported at the top of the file) instead of fs.stat and fs.readFile on the path. It opens the checked path with O_NOFOLLOW, and with a root it confirms the open handle is the same file (device and inode) at the same real path inside the root, then reads at most the size limit from the handle. A folder or file swapped for a symlink between the root check and the read is refused, and a file that grows during the read is not read past the limit.",
+      "budget": 7
     }
   }
 }
