@@ -89,6 +89,13 @@ if (flag("--fetch")) {
   const remote = ONTO.split("/")[0];
   note(`fetch ${remote}`);
   git(root, "fetch", "--no-tags", remote);
+  git(
+    root,
+    "fetch",
+    "--no-tags",
+    remote,
+    "+refs/tags/desktop-v*:refs/tags/desktop-v*",
+  );
 }
 
 const ontoRef = git(root, "rev-parse", "--verify", ONTO);
