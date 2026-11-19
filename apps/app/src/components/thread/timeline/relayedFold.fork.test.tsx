@@ -345,13 +345,34 @@ describe("two relayed lines in one turn", () => {
     expect(rowText(container, "two_second")).toContain("Message from");
   });
 
-  it("folds nothing when the turn ends in a real reply", () => {
+  it("checks only the line the quiet reply answered when the turn ends in a real reply", () => {
     registerStudioLike();
     const rows = steered();
     rows[4] = conversationRow({ id: "two_reply_b", role: "assistant", text: "The kettle is fine.", sourceSeqStart: 9004, sourceSeqEnd: 9004, threadId: "thr_main", turnId: "turn_two" });
     const fold = foldRelayedRows(buildTimelineViewRows(rows), null);
-    expect(fold.rows.map((row) => row.id)).toContain("two_reply_b");
-    expect(fold.rows.map((row) => row.id)).not.toContain("two_reply_a");
+    expect(fold.rows.map((row) => row.id)).toEqual(["two_first", "two_second", "two_reply_b"]);
+    expect([...fold.folded]).toEqual(["two_first"]);
+  });
+
+  it("gives no check to a line whose turn ends in a real reply after a [PASS]", () => {
+    registerStudioLike();
+    const at = (offset: number) => ({ sourceSeqStart: 9100 + offset, sourceSeqEnd: 9100 + offset, threadId: "thr_main", turnId: "turn_one" });
+    const rows = [
+      conversationRow({ id: "one_line", role: "user", initiator: "user", text: `${WATCHER}kettle-ok-11`, ...at(0) }),
+      conversationRow({ id: "one_pass", role: "assistant", text: "[PASS]", ...at(1) }),
+      conversationRow({ id: "one_real", role: "assistant", text: "The kettle is off.", ...at(2) }),
+    ];
+    const fold = foldRelayedRows(buildTimelineViewRows(rows), null);
+    expect(fold.folded.size).toBe(0);
+    expect(fold.rows.map((row) => row.id)).toEqual(["one_line", "one_real"]);
+  });
+
+  it("waits for a streaming reply before checking the last line", () => {
+    registerStudioLike();
+    const rows = steered();
+    rows.push(conversationRow({ id: "two_streaming", role: "assistant", text: "[PA", sourceSeqStart: 9005, sourceSeqEnd: 9005, threadId: "thr_main", turnId: "turn_two" }));
+    const fold = foldRelayedRows(buildTimelineViewRows(rows), "two_streaming");
+    expect([...fold.folded]).toEqual(["two_first"]);
   });
 });
 
