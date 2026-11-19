@@ -8,6 +8,7 @@ import {
   removeCreated,
   throwIfCancelled,
 } from "./files.js";
+import { settleBroughtOverThread } from "./settle.js";
 
 type Sqlite = Database.Database;
 type Row = Record<string, unknown>;
@@ -492,6 +493,14 @@ export async function importThread(
             `INSERT OR IGNORE INTO main.events (${selectList(eventColumns)}) SELECT ${selectList(eventColumns)} FROM temp.${staging}`,
           );
         }
+        settleBroughtOverThread(target, {
+          threadId,
+          environmentId:
+            typeof prepared.environment_id === "string"
+              ? prepared.environment_id
+              : null,
+          now: Date.now(),
+        });
         finishRows();
       })();
     } finally {
