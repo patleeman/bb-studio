@@ -190,6 +190,7 @@ vi.mock("@/components/thread/timeline", async (importOriginal) => {
     await importOriginal<typeof import("@/components/thread/timeline")>();
   return {
     ...actual,
+    useThreadTimelineController: () => TIMELINE,
     ThreadTimelineSurface: () => <div data-testid="transcript" />,
   };
 });
@@ -432,7 +433,7 @@ async function renderThreadInLayout() {
         projectId={THREAD.projectId}
         resolveMentionLink={() => null}
         thread={THREAD}
-        timeline={TIMELINE}
+        timelineEnabled
         timelineHost={{
           environmentHostName: null,
           includePluginMessageActions: false,
@@ -1399,7 +1400,7 @@ describe("bb's pages as column cards over an app backdrop", () => {
       </PageShell>,
     );
     const scroller = one('[data-sidebar="inset"] [data-page-scroll-viewport]');
-    const column = scroller.firstElementChild as Element;
+    const column = scroller.firstElementChild?.firstElementChild as Element;
     expect(column.className).toContain("max-w-[760px]");
     expect(column.className).toContain("px-4");
     expect(forkCascade(column, "content", "::before")).toBeNull();
