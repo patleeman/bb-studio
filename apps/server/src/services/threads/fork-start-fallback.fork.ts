@@ -3,13 +3,13 @@ import {
   listStoredEventRows,
   threads,
   type DbConnection,
-  type DbNotifier,
   type DbTransaction,
 } from "@bb/db";
 import type { PromptInput, ResolvedThreadExecutionOptions } from "@bb/domain";
 import { eq, sql } from "drizzle-orm";
 import type {
   CommandResultReportForType,
+  CommandResultSettlementDeps,
   CommandResultSideEffectsResult,
   HostDaemonCommandExecutionRecord,
   HostDaemonCommandForType,
@@ -18,11 +18,13 @@ import {
   LIVE_DAEMON_COMMAND_TIMEOUT_MS,
   runLiveHostCommand,
 } from "../hosts/live-command.js";
-import { applyLoggedThreadLifecycleEventInTransaction } from "./lifecycle-outcome.js";
+import { finishThreadLifecycle } from "./lifecycle/finish.js";
+import { runThreadLifecycleInTransaction } from "./lifecycle/run.js";
 import { parseStoredEventPayload } from "./thread-data.js";
 import { appendClientTurnEventInTransaction } from "./thread-events.js";
 import {
   persistedThreadProvisionContextSchema,
+  clearThreadProvisionSchedule,
   readThreadStartupContextOfKind,
 } from "./thread-startup-store.js";
 
@@ -30,13 +32,9 @@ const SEED_MAX_CHARS = 60_000;
 const SEED_HEADER =
   "This thread continues an earlier conversation whose session could not be copied. Here it is, up to where this thread starts:";
 
-type LifecycleDeps = Parameters<
-  typeof applyLoggedThreadLifecycleEventInTransaction
->[0];
-
 export interface ForkStartFallbackArgs {
   command: HostDaemonCommandForType<"thread.start">;
-  deps: LifecycleDeps & { db: DbTransaction; hub: DbNotifier };
+  deps: CommandResultSettlementDeps;
   execution: HostDaemonCommandExecutionRecord;
   report: CommandResultReportForType<"thread.start">;
 }
@@ -193,6 +191,7 @@ export function restartForkFromTranscript(
           ),
         ));
   const contextExecution = forgetDispatchedFork(db, thread.id);
+  clearThreadProvisionSchedule(thread.id);
   deps.logger.warn(
     { threadId: thread.id, detail: args.report.errorMessage },
     "Fork session copy failed; starting from the transcript",
@@ -250,10 +249,25 @@ export function restartForkFromTranscript(
       target: { kind: "thread-start" },
     });
   }
-  const outcome = applyLoggedThreadLifecycleEventInTransaction(deps, {
-    event: { type: "run.succeeded" },
-    threadId: thread.id,
-  });
-  if (outcome.applied) deps.hub.notifyThread(thread.id, ["status-changed"]);
-  return { postCommitActions: [] };
+  const outcomes = [
+    runThreadLifecycleInTransaction(deps, thread.id, {
+      type: "request.answered",
+      requestId: command.requestId,
+      answer: { kind: "accepted", threadStart: null },
+    }),
+    runThreadLifecycleInTransaction(deps, thread.id, {
+      type: "provisioning.seeded",
+    }),
+  ];
+  return {
+    postCommitActions: [
+      {
+        run: async (runDeps) => {
+          for (const outcome of outcomes) {
+            await finishThreadLifecycle(runDeps, outcome);
+          }
+        },
+      },
+    ],
+  };
 }
