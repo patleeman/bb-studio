@@ -14,8 +14,8 @@ import { listProjects, listThreads } from "./listing.js";
 import { addPlugin, listPlugins, type PluginInstaller } from "./plugins.js";
 import { listSettings } from "./settings.js";
 import {
-  registerUiToken,
   UI_TOKEN_HEADER,
+  uiTokenConfigured,
   uiTokenMatches,
 } from "./ui-token.js";
 import {
@@ -90,19 +90,12 @@ export function registerBringOverRoutes(
     }
   }
 
-  app.post("/fork/bring-over/ui-token", async (context) => {
-    const body = (await context.req.json().catch(() => null)) as {
-      token?: unknown;
-    } | null;
-    if (!registerUiToken(body?.token)) {
-      throw new ApiError(
-        409,
-        "invalid_request",
-        "The app's token is already set",
-      );
-    }
-    return context.body(null, 204);
-  });
+  app.get("/fork/bring-over/gate", (context) =>
+    context.json({
+      fromApp: uiTokenConfigured(),
+      matches: uiTokenMatches(context.req.header(UI_TOKEN_HEADER)),
+    }),
+  );
 
   async function source(): Promise<string> {
     const found = await bringOverSource(dataDir(), process.env);
@@ -181,6 +174,7 @@ export function registerBringOverRoutes(
   });
 
   app.post("/fork/bring-over/snapshot", async (context) => {
+    requireUi(context, "snapshot");
     const sourceDataDir = await source();
     snapshotting ??= takeSourceSnapshot({
       dataDir: dataDir(),
@@ -246,9 +240,10 @@ export function registerBringOverRoutes(
     context.json({ job: currentBringOverJob(dataDir()) }),
   );
 
-  app.post("/fork/bring-over/jobs/current/cancel", (context) =>
-    context.json({ job: cancelBringOverJob(dataDir()) }),
-  );
+  app.post("/fork/bring-over/jobs/current/cancel", (context) => {
+    requireUi(context, "cancel");
+    return context.json({ job: cancelBringOverJob(dataDir()) });
+  });
 
   app.post("/fork/bring-over/plugins/:pluginId/add", async (context) => {
     requireUi(context, "plugins/add");
