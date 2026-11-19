@@ -946,7 +946,7 @@ export function createApp(
   registerSkillsRegistryRoutes(publicApi, deps);
   registerServerMoveRoutes(publicApi, deps, serverMove);
   registerServerSweepRoutes(publicApi, deps);
-  registerForkImportRoutes(publicApi, deps);
+  registerForkImportRoutes(publicApi, deps, pluginService);
   registerForkApprovalRoutes(publicApi);
   app.route("/api/v1", publicApi);
   app.use("/api/v1/*", () => {

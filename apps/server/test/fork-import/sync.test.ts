@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { turnScope } from "@bb/domain";
 import { afterEach, describe, expect, it } from "vitest";
-import { runForkFirstRunImport } from "../../src/services/fork-import/first-run.js";
+import { createMirroredInstall } from "./mirrored-install.js";
 import {
   closeForkImportDatabases,
   isMirroredReadOnly,
@@ -65,12 +65,10 @@ async function importedPair(): Promise<{
     await harness.db.$client.backup(join(sourceDir, "bb.db"));
   });
   await writeFile(join(sourceDir, "host-id"), "host_source\n");
-  await runForkFirstRunImport({
+  await createMirroredInstall({
     dataDir,
-    env: { BB_STUDIO_IMPORT_FROM: sourceDir },
-    logger,
+    sourceDataDir: sourceDir,
     now: 1000,
-    appVersion: "1.0.0",
   });
   const source = new Database(join(sourceDir, "bb.db"));
   const target = new Database(join(dataDir, "bb.db"));
