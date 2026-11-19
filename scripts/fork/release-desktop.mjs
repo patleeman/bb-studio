@@ -109,7 +109,7 @@ const NOTARY_KEY = notaryApiKey();
 const syncRoot =
   process.env.BB_STUDIO_SYNC_DIR ?? resolve(root, "..", ".bb-studio-fork-sync");
 const monorepo = resolve(
-  process.env.BB_STUDIO_MONOREPO ?? resolve(root, "..", "bb-studio-app"),
+  process.env.BB_STUDIO_MONOREPO ?? resolve(root, "..", "bb-studio-public"),
 );
 const COAUTHOR = "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>";
 const VERSION_FILE = "apps/desktop/studio-release.fork.json";
