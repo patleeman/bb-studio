@@ -24,6 +24,7 @@ import { useOpenThread } from "./workspace";
 import { botLanding, readLastBotThread, threadLocator } from "./threadListSwitch";
 import { BOT_PATH, botPath, forBot, rememberBot, useBotSelection } from "./selection";
 import { formatModelName } from "../../model-names";
+import { STARTER_BOT } from "../../starter-bot";
 
 export { BOT_PATH };
 /** The Bot page's path under the Studio panel. */
@@ -119,8 +120,8 @@ function useBotLanding(bare: boolean, view: BotView | undefined): boolean {
 /** shape null: the emoji avatar. */
 export type Profile = { name: string; shape: Exclude<RpcInput<"bot_set">["shape"], undefined>; color: string | null; role: string; emoji: string };
 
-/** The first Bot's name until it picks its own; a further Bot's. */
-export const FIRST_BOT_NAME = "Chief of Staff";
+/** The first Bot's name until it picks its own (the same as onboarding's); a further Bot's. */
+export const FIRST_BOT_NAME = STARTER_BOT.name;
 export const NEXT_BOT_NAME = "New Bot";
 
 /**

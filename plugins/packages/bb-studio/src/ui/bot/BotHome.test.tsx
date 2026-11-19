@@ -159,11 +159,11 @@ function Chat({ threadId }: { threadId: string }) { useThreadTabRequests(threadI
 
 test("with no Bot, the welcome's Create makes it with the setup and opens its chat", async () => {
   state.data = { bot_get: { bot: null, run: null } };
-  state.call.mockImplementation((async (method: string) => method === "bot_create" ? { bot: { ...dot, name: "Chief of Staff" }, run: null } : {}) as never);
+  state.call.mockImplementation((async (method: string) => method === "bot_create" ? { bot: { ...dot, name: "Assistant" }, run: null } : {}) as never);
   await show(<BotPanel />);
   expect(container.textContent).toContain("Meet your Bot");
   await act(async () => button("Create Bot").click());
-  expect(state.call).toHaveBeenCalledWith("bot_create", { name: "Chief of Staff", avatar: "🤖", shape: "blob", color: "#5b8def", setup: "Watch my PRs" });
+  expect(state.call).toHaveBeenCalledWith("bot_create", { name: "Assistant", avatar: "🤖", shape: "blob", color: "#5b8def", setup: "Watch my PRs" });
   expect(state.toThread).toHaveBeenCalledWith("thr_bot");
   state.call.mockImplementation(async () => ({}));
 });
