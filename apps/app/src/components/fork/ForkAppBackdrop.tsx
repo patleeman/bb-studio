@@ -1,4 +1,11 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type ComponentType,
+} from "react";
 import { createPortal } from "react-dom";
 import type {
   ExperimentalAppAppearance,
@@ -144,9 +151,7 @@ function appearanceKey(appearance: ForkAppearance): string {
   ]);
 }
 
-function appearanceProperties(
-  appearance: ForkAppearance,
-): Map<string, string> {
+function appearanceProperties(appearance: ForkAppearance): Map<string, string> {
   const properties = new Map(appearance.properties);
   if (appearance.cards !== null) {
     properties.set(FORK_CARDS_GAP_PROPERTY, `${appearance.cards.gap}px`);
@@ -211,16 +216,48 @@ function useBackdropAttribute(slot: PluginAppBackdropSlot, active: boolean) {
   }, [slot.pluginId, slot.id, active]);
 }
 
+type AppearanceSlot = PluginAppBackdropSlot & {
+  useAppearance: () => ExperimentalAppAppearance | null;
+};
+
+const appearanceHosts = new WeakMap<AppearanceSlot, { Probe: ComponentType }>();
+
+function appearanceHost(slot: AppearanceSlot) {
+  const existing = appearanceHosts.get(slot);
+  if (existing !== undefined) return existing;
+  function AppearanceHost() {
+    const raw = slot.useAppearance();
+    return (
+      <AppearanceProbe
+        slot={slot}
+        active={raw !== null && raw !== undefined}
+        appearance={appearanceKey(cleanAppearance(raw))}
+      />
+    );
+  }
+  const host = { Probe: AppearanceHost };
+  appearanceHosts.set(slot, host);
+  return host;
+}
+
+function AppearanceSlotProbe({ slot }: { slot: AppearanceSlot }) {
+  const host = appearanceHost(slot);
+  return <host.Probe />;
+}
+
+function hasUseAppearance(slot: PluginAppBackdropSlot): slot is AppearanceSlot {
+  return slot.useAppearance !== undefined;
+}
+
 const AppearanceProbe = memo(function AppearanceProbe({
   slot,
-  useAppearance,
+  active,
+  appearance: key,
 }: {
   slot: PluginAppBackdropSlot;
-  useAppearance: () => ExperimentalAppAppearance | null;
+  active: boolean;
+  appearance: string;
 }) {
-  const raw = useAppearance();
-  const active = raw !== null && raw !== undefined;
-  const key = appearanceKey(cleanAppearance(raw));
   const wasActive = useRef(false);
   useLayoutEffect(() => {
     if (active) clearLaunchAppearance();
@@ -319,10 +356,10 @@ export function ForkAppBackdropHost() {
       wrapRoot={false}
     >
       <BackdropLayer slot={slot} />
-      {slot.useAppearance === undefined ? (
-        <AlwaysActive slot={slot} />
+      {hasUseAppearance(slot) ? (
+        <AppearanceSlotProbe slot={slot} />
       ) : (
-        <AppearanceProbe slot={slot} useAppearance={slot.useAppearance} />
+        <AlwaysActive slot={slot} />
       )}
     </PluginSlotMount>
   );

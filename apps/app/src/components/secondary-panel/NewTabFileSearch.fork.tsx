@@ -5,6 +5,7 @@ import {
   useLayoutEffect,
   useMemo,
   useState,
+  type ComponentType,
   type ReactNode,
 } from "react";
 import type {
@@ -151,17 +152,42 @@ function useNoRecents(): readonly ExperimentalNewTabItem[] {
   return NO_RECENTS;
 }
 
-const RecentsCollector = memo(function RecentsCollector({
-  slot,
-  threadId,
-  report,
-}: {
+interface RecentsCollectorProps {
   slot: PluginNewTabItemsSlot;
   threadId: string | null;
   report: ReportRecents;
-}) {
+}
+
+const recentsHosts = new WeakMap<
+  PluginNewTabItemsSlot,
+  { Collector: ComponentType<RecentsCollectorProps> }
+>();
+
+function recentsHost(slot: PluginNewTabItemsSlot) {
+  const existing = recentsHosts.get(slot);
+  if (existing !== undefined) return existing;
   const useRecents = slot.useRecents ?? useNoRecents;
-  const items = useRecents({ threadId });
+  function RecentsHost(props: RecentsCollectorProps) {
+    const items = useRecents({ threadId: props.threadId });
+    return <RecentsReport {...props} items={items} />;
+  }
+  const host = { Collector: RecentsHost };
+  recentsHosts.set(slot, host);
+  return host;
+}
+
+const RecentsCollector = memo(function RecentsCollector(
+  props: RecentsCollectorProps,
+) {
+  const host = recentsHost(props.slot);
+  return <host.Collector {...props} />;
+});
+
+function RecentsReport({
+  slot,
+  report,
+  items,
+}: RecentsCollectorProps & { items: readonly ExperimentalNewTabItem[] }) {
   const key = slotKey(slot);
   const valid = useMemo(
     () => toForkNewTabItems(slot, items, "recent"),
@@ -172,7 +198,27 @@ const RecentsCollector = memo(function RecentsCollector({
   }, [key, report, valid]);
   useLayoutEffect(() => () => report(key, null), [key, report]);
   return null;
-});
+}
+
+async function searchSlot(
+  slot: PluginNewTabItemsSlot,
+  query: string,
+  threadId: string | null,
+  signal: AbortSignal,
+): Promise<readonly ForkNewTabItem[]> {
+  try {
+    const results = await slot.search?.(query, { signal, threadId });
+    return toForkNewTabItems(slot, results, "fork", NEW_TAB_SEARCH_GROUP_LIMIT);
+  } catch (error) {
+    if (!signal.aborted) {
+      console.warn(
+        `[plugin:${slot.pluginId}] new tab search "${slot.id}" failed`,
+        error,
+      );
+    }
+    return [];
+  }
+}
 
 function usePluginSearch(
   slots: readonly PluginNewTabItemsSlot[],
@@ -190,28 +236,9 @@ function usePluginSearch(
     const controller = new AbortController();
     const timer = setTimeout(() => {
       void Promise.all(
-        searchable.map(async (slot) => {
-          try {
-            const results = await slot.search?.(query, {
-              signal: controller.signal,
-              threadId,
-            });
-            return toForkNewTabItems(
-              slot,
-              results,
-              "fork",
-              NEW_TAB_SEARCH_GROUP_LIMIT,
-            );
-          } catch (error) {
-            if (!controller.signal.aborted) {
-              console.warn(
-                `[plugin:${slot.pluginId}] new tab search "${slot.id}" failed`,
-                error,
-              );
-            }
-            return [];
-          }
-        }),
+        searchable.map((slot) =>
+          searchSlot(slot, query, threadId, controller.signal),
+        ),
       ).then((groups) => {
         if (controller.signal.aborted) return;
         setSettled({ query, slots, items: groups.flat() });
