@@ -23,7 +23,17 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { turnScope } from "@bb/domain";
-import { createConnection, listProviderLifecycleEnvironments } from "@bb/db";
+import {
+  createConnection,
+  getAppSettings,
+  listOpenBackgroundTaskItemRowsForThread,
+  listOwnerStoppedBackgroundTaskRowsForHost,
+  listProviderLifecycleEnvironments,
+  listThreadIdsWithLatestHostDaemonRestartInterruption,
+  setAppSettings,
+} from "@bb/db";
+import { planRestartResumes } from "../../src/services/threads/restart-resume.js";
+import { rmSync } from "node:fs";
 import { createMigratedConnection } from "@bb/db/testing";
 import { afterEach, describe, expect, it } from "vitest";
 import {
@@ -457,7 +467,7 @@ describe("bring things over from bb", () => {
     expect(
       count(
         f.db,
-        "SELECT COUNT(*) AS n FROM events WHERE thread_id = ?",
+        "SELECT COUNT(*) AS n FROM events WHERE thread_id = ? AND type <> 'system/operation'",
         f.ids.t1,
       ),
     ).toBe(3);
@@ -1457,7 +1467,7 @@ describe("bring-over API and review fixes", () => {
     expect(
       count(
         f.db,
-        "SELECT COUNT(*) AS n FROM events WHERE thread_id = ?",
+        "SELECT COUNT(*) AS n FROM events WHERE thread_id = ? AND type <> 'system/operation'",
         f.ids.t1,
       ),
     ).toBe(3);
@@ -1685,7 +1695,7 @@ describe("bring-over API and review fixes", () => {
     expect(
       count(
         f.db,
-        "SELECT COUNT(*) AS n FROM events WHERE thread_id = ?",
+        "SELECT COUNT(*) AS n FROM events WHERE thread_id = ? AND type <> 'system/operation'",
         f.ids.t1,
       ),
     ).toBe(3);
@@ -1873,5 +1883,126 @@ describe("bring-over API and review fixes", () => {
       }).map((row) => row.id),
     ).toEqual(["env_mine"]);
     db.close();
+  });
+
+  it("never brings a thread over in a state that resumes it after a restart", async () => {
+    const f = await fixture();
+    const bb = new Database(join(f.source, "bb.db"));
+    const event = (sequence: number, row: Record<string, unknown>) =>
+      insertRow(bb, "events", {
+        id: `evt_n1_${String(sequence)}`,
+        thread_id: f.ids.t1,
+        environment_id: f.ids.env1,
+        scope_kind: "thread",
+        turn_id: null,
+        provider_thread_id: `provider-${f.ids.t1}`,
+        sequence,
+        item_id: null,
+        item_kind: null,
+        created_at: 10,
+        ...row,
+      });
+    const task = {
+      type: "backgroundTask",
+      id: "bg_dev",
+      taskType: "shell",
+      description: "npm run dev",
+      status: "pending",
+      taskStatus: "running",
+      skipTranscript: false,
+      foreground: false,
+    };
+    event(4, {
+      type: "item/started",
+      item_id: "bg_dev",
+      item_kind: "backgroundTask",
+      data: JSON.stringify({ item: task }),
+    });
+    event(5, {
+      type: "system/thread/interrupted",
+      data: JSON.stringify({ reason: "host-daemon-restarted" }),
+    });
+    bb.prepare("UPDATE threads SET status = 'error' WHERE id = ?").run(
+      f.ids.t1,
+    );
+    bb.close();
+    const bbConnection = createConnection(join(f.source, "bb.db"));
+    expect(
+      listThreadIdsWithLatestHostDaemonRestartInterruption(bbConnection, {
+        threadIds: [f.ids.t1],
+      }),
+    ).toEqual([f.ids.t1]);
+    expect(
+      listOpenBackgroundTaskItemRowsForThread(bbConnection, {
+        threadId: f.ids.t1,
+      }),
+    ).toHaveLength(1);
+    bbConnection.$client.close();
+    rmSync(f.snapshot.snapshotPath, { force: true });
+
+    await run(f, { picks: [{ kind: "thread", id: f.ids.t1 }] });
+
+    const here = createConnection(join(f.target, "bb.db"));
+    try {
+      expect(
+        listThreadIdsWithLatestHostDaemonRestartInterruption(here, {
+          threadIds: [f.ids.t1],
+        }),
+      ).toEqual([]);
+      expect(
+        listOpenBackgroundTaskItemRowsForThread(here, { threadId: f.ids.t1 }),
+      ).toEqual([]);
+      const hostId = (
+        f.db
+          .prepare(
+            "SELECT environments.host_id FROM threads JOIN environments ON environments.id = threads.environment_id WHERE threads.id = ?",
+          )
+          .get(f.ids.t1) as { host_id: string }
+      ).host_id;
+      expect(
+        listOwnerStoppedBackgroundTaskRowsForHost(here, {
+          hostId,
+          settledSinceMs: 0,
+        }).filter((row) => row.threadId === f.ids.t1),
+      ).toEqual([]);
+      setAppSettings(here, {
+        ...getAppSettings(here),
+        resumeThreadsAfterRestart: true,
+      });
+      const plan = planRestartResumes(
+        {
+          db: here,
+          logger,
+          pendingInteractions: {
+            hasTurnBoundPendingThreadInteraction: () => false,
+          },
+        } as unknown as Parameters<typeof planRestartResumes>[0],
+        { hostId, ownerStoppedSinceMs: 0 },
+      );
+      expect([...plan.keys()]).toEqual([]);
+      const last = f.db
+        .prepare(
+          "SELECT type, data FROM events WHERE thread_id = ? ORDER BY sequence DESC LIMIT 2",
+        )
+        .all(f.ids.t1) as { type: string; data: string }[];
+      expect(last.map((row) => row.type)).toEqual([
+        "system/operation",
+        "item/backgroundTask/completed",
+      ]);
+      expect(JSON.parse(last[0]!.data)).toMatchObject({
+        operation: "brought_over_from_bb",
+        status: "completed",
+      });
+      const settled = JSON.parse(last[1]!.data) as {
+        item: { taskStatus: string; status: string; ownerStopped?: true };
+      };
+      expect(settled.item).toMatchObject({
+        taskStatus: "stopped",
+        status: "interrupted",
+      });
+      expect(settled.item.ownerStopped).toBeUndefined();
+    } finally {
+      here.$client.close();
+    }
   });
 });
