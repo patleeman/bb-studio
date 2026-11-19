@@ -12,6 +12,7 @@ export interface StudioRelease {
 export interface StudioUpstream {
   version: string;
   commit: string;
+  ahead?: number | null;
 }
 
 export interface StudioUpdateTestInput {
@@ -24,6 +25,7 @@ export interface StudioBuildInfo {
   version: string;
   upstreamVersion: string;
   upstreamCommit: string;
+  upstreamAhead: number | null;
   updateFeed: StudioGithubFeed | { provider: "generic"; url: string };
   versionFeedBaseUrl: string;
   test: {
@@ -50,6 +52,7 @@ export function assertStudioVersion(version: unknown, label: string): string;
 export function parseStudioRelease(text: string): StudioRelease;
 export function readStudioRelease(path?: string): StudioRelease;
 export function readStudioUpstream(path?: string): StudioUpstream;
+export function formatStudioUpstream(upstream: StudioUpstream): string;
 export function readStudioUpdateTest(
   env: NodeJS.ProcessEnv,
 ): StudioUpdateTestInput | null;
