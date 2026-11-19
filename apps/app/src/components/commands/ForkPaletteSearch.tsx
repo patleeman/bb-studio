@@ -2,13 +2,13 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
-  useRef,
   useState,
   type ComponentProps,
   type Dispatch,
   type SetStateAction,
 } from "react";
 import { cn } from "@bb/shared-ui/lib/utils";
+import { useLatestRef } from "@/hooks/useLatestRef";
 import type { PluginPaletteSearchSlot } from "@/lib/fork-slots";
 import { usePluginSlots } from "@/lib/plugin-slots";
 import { resolveRouteHref } from "@/lib/route-paths";
@@ -354,10 +354,8 @@ export function usePluginPaletteHighlightReset<Option>({
     (count, group) => count + group.rows.length,
     0,
   );
-  const optionsRef = useRef(options);
-  optionsRef.current = options;
-  const optionKeyRef = useRef(optionKey);
-  optionKeyRef.current = optionKey;
+  const optionsRef = useLatestRef(options);
+  const optionKeyRef = useLatestRef(optionKey);
   useLayoutEffect(() => {
     if (leadingRowCount === 0) return;
     const displaced = optionsRef.current[leadingRowCount];
@@ -368,7 +366,14 @@ export function usePluginPaletteHighlightReset<Option>({
       setHighlightedIndex(0);
       return null;
     });
-  }, [leading, leadingRowCount, setHighlightedIndex, setHighlightedKey]);
+  }, [
+    leading,
+    leadingRowCount,
+    optionKeyRef,
+    optionsRef,
+    setHighlightedIndex,
+    setHighlightedKey,
+  ]);
 }
 
 export function selectPluginPaletteRow(
