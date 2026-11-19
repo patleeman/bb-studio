@@ -9,6 +9,7 @@ import { threadIdsOfProject } from "./listing.js";
 import { applySetting, type SettingId } from "./settings.js";
 import {
   BRING_OVER_DIR_NAME,
+  forgetSourceSnapshot,
   openSnapshot,
   type SourceSnapshot,
 } from "./source.js";
@@ -143,8 +144,9 @@ export function startBringOverJob(args: {
     failures: [],
   };
   const run = async () => {
-    const source = openSnapshot(args.snapshot);
+    let source: Sqlite | null = null;
     try {
+      source = openSnapshot(args.snapshot);
       for (const setting of args.request.settings) {
         if (control.signal.aborted) break;
         try {
@@ -198,7 +200,8 @@ export function startBringOverJob(args: {
       job.state = "failed";
       job.failures.push({ item: "job", detail: errorDetail(error) });
     } finally {
-      source.close();
+      source?.close();
+      await forgetSourceSnapshot(args.dataDir).catch(() => undefined);
       job.finishedAt = Date.now();
       running.delete(args.dataDir);
       last.set(args.dataDir, job);
@@ -216,6 +219,6 @@ export function startBringOverJob(args: {
   };
   const entry: RunningJob = { job, control, finished: Promise.resolve() };
   running.set(args.dataDir, entry);
-  entry.finished = run();
+  entry.finished = run().catch(() => undefined);
   return job;
 }
