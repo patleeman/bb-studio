@@ -15,11 +15,13 @@ import {
   listProjectThreads,
   readBb,
   readBringOver,
+  readGate,
   secretLine,
   startBringOver,
   uiToken,
   type BringOverPlugin,
   type BringOverProject,
+  type BringOverGate,
   type BringOverRequest,
   type BringOverState,
   type BringOverThread,
@@ -141,6 +143,7 @@ export function BringOverSection() {
   const [reading, setReading] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [tokenRead, setTokenRead] = useState(false);
+  const [gate, setGate] = useState<BringOverGate | null>(null);
   const [confirmingSecrets, setConfirmingSecrets] = useState(false);
   const [, setVersion] = useState(0);
   const picks = useRef<Picks>({ projects: new Set(), threads: new Set(), settings: new Map(), attachments: true });
@@ -150,7 +153,10 @@ export function BringOverSection() {
   useEffect(load, [load]);
   useEffect(() => {
     let current = true;
-    void uiToken().then((next) => { if (current) { setToken(next); setTokenRead(true); } });
+    void uiToken().then(async (next) => {
+      const answer = next === null ? null : await readGate(next);
+      if (current) { setToken(next); setGate(answer); setTokenRead(true); }
+    });
     return () => { current = false; };
   }, []);
   useEffect(() => {
@@ -171,15 +177,18 @@ export function BringOverSection() {
     return () => clearInterval(timer);
   }, [running, load]);
   if (!state?.available) return null;
+  const allowed = token !== null && gate?.matches === true;
+  const attached = token !== null && tokenRead && gate?.matches !== true;
   const read = async () => {
     setReading(true);
     setError(null);
-    try { setState(await readBb()); } catch (cause) { setError(errorMessage(cause)); } finally { setReading(false); }
+    if (!allowed) return;
+    try { setState(await readBb(token)); } catch (cause) { setError(errorMessage(cause)); } finally { setReading(false); }
   };
   const start = async () => {
     setError(null);
     setConfirmingSecrets(false);
-    if (token === null) return;
+    if (!allowed) return;
     try {
       const job = await startBringOver(requestFrom(picks.current), token);
       picks.current = { projects: new Set(), threads: new Set(), settings: new Map(), attachments: picks.current.attachments };
@@ -193,16 +202,18 @@ export function BringOverSection() {
     <div ref={ref} id={BRING_OVER_SECTION_ANCHOR} data-testid="bring-over" className="scroll-mt-4">
       <Card>
         <Row label="From" description={state.readAt ? `${state.sourceDataDir ?? ""} · read ${relativeTime(state.readAt)}` : state.sourceDataDir} testId="bring-over-source">
-          <Button size="sm" variant="outline" disabled={reading || running} onClick={() => void read()}>{reading ? "Reading…" : state.readAt ? "Read again" : "Read bb"}</Button>
+          <Button size="sm" variant="outline" disabled={reading || running || !allowed} onClick={() => void read()}>{reading ? "Reading…" : state.readAt ? "Read again" : "Read bb"}</Button>
         </Row>
         {tokenRead && token === null ? <p data-testid="bring-over-app-only" className="px-3 py-1 text-xs text-muted-foreground">Bringing things over works only in the BB Studio app on this Mac.</p> : null}
+        {attached ? <p data-testid="bring-over-attached" className="px-3 py-1 text-xs text-muted-foreground">This window is connected to a BB Studio server it did not start, so it can't bring things over. Quit BB Studio, stop that server, and open BB Studio again.</p> : null}
         {error ? <p className="px-3 py-1 text-xs text-destructive">{error}</p> : null}
         {state.job ? (
           <div data-testid="bring-over-job" className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
             <span className="min-w-0 flex-1">{jobLine(state.job)}</span>
-            {running ? <Button size="sm" variant="outline" onClick={() => void cancelBringOver().then(load, () => {})}>Cancel</Button> : null}
+            {running && allowed ? <Button size="sm" variant="outline" onClick={() => void cancelBringOver(token).then(load, () => {})}>Cancel</Button> : null}
           </div>
         ) : null}
+        {state.job && !running && !state.projects ? <p data-testid="bring-over-read-again" className="px-3 py-1 text-xs text-muted-foreground">The list of what bb has is cleared after each bring-over. Read bb again to see what's left and to add plugins.</p> : null}
         {state.job && !running && state.job.failures.length > 0 ? (
           <ul className="px-3 pb-2 text-xs text-destructive">{state.job.failures.slice(0, 10).map((failure) => <li key={failure.item}>{failure.item}: {failure.detail}</li>)}</ul>
         ) : null}
@@ -241,13 +252,13 @@ export function BringOverSection() {
             </div>
           ) : (
             <div className="flex justify-end py-2">
-              <Button disabled={nothingPicked || running || token === null} onClick={() => { if (pickedSecrets.length > 0) setConfirmingSecrets(true); else void start(); }} data-testid="bring-over-start">Bring over</Button>
+              <Button disabled={nothingPicked || running || !allowed} onClick={() => { if (pickedSecrets.length > 0) setConfirmingSecrets(true); else void start(); }} data-testid="bring-over-start">Bring over</Button>
             </div>
           )}
           <SubHeading>Plugins from bb</SubHeading>
           <Card>
             {(state.plugins ?? []).length === 0 ? <p className="px-3 py-2 text-sm text-muted-foreground">No plugins to add</p>
-              : (state.plugins ?? []).map((plugin) => <PluginRow key={plugin.id} plugin={plugin} token={token} onAdded={() => {}} />)}
+              : (state.plugins ?? []).map((plugin) => <PluginRow key={plugin.id} plugin={plugin} token={allowed ? token : null} onAdded={() => {}} />)}
           </Card>
         </>
       ) : null}

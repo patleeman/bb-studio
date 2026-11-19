@@ -60,11 +60,14 @@ describe("BringOverSection", () => {
   const calls: { url: string; method: string; body: unknown; token: string | null }[] = [];
   const $ = (selector: string) => host.querySelector<HTMLElement>(selector);
   const button = (text: string) => [...host.querySelectorAll("button")].find((each) => each.textContent === text);
+  let fromApp = true;
   const serve = (routes: Record<string, (body: unknown) => Response>) => {
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
       const method = init?.method ?? "GET";
       const body = init?.body ? JSON.parse(String(init.body)) as unknown : undefined;
-      calls.push({ url, method, body, token: new Headers(init?.headers).get("x-bb-studio-ui-token") });
+      const token = new Headers(init?.headers).get("x-bb-studio-ui-token");
+      calls.push({ url, method, body, token });
+      if (`${method} ${url}` === "GET /api/v1/fork/bring-over/gate") return json({ fromApp, matches: fromApp && token === "token-from-the-app" });
       const route = routes[`${method} ${url}`];
       return route ? route(body) : new Response("Not Found", { status: 404 });
     }));
@@ -73,6 +76,7 @@ describe("BringOverSection", () => {
   const render = async () => {
     await act(async () => { root.render(<BringOverSection />); });
     await act(async () => { await Promise.resolve(); });
+    await act(async () => { await Promise.resolve(); });
   };
 
   beforeEach(() => {
@@ -80,6 +84,7 @@ describe("BringOverSection", () => {
     resetUiTokenForTests();
     vi.stubGlobal("bbDesktop", { experimental_bringOverToken: async () => "token-from-the-app" });
     calls.length = 0;
+    fromApp = true;
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
@@ -142,6 +147,39 @@ describe("BringOverSection", () => {
     expect($('[data-testid="bring-over-app-only"]')?.textContent).toBe("Bringing things over works only in the BB Studio app on this Mac.");
     expect(button("Bring over")?.disabled).toBe(true);
     expect(button("Add…")).toBeUndefined();
+  });
+
+  it("says why it can't bring things over when the window is attached to a server the app did not start", async () => {
+    fromApp = false;
+    serve({ "GET /api/v1/fork/bring-over": () => json(listing) });
+    await render();
+    expect($('[data-testid="bring-over-attached"]')?.textContent).toContain("connected to a BB Studio server it did not start");
+    expect($('[data-testid="bring-over-app-only"]')).toBeNull();
+    expect(button("Read again")?.disabled).toBe(true);
+    expect(button("Bring over")?.disabled).toBe(true);
+    expect(button("Add…")).toBeUndefined();
+  });
+
+  it("sends the app's token to read bb and to cancel", async () => {
+    let current: BringOverJob = job;
+    serve({
+      "GET /api/v1/fork/bring-over": () => json({ ...listing, job: current }),
+      "POST /api/v1/fork/bring-over/jobs/current/cancel": () => { current = { ...job, state: "cancelled" }; return json({ job: current }); },
+      "POST /api/v1/fork/bring-over/snapshot": () => json(listing),
+    });
+    await render();
+    await act(async () => { button("Cancel")!.click(); });
+    await act(async () => { await Promise.resolve(); });
+    expect(calls.find((call) => call.url.endsWith("/cancel"))?.token).toBe("token-from-the-app");
+    await act(async () => { button("Read again")!.click(); });
+    expect(calls.find((call) => call.url.endsWith("/snapshot"))?.token).toBe("token-from-the-app");
+  });
+
+  it("after a bring-over, says the list is gone and how to get it back", async () => {
+    serve({ "GET /api/v1/fork/bring-over": () => json({ available: true, sourceDataDir: "/Users/x/.bb", readAt: null, job: { ...job, state: "done", threadsDone: 40 } }) });
+    await render();
+    expect($('[data-testid="bring-over-read-again"]')?.textContent).toBe("The list of what bb has is cleared after each bring-over. Read bb again to see what's left and to add plugins.");
+    expect(button("Read bb")?.disabled).toBe(false);
   });
 
   it("adds a plugin, and says when its source is gone or adding fails", async () => {

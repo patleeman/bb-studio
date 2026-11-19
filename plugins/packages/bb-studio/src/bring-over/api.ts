@@ -48,7 +48,6 @@ async function send<T>(path: string, init: RequestInit | undefined, load: typeof
   return (await response.json()) as T;
 }
 
-const post = (body?: unknown): RequestInit => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body ?? {}) });
 const gatedPost = (token: string, body?: unknown): RequestInit => ({ method: "POST", headers: { "content-type": "application/json", "x-bb-studio-ui-token": token }, body: JSON.stringify(body ?? {}) });
 
 type DesktopBridge = { bbDesktop?: { experimental_bringOverToken?: () => Promise<string | null> } };
@@ -89,11 +88,24 @@ export async function readBringOver(load: typeof fetch = fetch): Promise<BringOv
   }
 }
 
-export const readBb = (load: typeof fetch = fetch) => send<BringOverState>("/snapshot", post(), load);
+export const readBb = (token: string, load: typeof fetch = fetch) => send<BringOverState>("/snapshot", gatedPost(token), load);
 export const listProjectThreads = (projectId: string, load: typeof fetch = fetch) => send<BringOverThread[]>(`/projects/${encodeURIComponent(projectId)}/threads`, undefined, load);
 export const startBringOver = (request: BringOverRequest, token: string, load: typeof fetch = fetch) => send<BringOverJob>("/jobs", gatedPost(token, request), load);
 export const currentJob = (load: typeof fetch = fetch) => send<{ job: BringOverJob | null }>("/jobs/current", undefined, load);
-export const cancelBringOver = (load: typeof fetch = fetch) => send<{ job: BringOverJob | null }>("/jobs/current/cancel", post(), load);
+export const cancelBringOver = (token: string, load: typeof fetch = fetch) => send<{ job: BringOverJob | null }>("/jobs/current/cancel", gatedPost(token), load);
+
+export interface BringOverGate { fromApp: boolean; matches: boolean }
+/** Whether the server was started by this app and takes this window's token. Null when the server can't say (an older BB Studio). */
+export async function readGate(token: string, load: typeof fetch = fetch): Promise<BringOverGate | null> {
+  try {
+    const response = await load(`${BASE}/gate`, { headers: { "x-bb-studio-ui-token": token } });
+    if (!response.ok) return null;
+    const gate = (await response.json()) as BringOverGate;
+    return typeof gate?.matches === "boolean" && typeof gate.fromApp === "boolean" ? gate : null;
+  } catch {
+    return null;
+  }
+}
 
 export const addOldPlugin = (id: string, token: string, load: typeof fetch = fetch) => send<{ id: string; data: boolean }>(`/plugins/${encodeURIComponent(id)}/add`, gatedPost(token), load);
 
