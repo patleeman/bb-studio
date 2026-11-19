@@ -14,7 +14,7 @@ The fork is kept in sync with upstream by an agent, every day. Everything below 
 6. **Generated changes are scripted.** Removing plugins, the app identity and the rebrand are produced by `scripts/fork/strip-plugins.mjs`, `identity.mjs` and `rebrand.mjs`. Their output is committed at the tip with a `Fork-Generated:` trailer. Never edit that output by hand and never rebase those commits: drop them and run the scripts again. A build or test run can rewrite the tracked file `apps/web/src/routeTree.gen.ts`; restore it (`git checkout -- apps/web/src/routeTree.gen.ts`) before committing, and never stage with `git add -A` without reading `git status` first.
 7. **Tests the fork breaks on purpose are skipped by list.** Add them to `scripts/fork/skipped-tests.json`. Do not edit the test source.
 8. **Push only to `origin`, the BB Studio repository (`scripts/git-hooks/pre-push` on `main` names it). Nothing goes upstream.** The pushed refs are `main`, `desktop` (with `--force-with-lease`) and `v*` tags. Never push to `get-bb/bb` or `patleeman/bb`; no pull requests or issues upstream; nothing is prepared for upstream.
-9. **`desktop/` on `main` is generated.** `scripts/import-desktop.mjs` on `main` writes it from the tree of the `desktop` branch; never edit it there. Work on the fork in the worktree that has `desktop` checked out (`~/workingdir/bb-studio-app-desktop`), then import.
+9. **`desktop/` on `main` is generated.** `scripts/import-desktop.mjs` on `main` writes it from the tree of the `desktop` branch; never edit it there. Work on the fork in the worktree that has `desktop` checked out (`~/workingdir/bb-studio-public-desktop`), then import.
 
 ## UI text
 
