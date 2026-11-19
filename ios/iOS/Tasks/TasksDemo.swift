@@ -15,6 +15,7 @@ enum TasksDemo {
         guard LoopsDemo.mode != nil, !installed else { return }
         installed = true
         ThreadTitles.set("thr_demo_w1", "Studio-native BB fork")
+        ThreadTitles.set("thr_demo_w2", "Theme stills renderer")
         ThreadTitles.set("thr_demo_w3", "Mock question bank")
         ThreadTitles.set("thr_demo_w7", "iPad UI suite")
         let previous = BBClient.demoTransport
@@ -129,6 +130,7 @@ enum TasksDemo {
 
         private func threads() -> [[String: Any]] {
             [["owner": "thread:thr_demo_w1", "name": "Studio-native BB fork", "threadId": "thr_demo_w1"],
+             ["owner": "thread:thr_demo_w2", "name": "Theme stills renderer", "threadId": "thr_demo_w2"],
              ["owner": "thread:thr_demo_w3", "name": "Mock question bank", "threadId": "thr_demo_w3"],
              ["owner": "thread:thr_demo_w7", "name": "iPad UI suite", "threadId": "thr_demo_w7"],
              ["owner": "thread:\(LoopsDemo.leadId)", "name": "Larkspur lead", "threadId": LoopsDemo.leadId],
@@ -287,7 +289,7 @@ enum TasksDemo {
             Store.task("wc_demo_fork_ui", "Run the UI suite on the iPad", owner: "thread:thr_demo_w7", state: "in_progress", conversation: main, step: "2/6 Layout",
                  workers: ["thr_demo_w7"], parentId: "wc_demo_fork", origin: "work", created: now - 3_000_000),
             Store.task("wc_demo_stills", "Theme stills renderer", state: "waiting", needs: "Light or dark set for the stills?", conversation: main, step: "2/4",
-                 workers: ["thr_demo_w1"], card: "worker", origin: "work", created: now - 1_200_000),
+                 workers: ["thr_demo_w2"], card: "worker", origin: "work", created: now - 1_200_000),
             Store.task("wc_demo_bank", "Mock question bank", owner: "thread:thr_demo_w3", state: "in_progress", conversation: main, line: "Wrote 12 of 20 questions",
                  workers: ["thr_demo_w3"], card: "worker", stale: true, origin: "work", created: now - 5_400_000),
             Store.task("wc_demo_notes", "Release notes", owner: "thread:thr_demo_w1", state: "done", conversation: main, line: "Posted to the release page",

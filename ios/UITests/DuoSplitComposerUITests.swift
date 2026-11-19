@@ -187,8 +187,8 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         XCTAssertEqual(layout.height - composer.frame.maxY, composerGap, accuracy: 2,
                        "\(name): the gap under the composer, with a \(layout.safeBottom)-point bottom safe area")
 
-        // 2. Up in the history, the jump button is centred on the page,
-        // above the composer and below the transcript's visible rows.
+        // 2. Up in the history, the jump button sits beside the composer:
+        // no row of its own, and over no row.
         let jump = app.buttons["Jump to latest"]
         for _ in 0..<3 where !jump.exists {
             command("mid")
@@ -202,9 +202,10 @@ final class DuoSplitComposerUITests: ServerIsolatedUITestCase {
         let page = (minX: pageMinX, maxX: layout.width)
         let visibleBottom = scroll.y + scroll.height - scroll.adjustedBottom
         print("SPLIT JUMP \(name) jump=\(jump.frame) composer=\(composer.frame) visibleBottom=\(visibleBottom)")
-        XCTAssertEqual(jump.frame.midX, (page.minX + page.maxX) / 2, accuracy: 2, "\(name): jump button is centred on the page")
-        XCTAssertLessThanOrEqual(jump.frame.maxY, composer.frame.minY + 1, "\(name): jump button is above the composer")
-        XCTAssertGreaterThanOrEqual(jump.frame.minY, visibleBottom - 1, "\(name): the transcript's bottom inset includes the jump button")
+        XCTAssertLessThanOrEqual(jump.frame.maxX, page.maxX + 1, "\(name): jump button stays on the page")
+        XCTAssertGreaterThanOrEqual(jump.frame.minX, composer.frame.maxX + 7, "\(name): jump button is beside the composer")
+        XCTAssertEqual(jump.frame.midY, composer.frame.midY, accuracy: 4, "\(name): on the composer's row, not a row of its own")
+        XCTAssertGreaterThanOrEqual(jump.frame.minY, visibleBottom - 1, "\(name): below the transcript's visible rows")
         let rows = transcriptTexts().filter { $0.maxY <= visibleBottom + 1 }
         let lastRow = try XCTUnwrap(rows.max { $0.maxY < $1.maxY }, "\(name): a visible transcript row")
         XCTAssertFalse(lastRow.intersects(jump.frame), "\(name): jump button covers the last row's text \(lastRow)")

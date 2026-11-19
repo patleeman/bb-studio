@@ -319,6 +319,14 @@ enum DuoDemo {
                 for child in children { if let found = find(child) { return found } }
                 return nil
             }
+            func field(_ view: UIView) -> UIView? {
+                if view is UITextInput, view.accessibilityIdentifier == id { return view }
+                return view.subviews.lazy.compactMap(field).first
+            }
+            if let input = field(window) {
+                input.becomeFirstResponder()
+                return true
+            }
             _ = find(window)?.accessibilityActivate()
             return true
         default: return false

@@ -3,7 +3,8 @@ import SwiftUI
 struct InFlightBar: View {
     let threadId: String
     var typing = false
-    var chipFills = true
+    var liveStep: String? = nil
+    var workers = 0
     @State private var model = TasksModel.shared
     @State private var showsDone = false
     @State private var hidden: [String: Date] = [:]
@@ -32,16 +33,23 @@ struct InFlightBar: View {
                 Label(error, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.red)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("in-flight-error")
+            } else if typing {
+                if !rows.isEmpty || liveStep != nil || workers > 0 { line(rows) }
             } else if !rows.isEmpty {
-                if typing && chipFills {
-                    chip(rows).frame(maxWidth: .infinity, alignment: .leading)
-                } else if typing {
-                    chip(rows)
-                } else {
-                    bar(rows)
-                }
+                bar(rows)
             }
         }
+    }
+
+    static func shows(_ threadId: String) -> Bool {
+        guard let flight = TasksModel.shared.flights[threadId] else { return false }
+        return TaskTree.nodes(flight).contains { live($0, rowsFeed: flight.rows != nil) }
+    }
+
+    static func listedWorkers(_ threadId: String) -> Set<String> {
+        guard let flight = TasksModel.shared.flights[threadId] else { return [] }
+        func ids(_ node: FlightNode) -> [String] { node.workers.map(\.threadId) + node.task.workers + node.children.flatMap(ids) }
+        return Set(TaskTree.nodes(flight).flatMap(ids))
     }
 
     static func poll(_ threadId: String) async {
@@ -62,6 +70,7 @@ struct InFlightBar: View {
                 Divider().opacity(0.5)
                 ScrollView {
                     VStack(spacing: 0) {
+                        if let liveStep { live(liveStep) }
                         ForEach(open) { node in row(node, names: names) }
                         if !finished.isEmpty {
                             doneToggle(finished.count)
@@ -80,32 +89,61 @@ struct InFlightBar: View {
         .accessibilityIdentifier("in-flight")
     }
 
-    private func chip(_ rows: [FlightNode]) -> some View {
+    private func live(_ step: String) -> some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.mini).frame(width: 14)
+            Text(step).font(.footnote).lineLimit(1).truncationMode(.tail)
+            Spacer(minLength: 4)
+            Text("Running").font(.caption2).lineLimit(1).fixedSize()
+        }
+        .padding(.horizontal, 12)
+        .frame(minHeight: 40)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(step), running")
+        .accessibilityIdentifier("in-flight-live")
+    }
+
+    private func latest(_ open: [FlightNode]) -> String? {
+        if let liveStep { return liveStep }
+        if let running = open.first(where: \.isRunning), let text = running.task.step ?? running.task.line ?? Optional(running.task.title) { return text }
+        if workers > 0 { return workers == 1 ? "1 worker" : "\(workers) workers" }
+        return nil
+    }
+
+    private func line(_ rows: [FlightNode]) -> some View {
         let rowsFeed = model.flights[threadId]?.rows != nil
         let open = rows.filter { Self.live($0, rowsFeed: rowsFeed) }
         let needs = open.filter(\.row.needsYou).count
-        let label = ["In flight, \(open.count) open", needs > 0 ? "\(needs) \(needs == 1 ? "needs" : "need") you" : nil].compactMap { $0 }.joined(separator: ", ")
+        let step = latest(open)
+        let busy = liveStep != nil || open.contains(where: \.isRunning)
+        let title = open.isEmpty ? "Working" : "In flight \(open.count)"
+        let label = [open.isEmpty ? "Working" : "In flight, \(open.count) open", needs > 0 ? "\(needs) \(needs == 1 ? "needs" : "need") you" : nil, step]
+            .compactMap { $0 }.joined(separator: ", ")
         return Button {
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             collapsed = false
         } label: {
             HStack(spacing: 6) {
                 if needs > 0 { Circle().fill(Color.orange).frame(width: 7, height: 7) }
-                Text("In flight")
-                Text("\(open.count)").monospacedDigit()
+                Text(title).fontWeight(.semibold).monospacedDigit().layoutPriority(1)
+                if let step {
+                    Text("·").foregroundStyle(.tertiary)
+                    Text(step).lineLimit(1).truncationMode(.tail)
+                }
+                Spacer(minLength: 4)
+                if busy { ProgressView().controlSize(.mini) }
                 Image(systemName: "chevron.up").font(.caption2.weight(.semibold))
             }
-            .font(.subheadline)
+            .font(.footnote)
             .foregroundStyle(.secondary)
-            .padding(.leading, 12)
-            .padding(.trailing, 14)
-            .frame(height: 36)
-            .background(look.stackFill, in: .capsule)
-            .overlay(Capsule().strokeBorder(.separator.opacity(0.6), lineWidth: 0.5))
-            .contentShape(.capsule)
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .frame(maxWidth: .infinity)
+            .background(look.stackFill, in: .rect(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.separator.opacity(0.6), lineWidth: 0.5))
+            .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .fixedSize()
         .accessibilityLabel(label)
         .accessibilityValue("Collapsed")
         .accessibilityHint("Shows the tasks")
@@ -118,7 +156,7 @@ struct InFlightBar: View {
         let needs = open.filter(\.row.needsYou).count
         let running = rowsFeed ? open.filter(\.isRunning).count : 0
         let needsText = "\(needs) \(needs == 1 ? "needs" : "need") you"
-        let label = ["In flight, \(open.count) open", needs > 0 ? needsText : nil, running > 0 ? "\(running) running" : nil].compactMap { $0 }.joined(separator: ", ")
+        let label = ["In flight, \(open.count) open", needs > 0 ? needsText : nil, running > 0 ? "\(running) running" : nil, liveStep].compactMap { $0 }.joined(separator: ", ")
         return HStack(spacing: 0) {
             Button {
                 if typing {
@@ -136,9 +174,13 @@ struct InFlightBar: View {
                             Text(needsText)
                         }
                         .font(.caption).foregroundStyle(.orange)
+                        .lineLimit(1).fixedSize()
                         .accessibilityIdentifier("in-flight-needs")
                     }
-                    if running > 0 {
+                    if let liveStep, collapsed {
+                        Text(liveStep).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                        ProgressView().controlSize(.mini)
+                    } else if running > 0 {
                         Text("\(running) running").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             .accessibilityIdentifier("in-flight-running")
                     }

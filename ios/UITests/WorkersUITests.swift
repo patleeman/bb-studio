@@ -80,7 +80,9 @@ final class WorkersUITests: ServerIsolatedUITestCase {
         askField.tap()
         askField.typeText("How far along is it?")
         app.buttons["workerAskSend"].tap()
-        XCTAssertTrue(app.buttons["conversationWorkers"].waitForExistence(timeout: 15), "back on Main")
+        let typingLine = app.buttons["in-flight-toggle"]
+        XCTAssertTrue(app.buttons["conversationWorkers"].waitForExistence(timeout: 15) || typingLine.label.contains("worker"),
+                      "back on Main, its workers in the chip or, while typing, in the one line")
         XCTAssertTrue(app.textViews["Message"].exists)
         XCTAssertFalse(askField.exists)
     }
