@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { cp, readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ServerLogger } from "../../types.js";
+import { copyMissingFiles } from "./first-run-install.js";
 import {
   openForkImportDatabase,
   readCursor,
@@ -667,4 +668,24 @@ export async function copyMissingThreadStorage(args: {
   writeCursor(fork, "threadStorageCopied", "2");
   args.logger.info({ copied }, "Import copied thread storage");
   return copied;
+}
+
+export async function copyMissingAttachments(args: {
+  dataDir: string;
+  logger: Pick<ServerLogger, "info" | "warn">;
+}): Promise<{ copied: number; failed: number } | null> {
+  const state = readForkImportState(args.dataDir);
+  if (state === null) return null;
+  const fork = openForkImportDatabase(args.dataDir);
+  if (readCursor(fork, "attachmentsCopied") === "1") return null;
+  const result = await copyMissingFiles(
+    join(state.sourceDataDir, "attachments"),
+    join(args.dataDir, "attachments"),
+  );
+  if (result.failed > 0) {
+    args.logger.warn(result, "Import could not copy some attachments");
+  }
+  writeCursor(fork, "attachmentsCopied", "1");
+  args.logger.info(result, "Import copied attachments");
+  return result;
 }
