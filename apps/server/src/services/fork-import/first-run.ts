@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import type { ServerLogger } from "../../types.js";
+import { adoptUiTokenHash } from "./bring-over/ui-token.js";
 import { resetForkRailPreferences } from "./fork-rail-reset.js";
 import { setForkImportDataDir } from "./index.js";
 
@@ -12,6 +13,7 @@ export async function forkBeforeDatabase(
   serverConfig: { BB_DATA_DIR: string; BB_APP_VERSION: string },
   logger: Pick<ServerLogger, "info" | "warn">,
 ): Promise<void> {
+  adoptUiTokenHash(process.env);
   const dataDir = resolve(serverConfig.BB_DATA_DIR);
   setForkImportDataDir(dataDir);
   try {
