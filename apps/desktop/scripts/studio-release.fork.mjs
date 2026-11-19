@@ -9,7 +9,10 @@ export const STUDIO_RELEASE_PATH = resolve(
   desktopRoot,
   "studio-release.fork.json",
 );
-export const STUDIO_UPSTREAM_PATH = resolve(desktopRoot, "studio-upstream.json");
+export const STUDIO_UPSTREAM_PATH = resolve(
+  desktopRoot,
+  "studio-upstream.json",
+);
 export const STUDIO_UPDATE_TEST_ENV = "BB_STUDIO_UPDATE_TEST";
 export const STUDIO_UPDATE_TEST_IDENTITY = {
   appId: "nyc.plee.bbstudio.updatetest",
@@ -78,7 +81,19 @@ export function readStudioUpstream(path = STUDIO_UPSTREAM_PATH) {
   ) {
     throw new Error(`${path} must hold bb's version and a full commit sha`);
   }
-  return { version: upstream.version, commit: upstream.commit };
+  const ahead =
+    Number.isInteger(upstream.ahead) && upstream.ahead >= 0
+      ? upstream.ahead
+      : null;
+  return { version: upstream.version, commit: upstream.commit, ahead };
+}
+
+export function formatStudioUpstream({ version, commit, ahead = null }) {
+  const past =
+    ahead === null || ahead === 0
+      ? ""
+      : ` + ${ahead} ${ahead === 1 ? "commit" : "commits"}`;
+  return `based on bb ${version}${past} @ ${commit.slice(0, 7)}`;
 }
 
 export function readStudioUpdateTest(env) {
@@ -103,7 +118,10 @@ export function readStudioUpdateTest(env) {
     version:
       test.version === undefined
         ? null
-        : assertStudioVersion(test.version, `${STUDIO_UPDATE_TEST_ENV}.version`),
+        : assertStudioVersion(
+            test.version,
+            `${STUDIO_UPDATE_TEST_ENV}.version`,
+          ),
   };
 }
 
@@ -117,6 +135,7 @@ export function createStudioBuild({ release, upstream, test }) {
       version: release.version,
       upstreamVersion: upstream.version,
       upstreamCommit: upstream.commit,
+      upstreamAhead: upstream.ahead ?? null,
       updateFeed: release.updates,
       versionFeedBaseUrl: githubLatestDownloadUrl(release.updates),
       test: null,
@@ -126,6 +145,7 @@ export function createStudioBuild({ release, upstream, test }) {
     version: test.version ?? release.version,
     upstreamVersion: upstream.version,
     upstreamCommit: upstream.commit,
+    upstreamAhead: upstream.ahead ?? null,
     updateFeed:
       test.feedUrl === "github"
         ? release.updates
