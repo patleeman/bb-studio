@@ -723,8 +723,8 @@
     },
     "apps/host-daemon/src/command-handlers/file-read.ts": {
       "seam": "host-read-root",
-      "intent": "readFileForTransport computes mimeType once, then takes stat and fileContents from forkReadWithinRoot(readablePath, args, getFileSizeLimitBytes(mimeType)) instead of fs.stat and fs.readFile; readFileChunkForTransport opens through forkOpenWithinRoot(readablePath, args, upstream's flags) (both in file-read.fork.ts, imported at the top of the file). With a root the open refuses a symlink anywhere in the path (macOS O_NOFOLLOW_ANY, Linux O_NOFOLLOW plus /proc/self/fd), re-checks device and inode as bigint, and reads at most the size limit from the handle. Without a root both readers behave as upstream (the full reader follows a symlinked file).",
-      "budget": 25
+      "intent": "Both readers catch resolveReadablePath with forkReadError(args), so a realpath that fails during a folder swap or on a file it may not read throws an error with no real path in it. readFileForTransport computes mimeType once, then takes stat and fileContents from forkReadWithinRoot(readablePath, args, getFileSizeLimitBytes(mimeType)) instead of fs.stat and fs.readFile; readFileChunkForTransport opens through forkOpenWithinRoot(readablePath, args, upstream's flags) (both in file-read.fork.ts, imported at the top of the file). With a root the open refuses a symlink anywhere in the path (macOS O_NOFOLLOW_ANY with no weaker fallback, Linux O_NOFOLLOW plus /proc/self/fd), re-checks device and inode as bigint, and reads at most the size limit from the handle. Without a root both readers behave as upstream (the full reader follows a symlinked file).",
+      "budget": 29
     }
   }
 }
