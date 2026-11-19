@@ -420,6 +420,14 @@ describe("bring things over from bb", () => {
       threadsImported: 0,
       threadsSkipped: 2,
     });
+    expect(
+      JSON.parse(
+        readFileSync(
+          join(f.target, "fork-bring-over", "last-job.json"),
+          "utf8",
+        ),
+      ),
+    ).toMatchObject({ id: again.id, threadsSkipped: 2 });
     expect(count(f.db, "SELECT COUNT(*) AS n FROM events")).toBe(events);
     const snap = openSnapshot(f.snapshot);
     open.push(snap);
