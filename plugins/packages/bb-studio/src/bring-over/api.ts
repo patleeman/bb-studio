@@ -5,7 +5,7 @@
 
 export interface BringOverProject { id: string; name: string; threads: number; threadsHere: number; lastActivityAt: number | null; joins: { id: string; name: string } | null }
 export interface BringOverThread { id: string; title: string; updatedAt: number; archived: boolean; attachments: number; here: boolean }
-export interface BringOverSetting { id: string; label: string; detail: string; secret: boolean; count: number }
+export interface BringOverSetting { id: string; label: string; detail: string; secret: boolean; count: number; names?: string[]; alreadyHere?: string[] }
 export interface BringOverPlugin { id: string; version: string | null; source: string; sourceKind: string; enabled: boolean; hasData: boolean; here: boolean; sourceMissing: boolean; needsNewer?: string | null }
 export interface BringOverJob {
   id: string;
@@ -51,6 +51,34 @@ async function send<T>(path: string, init: RequestInit | undefined, load: typeof
 }
 
 const post = (body?: unknown): RequestInit => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body ?? {}) });
+const gatedPost = (token: string, body?: unknown): RequestInit => ({ method: "POST", headers: { "content-type": "application/json", "x-bb-studio-ui-token": token }, body: JSON.stringify(body ?? {}) });
+
+type DesktopBridge = { bbDesktop?: { experimental_bringOverToken?: () => Promise<string | null> } };
+let token: Promise<string | null> | null = null;
+/** This launch's token from BB Studio's own window; null in a browser or on a phone, where bringing things over is refused. */
+export function uiToken(): Promise<string | null> {
+  token ??= (async () => {
+    try {
+      return (await (globalThis as DesktopBridge).bbDesktop?.experimental_bringOverToken?.()) ?? null;
+    } catch {
+      return null;
+    }
+  })();
+  return token;
+}
+export function resetUiTokenForTests(): void { token = null; }
+
+/** Whether bb is on this Mac and the last bring-over, without reading bb's listing. */
+export async function readBringOverSummary(load: typeof fetch = fetch): Promise<BringOverState> {
+  try {
+    const response = await load(`${BASE}?summary=1`);
+    if (!response.ok) return { available: false };
+    const state = (await response.json()) as BringOverState;
+    return typeof state?.available === "boolean" ? state : { available: false };
+  } catch {
+    return { available: false };
+  }
+}
 
 export async function readBringOver(load: typeof fetch = fetch): Promise<BringOverState> {
   try {
@@ -65,10 +93,10 @@ export async function readBringOver(load: typeof fetch = fetch): Promise<BringOv
 
 export const readBb = (load: typeof fetch = fetch) => send<BringOverState>("/snapshot", post(), load);
 export const listProjectThreads = (projectId: string, load: typeof fetch = fetch) => send<BringOverThread[]>(`/projects/${encodeURIComponent(projectId)}/threads`, undefined, load);
-export const startBringOver = (request: BringOverRequest, load: typeof fetch = fetch) => send<BringOverJob>("/jobs", post(request), load);
+export const startBringOver = (request: BringOverRequest, token: string, load: typeof fetch = fetch) => send<BringOverJob>("/jobs", gatedPost(token, request), load);
 export const currentJob = (load: typeof fetch = fetch) => send<{ job: BringOverJob | null }>("/jobs/current", undefined, load);
 export const cancelBringOver = (load: typeof fetch = fetch) => send<{ job: BringOverJob | null }>("/jobs/current/cancel", post(), load);
-export const bringOverStudioData = (load: typeof fetch = fetch) => send<{ threads: number; threadsHere: number; bots: number }>("/studio-data", post(), load);
+export const bringOverStudioData = (token: string, load: typeof fetch = fetch) => send<{ threads: number; threadsHere: number; bots: number }>("/studio-data", gatedPost(token), load);
 
 /** "2 Bots · 14 pages · 6 tasks". */
 export function studioDataLine(data: BringOverStudioData): string {
@@ -76,7 +104,16 @@ export function studioDataLine(data: BringOverStudioData): string {
   return [plural(data.bots, "Bot"), plural(data.pages, "page"), plural(data.tasks, "task")].join(" · ");
 }
 
-export const addOldPlugin = (id: string, load: typeof fetch = fetch) => send<{ id: string; data: boolean }>(`/plugins/${encodeURIComponent(id)}/add`, post(), load);
+export const addOldPlugin = (id: string, token: string, load: typeof fetch = fetch) => send<{ id: string; data: boolean }>(`/plugins/${encodeURIComponent(id)}/add`, gatedPost(token), load);
+
+/** What a secret setting will do, in one line: the variables it brings and the ones it replaces. */
+export function secretLine(setting: BringOverSetting, replace: boolean): string {
+  const names = setting.names ?? [];
+  const noun = names.length === 1 ? setting.label.toLowerCase().replace(/s$/u, "") : setting.label.toLowerCase();
+  const brings = names.length > 0 ? `Brings over ${String(names.length)} ${noun}: ${names.join(", ")}.` : `Brings over ${setting.label.toLowerCase()}.`;
+  const replaced = replace ? (setting.alreadyHere ?? []) : [];
+  return replaced.length > 0 ? `${brings} Replaces BB Studio's values for ${replaced.join(", ")}.` : brings;
+}
 
 /** The job's one line: "12 of 40 threads · 3 already here · 1 failed". */
 export function jobLine(job: BringOverJob): string {

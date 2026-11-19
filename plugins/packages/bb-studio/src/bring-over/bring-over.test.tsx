@@ -7,7 +7,7 @@ const welcome = vi.hoisted(() => ({ threadId: "thr_first" as string | null }));
 vi.mock("../ui/live", () => ({ useLive: () => ({ data: { threadId: welcome.threadId, opened: true, pending: false, bot: { id: "bot_1" } } }) }));
 vi.mock("../kit/app/nav", () => ({ openAppPath: vi.fn() }));
 
-import { jobLine, readBringOver, type BringOverJob, type BringOverState } from "./api";
+import { jobLine, readBringOver, resetUiTokenForTests, secretLine, type BringOverJob, type BringOverState } from "./api";
 import { BringOverSection, requestFrom } from "./ui/BringOverSection";
 import { BringOverLink, resetBringOverOfferForTests } from "./ui/FirstChatLink";
 
@@ -18,7 +18,8 @@ const listing: BringOverState = {
   projects: [{ id: "proj_a", name: "orbital", threads: 2, threadsHere: 0, lastActivityAt: 1, joins: null }],
   settings: [
     { id: "preferences", label: "Display preferences", detail: "d", secret: false, count: 3 },
-    { id: "env", label: "Environment variables", detail: "May hold API keys and tokens.", secret: true, count: 1 },
+    { id: "env", label: "Environment variables", detail: "May hold API keys and tokens.", secret: true, count: 2, names: ["GITHUB_TOKEN", "OPENAI_API_KEY"], alreadyHere: ["OPENAI_API_KEY"] },
+    { id: "skills", label: "Skills", detail: "bb's skills folder is a link to another folder and is not copied.", secret: false, count: 0 },
   ],
   plugins: [
     { id: "acme-tool", version: "1.0.0", source: "/src/acme", sourceKind: "path", enabled: true, hasData: true, here: false, sourceMissing: false },
@@ -40,6 +41,11 @@ describe("api", () => {
     expect(jobLine(job)).toBe("Bringing over: 12 of 40 threads · 3 already here");
     expect(jobLine({ ...job, state: "failed", failures: [{ item: "t", detail: "d" }] })).toBe("Finished with errors: 12 of 40 threads · 3 already here · 1 failed");
   });
+  it("names the secrets in one line", () => {
+    const env = { id: "env", label: "Environment variables", detail: "", secret: true, count: 1, names: ["A"], alreadyHere: ["A"] };
+    expect(secretLine(env, false)).toBe("Brings over 1 environment variable: A.");
+    expect(secretLine(env, true)).toBe("Brings over 1 environment variable: A. Replaces BB Studio's values for A.");
+  });
   it("turns picks into a request", () => {
     expect(requestFrom({ projects: new Set(["proj_a"]), threads: new Set(["thr_b"]), settings: new Map([["env", false]]), attachments: true })).toEqual({
       picks: [{ kind: "project", id: "proj_a" }, { kind: "thread", id: "thr_b" }],
@@ -52,14 +58,14 @@ describe("api", () => {
 describe("BringOverSection", () => {
   let root: Root;
   let host: HTMLDivElement;
-  const calls: { url: string; method: string; body: unknown }[] = [];
+  const calls: { url: string; method: string; body: unknown; token: string | null }[] = [];
   const $ = (selector: string) => host.querySelector<HTMLElement>(selector);
   const button = (text: string) => [...host.querySelectorAll("button")].find((each) => each.textContent === text);
   const serve = (routes: Record<string, (body: unknown) => Response>) => {
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
       const method = init?.method ?? "GET";
       const body = init?.body ? JSON.parse(String(init.body)) as unknown : undefined;
-      calls.push({ url, method, body });
+      calls.push({ url, method, body, token: new Headers(init?.headers).get("x-bb-studio-ui-token") });
       const route = routes[`${method} ${url}`];
       return route ? route(body) : new Response("Not Found", { status: 404 });
     }));
@@ -72,6 +78,8 @@ describe("BringOverSection", () => {
 
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    resetUiTokenForTests();
+    vi.stubGlobal("bbDesktop", { experimental_bringOverToken: async () => "token-from-the-app" });
     calls.length = 0;
     host = document.createElement("div");
     document.body.append(host);
@@ -103,8 +111,38 @@ describe("BringOverSection", () => {
       attachments: true,
       settings: [{ id: "preferences", replace: false }],
     });
+    expect(calls.find((call) => call.method === "POST")?.token).toBe("token-from-the-app");
     expect($('[data-testid="bring-over-job"]')?.textContent).toContain("12 of 40 threads");
     expect(button("Cancel")).toBeDefined();
+  });
+
+  it("asks before bringing secrets over, naming them and what they replace", async () => {
+    serve({
+      "GET /api/v1/fork/bring-over": () => json(listing),
+      "POST /api/v1/fork/bring-over/jobs": () => json(job, 202),
+      "GET /api/v1/fork/bring-over/jobs/current": () => json({ job }),
+    });
+    await render();
+    const env = $('[data-testid="bring-over-setting-env"]')!;
+    expect(env.textContent).toContain("Holds secrets");
+    expect(host.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Skills"]')!.disabled).toBe(true);
+    act(() => { env.querySelector<HTMLButtonElement>('[role="switch"]')!.click(); });
+    act(() => { env.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(); });
+    act(() => { button("Bring over")!.click(); });
+    expect(calls.some((call) => call.method === "POST")).toBe(false);
+    expect($('[data-testid="bring-over-confirm-secrets"]')?.textContent).toContain("Brings over 2 environment variables: GITHUB_TOKEN, OPENAI_API_KEY. Replaces BB Studio's values for OPENAI_API_KEY.");
+    await act(async () => { button("Bring over with secrets")!.click(); });
+    expect(calls.find((call) => call.method === "POST")?.body).toMatchObject({ settings: [{ id: "env", replace: true }] });
+  });
+
+  it("says it works only in the app when there is no app token", async () => {
+    vi.stubGlobal("bbDesktop", undefined);
+    serve({ "GET /api/v1/fork/bring-over": () => json(listing) });
+    await render();
+    await act(async () => { await Promise.resolve(); });
+    expect($('[data-testid="bring-over-app-only"]')?.textContent).toBe("Bringing things over works only in the BB Studio app on this Mac.");
+    expect(button("Bring over")?.disabled).toBe(true);
+    expect(button("Add…")).toBeUndefined();
   });
 
   it("adds a plugin, and says when its source is gone or adding fails", async () => {
@@ -116,10 +154,15 @@ describe("BringOverSection", () => {
     await render();
     expect($('[data-testid="bring-over-plugin-gone-tool"]')?.textContent).toContain("Not found here");
     expect($('[data-testid="bring-over-plugin-future-tool"]')?.textContent).toContain("Needs a newer BB Studio");
-    await act(async () => { button("Add")!.click(); });
+    const row = $('[data-testid="bring-over-plugin-acme-tool"]')!;
+    act(() => { [...row.querySelectorAll("button")].find((each) => each.textContent === "Add…")!.click(); });
+    expect(row.textContent).toContain("Installs code from /src/acme and copies its saved data, which may include sign-ins.");
+    await act(async () => { [...row.querySelectorAll("button")].find((each) => each.textContent === "Add")!.click(); });
+    expect(calls.find((call) => call.url.endsWith("/add"))).toBeDefined();
     expect($('[data-testid="bring-over-plugin-acme-tool"]')?.textContent).toContain("no manifest");
     fail = false;
-    await act(async () => { button("Add")!.click(); });
+    act(() => { [...row.querySelectorAll("button")].find((each) => each.textContent === "Add…")!.click(); });
+    await act(async () => { [...row.querySelectorAll("button")].find((each) => each.textContent === "Add")!.click(); });
     expect($('[data-testid="bring-over-plugin-acme-tool"]')?.textContent).toContain("Added with its data");
   });
 });
@@ -131,6 +174,8 @@ describe("BB Studio data row", () => {
   const button = (text: string) => [...host.querySelectorAll("button")].find((each) => each.textContent === text);
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    resetUiTokenForTests();
+    vi.stubGlobal("bbDesktop", { experimental_bringOverToken: async () => "token-from-the-app" });
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
@@ -176,6 +221,8 @@ describe("BringOverLink", () => {
 
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    resetUiTokenForTests();
+    vi.stubGlobal("bbDesktop", { experimental_bringOverToken: async () => "token-from-the-app" });
     resetBringOverOfferForTests();
     localStorage.clear();
     welcome.threadId = "thr_first";
@@ -184,6 +231,13 @@ describe("BringOverLink", () => {
     root = createRoot(host);
   });
   afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
+
+  it("asks only for the light summary", async () => {
+    const load = vi.fn(async () => new Response(JSON.stringify({ available: true, job: null }), { status: 200 }));
+    vi.stubGlobal("fetch", load);
+    await render("thr_first");
+    expect(load).toHaveBeenCalledWith("/api/v1/fork/bring-over?summary=1");
+  });
 
   it("offers bb on the first chat until dismissed", async () => {
     answer({ available: true, sourceDataDir: "/Users/x/.bb", readAt: null, job: null });

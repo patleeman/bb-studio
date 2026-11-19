@@ -18,7 +18,9 @@ import {
   listProjectThreads,
   readBb,
   readBringOver,
+  secretLine,
   startBringOver,
+  uiToken,
   type BringOverPlugin,
   type BringOverProject,
   type BringOverRequest,
@@ -98,7 +100,7 @@ function ProjectRow({ project, picks, onChange }: { project: BringOverProject; p
   );
 }
 
-function StudioDataRow({ data, onDone }: { data: BringOverStudioData; onDone(): void }) {
+function StudioDataRow({ data, token, onDone }: { data: BringOverStudioData; token: string | null; onDone(): void }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,7 +109,7 @@ function StudioDataRow({ data, onDone }: { data: BringOverStudioData; onDone(): 
     setBusy(true);
     setError(null);
     try {
-      const result = await bringOverStudioData();
+      const result = await bringOverStudioData(token ?? "");
       setDone(`Brought over with ${String(result.threads + result.threadsHere)} of its threads. Reload BB Studio to see bb's Bots.`);
       onDone();
     } catch (cause) {
@@ -129,7 +131,7 @@ function StudioDataRow({ data, onDone }: { data: BringOverStudioData; onDone(): 
   return (
     <Row label="BB Studio data (Bots, pages, memory, tasks)" description={description} testId="bring-over-studio-data">
       {done ? <Button size="sm" variant="outline" onClick={() => window.location.reload()}>Reload</Button>
-        : !data.offered ? null
+        : !data.offered || token === null ? null
         : confirming ? (
           <span className="flex gap-2">
             <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirming(false)}>Cancel</Button>
@@ -140,30 +142,40 @@ function StudioDataRow({ data, onDone }: { data: BringOverStudioData; onDone(): 
   );
 }
 
-function PluginRow({ plugin, onAdded }: { plugin: BringOverPlugin; onAdded(): void }) {
+function PluginRow({ plugin, token, onAdded }: { plugin: BringOverPlugin; token: string | null; onAdded(): void }) {
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const add = async () => {
     setBusy(true);
     setError(null);
     try {
-      const result = await addOldPlugin(plugin.id);
+      const result = await addOldPlugin(plugin.id, token ?? "");
       setNote(result.data ? "Added with its data" : "Added");
       onAdded();
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
       setBusy(false);
+      setConfirming(false);
     }
   };
+  const fetched = plugin.sourceKind === "git" || plugin.sourceKind === "npm";
   const description = [plugin.version ? `v${plugin.version}` : null, plugin.source, plugin.hasData ? "has data" : null].filter(Boolean).join(" · ");
+  const warning = `Installs code from ${plugin.source}${fetched ? ", bb's version, fetched from the network," : ""} and copies its saved data, which may include sign-ins.`;
   return (
-    <Row label={plugin.id} description={<>{description}{error ? <span className="block text-destructive">{error}</span> : null}</>} testId={`bring-over-plugin-${plugin.id}`}>
+    <Row label={plugin.id} description={<>{description}{confirming ? <span className="block text-foreground">{warning}</span> : null}{error ? <span className="block text-destructive">{error}</span> : null}</>} testId={`bring-over-plugin-${plugin.id}`}>
       {plugin.here || note ? <span className="text-xs text-muted-foreground">{note ?? "Already here"}</span>
         : plugin.sourceMissing ? <span className="text-xs text-muted-foreground">Not found here</span>
         : plugin.needsNewer ? <span className="text-xs text-muted-foreground">Needs a newer BB Studio</span>
-        : <Button size="sm" variant="outline" disabled={busy} onClick={() => void add()}>Add</Button>}
+        : token === null ? null
+        : confirming ? (
+          <span className="flex gap-2">
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirming(false)}>Cancel</Button>
+            <Button size="sm" disabled={busy} onClick={() => void add()}>{busy ? "Adding…" : "Add"}</Button>
+          </span>
+        ) : <Button size="sm" variant="outline" onClick={() => setConfirming(true)}>Add…</Button>}
     </Row>
   );
 }
@@ -172,12 +184,20 @@ export function BringOverSection() {
   const [state, setState] = useState<BringOverState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [tokenRead, setTokenRead] = useState(false);
+  const [confirmingSecrets, setConfirmingSecrets] = useState(false);
   const [, setVersion] = useState(0);
   const picks = useRef<Picks>({ projects: new Set(), threads: new Set(), settings: new Map(), attachments: true });
   const ref = useRef<HTMLDivElement>(null);
   const changed = () => setVersion((value) => value + 1);
   const load = useCallback(() => void readBringOver().then(setState), []);
   useEffect(load, [load]);
+  useEffect(() => {
+    let current = true;
+    void uiToken().then((next) => { if (current) { setToken(next); setTokenRead(true); } });
+    return () => { current = false; };
+  }, []);
   useEffect(() => {
     if (!requested || !state?.available) return;
     requested = false;
@@ -203,20 +223,24 @@ export function BringOverSection() {
   };
   const start = async () => {
     setError(null);
+    setConfirmingSecrets(false);
+    if (token === null) return;
     try {
-      const job = await startBringOver(requestFrom(picks.current));
+      const job = await startBringOver(requestFrom(picks.current), token);
       picks.current = { projects: new Set(), threads: new Set(), settings: new Map(), attachments: picks.current.attachments };
       setState({ ...state, job });
     } catch (cause) { setError(errorMessage(cause)); }
   };
   const p = picks.current;
   const nothingPicked = p.projects.size === 0 && p.threads.size === 0 && p.settings.size === 0;
+  const pickedSecrets = (state.settings ?? []).filter((setting) => setting.secret && p.settings.has(setting.id));
   return (
     <div ref={ref} id={BRING_OVER_SECTION_ANCHOR} data-testid="bring-over" className="scroll-mt-4">
       <Card>
         <Row label="From" description={state.readAt ? `${state.sourceDataDir ?? ""} · read ${relativeTime(state.readAt)}` : state.sourceDataDir} testId="bring-over-source">
           <Button size="sm" variant="outline" disabled={reading || running} onClick={() => void read()}>{reading ? "Reading…" : state.readAt ? "Read again" : "Read bb"}</Button>
         </Row>
+        {tokenRead && token === null ? <p data-testid="bring-over-app-only" className="px-3 py-1 text-xs text-muted-foreground">Bringing things over works only in the BB Studio app on this Mac.</p> : null}
         {error ? <p className="px-3 py-1 text-xs text-destructive">{error}</p> : null}
         {state.job ? (
           <div data-testid="bring-over-job" className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
@@ -242,29 +266,39 @@ export function BringOverSection() {
           <SubHeading>Settings</SubHeading>
           <Card>
             {(state.settings ?? []).map((setting) => (
-              <Row key={setting.id} label={setting.label} description={setting.detail} testId={`bring-over-setting-${setting.id}`}>
+              <Row key={setting.id} label={<>{setting.label}{setting.secret ? <span className="ml-2 rounded bg-destructive/15 px-1.5 py-0.5 text-[11px] font-medium text-destructive">Holds secrets</span> : null}</>} description={setting.detail} testId={`bring-over-setting-${setting.id}`}>
                 <span className="flex items-center gap-3">
                   {p.settings.has(setting.id) ? (
                     <label className="flex items-center gap-1 text-xs text-muted-foreground"><input type="checkbox" checked={p.settings.get(setting.id) === true} onChange={(event) => { p.settings.set(setting.id, event.target.checked); changed(); }} />Replace BB Studio's</label>
                   ) : null}
-                  <Switch label={setting.label} checked={p.settings.has(setting.id)} onChange={(next) => { if (next) p.settings.set(setting.id, false); else p.settings.delete(setting.id); changed(); }} />
+                  <Switch label={setting.label} disabled={setting.count === 0} checked={p.settings.has(setting.id)} onChange={(next) => { if (next) p.settings.set(setting.id, false); else p.settings.delete(setting.id); changed(); }} />
                 </span>
               </Row>
             ))}
           </Card>
-          <div className="flex justify-end py-2">
-            <Button disabled={nothingPicked || running} onClick={() => void start()} data-testid="bring-over-start">Bring over</Button>
-          </div>
+          {confirmingSecrets ? (
+            <div data-testid="bring-over-confirm-secrets" className="flex flex-col gap-2 py-2 text-xs text-foreground">
+              {pickedSecrets.map((setting) => <p key={setting.id}>{secretLine(setting, p.settings.get(setting.id) === true)}</p>)}
+              <span className="flex justify-end gap-2">
+                <Button size="sm" variant="outline" onClick={() => setConfirmingSecrets(false)}>Cancel</Button>
+                <Button size="sm" onClick={() => void start()}>Bring over with secrets</Button>
+              </span>
+            </div>
+          ) : (
+            <div className="flex justify-end py-2">
+              <Button disabled={nothingPicked || running || token === null} onClick={() => { if (pickedSecrets.length > 0) setConfirmingSecrets(true); else void start(); }} data-testid="bring-over-start">Bring over</Button>
+            </div>
+          )}
           {state.studioData?.inBb ? (
             <>
               <SubHeading>BB Studio data</SubHeading>
-              <Card><StudioDataRow data={state.studioData} onDone={() => {}} /></Card>
+              <Card><StudioDataRow data={state.studioData} token={token} onDone={() => {}} /></Card>
             </>
           ) : null}
           <SubHeading>Plugins from bb</SubHeading>
           <Card>
             {(state.plugins ?? []).length === 0 ? <p className="px-3 py-2 text-sm text-muted-foreground">No plugins to add</p>
-              : (state.plugins ?? []).map((plugin) => <PluginRow key={plugin.id} plugin={plugin} onAdded={() => {}} />)}
+              : (state.plugins ?? []).map((plugin) => <PluginRow key={plugin.id} plugin={plugin} token={token} onAdded={() => {}} />)}
           </Card>
         </>
       ) : null}

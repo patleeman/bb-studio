@@ -8,7 +8,7 @@ import { registerThreadBanner } from "../../kit/app/host-sdk";
 import { openAppPath } from "../../kit/app/nav";
 import { STUDIO_SETTINGS_PATH } from "../../settings/ui/voice-anchor";
 import { useLive } from "../../ui/live";
-import { readBringOver } from "../api";
+import { readBringOverSummary } from "../api";
 import { requestBringOverSection } from "./BringOverSection";
 
 const DISMISSED_KEY = "studio.bringOver.linkDismissed";
@@ -17,7 +17,7 @@ const storage = (): Storage | null => { try { return typeof localStorage === "un
 let offered: Promise<boolean> | null = null;
 /** Whether bb is there and nothing was brought over yet; asked once per session. */
 export function bringOverOffered(load: typeof fetch = fetch): Promise<boolean> {
-  offered ??= readBringOver(load).then((state) => state.available && !state.job);
+  offered ??= readBringOverSummary(load).then((state) => state.available && !state.job);
   return offered;
 }
 export function resetBringOverOfferForTests(): void { offered = null; }
