@@ -21,6 +21,7 @@ function config(options: CodexSessionOptions) {
     additionalWorkspaceWriteRoots: [],
     gitWritableRoots: [],
     options,
+    supportsAgentsEnabled: true,
   });
 }
 

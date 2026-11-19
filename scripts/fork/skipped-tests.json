@@ -775,6 +775,10 @@
     {
       "file": "packages/provider-parity/src/parity.self.test.ts",
       "title": "codex/auth-failure reproduces its recording"
+    },
+    {
+      "file": "packages/server-contract/test/contract.test.ts",
+      "title": "keeps contract optional fields on an explicit allowlist"
     }
   ],
   "removeLines": [
@@ -839,6 +843,10 @@
     {
       "file": "apps/app/src/components/plugin/PluginProviderModelPicker.test.tsx",
       "title": "reconciles model capabilities and drops unsupported service tiers"
+    },
+    {
+      "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
+      "title": "hides the split action for %s"
     }
   ]
 }

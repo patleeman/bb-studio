@@ -245,6 +245,11 @@ const replacements = [
   ],
   [
     "apps/app/src/components/sidebar/SidebarUpdatesBadge.test.tsx",
+    '.toContain("bb 5c1cf4e")',
+    `.toContain("${NAME} 5c1cf4e")`,
+  ],
+  [
+    "apps/app/src/components/sidebar/SidebarUpdatesBadge.test.tsx",
     '"Installs when bb restarts"',
     `"Installs when ${NAME} restarts"`,
   ],
