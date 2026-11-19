@@ -68,6 +68,8 @@ export interface PluginInstaller {
   ): Promise<{ id: string }>;
   installPath(path: string): Promise<{ id: string }>;
   reload(id?: string): Promise<unknown>;
+  setEnabled(id: string, enabled: boolean): Promise<unknown>;
+  listOpenPluginDatabases(): { pluginId: string }[];
 }
 
 function sourceRows(source: Sqlite): SourcePluginRow[] {
@@ -185,7 +187,7 @@ export async function addPlugin(args: {
   target: Sqlite;
   sourceDataDir: string;
   dataDir: string;
-  installer: PluginInstaller;
+  installer: Pick<PluginInstaller, "install" | "installPath" | "reload">;
   appVersion: string;
 }): Promise<{ id: string; data: boolean }> {
   const { source, target } = args;

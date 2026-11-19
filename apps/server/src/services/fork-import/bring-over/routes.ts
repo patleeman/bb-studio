@@ -13,6 +13,7 @@ import {
 import { listProjects, listThreads } from "./listing.js";
 import { addPlugin, listPlugins, type PluginInstaller } from "./plugins.js";
 import { listSettings } from "./settings.js";
+import { bringOverStudioData, studioDataState } from "./studio-data.js";
 import {
   bringOverSource,
   existingSourceSnapshot,
@@ -106,6 +107,7 @@ export function registerBringOverRoutes(
           snap.sourceDataDir,
           deps.config.appVersion,
         ),
+        studioData: await studioDataState(dataDir(), snap.sourceDataDir),
         job: currentBringOverJob(dataDir()),
       };
     } finally {
@@ -196,6 +198,50 @@ export function registerBringOverRoutes(
   app.post("/fork/bring-over/jobs/current/cancel", (context) =>
     context.json({ job: cancelBringOverJob(dataDir()) }),
   );
+
+  let studioDataRunning = false;
+  app.post("/fork/bring-over/studio-data", async (context) => {
+    if (installer === null) {
+      throw new ApiError(
+        409,
+        "invalid_request",
+        "BB Studio data can't be brought over on this server",
+      );
+    }
+    if (studioDataRunning) {
+      throw new ApiError(
+        409,
+        "invalid_request",
+        "BB Studio data is already being brought over",
+      );
+    }
+    studioDataRunning = true;
+    try {
+      return context.json(
+        await bringOverStudioData({
+          dataDir: dataDir(),
+          snapshot: await snapshot(),
+          target: deps.db.$client,
+          ourHostId: readHostId(dataDir()),
+          controller: {
+            setEnabled: (id, enabled) => installer.setEnabled(id, enabled),
+            databaseOpen: (id) =>
+              installer
+                .listOpenPluginDatabases()
+                .some((open) => open.pluginId === id),
+          },
+          now: Date.now(),
+        }),
+      );
+    } catch (error) {
+      if (error instanceof BringOverError) {
+        throw new ApiError(422, "invalid_request", error.message);
+      }
+      throw error;
+    } finally {
+      studioDataRunning = false;
+    }
+  });
 
   app.post("/fork/bring-over/plugins/:pluginId/add", async (context) => {
     if (installer === null) {
