@@ -11,9 +11,15 @@ import {
 } from "./state.js";
 import {
   copyFilesInParallel,
+  failureAttempts,
+  failureDetail,
   FIRST_RUN_FAILED_FILE_NAME,
   firstRunFailureMessage,
+  FirstRunImportError,
   FirstRunImportTimeoutError,
+  firstRunRetryPending,
+  hasFirstRunJournal,
+  readFirstRunFailure,
   ImportDeadline,
   moveIntoDataDir,
   recoverInterruptedFirstRunImport,
@@ -54,6 +60,16 @@ export const FORK_IMPORT_SOURCE_ENV = "BB_STUDIO_IMPORT_FROM";
 export const FORK_IMPORT_TIMEOUT_ENV = "BB_STUDIO_IMPORT_TIMEOUT_MS";
 
 const DEFAULT_IMPORT_TIMEOUT_MS = 30_000;
+const MAX_IMPORT_TIMEOUT_MS = 45_000;
+const RETRY_BACKUP_DIR_NAME = "fork-import-retry-backup";
+const CLEAN_START_EXTRA_PATHS = [
+  "auth.json",
+  "host-id",
+  "fork-rail-reset.json",
+  "server-import.json",
+  "server-connect-hold.json",
+];
+const SQLITE_SIDECAR_SUFFIXES = ["-wal", "-shm", "-journal"];
 
 const DATABASE_FILE_NAME = "bb.db";
 const MANAGED_CONFIG_FILE_NAME = "config.json";
@@ -330,12 +346,17 @@ function readSnapshotFacts(databasePath: string): {
   }
 }
 
-function importTimeoutMs(args: RunForkFirstRunImportArgs): number {
-  if (args.timeoutMs !== undefined) return args.timeoutMs;
-  const configured = Number(args.env[FORK_IMPORT_TIMEOUT_ENV]);
-  return Number.isFinite(configured) && configured > 0
-    ? configured
-    : DEFAULT_IMPORT_TIMEOUT_MS;
+export function importTimeoutMs(args: {
+  env: Readonly<Record<string, string | undefined>>;
+  timeoutMs?: number;
+}): number {
+  const configured =
+    args.timeoutMs ?? Number(args.env[FORK_IMPORT_TIMEOUT_ENV]);
+  const timeout =
+    Number.isFinite(configured) && configured > 0
+      ? configured
+      : DEFAULT_IMPORT_TIMEOUT_MS;
+  return Math.min(timeout, MAX_IMPORT_TIMEOUT_MS);
 }
 
 function parseManagedConfig(value: unknown): ImportedManagedConfig {
@@ -345,8 +366,22 @@ function parseManagedConfig(value: unknown): ImportedManagedConfig {
   return config;
 }
 
-async function readJson(path: string): Promise<unknown> {
-  return JSON.parse(await readFile(path, "utf8")) as unknown;
+async function readManaged<T>(
+  path: string,
+  label: string,
+  parse: (value: unknown) => T,
+): Promise<T> {
+  let value: unknown;
+  try {
+    value = JSON.parse(await readFile(path, "utf8")) as unknown;
+  } catch {
+    throw new FirstRunImportError(`${label} is not valid JSON`);
+  }
+  try {
+    return parse(value);
+  } catch {
+    throw new FirstRunImportError(`${label} is not in the expected form`);
+  }
 }
 
 async function mergeManagedFiles(
@@ -357,8 +392,16 @@ async function mergeManagedFiles(
   const stagedConfig = join(filesDir, MANAGED_CONFIG_FILE_NAME);
   if ((await exists(config)) && (await exists(stagedConfig))) {
     const merged = mergeImportedManagedConfig({
-      importedConfig: parseManagedConfig(await readJson(stagedConfig)),
-      existingConfig: parseManagedConfig(await readJson(config)),
+      importedConfig: await readManaged(
+        stagedConfig,
+        "bb's config.json",
+        parseManagedConfig,
+      ),
+      existingConfig: await readManaged(
+        config,
+        "BB Studio's config.json",
+        parseManagedConfig,
+      ),
       localServerUrl: null,
     });
     await writeFile(stagedConfig, `${JSON.stringify(merged, null, 2)}\n`);
@@ -366,14 +409,47 @@ async function mergeManagedFiles(
   const env = join(dataDir, MANAGED_ENV_FILE_NAME);
   const stagedEnv = join(filesDir, MANAGED_ENV_FILE_NAME);
   if ((await exists(env)) && (await exists(stagedEnv))) {
-    const existing = bbAppManagedEnvFileSchema.parse(await readJson(env));
-    const imported = bbAppManagedEnvFileSchema.parse(await readJson(stagedEnv));
+    const parseEnv = (value: unknown) => bbAppManagedEnvFileSchema.parse(value);
+    const existing = await readManaged(env, "BB Studio's env.json", parseEnv);
+    const imported = await readManaged(stagedEnv, "bb's env.json", parseEnv);
     const merged = { ...existing.env, ...imported.env };
     await writeFile(
       stagedEnv,
       `${JSON.stringify(Object.keys(merged).length > 0 ? { env: merged } : {}, null, 2)}\n`,
     );
   }
+}
+
+async function setAsideCleanStart(
+  dataDir: string,
+  now: number,
+): Promise<string> {
+  const backup = join(dataDir, RETRY_BACKUP_DIR_NAME, String(now));
+  const inventory = await listServerOwnedEntries(dataDir);
+  const paths = new Set<string>(CLEAN_START_EXTRA_PATHS);
+  for (const entry of inventory.entries) {
+    if (
+      entry.path === MANAGED_CONFIG_FILE_NAME ||
+      entry.path === MANAGED_ENV_FILE_NAME
+    ) {
+      continue;
+    }
+    paths.add(entry.path);
+  }
+  for (const path of [...paths]) {
+    if (path.endsWith(".db")) {
+      for (const suffix of SQLITE_SIDECAR_SUFFIXES)
+        paths.add(`${path}${suffix}`);
+    }
+  }
+  for (const path of [...paths].sort()) {
+    const from = join(dataDir, ...path.split("/"));
+    if (!(await exists(from))) continue;
+    const to = join(backup, ...path.split("/"));
+    await mkdir(dirname(to), { recursive: true });
+    await rename(from, to);
+  }
+  return backup;
 }
 
 export async function runForkFirstRunImport(
@@ -383,12 +459,19 @@ export async function runForkFirstRunImport(
   await recoverInterruptedFirstRunImport(dataDir, args.logger);
   const sourceDataDir = resolveForkImportSource(args);
   if (sourceDataDir === null || sourceDataDir === dataDir) return null;
-  for (const name of [
-    DATABASE_FILE_NAME,
-    FORK_IMPORT_STATE_FILE_NAME,
-    FIRST_RUN_FAILED_FILE_NAME,
-    SERVER_IMPORT_JOURNAL_FILE_NAME,
-  ]) {
+  if (await exists(join(dataDir, FORK_IMPORT_STATE_FILE_NAME))) return null;
+  if (await exists(join(dataDir, SERVER_IMPORT_JOURNAL_FILE_NAME))) return null;
+  const failure = readFirstRunFailure(dataDir);
+  if (failure !== null) {
+    if (!firstRunRetryPending(dataDir, failure)) return null;
+    if (!(await exists(join(sourceDataDir, DATABASE_FILE_NAME)))) return null;
+    const backup = await setAsideCleanStart(dataDir, args.now);
+    args.logger.info(
+      { attempt: failureAttempts(failure) + 1, backup },
+      "First-run import trying again; the empty start is set aside",
+    );
+  }
+  for (const name of [DATABASE_FILE_NAME, FORK_IMPORT_STATE_FILE_NAME]) {
     if (await exists(join(dataDir, name))) return null;
   }
   if (!(await exists(join(sourceDataDir, DATABASE_FILE_NAME)))) {
@@ -526,6 +609,7 @@ export async function runForkFirstRunImport(
       },
     });
     finished = true;
+    await rm(join(dataDir, FIRST_RUN_FAILED_FILE_NAME), { force: true });
     args.logger.info(
       {
         sourceDataDir,
@@ -534,15 +618,18 @@ export async function runForkFirstRunImport(
         attachmentsAfterStart: afterStart,
         skippedPaths: inventory.skippedPaths.length,
         durationMs: Date.now() - startedAt,
+        serverUptimeMs: Math.round(process.uptime() * 1000),
       },
       "First-run import finished",
     );
     return state;
   } finally {
     closeForkImportDatabase(filesDir);
-    const removal = rm(stagingDir, { force: true, recursive: true });
-    if (finished) await removal;
-    else void removal.catch(() => undefined);
+    if (!(await hasFirstRunJournal(dataDir))) {
+      const removal = rm(stagingDir, { force: true, recursive: true });
+      if (finished) await removal;
+      else void removal.catch(() => undefined);
+    }
   }
 }
 
@@ -550,7 +637,7 @@ export async function forkBeforeDatabase(
   serverConfig: { BB_DATA_DIR: string; BB_APP_VERSION: string },
   logger: Pick<ServerLogger, "info" | "warn">,
 ): Promise<void> {
-  const dataDir = serverConfig.BB_DATA_DIR;
+  const dataDir = resolve(serverConfig.BB_DATA_DIR);
   setForkImportDataDir(dataDir);
   try {
     await runForkFirstRunImport({
@@ -565,19 +652,36 @@ export async function forkBeforeDatabase(
       resolveForkImportSource({ dataDir, env: process.env }) ?? "";
     const reason =
       error instanceof FirstRunImportTimeoutError ? "timed-out" : "error";
-    const message = firstRunFailureMessage(sourceDataDir, reason);
-    logger.warn({ err: error, sourceDataDir }, message);
+    const previous = readFirstRunFailure(dataDir);
+    const attempts = previous === null ? 1 : failureAttempts(previous) + 1;
+    const message = firstRunFailureMessage(sourceDataDir, reason, attempts);
+    const detail = failureDetail(error);
+    logger.warn({ sourceDataDir, detail, attempts }, message);
     try {
       await writeFirstRunFailure(dataDir, {
         version: 1,
         sourceDataDir,
         failedAt: Date.now(),
         reason,
-        detail: error instanceof Error ? error.message : String(error),
+        detail,
         message,
+        attempts,
       });
     } catch (writeError) {
-      logger.warn({ err: writeError }, "could not record the failed import");
+      logger.warn(
+        { detail: failureDetail(writeError) },
+        "could not record the failed import",
+      );
+    }
+  }
+  if (await hasFirstRunJournal(dataDir)) {
+    await recoverInterruptedFirstRunImport(dataDir, logger).catch(
+      () => undefined,
+    );
+    if (await hasFirstRunJournal(dataDir)) {
+      throw new FirstRunImportError(
+        `BB Studio could not undo an unfinished copy of your bb data in ${dataDir}, so it will not start on half-copied data. Move ${dataDir} aside and open BB Studio again.`,
+      );
     }
   }
   void sweepFirstRunStaging(dataDir)
@@ -587,7 +691,10 @@ export async function forkBeforeDatabase(
       }
     })
     .catch((error: unknown) => {
-      logger.warn({ err: error }, "could not remove old import staging");
+      logger.warn(
+        { detail: failureDetail(error) },
+        "could not remove old import staging",
+      );
     });
   try {
     resetForkRailPreferences(dataDir, Date.now());

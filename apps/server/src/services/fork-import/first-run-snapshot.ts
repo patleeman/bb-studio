@@ -1,17 +1,25 @@
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import {
+  FirstRunImportError,
   FirstRunImportTimeoutError,
   type ImportDeadline,
 } from "./first-run-install.js";
 
-const snapshotChildSource = String.raw`
+export const snapshotChildSource = String.raw`
 "use strict";
 const Database = require(process.env.BB_STUDIO_SNAPSHOT_DRIVER);
 const jobs = JSON.parse(process.env.BB_STUDIO_SNAPSHOT_JOBS);
 const ALL_PAGES = 0x7fffffff;
+let orphaned = false;
+const stop = () => { orphaned = true; process.exit(1); };
+process.stdin.on("end", stop);
+process.stdin.on("close", stop);
+process.stdin.on("error", stop);
+process.stdin.resume();
 (async () => {
   for (const job of jobs) {
+    if (orphaned) process.exit(1);
     const source = new Database(job.from, { readonly: true, fileMustExist: true });
     try {
       source.pragma("busy_timeout = 5000");
@@ -29,8 +37,6 @@ const ALL_PAGES = 0x7fffffff;
 );
 `;
 
-const driverPath = createRequire(import.meta.url).resolve("better-sqlite3");
-
 export interface SnapshotJob {
   from: string;
   to: string;
@@ -42,6 +48,12 @@ export async function snapshotDatabases(
 ): Promise<void> {
   if (jobs.length === 0) return;
   deadline.check();
+  let driverPath: string;
+  try {
+    driverPath = createRequire(import.meta.url).resolve("better-sqlite3");
+  } catch {
+    throw new FirstRunImportError("the SQLite driver could not be found");
+  }
   const child = spawn(process.execPath, ["-e", snapshotChildSource], {
     env: {
       ...process.env,
@@ -49,7 +61,7 @@ export async function snapshotDatabases(
       BB_STUDIO_SNAPSHOT_DRIVER: driverPath,
       BB_STUDIO_SNAPSHOT_JOBS: JSON.stringify(jobs),
     },
-    stdio: ["ignore", "ignore", "pipe"],
+    stdio: ["pipe", "ignore", "pipe"],
   });
   let stderr = "";
   child.stderr.setEncoding("utf8");
@@ -75,8 +87,8 @@ export async function snapshotDatabases(
     throw new FirstRunImportTimeoutError(deadline.timeoutMs);
   }
   if (result !== 0) {
-    throw new Error(
-      `database copy failed${stderr.length > 0 ? `: ${stderr.trim()}` : ""}`,
+    throw new FirstRunImportError(
+      `database copy failed${stderr.length > 0 ? `: ${stderr.trim().slice(0, 300)}` : ""}`,
     );
   }
 }
