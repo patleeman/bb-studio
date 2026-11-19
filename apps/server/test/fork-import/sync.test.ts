@@ -15,6 +15,7 @@ import {
   copyMissingThreadStorage,
   runForkImportSync,
 } from "../../src/services/fork-import/sync.js";
+import { releaseBbEnvironments } from "../../src/services/fork-import/bb-environments.js";
 import { takeOverMirroredThread } from "../../src/services/fork-import/takeover.js";
 import { seedEvent, seedThread, seedThreadFixture } from "../helpers/seed.js";
 import { withTestHarness } from "../helpers/test-app.js";
@@ -295,6 +296,63 @@ describe("one-way sync from the source bb", () => {
         .prepare("SELECT host_id FROM environments WHERE id = ?")
         .get(environment.id),
     ).toEqual({ host_id: "host_ours" });
+  });
+
+  it("keeps bb's worktree environments plain when a mirror tick copies them again", async () => {
+    const { source, target, dataDir, threadId } = await importedPair();
+    const sourceDir = join(dataDir, "..", "source");
+    const environmentId = target
+      .prepare<[string], { environment_id: string }>(
+        "SELECT environment_id FROM threads WHERE id = ?",
+      )
+      .get(threadId)?.environment_id;
+    if (environmentId === undefined)
+      throw new Error("fixture has no environment");
+    const worktree = join(sourceDir, "worktrees", environmentId, "repo");
+    const managed = {
+      id: environmentId,
+      path: worktree,
+      provider: "git-worktree",
+      plugin: "environment-git-worktree",
+    };
+    const manage = (database: Database.Database, bump: number) =>
+      database
+        .prepare(
+          `UPDATE environments SET path = @path, environment_provider_id = @provider, environment_provider_plugin_id = @plugin,
+             provider_owns_path = 1, retire_at = 1, teardown_status = 'running', updated_at = updated_at + ${String(bump)} WHERE id = @id`,
+        )
+        .run(managed);
+    manage(target, 0);
+    releaseBbEnvironments(target, [sourceDir]);
+    const plain = {
+      environment_provider_id: null,
+      environment_provider_plugin_id: null,
+      provider_owns_path: 0,
+      retire_at: null,
+      teardown_status: null,
+    };
+    const read = () =>
+      target
+        .prepare(
+          "SELECT environment_provider_id, environment_provider_plugin_id, provider_owns_path, retire_at, teardown_status FROM environments WHERE id = ?",
+        )
+        .get(environmentId);
+    expect(read()).toEqual(plain);
+
+    manage(source, 100);
+    const summary = runForkImportSync({
+      dataDir,
+      database: target,
+      logger,
+      now: 7000,
+    });
+    expect(summary?.environments).toBe(1);
+    expect(read()).toEqual(plain);
+    expect(
+      target
+        .prepare("SELECT path FROM environments WHERE id = ?")
+        .get(environmentId),
+    ).toEqual({ path: worktree });
   });
 
   it("stops quietly when bb's folder is gone", async () => {

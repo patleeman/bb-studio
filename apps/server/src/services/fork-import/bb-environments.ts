@@ -32,8 +32,8 @@ export function releaseBbEnvironments(
   if (assignments.length === 0) return 0;
   const update = db.prepare(
     `UPDATE environments SET ${assignments.map((column) => `"${column}" = @${column}`).join(", ")}
-     WHERE status <> 'destroyed'
-       AND (path = @root OR substr(path, 1, length(@root) + 1) = @root || '/')
+     WHERE (status <> 'destroyed' OR teardown_status IS NOT 'removed')
+       AND (path = @root OR substr(path, 1, length(@root) + 1) = @root || '/'${columns.has("claim_path") ? " OR claim_path = @root OR substr(claim_path, 1, length(@root) + 1) = @root || '/'" : ""})
        AND (environment_provider_id IS NOT NULL OR provider_owns_path = 1 OR retire_at IS NOT NULL OR teardown_status IS NOT NULL)`,
   );
   let released = 0;
