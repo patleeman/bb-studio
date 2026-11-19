@@ -1,6 +1,8 @@
-import { constants as fsConstants, readFileSync } from "node:fs";
+import Database from "better-sqlite3";
+import { constants as fsConstants, existsSync, readFileSync } from "node:fs";
 import {
   copyFile,
+  link,
   lstat,
   mkdir,
   readdir,
@@ -16,14 +18,21 @@ import { FORK_IMPORT_STATE_FILE_NAME } from "./state.js";
 
 export const FIRST_RUN_JOURNAL_FILE_NAME = "fork-import-pending.json";
 export const FIRST_RUN_FAILED_FILE_NAME = "fork-import-failed.json";
+export const FIRST_RUN_MAX_ATTEMPTS = 3;
 
 const REPLACED_DIR_NAME = "replaced";
 const COPY_CONCURRENCY = 16;
+const IMPORT_TEMP_SUFFIX = ".import-tmp";
+
+export interface FirstRunJournalEntry {
+  path: string;
+  id: string;
+}
 
 export interface FirstRunJournal {
-  version: 1;
+  version: 2;
   stagingDir: string;
-  added: string[];
+  added: FirstRunJournalEntry[];
   replaced: string[];
 }
 
@@ -34,6 +43,8 @@ export interface FirstRunFailure {
   reason: "timed-out" | "error";
   detail: string;
   message: string;
+  attempts?: number;
+  retryRequested?: boolean;
 }
 
 type Logger = Pick<ServerLogger, "info" | "warn">;
@@ -42,6 +53,13 @@ export class FirstRunImportTimeoutError extends Error {
   constructor(timeoutMs: number) {
     super(`the import did not finish within ${Math.round(timeoutMs / 1000)}s`);
     this.name = "FirstRunImportTimeoutError";
+  }
+}
+
+export class FirstRunImportError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FirstRunImportError";
   }
 }
 
@@ -65,11 +83,34 @@ export function stagingDirPrefix(dataDir: string): string {
   return `.${basename(resolve(dataDir))}-first-run-import-`;
 }
 
+export function failureDetail(error: unknown): string {
+  if (
+    error instanceof FirstRunImportTimeoutError ||
+    error instanceof FirstRunImportError
+  ) {
+    return error.message;
+  }
+  const { code, syscall } = (error ?? {}) as NodeJS.ErrnoException;
+  if (typeof code === "string") {
+    return typeof syscall === "string" ? `${code} (${syscall})` : code;
+  }
+  return error instanceof Error ? error.name : "unknown error";
+}
+
 async function exists(path: string): Promise<boolean> {
   return lstat(path).then(
     () => true,
     () => false,
   );
+}
+
+async function identity(path: string): Promise<string | null> {
+  try {
+    const stats = await lstat(path, { bigint: true });
+    return `${String(stats.dev)}:${String(stats.ino)}`;
+  } catch {
+    return null;
+  }
 }
 
 async function writeFileAtomically(path: string, text: string): Promise<void> {
@@ -105,18 +146,39 @@ async function readJournal(dataDir: string): Promise<FirstRunJournal | null> {
   } catch {
     return null;
   }
+  let value: Partial<FirstRunJournal>;
   try {
-    const value = JSON.parse(text) as Partial<FirstRunJournal>;
-    if (
-      value.version === 1 &&
-      typeof value.stagingDir === "string" &&
-      Array.isArray(value.added) &&
-      Array.isArray(value.replaced)
-    ) {
-      return value as FirstRunJournal;
-    }
-  } catch {}
-  return { version: 1, stagingDir: "", added: [], replaced: [] };
+    value = JSON.parse(text) as Partial<FirstRunJournal>;
+  } catch {
+    throw new FirstRunImportError(
+      "the unfinished import's journal is unreadable",
+    );
+  }
+  if (
+    value.version !== 2 ||
+    typeof value.stagingDir !== "string" ||
+    !Array.isArray(value.added) ||
+    !Array.isArray(value.replaced)
+  ) {
+    throw new FirstRunImportError(
+      "the unfinished import's journal is unreadable",
+    );
+  }
+  return value as FirstRunJournal;
+}
+
+export async function hasFirstRunJournal(dataDir: string): Promise<boolean> {
+  return exists(join(resolve(dataDir), FIRST_RUN_JOURNAL_FILE_NAME));
+}
+
+export async function readFirstRunJournalStaging(
+  dataDir: string,
+): Promise<string | null> {
+  try {
+    return (await readJournal(resolve(dataDir)))?.stagingDir ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function insideDataDir(dataDir: string, relativePath: string): string | null {
@@ -162,14 +224,13 @@ export async function recoverInterruptedFirstRunImport(
     logger.info({ dataDir: root }, "First-run import finished its cleanup");
     return "finished";
   }
-  for (const path of [...journal.added].reverse()) {
-    const absolute = insideDataDir(root, path);
+  let removed = 0;
+  for (const entry of [...journal.added].reverse()) {
+    const absolute = insideDataDir(root, entry.path);
     if (absolute === null) continue;
-    await rm(absolute, { force: true, recursive: true }).catch(
-      (error: NodeJS.ErrnoException) => {
-        if (error.code !== "ENOTDIR") throw error;
-      },
-    );
+    if ((await identity(absolute)) !== entry.id) continue;
+    await rm(absolute, { force: true, recursive: true });
+    removed += 1;
   }
   const staging = journal.stagingDir;
   const stagingOk =
@@ -180,12 +241,17 @@ export async function recoverInterruptedFirstRunImport(
     const absolute = insideDataDir(root, path);
     if (absolute === null || !stagingOk) continue;
     const backup = join(staging, REPLACED_DIR_NAME, ...path.split("/"));
-    if (await exists(backup)) await rename(backup, absolute);
+    if ((await exists(backup)) && !(await exists(absolute))) {
+      await rename(backup, absolute);
+    }
   }
-  await removeEmptyParents(root, journal.added);
+  await removeEmptyParents(
+    root,
+    journal.added.map((entry) => entry.path),
+  );
   await rm(join(root, FIRST_RUN_JOURNAL_FILE_NAME), { force: true });
   logger.warn(
-    { dataDir: root, added: journal.added.length },
+    { dataDir: root, removed },
     "First-run import was interrupted; took the half-moved import back out",
   );
   return "rolled-back";
@@ -227,20 +293,24 @@ export async function moveIntoDataDir(
 ): Promise<void> {
   const dataDir = resolve(args.dataDir);
   const replaced: string[] = [];
+  const added: FirstRunJournalEntry[] = [];
   for (const path of args.paths) {
     const destination = insideDataDir(dataDir, path);
     if (destination === null) throw new Error(`unsafe import path ${path}`);
     if (await exists(destination)) {
       if (!args.replaceable.has(path)) {
-        throw new Error(`the data dir already has ${path}`);
+        throw new FirstRunImportError(`the data dir already has ${path}`);
       }
       replaced.push(path);
     }
+    const id = await identity(join(args.filesDir, ...path.split("/")));
+    if (id === null) throw new FirstRunImportError(`${path} was not staged`);
+    added.push({ path, id });
   }
   const journal: FirstRunJournal = {
-    version: 1,
+    version: 2,
     stagingDir: args.stagingDir,
-    added: [...args.paths],
+    added,
     replaced,
   };
   await writeFileAtomically(
@@ -297,10 +367,20 @@ export function readFirstRunFailure(dataDir: string): FirstRunFailure | null {
   }
 }
 
+export function failureAttempts(failure: FirstRunFailure): number {
+  return typeof failure.attempts === "number" && failure.attempts > 0
+    ? failure.attempts
+    : 1;
+}
+
 export function firstRunFailureMessage(
   sourceDataDir: string,
   reason: FirstRunFailure["reason"],
+  attempts = 1,
 ): string {
+  if (attempts >= FIRST_RUN_MAX_ATTEMPTS) {
+    return `BB Studio tried ${String(attempts)} times to copy your bb data from ${sourceDataDir} and could not, so it started without it. Your bb data there is unchanged.`;
+  }
   return reason === "timed-out"
     ? `BB Studio could not copy your bb data from ${sourceDataDir} in time, so it started without it. Your bb data there is unchanged.`
     : `BB Studio could not copy your bb data from ${sourceDataDir}, so it started without it. Your bb data there is unchanged.`;
@@ -327,6 +407,8 @@ export async function copyMissingFiles(
   fromRoot: string,
   toRoot: string,
 ): Promise<{ copied: number; failed: number }> {
+  const rootStats = await lstat(fromRoot).catch(() => null);
+  if (rootStats?.isDirectory() !== true) return { copied: 0, failed: 0 };
   const files = await listFiles(fromRoot);
   const directories = [
     ...new Set(files.map((file) => dirname(join(toRoot, ...file.split("/"))))),
@@ -340,18 +422,69 @@ export async function copyMissingFiles(
   const worker = async (): Promise<void> => {
     while (next < files.length) {
       const file = files[next++]!.split("/");
+      const destination = join(toRoot, ...file);
+      const temp = `${destination}${IMPORT_TEMP_SUFFIX}`;
       try {
+        if (await exists(destination)) {
+          await rm(temp, { force: true });
+          continue;
+        }
         await copyFile(
           join(fromRoot, ...file),
-          join(toRoot, ...file),
-          fsConstants.COPYFILE_EXCL | fsConstants.COPYFILE_FICLONE,
+          temp,
+          fsConstants.COPYFILE_FICLONE,
         );
-        copied += 1;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "EEXIST") failed += 1;
+        try {
+          await link(temp, destination);
+          copied += 1;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        } finally {
+          await rm(temp, { force: true });
+        }
+      } catch {
+        failed += 1;
       }
     }
   };
   await Promise.all(Array.from({ length: COPY_CONCURRENCY }, worker));
   return { copied, failed };
+}
+
+export function cleanStartHasUserContent(dataDir: string): boolean {
+  const path = join(dataDir, "bb.db");
+  if (!existsSync(path)) return false;
+  let database: Database.Database | null = null;
+  try {
+    database = new Database(path, { readonly: true, fileMustExist: true });
+    database.pragma("busy_timeout = 1000");
+    const threads = database
+      .prepare<[], { id: string }>(
+        "SELECT id FROM threads WHERE deleted_at IS NULL LIMIT 2",
+      )
+      .all();
+    if (threads.length > 1) return true;
+    if (threads.length === 0) return false;
+    const turns = database
+      .prepare<[string], { count: number }>(
+        "SELECT COUNT(*) AS count FROM events WHERE thread_id = ? AND type = 'client/turn/requested'",
+      )
+      .get(threads[0]!.id);
+    return (turns?.count ?? 0) > 1;
+  } catch {
+    return true;
+  } finally {
+    database?.close();
+  }
+}
+
+export function firstRunRetryPending(
+  dataDir: string,
+  failure: FirstRunFailure,
+): boolean {
+  return (
+    (failure.retryRequested === true ||
+      failureAttempts(failure) < FIRST_RUN_MAX_ATTEMPTS) &&
+    !cleanStartHasUserContent(dataDir)
+  );
 }
