@@ -116,7 +116,8 @@ function PluginRow({ plugin, onAdded }: { plugin: BringOverPlugin; onAdded(): vo
   return (
     <Row label={plugin.id} description={<>{description}{error ? <span className="block text-destructive">{error}</span> : null}</>} testId={`bring-over-plugin-${plugin.id}`}>
       {plugin.here || note ? <span className="text-xs text-muted-foreground">{note ?? "Already here"}</span>
-        : plugin.sourceMissing ? <span className="text-xs text-muted-foreground">Source gone</span>
+        : plugin.sourceMissing ? <span className="text-xs text-muted-foreground">Not found here</span>
+        : plugin.needsNewer ? <span className="text-xs text-muted-foreground">Needs a newer BB Studio</span>
         : <Button size="sm" variant="outline" disabled={busy} onClick={() => void add()}>Add</Button>}
     </Row>
   );
@@ -135,7 +136,8 @@ export function BringOverSection() {
   useEffect(() => {
     if (!requested || !state?.available) return;
     requested = false;
-    ref.current?.scrollIntoView({ block: "start" });
+    const timers = [0, 300, 800, 1600, 2500].map((ms) => setTimeout(() => ref.current?.scrollIntoView({ block: "start" }), ms));
+    return () => timers.forEach(clearTimeout);
   }, [state?.available]);
   const running = state?.job?.state === "running";
   useEffect(() => {

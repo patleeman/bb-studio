@@ -6,7 +6,7 @@
 export interface BringOverProject { id: string; name: string; threads: number; threadsHere: number; lastActivityAt: number | null; joins: { id: string; name: string } | null }
 export interface BringOverThread { id: string; title: string; updatedAt: number; archived: boolean; attachments: number; here: boolean }
 export interface BringOverSetting { id: string; label: string; detail: string; secret: boolean; count: number }
-export interface BringOverPlugin { id: string; version: string | null; source: string; sourceKind: string; enabled: boolean; hasData: boolean; here: boolean; sourceMissing: boolean }
+export interface BringOverPlugin { id: string; version: string | null; source: string; sourceKind: string; enabled: boolean; hasData: boolean; here: boolean; sourceMissing: boolean; needsNewer?: string | null }
 export interface BringOverJob {
   id: string;
   state: "running" | "done" | "failed" | "cancelled";

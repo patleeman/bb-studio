@@ -23,6 +23,7 @@ const listing: BringOverState = {
   plugins: [
     { id: "acme-tool", version: "1.0.0", source: "/src/acme", sourceKind: "path", enabled: true, hasData: true, here: false, sourceMissing: false },
     { id: "gone-tool", version: null, source: "/nowhere", sourceKind: "path", enabled: true, hasData: false, here: false, sourceMissing: true },
+    { id: "future-tool", version: null, source: "/src/future", sourceKind: "path", enabled: true, hasData: false, here: false, sourceMissing: false, needsNewer: ">=99.0.0" },
   ],
   job: null,
 };
@@ -112,7 +113,8 @@ describe("BringOverSection", () => {
       "POST /api/v1/fork/bring-over/plugins/acme-tool/add": () => (fail ? json({ message: "acme-tool could not be installed from /src/acme: no manifest" }, 422) : json({ id: "acme-tool", data: true })),
     });
     await render();
-    expect($('[data-testid="bring-over-plugin-gone-tool"]')?.textContent).toContain("Source gone");
+    expect($('[data-testid="bring-over-plugin-gone-tool"]')?.textContent).toContain("Not found here");
+    expect($('[data-testid="bring-over-plugin-future-tool"]')?.textContent).toContain("Needs a newer BB Studio");
     await act(async () => { button("Add")!.click(); });
     expect($('[data-testid="bring-over-plugin-acme-tool"]')?.textContent).toContain("no manifest");
     fail = false;
