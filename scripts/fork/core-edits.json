@@ -646,6 +646,11 @@
       "intent": "APP_COMMAND_IDS lists \"panel.closeAll\" right after \"panel.close\".",
       "budget": 1
     },
+    "apps/server/src/services/system/cli-command.ts": {
+      "seam": "beside-bb",
+      "intent": "A `bb` link counts as this app's (installed, replaced or removed) only when it points at this app's own launcher (pointsAtOwnLauncher, cli-command.fork.ts, imported under the marker import). Stock bb writes the same launcher marker, so without the check BB Studio would replace or delete stock bb's `bb` link; with it, stock bb's link reads as the `bb` already on PATH.",
+      "budget": 7
+    },
     "apps/server/src/services/system/app-keybindings.ts": {
       "seam": "close-all",
       "intent": "The default keymap binds panel.closeAll to Mod+Alt+W (⌥⌘W on a Mac), desktop only, in the main surface without a modal, right after panel.close.",
