@@ -6,7 +6,6 @@ import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
 import { Icon } from "@bb/shared-ui/icon";
 import { appToast } from "@/components/ui/app-toast";
 import bbLogoUrl from "../../../../../../assets/bb-logo.svg";
-import { OpenPluginGuideButton } from "./OpenPluginGuideButton";
 import { cn } from "@bb/shared-ui/lib/utils";
 import {
   ResourceCollectionViewport,
@@ -241,7 +240,6 @@ export function BrowsePluginsTab({
               </ResourceTabDescription>
             ) : (
               <div className="flex items-center justify-between gap-3">
-                <OpenPluginGuideButton />
                 {createAction}
               </div>
             )}
