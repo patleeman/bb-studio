@@ -7,7 +7,11 @@ import {
   readFileChunkForTransport,
   readFileForTransport,
 } from "./file-read.js";
-import { forkReadWithinRoot, openRefusingSymlinks } from "./file-read.fork.js";
+import {
+  forkReadError,
+  forkReadWithinRoot,
+  openRefusingSymlinks,
+} from "./file-read.fork.js";
 
 const PNG = Buffer.from("89504e470d0a1a0a0000", "hex");
 const FLIP = `
@@ -68,7 +72,7 @@ describe("reading a file inside a root (BB Studio)", () => {
     await fs.symlink(outside, path.join(root, "shots"));
     const error = await forkReadWithinRoot(
       file,
-      { resolvedPath: file, rootPath: root },
+      { resolvedPath: file, resultPath: "shots/a.png", rootPath: root },
       1024,
     ).catch((caught: unknown) => caught);
     expect(error).toMatchObject({
@@ -83,7 +87,11 @@ describe("reading a file inside a root (BB Studio)", () => {
     await fs.rm(file);
     await fs.symlink(path.join(outside, "a.png"), file);
     await expect(
-      forkReadWithinRoot(file, { resolvedPath: file, rootPath: root }, 1024),
+      forkReadWithinRoot(
+        file,
+        { resolvedPath: file, resultPath: "shots/a.png", rootPath: root },
+        1024,
+      ),
     ).rejects.toMatchObject({
       code: "file_changed",
       message: "File changed during read",
@@ -113,7 +121,11 @@ describe("reading a file inside a root (BB Studio)", () => {
                 ? (
                     await forkReadWithinRoot(
                       readable,
-                      { resolvedPath: file, rootPath: root },
+                      {
+                        resolvedPath: file,
+                        resultPath: "shots/a.png",
+                        rootPath: root,
+                      },
                       1024,
                     )
                   ).fileContents
@@ -178,7 +190,7 @@ describe("reading a file inside a root (BB Studio)", () => {
     const { root, file } = await setup();
     const read = await forkReadWithinRoot(
       file,
-      { resolvedPath: file, rootPath: root },
+      { resolvedPath: file, resultPath: "shots/a.png", rootPath: root },
       4,
     );
     expect(read.stat.size).toBe(PNG.length);
@@ -208,16 +220,55 @@ describe("reading a file inside a root (BB Studio)", () => {
       return (realRead as (...a: unknown[]) => unknown).apply(this, args);
     } as never);
     await expect(
-      forkReadWithinRoot(file, { resolvedPath: file, rootPath: root }, 1024),
+      forkReadWithinRoot(
+        file,
+        { resolvedPath: file, resultPath: "shots/a.png", rootPath: root },
+        1024,
+      ),
     ).rejects.toMatchObject({ code: "file_changed" });
     grown = false;
     await fs.writeFile(file, PNG);
     await expect(
       forkReadWithinRoot(
         file,
-        { resolvedPath: file, rootPath: root },
+        { resolvedPath: file, resultPath: "shots/a.png", rootPath: root },
         PNG.length,
       ),
     ).rejects.toMatchObject({ code: "file_too_large" });
+  });
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "refuses a rooted file it may not read without naming the real path",
+    async () => {
+      const { root, file } = await setup();
+      await fs.chmod(file, 0o000);
+      try {
+        const error = await readFileForTransport(rooted(root, file)).catch(
+          (caught: unknown) => caught,
+        );
+        expect(error).toMatchObject({
+          code: "invalid_path",
+          message: 'Path "shots/a.png" can\'t be read',
+          name: "ExpectedCommandDispatchError",
+        });
+      } finally {
+        await fs.chmod(file, 0o644);
+      }
+    },
+  );
+
+  it("maps a realpath EINVAL during a flip to file_changed with no path", () => {
+    const raw = Object.assign(
+      new Error("EINVAL: invalid argument, realpath '/private/real/path'"),
+      { code: "EINVAL" },
+    );
+    expect(() => forkReadError({ resultPath: "a.png" })(raw)).toThrow(
+      expect.objectContaining({
+        code: "file_changed",
+        message: "File changed during read",
+      }),
+    );
+    const other = new Error("boom");
+    expect(() => forkReadError({ resultPath: "a.png" })(other)).toThrow(other);
   });
 });
