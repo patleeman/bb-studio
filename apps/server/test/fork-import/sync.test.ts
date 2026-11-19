@@ -7,6 +7,11 @@ import { turnScope } from "@bb/domain";
 import { afterEach, describe, expect, it } from "vitest";
 import { createMirroredInstall } from "./mirrored-install.js";
 import {
+  createConnection,
+  listOpenBackgroundTaskItemRowsForThread,
+  listThreadIdsWithLatestHostDaemonRestartInterruption,
+} from "@bb/db";
+import {
   closeForkImportDatabases,
   isMirroredReadOnly,
   openForkImportDatabase,
@@ -31,6 +36,10 @@ afterEach(async () => {
     roots.splice(0).map((root) => rm(root, { force: true, recursive: true })),
   );
 });
+
+function drizzleOver(dataDir: string) {
+  return createConnection(join(dataDir, "bb.db"));
+}
 
 async function importedPair(): Promise<{
   source: Database.Database;
@@ -232,7 +241,14 @@ describe("one-way sync from the source bb", () => {
     expect(takeOver().note).toContain("separate");
 
     expect(isMirroredReadOnly(dataDir, threadId)).toBe(false);
-    expect(eventCount(target, threadId)).toBe(3);
+    expect(eventCount(target, threadId)).toBe(4);
+    expect(
+      target
+        .prepare(
+          "SELECT COUNT(*) AS n FROM events WHERE thread_id = ? AND type = 'system/operation'",
+        )
+        .get(threadId),
+    ).toEqual({ n: 1 });
     expect(takeOver).toThrowError(
       expect.objectContaining({ reason: "already_taken_over" }),
     );
@@ -353,6 +369,101 @@ describe("one-way sync from the source bb", () => {
         .prepare("SELECT path FROM environments WHERE id = ?")
         .get(environmentId),
     ).toEqual({ path: worktree });
+  });
+
+  it("a thread bb left cut off by a restart is not resumed on its own after it is taken over", async () => {
+    const { source, target, dataDir, threadId } = await importedPair();
+    const row = source
+      .prepare<
+        [string],
+        { environment_id: string; provider_thread_id: string }
+      >(
+        "SELECT environment_id, provider_thread_id FROM events WHERE thread_id = ? ORDER BY sequence DESC LIMIT 1",
+      )
+      .get(threadId)!;
+    const insert = source.prepare(
+      `INSERT INTO events (id, thread_id, environment_id, scope_kind, turn_id, provider_thread_id, sequence, type, item_id, item_kind, data, created_at)
+       VALUES (@id, @thread, @environment, 'thread', NULL, @provider, @sequence, @type, @item, @kind, @data, 10)`,
+    );
+    const base = {
+      thread: threadId,
+      environment: row.environment_id,
+      provider: row.provider_thread_id,
+    };
+    insert.run({
+      ...base,
+      id: "evt_bg_start",
+      sequence: 3,
+      type: "item/started",
+      item: "bg_dev",
+      kind: "backgroundTask",
+      data: JSON.stringify({
+        item: {
+          type: "backgroundTask",
+          id: "bg_dev",
+          taskType: "shell",
+          description: "npm run dev",
+          status: "pending",
+          taskStatus: "running",
+          skipTranscript: false,
+          foreground: false,
+        },
+      }),
+    });
+    insert.run({
+      ...base,
+      id: "evt_cut",
+      sequence: 4,
+      type: "system/thread/interrupted",
+      item: null,
+      kind: null,
+      data: JSON.stringify({ reason: "host-daemon-restarted" }),
+    });
+    source
+      .prepare(
+        "UPDATE threads SET status = 'error', updated_at = updated_at + 100 WHERE id = ?",
+      )
+      .run(threadId);
+    runForkImportSync({ dataDir, database: target, logger, now: 3000 });
+
+    const here = drizzleOver(dataDir);
+    try {
+      expect(
+        listThreadIdsWithLatestHostDaemonRestartInterruption(here, {
+          threadIds: [threadId],
+        }),
+      ).toEqual([threadId]);
+      expect(isMirroredReadOnly(dataDir, threadId)).toBe(true);
+
+      takeOverMirroredThread({
+        dataDir,
+        database: target,
+        logger,
+        threadId,
+        now: 4000,
+      });
+
+      expect(isMirroredReadOnly(dataDir, threadId)).toBe(false);
+      expect(
+        listThreadIdsWithLatestHostDaemonRestartInterruption(here, {
+          threadIds: [threadId],
+        }),
+      ).toEqual([]);
+      expect(
+        listOpenBackgroundTaskItemRowsForThread(here, { threadId }),
+      ).toEqual([]);
+      const newest = target
+        .prepare<[string], { type: string; data: string }>(
+          "SELECT type, data FROM events WHERE thread_id = ? ORDER BY sequence DESC LIMIT 1",
+        )
+        .get(threadId)!;
+      expect(newest.type).toBe("system/operation");
+      expect(JSON.parse(newest.data)).toMatchObject({
+        operation: "brought_over_from_bb",
+      });
+    } finally {
+      here.$client.close();
+    }
   });
 
   it("stops quietly when bb's folder is gone", async () => {
