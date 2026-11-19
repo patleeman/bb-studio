@@ -4,7 +4,7 @@ import { registerForkApprovalIpc } from "./fork-approvals.js";
 import { registerForkWindowIpc } from "./fork-windows.js";
 import { registerForkFinderIpc } from "./fork-finder.js";
 import { registerForkActivityIpc } from "./fork-activity.js";
-import { registerForkUiToken, registerForkUiTokenIpc } from "./fork-ui-token.js";
+import { forkUiTokenEnv, registerForkUiTokenIpc } from "./fork-ui-token.js";
 import { pathToFileURL } from "node:url";
 import { spawnHostProcess as spawn, hostToolchain } from "@bb/process-utils";
 import { openApplicationUrl } from "./application-url.js";
@@ -2569,6 +2569,7 @@ async function spawnOwnedRuntime(
     env: {
       ...process.env,
       [APP_SURFACE_ENV_NAME]: APP_SURFACE_DESKTOP,
+      ...forkUiTokenEnv(),
     },
     logLineLimit: PROCESS_LOG_LINE_LIMIT,
     runtime: resolveBbAppProcessRuntime({
@@ -2696,7 +2697,6 @@ async function startOwnedRuntime(
       timeoutMs: STARTUP_TIMEOUT_MS,
     }).then(async (result) => {
       if (result.kind === "compatible") {
-        void registerForkUiToken(args.serverUrl);
         await waitForOwnedRuntimeReady(bbProcess);
       }
       return { kind: "server-probe", result };
