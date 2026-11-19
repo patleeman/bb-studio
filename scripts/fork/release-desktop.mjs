@@ -15,6 +15,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assertStudioVersion,
+  formatStudioUpstream,
   parseStudioRelease,
   STUDIO_UPDATE_TEST_ENV,
 } from "../../apps/desktop/scripts/studio-release.fork.mjs";
@@ -253,7 +254,7 @@ function desktopTipAt(ref) {
 function draftNotes({ version, since, desktopTip }) {
   const upstream = upstreamOf(desktopTip);
   const lines = [
-    `BB Studio ${version} (based on bb ${upstream.version} @ ${upstream.commit.slice(0, 7)}) for macOS (Apple silicon). The app is signed with a Developer ID and notarized by Apple. Installed copies update themselves once this release is published; to install by hand, open the DMG and drag BB Studio to Applications.`,
+    `BB Studio ${version} (${formatStudioUpstream(upstream)}) for macOS (Apple silicon). The app is signed with a Developer ID and notarized by Apple. Installed copies update themselves once this release is published; to install by hand, open the DMG and drag BB Studio to Applications.`,
     "",
   ];
   if (since !== null) {
