@@ -152,10 +152,7 @@ describe("first-run import safety", () => {
         "config.json",
         "fork-import.db",
         FORK_IMPORT_STATE_FILE_NAME,
-        "plugins/cache/npm/pkg/1.0.0/dist/index.js",
-        "plugins/studio/data.db",
-        "plugins/studio/files/page.md",
-        "plugins/studio/secrets/key",
+        "fork-import-plugins.json",
         "server-connect-hold.json",
         "server-import.json",
         "skills/one/SKILL.md",
@@ -166,7 +163,7 @@ describe("first-run import safety", () => {
       ".DS_Store",
       "skills/one/.DS_Store",
       "telemetry-id",
-      "plugins/snapshots/",
+      "plugins/",
       "plugins/mobile/",
       "plugins/account-pool/",
       "plugins/studio/logs/",
@@ -213,7 +210,12 @@ describe("first-run import safety", () => {
       join(target, "config.json"),
       '{"serverUrl":"http://127.0.0.1:1"}\n',
     );
-    await writeFile(join(target, "plugins"), "not a folder");
+    await writeFile(join(target, "server-import.json.lock"), "x");
+    await mkdir(join(target, "skills"), { recursive: true });
+    await writeFile(
+      join(target, "skills", "one"),
+      "a file where the import needs a folder",
+    );
     const before = listTree(target);
 
     await expect(
@@ -575,7 +577,7 @@ describe("first-run import review fixes", () => {
     ]) {
       expect(existsSync(join(backup, kept))).toBe(true);
     }
-    expect(existsSync(join(target, "plugins", "studio", "data.db"))).toBe(true);
+    expect(existsSync(join(target, "fork-import-plugins.json"))).toBe(true);
   });
 
   it("does not try again once BB Studio has threads of its own", async () => {
