@@ -138,8 +138,8 @@
     },
     "apps/app/src/lib/thread-actions/thread-action-registry.tsx": {
       "seam": "app-route",
-      "intent": "The stable BbNavigate that thread actions build spreads forkLatestNavigate(latest) (plugin-navigation.fork.ts) first, so the fork's navigate methods forward too.",
-      "budget": 2
+      "intent": "useLatestNavigate takes forkNavigate = useForkLatestNavigate(latest) (plugin-navigation.fork.ts, imported at the top of the file) and its stable BbNavigate spreads it first, so the fork's navigate methods forward too. A hook rather than a call with the ref, so the React Compiler accepts it.",
+      "budget": 3
     },
     "apps/app/src/main.tsx": {
       "seam": "fork-styles",
