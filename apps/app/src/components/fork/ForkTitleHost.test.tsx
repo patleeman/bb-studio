@@ -268,7 +268,7 @@ describe("where bb puts its title hosts", () => {
       </PageShell>,
     );
     const column = document.querySelector("[data-page-scroll-viewport]")
-      ?.firstElementChild as HTMLElement;
+      ?.firstElementChild?.firstElementChild as HTMLElement;
     expect(column.firstElementChild).toBe(host());
   });
 });
