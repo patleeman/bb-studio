@@ -779,6 +779,10 @@
     {
       "file": "packages/server-contract/test/contract.test.ts",
       "title": "keeps contract optional fields on an explicit allowlist"
+    },
+    {
+      "file": "apps/server/test/system/cli-command.test.ts",
+      "title": "repoints a link left by a bb that used another data directory"
     }
   ],
   "removeLines": [
