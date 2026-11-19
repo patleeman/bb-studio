@@ -197,6 +197,8 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     store.idle(thread.id, lastAssistantText);
     void store.repliedSince(thread.id).catch(() => false);
     threadChanged(thread.id);
+    // A mention of a thread Studio keeps no title for reads as its BB title once BB answers.
+    void store.nameMentions(thread.id, lastAssistantText).catch(() => {});
   });
   // A turn starting or failing, or a question, is real activity (BB's updated_at isn't: the importer moves it).
   for (const event of ["thread.active", "thread.failed"] as const) bb.events.on(event, ({ thread }) => { if (known(thread.id)) { store.touched(thread.id); threadChanged(thread.id); } });
@@ -235,9 +237,9 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
       rechecked.add(threadId);
       const events = await bb.sdk.threads.events.list({ threadId, order: "desc", limit: "60", types: ["item/completed"] } as never).catch(() => []) as { data?: { item?: { type?: string; text?: string } } }[];
       const reply = events.map((event) => event.data?.item).find((item) => item?.type === "agentMessage" && !!latestLine(item.text))?.text ?? null;
-      if (reply) { store.fillLatest(threadId, reply, true); return; }
+      if (reply) { store.fillLatest(threadId, reply, true, await store.mentionTitles(reply)); return; }
       const output = await bb.sdk.threads.output({ threadId }).catch(() => null) as { output?: string | null } | null;
-      store.fillLatest(threadId, output?.output ?? null);
+      store.fillLatest(threadId, output?.output ?? null, false, await store.mentionTitles(output?.output));
     }));
   };
   const rechecked = new Set<string>();

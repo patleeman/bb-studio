@@ -215,6 +215,25 @@ it("keeps a conversation's latest reply, skips quiet ones, and hands a deleted c
   expect(store.get("w")!.ownerConversationId).toBe("thr_main");
 });
 
+it("names a mentioned conversation by its BB title once BB answers, unless a newer line came first", async () => {
+  const { store, changes } = setup([{ id: "thr_main" }, { id: "conv" }, { id: "thr_report", title: "Kettle report" }, { id: "thr_untitled" }]);
+  await store.backfill();
+  const text = "Done: @thread:thr_report and @thread:thr_untitled.";
+  store.idle("conv", text);
+  expect(store.get("conv")!.latest?.text).toBe("Done: a conversation and a conversation.");
+  const before = changes();
+  await store.nameMentions("conv", text);
+  expect(store.get("conv")!.latest?.text).toBe("Done: Kettle report and a conversation.");
+  expect(changes()).toBeGreaterThan(before);
+  // A newer line wins over a late title.
+  store.idle("conv", "Report: @thread:thr_report");
+  store.idle("conv", "Something newer.");
+  await store.nameMentions("conv", "Report: @thread:thr_report");
+  expect(store.get("conv")!.latest?.text).toBe("Something newer.");
+  // A lazy fill reads the titles it is given; Main stays Main.
+  expect([...(await store.mentionTitles("@thread:thr_main @thread:thr_report @thread:thr_gone"))]).toEqual([["thr_report", "Kettle report"]]);
+});
+
 it("lets the user rename and archive a conversation, but not archive Main", async () => {
   const { store } = setup([{ id: "thr_main" }, { id: "conv" }]);
   await store.backfill();
