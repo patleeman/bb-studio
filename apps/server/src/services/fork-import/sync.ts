@@ -17,7 +17,6 @@ type Row = Record<string, unknown>;
 
 const RUNNING_STATUSES = new Set(["starting", "active", "stopping"]);
 const THREAD_SCOPED_TABLES = [
-  "thread_plugin_metadata",
   "thread_conversation_outlines",
   "thread_tabs",
   "project_attachment_threads",
