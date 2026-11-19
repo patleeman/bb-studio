@@ -12,6 +12,7 @@ export interface StudioUpdateTest {
 export interface StudioBuild {
   test: StudioUpdateTest | null;
   updateFeed: StudioAutoUpdateFeed;
+  upstreamAhead: number | null;
   upstreamCommit: string;
   upstreamVersion: string;
   version: string;
@@ -79,6 +80,12 @@ export function parseStudioBuild(raw: string | undefined): StudioBuild | null {
   return {
     test: parseTest(value.test),
     updateFeed,
+    upstreamAhead:
+      typeof value.upstreamAhead === "number" &&
+      Number.isInteger(value.upstreamAhead) &&
+      value.upstreamAhead >= 0
+        ? value.upstreamAhead
+        : null,
     upstreamCommit: value.upstreamCommit,
     upstreamVersion: value.upstreamVersion,
     version: value.version,
@@ -86,8 +93,18 @@ export function parseStudioBuild(raw: string | undefined): StudioBuild | null {
   };
 }
 
-export function formatStudioBase(build: StudioBuild): string {
-  return `based on bb ${build.upstreamVersion} @ ${build.upstreamCommit.slice(0, 7)}`;
+export function formatStudioBase(
+  build: Pick<
+    StudioBuild,
+    "upstreamAhead" | "upstreamCommit" | "upstreamVersion"
+  >,
+): string {
+  const ahead = build.upstreamAhead;
+  const past =
+    ahead === null || ahead === 0
+      ? ""
+      : ` + ${ahead} ${ahead === 1 ? "commit" : "commits"}`;
+  return `based on bb ${build.upstreamVersion}${past} @ ${build.upstreamCommit.slice(0, 7)}`;
 }
 
 export function formatStudioAboutVersion(
