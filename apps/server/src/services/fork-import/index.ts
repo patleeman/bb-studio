@@ -12,15 +12,10 @@ import {
   readForkImportState,
   writeCursor,
 } from "./state.js";
+import { currentBringOverJob } from "./bring-over/job.js";
+import type { PluginInstaller } from "./bring-over/plugins.js";
+import { registerBringOverRoutes } from "./bring-over/routes.js";
 import {
-  cleanStartHasUserContent,
-  failureAttempts,
-  firstRunRetryPending,
-  readFirstRunFailure,
-  writeFirstRunFailure,
-} from "./first-run-install.js";
-import {
-  copyMissingAttachments,
   copyMissingThreadStorage,
   runForkImportSync,
   type ForkSyncSummary,
@@ -120,23 +115,6 @@ const FORK_SWEEP_JOBS: readonly ForkSweepJob[] = [
         },
       }),
   },
-  {
-    cadenceMs: SYNC_CADENCE_MS,
-    category: "maintenance",
-    name: "fork-import-attachments",
-    background: true,
-    sweep: (deps) =>
-      defineSingleItemSweep({
-        name: "fork-import-attachments",
-        process: async () => {
-          if (activeDataDir === null || !hasForkImport(activeDataDir)) return;
-          await copyMissingAttachments({
-            dataDir: activeDataDir,
-            logger: deps.logger,
-          });
-        },
-      }),
-  },
 ];
 
 async function startForkImportSweeps(
@@ -163,21 +141,11 @@ function lastSummary(dataDir: string): ForkSyncSummary | null {
 function importStatus(deps: AppDeps) {
   const state = readForkImportState(requireDataDir());
   if (state === null || !hasForkImport(requireDataDir())) {
-    const failure = readFirstRunFailure(requireDataDir());
-    return failure === null
-      ? { imported: false as const }
-      : {
-          imported: false as const,
-          failure: {
-            sourceDataDir: failure.sourceDataDir,
-            failedAt: failure.failedAt,
-            reason: failure.reason,
-            message: failure.message,
-            attempts: failureAttempts(failure),
-            canRetry: !cleanStartHasUserContent(requireDataDir()),
-            retryPending: firstRunRetryPending(requireDataDir(), failure),
-          },
-        };
+    return {
+      imported: false as const,
+      bringOver:
+        activeDataDir === null ? null : currentBringOverJob(activeDataDir),
+    };
   }
   const fork = openForkImportDatabase(requireDataDir());
   const counts = fork
@@ -201,26 +169,14 @@ function importStatus(deps: AppDeps) {
   };
 }
 
-export function registerForkImportRoutes(app: Hono, deps: AppDeps): void {
+export function registerForkImportRoutes(
+  app: Hono,
+  deps: AppDeps,
+  plugins: PluginInstaller | null = null,
+): void {
+  registerBringOverRoutes(app, deps, requireDataDir, plugins);
   if (activeDataDir !== null) void startForkImportSweeps(deps, activeDataDir);
   app.get("/fork/import", (context) => context.json(importStatus(deps)));
-
-  app.post("/fork/import/retry", async (context) => {
-    const dataDir = requireDataDir();
-    const failure = readFirstRunFailure(dataDir);
-    if (failure === null) {
-      throw new ApiError(409, "invalid_request", "No import failed here");
-    }
-    if (cleanStartHasUserContent(dataDir)) {
-      throw new ApiError(
-        409,
-        "invalid_request",
-        "BB Studio has threads of its own now, so the import won't replace them",
-      );
-    }
-    await writeFirstRunFailure(dataDir, { ...failure, retryRequested: true });
-    return context.json(importStatus(deps));
-  });
 
   app.post("/fork/import/sync", (context) => {
     const summary = runForkImportSync({

@@ -36,11 +36,21 @@ function when(value: unknown): string {
 
 function printStatus(status: Record<string, unknown>): void {
   if (status.imported !== true) {
-    const failure = status.failure as { message?: unknown } | undefined;
+    const job = status.bringOver as
+      | {
+          state?: unknown;
+          threadsImported?: unknown;
+          threadsSkipped?: unknown;
+          failures?: unknown[];
+        }
+      | null
+      | undefined;
+    if (job === null || job === undefined) {
+      console.log("Nothing was brought over from bb yet.");
+      return;
+    }
     console.log(
-      typeof failure?.message === "string"
-        ? failure.message
-        : "Nothing was imported into this server.",
+      `Last bring-over: ${String(job.state)}, ${String(job.threadsImported)} threads brought over, ${String(job.threadsSkipped)} already here, ${String(job.failures?.length ?? 0)} failed`,
     );
     return;
   }

@@ -1,10 +1,6 @@
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
-import {
-  FirstRunImportError,
-  FirstRunImportTimeoutError,
-  type ImportDeadline,
-} from "./first-run-install.js";
+import { BringOverError, throwIfCancelled } from "./files.js";
 
 export const snapshotChildSource = String.raw`
 "use strict";
@@ -44,15 +40,15 @@ export interface SnapshotJob {
 
 export async function snapshotDatabases(
   jobs: readonly SnapshotJob[],
-  deadline: ImportDeadline,
+  signal?: AbortSignal,
 ): Promise<void> {
   if (jobs.length === 0) return;
-  deadline.check();
+  throwIfCancelled(signal);
   let driverPath: string;
   try {
     driverPath = createRequire(import.meta.url).resolve("better-sqlite3");
   } catch {
-    throw new FirstRunImportError("the SQLite driver could not be found");
+    throw new BringOverError("the SQLite driver could not be found");
   }
   const child = spawn(process.execPath, ["-e", snapshotChildSource], {
     env: {
@@ -72,23 +68,18 @@ export async function snapshotDatabases(
     child.once("exit", (code) => resolve(code));
     child.once("error", () => resolve(null));
   });
-  let timer: NodeJS.Timeout | undefined;
-  const timedOut = new Promise<"timed-out">((resolve) => {
-    timer = setTimeout(
-      () => resolve("timed-out"),
-      Math.max(0, deadline.at - Date.now()),
-    );
-  });
-  const result = await Promise.race([exited, timedOut]);
-  clearTimeout(timer);
-  if (result === "timed-out") {
-    child.kill("SIGKILL");
-    await exited;
-    throw new FirstRunImportTimeoutError(deadline.timeoutMs);
+  const onAbort = () => child.kill("SIGKILL");
+  signal?.addEventListener("abort", onAbort, { once: true });
+  let code: number | null;
+  try {
+    code = await exited;
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
   }
-  if (result !== 0) {
-    throw new FirstRunImportError(
-      `database copy failed${stderr.length > 0 ? `: ${stderr.trim().slice(0, 300)}` : ""}`,
+  throwIfCancelled(signal);
+  if (code !== 0) {
+    throw new BringOverError(
+      `the copy of bb's database failed${stderr.length > 0 ? `: ${stderr.trim().slice(0, 300)}` : ""}`,
     );
   }
 }
