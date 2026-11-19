@@ -1,4 +1,4 @@
-import { forkReadWithinRoot } from "./file-read.fork.js";
+import { forkOpenWithinRoot, forkReadWithinRoot } from "./file-read.fork.js";
 import { constants, type BigIntStats } from "node:fs";
 import { isUtf8 } from "node:buffer";
 import fs from "node:fs/promises";
@@ -290,8 +290,12 @@ export async function readFileForTransport(
   args: ReadFileForTransportArgs,
 ): Promise<ReadFileForTransportResult> {
   const readablePath = await resolveReadablePath(args);
-  const { stat, fileContents } = await forkReadWithinRoot(readablePath, args, getFileSizeLimitBytes(mimeTypes.lookup(args.resultPath) || undefined))
-    .catch((error: unknown) => throwMissingTargetOrRethrow(args, error));
+  const mimeType = mimeTypes.lookup(args.resultPath) || undefined;
+  const { stat, fileContents } = await forkReadWithinRoot(
+    readablePath,
+    args,
+    getFileSizeLimitBytes(mimeType),
+  ).catch((error: unknown) => throwMissingTargetOrRethrow(args, error));
   if (stat.isDirectory()) {
     throw new CommandDispatchError(
       "invalid_path",
@@ -305,7 +309,6 @@ export async function readFileForTransport(
     );
   }
 
-  const mimeType = mimeTypes.lookup(args.resultPath) || undefined;
   assertFileWithinSizeLimit(stat.size, mimeType);
 
   return createReadFileForTransportResult({
@@ -335,12 +338,11 @@ export async function readFileChunkForTransport(
   },
 ) {
   const readablePath = await resolveReadablePath(args);
-  const file = await fs
-    .open(
-      readablePath,
-      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
-    )
-    .catch((error: unknown) => throwMissingTargetOrRethrow(args, error));
+  const file = await forkOpenWithinRoot(
+    readablePath,
+    args,
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+  ).catch((error: unknown) => throwMissingTargetOrRethrow(args, error));
   try {
     const stat = await file.stat({ bigint: true });
     if (!stat.isFile()) {
