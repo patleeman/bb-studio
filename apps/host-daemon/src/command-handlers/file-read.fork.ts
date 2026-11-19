@@ -14,6 +14,7 @@ export interface ForkWithinRootRead {
 
 interface ForkReadArgs {
   resolvedPath: string;
+  resultPath: string;
   rootPath?: string;
 }
 
@@ -32,10 +33,20 @@ function errorCode(error: unknown): string | undefined {
     : undefined;
 }
 
-function mapSwapError(error: unknown): never {
-  const code = errorCode(error);
-  if (code !== undefined && SWAP_ERROR_CODES.has(code)) throw fileChanged();
-  throw error;
+const DENIED_ERROR_CODES = new Set(["EACCES", "EPERM"]);
+
+export function forkReadError(args: { resultPath: string }) {
+  return (error: unknown): never => {
+    const code = errorCode(error);
+    if (code !== undefined && SWAP_ERROR_CODES.has(code)) throw fileChanged();
+    if (code !== undefined && DENIED_ERROR_CODES.has(code)) {
+      throw new ExpectedCommandDispatchError(
+        "invalid_path",
+        `Path "${args.resultPath}" can't be read`,
+      );
+    }
+    throw error;
+  };
 }
 
 export function noSymlinkOpenFlags(
@@ -46,20 +57,8 @@ export function noSymlinkOpenFlags(
   return base | (constants.O_NOFOLLOW ?? 0);
 }
 
-export async function openRefusingSymlinks(
-  path: string,
-): Promise<fs.FileHandle> {
-  try {
-    return await fs.open(path, noSymlinkOpenFlags());
-  } catch (error) {
-    if (process.platform !== "darwin" || errorCode(error) !== "EINVAL") {
-      throw error;
-    }
-    return fs.open(
-      path,
-      constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW,
-    );
-  }
+export function openRefusingSymlinks(path: string): Promise<fs.FileHandle> {
+  return fs.open(path, noSymlinkOpenFlags());
 }
 
 async function assertHandleIsPath(
@@ -90,7 +89,10 @@ async function assertStillTheCheckedFile(
 
 async function throwIfDirectory(path: string, error: unknown): Promise<never> {
   const code = errorCode(error);
-  if (code === "EISDIR" || code === "EPERM" || code === "EACCES") {
+  if (
+    code === "EISDIR" ||
+    (code !== undefined && DENIED_ERROR_CODES.has(code))
+  ) {
     const stat = await fs.stat(path).catch(() => null);
     if (stat?.isDirectory()) {
       throw new CommandDispatchError(
@@ -109,15 +111,15 @@ export async function forkOpenWithinRoot(
 ): Promise<fs.FileHandle> {
   if (!args.rootPath) return fs.open(readablePath, unrootedFlags);
   const file = await openRefusingSymlinks(readablePath)
-    .catch(mapSwapError)
-    .catch((error: unknown) => throwIfDirectory(readablePath, error));
+    .catch((error: unknown) => throwIfDirectory(readablePath, error))
+    .catch(forkReadError(args));
   try {
     await assertHandleIsPath(file, readablePath);
     await assertStillTheCheckedFile(
       file,
       readablePath,
       args.resolvedPath,
-    ).catch(mapSwapError);
+    ).catch(forkReadError(args));
     return file;
   } catch (error) {
     await file.close();
