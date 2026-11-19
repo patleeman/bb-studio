@@ -279,8 +279,16 @@ export function foldRelayedRows(
     ) {
       end = later;
     }
+    // A real reply after the quiet ones answers the group's last line: that
+    // line stays as it is, without the check.
+    const after = rows[nextConversation(end + 1)];
+    const answered =
+      after?.kind === "conversation" && after.role === "assistant"
+        ? Math.max(...group)
+        : -1;
     for (let at = index; at <= end; at += 1) {
       const row = rows[at]!;
+      if (at === answered) continue;
       if (group.has(at)) folded.add(row.id);
       else if (row.kind === "conversation" || hiddenInFold(row)) hidden.add(row.id);
     }
