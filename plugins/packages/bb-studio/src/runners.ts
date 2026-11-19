@@ -235,7 +235,7 @@ export class Runners {
     if (reports.length === 3) return reports.reverse().map(r => r.summary).join("\n");
     // Older runners predate the report buffer. Recover bounded history from
     // the old thread's runner_report calls before falling back to its last report.
-    const timeline = await this.deps.sdk.threads.timeline({ threadId: row.thread_id!, segmentLimit: "12", includeNestedRows: "true", summaryOnly: "false" }).catch(() => null);
+    const timeline = await this.deps.sdk.threads.timeline({ threadId: row.thread_id!, segmentLimit: "12", includeNestedRows: "true" }).catch(() => null);
     const recovered: { at: number; summary: string }[] = [];
     const visit = (rows: TimelineRow[]) => {
       for (const entry of rows) {
