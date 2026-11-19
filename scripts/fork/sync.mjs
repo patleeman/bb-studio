@@ -1,6 +1,14 @@
 #!/usr/bin/env node
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveImportConflictsInFile } from "./import-conflicts.mjs";
@@ -199,12 +207,13 @@ for (const commit of hand) {
 }
 note(`replayed ${hand.length} hand commits`);
 
-const run = (label, command, argv) => {
+const run = (label, command, argv, env = undefined) => {
   const started = Date.now();
   const result = spawnSync(command, argv, {
     cwd: worktree,
     encoding: "utf8",
     maxBuffer: 1 << 28,
+    ...(env ? { env: { ...process.env, ...env } } : {}),
   });
   const seconds = Math.round((Date.now() - started) / 1000);
   if (result.status !== 0) {
@@ -271,13 +280,18 @@ if (CHECKS !== "none") {
       : ["@bb/server", "@bb/web", "@bb/plugin-build", "@get-bb/plugin-sdk"].map(
           (name) => `--filter=${name}`,
         );
-  run(`tests (${CHECKS})`, "pnpm", [
-    "exec",
-    "turbo",
-    "run",
-    "test",
-    ...filters,
-  ]);
+  // One temp root for the test run, removed on exit: plugin tests (and the
+  // SDK's fake host) leave mkdtemp folders in the temp folder otherwise.
+  const testTmp = mkdtempSync(join(tmpdir(), "bb-fork-sync-tests-"));
+  process.on("exit", () => {
+    rmSync(testTmp, { recursive: true, force: true, maxRetries: 3 });
+  });
+  run(
+    `tests (${CHECKS})`,
+    "pnpm",
+    ["exec", "turbo", "run", "test", ...filters],
+    { TMPDIR: testTmp, TMP: testTmp, TEMP: testTmp },
+  );
 }
 
 const tip = git(worktree, "rev-parse", "HEAD");
