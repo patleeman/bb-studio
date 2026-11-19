@@ -2,7 +2,11 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getInstalledPluginRegistration, type DbConnection } from "@bb/db";
+import {
+  getInstalledPluginRegistration,
+  markInstalledPluginRemoved,
+  type DbConnection,
+} from "@bb/db";
 import { createMigratedConnection } from "@bb/db/testing";
 import type { Logger } from "@bb/logger";
 import { createAiServiceRegistry } from "../../../src/services/ai/ai-service-registry.js";
@@ -13,6 +17,7 @@ import {
 import type { BundledPluginRegistration } from "../../../src/services/plugins/builtin-registry.js";
 import {
   FORK_BUNDLED_PLUGINS,
+  forgetReplacedInstallNotes,
   withForkBundledPlugins,
 } from "../../../src/services/plugins/builtin-registry.fork.js";
 import { testLogger } from "../../helpers/test-app.js";
@@ -164,5 +169,91 @@ describe("BB Studio's bundled plugins", () => {
       enabled: true,
     });
     expect(loads().sort()).toEqual(["studio:path"]);
+  });
+
+  async function startWithPathInstall(): Promise<{
+    dataDir: string;
+    pathRoot: string;
+  }> {
+    const pathRoot = join(workDir, "old-checkout", "bb-studio");
+    await writePlugin(pathRoot, "bb-studio", "path");
+    const dataDir = join(workDir, "data");
+    service = createService(
+      db,
+      dataDir,
+      withForkBundledPlugins([], (name) => join(workDir, "missing", name)),
+    );
+    await service.start();
+    await service.install(`path:${pathRoot}`, { kind: "root" });
+    await service.stop();
+    delete globals.__forkBundledLoads;
+    return { dataDir, pathRoot };
+  }
+
+  it("runs the bundled Studio when a path install's folder is gone, and notes it", async () => {
+    const { dataDir, pathRoot } = await startWithPathInstall();
+    await rm(join(workDir, "old-checkout"), { recursive: true, force: true });
+
+    service = createService(
+      db,
+      dataDir,
+      withForkBundledPlugins([], (name) => join(bundledRoot, name)),
+    );
+    await service.start();
+
+    expect(getInstalledPluginRegistration(db, "studio")).toMatchObject({
+      source: "builtin:bb-studio",
+      sourceKind: "builtin",
+      rootDir: join(bundledRoot, "bb-studio"),
+      enabled: true,
+      removedAt: null,
+    });
+    expect(loads()).toEqual(["studio:bundled"]);
+    const studio = service.list().find((plugin) => plugin.id === "studio");
+    expect(studio).toMatchObject({
+      status: "running",
+      statusDetail: `bundled copy; path:${pathRoot} was not found`,
+    });
+    forgetReplacedInstallNotes();
+  });
+
+  it("brings the bundled Studio back after a removed path install", async () => {
+    const { dataDir } = await startWithPathInstall();
+    markInstalledPluginRemoved(db, "studio");
+
+    service = createService(
+      db,
+      dataDir,
+      withForkBundledPlugins([], (name) => join(bundledRoot, name)),
+    );
+    await service.start();
+
+    expect(getInstalledPluginRegistration(db, "studio")).toMatchObject({
+      sourceKind: "builtin",
+      enabled: true,
+      removedAt: null,
+    });
+    expect(loads()).toEqual(["studio:bundled"]);
+    forgetReplacedInstallNotes();
+  });
+
+  it("keeps a removed bundled Studio removed", async () => {
+    const dataDir = join(workDir, "data");
+    const bundled = withForkBundledPlugins([], (name) =>
+      join(bundledRoot, name),
+    );
+    service = createService(db, dataDir, bundled);
+    await service.start();
+    await service.stop();
+    markInstalledPluginRemoved(db, "studio");
+    delete globals.__forkBundledLoads;
+
+    service = createService(db, dataDir, bundled);
+    await service.start();
+
+    expect(getInstalledPluginRegistration(db, "studio")?.removedAt).not.toBe(
+      null,
+    );
+    expect(loads()).toEqual([]);
   });
 });
