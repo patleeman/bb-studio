@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
-import { readdir, readFile, rename, writeFile } from "node:fs/promises";
+import { lstat, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { customProviderModelSchema } from "@bb/config/bb-app-managed-config";
 import { mutateManagedJsonFile } from "@bb/config/managed-json-file";
 import { quote, selectList, sharedColumns } from "../sync.js";
 import {
@@ -30,6 +31,12 @@ export interface SettingItem {
   count: number;
 }
 
+const SKIPPED_APP_SETTING_KEYS = new Set([
+  "pluginSafeMode",
+  "appUpdateSendHold",
+  "skippedAppUpdate",
+]);
+
 const SKIPPED_PREFERENCE_KEYS = new Set([
   "sidebar.pluginPanelOrder",
   "sidebar.visiblePluginPanels",
@@ -48,6 +55,11 @@ async function readJsonObject(
   } catch {
     return null;
   }
+}
+
+async function isLink(path: string): Promise<boolean> {
+  const stats = await lstat(path).catch(() => null);
+  return stats?.isSymbolicLink() === true;
 }
 
 function count(source: Sqlite, sql: string): number {
@@ -87,11 +99,14 @@ export async function listSettings(
       count(source, "SELECT COUNT(*) AS count FROM app_settings_values"),
   });
   const themeRows = count(source, "SELECT COUNT(*) AS count FROM app_theme");
+  const themeLink = await isLink(join(sourceDataDir, "theme"));
   if (themeRows > 0 || (await exists(join(sourceDataDir, "theme")))) {
     items.push({
       id: "theme",
       label: "Theme",
-      detail: "bb's chosen theme and its theme files.",
+      detail: themeLink
+        ? "bb's chosen theme. Its theme folder is a link to another folder and is not copied."
+        : "bb's chosen theme and its theme files.",
       secret: false,
       count: themeRows,
     });
@@ -105,8 +120,18 @@ export async function listSettings(
       count: 1,
     });
   }
-  const skills = await readdir(join(sourceDataDir, "skills")).catch(() => []);
-  if (skills.length > 0) {
+  const skillsDir = join(sourceDataDir, "skills");
+  const skills = await readdir(skillsDir).catch(() => []);
+  if (await isLink(skillsDir)) {
+    items.push({
+      id: "skills",
+      label: "Skills",
+      detail:
+        "bb's skills folder is a link to another folder and is not copied.",
+      secret: false,
+      count: 0,
+    });
+  } else if (skills.length > 0) {
     items.push({
       id: "skills",
       label: "Skills",
@@ -194,7 +219,13 @@ export async function applySetting(args: {
       return;
     case "app-settings":
       copyKeyedRows(source, target, "app_settings", replace);
-      copyKeyedRows(source, target, "app_settings_values", replace);
+      copyKeyedRows(
+        source,
+        target,
+        "app_settings_values",
+        replace,
+        (row) => !SKIPPED_APP_SETTING_KEYS.has(String(row.key)),
+      );
       return;
     case "theme":
       copyKeyedRows(source, target, "app_theme", replace);
@@ -211,6 +242,11 @@ export async function applySetting(args: {
       return;
     }
     case "skills":
+      if (await isLink(join(args.sourceDataDir, "skills"))) {
+        throw new BringOverError(
+          "bb's skills folder is a link to another folder and is not copied",
+        );
+      }
       await copyMissingTree(
         join(args.sourceDataDir, "skills"),
         join(args.dataDir, "skills"),
@@ -220,9 +256,9 @@ export async function applySetting(args: {
       const config = await readJsonObject(
         join(args.sourceDataDir, "config.json"),
       );
-      const models = Array.isArray(config?.customModels)
-        ? config.customModels
-        : [];
+      const models = (
+        Array.isArray(config?.customModels) ? config.customModels : []
+      ).filter((model) => customProviderModelSchema.safeParse(model).success);
       await mutateManagedJsonFile<Record<string, unknown>>({
         path: join(args.dataDir, "config.json"),
         read: async () =>

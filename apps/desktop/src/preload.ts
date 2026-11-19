@@ -10,6 +10,7 @@ import { STUDIO_BUILD } from "./studio-release.fork.js";
 import { forkLaunchThemeApi } from "./fork-launch-theme-preload.js";
 import { forkFinderApi } from "./fork-finder-preload.js";
 import { forkActivityApi } from "./fork-activity-preload.js";
+import { forkUiTokenApi } from "./fork-ui-token-preload.js";
 import {
   BB_DESKTOP_FORK_WINDOW_CHANNEL,
   type ForkWindowRequest,
@@ -558,6 +559,7 @@ const bbDesktopApi: BbDesktopApi = {
   ...forkLaunchThemeApi(ipcRenderer),
   ...forkFinderApi(ipcRenderer),
   ...forkActivityApi(ipcRenderer),
+  ...forkUiTokenApi(ipcRenderer),
   async openServerDaemonLogs(): Promise<void> {
     await ipcRenderer.invoke(BB_DESKTOP_OPEN_SERVER_DAEMON_LOGS_CHANNEL);
   },

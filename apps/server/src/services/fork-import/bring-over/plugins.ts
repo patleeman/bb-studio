@@ -149,6 +149,7 @@ export async function listPlugins(
   const items: PluginItem[] = [];
   for (const row of sourceRows(source)) {
     if (
+      !safeId(row.id) ||
       row.source_kind === "builtin" ||
       HIDDEN_PLUGIN_IDS.has(row.id) ||
       bundledHere(target, row.id)

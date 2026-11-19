@@ -1,4 +1,4 @@
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 import { z } from "zod";
 import { ApiError } from "../../../errors.js";
 import type { AppDeps } from "../../../types.js";
@@ -13,6 +13,11 @@ import {
 import { listProjects, listThreads } from "./listing.js";
 import { addPlugin, listPlugins, type PluginInstaller } from "./plugins.js";
 import { listSettings } from "./settings.js";
+import {
+  registerUiToken,
+  UI_TOKEN_HEADER,
+  uiTokenMatches,
+} from "./ui-token.js";
 import { bringOverStudioData, studioDataState } from "./studio-data.js";
 import {
   bringOverSource,
@@ -59,6 +64,46 @@ export function registerBringOverRoutes(
   installer: PluginInstaller | null,
 ): void {
   let snapshotting: Promise<SourceSnapshot> | null = null;
+
+  function requireUi(context: Context, route: string): void {
+    const callerThread = context.req.header("x-bb-caller-thread") ?? null;
+    const cli = context.req.header("x-bb-cli") !== undefined;
+    const allowed =
+      callerThread === null &&
+      !cli &&
+      uiTokenMatches(context.req.header(UI_TOKEN_HEADER));
+    deps.logger.info(
+      {
+        route,
+        callerThread,
+        cli,
+        origin: context.req.header("origin") ?? null,
+        allowed,
+      },
+      "Bring-over request",
+    );
+    if (!allowed) {
+      throw new ApiError(
+        403,
+        "forbidden",
+        "Bringing things over works only in the BB Studio app on this Mac",
+      );
+    }
+  }
+
+  app.post("/fork/bring-over/ui-token", async (context) => {
+    const body = (await context.req.json().catch(() => null)) as {
+      token?: unknown;
+    } | null;
+    if (!registerUiToken(body?.token)) {
+      throw new ApiError(
+        409,
+        "invalid_request",
+        "The app's token is already set",
+      );
+    }
+    return context.body(null, 204);
+  });
 
   async function source(): Promise<string> {
     const found = await bringOverSource(dataDir(), process.env);
@@ -118,6 +163,13 @@ export function registerBringOverRoutes(
   app.get("/fork/bring-over", async (context) => {
     const sourceDataDir = await bringOverSource(dataDir(), process.env);
     if (sourceDataDir === null) return context.json({ available: false });
+    if (context.req.query("summary") !== undefined) {
+      return context.json({
+        available: true,
+        sourceDataDir,
+        job: currentBringOverJob(dataDir()),
+      });
+    }
     const existing = await existingSourceSnapshot(dataDir(), sourceDataDir);
     if (existing === null) {
       return context.json({
@@ -163,6 +215,7 @@ export function registerBringOverRoutes(
   });
 
   app.post("/fork/bring-over/jobs", async (context) => {
+    requireUi(context, "jobs");
     const parsed = requestSchema.safeParse(
       await context.req.json().catch(() => null),
     );
@@ -201,6 +254,7 @@ export function registerBringOverRoutes(
 
   let studioDataRunning = false;
   app.post("/fork/bring-over/studio-data", async (context) => {
+    requireUi(context, "studio-data");
     if (installer === null) {
       throw new ApiError(
         409,
@@ -244,6 +298,7 @@ export function registerBringOverRoutes(
   });
 
   app.post("/fork/bring-over/plugins/:pluginId/add", async (context) => {
+    requireUi(context, "plugins/add");
     if (installer === null) {
       throw new ApiError(
         409,
