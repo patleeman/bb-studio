@@ -413,6 +413,20 @@ it("Ask from the omnibar sends to a conversation (a worker's goes to its convers
   await expect(server.rpc.bot_ask({ text: "Hi", to: { kind: "new", botId: "nope" } })).rejects.toThrow(/No Bot/);
 });
 
+it("FM: Ask the Bot starts a conversation when its default model can't start, or its Main is gone", async () => {
+  const { server, spawn, defaults, threads } = await setup();
+  // Its default model's provider is signed out: BB refuses it, so the project's default.
+  defaults.set("home", { providerId: "claude", model: "opus-gone", reasoning: null });
+  spawn.mockRejectedValueOnce(new Error("Provider claude is not signed in"));
+  const made = await server.rpc.bot_ask({ text: "Plan the trip", to: { kind: "new", botId: "home" } });
+  expect(spawn.mock.lastCall?.[0]).not.toHaveProperty("model");
+  expect(server.store.get(made.threadId)).toMatchObject({ botId: "home", kind: "conversation" });
+  // Its Main is gone (being replaced): before, "has no chat to start from".
+  threads.delete("thr_home");
+  defaults.delete("home");
+  expect((await server.rpc.bot_ask({ text: "Hi", to: { kind: "new", botId: "home" } })).projectId).toBe("proj_personal");
+});
+
 it("a fork from a message starts on the Bot's default model on the fork's provider, else keeps its source's", async () => {
   const { server, update, defaults } = await setup();
   defaults.set("dot", { providerId: "claude", model: "sonnet", reasoning: "medium" });

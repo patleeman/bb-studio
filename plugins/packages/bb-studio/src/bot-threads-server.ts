@@ -527,17 +527,24 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     const id = botOrCurrent(to.botId ?? undefined);
     const bot = deps.bots().find((each) => each.id === id);
     if (!bot) throw new Error(to.botId ? `No Bot "${to.botId}".` : "Make your Bot first.");
-    const projectId = bot.threadId ? (await facts([bot.threadId])).get(bot.threadId)?.projectId ?? null : null;
-    if (!projectId) throw new Error(`${bot.name} has no chat to start from.`);
+    // A Bot's conversations live in the personal project; a Main that is gone (being replaced) doesn't stop a new one.
+    const projectId = (bot.threadId ? (await facts([bot.threadId])).get(bot.threadId)?.projectId ?? null : null) ?? PERSONAL_PROJECT_ID;
     const preset = deps.defaultModel(bot.id);
     const model = preset ? {
       providerId: preset.providerId, model: preset.model, ...(preset.reasoning ? { reasoningLevel: preset.reasoning } : {}),
       executionInputSources: { providerId: "explicit", model: "explicit", ...(preset.reasoning ? { reasoningLevel: "explicit" } : {}) },
     } : {};
     store.setFocus(bot.id);
-    const thread = await bb.sdk.threads.spawn({
-      projectId, environment: { type: "project-default" }, input: [{ type: "text", text, mentions: [] }], pluginMetadata: { botConversation: bot.id }, ...model,
-    } as never) as { id: string; projectId?: string | null };
+    const request = { projectId, environment: { type: "project-default" }, input: [{ type: "text", text, mentions: [] }], pluginMetadata: { botConversation: bot.id } };
+    let thread: { id: string; projectId?: string | null };
+    try {
+      thread = await bb.sdk.threads.spawn({ ...request, ...model } as never) as typeof thread;
+    } catch (error) {
+      // The Bot's default model can't start (its provider signed out, or the model gone): the project's default instead.
+      if (!preset) throw error;
+      bb.log.warn(`${bot.name}'s default model ${preset.providerId}/${preset.model} couldn't start a conversation (${String((error as Error)?.message ?? error).slice(0, 200)}); using the project's default.`);
+      thread = await bb.sdk.threads.spawn(request as never) as typeof thread;
+    }
     store.recordConversation(thread.id, bot.id);
     threadChanged(thread.id);
     return { threadId: thread.id, projectId: thread.projectId ?? projectId };
