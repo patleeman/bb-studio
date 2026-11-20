@@ -293,7 +293,12 @@ function parseSelection(
 export function restorableHere(
   context: Pick<
     ThreadImportContext,
-    "source" | "target" | "sourceHostId" | "ourHostId"
+    | "source"
+    | "target"
+    | "sourceHostId"
+    | "ourHostId"
+    | "sourceDataDir"
+    | "dataDir"
   >,
   row: Row,
   projectId: string,
@@ -308,6 +313,17 @@ export function restorableHere(
   let inputs = selection.inputs ?? null;
   if (row.environment_provider_id === GIT_WORKTREE_PROVIDER_ID) {
     if (typeof row.branch_name !== "string" || row.branch_name.length === 0) {
+      return null;
+    }
+    const checkout = target
+      .prepare<[string, string], { path: string }>(
+        "SELECT path FROM project_sources WHERE project_id = ? AND host_id = ? AND path IS NOT NULL ORDER BY is_default DESC LIMIT 1",
+      )
+      .get(projectId, ourHostId);
+    if (
+      checkout !== undefined &&
+      outOfBounds(context, resolve(checkout.path))
+    ) {
       return null;
     }
     inputs = { branch: { kind: "named", name: row.branch_name } };
@@ -395,6 +411,8 @@ export function attachWorkspaceToBroughtOverThread(
             target,
             sourceHostId: context.sourceHostId ?? null,
             ourHostId: context.ourHostId,
+            sourceDataDir: context.sourceDataDir,
+            dataDir: context.dataDir,
           },
           previous,
           thread.project_id,
