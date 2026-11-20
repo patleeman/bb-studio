@@ -3,6 +3,7 @@ import { formatReport } from "./checks";
 import { MAX_MOTION } from "./schema";
 import { formatListing, formatPresence, type PresenceOutcome, type PresenceService } from "./service";
 import type { PresenceCreator } from "./store";
+import { opNeeds, type OpError } from "../op-errors";
 
 export const PRESENCE_TOOLS = ["presence"] as const;
 
@@ -17,7 +18,7 @@ export interface PresenceTool {
   name: (typeof PRESENCE_TOOLS)[number];
   description: string;
   parameters: z.ZodObject<z.ZodRawShape>;
-  execute(input: never, ctx: PresenceToolContext): Promise<string>;
+  execute(input: never, ctx: PresenceToolContext): Promise<string | OpError>;
 }
 
 const colorInput = z.string().regex(/^(theme|#[0-9a-fA-F]{6})$/, "theme or #rrggbb");
@@ -62,11 +63,11 @@ export function presenceTools(deps: PresenceToolDeps): PresenceTool[] {
         return builtin ? formatListing(builtin) : `No presence ${input.id}.`;
       }
       if (input.op === "create") {
-        if (!input.id || !input.name || !input.code) return "Not saved. Pass id, name and code.";
+        if (!input.id || !input.name || !input.code) return opNeeds("create", ["id", "name", "code"]);
         return outcomeText(await service.create({ id: input.id, name: input.name, description: input.description ?? "", code: input.code }, await deps.creator(ctx.threadId)), "Saved");
       }
       if (input.op === "update") {
-        if (!input.id) return "Not saved. Pass id.";
+        if (!input.id) return opNeeds("update", ["id"]);
         const copying = !!input.newId && input.newId !== input.id;
         const patch = { ...(input.name !== undefined ? { name: input.name } : {}), ...(input.description !== undefined ? { description: input.description } : {}), ...(input.code !== undefined ? { code: input.code } : {}) };
         const outcome = await service.update(input.id, patch, { ...(input.newId ? { newId: input.newId } : {}), creator: copying ? await deps.creator(ctx.threadId) : null });
@@ -79,7 +80,7 @@ export function presenceTools(deps: PresenceToolDeps): PresenceTool[] {
         if (!outcome.ok) return `Not applied.\n${outcome.reasons.map((reason) => `- ${reason}`).join("\n")}`;
         return `${outcome.bot.name} shows ${formatPresence(outcome.presence)}.`;
       }
-      if (!input.id) return "Not deleted. Pass id.";
+      if (!input.id) return opNeeds("delete", ["id"]);
       const outcome = service.remove(input.id);
       return outcome.ok ? `Deleted ${outcome.id}.` : `Not deleted.\n${outcome.reasons.map((reason) => `- ${reason}`).join("\n")}`;
     },

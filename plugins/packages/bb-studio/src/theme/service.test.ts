@@ -92,6 +92,12 @@ describe("theme tools", () => {
     expect(await run.execute({ op: "create", theme: { id: "half" } }, {})).toMatch(/- schema: /);
   });
 
+  it("answers an op missing its fields with an error that names them", async () => {
+    const run = setup().tool("theme");
+    expect(await run.execute({ op: "update", id: "ember" }, {})).toEqual({ content: [{ type: "text", text: 'op "update" needs id and theme.' }], isError: true });
+    expect(await run.execute({ op: "delete" }, {})).toEqual({ content: [{ type: "text", text: 'op "delete" needs id.' }], isError: true });
+  });
+
   it("op create refuses a built-in or taken id", async () => {
     const { tool, service } = setup();
     const run = tool("theme");

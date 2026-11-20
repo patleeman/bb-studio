@@ -8,6 +8,7 @@ import { threadImageReader } from "./local-image-reader";
 import { skippedNote } from "./local-images";
 import { errorText, pageUrl, truncate, type PagesService } from "./service";
 import type { PageMeta } from "./store";
+import { opNeeds } from "../op-errors";
 
 const MAX_READ_CHARS = 60_000;
 
@@ -120,7 +121,7 @@ export function registerTools(
 
   bb.agents.registerTool({
     name: "pages_create",
-    description: "Create a BB Page from Markdown (GFM, chart/stats/embed/mermaid/html blocks, callouts, mentions; see studio skill). Local image paths in workspace/thread storage are imported.",
+    description: "Create a BB Page from Markdown (GFM, chart/stats/embed/mermaid/html blocks, callouts, mentions; see studio skill). Local image paths in workspace/thread storage are imported. In this project unless global: true.",
     parameters: z.object({
       title: z.string().min(1).max(200),
       markdown: z.string().max(200_000).optional(),
@@ -201,14 +202,14 @@ export function registerTools(
       const live = service.hub.open(meta.id);
       try {
         if (op === "create") {
-          if (!params.block || !params.text) return { content: [{ type: "text", text: "create requires block and text." }], isError: true };
+          if (!params.block || !params.text) return opNeeds("create", ["block", "text"]);
           const { threadId, blockId } = await createThread(live.doc, actor.key, { block: params.block, text: params.text, quote: params.quote }, actor.key);
           service.hub.showPresence(live, actor, blockId);
           return `Started comment thread ${threadId} on block ^${shortId(blockId)}.`;
         }
-        if (!params.thread) return { content: [{ type: "text", text: `${op} requires thread.` }], isError: true };
+        if (!params.thread) return opNeeds(op, op === "reply" ? ["thread", "text"] : ["thread"]);
         if (op === "reply") {
-          if (!params.text) return { content: [{ type: "text", text: "reply requires text." }], isError: true };
+          if (!params.text) return opNeeds("reply", ["thread", "text"]);
           reply(live.doc, actor.key, params.thread, params.text, actor.key);
           const anchor = listThreads(live.doc, { includeResolved: true }).find((thread) => thread.id === params.thread);
           service.hub.showPresence(live, actor, anchor?.blockId ?? null);

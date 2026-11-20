@@ -255,7 +255,7 @@ export function workbenchTools(deps: WorkbenchToolDeps) {
     },
     {
       name: "workbench_open",
-      description: "Open a tab in this conversation's workbench (or pane \"window\" for its own window) by type+id/path/url or link. Selects if already open.",
+      description: "Open a tab in this conversation's workbench (or pane \"window\" for its own window) by type+id/path/url or link. Selects if already open. Won't reopen what the user closed after you opened it, or take the screen while they type.",
       parameters: openInput,
       execute: async (input: OpenInput, ctx: { threadId: string }) => {
         const op = await openOp(input, ctx.threadId, deps);
@@ -264,14 +264,14 @@ export function workbenchTools(deps: WorkbenchToolDeps) {
     },
     {
       name: "workbench_tab",
-      description: 'Act on a workbench tab by key (from workbench_list): action "close", "focus", or "pop_out" (into its own window).',
+      description: 'Act on a workbench tab by key (from workbench_list): action "close", "focus", or "pop_out" (into its own window). focus and pop_out are refused while the user types in the panel.',
       parameters: z.object({ action: z.enum(["close", "focus", "pop_out"]), key: tabKey, force }),
       execute: async (input: { action: "close" | "focus" | "pop_out"; key: string; force?: boolean }, ctx: { threadId: string }) =>
         run(ctx.threadId, { type: input.action === "pop_out" ? "popOut" : input.action, key: input.key, force: input.force === true }),
     },
     {
       name: "workbench_arrange",
-      description: `Arrange the workbench: layout (side by side, panel only, conversation only), widthPercent (${MIN_WIDTH_PERCENT}–${MAX_WIDTH_PERCENT}), panes (1|2), paneWidths.`,
+      description: `Arrange the workbench: layout (side by side, panel only, conversation only), widthPercent (${MIN_WIDTH_PERCENT}–${MAX_WIDTH_PERCENT}), panes (1|2), paneWidths. A setting the user changed after you set it stays theirs.`,
       parameters: arrangeInput,
       execute: async (input: z.infer<typeof arrangeInput>, ctx: { threadId: string }) => {
         if (input.layout === "stacked") return STACKED;

@@ -14,6 +14,7 @@ import { toLoop } from "./src/tasks/views";
 import type { Loop } from "./src/loops/contract";
 import { assertTasksReady, cardNeedsUser, TaskStore, taskTitle, tasksUnavailable } from "./src/tasks/store";
 import { withToolLabel } from "./src/tool-labels";
+import { opNeeds } from "./src/op-errors";
 import { CONTINUE_TOOL, registerContinueNew } from "./src/continue-new";
 import { runWorkCli } from "./src/work/cli";
 import { registerLoops, LOOP_TOOLS } from './src/loops/register';
@@ -2130,11 +2131,11 @@ export default async function plugin(bb: BbPluginApi) {
       if (op === "patch") {
         const skill = bots.skill(name, botId);
         if (!skill) return `No skill "${name}". Make it with bot_skill_edit (op: "write").`;
-        if (find === undefined || replace === undefined) throw new Error("patch requires find and replace.");
+        if (find === undefined || replace === undefined) return opNeeds("patch", ["name", "find", "replace"]);
         return saveSkill({ name, description: description ?? skill.description, body: patchText(skill.body, find, replace, all) }, botId, ctx.threadId, "patched");
       }
-      if (!SKILL_NAME.test(name)) throw new Error("Skill name must be lowercase-with-hyphens.");
-      if (!description || !body) throw new Error("write requires description and body.");
+      if (!description || !body) return opNeeds("write", ["name", "description", "body"]);
+      if (!SKILL_NAME.test(name)) return { content: [{ type: "text" as const, text: "Skill name must be lowercase-with-hyphens." }], isError: true as const };
       return saveSkill({ name, description, body }, botId, ctx.threadId, bots.skill(name, botId) ? "rewritten" : "new");
     },
   });
@@ -2236,7 +2237,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
   runnerTool("automation_list", "List what you have scheduled: check-ins, reminders, watchers and runners, with schedule, state, next run and last outcome. The user sees them under Scheduled on the Tasks page; call them scheduled items, never automations.", z.object({}),
     async (_input: unknown, botId) => (await automations.list(botId)).map(describeAutomation).join("\n") || "Nothing scheduled yet.");
-  runnerTool("automation_create", "Create a scheduled item (checkin, reminder, watcher, or runner). Reminders with at/in become timed tasks when Tasks is on. Watchers run a script and wake only on stdout (trailing JSON line supports each/key/severity/clear). Call them scheduled items to the user.",
+  runnerTool("automation_create", "Create a scheduled item (checkin, reminder, watcher, or runner). Reminders with at/in become timed tasks when Tasks is on. Watchers run a script and wake only on stdout (trailing JSON line supports each/key/severity/clear). A runner may answer with preflight warnings: review them and retry with confirm: true. Call them scheduled items to the user.",
     z.object({ kind: z.enum(["checkin", "reminder", "watcher", "runner"]), name: z.string().trim().min(1).max(60), ...automationFields, schedule: toolSchedule }),
     async (input: AutomationToolInput & { kind: "checkin" | "reminder" | "watcher" | "runner"; name: string }, botId) => {
       const schedule = toSchedule(input.schedule!);

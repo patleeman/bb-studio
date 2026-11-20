@@ -2,6 +2,7 @@ import { z } from "zod";
 import { EFFECTS } from "./appearance";
 import { formatListing, formatReport, type ThemeOutcome, type ThemeService } from "./service";
 import type { ThemeCreator } from "./store";
+import { opNeeds, type OpError } from "../op-errors";
 
 export const THEME_TOOLS = ["theme"] as const;
 
@@ -16,7 +17,7 @@ export interface ThemeTool {
   name: (typeof THEME_TOOLS)[number];
   description: string;
   parameters: z.ZodObject<z.ZodRawShape>;
-  execute(input: never, ctx: ThemeToolContext): Promise<string>;
+  execute(input: never, ctx: ThemeToolContext): Promise<string | OpError>;
 }
 
 const unit = z.number().min(0).max(1);
@@ -60,17 +61,17 @@ export function themeTools(deps: ThemeToolDeps): ThemeTool[] {
         return service.list().map(formatListing).join("\n");
       }
       if (input.op === "create") {
-        if (!input.theme) return "Not saved. Pass theme (full theme package JSON).";
+        if (!input.theme) return opNeeds("create", ["theme"], "Pass the full theme package JSON.");
         return outcomeText(await service.create(input.theme, await deps.creator(ctx.threadId)), "Saved");
       }
       if (input.op === "update") {
-        if (!input.id || !input.theme) return "Not saved. Pass id and theme.";
+        if (!input.id || !input.theme) return opNeeds("update", ["id", "theme"]);
         const copying = !!input.newId && input.newId !== input.id;
         const outcome = await service.update(input.id, input.theme, { ...(input.newId ? { newId: input.newId } : {}), creator: copying ? await deps.creator(ctx.threadId) : null });
         return outcomeText(outcome, copying ? "Saved a copy as" : "Updated");
       }
       if (input.op === "apply") {
-        if (input.themeId === undefined) return "Not applied. Pass themeId (a theme id or null).";
+        if (input.themeId === undefined) return opNeeds("apply", ["themeId"], "Pass a theme id, or null for none.");
         const bot = await deps.resolveBot(input.bot, ctx.threadId);
         if (typeof bot === "string") return bot;
         const outcome = await service.apply({
@@ -86,7 +87,7 @@ export function themeTools(deps: ThemeToolDeps): ThemeTool[] {
         const on = EFFECTS.filter((key) => appearance.effects[key]);
         return `${outcome.bot.name} uses ${appearance.themeId}: intensity ${appearance.intensity}, glass ${appearance.glass}, motion ${appearance.motion}; effects on: ${on.join(", ") || "none"}.`;
       }
-      if (!input.id) return "Not deleted. Pass id.";
+      if (!input.id) return opNeeds("delete", ["id"]);
       const outcome = service.remove(input.id);
       return outcome.ok ? `Deleted ${outcome.id}.` : `Not deleted.\n${outcome.reasons.map((reason) => `- ${reason}`).join("\n")}`;
     },
