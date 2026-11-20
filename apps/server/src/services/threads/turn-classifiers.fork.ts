@@ -8,6 +8,8 @@ import { requestPluginApproval } from "../fork-approvals/index.js";
 import { registerSkillsRegistryPolicy } from "../skills/registry-policy.fork.js";
 import { registerBeforeThreadDelete } from "./thread-delete-hooks.fork.js";
 import { registerTurnContextProvider } from "./turn-context.fork.js";
+import { registerAutoRouter } from "./auto-router.fork.js";
+import { completeTextForPlugin } from "../ai/plugin-text-completion.fork.js";
 import { readThreadForkPoint } from "./thread-fork-point.fork.js";
 import type { DbConnection } from "@bb/db";
 
@@ -44,7 +46,11 @@ export function forkPluginHooks(args: {
   db: DbConnection;
 }): ForkPluginHooks {
   return {
-    experimental_features: { threadNotices: true },
+    experimental_features: {
+      threadNotices: true,
+      autoRouter: true,
+      textCompletion: true,
+    },
     experimental_classifyTurns(classifier) {
       args.assertLive();
       if (typeof classifier !== "function") {
@@ -80,6 +86,21 @@ export function forkPluginHooks(args: {
       args.disposeHooks.push(
         registerSkillsRegistryPolicy(args.pluginId, policy, args.db),
       );
+    },
+    experimental_autoRouter(router) {
+      args.assertLive();
+      if (
+        router === null ||
+        typeof router !== "object" ||
+        typeof router.resolve !== "function"
+      ) {
+        throw new Error("experimental_autoRouter expects { resolve }");
+      }
+      args.disposeHooks.push(registerAutoRouter(args.pluginId, router));
+    },
+    experimental_completeText(request) {
+      args.assertLive();
+      return completeTextForPlugin(args.pluginId, request);
     },
     experimental_turnContext(provider) {
       args.assertLive();

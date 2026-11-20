@@ -95,6 +95,13 @@ const FORK_API_SYMBOLS: Readonly<Record<string, readonly string[]>> = {
   "thread-events": [
     "PluginHooks.experimental_threadForkPoint",
     "ExperimentalThreadForkPoint",
+    "PluginHooks.experimental_autoRouter",
+    "ExperimentalAutoRouter",
+    "ExperimentalAutoRouteRequest",
+    "ExperimentalAutoRouteTarget",
+    "PluginHooks.experimental_completeText",
+    "ExperimentalTextCompletionRequest",
+    "ExperimentalTextCompletionResult",
   ],
   "thread-panel": [
     "BbNavigate.experimental_workbench",

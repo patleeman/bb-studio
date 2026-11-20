@@ -27,7 +27,19 @@ export function forkEventCounts(
 
 export function forkFakeHooks(): ForkPluginHooks {
   return {
-    experimental_features: { threadNotices: true },
+    experimental_features: {
+      threadNotices: true,
+      autoRouter: true,
+      textCompletion: true,
+    },
+    experimental_autoRouter() {},
+    experimental_completeText: () =>
+      Promise.resolve({
+        ok: false,
+        reason: "unavailable",
+        message: "No AI service in the fake host",
+        ms: 0,
+      }),
     experimental_classifyTurns() {},
     experimental_beforeThreadDelete() {},
     experimental_turnContext() {},
