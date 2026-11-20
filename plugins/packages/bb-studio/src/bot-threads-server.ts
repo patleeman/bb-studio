@@ -508,7 +508,19 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
   const startConversation = async ({ botId, request }: { botId: string; request: NewConversationRequest }) => {
     if (!deps.bots().some((bot) => bot.id === botId)) throw new Error(`No Bot "${botId}".`);
     store.setFocus(botId);
-    const thread = await bb.sdk.threads.spawn({ ...request, pluginMetadata: { botConversation: botId } } as never) as { id: string; projectId?: string | null };
+    let thread: { id: string; projectId?: string | null };
+    try {
+      thread = await bb.sdk.threads.spawn({ ...request, pluginMetadata: { botConversation: botId } } as never) as typeof thread;
+    } catch (error) {
+      // The composer was seeded with the Bot's default model, which can't start now (its provider signed out, the model gone):
+      // BB's default instead, so + New still works. A model the user picked themselves fails as BB says.
+      const preset = deps.defaultModel(botId);
+      const asked = request as { providerId?: string; model?: string };
+      if (!preset || asked.providerId !== preset.providerId || asked.model !== preset.model) throw error;
+      deps.log(`The default model ${preset.providerId}/${preset.model} couldn't start a conversation (${String((error as Error)?.message ?? error).slice(0, 200)}); using BB's default.`);
+      const { providerId: _providerId, model: _model, reasoningLevel: _reasoning, executionInputSources: _sources, ...rest } = request as Record<string, unknown>;
+      thread = await bb.sdk.threads.spawn({ ...rest, pluginMetadata: { botConversation: botId } } as never) as typeof thread;
+    }
     store.recordConversation(thread.id, botId);
     threadChanged(thread.id);
     return { threadId: thread.id, projectId: thread.projectId ?? null };

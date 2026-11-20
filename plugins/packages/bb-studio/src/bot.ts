@@ -600,6 +600,10 @@ export class Bots {
     if (!provider) throw new Error(`${input.providerId} isn't an agent provider BB has right now.`);
     const external = botKind(input.providerId) === "external";
     if (external !== (botKind(row.provider_id) === "external")) throw new Error(external ? `${row.name} runs with Studio's tools, so its conversations can't start on ${externalName(input.providerId)}.` : `${row.name} runs on ${externalName(row.provider_id)}, so its conversations start there.`);
+    // A provider BB says is signed out, or a model its catalog doesn't list, would break every + New, Ask and new Main later.
+    if (!external && !await this.providerReady(input.providerId)) throw new Error(`${providerName(input.providerId)} isn't signed in, so it can't be the default model. Sign in to it in Settings → Providers, or pick another model.`);
+    const catalog = await this.deps.sdk.providers.models({ providerId: input.providerId }).then((result) => (result.models as readonly { model: string }[]).map((each) => each.model), () => null);
+    if (catalog && catalog.length && !catalog.includes(input.model)) throw new Error(`${providerName(input.providerId)} doesn't offer ${input.model} any more. Pick another model.`);
     const reasoning = external ? "none" : input.reasoning && (!provider.levels.length || provider.levels.includes(input.reasoning)) ? input.reasoning : null;
     this.deps.db.prepare("UPDATE bots SET default_provider_id = ?, default_model = ?, default_reasoning = ?, updated_at = ? WHERE id = ?").run(input.providerId, input.model, reasoning, Date.now(), row.id);
     void this.modelNames.warm(input.providerId);
@@ -675,7 +679,7 @@ export class Bots {
    */
   async switchModel(threadId: string, input: { providerId: string; model: string; reasoning?: ReasoningLevel }): Promise<{ change: "unchanged" | "in-place" | "handoff"; threadId: string }> {
     const [thread, options] = await Promise.all([
-      this.deps.sdk.threads.get({ threadId }),
+      this.deps.sdk.threads.get({ threadId }).catch((error) => { if (rpcErrorStatus(error) === 404) throw new Error("That conversation no longer exists."); throw error; }),
       this.deps.sdk.threads.defaultExecutionOptions({ threadId }).catch(() => null),
     ]);
     const provider = await this.provider(input.providerId);
@@ -698,7 +702,8 @@ export class Bots {
     const { threadId: newId } = await this.deps.leads.handoff(threadId, {
       projectId: thread.projectId, providerId: input.providerId, model: input.model, reasoningLevel: reasoning, permissionMode: permission,
       executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit", permissionMode: "explicit" },
-      environment: { type: "project-default" },
+      // Its own workspace (a worktree stays the worktree), as BB's own handoff does; the project's default without one.
+      environment: (thread as { environmentId?: string | null }).environmentId ? { type: "reuse", environmentId: (thread as { environmentId?: string | null }).environmentId } : { type: "project-default" },
       input: [{ type: "text", text: `You were moved from ${providerName(thread.providerId)} to ${providerName(input.providerId)} (${input.model}). Say in a sentence that you're here and carry on.`, mentions: [], visibility: "agent-only" }],
     } as never);
     await this.handedOff(threadId, newId);

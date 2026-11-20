@@ -1375,12 +1375,12 @@ it("FM: Make this the Main on a conversation with no model fills it from the Bot
   expect(x.update).toHaveBeenLastCalledWith(expect.objectContaining({ threadId: "conv_a", model: "codex-default" }));
   expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("conv_a");
   // With the Bot's default model on that provider, that one; check-ins on.
-  await bots.setDefaultModel({ botId: BOT_ID, providerId: "codex", model: "codex-other", reasoning: "low" });
+  await bots.setDefaultModel({ botId: BOT_ID, providerId: "codex", model: "other", reasoning: "low" });
   await bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
   x.add({ id: "conv_b", projectId: PERSONAL_PROJECT_ID, providerId: "codex" });
   x.execution.set("conv_b", { model: null as never, reasoningLevel: "high", permissionMode: "accept-edits" });
   await bots.makeMain("conv_b");
-  expect(x.update).toHaveBeenLastCalledWith(expect.objectContaining({ threadId: "conv_b", model: "codex-other", reasoningLevel: "low" }));
+  expect(x.update).toHaveBeenLastCalledWith(expect.objectContaining({ threadId: "conv_b", model: "other", reasoningLevel: "low" }));
   expect((await checkins(x))[0]?.threadId).toBe("conv_b");
 });
 
@@ -1401,16 +1401,17 @@ it("FM: Start a new Main: a fresh conversation on the Bot's default model become
   const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, mainMoved, providerStates: async () => [{ providerId: "codex", status: "ready" }, { providerId: "claude", status: "signed-out" }] as never });
   await bots.create({ name: "Dot", avatar: "🟣" });
   await bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
-  await bots.setDefaultModel({ botId: BOT_ID, providerId: "codex", model: "codex-other" });
+  await bots.setDefaultModel({ botId: BOT_ID, providerId: "codex", model: "other" });
   const view = await bots.newMain(BOT_ID);
   const made = view.bot!.threadId!;
   expect(made).not.toBe("t1");
-  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: PERSONAL_PROJECT_ID, providerId: "codex", model: "codex-other", pluginMetadata: { bot: BOT_ID } }));
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: PERSONAL_PROJECT_ID, providerId: "codex", model: "other", pluginMetadata: { bot: BOT_ID } }));
   expect(mainMoved).toHaveBeenLastCalledWith(BOT_ID, made, "t1");
   expect(x.threads.get("t1")?.archivedAt ?? null).toBeNull();
   expect((await checkins(x))[0]?.threadId).toBe(made);
   // The default's provider signed out: a signed-in one instead, not a spawn BB refuses.
-  await bots.setDefaultModel({ botId: BOT_ID, providerId: "claude", model: "claude-x" });
+  // Set while claude was signed in; it signed out since (setDefaultModel now refuses a signed-out one).
+  x.db.prepare("UPDATE bots SET default_provider_id = 'claude', default_model = 'claude-x'").run();
   await bots.newMain(BOT_ID);
   expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ providerId: "codex" }));
   expect(x.spawn.mock.lastCall?.[0]).not.toHaveProperty("model", "claude-x");
@@ -1482,4 +1483,27 @@ it("FM: an archived Memory page comes back instead of a blank one taking its pla
   // Before: a new blank page, and the old memory dropped out of the Bot's instructions.
   expect(x.bots.memoryPage()).toBe(first);
   expect(x.pages.size).toBe(1);
+});
+
+it("FM: switching a worktree conversation to another provider keeps its workspace; a gone one is said plainly", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  x.add({ id: "wt", providerId: "codex", environmentId: "env_worktree" } as never);
+  await x.bots.switchModel("wt", { providerId: "claude", model: "sonnet" });
+  // Before: the new thread started in the project's default workspace, away from the worktree.
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ providerId: "claude", environment: { type: "reuse", environmentId: "env_worktree" } }));
+  x.add({ id: "plain", providerId: "codex", environmentId: null } as never);
+  await x.bots.switchModel("plain", { providerId: "claude", model: "sonnet" });
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ environment: { type: "project-default" } }));
+  await expect(x.bots.switchModel("gone", { providerId: "claude", model: "sonnet" })).rejects.toThrow("That conversation no longer exists.");
+});
+
+it("FM: the default model can't be set to a signed-out provider or a model its provider doesn't offer", async () => {
+  const x = await setup();
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, providerStates: async () => [{ providerId: "codex", status: "ready" }, { providerId: "claude", status: "signed-out" }] as never });
+  await bots.create({ name: "Dot", avatar: "🟣" });
+  // Before: both were saved, and every later + New, Ask and new Main failed with BB's raw error.
+  await expect(bots.setDefaultModel({ botId: BOT_ID, providerId: "claude", model: "opus" })).rejects.toThrow("isn't signed in");
+  await expect(bots.setDefaultModel({ botId: BOT_ID, providerId: "codex", model: "retired-model" })).rejects.toThrow("doesn't offer retired-model any more");
+  await expect(bots.setDefaultModel({ botId: BOT_ID, providerId: "codex", model: "codex-default" })).resolves.toMatchObject({ bot: { defaultModel: { providerId: "codex", model: "codex-default" } } });
 });
