@@ -8,6 +8,7 @@ import { registerForkApprovalRoutes } from "./services/fork-approvals/index.js";
 import { registerForkImportRoutes } from "./services/fork-import/index.js";
 import { registerSkillsRegistryGate } from "./services/skills/registry-policy.fork.js";
 import { registerForkThreadSuccessors } from "./services/threads/thread-successor.fork.js";
+import { registerForkTextCompletion } from "./services/ai/plugin-text-completion.fork.js";
 import { registerPluginUpdateJobRoutes } from "./routes/plugin-update-jobs.js";
 import {
   recheckEnvironmentProvisioning,
@@ -943,6 +944,7 @@ export function createApp(
   );
   registerSkillsRegistryGate(publicApi, deps.db);
   registerForkThreadSuccessors(deps.db);
+  registerForkTextCompletion(deps);
   registerSkillsRegistryRoutes(publicApi, deps);
   registerServerMoveRoutes(publicApi, deps, serverMove);
   registerServerSweepRoutes(publicApi, deps);

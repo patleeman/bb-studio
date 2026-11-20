@@ -797,6 +797,70 @@ a session is constructed.
    registered; decide on a per-plugin budget or a cached value.
 3. Decide whether steers and queued drains should get it too.
 
+## Auto router (`bb.experimental_hooks.experimental_autoRouter`)
+
+`bb.experimental_hooks.experimental_autoRouter({ resolve, label, enabled,
+isDefault })` registers the one router (`services/threads/auto-router.fork.ts`;
+a second registration replaces the first). Two seams use it:
+
+- `resolveSystemExecutionOptions` (the pickers' execution options, not the
+  validation path) goes through `withAutoExecutionOptions`: while `enabled()`
+  is true it adds an Auto `ProviderInfo` (id `auto`, the router plugin's id,
+  capabilities copied from the first available real provider, no service
+  tiers) after the real providers, or first when `isDefault()` is true. Asked
+  about provider `auto`, it answers bb's options for the default provider
+  with Auto's one model (`auto`, no reasoning levels) in place of the models.
+- `createThreadFromRequest` calls `resolveAutoForCreate` before the defaults
+  ladder. A create goes through Auto when it asks for provider `auto`; when it
+  names no provider and no model and `isDefault()` is true (a worker with a
+  parent included; a fork never); or when it is a root create naming no
+  provider and no model in a project whose saved default is Auto. bb asks
+  `resolve` with the visible text of the first message and the permission
+  mode asked for, waits 8 s, then aborts the signal. A valid target replaces
+  the provider, model, reasoning and service tier and marks them explicit;
+  the session options are dropped (they belonged to Auto). A permission mode
+  the target provider does not support becomes the most permissive one it
+  does support that is not above it; Auto never widens access. Otherwise
+  those fields are cleared and bb's usual defaults pick the provider.
+- The create is marked with a symbol (`AUTO_ROUTED`, never serialized), and
+  `autoRememberArgs` makes the project remember provider and model `auto`
+  instead of the routed ones.
+
+**Core callers.** None. Core's own default chain is
+`resolveCreateThreadExecutionDefaults` and the catalog fallback in
+`resolveCatalogDefaultModel`.
+
+**Audit before stabilizing.**
+
+1. Auto is a pseudo provider only in the pickers' execution options. Other
+   endpoints that take a provider id (provider states, commands) do not know
+   it; the app only asks them for the selected real provider in practice.
+2. The 8 s wait sits on the create request. Decide whether creation should
+   return first and resolve before dispatch instead.
+3. Decide whether the router's choice should be recorded on the thread
+   (plugin metadata) so a later failure can use the same rule.
+
+## Text completion (`bb.experimental_hooks.experimental_completeText`)
+
+`experimental_completeText({ prompt, timeoutMs?, signal? })` runs
+`runTextAiTask` with task `thread-title` (`services/ai/plugin-text-completion.fork.ts`,
+registered with the server's deps in `createApp`): the AI service the user
+picked for thread titles, a single call with no tools, thread or workspace.
+The prompt is trimmed and capped at 32,000 characters; the wait is clamped to
+500-8000 ms; the reply is cleaned to one line as titles are. It resolves
+`{ ok, text, service, ms }` or `{ ok: false, reason, message, ms }`, never
+throws.
+
+**Core callers.** None; core's own callers of `runTextAiTask` are titles,
+commit messages and the AI services test.
+
+**Audit before stabilizing.**
+
+1. It borrows the title task's service choice and on/off switch. Decide
+   whether plugins should get their own task in Settings → AI services.
+2. The one-line cleanup suits classifiers; a general API would want the raw
+   text.
+
 ## Fork point (`bb.experimental_hooks.experimental_threadForkPoint`)
 
 `await bb.experimental_hooks.experimental_threadForkPoint(threadId)` returns `{

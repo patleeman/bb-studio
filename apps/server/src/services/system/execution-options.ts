@@ -1,3 +1,4 @@
+import { withAutoExecutionOptions } from "../threads/auto-router.fork.js";
 import type {
   SystemExecutionOptionsModelLoadErrorCode,
   SystemExecutionOptionsModelLoadError,
@@ -454,7 +455,7 @@ export function resolveSystemExecutionOptions(
   deps: LoggedWorkSessionDeps,
   query: SystemExecutionOptionsRequest,
 ): Promise<SystemExecutionOptionsResponse> {
-  return resolveExecutionOptions(
+  return withAutoExecutionOptions(query, (query) => resolveExecutionOptions(
     deps,
     query,
     query.preferCached === "true"
@@ -464,7 +465,7 @@ export function resolveSystemExecutionOptions(
           requiredModel: query.selectedModel ?? null,
           selectedModel: query.selectedModel,
         },
-  );
+  ));
 }
 
 export function resolveSystemExecutionOptionsForValidation(

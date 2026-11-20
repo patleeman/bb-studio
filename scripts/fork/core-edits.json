@@ -167,9 +167,9 @@
       "budget": 2
     },
     "apps/server/src/server.ts": {
-      "seam": "import-sync, approvals, skills-registry-policy, thread-successor",
-      "intent": "Registers the fork's import routes (/api/v1/fork/import/* and /api/v1/fork/bring-over/*, given the plugin service so a plugin from bb can be added) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts). One fork import and registerForkThreadSuccessors(deps.db) after the registry gate, so archived-thread errors can look up the handoff chain.",
-      "budget": 8
+      "seam": "import-sync, approvals, skills-registry-policy, thread-successor, text-completion",
+      "intent": "Registers the fork's import routes (/api/v1/fork/import/* and /api/v1/fork/bring-over/*, given the plugin service so a plugin from bb can be added) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts). One fork import and registerForkThreadSuccessors(deps.db) after the registry gate, so archived-thread errors can look up the handoff chain. One fork import and registerForkTextCompletion(deps) right after it, so plugins' experimental_completeText can run bb's title task (services/ai/plugin-text-completion.fork.ts).",
+      "budget": 10
     },
     "apps/server/src/services/plugins/plugin-service.ts": {
       "seam": "quiet-turns, plugin-events, bundled-studio",
@@ -192,9 +192,14 @@
       "budget": 10
     },
     "apps/server/src/services/threads/thread-create.ts": {
-      "seam": "import-sync, idle-thread",
-      "intent": "assertForkSourceHost returns early when forkHostStandsIn(sourceThread, sourceHostId, childHostId) (services/threads/thread-fork-hosts.fork.ts) says yes; fork-import registers one that lets a mirrored thread, whose environment is on the bb machine it was imported from, be forked onto this machine. A plugin's root thread with empty input (createsIdleThread and startsIdleThread, idle-thread.fork.ts, imported at the top of the file) is created pending with nothing queued and keeps its sessionOptions: no catalog default model is resolved and no first dispatch is attempted, so it stays idle until its first message.",
-      "budget": 6
+      "seam": "import-sync, idle-thread, auto-router",
+      "intent": "assertForkSourceHost returns early when forkHostStandsIn(sourceThread, sourceHostId, childHostId) (services/threads/thread-fork-hosts.fork.ts) says yes; fork-import registers one that lets a mirrored thread, whose environment is on the bb machine it was imported from, be forked onto this machine. A plugin's root thread with empty input (createsIdleThread and startsIdleThread, idle-thread.fork.ts, imported at the top of the file) is created pending with nothing queued and keeps its sessionOptions: no catalog default model is resolved and no first dispatch is attempted, so it stays idle until its first message. Right after provider registrations settle, createThreadFromRequest merges resolveAutoForCreate(requestInput, parentThread, deps) (auto-router.fork.ts, imported at the top of the file) into the request: a create with provider auto (or one naming no model when the router makes Auto the default, or a root create in a project whose saved default is Auto) is created on the plugin router's provider and model, with the permission mode narrowed to one that provider supports, or on the usual defaults when it has no answer. createPendingThreadAndAttemptFirstDispatch passes its remember arguments through autoRememberArgs, so a create that went through Auto saves Auto, not the routed model, as the project's default.",
+      "budget": 12
+    },
+    "apps/server/src/services/system/execution-options.ts": {
+      "seam": "auto-router",
+      "intent": "resolveSystemExecutionOptions (the pickers' path, not resolveSystemExecutionOptionsForValidation) returns its result through withAutoExecutionOptions (services/threads/auto-router.fork.ts, imported at the top of the file), which lists the Auto provider while a plugin router is enabled and answers provider auto with its one model.",
+      "budget": 5
     },
     "apps/server/src/start-server.ts": {
       "seam": "import-sync",
