@@ -23,7 +23,7 @@ import { markPresenceSaved, setPresenceDraft } from "../../presence/ui/state";
 import { defaultPresence, samePresence, type Presence } from "../../presence/schema";
 import { defaultChanged, DefaultModelPicker, saveDefault, startingDefault, type DefaultModelChoice } from "../bot/DefaultModel";
 import { useCall, useLive } from "../live";
-import { sameAppearance, type Appearance } from "../../theme/appearance";
+import { resolveTheme, sameAppearance, type Appearance } from "../../theme/appearance";
 import { ThemePicker } from "../../theme/ui/ThemePicker";
 import { forgetSavedAppearance, markAppearanceSaved, setAppearanceDraft, useThemeRegistry } from "../../theme/ui/state";
 import { EditSpaceStage, type StageRect } from "./EditSpaceStage";
@@ -131,7 +131,7 @@ export function EditSpace({ bot, bots, onClose, stage = null }: { bot: BotSpace;
     <ThemePicker registry={registry} mode={appMode} value={appearance} onChange={setAppearance} everyBot={everyBot} onEveryBot={setEveryBot}
       after={<>{modelField}{errorLine}</>} actions={actions} actionsClassName={stage ? STAGE_ACTIONS : SIDEBAR_ACTIONS} />
   );
-  const shownTheme = appearance ? registry.get(appearance.themeId) : null;
+  const shownTheme = resolveTheme(registry, appearance).theme;
   const title = `Edit ${bot.name}`;
   const titleRow = (className: string) => (
     <header data-testid="edit-space-title-row" className={className}>

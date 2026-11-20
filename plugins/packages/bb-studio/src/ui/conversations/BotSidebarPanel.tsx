@@ -36,6 +36,7 @@ import { buttonVariants } from "../../kit/ui/button";
 import { cn } from "../../kit/ui/utils";
 import { usePathname } from "../../kit/app/route";
 import { BotPresence } from "../../presence/ui/BotPresence";
+import { resolveTheme } from "../../theme/appearance";
 import { useCall, useLive } from "../live";
 import { conversationLines, doneLabel, hiddenThreadTarget, landingThread, olderPath, secondLine, shortAge, spaceDots, splitWorkers, swipeStep, switchTarget, SWIPE_START, workerLines, type ConversationLine, type LiveThread, type WorkerLine } from "./model";
 import { currentBot, hasLanded, isLaunchPage, lastConversation, markLanded, newThreadAsked, rememberConversation, setBotSwitcher, setCurrentBot, setConversationStarter, setFocusHandler, setThreadOpener, useCurrentBot, watchNewThreadArrivals } from "./state";
@@ -334,7 +335,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const registry = useThemeRegistry();
   const appMode = useAppMode();
   const appearance = shownAppearance(bot, appearanceDraft);
-  const theme = appearance ? registry.get(appearance.themeId) : null;
+  const theme = resolveTheme(registry, appearance).theme;
   const glass = !!theme?.glass;
   const navRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -346,7 +347,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const slots = useMemo(() => (theme?.kind === "scene" && appearance?.effects.workers ? workerSlots(workers) : null), [theme, appearance?.effects.workers, workers]);
   const accents = useMemo(() => Object.fromEntries(bots.flatMap((each) => {
     const own = shownAppearance(each, appearanceDraft);
-    const accent = own ? accentOf(registry.get(own.themeId), appMode) : null;
+    const accent = own ? accentOf(resolveTheme(registry, own).theme, appMode) : null;
     return accent ? [[each.id, accent]] : [];
   })), [bots, appearanceDraft, registry, appMode]);
   const themes = useMemo(() => themeChoices(registry), [registry]);

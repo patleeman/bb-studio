@@ -4,6 +4,7 @@ import { shownBot } from "../ui/conversations/BotSidebarPanel";
 import { useAppMode } from "../ui/conversations/app-mode";
 import { useCurrentBot } from "../ui/conversations/state";
 import { useLive } from "../ui/live";
+import { resolveTheme } from "./appearance";
 import { defaultEngineDeps, ThemeEngine, type ShownTheme } from "./engine";
 import { watchEnvironment } from "./guards";
 import type { ResolvedLook } from "./look";
@@ -62,8 +63,8 @@ function useShownTheme(): ShownTheme | null {
   const draft = useAppearanceDraft();
   const registry = useThemeRegistry();
   const bot = shownBot(spaces.data?.bots ?? [], chosen, spaces.data?.currentBotId ?? null);
-  const appearance = shownAppearance(bot, draft);
-  const theme = appearance ? registry.get(appearance.themeId) : null;
+  // A theme that is gone shows the default theme rather than none.
+  const { theme, appearance } = resolveTheme(registry, shownAppearance(bot, draft));
   return bot && theme && appearance ? { key: `${bot.id}:${theme.id}`, theme, appearance } : null;
 }
 
