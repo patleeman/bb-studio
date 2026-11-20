@@ -18,12 +18,15 @@ export type BroughtOverWorkspace =
   | { kind: "same" }
   | { kind: "none" }
   | { kind: "project-folder"; path: string | null }
+  | { kind: "restorable" }
   | { kind: "missing" };
 
 export function broughtOverMessage(workspace: BroughtOverWorkspace): string {
   switch (workspace.kind) {
     case "project-folder":
       return `${BROUGHT_OVER_MESSAGE} Its workspace in bb (a worktree or a folder bb manages) stays in bb; here it works in the project's folder${workspace.path ? ` ${workspace.path}` : ""}.`;
+    case "restorable":
+      return `${BROUGHT_OVER_MESSAGE} Its workspace in bb (a worktree or a folder bb manages) stays in bb; restore the workspace to get a new one on this Mac.`;
     case "missing":
       return `${BROUGHT_OVER_MESSAGE} Workspace not on this Mac: its workspace stays in bb and this project has no folder here, so it can't run until you add the project's folder on this Mac and bring it over again. You can still read, archive or delete it.`;
     default:
