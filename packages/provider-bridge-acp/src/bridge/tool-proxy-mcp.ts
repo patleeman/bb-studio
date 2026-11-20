@@ -1,3 +1,4 @@
+import { compactAcpToolSchema } from "./acp-tools.fork.js";
 import { dynamicToolSchema } from "@bb/domain";
 import type { DynamicTool } from "@bb/domain";
 import {
@@ -317,7 +318,7 @@ async function handleRequest(
         tools: env.tools.map((tool) => ({
           name: tool.name,
           description: tool.description,
-          inputSchema: tool.inputSchema,
+          inputSchema: compactAcpToolSchema(tool.inputSchema),
         })),
       });
       return;
