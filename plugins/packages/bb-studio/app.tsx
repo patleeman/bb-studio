@@ -2,6 +2,7 @@ import { useStudioPageTitle } from "./src/ui/page-bar";
 import { ApprovalCard } from "./src/ui/conversations/ApprovalCard";
 import { registerCodeApp } from "./src/code/register";
 import { registerSettingsApp } from "./src/settings/ui/sections";
+import { registerBringOverLink } from "./src/bring-over/ui/FirstChatLink";
 import { lazy, Suspense, useEffect, useLayoutEffect, type ComponentType } from "react";
 import { StudioWorkspace, WorkspaceBridge } from "./src/ui/Workspace";
 import { forkOnly, hasGlobalWorkbench, registerCommandPalette, registerFirstRun, registerModelPickerGate, registerNewConversation, registerNewTabItems, registerPaletteSearch, registerSidebarSection } from "./src/kit/app/host-sdk";
@@ -32,7 +33,6 @@ import { openBugReport, REPORT_BUG_FOOTER_ID } from "./src/ui/footer/report-bug"
 import { askAboutItemHandler, askBotNameOf } from "./src/ui/ask-about-item";
 import { setAskAboutItem } from "./src/kit/app/item-header";
 import { registerReadOnlyComposer } from "./src/ui/conversations/ReadOnlyComposer";
-import { registerImportNotice } from "./src/ui/import-notice";
 import { FinishedCard } from "./src/ui/conversations/finish";
 import { ContinuedCard } from "./src/ui/conversations/ContinuedCard";
 import { CONTINUED_DIRECTIVE } from "./src/continue-shared";
@@ -270,6 +270,8 @@ export default definePluginApp((app) => {
   // Studio's settings sections (src/settings/ui), first so they keep their
   // order after BB's API key fields; and push status on BB's Mobile page.
   registerSettingsApp(app);
+  // The first chat links to Settings → Bring things over from bb while bb is on this Mac (src/bring-over).
+  registerBringOverLink(app);
   hideBbSkills(app.slots);
   hideBbChrome(app.slots);
   registerCodeApp(app);
@@ -349,8 +351,6 @@ export default definePluginApp((app) => {
   // this worker…" where the composer goes; a conversation shows its workers
   // above its composer (src/ui/conversations/ReadOnlyComposer.tsx).
   registerReadOnlyComposer(app);
-  // When the first start could not copy bb, the first chat says so (src/ui/import-notice.tsx).
-  registerImportNotice(app);
   // Archiving a conversation writes its summary (src/bot-finish.ts); the card
   // the Bot posts in Main is `::finished{thread="thr_…"}`.
   app.slots.messageDirective({ id: "finished", component: FinishedCard });

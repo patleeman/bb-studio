@@ -2,6 +2,7 @@
 // under a `::page` card. Chat knows none of Pages' extensions, so mentions
 // become links or plain labels, callouts a bold label, and JSON blocks a short
 // line of text.
+import { isLocalImageSrc, pageImageUrl, studioFileUrl } from "../../kit/pages-contract";
 import { pagePath } from "../constants";
 
 const MENTION = /@\[((?:\\.|[^\]\\])*)\]\((bot|page|thread|date|agent|item):([^)\s]+)\)/g;
@@ -21,6 +22,25 @@ function mentions(line: string): string {
   return line.replace(MENTION, (_, label: string, kind: string, target: string) => {
     if (kind === "page") return `[${label}](${pagePath(target)})`;
     return kind === "bot" || kind === "agent" ? `@${label}` : label;
+  });
+}
+
+const IMAGE = /(!\[(?:\\.|[^\]\\])*\]\(\s*)(?:<([^>\n]+)>|([^)\s]+))/g;
+
+/**
+ * Image srcs made absolute: chat's renderer reads a src starting with "/" as a
+ * path on the thread's host, for any path. A page file's address
+ * (`/api/v1/plugins/studio/http/pages/files?id=…`) becomes the app's, and with
+ * `pageId`, a local path goes through Studio's route, which shows it only if
+ * a thread of the page can read it, as the full editor and the phone do.
+ */
+function appImages(line: string, origin: string | undefined, pageId: string | undefined): string {
+  if (!origin || !line.includes("![")) return line;
+  return line.replace(IMAGE, (whole, head: string, angled: string | undefined, bare: string | undefined) => {
+    const src = angled ?? bare ?? "";
+    if (src.startsWith("/api/")) return `${head}${origin}${studioFileUrl(src)}`;
+    if (pageId && isLocalImageSrc(src)) return `${head}${origin}${pageImageUrl(pageId, src)}`;
+    return whole;
   });
 }
 
@@ -48,13 +68,14 @@ function dataBlock(kind: string, json: string): string {
   return `*${title ? `${name}: ${title}` : name}*`;
 }
 
-export function chatMarkdown(markdown: string): string {
+/** `origin` is the app's (`location.origin`), for image addresses; `pageId` the page's, for its local image paths. */
+export function chatMarkdown(markdown: string, origin?: string, pageId?: string): string {
   const out: string[] = [];
   const lines = markdown.split("\n");
   for (let index = 0; index < lines.length; index++) {
     const open = FENCE.exec(lines[index]);
     if (!open) {
-      out.push(callout(mentions(lines[index])));
+      out.push(callout(mentions(appImages(lines[index], origin, pageId))));
       continue;
     }
     // A fence runs to a closing fence of the same character, at least as long.

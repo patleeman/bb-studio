@@ -23,6 +23,7 @@ import { botPath } from "../../ui/bot/selection";
 import { SETTINGS_GROUPS, STUDIO_SETTINGS } from "../schema";
 import { Card, Disclosure, Row, SectionState, Segmented, SettingControl, SettingRow, SubHeading } from "./controls";
 import { ApiKeysSection } from "./ApiKeysSection";
+import { BringOverSection } from "../../bring-over/ui/BringOverSection";
 import { DeskPresenceOverlay } from "./DeskPresenceOverlay";
 import { PushSection } from "./PushSection";
 import { SkillsRegistrySection } from "./SkillsRegistrySection";
@@ -223,7 +224,7 @@ function AdvancedSection() {
 const SECTIONS = { voice: VoiceSection, recordings: RecordingsSection, replies: RepliesSection, threads: ThreadsSection, windows: WindowsSection, jev: JevSection, advanced: AdvancedSection };
 
 /**
- * Studio's settings sections, in order; then Skill registry, Phone notifications and API keys.
+ * Studio's settings sections, in order; then Skill registry, Phone notifications, API keys and Bring things over from bb.
  * Windows shows only on a BB that can open plugin windows.
  */
 export function registerSettingsApp(app: PluginAppBuilder, windows: boolean = hasHostWindows): void {
@@ -236,4 +237,5 @@ export function registerSettingsApp(app: PluginAppBuilder, windows: boolean = ha
   // "At the desk" heartbeat for the Mobile plugin's "Hold phone notifications while I'm at my Mac".
   app.slots.experimental_appOverlay?.({ id: "desk-presence", component: DeskPresenceOverlay });
   app.slots.settingsSection({ id: "api-keys", title: "API keys", component: ApiKeysSection });
+  app.slots.settingsSection({ id: "bring-over", title: "Bring things over from bb", component: BringOverSection });
 }

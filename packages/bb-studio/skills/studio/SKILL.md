@@ -390,7 +390,7 @@ change nothing.
   opens a conversation, worker, board (thread `id`), a page, whiteboard,
   design, app, artifact or recording (its `id`), a Bot (its `id`),
   Memory, the Library, Tasks (its Scheduled & recurring list holds your check-ins,
-  reminders, watchers and runners; `automations` opens it there), the Archive (a Bot `id`, or none for the Bot
+  reminders, watchers and runners; `automations` opens it there), the Conversations page (`archive`: a Bot `id`, or none for the Bot
   on screen), one automation (`type: "automation"`, `id`
   `<botId>:<row id>`, or `bb://automation/<botId>:<row id>`), one task
   (`type: "todo"`, its `loop_…` or `task_…` id, or `bb://todo/loop_…`), one memory
@@ -468,6 +468,16 @@ like `@[Title](page:pg_id)`, `@[Title](item:plugin:id)`,
   item targets are `plugin:id` from `studio_list_items`; a table target may
   be `<table id>/view/<view id>`; a drawing (whiteboard) embed may set
   `"height"` in pixels (160–1200).
+
+Images: prefer an artifact embed. Save the image as an artifact
+(`apps_create` with type `"artifact"`), then embed it with
+` ```embed {"kind":"artifact","target":"art_…"} `. A Markdown image with a
+local path (`![Chart](/…/chart.png)`) is imported into the page when Studio
+supports it: a PNG, JPEG, GIF or WebP of up to 10 MB inside your thread's
+workspace or thread storage is copied into the page, so it keeps working after
+the file is gone and on the phone. Any other path stays as written and may not
+show; the `pages_create` / `pages_edit` result names each image it couldn't
+import and why.
 
 An ```html block renders its HTML in a sandboxed iframe: scripts run, but
 with no same-origin access (no cookies, storage or BB APIs), and don't assume

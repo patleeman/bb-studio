@@ -1,3 +1,4 @@
+import { forkProviderOptionsContext } from "../providers/provider-options-context.fork.js";
 import {
   environments,
   hasStoredSpawnAgentToolCall,
@@ -19,6 +20,7 @@ import {
 } from "@bb/domain";
 import {
   type HostDaemonCommand,
+  type ThreadStopAim,
   type ThreadStopIntent,
   type TurnSubmitTarget,
 } from "@bb/host-daemon-contract";
@@ -58,6 +60,7 @@ import {
 type ExecutionOptionsRequest = ExistingThreadExecutionInputRequest;
 
 export interface ThreadStopCommandArgs {
+  aimedAt: ThreadStopAim | null;
   environmentId: string;
   hostId: string;
   intent: ThreadStopIntent;
@@ -221,6 +224,7 @@ function toRuntimeExecutionOptions(
       model: args.execution.model,
       permissionMode,
       ...(promptMode !== undefined ? { promptMode } : {}),
+      ...forkProviderOptionsContext(args.deps, args.providerId, args.threadId),
     }) ?? {};
   const sessionOptions = resolvePendingThreadSessionOptions(
     args.deps.db,
@@ -645,6 +649,7 @@ export function buildThreadStopCommand(
 ): Extract<HostDaemonCommand, { type: "thread.stop" }> {
   return {
     type: "thread.stop",
+    aimedAt: args.aimedAt,
     environmentId: args.environmentId,
     intent: args.intent,
     threadId: args.threadId,

@@ -21,7 +21,7 @@ has a canonical link that parses back to itself and opens through the router.
   (system browser, or the in-app browser), whatever the modifier.
 - With no conversation on screen, a thread opens in the main view; an item
   opens beside the Studio page, or in the main view elsewhere.
-- A Bot page (Memory, Library, Todos, Archive) is a list: a row
+- A Bot page (Memory, Library, Todos, Conversations) is a list: a row
   opens its item as a tab in the workbench beside the page, a thread
   included (a conversation tab), and the page stays. Every row calls
   `useRowOpen()` (`src/ui/bot-page/open-row.ts`), which hands the row's
@@ -73,7 +73,7 @@ registry doesn't know (Settings) parses to nothing and stays bb's.
 | Library | `bb://library` | `/plugins/studio/studio` |  |
 | Scheduled | `bb://automations` | `/plugins/studio/automations` |  |
 | Tasks | `bb://todos/bot_main` | `/plugins/studio/studio/bot/bot_main/loops` |  |
-| Archive | `bb://archive/bot_main` | `/plugins/studio/studio/conversations/bot_main` |  |
+| Conversations | `bb://archive/bot_main` | `/plugins/studio/studio/conversations/bot_main` |  |
 | Automation | `bb://automation/bot_main%3Aaut_0123456789abcdef` | `/plugins/studio/studio/automation/bot_main%3Aaut_0123456789abcdef` |  |
 | Task | `bb://todo/loop_0123abcd` | `/plugins/studio/studio/todo/loop_0123abcd` |  |
 | Memory record | `bb://record/mem_0123456789abcdef` | `/plugins/studio/studio/record/mem_0123456789abcdef` |  |
@@ -106,7 +106,7 @@ the rule above; **n/a** says why it can't.
 | Library | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Scheduled | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Tasks | routes | routes | routes | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
-| Archive | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
+| Conversations | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | n/a [3] |
 | Automation | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
 | Task | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
 | Memory record | routes | routes | n/a [2] | routes | routes | n/a [1] | routes | routes | routes | routes | routes | routes |
@@ -141,7 +141,7 @@ the rule above; **n/a** says why it can't.
 | Launcher | src/launcher/ui/Launcher.tsx run | src/launcher/ui/Launcher.test.tsx |
 | workbench_open | src/workbench-agent/server.ts linkedInput | src/workbench-agent/workbench-agent.test.ts |
 | Popped-out window | src/links/open.ts inMainWindow, LinksBridge in each window | src/links/open.test.ts; src/links/router.test.ts (relay) |
-| Bot page row | src/ui/bot-page/open-row.ts useRowOpen (Automations, Todos, Library, Memory, Archive) | src/ui/bot-page/open-row.test.tsx; each page's test |
+| Bot page row | src/ui/bot-page/open-row.ts useRowOpen (Automations, Todos, Library, Memory, Conversations) | src/ui/bot-page/open-row.test.tsx; each page's test |
 
 ## Not wired
 

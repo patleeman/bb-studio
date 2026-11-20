@@ -459,6 +459,46 @@ export function olderView(botId: string, records: readonly BotThreadRecord[], th
   };
 }
 
+/** A row of the Conversations page (bot_conversations_all). */
+export interface PageConversationView {
+  threadId: string; title: string; isMain: boolean; forkedFrom: { threadId: string; title: string } | null; projectId: string | null;
+  updatedAt: number; archivedAt: number | null; summary: string | null; latest: string | null;
+  running: boolean; needsYou: { reason: string; at: number } | null; failed: boolean;
+}
+
+/**
+ * The Conversations page: every conversation of a Bot, the active ones as
+ * the sidebar orders them (Main, then by activity), then the archived ones
+ * by activity; a fork made at a message has no row, as in the sidebar. Its
+ * workers that aren't archived, as the sidebar orders them. `summary` and
+ * `latest` say what each row's second line is.
+ */
+export function conversationsPage(botId: string, records: readonly BotThreadRecord[], threads: ReadonlyMap<string, ThreadFacts>, lines: { summary(rec: BotThreadRecord, title: string): string | null; latest(rec: BotThreadRecord): string | null }): { botId: string; conversations: PageConversationView[]; workers: WorkerView[] } {
+  const all = allRows(botId, records, threads);
+  const byId = new Map(records.map((rec) => [rec.threadId, rec]));
+  const failed = (threadId: string) => threads.get(threadId)?.status === "error";
+  const active = all.conversations.map((row): PageConversationView => {
+    const rec = byId.get(row.threadId)!;
+    return {
+      threadId: row.threadId, title: row.title, isMain: row.isMain, forkedFrom: row.forkedFrom ? { threadId: row.forkedFrom.threadId, title: row.forkedFrom.title } : null,
+      projectId: row.projectId, updatedAt: row.updatedAt, archivedAt: null, summary: lines.summary(rec, row.title), latest: row.latest || lines.latest(rec),
+      running: row.running, needsYou: row.needsYou, failed: failed(row.threadId),
+    };
+  });
+  const name = (id: string) => { const rec = byId.get(id); return rec ? conversationTitle(rec, threads.get(id)) : titleOf(threads.get(id)) ?? "a conversation"; };
+  const archived = records.filter((rec) => rec.botId === botId && rec.kind === "conversation" && rec.archivedAt !== null && (rec.isMain || !rec.forkedFrom?.messageId))
+    .map((rec): PageConversationView => {
+      const thread = threads.get(rec.threadId);
+      const title = conversationTitle(rec, thread);
+      return {
+        threadId: rec.threadId, title, isMain: rec.isMain, forkedFrom: rec.forkedFrom ? { threadId: rec.forkedFrom.threadId, title: name(rec.forkedFrom.threadId) } : null,
+        projectId: thread?.projectId ?? null, updatedAt: activityOf(rec, thread), archivedAt: rec.archivedAt, summary: lines.summary(rec, title), latest: rec.latest?.text || lines.latest(rec),
+        running: false, needsYou: null, failed: failed(rec.threadId),
+      };
+    }).sort((a, b) => b.updatedAt - a.updatedAt);
+  return { botId, conversations: [...active, ...archived], workers: all.workers };
+}
+
 function conversationListed(row: ConversationView, now: number): boolean {
   return row.isMain || row.running || !!row.needsYou || now - row.updatedAt < CONVERSATION_RECENT_MS;
 }

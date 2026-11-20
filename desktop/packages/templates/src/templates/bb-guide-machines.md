@@ -145,9 +145,7 @@ CLI counterpart of Settings → Updates.
                                           for 15 minutes
   bb updates app dismiss                  Mark the last update result as seen
 
-`--when-idle`, `cancel`, and `auto on|off` need the `updateWhenIdle` experiment (on for early
-adopters; `bb settings experiment updateWhenIdle true`); while it is off they
-fail with a message naming it. `bb updates app apply --when-idle` updates at
+`bb updates app apply --when-idle` updates at
 once when no thread is running.
 Otherwise the server schedules the update and the command returns, so an agent
 can run it from its own thread; the server starts the update after every thread
@@ -164,10 +162,10 @@ until a newer one appears; you can still update to it by hand. Without
 `--when-idle` or `--yes`,
 apply asks before interrupting running threads and fails without a terminal.
 Updating restarts bb, which interrupts running threads; with the
-`resumeThreadsAfterRestart` experiment on they resume after the update, and
+`resumeThreadsAfterRestart` general setting on they resume after the update, and
 the prompt and the `threads_running` error say so.
 
-With `updateWhenIdle` on, once bb decides to restart into an update, new sends
+Once bb decides to restart into an update, new sends
 wait in the thread's queue (`sending after bb restarts to update` in
 `bb thread queue`) and go out after the restart, behind any resume; if the
 update is deferred, cancelled, or fails they go out at once.
@@ -249,16 +247,6 @@ checks report unavailable. Machines use this access for ongoing runtime
 requests, including account-pool endpoints. A machine on bb connect access holds
 a getbb.app machine credential that `bb machine remove` revokes; if that
 revocation fails, revoke the machine in the getbb.app dashboard.
-
-Remote access through getbb.app comes from the bundled bb account and Connect
-plugins: `bb account login|status|logout` signs this server in (bb-account
-skill), and `bb connect status|on|off|expose|unexpose|unexpose-all|shares`
-serves it at `<handle>.getbb.app` and shares HTTP ports from any enrolled host
-(share-server-links skill). `bb connect servers` lists every bb on the account.
-`bb connect machine-code` mints a one-time, 10-minute code that pairs the bb
-mobile app (also shown under Settings → Mobile → Add mobile device); `--json`
-prints `{code, serverUrl, apex, expiresAt}`. Without an installed bb, pair a
-dashboard code with `npx -p bb-app@latest bb connect --code <code>`.
 
 ## Move the server
 
@@ -431,3 +419,5 @@ Git config. `bb settings general machineGitCredentialsEnabled false` (the
 automatic GH_TOKEN switch in Settings → Environment variables) stops forwarding
 the server's gh credentials; `true` enables it again. This does not log the
 server out or suppress an explicit custom GH_TOKEN.
+
+Resume interrupted threads after a restart is available in Settings → General (default off). Toggle it with `bb settings general resumeThreadsAfterRestart true` or `false`, or through the SDK’s `system.updateGeneralSettings`. Existing experiment opt-ins are preserved.

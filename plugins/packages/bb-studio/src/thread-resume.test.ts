@@ -104,6 +104,18 @@ it("skips a stale interrupt: a newer event, or the thread isn't in error any mor
   expect(x.send).not.toHaveBeenCalled();
 });
 
+it("skips a thread brought over from bb after its restart interruption, even with no owner", async () => {
+  const x = await setup();
+  x.cut("thr_bb");
+  x.events.get("thr_bb")!.push({
+    id: "evt_brought_over", seq: 99, type: "system/operation",
+    data: { operation: "brought_over_from_bb", operationId: "evt_op", status: "completed", message: "Brought over from bb. Anything that was running there was not resumed here." },
+  });
+  expect(x.threads.get("thr_bb")!.status).toBe("error");
+  expect(await x.resume.attempt("thr_bb")).toBe("skipped");
+  expect(x.send).not.toHaveBeenCalled();
+});
+
 it("never resumes the same interrupt twice", async () => {
   const x = await setup();
   x.cut("thr_a");

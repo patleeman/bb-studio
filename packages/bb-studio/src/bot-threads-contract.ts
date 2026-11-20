@@ -73,6 +73,35 @@ const worker = z.object({
   sameTitle: z.number().int().min(1),
 });
 
+/** A row of the Conversations page: a conversation, active or archived. */
+const pageConversation = z.object({
+  threadId: z.string(),
+  title: z.string(),
+  isMain: z.boolean(),
+  forkedFrom: z.object({ threadId: z.string(), title: z.string() }).nullable(),
+  projectId: z.string().nullable(),
+  /** Last activity (ms). */
+  updatedAt: z.number(),
+  /** When it was archived; null while active. */
+  archivedAt: z.number().nullable(),
+  /** Its summary's first line or two (from finishing it, or its memory record); null without one. */
+  summary: z.string().nullable(),
+  /** The latest reply's first line. */
+  latest: z.string().nullable(),
+  running: z.boolean(),
+  needsYou: needsYou.nullable(),
+  /** Its last turn failed. */
+  failed: z.boolean(),
+});
+
+/** A search hit: where it matched (title, summary, or a message) and one line of it. */
+const conversationHit = z.object({
+  threadId: z.string(),
+  kind,
+  field: z.enum(["title", "summary", "message"]),
+  snippet: z.string().nullable(),
+});
+
 /** One thread's place: its Bot, kind and links, for the main view. */
 const threadInfo = z.object({
   threadId: z.string(),
@@ -165,6 +194,25 @@ export const botThreadsSchemas = {
       finished: z.array(z.object({ threadId: z.string(), title: z.string(), finishedAt: z.number(), summary: z.string(), failed: z.boolean().optional() })),
     }),
   },
+  /**
+   * The Conversations page: every conversation of a Bot, active first (Main,
+   * then by last activity), then the archived ones by last activity; and its
+   * workers that aren't archived, newest first.
+   */
+  bot_conversations_all: {
+    input: z.object({ botId: botId.optional() }),
+    output: z.object({ botId: z.string().nullable(), conversations: z.array(pageConversation), workers: z.array(worker) }),
+  },
+  /**
+   * Searches a Bot's conversations (titles, summaries and messages) and its
+   * workers (titles, and messages BB's search reaches): each hit with where
+   * it matched and a one-line snippet. `indexing`: some conversations'
+   * messages aren't read yet, so a later search may find more.
+   */
+  bot_conversations_search: {
+    input: z.object({ botId: botId.optional(), query: z.string().trim().min(1).max(200) }),
+    output: z.object({ hits: z.array(conversationHit), indexing: z.boolean() }),
+  },
   /** One thread's place; null for a thread no Bot has (yet). */
   bot_thread_info: { input: z.object({ threadId }), output: z.object({ info: threadInfo.nullable() }) },
   /** Where switching to a Bot lands: `last` while it still exists, else the Bot's Main, else null. */
@@ -228,6 +276,8 @@ export const botThreadsSchemas = {
 export type BotSpace = z.infer<typeof space>;
 export type ConversationRow = z.infer<typeof conversation>;
 export type WorkerRow = z.infer<typeof worker>;
+export type PageConversationRow = z.infer<typeof pageConversation>;
+export type ConversationSearchHit = z.infer<typeof conversationHit>;
 export type BotThreadInfo = z.infer<typeof threadInfo>;
 export type LibraryItem = z.infer<typeof libraryItem>;
 export type LibraryKind = z.infer<typeof libraryKind>;

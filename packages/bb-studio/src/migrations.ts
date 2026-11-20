@@ -1145,4 +1145,9 @@ export const MIGRATIONS = [
    CREATE INDEX task_events_type ON task_events (type, at);
    CREATE TABLE task_legacy (id TEXT PRIMARY KEY, source TEXT NOT NULL, adopted_at INTEGER NOT NULL);`,
   `CREATE TABLE areas (id TEXT PRIMARY KEY, record TEXT NOT NULL, updated_at INTEGER NOT NULL);`,
+  `CREATE VIRTUAL TABLE conversation_text_fts USING fts5(
+       thread_id UNINDEXED, seq UNINDEXED, kind UNINDEXED, text,
+       tokenize='unicode61 remove_diacritics 2'
+     );
+   CREATE TABLE conversation_text_state (thread_id TEXT PRIMARY KEY, seen_seq INTEGER NOT NULL, done INTEGER NOT NULL, read_at INTEGER NOT NULL);`,
 ];

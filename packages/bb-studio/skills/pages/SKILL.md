@@ -110,6 +110,16 @@ Historical bot mentions remain readable. Use thread mentions and page chats for
 new agent work; bot profiles and their mention/refresh workers are retired.
 
 Tables, checklists (`- [ ]`), headings, quotes, and images work as in GFM.
+
+Images: prefer an artifact embed. Save the image as an artifact
+(`apps_create` with type `"artifact"`), then embed it with
+` ```embed {"kind":"artifact","target":"art_…"} `. A Markdown image with a
+local path (`![Chart](/…/chart.png)`) is imported into the page when Studio
+supports it: a PNG, JPEG, GIF or WebP of up to 10 MB inside your thread's
+workspace or thread storage is copied into the page, so it keeps working after
+the file is gone and on the phone. Any other path stays as written and may not
+show; the `pages_create` / `pages_edit` result names each image it couldn't
+import and why.
 Code fences keep their language and are highlighted for TypeScript,
 JavaScript, JSON, Python, shell, Go, Rust, SQL, HTML (` ```html source `),
 CSS, YAML, Markdown, diffs, Java, Kotlin, Swift, C, C#, TOML, Dockerfile,
@@ -150,5 +160,6 @@ bb studio pages append <page-id|title> <markdown…>             # "\n" in argum
 ## Limits
 
 - Uploaded files (images, video, audio, files) are limited to 15 MB each.
+- Local images imported on a write: PNG, JPEG, GIF or WebP, up to 10 MB each, from the writing thread's workspace or thread storage. SVG is not imported.
 - `pages_read` returns up to 60,000 characters.
 - Deleting a page deletes its sub-pages. Archive it instead to keep it.

@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { settleBroughtOverThread } from "./bring-over/settle.js";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ServerLogger } from "../../types.js";
@@ -179,6 +180,18 @@ export function takeOverMirroredThread(args: {
       sourceHostId: state?.sourceServerHostId ?? null,
       now: args.now,
     });
+    const thread = args.database
+      .prepare<[string], { environment_id: string | null }>(
+        "SELECT environment_id FROM threads WHERE id = ?",
+      )
+      .get(args.threadId);
+    if (thread !== undefined) {
+      settleBroughtOverThread(args.database, {
+        threadId: args.threadId,
+        environmentId: thread.environment_id,
+        now: args.now,
+      });
+    }
   })();
   openForkImportDatabase(args.dataDir)
     .prepare(

@@ -3,6 +3,8 @@ import { resolveBbAppRuntimeState } from "../../../packages/bb-app/src/launcher.
 import { registerForkApprovalIpc } from "./fork-approvals.js";
 import { registerForkWindowIpc } from "./fork-windows.js";
 import { registerForkFinderIpc } from "./fork-finder.js";
+import { registerForkActivityIpc } from "./fork-activity.js";
+import { forkUiTokenEnv, registerForkUiTokenIpc } from "./fork-ui-token.js";
 import { pathToFileURL } from "node:url";
 import { spawnHostProcess as spawn, hostToolchain } from "@bb/process-utils";
 import { openApplicationUrl } from "./application-url.js";
@@ -2414,6 +2416,8 @@ function registerDesktopUpdateIpc(): void {
   registerForkApprovalIpc(ipcMain, dialog);
   registerForkWindowIpc(ipcMain);
   registerForkFinderIpc(ipcMain, applicationWindowWebContentsIds);
+  registerForkActivityIpc(ipcMain, applicationWindowWebContentsIds);
+  registerForkUiTokenIpc(ipcMain, applicationWindowWebContentsIds);
   ipcMain.handle(BB_DESKTOP_GET_INFO_CHANNEL, () => {
     return getCurrentDesktopInfo();
   });
@@ -2566,6 +2570,7 @@ async function spawnOwnedRuntime(
     env: {
       ...process.env,
       [APP_SURFACE_ENV_NAME]: APP_SURFACE_DESKTOP,
+      ...forkUiTokenEnv(),
     },
     logLineLimit: PROCESS_LOG_LINE_LIMIT,
     runtime: resolveBbAppProcessRuntime({
@@ -2664,6 +2669,22 @@ async function waitForWindowsInstallerToFinish(): Promise<boolean> {
   return result === "finished" && !quitting;
 }
 
+async function waitForOwnedRuntimeReady(bbProcess: BbAppProcess): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  const result = await Promise.race([
+    bbProcess.ready.then(() => "ready" as const),
+    new Promise<"timed-out">((resolveTimeout) => {
+      timer = setTimeout(() => resolveTimeout("timed-out"), STARTUP_TIMEOUT_MS);
+    }),
+  ]);
+  clearTimeout(timer);
+  if (result === "timed-out") {
+    desktopLogger.warn(
+      `[desktop] bb-app did not report this computer connected within ${STARTUP_TIMEOUT_MS}ms; opening bb anyway`,
+    );
+  }
+}
+
 async function startOwnedRuntime(
   args: StartOwnedRuntimeArgs,
 ): Promise<DesktopRuntime | null> {
@@ -2675,10 +2696,12 @@ async function startOwnedRuntime(
       intervalMs: STARTUP_POLL_INTERVAL_MS,
       serverUrl: args.serverUrl,
       timeoutMs: STARTUP_TIMEOUT_MS,
-    }).then((result) => ({
-      kind: "server-probe",
-      result,
-    })),
+    }).then(async (result) => {
+      if (result.kind === "compatible") {
+        await waitForOwnedRuntimeReady(bbProcess);
+      }
+      return { kind: "server-probe", result };
+    }),
     bbProcess.exit.then((exit) => ({
       exit,
       kind: "process-exited",

@@ -347,6 +347,7 @@ html[data-fork-cards]
 html[data-fork-cards]
   [data-sidebar="inset"]
   [data-page-scroll-viewport].flex-1
+  > div
   > div::before,
 html[data-fork-cards]
   [data-sidebar="inset"]
@@ -399,6 +400,7 @@ html[data-fork-cards]
 html[data-fork-cards]
   [data-sidebar="inset"]
   [data-page-scroll-viewport].flex-1
+  > div
   > div::before,
 html[data-fork-cards]
   [data-sidebar="inset"]
@@ -478,9 +480,11 @@ html[data-fork-cards] [data-sidebar="content"]:not(:hover) {
   scrollbar-color: transparent transparent;
 }
 
-html[data-fork-cards]
-  [data-sidebar="content"]:not(:hover)::-webkit-scrollbar-thumb {
-  background-color: transparent;
+@media (pointer: fine) {
+  html[data-fork-cards]
+    [data-sidebar="content"]:not(:hover)::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
 }
 
 html[data-fork-cards]
@@ -612,6 +616,7 @@ html[data-fork-cards]
 html[data-fork-cards]
   [data-sidebar="inset"]
   [data-page-scroll-viewport].flex-1
+  > div
   > div {
   isolation: isolate;
 }
@@ -619,6 +624,7 @@ html[data-fork-cards]
 html[data-fork-cards]
   [data-sidebar="inset"]
   [data-page-scroll-viewport].flex-1
+  > div
   > div::before {
   content: "";
   position: sticky;
@@ -744,10 +750,12 @@ html[data-fork-cards] [data-sidebar="inset"] :not(:hover, .thread-scrollbar) {
   scrollbar-color: transparent transparent;
 }
 
-html[data-fork-cards]
-  [data-sidebar="inset"]
-  :not(:hover, .thread-scrollbar)::-webkit-scrollbar-thumb {
-  background-color: transparent;
+@media (pointer: fine) {
+  html[data-fork-cards]
+    [data-sidebar="inset"]
+    :not(:hover, .thread-scrollbar)::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
 }
 
 html[data-fork-cards]
@@ -891,7 +899,7 @@ html[data-fork-title-rows] [data-fork-title-host="page"]::before {
 
 html[data-fork-title-rows]
   [data-page-scroll-viewport]
-  > div:has(> [data-fork-title-host="page"]:not(:empty)) {
+  div:has(> [data-fork-title-host="page"]:not(:empty)) {
   padding-top: 0;
 }
 

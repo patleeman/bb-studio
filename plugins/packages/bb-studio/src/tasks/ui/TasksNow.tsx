@@ -194,7 +194,21 @@ export function PageInFlight({ nodes, names, now, titleOf, onOpen, onOpenThread,
         <ul className="flex flex-col">
           {nodes.map((node) => <PageFlightRow key={node.task.id} node={node} names={names} now={now} titleOf={titleOf} open={open.has(node.task.id)} onToggle={() => toggle(node.task.id)} onOpenTask={(task, event) => onOpen(task, event)} onOpenThread={onOpenThread} isOpen={isOpen} />)}
         </ul>
-      ) : <p data-testid="flight-empty" className="py-3 text-sm text-muted-foreground">{query ? "Nothing in flight matches." : "Nothing in flight. Agents' work shows here while it runs or waits."}</p>}
+      ) : <p data-testid="flight-empty" className="py-3 text-sm text-muted-foreground">{query ? "Nothing in flight matches." : "Nothing in flight. Agents' work shows here while it runs."}</p>}
+    </section>
+  );
+}
+
+/** What only waits (on someone outside, another task or a trigger) with nobody working on it: off In flight, in its own group. Its rows open the task like every row. */
+export function PageWaiting({ nodes, names, now, titleOf, onOpen, onOpenThread, isOpen = noneOpen }: { nodes: readonly FlightNode[]; names: Names; now: number; titleOf(id: string): string | null; onOpen: Open; onOpenThread(threadId: string): void; isOpen?: IsOpen }) {
+  const [open, toggle] = useFold();
+  if (!nodes.length) return null;
+  return (
+    <section aria-labelledby="tasks-waiting-head" data-testid="tasks-waiting" data-studio-card="" className={BOX}>
+      <BoxHead id="tasks-waiting-head" title="Waiting" detail={`${nodes.length} on someone or something else`} />
+      <ul className="flex flex-col">
+        {nodes.map((node) => <PageFlightRow key={node.task.id} node={node} names={names} now={now} titleOf={titleOf} open={open.has(node.task.id)} onToggle={() => toggle(node.task.id)} onOpenTask={(task, event) => onOpen(task, event)} onOpenThread={onOpenThread} isOpen={isOpen} />)}
+      </ul>
     </section>
   );
 }

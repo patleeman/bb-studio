@@ -34,7 +34,7 @@ import { authorInfo, usePagesUi } from "./context";
 import { useDarkMode } from "./shared";
 import { CommentsPortal, PageCommentButton, StartCommentProvider, usePageComments } from "./PageComments";
 import { editWhiteboardWhenShown } from "./whiteboard";
-import { studioFileUrl } from "../../kit/pages-contract";
+import { pageImageUrl } from "../../kit/pages-contract";
 import {
   dictationParagraphs,
   pageFieldKey,
@@ -195,8 +195,9 @@ export function PageEditor({
       // through openLink below, never in a new window.
       links: { onClick: () => true },
       uploadFile: (file: File) => uploadFile(page.id, file),
-      // A file uploaded before Pages was built into Studio, at the old plugin's address.
-      resolveFileUrl: async (url: string) => studioFileUrl(url),
+      // A file uploaded before Pages was built into Studio, at the old plugin's
+      // address; a local image path an agent wrote before pages imported them.
+      resolveFileUrl: async (url: string) => pageImageUrl(page.id, url),
       // BlockNote eases nesting changes over 0.3s, which makes Tab feel slow.
       animations: false,
       pasteHandler: ({ event, editor, defaultPasteHandler }) => {

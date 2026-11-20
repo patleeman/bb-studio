@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+  <title>Conversations</title>
+  <path d="M10 6.5A1.5 1.5 0 0 1 8.5 8H5l-3 3V3.5A1.5 1.5 0 0 1 3.5 2h5A1.5 1.5 0 0 1 10 3.5z"/>
+  <path d="M12.5 6h.5a1.5 1.5 0 0 1 1.5 1.5V14L12 11.5H8A1.5 1.5 0 0 1 6.5 10v-.5"/>
+</svg>

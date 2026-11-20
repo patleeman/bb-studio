@@ -108,6 +108,44 @@ export type FlightLook = "running" | "waiting" | "needs-you" | "todo" | "done" |
 
 export const isRunning = (n: Pick<FlightNode, "task" | "row">) => n.task.state === "in_progress" && !n.task.stale && !n.row.stalled;
 
+const LIVE_WORKER = new Set(["active", "running"]);
+
+/** Something under the row is being worked on now: a worker thread that is running, or a running subtask. */
+export function workedOn(node: FlightNode): boolean {
+  return node.workers.some((w) => !w.archived && LIVE_WORKER.has(w.status ?? "")) || node.children.some((c) => isRunning(c) || workedOn(c));
+}
+
+/** A trigger that hasn't fired yet: an event or a place, a time still ahead, or a snooze. */
+export function untriggered(task: Task, now: number): boolean {
+  const trigger = task.timing.trigger;
+  return task.timing.snoozed || trigger.type === "event" || trigger.type === "place" || (trigger.type === "time" && (trigger.at ?? 0) > now);
+}
+
+/**
+ * Only waiting: nobody is working on it until something outside happens.
+ * Open and not in progress; not waiting on the user (that is "needs you")
+ * or on CI (a build is running); waiting on someone outside or another task
+ * (kind waiting-outside, or waitingOn outside or task), or waiting or queued
+ * behind a trigger that hasn't fired; and no worker or subtask under it is
+ * running. These leave In flight for the Waiting group.
+ */
+export function isWaitingOnly(node: FlightNode, now: number = Date.now()): boolean {
+  const t = node.task;
+  if (!node.row.open || isClosed(t) || t.stale || t.state === "in_progress" || node.row.needsYou || needsYou(t)) return false;
+  const on = t.waitingOn?.kind ?? null;
+  if (on === "user" || on === "ci") return false;
+  const waits = t.kind === "waiting-outside" || (t.state === "waiting" && (on === "outside" || on === "task")) || ((t.state === "waiting" || t.state === "todo") && untriggered(t, now));
+  return waits && !workedOn(node);
+}
+
+/** The page's In flight rows split: the ones being worked on, and the ones only waiting. */
+export function splitWaiting(nodes: readonly FlightNode[], now: number = Date.now()): { active: FlightNode[]; waiting: FlightNode[] } {
+  const active: FlightNode[] = [];
+  const waiting: FlightNode[] = [];
+  for (const node of nodes) (isWaitingOnly(node, now) ? waiting : active).push(node);
+  return { active, waiting };
+}
+
 export function flightLook(task: Task, rowNeedsYou = false, stalled = false): FlightLook {
   if (task.state === "failed") return "failed";
   if (task.stale) return "done";
@@ -216,7 +254,8 @@ export function workersUnder(node: FlightNode): WorkerInfo[] {
 
 export type WorkerGroup = { conversation: string | null; name: string; nodes: FlightNode[] };
 
-export function workerGroups(data: RowsData & { groups: readonly { conversation: string | null; name: string; ids: readonly string[] }[] }, keep: (conversation: string | null) => boolean = () => true): WorkerGroup[] {
-  const tops = new Map(treeOf(data).map((n) => [n.task.id, n]));
+export function workerGroups(data: RowsData & { groups: readonly { conversation: string | null; name: string; ids: readonly string[] }[] }, keep: (conversation: string | null) => boolean = () => true, now: number = Date.now()): WorkerGroup[] {
+  // A task that only waits, with no worker running on it, isn't a worker's live work.
+  const tops = new Map(treeOf(data).filter((n) => !isWaitingOnly(n, now)).map((n) => [n.task.id, n]));
   return data.groups.filter((g) => keep(g.conversation)).map((g) => ({ conversation: g.conversation, name: g.name, nodes: g.ids.map((id) => tops.get(id)).filter((n): n is FlightNode => !!n) })).filter((g) => g.nodes.length);
 }

@@ -36,11 +36,6 @@ const REPO_PLUGINS_DIRECTORY_NAME = "plugins";
 
 export const BUILTIN_PLUGINS = [
   {
-    name: "storage-retention",
-    pluginId: "bb--storage-retention",
-    defaultEnabled: false,
-  },
-  {
     name: "bb-guide",
     pluginId: "bb-guide",
     defaultEnabled: true,
@@ -59,16 +54,6 @@ export const BUILTIN_PLUGINS = [
     name: "automations",
     pluginId: "automations",
     defaultEnabled: true,
-  },
-  {
-    name: "bb-account",
-    pluginId: "bb-account",
-    defaultEnabled: false,
-  },
-  {
-    name: "connect",
-    pluginId: "connect",
-    defaultEnabled: false,
   },
   {
     name: "environment-project-checkout",
@@ -121,11 +106,6 @@ export const BUILTIN_PLUGINS = [
     defaultEnabled: true,
   },
   {
-    name: "plugin-api-docs",
-    pluginId: "plugin-api-docs",
-    defaultEnabled: false,
-  },
-  {
     name: "provider-retry",
     pluginId: "provider-retry",
     defaultEnabled: true,
@@ -171,19 +151,9 @@ export const BUILTIN_PLUGINS = [
     defaultEnabled: true,
   },
   {
-    name: "agent-annotations",
-    pluginId: "agent-annotations",
-    defaultEnabled: false,
-  },
-  {
     name: "concurrency-limit",
     pluginId: "concurrency-limit",
     defaultEnabled: true,
-  },
-  {
-    name: "workflows",
-    pluginId: "workflows",
-    defaultEnabled: false,
   },
   {
     name: "composer",

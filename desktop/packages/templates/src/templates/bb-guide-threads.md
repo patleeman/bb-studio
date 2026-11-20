@@ -132,7 +132,7 @@ Spawning:
   Worktree, and Personal workspace.
 
 Handoff:
-  The app's Handoff to new thread (in the follow-up model picker) starts a new
+  The app's Hand off to new thread (in the follow-up model picker) starts a new
   thread that references the source. From the CLI, run bb thread spawn with
   --provider, --model, --environment and --prompt 'Continue from
   @thread:THREAD_ID ...'; SDK callers pass the same fields to threads.spawn.
@@ -187,8 +187,7 @@ Editing a sent message:
   replacement history. If the thread is running,
   submission stops the current turn and waits for it to settle. Provider-owned
   background commands, agents, and workflows are stopped before replacing the
-  session, and retained task cards keep their terminal status. Durable runs
-  managed by the Workflows plugin continue independently. It then
+  session, and retained task cards keep their terminal status. It then
   replaces the selected turn and every later turn while retaining workspace
   changes. Unsent queued messages remain in the queue and dispatch after the
   replacement turn when their waits clear. An already-sending queued message

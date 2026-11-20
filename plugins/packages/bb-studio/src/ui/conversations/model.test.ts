@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { ConversationRow, WorkerRow } from "../../bot-threads-contract";
-import { conversationLines, staleFailure, landingThread, olderBotFromPath, olderLabel, olderPath, secondLine, shortAge, spaceDots, summarySections, swipeStep, switchTarget, SWIPE_IDLE_MS, SWIPE_START, SWIPE_THRESHOLD, workerLines, splitWorkers, doneLabel, hiddenThreadTarget } from "./model";
+import { conversationLines, staleFailure, landingThread, olderBotFromPath, olderPath, secondLine, shortAge, spaceDots, summarySections, swipeStep, switchTarget, SWIPE_IDLE_MS, SWIPE_START, SWIPE_THRESHOLD, workerLines, splitWorkers, doneLabel, hiddenThreadTarget } from "./model";
 
 const bots = [
   { id: "cos", name: "Chief of Staff", needsYou: false },
@@ -105,9 +105,6 @@ it("splits a finished conversation's summary into its sections for the card", ()
     { heading: "Last replies", items: ["First line", "second"], list: false },
   ]);
   expect(summarySections("Just one line.")).toEqual([{ heading: "", items: ["Just one line."], list: false }]);
-  expect(olderLabel(0, "worker")).toBeNull();
-  expect(olderLabel(1, "conversation")).toBe("1 older conversation");
-  expect(olderLabel(12, "worker")).toBe("12 older workers");
   const DAY = 24 * 60 * 60_000;
   expect(staleFailure({ status: "failed", updatedAt: 0 }, 70 * DAY)).toBe(true);
   expect(staleFailure({ status: "failed", updatedAt: 69 * DAY }, 70 * DAY)).toBe(false);

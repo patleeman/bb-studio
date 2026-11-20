@@ -15,6 +15,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assertStudioVersion,
+  formatStudioUpstream,
   parseStudioRelease,
   STUDIO_UPDATE_TEST_ENV,
 } from "../../apps/desktop/scripts/studio-release.fork.mjs";
@@ -75,7 +76,7 @@ Run it in the desktop worktree. The Studio version is apps/desktop/studio-releas
                      signed when CSC_NAME is set, never notarized, tagged or
                      uploaded. For testing a fresh install.
 
-Studio and Visual Chat are bundled with the app as built-in plugins
+Studio is bundled with the app as a built-in plugin
 (scripts/fork/bundle-studio-plugins.mjs): plugins/ is taken from the
 monorepo's origin/main, installed with pnpm and built with the release
 worktree's CLI into bb-app's builtin-plugins before electron-builder runs.
@@ -109,7 +110,7 @@ const NOTARY_KEY = notaryApiKey();
 const syncRoot =
   process.env.BB_STUDIO_SYNC_DIR ?? resolve(root, "..", ".bb-studio-fork-sync");
 const monorepo = resolve(
-  process.env.BB_STUDIO_MONOREPO ?? resolve(root, "..", "bb-studio-app"),
+  process.env.BB_STUDIO_MONOREPO ?? resolve(root, "..", "bb-studio-public"),
 );
 const COAUTHOR = "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>";
 const VERSION_FILE = "apps/desktop/studio-release.fork.json";
@@ -253,7 +254,7 @@ function desktopTipAt(ref) {
 function draftNotes({ version, since, desktopTip }) {
   const upstream = upstreamOf(desktopTip);
   const lines = [
-    `BB Studio ${version} (based on bb ${upstream.version} @ ${upstream.commit.slice(0, 7)}) for macOS (Apple silicon). The app is signed with a Developer ID and notarized by Apple. Installed copies update themselves once this release is published; to install by hand, open the DMG and drag BB Studio to Applications.`,
+    `BB Studio ${version} (${formatStudioUpstream(upstream)}) for macOS (Apple silicon). The app is signed with a Developer ID and notarized by Apple. Installed copies update themselves once this release is published; to install by hand, open the DMG and drag BB Studio to Applications.`,
     "",
   ];
   if (since !== null) {
@@ -544,7 +545,7 @@ function bundleStudioPlugins(dir) {
     "--out",
     join(dir, "packages", "bb-app", "server", "dist", "builtin-plugins"),
   ]);
-  console.log(`  bundled Studio and Visual Chat from origin/main ${target.slice(0, 10)}`);
+  console.log(`  bundled Studio from origin/main ${target.slice(0, 10)}`);
 }
 
 function releaseFiles(desktop, version) {

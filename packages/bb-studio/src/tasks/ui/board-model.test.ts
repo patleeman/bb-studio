@@ -4,7 +4,7 @@ import { boardRows, flightRows, workerRows } from "../rows";
 import { zonedTime } from "../../loops/clock";
 import { areaOrder, itemAge, runBars } from "../../areas/ui/model";
 import type { AreaView } from "../../areas/contract";
-import { areaAsks, doneSummary, startedAt, flightLook, moreLine, pageCounts, pageFlight, stepProgress, todoBox, todoHeader, todoShown, treeOf, waitLabel, weekStart, workerGroups } from "./board-model";
+import { areaAsks, doneSummary, isWaitingOnly, splitWaiting, startedAt, flightLook, moreLine, pageCounts, pageFlight, stepProgress, todoBox, todoHeader, todoShown, treeOf, waitLabel, weekStart, workerGroups, type FlightNode, type WorkerInfo } from "./board-model";
 
 const NOW = Date.UTC(2026, 10, 15, 22, 0);
 const H = 3_600_000;
@@ -196,4 +196,64 @@ it("tasks.check lists a stalled running task as a problem and changes nothing", 
   const problems = checkTasks(tasks, facts, ctx, [], NOW);
   expect(problems.filter((p) => p.kind === "stalled").map((p) => p.taskIds)).toEqual([["quiet"]]);
   expect(JSON.stringify(tasks)).toBe(before);
+});
+
+// In flight is work under way; what only waits leaves it for Waiting.
+const node = (task: Task, extra: { workers?: WorkerInfo[]; children?: FlightNode[]; needsYou?: boolean; stalled?: boolean } = {}): FlightNode => ({
+  row: { id: task.id, home: null, under: null, depth: 0, open: !["done", "dropped", "failed"].includes(task.state), workers: (extra.workers ?? []).map((w) => w.threadId), hasWorkers: !!extra.workers?.length, needsYou: extra.needsYou ?? false, stalled: extra.stalled ?? false },
+  task, children: extra.children ?? [], workers: extra.workers ?? [],
+});
+const agent = (id: string, patch: Record<string, unknown> = {}) => t(id, { owner: "thread:thr_lead", ...patch });
+const worker = (status: string | null, archived = false): WorkerInfo => ({ threadId: `thr_${status ?? "none"}`, name: "A worker", status, archived });
+const at = (type: string, extra: Record<string, unknown> = {}) => ({ due: null, trigger: { type, ...extra }, snoozed: false });
+
+it("puts each kind of row in In flight or Waiting", () => {
+  const active = {
+    running: node(agent("running", { state: "in_progress" })),
+    stalledRunning: node(agent("stalled", { state: "in_progress" }), { stalled: true }),
+    queued: node(agent("queued", { state: "todo" })),
+    waitingWithoutReason: node(agent("waiting", { state: "waiting" })),
+    onCi: node(agent("ci", { state: "waiting", waitingOn: { kind: "ci", ref: "run 7", text: null } })),
+    onTheUser: node(agent("user", { state: "waiting", waitingOn: { kind: "user", ref: null, text: null } })),
+    subtaskNeedsYou: node(agent("sub_needs", { state: "waiting", waitingOn: { kind: "outside", ref: null, text: "Unraid" } }), { needsYou: true }),
+    timeAlreadyDue: node(agent("due", { state: "todo", timing: at("time", { at: NOW - H }) })),
+    outsideButWorkerRunning: node(agent("worked", { state: "waiting", waitingOn: { kind: "outside", ref: null, text: "Unraid" } }), { workers: [worker("active")] }),
+    outsideButSubtaskRunning: node(agent("parent", { state: "waiting", waitingOn: { kind: "task", ref: "x", text: null } }), { children: [node(agent("child", { state: "in_progress", parentId: "parent" }))] }),
+    ended: node(agent("ended", { state: "waiting", stale: true, waitingOn: { kind: "outside", ref: null, text: "Unraid" } })),
+    closed: node(agent("closed", { state: "done", closedAt: NOW - H, kind: "waiting-outside" })),
+  };
+  const waiting = {
+    onSomeoneOutside: node(agent("red4", { owner: "cos", state: "waiting", waitingOn: { kind: "outside", ref: null, text: "Unraid shipping a fix" } })),
+    onAnotherTask: node(agent("tf", { state: "waiting", waitingOn: { kind: "task", ref: "polish", text: null } })),
+    waitingOutsideKind: node(t("lease", { kind: "waiting-outside", state: "waiting" })),
+    agentsWaitingOutsideKind: node(agent("agent_lease", { kind: "waiting-outside", state: "todo" })),
+    onAnEvent: node(agent("event", { state: "todo", timing: at("event", { event: "reply:sam" }) })),
+    onAPlace: node(agent("place", { state: "waiting", timing: at("place", { place: "home", direction: "arrive" }) })),
+    untilALaterTime: node(agent("later", { state: "todo", timing: at("time", { at: NOW + 24 * H }) })),
+    snoozed: node(agent("snoozed", { state: "waiting", timing: { due: null, trigger: { type: "none" }, snoozed: true } })),
+    withAnIdleWorker: node(agent("idle", { state: "waiting", waitingOn: { kind: "outside", ref: null, text: "Unraid" } }), { workers: [worker("idle")] }),
+    withAnArchivedWorker: node(agent("gone", { state: "waiting", waitingOn: { kind: "outside", ref: null, text: "Unraid" } }), { workers: [worker("active", true)] }),
+  };
+  for (const [kind, n] of Object.entries(active)) expect(isWaitingOnly(n, NOW), kind).toBe(false);
+  for (const [kind, n] of Object.entries(waiting)) expect(isWaitingOnly(n, NOW), kind).toBe(true);
+  const split = splitWaiting([active.running, waiting.onSomeoneOutside, active.onCi, waiting.onAnEvent], NOW);
+  expect(split.active.map((n) => n.task.id)).toEqual(["running", "ci"]);
+  expect(split.waiting.map((n) => n.task.id)).toEqual(["red4", "event"]);
+});
+
+it("splits the board's In flight: the sample's outside and task waits go to Waiting, the rest stay", () => {
+  const split = splitWaiting(pageFlight({ ...boardRows(DATA, ctx), workers: [{ threadId: "thr_w1", name: "Shots", status: "active", archived: false }] }), NOW);
+  expect(split.waiting.map((n) => n.task.id)).toEqual(["outside", "testflight"]);
+  expect(split.active.map((n) => n.task.id)).not.toContain("outside");
+  expect(split.active.map((n) => n.task.id)).toContain("duo");
+});
+
+it("leaves a worker's task that only waits out of the sidebar's Workers", () => {
+  const tasks = [
+    agent("live", { state: "in_progress", workers: ["thr_w1"], conversation: "thr_studio" }),
+    agent("parked", { state: "waiting", waitingOn: { kind: "outside", ref: null, text: "Unraid" }, workers: ["thr_w2"], conversation: "thr_studio" }),
+  ];
+  const rows = workerRows(tasks, ctx);
+  const data = { ...rows, workers: [{ threadId: "thr_w1", name: "Live", status: "active", archived: false }, { threadId: "thr_w2", name: "Parked", status: "idle", archived: false }], groups: rows.groups.map((g) => ({ ...g, name: "BB Studio" })) };
+  expect(workerGroups(data, () => true, NOW).flatMap((g) => g.nodes.map((n) => n.task.id))).toEqual(["live"]);
 });

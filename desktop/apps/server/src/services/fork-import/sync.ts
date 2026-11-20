@@ -1,3 +1,4 @@
+import { releaseBbEnvironments } from "./bb-environments.js";
 import Database from "better-sqlite3";
 import { cpSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { cp, readdir } from "node:fs/promises";
@@ -16,7 +17,6 @@ type Row = Record<string, unknown>;
 
 const RUNNING_STATUSES = new Set(["starting", "active", "stopping"]);
 const THREAD_SCOPED_TABLES = [
-  "thread_plugin_metadata",
   "thread_conversation_outlines",
   "thread_tabs",
   "project_attachment_threads",
@@ -66,7 +66,7 @@ function primaryKeyOf(database: Sqlite, table: string): string[] {
     .map((row) => row.name);
 }
 
-function quote(name: string): string {
+export function quote(name: string): string {
   return `"${name.replaceAll('"', '""')}"`;
 }
 
@@ -111,11 +111,11 @@ export function upsertRows(
   return written;
 }
 
-function selectList(columns: readonly string[]): string {
+export function selectList(columns: readonly string[]): string {
   return columns.map(quote).join(", ");
 }
 
-function readHostId(dataDir: string): string | null {
+export function readHostId(dataDir: string): string | null {
   try {
     const value = readFileSync(join(dataDir, "host-id"), "utf8").trim();
     return value.length > 0 ? value : null;
@@ -124,7 +124,11 @@ function readHostId(dataDir: string): string | null {
   }
 }
 
-function rowExists(database: Sqlite, table: string, id: string): boolean {
+export function rowExists(
+  database: Sqlite,
+  table: string,
+  id: string,
+): boolean {
   return (
     database
       .prepare<[string], { found: number }>(
@@ -174,7 +178,7 @@ function syncUpdatedTable(
   return written;
 }
 
-function ensureHosts(source: Sqlite, target: Sqlite): void {
+export function ensureHosts(source: Sqlite, target: Sqlite): void {
   const columns = sharedColumns(source, target, "hosts");
   const rows = source
     .prepare<[], Row>(`SELECT ${selectList(columns)} FROM hosts`)
@@ -619,6 +623,7 @@ export function runForkImportSync(
     writeCursor(fork, "threads.updated_at", String(newestThread));
     writeCursor(fork, "events.rowid", String(newestEvent));
     deleteThreadsRemovedAtSource(context, args.now);
+    releaseBbEnvironments(target, [state.sourceDataDir]);
     writeCursor(fork, "lastSyncAt", String(args.now));
     writeCursor(fork, "lastSummary", JSON.stringify(summary));
     if (summary.conflicts.length > 0) {

@@ -14,6 +14,7 @@ export interface ForkDesktopWindowRequest {
 }
 
 export interface ForkStudioBuild {
+  upstreamAhead?: number | null;
   upstreamCommit: string;
   upstreamVersion: string;
   version: string;
@@ -59,6 +60,12 @@ export interface ForkFileLinkMenuRequest {
   point: { x: number; y: number } | null;
 }
 
+/** The Mac's input idle time and lock state (Studio's "at the desk" heartbeat). */
+export interface ForkSystemActivity {
+  idleSeconds: number;
+  locked: boolean;
+}
+
 export interface ForkDesktopApi {
   experimental_finderLabel?: string;
   experimental_showInFinder?(path: string): Promise<ForkFinderShowResult>;
@@ -73,4 +80,8 @@ export interface ForkDesktopApi {
     approvalId: string,
   ): Promise<"answered" | "unavailable">;
   experimental_window?(request: ForkDesktopWindowRequest): Promise<boolean>;
+  experimental_systemActivity?(): Promise<ForkSystemActivity>;
+  experimental_onSystemActivity?(
+    listener: (activity: ForkSystemActivity) => void,
+  ): () => void;
 }

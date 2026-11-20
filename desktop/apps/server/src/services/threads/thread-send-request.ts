@@ -1,3 +1,4 @@
+import { automationNotice } from "./automation-notice.fork.js";
 import {
   isStandaloneBuiltinClearCommand,
   isStandaloneBuiltinCompactCommand,
@@ -29,13 +30,13 @@ export async function acceptThreadSendRequest(
     input: args.payload.input,
     providerId: args.thread.providerId,
   });
-  const { compactFirst, ...request } = args.payload;
+  const { compactFirst, experimental_notice, ...request } = args.payload;
   if (isStandaloneBuiltinClearCommand(request.input)) {
     if (compactFirst) throwInvalidCompactFirst("cannot clear the context");
     const environment = await requireThreadCommandEnvironment(deps, {
       thread: args.thread,
     });
-    await attemptDispatch(deps, {
+    const outcome = await attemptDispatch(deps, {
       thread: args.thread,
       payload: request,
       source: { kind: "operation", environment },
@@ -47,7 +48,12 @@ export async function acceptThreadSendRequest(
       startedOnBehalfOf: null,
       trigger: "user",
     });
-    return { ok: true, delivery: "sent" };
+    return {
+      ok: true,
+      delivery: "sent",
+      messageSequence:
+        outcome.kind === "dispatched" ? outcome.messageSequence : null,
+    };
   }
 
   if (compactFirst) {
@@ -75,7 +81,7 @@ export async function acceptThreadSendRequest(
         source: { kind: "inline" },
         queuePayload: { kind: "inline" },
         pluginSubmission: payload.pluginSubmission ?? null,
-        systemNotice: null,
+        systemNotice: automationNotice(experimental_notice, args.thread),
         origin: payload.originPluginId === undefined ? null : "plugin",
         originPluginId: payload.originPluginId ?? null,
         startedOnBehalfOf: null,
@@ -83,7 +89,11 @@ export async function acceptThreadSendRequest(
       }),
   );
   if (outcome.kind === "dispatched") {
-    return { ok: true, delivery: "sent" };
+    return {
+      ok: true,
+      delivery: "sent",
+      messageSequence: outcome.messageSequence,
+    };
   }
   return {
     ok: true,

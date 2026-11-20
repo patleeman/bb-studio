@@ -324,6 +324,12 @@ it("says what a waiting row waits on: you, CI, another task or someone outside",
     base("task_o", "Lease addendum", { kind: "outside", ref: null, text: "the landlord" }),
   ] as never;
   await renderList();
+  // Waits on you and on CI stay in In flight; what only waits on another task or someone outside folds into "2 waiting".
+  expect(rows().map((row) => row.querySelector('[data-testid="in-flight-right"]')?.textContent)).toEqual(["Waiting on you", "Waiting on CI"]);
+  const fold = q('[data-testid="in-flight-waiting"]')!;
+  expect(fold.textContent).toBe("2 waiting");
+  expect(q('[data-testid="in-flight-count"]')!.textContent).toBe("2");
+  await act(async () => (fold as HTMLButtonElement).click());
   const right = rows().map((row) => row.querySelector('[data-testid="in-flight-right"]')?.textContent);
   expect(right).toEqual(["Waiting on you", "Waiting on CI", "Waiting on a task", "Waiting on the landlord"]);
   expect(rows()[1]!.textContent).toContain("Waiting on CI: run 42");
@@ -390,6 +396,8 @@ it("a stalled running task draws as waiting with Stalled, not a ring; queued wor
   const queued = byTitle("Pick up next");
   expect(queued.querySelector('[data-testid="in-flight-right"]')!.textContent).toBe("Queued");
   expect((queued.textContent!.match(/Queued/g) ?? []).length).toBe(1);
+  expect(rows().some((row) => row.title === "Remove the PHP mitigation")).toBe(false);
+  await act(async () => (q('[data-testid="in-flight-waiting"]') as HTMLButtonElement).click());
   expect(byTitle("Remove the PHP mitigation").querySelector('[data-testid="in-flight-right"]')!.textContent).toBe("Waiting on someone");
   const event = byTitle("After the reply");
   expect(event.querySelector('[data-testid="in-flight-right"]')!.textContent).toBe("Waiting on an event");

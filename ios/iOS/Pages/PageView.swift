@@ -347,6 +347,7 @@ struct PageView: View {
                     } else {
                         PageMarkdown(source: markdown)
                             .textSelection(.enabled)
+                            .environment(\.pageId, model.pageId)
                     }
                 } else if model.error == nil {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)

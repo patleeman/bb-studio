@@ -268,6 +268,7 @@ export interface ExperimentalFakeHostRpcCall {
   input: unknown;
   hostId: string;
   signal?: AbortSignal;
+  timeoutMs?: number;
 }
 
 /** Everything the plugin registered, exposed raw for assertions. */
@@ -1382,6 +1383,9 @@ function createFakePluginHostInternal(
             ...(callOptions.signal === undefined
               ? {}
               : { signal: callOptions.signal }),
+            ...(callOptions.timeoutMs === undefined
+              ? {}
+              : { timeoutMs: callOptions.timeoutMs }),
           };
           hostRpcCalls.push(call);
           if (options.experimental_callHostRpc === undefined) {

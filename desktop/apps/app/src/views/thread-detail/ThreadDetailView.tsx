@@ -39,7 +39,6 @@ import {
   type ThreadTimelineLinkHandler,
   type ThreadTimelineLocalFileLink,
   type TimelineTitleActionResolver,
-  useThreadTimelineController,
 } from "@/components/thread/timeline";
 import { ThreadProviderContext } from "@/components/thread/thread-provider-context";
 import { type ThreadListEntry } from "@bb/domain";
@@ -86,6 +85,10 @@ import type { LiveFileRoot } from "@/hooks/useResolvedLiveFileTarget";
 import { selectHosts, useHosts } from "@/hooks/queries/host-queries";
 import { useConnectionAwareQueryState } from "@/hooks/queries/connection-aware-query-state";
 import { useThreadTerminals } from "@/hooks/queries/thread-terminal-queries";
+import {
+  useThreadTimelineProvisioningFailure,
+  useThreadTimelineSubscription,
+} from "@/hooks/queries/thread-panel-queries";
 import { usePanelBrowser } from "@/components/secondary-panel/usePanelBrowser";
 import { usePanelFiles } from "@/components/secondary-panel/usePanelFiles";
 import { usePanelTerminals } from "@/components/secondary-panel/usePanelTerminals";
@@ -98,7 +101,6 @@ import { useSystemEnvironmentProviders } from "@/hooks/queries/environment-provi
 import { useSystemMachineProviders } from "@/hooks/queries/machine-provider-queries";
 import { resolveAbsoluteFilePath } from "@bb/shared-ui/lib/absolute-file-path";
 import { getThreadDisplayTitle } from "@/lib/thread-title";
-import { hasThreadProvisioningFailure } from "@/lib/thread-provisioning-failure";
 import {
   getProjectComposeRoutePath,
   type ThreadRoutePathArgs,
@@ -147,7 +149,7 @@ import {
   type OpenAttachmentRequest,
 } from "@/components/secondary-panel/AttachmentOpenerContext";
 import { SelectionAddToChatContext } from "@/components/thread/SelectionAddToChatContext";
-import { usePluginSlots } from "@/lib/plugin-slots";
+import { usePluginSlotKind } from "@/lib/plugin-slots";
 import { getFileExtension } from "@/lib/plugin-slot-resolvers";
 import { Icon } from "@bb/shared-ui/icon";
 import { getBbDesktopInfo, isDesktopBrowserAvailable } from "@/lib/bb-desktop";
@@ -436,10 +438,8 @@ function ThreadDetailViewInternal(
   });
   const openBrowser = panelBrowser.open;
   const openBrowserUrl = panelBrowser.openUrl;
-  const {
-    fileOpeners: pluginFileOpeners,
-    threadPanelActions: registeredThreadActions,
-  } = usePluginSlots();
+  const pluginFileOpeners = usePluginSlotKind("fileOpeners");
+  const registeredThreadActions = usePluginSlotKind("threadPanelActions");
   useThreadOpenFileSignal({
     threadId,
     environmentId: thread?.environmentId,
@@ -447,12 +447,13 @@ function ThreadDetailViewInternal(
   });
   const browserDeckThreadId = thread?.id ?? null;
   const browserDeckEnvironmentId = thread?.environmentId ?? null;
+  const selectedBrowserTabId = activeBrowserTab?.id ?? null;
   const renderBrowserDeck = useCallback(
     ({
       canHandleBrowserCommands,
       canShowNativeBrowserView,
       onNativeFocus,
-      activeBrowserTabId = activeBrowserTab?.id ?? null,
+      activeBrowserTabId = selectedBrowserTabId,
     }: {
       canHandleBrowserCommands?: boolean;
       canShowNativeBrowserView: boolean;
@@ -481,7 +482,7 @@ function ThreadDetailViewInternal(
       );
     },
     [
-      activeBrowserTab?.id,
+      selectedBrowserTabId,
       panelBrowser.addressFocusRequest,
       browserTabs,
       browserDeckEnvironmentId,
@@ -526,19 +527,21 @@ function ThreadDetailViewInternal(
         : EMPTY_PARENT_THREADS,
     [parentThreadSubsetQuery.data, shouldLoadParentThreads],
   );
+  const loadedThreadId = thread?.id;
   const handleParentSelectorOpenChange = useCallback(
     (open: boolean) => {
-      if (open && thread?.id) {
-        setParentThreadsRequestedForThreadId(thread.id);
+      if (open && loadedThreadId) {
+        setParentThreadsRequestedForThreadId(loadedThreadId);
       }
     },
-    [thread?.id],
+    [loadedThreadId],
   );
   const handleRetryParentThreads = parentThreadSubsetQuery.retry;
-  const timeline = useThreadTimelineController({
+  useThreadTimelineSubscription(threadId, { enabled: timelineEnabled });
+  const environmentProvisioningFailure = useThreadTimelineProvisioningFailure(
     threadId,
-    enabled: timelineEnabled,
-  });
+    thread?.status === "error" && thread.environmentId === null,
+  );
   const updateThread = useUpdateThread({
     errorMessage: "Failed to assign parent thread.",
   });
@@ -1110,7 +1113,21 @@ function ThreadDetailViewInternal(
       switch (action.kind) {
         case "open-file-diff":
           return () => {
-            openSecondaryPanelDiffFile(action.path);
+            if (openSecondaryPanelDiffFile(action.path)) return;
+            const environmentId = thread?.environmentId;
+            if (environmentId === null || environmentId === undefined) return;
+            openLiveFilePreview({
+              target: { kind: "workspace", environmentId, path: action.path },
+              location: null,
+            });
+          };
+        case "open-local-file":
+          return () => {
+            handleOpenTimelineLocalFileLink({
+              lineRange: null,
+              openTargetId: null,
+              path: action.path,
+            });
           };
         case "open-plugin-side-chat":
           return () => {
@@ -1127,7 +1144,14 @@ function ThreadDetailViewInternal(
           return assertNever(action);
       }
     },
-    [openSecondaryPanelDiffFile, panel, threadId],
+    [
+      handleOpenTimelineLocalFileLink,
+      openLiveFilePreview,
+      openSecondaryPanelDiffFile,
+      panel,
+      thread?.environmentId,
+      threadId,
+    ],
   );
   const metadataStorage = useMemo(
     () =>
@@ -1323,24 +1347,25 @@ function ThreadDetailViewInternal(
       threadEnvironmentIsLocal,
     ],
   );
+  const loadedThreadEnvironmentId = thread?.environmentId;
   const handleOpenFilePreview = useCallback<OpenFilePreviewHandler>(
     (relativePath) => {
       if (
-        thread?.environmentId === null ||
-        thread?.environmentId === undefined
+        loadedThreadEnvironmentId === null ||
+        loadedThreadEnvironmentId === undefined
       ) {
         return;
       }
       openLiveFilePreview({
         target: {
           kind: "workspace",
-          environmentId: thread.environmentId,
+          environmentId: loadedThreadEnvironmentId,
           path: relativePath,
         },
         location: null,
       });
     },
-    [openLiveFilePreview, thread?.environmentId],
+    [openLiveFilePreview, loadedThreadEnvironmentId],
   );
 
   if (threadQueryState.status === "loading") {
@@ -1361,10 +1386,6 @@ function ThreadDetailViewInternal(
   }
   const canAssignToParent = isThreadRoot;
   const canTakeOverThread = Boolean(thread.parentThreadId);
-  const environmentProvisioningFailure =
-    thread.status === "error" && thread.environmentId === null
-      ? hasThreadProvisioningFailure(timeline.timelineRows)
-      : false;
   const threadEnvironmentProviderLookup = findEnvironmentDisplayProvider(
     registeredEnvironmentProviders,
     environment?.environmentProviderId ?? null,
@@ -1543,7 +1564,7 @@ function ThreadDetailViewInternal(
       projectId={projectId}
       resolveMentionLink={resolveMentionLink}
       thread={thread}
-      timeline={timeline}
+      timelineEnabled={timelineEnabled}
       timelineHost={{
         environmentHostName: threadEnvironmentHost?.name ?? null,
         includePluginMessageActions: true,

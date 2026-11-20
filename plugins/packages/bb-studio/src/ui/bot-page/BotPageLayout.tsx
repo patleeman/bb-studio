@@ -22,7 +22,7 @@ export const BOT_PAGE_CARD = `pointer-events-none sticky top-0 -z-10 -mb-[100cqh
 export const BOT_PAGE_COLUMN = "mx-auto flex w-full max-w-4xl flex-col gap-5 px-8 pt-5 pb-16 @max-2xl/bot-page:px-4";
 
 export interface BotPageLayoutProps {
-  /** The page's name: "Todos", "Memory", "Library", "Automations", "Archive". */
+  /** The page's name: "Todos", "Memory", "Library", "Automations", "Conversations". */
   title: string;
   /** The Bot the page shows, after the title. */
   bot?: string | null;

@@ -40,6 +40,8 @@ async function setup() {
   const defaults = new Map<string, { providerId: string; model: string; reasoning: "low" | "medium" | "high" | null }>();
   const lastEvent = new Map<string, number>();
   const interactions = new Map<string, unknown[]>();
+  /** The summaries saved to memory, by conversation (bot-finish's records). */
+  const saved = new Map<string, string>();
   /** Each thread's replies, newest first (item/completed agentMessage events). */
   const replies = new Map<string, string[]>([["thr_main", ["[PASS]", "[PASS]", "Morning brief is out: 3 things for today", "older"]]]);
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
@@ -54,7 +56,7 @@ async function setup() {
       interactions: { list: (async ({ threadId }: { threadId: string }) => interactions.get(threadId) ?? []) as never } as never,
       // Each thread's latest real event: now, unless a test says otherwise.
       events: { list: (async ({ threadId, types }: { threadId: string; types?: string[] }) => types?.includes("item/completed") && replies.has(threadId)
-        ? replies.get(threadId)!.map((text, at) => ({ seq: 10 - at, type: "item/completed", data: { item: { type: "agentMessage", text } } }))
+        ? replies.get(threadId)!.map((text, at, all) => ({ seq: 10 + all.length - at, type: "item/completed", data: { item: { type: "agentMessage", text } } }))
         : [{ seq: 1, type: "turn/completed", createdAt: lastEvent.get(threadId) ?? Date.now() }]) as never },
     },
   } });
@@ -70,9 +72,10 @@ async function setup() {
     changed, log: () => {},
     actingBot: async () => null,
     defaultModel: (botId) => defaults.get(botId) ?? null,
+    conversationSummaries: () => saved,
   });
   await server.start();
-  return { bb, harness, server, threads, send, fork, spawn, update, models, defaults, changed, lastEvent, replies, interactions };
+  return { bb, harness, server, threads, send, fork, spawn, update, models, defaults, changed, lastEvent, replies, interactions, saved };
 }
 
 it("answers a Bot's sidebar and one thread's place for the main view", async () => {
@@ -237,6 +240,51 @@ it("names a finished conversation by BB's title when Studio's row has none, and 
   }
   const older = await server.rpc.bot_threads_older({});
   expect(older.finished.map((each) => [each.threadId, each.title, each.failed])).toEqual([["gone", "Untitled conversation", false], ["hello", "Say hello", true], ["kindle", "Kindle vs Kobo for bed", false]]);
+});
+
+it("lists every conversation for the Conversations page, archived ones too, each with its summary's first line", async () => {
+  const { server, threads, bb, saved } = await setup();
+  const db = bb.storage.database();
+  threads.set("tax", { id: "tax", title: "Tax questions", createdAt: 1, updatedAt: 2, status: "idle", archivedAt: 60 } as never);
+  threads.set("prep", { id: "prep", title: "Launch prep", createdAt: 1, updatedAt: 2, status: "error", archivedAt: 70 } as never);
+  db.prepare("INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, source, created_at, updated_at, archived_at, latest, latest_at) VALUES ('tax', 'dot', 'conversation', 0, 'created', 1, 1, 60, 'Filed the extension', 2)").run();
+  db.prepare("INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, source, created_at, updated_at, archived_at, finished_summary) VALUES ('prep', 'dot', 'conversation', 0, 'created', 1, 1, 70, ?)").run("**Decisions**\n- Ship the checklist Friday.\n- The press kit waits.\n\n**Made**\n- The checklist");
+  // Another Bot's archived conversation stays off this page.
+  db.prepare("INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, source, created_at, updated_at, archived_at) VALUES ('other', 'home', 'conversation', 0, 'created', 1, 1, 80)").run();
+  saved.set("tax", "Tax questions\n\nAsked about the county assessment; the appeal is due in March.");
+  const page = await server.rpc.bot_conversations_all({});
+  expect(page.botId).toBe("dot");
+  const rows = new Map(page.conversations.map((each) => [each.threadId, each]));
+  // Active first, as the sidebar orders them, then the archived ones.
+  expect(page.conversations.map((each) => each.threadId).slice(0, 2)).toEqual(["thr_main", "redesign"]);
+  expect(new Set(page.conversations.slice(2).map((each) => each.threadId))).toEqual(new Set(["tax", "prep"]));
+  expect(rows.get("thr_main")).toMatchObject({ title: "Main", archivedAt: null, summary: null, latest: "Morning brief is out: 3 things for today" });
+  // Finishing's summary, its section heads left out; else the record saved to memory, its title line left out.
+  expect(rows.get("prep")).toMatchObject({ title: "Launch prep", archivedAt: 70, summary: "Ship the checklist Friday. The press kit waits.", failed: true });
+  expect(rows.get("tax")).toMatchObject({ title: "Tax questions", archivedAt: 60, summary: "Asked about the county assessment; the appeal is due in March.", latest: "Filed the extension", failed: false });
+  expect(page.workers.map((each) => each.threadId)).toEqual(["lead", "review"]);
+});
+
+it("searches a Bot's conversations: a word only in a message, hidden Main's too, and a summary, each with a snippet", async () => {
+  const { server, threads, bb, replies, saved, harness } = await setup();
+  const db = bb.storage.database();
+  threads.set("tax", { id: "tax", title: "Tax questions", createdAt: 1, updatedAt: 2, status: "idle", archivedAt: 60, visibility: "hidden" } as never);
+  db.prepare("INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, source, created_at, updated_at, archived_at) VALUES ('tax', 'dot', 'conversation', 0, 'created', 1, 1, 60)").run();
+  replies.set("tax", ["We sent the zebra release to the county office on Friday."]);
+  saved.set("tax", "Tax questions\n\nAsked about the county assessment.");
+  const zebra = await server.rpc.bot_conversations_search({ query: "Zebra" });
+  expect(zebra).toEqual({ hits: [{ threadId: "tax", kind: "conversation", field: "message", snippet: "We sent the zebra release to the county office on Friday." }], indexing: false });
+  // Main is hidden from BB's own search; Studio reads its messages itself.
+  expect((await server.rpc.bot_conversations_search({ query: "morning brief" })).hits).toEqual([{ threadId: "thr_main", kind: "conversation", field: "message", snippet: "Morning brief is out: 3 things for today" }]);
+  expect((await server.rpc.bot_conversations_search({ query: "assessment" })).hits).toEqual([{ threadId: "tax", kind: "conversation", field: "summary", snippet: "Asked about the county assessment." }]);
+  expect((await server.rpc.bot_conversations_search({ query: "redesign" })).hits).toEqual([{ threadId: "redesign", kind: "conversation", field: "title", snippet: null }]);
+  expect((await server.rpc.bot_conversations_search({ query: "nothing here" })).hits).toEqual([]);
+  // A new reply is read after the conversation goes idle.
+  replies.set("tax", ["A quokka note", "We sent the zebra release to the county office on Friday."]);
+  await harness.emitThreadEvent("thread.idle", { thread: threads.get("tax") as never, lastAssistantText: "A quokka note" } as never);
+  expect(server.text.pending(["tax"])).toBe(true);
+  const fresh = new Map((await server.rpc.bot_conversations_search({ query: "quokka" })).hits.map((hit) => [hit.threadId, hit.field]));
+  expect(fresh.get("tax")).toBe("message");
 });
 
 it("moves forks agents made, recorded as conversations by an earlier start, to workers once at the next start", async () => {

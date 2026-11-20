@@ -119,7 +119,7 @@ it("draws the current Bot: its name, conversations in two lines with the needs-y
   const workers = $$('[data-testid="worker-row"]');
   expect(workers.map((row) => [row.dataset.status, row.querySelector('[data-testid="worker-tag"]')?.textContent ?? null])).toEqual([["running", "bb-studio-native"]]);
   expect($('[data-testid="workers-done"]')?.textContent).toBe("1 done");
-  // Workers are the active ones and the done row: older ones are on the Archive page.
+  // Workers are the active ones and the done row: the rest are on the Conversations page.
   expect($('[data-testid="older-workers"]')).toBeNull();
   expect($('[data-testid="older-conversations"]')).toBeNull();
   const dots = $$('[data-testid="space-dot"]');
@@ -210,15 +210,16 @@ it("keeps the header clickable in the desktop app, and with one Bot shows its ic
   expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "bot/new" });
 });
 
-it("ends Conversations with a quiet row for the older ones, and Archive in the menu opens the same page", async () => {
+it("opens every conversation from the Conversations row; the list ends without an older row, and the menu has no Archive", async () => {
   (state.live["bot_threads_view:cos"] as { olderConversations: number }).olderConversations = 41;
   await mount();
-  expect($('[data-testid="older-conversations"]')?.textContent).toBe("41 older conversations");
-  await act(async () => { $('[data-testid="older-conversations"]')!.click(); });
+  expect($('[data-testid="older-conversations"]')).toBeNull();
+  expect($('[data-testid="conversations"]')!.textContent).not.toContain("older");
+  const row = $('[data-testid="space-page-conversations"]')!;
+  expect(row.textContent).toBe("Conversations");
+  await act(async () => { row.click(); });
   expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "conversations/cos" });
-  state.navigate.toPluginPanel.mockClear();
-  await act(async () => { $$('[data-testid="menu"] [role="menuitem"]').find((item) => item.textContent === "Archive")!.click(); });
-  expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "conversations/cos" });
+  expect($$('[data-testid="menu"] [role="menuitem"]').map((item) => item.textContent)).not.toContain("Archive");
 });
 
 it("keeps the space dots pinned to the bottom of a long list: the panel grows with its rows and the footer sticks", async () => {
@@ -305,7 +306,7 @@ it("draws titles at 13px/500 with the second line and time at 55% ink; a row wit
 it("keeps the Bot header at the top while the list scrolls, and its menu lists the Bot's actions", async () => {
   await mount();
   expect($('[data-testid="bot-sidebar-header"]')?.className.split(" ")).toEqual(expect.arrayContaining(["sticky", "top-0"]));
-  expect($$('[data-testid="menu"] [role="menuitem"]').map((item) => item.textContent)).toEqual(["Edit Chief of Staff…", "Bot settings…", "Default model", "Archive", "New Bot"]);
+  expect($$('[data-testid="menu"] [role="menuitem"]').map((item) => item.textContent)).toEqual(["Edit Chief of Staff…", "Bot settings…", "Default model", "New Bot"]);
 });
 
 it("draws + New as BB's ghost button, named New conversation", async () => {
@@ -328,7 +329,7 @@ it("has the same Bot menu where BB has plugin windows", async () => {
   try {
     await mount();
     const items = $$('[data-testid="menu"] [role="menuitem"]');
-    expect(items.map((item) => item.textContent)).toEqual(["Edit Chief of Staff…", "Bot settings…", "Default model", "Archive", "New Bot"]);
+    expect(items.map((item) => item.textContent)).toEqual(["Edit Chief of Staff…", "Bot settings…", "Default model", "New Bot"]);
   } finally { state.windows = false; }
 });
 
@@ -374,7 +375,7 @@ it("says No workers with none, and no done row", async () => {
   expect($('[data-testid="workers"]')?.textContent).toContain("No workers");
 });
 
-it("lists no older-workers row however many there are; the older conversations row is selected while that page is open", async () => {
+it("lists no older-workers row however many there are; the Conversations row is selected while its page is open", async () => {
   const view = state.live["bot_threads_view:cos"] as { hiddenWorkers: number; hiddenToday: number; olderConversations: number };
   view.hiddenWorkers = 343;
   view.hiddenToday = 3;
@@ -382,11 +383,12 @@ it("lists no older-workers row however many there are; the older conversations r
   await mount();
   expect($('[data-testid="older-workers"]')).toBeNull();
   expect($('[data-testid="workers"]')!.textContent).not.toContain("older");
-  expect($('[data-testid="older-conversations"]')?.getAttribute("aria-current")).toBeNull();
+  expect($('[data-testid="space-page-conversations"]')?.getAttribute("aria-current")).toBeNull();
   window.history.replaceState(null, "", "/plugins/studio/studio/conversations/cos");
   await mount();
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
-  expect($('[data-testid="older-conversations"]')?.getAttribute("aria-current")).toBe("page");
+  expect($('[data-testid="space-page-conversations"]')?.getAttribute("aria-current")).toBe("page");
+  expect($('[data-testid="space-page-library"]')?.getAttribute("aria-current")).toBeNull();
   window.history.replaceState(null, "", "/");
 });
 
@@ -430,7 +432,7 @@ describe("the Bot's space (round 7)", () => {
 
   it("lists the Bot's pages as rows, opens each, and selects the one on screen", async () => {
     await mount();
-    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Tasks"]);
+    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Tasks", "Conversations"]);
     await act(async () => { $('[data-testid="space-page-skills"]')!.click(); });
     expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "skills/cos" });
     await act(async () => { $('[data-testid="space-page-library"]')!.click(); });
@@ -448,7 +450,7 @@ describe("the Bot's space (round 7)", () => {
     state.loopsOn = true;
     state.live.bot_spaces = { bots: [space("cos", "Chief of Staff", false, "main"), space("home", "Home", false, "home_main")], currentBotId: "home" };
     await mount();
-    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Scheduled"]);
+    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Scheduled", "Conversations"]);
     expect($('[data-testid="space-page-todos"]')).toBeNull();
     await act(async () => { $('[data-testid="space-page-automations"]')!.click(); });
     expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("automations");
@@ -459,7 +461,7 @@ describe("the Bot's space (round 7)", () => {
     state.live["loops.list"] = { needsYouNow: [{}, {}, {}], comingUp: [], agentsOnIt: [], waitingOnOthers: [], done: [] };
     await mount();
     expect($('[data-testid="space-todos-count"]')?.textContent).toBe("3");
-    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Tasks"]);
+    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Tasks", "Conversations"]);
     expect($('[data-testid="space-page-automations"]')).toBeNull();
     await act(async () => { $('[data-testid="space-page-todos"]')!.click(); });
     expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "bot/cos/loops" });

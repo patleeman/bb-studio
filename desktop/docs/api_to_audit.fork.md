@@ -222,10 +222,10 @@ reply of exactly `[PASS]`).
   its `src/kit/relayed.ts`.
 
 **Core callers.** `services/threads/turn-classifiers.fork.ts` is the registry;
-`services/threads/quiet-turn.fork.ts` asks it. `lifecycle-outcome.ts` calls
-`forkBeforeLifecycle`/`forkAfterLifecycle` (`lifecycle-outcome.fork.ts`),
-which keep `latestAttentionAt` after a quiet `run.succeeded`;
-`internal/events.ts` adds one condition to the parent notice, and
+`services/threads/quiet-turn.fork.ts` asks it. `lifecycle/run.ts` calls
+`forkAfterLifecycle` (`lifecycle-outcome.fork.ts`) for every lifecycle input,
+which keeps `latestAttentionAt` after a quiet completed turn;
+`turn-end-follow-ups.ts` adds one condition to the parent notice, and
 `plugin-service.ts` spreads `forkIdleFields` into the event.
 push-notifications' `sender.ts` returns early on the flag. On the client,
 `lib/fork-reply-classifiers.ts` reads the slot for `ThreadTimelineRows`;
@@ -415,8 +415,8 @@ thread after a server start only carries changes from the last ten seconds.
 
 **Core callers.** `services/plugins/fork-plugin-events.ts` builds and emits
 all of them through the plugin service's own `emitThreadEvent`.
-`lifecycle-outcome.ts` calls `announceTurnInterrupted` through
-`forkAfterLifecycle`, after `announceTurnFailed`; `ws/daemon-protocol.ts` emits the connect;
+`lifecycle/run.ts` calls `announceTurnInterrupted` through
+`forkAfterLifecycle`, inside the lifecycle transaction; `ws/daemon-protocol.ts` emits the connect;
 `internal/session-owner-side-effects.ts` emits the disconnect.
 
 **Audit before stabilizing.**
@@ -1092,17 +1092,15 @@ Any other target (not marked, unknown tab id, unknown or empty plugin id, a
 fixed tab, a plugin page tab) resolves null and opens nothing. A plugin id
 equal to the caller's own is the same as leaving it out. The check reads the
 plugin slot snapshot at the time of the call. The target tab gets the
-opener's params, so it must validate them. Studio's callers open the
-Workflows plugin's "workflow-run" tab (`{ runId }`), which carries the flag,
-and Visual Chat's board tab, which needs it in Visual Chat's own
-repository.
+opener's params, so it must validate them. Studio's caller opens
+Visual Chat's board tab, which needs it in Visual Chat's own repository.
+The Workflows plugin's "workflow-run" tab carried the flag until the fork
+stopped bundling Workflows (Nov 16).
 
 **Core callers.** The open goes through `createPluginPanelController(owner,
 …).openTab`, the path the target plugin's own `openTab` uses, with the
 owner swapped for the target plugin.
-`workbenchTabOwner` in `lib/fork-workbench.ts` applies the rule. The
-Workflows plugin's registration carries the flag (one line in
-`plugins/workflows/src/app.tsx`).
+`workbenchTabOwner` in `lib/fork-workbench.ts` applies the rule.
 
 **Audit before stabilizing.**
 
@@ -1545,3 +1543,33 @@ and the middleware; `server.ts` mounts it before the registry routes.
    app's shape. Only the fork's approval dialog proves a person.
 2. Skills installed outside bb (a harness's own installer, a shell command)
    are not covered.
+
+## `PluginProviderOptionsContext.experimental_pluginMetadata`
+
+**Behavior.** The context `deriveProviderOptions` receives carries the thread's metadata under the provider plugin's own id (`{}` when it has none), read when the server builds the session or turn command. provider-codex reads `experimental_computerUse === false` from it and turns Codex's Computer Use (`cua_repl`) off for that thread.
+
+**Core callers.** `toRuntimeExecutionOptions` in `apps/server/src/services/threads/thread-commands.ts`, the only caller of `deriveProviderOptions`, adds it through `forkProviderOptionsContext` (`services/providers/provider-options-context.fork.ts`).
+
+**Audit before stabilizing.**
+
+1. Thread metadata is writable by any plugin, API client or the thread's agent, so the flag is a default, not a policy. Decide whether provider options need a source only plugins (or only the user) can set.
+2. It takes effect when the session is built; provider-codex puts the flag in its session signature, so a change rebuilds the session on the next turn, not mid-turn.
+3. The Codex side depends on the bundled plugin name `unified-computer-use@openai-bundled` and the server name `cua_repl`; check both on Codex updates.
+
+## Automated inputs (`experimental_notice`, `experimental_features`)
+
+**What it does.** `threads.send` takes `experimental_notice: { source, label }`
+(`api/thread-notice.fork.ts`). The send dispatches with a system notice
+(`automation-notice.fork.ts`): the turn is the system's, its request carries
+`{ kind: "automation", source, label }`, and permission escalation stays the
+user's. `relayedFold.fork.tsx` and `noticeFold.fork.ts` draw the input as one
+quiet row. `bb.experimental_hooks.experimental_features.threadNotices` (true)
+lets a plugin keep an older bb's behaviour.
+
+**Core callers.** `thread-send-request.ts` (the notice), `thread-send.ts` (the
+escalation), the SDK's `sendJson`.
+
+**Audit before stabilizing.** Decide whether the notice belongs on the queued
+message API too, whether `source` should be an enum, and whether
+`experimental_features` should become a general capability list.
+

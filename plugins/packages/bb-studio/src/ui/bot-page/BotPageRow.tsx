@@ -1,7 +1,9 @@
 // The one row of every Bot page: one line, its icon and title on the left,
 // small muted meta on the right (or fixed meta columns, where the page is a
 // table: Automations), an optional status before the meta, and actions that
-// show on hover or focus. A row with `onOpen` is a button.
+// show on hover or focus. A row with `onOpen` is a button. A row with
+// `detail` has a second line under its title (at most two lines of muted
+// text: a summary, a search snippet).
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { Icon } from "../../kit/ui/icon";
 import { cn } from "../../kit/ui/utils";
@@ -26,6 +28,9 @@ export interface BotPageRowProps {
   title: ReactNode;
   /** The title's full text, for its tooltip when it truncates. */
   titleText?: string;
+  /** A second line under the title, muted, at most two lines. */
+  detail?: ReactNode;
+  detailTone?: BotPageTone;
   /** Small muted text on the right: a date, a kind, a count. */
   meta?: ReactNode;
   metaTone?: BotPageTone;
@@ -48,8 +53,8 @@ export interface BotPageRowProps {
 
 export const BOT_ROW_ICON = "size-4 shrink-0";
 
-export function BotPageRow({ icon, iconClassName, title, titleText, meta, metaTone = "neutral", columns, status, actions, onOpen, link, selected = false, muted = false, disabled = false, testId, data, dragItem = null }: BotPageRowProps) {
-  const inner = <>
+export function BotPageRow({ icon, iconClassName, title, titleText, detail, detailTone = "neutral", meta, metaTone = "neutral", columns, status, actions, onOpen, link, selected = false, muted = false, disabled = false, testId, data, dragItem = null }: BotPageRowProps) {
+  const top = <>
     {icon === undefined || icon === null ? null : typeof icon === "string"
       ? <Icon name={icon} className={cn(BOT_ROW_ICON, "text-muted-foreground", iconClassName)} />
       : <span className={cn("flex shrink-0 items-center justify-center", iconClassName)}>{icon}</span>}
@@ -58,7 +63,13 @@ export function BotPageRow({ icon, iconClassName, title, titleText, meta, metaTo
     {columns?.map((column) => <span key={column.key} data-column={column.key} className={cn("shrink-0 truncate text-right text-xs text-muted-foreground tabular-nums", column.className)}>{column.content}</span>)}
     {meta !== undefined && meta !== null && meta !== "" ? <span data-testid="bot-page-row-meta" className={cn("max-w-[45%] shrink-0 truncate text-right text-xs tabular-nums", TONE[metaTone])}>{meta}</span> : null}
   </>;
-  const line = "flex h-9 min-w-0 flex-1 items-center gap-2.5 px-2";
+  const hasDetail = detail !== undefined && detail !== null && detail !== "";
+  const inner = hasDetail ? <>
+    <span className="flex min-w-0 items-center gap-2.5">{top}</span>
+    {/* Under the title: the icon's width and the gap. */}
+    <span data-testid="bot-page-row-detail" className={cn("line-clamp-2 min-w-0 break-words pl-[26px] text-xs leading-[17px]", TONE[detailTone])}>{detail}</span>
+  </> : top;
+  const line = hasDetail ? "flex min-w-0 flex-1 flex-col gap-0.5 px-2 py-1.5" : "flex h-9 min-w-0 flex-1 items-center gap-2.5 px-2";
   return (
     <div data-testid={testId} data-selected={selected || undefined} data-row-link={link} {...data} {...dragSourceProps(dragItem)}
       className={cn("group flex min-w-0 items-center rounded-md", selected ? "bg-state-active" : "hover:bg-state-hover focus-within:bg-state-hover")}>

@@ -56,8 +56,8 @@ it("in a tab's own window, the window bar has the title: the page draws no title
 
 it("titles the window by the Bot's page, and leaves the Library's own title alone", () => {
   expect(botPageTitle("memory/bot_main")).toEqual({ title: "Memory", windowTitle: "Memory" });
-  expect(botPageTitle("conversations")).toEqual({ title: "Archive", windowTitle: "Archive" });
-  expect(botPageTitle("conversations/bot_main")).toEqual({ title: "Archive", windowTitle: "Archive" });
+  expect(botPageTitle("conversations")).toEqual({ title: "Conversations", windowTitle: "Conversations" });
+  expect(botPageTitle("conversations/bot_main")).toEqual({ title: "Conversations", windowTitle: "Conversations" });
   // Tasks is under the Bot page: its header named the Library before.
   expect(botPageTitle("bot/bot_main/loops")).toEqual({ title: "Tasks", windowTitle: "Tasks" });
   expect(botPageTitle("/bot/bot_main/loops/")).toEqual({ title: "Tasks", windowTitle: "Tasks" });

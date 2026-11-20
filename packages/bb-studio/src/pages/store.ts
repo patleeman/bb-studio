@@ -302,6 +302,11 @@ export class PageStore {
     return id;
   }
 
+  deleteFiles(ids: readonly string[]): void {
+    const remove = this.db.prepare("DELETE FROM files WHERE id = ?");
+    for (const id of ids) remove.run(id);
+  }
+
   hasFile(id: string): boolean {
     return this.db.prepare("SELECT 1 FROM files WHERE id = ?").get(id) !== undefined;
   }

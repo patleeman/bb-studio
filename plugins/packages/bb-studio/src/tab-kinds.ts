@@ -199,7 +199,7 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
     },
   },
   botPage("todos", "Tasks", "ListTodo", TAB_IDS.todos),
-  botPage("archive", "Archive", "Archive", TAB_IDS.archive),
+  botPage("archive", "Conversations", "studio/conversations", TAB_IDS.archive),
   pageRow("automation", "Automation", "Automations", "Clock", TAB_IDS.automation, "Automations page"),
   pageRow("todo", "Task", "Tasks", "ListTodo", TAB_IDS.todo, "Tasks page"),
   pageRow("record", "Memory record", "Memory records", "Brain", TAB_IDS.record, "Memory page"),
@@ -399,7 +399,7 @@ export function newTabFields(tabId: string): { experimental_newTabGroup?: NewTab
 }
 
 /** Kinds whose name or plural a search query names ("whiteboard", "todos"): their rows answer it. */
-const FORMER_NAMES: Partial<Record<TabKindId, readonly string[]>> = { todos: ["Todos"], todo: ["Todo", "Todos"] };
+const FORMER_NAMES: Partial<Record<TabKindId, readonly string[]>> = { todos: ["Todos"], todo: ["Todo", "Todos"], archive: ["Archive"] };
 
 export function kindsNamedBy(query: string): TabKindId[] {
   const text = query.trim().toLocaleLowerCase();

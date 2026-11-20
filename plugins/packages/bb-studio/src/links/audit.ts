@@ -57,7 +57,7 @@ export const LINK_AUDIT_SOURCES: readonly LinkAuditSource[] = [
   { id: "launcher", name: "Launcher", path: "src/launcher/ui/Launcher.tsx run", test: "src/launcher/ui/Launcher.test.tsx" },
   { id: "agent", name: "workbench_open", path: "src/workbench-agent/server.ts linkedInput", test: "src/workbench-agent/workbench-agent.test.ts" },
   { id: "window", name: "Popped-out window", path: "src/links/open.ts inMainWindow, LinksBridge in each window", test: "src/links/open.test.ts; src/links/router.test.ts (relay)" },
-  { id: "botPage", name: "Bot page row", path: "src/ui/bot-page/open-row.ts useRowOpen (Automations, Todos, Library, Memory, Archive)", test: "src/ui/bot-page/open-row.test.tsx; each page's test" },
+  { id: "botPage", name: "Bot page row", path: "src/ui/bot-page/open-row.ts useRowOpen (Automations, Todos, Library, Memory, Conversations)", test: "src/ui/bot-page/open-row.test.tsx; each page's test" },
 ];
 
 export type LinkAuditCell = "routes" | { na: string };

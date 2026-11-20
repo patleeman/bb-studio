@@ -191,19 +191,11 @@ export function summarySections(markdown: string): SummarySection[] {
   return sections.filter((section) => section.items.length || section.heading);
 }
 
-/** "N older conversations" / "N older workers": the quiet last row of each list. */
-export function olderLabel(count: number, noun: "conversation" | "worker"): string | null {
-  return count > 0 ? `${count} older ${noun}${count === 1 ? "" : "s"}` : null;
-}
-
-/** Whether the main view shows the older conversations and workers (its sidebar row is then selected). */
-export const isOlderPage = (pathname: string): boolean => /^\/plugins\/studio\/studio\/conversations(?:\/|$)/.test(pathname);
-
 /** A failure is history after this long: grey on the older list, not red. */
 export const STALE_FAILURE_MS = 7 * 24 * 60 * 60_000;
 export const staleFailure = (row: Pick<WorkerRow, "status" | "updatedAt">, now: number): boolean => row.status === "failed" && now - row.updatedAt > STALE_FAILURE_MS;
 
-/** The page's address under the Studio panel. */
+/** The Conversations page's address under the Studio panel. */
 export const OLDER_SUBPATH = "conversations";
 export const olderPath = (botId: string | null) => `${OLDER_SUBPATH}${botId ? `/${encodeURIComponent(botId)}` : ""}`;
 

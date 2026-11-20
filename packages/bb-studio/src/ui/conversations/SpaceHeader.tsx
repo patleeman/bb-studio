@@ -4,11 +4,12 @@
 // its name, a status line ("2 running", "Paused", "Paused · in bb" for a
 // Bot a BB Studio copy imported and doesn't run, or nothing), and a ···
 // menu (Edit <name>…, Bot settings…: its Controls page, Default model: what
-// its new conversations start on, Archive: the older page, New Bot); then the Bot's pages as rows: Memory, Skills,
-// Library and Todos (with the Todos list on, the primary Bot's Todos page and
+// its new conversations start on, New Bot); then the Bot's pages as rows: Memory, Skills,
+// Library, Todos (with the Todos list on, the primary Bot's Todos page and
 // what needs the user now; else the Todos page at studio/automations; for any
-// other Bot, Scheduled, its automations, as todos are the primary's). The row of the page
-// on screen is selected.
+// other Bot, Scheduled, its automations, as todos are the primary's) and
+// Conversations (every conversation, active and archived, with search). The
+// row of the page on screen is selected.
 import type { ReactNode } from "react";
 import type { BotSpace } from "../../bot-threads-contract";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Icon } from "../../kit/app/index";
@@ -19,7 +20,7 @@ import type { TabKindId } from "../../tab-kinds";
 export const STUDIO_ROOT_PATH = "/plugins/studio/studio";
 export const AUTOMATIONS_PATH = "/plugins/studio/automations";
 
-export type SpacePage = "memory" | "skills" | "library" | "automations" | "todos";
+export type SpacePage = "memory" | "skills" | "library" | "automations" | "todos" | "conversations";
 
 /** Which of the Bot's pages the main view shows, if any. */
 export function spacePageAt(pathname: string): SpacePage | null {
@@ -29,6 +30,7 @@ export function spacePageAt(pathname: string): SpacePage | null {
   if (/^\/plugins\/studio\/studio\/skills(?:\/|$)/.test(path)) return "skills";
   if (path === AUTOMATIONS_PATH || path.startsWith(`${AUTOMATIONS_PATH}/`)) return "automations";
   if (/^\/plugins\/studio\/studio\/bot\/[^/]+\/loops$/.test(path)) return "todos";
+  if (/^\/plugins\/studio\/studio\/conversations(?:\/|$)/.test(path)) return "conversations";
   return null;
 }
 
@@ -57,8 +59,6 @@ export interface SpaceMenu {
   editSpace(): void;
   botSettings(): void;
   defaultModel(): void;
-  /** The Bot's older and finished conversations and workers (the older page). */
-  archive(): void;
   newBot(): void;
 }
 
@@ -76,7 +76,7 @@ export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
   // Each row drags as its page (src/tab-kinds.ts), for the workbench: a drop opens that page as a tab.
   const row = (id: SpacePage, label: string, glyph: ReactNode, extra?: ReactNode) => (
     <button key={id} type="button" data-testid={`space-page-${id}`} aria-current={page === id || (id === "todos" && page === "automations") ? "page" : undefined} onClick={() => onPage(id)} className={PAGE_ROW}
-      {...dragSourceProps(bot ? refDragItem({ kind: id satisfies TabKindId, id: bot.id }, label) : null)}>
+      {...dragSourceProps(bot ? refDragItem({ kind: (id === "conversations" ? "archive" : id) satisfies TabKindId, id: bot.id }, label) : null)}>
       <span aria-hidden className="flex w-4 shrink-0 justify-center text-muted-foreground">{glyph}</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {extra}
@@ -98,7 +98,6 @@ export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
             <DropdownMenuItem disabled={!bot} onSelect={menu.editSpace}>{bot ? `Edit ${bot.name}…` : "Edit…"}</DropdownMenuItem>
             <DropdownMenuItem disabled={!bot} onSelect={menu.botSettings}>Bot settings…</DropdownMenuItem>
             <DropdownMenuItem disabled={!bot} onSelect={menu.defaultModel}>Default model</DropdownMenuItem>
-            <DropdownMenuItem disabled={!bot} onSelect={menu.archive}>Archive</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={menu.newBot}>New Bot</DropdownMenuItem>
           </DropdownMenuContent>
@@ -112,6 +111,7 @@ export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
           ? row("todos", "Tasks", <Icon name="ListTodo" className="size-4" />, todos > 0 ? <span data-testid="space-todos-count" className="shrink-0 text-xs tabular-nums text-warning">{todos}</span> : null)
           : bot && !bot.primary ? row("automations", "Scheduled", <Icon name="Clock" className="size-4" />)
             : row("automations", "Tasks", <Icon name="ListTodo" className="size-4" />)}
+        {row("conversations", "Conversations", <Icon name="studio/conversations" className="size-4" />)}
       </nav>
     </header>
   );

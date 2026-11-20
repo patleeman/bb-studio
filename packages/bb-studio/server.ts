@@ -139,7 +139,7 @@ import { BOT_THREADS_CHANNEL } from "./src/bot-threads-contract";
 import { readMirroredSince, readMirrorLive } from "./src/mirror-live";
 import { registerLiveActivity } from "./src/live-activity";
 import { ThreadSeeds } from "./src/thread-seeds";
-import { registerBotFinish } from "./src/bot-finish";
+import { FINISH_TOPIC, registerBotFinish } from "./src/bot-finish";
 import { askModel } from "./src/kit/decisions";
 import type { ModelSelection } from "./src/decisions/contract";
 import { studioInstructions } from "./src/agent-instructions";
@@ -1163,6 +1163,10 @@ export default async function plugin(bb: BbPluginApi) {
     sideThreads,
     seeds: threadSeeds,
     defaultModel: (botId) => bots.defaultModel(botId),
+    // The summaries finishing saved (src/bot-finish.ts), newest last so it wins.
+    conversationSummaries: (botId) => new Map((db.prepare(`SELECT source_id, text FROM memory_records
+      WHERE bot_id = ? AND source_kind = 'conversation' AND topic = ? AND replaced_by_id IS NULL AND archived = 0 AND source_id IS NOT NULL
+      ORDER BY created_at ASC`).all(botId, FINISH_TOPIC) as { source_id: string; text: string }[]).map((row) => [row.source_id, row.text])),
   });
   // Workers from before that default get it once, after the first classification settles.
   const quietWorkersOnce = setTimeout(() => void (async () => {

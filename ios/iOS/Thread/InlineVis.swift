@@ -4,6 +4,8 @@ import WebKit
 extension EnvironmentValues {
     /// The thread whose messages are on screen, for directives that load the thread's files.
     @Entry var threadId: String?
+    /// The page on screen, for images an older page names by a local path.
+    @Entry var pageId: String?
 }
 
 /// `::inline-vis{file="…" source="…" height="…"}` in a reply, from BB's

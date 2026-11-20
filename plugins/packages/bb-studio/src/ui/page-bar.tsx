@@ -1,7 +1,7 @@
 // One header row per Studio page (UX review 2, items 7 and 12; mockups 6e
 // and 6f): the page's own title row lives in BB's title bar, in place of the
 // panel's "Library" label (StudioBar, src/kit/app/item-header.tsx), so the
-// Library, Memory and the older-conversations page show one row, not BB's
+// Library, Memory and the Conversations page show one row, not BB's
 // row with Studio's below it. Where BB lends no title bar, the same row sits
 // at the top of the page. The title never shrinks; the secondary text
 // truncates first.
@@ -67,7 +67,7 @@ export function useStudioPageTitle({ subPath }: { subPath: string }): { title: s
 export function botPageTitle(subPath: string): { title: string; windowTitle: string } | null {
   const parts = subPath.replace(/^\/+|\/+$/g, "").split("/");
   const title = parts[0] === "memory" ? "Memory"
-    : parts[0] === "conversations" ? "Archive"
+    : parts[0] === "conversations" ? "Conversations"
       : parts[0] === "new-conversation" ? "New conversation"
         : parts[0] === "bot" && parts.length === 2 && parts[1] === "new" ? "New Bot"
           : parts[0] === "bot" && parts.length === 3 && parts[2] === "loops" ? "Tasks"

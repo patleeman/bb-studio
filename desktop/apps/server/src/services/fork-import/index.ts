@@ -1,6 +1,5 @@
 import { readServerImportFile } from "@bb/server-archive";
 import type { Hono } from "hono";
-import { runForkPluginSync } from "./plugin-sync.js";
 import { ApiError } from "../../errors.js";
 import type { AppDeps } from "../../types.js";
 import { defineSingleItemSweep } from "../system/item-sweep.js";
@@ -13,6 +12,11 @@ import {
   readForkImportState,
   writeCursor,
 } from "./state.js";
+import { releaseBbEnvironments } from "./bb-environments.js";
+import { currentBringOverJob } from "./bring-over/job.js";
+import { resolveForkImportSource } from "./import-source.js";
+import type { PluginInstaller } from "./bring-over/plugins.js";
+import { registerBringOverRoutes } from "./bring-over/routes.js";
 import {
   copyMissingThreadStorage,
   runForkImportSync,
@@ -35,7 +39,6 @@ import {
 } from "../threads/thread-fork-hosts.fork.js";
 
 const SYNC_CADENCE_MS = 60_000;
-const PLUGIN_SYNC_CADENCE_MS = 5 * 60_000;
 
 let activeDataDir: string | null = null;
 let sweepsStarted = false;
@@ -114,27 +117,13 @@ const FORK_SWEEP_JOBS: readonly ForkSweepJob[] = [
         },
       }),
   },
-  {
-    cadenceMs: PLUGIN_SYNC_CADENCE_MS,
-    category: "maintenance",
-    name: "fork-import-plugin-sync",
-    background: true,
-    sweep: () =>
-      defineSingleItemSweep({
-        name: "fork-import-plugin-sync",
-        process: () => {
-          if (activeDataDir === null || !hasForkImport(activeDataDir)) return;
-          runForkPluginSync({ dataDir: activeDataDir });
-        },
-      }),
-  },
 ];
 
 async function startForkImportSweeps(
   deps: AppDeps,
   dataDir: string,
 ): Promise<void> {
-  if (sweepsStarted) return;
+  if (sweepsStarted || !hasForkImport(dataDir)) return;
   sweepsStarted = true;
   const marker = await readServerImportFile(dataDir).catch(() => null);
   if (marker?.kind === "move") return;
@@ -154,7 +143,11 @@ function lastSummary(dataDir: string): ForkSyncSummary | null {
 function importStatus(deps: AppDeps) {
   const state = readForkImportState(requireDataDir());
   if (state === null || !hasForkImport(requireDataDir())) {
-    return { imported: false as const };
+    return {
+      imported: false as const,
+      bringOver:
+        activeDataDir === null ? null : currentBringOverJob(activeDataDir),
+    };
   }
   const fork = openForkImportDatabase(requireDataDir());
   const counts = fork
@@ -178,8 +171,38 @@ function importStatus(deps: AppDeps) {
   };
 }
 
-export function registerForkImportRoutes(app: Hono, deps: AppDeps): void {
-  if (activeDataDir !== null) void startForkImportSweeps(deps, activeDataDir);
+function releaseEnvironmentsFromBb(deps: AppDeps, dataDir: string): void {
+  const roots = [
+    resolveForkImportSource({ dataDir, env: process.env }),
+    readForkImportState(dataDir)?.sourceDataDir ?? null,
+  ].filter((root): root is string => root !== null && root !== dataDir);
+  if (roots.length === 0) return;
+  try {
+    const released = releaseBbEnvironments(deps.db.$client, roots);
+    if (released > 0) {
+      deps.logger.info(
+        { released },
+        "Environments in bb's folder are no longer managed here",
+      );
+    }
+  } catch (error) {
+    deps.logger.warn(
+      { error: String(error) },
+      "Could not release bb's environments",
+    );
+  }
+}
+
+export function registerForkImportRoutes(
+  app: Hono,
+  deps: AppDeps,
+  plugins: PluginInstaller | null = null,
+): void {
+  registerBringOverRoutes(app, deps, requireDataDir, plugins);
+  if (activeDataDir !== null) {
+    releaseEnvironmentsFromBb(deps, activeDataDir);
+    void startForkImportSweeps(deps, activeDataDir);
+  }
   app.get("/fork/import", (context) => context.json(importStatus(deps)));
 
   app.post("/fork/import/sync", (context) => {
@@ -192,10 +215,7 @@ export function registerForkImportRoutes(app: Hono, deps: AppDeps): void {
     if (summary === null) {
       throw new ApiError(409, "invalid_request", "Nothing was imported here");
     }
-    return context.json({
-      ...summary,
-      plugins: runForkPluginSync({ dataDir: requireDataDir() }),
-    });
+    return context.json(summary);
   });
 
   app.post("/fork/import/pause", (context) => {

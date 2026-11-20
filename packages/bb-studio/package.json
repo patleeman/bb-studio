@@ -38,7 +38,8 @@
         "explore": "./icons/explore.svg",
         "handsfree": "./icons/handsfree.svg",
         "phone-off": "./icons/phone-off.svg",
-        "library": "./icons/library.svg"
+        "library": "./icons/library.svg",
+    "conversations": "./icons/conversations.svg"
       }
     },
     "server": "./server.ts",

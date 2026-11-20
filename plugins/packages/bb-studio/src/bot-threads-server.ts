@@ -14,7 +14,8 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import type { ThreadSeeds } from "./thread-seeds";
-import { BotThreads, forkUndecided, botActivity, botNeedsYou, conversationTitle, conversationWorkers, latestLine, needsYouOf, olderView, repoTag, staleRaises, threadsView, workerStatus, type BotThreadRecord, type Signals, type ThreadFacts } from "./bot-threads";
+import { BotThreads, forkUndecided, botActivity, botNeedsYou, conversationsPage, conversationTitle, conversationWorkers, latestLine, needsYouOf, olderView, repoTag, staleRaises, threadsView, workerStatus, type BotThreadRecord, type Signals, type ThreadFacts } from "./bot-threads";
+import { ConversationText, plainLine, queryWords, snippetOf, summaryBody, summaryPreview } from "./conversation-text";
 import { isWorkerApproval, viewOf, waitingOn, workerApprovalPush, type Interaction, type WorkerApprovalPush } from "./worker-approvals";
 import { PERSONAL_PROJECT_ID } from "./project-lead";
 import { isFinishing } from "./bot-finish";
@@ -67,6 +68,8 @@ export interface BotThreadsServerDeps {
   seeds?: ThreadSeeds;
   /** A Bot's default model (src/bot.ts): what its new conversations start on; null when it has none. */
   defaultModel(botId: string): { providerId: string; model: string; reasoning: ReasoningLevel | null } | null;
+  /** The summaries a Bot saved of its conversations (memory records under "Conversations"), newest per conversation, by thread id. */
+  conversationSummaries?(botId: string): ReadonlyMap<string, string>;
 }
 
 /** How many forks the start looks up the fork point of. */
@@ -79,6 +82,10 @@ const ACTIVITY_PARALLEL = 8;
 const ACTIVITY_PER_VIEW = 20;
 
 const FACTS_TTL_MS = 3_000;
+/** How long a search waits for conversations' messages to be read before it answers with what is read. */
+const SEARCH_READ_WAIT_MS = 1_500;
+/** How many archived conversations the Conversations page lists. */
+const ARCHIVED_LISTED = 500;
 const LATEST_FILL = 8;
 /** A worker's approval is looked for only if the worker was active this recently. */
 const APPROVAL_WINDOW_MS = 7 * 24 * 60 * 60_000;
@@ -172,6 +179,8 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     ...(deps.mirrorLive ? { mirrorLive: deps.mirrorLive } : {}),
   });
   const known = (threadId: string) => !!store.get(threadId);
+  /** The messages of the Bots' conversations, for the Conversations page's search (src/conversation-text.ts). */
+  const text = new ConversationText({ db, sdk: bb.sdk, log: deps.log });
 
   /** A fork's point in its source (the last copied turn), from BB where it says. */
   const lookUpForkPoint = async (threadId: string) => {
@@ -194,9 +203,10 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
   });
   bb.events.on("thread.archived", ({ thread }) => store.archived(thread.id, true));
   bb.events.on("thread.unarchived", ({ thread }) => { if (known(thread.id)) store.archived(thread.id, false); else void store.created(thread as ThreadFacts); });
-  bb.events.on("thread.deleted", ({ thread }) => store.deleted(thread.id));
+  bb.events.on("thread.deleted", ({ thread }) => { store.deleted(thread.id); text.forget(thread.id); });
   bb.events.on("thread.idle", ({ thread, lastAssistantText }) => {
     if (!known(thread.id)) return;
+    if (store.get(thread.id)?.kind === "conversation") text.touched(thread.id);
     store.idle(thread.id, lastAssistantText);
     void store.repliedSince(thread.id).catch(() => false);
     threadChanged(thread.id);
@@ -295,6 +305,60 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     const failed = new Set(archived.filter((thread) => thread.status === "error").map((thread) => thread.id));
     const finished = done.map((rec) => ({ threadId: rec.threadId, title: rec.title?.trim() || bbTitles.get(rec.threadId) || "Untitled conversation", finishedAt: rec.archivedAt!, summary: rec.finishedSummary!, failed: failed.has(rec.threadId) }));
     return { ...rest, finished };
+  };
+
+  /** A conversation's whole summary: what finishing it wrote, else the record it saved under "Conversations". */
+  const summaryOf = (rec: BotThreadRecord, saved: ReadonlyMap<string, string>) => rec.finishedSummary?.trim() || saved.get(rec.threadId)?.trim() || null;
+  /** BB's view of archived threads, which threads.list leaves out unless asked. */
+  const archivedFacts = async (ids: readonly string[]): Promise<Map<string, ThreadFacts>> => {
+    const result = new Map<string, ThreadFacts>();
+    for (let at = 0; at < ids.length; at += 200) {
+      const batch = ids.slice(at, at + 200);
+      const listed = await bb.sdk.threads.list({ threadIds: batch, archived: true, includeHidden: true, limit: 200 } as never).catch(() => []) as ThreadFacts[];
+      for (const thread of listed) result.set(thread.id, thread);
+    }
+    return result;
+  };
+  /** The Conversations page: every conversation, active then archived, and the workers; with each conversation's whole summary for search. */
+  const conversationsAll = async (botId: string | undefined) => {
+    const id = botOrCurrent(botId);
+    if (!id) return { page: { botId: null, conversations: [], workers: [] }, summaries: new Map<string, string>() };
+    const { records, threads } = await botRows(id);
+    const archived = records.filter((rec) => rec.botId === id && rec.kind === "conversation" && rec.archivedAt !== null)
+      .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0)).slice(0, ARCHIVED_LISTED);
+    const all = new Map([...threads, ...(await archivedFacts(archived.map((rec) => rec.threadId)))]);
+    const listed = new Set(archived.map((rec) => rec.threadId));
+    const kept = records.filter((rec) => rec.archivedAt === null || listed.has(rec.threadId));
+    const saved = deps.conversationSummaries?.(id) ?? new Map<string, string>();
+    const replies = text.newestReplies(kept.filter((rec) => rec.kind === "conversation" && !rec.latest?.text).map((rec) => rec.threadId));
+    const title = titleFrom(all);
+    const summaries = new Map<string, string>();
+    const page = conversationsPage(id, kept, all, {
+      summary: (rec, name) => { const whole = summaryOf(rec, saved); if (whole) summaries.set(rec.threadId, summaryBody(whole, name)); return summaryPreview(whole, name); },
+      latest: (rec) => latestLine(replies.get(rec.threadId), title),
+    });
+    // The page is open: read what isn't read yet, for its search.
+    void text.readAll(page.conversations.map((row) => row.threadId));
+    return { page, summaries };
+  };
+  const conversationsSearch = async ({ botId, query }: { botId?: string; query: string }) => {
+    const { page, summaries } = await conversationsAll(botId);
+    const ids = page.conversations.map((row) => row.threadId);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([text.readAll(ids), new Promise((resolve) => { timer = setTimeout(resolve, SEARCH_READ_WAIT_MS); })]);
+    clearTimeout(timer);
+    const hits = text.search(query, page.conversations.map((row) => ({ threadId: row.threadId, title: row.title, summary: summaries.get(row.threadId) ?? null })))
+      .map((hit) => ({ ...hit, kind: "conversation" as const }));
+    // Workers: their titles match on the page; BB's search finds the messages of the ones it can see.
+    const workers = new Set(page.workers.map((row) => row.threadId));
+    const words = queryWords(query);
+    const found = workers.size && words.length ? await Promise.resolve().then(() => bb.sdk.threads.search({ query, limitPerGroup: "50" })).catch(() => null) : null;
+    const workerHits = found ? [...found.active.results, ...found.archived.results].flatMap((result) => {
+      if (!workers.has(result.thread.id)) return [];
+      const match = result.matches.find((each) => each.sourceKind !== "title" && each.sourceKind !== "title_fallback");
+      return [{ threadId: result.thread.id, kind: "worker" as const, field: match ? "message" as const : "title" as const, snippet: match ? snippetOf(plainLine(match.text), words) : null }];
+    }) : [];
+    return { hits: [...hits, ...workerHits], indexing: text.pending(ids) };
   };
 
   const spaces = async (): Promise<{ bots: BotSpace[]; currentBotId: string | null }> => {
@@ -496,6 +560,8 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     bot_spaces: () => spaces(),
     bot_threads_view: ({ botId }: { botId?: string }) => view(botId),
     bot_threads_older: ({ botId }: { botId?: string }) => older(botId),
+    bot_conversations_all: async ({ botId }: { botId?: string }) => (await conversationsAll(botId)).page,
+    bot_conversations_search: (input: { botId?: string; query: string }) => conversationsSearch(input),
     bot_thread_info: async ({ threadId }: { threadId: string }) => ({ info: await info(threadId) }),
     bot_landing: async ({ botId, last }: { botId: string; last: string | null }) => {
       const main = deps.bots().find((bot) => bot.id === botId)?.threadId ?? null;
@@ -614,5 +680,5 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     return { classified, linked: linked.length };
   };
 
-  return { store, rpc, start, reconcile, threadChanged, catchUp, messageThreads, owner, pushIds, approvalPush, tools: ["bot_conversations", "bot_threads_list", "bot_needs_you"] as const };
+  return { store, text, rpc, start, reconcile, threadChanged, catchUp, messageThreads, owner, pushIds, approvalPush, tools: ["bot_conversations", "bot_threads_list", "bot_needs_you"] as const };
 }

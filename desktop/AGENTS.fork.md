@@ -14,7 +14,7 @@ The fork is kept in sync with upstream by an agent, every day. Everything below 
 6. **Generated changes are scripted.** Removing plugins, the app identity and the rebrand are produced by `scripts/fork/strip-plugins.mjs`, `identity.mjs` and `rebrand.mjs`. Their output is committed at the tip with a `Fork-Generated:` trailer. Never edit that output by hand and never rebase those commits: drop them and run the scripts again. A build or test run can rewrite the tracked file `apps/web/src/routeTree.gen.ts`; restore it (`git checkout -- apps/web/src/routeTree.gen.ts`) before committing, and never stage with `git add -A` without reading `git status` first.
 7. **Tests the fork breaks on purpose are skipped by list.** Add them to `scripts/fork/skipped-tests.json`. Do not edit the test source.
 8. **Push only to `origin`, the BB Studio repository (`scripts/git-hooks/pre-push` on `main` names it). Nothing goes upstream.** The pushed refs are `main`, `desktop` (with `--force-with-lease`) and `v*` tags. Never push to `get-bb/bb` or `patleeman/bb`; no pull requests or issues upstream; nothing is prepared for upstream.
-9. **`desktop/` on `main` is generated.** `scripts/import-desktop.mjs` on `main` writes it from the tree of the `desktop` branch; never edit it there. Work on the fork in the worktree that has `desktop` checked out (`~/workingdir/bb-studio-app-desktop`), then import.
+9. **`desktop/` on `main` is generated.** `scripts/import-desktop.mjs` on `main` writes it from the tree of the `desktop` branch; never edit it there. Work on the fork in the worktree that has `desktop` checked out (`~/workingdir/bb-studio-public-desktop`), then import.
 
 ## UI text
 
@@ -36,6 +36,17 @@ Iterate without signing; notarize only when asked, or once at the end of a day's
 - A fork or core change needs a local app build (`pnpm build`, then `pnpm run package` in `apps/desktop`). Install it as built, with the Developer ID signature when `CSC_NAME` is set or ad-hoc (`codesign -s - --force --deep`) otherwise. A locally built app is not quarantined, so Gatekeeper does not block it. Do not wait on Apple before installing or taking screenshots.
 - Notarize and staple (`xcrun notarytool submit … --keychain-profile bbstudio-notary --wait`, then `xcrun stapler staple`) only on request or for the day's last build. If the keychain profile cannot be read, the Mac is probably locked: retry later, do not ask for it to be recreated.
 - If an unsigned or ad-hoc build loses keychain or permission access (microphone, accessibility, notifications), say which one.
+
+## Test isolation
+
+Every Codex, Claude Code, Pi and OpenCode session on the owner's Mac is kept as their history, and the live BB Studio holds their real data. Tests and staged runs touch neither.
+
+- **Staged copies only.** Never test against the installed app, its data folder (`~/.bb-studio`), the retired `~/.bb`, or the live port 38986. Give a staged copy its own data folder (not named `.bb-studio`; set `BB_STUDIO_IMPORT_FROM=off` so first run imports nothing), its own ports and `--user-data-dir`, and start it with `env -i` so it inherits nothing from the agent shell.
+- **Which copy.** `plugins/scripts/staged-bb.mjs` (in the monorepo) runs upstream bb with the Studio plugins from GitHub: use it for plugin work. To test the fork itself, use a packaged or dev build of this branch with the same isolation.
+- **Own provider homes.** Point `CODEX_HOME` and `CLAUDE_CONFIG_DIR` at folders in the test's temp directory (or the dedicated staged sign-in folders) and sign in there. Never copy or link `auth.json`, `~/.claude` or `~/.claude.json` into them. Prefer modes that save nothing (`codex exec --ephemeral`).
+- **Pi off.** Its sessions always land in the real history; don't run it in tests or staged copies.
+- **`--use-mock-keychain`** for every staged app; never touch `~/Library/Keychains`.
+- **The scratch server, explicitly.** The bb CLI calls only `BB_SERVER_URL`, and agent shells inherit the live `http://127.0.0.1:38986`. Before any bb CLI call, script or curl, export `BB_SERVER_URL` and `BB_DATA_DIR` for the scratch copy, then `. scripts/fork/staged-guard.sh || exit 1`. It refuses port 38986, `~/.bb` and `~/.bb-studio`, and either variable unset.
 
 ## Stack order
 
