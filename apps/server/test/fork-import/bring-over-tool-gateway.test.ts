@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { existsSync, statSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
@@ -9,6 +9,7 @@ import { HTTPException } from "hono/http-exception";
 import { afterEach, describe, expect, it } from "vitest";
 import { addPlugin } from "../../src/services/fork-import/bring-over/plugins.js";
 import { registerBringOverRoutes } from "../../src/services/fork-import/bring-over/routes.js";
+import { studioImportDir } from "../../src/services/fork-import/bring-over/studio-data.js";
 import {
   AGENT_PLUGINS_ID,
   TOOL_GATEWAY_STAGED,
@@ -119,9 +120,36 @@ describe("bring over Agent Plugins as a Tool Gateway import", () => {
     db.close();
     // Only the database: bb's secrets folder is not copied.
     expect(
-      existsSync(join(target, "plugins", "studio", "import-staged", "secrets")),
-    ).toBe(false);
+      readdirSync(join(staged, "..")).filter(
+        (name) => name !== "agent-plugins-import.db",
+      ),
+    ).toEqual([]);
     expect(existsSync(join(target, "plugins", AGENT_PLUGINS_ID))).toBe(false);
+    // It sits in Studio's secrets folder, which the Studio-data swap keeps in
+    // place, and outside import-staged, which Studio-data staging replaces.
+    expect(
+      statSync(join(target, "plugins", "studio", "secrets")).mode & 0o777,
+    ).toBe(0o700);
+    expect(staged.startsWith(`${studioImportDir(target)}/`)).toBe(false);
+    await rm(studioImportDir(target), { recursive: true, force: true });
+    expect(existsSync(staged)).toBe(true);
+  });
+
+  it("tightens folders that already exist and replaces an older staged copy", async () => {
+    const { hono, target } = await setup(true);
+    const staged = join(target, ...TOOL_GATEWAY_STAGED);
+    await mkdir(join(staged, ".."), { recursive: true, mode: 0o755 });
+    await chmod(join(staged, ".."), 0o755);
+    await writeFile(staged, "old");
+    await writeFile(`${staged}-wal`, "old");
+    const response = await hono.request(
+      "/fork/bring-over/tool-gateway/stage",
+      post({ "x-bb-studio-ui-token": TOKEN }),
+    );
+    expect(response.status).toBe(200);
+    expect(statSync(join(staged, "..")).mode & 0o777).toBe(0o700);
+    expect(existsSync(`${staged}-wal`)).toBe(false);
+    expect(statSync(staged).mode & 0o777).toBe(0o600);
   });
 
   it("says so when bb has no Agent Plugins data", async () => {
