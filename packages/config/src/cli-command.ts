@@ -1,3 +1,4 @@
+export * from "./studio-cli.fork.js";
 export const CLI_LAUNCHER_ENV_NAME = "BB_CLI_LAUNCHER";
 export const CLI_REEXEC_ENV_NAME = "BB_CLI_REEXEC";
 

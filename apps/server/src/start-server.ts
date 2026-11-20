@@ -1,3 +1,4 @@
+import { migrateLegacyStudioBbLink } from "./services/system/cli-command.fork.js";
 import { createDesktopAppUpdateService } from "./services/system/desktop-app-update.js";
 import { forkBeforeDatabase } from "./services/fork-import/first-run.js";
 import {
@@ -380,6 +381,7 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
     platform: process.platform,
     windowsUserPath: createWindowsUserPath(process.env),
   });
+  void migrateLegacyStudioBbLink({ env: process.env, homeDir: homedir(), launcherPath: serverConfig.BB_CLI_LAUNCHER ?? null, log: (message) => logger.info(message), platform: process.platform }).catch((error: unknown) => logger.warn({ err: error }, "bbs link update failed"));
   const {
     app,
     closeWebSockets,
