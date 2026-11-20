@@ -195,3 +195,17 @@ it('tells the Bot "Owner: the user." after the user chooses, and the stored owne
  expect(post.mock.calls.at(-1)?.[0]).not.toContain('patrick');
  expect(loops.store.get(l.id).owner).toBe('patrick');
 });
+it('FM: a failed phone push does not stop the tick or mark the card pushed; a Bot that cannot post leaves cards queued',async()=>{
+ const a=store.add({title:'A',push:true});const b=store.add({title:'B',push:true});
+ notify.mockRejectedValueOnce(new Error('mobile plugin off'));
+ // Before: the first failed push threw out of the tick, so B was never pushed and the weekly post was skipped.
+ await expect(scheduler.tick()).resolves.toBeUndefined();
+ expect(notify).toHaveBeenCalledTimes(2);
+ expect(store.history(a.id).some(e=>e.type==='notified')).toBe(false);
+ expect(store.history(b.id).some(e=>e.type==='notified')).toBe(true);
+ // The Bot is paused (or has no Main): nothing is lost; the card stays queued for the next tick.
+ const c=store.add({title:'C'});post.mockRejectedValueOnce(new Error('Dot is paused. Resume it (Bot settings) and todos will be posted in its chat.'));
+ await expect(scheduler.tick()).rejects.toThrow('Resume it');
+ expect(store.get(c.id).status).toBe('queued');
+ await scheduler.tick();expect(store.get(c.id).status).toBe('surfaced');
+});

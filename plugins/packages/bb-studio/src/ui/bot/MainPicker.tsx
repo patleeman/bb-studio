@@ -19,8 +19,9 @@ type Conversation = { threadId: string; title: string; isMain: boolean; archived
 export function mainChoices(conversations: readonly Conversation[], mainThreadId: string | null): { value: string; label: string }[] {
   const active = conversations.filter((each) => each.archivedAt == null);
   const main = active.find((each) => each.threadId === mainThreadId || each.isMain);
-  const rest = active.filter((each) => each !== main).sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-  return [...(main ? [main] : []), ...rest].map((each) => ({ value: each.threadId, label: each.title.trim() || "Untitled conversation" }));
+  const label = (each: Conversation) => each.title.trim() || "Untitled conversation";
+  const rest = active.filter((each) => each !== main).sort((a, b) => label(a).localeCompare(label(b)));
+  return [...(main ? [main] : []), ...rest].map((each) => ({ value: each.threadId, label: label(each) }));
 }
 
 /** The value the picker shows: the Main when it is listed, else "No Main". */

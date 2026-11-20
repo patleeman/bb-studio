@@ -969,6 +969,9 @@ test("the bare Bot page falls back to the Bot's chat when the last thread is gon
   await show(<BotPanel />);
   expect(state.toThread).not.toHaveBeenCalled();
   expect(container.querySelector("[data-testid=bot-info-status]")).not.toBeNull();
+  // FM: with no Main, the page says so and links to the picker (it pointed at a ⋯ menu item that doesn't exist).
+  expect(container.querySelector("[data-testid=bot-no-main]")?.textContent).toContain("has no Main conversation");
+  expect([...container.querySelectorAll("[data-testid=bot-no-main] button")].map((each) => each.textContent)).toEqual(["Pick a Main…"]);
 });
 
 test("a Bot's Info by id (its ⓘ, Bot info) isn't redirected", async () => {

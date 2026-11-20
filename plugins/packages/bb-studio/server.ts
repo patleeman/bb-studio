@@ -719,13 +719,16 @@ export default async function plugin(bb: BbPluginApi) {
   };
   const postToBot = async (text: string) => {
     const bot = bots.stored();
-    if (!bot?.threadId || bot.state !== 'active') throw new Error('An active Bot chat is required');
+    // Plain words with the action: the Todos page and task tools show this as is.
+    if (!bot) throw new Error('Make your Bot first; todos are posted in its chat.');
+    if (bot.state !== 'active') throw new Error(`${bot.name} is ${bot.state}. Resume it (Bot settings) and todos will be posted in its chat.`);
+    if (!bot.threadId) throw new Error(`${bot.name} has no Main conversation. Pick one in Bot settings (or start a new one), and todos will be posted there.`);
     await bb.sdk.threads.send({threadId:bot.threadId,mode:'auto',input:[{type:'text',text,mentions:[],visibility:'agent-only'}]} as never);
   };
   const taskPushedAt = new Map<string, number>();
   const pushLoop = async (loop: Loop) => {
     const bot = bots.stored();
-    if (!bot?.threadId) throw new Error('A Bot chat is required');
+    if (!bot?.threadId) throw new Error('Your Bot has no Main conversation for the push to open. Pick one in Bot settings.');
     taskPushedAt.set(bot.id, Date.now());
     await bb.sdk.plugins.callRpc({ pluginId: 'mobile', method: 'notify', outputSchema: z.unknown(), input: loopPushInput(loop, { id: bot.id, threadId: bot.threadId }, new TaskStore(db).find(loop.id), PERSONAL_PROJECT_ID) as never });
   };
