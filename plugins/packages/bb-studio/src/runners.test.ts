@@ -784,7 +784,7 @@ it("FM: a runner whose thread was deleted gets a new thread and keeps running, i
 
 it("FM: a runner whose machine was removed (not just offline) says so and what to do, not \"until it reconnects\"", async () => {
   const x = await setup();
-  const runner = await x.runners.create({ name: "Files", job: "Check files", schedule, machine: "homelab" });
+  await x.runners.create({ name: "Files", job: "Check files", schedule, machine: "homelab" });
   // The machine removed from BB: hosts.get answers not found.
   x.hosts.splice(0, 1);
   await x.runners.checkMachines();
