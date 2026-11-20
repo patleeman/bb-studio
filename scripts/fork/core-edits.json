@@ -740,6 +740,11 @@
       "seam": "acp-tools",
       "intent": "tools/list sends each tool's inputSchema through compactAcpToolSchema (acp-tools.fork.ts, imported at the top of the file), which drops only $comment, examples and a draft 2020-12 $schema, at schema positions; parameter names, constraints and nulls are kept.",
       "budget": 3
+    },
+    "plugins/environment-personal-workspace/server.ts": {
+      "seam": "import-sync",
+      "intent": "The personal workspace provider can restore: a destroyed personal workspace is rebuilt as a new, empty one (restore calls create). Brought-over threads whose bb workspace was a personal workspace inside bb's data come in with a destroyed, restorable environment, and a BB Studio data bring-over restores the Bots' Main threads (fork-import/bring-over/workspace-restore.ts).",
+      "budget": 10
     }
   }
 }
