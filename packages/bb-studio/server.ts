@@ -193,6 +193,9 @@ import { BackupService, formatBackup, formatRestore, restoreFailed } from "./src
 import { studioDataBackup } from "./src/backup/studio-data";
 import { backupFileName, registerBackup } from "./src/backup/register";
 import { readFile as readTextFile, stat as statPath } from "node:fs/promises";
+import { claimFirstLoad, finishStudioImport } from "./src/studio-data/start";
+import { studioDataStatus } from "./src/studio-data/preview";
+import { studioDataContract } from "./src/studio-data/contract";
 import { isAbsolute, resolve as resolvePath } from "node:path";
 
 const WORKER_LEVELS_KEY = "push-levels:workers-input-only";
@@ -201,6 +204,11 @@ const WORKER_LEVELS_KEY = "push-levels:workers-input-only";
 const HEALTH_INTERVAL_MS = 3 * 60_000;
 
 export default async function plugin(bb: BbPluginApi) {
+  // "Bring over BB Studio data" from bb is applied here, before Studio opens
+  // its database (src/studio-data/start.ts). A failure leaves the journal for
+  // the next start and this install's data as it was.
+  await finishStudioImport({ dataDir: bb.server.experimental_dataDir, kv: bb.storage.kv, migrate: (database, statements) => bb.storage.migrate(database, statements), migrations: MIGRATIONS, log: bb.log, firstLoad: claimFirstLoad() })
+    .catch((error) => bb.log.warn(`BB Studio data from bb could not be applied; this install's data is unchanged: ${errorText(error)}`));
   registerQuietTurnClassifier(bb);
   await registerChat(bb);
   const changes = new ChangeLog();
@@ -316,6 +324,9 @@ export default async function plugin(bb: BbPluginApi) {
   });
   registerThreadExportHook(bb, () => ({ enabled: settingValues.exportDeletedThreads === true, folder: typeof settingValues.exportDeletedThreadsFolder === "string" ? settingValues.exportDeletedThreadsFolder : "" }));
   const skillsRegistry = createSkillsRegistryGate({ hooks: (bb as { experimental_hooks?: object }).experimental_hooks, kv: bb.storage.kv, approval: hostApproval(bb) });
+  bb.rpc.register(studioDataContract, {
+    "studioData.status": () => studioDataStatus(bb.server.experimental_dataDir, db, MIGRATIONS),
+  });
   bb.rpc.register(skillsRegistryContract, {
     "skillsRegistry.state": () => skillsRegistry.state(),
     "skillsRegistry.set": ({ enabled }) => skillsRegistry.set(enabled),

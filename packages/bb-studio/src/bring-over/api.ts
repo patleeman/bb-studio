@@ -2,6 +2,7 @@
 // routes): what the old bb install has, and a job that brings picked projects,
 // threads and settings over while BB Studio runs. On a BB without the routes,
 // or with no bb install, `available` is false and nothing is shown.
+import { plural } from "../kit/format";
 
 export interface BringOverProject { id: string; name: string; threads: number; threadsHere: number; lastActivityAt: number | null; joins: { id: string; name: string } | null }
 export interface BringOverThread { id: string; title: string; updatedAt: number; archived: boolean; attachments: number; here: boolean }
@@ -26,11 +27,23 @@ export interface BringOverState {
   settings?: BringOverSetting[];
   plugins?: BringOverPlugin[];
   job?: BringOverJob | null;
+  studioData?: BringOverStudioData;
+}
+export type StudioImportState = "staging" | "staged" | "ready" | "applying" | "applied" | "refused" | "failed" | "rolling-back" | "rollback-failed" | "restore-requested" | "restoring" | "restored" | "unreadable";
+/** bb's Studio data as the server sees it: in bb, its size, and where a bring-over of it is (the journal). */
+export interface BringOverStudioData {
+  inBb: boolean;
+  bots: number;
+  pages: number;
+  tasks: number;
+  journal: { state: StudioImportState; error: string | null; stagedAt: number; appliedAt?: number | null; restoredAt?: number | null } | null;
 }
 export interface BringOverRequest {
   picks: { kind: "project" | "thread"; id: string }[];
   attachments: boolean;
   settings: { id: string; replace: boolean }[];
+  /** Bringing over BB Studio data: the Bots' own threads, which must all come over. */
+  studioData?: { required: string[] };
 }
 
 const BASE = "/api/v1/fork/bring-over";
@@ -107,6 +120,58 @@ export async function readGate(token: string, load: typeof fetch = fetch): Promi
   }
 }
 
+async function sendEmpty(path: string, init: RequestInit, load: typeof fetch): Promise<void> {
+  const response = await load(`${BASE}${path}`, init);
+  if (!response.ok) throw new Error(await errorOf(response));
+}
+
+/**
+ * bb's Studio data and where a bring-over of it is. Null on a BB Studio
+ * without the route (1.0.8 and older answer 404) or with an answer of another
+ * shape, so the row stays hidden there.
+ */
+export async function readStudioData(load: typeof fetch = fetch): Promise<BringOverStudioData | null> {
+  try {
+    const response = await load(`${BASE}/studio-data`);
+    if (!response.ok) return null;
+    const data = (await response.json()) as Partial<BringOverStudioData> | null;
+    const counts = typeof data?.bots === "number" && typeof data.pages === "number" && typeof data.tasks === "number";
+    const journal = data?.journal === null || (typeof data?.journal === "object" && typeof data.journal?.state === "string");
+    return typeof data?.inBb === "boolean" && counts && journal ? (data as BringOverStudioData) : null;
+  } catch {
+    return null;
+  }
+}
+/** Copies bb's Studio data into a staging folder; nothing here changes yet. */
+export const copyStudioData = (token: string, load: typeof fetch = fetch) => send<{ studioData: BringOverStudioData }>("/studio-data", gatedPost(token), load);
+export const discardStudioData = (token: string, load: typeof fetch = fetch) => sendEmpty("/studio-data/discard", gatedPost(token), load);
+export const putBackStudioData = (token: string, load: typeof fetch = fetch) => sendEmpty("/studio-data/put-back", gatedPost(token), load);
+export const deleteOldStudioData = (token: string, load: typeof fetch = fetch) => sendEmpty("/studio-data/forget", gatedPost(token), load);
+
+/** "2 Bots · 14 pages · 6 tasks". */
+export function studioDataLine(data: Pick<BringOverStudioData, "bots" | "pages" | "tasks">): string {
+  return [plural(data.bots, "Bot"), plural(data.pages, "page"), plural(data.tasks, "task")].join(" · ");
+}
+
+/** What a staged copy holds (Studio's studioData.status preview). */
+export interface StudioDataPreview { bots: number; pages: number; tasks: number; memories: number; threads: { required: string[]; wanted: string[] }; minisWithSecrets: number; watchersWithEnv: number; problem: string | null }
+
+/** The confirm step, in plain words: what is replaced, what comes over, what happens next. */
+export function studioDataConfirm(preview: StudioDataPreview): string[] {
+  const lines = [
+    `Replaces everything in BB Studio's Studio (your Assistant, its chats, pages, memory, tasks and Studio settings) with bb's: ${[plural(preview.bots, "Bot"), plural(preview.pages, "page"), plural(preview.tasks, "task"), plural(preview.memories, "memory", "memories")].join(", ")}, and ${plural(preview.threads.wanted.length, "thread")}.`,
+    "Your current Studio data is kept in a folder, not deleted, and you can put it back. Your Assistant's chat stays as a thread with no Bot.",
+    "The threads come over first, like any thread you bring over, and stay here even if you put your old data back.",
+    "bb's Bots arrive stopped, with their check-ins, runners and watchers off, and Task reminders off. If you resume a Bot here, stop it in bb so it doesn't run twice.",
+    "Project leads' heartbeats are off too; turn each back on in its lead's settings.",
+    "Approvals you gave in bb (mini apps, dashboard scripts, the public skill registry) are asked for again here.",
+  ];
+  const secrets = [preview.minisWithSecrets > 0 ? `API keys in ${plural(preview.minisWithSecrets, "mini app")}` : null, preview.watchersWithEnv > 0 ? `environment values in ${plural(preview.watchersWithEnv, "watcher")}` : null].filter(Boolean);
+  if (secrets.length > 0) lines.push(`Secrets kept in Studio's data come along: ${secrets.join(" and ")}.`);
+  lines.push("Then quit and reopen BB Studio to finish. Open windows and the phone app reconnect after that.");
+  return lines;
+}
+
 export const addOldPlugin = (id: string, token: string, load: typeof fetch = fetch) => send<{ id: string; data: boolean }>(`/plugins/${encodeURIComponent(id)}/add`, gatedPost(token), load);
 
 /** What a secret setting will do, in one line: the variables it brings and the ones it replaces. */
@@ -120,7 +185,7 @@ export function secretLine(setting: BringOverSetting, replace: boolean): string 
 
 /** The job's one line: "12 of 40 threads · 3 already here · 1 failed". */
 export function jobLine(job: BringOverJob): string {
-  const parts = [`${String(job.threadsDone)} of ${String(job.threadsTotal)} threads`];
+  const parts = [`${job.threadsDone.toLocaleString()} of ${plural(job.threadsTotal, "thread")}`];
   if (job.threadsSkipped > 0) parts.push(`${String(job.threadsSkipped)} already here`);
   if (job.failures.length > 0) parts.push(`${String(job.failures.length)} failed`);
   const state = job.state === "running" ? "Bringing over" : job.state === "done" ? "Done" : job.state === "cancelled" ? "Cancelled" : "Finished with errors";

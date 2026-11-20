@@ -4,7 +4,7 @@
 // Plugins are added one at a time. Nothing is shown on a BB without the
 // fork's bring-over routes or without a bb install.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { relativeTime, errorMessage } from "../../kit/format";
+import { relativeTime, errorMessage, plural } from "../../kit/format";
 import { Button } from "../../kit/ui/index";
 import { Card, Row, SubHeading, Switch } from "../../settings/ui/controls";
 import {
@@ -26,6 +26,7 @@ import {
   type BringOverState,
   type BringOverThread,
 } from "../api";
+import { StudioDataRow } from "./StudioDataRow";
 
 export const BRING_OVER_SECTION_ANCHOR = "studio-settings-bring-over";
 
@@ -62,6 +63,7 @@ function ProjectRow({ project, picks, onChange }: { project: BringOverProject; p
   const allHere = project.threadsHere >= project.threads;
   const toggleOpen = () => {
     setOpen(!open);
+    setError(null);
     if (!open && threads === null) void listProjectThreads(project.id).then(setThreads, (cause: unknown) => setError(errorMessage(cause)));
   };
   const loaded = threads !== null;
@@ -70,7 +72,7 @@ function ProjectRow({ project, picks, onChange }: { project: BringOverProject; p
   }, [project.threadsHere, project.id, loaded]);
   const whole = picks.projects.has(project.id);
   const details = [
-    `${String(project.threads)} threads`,
+    plural(project.threads, "thread"),
     project.lastActivityAt ? `last active ${relativeTime(project.lastActivityAt)}` : null,
     project.threadsHere > 0 ? (allHere ? "Already here" : `${String(project.threadsHere)} already here`) : null,
     project.joins ? `joins ${project.joins.name}` : null,
@@ -129,10 +131,10 @@ function PluginRow({ plugin, token, onAdded }: { plugin: BringOverPlugin; token:
         : token === null ? null
         : confirming ? (
           <span className="flex gap-2">
-            <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirming(false)}>Cancel</Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => { setError(null); setConfirming(false); }}>Cancel</Button>
             <Button size="sm" disabled={busy} onClick={() => void add()}>{busy ? "Adding…" : "Add"}</Button>
           </span>
-        ) : <Button size="sm" variant="outline" onClick={() => setConfirming(true)}>Add…</Button>}
+        ) : <Button size="sm" variant="outline" onClick={() => { setError(null); setConfirming(true); }}>Add…</Button>}
     </Row>
   );
 }
@@ -218,6 +220,7 @@ export function BringOverSection() {
           <ul className="px-3 pb-2 text-xs text-destructive">{state.job.failures.slice(0, 10).map((failure) => <li key={failure.item}>{failure.item}: {failure.detail}</li>)}</ul>
         ) : null}
       </Card>
+      <StudioDataRow token={allowed ? token : null} jobRunning={running} onJob={(next) => setState((previous) => (previous ? { ...previous, job: next } : previous))} />
       {state.projects ? (
         <>
           <SubHeading>Projects and threads</SubHeading>
@@ -246,13 +249,13 @@ export function BringOverSection() {
             <div data-testid="bring-over-confirm-secrets" className="flex flex-col gap-2 py-2 text-xs text-foreground">
               {pickedSecrets.map((setting) => <p key={setting.id}>{secretLine(setting, p.settings.get(setting.id) === true)}</p>)}
               <span className="flex justify-end gap-2">
-                <Button size="sm" variant="outline" onClick={() => setConfirmingSecrets(false)}>Cancel</Button>
+                <Button size="sm" variant="outline" onClick={() => { setError(null); setConfirmingSecrets(false); }}>Cancel</Button>
                 <Button size="sm" onClick={() => void start()}>Bring over with secrets</Button>
               </span>
             </div>
           ) : (
             <div className="flex justify-end py-2">
-              <Button disabled={nothingPicked || running || !allowed} onClick={() => { if (pickedSecrets.length > 0) setConfirmingSecrets(true); else void start(); }} data-testid="bring-over-start">Bring over</Button>
+              <Button disabled={nothingPicked || running || !allowed} onClick={() => { setError(null); if (pickedSecrets.length > 0) setConfirmingSecrets(true); else void start(); }} data-testid="bring-over-start">Bring over</Button>
             </div>
           )}
           <SubHeading>Plugins from bb</SubHeading>
