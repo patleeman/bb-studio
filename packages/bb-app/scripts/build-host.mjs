@@ -1,3 +1,4 @@
+import { writeStudioCliAliases } from "../../../scripts/fork/studio-cli-aliases.mjs";
 import {
   chmod,
   copyFile,
@@ -84,6 +85,7 @@ await copyFile(
   resolve(hostDaemonSource, "bb.cmd"),
   resolve(hostDaemonTarget, "bb.cmd"),
 );
+await writeStudioCliAliases(hostDaemonTarget);
 await copyDirectory({
   from: resolve(hostDaemonSource, "bb-chunks"),
   to: resolve(hostDaemonTarget, "bb-chunks"),
