@@ -185,7 +185,7 @@ export function secretLine(setting: BringOverSetting, replace: boolean): string 
 
 /** The job's one line: "12 of 40 threads · 3 already here · 1 failed". */
 export function jobLine(job: BringOverJob): string {
-  const parts = [`${String(job.threadsDone)} of ${String(job.threadsTotal)} threads`];
+  const parts = [`${job.threadsDone.toLocaleString()} of ${plural(job.threadsTotal, "thread")}`];
   if (job.threadsSkipped > 0) parts.push(`${String(job.threadsSkipped)} already here`);
   if (job.failures.length > 0) parts.push(`${String(job.failures.length)} failed`);
   const state = job.state === "running" ? "Bringing over" : job.state === "done" ? "Done" : job.state === "cancelled" ? "Cancelled" : "Finished with errors";

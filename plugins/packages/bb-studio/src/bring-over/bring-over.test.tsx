@@ -45,6 +45,7 @@ describe("api", () => {
   it("says where a job is in one line", () => {
     expect(jobLine(job)).toBe("Bringing over: 12 of 40 threads · 3 already here");
     expect(jobLine({ ...job, state: "failed", failures: [{ item: "t", detail: "d" }] })).toBe("Finished with errors: 12 of 40 threads · 3 already here · 1 failed");
+    expect(jobLine({ ...job, state: "done", threadsTotal: 1, threadsDone: 1, threadsSkipped: 0 })).toBe("Done: 1 of 1 thread");
   });
   it("names the secrets in one line", () => {
     const env = { id: "env", label: "Environment variables", detail: "", secret: true, count: 1, names: ["A"], alreadyHere: ["A"] };
@@ -111,6 +112,7 @@ describe("BringOverSection", () => {
     });
     await render();
     expect($('[data-testid="bring-over-project"]')?.textContent).toContain("orbital");
+    expect($('[data-testid="bring-over-project"]')?.textContent).toContain("2 threads");
     expect(host.querySelector('[role="switch"][aria-label="Environment variables"]')?.getAttribute("aria-checked")).toBe("false");
     expect(button("Bring over")?.disabled).toBe(true);
     act(() => { host.querySelector<HTMLInputElement>('input[aria-label="Bring over orbital"]')!.click(); });
@@ -124,6 +126,13 @@ describe("BringOverSection", () => {
     expect(calls.find((call) => call.method === "POST")?.token).toBe("token-from-the-app");
     expect($('[data-testid="bring-over-job"]')?.textContent).toContain("12 of 40 threads");
     expect(button("Cancel")).toBeDefined();
+  });
+
+  it("counts one thread as one thread", async () => {
+    serve({ "GET /api/v1/fork/bring-over": () => json({ ...listing, projects: [{ ...listing.projects![0], threads: 1 }] }) });
+    await render();
+    expect($('[data-testid="bring-over-project"]')?.textContent).toContain("1 thread ·");
+    expect($('[data-testid="bring-over-project"]')?.textContent).not.toContain("1 threads");
   });
 
   it("asks before bringing secrets over, naming them and what they replace", async () => {
@@ -205,6 +214,8 @@ describe("BringOverSection", () => {
     expect($('[data-testid="bring-over-plugin-acme-tool"]')?.textContent).toContain("no manifest");
     fail = false;
     act(() => { [...row.querySelectorAll("button")].find((each) => each.textContent === "Add…")!.click(); });
+    expect(row.textContent).toContain("Installs code from /src/acme");
+    expect(row.textContent).not.toContain("no manifest");
     await act(async () => { [...row.querySelectorAll("button")].find((each) => each.textContent === "Add")!.click(); });
     expect($('[data-testid="bring-over-plugin-acme-tool"]')?.textContent).toContain("Added with its data");
   });
