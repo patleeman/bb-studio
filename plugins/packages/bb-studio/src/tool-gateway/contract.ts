@@ -2,7 +2,7 @@
 // the requests agents make, and the per-provider access. Reads are open to
 // every caller (the app, the phone, the CLI, agents); every change is
 // refused unless the call comes from BB Studio's own app window on this Mac
-// (server/caller.ts). See docs/tool-gateway.md.
+// (server/caller.ts).
 import type { defineRpcContract as sdkDefineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 
