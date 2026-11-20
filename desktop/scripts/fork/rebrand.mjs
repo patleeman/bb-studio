@@ -241,6 +241,12 @@ const replacements = [
     "apps/app/src/components/sidebar/SidebarUpdatesBadge.test.tsx",
     '{ name: "bb update" }',
     `{ name: "${NAME} update" }`,
+    2,
+  ],
+  [
+    "apps/app/src/components/sidebar/SidebarUpdatesBadge.test.tsx",
+    '.toContain("bb 5c1cf4e")',
+    `.toContain("${NAME} 5c1cf4e")`,
   ],
   [
     "apps/app/src/components/sidebar/SidebarUpdatesBadge.test.tsx",
@@ -324,7 +330,7 @@ const replacements = [
   ],
   [
     "apps/app/src/components/pickers/ModelReasoningMenu.tsx",
-    'label="Handoff to new thread"',
+    'label="Hand off to new thread"',
     'label="Continue in a new conversation"',
   ],
   [
@@ -362,7 +368,7 @@ const replacements = [
   ],
   [
     "apps/app/src/components/pickers/ModelReasoningPicker.test.tsx",
-    '"Handoff to new thread"',
+    '"Hand off to new thread"',
     '"Continue in a new conversation"',
     4,
   ],
@@ -442,7 +448,53 @@ const replacements = [
   [
     "apps/app/src/components/settings/CommunitySettingsSection.tsx",
     '"Chat with other bb users and follow development on GitHub."',
-    `"Chat with other bb users and follow ${NAME} on GitHub."`,
+    `"Follow ${NAME} on GitHub."`,
+  ],
+  // bb's Discord is bb's community, not BB Studio's: the row goes.
+  [
+    "apps/app/src/components/settings/CommunitySettingsSection.tsx",
+    'const DISCORD_INVITE_URL = "https://discord.gg/kvBU6tJhcJ";\n',
+    "",
+  ],
+  [
+    "apps/app/src/components/settings/CommunitySettingsSection.tsx",
+    '        <CommunityLinkRow\n          label="Discord"\n          description="Join the server for support, feedback, and announcements."\n          href={DISCORD_INVITE_URL}\n          icon="DiscordLogo"\n          iconClassName="text-brand-discord"\n          openLabel="Join Discord"\n        />\n',
+    "",
+  ],
+  [
+    "apps/app/src/components/settings/settings-search.ts",
+    '      { title: "Discord", keywords: ["chat", "support"] },\n',
+    "",
+  ],
+  [
+    "apps/app/src/components/settings/SidebarThreadListSetting.tsx",
+    '"Which plugin draws your threads in the sidebar."',
+    '"Which plugin draws your conversations in the sidebar."',
+  ],
+  [
+    "apps/app/src/components/settings/CodeRendererSettings.tsx",
+    '"Syntax highlighting and gutters from the bb code theme."',
+    '"Syntax highlighting and gutters from the built-in code theme."',
+  ],
+  [
+    "apps/app/src/components/settings/CodeRendererSettings.tsx",
+    '"Applies to file diffs in threads, the diff panel, and plugin views."',
+    '"Applies to file diffs in conversations, the diff panel, and plugin views."',
+  ],
+  [
+    "apps/app/src/components/settings/CodeRendererSettings.tsx",
+    '"Unified and split diffs from the bb code theme."',
+    '"Unified and split diffs from the built-in code theme."',
+  ],
+  [
+    "apps/app/src/components/settings/ReplacementProviderSetting.tsx",
+    'title: "bb (built-in)",',
+    `title: "${NAME} (built-in)",`,
+  ],
+  [
+    "apps/app/src/components/settings/CodeRendererSettings.test.tsx",
+    'expect(items[3]).toContain("bb (built-in)");',
+    `expect(items[3]).toContain("${NAME} (built-in)");`,
   ],
   [
     "apps/app/src/views/SettingsView.tsx",
@@ -499,11 +551,6 @@ const replacements = [
     "apps/app/src/views/SettingsView.tsx",
     "`bb puts this in front of every branch",
     `\`${NAME} puts this in front of every branch`,
-  ],
-  [
-    "apps/app/src/views/SettingsView.tsx",
-    "Clear notifications once a thread is read",
-    "Clear notifications once a conversation is read",
   ],
   [
     "apps/app/src/components/settings/AiServicesSettingsSection.tsx",
@@ -855,7 +902,12 @@ const replacements = [
     "apps/app/src/views/thread-detail/ThreadDetailPromptArea.test.tsx",
     '.textContent).toBe("New thread");',
     '.textContent).toBe("Send");',
-    4,
+    6,
+  ],
+  [
+    "apps/app/src/views/thread-detail/ThreadDetailPromptArea.test.tsx",
+    '.textContent).toBe(\n          "New thread",\n        ),',
+    '.textContent).toBe(\n          "Send",\n        ),',
   ],
   [
     "apps/app/src/views/thread-detail/ThreadDetailPromptArea.test.tsx",

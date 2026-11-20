@@ -131,6 +131,39 @@ finalOutput }) => ({ quiet }))`. bb asks it for every turn that finishes;
   <sender>", its preview starting at `previewStart`. With a quiet reply the
   row and the reply fold into that one row. Return null for anything else.
 
+## Compacting on your own
+
+- `bb.sdk.threads.compact({ threadId, reason })` compacts a thread as bb
+  does when you type `/compact`, but as the system's turn: no user message.
+  The thread view draws it as one quiet row, "✓ Compacted · <reason>"
+  (for example "cache warming ended"), with a spinner and "Compacting…"
+  while it runs. The reason is one line of plain text, at most 200
+  characters (no line breaks, control, format or bidi characters); anything
+  else is refused with 400. The turn is quiet: no attention, push or parent
+  notice. Leave `reason` out for a compaction the user asked for. An older
+  bb ignores `reason` and draws it as the user's.
+
+## Automated inputs
+
+- `bb.sdk.threads.send({ …, experimental_notice: { source, label } })`
+  sends an automated input the user did not type. `source` is one of
+  `watcher`, `runner`, `check-in`, `reminder`, `maintenance`, `resume`,
+  `schedule`, `handoff`, `keepalive`; another source is ignored (the
+  message arrives as an ordinary one). `label` is one line, at most 120
+  characters; a label that isn't is refused with 400. The model gets the input
+  as is.
+- Your own input is the system's turn and may still ask for approvals. One
+  sent with `senderThreadId` stays that thread's turn (approvals denied). To
+  a thread that hasn't started, the notice is dropped and the message
+  starts the thread as before.
+- The thread view draws it as one quiet row, "<source> <label> · <first
+  line>". A quiet reply (`[PASS]`) folds into it ("… · handled", which
+  expands to the input, the steps and the reply). A real reply stays a
+  message under it. An urgent (⚠) or critical input, or a failed turn, is
+  drawn in full. A quiet keepalive leaves no row.
+- Check `bb.experimental_hooks.experimental_features?.threadNotices` first:
+  an older bb ignores the notice and draws the input as the user's.
+
 ## Title rows in cards
 
 `layout: { cards: { gap, radius, titleRow: true } }` in an app backdrop's
@@ -206,3 +239,17 @@ page is not on screen, and for a page of another plugin.
   resolves false: a page's panel has no conversation beside it and no window
   of its own.
 - `experimental_workbench()` with no argument never returns a page's panel.
+
+## Codex Computer Use per thread
+
+To keep Codex's native Computer Use (its `cua_repl` server) out of one thread, write the flag into that thread's metadata under `provider-codex`:
+
+```ts
+await bb.sdk.threads.updatePluginMetadata({
+  threadId,
+  pluginId: "provider-codex",
+  set: { experimental_computerUse: false },
+});
+```
+
+It applies from the thread's next turn: bb rebuilds the thread's Codex session when the flag changes. Remove the key (`remove: ["experimental_computerUse"]`) to allow it again. Any API client or the thread's own agent can write the same metadata, so this is a default, not a lock. A provider reads its own thread metadata as `context.experimental_pluginMetadata` in `deriveProviderOptions`.

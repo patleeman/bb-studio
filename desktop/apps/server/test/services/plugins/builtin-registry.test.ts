@@ -11,14 +11,11 @@ import { resolveBundledMarketplaceDirectory } from "../../../src/services/plugin
 
 const UNPREFIXED_BUNDLED_PLUGIN_IDS = [
   "account-pool",
-  "agent-annotations",
   "ask-user-question",
   "automations",
-  "bb-account",
   "bb-guide",
   "browser-automation",
   "concurrency-limit",
-  "connect",
   "drafts",
   "environment-git-worktree",
   "environment-personal-workspace",
@@ -26,7 +23,6 @@ const UNPREFIXED_BUNDLED_PLUGIN_IDS = [
   "keep-awake",
   "navigation",
   "pdf-preview",
-  "plugin-api-docs",
   "provider-acp",
   "provider-claude-code",
   "provider-codex",
@@ -37,7 +33,6 @@ const UNPREFIXED_BUNDLED_PLUGIN_IDS = [
   "secrets",
   "side-chat",
   "thread-list",
-  "workflows",
 ];
 
 describe("bundled plugin ids", () => {

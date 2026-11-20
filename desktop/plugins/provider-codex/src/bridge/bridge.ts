@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { failFastOnAuthError } from "./auth-fail-fast.fork.js";
+import { forkCodexSessionOptions } from "../computer-use.fork.js";
 
 import { experimental_selectedSkillMentions as selectedSkillMentions } from "@get-bb/plugin-sdk/provider-bridge";
 import { createHash } from "node:crypto";
@@ -47,6 +48,8 @@ import {
   type PreparedProviderCommandDispatch,
   type ProviderRuntimeEvent,
   experimental_defineProviderBridge,
+  experimental_compareVersions as compareVersions,
+  experimental_versionFrom as versionFrom,
   type ProviderRecoveryHint,
 } from "@get-bb/plugin-sdk/provider-bridge";
 import { z } from "zod";
@@ -573,6 +576,7 @@ function decodeCodexOptions(
       ...(decoded.providerSubagentsEnabled !== undefined
         ? { providerSubagentsEnabled: decoded.providerSubagentsEnabled }
         : {}),
+      ...forkCodexSessionOptions(options.providerOptions),
     },
     additionalWorkspaceWriteRoots: decoded.additionalWorkspaceWriteRoots ?? [],
     daybreak: requestedDaybreak(options),
@@ -603,6 +607,7 @@ function constructionSignature(
     reasoningLevel: sessionOptions.reasoningLevel ?? null,
     memoryEnabled: sessionOptions.memoryEnabled ?? null,
     providerSubagentsEnabled: sessionOptions.providerSubagentsEnabled ?? null,
+    computerUseEnabled: sessionOptions.computerUseEnabled ?? null,
     envHash,
   });
 }
@@ -1012,14 +1017,17 @@ function spawnChildConnection(callbacks: {
 }
 
 const ignoredChildResultSchema = z.unknown();
+const initializeChildResultSchema = z.object({
+  userAgent: z.string().optional(),
+});
 
 async function initializeChild(
   connection: CodexAppServerConnection,
-): Promise<void> {
-  await connection.request({
+): Promise<boolean> {
+  const result = await connection.request({
     method: "initialize",
     params: CODEX_INITIALIZE_PARAMS,
-    resultSchema: ignoredChildResultSchema,
+    resultSchema: initializeChildResultSchema,
     timeoutMs: CHILD_REQUEST_TIMEOUT_MS,
   });
   if (configuredSkillExtraRoots !== null) {
@@ -1030,6 +1038,10 @@ async function initializeChild(
       timeoutMs: CHILD_REQUEST_TIMEOUT_MS,
     });
   }
+  const version = versionFrom(
+    result.userAgent?.match(/^[^/\s]+\/(\S+)/)?.[1] ?? null,
+  );
+  return version !== null && compareVersions(version, "0.145.0") >= 0;
 }
 
 const codexThreadIdentityResultSchema = z
@@ -1330,9 +1342,10 @@ async function constructThreadSession(
   session.connection = connection;
 
   try {
-    await initializeChild(connection);
+    const supportsAgentsEnabled = await initializeChild(connection);
 
     const preparedGitRoots = translator.prepareWorkspaceWriteGitRoots({
+      supportsAgentsEnabled,
       command: {
         threadId: args.threadId,
         cwd: args.cwd,

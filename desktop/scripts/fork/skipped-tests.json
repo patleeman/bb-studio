@@ -601,6 +601,30 @@
       "title": "shows close on a compact plugin page"
     },
     {
+      "file": "apps/app/src/views/thread-detail/SplitThreadArea.test.tsx",
+      "title": "shows the destination thread in a split in the commit that changes the route"
+    },
+    {
+      "file": "apps/server/test/public/public-host-management.test.ts",
+      "title": "asks the connect plugin to revoke the removed host's cloud machine"
+    },
+    {
+      "file": "apps/server/test/services/plugin-catalog/plugin-catalog-service.test.ts",
+      "title": "serves a bundled entry's own compact icon from the catalog route"
+    },
+    {
+      "file": "apps/server/test/services/plugins/plugin-install.test.ts",
+      "title": "refuses a git plugin that shadows a builtin after materialization"
+    },
+    {
+      "file": "apps/server/test/services/plugins/plugin-install.test.ts",
+      "title": "refuses a path plugin whose manifest id shadows a builtin"
+    },
+    {
+      "file": "apps/server/test/services/plugins/plugin-install.test.ts",
+      "title": "refuses an npm package whose derived id shadows a builtin before install"
+    },
+    {
       "file": "apps/app/src/components/commands/CommandPalette.cold-open.test.tsx",
       "title": "stays usable before its body downloads on first open and keeps typed text"
     },
@@ -751,6 +775,34 @@
     {
       "file": "packages/provider-parity/src/parity.self.test.ts",
       "title": "codex/auth-failure reproduces its recording"
+    },
+    {
+      "file": "packages/server-contract/test/contract.test.ts",
+      "title": "keeps contract optional fields on an explicit allowlist"
+    },
+    {
+      "file": "apps/server/test/system/cli-command.test.ts",
+      "title": "repoints a link left by a bb that used another data directory"
+    },
+    {
+      "file": "apps/host-daemon/src/server-move/service.test.ts",
+      "title": "abort stops the pending server, restores config backups, and un-archives standalone data"
+    },
+    {
+      "file": "apps/host-daemon/src/server-move/service.test.ts",
+      "title": "refuses to archive ~/.bb while bb is running from it"
+    },
+    {
+      "file": "apps/host-daemon/src/server-move/service.test.ts",
+      "title": "hides ~/.bb when it is this daemon's data dir and refuses to archive it"
+    },
+    {
+      "file": "apps/host-daemon/src/server-move/service.test.ts",
+      "title": "reports the target machine's server-move readiness"
+    },
+    {
+      "file": "apps/cli/src/commands/machine-enrollment.test.ts",
+      "title": "uses the default BB data directory only when it already holds this machine"
     }
   ],
   "removeLines": [
@@ -815,6 +867,10 @@
     {
       "file": "apps/app/src/components/plugin/PluginProviderModelPicker.test.tsx",
       "title": "reconciles model capabilities and drops unsupported service tiers"
+    },
+    {
+      "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
+      "title": "hides the split action for %s"
     }
   ]
 }

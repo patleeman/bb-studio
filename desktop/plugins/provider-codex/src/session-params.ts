@@ -1,3 +1,4 @@
+import { applyForkCodexConfig } from "./computer-use.fork.js";
 import { experimental_selectedSkillMentions as selectedSkillMentions } from "@get-bb/plugin-sdk/provider-bridge";
 import {
   jsonValueSchema,
@@ -27,6 +28,7 @@ export type CodexSessionOptions = {
   reasoningLevel?: ReasoningLevel;
   memoryEnabled?: boolean;
   providerSubagentsEnabled?: boolean;
+  computerUseEnabled?: boolean;
   instructions?: string;
   envVars?: Record<string, string>;
 } & RuntimePermissionPolicy;
@@ -72,6 +74,7 @@ interface ToCodexPermissionSettingsArgs {
 }
 
 interface BuildCodexConfigArgs {
+  supportsAgentsEnabled: boolean;
   additionalWorkspaceWriteRoots: readonly string[];
   gitWritableRoots: readonly string[];
   options?: CodexSessionOptions;
@@ -648,8 +651,13 @@ export function buildCodexConfig(
     );
   }
   if (args.options?.providerSubagentsEnabled === false) {
-    config["features.multi_agent"] = false;
-    config["features.multi_agent_v2.max_concurrent_threads_per_session"] = 1;
+    if (args.supportsAgentsEnabled) {
+      config["agents.enabled"] = false;
+      config["features.multi_agent_v2"] = false;
+    } else {
+      config["features.multi_agent"] = false;
+      config["features.multi_agent_v2.max_concurrent_threads_per_session"] = 1;
+    }
   }
   config["memories.use_memories"] = args.options?.memoryEnabled ?? true;
   config["memories.generate_memories"] = args.options?.memoryEnabled ?? true;
@@ -662,6 +670,7 @@ export function buildCodexConfig(
       config["sandbox_workspace_write.writable_roots"] = [...writableRoots];
     }
   }
+  applyForkCodexConfig(config, args.options);
   return Object.keys(config).length > 0 ? config : undefined;
 }
 

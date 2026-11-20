@@ -1,3 +1,4 @@
+import { threadCompactQuerySchema, type ThreadCompactQuery } from "./api/thread-compact.fork.js";
 import {
   machineEnvironmentSetSchema,
   machineEnvironmentDeleteSchema,
@@ -20,6 +21,7 @@ import {
   type SystemProviderEnabledRequest,
   type TestAiServiceRequest,
   type TestAiServiceResponse,
+  type SystemSetupGuideResponse,
 } from "./api/system.js";
 import {
   desktopBrowserBrokerProofRequestSchema,
@@ -198,7 +200,6 @@ import {
   type SendQueuedMessageResponse,
   type SidebarBootstrapResponse,
   type SystemAttentionResponse,
-  type SystemSetupGuideResponse,
   type SystemConfigReloadResponse,
   type SystemConfigResponse,
   type SystemMobileAppReleasesResponse,
@@ -213,6 +214,7 @@ import {
   type SystemMachineProvidersResponse,
   type SystemProviderInfo,
   type SystemProvidersQuery,
+  type SystemProviderStatesQuery,
   type SystemProviderStatesResponse,
   type SystemUsageLimitsQuery,
   type SystemAppUpdateAcknowledgeRequest,
@@ -364,6 +366,7 @@ import {
   systemExecutionOptionsQuerySchema,
   systemEnvironmentProvidersQuerySchema,
   systemProvidersQuerySchema,
+  systemProviderStatesQuerySchema,
   systemUsageLimitsQuerySchema,
   systemVersionQuerySchema,
   systemAppUpdateAcknowledgeRequestSchema,
@@ -1594,7 +1597,7 @@ export const publicApiRoutes = {
     compact: defineRoute({
       path: "/threads/:id/compact",
       method: "post",
-      request: noRequest<PathId>(),
+      request: optionalQueryRequest<PathId, ThreadCompactQuery>(threadCompactQuerySchema),
       response: jsonResponse<{ ok: true }>(),
     }),
     clearContext: defineRoute({
@@ -2120,8 +2123,8 @@ export const publicApiRoutes = {
     providerStates: defineRoute({
       path: "/system/providers/state",
       method: "get",
-      request: optionalQueryRequest<EmptyInput, SystemProvidersQuery>(
-        systemProvidersQuerySchema,
+      request: optionalQueryRequest<EmptyInput, SystemProviderStatesQuery>(
+        systemProviderStatesQuerySchema,
       ),
       response: jsonResponse<SystemProviderStatesResponse>(),
     }),

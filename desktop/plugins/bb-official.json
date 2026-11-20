@@ -3,10 +3,6 @@
     "category": "agents-and-providers",
     "screenshots": []
   },
-  "agent-annotations": {
-    "category": "code-and-reviews",
-    "screenshots": []
-  },
   "ask-user-question": {
     "category": "thread-content",
     "screenshots": []
@@ -17,14 +13,6 @@
       "https://getbb.app/marketplace/v2/screenshots/automations/automations-catalog.png",
       "https://getbb.app/marketplace/v2/screenshots/automations/automations-sidebar.png"
     ]
-  },
-  "bb-account": {
-    "category": "cloud-and-remote",
-    "screenshots": []
-  },
-  "connect": {
-    "category": "cloud-and-remote",
-    "screenshots": []
   },
   "pdf-preview": {
     "category": "file-viewers-and-editors",
@@ -49,14 +37,6 @@
   "keep-awake": {
     "category": "utilities",
     "screenshots": []
-  },
-  "plugin-api-docs": {
-    "category": "plugin-development",
-    "screenshots": [
-      "https://getbb.app/marketplace/v2/screenshots/plugin-api-docs/plugin-guide-map.png",
-      "https://getbb.app/marketplace/v2/screenshots/plugin-api-docs/plugin-guide-surfaces.png",
-      "https://getbb.app/marketplace/v2/screenshots/plugin-api-docs/plugin-guide-reference.png"
-    ]
   },
   "provider-retry": {
     "category": "agents-and-providers",
@@ -94,10 +74,6 @@
     "category": "tasks-and-workflows",
     "screenshots": []
   },
-  "workflows": {
-    "category": "tasks-and-workflows",
-    "screenshots": []
-  },
   "git": {
     "category": "code-and-reviews",
     "screenshots": []
@@ -128,10 +104,6 @@
   },
   "bb-guide": {
     "category": "memory-and-context",
-    "screenshots": []
-  },
-  "storage-retention": {
-    "category": "tasks-and-workflows",
     "screenshots": []
   }
 }

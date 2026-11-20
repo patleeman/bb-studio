@@ -18,6 +18,12 @@ import {
   type PluginMessageClassification,
   type ReplyClassifiers,
 } from "@/lib/fork-reply-classifiers";
+import { QuietTurnMarker } from "./ForkQuietTurnMarker.js";
+import {
+  noticeFoldOf,
+  noticeOf,
+  type QuietFoldDetails,
+} from "./noticeFold.fork.js";
 
 const KEPT_OPERATIONS: ReadonlySet<string> = new Set([
   "warning",
@@ -42,14 +48,47 @@ const ALERT_ICONS: ReadonlySet<IconName> = new Set<IconName>([
 
 const URGENT_BODY = /^(?:\[bb [^\]\n]*\]\s*)?(?:[^\n:]{0,80}:\s*)?⚠/u;
 
-const NO_FOLDS: ReadonlySet<string> = new Set();
+export type QuietFoldState =
+  | "running"
+  | "done"
+  | "skipped"
+  | "notice"
+  | "failed"
+  | "alert";
 
-export const RelayedFoldContext = createContext<ReadonlySet<string>>(NO_FOLDS);
+export interface QuietFold {
+  label: string;
+  state: QuietFoldState;
+  createdAt: number;
+  details?: QuietFoldDetails;
+}
+
+const QUIET_FOLD_PREFIX: Record<"running" | "done" | "skipped", string> = {
+  running: "Compacting…",
+  done: "Compacted",
+  skipped: "Compaction skipped",
+};
+
+export class FoldedRows extends Set<string> {
+  readonly quiet: ReadonlyMap<string, QuietFold>;
+
+  constructor(
+    ids: Iterable<string> = [],
+    quiet: ReadonlyMap<string, QuietFold> = new Map(),
+  ) {
+    super(ids);
+    this.quiet = quiet;
+  }
+}
+
+const NO_FOLDS = new FoldedRows();
+
+export const RelayedFoldContext = createContext<FoldedRows>(NO_FOLDS);
 export const RelayedRowFoldedContext = createContext(false);
 
 export interface RelayedFold {
   rows: readonly ThreadTimelineViewRow[];
-  folded: ReadonlySet<string>;
+  folded: FoldedRows;
 }
 
 export interface RelayedGeneratedSource {
@@ -82,6 +121,83 @@ export function isAlertRow(row: ThreadTimelineViewRow): boolean {
   return URGENT_BODY.test(row.text.trimStart());
 }
 
+function compactionReason(row: ThreadTimelineViewRow): string | null {
+  if (row.kind !== "conversation" || row.role !== "user") return null;
+  if (row.initiator !== "system") return null;
+  const subject = row.systemMessageSubject;
+  return subject?.kind === "compaction" ? subject.reason.trim() : null;
+}
+
+function isCompactionRow(row: ThreadTimelineViewRow): boolean {
+  return (
+    row.kind === "system" &&
+    row.systemKind === "operation" &&
+    row.operationKind === "compaction"
+  );
+}
+
+function inQuietTurn(
+  message: ThreadTimelineViewRow,
+  row: ThreadTimelineViewRow,
+): boolean {
+  return message.turnId !== null
+    ? row.turnId === message.turnId
+    : isCompactionRow(row);
+}
+
+function rowStatus(row: ThreadTimelineViewRow): string | null {
+  return "status" in row && typeof row.status === "string" ? row.status : null;
+}
+
+function quietFoldState(
+  compaction: ThreadTimelineViewRow | undefined,
+): keyof typeof QUIET_FOLD_PREFIX | null {
+  const status = compaction === undefined ? "pending" : rowStatus(compaction);
+  if (status === "error" || status === "interrupted") return null;
+  if (status === "pending") return "running";
+  return compaction !== undefined &&
+    "title" in compaction &&
+    /skipped/iu.test(compaction.title)
+    ? "skipped"
+    : "done";
+}
+
+function hiddenInQuietTurn(row: ThreadTimelineViewRow): boolean {
+  if (isCompactionRow(row)) return true;
+  const status = rowStatus(row);
+  if (status === "pending" || status === "interrupted") return false;
+  return hiddenInFold(row);
+}
+
+export function quietFoldOf(
+  rows: readonly ThreadTimelineViewRow[],
+  index: number,
+): { fold: QuietFold; hidden: string[] } | null {
+  const message = rows[index];
+  if (message === undefined) return null;
+  const reason = compactionReason(message);
+  if (reason === null) return null;
+  const turn: ThreadTimelineViewRow[] = [];
+  for (
+    let later = index + 1;
+    later < rows.length && rows[later]!.kind !== "conversation";
+    later += 1
+  ) {
+    if (inQuietTurn(message, rows[later]!)) turn.push(rows[later]!);
+  }
+  const state = quietFoldState(turn.filter(isCompactionRow).at(-1));
+  if (state === null) return null;
+  const prefix = QUIET_FOLD_PREFIX[state];
+  return {
+    fold: {
+      label: reason.length > 0 ? `${prefix} · ${reason}` : prefix,
+      state,
+      createdAt: message.createdAt,
+    },
+    hidden: turn.filter(hiddenInQuietTurn).map((row) => row.id),
+  };
+}
+
 function hiddenInFold(row: ThreadTimelineViewRow): boolean {
   if (row.kind === "system") {
     if (KEPT_SYSTEM_KINDS.has(row.systemKind)) return false;
@@ -96,9 +212,13 @@ export function foldRelayedRows(
   rows: readonly ThreadTimelineViewRow[],
   streamingAssistantMessageId: string | null,
   classifiers: ReplyClassifiers = getPluginSlotSnapshot().replyClassifiers,
+  active: boolean = streamingAssistantMessageId !== null,
 ): RelayedFold {
   const relayed = (row: ThreadTimelineViewRow | undefined): boolean =>
-    row !== undefined && isRelayedRow(row, classifiers) && !isAlertRow(row);
+    row !== undefined &&
+    noticeOf(row) === null &&
+    isRelayedRow(row, classifiers) &&
+    !isAlertRow(row);
   const quiet = (row: ThreadTimelineViewRow | undefined): boolean =>
     row !== undefined &&
     row.kind === "conversation" &&
@@ -114,8 +234,36 @@ export function foldRelayedRows(
   };
   const hidden = new Set<string>();
   const folded = new Set<string>();
+  const quietFolds = new Map<string, QuietFold>();
+  for (const [index, row] of rows.entries()) {
+    const quiet = quietFoldOf(rows, index);
+    if (quiet === null) continue;
+    quietFolds.set(row.id, quiet.fold);
+    for (const id of quiet.hidden) hidden.add(id);
+  }
+  for (const [index, row] of rows.entries()) {
+    const notice = noticeFoldOf(
+      rows,
+      index,
+      quiet,
+      streamingAssistantMessageId,
+      active,
+    );
+    if (notice === null) continue;
+    for (const id of notice.hidden) hidden.add(id);
+    if (notice.hideRow) {
+      hidden.add(row.id);
+      continue;
+    }
+    quietFolds.set(row.id, {
+      label: notice.label,
+      state: notice.state,
+      createdAt: row.createdAt,
+      details: notice.details,
+    });
+  }
   for (let index = 0; index < rows.length; index += 1) {
-    if (!relayed(rows[index])) continue;
+    if (quietFolds.has(rows[index]!.id) || !relayed(rows[index])) continue;
     const group = new Set([index]);
     let reply = nextConversation(index + 1);
     while (relayed(rows[reply])) {
@@ -131,15 +279,28 @@ export function foldRelayedRows(
     ) {
       end = later;
     }
+    // A real reply after the quiet ones answers the group's last line: that
+    // line stays as it is, without the check.
+    const after = rows[nextConversation(end + 1)];
+    const answered =
+      after?.kind === "conversation" && after.role === "assistant"
+        ? Math.max(...group)
+        : -1;
     for (let at = index; at <= end; at += 1) {
       const row = rows[at]!;
+      if (at === answered) continue;
       if (group.has(at)) folded.add(row.id);
       else if (row.kind === "conversation" || hiddenInFold(row)) hidden.add(row.id);
     }
     index = end;
   }
-  if (folded.size === 0) return { rows, folded: NO_FOLDS };
-  return { rows: rows.filter((row) => !hidden.has(row.id)), folded };
+  if (folded.size === 0 && quietFolds.size === 0 && hidden.size === 0) {
+    return { rows, folded: NO_FOLDS };
+  }
+  return {
+    rows: rows.filter((row) => !hidden.has(row.id)),
+    folded: new FoldedRows(folded, quietFolds),
+  };
 }
 
 export function useRelayedFold(
@@ -160,6 +321,7 @@ export function useRelayedFold(
         rows,
         scopeActive ? findStreamingAssistantMessageId(rows) : null,
         slots.replyClassifiers,
+        scopeActive,
       ),
     [rows, scopeActive, findStreamingAssistantMessageId, slots.replyClassifiers],
   );
@@ -172,7 +334,19 @@ export function RelayedRowFolded({
   rowId: string;
   children: ReactNode;
 }) {
-  const folded = useContext(RelayedFoldContext).has(rowId);
+  const folds = useContext(RelayedFoldContext);
+  const quiet = folds.quiet.get(rowId);
+  if (quiet !== undefined) {
+    return (
+      <QuietTurnMarker
+        label={quiet.label}
+        state={quiet.state}
+        at={quiet.createdAt}
+        details={quiet.details}
+      />
+    );
+  }
+  const folded = folds.has(rowId);
   return (
     <RelayedRowFoldedContext.Provider value={folded}>
       {children}

@@ -6,7 +6,6 @@ import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
 import { Icon } from "@bb/shared-ui/icon";
 import { appToast } from "@/components/ui/app-toast";
 import bbLogoUrl from "../../../../../../assets/bb-logo.svg";
-import { OpenPluginGuideButton } from "./OpenPluginGuideButton";
 import { cn } from "@bb/shared-ui/lib/utils";
 import {
   ResourceCollectionViewport,
@@ -120,12 +119,13 @@ export function BrowsePluginsTab({
       ),
     [catalog.categories, shelfEntries, selectedCategories],
   );
+  const searchEntries = searchQuery.data?.entries;
   const filteredEntries = useMemo(() => {
     const selected = new Set(selectedCategories);
     const matchingSearch =
       shelfKey !== null && trimmedQuery !== ""
         ? new Set(
-            searchQuery.data?.entries.map(
+            searchEntries?.map(
               (entry) => `${entry.marketplace}/${entry.entryId}`,
             ),
           )
@@ -136,13 +136,7 @@ export function BrowsePluginsTab({
         (matchingSearch === null ||
           matchingSearch.has(`${entry.marketplace}/${entry.entryId}`)),
     );
-  }, [
-    trimmedQuery,
-    searchQuery.data?.entries,
-    selectedCategories,
-    shelfEntries,
-    shelfKey,
-  ]);
+  }, [trimmedQuery, searchEntries, selectedCategories, shelfEntries, shelfKey]);
   const shelvesMode =
     sort === null && shelfKey === null && selectedCategories.length === 0;
   const shelves = useMemo(
@@ -246,7 +240,6 @@ export function BrowsePluginsTab({
               </ResourceTabDescription>
             ) : (
               <div className="flex items-center justify-between gap-3">
-                <OpenPluginGuideButton />
                 {createAction}
               </div>
             )}

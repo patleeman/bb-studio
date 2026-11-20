@@ -98,7 +98,7 @@
     },
     "apps/app/src/components/thread/timeline/ThreadTimelineRows.tsx": {
       "seam": "quiet-turns, message-menu, sign-in-errors, unread-divider",
-      "intent": "A finished assistant message that a plugin's reply classifier calls quiet (useQuietReply, lib/fork-reply-classifiers.ts, which redraws the row when a classifier registers after it was drawn) draws as QuietTurnMarker instead of a message. Core has no rule of its own. ConversationRowContent reads the plugins' slots.experimental_messageAction items (useForkMessageActions) and wraps the row's plugin actions in withForkMessageMenu (forkMessageActions.ts), which adds the items that are available for that message, keyed as menu items. A system row that is a sign-in error draws forkSignInErrorBody (SignInErrorActions.fork.tsx, imported at the top of the file: Sign in runs the provider's login command in a terminal, Pick another model opens the picker) instead of the detail code box. findUnreadDividerIndex moves the divider back to the first unread row of the reply's turn with unreadDividerTurnStart (unreadDividerTurnStart.fork.ts, imported at the top of the file), so NEW never sits between a Thought or tool row and its reply. buildTimelineRowsListItems skips a settled Thought row with no text (isEmptyThought, emptyThought.fork.ts, imported at the top of the file); a thought with text, deferred text or still running is always drawn. TimelineRowsList builds its items from useRelayedFold's rows and provides its folded ids (relayedFold.fork.tsx, imported at the top of the file): a message that came into the thread whose turn ends in a quiet reply folds with that reply into its own row; ConversationRow wraps its content in RelayedRowFolded so that row draws a check.",
+      "intent": "A finished assistant message that a plugin's reply classifier calls quiet (useQuietReply, lib/fork-reply-classifiers.ts, which redraws the row when a classifier registers after it was drawn) draws as QuietTurnMarker instead of a message. Core has no rule of its own. ConversationRowContent reads the plugins' slots.experimental_messageAction items (useForkMessageActions) and wraps the row's plugin actions in withForkMessageMenu (forkMessageActions.ts), which adds the items that are available for that message, keyed as menu items. A system row that is a sign-in error draws forkSignInErrorBody (SignInErrorActions.fork.tsx, imported at the top of the file: Sign in runs the provider's login command in a terminal, Pick another model opens the picker) instead of the detail code box. findUnreadDividerIndex moves the divider back to the first unread row of the reply's turn with unreadDividerTurnStart (unreadDividerTurnStart.fork.ts, imported at the top of the file), so NEW never sits between a Thought or tool row and its reply. buildTimelineRowsListItems skips a settled Thought row with no text (isEmptyThought, emptyThought.fork.ts, imported at the top of the file); a thought with text, deferred text or still running is always drawn. TimelineRowsList builds its items from useRelayedFold's rows and provides its folded ids (relayedFold.fork.tsx, imported at the top of the file): a message that came into the thread whose turn ends in a quiet reply folds with that reply into its own row; ConversationRow wraps its content in RelayedRowFolded so that row draws a check, and a compaction bb ran on its own (a system row with a compaction subject) draws as a labelled QuietTurnMarker in its place.",
       "budget": 35
     },
     "apps/app/src/components/ui/tab-pill.tsx": {
@@ -138,8 +138,8 @@
     },
     "apps/app/src/lib/thread-actions/thread-action-registry.tsx": {
       "seam": "app-route",
-      "intent": "The stable BbNavigate that thread actions build spreads forkLatestNavigate(latest) (plugin-navigation.fork.ts) first, so the fork's navigate methods forward too.",
-      "budget": 2
+      "intent": "useLatestNavigate takes forkNavigate = useForkLatestNavigate(latest) (plugin-navigation.fork.ts, imported at the top of the file) and its stable BbNavigate spreads it first, so the fork's navigate methods forward too. A hook rather than a call with the ref, so the React Compiler accepts it.",
+      "budget": 3
     },
     "apps/app/src/main.tsx": {
       "seam": "fork-styles",
@@ -166,35 +166,30 @@
       "intent": "Registers the `bb server mirror` commands (commands/fork-import.ts).",
       "budget": 2
     },
-    "apps/server/src/internal/events.ts": {
-      "seam": "quiet-turns",
-      "intent": "No completion notice is queued to the parent thread when a plugin's turn classifier called the turn quiet (isQuietTurn).",
-      "budget": 4
-    },
     "apps/server/src/server.ts": {
-      "seam": "import-sync, approvals, skills-registry-policy",
-      "intent": "Registers the fork's import routes (/api/v1/fork/import/*) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts).",
-      "budget": 6
+      "seam": "import-sync, approvals, skills-registry-policy, thread-successor",
+      "intent": "Registers the fork's import routes (/api/v1/fork/import/* and /api/v1/fork/bring-over/*, given the plugin service so a plugin from bb can be added) and approval routes (/api/v1/fork/approvals/*) beside the server-move routes. registerForkImportRoutes also starts the import jobs on their own timer (fork-import/sweeps.ts) when forkBeforeDatabase named a data dir, so it must stay called from createApp. One fork import and registerSkillsRegistryGate(publicApi, deps.db) right before registerSkillsRegistryRoutes, so every /skills-registry request is first put to the plugins' registry policies (services/skills/registry-policy.fork.ts). One fork import and registerForkThreadSuccessors(deps.db) after the registry gate, so archived-thread errors can look up the handoff chain.",
+      "budget": 8
     },
     "apps/server/src/services/plugins/plugin-service.ts": {
       "seam": "quiet-turns, plugin-events, bundled-studio",
-      "intent": "The thread.idle plugin event spreads forkIdleFields (quiet-turn.fork.ts: experimental_quiet) as its first field, on its own line. The events object also registers the fork's event wiring (registerForkPluginEvents: emitThreadEvent, the database, buildThreadDto, toHostRecord) so fork-plugin-events.ts can emit its three events. The bundled plugin list is withForkBundledPlugins(listBundledPluginRegistrations()) (builtin-registry.fork.ts, imported at the top of the file), so Studio and Visual Chat reconcile as built-ins when their bundles are in the app; an existing install of the same id from another source (a path install) is left alone.",
-      "budget": 13
+      "intent": "The thread.idle plugin event spreads forkIdleFields (quiet-turn.fork.ts: experimental_quiet) as its first field, on its own line. The events object also registers the fork's event wiring (registerForkPluginEvents: emitThreadEvent, the database, buildThreadDto, toHostRecord) so fork-plugin-events.ts can emit its three events. The bundled plugin list is withForkBundledPlugins(listBundledPluginRegistrations()) (builtin-registry.fork.ts, imported at the top of the file), so Studio reconciles as a built-in when its bundle is in the app; an existing install of the same id from another source (a path install) is left alone while its folder is there. Just before reconcileBundled, releaseDeadBundledInstalls (builtin-registry.fork.ts) drops a bundled id's path row whose folder is gone, or its removed non-builtin row, so the bundled copy takes the id; the list's statusDetail falls back to forkReplacedInstallNote(row.id) so the dropped source shows on the plugin until restart.",
+      "budget": 16
     },
     "apps/server/src/services/threads/dispatch-attempt.ts": {
-      "seam": "import-sync",
-      "intent": "When startsNoTurn(thread, input) (services/threads/turnless-dispatch.fork.ts) says the attempt is the first dispatch of a pending fork with an empty input, runDispatchAttempt skips the message.dispatch hook pass and waitOn returns dispatched without writing a queued row. An empty-input fork (Reply in thread) then starts as an idle fork even when the concurrency limit is full, and never stores an empty queued message.",
-      "budget": 4
+      "seam": "import-sync, system-compaction, thread-notices",
+      "intent": "When startsNoTurn(thread, input) (services/threads/turnless-dispatch.fork.ts) says the attempt is the first dispatch of a pending fork with an empty input, runDispatchAttempt skips the message.dispatch hook pass and waitOn returns dispatched without writing a queued row. An empty-input fork (Reply in thread) then starts as an idle fork even when the concurrency limit is full, and never stores an empty queued message. compactThreadContext takes an optional reason; with one it dispatches with systemCompactionNotice(reason) (system-compaction.fork.ts, imported at the top of the file), so the compaction turn is the system's and its request carries { kind: \"compaction\", reason }, and runOperationDispatch passes the attempt's systemNotice on to sendThreadMessage. Without a reason the compaction is the user's, as upstream. resolveDispatchAuthor is told systemAuthored(systemNotice, senderThreadId) (automation-notice.fork.ts, imported at the top of the file): an automated input another thread sent stays that thread's turn; every other notice is the system's, as upstream.",
+      "budget": 12
     },
     "apps/server/src/services/threads/thread-lifecycle.ts": {
       "seam": "fork-transcript",
-      "intent": "settleThreadStartCommandResult's failure branch first asks restartForkFromTranscript(args) (services/threads/fork-start-fallback.fork.ts, imported at the top of the file) and returns its result when it handles a failed thread.start that carried a fork whose session copy failed (the error names the source session and the thread is still starting); otherwise settleThreadCommandFailure runs as upstream. A fork whose session copy fails then starts from the transcript and writes no error row.",
+      "intent": "settleThreadStartCommandResult first asks restartForkFromTranscript(args) (services/threads/fork-start-fallback.fork.ts, imported at the top of the file) and returns its result when it handles a failed thread.start that carried a fork whose session copy failed (the error names the source session and the thread is still starting); otherwise the answer goes to the lifecycle machine as upstream. A fork whose session copy fails then starts from the transcript and writes no error row: with input it resends the start without the fork under the same request id, without input it settles the start request and moves the thread to idle through the lifecycle machine.",
       "budget": 4
     },
     "apps/server/src/services/threads/thread-send.ts": {
-      "seam": "import-sync",
-      "intent": "ensureThreadIsWritable ends with ensureForkThreadWritable(thread) (services/threads/thread-write-guards.fork.ts), which throws a 409 thread_read_only for the first registered fork guard that refuses; fork-import registers the mirrored-thread guard. This one call also covers the queue path.",
-      "budget": 2
+      "seam": "import-sync, thread-successor, thread-notices",
+      "intent": "ensureThreadIsWritable ends with ensureForkThreadWritable(thread) (services/threads/thread-write-guards.fork.ts), which throws a 409 thread_read_only for the first registered fork guard that refuses; fork-import registers the mirrored-thread guard. This one call also covers the queue path. The archived check calls throwArchivedThread(thread) (services/threads/thread-successor.fork.ts), the same 409 thread_not_writable that also names the live thread a handoff left (details.successorThreadId). Permission escalation is resolved for escalationInitiator(initiator, systemNotice) (automation-notice.fork.ts, imported at the top of the file): an automated input keeps the user's escalation (ask), every other system turn keeps upstream's. The author is resolved with systemAuthored(systemNotice, senderThreadId), the same rule as at dispatch.",
+      "budget": 10
     },
     "apps/server/src/services/threads/thread-create.ts": {
       "seam": "import-sync, idle-thread",
@@ -207,8 +202,13 @@
       "budget": 2
     },
     "apps/server/test/services/plugins/plugin-authoring-docs.test.ts": {
-      "seam": "quiet-turns, plugin-events",
-      "intent": "The event field table lists experimental_quiet for thread.idle and the fields of the fork's four events (a type assertion requires every event name).",
+      "seam": "sdk-tables",
+      "intent": "receivedFields reads only the object parts of a callback's first parameter, skipping primitives and arrays, so a fork callback that takes a JsonValue (experimental_tab's experimental_instanceIcon(params)) is not checked for String and Array prototype members. One line.",
+      "budget": 2
+    },
+    "packages/bb-app/src/launcher.ts": {
+      "seam": "bring-over-token",
+      "intent": "One fork import (withoutForkUiTokenHash, fork-ui-token-env.ts). createDaemonEnv and createCliEnv drop BB_STUDIO_UI_TOKEN_SHA256, so the host daemon (and every agent shell, provider and plugin host it starts) and bb commands never see the bring-over token's hash. createServerEnv keeps it, so every server start by this launcher, restarts included, gets the same hash.",
       "budget": 7
     },
     "packages/domain/src/ui-preferences.ts": {
@@ -227,9 +227,9 @@
       "budget": 1
     },
     "packages/plugin-sdk/src/backend-contract.ts": {
-      "seam": "quiet-turns, plugin-events",
-      "intent": "Imports and re-exports backend-contract.fork.ts. PluginHooks extends ForkPluginHooks, PluginThreadEventPayloads extends ForkPluginEventPayloads (three events), and the thread.idle payload is intersected with ForkThreadIdlePayload on upstream's one line.",
-      "budget": 13
+      "seam": "quiet-turns, plugin-events, codex-computer-use",
+      "intent": "Imports and re-exports backend-contract.fork.ts. PluginHooks extends ForkPluginHooks, PluginThreadEventPayloads extends ForkPluginEventPayloads (three events), and the thread.idle payload is intersected with ForkThreadIdlePayload on upstream's one line. PluginProviderOptionsContext extends ForkProviderOptionsContext (experimental_pluginMetadata: the thread's metadata under the provider plugin's id), imported with the other fork types.",
+      "budget": 16
     },
     "packages/plugin-sdk/src/internal/composer-customization-validation.ts": {
       "seam": "composer-footer, composer-replace",
@@ -271,15 +271,20 @@
       "intent": "No push is sent for a quiet thread.idle event.",
       "budget": 3
     },
+    "plugins/provider-pi/vitest.config.ts": {
+      "seam": "test-tmpdir",
+      "intent": "Runs the Pi plugin's tests in upstream's per-run temp root (vitest.global-tmpdir.ts), removed at the end, so the bridge channel and fake host folders the tests leave go with it.",
+      "budget": 1
+    },
     "vitest.shared.ts": {
       "seam": "test-skips",
       "intent": "Adds scripts/fork/vitest-skips.ts as a setup file in the shared base config, so tests listed in skipped-tests.json are skipped at run time.",
       "budget": 4
     },
     "apps/server/src/services/threads/thread-commands.ts": {
-      "seam": "turn-context",
-      "intent": "buildThreadStartCommand and prepareTurnSubmitCommandPayload (only for target.mode start, never a steer) pass their input through withTurnContext (turn-context.fork.ts), which appends each plugin's experimental_turnContext text as agent-only items to input and the last input group. Nothing is stored; no wire field changes.",
-      "budget": 3
+      "seam": "turn-context, codex-computer-use",
+      "intent": "buildThreadStartCommand and prepareTurnSubmitCommandPayload (only for target.mode start, never a steer) pass their input through withTurnContext (turn-context.fork.ts), which appends each plugin's experimental_turnContext text as agent-only items to input and the last input group. Nothing is stored; no wire field changes. toRuntimeExecutionOptions spreads forkProviderOptionsContext(deps, providerId, threadId) (services/providers/provider-options-context.fork.ts, imported at the top) into the deriveProviderOptions context, so a provider sees the thread's metadata under its own plugin id.",
+      "budget": 5
     },
     "apps/server/src/services/plugins/plugin-api.ts": {
       "seam": "quiet-turns, thread-delete-hook, plugin-events, turn-context, fork-point",
@@ -306,10 +311,15 @@
       "intent": "Before bb opens a clicked link by the user's preference, it asks plugin link handlers (openUrlWithPlugin, lib/fork-link-handlers.ts); a handler that returns true has opened it. InAppBrowserUrlOpenContext is exported so the workbench seam (fork-workbench.ts) opens a URL in the thread view's in-app browser.",
       "budget": 4
     },
-    "apps/server/src/services/threads/lifecycle-outcome.ts": {
-      "seam": "plugin-events, quiet-turns",
-      "intent": "Both lifecycle apply functions take forkBefore = forkBeforeLifecycle(deps.db, args) next to previousStatus and call forkAfterLifecycle(deps, args, outcome, previousStatus, forkBefore) after announceTurnFailed (services/threads/lifecycle-outcome.fork.ts). It puts latestAttentionAt back after a quiet run.succeeded from active and calls announceTurnInterrupted (fork-plugin-events.ts). Every turn completion and interruption path goes through these two functions.",
-      "budget": 5
+    "apps/server/src/services/threads/lifecycle/run.ts": {
+      "seam": "plugin-events, quiet-turns, title-service",
+      "intent": "runThreadLifecycleInTransaction, the one place every lifecycle input is applied, returns thread: forkAfterLifecycle(deps.db, thread, written.thread, transition.effects) (services/threads/lifecycle-outcome.fork.ts, imported at the top of the file). It puts latestAttentionAt back after a quiet completed turn from active (and returns the row with it), calls announceTurnInterrupted (fork-plugin-events.ts) for a turn that ended from active or stopping without completing, and schedules the queued title retry after a completed turn.",
+      "budget": 3
+    },
+    "apps/server/src/services/threads/turn-end-follow-ups.ts": {
+      "seam": "quiet-turns",
+      "intent": "planTurnEnd queues no completion notice to the parent thread when a plugin's turn classifier called the turn quiet (isQuietTurn, quiet-turn.fork.ts, imported at the top of the file). It decides the parent notice for every turn end, held or not.",
+      "budget": 4
     },
     "apps/server/src/ws/daemon-protocol.ts": {
       "seam": "plugin-events",
@@ -322,14 +332,14 @@
       "budget": 6
     },
     "apps/desktop/src/main.ts": {
-      "seam": "approvals, windows, studio-release, finder",
-      "intent": "Registers the fork's approval IPC handler (registerForkApprovalIpc, fork-approvals.ts) beside the desktop info handler. Importing that module also makes the per-launch signing key and puts its public half in the environment before the server is started. It also registers the fork's window IPC handler (registerForkWindowIpc, fork-windows.ts). Its first import is studio-desktop.fork.ts (a test build's scratch data dir, ports and user data are set there before anything reads them), and About shows the Studio version with its bb base (studioAboutVersion). It also registers the fork's Show in Finder and folder listing IPC handlers (registerForkFinderIpc, fork-finder.ts) with applicationWindowWebContentsIds, so they answer only the main frame of an app window (or a fork window).",
-      "budget": 9
+      "seam": "approvals, windows, studio-release, finder, activity, bring-over-token",
+      "intent": "Registers the fork's approval IPC handler (registerForkApprovalIpc, fork-approvals.ts) beside the desktop info handler. Importing that module also makes the per-launch signing key and puts its public half in the environment before the server is started. It also registers the fork's window IPC handler (registerForkWindowIpc, fork-windows.ts). Its first import is studio-desktop.fork.ts (a test build's scratch data dir, ports and user data are set there before anything reads them), and About shows the Studio version with its bb base (studioAboutVersion). It also registers the fork's Show in Finder and folder listing IPC handlers (registerForkFinderIpc, fork-finder.ts) with applicationWindowWebContentsIds, so they answer only the main frame of an app window (or a fork window). It also registers the fork's system activity IPC (registerForkActivityIpc, fork-activity.ts) with applicationWindowWebContentsIds: the Mac's idle seconds and lock state for Studio's at-the-desk heartbeat, answered only to an app window's main frame, with lock and unlock pushed to app windows. One fork import, registerForkUiTokenIpc(ipcMain, applicationWindowWebContentsIds) beside the other fork IPC, and ...forkUiTokenEnv() in spawnOwnedRuntime's env, which hands bb-app the SHA-256 of the per-launch bring-over token (fork-ui-token.ts). The token itself never leaves the main process except to app windows over IPC.",
+      "budget": 14
     },
     "apps/desktop/src/preload.ts": {
-      "seam": "approvals, windows, studio-release, launch-theme, finder",
-      "intent": "Exposes experimental_answerApproval and experimental_window on window.bbDesktop; each invokes the main process. It also exposes experimental_studioBuild (the Studio version and its bb base, from studio-release.fork.ts). It spreads forkLaunchThemeApi(ipcRenderer) (fork-launch-theme-preload.ts) into the API: that paints the main window from the cached backdrop appearance before the page runs and adds experimental_launchAppearance and experimental_saveLaunchAppearance. It spreads forkFinderApi(ipcRenderer) (fork-finder-preload.ts): experimental_finderLabel, experimental_showInFinder, experimental_listFolder and experimental_fileLinkMenu.",
-      "budget": 15
+      "seam": "approvals, windows, studio-release, launch-theme, finder, activity, bring-over-token",
+      "intent": "Exposes experimental_answerApproval and experimental_window on window.bbDesktop; each invokes the main process. It also exposes experimental_studioBuild (the Studio version and its bb base, from studio-release.fork.ts). It spreads forkLaunchThemeApi(ipcRenderer) (fork-launch-theme-preload.ts) into the API: that paints the main window from the cached backdrop appearance before the page runs and adds experimental_launchAppearance and experimental_saveLaunchAppearance. It spreads forkFinderApi(ipcRenderer) (fork-finder-preload.ts): experimental_finderLabel, experimental_showInFinder, experimental_listFolder and experimental_fileLinkMenu. It spreads forkActivityApi(ipcRenderer) (fork-activity-preload.ts): experimental_systemActivity and experimental_onSystemActivity. One fork import and ...forkUiTokenApi(ipcRenderer) in bbDesktopApi: experimental_bringOverToken() asks the main process for the per-launch bring-over token (fork-ui-token-preload.ts).",
+      "budget": 19
     },
     "packages/desktop-contract/src/info.ts": {
       "seam": "approvals, windows",
@@ -401,11 +411,6 @@
       "intent": "The \"Open in split\" thread action is unavailable while MAIN_SPLITS_ENABLED is false (one condition, plus the import).",
       "budget": 4
     },
-    "plugins/workflows/src/app.tsx": {
-      "seam": "workbench-api",
-      "intent": "The workflow-run action tab is registered with experimental_openableByPlugins: true, so other plugins (Studio) open a run in a thread's side panel with experimental_workbench(...).open. One added line.",
-      "budget": 1
-    },
     "apps/app/src/hooks/useTheme.ts": {
       "seam": "app-backdrop",
       "intent": "An app backdrop's mode overrides this window's resolved light or dark: getPreferredTheme returns forkThemeModeOverride() (lib/fork-theme-mode.ts) before the preference or the system, and ensureThemeObserver subscribes emitTheme to subscribeForkThemeModeOverride, so .dark and usePreferredTheme follow it. The fork import sits at the top of the file.",
@@ -457,9 +462,9 @@
       "budget": 3
     },
     "packages/server-contract/src/api/threads.ts": {
-      "seam": "idle-thread",
-      "intent": "createThreadRequestSchema accepts empty input for origin \"plugin\" (an idle thread a plugin makes, started by its first message); every other origin still needs input for a root thread.",
-      "budget": 2
+      "seam": "idle-thread, thread-notices",
+      "intent": "createThreadRequestSchema accepts empty input for origin \"plugin\" (an idle thread a plugin makes, started by its first message); every other origin still needs input for a root thread. sendMessageRequestSchema extends the send fields with forkSendMessageFields (api/thread-notice.fork.ts, imported at the top of the file): experimental_notice { source, label }; the edit-message schema does not take it.",
+      "budget": 5
     },
     "apps/app/src/components/sidebar/SidebarNavigationModel.tsx": {
       "seam": "host-entries",
@@ -508,7 +513,7 @@
     },
     "apps/server/src/services/threads/thread-metadata-inference.ts": {
       "seam": "title-service",
-      "intent": "inferThreadMetadata calls noteTitleOutcome(deps, args, outcome) (title-retry.fork.ts, imported at the top of the file) right after the first title attempt, so a title that failed because no service was signed in, timed out or failed is tried again after the conversation's next finished turns (lifecycle-outcome.fork.ts runs it on run.succeeded, up to three times).",
+      "intent": "inferThreadMetadata calls noteTitleOutcome(deps, args, outcome) (title-retry.fork.ts, imported at the top of the file) right after the first title attempt, so a title that failed because no service was signed in, timed out or failed is tried again after the conversation's next finished turns (lifecycle-outcome.fork.ts runs it after a completed turn, up to three times).",
       "budget": 2
     },
     "plugins/provider-claude-code/server.ts": {
@@ -587,9 +592,9 @@
       "budget": 3
     },
     "plugins/provider-codex/src/bridge/bridge.ts": {
-      "seam": "sign-in-errors",
-      "intent": "handleChildNotification passes the translator's deltas through failFastOnAuthError (auth-fail-fast.fork.ts, imported right under the shebang): a reconnect whose error shows missing credentials, or the second 401 reconnect in a row, becomes the turn's final unauthorized error and the bridge interrupts that Codex turn (requestCodexTurnInterrupt), so a signed-out Codex fails at once instead of after its own reconnects, while a single 401 can still recover after a token refresh.",
-      "budget": 6
+      "seam": "sign-in-errors, codex-computer-use",
+      "intent": "handleChildNotification passes the translator's deltas through failFastOnAuthError (auth-fail-fast.fork.ts, imported right under the shebang): a reconnect whose error shows missing credentials, or the second 401 reconnect in a row, becomes the turn's final unauthorized error and the bridge interrupts that Codex turn (requestCodexTurnInterrupt), so a signed-out Codex fails at once instead of after its own reconnects, while a single 401 can still recover after a token refresh. decodeCodexOptions spreads forkCodexSessionOptions(options.providerOptions) (src/computer-use.fork.ts, imported under the shebang), which carries computerUseEnabled: false into the session options, and constructionSignature includes computerUseEnabled, so a change rebuilds the session on the next turn.",
+      "budget": 9
     },
     "apps/app/src/views/thread-detail/ThreadDetailPromptArea.tsx": {
       "seam": "host-copy, sign-in-errors",
@@ -646,6 +651,11 @@
       "intent": "APP_COMMAND_IDS lists \"panel.closeAll\" right after \"panel.close\".",
       "budget": 1
     },
+    "apps/server/src/services/system/cli-command.ts": {
+      "seam": "beside-bb",
+      "intent": "A `bb` link counts as this app's (installed, replaced or removed) only when it points at this app's own launcher (pointsAtOwnLauncher, cli-command.fork.ts, imported under the marker import). Stock bb writes the same launcher marker, so without the check BB Studio would replace or delete stock bb's `bb` link; with it, stock bb's link reads as the `bb` already on PATH.",
+      "budget": 7
+    },
     "apps/server/src/services/system/app-keybindings.ts": {
       "seam": "close-all",
       "intent": "The default keymap binds panel.closeAll to Mod+Alt+W (⌥⌘W on a Mac), desktop only, in the main surface without a modal, right after panel.close.",
@@ -655,6 +665,66 @@
       "seam": "close-all",
       "intent": "panel.closeAll has a label (\"Close all panel tabs\") and a description for the shortcuts settings and the palette, right after panel.close.",
       "budget": 1
+    },
+    "apps/server/src/routes/threads/actions.ts": {
+      "seam": "system-compaction",
+      "intent": "POST /threads/:id/compact passes the optional reason query (threadCompactQuerySchema) to compactThreadContext.",
+      "budget": 4
+    },
+    "packages/domain/src/system-message.ts": {
+      "seam": "system-compaction, thread-notices",
+      "intent": "systemMessageSubjectSchema has a { kind: \"compaction\", reason } member: the subject of a compaction bb ran on its own, which the thread view folds into one quiet row (relayedFold.fork.tsx). It also has a { kind: \"automation\", source, label } member: the subject of an automated input sent with experimental_notice, which the thread view draws as one quiet row (noticeFold.fork.ts).",
+      "budget": 2
+    },
+    "packages/server-contract/src/public-api.ts": {
+      "seam": "system-compaction",
+      "intent": "The compact route takes an optional query, threadCompactQuerySchema (api/thread-compact.fork.ts, imported at the top of the file): { reason? }.",
+      "budget": 3
+    },
+    "packages/sdk/src/areas/threads.ts": {
+      "seam": "system-compaction, thread-notices",
+      "intent": "threads.compact takes an optional reason and sends it as the compact route's reason query. sendJson forwards experimental_notice.",
+      "budget": 4
+    },
+    "apps/server/src/services/threads/turn-retry.ts": {
+      "seam": "system-compaction",
+      "intent": "dispatchRetry passes retrySystemCompactionNotice(db, { threadId, failed }) (system-compaction.fork.ts, imported at the top of the file) as the retry's systemNotice: a retried compaction bb ran on its own keeps its reason when it re-sends the same /compact; every other retry still has none.",
+      "budget": 3
+    },
+    "plugins/provider-codex/server.ts": {
+      "seam": "codex-computer-use",
+      "intent": "deriveProviderOptions spreads forkCodexProviderOptions(context) (src/computer-use.fork.ts, imported at the top): computerUseEnabled: false when the thread's provider-codex metadata has experimental_computerUse === false.",
+      "budget": 2
+    },
+    "plugins/provider-codex/src/session-params.ts": {
+      "seam": "codex-computer-use",
+      "intent": "CodexSessionOptions has computerUseEnabled, and buildCodexConfig calls applyForkCodexConfig(config, args.options) (src/computer-use.fork.ts, imported at the top) last: with computerUseEnabled false it turns off the unified-computer-use plugin and adds a disabled cua_repl entry, so Codex's Computer Use server does not start in that thread. Without it the config is unchanged.",
+      "budget": 3
+    },
+    "apps/cli/src/commands/thread/actions.ts": {
+      "seam": "thread-successor",
+      "intent": "`bb thread tell` sends through sendToLiveThread (commands/thread/tell-successor.fork.ts) and prints the thread it reached: an archived-thread 409 becomes an error that names the live successor or how to find one, and --follow-successor sends to the successor instead (JSON adds redirectedFrom).",
+      "budget": 18
+    },
+    "apps/server/src/services/threads/thread-send-request.ts": {
+      "seam": "thread-notices",
+      "intent": "acceptThreadSendRequest takes experimental_notice off the payload and dispatches the inline send with automationNotice(experimental_notice, thread) (automation-notice.fork.ts, imported at the top of the file) as its systemNotice: the turn is the system's with the subject { kind: \"automation\", source, label }. Without a notice the send is unchanged. A thread that hasn't started (pending, or no environment) gets no notice, so the message starts it as before.",
+      "budget": 5
+    },
+    "apps/server/src/services/threads/thread-queued-messages.ts": {
+      "seam": "thread-notices",
+      "intent": "toThreadQueuedMessage resolves a queued row's author with systemAuthored(its parsed systemNotice, senderThreadId) (automation-notice.fork.ts, imported at the top of the file), the same rule as at dispatch: an automated input from another thread stays that thread's.",
+      "budget": 3
+    },
+    "apps/server/src/services/threads/queued-messages.ts": {
+      "seam": "thread-notices",
+      "intent": "sendClaimedQueuedMessageForThread sends a queued row as the message it was (sendQueuedMessagePayload: its sender, model, permission mode, reasoning level and service tier) when sendsAsQueuedMessage(systemNotice) (automation-notice.fork.ts, imported at the top of the file): no notice, or an automated input's. Only core's own notices go as { input, mode }, as upstream.",
+      "budget": 3
+    },
+    "apps/host-daemon/src/command-handlers/file-read.ts": {
+      "seam": "host-read-root",
+      "intent": "Both readers catch resolveReadablePath with forkReadError(args), so a realpath that fails during a folder swap or on a file it may not read throws an error with no real path in it. readFileForTransport computes mimeType once, then takes stat and fileContents from forkReadWithinRoot(readablePath, args, getFileSizeLimitBytes(mimeType)) instead of fs.stat and fs.readFile; readFileChunkForTransport opens through forkOpenWithinRoot(readablePath, args, upstream's flags) (both in file-read.fork.ts, imported at the top of the file). With a root the open refuses a symlink anywhere in the path (macOS O_NOFOLLOW_ANY with no weaker fallback, Linux O_NOFOLLOW plus /proc/self/fd), re-checks device and inode as bigint, and reads at most the size limit from the handle. Without a root both readers behave as upstream (the full reader follows a symlinked file).",
+      "budget": 29
     }
   }
 }
