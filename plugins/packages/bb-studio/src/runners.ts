@@ -177,8 +177,13 @@ export class Runners {
   async preflight(input: { machine?: string | null; job: string; id?: string }, botId?: string) {
     const bot = this.bot(botId);
     const row = input.id ? this.row(input.id, botId) : null;
-    const thread = await this.deps.sdk.threads.get({ threadId: row?.thread_id ?? bot.threadId });
+    const thread = await this.threadOrSay(row?.thread_id ?? bot.threadId, row ? `"${row.name}"'s thread is gone. Delete the runner and make it again.` : `${bot.name}'s Main conversation is gone. Pick a Main in Bot settings (or start a new one), then make the runner.`);
     return runnerMachineCheck(this.deps.sdk, { ...input, providerId: thread.providerId ?? "" });
+  }
+
+  /** A thread BB has, or `gone` in plain words instead of BB's 404. */
+  private async threadOrSay(threadId: string, gone: string) {
+    return this.deps.sdk.threads.get({ threadId }).catch((error) => { if (rpcErrorStatus(error) === 404) throw new Error(gone); throw error; });
   }
 
   async machines() {
@@ -188,7 +193,7 @@ export class Runners {
   async installProvider(input: { id?: string; machine: string }, botId?: string) {
     const bot = this.bot(botId);
     const row = input.id ? this.row(input.id, botId) : null;
-    const thread = await this.deps.sdk.threads.get({ threadId: row?.thread_id ?? bot.threadId });
+    const thread = await this.threadOrSay(row?.thread_id ?? bot.threadId, row ? `"${row.name}"'s thread is gone. Delete the runner and make it again.` : `${bot.name}'s Main conversation is gone. Pick a Main in Bot settings (or start a new one).`);
     const host = await resolveRunnerMachine(this.deps.sdk, input.machine);
     if (!host || !thread.providerId) throw new Error("Choose a machine and provider first.");
     await this.deps.sdk.hosts.installProviderCli({ hostId: host.id, provider: thread.providerId, actionKind: "install" });

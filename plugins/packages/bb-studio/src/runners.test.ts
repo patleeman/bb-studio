@@ -793,3 +793,13 @@ it("FM: a runner whose machine was removed (not just offline) says so and what t
   expect(lines[0]).toContain("move \"Files\" to another machine");
   expect(lines[0]).not.toContain("until it reconnects");
 });
+
+it("FM (#9): making a runner when the Main is gone or has no model says so with the action", async () => {
+  const x = await setup();
+  x.threads.delete("bot1");
+  await expect(x.runners.create({ name: "Inbox", job: "Check mail.", schedule })).rejects.toThrow("Jarvis's Main conversation is gone. Pick a Main in Bot settings");
+  // No model, and its provider's catalog can't be read: nothing to fall back on.
+  x.add({ id: "bot1", title: "Jarvis", providerId: null as never });
+  await expect(x.runners.create({ name: "Inbox", job: "Check mail.", schedule })).rejects.toThrow("Jarvis's Main conversation has no model yet. Choose one in it");
+  expect(await x.runners.list()).toEqual([]);
+});
