@@ -9,7 +9,8 @@ export default async function personalWorkspacePlugin(
     contract: personalWorkspaceHostContract,
   });
 
-  bb.experimental_environments.register({
+  type Provider = Parameters<typeof bb.experimental_environments.register>[0];
+  const provider: Provider = {
     apiVersion: 2,
     id: PERSONAL_WORKSPACE_ENVIRONMENT_PROVIDER_ID,
     displayName: "Personal workspace",
@@ -38,6 +39,9 @@ export default async function personalWorkspacePlugin(
         };
       }
     },
+    async restore(context) {
+      return provider.create(context);
+    },
     async remove({ hostId, path, pathKey, signal }) {
       if (hostId === null) {
         return {
@@ -60,5 +64,6 @@ export default async function personalWorkspacePlugin(
         };
       }
     },
-  });
+  };
+  bb.experimental_environments.register(provider);
 }

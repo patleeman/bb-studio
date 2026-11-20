@@ -273,11 +273,98 @@ export function checkoutHere(
  * A thread brought over before BB Studio gave such threads a workspace:
  * attach this Mac's project folder now. Returns whether it changed.
  */
+const GIT_WORKTREE_PROVIDER_ID = "git-worktree";
+const RESTORED_BRANCH_SUFFIX = "-bb-studio";
+
+function parseSelection(
+  value: unknown,
+): { machine?: unknown; inputs?: unknown } | null {
+  if (typeof value !== "string") return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return typeof parsed === "object" && parsed !== null
+      ? (parsed as { machine?: unknown; inputs?: unknown })
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function restorableHere(
+  context: Pick<
+    ThreadImportContext,
+    "source" | "target" | "sourceHostId" | "ourHostId"
+  >,
+  row: Row,
+  projectId: string,
+): string | null {
+  const { target, ourHostId } = context;
+  if (ourHostId === null || row.host_id !== context.sourceHostId) return null;
+  if (typeof row.environment_provider_id !== "string") return null;
+  if (typeof row.environment_provider_plugin_id !== "string") return null;
+  const selection = parseSelection(row.environment_provider_selection);
+  if (selection === null) return null;
+  let branchName = row.branch_name ?? null;
+  let inputs = selection.inputs ?? null;
+  if (row.environment_provider_id === GIT_WORKTREE_PROVIDER_ID) {
+    if (typeof row.branch_name !== "string" || row.branch_name.length === 0) {
+      return null;
+    }
+    inputs = { branch: { kind: "named", name: row.branch_name } };
+    branchName = `${row.branch_name}${RESTORED_BRANCH_SUFFIX}`;
+  }
+  const id = String(row.id);
+  if (rowExists(target, "environments", id)) return id;
+  const columns = sharedColumns(context.source, target, "environments");
+  insertIfMissing(target, "environments", columns, [
+    {
+      ...row,
+      host_id: ourHostId,
+      project_id: projectId,
+      path: null,
+      status: "destroyed",
+      status_message: null,
+      branch_name: branchName,
+      environment_provider_selection: JSON.stringify({
+        machine: { type: "existing", hostId: ourHostId },
+        inputs,
+      }),
+      owner_thread_id: null,
+      retire_at: null,
+      teardown_status: "removed",
+      teardown_message: null,
+      teardown_attempt: 0,
+      resource: null,
+      claim_path: null,
+      pending_log: "",
+    },
+  ]);
+  return rowExists(target, "environments", id) ? id : null;
+}
+
+function sourceEnvironmentOf(
+  context: Pick<ThreadImportContext, "source">,
+  threadId: string,
+): Row | null {
+  const environmentId = context.source
+    .prepare<[string], { environment_id: string | null }>(
+      "SELECT environment_id FROM threads WHERE id = ?",
+    )
+    .get(threadId)?.environment_id;
+  if (typeof environmentId !== "string") return null;
+  return (
+    context.source
+      .prepare<[string], Row>("SELECT * FROM environments WHERE id = ?")
+      .get(environmentId) ?? null
+  );
+}
+
 export function attachWorkspaceToBroughtOverThread(
   context: Pick<
     ThreadImportContext,
     "target" | "ourHostId" | "sourceDataDir" | "dataDir"
-  >,
+  > &
+    Partial<Pick<ThreadImportContext, "source" | "sourceHostId">>,
   threadId: string,
 ): boolean {
   const { target } = context;
@@ -295,7 +382,25 @@ export function attachWorkspaceToBroughtOverThread(
     .get(threadId, BROUGHT_OVER_OPERATION);
   if (broughtOver === undefined) return false;
   return target.transaction(() => {
-    const environmentId = checkoutHere(context, thread.project_id);
+    let environmentId = checkoutHere(context, thread.project_id);
+    if (environmentId === null && context.source !== undefined) {
+      const previous = sourceEnvironmentOf(
+        { source: context.source },
+        threadId,
+      );
+      if (previous !== null && managedByBb(previous, context.sourceDataDir)) {
+        environmentId = restorableHere(
+          {
+            source: context.source,
+            target,
+            sourceHostId: context.sourceHostId ?? null,
+            ourHostId: context.ourHostId,
+          },
+          previous,
+          thread.project_id,
+        );
+      }
+    }
     if (environmentId === null) return false;
     const changed = target
       .prepare(
@@ -321,7 +426,10 @@ function ensureEnvironment(
     .get(environmentId);
   if (row === undefined) return null;
   if (managedByBb(row, context.sourceDataDir)) {
-    return checkoutHere(context, projectId);
+    return (
+      checkoutHere(context, projectId) ??
+      restorableHere(context, row, projectId)
+    );
   }
   let hostId = String(row.host_id);
   if (hostId === context.sourceHostId && context.ourHostId !== null) {
@@ -423,12 +531,13 @@ function workspaceOutcome(
   if (source !== undefined && !managedByBb(source, context.sourceDataDir)) {
     return { kind: "same" };
   }
-  const path = context.target
-    .prepare<[string], { path: string | null }>(
-      "SELECT path FROM environments WHERE id = ?",
+  const here = context.target
+    .prepare<[string], { path: string | null; status: string }>(
+      "SELECT path, status FROM environments WHERE id = ?",
     )
-    .get(environmentId)?.path;
-  return { kind: "project-folder", path: path ?? null };
+    .get(environmentId);
+  if (here?.status === "destroyed") return { kind: "restorable" };
+  return { kind: "project-folder", path: here?.path ?? null };
 }
 
 export const eventChunking = { threshold: 5_000, size: 2_000 };
