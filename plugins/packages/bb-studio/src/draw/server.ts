@@ -50,8 +50,8 @@ export const DRAWINGS_USAGE = [
   "  remove-elements <id> <element-id…>    Delete elements by id",
 ].join("\n");
 
-/** Available in every agent session. */
-export const DRAW_TOOLS = ["whiteboard_list", "whiteboard_get", "whiteboard_create", "whiteboard_update"];
+/** Available in every agent session (list/read/create go through pages_list, pages_read, pages_create). */
+export const DRAW_TOOLS = ["whiteboard_update"];
 
 export interface BuiltinDrawings {
   store: DrawingStore;
@@ -419,7 +419,7 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
 
   bb.agents.registerTool({
     name: "whiteboard_update",
-    description: "Upsert or delete Excalidraw elements on a whiteboard live (element-level merge; read with whiteboard_get first). Load the whiteboards skill for element shapes.",
+    description: "Upsert or delete Excalidraw elements on a whiteboard live (element-level merge; read with pages_read first). Load the whiteboards skill for element shapes.",
     parameters: z.object({ whiteboardId: z.string().min(1), ...editFields }),
     execute: ({ whiteboardId, ...rest }, ctx) => updateWhiteboard({ id: whiteboardId, ...rest }, ctx),
   });

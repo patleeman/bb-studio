@@ -119,9 +119,9 @@ export function botInstructions(bot: { name: string; state: BotState; role?: str
     const all = bot.skills ?? [];
     const listed = listedSkills(all);
     const skills = [
-      "Save a reusable procedure as a skill with bot_skill_write (bot_skill_patch fixes one); find one with skill_search. Search past threads with bot_history_search.",
+      "Manage skills with bot_skill_edit (write/patch/delete) and bot_skill_list (list/search). Search past threads with bot_history_search.",
       ...(all.length ? ["Your skills (load one with bot_skill_view before you follow it):", ...listed.map((skill) => `- ${skill.name}: ${skill.description}`)] : []),
-      ...(all.length > listed.length ? [`${all.length - listed.length} more: find them with skill_search.`] : []),
+      ...(all.length > listed.length ? [`${all.length - listed.length} more: search with bot_skill_list.`] : []),
     ].join("\n");
     // The Bot is the triage layer (docs/needs-you/REDO.md): reports, alerts and its threads' questions come
     // to it, and nothing else in Studio asks the user for attention.

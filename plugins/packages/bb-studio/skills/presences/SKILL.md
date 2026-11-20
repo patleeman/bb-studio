@@ -1,13 +1,13 @@
 ---
 name: presences
-description: Use when creating, updating, or customizing a Bot presence (living icon) with presence_create or presence_update — draw() canvas contract, four states, sandbox limits, validation checks, and a working template.
+description: Use when creating, updating, or customizing a Bot presence (living icon) with the presence tool — draw() canvas contract, four states, sandbox limits, validation checks, and a working template.
 ---
 
 # BB Studio Presences
 
-A presence is a Bot's living icon. Create one with `presence_create`, update or copy a stored one with `presence_update` (pass `newId` to copy), apply it with `presence_apply`, and inspect stored code with `presence_list` (`id: "<id>"`).
+A presence is a Bot's living icon. Use the `presence` tool with `op`: `"list"` (`id` prints stored package + code), `"create"` (`id`, `name`, `code`, `description?`), `"update"` (`id`, `name?`/`description?`/`code?`, `newId?` to copy), `"apply"` (`form?`, `bot?`, `color?`, `motion?`), or `"delete"` (`id`).
 
-`presence_create` and `presence_update` run every check in a sandbox in an open BB Studio window before saving; a failure saves nothing and lists each failed check.
+`op: "create"` and `op: "update"` run every check in a sandbox in an open BB Studio window before saving; a failure saves nothing and lists each failed check.
 
 ## Contract
 

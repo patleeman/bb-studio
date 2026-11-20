@@ -31,14 +31,25 @@ export function registerBotProfileTools(bb: Pick<BbPluginApi, "agents">, deps: B
   const { bots } = deps;
   bb.agents.registerTool({
     name: "bot_profile_update",
-    description: "Change your own profile: your name, description (role), emoji, or drawn avatar's shape and color. The user sees each change in your Info as \"Changed by\" you and can revert it. Pausing, stopping, your model, provider and permissions are the user's alone.",
+    description: "Update the Bot's profile: name, role, avatar emoji, or drawn avatar shape and color. From a Bot's own thread, edits are recorded in Info for the user to revert; from other threads, use only when the user asks. Pausing, stopping, model, provider and permissions are the user's alone.",
     parameters: profileUpdateParams,
     execute: async (input, ctx) => {
       const acting = await deps.acting(ctx.threadId);
-      if (acting?.via !== "own") return "Only a Bot's own thread can change its profile. To change the user's Bot on their behalf, use bot_set when they ask.";
-      const { view, changed } = await bots.selfEdit(acting.botId, input, { botId: acting.botId, threadId: ctx.threadId ?? null });
-      const bot = view.bot!;
-      return changed.length ? `Changed your ${changed.join(", ")}. You are now ${bot.avatar} ${bot.name}${bot.role ? `: ${bot.role}` : ""}. The user can revert it in your Info.` : "Nothing changed: those are already your values.";
+      if (acting?.via === "runner") return "A runner can't change its Bot's profile; tell the user instead (runner_report).";
+      if (acting?.via === "started") return "Only a Bot's own thread can change its profile.";
+      if (acting?.via === "own") {
+        const { view, changed } = await bots.selfEdit(acting.botId, input, { botId: acting.botId, threadId: ctx.threadId ?? null });
+        const bot = view.bot!;
+        return changed.length ? `Changed your ${changed.join(", ")}. You are now ${bot.avatar} ${bot.name}${bot.role ? `: ${bot.role}` : ""}. The user can revert it in your Info.` : "Nothing changed: those are already your values.";
+      }
+      const view = await bots.set({
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.avatar !== undefined ? { avatar: input.avatar } : {}),
+        ...(input.role !== undefined ? { role: input.role } : {}),
+        botId: undefined,
+      });
+      const bot = view.bot;
+      return bot ? `${bot.avatar} ${bot.name} (${bot.state})${bot.role ? `: ${bot.role}` : ""}.` : "No Bot configured.";
     },
   });
 }

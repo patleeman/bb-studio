@@ -49,8 +49,8 @@ export const SKILL_SOFT_LIMIT = 8000;
 /** BB's largest page of thread events. */
 const EVENT_PAGE = 100;
 /** The tools a review fork gets, and nothing else of Studio's. */
-export const REVIEW_TOOLS = ["bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_skill_lint", "pages_read", "memory_search", "memory_add", "memory_update"] as const;
-const SKILL_WRITE_TOOL = /bot_skill_(write|patch|delete)$/;
+export const REVIEW_TOOLS = ["bot_skill_list", "bot_skill_view", "bot_skill_edit", "bot_skill_lint", "pages_read", "memory_search", "memory_add", "memory_update"] as const;
+const SKILL_WRITE_TOOL = /bot_skill_(write|patch|delete|edit)$/;
 /** Items that aren't tool work. Everything else an agent does in a turn is. */
 const NOT_TOOLS = new Set(["agentMessage", "reasoning", "userMessage", "plan", "contextCompaction", "error"]);
 

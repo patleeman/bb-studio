@@ -22,7 +22,7 @@ import {
   type OpenSpec, type WorkbenchCommand, type WorkbenchLayout, type WorkbenchOp, type WorkbenchRecord,
 } from "./shared";
 
-export const WORKBENCH_TOOLS = ["workbench_list", "workbench_open", "workbench_close", "workbench_focus", "workbench_pop_out", "workbench_arrange"] as const;
+export const WORKBENCH_TOOLS = ["workbench_list", "workbench_open", "workbench_tab", "workbench_arrange"] as const;
 
 export type CallOutcome = { status: "off-screen" } | { status: "timeout" } | { status: "done"; message: string; record: WorkbenchRecord };
 
@@ -263,22 +263,11 @@ export function workbenchTools(deps: WorkbenchToolDeps) {
       },
     },
     {
-      name: "workbench_close",
-      description: "Close a workbench tab by key (from workbench_list).",
-      parameters: z.object({ key: tabKey, force }),
-      execute: async (input: { key: string; force?: boolean }, ctx: { threadId: string }) => run(ctx.threadId, { type: "close", key: input.key, force: input.force === true }),
-    },
-    {
-      name: "workbench_focus",
-      description: "Focus a workbench tab by key (from workbench_list).",
-      parameters: z.object({ key: tabKey, force }),
-      execute: async (input: { key: string; force?: boolean }, ctx: { threadId: string }) => run(ctx.threadId, { type: "focus", key: input.key, force: input.force === true }),
-    },
-    {
-      name: "workbench_pop_out",
-      description: "Pop a workbench tab out into its own window by key (from workbench_list).",
-      parameters: z.object({ key: tabKey, force }),
-      execute: async (input: { key: string; force?: boolean }, ctx: { threadId: string }) => run(ctx.threadId, { type: "popOut", key: input.key, force: input.force === true }),
+      name: "workbench_tab",
+      description: 'Act on a workbench tab by key (from workbench_list): action "close", "focus", or "pop_out" (into its own window).',
+      parameters: z.object({ action: z.enum(["close", "focus", "pop_out"]), key: tabKey, force }),
+      execute: async (input: { action: "close" | "focus" | "pop_out"; key: string; force?: boolean }, ctx: { threadId: string }) =>
+        run(ctx.threadId, { type: input.action === "pop_out" ? "popOut" : input.action, key: input.key, force: input.force === true }),
     },
     {
       name: "workbench_arrange",

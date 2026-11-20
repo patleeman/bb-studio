@@ -150,8 +150,8 @@ export interface AutomationDeps {
   runners: {
     list(botId: string): Promise<AutomationRunner[]>;
     get(id: string, botId: string): Promise<AutomationRunner>;
-    create(input: { name: string; job: string; schedule: { cadence: HeartbeatRun["cadence"]; time: string; cron?: string } }, botId: string): Promise<AutomationRunner>;
-    update(input: { id: string; name?: string; job?: string; schedule?: { cadence: HeartbeatRun["cadence"]; time: string; cron?: string } }, botId: string): Promise<AutomationRunner>;
+    create(input: { name: string; job: string; schedule: { cadence: HeartbeatRun["cadence"]; time: string; cron?: string }; machine?: string | null; confirm?: boolean }, botId: string): Promise<AutomationRunner>;
+    update(input: { id: string; name?: string; job?: string; schedule?: { cadence: HeartbeatRun["cadence"]; time: string; cron?: string }; machine?: string | null; confirm?: boolean }, botId: string): Promise<AutomationRunner>;
     setState(id: string, state: "active" | "paused", botId: string): Promise<AutomationRunner>;
     runNow(id: string, botId: string): Promise<AutomationRunner>;
     delete(id: string, botId: string): Promise<unknown>;
@@ -183,6 +183,9 @@ export type CreateInput = {
   script?: ScriptInput | null;
   /** A watcher's target: the Bot's thread ("main", the default) or a runner id. */
   target?: string | null;
+  /** A runner's machine (host id/name, or null for server) and preflight confirm. */
+  machine?: string | null;
+  confirm?: boolean;
 };
 export type UpdateInput = Partial<Omit<CreateInput, "kind">> & { id: string };
 
@@ -598,7 +601,11 @@ export class Automations {
     const name = input.name.trim();
     automationName(this.deps.db, bot.id, name);
     if (input.kind === "runner") {
-      const runner = await this.deps.runners.create({ name, job: (input.instruction ?? "").trim(), schedule: runnerSchedule(input.schedule) }, bot.id);
+      const runner = await this.deps.runners.create({
+        name, job: (input.instruction ?? "").trim(), schedule: runnerSchedule(input.schedule),
+        ...(input.machine !== undefined ? { machine: input.machine } : {}),
+        ...(input.confirm !== undefined ? { confirm: input.confirm } : {}),
+      }, bot.id);
       return this.one(runner.id, bot.id);
     }
     if (input.kind === "reminder" && input.schedule.type !== "once") throw new Error("A reminder is one time (at or in); make a check-in for a repeating one.");
@@ -673,7 +680,14 @@ export class Automations {
     if (runnerId) {
       const stored = this.deps.db.prepare("SELECT timezone FROM bot_runners WHERE id = ?").get(runnerId) as { timezone: string | null };
       const timezone = stored.timezone ?? (await this.deps.runners.get(runnerId, bot.id)).schedule.timezone ?? localZone();
-      await this.deps.runners.update({ id: runnerId, ...(input.name ? { name: input.name } : {}), ...(input.instruction ? { job: input.instruction } : {}), ...(input.schedule ? { schedule: runnerSchedule(input.schedule.type === "once" ? input.schedule : { ...input.schedule, timezone: input.schedule.timezone || timezone }, timezone) } : {}) }, bot.id);
+      await this.deps.runners.update({
+        id: runnerId,
+        ...(input.name ? { name: input.name } : {}),
+        ...(input.instruction ? { job: input.instruction } : {}),
+        ...(input.schedule ? { schedule: runnerSchedule(input.schedule.type === "once" ? input.schedule : { ...input.schedule, timezone: input.schedule.timezone || timezone }, timezone) } : {}),
+        ...(input.machine !== undefined ? { machine: input.machine } : {}),
+        ...(input.confirm !== undefined ? { confirm: input.confirm } : {}),
+      }, bot.id);
       return this.one(runnerId, bot.id);
     }
     const row = this.row(input.id, bot.id);

@@ -10,8 +10,9 @@ one self-contained HTML screen. The user sees them on a canvas, newest round
 at the top, with each option's id badge (`1a`, `1b`, `2a`) and caption. They
 refer to options by id in chat.
 
-Tools: `design_ask`, `design_create`, `design_read`, `design_write_screen`,
-`design_edit_screen`, `design_list`, `design_comments`,
+Tools: `pages_list` (`type: "design"`), `pages_create` (`type: "design"`),
+`pages_read` (with `dsn_…`, optional `screenIds`), `design_ask`,
+`design_write_screen`, `design_edit_screen`, `design_comments`,
 `design_resolve_comments`, `design_save_style`, `design_styles`.
 
 ## Saved styles
@@ -61,7 +62,7 @@ chat, not on the slides. For later changes, edit the one slide with
 ## Edits on the canvas
 
 The user can also type over a screen's text right on the canvas, which
-changes its HTML. Always read a screen with `design_read` before editing it,
+changes its HTML. Always read a screen with `pages_read` before editing it,
 and keep their wording.
 
 ## Comments

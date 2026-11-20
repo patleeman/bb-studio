@@ -1,13 +1,13 @@
 ---
 name: themes
-description: Use when creating, updating, or customizing a BB Studio theme with theme_create or theme_update — full JSON package format, GLSL ES 1.00 shader contract, uniforms, glass/contrast checks, and a working template.
+description: Use when creating, updating, or customizing a BB Studio theme with the theme tool — full JSON package format, GLSL ES 1.00 shader contract, uniforms, glass/contrast checks, and a working template.
 ---
 
 # BB Studio Themes
 
-Create a theme with `theme_create`, change a stored one with `theme_update` (pass `newId` to copy any theme, including built-ins), apply it to a Bot with `theme_apply`, and inspect existing packages with `theme_list` (`id: "<id>"` prints full JSON).
+Use the `theme` tool with `op`: `"list"` (`id` prints full JSON), `"create"` (`theme`), `"update"` (`id`, `theme`, optional `newId` to copy any theme including built-ins), `"apply"` (`themeId` or `null`, `bot?`, `intensity?`, `glass?`, `motion?`, `effects?`), or `"delete"` (`id`).
 
-`theme_create` and `theme_update` run every check before saving; a failure saves nothing and lists each failed check. The `id` must be new and not a built-in id.
+`op: "create"` and `op: "update"` run every check before saving; a failure saves nothing and lists each failed check. The `id` must be new and not a built-in id.
 
 ## Package format
 

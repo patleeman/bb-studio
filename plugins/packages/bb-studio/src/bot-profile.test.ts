@@ -59,9 +59,10 @@ it("bot_profile_update edits the calling Bot from its own thread only, and its s
   expect(await harness.callAgentTool("bot_profile_update", { name: "Scouty", avatar: "🛰️", shape: "star" }, { threadId: "thr_scout" })).toMatch(/^Changed your name, avatar, shape\. You are now 🛰️ Scouty/);
   expect(bots.stored("bot_scout")).toMatchObject({ name: "Scouty", avatar: "🛰️", shape: "star" });
   expect(bots.stored()?.name).toBe("Dot");
-  // A thread the Bot started, or no Bot's thread, can't.
+  // A thread the Bot started can't change its profile; a loose thread edits the primary Bot when the user asks.
   expect(await harness.callAgentTool("bot_profile_update", { name: "Worker" }, { threadId: "thr_child" })).toMatch(/^Only a Bot's own thread/);
-  expect(await harness.callAgentTool("bot_profile_update", { name: "Worker" }, { threadId: "thr_loose" })).toMatch(/^Only a Bot's own thread/);
+  expect(await harness.callAgentTool("bot_profile_update", { name: "Dotty" }, { threadId: "thr_loose" })).toContain("Dotty");
+  expect(bots.stored()?.name).toBe("Dotty");
   // The user's fields don't parse.
   await expect(harness.callAgentTool("bot_profile_update", { state: "paused" }, { threadId: "thr_scout" })).rejects.toThrow();
   await expect(harness.callAgentTool("bot_profile_update", { name: "X", model: "gpt" }, { threadId: "thr_scout" })).rejects.toThrow();

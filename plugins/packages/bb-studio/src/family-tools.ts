@@ -85,21 +85,37 @@ export function familyTool<T extends AgentTool>(tool: T, deps: FamilyToolDeps): 
   if (tool.name === "pages_read") {
     return {
       ...tool,
-      description: `${tool.description} Also reads designs (dsn_…) and whiteboards (drw_…).`,
-      execute: (async (input: { page?: unknown } & Record<string, unknown>, ctx: unknown) => {
+      description: `${tool.description} Also reads designs (dsn_…, optional screenIds) and whiteboards (drw_…).`,
+      parameters: (tool.parameters as z.ZodObject).extend({
+        screenIds: z.array(z.string().min(1)).max(12).optional().describe('Design screen ids, e.g. ["1a"]'),
+      }),
+      execute: (async (input: { page?: unknown; screenIds?: string[] } & Record<string, unknown>, ctx: unknown) => {
         const type = typeof input.page === "string" ? typeOfId(input.page.trim())?.type : undefined;
         if (type !== "design" && type !== "whiteboard") return own(input, ctx);
-        return viaType(type, "read", { [TYPE_TOOLS[type].idParam]: (input.page as string).trim() }, ctx);
+        return viaType(type, "read", {
+          [TYPE_TOOLS[type].idParam]: (input.page as string).trim(),
+          ...(type === "design" && input.screenIds ? { screenIds: input.screenIds } : {}),
+        }, ctx);
       }) as never,
     };
   }
   if (tool.name === "pages_create") {
     return {
       ...tool,
-      description: `${tool.description} Pass type "design" or "whiteboard" to create those instead.`,
-      parameters: (tool.parameters as z.ZodObject).extend({ type: z.enum(PAGE_TYPES).optional().describe('"doc" (default), "design" or "whiteboard"') }),
-      execute: (async ({ type, ...input }: { type?: (typeof PAGE_TYPES)[number]; title?: string } & Record<string, unknown>, ctx: unknown) =>
-        type && type !== "doc" ? viaType(type, "create", { name: input.title }, ctx) : own(input, ctx)) as never,
+      description: `${tool.description} Pass type "design" or "whiteboard" (optional pageId/afterBlockId to embed in an existing page) to create those instead.`,
+      parameters: (tool.parameters as z.ZodObject).extend({
+        type: z.enum(PAGE_TYPES).optional().describe('"doc" (default), "design" or "whiteboard"'),
+        pageId: z.string().min(1).optional().describe("Whiteboard: embed in this page instead of creating a new one"),
+        afterBlockId: z.string().min(1).optional().describe("Whiteboard: insert after this block id"),
+      }),
+      execute: (async ({ type, pageId, afterBlockId, ...input }: { type?: (typeof PAGE_TYPES)[number]; title?: string; pageId?: string; afterBlockId?: string } & Record<string, unknown>, ctx: unknown) =>
+        type && type !== "doc"
+          ? viaType(type, "create", {
+            name: input.title,
+            ...(type === "whiteboard" && pageId ? { pageId } : {}),
+            ...(type === "whiteboard" && afterBlockId ? { afterBlockId } : {}),
+          }, ctx)
+          : own(input, ctx)) as never,
     };
   }
   return tool;

@@ -133,11 +133,11 @@ describe("the presence service", () => {
 });
 
 describe("the presence tools", () => {
-  it("are presence_list, presence_create, presence_update, presence_apply and presence_delete", async () => {
+  it("register the unified presence tool and the presences skill carries the draw contract", async () => {
     const { tools } = setup();
     expect(tools.map((tool) => tool.name)).toEqual([...PRESENCE_TOOLS]);
-    const create = tools.find((tool) => tool.name === "presence_create")!;
-    expect(create.description).toContain("presences skill");
+    const presence = tools.find((tool) => tool.name === "presence")!;
+    expect(presence.description).toContain("presences skill");
     const { readFileSync } = await import("node:fs");
     const skill = readFileSync(new URL("../../skills/presences/SKILL.md", import.meta.url), "utf8");
     expect(skill).toContain("function draw(ctx, t, state, palette, size)");
@@ -146,30 +146,32 @@ describe("the presence tools", () => {
 
   it("create from a module, credit the Bot whose thread made it, then apply and delete", async () => {
     const { tool, service, bots } = setup();
-    const made = await tool("presence_create").execute({ id: "crane", name: "Crane", code: PRESENCE_TEMPLATE_CODE }, { threadId: "home-thread" });
-    expect(made).toContain("Saved crane (Crane). presence_apply puts it on a Bot.");
+    const run = tool("presence");
+    const made = await run.execute({ op: "create", id: "crane", name: "Crane", code: PRESENCE_TEMPLATE_CODE }, { threadId: "home-thread" });
+    expect(made).toContain('Saved crane (Crane). presence op "apply" puts it on a Bot.');
     expect(made).toContain("pass  runs");
     expect(service.entries().at(-1)).toMatchObject({ id: "crane", description: "", creator: { name: "Home", botId: "home" } });
-    expect(await tool("presence_list").execute({}, {})).toContain("crane\tCrane (stored) · made by Home");
-    expect(JSON.parse(await tool("presence_list").execute({ id: "crane" }, {}))).toMatchObject({ id: "crane", code: PRESENCE_TEMPLATE_CODE });
-    expect(await tool("presence_list").execute({ id: "orb" }, {})).toContain("orb\tOrb (builtin)");
-    expect(await tool("presence_apply").execute({ form: "crane", bot: "Home", color: "#00AAFF", motion: 1.5 }, {})).toBe("Home shows crane, color #00aaff, motion 1.5.");
+    expect(await run.execute({ op: "list" }, {})).toContain("crane\tCrane (stored) · made by Home");
+    expect(JSON.parse(await run.execute({ op: "list", id: "crane" }, {}))).toMatchObject({ id: "crane", code: PRESENCE_TEMPLATE_CODE });
+    expect(await run.execute({ op: "list", id: "orb" }, {})).toContain("orb\tOrb (builtin)");
+    expect(await run.execute({ op: "apply", form: "crane", bot: "Home", color: "#00AAFF", motion: 1.5 }, {})).toBe("Home shows crane, color #00aaff, motion 1.5.");
     expect(bots[1]!.presence).toEqual({ form: "crane", color: { source: "custom", hex: "#00aaff" }, motion: 1.5 });
-    expect(await tool("presence_apply").execute({ color: "theme" }, {})).toBe("Chief of Staff shows tesseract, color from theme, motion 1.");
-    expect(await tool("presence_apply").execute({ form: "orb", bot: "Nobody" }, {})).toBe("No Bot Nobody.");
-    expect(await tool("presence_delete").execute({ id: "crane" }, {})).toContain("in use by Home");
-    await tool("presence_apply").execute({ form: "orb", bot: "home" }, {});
-    expect(await tool("presence_delete").execute({ id: "crane" }, {})).toBe("Deleted crane.");
+    expect(await run.execute({ op: "apply", color: "theme" }, {})).toBe("Chief of Staff shows tesseract, color from theme, motion 1.");
+    expect(await run.execute({ op: "apply", form: "orb", bot: "Nobody" }, {})).toBe("No Bot Nobody.");
+    expect(await run.execute({ op: "delete", id: "crane" }, {})).toContain("in use by Home");
+    await run.execute({ op: "apply", form: "orb", bot: "home" }, {});
+    expect(await run.execute({ op: "delete", id: "crane" }, {})).toBe("Deleted crane.");
   });
 
   it("say why nothing was saved", async () => {
     const { tool, store } = setup();
-    const text = await tool("presence_create").execute({ id: "leak", name: "Leak", code: `function draw() { new WebSocket("wss://example.com"); parent.postMessage(1, "*"); }` }, {});
+    const run = tool("presence");
+    const text = await run.execute({ op: "create", id: "leak", name: "Leak", code: `function draw() { new WebSocket("wss://example.com"); parent.postMessage(1, "*"); }` }, {});
     expect(text).toContain("Not saved. Nothing changed.");
     expect(text).toContain("FAIL  network");
     expect(text).toContain("FAIL  isolation");
     expect(store.has("leak")).toBe(false);
-    expect(await tool("presence_update").execute({ id: "tesseract", name: "Cube" }, {})).toContain("built-in form");
+    expect(await run.execute({ op: "update", id: "tesseract", name: "Cube" }, {})).toContain("built-in form");
   });
 
   it("the picker's Create field asks the Bot to call presence_create", () => {

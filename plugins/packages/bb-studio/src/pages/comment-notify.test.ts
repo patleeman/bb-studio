@@ -101,7 +101,7 @@ describe("comments on a page an agent made", () => {
       expect(send.mock.calls[0]![0]).toMatchObject({ threadId: "thr_maker", mode: "queue-if-active" });
       expect(send.mock.calls[0]![0].input[0]!.text).toContain(`New thread ${threadId} on "Friday":\n> Can it be Monday?`);
 
-      await host.harness.behavior.callAgentTool("pages_comment_reply", { page: id, thread: threadId, text: "Done." }, { threadId: "thr_maker" });
+      await host.harness.behavior.callAgentTool("pages_comments", { op: "reply", page: id, thread: threadId, text: "Done." }, { threadId: "thr_maker" });
       await call("pages.commentResolve", { id, thread: threadId, resolved: true });
       await call("pages.commentResolve", { id, thread: threadId, resolved: false });
       await vi.advanceTimersByTimeAsync(1500);

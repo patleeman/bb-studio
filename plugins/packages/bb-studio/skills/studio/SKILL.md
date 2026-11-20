@@ -103,8 +103,9 @@ stuff".
   successor the lead.
 - The Bot is the user's always-on agent, with a name and emoji. `bot_get`
   shows it, `bot_activity` lists what needs the user, what's in progress,
-  what's scheduled and what finished. `bot_set` renames it; `bot_pause`,
-  `bot_resume` and `bot_stop` change its state, only when the user asks.
+  what's scheduled and what finished. `bot_profile_update` updates its name,
+  role, emoji, or avatar; `bot_state` (`action: "pause"|"resume"|"stop"`)
+  changes its state, only when the user asks.
   Pause and stop work only in the Bot's own chat; elsewhere they're refused
   and the user uses the Bots list in the sidebar.
   Paused or stopped, the Bot starts no new work. Its home is
@@ -120,8 +121,8 @@ stuff".
 
 ## Themes and presences
 
-- Custom themes (`theme_create`, `theme_update`, `theme_apply`, `theme_list`, `theme_delete`): load the `themes` skill first for the JSON package schema, GLSL ES 1.00 shader contract, checks and template.
-- Custom presences (`presence_create`, `presence_update`, `presence_apply`, `presence_list`, `presence_delete`): load the `presences` skill first for the `draw()` canvas contract, four states, limits, checks and template.
+- Custom themes (`theme` tool with `op: list|create|update|apply|delete`): load the `themes` skill first for the JSON package schema, GLSL ES 1.00 shader contract, checks and template.
+- Custom presences (`presence` tool with `op: list|create|update|apply|delete`): load the `presences` skill first for the `draw()` canvas contract, four states, limits, checks and template.
 
 ## Tasks and morning card
 
@@ -414,13 +415,11 @@ change nothing.
   `pane` is 1, 2 or `"new"` (a second pane on the right), or `"window"`
   for a window of its own, out of the workbench; `index` is its place in
   that pane's tab strip. `focus: false` opens it behind the selected tab.
-- `workbench_pop_out { key }` opens an open tab in a window of its own; the
-  window's Return to workbench puts it back. Pages, whiteboards, designs,
-  apps, conversations, other plugin tabs and files pop out; terminals,
-  browser tabs, Info, Diff, New Tab and fixed tabs don't. Use a window only
-  when the user asks for one.
-- `workbench_close { key }` and `workbench_focus { key }` take keys from
-  `workbench_list`; keys change when a tab is reopened.
+- `workbench_tab { action: "close"|"focus"|"pop_out", key, force? }` acts on an
+  open tab by key from `workbench_list` (keys change when reopened). `pop_out`
+  opens the tab in a window of its own (only when the user asks; pages,
+  whiteboards, designs, apps, conversations, other plugin tabs and files pop
+  out; terminals, browser tabs, Info, Diff, New Tab and fixed tabs don't).
 - `workbench_arrange { layout?, widthPercent?, panes?, paneWidths? }`:
   `side by side`, `panel only` or `conversation only`; the panel's width, 20
   to 80 percent; one or two panes; their widths as a ratio, such as `[2, 1]`.
@@ -436,7 +435,7 @@ override that.
 
 ### Runner machines
 
-`runner_create` and `runner_update` accept `machine`: a host id or unique host
+`automation_create` (with `kind: "runner"`) and `automation_update` accept `machine`: a host id or unique host
 name, resolved and stored as a host id. Omit it (or use null) for the server.
 `runner_migrate({ id, machine, confirm? })` moves an existing runner; null moves
 it back to the server. Wait until its current run ends. The runner id, Bot,
@@ -501,8 +500,9 @@ characters (longer ones show as code). Use ```html only for something to
 render; show HTML source as code with ```html source (or another language
 such as ```xml).
 
-Answer comments with pages_comment_reply in the same thread; start new
-threads with `pages_comment` on the text you are discussing. When the user
+Manage comments with `pages_comments` (`op: "list"|"create"|"reply"|"resolve"`):
+answer in the same thread with `op: "reply"`, start new threads with
+`op: "create"`, and resolve with `op: "resolve"`. When the user
 comments on a page you made, you get a message with the thread id, the
 commented text and the comment: answer in that thread, make the change if it
 asks for one, then resolve it.

@@ -56,8 +56,8 @@ export const DESIGNS_USAGE = [
   "  delete <id>                Delete a design",
 ].join("\n");
 
-/** Available in every agent session. */
-export const DESIGN_TOOLS = ["design_save_style", "design_styles", "design_list", "design_create", "design_rename", "design_read", "design_ask", "design_ready", "design_write_screen", "design_edit_screen", "design_comments", "design_resolve_comments"];
+/** Available in every agent session (list/read/create go through pages_list, pages_read, pages_create). */
+export const DESIGN_TOOLS = ["design_save_style", "design_styles", "design_rename", "design_ask", "design_ready", "design_write_screen", "design_edit_screen", "design_comments", "design_resolve_comments"];
 
 export interface BuiltinDesigns {
   store: DesignStore;
@@ -373,6 +373,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
   bb.agents.registerTool({
     name: "design_write_screen",
     description: 'Create or replace one self-contained HTML screen ("1a", "2b"). For slide decks use viewport "slide" with steps; for multi-step prototypes declare `<meta name="bb-design-steps">` (see design skill).',
+    instructions: 'For UI design work (prototypes, screens, flows) and for slides and slide decks, create with pages_create (type "design"), use the design_* tools, and follow the design skill.',
     presentation: { label: { pending: "Writing a screen", completed: "Wrote a screen" } },
     parameters: z.object({
       designId: z.string().min(1),

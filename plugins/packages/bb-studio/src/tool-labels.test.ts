@@ -10,7 +10,7 @@ it("gives every Studio tool a plain label for its row in the chat, never its too
   await plugin(host.bb);
   const registered = (host.harness.registrations as unknown as { agentTools: Map<string, Registered> | Registered[] }).agentTools;
   const tools = [...(registered instanceof Map ? registered.values() : registered)];
-  expect(tools.length).toBeGreaterThan(100);
+  expect(tools.length).toBeGreaterThan(70);
   const unlabeled = tools.filter((tool) => !tool.presentation?.label).map((tool) => tool.name);
   expect(unlabeled).toEqual([]);
   for (const tool of tools) {
@@ -24,7 +24,7 @@ it("gives every Studio tool a plain label for its row in the chat, never its too
   const label = (name: string) => tools.find((tool) => tool.name === name)!.presentation!.label;
   expect(label("conversation_continue_new")).toEqual({ pending: "Continuing in a new conversation", completed: "Continued in a new conversation" });
   expect(label("bot_profile_update")).toEqual({ pending: "Updating the Bot's profile", completed: "Updated the Bot's profile" });
-  expect(label("design_create")).toEqual({ pending: "Creating a design", completed: "Created a design" });
+  expect(label("design_rename")).toEqual({ pending: "Renaming a design", completed: "Renamed a design" });
   await host.harness.lifecycle.dispose();
 });
 
