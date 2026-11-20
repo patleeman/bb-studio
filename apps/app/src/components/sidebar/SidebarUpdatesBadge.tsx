@@ -367,11 +367,11 @@ function SidebarBbUpdateSection({
   onRestart: () => void;
 }) {
   return (
-    <section aria-label="bb update">
+    <section aria-label="BB Studio update">
       <div className="flex items-center gap-1.5 max-md:pointer-coarse:gap-2">
         <BbLogo className={UPDATE_CARD_ICON_CLASS} />
         <span className="text-sm font-medium max-md:pointer-coarse:text-base">
-          {bb.version === null ? "bb update" : `bb ${bb.version}`}
+          {bb.version === null ? "BB Studio update" : `BB Studio ${bb.version}`}
         </span>
         {bb.currentVersion === null || bb.version === null ? null : (
           <span className="truncate font-mono text-muted-foreground">
@@ -392,7 +392,7 @@ function SidebarBbUpdateSection({
             ? "Restarting into the update…"
             : bb.installsWhenIdle
               ? "Installs itself when you're idle"
-              : "Installs when bb restarts"}
+              : "Installs when BB Studio restarts"}
         </span>
         {bb.restartLabel === null || bb.restarting ? null : (
           <button
