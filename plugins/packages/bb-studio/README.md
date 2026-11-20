@@ -4351,6 +4351,10 @@ Old draft keys and quote storage are retained.
 
 ![Studio item chat: a staged image on the left, and in a split beside it a new-thread composer quoting a cropped area of it, with a note and an attached file](assets/chat-preview.png)
 
+## Model router
+
+Auto in the model pickers, plain-language rules with fallback chains that Jev picks between, and a usage-limit notice with **Hand off**. Settings → Plugins → Studio → Model router. See the [model router guide](../../docs/router.md).
+
 ## Decisions in Studio
 
 See the [Decisions guide](../../docs/decisions.md) for provider setup and the plugin RPC.

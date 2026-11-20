@@ -37,6 +37,7 @@ import { quietByDefault, repliesAllowed } from "./src/push-levels";
 import { MainPushes } from "./src/main-push";
 import { registerDecisions } from "./src/decisions/server";
 import { registerToolGateway, type ToolGateway } from "./src/tool-gateway/server/register";
+import { registerRouter } from "./src/router/register";
 import { BotMaintenance } from "./src/bot-maintenance";
 import { registerChat } from "./src/chat/server";
 import { ARTIFACT_TOOLS, registerArtifacts } from "./src/artifacts/server";
@@ -324,6 +325,8 @@ export default async function plugin(bb: BbPluginApi) {
   // the runner guard (assigned below, once runners exist) first.
   let runnerDispatch: (context: { thread: { id: string } }) => Promise<{ action: "reject"; message: string } | null> = async () => null;
   const decisions = await registerDecisions(bb, settings, (context) => runnerDispatch(context));
+  // The model router (src/router): Auto in the pickers, rules picked by Jev, the usage-limit notice.
+  await registerRouter(bb, { systemOne: decisions.ask.systemOne });
   let settingValues: Record<string, unknown> = await settings.get();
   appCards = settingValues.appCards === true;
   const explore = registerExploreBuiltin(bb, db, settingValues);

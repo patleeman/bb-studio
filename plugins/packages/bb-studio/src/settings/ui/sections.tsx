@@ -28,6 +28,7 @@ import { ToolGatewaySection } from "../../tool-gateway/ui/ToolGatewaySection";
 import { DeskPresenceOverlay } from "./DeskPresenceOverlay";
 import { PushSection } from "./PushSection";
 import { SkillsRegistrySection } from "./SkillsRegistrySection";
+import { RouterSettingsSection } from "../../router/ui/RouterSettings";
 import { useStudioSettings } from "./use-settings";
 import { takeVoiceSectionRequest, VOICE_SECTION_ANCHOR } from "./voice-anchor";
 import { hasHostWindows, useHostWindows } from "../../kit/app/windows";
@@ -225,7 +226,7 @@ function AdvancedSection() {
 const SECTIONS = { voice: VoiceSection, recordings: RecordingsSection, replies: RepliesSection, threads: ThreadsSection, windows: WindowsSection, jev: JevSection, advanced: AdvancedSection };
 
 /**
- * Studio's settings sections, in order; then Skill registry, Phone notifications, API keys, Tool Gateway and Bring things over from bb.
+ * Studio's settings sections, in order; then Model router, Skill registry, Phone notifications, API keys, Tool Gateway and Bring things over from bb.
  * Windows shows only on a BB that can open plugin windows.
  */
 export function registerSettingsApp(app: PluginAppBuilder, windows: boolean = hasHostWindows): void {
@@ -233,6 +234,7 @@ export function registerSettingsApp(app: PluginAppBuilder, windows: boolean = ha
     if (group.id === "windows" && !windows) continue;
     app.slots.settingsSection({ id: `settings-${group.id}`, title: group.title, component: SECTIONS[group.id] });
   }
+  app.slots.settingsSection({ id: "model-router", title: "Model router", component: RouterSettingsSection });
   app.slots.settingsSection({ id: "skills-registry", title: "Skill registry", component: SkillsRegistrySection });
   app.slots.settingsSection({ id: "mobile-push", title: "Phone notifications", component: PushSection });
   // "At the desk" heartbeat for the Mobile plugin's "Hold phone notifications while I'm at my Mac".

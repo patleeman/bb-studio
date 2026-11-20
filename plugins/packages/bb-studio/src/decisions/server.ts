@@ -20,7 +20,7 @@ import {
   type ModelTarget,
   type Situation,
 } from "./server/classifier";
-import { defaultFallback, fallbackSchema, type Fallback } from "./contract";
+import { defaultFallback, fallbackSchema, type Fallback, type ModelSelection, type Questions } from "./contract";
 import { jevRoutes } from "./server/jev-providers";
 import { askSystemOne } from "./server/system-one";
 import { RouteFailed, SmartQueue, describeVerdict, rowText, type DecisionRecord, type ThreadInfo } from "./server/queue";
@@ -188,22 +188,27 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
       return { ok: false as const, unavailable, error: message };
     }
   }
+  type SystemOneInput = { caller: string; state: unknown; questions: Questions };
+  type ModelInput = { caller: string; requestId: string; hostId: string; prompt: string; providerId: string | null; modelSelection?: ModelSelection };
+  /** The two public asks, also for Studio's own callers in this process (the model router), with the caller's deadline. */
+  const askJevFor = ({ caller, state, questions }: SystemOneInput, signal?: AbortSignal) =>
+    answer(caller, "Jev", async () => {
+      return tracked(askSystemOne(await config(), { state, questions }, AbortSignal.any([lifetime.signal, AbortSignal.timeout(60_000), ...(signal ? [signal] : [])])));
+    });
+  const askModelFor = ({ caller, requestId, hostId, prompt, providerId, modelSelection }: ModelInput, signal?: AbortSignal) =>
+    answer(caller, "Fallback model", async () => {
+      return runModel(
+        bb,
+        modelSelection ? { mode: "model", ...modelSelection } : await fallback(),
+        { projectId: await personalProjectId(bb), hostId, requestId: `${caller} ${requestId}`, defaultProviderId: providerId },
+        prompt,
+        AbortSignal.any([lifetime.signal, AbortSignal.timeout(60_000), ...(signal ? [signal] : [])]),
+        sessions,
+      );
+    });
   bb.rpc.register(decisionMethods, {
-    "decisions.systemOne.ask": ({ caller, state, questions }) =>
-      answer(caller, "Jev", async () => {
-        return tracked(askSystemOne(await config(), { state, questions }, AbortSignal.any([lifetime.signal, AbortSignal.timeout(60_000)])));
-      }),
-    "decisions.model.ask": ({ caller, requestId, hostId, prompt, providerId, modelSelection }) =>
-      answer(caller, "Fallback model", async () => {
-        return runModel(
-          bb,
-          modelSelection ? { mode: "model", ...modelSelection } : await fallback(),
-          { projectId: await personalProjectId(bb), hostId, requestId: `${caller} ${requestId}`, defaultProviderId: providerId },
-          prompt,
-          AbortSignal.any([lifetime.signal, AbortSignal.timeout(60_000)]),
-          sessions,
-        );
-      }),
+    "decisions.systemOne.ask": (input) => askJevFor(input),
+    "decisions.model.ask": (input) => askModelFor(input),
     "decisions.fallback.get": () => fallback(),
     "decisions.fallback.set": (value) => setFallback(value),
     "decisions.fallback.suggest": () => suggestFallback(),
@@ -545,5 +550,5 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
       return { exitCode: 1, stderr: usage };
   };
   bb.rpc.register({ "decisions.cli": rpcContract["decisions.cli"] }, { "decisions.cli": ({ argv }) => cli(argv) });
-  return { cli };
+  return { cli, ask: { systemOne: askJevFor, model: askModelFor } };
 }
