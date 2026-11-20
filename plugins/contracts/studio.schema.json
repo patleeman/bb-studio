@@ -8714,6 +8714,15 @@
                 "inBb": {
                   "type": "boolean"
                 },
+                "mainProblem": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "mainNeedsModel": {
+                  "type": "boolean"
+                },
                 "createdAt": {
                   "type": "number"
                 },
@@ -9003,6 +9012,15 @@
                     ]
                   },
                   "inBb": {
+                    "type": "boolean"
+                  },
+                  "mainProblem": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "mainNeedsModel": {
                     "type": "boolean"
                   },
                   "createdAt": {
@@ -9412,6 +9430,15 @@
                     ]
                   },
                   "inBb": {
+                    "type": "boolean"
+                  },
+                  "mainProblem": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "mainNeedsModel": {
                     "type": "boolean"
                   },
                   "createdAt": {
@@ -9943,6 +9970,15 @@
                     ]
                   },
                   "inBb": {
+                    "type": "boolean"
+                  },
+                  "mainProblem": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "mainNeedsModel": {
                     "type": "boolean"
                   },
                   "createdAt": {
@@ -10592,6 +10628,15 @@
                   "inBb": {
                     "type": "boolean"
                   },
+                  "mainProblem": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "mainNeedsModel": {
+                    "type": "boolean"
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -10970,6 +11015,15 @@
                     ]
                   },
                   "inBb": {
+                    "type": "boolean"
+                  },
+                  "mainProblem": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "mainNeedsModel": {
                     "type": "boolean"
                   },
                   "createdAt": {
@@ -11424,6 +11478,15 @@
                   "inBb": {
                     "type": "boolean"
                   },
+                  "mainProblem": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "mainNeedsModel": {
+                    "type": "boolean"
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -11766,6 +11829,15 @@
                     ]
                   },
                   "inBb": {
+                    "type": "boolean"
+                  },
+                  "mainProblem": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "mainNeedsModel": {
                     "type": "boolean"
                   },
                   "createdAt": {
@@ -12140,6 +12212,15 @@
                   "inBb": {
                     "type": "boolean"
                   },
+                  "mainProblem": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "mainNeedsModel": {
+                    "type": "boolean"
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -12481,6 +12562,15 @@
                   "inBb": {
                     "type": "boolean"
                   },
+                  "mainProblem": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "mainNeedsModel": {
+                    "type": "boolean"
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -12820,6 +12910,15 @@
                     ]
                   },
                   "inBb": {
+                    "type": "boolean"
+                  },
+                  "mainProblem": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "mainNeedsModel": {
                     "type": "boolean"
                   },
                   "createdAt": {
@@ -13170,6 +13269,15 @@
                   "inBb": {
                     "type": "boolean"
                   },
+                  "mainProblem": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "mainNeedsModel": {
+                    "type": "boolean"
+                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -13509,6 +13617,15 @@
                     ]
                   },
                   "inBb": {
+                    "type": "boolean"
+                  },
+                  "mainProblem": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "mainNeedsModel": {
                     "type": "boolean"
                   },
                   "createdAt": {
@@ -16221,6 +16338,15 @@
                     ]
                   },
                   "inBb": {
+                    "type": "boolean"
+                  },
+                  "mainProblem": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "mainNeedsModel": {
                     "type": "boolean"
                   },
                   "createdAt": {

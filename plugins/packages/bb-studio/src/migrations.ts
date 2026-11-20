@@ -1155,4 +1155,9 @@ export const MIGRATIONS = [
    CREATE INDEX tool_gateway_requests_state ON tool_gateway_requests (state, created_at);
    CREATE TABLE tool_gateway_log (seq INTEGER PRIMARY KEY AUTOINCREMENT, server_id TEXT NOT NULL, at INTEGER NOT NULL, kind TEXT NOT NULL, text TEXT NOT NULL);
    CREATE INDEX tool_gateway_log_server ON tool_gateway_log (server_id, seq);`,
+  // The model a Bot's Main last ran on (src/bot.ts), saved whenever Studio reads it, so a new
+  // Main can start on it after the old one is deleted and can't be read any more.
+  `ALTER TABLE bots ADD COLUMN main_provider_id TEXT;
+   ALTER TABLE bots ADD COLUMN main_model TEXT;
+   ALTER TABLE bots ADD COLUMN main_reasoning TEXT;`,
 ];

@@ -86,10 +86,15 @@ export class ProjectLeads {
     return thread && thread.deletedAt == null ? thread : null;
   }
 
-  /** The project's lead; forgets a lead thread that was deleted and turns its heartbeat off. Transport errors keep it. */
+  /**
+   * The project's lead; forgets a lead thread that was deleted and turns its
+   * heartbeat off. Transport errors keep it. Not the personal project's: its
+   * lead is the primary Bot's Main, which Studio replaces with a new Main
+   * that takes the heartbeat (Bots.replaceMain), so neither is dropped here.
+   */
   private async read(projectId: string): Promise<ProjectLeadView> {
     let leadThreadId = this.storedLead(projectId);
-    if (leadThreadId && !(await this.thread(leadThreadId))) {
+    if (leadThreadId && projectId !== PERSONAL_PROJECT_ID && !(await this.thread(leadThreadId))) {
       this.saveLead(projectId, null);
       leadThreadId = null;
       const run = this.runs.get(projectId);

@@ -1166,7 +1166,7 @@ export default async function plugin(bb: BbPluginApi) {
   const restoreMainFailed = (error: unknown) => bb.log.warn(`Couldn't start a new Main: ${errorText(error)}`);
   const mainGone = ({ thread }: { thread: { id: string } }) => {
     const bot = bots.list().find((each) => each.threadId === thread.id);
-    if (bot) void bots.restoreMain(bot.id, thread.id).catch(restoreMainFailed);
+    if (bot) void bots.heal(bot.id, thread.id, (message) => bb.log.warn(message)).catch(restoreMainFailed);
   };
   bb.events.on("thread.deleted", mainGone);
   bb.events.on("thread.archived", mainGone);

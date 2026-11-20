@@ -8471,10 +8471,12 @@ public enum Studio {
     public var presence: BotListOutputBotsItemPresence?
     public var defaultModel: BotListOutputBotsItemDefaultModel?
     public var inBb: Bool?
+    public var mainProblem: String?
+    public var mainNeedsModel: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotListOutputBotsItemState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotListOutputBotsItemKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotListOutputBotsItemAppearance? = nil, presence: BotListOutputBotsItemPresence? = nil, defaultModel: BotListOutputBotsItemDefaultModel? = nil, inBb: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotListOutputBotsItemState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotListOutputBotsItemKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotListOutputBotsItemAppearance? = nil, presence: BotListOutputBotsItemPresence? = nil, defaultModel: BotListOutputBotsItemDefaultModel? = nil, inBb: Bool? = nil, mainProblem: String? = nil, mainNeedsModel: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -8493,6 +8495,8 @@ public enum Studio {
       self.presence = presence
       self.defaultModel = defaultModel
       self.inBb = inBb
+      self.mainProblem = mainProblem
+      self.mainNeedsModel = mainNeedsModel
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -8682,10 +8686,12 @@ public enum Studio {
     public var presence: BotGetOutputBotPresence?
     public var defaultModel: BotGetOutputBotDefaultModel?
     public var inBb: Bool?
+    public var mainProblem: String?
+    public var mainNeedsModel: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotGetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotGetOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotGetOutputBotAppearance? = nil, presence: BotGetOutputBotPresence? = nil, defaultModel: BotGetOutputBotDefaultModel? = nil, inBb: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotGetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotGetOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotGetOutputBotAppearance? = nil, presence: BotGetOutputBotPresence? = nil, defaultModel: BotGetOutputBotDefaultModel? = nil, inBb: Bool? = nil, mainProblem: String? = nil, mainNeedsModel: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -8704,6 +8710,8 @@ public enum Studio {
       self.presence = presence
       self.defaultModel = defaultModel
       self.inBb = inBb
+      self.mainProblem = mainProblem
+      self.mainNeedsModel = mainNeedsModel
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -9055,10 +9063,12 @@ public enum Studio {
     public var presence: BotCreateOutputBotPresence?
     public var defaultModel: BotCreateOutputBotDefaultModel?
     public var inBb: Bool?
+    public var mainProblem: String?
+    public var mainNeedsModel: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCreateOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotCreateOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotCreateOutputBotAppearance? = nil, presence: BotCreateOutputBotPresence? = nil, defaultModel: BotCreateOutputBotDefaultModel? = nil, inBb: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCreateOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotCreateOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotCreateOutputBotAppearance? = nil, presence: BotCreateOutputBotPresence? = nil, defaultModel: BotCreateOutputBotDefaultModel? = nil, inBb: Bool? = nil, mainProblem: String? = nil, mainNeedsModel: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -9077,6 +9087,8 @@ public enum Studio {
       self.presence = presence
       self.defaultModel = defaultModel
       self.inBb = inBb
+      self.mainProblem = mainProblem
+      self.mainNeedsModel = mainNeedsModel
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -9579,10 +9591,12 @@ public enum Studio {
     public var presence: BotSetDefaultModelOutputBotPresence?
     public var defaultModel: BotSetDefaultModelOutputBotDefaultModel?
     public var inBb: Bool?
+    public var mainProblem: String?
+    public var mainNeedsModel: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetDefaultModelOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetDefaultModelOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotSetDefaultModelOutputBotAppearance? = nil, presence: BotSetDefaultModelOutputBotPresence? = nil, defaultModel: BotSetDefaultModelOutputBotDefaultModel? = nil, inBb: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetDefaultModelOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetDefaultModelOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotSetDefaultModelOutputBotAppearance? = nil, presence: BotSetDefaultModelOutputBotPresence? = nil, defaultModel: BotSetDefaultModelOutputBotDefaultModel? = nil, inBb: Bool? = nil, mainProblem: String? = nil, mainNeedsModel: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -9601,6 +9615,8 @@ public enum Studio {
       self.presence = presence
       self.defaultModel = defaultModel
       self.inBb = inBb
+      self.mainProblem = mainProblem
+      self.mainNeedsModel = mainNeedsModel
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -10162,10 +10178,12 @@ public enum Studio {
     public var presence: BotSetAppearanceOutputBotPresence?
     public var defaultModel: BotSetAppearanceOutputBotDefaultModel?
     public var inBb: Bool?
+    public var mainProblem: String?
+    public var mainNeedsModel: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetAppearanceOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetAppearanceOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotSetAppearanceOutputBotAppearance? = nil, presence: BotSetAppearanceOutputBotPresence? = nil, defaultModel: BotSetAppearanceOutputBotDefaultModel? = nil, inBb: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetAppearanceOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetAppearanceOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotSetAppearanceOutputBotAppearance? = nil, presence: BotSetAppearanceOutputBotPresence? = nil, defaultModel: BotSetAppearanceOutputBotDefaultModel? = nil, inBb: Bool? = nil, mainProblem: String? = nil, mainNeedsModel: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -10184,6 +10202,8 @@ public enum Studio {
       self.presence = presence
       self.defaultModel = defaultModel
       self.inBb = inBb
+      self.mainProblem = mainProblem
+      self.mainNeedsModel = mainNeedsModel
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -10492,10 +10512,12 @@ public enum Studio {
     public var presence: BotSetOutputBotPresence?
     public var defaultModel: BotSetOutputBotDefaultModel?
     public var inBb: Bool?
+    public var mainProblem: String?
+    public var mainNeedsModel: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotSetOutputBotAppearance? = nil, presence: BotSetOutputBotPresence? = nil, defaultModel: BotSetOutputBotDefaultModel? = nil, inBb: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotSetOutputBotAppearance? = nil, presence: BotSetOutputBotPresence? = nil, defaultModel: BotSetOutputBotDefaultModel? = nil, inBb: Bool? = nil, mainProblem: String? = nil, mainNeedsModel: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -10514,6 +10536,8 @@ public enum Studio {
       self.presence = presence
       self.defaultModel = defaultModel
       self.inBb = inBb
+      self.mainProblem = mainProblem
+      self.mainNeedsModel = mainNeedsModel
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -10847,10 +10871,12 @@ public enum Studio {
     public var presence: BotProfileRevertOutputBotPresence?
     public var defaultModel: BotProfileRevertOutputBotDefaultModel?
     public var inBb: Bool?
+    public var mainProblem: String?
+    public var mainNeedsModel: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotProfileRevertOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotProfileRevertOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotProfileRevertOutputBotAppearance? = nil, presence: BotProfileRevertOutputBotPresence? = nil, defaultModel: BotProfileRevertOutputBotDefaultModel? = nil, inBb: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotProfileRevertOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotProfileRevertOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotProfileRevertOutputBotAppearance? = nil, presence: BotProfileRevertOutputBotPresence? = nil, defaultModel: BotProfileRevertOutputBotDefaultModel? = nil, inBb: Bool? = nil, mainProblem: String? = nil, mainNeedsModel: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -10869,6 +10895,8 @@ public enum Studio {
       self.presence = presence
       self.defaultModel = defaultModel
       self.inBb = inBb
+      self.mainProblem = mainProblem
+      self.mainNeedsModel = mainNeedsModel
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -11122,10 +11150,12 @@ public enum Studio {
     public var presence: BotSetThreadOutputBotPresence?
     public var defaultModel: BotSetThreadOutputBotDefaultModel?
     public var inBb: Bool?
+    public var mainProblem: String?
+    public var mainNeedsModel: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetThreadOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetThreadOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotSetThreadOutputBotAppearance? = nil, presence: BotSetThreadOutputBotPresence? = nil, defaultModel: BotSetThreadOutputBotDefaultModel? = nil, inBb: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetThreadOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetThreadOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotSetThreadOutputBotAppearance? = nil, presence: BotSetThreadOutputBotPresence? = nil, defaultModel: BotSetThreadOutputBotDefaultModel? = nil, inBb: Bool? = nil, mainProblem: String? = nil, mainNeedsModel: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -11144,6 +11174,8 @@ public enum Studio {
       self.presence = presence
       self.defaultModel = defaultModel
       self.inBb = inBb
+      self.mainProblem = mainProblem
+      self.mainNeedsModel = mainNeedsModel
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -11453,10 +11485,12 @@ public enum Studio {
     public var presence: BotSetRunOutputBotPresence?
     public var defaultModel: BotSetRunOutputBotDefaultModel?
     public var inBb: Bool?
+    public var mainProblem: String?
+    public var mainNeedsModel: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetRunOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetRunOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotSetRunOutputBotAppearance? = nil, presence: BotSetRunOutputBotPresence? = nil, defaultModel: BotSetRunOutputBotDefaultModel? = nil, inBb: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotSetRunOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotSetRunOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotSetRunOutputBotAppearance? = nil, presence: BotSetRunOutputBotPresence? = nil, defaultModel: BotSetRunOutputBotDefaultModel? = nil, inBb: Bool? = nil, mainProblem: String? = nil, mainNeedsModel: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -11475,6 +11509,8 @@ public enum Studio {
       self.presence = presence
       self.defaultModel = defaultModel
       self.inBb = inBb
+      self.mainProblem = mainProblem
+      self.mainNeedsModel = mainNeedsModel
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -11728,10 +11764,12 @@ public enum Studio {
     public var presence: BotPauseOutputBotPresence?
     public var defaultModel: BotPauseOutputBotDefaultModel?
     public var inBb: Bool?
+    public var mainProblem: String?
+    public var mainNeedsModel: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotPauseOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotPauseOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotPauseOutputBotAppearance? = nil, presence: BotPauseOutputBotPresence? = nil, defaultModel: BotPauseOutputBotDefaultModel? = nil, inBb: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotPauseOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotPauseOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotPauseOutputBotAppearance? = nil, presence: BotPauseOutputBotPresence? = nil, defaultModel: BotPauseOutputBotDefaultModel? = nil, inBb: Bool? = nil, mainProblem: String? = nil, mainNeedsModel: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -11750,6 +11788,8 @@ public enum Studio {
       self.presence = presence
       self.defaultModel = defaultModel
       self.inBb = inBb
+      self.mainProblem = mainProblem
+      self.mainNeedsModel = mainNeedsModel
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -12003,10 +12043,12 @@ public enum Studio {
     public var presence: BotResumeOutputBotPresence?
     public var defaultModel: BotResumeOutputBotDefaultModel?
     public var inBb: Bool?
+    public var mainProblem: String?
+    public var mainNeedsModel: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotResumeOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotResumeOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotResumeOutputBotAppearance? = nil, presence: BotResumeOutputBotPresence? = nil, defaultModel: BotResumeOutputBotDefaultModel? = nil, inBb: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotResumeOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotResumeOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotResumeOutputBotAppearance? = nil, presence: BotResumeOutputBotPresence? = nil, defaultModel: BotResumeOutputBotDefaultModel? = nil, inBb: Bool? = nil, mainProblem: String? = nil, mainNeedsModel: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -12025,6 +12067,8 @@ public enum Studio {
       self.presence = presence
       self.defaultModel = defaultModel
       self.inBb = inBb
+      self.mainProblem = mainProblem
+      self.mainNeedsModel = mainNeedsModel
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -12280,10 +12324,12 @@ public enum Studio {
     public var presence: BotMakeMainOutputBotPresence?
     public var defaultModel: BotMakeMainOutputBotDefaultModel?
     public var inBb: Bool?
+    public var mainProblem: String?
+    public var mainNeedsModel: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotMakeMainOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotMakeMainOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotMakeMainOutputBotAppearance? = nil, presence: BotMakeMainOutputBotPresence? = nil, defaultModel: BotMakeMainOutputBotDefaultModel? = nil, inBb: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotMakeMainOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotMakeMainOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotMakeMainOutputBotAppearance? = nil, presence: BotMakeMainOutputBotPresence? = nil, defaultModel: BotMakeMainOutputBotDefaultModel? = nil, inBb: Bool? = nil, mainProblem: String? = nil, mainNeedsModel: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -12302,6 +12348,8 @@ public enum Studio {
       self.presence = presence
       self.defaultModel = defaultModel
       self.inBb = inBb
+      self.mainProblem = mainProblem
+      self.mainNeedsModel = mainNeedsModel
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -12555,10 +12603,12 @@ public enum Studio {
     public var presence: BotStopOutputBotPresence?
     public var defaultModel: BotStopOutputBotDefaultModel?
     public var inBb: Bool?
+    public var mainProblem: String?
+    public var mainNeedsModel: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotStopOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotStopOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotStopOutputBotAppearance? = nil, presence: BotStopOutputBotPresence? = nil, defaultModel: BotStopOutputBotDefaultModel? = nil, inBb: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotStopOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotStopOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotStopOutputBotAppearance? = nil, presence: BotStopOutputBotPresence? = nil, defaultModel: BotStopOutputBotDefaultModel? = nil, inBb: Bool? = nil, mainProblem: String? = nil, mainNeedsModel: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -12577,6 +12627,8 @@ public enum Studio {
       self.presence = presence
       self.defaultModel = defaultModel
       self.inBb = inBb
+      self.mainProblem = mainProblem
+      self.mainNeedsModel = mainNeedsModel
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }
@@ -14275,10 +14327,12 @@ public enum Studio {
     public var presence: BotCheckinPresetOutputBotPresence?
     public var defaultModel: BotCheckinPresetOutputBotDefaultModel?
     public var inBb: Bool?
+    public var mainProblem: String?
+    public var mainNeedsModel: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCheckinPresetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotCheckinPresetOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotCheckinPresetOutputBotAppearance? = nil, presence: BotCheckinPresetOutputBotPresence? = nil, defaultModel: BotCheckinPresetOutputBotDefaultModel? = nil, inBb: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotCheckinPresetOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotCheckinPresetOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotCheckinPresetOutputBotAppearance? = nil, presence: BotCheckinPresetOutputBotPresence? = nil, defaultModel: BotCheckinPresetOutputBotDefaultModel? = nil, inBb: Bool? = nil, mainProblem: String? = nil, mainNeedsModel: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -14297,6 +14351,8 @@ public enum Studio {
       self.presence = presence
       self.defaultModel = defaultModel
       self.inBb = inBb
+      self.mainProblem = mainProblem
+      self.mainNeedsModel = mainNeedsModel
       self.createdAt = createdAt
       self.updatedAt = updatedAt
     }

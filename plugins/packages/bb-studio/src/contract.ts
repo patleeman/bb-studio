@@ -168,6 +168,10 @@ const bot = z.object({
   defaultModel: threadModel.nullable().optional(),
   /** On a BB Studio copy: imported from bb and not running here (the import stops every Bot so nothing runs twice). Shown "Paused · in bb". */
   inBb: z.boolean().optional(),
+  /** Its Main is gone and a new one couldn't start: why, in plain words (the sidebar header's line). */
+  mainProblem: z.string().nullable().optional(),
+  /** That problem is a missing model: the header offers Choose a model (its Default model). */
+  mainNeedsModel: z.boolean().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });

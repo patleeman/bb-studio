@@ -50,11 +50,15 @@ export function spaceLine(bot: { state: string; inBb?: boolean } | null | undefi
   return running ? `${running} running` : null;
 }
 
-function SpaceLine({ line, resume, onResume }: { line: string | null; resume: string | null; onResume?: () => void }) {
+function SpaceLine({ line, resume, onResume, onChooseModel }: { line: string | null; resume: string | null; onResume?: () => void; onChooseModel?: () => void }) {
   if (!line) return null;
   return (
     <span data-testid="bot-sidebar-status" className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
       <span data-testid="bot-sidebar-line" className="truncate" title={line}>{line}</span>
+      {onChooseModel ? <>
+        <span aria-hidden>·</span>
+        <button type="button" data-testid="bot-sidebar-choose-model" onClick={onChooseModel} className="shrink-0 rounded-sm text-foreground underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">Choose a model</button>
+      </> : null}
       {resume && onResume ? <>
         <span aria-hidden>·</span>
         <button type="button" data-testid="bot-sidebar-resume" onClick={onResume} className="shrink-0 rounded-sm text-foreground underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">{resume}</button>
@@ -75,7 +79,9 @@ export interface SpaceMenu {
   newBot(): void;
 }
 
-export function SpaceHeader({ bot, line, resume = null, glass, page, todos, onPage, menu }: {
+export function SpaceHeader({ bot, line, resume = null, chooseModel = false, glass, page, todos, onPage, menu }: {
+  /** Its new Main can't start for want of a model: Choose a model after the line opens its Default model. */
+  chooseModel?: boolean;
   bot: BotSpace | null;
   line: string | null;
   /** The Bot's resume word (resumeWord) while it is paused or stopped: a button after the line and the menu's first item. */
@@ -103,7 +109,7 @@ export function SpaceHeader({ bot, line, resume = null, glass, page, todos, onPa
         {bot ? <BotPresence bot={bot} size={36} /> : <span className="size-9" />}
         <div className="flex min-w-0 flex-1 flex-col">
           <h2 data-testid="bot-sidebar-name" className="truncate text-[15px] font-semibold leading-tight text-foreground">{bot?.name ?? ""}</h2>
-          <SpaceLine line={line} resume={resume} onResume={menu.resume} />
+          <SpaceLine line={line} resume={resume} onResume={menu.resume} {...(chooseModel && bot ? { onChooseModel: menu.defaultModel } : {})} />
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

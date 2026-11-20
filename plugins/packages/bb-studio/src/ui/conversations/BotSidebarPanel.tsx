@@ -395,7 +395,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
     <nav aria-label={bot ? bot.name : "Bot"} data-testid="bot-sidebar" ref={navRef} onWheel={onWheel} className={glass ? GLASS_NAV : "studio-root relative flex min-h-full shrink-0 flex-col px-1.5"}>
       <NoDragStyle />
       <div data-testid="bot-sidebar-rows" {...(glass ? { "data-fork-overlay-scroll": "" } : {})} className={glass ? GLASS_ROWS : "contents"} style={glass ? { maskImage: ROWS_FADE, WebkitMaskImage: ROWS_FADE } : undefined}>
-      <SpaceHeader bot={bot} line={welcome.data?.pending && welcome.data.problem ? welcome.data.problem : spaceLine(botRow, running)} resume={resumeWord(botRow)} glass={glass} page={page} todos={todos} onPage={openPage}
+      <SpaceHeader bot={bot} line={welcome.data?.pending && welcome.data.problem ? welcome.data.problem : botRow?.mainProblem ?? spaceLine(botRow, running)} resume={resumeWord(botRow)} chooseModel={!!botRow?.mainNeedsModel} glass={glass} page={page} todos={todos} onPage={openPage}
         menu={{
           resume: () => {
             if (!bot) return;
