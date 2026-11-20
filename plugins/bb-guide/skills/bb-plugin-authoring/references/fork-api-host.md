@@ -100,6 +100,36 @@ string | null | Promise<string | null>)`. bb calls it each time a turn
 
 Names: `ExperimentalTurnContextProvider`.
 
+## Auto: pick the model when a thread is created
+
+- Backend: `bb.experimental_hooks.experimental_autoRouter({ resolve, label?,
+enabled?, isDefault? })`. While `enabled()` is true, the model pickers list an
+  Auto provider (id `auto`, one model `auto`). A thread created with it, one
+  naming no provider and no model while `isDefault()` is true (workers too;
+  never a fork), or a root thread in a project whose saved default is Auto,
+  is created on what `resolve({ projectId, text, parentThreadId,
+  originPluginId, permissionMode, signal })` returns: `{ providerId, model,
+  reasoningLevel?, serviceTier? }`. The project then remembers Auto. The
+  thread never runs as Auto. bb waits at most 8 seconds and then aborts
+  `signal`; null, a throw, a late answer or an Auto target leaves the thread
+  on bb's usual defaults. Return only enabled providers that support a
+  permission mode at or below `permissionMode`. One router per bb. Check
+  `experimental_features?.autoRouter` first.
+
+Names: `ExperimentalAutoRouter`, `ExperimentalAutoRouteRequest`,
+`ExperimentalAutoRouteTarget`.
+
+## One-line model call
+
+- Backend: `await bb.experimental_hooks.experimental_completeText({ prompt,
+timeoutMs?, signal? })` answers with the AI service the user picked for
+  thread titles: one call, no tools, no thread. The reply is one cleaned
+  line. `{ ok: false, reason }` when the title task is off, no service is
+  ready, or it fails or times out (8 s at most). Check
+  `experimental_features?.textCompletion` first.
+
+Names: `ExperimentalTextCompletionRequest`, `ExperimentalTextCompletionResult`.
+
 ## Where a fork came from
 
 - A fork's `ThreadResponse` (in `thread.created`, `bb.sdk.threads.get` and
