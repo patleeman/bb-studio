@@ -1507,3 +1507,93 @@ it("FM: the default model can't be set to a signed-out provider or a model its p
   await expect(bots.setDefaultModel({ botId: BOT_ID, providerId: "codex", model: "retired-model" })).rejects.toThrow("doesn't offer retired-model any more");
   await expect(bots.setDefaultModel({ botId: BOT_ID, providerId: "codex", model: "codex-default" })).resolves.toMatchObject({ bot: { defaultModel: { providerId: "codex", model: "codex-default" } } });
 });
+
+it("FM (review F1): Resume with check-ins on and the Main gone goes through; check-ins come back with the new Main", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  await x.bots.setRun({ botId: scout.id, enabled: true, cadence: "daily", time: "07:30" });
+  await x.bots.pause(scout.id);
+  x.threads.delete(scout.threadId!);
+  x.spawn.mockRejectedValueOnce(new Error("Provider codex is busy"));
+  // Before: "The Bot's Main conversation is gone… then turn check-ins on", and the Bot stayed paused.
+  await expect(x.bots.resume(scout.id)).resolves.toMatchObject({ bot: { state: "active" } });
+  // The heal right after Resume makes the new Main, and the check-in is on there.
+  await vi.waitFor(() => expect(x.bots.stored(scout.id)?.threadId).not.toBe(scout.threadId));
+  const made = x.bots.stored(scout.id)!.threadId!;
+  await vi.waitFor(() => expect(x.leads.runs.get(`bot:${scout.id}`)?.enabled).toBe(true));
+  x.send.mockClear();
+  await x.scheduler.runNow({ owner: "heartbeat", ownerId: `bot:${scout.id}` });
+  expect(x.send.mock.lastCall?.[0].threadId).toBe(made);
+});
+
+it("FM (review F1): turning check-ins off forgets a heartbeat waiting for a new Main", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  await x.bots.setRun({ botId: scout.id, enabled: true, cadence: "daily", time: "07:30" });
+  await x.bots.pause(scout.id);
+  await x.bots.setRun({ botId: scout.id, enabled: false, cadence: "daily", time: "07:30" });
+  expect((x.db.prepare("SELECT heartbeat_was_on FROM bots WHERE id = ?").get(scout.id) as { heartbeat_was_on: number }).heartbeat_was_on).toBe(0);
+});
+
+it("FM (review F2): a Bot brought over from bb whose Main was deleted there gets a new Main on Resume (Run here)", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  await x.bots.setRun({ botId: scout.id, enabled: true, cadence: "daily", time: "07:30" });
+  await x.bots.stop(scout.id);
+  // Brought over: stopped, made before the import, its Main deleted in bb (left out of the bring-over).
+  const copy = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, importedAt: () => Date.now() + 1 });
+  x.threads.delete(scout.threadId!);
+  expect(copy.stored(scout.id)?.inBb).toBe(true);
+  // Before: Resume failed, Start a new Main was refused ("runs in bb"), and there was no way out.
+  await expect(copy.resume(scout.id)).resolves.toMatchObject({ bot: { state: "active", inBb: false } });
+  const made = copy.stored(scout.id)!.threadId!;
+  expect(made).not.toBe(scout.threadId);
+  expect(x.threads.has(made)).toBe(true);
+  expect(x.leads.runs.get(`bot:${scout.id}`)?.enabled).toBe(true);
+});
+
+it("FM (review F3): picking or starting a Main clears the sidebar's \"can't start a new Main\" line at once", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  x.threads.delete("t1");
+  x.spawn.mockRejectedValueOnce(new Error("Provider codex is busy"));
+  expect(await x.bots.heal(BOT_ID, "t1")).toBeNull();
+  expect((await x.bots.get()).bot?.mainProblem).toBe("Couldn't start a new Main yet; trying again");
+  // Before: the line stayed until the heal's next try (up to an hour).
+  await x.bots.newMain(BOT_ID);
+  expect((await x.bots.get()).bot?.mainProblem).toBeNull();
+});
+
+it("FM (review F4): Start a new Main on a paused Bot doesn't wake it: no first message", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  await x.bots.pause();
+  await x.bots.newMain(BOT_ID);
+  expect(x.spawn.mock.lastCall?.[0]).toMatchObject({ input: [] });
+});
+
+it("FM (review F6): the automatic new Main skips a signed-out provider; with none signed in, the sidebar says to sign in or choose a model", async () => {
+  const x = await setup();
+  const states = [{ providerId: "codex", status: "signed-out", loginCommand: "codex login" }, { providerId: "claude", status: "ready", loginCommand: "claude login" }];
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, providerStates: async () => states as never });
+  await bots.create({ name: "Dot", avatar: "🟣" });
+  x.threads.delete("t1");
+  // The old Main ran on codex, now signed out: claude, which is signed in.
+  const warn = vi.fn();
+  const first = await bots.heal(BOT_ID, "t1", warn);
+  expect(warn.mock.calls).toEqual([]);
+  expect(first).toBeTruthy();
+  expect(x.spawn.mock.lastCall?.[0]).toMatchObject({ providerId: "claude" });
+  // Nothing signed in: no spawn, and plain words with the action.
+  const main = x.leads.storedLead(PERSONAL_PROJECT_ID)!;
+  x.threads.delete(main);
+  states[1]!.status = "signed-out";
+  const before = x.spawn.mock.calls.length;
+  expect(await bots.heal(BOT_ID, main)).toBeNull();
+  expect(x.spawn.mock.calls.length).toBe(before);
+  // The Main last ran on Claude, so that is the one to sign in to.
+  expect((await bots.get()).bot).toMatchObject({ mainProblem: "Sign in to Claude or choose a model", mainNeedsModel: true });
+});

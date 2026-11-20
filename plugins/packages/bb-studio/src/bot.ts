@@ -412,6 +412,14 @@ export class NoMainModel extends Error {
   }
 }
 
+/** The new Main's provider is signed out, and no other provider is signed in: the sidebar says to sign in or choose a model. */
+export class MainProviderSignedOut extends NoMainModel {
+  constructor(name: string, readonly providerName: string) {
+    super(name);
+    this.message = `${providerName} is signed out, so ${name}'s new Main can't start. Sign in to ${providerName} or choose a model.`;
+  }
+}
+
 /** How often the heal looks for a Bot whose Main is gone, and the longest it waits while a new Main keeps failing. */
 export const MAIN_HEAL_MS = 5 * 60_000;
 export const MAIN_HEAL_MAX_MS = 60 * 60_000;
@@ -836,7 +844,7 @@ export class Bots {
   }
 
   /** Per Bot, while its new Main keeps failing: failures in a row, when to try next, and the last error said. */
-  private readonly healBackoff = new Map<string, { failures: number; nextAt: number; error: string; needsModel: boolean }>();
+  private readonly healBackoff = new Map<string, { failures: number; nextAt: number; error: string; needsModel: boolean; signedOut?: string }>();
 
   /**
    * The heal (startup and every 5 minutes): each Bot whose Main is gone gets
@@ -872,7 +880,7 @@ export class Bots {
       const delay = mainHealDelay(failures);
       const text = String((error as Error)?.message ?? error).slice(0, 300);
       if (text !== backoff?.error) warn?.(`Couldn't start a new Main for ${row.name}: ${text} Trying again in ${Math.round(delay / 60_000)} min.`);
-      this.healBackoff.set(row.id, { failures, nextAt: now + delay, error: text, needsModel: error instanceof NoMainModel });
+      this.healBackoff.set(row.id, { failures, nextAt: now + delay, error: text, needsModel: error instanceof NoMainModel, ...(error instanceof MainProviderSignedOut ? { signedOut: error.providerName } : {}) });
       this.deps.changed();
       return null;
     }
@@ -882,6 +890,7 @@ export class Bots {
   private mainProblem(botId: string): { mainProblem: string | null; mainNeedsModel: boolean } {
     const backoff = this.healBackoff.get(botId);
     if (!backoff) return { mainProblem: null, mainNeedsModel: false };
+    if (backoff.signedOut) return { mainProblem: `Sign in to ${backoff.signedOut} or choose a model`, mainNeedsModel: true };
     return backoff.needsModel
       ? { mainProblem: "No model for a new Main", mainNeedsModel: true }
       : { mainProblem: "Couldn't start a new Main yet; trying again", mainNeedsModel: false };
@@ -936,7 +945,8 @@ export class Bots {
    */
   private async replaceMain(botId: string, goneThreadId?: string, resuming = false): Promise<string | null> {
     const row = this.row(botId);
-    if (!row || this.inBb(row)) return null;
+    // A Bot brought over from bb gets its new Main when it is resumed here (Resume is "Run here"), not before.
+    if (!row || (this.inBb(row) && !resuming)) return null;
     // A paused or stopped Bot gets its new Main when it is resumed, not while it is put away.
     if (row.state !== "active" && !resuming) return null;
     const current = this.view(row).threadId;
@@ -949,7 +959,13 @@ export class Bots {
     if (!gone) return null;
     const picked = await this.mainModel(row, lost);
     if (!picked) throw new NoMainModel(row.name);
-    const model = { providerId: picked.providerId, model: picked.model, ...(picked.reasoning ? { reasoningLevel: picked.reasoning } : {}), executionInputSources: { providerId: "explicit", model: "explicit", ...(picked.reasoning ? { reasoningLevel: "explicit" } : {}) } };
+    let model: Record<string, unknown> = { providerId: picked.providerId, model: picked.model, ...(picked.reasoning ? { reasoningLevel: picked.reasoning } : {}), executionInputSources: { providerId: "explicit", model: "explicit", ...(picked.reasoning ? { reasoningLevel: "explicit" } : {}) } };
+    // Its provider signed out since: a signed-in one instead, or the sidebar says to sign in or choose a model.
+    if (botKind(picked.providerId) === "studio" && !await this.providerReady(picked.providerId)) {
+      const other = await this.signedInModel();
+      if (!("providerId" in other)) throw new MainProviderSignedOut(row.name, providerName(picked.providerId));
+      model = other;
+    }
     const input = [{ type: "text", text: newMainNote(row.name, gone), mentions: [], visibility: "agent-only" }];
     const thread = await this.deps.sdk.threads.spawn({ projectId: PERSONAL_PROJECT_ID, title: row.name, environment: { type: "project-default" }, pluginMetadata: { bot: row.id }, ...model, input } as never);
     try {
@@ -971,8 +987,19 @@ export class Bots {
       if (run?.enabled) await this.deps.leads.runs.set(this.runKey(row), threadId, run);
       this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(threadId, Date.now(), row.id);
     }
+    // Check-ins Resume couldn't bring back while the Main was gone come back with the new Main.
+    const fresh = this.row(row.id);
+    if (fresh?.state === "active" && fresh.heartbeat_was_on) {
+      const run = this.deps.leads.runs.get(this.runKey(fresh));
+      if (run) {
+        await this.writeRun(fresh, { ...run, enabled: true }).catch(() => {});
+        this.deps.db.prepare("UPDATE bots SET heartbeat_was_on = 0 WHERE id = ?").run(row.id);
+      }
+    }
     await this.deps.automations?.follow(row.id).catch(() => {});
     this.reviveSchedules(row);
+    // A Main is there now (picked, started or healed): the sidebar's "can't start a new Main" line goes at once.
+    this.healBackoff.delete(row.id);
     try { this.deps.mainMoved?.(row.id, threadId, previous); } catch { /* The records catch up at the next reconcile. */ }
     await this.claimChains();
     this.deps.changed();
@@ -1053,7 +1080,8 @@ export class Bots {
         ? { providerId: preset.providerId, model: preset.model, ...(preset.reasoning ? { reasoningLevel: preset.reasoning } : {}), executionInputSources: { providerId: "explicit", model: "explicit", ...(preset.reasoning ? { reasoningLevel: "explicit" } : {}) } }
         : await this.signedInModel().then((picked) => "providerId" in picked ? picked : row.provider_id ? { providerId: row.provider_id } : picked);
     if (!("providerId" in model)) throw new Error(SIGN_IN_FOR_MAIN);
-    const input = [{ type: "text", text: `You are ${row.name} and this is your new Main conversation; the user started it from Bot settings. Check-ins, runners and automations report here now. Read your memory for context and don't redo finished work. Reply with one short line that you're here.`, mentions: [], visibility: "agent-only" }];
+    // A paused or stopped Bot isn't woken: its new Main starts with no first message, and it says hello when resumed.
+    const input = row.state !== "active" ? [] : [{ type: "text", text: `You are ${row.name} and this is your new Main conversation; the user started it from Bot settings. Check-ins, runners and automations report here now. Read your memory for context and don't redo finished work. Reply with one short line that you're here.`, mentions: [], visibility: "agent-only" }];
     let thread: { id: string };
     try {
       thread = await this.deps.sdk.threads.spawn({ projectId: PERSONAL_PROJECT_ID, title: row.name, environment: { type: "project-default" }, pluginMetadata: { bot: row.id }, ...model, input } as never);
@@ -1228,6 +1256,8 @@ export class Bots {
     const { botId, ...run } = input;
     const row = this.row(botId);
     if (botId && !row) throw new Error(`No Bot "${botId}".`);
+    // Off is off: a heartbeat waiting to come back with a new Main (Resume) doesn't.
+    if (!run.enabled && row?.heartbeat_was_on) this.deps.db.prepare("UPDATE bots SET heartbeat_was_on = 0 WHERE id = ?").run(row.id);
     if (run.enabled && row && row.state !== "active") throw new Error(`${row.name} is ${row.state}. Resume it before turning its check-ins on.`);
     // Check-ins need a Main to wake: with none, say so with the action, not store them off and report success.
     if (run.enabled && row && !this.view(row).threadId) throw new Error(`${row.name} has no Main conversation, so check-ins have nowhere to run. Pick one in Bot settings (or start a new one), then turn check-ins on.`);
@@ -1315,11 +1345,20 @@ export class Bots {
       // If that fails the Bot still resumes: the heal keeps trying, and Bot settings can pick a Main.
       if (await this.restoreMain(row.id, undefined, true).catch(() => null)) row = this.need(row.id);
       // The heartbeat comes back first: if that fails the Bot stays paused and remembers it, so Resume can be retried.
+      // With the Main still gone (a new one couldn't start yet), it waits for the new Main (pointMain), and Resume goes through.
       const run = this.deps.leads.runs.get(this.runKey(row));
-      if (row.heartbeat_was_on && run && this.view(row).threadId) await this.writeRun(row, { ...run, enabled: true });
+      const main = this.view(row).threadId;
+      const mainThere = !!main && !await this.mainGone(main);
+      let waiting = false;
+      if (row.heartbeat_was_on && run) {
+        if (mainThere) await this.writeRun(row, { ...run, enabled: true });
+        else waiting = true;
+      }
       // Then what Stop paused; one that fails stays recorded and the Bot stays as it was.
       await this.restorePaused(row.id);
-      this.update(this.need(row.id), { state: "active", heartbeat_was_on: 0 });
+      this.update(this.need(row.id), { state: "active", heartbeat_was_on: waiting ? 1 : 0 });
+      // The heal makes the new Main now that the Bot is active (it backs off while that keeps failing).
+      if (waiting || !mainThere) void this.heal(row.id).catch(() => null);
     }
     return this.get(row.id);
   }
