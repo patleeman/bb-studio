@@ -211,6 +211,11 @@
       "intent": "One fork import (withoutForkUiTokenHash, fork-ui-token-env.ts). createDaemonEnv and createCliEnv drop BB_STUDIO_UI_TOKEN_SHA256, so the host daemon (and every agent shell, provider and plugin host it starts) and bb commands never see the bring-over token's hash. createServerEnv keeps it, so every server start by this launcher, restarts included, gets the same hash.",
       "budget": 7
     },
+    "apps/server/src/routes/plugins.ts": {
+      "seam": "app-window-caller",
+      "intent": "One fork import (forkAppWindowCaller, fork-app-window-caller.ts) and the caller handed to invokeRpcHandler in POST /plugins/:id/rpc/:method goes through it. A client call that carries the per-launch app token and neither x-bb-caller-thread nor x-bb-cli reaches the handler as { kind: \"client\", studioAppWindow: true }; every other caller is unchanged.",
+      "budget": 6
+    },
     "packages/domain/src/ui-preferences.ts": {
       "seam": "workbench-global-tabs",
       "intent": "Two lines at the top import and re-export ui-preferences.fork.ts, and two spreads put the fork's preference keys (FORK_UI_PREFERENCE_KEYS: the synced workbench.globalTabs, which stores the fixed plugin tabs) and their definitions FIRST in UI_PREFERENCE_KEYS and uiPreferenceDefinitions. All defaults are upstream's.",

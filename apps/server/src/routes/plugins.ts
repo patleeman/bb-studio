@@ -1,3 +1,4 @@
+import { forkAppWindowCaller } from "../services/plugins/fork-app-window-caller.js";
 import { HOST_TAILWIND_VERSION } from "@bb/plugin-build/host-tailwind-version";
 import type { PluginUpdateJobs } from "../services/plugins/plugin-update-jobs.js";
 import { timingSafeEqual } from "node:crypto";
@@ -1078,7 +1079,9 @@ export function registerPluginRoutes(
       method,
       lookup.value,
       input,
-      callerResolution.caller,
+      forkAppWindowCaller(callerResolution.caller, (name) =>
+        context.req.header(name),
+      ),
       context.req.raw.signal,
     );
     if (!outcome.ok) {
