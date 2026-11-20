@@ -888,7 +888,13 @@ export class Bots {
     if (this.isPrimary(row) && thread.providerId && botKind(thread.providerId) === "external") throw new Error(`${row.name} leads your personal project with Studio's tools, so its Main can't run on ${externalName(thread.providerId)}.`);
     const other = this.list().find((bot) => bot.id !== row.id && bot.threadId === threadId);
     if (other) throw new Error(`That is ${other.name}'s Main.`);
-    await this.pointMain(row, threadId, current);
+    try {
+      await this.pointMain(row, threadId, current);
+    } catch (error) {
+      // The heartbeat moves first, and BB has no model for a thread that never ran a turn.
+      if (/Choose a provider and model/.test(String((error as Error)?.message ?? error))) throw new Error("That conversation has no model yet, so check-ins can't run there. Send it a message first, then make it the Main.");
+      throw error;
+    }
     return this.get(row.id);
   }
 

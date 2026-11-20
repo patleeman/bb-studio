@@ -347,6 +347,10 @@ it("makes a conversation the Main: check-ins move at once, the old Main stays an
   await expect(bots.makeMain("conv_2")).rejects.toThrow("archived. Unarchive it first");
   await expect(bots.makeMain("conv_gone")).rejects.toThrow("no longer exists");
   await expect(bots.makeMain(scout.threadId!, BOT_ID)).rejects.toThrow("Scout's Main");
+  // A thread BB has no model for (it never ran a turn): said plainly, and nothing moves.
+  x.add({ id: "conv_3", projectId: PERSONAL_PROJECT_ID, providerId: null as never });
+  await expect(bots.makeMain("conv_3")).rejects.toThrow("has no model yet");
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("conv_1");
 });
 
 it("on a BB Studio copy, a stopped Bot from before the import is in bb, and Resume runs it here: active and no longer in bb", async () => {
