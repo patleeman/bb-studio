@@ -424,6 +424,18 @@ it("FM: + New seeded with a default model that can't start (provider signed out)
   await expect(server.rpc.bot_conversation_start({ botId: "home", request: newRequest("sonnet") })).rejects.toThrow("not signed in");
 });
 
+it("FM (review F7): Ask and + New retry without the model only for a model or provider error, never a timeout", async () => {
+  const { server, spawn, defaults } = await setup();
+  defaults.set("home", { providerId: "claude", model: "opus-gone", reasoning: null });
+  const calls = spawn.mock.calls.length;
+  spawn.mockRejectedValueOnce(new Error("Request timed out after 30000ms"));
+  await expect(server.rpc.bot_ask({ text: "Hi", to: { kind: "new", botId: "home" } })).rejects.toThrow("timed out");
+  spawn.mockRejectedValueOnce(new Error("Request timed out after 30000ms"));
+  await expect(server.rpc.bot_conversation_start({ botId: "home", request: newRequest("opus-gone") })).rejects.toThrow("timed out");
+  // One try each: no second conversation behind the user's back.
+  expect(spawn.mock.calls.length - calls).toBe(2);
+});
+
 it("FM: Ask the Bot starts a conversation when its default model can't start, or its Main is gone", async () => {
   const { server, spawn, defaults, threads } = await setup();
   // Its default model's provider is signed out: BB refuses it, so the project's default.

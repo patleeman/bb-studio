@@ -25,6 +25,19 @@ export function missingModel(error: unknown): boolean {
   return /has no stored execution model/i.test(String((error as Error)?.message ?? error));
 }
 
+/**
+ * Whether BB refused a thread for its model or provider (no stored model, a
+ * model it doesn't offer, a provider that is signed out or unavailable): the
+ * only errors worth retrying on another model. A timeout or a dropped
+ * connection is not one, since BB may have made the thread already.
+ */
+export function modelProblem(error: unknown): boolean {
+  if (missingModel(error)) return true;
+  const text = String((error as Error)?.message ?? error);
+  if (/time(d)? ?out|ECONN|socket hang up|network|fetch failed|aborted/i.test(text)) return false;
+  return /not signed in|signed out|unauthenticated|sign in|login required|\b(model|provider)\b[^.]*\b(not found|unknown|isn't|is not|doesn't|does not|unavailable|not available|not supported|invalid)\b|\b(unknown|unsupported|invalid) (model|provider)\b/i.test(text);
+}
+
 /** The provider's default model (its catalog's isDefault, else its first), or null when it is signed out or lists none. */
 export async function providerDefaultModel(sdk: Sdk, providerId: string): Promise<string | null> {
   try {

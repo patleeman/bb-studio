@@ -18,6 +18,7 @@ import { BotThreads, forkUndecided, botActivity, botNeedsYou, conversationsPage,
 import { ConversationText, plainLine, queryWords, snippetOf, summaryBody, summaryPreview } from "./conversation-text";
 import { isWorkerApproval, viewOf, waitingOn, workerApprovalPush, type Interaction, type WorkerApprovalPush } from "./worker-approvals";
 import { PERSONAL_PROJECT_ID } from "./project-lead";
+import { modelProblem } from "./thread-model";
 import { isFinishing } from "./bot-finish";
 import { kindOf, type BotChange } from "./bot-signal";
 import type { BotChangeKind } from "./bot-threads-contract";
@@ -516,7 +517,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
       // BB's default instead, so + New still works. A model the user picked themselves fails as BB says.
       const preset = deps.defaultModel(botId);
       const asked = request as { providerId?: string; model?: string };
-      if (!preset || asked.providerId !== preset.providerId || asked.model !== preset.model) throw error;
+      if (!preset || asked.providerId !== preset.providerId || asked.model !== preset.model || !modelProblem(error)) throw error;
       deps.log(`The default model ${preset.providerId}/${preset.model} couldn't start a conversation (${String((error as Error)?.message ?? error).slice(0, 200)}); using BB's default.`);
       const { providerId: _providerId, model: _model, reasoningLevel: _reasoning, executionInputSources: _sources, ...rest } = request as Record<string, unknown>;
       thread = await bb.sdk.threads.spawn({ ...rest, pluginMetadata: { botConversation: botId } } as never) as typeof thread;
@@ -553,7 +554,8 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
       thread = await bb.sdk.threads.spawn({ ...request, ...model } as never) as typeof thread;
     } catch (error) {
       // The Bot's default model can't start (its provider signed out, or the model gone): the project's default instead.
-      if (!preset) throw error;
+      // Only then: a timeout may have made the thread already, and retrying would make a second conversation.
+      if (!preset || !modelProblem(error)) throw error;
       deps.log(`${bot.name}'s default model ${preset.providerId}/${preset.model} couldn't start a conversation (${String((error as Error)?.message ?? error).slice(0, 200)}); using the project's default.`);
       thread = await bb.sdk.threads.spawn(request as never) as typeof thread;
     }
