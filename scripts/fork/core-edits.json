@@ -202,9 +202,9 @@
       "budget": 5
     },
     "apps/server/src/start-server.ts": {
-      "seam": "import-sync",
-      "intent": "Calls forkBeforeDatabase right after refuseInterruptedServerImport and before initDb. It runs the first-run import (services/fork-import/first-run.ts) when the data dir has no database yet, and tells the fork module which data dir is active.",
-      "budget": 2
+      "seam": "import-sync, cli-name",
+      "intent": "Calls forkBeforeDatabase right after refuseInterruptedServerImport and before initDb. It runs the first-run import (services/fork-import/first-run.ts) when the data dir has no database yet, and tells the fork module which data dir is active. A fork import at the top and one line after createCliCommandService: migrateLegacyStudioBbLink (cli-command.fork.ts) gives an old Studio `bb` link (before bbs) a `bbs` and `bb-studio` beside it, removes the old link only when another `bb` is on PATH, and logs what it did.",
+      "budget": 4
     },
     "apps/server/test/services/plugins/plugin-authoring-docs.test.ts": {
       "seam": "sdk-tables",
@@ -212,9 +212,9 @@
       "budget": 2
     },
     "packages/bb-app/src/launcher.ts": {
-      "seam": "bring-over-token",
-      "intent": "One fork import (withoutForkUiTokenHash, fork-ui-token-env.ts). createDaemonEnv and createCliEnv drop BB_STUDIO_UI_TOKEN_SHA256, so the host daemon (and every agent shell, provider and plugin host it starts) and bb commands never see the bring-over token's hash. createServerEnv keeps it, so every server start by this launcher, restarts included, gets the same hash.",
-      "budget": 7
+      "seam": "bring-over-token, cli-name",
+      "intent": "One fork import (withoutForkUiTokenHash, fork-ui-token-env.ts). createDaemonEnv and createCliEnv drop BB_STUDIO_UI_TOKEN_SHA256, so the host daemon (and every agent shell, provider and plugin host it starts) and bb commands never see the bring-over token's hash. createServerEnv keeps it, so every server start by this launcher, restarts included, gets the same hash. A second fork import (guardStudioCliEnv, @bb/config/cli-command) and one call at the start of runBbCli, guardStudioCliEnv(process.env, homedir()): Studio's launcher (bbs) drops stock bb's data folder, server and thread context, and follows BB_CLI only when it is Studio's (a `bbs` sits beside it), so it never runs stock bb's CLI with Studio's data folder.",
+      "budget": 9
     },
     "apps/server/src/routes/plugins.ts": {
       "seam": "app-window-caller, secret-redaction",
@@ -662,9 +662,9 @@
       "budget": 1
     },
     "apps/server/src/services/system/cli-command.ts": {
-      "seam": "beside-bb",
-      "intent": "A `bb` link counts as this app's (installed, replaced or removed) only when it points at this app's own launcher (pointsAtOwnLauncher, cli-command.fork.ts, imported under the marker import). Stock bb writes the same launcher marker, so without the check BB Studio would replace or delete stock bb's `bb` link; with it, stock bb's link reads as the `bb` already on PATH.",
-      "budget": 7
+      "seam": "beside-bb, cli-name",
+      "intent": "Studio's command is `bbs`: CLI_COMMAND_NAME is STUDIO_CLI_NAME, and every link this file installs, finds or removes is `bbs`, so it never touches a `bb`. linkStudioCliAliases runs after a `bbs` link is made or found (`bb-studio` beside it), removeStudioCliAliases in removeUnix. A link counts as this app's only when it points at this app's own launcher (pointsAtOwnLauncher); stock bb writes the same launcher marker. All four come from cli-command.fork.ts, imported under the marker import. The messages' `bbs` wording comes from rebrand.mjs.",
+      "budget": 12
     },
     "apps/server/src/services/system/app-keybindings.ts": {
       "seam": "close-all",
@@ -780,6 +780,36 @@
       "seam": "secret-redaction",
       "intent": "The status command's stdout, text and --json, goes through redactSecrets (redact.fork.ts, imported at the top of the file), so the relay URL's token never prints. There is no flag that shows it.",
       "budget": 5
+    },
+    "apps/cli/src/index.ts": {
+      "seam": "cli-name",
+      "intent": "Two fork imports at the top (guardStudioCliEnv from studio-cli-env.fork.ts, homedir) and one call, guardStudioCliEnv(process.env, homedir()), right before maybeReexecViaBbCli(). It drops what stock bb's shell or `bb` hands over (BB_DATA_DIR=~/.bb, a BB_SERVER_URL on port 38886 with that shell's thread context, BB_HOST_DAEMON_PORT 38887, a BB_CLI with no Studio `bbs` beside it) before the CLI re-execs or reads them. The guard file loads only node builtins, as startup-graph.test.ts requires. The CLI's name (`bbs`), description and Quick start come from rebrand.mjs.",
+      "budget": 3
+    },
+    "apps/cli/src/commands/guide.ts": {
+      "seam": "cli-name",
+      "intent": "One fork import (toStudioGuide, @bb/config/cli-command) and the rendered chapter wrapped in toStudioGuide(...), so `bbs guide` shows `bbs <command>` in its code. The command index prefix and hint come from rebrand.mjs.",
+      "budget": 3
+    },
+    "apps/host-daemon/scripts/build-bundles.mjs": {
+      "seam": "cli-name",
+      "intent": "One fork import and one call, writeStudioCliAliases(dist) after bb.cmd is written: the `bbs` and `bb-studio` files (scripts/fork/studio-cli-aliases.mjs) sit next to dist/bb, so agent shells, which put this folder first on PATH, run Studio's CLI under every name, and Studio's CLI can tell its own BB_CLI from stock bb's.",
+      "budget": 2
+    },
+    "packages/bb-app/scripts/build-host.mjs": {
+      "seam": "cli-name",
+      "intent": "One fork import and one call, writeStudioCliAliases(hostDaemonTarget), before bb-chunks is copied: the packaged host-daemon folder gets the same `bbs` and `bb-studio` files as apps/host-daemon/dist.",
+      "budget": 2
+    },
+    "packages/bb-app/package.json": {
+      "seam": "cli-name",
+      "intent": "`files` lists host-daemon/dist/bbs, bbs.cmd, bb-studio and bb-studio.cmd, so the package and the desktop app ship them.",
+      "budget": 4
+    },
+    "packages/config/src/cli-command.ts": {
+      "seam": "cli-name",
+      "intent": "One line at the top re-exports studio-cli.fork.ts (names, guardStudioCliEnv, isStudioCliPath, toStudioCommandText, toStudioGuide) through @bb/config/cli-command, which bb-app, the server and the CLI already import.",
+      "budget": 1
     }
   }
 }

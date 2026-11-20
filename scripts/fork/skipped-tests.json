@@ -815,6 +815,62 @@
     {
       "file": "packages/provider-bridge-acp/src/bridge/bridge.test.ts",
       "title": "lists skills/configure roots in canonical session instructions"
+    },
+    {
+      "file": "apps/cli/src/__tests__/cli-entry-errors.e2e.test.ts",
+      "title": "fills in the current project when thread spawn omits --project"
+    },
+    {
+      "file": "apps/cli/src/__tests__/command-resolution.test.ts",
+      "title": "suggests for [\"thread\",\"message\"]"
+    },
+    {
+      "file": "apps/cli/src/__tests__/command-resolution.test.ts",
+      "title": "suggests for [\"thread\",\"timeline\"]"
+    },
+    {
+      "file": "apps/cli/src/__tests__/command-resolution.test.ts",
+      "title": "suggests for [\"thread\",\"create\"]"
+    },
+    {
+      "file": "apps/cli/src/__tests__/command-resolution.test.ts",
+      "title": "suggests for [\"thread\",\"shwo\"]"
+    },
+    {
+      "file": "apps/cli/src/__tests__/command-resolution.test.ts",
+      "title": "suggests for [\"terminal\",\"read\"]"
+    },
+    {
+      "file": "apps/cli/src/__tests__/command-resolution.test.ts",
+      "title": "suggests for [\"host\"]"
+    },
+    {
+      "file": "apps/cli/src/__tests__/command-resolution.test.ts",
+      "title": "suggests for [\"models\"]"
+    },
+    {
+      "file": "apps/cli/src/__tests__/command-resolution.test.ts",
+      "title": "prints the full command path and hides hidden options"
+    },
+    {
+      "file": "apps/cli/src/__tests__/commander-errors.test.ts",
+      "title": "fills in the current project for a missing --project"
+    },
+    {
+      "file": "apps/cli/src/__tests__/commander-errors.test.ts",
+      "title": "names the closest option and lists the valid ones"
+    },
+    {
+      "file": "apps/cli/src/__tests__/commander-errors.test.ts",
+      "title": "suggests the real verb and lists the group's commands"
+    },
+    {
+      "file": "apps/cli/src/__tests__/commander-errors.test.ts",
+      "title": "says a top-level unknown command may belong to a plugin that is not enabled"
+    },
+    {
+      "file": "apps/cli/src/__tests__/commander-errors.test.ts",
+      "title": "tells a caller with a terminal ID missing how to list this thread's terminals"
     }
   ],
   "removeLines": [
@@ -883,6 +939,54 @@
     {
       "file": "apps/app/src/components/commands/CommandPalette.test.tsx",
       "title": "hides the split action for %s"
+    },
+    {
+      "file": "apps/server/test/system/cli-command.test.ts",
+      "title": "links the launcher into a PATH folder and removes it again"
+    },
+    {
+      "file": "apps/server/test/system/cli-command.test.ts",
+      "title": "reports a link in a folder that is not on PATH yet"
+    },
+    {
+      "file": "apps/server/test/system/cli-command.test.ts",
+      "title": "refuses to install behind another bb that runs first"
+    },
+    {
+      "file": "apps/server/test/system/cli-command.test.ts",
+      "title": "recognises a bb that npm already put on PATH"
+    },
+    {
+      "file": "apps/server/test/system/cli-command.test.ts",
+      "title": "recognises the command a bb machine install added and leaves it"
+    },
+    {
+      "file": "apps/server/test/system/cli-command.test.ts",
+      "title": "ignores the bb that npx puts on PATH for the run"
+    },
+    {
+      "file": "apps/app/src/components/settings/CliCommandSettingsSection.test.tsx",
+      "title": "installs the command when it is not on PATH"
+    },
+    {
+      "file": "apps/app/src/components/settings/CliCommandSettingsSection.test.tsx",
+      "title": "removes the command it installed and says where it is"
+    },
+    {
+      "file": "apps/app/src/components/settings/CliCommandSettingsSection.test.tsx",
+      "title": "says which folder is missing from PATH after installing off PATH"
+    },
+    {
+      "file": "apps/app/src/components/settings/CliCommandSettingsSection.test.tsx",
+      "title": "does not offer to install behind another bb that runs first"
+    },
+    {
+      "file": "apps/app/src/components/settings/CliCommandSettingsSection.test.tsx",
+      "title": "recognises a bb that npm already put on PATH"
+    },
+    {
+      "file": "apps/app/src/components/settings/CliCommandSettingsSection.test.tsx",
+      "title": "blocks a second change while one is running"
     }
   ]
 }
