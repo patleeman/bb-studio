@@ -208,7 +208,7 @@ export default async function plugin(bb: BbPluginApi) {
   // "Bring over BB Studio data" from bb is applied here, before Studio opens
   // its database (src/studio-data/start.ts). A failure leaves the journal for
   // the next start and this install's data as it was.
-  await finishStudioImport({ dataDir: bb.server.experimental_dataDir, kv: bb.storage.kv, migrate: (database, statements) => bb.storage.migrate(database, statements), migrations: MIGRATIONS, log: bb.log, firstLoad: claimFirstLoad() })
+  await finishStudioImport({ dataDir: bb.server.experimental_dataDir, kv: bb.storage.kv, migrate: (database, statements) => bb.storage.migrate(database, statements), migrations: MIGRATIONS, log: bb.log, firstLoad: claimFirstLoad(), threads: { archive: (threadId) => bb.sdk.threads.archive({ threadId }), unarchive: (threadId) => bb.sdk.threads.unarchive({ threadId }) } })
     .catch((error) => bb.log.warn(`BB Studio data from bb could not be applied; this install's data is unchanged: ${errorText(error)}`));
   registerQuietTurnClassifier(bb);
   await registerChat(bb);

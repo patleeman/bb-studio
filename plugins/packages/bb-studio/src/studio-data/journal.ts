@@ -68,6 +68,9 @@ export interface ImportJournal {
   restoredAt?: number | null;
   /** The thread ids the Bots can't do without (their Main threads). */
   required?: string[];
+  /** This install's own Bot threads (its onboarding Main and the like) that bb's data replaced; archived after the swap, unarchived at a put-back. */
+  replacedThreads?: string[];
+  replacedArchived?: boolean;
   /** What the swap stopped: the Bots and their schedules. */
   stopped?: StopSummary | null;
 }

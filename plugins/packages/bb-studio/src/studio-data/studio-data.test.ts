@@ -445,6 +445,26 @@ describe("applying bb's Studio data at Studio's start", () => {
     expect(studioDataFromBb(x.dataDir)).toBe(false);
   });
 
+  it("archives this install's own Main once the swap applies, unarchives it at a put-back, and retries what failed", async () => {
+    const x = await staged();
+    const calls: string[] = [];
+    let refuse = true;
+    const threads = {
+      archive: async (threadId: string) => { calls.push(`archive ${threadId}`); if (refuse) throw new Error("host offline"); return {}; },
+      unarchive: async (threadId: string) => { calls.push(`unarchive ${threadId}`); return {}; },
+    };
+    const first = await x.start({ threads });
+    expect(first).toMatchObject({ state: "applied", replacedThreads: ["thr_1"], replacedArchived: false });
+    expect(calls).toEqual(["archive thr_1"]);
+    refuse = false;
+    expect(await x.start({ threads })).toMatchObject({ state: "applied", replacedArchived: true });
+    expect(await x.start({ threads })).toMatchObject({ replacedArchived: true });
+    expect(calls).toEqual(["archive thr_1", "archive thr_1"]);
+    writeJournal(x.dataDir, { ...(readJournal(x.dataDir) as ImportJournal), state: "restore-requested" });
+    expect(await x.start({ threads })).toMatchObject({ state: "restored", replacedArchived: false });
+    expect(calls.at(-1)).toBe("unarchive thr_1");
+  });
+
   it("puts the old data back when asked, keeping bb's in a folder", async () => {
     const x = await staged();
     await x.start();

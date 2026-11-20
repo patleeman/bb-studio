@@ -30,6 +30,7 @@ import {
 } from "./journal";
 import { studioOwnData, type OwnData } from "./own-data";
 import { stopImportedStudio } from "./stop";
+import { studioThreads } from "./threads";
 import { isRolledBack, rollBack, runSwap, type KvFile, type RolledBack, type StudioKv, type SwapPlan } from "./swap";
 
 export interface StartDeps {
@@ -46,6 +47,8 @@ export interface StartDeps {
    * key-value rows, so a swap waits for the next real start.
    */
   firstLoad: boolean;
+  /** BB's threads, to archive this install's replaced Bot threads after a swap and unarchive them at a put-back. */
+  threads?: { archive(threadId: string): Promise<unknown>; unarchive(threadId: string): Promise<unknown> };
 }
 
 const LOADED = Symbol.for("bb-studio.studio-data.loaded");
@@ -207,6 +210,50 @@ function settleRollBack(deps: StartDeps, ending: Ending, thrown: RolledBack): Im
   return settle(deps.dataDir, ending.undone({ ...thrown.journal, phase: null, undoing: undefined, updatedAt: now() }, reason), deps.log);
 }
 
+/** The Bot threads a Studio database names (threads.ts), or none when it can't be read. */
+function threadsIn(path: string): string[] {
+  if (!existsSync(path)) return [];
+  let db: Database.Database | null = null;
+  try {
+    db = new Database(path, { readonly: true, fileMustExist: true });
+    db.pragma("busy_timeout = 1000");
+    return studioThreads(db).wanted;
+  } catch {
+    return [];
+  } finally {
+    db?.close();
+  }
+}
+
+/**
+ * After a swap, this install's own Bot threads (the Main onboarding made)
+ * belong to no Bot: they are archived, so they don't linger as hidden
+ * threads. A put-back unarchives them for the Bots that come back. Failures
+ * are retried at the next start.
+ */
+async function tidyReplacedThreads(deps: StartDeps, journal: ImportJournal): Promise<ImportJournal> {
+  const ids = journal.replacedThreads ?? [];
+  if (!deps.threads || ids.length === 0) return journal;
+  const archive = journal.state === "applied" && !journal.replacedArchived;
+  const unarchive = journal.state === "restored" && journal.replacedArchived === true;
+  if (!archive && !unarchive) return journal;
+  let failed = 0;
+  for (const threadId of ids) {
+    try {
+      await (archive ? deps.threads.archive(threadId) : deps.threads.unarchive(threadId));
+    } catch (error) {
+      if (!/not found|404/i.test(errorText(error))) failed += 1;
+    }
+  }
+  if (failed > 0) {
+    deps.log.warn(`BB Studio data from bb: ${failed} of this install's replaced Bot threads could not be ${archive ? "archived" : "unarchived"}; trying again at the next start.`);
+    return journal;
+  }
+  const next: ImportJournal = { ...journal, replacedArchived: archive, updatedAt: (deps.now ?? Date.now)() };
+  writeJournal(deps.dataDir, next);
+  return next;
+}
+
 async function apply(deps: StartDeps, journal: ImportJournal): Promise<ImportJournal> {
   const now = deps.now ?? Date.now;
   const plan = applyPlan(deps.dataDir);
@@ -238,8 +285,10 @@ async function apply(deps: StartDeps, journal: ImportJournal): Promise<ImportJou
   const bbKv = readJson<BbKvFile>(plan.incomingKvFile);
   if (!bbKv.prepared) writePrivateJson(plan.incomingKvFile, prepareKv(bbKv));
 
+  const bbThreads = new Set(threadsIn(stagedDb));
+  const replacedThreads = threadsIn(join(studioDir(deps.dataDir), "data.db")).filter((id) => !bbThreads.has(id));
   const incoming = readdirSync(plan.incomingDir).filter((name) => !KEPT_HERE.has(name)).sort();
-  const applying: ImportJournal = { ...journal, state: "applying", phase: "out", incoming, stopped, error: null, updatedAt: now() };
+  const applying: ImportJournal = { ...journal, state: "applying", phase: "out", incoming, stopped, replacedThreads, replacedArchived: false, error: null, updatedAt: now() };
   writeJournal(deps.dataDir, applying);
   return swapOrRollBack(deps, plan, applying, "out", applyEnding(deps, plan));
 }
@@ -268,6 +317,11 @@ export async function finishStudioImport(deps: StartDeps): Promise<ImportJournal
     deps.log.info(`BB Studio data from bb: ${journal.state}; Studio was reloaded, not restarted, so this waits for BB Studio to be quit and reopened.`);
     return journal;
   }
+  const result = await act(deps, journal);
+  return result.state === "applied" || result.state === "restored" ? tidyReplacedThreads(deps, result) : result;
+}
+
+async function act(deps: StartDeps, journal: ImportJournal): Promise<ImportJournal> {
   switch (journal.state) {
     case "ready": return apply(deps, journal);
     case "restore-requested": return restore(deps, journal);
