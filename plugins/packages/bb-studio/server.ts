@@ -107,7 +107,7 @@ import { registerMemory } from "./src/memory/register";
 import { recordLine } from "./src/memory/shared";
 import { BotPageState, registerGroupTool } from "./src/bot-page-state";
 import { BotCacheWarmer } from "./src/bot-cache";
-import { botControlRefusal, Bots, SKILL_NAME } from "./src/bot";
+import { botControlRefusal, Bots, MAIN_HEAL_MS, SKILL_NAME } from "./src/bot";
 import { ThemeStore } from "./src/theme/store";
 import { forestContract } from "./src/theme/forest/contract";
 import { ForestWeather } from "./src/theme/forest/weather";
@@ -675,7 +675,7 @@ export default async function plugin(bb: BbPluginApi) {
     claimChains: () => ownedThreads.claimChains(),
     // Read when a Main moves, after the conversation records are registered below.
     mainMoved: (botId, threadId) => botThreads.store.setMain(botId, threadId),
-    conversationBot: (threadId) => botThreads.store.conversationBot(threadId),
+    conversationBot: (threadId) => botThreads.store.get(threadId)?.botId ?? null,
     revive: (key) => scheduler.revive(key),
     runners: { threads: (botId) => runners.threads(botId), pauseAll: (botId, onPaused) => runners.pauseAll(botId, onPaused), restore: (id) => runners.restore(id) },
     automations: {
@@ -1194,9 +1194,9 @@ export default async function plugin(bb: BbPluginApi) {
   });
   // Startup, and every 5 minutes: a Bot whose Main was deleted or archived while Studio was off, or
   // when a new Main couldn't start (no host connected yet), gets a new Main. One thread read per Bot.
-  const healMains = () => { for (const bot of bots.list()) void bots.restoreMain(bot.id).catch(restoreMainFailed); };
+  const healMains = () => void bots.restoreMains((message) => bb.log.warn(message)).catch(restoreMainFailed);
   healMains();
-  triggers.every("main-heal", 5 * 60_000, healMains);
+  triggers.every("main-heal", MAIN_HEAL_MS, healMains);
   // Workers from before that default get it once, after the first classification settles.
   const quietWorkersOnce = setTimeout(() => void (async () => {
     if (await bb.storage.kv.get(WORKER_LEVELS_KEY)) return;

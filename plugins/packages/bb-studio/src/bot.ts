@@ -388,7 +388,7 @@ export interface BotDeps {
   mainMoved?(botId: string, threadId: string, previous: string | null): void;
   /** Turns back on schedules a lost Main turned off (EngineScheduler.revive); true when one came back. */
   revive?(key: { owner: "heartbeat" | "automation"; ownerId: string }): boolean;
-  /** The Bot a conversation belongs to (src/bot-threads.ts), or null. */
+  /** The Bot a thread is a conversation or worker of (src/bot-threads.ts), or null. */
   conversationBot?(threadId: string): string | null;
   providerStates?(): Promise<readonly OnboardingProviderState[]>;
   /** Check-ins, reminders and watchers (src/automations.ts): Pause and Stop turn them off, Resume back on. */
@@ -400,6 +400,15 @@ export interface BotDeps {
     /** Its check-ins and reminders, which run on Studio's scheduler (not in BB's automations list), for Activity. */
     scheduled?(botId: string): { id: string; name: string; cron: string | null; enabled: boolean; nextRunAt: number | null }[];
   };
+}
+
+/** How often the heal looks for a Bot whose Main is gone, and the longest it waits while a new Main keeps failing. */
+export const MAIN_HEAL_MS = 5 * 60_000;
+export const MAIN_HEAL_MAX_MS = 60 * 60_000;
+
+/** The wait after `failures` failed new Mains in a row: 5 minutes, doubling up to an hour (like onboarding's back-off). */
+export function mainHealDelay(failures: number): number {
+  return Math.min(MAIN_HEAL_MS * 2 ** Math.max(0, failures - 1), MAIN_HEAL_MAX_MS);
 }
 
 /** BB's answer for a thread made before any provider was ready: it has no model to run with. */
@@ -794,19 +803,38 @@ export class Bots {
 
   private readonly restoring = new Map<string, Promise<string | null>>();
 
-  restoreMain(botId: string, goneThreadId?: string): Promise<string | null> {
+  restoreMain(botId: string, goneThreadId?: string, resuming = false): Promise<string | null> {
     const pending = this.restoring.get(botId);
     if (pending) return pending;
-    const run = this.replaceMain(botId, goneThreadId).finally(() => this.restoring.delete(botId));
+    const run = this.replaceMain(botId, goneThreadId, resuming).finally(() => this.restoring.delete(botId));
     this.restoring.set(botId, run);
     return run;
   }
 
-  async restoreMains(): Promise<string[]> {
+  /** Per Bot, while its new Main keeps failing: failures in a row, when to try next, and the last error said. */
+  private readonly healBackoff = new Map<string, { failures: number; nextAt: number; error: string }>();
+
+  /**
+   * The heal (startup and every 5 minutes): each Bot whose Main is gone gets
+   * a new one. One that keeps failing waits longer each time (mainHealDelay),
+   * and `warn` hears each new error once, not every pass.
+   */
+  async restoreMains(warn?: (message: string) => void, now = Date.now()): Promise<string[]> {
     const made: string[] = [];
     for (const row of this.rows()) {
-      const threadId = await this.restoreMain(row.id).catch(() => null);
-      if (threadId) made.push(threadId);
+      const backoff = this.healBackoff.get(row.id);
+      if (backoff && now < backoff.nextAt) continue;
+      try {
+        const threadId = await this.restoreMain(row.id);
+        this.healBackoff.delete(row.id);
+        if (threadId) made.push(threadId);
+      } catch (error) {
+        const failures = (backoff?.failures ?? 0) + 1;
+        const delay = mainHealDelay(failures);
+        const text = String((error as Error)?.message ?? error).slice(0, 300);
+        if (text !== backoff?.error) warn?.(`Couldn't start a new Main for ${row.name}: ${text} Trying again in ${Math.round(delay / 60_000)} min.`);
+        this.healBackoff.set(row.id, { failures, nextAt: now + delay, error: text });
+      }
     }
     return made;
   }
@@ -817,9 +845,11 @@ export class Bots {
    * short note when it is active. Its heartbeat, check-ins, reminders and
    * runner reports go there (they read the Main when they run).
    */
-  private async replaceMain(botId: string, goneThreadId?: string): Promise<string | null> {
+  private async replaceMain(botId: string, goneThreadId?: string, resuming = false): Promise<string | null> {
     const row = this.row(botId);
     if (!row || this.inBb(row)) return null;
+    // A paused or stopped Bot gets its new Main when it is resumed, not while it is put away.
+    if (row.state !== "active" && !resuming) return null;
     const current = this.view(row).threadId;
     const lost = goneThreadId ?? current;
     if (!lost || (current !== lost && !(current === null && this.isPrimary(row)))) return null;
@@ -829,19 +859,26 @@ export class Bots {
     const model = preset
       ? { providerId: preset.providerId, model: preset.model, ...(preset.reasoning ? { reasoningLevel: preset.reasoning } : {}), executionInputSources: { providerId: "explicit", model: "explicit", ...(preset.reasoning ? { reasoningLevel: "explicit" } : {}) } }
       : row.provider_id ? { providerId: row.provider_id } : {};
-    const input = row.state === "active" ? [{ type: "text", text: newMainNote(row.name, gone), mentions: [], visibility: "agent-only" }] : [];
+    const input = [{ type: "text", text: newMainNote(row.name, gone), mentions: [], visibility: "agent-only" }];
     const thread = await this.deps.sdk.threads.spawn({ projectId: PERSONAL_PROJECT_ID, title: row.name, environment: { type: "project-default" }, pluginMetadata: { bot: row.id }, ...model, input } as never);
-    await this.pointMain(row, thread.id, lost);
+    try {
+      await this.pointMain(row, thread.id, lost);
+    } catch (error) {
+      // The pointer didn't move (its heartbeat couldn't go there): the new thread goes, so no empty Main is left behind.
+      await this.deps.sdk.threads.delete({ threadId: thread.id, childThreadsConfirmed: false }).catch(() => {});
+      throw error;
+    }
     return thread.id;
   }
 
   /** Moves a Bot's Main to a thread: the pointer, its heartbeat, its check-ins and the conversation records. */
   private async pointMain(row: BotRow, threadId: string, previous: string | null): Promise<void> {
+    // The heartbeat moves first (setLead does the same): if it can't go there, nothing moves.
     if (this.isPrimary(row)) await this.deps.leads.setLead(PERSONAL_PROJECT_ID, threadId);
     else {
-      this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(threadId, Date.now(), row.id);
       const run = this.deps.leads.runs.get(this.runKey(row));
       if (run?.enabled) await this.deps.leads.runs.set(this.runKey(row), threadId, run);
+      this.deps.db.prepare("UPDATE bots SET thread_id = ?, updated_at = ? WHERE id = ?").run(threadId, Date.now(), row.id);
     }
     await this.deps.automations?.follow(row.id).catch(() => {});
     this.reviveSchedules(row);
@@ -873,9 +910,14 @@ export class Bots {
     const row = this.need(botId ?? this.deps.conversationBot?.(threadId) ?? undefined);
     const current = this.view(row).threadId;
     if (current === threadId) return this.get(row.id);
+    if (this.inBb(row)) throw new Error(`${row.name} runs in bb. Run it here first, then pick its Main.`);
+    // Only the Bot's own threads: its conversations and workers, or an older thread of its chat.
     const owner = this.deps.conversationBot?.(threadId) ?? null;
-    if (owner && owner !== row.id) throw new Error(`That conversation is another Bot's, not ${row.name}'s.`);
-    type Facts = { id: string; providerId?: string | null; archivedAt?: number | null; deletedAt?: number | null };
+    if (owner !== row.id && !this.chain(row.id).includes(threadId)) {
+      const other = owner ? this.list().find((bot) => bot.id === owner) : undefined;
+      throw new Error(other ? `That conversation is ${other.name}'s, not ${row.name}'s.` : `That thread isn't one of ${row.name}'s conversations.`);
+    }
+    type Facts = { id: string; projectId?: string; providerId?: string | null; archivedAt?: number | null; deletedAt?: number | null };
     let thread: Facts | null;
     try {
       thread = await this.deps.sdk.threads.get({ threadId }) as unknown as Facts | null;
@@ -885,6 +927,7 @@ export class Bots {
     }
     if (!thread || thread.deletedAt != null) throw new Error("That conversation no longer exists.");
     if (thread.archivedAt != null) throw new Error("That conversation is archived. Unarchive it first, then make it the Main.");
+    if (thread.projectId && thread.projectId !== PERSONAL_PROJECT_ID) throw new Error("That conversation is in another project. A Bot's Main lives in your personal project.");
     if (this.isPrimary(row) && thread.providerId && botKind(thread.providerId) === "external") throw new Error(`${row.name} leads your personal project with Studio's tools, so its Main can't run on ${externalName(thread.providerId)}.`);
     const other = this.list().find((bot) => bot.id !== row.id && bot.threadId === threadId);
     if (other) throw new Error(`That is ${other.name}'s Main.`);
@@ -1132,8 +1175,10 @@ export class Bots {
   }
 
   async resume(botId?: string): Promise<BotView> {
-    const row = this.need(botId);
+    let row = this.need(botId);
     if (row.state !== "active") {
+      // A Main lost while it was put away is replaced now, before its heartbeat comes back there.
+      if (await this.restoreMain(row.id, undefined, true)) row = this.need(row.id);
       // The heartbeat comes back first: if that fails the Bot stays paused and remembers it, so Resume can be retried.
       const run = this.deps.leads.runs.get(this.runKey(row));
       if (row.heartbeat_was_on && run && this.view(row).threadId) await this.writeRun(row, { ...run, enabled: true });

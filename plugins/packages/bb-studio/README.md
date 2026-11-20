@@ -409,8 +409,12 @@ that spawned it, which is the worker's conversation.
 **Main can be archived, deleted or replaced.** Archiving or deleting a
 Bot's Main, from anywhere (BB's thread menu, the CLI, a tool, Studio's
 sidebar), is allowed: Studio starts a new Main for the same Bot, on its
-default provider and model, with a short agent-only note when the Bot is
-active (`Bots.replaceMain`). Its heartbeat moves there; check-ins,
+default provider and model, with a short agent-only note
+(`Bots.replaceMain`). A paused or stopped Bot gets its new Main when it is
+resumed, not before. When the Main can't move to the new thread (its
+heartbeat can't go there), the new thread is deleted, and the heal waits
+longer after each failure (5 minutes doubling to an hour), saying each new
+error once. Its heartbeat moves there; check-ins,
 reminders, watchers and runner reports read the Main when they run. This
 happens on `thread.archived` and `thread.deleted`, at startup and every
 5 minutes (`main-heal`: a Main lost while Studio was off, or a new Main
@@ -420,7 +424,9 @@ off). A heartbeat or check-in a lost Main already turned off comes back on
 with the new Main, from now (`EngineScheduler.revive`). **Make this the
 Main** (every thread menu on a Bot's conversation: the sidebar row and the
 thread header; RPC `bot_make_main`) makes a conversation the Main at once;
-the old Main stays an ordinary, open conversation.
+the old Main stays an ordinary, open conversation. It takes only the Bot's
+own threads (its conversations and workers, or an older thread of its
+chat) in the personal project, never another Bot's or another project's.
 
 **Every conversation is the Bot**: its instructions (plus one short line
 saying which conversation it is), all of its tools (profile, skills,
