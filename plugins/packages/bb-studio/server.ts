@@ -680,6 +680,7 @@ export default async function plugin(bb: BbPluginApi) {
       create: ({ botId, botName }) => memoryService.newProfile(botId, botName),
       addCheckin: (pageId, line) => pages.addCheckin(pageId, line),
       retitle: (pageId, from, to) => pages.retitle(pageId, from, to),
+      unarchive: (pageId) => { const page = pages.store.meta(pageId); if (!page?.archived_at) return false; return !!pages.store.update(pageId, { archived_at: null }, "studio"); },
     },
     userSkillsDir: join(bb.server.experimental_dataDir, "skills"),
     providerStates: async () => { const { primaryHostId } = await bb.sdk.system.config(); return (await bb.sdk.system.providerStates(primaryHostId ? { hostId: primaryHostId } : undefined)).providers; },

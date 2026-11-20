@@ -1469,3 +1469,17 @@ it("FM: Resume works when the Main is gone and a new one can't start yet", async
   // Before: the raw error, and the Bot stayed paused.
   await expect(x.bots.resume(scout.id)).resolves.toMatchObject({ bot: { state: "active" } });
 });
+
+it("FM: an archived Memory page comes back instead of a blank one taking its place", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const first = x.bots.memoryPage()!;
+  const archived = new Set([first]);
+  const deps = (x.bots as unknown as { deps: { memory: { exists(id: string): boolean; unarchive?(id: string): boolean } } }).deps.memory;
+  const exists = deps.exists;
+  deps.exists = (id) => !archived.has(id) && exists(id);
+  deps.unarchive = (id) => archived.delete(id);
+  // Before: a new blank page, and the old memory dropped out of the Bot's instructions.
+  expect(x.bots.memoryPage()).toBe(first);
+  expect(x.pages.size).toBe(1);
+});

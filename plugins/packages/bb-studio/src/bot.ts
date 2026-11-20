@@ -358,6 +358,8 @@ export interface BotMemoryPages {
   /** Adds a line to the page's "## Check-in" section (made if missing); false when it was already there. */
   addCheckin?(pageId: string, line: string): boolean;
   retitle?(pageId: string, from: string, to: string): boolean;
+  /** Unarchives a page that was archived (not deleted); true when it is back. */
+  unarchive?(pageId: string): boolean;
 }
 
 export interface BotDeps {
@@ -1393,6 +1395,8 @@ export class Bots {
     const pages = this.deps.memory;
     if (!row || !pages || botKind(row.provider_id) === "external") return null;
     if (row.memory_page_id && pages.exists(row.memory_page_id)) return row.memory_page_id;
+    // Archived, not deleted: it comes back, rather than a blank page taking its place and its memory dropping out.
+    if (row.memory_page_id && pages.unarchive?.(row.memory_page_id)) { this.deps.changed(); return row.memory_page_id; }
     const pageId = pages.create({ title: `${row.name}'s Memory`, markdown: MEMORY_TEMPLATE, botId: row.id, botName: row.name });
     this.deps.db.prepare("UPDATE bots SET memory_page_id = ?, updated_at = ? WHERE id = ?").run(pageId, Date.now(), row.id);
     this.deps.changed();
