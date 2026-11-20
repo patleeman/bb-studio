@@ -1,3 +1,4 @@
+import { forkCheckAcpToolCall, forkThreadToken, forkThreadTokenMatches } from "./acp-tools.fork.js";
 import {
   isStandaloneBuiltinCompactCommand,
   pendingInteractionResolutionSchema,
@@ -494,6 +495,8 @@ async function forwardDynamicToolCall(
   ) {
     return { ok: false, error: "No active ACP session for dynamic tool call." };
   }
+  const forkRefusal = forkCheckAcpToolCall(session.construction.dynamicTools, args.tool);
+  if (forkRefusal !== null) return { ok: false, error: forkRefusal };
 
   const controller = new AbortController();
   session.pendingToolCalls.add(controller);
@@ -549,7 +552,7 @@ function handleDynamicToolBridgeSocket(
       return;
     }
     const request = dynamicToolBridgeRequestSchema.safeParse(parsed);
-    if (!request.success || request.data.token !== bridge.token) {
+    if (!request.success || !forkThreadTokenMatches(bridge.token, request.data.threadId, request.data.token)) {
       socket.end(
         `${JSON.stringify({ ok: false, error: "Invalid dynamic tool request" })}\n`,
       );
@@ -621,7 +624,7 @@ async function buildSessionMcpServers(
     port: bridge.port,
     runtimeEnv: resolveBridgeProcessEnvForMcpServer(),
     threadId: params.threadId,
-    token: bridge.token,
+    token: forkThreadToken(bridge.token, params.threadId),
   });
   process.stderr.write(
     `acp bridge: built "${config.name}" session MCP config for thread "${params.threadId}" (${dynamicTools.length} tools)\n`,
