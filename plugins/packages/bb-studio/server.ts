@@ -149,7 +149,9 @@ import { FINISH_TOPIC, registerBotFinish } from "./src/bot-finish";
 import { askModel } from "./src/kit/decisions";
 import type { ModelSelection } from "./src/decisions/contract";
 import { studioInstructions } from "./src/agent-instructions";
-import { activityOf, conversationInstructions } from "./src/bot-threads";
+import { activityOf, conversationInstructions, workerStatus } from "./src/bot-threads";
+import { registerStrands } from "./src/strands/register";
+import { STRANDS_USAGE } from "./src/strands/cli";
 import { newTabRecents, newTabSearch, VISUAL_CHAT_PLUGIN_ID, type EntryRow, type NewTabSearchSources, type NewTabSources } from "./src/newtab";
 import { automationRefId, parseAutomationRefId } from "./src/automation-table-contract";
 import { ITEM_KINDS, type TabKindId } from "./src/tab-kinds";
@@ -1230,6 +1232,22 @@ export default async function plugin(bb: BbPluginApi) {
     conversationSummaries: (botId) => new Map((db.prepare(`SELECT source_id, text FROM memory_records
       WHERE bot_id = ? AND source_kind = 'conversation' AND topic = ? AND replaced_by_id IS NULL AND archived = 0 AND source_id IS NOT NULL
       ORDER BY created_at ASC`).all(botId, FINISH_TOPIC) as { source_id: string; text: string }[]).map((row) => [row.source_id, row.text])),
+  });
+  // Strands (src/strands): each turn of a Bot's Main sorted into a line of work, with live states. Phase 1: Main only, read-only.
+  const strands = registerStrands(bb, db, {
+    decisions: decisions.ask,
+    mains: () => bots.list().flatMap((bot) => (bot.threadId ? [bot.threadId] : [])),
+    workers: async (threadId) => {
+      const records = botThreads.store.workersOf(threadId);
+      const facts = await botThreads.store.facts(records.map((rec) => rec.threadId));
+      return records.map((rec) => {
+        const fact = facts.get(rec.threadId);
+        const status = workerStatus(fact);
+        return { threadId: rec.threadId, title: rec.title?.trim() || fact?.title?.trim() || "Worker", status, createdAt: rec.createdAt,
+          endedAt: status === "done" || status === "failed" ? rec.activityAt ?? fact?.updatedAt ?? rec.updatedAt : null };
+      });
+    },
+    log: (message) => bb.log.warn(message),
   });
   // Startup, and every 5 minutes: a Bot whose Main was deleted or archived while Studio was off, or
   // when a new Main couldn't start (no host connected yet), gets a new Main. One thread read per Bot.
@@ -2667,6 +2685,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "theme", summary: "List, show, check, create, update, apply and delete Bot themes", usage: "bb studio theme <list|show|create|update|apply|check|delete|template> …" },
       { name: "presence", summary: "List, show, check, create, update, apply and delete Bot presences", usage: "bb studio presence <list|show|create|update|apply|check|delete|template> …" },
       { name: "tool-gateway", summary: "Your MCP servers: list them, search and run their tools, and ask the user to add one", usage: "bb studio tool-gateway <list|tools|describe|call|request|status> …" },
+      { name: "strands", summary: "A conversation's strands (its lines of work), their live states, and how its newest messages were sorted", usage: STRANDS_USAGE },
       { name: "work", summary: "Live work cards: create one, update it in place, show and list a conversation's In flight cards, remove finished ones from the list", usage: "bb studio work <create|update|show|list|dismiss|clear> …" },
     ],
     async run(argv, ctx) {
@@ -2684,6 +2703,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (argv[0] === "presence") return runPresenceCli(argv.slice(1), { service: presenceService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)) });
       if (argv[0] === "theme") return runThemeCli(argv.slice(1), { service: themeService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)), weather: { sky: () => forestWeather.sky(Intl.DateTimeFormat().resolvedOptions().timeZone ?? null), setCity: (city) => forestWeather.setCity(city) }, sky: { place: () => forestWeather.place(Intl.DateTimeFormat().resolvedOptions().timeZone ?? null), preview: () => readPreview(bb.storage.kv), setPreview: (at) => writePreview(bb.storage.kv, at), view: () => readView(bb.storage.kv), setView: (view) => writeView(bb.storage.kv, view), now: () => Date.now(), zoneOffsetMinutes: () => -new Date().getTimezoneOffset() } });
       if (argv[0] === "work") return runWorkCli(argv.slice(1), work, ctx);
+      if (argv[0] === "strands") return strands.cli(argv.slice(1), ctx);
       if (argv[0] === "tool-gateway") return toolGateway ? toolGateway.cli(argv.slice(1), { threadId: ctx.threadId ?? null }) : { exitCode: 1, stderr: "Tool Gateway isn't loaded.\n" };
       if (argv[0] === "pages") return argv[1] === "explore" ? explore.cli(argv.slice(2), ctx) : pages.cli(argv.slice(1), ctx);
       const { command, rest: raw } = subcommand(argv);

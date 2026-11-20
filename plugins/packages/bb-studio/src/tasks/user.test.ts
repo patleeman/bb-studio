@@ -17,7 +17,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   db = new Database(":memory:");
-  for (const sql of MIGRATIONS) db.exec(sql);
+  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
 });
 afterEach(() => { db.close(); vi.useRealTimers(); });
 
@@ -80,7 +80,7 @@ it("hands a task to a worker thread directly, and through the Bot when that thre
   await ok.handlers["tasks.act"]!({ id: a.id, action: "hand_off", to: "thread:thr_worker" });
   expect(ok.sent).toEqual([{ threadId: "thr_worker", text: expect.stringContaining("Look into the CI cache") }]);
   expect(ok.posts).toEqual([]);
-  db.close(); db = new Database(":memory:"); for (const sql of MIGRATIONS) db.exec(sql);
+  db.close(); db = new Database(":memory:"); for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
   const down = setup({ sendFails: true });
   const b = await down.handlers["loops.add"]!({ text: "Look into the CI cache" });
   const out = await down.handlers["tasks.act"]!({ id: b.id, action: "hand_off", to: "thread:thr_worker" });

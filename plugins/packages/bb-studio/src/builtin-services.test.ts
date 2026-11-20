@@ -16,7 +16,7 @@ describe("built-in item thread links", () => {
       const callRpc = vi.fn(async () => { throw new Error("bridge unavailable"); });
       const host = createFakePluginHost({ pluginId: "studio", sdk: { plugins: { callRpc } } });
       const db = host.bb.storage.database();
-      for (const sql of MIGRATIONS) db.exec(sql);
+      for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
       const services = new StudioServices(db);
       const builtin = register(host.bb, db, services, async () => {});
       // A whiteboard is made in a page.

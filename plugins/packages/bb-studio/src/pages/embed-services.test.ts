@@ -10,7 +10,7 @@ it("reads and edits built-in embeds in process and preserves read errors", async
   const callRpc = vi.fn(async () => { throw new Error("RPC must not be used"); });
   const host = createFakePluginHost({ pluginId: "studio", sdk: { plugins: { callRpc } } });
   const db = host.bb.storage.database();
-  for (const sql of MIGRATIONS) db.exec(sql);
+  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
   const services = new StudioServices(db);
   const draw = registerDraw(host.bb, db, services, async () => {});
   const artifacts = registerArtifacts(host.bb, db, services, async () => {});

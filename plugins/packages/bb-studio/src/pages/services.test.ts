@@ -16,7 +16,7 @@ it("links pages and checklist handoffs directly, and reports activity failures w
     threads: { spawn: async () => ({ id: "thr_checklist" }) }, system: { config: async () => ({ primaryHostId: "host_1" }) },
   } });
   const db = host.bb.storage.database();
-  for (const sql of MIGRATIONS) db.exec(sql);
+  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
   const services = new StudioServices(db);
   const pages = registerPages(host.bb, db, { snapshotsPerPage: () => 10 }, services, async () => {}, {
     items: async () => [], create: async () => { throw new Error("not in this test"); },
@@ -74,7 +74,7 @@ it("links pages and checklist handoffs directly, and reports activity failures w
 it("embeds whiteboards in a page and finds the pages each drawing is in", async () => {
   const host = createFakePluginHost({ pluginId: "studio" });
   const db = host.bb.storage.database();
-  for (const sql of MIGRATIONS) db.exec(sql);
+  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
   const pages = registerPages(host.bb, db, { snapshotsPerPage: () => 10 }, new StudioServices(db), async () => {}, {
     items: async () => [], create: async () => { throw new Error("not in this test"); },
     drawing: () => null, saveDrawing: () => { throw new Error("not in this test"); },
