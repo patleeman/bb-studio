@@ -402,6 +402,11 @@ export interface BotDeps {
   };
 }
 
+/** BB's answer for a thread made before any provider was ready: it has no model to run with. */
+export function noStoredModel(error: unknown): boolean {
+  return /has no stored execution model/i.test(String((error as Error)?.message ?? error));
+}
+
 /** The first words in a Bot's new Main, made because the old one was deleted or archived. */
 export function newMainNote(name: string, gone: "deleted" | "archived"): string {
   return `Your previous Main conversation was ${gone}, so this is ${name}'s new Main. Check-ins, runners and automations report here now. Read your memory for context and don't redo finished work. Reply with one short line that you're here.`;
@@ -768,8 +773,14 @@ export class Bots {
     if (thread.status !== "pending" || (thread as { queuedMessageCount?: number }).queuedMessageCount) return null;
     const prompt = [{ type: "text", text: input.prompt, mentions: [], visibility: "agent-only" }];
     if (thread.providerId === input.providerId) {
-      await this.deps.sdk.threads.send({ threadId, mode: "auto", input: prompt } as never);
-      return threadId;
+      try {
+        await this.deps.sdk.threads.send({ threadId, mode: "auto", input: prompt } as never);
+        return threadId;
+      } catch (error) {
+        // The seeded Main was made before any provider was ready, so BB stored no model for it and
+        // can't send there. A new Main on the provider gets its default model; this one goes.
+        if (!noStoredModel(error)) throw error;
+      }
     }
     const next = await this.deps.sdk.threads.spawn({ projectId: thread.projectId, title: thread.title ?? input.botId, environment: { type: "project-default" }, providerId: input.providerId, pluginMetadata: { handoffFrom: threadId }, input: prompt } as never);
     const row = this.need(input.botId);

@@ -595,6 +595,8 @@ export const rpcContract = defineRpcContract({
       threadId: z.string().nullable(),
       opened: z.boolean(),
       pending: z.boolean(),
+      /** While onboarding can't finish: why, in plain words, and when it tries again. */
+      problem: z.string().nullable().optional(),
       bot: z.object({ id: z.string(), name: z.string(), primary: z.boolean(), presence: presenceSchema.optional(), appearance: appearanceSchema.nullable() }).nullable(),
     }),
   },

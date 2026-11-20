@@ -54,7 +54,7 @@ function SpaceLine({ line, resume, onResume }: { line: string | null; resume: st
   if (!line) return null;
   return (
     <span data-testid="bot-sidebar-status" className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-      <span data-testid="bot-sidebar-line" className="truncate">{line}</span>
+      <span data-testid="bot-sidebar-line" className="truncate" title={line}>{line}</span>
       {resume && onResume ? <>
         <span aria-hidden>·</span>
         <button type="button" data-testid="bot-sidebar-resume" onClick={onResume} className="shrink-0 rounded-sm text-foreground underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">{resume}</button>

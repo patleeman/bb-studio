@@ -14033,12 +14033,14 @@ public enum Studio {
     public var threadId: String?
     public var opened: Bool?
     public var pending: Bool?
+    public var problem: String?
     public var bot: BotWelcomeOutputBot?
 
-    public init(threadId: String? = nil, opened: Bool? = nil, pending: Bool? = nil, bot: BotWelcomeOutputBot? = nil) {
+    public init(threadId: String? = nil, opened: Bool? = nil, pending: Bool? = nil, problem: String? = nil, bot: BotWelcomeOutputBot? = nil) {
       self.threadId = threadId
       self.opened = opened
       self.pending = pending
+      self.problem = problem
       self.bot = bot
     }
   }

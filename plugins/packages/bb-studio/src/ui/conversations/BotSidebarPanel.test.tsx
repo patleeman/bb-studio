@@ -417,6 +417,17 @@ describe("the Bot's space (round 7)", () => {
     expect($('[data-testid="bot-sidebar-line"]')).toBeNull();
   });
 
+  it("shows onboarding's problem on the header's line while the first chat can't start, and the status again once it has", async () => {
+    state.live.bot_list = { bots: [{ id: "cos", state: "active" }] };
+    state.live.bot_welcome = { threadId: "fork", opened: false, pending: true, problem: "Your Bot's first chat didn't start yet (Host is not connected). Trying again in 20 s.", bot: null };
+    await mount();
+    expect($('[data-testid="bot-sidebar-line"]')!.textContent).toBe("Your Bot's first chat didn't start yet (Host is not connected). Trying again in 20 s.");
+    state.live.bot_welcome = { threadId: "fork", opened: true, pending: false, problem: null, bot: null };
+    await mount();
+    expect($('[data-testid="bot-sidebar-line"]')!.textContent).toBe("2 running");
+    delete state.live.bot_welcome;
+  });
+
   it("puts Resume beside a stopped or paused Bot's status and first in its menu; an active Bot has none", async () => {
     state.live.bot_list = { bots: [{ id: "cos", state: "stopped" }] };
     await mount();

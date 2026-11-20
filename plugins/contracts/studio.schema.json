@@ -15764,6 +15764,12 @@
           "pending": {
             "type": "boolean"
           },
+          "problem": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "bot": {
             "anyOf": [
               {
