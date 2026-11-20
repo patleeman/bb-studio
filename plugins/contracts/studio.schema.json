@@ -13354,6 +13354,356 @@
         "additionalProperties": false
       }
     },
+    "bot_new_main": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "bot": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "avatar": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "paused",
+                      "stopped"
+                    ]
+                  },
+                  "threadId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "memoryPageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "shape": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "color": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "role": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "primary": {
+                    "type": "boolean"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "studio",
+                      "external"
+                    ]
+                  },
+                  "providerId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "model": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "modelName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "appearance": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "themeId": {
+                            "type": "string",
+                            "pattern": "^[a-z0-9][a-z0-9-]{0,47}$"
+                          },
+                          "intensity": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "glass": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "motion": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "effects": {
+                            "type": "object",
+                            "properties": {
+                              "workers": {
+                                "type": "boolean"
+                              },
+                              "finished": {
+                                "type": "boolean"
+                              },
+                              "needsYou": {
+                                "type": "boolean"
+                              },
+                              "error": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "workers",
+                              "finished",
+                              "needsYou",
+                              "error"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "themeId",
+                          "intensity",
+                          "glass",
+                          "motion",
+                          "effects"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "presence": {
+                    "type": "object",
+                    "properties": {
+                      "form": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{1,39}$"
+                      },
+                      "color": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string",
+                                "const": "theme"
+                              }
+                            },
+                            "required": [
+                              "source"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string",
+                                "const": "custom"
+                              },
+                              "hex": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "hex"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "motion": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 2
+                      }
+                    },
+                    "required": [
+                      "form",
+                      "color",
+                      "motion"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "defaultModel": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "providerId": {
+                            "type": "string"
+                          },
+                          "model": {
+                            "type": "string"
+                          },
+                          "reasoningLevel": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "none",
+                                  "low",
+                                  "medium",
+                                  "high",
+                                  "xhigh",
+                                  "max",
+                                  "ultra",
+                                  "ultracode"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "modelName": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "providerId",
+                          "model",
+                          "reasoningLevel",
+                          "modelName"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "inBb": {
+                    "type": "boolean"
+                  },
+                  "mainProblem": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "mainNeedsModel": {
+                    "type": "boolean"
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "avatar",
+                  "state",
+                  "threadId",
+                  "createdAt",
+                  "updatedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "cadence": {
+                    "type": "string",
+                    "enum": [
+                      "hourly",
+                      "daily",
+                      "weekdays",
+                      "every5minutes",
+                      "every15minutes",
+                      "every30minutes",
+                      "every2hours",
+                      "every6hours",
+                      "weekly",
+                      "custom"
+                    ]
+                  },
+                  "time": {
+                    "type": "string",
+                    "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                  },
+                  "cron": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "cadence",
+                  "time"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "bot",
+          "run"
+        ],
+        "additionalProperties": false
+      }
+    },
     "bot_stop": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
