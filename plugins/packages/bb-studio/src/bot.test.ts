@@ -8,7 +8,7 @@ import { testScheduler } from "./test/scheduler-fixture";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { botHeartbeat, botInstructions, BOT_ID, Bots, CHECKIN_PRESETS, classifyActivity, descendants, MEMORY_TEMPLATE, setupInput, spawnedBy, startedBy } from "./bot";
+import { botHeartbeat, botInstructions, BOT_ID, Bots, newMainNote, CHECKIN_PRESETS, classifyActivity, descendants, MEMORY_TEMPLATE, setupInput, spawnedBy, startedBy } from "./bot";
 import { PERSONAL_PROJECT_ID, ProjectLeads } from "./project-lead";
 
 const dispose: (() => Promise<void>)[] = [];
@@ -234,7 +234,7 @@ it("gives a Bot whose Main was deleted a new, empty Main that its check-in follo
 
   const [made] = await Promise.all([x.bots.restoreMain(id, "t2"), x.bots.restoreMains()]);
   expect(x.spawn.mock.calls.length).toBe(spawned + 1);
-  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: PERSONAL_PROJECT_ID, title: "Scout", pluginMetadata: { bot: id }, input: [] }));
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: PERSONAL_PROJECT_ID, title: "Scout", pluginMetadata: { bot: id }, input: [expect.objectContaining({ text: newMainNote("Scout", "deleted"), visibility: "agent-only" })] }));
   expect(x.bots.stored(id)?.threadId).toBe(made);
   expect(x.bots.forThread(made!)?.id).toBe(id);
   expect(await checkins(x)).toEqual([{ key: `bot:${id}`, threadId: made, prompt: botHeartbeat("Scout") }]);
@@ -252,6 +252,101 @@ it("gives a Bot whose Main was deleted a new, empty Main that its check-in follo
   const copy = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, importedAt: () => Date.now() });
   expect(await copy.restoreMain(id, made!)).toBeNull();
   expect(x.bots.stored(id)?.threadId).toBe(made);
+});
+
+it("gives a Bot whose Main was archived a new Main with a note, and its check-ins land there; the old Main stays archived", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const id = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!.id;
+  await x.bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
+  await x.bots.setRun({ botId: id, enabled: true, cadence: "daily", time: "07:30" });
+  // Scout's Main archived (BB's menu, the CLI, a tool): a new Main.
+  x.threads.set("t2", { ...x.threads.get("t2")!, archivedAt: 9 });
+  const made = await x.bots.restoreMain(id, "t2");
+  expect(made).toBeTruthy();
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ title: "Scout", pluginMetadata: { bot: id }, input: [expect.objectContaining({ text: newMainNote("Scout", "archived") })] }));
+  expect(x.bots.stored(id)?.threadId).toBe(made);
+  expect(x.threads.get("t2")?.archivedAt).toBe(9);
+  // The primary's too: its lead moves, with its heartbeat.
+  x.threads.set("t1", { ...x.threads.get("t1")!, archivedAt: 9 });
+  const primary = await x.bots.restoreMain(BOT_ID, "t1");
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe(primary);
+  expect(new Map((await checkins(x)).map((each) => [each.key, each.threadId]))).toEqual(new Map([[PERSONAL_PROJECT_ID, primary], [`bot:${id}`, made]]));
+  // At startup nothing more to do.
+  expect(await x.bots.restoreMains()).toEqual([]);
+});
+
+it("heals at startup: a Bot whose Main was archived or deleted while Studio was off gets a new Main", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const id = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!.id;
+  x.threads.set("t1", { ...x.threads.get("t1")!, archivedAt: 9 });
+  x.threads.delete("t2");
+  const made = await x.bots.restoreMains();
+  expect(made).toHaveLength(2);
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe(made[0]);
+  expect(x.bots.stored(id)?.threadId).toBe(made[1]);
+});
+
+it("doesn't let a check-in die with an archived Main: the run finds the new Main instead of turning off", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const id = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!.id;
+  await x.bots.setRun({ botId: id, enabled: true, cadence: "daily", time: "07:30" });
+  x.scheduler.onThreadGone((threadId) => x.bots.rescueMain(threadId));
+  // Archived without Studio hearing of it (the event was missed).
+  x.threads.set("t2", { ...x.threads.get("t2")!, archivedAt: 9 });
+  const [run] = await checkins(x);
+  const main = x.bots.stored(id)?.threadId;
+  expect(main).not.toBe("t2");
+  expect(run).toEqual({ key: `bot:${id}`, threadId: main, prompt: botHeartbeat("Scout") });
+  expect(x.engine.list("heartbeat").find((trigger) => trigger.ownerId === `bot:${id}`)?.state).toBe("on");
+  // A thread that was no Bot's Main still turns its run off.
+  expect(await x.bots.rescueMain("t_other")).toBeNull();
+});
+
+it("turns back on a check-in a lost Main already turned off, once the Bot has a new Main", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const id = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!.id;
+  await x.bots.setRun({ botId: id, enabled: true, cadence: "daily", time: "07:30" });
+  const state = () => x.engine.list("heartbeat").find((trigger) => trigger.ownerId === `bot:${id}`)?.state;
+  // Before this fix: the run found the Main archived and went off for good.
+  x.threads.set("t2", { ...x.threads.get("t2")!, archivedAt: 9 });
+  await expect(x.scheduler.runNow({ owner: "heartbeat", ownerId: `bot:${id}` })).rejects.toThrow("deleted or archived");
+  expect(state()).toBe("off");
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, revive: (key) => x.scheduler.revive(key) });
+  const made = await bots.restoreMain(id, "t2");
+  expect(state()).toBe("on");
+  expect(await checkins(x)).toEqual([{ key: `bot:${id}`, threadId: made, prompt: botHeartbeat("Scout") }]);
+  // One the user turned off stays off.
+  await bots.setRun({ botId: id, enabled: false, cadence: "daily", time: "07:30" });
+  expect(x.scheduler.revive({ owner: "heartbeat", ownerId: `bot:${id}` })).toBe(false);
+});
+
+it("makes a conversation the Main: check-ins move at once, the old Main stays an ordinary conversation, and the records follow", async () => {
+  const x = await setup();
+  const mainMoved = vi.fn();
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, mainMoved, conversationBot: (threadId) => threadId.startsWith("conv") ? BOT_ID : null });
+  await bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  await bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
+  x.add({ id: "conv_1", projectId: PERSONAL_PROJECT_ID });
+  const view = await bots.makeMain("conv_1");
+  expect(view.bot).toMatchObject({ id: BOT_ID, threadId: "conv_1" });
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("conv_1");
+  expect(mainMoved).toHaveBeenLastCalledWith(BOT_ID, "conv_1", "t1");
+  expect(x.threads.get("t1")?.archivedAt ?? null).toBeNull();
+  expect((await checkins(x)).find((each) => each.key === PERSONAL_PROJECT_ID)?.threadId).toBe("conv_1");
+  // Already the Main: nothing changes.
+  mainMoved.mockClear();
+  await bots.makeMain("conv_1", BOT_ID);
+  expect(mainMoved).not.toHaveBeenCalled();
+  // Refused: archived, gone, or another Bot's Main.
+  x.add({ id: "conv_2", projectId: PERSONAL_PROJECT_ID, archivedAt: 3 });
+  await expect(bots.makeMain("conv_2")).rejects.toThrow("archived. Unarchive it first");
+  await expect(bots.makeMain("conv_gone")).rejects.toThrow("no longer exists");
+  await expect(bots.makeMain(scout.threadId!, BOT_ID)).rejects.toThrow("Scout's Main");
 });
 
 it("on a BB Studio copy, a stopped Bot from before the import is in bb, and Resume runs it here: active and no longer in bb", async () => {

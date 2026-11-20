@@ -673,6 +673,10 @@ export default async function plugin(bb: BbPluginApi) {
     hiddenThreads: () => new Set([...learning.reviewThreads(), ...sideThreads.threadIds()]),
     ownedThreads: (botId) => ownedThreads.owned(botId),
     claimChains: () => ownedThreads.claimChains(),
+    // Read when a Main moves, after the conversation records are registered below.
+    mainMoved: (botId, threadId) => botThreads.store.setMain(botId, threadId),
+    conversationBot: (threadId) => botThreads.store.conversationBot(threadId),
+    revive: (key) => scheduler.revive(key),
     runners: { threads: (botId) => runners.threads(botId), pauseAll: (botId, onPaused) => runners.pauseAll(botId, onPaused), restore: (id) => runners.restore(id) },
     automations: {
       pauseAll: (botId, onPaused) => automations.pauseAll(botId, onPaused),
@@ -880,12 +884,6 @@ export default async function plugin(bb: BbPluginApi) {
   triggers.every("area-leads", 30 * 60_000, () => { void readAreaLeads(); });
   triggers.every("automation-tasks", 60_000, () => { syncAutomationTasks(); areaStep("sync", () => areas.sync()); });
   triggers.every("automation-tasks-prune", 60 * 60_000, () => { taskStep("prune", () => automationTasks.prune()); });
-  const restoreMainFailed = (error: unknown) => bb.log.warn(`Couldn't start a new Main: ${errorText(error)}`);
-  bb.events.on("thread.deleted", ({ thread }) => {
-    const bot = bots.list().find((each) => each.threadId === thread.id);
-    if (bot) void bots.restoreMain(bot.id, thread.id).catch(restoreMainFailed);
-  });
-  void bots.restoreMains().catch(restoreMainFailed);
   bb.rpc.register(scheduledContract, {
     "loops.scheduled": async ({ threadId }) => ({
       items: scheduledItems({
@@ -1146,6 +1144,17 @@ export default async function plugin(bb: BbPluginApi) {
     botThreadsSignal ??= setTimeout(() => { botThreadsSignal = null; bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }); }, 250);
     botSignal.add(changes);
   };
+  // A Bot's Main deleted or archived (from anywhere: BB's menu, the CLI, a tool): a new Main
+  // takes over, and its heartbeat, check-ins and runner reports go there. At startup too, and
+  // when a due run finds its Main gone (the scheduler asks before it turns the run off).
+  const restoreMainFailed = (error: unknown) => bb.log.warn(`Couldn't start a new Main: ${errorText(error)}`);
+  const mainGone = ({ thread }: { thread: { id: string } }) => {
+    const bot = bots.list().find((each) => each.threadId === thread.id);
+    if (bot) void bots.restoreMain(bot.id, thread.id).catch(restoreMainFailed);
+  };
+  bb.events.on("thread.deleted", mainGone);
+  bb.events.on("thread.archived", mainGone);
+  scheduler.onThreadGone((threadId) => bots.rescueMain(threadId));
   const threadSeeds = new ThreadSeeds(db);
   const pushRpc = (call: Parameters<typeof bb.sdk.plugins.callRpc>[0]) => bb.sdk.plugins.callRpc(call);
   const botThreads = registerBotThreads(bb, db, {
@@ -1183,6 +1192,11 @@ export default async function plugin(bb: BbPluginApi) {
       WHERE bot_id = ? AND source_kind = 'conversation' AND topic = ? AND replaced_by_id IS NULL AND archived = 0 AND source_id IS NOT NULL
       ORDER BY created_at ASC`).all(botId, FINISH_TOPIC) as { source_id: string; text: string }[]).map((row) => [row.source_id, row.text])),
   });
+  // Startup, and every 5 minutes: a Bot whose Main was deleted or archived while Studio was off, or
+  // when a new Main couldn't start (no host connected yet), gets a new Main. One thread read per Bot.
+  const healMains = () => { for (const bot of bots.list()) void bots.restoreMain(bot.id).catch(restoreMainFailed); };
+  healMains();
+  triggers.every("main-heal", 5 * 60_000, healMains);
   // Workers from before that default get it once, after the first classification settles.
   const quietWorkersOnce = setTimeout(() => void (async () => {
     if (await bb.storage.kv.get(WORKER_LEVELS_KEY)) return;
@@ -1600,6 +1614,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_set_run: (run) => bots.setRun(run),
     bot_pause: ({ botId }) => bots.pause(botId),
     bot_resume: ({ botId }) => bots.resume(botId),
+    bot_make_main: ({ botId, threadId }) => bots.makeMain(threadId, botId),
     bot_stop: ({ botId }) => bots.stop(botId),
     bot_maintenance_threads: async ({ botId }) => ({ threads: await maintenance.olderThreads(learnerId(botId)) }),
     bot_maintenance_get: ({ botId }) => maintenance.view(learnerId(botId)),
@@ -1632,6 +1647,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_listed_threads: () => ({ threadIds: [...new Set([...ownedThreads.all(), ...sideThreads.threadIds()])] }),
     bot_side_thread_open: async ({ threadId, messageId }) => { const opened = await botThreads.messageThreads.reply({ threadId, messageId }); return { threadId: opened.threadId, created: opened.created }; },
     bot_thread_owner: async ({ threadId }) => ({ botId: ownedThreads.ownerOf(threadId) ?? runners.forThread(threadId)?.bot_id ?? await botThreads.owner(threadId) }),
+    bot_conversation_owner: ({ threadId }) => ({ botId: botThreads.store.conversationBot(threadId) ?? bots.list().find((bot) => bot.threadId === threadId)?.id ?? null }),
     bot_thread_release: ({ threadId }) => ownedThreads.release(threadId),
     bot_welcome: onboarding.bot_welcome,
     bot_welcome_opened: onboarding.bot_welcome_opened,

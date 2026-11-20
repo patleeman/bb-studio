@@ -234,11 +234,11 @@ it("names a mentioned conversation by its BB title once BB answers, unless a new
   expect([...(await store.mentionTitles("@thread:thr_main @thread:thr_report @thread:thr_gone"))]).toEqual([["thr_report", "Kettle report"]]);
 });
 
-it("lets the user rename and archive a conversation, but not archive Main", async () => {
+it("lets the user rename and archive a conversation, Main too (the Bot then gets a new Main)", async () => {
   const { store } = setup([{ id: "thr_main" }, { id: "conv" }]);
   await store.backfill();
   expect(store.update("conv", { title: "  Launch prep " }).title).toBe("Launch prep");
-  expect(() => store.update("thr_main", { archived: true })).toThrow(/Main/);
+  expect(store.update("thr_main", { archived: true }).archivedAt).not.toBeNull();
   expect(store.update("conv", { archived: true }).archivedAt).not.toBeNull();
   expect(() => store.update("nope", { title: "x" })).toThrow();
 });
@@ -534,6 +534,23 @@ it("keeps a hidden \"Reply in thread\" side thread of Main a conversation, over 
   // An agent's hidden fork stays a worker in the same pass.
   db.prepare("INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, owner_conversation_id, source, created_at, updated_at) VALUES ('agent_w', 'bot_dot', 'worker', 0, 'thr_main', 'reconciled', 7, 7)").run();
   expect(await store.reclassifyForks(new Map([["agent_w", { id: "agent_w", originKind: "fork", sourceThreadId: "thr_main", visibility: "hidden" }]]))).toBe(0);
+});
+
+it("moves the Main mark with Make this the Main: the old Main stays an open conversation, the new one is the Main", () => {
+  const { store } = setup([]);
+  store.recordConversation("thr_old", "bot_dot");
+  store.setMain("bot_dot", "thr_old");
+  store.recordConversation("thr_new", "bot_dot");
+  store.recordConversation("thr_scout", "bot_scout");
+  store.setMain("bot_scout", "thr_scout");
+  store.setMain("bot_dot", "thr_new");
+  expect(store.get("thr_new")).toMatchObject({ isMain: true, archivedAt: null, kind: "conversation" });
+  expect(store.get("thr_old")).toMatchObject({ isMain: false, archivedAt: null, kind: "conversation" });
+  expect(store.get("thr_scout")).toMatchObject({ isMain: true });
+  // A new Main Studio just made, with no row yet.
+  store.setMain("bot_dot", "thr_fresh");
+  expect(store.get("thr_fresh")).toMatchObject({ botId: "bot_dot", isMain: true });
+  expect(store.get("thr_new")?.isMain).toBe(false);
 });
 
 it("lists every Bot's open conversations latest activity first for the New Tab page", () => {

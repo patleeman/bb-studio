@@ -580,8 +580,11 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     bot_worker_ask: ({ threadId, text }: { threadId: string; text: string }) => askAboutWorker(threadId, text),
     bot_conversation_approvals: ({ threadId }: { threadId: string }) => conversationApprovals(threadId),
     bot_push_ids: ({ threadId }: { threadId: string }) => pushIds(threadId),
-    bot_thread_update: ({ threadId, title, archived }: { threadId: string; title?: string | null; archived?: boolean }) => {
+    bot_thread_update: async ({ threadId, title, archived }: { threadId: string; title?: string | null; archived?: boolean }) => {
+      const main = archived === true && !!store.get(threadId)?.isMain;
       store.update(threadId, { ...(title !== undefined ? { title } : {}), ...(archived !== undefined ? { archived } : {}) });
+      // Archiving Main archives the thread in BB too: the Bot gets a new Main (thread.archived, server.ts).
+      if (main) await bb.sdk.threads.archive({ threadId });
       return { ok: true };
     },
     bot_needs_you_set: ({ threadId, reason }: { threadId: string; reason: string | null }) => ({ ok: store.setNeedsYou(threadId, reason, reason ? "user" : null) }),

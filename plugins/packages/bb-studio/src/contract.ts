@@ -539,6 +539,8 @@ export const rpcContract = defineRpcContract({
   bot_pause: { input: forBot, output: botView },
   /** Resumes a paused or stopped Bot, and its heartbeat if it was on. */
   bot_resume: { input: forBot, output: botView },
+  /** Make this the Main: a conversation of the Bot becomes its Main; the old Main stays an ordinary conversation. */
+  bot_make_main: { input: z.object({ botId, threadId: z.string().min(1) }), output: botView },
   /** Pauses the Bot, stops the running threads it started and turns off its schedules. Its data is kept. */
   bot_stop: { input: forBot, output: botView.extend({ stoppedThreadIds: z.array(z.string()), pausedAutomationIds: z.array(z.string()) }) },
   /** What the Bot is doing: Needs you, In progress, Scheduled, Completed. */
@@ -581,6 +583,8 @@ export const rpcContract = defineRpcContract({
   bot_side_thread_open: { input: z.object({ threadId: threadIdInput, messageId: z.string().min(1).max(200) }), output: z.object({ threadId: z.string(), created: z.boolean() }) },
   /** The Bot a thread belongs to (its chat, a thread it started, a runner, an automation run), or null: the sidebar keeps the Bots list on it. */
   bot_thread_owner: { input: z.object({ threadId: z.string().min(1).max(200) }), output: z.object({ botId: z.string().nullable() }) },
+  /** The Bot whose conversation (not worker) a thread is, Main or not: Make this the Main's menu item. */
+  bot_conversation_owner: { input: z.object({ threadId: z.string().min(1).max(200) }), output: z.object({ botId: z.string().nullable() }) },
   /** Hands a thread to a Bot (dropped on it in the sidebar): it moves under the Bot, out of BB's thread list. */
   bot_thread_adopt: { input: z.object({ botId: z.string().min(1).max(100), threadId: z.string().min(1).max(200) }), output: z.object({ botId: z.string() }) },
   /** Takes a thread back from its Bot (dropped on Threads in the sidebar): back in BB's thread list, and no Bot's from now on. */

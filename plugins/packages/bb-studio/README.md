@@ -406,6 +406,22 @@ create, update, pause, resume, delete) are noted in Main with a quiet line.
 BB's own completion notice for a finished child still goes to the thread
 that spawned it, which is the worker's conversation.
 
+**Main can be archived, deleted or replaced.** Archiving or deleting a
+Bot's Main, from anywhere (BB's thread menu, the CLI, a tool, Studio's
+sidebar), is allowed: Studio starts a new Main for the same Bot, on its
+default provider and model, with a short agent-only note when the Bot is
+active (`Bots.replaceMain`). Its heartbeat moves there; check-ins,
+reminders, watchers and runner reports read the Main when they run. This
+happens on `thread.archived` and `thread.deleted`, at startup and every
+5 minutes (`main-heal`: a Main lost while Studio was off, or a new Main
+that couldn't start yet with no host connected), and when a due run finds
+its Main gone (the scheduler asks `onThreadGone` before it turns a run
+off). A heartbeat or check-in a lost Main already turned off comes back on
+with the new Main, from now (`EngineScheduler.revive`). **Make this the
+Main** (every thread menu on a Bot's conversation: the sidebar row and the
+thread header; RPC `bot_make_main`) makes a conversation the Main at once;
+the old Main stays an ordinary, open conversation.
+
 **Every conversation is the Bot**: its instructions (plus one short line
 saying which conversation it is), all of its tools (profile, skills,
 history, runners, automations, pause and stop) and its skills. A thread on
