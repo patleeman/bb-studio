@@ -274,6 +274,42 @@ const replacements = [
     `openLabel="View the failed ${NAME} update"`,
   ],
   [
+    "apps/app/src/components/settings/UpdatesSettingsSection.tsx",
+    ': "Restart and update bb automatically"',
+    `: "Restart and update ${NAME} automatically"`,
+  ],
+  [
+    "apps/app/src/components/settings/UpdatesSettingsSection.tsx",
+    'description="Checks every hour and restarts bb into a new version',
+    `description="Checks every hour and restarts ${NAME} into a new version`,
+  ],
+  [
+    "apps/app/src/components/settings/UpdatesSettingsSection.tsx",
+    '<RowStateCaption state="in-progress">Updating bb</RowStateCaption>',
+    `<RowStateCaption state="in-progress">Updating ${NAME}</RowStateCaption>`,
+  ],
+  [
+    "apps/app/src/components/settings/UpdatesSettingsSection.tsx",
+    "isn’t compatible with this bb`",
+    `isn’t compatible with this ${NAME}\``,
+  ],
+  [
+    "apps/app/src/components/settings/UpdatesSettingsSection.tsx",
+    ": `bb couldn’t activate ",
+    `: \`${NAME} couldn’t activate `,
+  ],
+  [
+    "apps/app/src/components/settings/UpdatesSettingsSection.test.tsx",
+    'name: "Restart and update bb automatically",',
+    `name: "Restart and update ${NAME} automatically",`,
+    2,
+  ],
+  [
+    "apps/app/src/components/settings/UpdatesSettingsSection.test.tsx",
+    '.getByText("Updating bb")',
+    `.getByText("Updating ${NAME}")`,
+  ],
+  [
     "apps/app/src/components/app-update/useStartAppUpdate.tsx",
     'title="Update bb now?"',
     `title="Update ${NAME} now?"`,
