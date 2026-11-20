@@ -4,7 +4,7 @@
 // and a card re-renders only when its own task changed. A long conversation
 // holds dozens of ::work and ::loop cards.
 import { useRealtime, useRealtimeConnectionState } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { STUDIO_REALTIME_CHANNEL } from "../../kit/contract";
 import { errorMessage } from "../../kit/format";
 import { useCall } from "../../ui/live";
@@ -148,12 +148,19 @@ function chunks<T>(items: readonly T[], size: number): T[][] {
 
 const shared = new TaskViews();
 
-/** A task card's task, read with every other card's. */
-export function useTaskView(id: string): TaskViewState & { refresh(): void } {
+/**
+ * A task card's task, read with every other card's. A card that is not
+ * `active` (far off screen) stays out of the reads and keeps what it last
+ * showed.
+ */
+export function useTaskView(id: string, active = true): TaskViewState & { refresh(): void } {
   const call = useCall();
   useEffect(() => { shared.load = (ids) => call("tasks.getMany", { ids }); }, [call]);
-  const subscribe = useCallback((listener: () => void) => shared.subscribe(id, listener), [id]);
-  const state = useSyncExternalStore(subscribe, () => shared.get(id), () => LOADING);
+  const subscribe = useCallback((listener: () => void) => (active ? shared.subscribe(id, listener) : () => {}), [id, active]);
+  const last = useRef<{ id: string; state: TaskViewState } | null>(null);
+  const held = last.current?.id === id ? last.current.state : LOADING;
+  const state = useSyncExternalStore(subscribe, () => (active ? shared.get(id) : held), () => LOADING);
+  last.current = { id, state };
   useRealtime(STUDIO_REALTIME_CHANNEL, () => shared.signal());
   // Signals are not replayed after a socket reconnect; read again then.
   const connection = useRealtimeConnectionState();
@@ -164,4 +171,34 @@ export function useTaskView(id: string): TaskViewState & { refresh(): void } {
   }, [connection]);
   const refresh = useCallback(() => shared.refresh(id), [id]);
   return { ...state, refresh };
+}
+
+/** How far past its scroll area's edges a card still counts as near: two screens. */
+export const NEAR_MARGIN = "200% 0px";
+
+function scrollParent(element: HTMLElement): HTMLElement | null {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node);
+    if (overflowY === "auto" || overflowY === "scroll") return node;
+  }
+  return null;
+}
+
+/**
+ * Whether an element is within two screens of what its scroll area shows.
+ * Near until measured, and always without IntersectionObserver.
+ */
+export function useNearScreen(): [(element: HTMLElement | null) => void, boolean] {
+  const [element, setElement] = useState<HTMLElement | null>(null);
+  const [near, setNear] = useState(true);
+  useEffect(() => {
+    if (!element || typeof IntersectionObserver !== "function") return;
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries.at(-1);
+      if (entry) setNear(entry.isIntersecting);
+    }, { root: scrollParent(element), rootMargin: NEAR_MARGIN });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [element]);
+  return [setElement, near];
 }

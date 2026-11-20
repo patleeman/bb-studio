@@ -7,7 +7,7 @@ import { Icon, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import { useTaskActions } from "./actions";
 import { TaskOutputs } from "./Outputs";
-import { useTaskView } from "./task-views";
+import { useNearScreen, useTaskView } from "./task-views";
 export { useTaskActions } from "./actions";
 import { BotAvatar } from "../../ui/bot/BotAvatar";
 import type { Loop } from "../../loops/contract";
@@ -51,7 +51,8 @@ export function TaskDirective({ attributes, message }: PluginMessageDirectivePro
 }
 
 export function LiveTask({ id, row, threadId, messageId }: { id: string; row: number | null; threadId: string | null; messageId: string | null }) {
-  const live = useTaskView(id);
+  const [nearRef, near] = useNearScreen();
+  const live = useTaskView(id, near);
   const call = useCall();
   const missing = live.missing;
   const view = remember<TaskView>(`task:${id}`, missing ? null : (live.data ?? undefined));
@@ -64,10 +65,14 @@ export function LiveTask({ id, row, threadId, messageId }: { id: string; row: nu
     anchored.current = true;
     void call("work.anchor", { id, threadId, messageId }).catch(() => {});
   }, [unplaced, call, id, threadId, messageId]);
-  if (missing) return <div data-testid="task-missing" className="my-1 flex items-center gap-2 text-xs text-muted-foreground"><Icon name="Unavailable" className="size-3.5" />This task was removed.</div>;
-  if (!view && live.error) return <p role="alert" data-testid="task-error" className="my-1 flex items-center gap-2 text-xs text-destructive"><Icon name="AlertCircle" className="size-3.5 shrink-0" />{live.error}</p>;
-  if (!view) return row !== null ? <div className="h-8 animate-pulse rounded-md bg-muted/40 motion-reduce:animate-none" /> : <div className={cn(CHAT_CARD_SKELETON, "h-28")} />;
-  return row !== null ? <TaskRow view={view} people={people} refresh={live.refresh} /> : <TaskCardView view={view} people={people} refresh={live.refresh} chat />;
+  // The wrapper is what useNearScreen watches: a card far off screen stays out of the reads.
+  return <div ref={nearRef} data-task-card-slot="">{body()}</div>;
+  function body() {
+    if (missing) return <div data-testid="task-missing" className="my-1 flex items-center gap-2 text-xs text-muted-foreground"><Icon name="Unavailable" className="size-3.5" />This task was removed.</div>;
+    if (!view && live.error) return <p role="alert" data-testid="task-error" className="my-1 flex items-center gap-2 text-xs text-destructive"><Icon name="AlertCircle" className="size-3.5 shrink-0" />{live.error}</p>;
+    if (!view) return row !== null ? <div className="h-8 animate-pulse rounded-md bg-muted/40 motion-reduce:animate-none" /> : <div className={cn(CHAT_CARD_SKELETON, "h-28")} />;
+    return row !== null ? <TaskRow view={view} people={people} refresh={live.refresh} /> : <TaskCardView view={view} people={people} refresh={live.refresh} chat />;
+  }
 }
 
 

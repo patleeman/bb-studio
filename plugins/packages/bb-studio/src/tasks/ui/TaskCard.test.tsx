@@ -31,6 +31,7 @@ vi.mock("../../ui/live", () => ({
   },
 }));
 vi.mock("./task-views", () => ({
+  useNearScreen: () => [() => {}, true],
   useTaskView: (id: string) => {
     const error = state.errors[id] ?? null;
     const missing = !!error && /not found/i.test(error);
