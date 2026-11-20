@@ -146,17 +146,17 @@ letters, digits and dashes, such as `identifierForVendor`) and per Bot:
 
 Tokens live in the plugin's SQLite database (`live_activity_tokens`, created
 by the plugin's migrations), at most 64 per device and 512 in all, the oldest
-dropped first. `bb mobile live-activities [--json]` lists them (device, Bot,
+dropped first. `bbs mobile live-activities [--json]` lists them (device, Bot,
 kind, last registered; not the tokens). Nothing in Studio calls
 `live_activity_push` yet: it waits for the app's Bot Live Activity.
 
 ## CLI, RPC, and settings
 
-- `bb mobile status [--json]` shows whether APNs is ready, the relay path, and
+- `bbs mobile status [--json]` shows whether APNs is ready, the relay path, and
   the last delivery.
-- `bb mobile live-activities [--json]` lists the registered Live Activity
+- `bbs mobile live-activities [--json]` lists the registered Live Activity
   tokens.
-- `bb mobile deliveries [--hours N] [--json]` shows what the relay did with
+- `bbs mobile deliveries [--hours N] [--json]` shows what the relay did with
   each push over the last N hours (24 by default): per hour, how many were
   sent, quiet, muted, held at the desk, folded into a window or failed, and
   the sent ones by kind; then the last 20. The journal keeps the last 1,000
@@ -164,7 +164,7 @@ kind, last registered; not the tokens). Nothing in Studio calls
   worker ids, category and outcome. No titles, bodies or device tokens.
 - RPC: `notify`, `mute_list`, `mute_set`, `push_status`, `push_test`,
   `live_activity_register`, `live_activity_unregister`, `live_activity_push`.
-- Settings (`bb plugin config mobile`): `apnsKey` (secret) and `apnsKeyId`.
+- Settings (`bbs plugin config mobile`): `apnsKey` (secret) and `apnsKeyId`.
   The team ID, bundle ID, APNs environment and Expo push URL are constants,
   each overridable with an environment variable on the BB host
   (`BB_MOBILE_APNS_TEAM_ID`, `BB_MOBILE_BUNDLE_ID`,
@@ -183,8 +183,8 @@ kind, last registered; not the tokens). Nothing in Studio calls
 cd packages/bb-studio-mobile
 npm install
 npm test
-bb plugin build .
-bb plugin install .
+bbs plugin build .
+bbs plugin install .
 ```
 
 ## Staged preview

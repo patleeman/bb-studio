@@ -10,6 +10,13 @@ your agents make, including pages, Talk recordings and dictations, drawings,
 designs and saved artifacts, and other plugins' items. Search across all of
 them, filter by kind, project and tag, and hand any of them to an agent.
 
+## Command line
+
+BB Studio's command is `bbs` (`bb-studio` also works). Install it from
+Settings › Command line. In a terminal, `bb` stays stock bb's; in Studio's own
+conversations `bb` runs Studio's command too, so agents can use either. The
+commands in this README use `bbs`.
+
 ## VS Code
 
 VS Code is built into Studio. Choose **VS Code** from a thread's right-panel
@@ -48,7 +55,7 @@ row's ⋯ or right-click menu. **Starred**, at the top of the Studio sidebar
 with its count, opens the library on `is:starred`, newest-starred first; the
 **Starred** button above the list does the same in the Studio app and in a
 thread's Studio tab. Stars sync to the iOS app, survive renames and go when
-the item is deleted. `bb studio starred` lists them.
+the item is deleted. `bbs studio starred` lists them.
 
 ### The Studio tab in a thread
 
@@ -237,14 +244,14 @@ replies), which the migration carried over. Bot → Controls → Attention:
 
 API keys are in the **API keys** section at the bottom of Studio's settings
 page, kept in BB's secret files. The rest are scriptable
-with `bb studio settings`:
+with `bbs studio settings`:
 
 ```sh
-bb studio settings                    # every setting by section; (default) marks unchanged ones
-bb studio settings get loopDailyBudget
-bb studio settings set loopQuietStart 23
-bb studio settings reset autoTitle    # back to the default
-bb studio settings list --json
+bbs studio settings                    # every setting by section; (default) marks unchanged ones
+bbs studio settings get loopDailyBudget
+bbs studio settings set loopQuietStart 23
+bbs studio settings reset autoTitle    # back to the default
+bbs studio settings list --json
 ```
 
 The keys are the ones BB's settings used. On the first load after this
@@ -264,7 +271,7 @@ environment variable (restart BB after setting one):
 | Talk segment length | 25 seconds | none |
 
 Todos' time zone is a setting again: **Time zone** in Bot settings ▸
-Attention (`todosTimeZone`; `bb studio settings set todosTimeZone
+Attention (`todosTimeZone`; `bbs studio settings set todosTimeZone
 America/Los_Angeles`). The Todos page, todo cards, the pane, snooze times,
 the scheduler's due and quiet hours, and the morning card all read it. Empty
 uses `STUDIO_LOOP_TIME_ZONE` when set, else this computer's zone.
@@ -316,7 +323,7 @@ first line); `source` (`backfill`, `created`, `reconciled` or `user`). Table
    tool made is a **worker** owned by the conversation that owns its source
    (else Main). BB's thread record doesn't say who made a fork, so an
    agent's is told by: a parent or lifecycle owner; `visibility: "hidden"`
-   (`bb thread fork --visibility hidden`; what you start in the app is
+   (`bbs thread fork --visibility hidden`; what you start in the app is
    visible); a source that is a worker, or an agent's thread Studio has no
    row for (an archived chain of such forks, read a few levels up); or a
    source that was in a turn when the fork was made (its last
@@ -436,7 +443,7 @@ conversations and workers are doing. Nothing shows on screen for it.
   name; elsewhere nothing is registered), a conversation gets an agent-only
   digest with its input, not stored in the thread. bb attaches turn context
   only to a turn it starts in "start" mode, which in practice is the
-  thread's first turn: later messages (the composer, `bb thread tell`) go in
+  thread's first turn: later messages (the composer, `bbs thread tell`) go in
   "auto" mode and carry none. That is kept on purpose: every turn would add
   up to 1,500 characters to the history each time. It is read
   from Studio's database only (bb waits at most 500 ms for all plugins): one
@@ -503,7 +510,7 @@ These conversations are kept indefinitely: nothing cleans them up.
 ### The Bot sidebar
 
 Choose **Bot (Studio)** (`studio/everything`) in Settings → Appearance or
-with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
+with `bbs thread-list`. It shows one Bot at a time (`src/ui/conversations`):
 
 - **Top**, sticky: the Bot's space header (round 7, 7a), a band of its own
   with a bottom border: the avatar (36px), the name (15px, semibold), a
@@ -717,13 +724,13 @@ engine that paints the scene and maps the theme onto BB's tokens
   mode. A scene that can't be drawn shows the variant that reads on its
   fallback color. The package's `scene.backdrop.modes` gives each variant
   its own darkest and brightest backdrop, so each variant's glass is
-  checked against the scenes it is shown over. `bb studio theme preview`
+  checked against the scenes it is shown over. `bbs studio theme preview`
   prints the season, the time of day and the variant; `--date` (and
   `--time`) previews a date in local time with fair weather and `--clear`
   goes back to the clock. It is the preview Tonight's Sky reads
   (`theme.sky.preview`), so both scenes show the same moment.
 - **Tonight's Sky shows the real sky.** For the place Forest uses (the
-  city once one is set with `bb studio theme weather --city`, else the
+  city once one is set with `bbs studio theme weather --city`, else the
   time zone's coordinates, else 40° N at the clock's offset) and the
   computer's clock, it draws 2,887 stars to magnitude 5.5 in their colors,
   the 88 constellations' lines and names, the Moon at its phase and
@@ -741,7 +748,7 @@ engine that paints the scene and maps the theme onto BB's tokens
   light once the Sun is above -3.5°, dark once it is below -4.5°, the
   last choice in between; the package declares each variant's backdrop
   (`scene.backdrop.modes`) and denser glass for the light one. The view
-  (`bb studio theme sky --view <follow|south|east|west>`, stored as
+  (`bbs studio theme sky --view <follow|south|east|west>`, stored as
   `theme.sky.view`, default follow) puts the Sun in the open area the
   cards leave while it is above -9°, else the Moon or the brightest
   planet, else faces south; south, east and west face that way whatever
@@ -778,7 +785,7 @@ engine that paints the scene and maps the theme onto BB's tokens
   engine uploads as the `u_layer` texture: a scene driver's `publish` takes
   an optional picture `{ source, version }`, and the engine uploads it when
   the version changes. RPC: `theme.sky { timeZone }` returns the place, the
-  preview time and the view. `bb studio theme sky` prints the Sun's
+  preview time and the view. `bbs studio theme sky` prints the Sun's
   altitude and azimuth, the phase of twilight, the view, the variant and
   what is up; `--date` previews another day or night in the window until
   `--clear` (stored in Studio's KV as `theme.sky.preview`; the window
@@ -884,17 +891,17 @@ engine that paints the scene and maps the theme onto BB's tokens
 - **CLI**:
 
 ```
-bb studio theme list [--json]
-bb studio theme show <id>
-bb studio theme template                      # a working scene package to start from
-bb studio theme check --file <theme.json> [--json]   # runs the checks, saves nothing
-bb studio theme create --file <theme.json>
-bb studio theme update <id> --file <patch.json> [--new-id <id>]
-bb studio theme apply <id|none> [--bot <id|name>] [--intensity 0-1] [--glass 0-1] [--motion 0-1] [--on workers,finished,needsYou,error] [--off …]
-bb studio theme delete <id>
-bb studio theme weather [--city <name> | --clear]   # Forest's place and weather (Open-Meteo); a city, or back to the time zone
-bb studio theme sky [--date <yyyy-mm-dd[Thh:mm]> [--time <hh:mm>] | --clear] [--view <follow|south|east|west>]   # Tonight's Sky: the Sun, the phase of twilight, the view, the variant, the Moon, planets, meteors and events; preview a date (local time), or back to the clock; choose where it looks
-bb studio theme preview [--date <yyyy-mm-dd[Thh:mm]> [--time <hh:mm>] | --clear]   # Kyoto Garden: the season, time of day and variant; the same preview as theme sky
+bbs studio theme list [--json]
+bbs studio theme show <id>
+bbs studio theme template                      # a working scene package to start from
+bbs studio theme check --file <theme.json> [--json]   # runs the checks, saves nothing
+bbs studio theme create --file <theme.json>
+bbs studio theme update <id> --file <patch.json> [--new-id <id>]
+bbs studio theme apply <id|none> [--bot <id|name>] [--intensity 0-1] [--glass 0-1] [--motion 0-1] [--on workers,finished,needsYou,error] [--off …]
+bbs studio theme delete <id>
+bbs studio theme weather [--city <name> | --clear]   # Forest's place and weather (Open-Meteo); a city, or back to the time zone
+bbs studio theme sky [--date <yyyy-mm-dd[Thh:mm]> [--time <hh:mm>] | --clear] [--view <follow|south|east|west>]   # Tonight's Sky: the Sun, the phase of twilight, the view, the variant, the Moon, planets, meteors and events; preview a date (local time), or back to the clock; choose where it looks
+bbs studio theme preview [--date <yyyy-mm-dd[Thh:mm]> [--time <hh:mm>] | --clear]   # Kyoto Garden: the season, time of day and variant; the same preview as theme sky
 ```
 
 ### Presence
@@ -953,7 +960,7 @@ plain JavaScript that declares `function draw(ctx, t, state, palette,
 size)`: `t` is seconds of presence time, `state` is `{ name, workers,
 clock }`, `palette` is three `#rrggbb` strings (amber in the needs
 state), `size` is the picture's side in CSS px.
-`bb studio presence template --guide` prints the full contract.
+`bbs studio presence template --guide` prints the full contract.
 
 The code is untrusted and never runs in the app's own context
 (`sandbox.ts`). Each custom presence is an `<iframe sandbox="allow-scripts">`
@@ -993,14 +1000,14 @@ template), `update { id, name?, description?, code?, newId? }`,
 a Bot uses it).
 
 ```bash
-bb studio presence list [--json]
-bb studio presence show <id>
-bb studio presence template [--guide]
-bb studio presence check --file <presence.json> [--code <draw.js>] [--json]
-bb studio presence create --file <presence.json> [--code <draw.js>]
-bb studio presence update <id> [--file <patch.json>] [--code <draw.js>] [--new-id <id>]
-bb studio presence apply <id> [--bot <id|name>] [--color theme|#rrggbb] [--motion 0-2]
-bb studio presence delete <id>
+bbs studio presence list [--json]
+bbs studio presence show <id>
+bbs studio presence template [--guide]
+bbs studio presence check --file <presence.json> [--code <draw.js>] [--json]
+bbs studio presence create --file <presence.json> [--code <draw.js>]
+bbs studio presence update <id> [--file <patch.json>] [--code <draw.js>] [--new-id <id>]
+bbs studio presence apply <id> [--bot <id|name>] [--color theme|#rrggbb] [--motion 0-2]
+bbs studio presence delete <id>
 ```
 
 `node scripts/presence-sandbox.mjs [draw.js]` runs a hostile module
@@ -1766,10 +1773,10 @@ what you are typing.
 The same actions are available from the CLI (`bb pages …` before the merge):
 
 ```sh
-bb studio pages list [--all]
-bb studio pages show <page-id|title> [--ids]
-bb studio pages create <title> [--global] [--markdown <text>]
-bb studio pages append <page-id|title> <markdown…>
+bbs studio pages list [--all]
+bbs studio pages show <page-id|title> [--ids]
+bbs studio pages create <title> [--global] [--markdown <text>]
+bbs studio pages append <page-id|title> <markdown…>
 ```
 
 [skills/pages/SKILL.md](skills/pages/SKILL.md) documents the tools, the
@@ -1788,7 +1795,7 @@ database in the BB data directory. Uploads are limited to 15 MB each and are
 served back at `/api/v1/plugins/studio/http/pages/files`; a page saved before
 the merge, with `/api/v1/plugins/pages/http/files` addresses in it, shows its
 files from Studio too. When an agent writes a page (`pages_create`,
-`pages_edit`, `bb studio pages create|append`), each Markdown image with a
+`pages_edit`, `bbs studio pages create|append`), each Markdown image with a
 local path inside its thread's workspace or thread storage (PNG, JPEG, GIF or
 WebP, up to 10 MB; not SVG) is copied into the page's files and its src
 rewritten to that address; the tool result names any it left as written. A
@@ -1802,13 +1809,13 @@ first time a page opens, not with Studio; the server loads pdf-lib only for a
 PDF export.
 
 BlockNote's menus and toolbars are styled with Tailwind classes that live in
-`node_modules`, which `bb plugin build` doesn't scan. `blocknote-tailwind.txt`
+`node_modules`, which `bbs plugin build` doesn't scan. `blocknote-tailwind.txt`
 lists them so the build generates them. After upgrading `@blocknote/shadcn`,
 run `pnpm tailwind:blocknote` (and `pnpm css:blocknote` for the stylesheet).
 
 ### Backup
 
-Pages are the `pages` section of `bb studio backup` (see
+Pages are the `pages` section of `bbs studio backup` (see
 [docs/backup.md](../../docs/backup.md)), as they were with the separate
 plugin, so older backups restore into Studio. A backup holds each page's
 content with its comments, the Markdown copy, saved versions and uploaded
@@ -1821,7 +1828,7 @@ again after you close it picks it up.
 
 ## Explore
 
-Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one drafts "💬 Tell me more" about it so the agent explains it in the thread. It ran inside the Studio Pages plugin and moved into Studio with it: Studio keeps the Next row's click log in its own database. The CLI is `bb studio pages explore stats` (`bb pages explore stats` before the merge).
+Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one drafts "💬 Tell me more" about it so the agent explains it in the thread. It ran inside the Studio Pages plugin and moved into Studio with it: Studio keeps the Next row's click log in its own database. The CLI is `bbs studio pages explore stats` (`bbs pages explore stats` before the merge).
 
 Explore's settings are in **Settings → Studio → Agent replies** (keys `explore_next`, `explore_explore`, `explore_quickReplies`, `explore_replyItems`, as before): **Next row** (on), **Things to explore** (on), **Quick replies** (on), and **Your usual quick replies** (`👍 Looks good, 🔁 Try another way, ❓ Explain more`). They apply to agent sessions started after the change. A session's instructions carry one line about the Next row (or Explore): which attributes are on and your usual quick replies; the full rules are in the studio skill's "Agent guide" (`skills/studio/SKILL.md`), which the agent loads before it writes one.
 
@@ -1839,7 +1846,7 @@ The agent writes it as one line, and any group can be left out:
 ::next{reply="👍 Ship it|🧪 Add tests first" btw="🐛 I noticed the new endpoint retries without waiting. If the server is down, it will get hammered." do="📄 Write up the plan as a page"}
 ```
 
-Studio logs each suggestion once when it's shown and counts its clicks. The log keeps the last 180 days (at most 50,000 suggestions). `bb studio pages explore stats [--days 30]` prints how often each kind (reply, do, fix; older logs also have more, for the removed Tell me more, and explore, for the removed Visual explainer) is clicked and the most-clicked labels, so the instructions can be tuned from real use. Older replies with `::explore` or `::reactions` lines, or `explore` items in `::next`, still render.
+Studio logs each suggestion once when it's shown and counts its clicks. The log keeps the last 180 days (at most 50,000 suggestions). `bbs studio pages explore stats [--days 30]` prints how often each kind (reply, do, fix; older logs also have more, for the removed Tell me more, and explore, for the removed Visual explainer) is clicked and the most-clicked labels, so the instructions can be tuned from real use. Older replies with `::explore` or `::reactions` lines, or `explore` items in `::next`, still render.
 
 ## Apps
 
@@ -1924,7 +1931,7 @@ with `BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=artifacts-compact-header`.
 - **Live HTML.** An HTML artifact's page gets `window.playground`, the same
   API as BB playgrounds: shared state that persists per artifact and syncs to
   every open copy, theme changes, an event log, actions an agent can run
-  (`apps (op: live)`, or `bb studio artifacts state|watch|actions|do`), and
+  (`apps (op: live)`, or `bbs studio artifacts state|watch|actions|do`), and
   `send(label, data)`, which puts an @artifact pill holding that data in the
   thread's composer. A playground's HTML works unchanged as an artifact.
   In a chat card the page's frame fits its height (120–640 px).
@@ -1937,10 +1944,10 @@ with `BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=artifacts-compact-header`.
   **App cards** on), a card with an inline preview that opens the viewer
   beside the chat. `@artifact` mentions give the agent the artifact's
   details and, for text up to 1 MB, its contents.
-- **Commands.** `bb studio artifacts save <path> [--title <title>]
+- **Commands.** `bbs studio artifacts save <path> [--title <title>]
   [--description <text>]`, `list [--thread]`, `show <id>`,
   `export <id> [path] [--force]` and `delete <id>`. A plugin registers one CLI
-  command, so the old `bb artifacts …` moved under `bb studio`.
+  command, so the old `bbs artifacts …` moved under `bbs studio`.
 - **Limits.** 25 MB per file. A version is keyed on its source thread and
   path; unchanged bytes add no version. Saving reads only from the thread's
   workspace or thread storage.
@@ -2055,7 +2062,7 @@ secrets aren't backed up, so a restored app asks again.
 
 `apps (op: create)` (type `"mini"`), `apps (op: read)`, `apps (op: list)` and `apps (op: live)`,
 `apps (op: update)` and `minis_data`, the `minis` skill, and
-`bb studio minis list|show|data|state|watch|actions|do`. What an app returns
+`bbs studio minis list|show|data|state|watch|actions|do`. What an app returns
 to an agent is wrapped as data, never instructions.
 
 ## Whiteboards
@@ -2064,7 +2071,7 @@ A whiteboard is an [Excalidraw](https://excalidraw.com) scene that lives in a
 page. There's one way to make one in each place: `/whiteboard` in a page,
 **New → Whiteboard** in Studio (a new page called "Untitled whiteboard"
 holding one 640px whiteboard), `pages_create` with `type: "whiteboard"` for agents and
-`bb studio whiteboards create` on the command line. Each is embedded in its
+`bbs studio whiteboards create` on the command line. Each is embedded in its
 page as `{"kind":"drawing","target":"drw_…"}`, with an optional `"height"`.
 Whiteboards used to be "drawings", the separate Studio Draw plugin
 (`excalidraw`) and then a kind of their own. Items keep that id as their
@@ -2138,12 +2145,12 @@ open. Recapture with
   missed), and the agent's next read sees yours. Edits merge per element;
   two edits to the same element resolve by Excalidraw's `version`, higher
   wins. Deletions travel as tombstones (pruned after 30 days).
-- **Commands.** `bb studio whiteboards list`, `create --page <page-id> <name>`,
+- **Commands.** `bbs studio whiteboards list`, `create --page <page-id> <name>`,
   `show <id> [--raw]`, `rename <id> <new-name>`, `delete <id>`,
   `merge <id> <scene-file.json>` (an elements array or a full scene, with its
-  image files) and `remove-elements <id> <element-id…>`. `bb studio drawings …`
+  image files) and `remove-elements <id> <element-id…>`. `bbs studio drawings …`
   is the old name and still works. A plugin registers one CLI command, so the
-  old `bb excalidraw …` moved under `bb studio`.
+  old `bbs excalidraw …` moved under `bbs studio`.
 - **Export.** **Download PNG** in the editor renders in your browser. Studio's
   item menu exports PNG, SVG or the `.excalidraw` JSON, drawn on the server
   with Excalidraw's fonts (resvg's WebAssembly build loads on the first PNG).
@@ -2231,7 +2238,7 @@ The same deck presented with Play and moved on with →: "Why it matters",
   `design_screen (op: edit)`, `design_review (op: comments)`, `design_review (op: resolve)`,
   `design_style (op: save)` and `design_style (op: list)`, and the `design` skill. `@design`
   mentions give the agent the design's rounds and options.
-- **Commands.** `bb studio designs list`, `show <id>` (rounds, screens and
+- **Commands.** `bbs studio designs list`, `show <id>` (rounds, screens and
   open comments as JSON), `html <id> <screen>`, `rename <id> <new-name>` and
   `delete <id>`.
 
@@ -2239,7 +2246,7 @@ Designs, rounds, screens, comments and saved styles are stored in Studio's
 SQLite database. Frames load from
 `GET /api/v1/plugins/studio/http/designs/screen`, whose response carries a
 sandbox CSP, so a screen gets an opaque origin with no access to BB.
-`bb studio backup` includes each design with its rounds, screens and
+`bbs studio backup` includes each design with its rounds, screens and
 comments; saved styles aren't in backups yet.
 
 ## Recordings
@@ -2425,7 +2432,7 @@ The compact recording header at 390 pixels, with **Chat** and **Item actions**.
   recording* and *Talk: Pause or resume* are Studio commands now. A keyboard
   shortcut set on the Talk plugin's command has to be set again on Studio's
   (BB keys custom shortcuts by plugin).
-- **CLI.** `bb studio recordings list [--query <text>] [--json]`,
+- **CLI.** `bbs studio recordings list [--query <text>] [--json]`,
   `show <id> [--json]`, `transcript <id> [--cleaned] [--offset <chars>] [--limit <chars>]`
   and `notes <id> [--json]`. The bundled `talk` skill documents them for
   agents.
@@ -2674,8 +2681,8 @@ reply's message bar shows the four reactions as emoji.
 | Show reactions under your messages | `showInUserBar` | on |
 
 ```sh
-bb studio settings set emojiItems "👍 Agree, 👎 Disagree, ✅ Do it"
-bb studio settings set quotePosition after
+bbs studio settings set emojiItems "👍 Agree, 👎 Disagree, ✅ Do it"
+bbs studio settings set quotePosition after
 ```
 
 Message menus read the settings once when Studio's frontend loads. After a
@@ -2685,7 +2692,7 @@ menus. Other open windows update on their next reload.
 **Moving from Studio Reactions.** On its first start with `emoji-react`
 installed, Studio copies that plugin's settings once (a KV marker records
 it), skipping any you already changed in Studio. Then remove the old plugin
-from **Setup → Retired plugins** or with `bb plugin remove emoji-react`;
+from **Setup → Retired plugins** or with `bbs plugin remove emoji-react`;
 while both are installed, each shows its own buttons.
 
 ## What you get
@@ -2760,21 +2767,21 @@ so it's as you left it when you come back.
 ![A regular staged thread without a workspace: its header shows the Automations count and no VS Code button.](assets/thread-header-automations.png)
 - **For agents**: the `studio_list_items`,
   `studio_tag_items`, `studio_delete_items` and
-  `studio_move_items` tools, the `bb studio` CLI, and a `studio` skill. With
+  `studio_move_items` tools, the `bbs studio` CLI, and a `studio` skill. With
   `studio_workspace`, `studio_open_items` and `studio_close_tabs` an agent sees
   the tabs you have open in the BB window you're using, opens items beside
   them, and closes tabs.
 
 ```sh
-bb studio list [query…] [--all] [--kind <kind>] [--query <text>] [--tag <tag>] [--json]
-bb studio tags
-bb studio starred [--json]
-bb studio move <item-link|plugin:id>… --project <name|id|global>
-bb studio providers
-bb studio health [--json]
-bb studio auth status [--json]
-bb studio auth login <provider-or-account> [--no-wait] [--json]
-bb studio reindex
+bbs studio list [query…] [--all] [--kind <kind>] [--query <text>] [--tag <tag>] [--json]
+bbs studio tags
+bbs studio starred [--json]
+bbs studio move <item-link|plugin:id>… --project <name|id|global>
+bbs studio providers
+bbs studio health [--json]
+bbs studio auth status [--json]
+bbs studio auth login <provider-or-account> [--no-wait] [--json]
+bbs studio reindex
 ```
 
 ## Bot
@@ -3279,7 +3286,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   makes at runtime can't be a native per-thread skill. **Skills** (⋯, or
   Bot info → **Manage skills**) has **Share**, which moves the skill to BB's user skills
   (`<BB data dir>/skills/<name>/SKILL.md`, scope `bb-user`; see
-  `bb skill list`), where every agent finds it; it refuses a name that's
+  `bbs skill list`), where every agent finds it; it refuses a name that's
   already there. **Delete** removes it. See "Skills that learn" below.
   Each Bot has a **Skills** page (`skills/<botId>`, `src/ui/skills/`) on
   the Bot-page template, beside Memory: its skills (archived ones apart),
@@ -4041,7 +4048,7 @@ any page type's id. Reply cards (`::page`, `::design`, `::mini`, `::artifact`)
 are unchanged, and `::app{id="…"}` shows either app type (see [Apps](#apps)).
 
 **Filters.** `family:page` and `family:app` filter by family and `type:design`
-by type, in the filter bar, `bb studio list` and `studio_list_items`. `kind:`
+by type, in the filter bar, `bbs studio list` and `studio_list_items`. `kind:`
 means what it did, so a saved `kind:design` or `kind:page` shows what it showed
 before; `type:` also reads the older names (`type:drawing` is whiteboards).
 `searchAll` takes `apps`, `pages`, `doc` and `whiteboard` in `kinds` too.
@@ -4086,7 +4093,7 @@ after a restore. A backup made before the index restores the same way.
   [Studio’s internal kit](src/kit), and publish them for RPC discovery.
   Studio finds them with `bb.sdk.plugins.experimental_discoverRpc` and calls
   them with `callRpc`. Any plugin can join the suite this way.
-- Studio keeps an FTS5 index of item titles and `studio_read` text. `studio_changed` updates changed items; `bb studio reindex` rebuilds the index. The `searchAll` RPC returns ranked items and thread matches with snippet ranges.
+- Studio keeps an FTS5 index of item titles and `studio_read` text. `studio_changed` updates changed items; `bbs studio reindex` rebuilds the index. The `searchAll` RPC returns ranked items and thread matches with snippet ranges.
 - An add-on tells Studio when its items change (`studio_changed`); Studio
   relays that over realtime and the open collection refetches.
 - A stopped or failing add-on shows up as unavailable instead of breaking the
@@ -4110,7 +4117,7 @@ off**, **Needs setup** or **Broken**, with its health checks under it.
   skips Studio Mobile, which only the iOS app needs. Each action shows the
   same CLI command with a Copy button, for when it fails.
 - If BB doesn't know the `bb-studio` marketplace yet, the page shows
-  `bb marketplace add git:github.com/patleeman/bb-studio@main` first.
+  `bbs marketplace add git:github.com/patleeman/bb-studio@main` first.
 - **Retired plugins** shows `studio-tables` and `emoji-react` (Studio
   Reactions, built into Studio now) if they're installed: why it is
   retired, what removing it keeps and deletes. **Remove…** asks before it
@@ -4119,7 +4126,7 @@ off**, **Needs setup** or **Broken**, with its health checks under it.
   each; see [Kinds](#kinds).
 - Problems with plugins outside BB Studio are listed at the bottom.
 
-`bb studio setup` prints the same status, the retired plugins and the
+`bbs studio setup` prints the same status, the retired plugins and the
 commands left to run; `--json` prints the whole summary.
 
 ## Kinds
@@ -4155,7 +4162,7 @@ When it applies:
 | Agent tools and instructions | From each thread's next session start or resume; a running session keeps what it has |
 | Thread tabs, composer entries, reply cards, the recorder | After a window reload (Setup offers **Reload window**) |
 
-No `bb plugin reload studio` is needed. Turning recordings off stops the
+No `bbs plugin reload studio` is needed. Turning recordings off stops the
 recorder and dictation in the window after its reload; recordings already
 transcribing finish on the server.
 
@@ -4198,10 +4205,10 @@ measured latency and cost are in [docs/voice/spike.md](../../docs/voice/spike.md
 
 ## Backup and restore
 
-`bb studio backup [--out <file|folder>]` saves every Studio item into one
+`bbs studio backup [--out <file|folder>]` saves every Studio item into one
 `.zip`. That covers pages, recordings with their audio, drawings, artifacts,
 designs, and Studio's tags, project leads, links, comments and
-versions. `bb studio restore <file>` shows what would change, and `--yes`
+versions. `bbs studio restore <file>` shows what would change, and `--yes`
 restores it. Restore matches each item by its original id, so running it
 again changes nothing, and it never overwrites a copy that is newer here.
 Projects are matched by path or name; items whose project isn't on the BB
@@ -4249,7 +4256,7 @@ once those problems are fixed or hidden, or with its close button. Each problem 
 actions: **Fix** opens the place to fix it, **Turn off plugin** disables the
 plugin, and **Hide** hides it until it changes or goes away and comes back.
 **Open plugin setup** goes to the Setup page, which also shows hidden
-problems and what passed. `bb studio health` prints every plugin's problems
+problems and what passed. `bbs studio health` prints every plugin's problems
 and exits 1 when a problem isn't hidden.
 
 ![The Plugin health card open above the sidebar footer on staged stable BB, showing that Studio Decisions has no Jev provider set up, with Add a key, Turn off plugin and Hide](assets/plugin-health.png)
@@ -4259,7 +4266,7 @@ and exits 1 when a problem isn't hidden.
 ## Sign in again
 
 Studio watches the sign-ins BB's agents run on: each Account Pooler login
-(`bb pool account list`: an enabled account in `error`) and each provider's
+(`bbs pool account list`: an enabled account in `error`) and each provider's
 own login on this Mac (BB's provider readiness: `expired`, or
 `unauthenticated` for a provider that was signed in before; and a turn that
 fails with a sign-in error such as "OAuth session expired and could not be
@@ -4286,10 +4293,10 @@ dropped, and error messages have token-like text removed. The pasted Claude
 code goes straight to the pooler or the command and is not kept.
 
 ```sh
-bb studio auth status [--json]
-bb studio auth login <provider-or-account> [--no-wait] [--json]
-printf '%s\n' "$CODE" | bb studio auth complete <session> --code-stdin
-bb studio auth cancel <session>
+bbs studio auth status [--json]
+bbs studio auth login <provider-or-account> [--no-wait] [--json]
+printf '%s\n' "$CODE" | bbs studio auth complete <session> --code-stdin
+bbs studio auth cancel <session>
 ```
 
 `<provider-or-account>` is `codex`, `claude`, a provider id, a pool account's
@@ -4307,12 +4314,12 @@ page's **Needs you**) lists every sign-in BB's agents run on, in three groups:
 | Group | What it lists | Read from |
 | --- | --- | --- |
 | BB Studio | this app's Account Pooler accounts | the pooler's `status.get`, the pooler's refresh-rejection markers (key names only) and whether each login file exists (never its contents) |
-| bb | the Account Pooler of the bb install BB Studio imported from | bb's own server on this Mac (`status.get` on its loopback address from bb's `bb-app-runtime.json`), the same call `bb pool status` makes; no token is needed or read |
-| This Mac | each provider's own login (Claude Code, Codex and any other signed-in provider) and its usage windows | BB's provider readiness and BB's usage limits (`bb settings usage`); a login through the Account Pooler shows the pooler's windows instead |
+| bb | the Account Pooler of the bb install BB Studio imported from | bb's own server on this Mac (`status.get` on its loopback address from bb's `bb-app-runtime.json`), the same call `bbs pool status` makes; no token is needed or read |
+| This Mac | each provider's own login (Claude Code, Codex and any other signed-in provider) and its usage windows | BB's provider readiness and BB's usage limits (`bbs settings usage`); a login through the Account Pooler shows the pooler's windows instead |
 
 Each account shows its status (Ready, Signed out, Error, Limited, Off), its
 5h and 7d windows and per-model limits (Fable, Opus, …) with reset times.
-`bb studio accounts` also lists the threads pinned to each pool account (the
+`bbs studio accounts` also lists the threads pinned to each pool account (the
 pooler's pins used in the last 65 minutes, matched to threads by their
 provider session). The panel has no scroller of its own: the footer's card
 scrolls. An account whose refresh
@@ -4357,11 +4364,11 @@ Studio 1.0.1 (footer-placed sidebar sections); older builds show only the
 cards.
 
 ```sh
-bb studio accounts [status] [--source studio|bb|local] [--json]
-bb studio accounts warnings [--json]
-bb studio accounts dismiss <warning-id>
-bb studio accounts use-other <account>
-bb studio accounts login <account> [--bb] [--no-wait] [--json]
+bbs studio accounts [status] [--source studio|bb|local] [--json]
+bbs studio accounts warnings [--json]
+bbs studio accounts dismiss <warning-id>
+bbs studio accounts use-other <account>
+bbs studio accounts login <account> [--bb] [--no-wait] [--json]
 ```
 
 `<account>` is a key from `status` (`studio:<id>`, `bb:<id>`, `local:<provider>`),
@@ -4375,7 +4382,7 @@ log line carries one.
 ```sh
 pnpm typecheck
 pnpm test
-bb plugin build .
+bbs plugin build .
 ```
 
 Studio owns its contracts, helpers and UI under `src/kit`. Its runtime dependencies
@@ -4525,7 +4532,7 @@ strands. Quiet `[PASS]` replies and the backfill's history aren't tagged.
   reply pushes as before. Thread levels still apply: muted and input-only
   threads push no replies at all.
 
-`bb studio strands [<conversation>|main] [--items <n>] [--sort] [--json]`
+`bbs studio strands [<conversation>|main] [--items <n>] [--sort] [--json]`
 shows how a conversation was sorted. An agent sees only its own Bot's
 conversations.
 
@@ -4537,7 +4544,7 @@ Auto in the model pickers, plain-language rules with fallback chains that Jev pi
 
 See the [Decisions guide](../../docs/decisions.md) for provider setup and the plugin RPC.
 
-Studio runs Jev, its fallback model and Smart Queue. Configure Decisions on Studio’s settings page (its keys with the API keys, the rest in the Jev, Threads and Advanced sections; `decisions_` keys, also with `bb studio settings`), or run `bb studio decisions status`, `check`, `recent`, `classify` and `fallback`. The standalone `smart-queue` plugin still suppresses Studio’s queue.
+Studio runs Jev, its fallback model and Smart Queue. Configure Decisions on Studio’s settings page (its keys with the API keys, the rest in the Jev, Threads and Advanced sections; `decisions_` keys, also with `bbs studio settings`), or run `bbs studio decisions status`, `check`, `recent`, `classify` and `fallback`. The standalone `smart-queue` plugin still suppresses Studio’s queue.
 
 The Decisions migration is complete. If Setup still lists an old Decisions
 bridge install, it is safe to remove: Studio already has the settings, keys,

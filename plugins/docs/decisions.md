@@ -118,7 +118,7 @@ card starts a fresh decision for the new text.
 
 ## Settings
 
-Open **Settings → Plugins → Studio**. The keys are in the **API keys** section at the bottom of the page, and each falls back to its environment variable; the rest are in Studio's Threads, Smart Queue model and Advanced sections (`bb studio settings`).
+Open **Settings → Plugins → Studio**. The keys are in the **API keys** section at the bottom of the page, and each falls back to its environment variable; the rest are in Studio's Threads, Smart Queue model and Advanced sections (`bbs studio settings`).
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
@@ -141,22 +141,22 @@ The Jev section also has:
 - **If Jev doesn't answer, use** chooses what decides when no Jev provider answers: the
   caller's provider (the busy thread's for Smart Queue), a
   specific model picked with BB's own provider, model, and reasoning picker,
-  or off. The same choice is available as `bb studio decisions fallback`.
+  or off. The same choice is available as `bbs studio decisions fallback`.
 
 ## Commands
 
 ```sh
-bb studio decisions status              # Jev routes, problems, and the fallback model
-bb studio decisions recent [--limit n]  # Recent decisions, newest first
-bb studio decisions classify <thread-id> <message>  # Dry run; sends nothing
-bb studio decisions check               # Test the Jev connection with a sample message
-bb studio decisions fallback [thread | off | <provider-id> <model> [<reasoning>]]
+bbs studio decisions status              # Jev routes, problems, and the fallback model
+bbs studio decisions recent [--limit n]  # Recent decisions, newest first
+bbs studio decisions classify <thread-id> <message>  # Dry run; sends nothing
+bbs studio decisions check               # Test the Jev connection with a sample message
+bbs studio decisions fallback [thread | off | <provider-id> <model> [<reasoning>]]
 ```
 
 Every command accepts `--json`.
 
 Studio's [plugin health](../packages/bb-studio/README.md#plugin-health) check
-(`bb studio health` and the sidebar footer) reports:
+(`bbs studio health` and the sidebar footer) reports:
 
 - a Jev provider setting that is invalid,
 - no Jev provider set up (broken if the fallback model is off too, otherwise
@@ -190,4 +190,4 @@ Both return `{ ok: true, … , via, ms }`, or `{ ok: false, unavailable, error }
 `unavailable` means nothing is configured to answer.
 
 
-Studio settings use `decisions_<old-key>`, including all five secret key settings. The migration from the standalone Decisions plugin is complete; if Setup lists an old bridge install, remove it there. Current commands start with `bb studio decisions`, for example `bb studio decisions status`.
+Studio settings use `decisions_<old-key>`, including all five secret key settings. The migration from the standalone Decisions plugin is complete; if Setup lists an old bridge install, remove it there. Current commands start with `bbs studio decisions`, for example `bbs studio decisions status`.

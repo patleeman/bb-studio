@@ -11,6 +11,7 @@
 // Once a notified thread is read or answered anywhere, a silent push tells the
 // app to remove its notifications (see clear.ts).
 import { setThreadMuted, stillMuted } from "./mute-levels.js";
+import { studioCliName, studioCliRegistration } from "./cli-name";
 import { readFile } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import { homedir } from "node:os";
@@ -819,7 +820,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 
-  bb.cli.register({
+  bb.cli.register(studioCliRegistration({
     name: "mobile",
     summary: "BB Studio push relay status",
     commands: [
@@ -864,7 +865,7 @@ export default async function plugin(bb: BbPluginApi) {
         apnsReady: !("missing" in apns),
         apnsProblem: "missing" in apns ? apns.missing : null,
         environment: "missing" in apns ? null : apns.config.environment,
-        relayPath: "/api/v1/plugins/mobile/http/push?token=<bb plugin token mobile>",
+        relayPath: `/api/v1/plugins/mobile/http/push?token=<${studioCliName()} plugin token mobile>`,
         lastDelivery: last ?? null,
         deskHold: deskStatus(),
       };
@@ -881,5 +882,5 @@ export default async function plugin(bb: BbPluginApi) {
         ].join("\n"),
       };
     },
-  });
+  }));
 }

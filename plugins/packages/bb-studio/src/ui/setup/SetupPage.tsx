@@ -174,7 +174,7 @@ export function SetupPage() {
           ) : null}
           <KindsSection />
           <ProjectLeadsSection />
-          <BackupSection />
+          <BackupSection cliName={summary.cliName} />
           <p className="text-xs text-subtle-foreground">Last checked {new Date(summary.checkedAt).toLocaleTimeString()}.</p>
         </>
       )}

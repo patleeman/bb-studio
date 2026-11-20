@@ -45,6 +45,8 @@ export const setupSummarySchema = z.object({
   /** False when BB doesn't know the bb-studio marketplace, so installs can't work. */
   marketplaceAdded: z.boolean(),
   marketplaceCommand: z.string(),
+  /** The command that runs Studio's CLI here: `bbs`, or `bb` under stock bb or a BB Studio from before bbs. */
+  cliName: z.enum(["bbs", "bb"]),
   addOns: z.array(addOnSchema),
   retired: z.array(retiredSchema),
   /** Every command left to run, one per line, or empty when there's nothing to do. */

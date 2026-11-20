@@ -65,7 +65,7 @@ stored settings keep the two kinds apart.
   composer entry (recordings: none of Talk's frontend) and its reply cards
   render nothing; a kind routed to another provider drops its composer +
   entry. Those need a window reload, which Setup offers. Nothing needs
-  `bb plugin reload studio`. Data, CLI commands and pending interactions stay.
+  `bbs plugin reload studio`. Data, CLI commands and pending interactions stay.
 
 ```ts
 kinds: [{ id: "notion-page", label: "Notion page", plural: "Notion pages", icon: "FileText", replaces: "page", create: { mode: "rpc" }, /* … */ }]
@@ -81,7 +81,7 @@ The Studio hub stores links, item threads, activity, comments, and content versi
 
 ## Search
 
-Studio keeps an SQLite FTS index of every provider's titles and `studio_read` text, updated from the change feed; `bb studio reindex` rebuilds it. `searchAll { query, kinds?, limit }` merges that index with live BB thread search and returns ranked hits with highlighted snippets. Cmd/Ctrl+Shift+K opens it as a quick-open palette; Cmd/Ctrl+K stays BB's thread search.
+Studio keeps an SQLite FTS index of every provider's titles and `studio_read` text, updated from the change feed; `bbs studio reindex` rebuilds it. `searchAll { query, kinds?, limit }` merges that index with live BB thread search and returns ranked hits with highlighted snippets. Cmd/Ctrl+Shift+K opens it as a quick-open palette; Cmd/Ctrl+K stays BB's thread search.
 
 Templates and bulk export are described in the [Studio README](../packages/bb-studio/README.md#templates-and-export).
 
@@ -102,15 +102,15 @@ implementation.
 
 ## Setup
 
-Studio's Setup page (`/plugins/studio/studio/setup`) and `bb studio setup` are the one place to set up BB Studio. `src/setup.ts` joins three things: the add-on list, BB's plugin list and the latest plugin health result.
+Studio's Setup page (`/plugins/studio/studio/setup`) and `bbs studio setup` are the one place to set up BB Studio. `src/setup.ts` joins three things: the add-on list, BB's plugin list and the latest plugin health result.
 
 - **Add-ons.** `src/setup-addons.ts` is a copy of `marketplace.json`'s entries, bundled so Studio needs no network call; `setup.test.ts` fails when the two drift. Each add-on is installed, not installed, turned off, needs setup (a degraded health problem) or broken (a broken one), with its health checks.
-- **Actions.** Install uses `sdk.plugins.catalog.installPlan` and `catalog.install` for `<id>@bb-studio`, passing the source BB resolved as the confirmation a third-party marketplace needs. Turn on uses `sdk.plugins.enable`. Each action also shows its CLI command (`bb plugin install <id>@bb-studio --yes`, `bb plugin enable <id>`) with a Copy button, for when the call fails.
+- **Actions.** Install uses `sdk.plugins.catalog.installPlan` and `catalog.install` for `<id>@bb-studio`, passing the source BB resolved as the confirmation a third-party marketplace needs. Turn on uses `sdk.plugins.enable`. Each action also shows its CLI command (`bbs plugin install <id>@bb-studio --yes`, `bbs plugin enable <id>`) with a Copy button, for when the call fails.
 - **Retired plugins.** `studio-tables` and `emoji-react` (Studio Reactions, built into Studio as `src/reactions/`) show up when installed, with what's kept and what's deleted. Remove uses `sdk.plugins.remove` after a confirm. `emoji-react` is blocked until Studio has copied its settings (it copies them once on start, and tries again when Setup checks).
 
 The RPCs are `setup.summary`, `setup.install`, `setup.enable` and `setup.remove` (`src/setup-contract.ts`).
 
-Backup and restore (`bb studio backup|restore` and the Setup page) are described in [backup.md](backup.md).
+Backup and restore (`bbs studio backup|restore` and the Setup page) are described in [backup.md](backup.md).
 
 ## Independent workspace
 
@@ -204,7 +204,7 @@ iOS has its own navigation stacks and isn't covered here.
 
 ## Decisions in Studio
 
-Studio runs Jev, its fallback model and Smart Queue. Configure Decisions on Studio’s settings page (`decisions_` setting keys), or run `bb studio decisions status`, `check`, `recent`, `classify` and `fallback`. The standalone `smart-queue` plugin still suppresses Studio’s queue.
+Studio runs Jev, its fallback model and Smart Queue. Configure Decisions on Studio’s settings page (`decisions_` setting keys), or run `bbs studio decisions status`, `check`, `recent`, `classify` and `fallback`. The standalone `smart-queue` plugin still suppresses Studio’s queue.
 
 The Decisions migration is complete. If Setup still lists an old Decisions
 bridge install, it is safe to remove: Studio already has the settings, keys,

@@ -66,11 +66,11 @@ describe("buildSetup", () => {
     }));
     const byId = Object.fromEntries(summary.addOns.map((addOn) => [addOn.id, addOn]));
     expect(byId.mobile).toMatchObject({ status: "not-installed", optional: expect.stringContaining("iOS") });
-    expect(byId.studio).toMatchObject({ status: "disabled", command: "bb plugin enable studio" });
+    expect(byId.studio).toMatchObject({ status: "disabled", command: "bbs plugin enable studio" });
     expect(byId["smart-decisions"]).toBeUndefined();
     expect(byId["studio"]!.problems).toEqual([]);
     expect(byId["studio"]).toMatchObject({ status: "disabled", passed: [] });
-    expect(summary.commands).toEqual(["bb plugin enable studio"]);
+    expect(summary.commands).toEqual(["bbs plugin enable studio"]);
     expect(summary.installAll).toBeNull();
     expect(summary.otherProblems.map((each) => each.pluginId)).toEqual(["other"]);
     expect(summary.checkedAt).toBe(1000);
@@ -80,7 +80,7 @@ describe("buildSetup", () => {
     const { sdk } = fakeSdk([], { marketplaces: ["bb-community"] });
     const summary = await buildSetup(sdk, health());
     expect(summary.marketplaceAdded).toBe(false);
-    expect(summary.commands[0]).toBe("bb marketplace add git:github.com/patleeman/bb-studio@main");
+    expect(summary.commands[0]).toBe("bbs marketplace add git:github.com/patleeman/bb-studio@main");
     // Mobile and Visual Chat are optional: not in "Install all".
     expect(summary.installAll?.split(" && ")).toHaveLength(ADDONS.length - 2);
     expect(summary.installAll).not.toContain("studio-visual-chat");
@@ -92,7 +92,7 @@ describe("retired plugins", () => {
     const { sdk } = fakeSdk([...allInstalled(), plugin("studio-tables", { enabled: false }), plugin("pages")]);
     const summary = await buildSetup(sdk, health());
     expect(summary.retired.map((each) => each.id)).toEqual(["studio-tables"]);
-    expect(summary.retired[0]).toMatchObject({ blocker: null, removeCommand: "bb plugin remove studio-tables", kept: expect.any(String), deleted: expect.stringContaining("CSV"), enabled: false });
+    expect(summary.retired[0]).toMatchObject({ blocker: null, removeCommand: "bbs plugin remove studio-tables", kept: expect.any(String), deleted: expect.stringContaining("CSV"), enabled: false });
   });
 });
 
@@ -135,7 +135,7 @@ describe("retired Studio Reactions", () => {
     expect(blocked.failures).toEqual([{ id: "emoji-react", error: expect.stringContaining("hasn't copied its settings") }]);
     expect(fake.calls).not.toContain("remove emoji-react");
     copied = true;
-    expect((await setup.summary(0)).retired[0]).toMatchObject({ id: "emoji-react", blocker: null, removeCommand: "bb plugin remove emoji-react" });
+    expect((await setup.summary(0)).retired[0]).toMatchObject({ id: "emoji-react", blocker: null, removeCommand: "bbs plugin remove emoji-react" });
     await setup.remove("emoji-react");
     expect(fake.calls).toContain("remove emoji-react");
   });
@@ -151,8 +151,8 @@ describe("formatSetup", () => {
     expect(text).toMatch(/ {2}disabled +studio +Studio:/);
     expect(text).not.toContain("smart-decisions");
     expect(text).toContain("Retired plugins still installed\n  studio-tables");
-    expect(text).toContain("Then remove it: bb plugin remove studio-tables");
-    expect(text.trimEnd().endsWith("To finish setup, run:\n  bb plugin enable studio")).toBe(true);
+    expect(text).toContain("Then remove it: bbs plugin remove studio-tables");
+    expect(text.trimEnd().endsWith("To finish setup, run:\n  bbs plugin enable studio")).toBe(true);
   });
 
   it("says when there's nothing left to run", async () => {
@@ -196,7 +196,7 @@ describe("retired upgrade bridges", () => {
     for (const entry of summary.retired) {
       expect(entry.blocker).toBeNull();
       expect(entry.before[0]?.text).toContain("No migration step is needed");
-      expect(entry.removeCommand).toBe(`bb plugin remove ${entry.id}`);
+      expect(entry.removeCommand).toBe(`bbs plugin remove ${entry.id}`);
     }
     const setup = new SetupService({ sdk: fake.sdk, health: async () => health() });
     await setup.remove("studio-code");

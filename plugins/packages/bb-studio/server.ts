@@ -92,6 +92,7 @@ import { parseCliArgs, type CliSpec } from "./src/cli-args";
 // - Studio keeps the sidebar's tabs, one per opened item (src/tabs.ts).
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { experimental_PluginRpcRefusal } from "@get-bb/plugin-sdk";
+import { studioCliName, studioCliRegistration } from "./src/cli-name";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { STUDIO_PLUGIN_ID, STUDIO_PROVIDER_CALL_METHOD, STUDIO_REALTIME_CHANNEL } from "./src/kit/contract";
@@ -2901,7 +2902,7 @@ export default async function plugin(bb: BbPluginApi) {
   /** A CLI path, relative to where the command ran. */
   const cliPath = (path: string, cwd: string | undefined) => (isAbsolute(path) ? path : resolvePath(cwd ?? homedir(), path));
 
-  bb.cli.register({
+  bb.cli.register(studioCliRegistration({
     name: "studio",
     summary: "BB Studio: pages, recordings, drawings, designs, artifacts and other add-ons' items",
     commands: [
@@ -3000,7 +3001,7 @@ export default async function plugin(bb: BbPluginApi) {
           }
           case "providers": {
             const providers = await hub.providers();
-            if (!providers.length) return { exitCode: 0, stdout: "No Studio kinds are ready. Reload Studio: bb plugin reload studio\n" };
+            if (!providers.length) return { exitCode: 0, stdout: `No Studio kinds are ready. Reload Studio: ${studioCliName()} plugin reload studio\n` };
             const lines = providers.map(
               (provider) =>
                 `${provider.pluginId}\t${provider.state}\t${provider.kinds.map((kind) => kind.id).join(",") || "-"}${provider.detail ? `\t${provider.detail}` : ""}`,
@@ -3050,7 +3051,7 @@ export default async function plugin(bb: BbPluginApi) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };
       }
     },
-  });
+  }));
   // Merged tools (src/merged-tools.ts), once every member tool is in the book. A merged op runs only when its old tool is in the thread's scope.
   mergedRegistration = true;
   for (const tool of mergedTools({ book: toolBook as never, allowed: async (ctx, oldName) => {
