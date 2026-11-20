@@ -1022,7 +1022,7 @@ export class Bots {
       await this.pointMain(row, threadId, current);
     } catch (error) {
       // The heartbeat moves first; BB still had no model for the thread.
-      if (/Choose a provider and model/.test(String((error as Error)?.message ?? error))) throw new Error(`That conversation has no model yet. Choose a model in it (or set ${row.name}'s default model in Bot settings), then make it the Main.`);
+      if (/Choose a (provider and )?model/.test(String((error as Error)?.message ?? error))) throw new Error(`That conversation has no model yet. Choose a model in it (or set ${row.name}'s default model in Bot settings), then make it the Main.`);
       throw error;
     }
     return this.get(row.id);

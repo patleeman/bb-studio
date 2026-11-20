@@ -56,6 +56,7 @@ import { join } from "node:path";
 import { resumeLog } from "./auto-resume";
 import { compileSchedule, describeSchedule, endOfDay, fromHeartbeat, localZone, type Schedule, type Trigger } from "./schedule";
 import { isScheduleId, scheduleKey, type EngineScheduler } from "./triggers/scheduler";
+import { threadModel } from "./thread-model";
 
 type Sdk = BbPluginApi["sdk"];
 export type AutomationKind = "checkin" | "runner" | "reminder" | "watcher";
@@ -337,9 +338,9 @@ export class Automations {
 
   /** What an agent kind runs on: the Bot thread's provider, and its model unless the automation picks a cheaper one. */
   private async agentExecution(row: Row, threadId: string, prompt: string) {
-    const [thread, defaults] = await Promise.all([this.deps.sdk.threads.get({ threadId }), this.deps.sdk.threads.defaultExecutionOptions({ threadId }).catch(() => null)]);
+    const [thread, defaults] = await Promise.all([this.deps.sdk.threads.get({ threadId }), threadModel(this.deps.sdk, threadId, this.deps.scheduler.preferredModel?.(threadId)).catch(() => null)]);
     const model = row.model ?? defaults?.model;
-    if (!thread.providerId || !model) throw new Error("Choose a provider and model for the Bot's thread first.");
+    if (!thread.providerId || !model) throw new Error("The Bot's Main conversation has no model yet. Choose one in it (or set the Bot's default model in Bot settings), then try again.");
     return {
       projectId: thread.projectId ?? PERSONAL,
       execution: {
@@ -360,12 +361,15 @@ export class Automations {
 
   /** A check-in or reminder: one trigger on Studio's scheduler, on while the row and its Bot are active. */
   private async provisionOwn(row: Row, bot: AutomationBot, schedule: Schedule): Promise<Row> {
-    if (!bot.threadId) throw new Error(`${bot.name} has no thread yet.`);
-    const { projectId } = await this.agentExecution(row, bot.threadId, "");
+    const on = row.state === "active" && bot.state === "active";
+    // Its run reads the Main and its model when due (the resolver, and the scheduler's model fallback), so
+    // pausing, or following a new Main, never reads the thread: a gone Main or one with no model can't block it.
+    if (on && !bot.threadId) throw new Error(`${bot.name} has no Main conversation. Pick one in Bot settings (or start a new one), then turn this on.`);
+    const projectId = PERSONAL;
     this.save(row.id, { provision_pending: 1 });
     // Left from before the move to Studio's scheduler: their BB automations go (best effort).
     for (const old of this.resources(row)) if (!isScheduleId(old.id)) await this.call("automations_delete", { projectId: old.projectId, automationId: old.id }, z.unknown()).catch(() => {});
-    const id = this.deps.scheduler.ensure({ owner: "automation", ownerId: row.id }, { schedule, timeZone: (schedule.type !== "once" && schedule.timezone) || localZone() }, row.state === "active" && bot.state === "active");
+    const id = this.deps.scheduler.ensure({ owner: "automation", ownerId: row.id }, { schedule, timeZone: (schedule.type !== "once" && schedule.timezone) || localZone() }, on);
     this.save(row.id, { bb_ids: JSON.stringify([id]), resources: JSON.stringify([{ id, projectId }]), project_id: projectId, target_thread_id: bot.threadId, provision_pending: 0 });
     return this.deps.db.prepare("SELECT * FROM bot_automations WHERE id = ?").get(row.id) as Row;
   }
@@ -614,6 +618,11 @@ export class Automations {
     if (input.kind === "watcher" && !input.script?.body.trim()) throw new Error("A watcher needs a script.");
     const target = input.kind === "watcher" ? this.target(input.target, bot.id) : "main";
     compileSchedule(input.schedule);
+    // A new check-in or reminder says now when the Main can't run it (no Main, no model), not at its first run.
+    if (input.kind !== "watcher") {
+      if (!bot.threadId) throw new Error(`${bot.name} has no Main conversation. Pick one in Bot settings (or start a new one), then try again.`);
+      await this.agentExecution({ model: input.model?.model || null, reasoning: input.model?.reasoning || null } as Row, bot.threadId, "");
+    }
     const id = `aut_${Math.random().toString(36).slice(2, 12)}`;
     const now = Date.now();
     this.deps.db.prepare(`INSERT INTO bot_automations (id, bot_id, kind, name, instruction, script, interpreter, timeout_ms, env_json, working_dir, target, schedule_json, provider_id, model, reasoning, state, project_id, bb_ids, seen_until, created_at, updated_at)
@@ -711,7 +720,7 @@ export class Automations {
     compileSchedule(JSON.parse(next.schedule_json) as Schedule);
     if (next.kind === "watcher" && !next.script?.trim()) throw new Error("A watcher needs a script.");
     if (next.kind !== "watcher") {
-      if (!bot.threadId) throw new Error(`${bot.name} has no thread yet.`);
+      if (!bot.threadId) throw new Error(`${bot.name} has no Main conversation. Pick one in Bot settings (or start a new one), then try again.`);
       await this.agentExecution(next, bot.threadId, "");
     }
     this.save(row.id, { name: next.name, instruction: next.instruction, schedule_json: next.schedule_json, model: next.model, reasoning: next.reasoning, script: next.script, interpreter: next.interpreter, timeout_ms: next.timeout_ms, env_json: next.env_json, working_dir: next.working_dir, target: next.target, state: next.state, provision_pending: 1 });

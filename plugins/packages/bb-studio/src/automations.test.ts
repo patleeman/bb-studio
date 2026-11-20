@@ -44,7 +44,7 @@ async function setup(off: Off | null = null, extra: Partial<AutomationDeps> = {}
   });
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: {
-      get: (async ({ threadId }: { threadId: string }) => threads.get(threadId)!) as never, send: send as never,
+      get: (async ({ threadId }: { threadId: string }) => { const thread = threads.get(threadId); if (!thread) throw Object.assign(new Error("Not found"), { status: 404 }); return thread; }) as never, send: send as never,
       events: { list: (async ({ threadId, beforeSeq }: { threadId: string; beforeSeq?: string }) => (requests.get(threadId) ?? []).filter((each) => beforeSeq === undefined || each.seq < Number(beforeSeq))) as never } as never,
       defaultExecutionOptions: async () => ({ model: "gpt-big", reasoningLevel: "high", permissionMode: "accept-edits" }) as never,
     },
@@ -405,7 +405,7 @@ it("retains a watcher's failed creation cleanup and retries without leaving enab
 it("leaves no trigger behind when making a check-in fails", async () => {
   const x = await setup();
   x.threads.set("bot1", { ...makeThreadResponse({ id: "bot1", projectId: "proj_personal" }), providerId: null } as never);
-  await expect(x.auto.create({ kind: "checkin", name: "Brief", instruction: "x", schedule: { type: "cron", cron: "0 8 * * *" } })).rejects.toThrow(/provider and model/);
+  await expect(x.auto.create({ kind: "checkin", name: "Brief", instruction: "x", schedule: { type: "cron", cron: "0 8 * * *" } })).rejects.toThrow(/has no model yet. Choose one/);
   expect(x.db.prepare("SELECT * FROM bot_automations").all()).toHaveLength(0);
   expect(x.engine.list("automation")).toEqual([]);
   // A cron Studio can't run is refused, not saved as a schedule that never fires.
@@ -714,4 +714,19 @@ it("with findings as tasks, a finding whose post fails is posted on the next tic
   expect(sent(x).map((each) => each.input[0]!.text)).toEqual(["[bb studio] Watcher Releases: Red4 does not answer", "[bb studio] Watcher Releases: Red4 does not answer"]);
   expect(x.store.children(parentIdOf(made.id))).toHaveLength(1);
   expect(x.store.children(parentIdOf(made.id))[0]!.automation!.posted).toBe(true);
+});
+
+it("FM: a check-in pauses and resumes while the Main is gone or has no model; turning on with no Main says what to do", async () => {
+  const x = await setup();
+  const made = await x.auto.create({ kind: "checkin", name: "Brief", instruction: "x", schedule: { type: "cron", cron: "0 8 * * *" } });
+  // The Main deleted in BB: before, Pause re-read it and failed with BB's 404.
+  x.threads.delete("bot1");
+  await expect(x.auto.setState(made.id, "paused")).resolves.toMatchObject({ state: "paused" });
+  // The Main has no model: Resume doesn't need one (the run fills it, or says so when due).
+  x.threads.set("bot1", { ...makeThreadResponse({ id: "bot1", projectId: "proj_personal" }), providerId: null } as never);
+  await expect(x.auto.setState(made.id, "active")).resolves.toMatchObject({ state: "active" });
+  // No Main at all: plain words with the action.
+  x.bot.threadId = null;
+  await expect(x.auto.setState(made.id, "paused")).resolves.toMatchObject({ state: "paused" });
+  await expect(x.auto.setState(made.id, "active")).rejects.toThrow("Pick one in Bot settings");
 });

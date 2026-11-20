@@ -19,9 +19,14 @@ async function setup() {
   add({ id: "thr", environmentId: "env_thr" });
   const hosts = new Map([["host_1", { id: "host_1", status: "connected" }]]);
   const send = vi.fn(async (_args: { threadId: string; mode: string; permissionMode?: string; input: { type: string; text: string; mentions: unknown[] }[] }) => ({}));
+  // Each thread's stored model (null: BB has none for it), and providers whose catalog can't be read.
+  const models = new Map<string, string | null>();
+  const signedOut = new Set<string>();
+  const update = vi.fn(async ({ threadId, model }: { threadId: string; model?: string }) => { if (model) models.set(threadId, model); return {}; });
   const get = vi.fn(async ({ threadId }: { threadId: string }) => { const thread = threads.get(threadId); if (!thread) throw Object.assign(new Error("Not found"), { status: 404 }); return thread; });
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
-    threads: { get: get as never, send: send as never, defaultExecutionOptions: (async () => ({ model: "m", permissionMode: "auto" })) as never },
+    threads: { get: get as never, send: send as never, update: update as never, defaultExecutionOptions: (async ({ threadId }: { threadId: string }) => ({ model: models.has(threadId) ? models.get(threadId) : "m", permissionMode: "auto" })) as never },
+    providers: { models: (async ({ providerId }: { providerId: string }) => { if (signedOut.has(providerId)) throw new Error("signed out"); return { models: [{ model: `${providerId}-default`, isDefault: true }] }; }) as never },
     environments: { get: (async ({ environmentId }: { environmentId: string }) => ({ id: environmentId, hostId: "host_1" })) as never },
     hosts: { get: (async ({ hostId }: { hostId: string }) => hosts.get(hostId)) as never },
   } });
@@ -35,7 +40,7 @@ async function setup() {
   const set = (id: string, fields: Partial<Thread>) => threads.set(id, { ...threads.get(id)!, ...fields } as Thread);
   /** Moves the clock just past the next due time and runs what is due. */
   const due = async () => { clock.now = engine.get("runner", "run_1")!.nextAt! + 1000; return engine.tick(); };
-  return { db, clock, engine, scheduler, warnings, threads, add, set, hosts, send, get, target, due };
+  return { db, clock, engine, scheduler, warnings, threads, add, set, hosts, send, get, target, due, models, signedOut, update };
 }
 
 it("names its ids so features can tell them from BB automation ids", () => {
@@ -235,4 +240,48 @@ it("a one-time schedule fires once and is then done", async () => {
   await x.engine.tick();
   expect(x.send).toHaveBeenCalledTimes(1);
   expect(x.scheduler.status(KEY)).toEqual({ on: false, done: true, nextRunAt: null, lastRunAt: at + 1000, lastRunStatus: "succeeded" });
+});
+
+it("FM: a run whose thread has no model gets the Bot's default (or its provider's) and runs, instead of BB's raw error", async () => {
+  const x = await setup();
+  x.scheduler.ensure(KEY, HOURLY, true);
+  x.models.set("thr", null);
+  x.scheduler.preferModel(() => ({ providerId: "codex", model: "codex-bot", reasoning: "low" }));
+  await x.due();
+  expect(x.update).toHaveBeenCalledWith(expect.objectContaining({ threadId: "thr", model: "codex-bot", reasoningLevel: "low" }));
+  expect(x.send).toHaveBeenCalledTimes(1);
+  x.scheduler.threadSettled("thr", "succeeded");
+  // The Bot's default is on another provider: the provider's default.
+  x.models.set("thr", null);
+  x.scheduler.preferModel(() => ({ providerId: "claude", model: "claude-bot" }));
+  await x.due();
+  expect(x.update).toHaveBeenLastCalledWith(expect.objectContaining({ threadId: "thr", model: "codex-default" }));
+  expect(x.send).toHaveBeenCalledTimes(2);
+});
+
+it("FM: a run whose thread has no model and a signed-out provider fails in plain words, and the schedule stays on", async () => {
+  const x = await setup();
+  x.scheduler.ensure(KEY, HOURLY, true);
+  x.models.set("thr", null);
+  x.signedOut.add("codex");
+  await x.due();
+  expect(x.send).not.toHaveBeenCalled();
+  expect(x.scheduler.runs(KEY)[0]).toMatchObject({ status: "failed", error: expect.stringContaining("has no model yet") });
+  expect(x.scheduler.status(KEY).on).toBe(true);
+  // Run now says the same, not BB's error.
+  await expect(x.scheduler.runNow(KEY)).rejects.toThrow("has no model yet");
+  // Once a model is chosen it runs.
+  x.models.set("thr", "picked");
+  await x.due();
+  expect(x.send).toHaveBeenCalledTimes(1);
+});
+
+it("FM: BB refusing a run for want of a model is said plainly, and the schedule stays on", async () => {
+  const x = await setup();
+  x.scheduler.ensure(KEY, HOURLY, true);
+  x.send.mockRejectedValueOnce(new Error("Thread thr has no stored execution model"));
+  await x.due();
+  expect(x.scheduler.runs(KEY)[0]).toMatchObject({ status: "failed", error: expect.stringContaining("has no model yet") });
+  expect(x.scheduler.runs(KEY)[0]!.error).not.toContain("stored execution model");
+  expect(x.scheduler.status(KEY).on).toBe(true);
 });

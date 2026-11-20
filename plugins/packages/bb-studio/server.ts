@@ -1171,6 +1171,8 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.deleted", mainGone);
   bb.events.on("thread.archived", mainGone);
   scheduler.onThreadGone((threadId) => bots.rescueMain(threadId));
+  // A run's thread with no model falls back on its Bot's default model (src/thread-model.ts).
+  scheduler.preferModel((threadId) => { const bot = bots.forThread(threadId); return bot ? bots.defaultModel(bot.id) : bots.defaultModel(); });
   const threadSeeds = new ThreadSeeds(db);
   const pushRpc = (call: Parameters<typeof bb.sdk.plugins.callRpc>[0]) => bb.sdk.plugins.callRpc(call);
   const botThreads = registerBotThreads(bb, db, {
