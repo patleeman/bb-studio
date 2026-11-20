@@ -391,7 +391,7 @@ export default definePluginApp((app) => {
   // Where strands run (phase 1: a Bot's Main) their strip takes the In flight strip's place (src/strands/ui).
   app.composer.customize({ id: "in-flight", scopes: ["thread"], banners: [{ id: "in-flight", component: StrandsOrInFlightBanner }] });
   app.slots.experimental_messageMetadata({ id: "strand-tag", placement: "above", component: StrandTag });
-  registerThreadTab(app, { id: STRANDS_TAB, title: "Strands", icon: "ListTree", layout: "flush", component: StrandsTab, ...OFF_NEW_TAB });
+  registerThreadTab(app, { id: STRANDS_TAB, title: "Strands", icon: "LayoutList", layout: "flush", component: StrandsTab, ...OFF_NEW_TAB });
   // The Todos pane: the todo list in a tab beside the chat.
   registerThreadTab(app, { id: LOOPS_PANE, title: newTabTitle(LOOPS_PANE) ?? "Tasks", icon: "ListTodo", layout: "flush", component: LoopsPane, ...newTabFields(LOOPS_PANE) });
   // The Bot's other pages as tabs (Memory, Library, Automations, the Archive) and the New Tab page's "New …" actions (src/tab-kinds.ts).

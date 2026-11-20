@@ -55,6 +55,8 @@ export interface DetectorDeps {
   openTasks(threadId: string): OpenTask[];
   changed(threadId: string): void;
   log(message: string): void;
+  /** The strand of one of the conversation's workers (the turn it started in); undefined when it isn't one. */
+  workerStrand?(threadId: string, workerThreadId: string): Promise<string | null | undefined>;
   now?(): number;
   /** Timers, so tests can run them. */
   setTimer?(run: () => void, ms: number): unknown;
@@ -202,6 +204,13 @@ export class StrandDetector {
       this.store.put({ threadId, seq: turn.seq, kind: turn.kind, turnId: turn.turnId, at: turn.at, line: turn.text, strandId, confidence, by, unsure });
       return strandId;
     };
+    // A notice about one of the conversation's workers (BB's "[bb system] @thread:… completed") goes to that worker's strand.
+    if (turn.kind === "report" && this.deps.workerStrand) {
+      for (const mention of new Set(turn.text.match(/\bthr_[a-z0-9]{6,}\b/gi) ?? [])) {
+        const strandId = await this.deps.workerStrand(threadId, mention).catch(() => undefined);
+        if (strandId !== undefined) return put(strandId, "inherit", null);
+      }
+    }
     if (this.now() < this.jevDownUntil) { this.batchSoon(threadId); return put(previous, "pending", null); }
     if (!this.store.takeJevCall(threadId, dayOf(this.now()), JEV_DAILY_CAP)) return put(previous, "fallback", null);
     const question = turnQuestion({ text: turn.text, reply: turn.reply }, this.openStrands(threadId, previous), previous);

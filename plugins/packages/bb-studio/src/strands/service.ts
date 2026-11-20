@@ -50,7 +50,13 @@ export class StrandService {
 
   constructor(private readonly deps: StrandServiceDeps) {
     this.store = new StrandStore(deps.db, deps.now);
-    this.detector = new StrandDetector({ ...deps, store: this.store, openTasks: (threadId) => openAgentTasks(deps.db, threadId) });
+    this.detector = new StrandDetector({
+      ...deps, store: this.store, openTasks: (threadId) => openAgentTasks(deps.db, threadId),
+      workerStrand: async (threadId, workerThreadId) => {
+        const worker = (await deps.workers(threadId).catch(() => [] as WorkerFact[])).find((each) => each.threadId === workerThreadId);
+        return worker ? this.workerStrand(threadId, worker, false) : undefined;
+      },
+    });
   }
 
   private now() { return this.deps.now?.() ?? Date.now(); }

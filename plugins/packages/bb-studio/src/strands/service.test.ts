@@ -128,6 +128,21 @@ describe("strands.list", () => {
     expect(list.strands[1]!.asks).toEqual([{ id: "int_2", kind: "question", threadId: "thr_worker", label: "Router fix: Which fallback model?", decisions: [] }]);
   });
 
+  it("puts a worker's completion notice into the worker's strand, without asking Jev", async () => {
+    const workers: WorkerFact[] = [];
+    const x = service({ workers });
+    await x.svc.idle(x.thread.id);
+    x.thread.turn("Look at the router", "Starting a worker.", { at: NOW - 2 * HOUR });
+    x.thread.turn("Book the dentist", "Ok.", { at: NOW - HOUR });
+    await x.svc.idle(x.thread.id);
+    workers.push({ threadId: "thr_worker1", title: "Router fix", status: "done", createdAt: NOW - 2 * HOUR + 2, endedAt: NOW - 10 });
+    const notice = x.thread.turn("[bb system] @thread:thr_worker1 completed: Fixed the fallback chain.", "The router fix is done.", { kind: "report", at: NOW - 5 });
+    await x.svc.idle(x.thread.id);
+    const item = x.svc.items(x.thread.id, 10).find((each) => each.seq === notice.seq)!;
+    expect(item).toMatchObject({ kind: "report", by: "inherit" });
+    expect((await x.svc.list(x.thread.id)).strands.find((each) => each.id === item.strandId)?.title).toBe("Look at the router");
+  });
+
   it("marks a strand opened, so what finished before isn't 'done, not seen'", async () => {
     const workers: WorkerFact[] = [{ threadId: "thr_worker", title: "Router fix", status: "done", createdAt: NOW - 2 * HOUR + 2, endedAt: NOW - HOUR }];
     const x = service({ workers });

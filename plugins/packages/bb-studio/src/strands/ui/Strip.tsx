@@ -178,7 +178,7 @@ export function StrandsStrip({ threadId, now = Date.now() }: { threadId: string;
         {panel ? (
           <Tooltip label="All strands">
             <button type="button" aria-label="All strands" onClick={openTab} className="ml-auto grid size-6 cursor-pointer place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground">
-              <Icon name="ListTree" className="size-3.5" />
+              <Icon name="LayoutList" className="size-3.5" />
             </button>
           </Tooltip>
         ) : null}
