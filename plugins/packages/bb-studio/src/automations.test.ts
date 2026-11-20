@@ -4,7 +4,7 @@ import { MIGRATIONS } from "./migrations";
 import { fromHeartbeat, localZone, type Weekday } from "./schedule";
 import { nextRun } from "./triggers/next-run";
 import { testScheduler } from "./test/scheduler-fixture";
-import { Automations, checkinPrompt, watcherFinding, watcherMessage, type AutomationDeps, type AutomationRunner } from "./automations";
+import { Automations, checkinPrompt, plainReason, retryDelay, WATCHER_GONE, watcherFinding, watcherMessage, type AutomationDeps, type AutomationRunner } from "./automations";
 import { AutomationTasks, parentIdOf, readSources } from "./tasks/automations";
 import { TaskStore } from "./tasks/store";
 import type { HeartbeatRun } from "./contract";
@@ -369,7 +369,7 @@ it("retains a watcher's desired configuration after a partial update and retries
     return original(args);
   });
   await expect(x.auto.update({ id: made.id, script: { body: "echo desired", interpreter: "bash" } })).rejects.toThrow("offline");
-  expect((await x.auto.list()).find((v) => v.id === made.id)).toMatchObject({ script: { body: "echo desired" }, lastOutcome: expect.stringContaining("retry") });
+  expect((await x.auto.list()).find((v) => v.id === made.id)).toMatchObject({ script: { body: "echo desired" }, lastOutcome: "Couldn't set it up: offline. Trying again in 1 min." });
   x.callRpc.mockImplementation(original);
   await x.auto.tick();
   expect(x.automations.every((a) => (a.execution as { script: string }).script === "echo desired")).toBe(true);
@@ -381,7 +381,7 @@ it("retries a check-in left half-provisioned, on tick", async () => {
   const made = await x.auto.create({ kind: "checkin", name: "Brief", instruction: "old", schedule: { type: "times", days: [1], times: ["08:00"] } });
   vi.spyOn(x.scheduler, "ensure").mockImplementationOnce(() => { throw new Error("disk full"); });
   await expect(x.auto.update({ id: made.id, instruction: "desired", schedule: { type: "times", days: [2], times: ["09:00"] } })).rejects.toThrow("disk full");
-  expect((await x.auto.list()).find((v) => v.id === made.id)).toMatchObject({ instruction: "desired", lastOutcome: expect.stringContaining("retry") });
+  expect((await x.auto.list()).find((v) => v.id === made.id)).toMatchObject({ instruction: "desired", lastOutcome: "Couldn't set it up: disk full. Trying again in 1 min." });
   await x.auto.tick();
   expect(trigger(x, made.id)!.nextAt).toBe(nextRun({ type: "times", days: [2], times: ["09:00"] }, x.clock.now, localZone()));
   expect((await x.auto.list()).find((v) => v.id === made.id)?.lastOutcome).toBeNull();
@@ -729,4 +729,138 @@ it("FM: a check-in pauses and resumes while the Main is gone or has no model; tu
   x.bot.threadId = null;
   await expect(x.auto.setState(made.id, "paused")).resolves.toMatchObject({ state: "paused" });
   await expect(x.auto.setState(made.id, "active")).rejects.toThrow("Pick one in Bot settings");
+});
+
+/** console.warn, quiet, restored after the test. */
+function quietWarn() {
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  dispose.push(async () => { warn.mockRestore(); });
+  return (match: string) => warn.mock.calls.filter((call) => String(call[0]).includes(match));
+}
+
+it("FM: a watcher that can't be set up says why, waits 1, 2, 4… minutes between tries and logs a reason once", async () => {
+  expect([1, 2, 3, 4, 7, 8].map((n) => retryDelay(n) / 60_000)).toEqual([1, 2, 4, 8, 60, 60]);
+  expect(plainReason(Object.assign(new Error('HTTP 503: plugin "automations" is not running (status: disabled)'), { status: 503 }))).toBe("bb's automations plugin isn't running");
+  const warned = quietWarn();
+  const x = await setup();
+  const made = await x.auto.create({ ...watcher, schedule: { type: "cron", cron: "0 8 * * *" } });
+  const original = x.callRpc.getMockImplementation()!;
+  let failure: Error | null = new Error("HTTP 500: database is locked.");
+  let tries = 0;
+  x.callRpc.mockImplementation(async (args) => {
+    if (args.method === "automations_update") { tries++; if (failure) throw failure; }
+    return original(args);
+  });
+  await expect(x.auto.update({ id: made.id, script: { body: "echo desired", interpreter: "bash" } })).rejects.toThrow("database is locked");
+  const outcome = async () => (await x.auto.list()).find((v) => v.id === made.id)?.lastOutcome;
+  // Before: "Provisioning incomplete; will retry", tried every minute, logged every minute.
+  expect(await outcome()).toBe("Couldn't set it up: database is locked. Trying again in 1 min.");
+  const t0 = Date.now();
+  await x.auto.tick(t0);
+  expect(tries).toBe(2);
+  expect(await outcome()).toBe("Couldn't set it up: database is locked. Trying again in 1 min.");
+  await x.auto.tick(t0 + 30_000);
+  expect(tries).toBe(2);
+  await x.auto.tick(t0 + 60_000);
+  expect(tries).toBe(3);
+  // The second failure waits 2 minutes, the third 4.
+  await x.auto.tick(t0 + 60_000 + 119_000);
+  expect(tries).toBe(3);
+  await x.auto.tick(t0 + 180_000);
+  expect(tries).toBe(4);
+  await x.auto.tick(t0 + 180_000 + 239_000);
+  expect(tries).toBe(4);
+  // The same reason three times is one line in the log; a new reason is a new line.
+  expect(warned(made.id)).toHaveLength(1);
+  expect(warned(made.id)[0]![0]).toContain("couldn't set it up: database is locked. Trying again in 1 min.");
+  failure = Object.assign(new Error('HTTP 503: plugin "automations" is not running (status: disabled)'), { status: 503 });
+  await x.auto.tick(t0 + 420_000);
+  expect(tries).toBe(5);
+  expect(warned(made.id)).toHaveLength(2);
+  expect(await outcome()).toMatch(/^Couldn't set it up: bb's automations plugin isn't running\. Trying again in \d+ min\.$/);
+  // Once it works, it's set up and says nothing more.
+  failure = null;
+  await x.auto.tick(t0 + 420_000 + 8 * 60_000);
+  expect(x.automations.every((a) => (a.execution as { script: string }).script === "echo desired")).toBe(true);
+  expect(await outcome()).toBeNull();
+});
+
+it("FM: one that can't be removed says why and waits before trying again", async () => {
+  quietWarn();
+  const x = await setup();
+  const made = await x.auto.create({ ...watcher, schedule: { type: "cron", cron: "0 8 * * *" } });
+  const original = x.callRpc.getMockImplementation()!;
+  let tries = 0;
+  x.callRpc.mockImplementation(async (args) => { if (args.method === "automations_delete") { tries++; throw new Error("offline"); } return original(args); });
+  await expect(x.auto.delete(made.id)).rejects.toThrow("offline");
+  expect((await x.auto.list()).find((v) => v.id === made.id)?.lastOutcome).toBe("Couldn't remove it: offline. Trying again in 1 min.");
+  const t0 = Date.now();
+  await x.auto.tick(t0);
+  await x.auto.tick(t0 + 30_000);
+  expect(tries).toBe(2);
+  x.callRpc.mockImplementation(original);
+  await x.auto.tick(t0 + 60_000);
+  expect(x.db.prepare("SELECT * FROM bot_automations").all()).toHaveLength(0);
+});
+
+/** bb's automations_runs answers 404 for an automation deleted in bb. */
+function runsAnswer404(x: X) {
+  const original = x.callRpc.getMockImplementation()!;
+  x.callRpc.mockImplementation(async (args) => {
+    if (args.method === "automations_runs" && !x.automations.some((a) => a.id === args.input.automationId)) throw Object.assign(new Error("Automation not found"), { status: 404 });
+    return original(args);
+  });
+  return original;
+}
+
+it("FM: a watcher whose bb automation was deleted in bb is set up again on the next tick, and wakes the Bot as before", async () => {
+  const warned = quietWarn();
+  const x = await setup();
+  const made = await x.auto.create({ ...watcher, schedule: { type: "cron", cron: "0 8 * * *" } });
+  runsAnswer404(x);
+  // Deleted in bb (another project's automation stays, so the new one gets a new id).
+  x.automations.splice(0, 1, { id: "elsewhere", projectId: "proj_other" });
+  // Before: "tick failed" every minute, and no next run.
+  await x.auto.tick();
+  expect(x.automations).toMatchObject([{ id: "elsewhere" }, { id: "a2", enabled: true }]);
+  const view = (await x.auto.list()).find((v) => v.id === made.id)!;
+  expect(view).toMatchObject({ state: "active", bbIds: ["a2"], lastOutcome: null });
+  expect(view.nextRunAt).not.toBeNull();
+  expect(warned(made.id).map((call) => call[0])).toEqual([expect.stringContaining("its bb automation was deleted in bb; set it up again")]);
+  x.runs.set("a2", [{ id: "r1", status: "succeeded", output: "v2 out", exitCode: 0, finishedAt: Date.now() + 1000 }]);
+  await x.auto.tick();
+  expect(sent(x)).toMatchObject([{ threadId: "bot1", input: [{ text: "[bb studio] Watcher Releases: v2 out" }, {}] }]);
+  // The one made again deleted too: it isn't made a third time; the list says what to do.
+  x.automations.splice(1, 1);
+  const calls = x.callRpc.mock.calls.length;
+  await x.auto.tick();
+  expect(x.callRpc.mock.calls.slice(calls).map(([call]) => call.method)).toEqual(["automations_runs"]);
+  expect((await x.auto.list()).find((v) => v.id === made.id)?.lastOutcome).toBe(WATCHER_GONE);
+});
+
+it("FM: a watcher whose bb automation was deleted in bb and can't be made again says so, stops trying, and off and on sets it up", async () => {
+  const warned = quietWarn();
+  const x = await setup();
+  const made = await x.auto.create({ ...watcher, schedule: { type: "cron", cron: "0 8 * * *" } });
+  const original = runsAnswer404(x);
+  const withRuns = x.callRpc.getMockImplementation()!;
+  x.callRpc.mockImplementation(async (args) => { if (args.method === "automations_create") throw new Error("offline"); return withRuns(args); });
+  x.automations.splice(0, 1);
+  await x.auto.tick();
+  const view = (await x.auto.list()).find((v) => v.id === made.id)!;
+  expect(view).toMatchObject({ state: "active", nextRunAt: null, lastOutcome: "Its bb automation was deleted in bb; turn it off and on to set it up again." });
+  // Not tried every minute: the tick leaves it alone, and logged it once.
+  const calls = x.callRpc.mock.calls.length;
+  const t0 = Date.now();
+  for (const at of [t0 + 60_000, t0 + 120_000, t0 + 3_600_000]) await x.auto.tick(at);
+  expect(x.callRpc.mock.calls.slice(calls).map(([call]) => call.method)).toEqual([]);
+  expect(warned(made.id)).toHaveLength(1);
+  expect(warned(made.id)[0]![0]).toContain("Turn it off and on to set it up again.");
+  // Turning it off and on sets it up again.
+  x.callRpc.mockImplementation(original);
+  await x.auto.setState(made.id, "paused");
+  const on = await x.auto.setState(made.id, "active");
+  expect(on).toMatchObject({ state: "active", lastOutcome: null });
+  expect(on.nextRunAt).not.toBeNull();
+  expect(x.automations).toMatchObject([{ enabled: true }]);
 });

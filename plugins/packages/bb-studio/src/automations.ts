@@ -41,6 +41,7 @@
 // the ones with output it hasn't seen. The script needs no bb CLI, token or
 // callback, and a missed minute is caught up on the next poll.
 import { readAvailable } from "./kit/server/read-available";
+import { rpcErrorStatus } from "./kit/server/index";
 import { markStudioLine } from "./kit/relayed";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
@@ -66,6 +67,19 @@ const PERSONAL = "proj_personal";
 export const PASS_RULE = "If nothing needs the user, reply exactly [PASS]: no \"✓\", \"nothing new\" or other filler.";
 const OUTPUT_LIMIT = 1500;
 const missing = (error: unknown) => (error as { status?: number })?.status === 404 || /not found/i.test(String((error as Error)?.message ?? ""));
+/** How long the minute tick waits before setting up (or removing) one that failed again: 1, 2, 4… minutes, at most an hour. */
+export function retryDelay(failures: number): number {
+  return Math.min(60_000 * 2 ** Math.max(0, failures - 1), 60 * 60_000);
+}
+/** A failure in a few plain words, for the list: no "HTTP 503:", no trailing period. */
+export function plainReason(error: unknown): string {
+  const text = String((error as Error)?.message ?? error ?? "").replace(/^HTTP \d+:\s*/i, "").trim();
+  if (rpcErrorStatus(error) === 503 || /is not running/i.test(text)) return "bb's automations plugin isn't running";
+  if (/ECONNREFUSED|ECONNRESET|fetch failed|timed? ?out/i.test(text)) return "bb didn't answer";
+  return (text || "something went wrong").replace(/[.\s]+$/, "").slice(0, 200);
+}
+/** A watcher whose bb automation was deleted in bb and couldn't be made again. */
+export const WATCHER_GONE = "Its bb automation was deleted in bb; turn it off and on to set it up again.";
 
 type Row = {
   id: string; bot_id: string; kind: "checkin" | "reminder" | "watcher"; name: string; instruction: string;
@@ -211,6 +225,18 @@ function runnerSchedule(schedule: Schedule, timezone = localZone()): { cadence: 
 export class Automations {
   private ticking: Promise<void> | null = null;
   private readonly watching = new Set<string>();
+  /**
+   * Rows that couldn't be set up or removed: why, and when the minute tick
+   * tries again (retryDelay). `logged` is the last reason written to the
+   * log, so one reason is logged once, not every minute.
+   */
+  private readonly retry = new Map<string, { failures: number; nextAt: number; error: string; logged: string | null }>();
+  /** Watchers whose bb automation was deleted in bb and couldn't be made again: not retried until turned off and on. */
+  private readonly gone = new Set<string>();
+  /** bb automations made again after theirs was deleted in bb: one of these gone too isn't made a third time. */
+  private readonly remade = new Set<string>();
+  /** The last tick failure logged per row, so one reason is logged once. */
+  private readonly tickWarned = new Map<string, string>();
   private readonly automationsOff: () => Promise<boolean>;
   constructor(private readonly deps: AutomationDeps) {
     this.automationsOff = deps.automationsOff ?? automationsPluginOff(deps.sdk);
@@ -392,8 +418,51 @@ export class Automations {
    * Makes the row's schedule match it. A check-in or reminder is a trigger on
    * Studio's scheduler. A watcher is BB automations: made, updated or deleted
    * to match, then paused or resumed. Throws before saving on a bad schedule.
+   * A failure is kept as the row's reason (the list shows it); success clears
+   * it, and a watcher's "its bb automation was deleted".
    */
   private async provision(row: Row): Promise<Row> {
+    try {
+      const done = await this.apply(row);
+      this.retry.delete(row.id);
+      this.tickWarned.delete(row.id);
+      if (this.gone.delete(row.id)) this.deps.changed();
+      return done;
+    } catch (error) {
+      this.noteFailure(row.id, error);
+      throw error;
+    }
+  }
+
+  /** Keeps why a row couldn't be set up or removed, leaving its back-off as it was. */
+  private noteFailure(id: string, error: unknown): void {
+    const prev = this.retry.get(id);
+    this.retry.set(id, { failures: prev?.failures ?? 0, nextAt: prev?.nextAt ?? 0, error: plainReason(error), logged: prev?.logged ?? null });
+  }
+
+  /** The minute tick's failure to set up or remove a row: wait longer each time, and log a reason once. */
+  private backOff(row: Row, error: unknown, now: number): void {
+    const prev = this.retry.get(row.id);
+    const failures = (prev?.failures ?? 0) + 1;
+    const delay = retryDelay(failures);
+    const reason = plainReason(error);
+    if (reason !== prev?.logged) console.warn(`[studio] automation ${row.id} (${row.name}): couldn't ${row.cleanup_pending ? "remove it" : "set it up"}: ${reason}. Trying again in ${Math.round(delay / 60_000)} min.`);
+    this.retry.set(row.id, { failures, nextAt: now + delay, error: reason, logged: reason });
+    this.deps.changed();
+  }
+
+  /** What the list says of a row being set up or removed, or of a watcher whose bb automation is gone; null otherwise. */
+  private pendingOutcome(row: Row, now = Date.now()): string | null {
+    if (this.gone.has(row.id)) return WATCHER_GONE;
+    if (!row.cleanup_pending && !row.provision_pending) return null;
+    const retry = this.retry.get(row.id);
+    const minutes = Math.max(1, Math.ceil(((retry?.nextAt ?? 0) - now) / 60_000));
+    const when = `Trying again in ${minutes} min.`;
+    if (row.cleanup_pending) return retry ? `Couldn't remove it: ${retry.error}. ${when}` : `Removing it. ${when}`;
+    return retry ? `Couldn't set it up: ${retry.error}. ${when}` : `Not set up yet. ${when}`;
+  }
+
+  private async apply(row: Row): Promise<Row> {
     const bot = this.bot(row.bot_id);
     const schedule = JSON.parse(row.schedule_json) as Schedule;
     if (row.kind !== "watcher") return this.provisionOwn(row, bot, schedule);
@@ -509,7 +578,7 @@ export class Automations {
         id: row.id, kind: row.kind, name: row.name, original: false, inBb: this.inBb(row.created_at, row.state), bbIds: this.ids(row), instruction: row.instruction,
         schedule, scheduleText: describeSchedule(schedule),
         state, nextRunAt: state === "active" && Number.isFinite(next) ? next : null, lastRunAt: Math.max(last, row.last_fired_at ?? 0) || null,
-        lastOutcome: row.cleanup_pending ? "Cleanup incomplete; will retry" : row.provision_pending ? "Provisioning incomplete; will retry" : this.resumedSince(this.ids(row), Math.max(last, row.last_fired_at ?? 0)) ?? (row.kind === "watcher" && row.last_fire ? `Woke it: ${row.last_fire.split("\n")[0]!.slice(0, 200)}` : automations.find((each) => each.lastRunAt === last)?.lastRunStatus ?? null),
+        lastOutcome: this.pendingOutcome(row) ?? this.resumedSince(this.ids(row), Math.max(last, row.last_fired_at ?? 0)) ?? (row.kind === "watcher" && row.last_fire ? `Woke it: ${row.last_fire.split("\n")[0]!.slice(0, 200)}` : automations.find((each) => each.lastRunAt === last)?.lastRunStatus ?? null),
         model: row.kind === "watcher" ? null : { model: row.model, reasoning: row.reasoning },
         script: row.kind === "watcher" ? { body: row.script ?? "", interpreter: (row.interpreter ?? "bash") as Interpreter, timeoutMs: row.timeout_ms ?? 120_000, workingDirectory: row.working_dir ?? null, envKeys: row.env_json ? Object.keys(JSON.parse(row.env_json) as object) : [] } : null,
         target: row.target, targetName: runner?.name ?? bot.name, threadId: runner ? runner.threadId : bot.threadId,
@@ -785,14 +854,22 @@ export class Automations {
     const row = this.row(id, bot.id);
     this.save(row.id, { cleanup_pending: 1, provision_pending: 0 });
     const resources = this.resources(row);
-    for (const resource of [...resources]) {
-      const key = scheduleKey(resource.id);
-      if (key) this.deps.scheduler.remove(key);
-      else await this.call("automations_delete", { projectId: resource.projectId, automationId: resource.id }, z.unknown()).catch((error) => { if (!missing(error)) throw error; });
-      resources.splice(resources.indexOf(resource), 1);
-      this.saveResources(row, resources);
+    try {
+      for (const resource of [...resources]) {
+        const key = scheduleKey(resource.id);
+        if (key) this.deps.scheduler.remove(key);
+        else await this.call("automations_delete", { projectId: resource.projectId, automationId: resource.id }, z.unknown()).catch((error) => { if (!missing(error)) throw error; });
+        resources.splice(resources.indexOf(resource), 1);
+        this.saveResources(row, resources);
+      }
+    } catch (error) {
+      this.noteFailure(row.id, error);
+      throw error;
     }
     this.deps.db.prepare("DELETE FROM bot_automations WHERE id = ?").run(row.id);
+    this.retry.delete(row.id);
+    this.gone.delete(row.id);
+    this.tickWarned.delete(row.id);
     this.deps.changed();
     return { deleted: true };
   }
@@ -914,10 +991,13 @@ export class Automations {
   private async reconcile(now: number): Promise<void> {
     const pending = this.deps.db.prepare("SELECT * FROM bot_automations WHERE cleanup_pending = 1 OR provision_pending = 1").all() as Row[];
     for (const row of pending) {
+      // A watcher whose bb automation is gone waits for its owner to turn it off and on; one that failed waits out its back-off.
+      if (!row.cleanup_pending && this.gone.has(row.id)) continue;
+      if (now < (this.retry.get(row.id)?.nextAt ?? 0)) continue;
       try {
         if (row.cleanup_pending) await this.delete(row.id, row.bot_id);
         else await this.provision(row);
-      } catch (error) { console.warn(`[studio] automation ${row.id} reconciliation pending`, error); }
+      } catch (error) { this.backOff(row, error, now); }
     }
     const reminders = this.deps.db.prepare("SELECT * FROM bot_automations WHERE kind = 'reminder' AND state = 'active' AND provision_pending = 0 AND cleanup_pending = 0").all() as Row[];
     if (reminders.length) {
@@ -941,9 +1021,13 @@ export class Automations {
           this.save(row.id, { state: "ended" });
           continue;
         }
-        if (row.kind === "watcher") await this.watch(row);
+        if (row.kind === "watcher" && !this.gone.has(row.id)) await this.watch(row);
+        this.tickWarned.delete(row.id);
       } catch (error) {
-        console.warn(`[studio] automation ${row.id} tick failed`, error);
+        // One reason is logged once, not every minute.
+        const reason = plainReason(error);
+        if (this.tickWarned.get(row.id) !== reason) console.warn(`[studio] automation ${row.id} (${row.name}) tick failed: ${reason}`, error);
+        this.tickWarned.set(row.id, reason);
       }
     }
   }
@@ -963,8 +1047,16 @@ export class Automations {
         let cursor: string | undefined;
         const cursors = new Set<string>();
         do {
-          const page = await this.call("automations_runs", { projectId, automationId: id, limit: 20, ...(cursor ? { cursor } : {}) },
-            z.object({ runs: z.array(bbRun), nextCursor: z.string().nullish() }));
+          let page: { runs: BbRun[]; nextCursor?: string | null };
+          try {
+            page = await this.call("automations_runs", { projectId, automationId: id, limit: 20, ...(cursor ? { cursor } : {}) },
+              z.object({ runs: z.array(bbRun), nextCursor: z.string().nullish() }));
+          } catch (error) {
+            if (!missing(error)) throw error;
+            // Its bb automation was deleted in bb: make it again; what it ran before is read on the next tick.
+            await this.remake(row, id);
+            return 0;
+          }
           runs.push(...page.runs.filter((run) => run.finishedAt && (run.finishedAt > row.seen_until || (run.finishedAt === row.seen_until && !seen.has(run.id)))));
           // Finish the entire boundary timestamp, including a boundary split across pages.
           if (page.runs.some((run) => run.finishedAt && run.finishedAt < row.seen_until)) break;
@@ -990,6 +1082,29 @@ export class Automations {
       return fired;
     } finally {
       this.watching.delete(row.id);
+    }
+  }
+
+  /**
+   * A watcher whose bb automation (`goneId`) was deleted in bb: set it up
+   * again, once. When that fails, or the one made again is gone too, the row
+   * is marked: the list says so, and the minute tick leaves it alone until
+   * it's turned off and on (which sets it up and clears the mark).
+   */
+  private async remake(row: Row, goneId: string): Promise<void> {
+    const markGone = (reason: string) => {
+      if (!this.gone.has(row.id)) console.warn(`[studio] watcher ${row.id} (${row.name}): its bb automation was deleted in bb and couldn't be set up again (${reason}). Turn it off and on to set it up again.`);
+      this.gone.add(row.id);
+      this.deps.changed();
+    };
+    if (this.remade.has(goneId)) { markGone("the one made again is gone too"); return; }
+    const before = new Set(this.ids(row));
+    try {
+      const done = await this.provision(row);
+      for (const id of this.ids(done)) if (!before.has(id)) this.remade.add(id);
+      console.warn(`[studio] watcher ${row.id} (${row.name}): its bb automation was deleted in bb; set it up again.`);
+    } catch (error) {
+      markGone(plainReason(error));
     }
   }
 
