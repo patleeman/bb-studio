@@ -67,8 +67,9 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("Studio's settings sections", () => {
-  it("registers Voice, Recordings and calls, Agent replies, Threads, Smart Queue model and Advanced in order, then Skill registry, Phone notifications, API keys, Tool Gateway and Bring things over from bb last", () => {
-    expect(order).toEqual(["settings-voice", "settings-recordings", "settings-replies", "settings-threads", "settings-jev", "settings-advanced", "skills-registry", "mobile-push", "api-keys", "tool-gateway", "bring-over"]);
+  it("registers Voice, Recordings and calls, Agent replies, Threads, Smart Queue model and Advanced in order, then Model router, Skill registry, Phone notifications, API keys, Tool Gateway and Bring things over from bb last", () => {
+    expect(order).toEqual(["settings-voice", "settings-recordings", "settings-replies", "settings-threads", "settings-jev", "settings-advanced", "model-router", "skills-registry", "mobile-push", "api-keys", "tool-gateway", "bring-over"]);
+    expect(sections.get("model-router")).toMatchObject({ title: "Model router" });
     expect(sections.get("api-keys")).toMatchObject({ title: "API keys" });
     expect(sections.get("tool-gateway")).toMatchObject({ title: "Tool Gateway" });
     expect(sections.get("bring-over")).toMatchObject({ title: "Bring things over from bb" });
