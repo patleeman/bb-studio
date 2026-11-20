@@ -1,3 +1,4 @@
+import { autoRememberArgs, resolveAutoForCreate } from "./auto-router.fork.js";
 import { createsIdleThread, startsIdleThread } from "./idle-thread.fork.js";
 import { forkHostStandsIn } from "./thread-fork-hosts.fork.js";
 import { requestThreadStorageDeletion } from "./thread-lifecycle.js";
@@ -562,10 +563,10 @@ async function createPendingThreadAndAttemptFirstDispatch(
     discardUnstartedThread(deps, thread);
     throw error;
   }
-  rememberProjectExecutionDefaultsForCreate(deps, {
+  rememberProjectExecutionDefaultsForCreate(deps, autoRememberArgs({
     execution,
     request: args.request,
-  });
+  }));
   return getThreadSafe(deps, thread.id);
 }
 
@@ -717,6 +718,7 @@ export async function createThreadFromRequest(
     }
   }
   await deps.providerRegistry.whenRegistrationsSettled();
+  Object.assign(requestInput, await resolveAutoForCreate(requestInput, parentThread, deps));
   const {
     defaultModel: inheritedDefaultModel,
     providerId,
