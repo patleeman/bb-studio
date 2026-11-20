@@ -1631,6 +1631,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_pause: ({ botId }) => bots.pause(botId),
     bot_resume: ({ botId }) => bots.resume(botId),
     bot_make_main: ({ botId, threadId }) => bots.makeMain(threadId, botId),
+    bot_new_main: ({ botId }) => bots.newMain(botId),
     bot_stop: ({ botId }) => bots.stop(botId),
     bot_maintenance_threads: async ({ botId }) => ({ threads: await maintenance.olderThreads(learnerId(botId)) }),
     bot_maintenance_get: ({ botId }) => maintenance.view(learnerId(botId)),

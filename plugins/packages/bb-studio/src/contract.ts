@@ -545,6 +545,8 @@ export const rpcContract = defineRpcContract({
   bot_resume: { input: forBot, output: botView },
   /** Make this the Main: a conversation of the Bot becomes its Main; the old Main stays an ordinary conversation. */
   bot_make_main: { input: z.object({ botId, threadId: z.string().min(1) }), output: botView },
+  /** Start a new Main (Bot settings): a fresh conversation becomes the Main; the old Main stays an ordinary conversation. */
+  bot_new_main: { input: z.object({ botId }), output: botView },
   /** Pauses the Bot, stops the running threads it started and turns off its schedules. Its data is kept. */
   bot_stop: { input: forBot, output: botView.extend({ stoppedThreadIds: z.array(z.string()), pausedAutomationIds: z.array(z.string()) }) },
   /** What the Bot is doing: Needs you, In progress, Scheduled, Completed. */

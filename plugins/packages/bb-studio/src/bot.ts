@@ -41,6 +41,7 @@ import { BOT_RUN_PREFIX, heartbeatCron, PERSONAL_PROJECT_ID, type ProjectLeads }
 import { BOT_SHAPES } from "./bot-shapes";
 import { readyProvider, type OnboardingProviderState } from "./onboarding";
 import { rpcErrorStatus } from "./kit/server/index";
+import { threadModel } from "./thread-model";
 import { turnStartedAt } from "./turn-started";
 import { botAttention, pendingInteractions, threadWaitingFor, type BotAttention } from "./bot-attention";
 import { lineDiff, lintSkill } from "./skill-learning";
@@ -422,6 +423,9 @@ export function mainHealDelay(failures: number): number {
 export function noStoredModel(error: unknown): boolean {
   return /has no stored execution model/i.test(String((error as Error)?.message ?? error));
 }
+
+/** Start a new Main with no signed-in provider (or none with a model): what to do, not BB's error. */
+export const SIGN_IN_FOR_MAIN = "No signed-in provider has a model, so a new Main can't start. Sign in to a provider in Settings → Providers (or choose the Bot's default model in Bot settings), then try again.";
 
 /** The first words in a Bot's new Main, made because the old one was deleted or archived. */
 export function newMainNote(name: string, gone: "deleted" | "archived"): string {
@@ -1011,20 +1015,60 @@ export class Bots {
     if (this.isPrimary(row) && thread.providerId && botKind(thread.providerId) === "external") throw new Error(`${row.name} leads your personal project with Studio's tools, so its Main can't run on ${externalName(thread.providerId)}.`);
     const other = this.list().find((bot) => bot.id !== row.id && bot.threadId === threadId);
     if (other) throw new Error(`That is ${other.name}'s Main.`);
-    // A thread BB stored no model for (it never ran a turn) gets one first: its provider's default, else the Bot's.
-    if (thread.providerId && !(await this.deps.sdk.threads.defaultExecutionOptions({ threadId }).catch(() => null))?.model) {
-      const preset = storedDefault(row);
-      const model = await this.providerDefault(thread.providerId) ?? (preset?.providerId === thread.providerId ? preset.model : null);
-      if (model) await this.deps.sdk.threads.update({ threadId, model } as never).catch(() => {});
-    }
+    // A conversation that never ran a turn has no model in BB: it gets the Bot's default (or its provider's), so check-ins can run there.
+    const model = await threadModel(this.deps.sdk, threadId, storedDefault(row)).catch(() => null);
+    if (!model) throw new Error(`That conversation has no model yet, and ${row.name} has no default model on its provider. Choose a model in it (or set ${row.name}'s default model in Bot settings), then make it the Main.`);
     try {
       await this.pointMain(row, threadId, current);
     } catch (error) {
-      // The heartbeat moves first, and BB has no model for a thread that never ran a turn.
-      if (/Choose a provider and model/.test(String((error as Error)?.message ?? error))) throw new Error("That conversation has no model yet, so check-ins can't run there. Send it a message first, then make it the Main.");
+      // The heartbeat moves first; BB still had no model for the thread.
+      if (/Choose a provider and model/.test(String((error as Error)?.message ?? error))) throw new Error(`That conversation has no model yet. Choose a model in it (or set ${row.name}'s default model in Bot settings), then make it the Main.`);
       throw error;
     }
     return this.get(row.id);
+  }
+
+  /**
+   * Start a new Main (Bot settings → Main conversation): a fresh conversation
+   * becomes the Bot's Main and the old one stays an ordinary conversation.
+   * It starts on the Bot's default model when that provider is signed in,
+   * else on a signed-in provider's default; with none signed in, it says so.
+   */
+  async newMain(botId?: string): Promise<BotView> {
+    const row = this.need(botId);
+    if (this.inBb(row)) throw new Error(`${row.name} runs in bb. Run it here first, then start its Main.`);
+    const current = this.view(row).threadId;
+    const external = botKind(row.provider_id) === "external";
+    const preset = storedDefault(row);
+    const model = external
+      ? (preset ? { providerId: preset.providerId, model: preset.model, reasoningLevel: "none", executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit" } } : { providerId: row.provider_id! })
+      : preset && await this.providerReady(preset.providerId)
+        ? { providerId: preset.providerId, model: preset.model, ...(preset.reasoning ? { reasoningLevel: preset.reasoning } : {}), executionInputSources: { providerId: "explicit", model: "explicit", ...(preset.reasoning ? { reasoningLevel: "explicit" } : {}) } }
+        : await this.signedInModel().then((picked) => "providerId" in picked ? picked : row.provider_id ? { providerId: row.provider_id } : picked);
+    if (!("providerId" in model)) throw new Error(SIGN_IN_FOR_MAIN);
+    const input = [{ type: "text", text: `You are ${row.name} and this is your new Main conversation; the user started it from Bot settings. Check-ins, runners and automations report here now. Read your memory for context and don't redo finished work. Reply with one short line that you're here.`, mentions: [], visibility: "agent-only" }];
+    let thread: { id: string };
+    try {
+      thread = await this.deps.sdk.threads.spawn({ projectId: PERSONAL_PROJECT_ID, title: row.name, environment: { type: "project-default" }, pluginMetadata: { bot: row.id }, ...model, input } as never);
+    } catch (error) {
+      if (noStoredModel(error)) throw new Error(SIGN_IN_FOR_MAIN);
+      throw error;
+    }
+    try {
+      await this.pointMain(row, thread.id, current);
+    } catch (error) {
+      await this.deps.sdk.threads.delete({ threadId: thread.id, childThreadsConfirmed: false }).catch(() => {});
+      throw error;
+    }
+    return this.get(row.id);
+  }
+
+  /** Whether BB says a provider is signed in (providerStates); true when it can't say, so nothing is refused on a guess. */
+  private async providerReady(providerId: string): Promise<boolean> {
+    let states: readonly OnboardingProviderState[] | undefined;
+    try { states = await this.deps.providerStates?.(); } catch { return true; }
+    if (!states) return true;
+    return states.some((state) => state.providerId === providerId && state.status === "ready");
   }
 
   /** A due run's thread is gone (src/triggers/scheduler.ts): when it was a Bot's Main, the new Main. */
