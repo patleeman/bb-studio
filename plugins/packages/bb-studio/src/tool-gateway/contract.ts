@@ -160,6 +160,8 @@ export const snapshotSchema = z.object({
   providers: z.array(providerViewSchema),
   ready: z.number().int(),
   importable: z.number().int(),
+  /** Secrets files that can't be read: until they are fixed, no server is approved. */
+  problems: z.array(z.string()),
 });
 export type ToolGatewaySnapshot = z.infer<typeof snapshotSchema>;
 

@@ -29,6 +29,7 @@ export interface Harness {
   todos: { created: { title: string; why: string; requestId: string; threadId: string | null }[]; closed: { taskId: string; state: string }[] };
   threads: Map<string, { providerId: string; projectId: string }>;
   removedPlugins: string[];
+  warnings: string[];
   rpc(method: string, input: unknown, context?: unknown): Promise<any>;
   /** Runs an agent tool as the given thread. */
   agent(tool: string, input: unknown, threadId?: string): Promise<any>;
@@ -53,6 +54,7 @@ export async function harness(options: { baseEnv?: Record<string, string | undef
     ["thr_other_project", { providerId: "claude-code", projectId: "prj_b" }],
   ]);
   const removedPlugins: string[] = [];
+  const warnings: string[] = [];
   let tools = new Map<string, Tool>();
   let routes = new Map<string, (context: { req: { url: string } }) => Promise<Response>>();
   let gateway!: ToolGateway;
@@ -74,7 +76,7 @@ export async function harness(options: { baseEnv?: Record<string, string | undef
         providers: { catalog: async () => [{ id: "claude-code", displayName: "Claude Code", enabled: true }, { id: "codex", displayName: "Codex", enabled: true }, { id: "acp-hermes", displayName: "Hermes", enabled: true }] },
         plugins: { list: async () => ({ plugins: (options.plugins ?? []).filter((id) => !removedPlugins.includes(id)).map((id) => ({ id })) }), remove: async ({ pluginId }: { pluginId: string }) => { removedPlugins.push(pluginId); return {}; } },
       },
-      log: { info: () => {}, warn: () => {}, error: () => {} },
+      log: { info: () => {}, warn: (message: string) => { warnings.push(message); }, error: () => {} },
       onDispose: () => {},
     };
     gateway = await registerToolGateway(bb as never, {
@@ -102,6 +104,7 @@ export async function harness(options: { baseEnv?: Record<string, string | undef
     todos,
     threads,
     removedPlugins,
+    warnings,
     rpc: async (method, input, context = APP_WINDOW) => {
       const handler = gateway.handlers[method];
       if (!handler) throw new Error(`no handler ${method}`);

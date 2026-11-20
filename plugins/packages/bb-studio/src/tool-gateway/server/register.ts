@@ -107,7 +107,8 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
   await store.loadProviders().catch((error) => bb.log.warn(`Tool Gateway: provider access unreadable: ${errorText(error)}`));
   const secretsDir = join(pluginSecretsDir(options.dataDir, options.pluginId), "tool-gateway");
   const secrets = new ToolGatewaySecrets(secretsDir);
-  await secrets.load().catch((error) => bb.log.warn(`Tool Gateway: secrets unreadable: ${errorText(error)}`));
+  // Never throws: a file that can't be read only means nothing is approved until it is fixed.
+  for (const problem of await secrets.load()) bb.log.warn(`Tool Gateway: a secrets file can't be read, so no server is approved until it is fixed: ${problem}`);
   const baseEnv = options.baseEnv ?? process.env;
   /** Logs, errors, descriptions: every server's secret-looking values. */
   const hide = (text: string) => redact(text, secrets.values());
@@ -115,7 +116,10 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
   const hideFor = <T,>(serverId: string, value: T): T => redactDeep(value, secrets.values(serverId));
 
   // ── Readiness: what configure() and the agent tools see ──────────────
-  const approvedNow = (record: ServerRecord): boolean => record.approvedHash !== null && record.approvedHash === configHash(record.config, secrets.get(record.id), secrets.approvalKey());
+  const approvedNow = (record: ServerRecord): boolean => {
+    const key = secrets.approvalKey();
+    return key !== null && record.approvedHash !== null && record.approvedHash === configHash(record.config, secrets.get(record.id), key);
+  };
   // Read from the database each time: a row edited outside Studio must not stay ready.
   const readyServers = (): ServerRecord[] => store.freshServers().filter((record) => record.enabled && approvedNow(record));
   /**
@@ -129,6 +133,8 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
       rules.every((rule) => rule.servers === "all" || rule.servers.includes(record.id)) &&
       (record.projects === null || (projectId !== null && record.projects.includes(projectId))));
   };
+
+  let configureFailureLogged = false;
 
   // ── Change notice ─────────────────────────────────────────────────────
   let publishTimer: ReturnType<typeof setTimeout> | null = null;
@@ -325,9 +331,12 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
   }
 
   async function approveRecord(record: ServerRecord, values: SecretValues): Promise<ServerRecord> {
+    if (secrets.approvalKey() === null) throw new ConfigError(`Tool Gateway's approval key can't be read (${secrets.loadProblems().join("; ")}). Fix or remove it in the secrets folder, then reload Studio.`);
     await secrets.set(record.id, values);
     const now = Date.now();
-    return store.saveServer({ ...record, approvedHash: configHash(record.config, values, secrets.approvalKey()), approvedAt: now, status: "stopped", lastError: null });
+    const key = secrets.approvalKey();
+    if (key === null) throw new ConfigError(`Tool Gateway's approval key can't be read (${secrets.loadProblems().join("; ")}). Fix or remove it in the secrets folder, then reload Studio.`);
+    return store.saveServer({ ...record, approvedHash: configHash(record.config, values, key), approvedAt: now, status: "stopped", lastError: null });
   }
 
   async function closeRequest(requestId: string, state: "approved" | "declined"): Promise<void> {
@@ -551,6 +560,7 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
         providers: await providerViews(),
         ready: readyServers().length,
         importable: importableCount(),
+        problems: secrets.loadProblems(),
       };
     },
     "toolGateway.server": async ({ id }: { id: string }, context?: unknown) => {
@@ -842,7 +852,18 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
   }
 
   return {
-    agentConfiguration: ({ providerId, projectId }) => (visibleServers(providerId, projectId).length > 0 ? { tools: [...TOOL_GATEWAY_TOOLS], instructions: TOOL_GATEWAY_INSTRUCTIONS } : { tools: [], instructions: "" }),
+    agentConfiguration: ({ providerId, projectId }) => {
+      // A Tool Gateway failure only hides its own tools; it never breaks the session or Studio's other tools.
+      try {
+        return visibleServers(providerId, projectId).length > 0 ? { tools: [...TOOL_GATEWAY_TOOLS], instructions: TOOL_GATEWAY_INSTRUCTIONS } : { tools: [], instructions: "" };
+      } catch (error) {
+        if (!configureFailureLogged) {
+          configureFailureLogged = true;
+          bb.log.warn(`Tool Gateway: its tools are hidden from agents because it failed: ${hide(errorText(error))}`);
+        }
+        return { tools: [], instructions: "" };
+      }
+    },
     cli,
     store,
     engine,

@@ -394,6 +394,7 @@ export function ImportPanel({ writable, onChanged, onClose }: { writable: boolea
         })}
       </ul>
       {preview.skills.length ? <p className="px-4 py-2 text-xs text-muted-foreground">Skills not imported: {preview.skills.join(", ")}</p> : null}
+      {preview.source === "bb" && !result ? <p className="px-4 py-2 text-xs text-muted-foreground" data-testid="tool-gateway-import-once">The staged copy is deleted after the import; other servers need staging again.</p> : null}
       {result ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">Imported {plural(result.imported.length, "server")}{result.skipped.length ? `; skipped ${result.skipped.map((each) => `${each.id} (${each.reason})`).join(", ")}` : ""}</p> : null}
       <div className="flex flex-wrap gap-2 px-4 py-3">
         <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
@@ -457,6 +458,7 @@ export function ToolGatewaySection() {
   return (
     <div id={TOOL_GATEWAY_SECTION_ANCHOR} className="flex flex-col gap-4" data-testid="tool-gateway-section">
       {!writable ? <p className="text-xs text-muted-foreground" data-testid="tool-gateway-read-only">{READ_ONLY_NOTE}</p> : null}
+      {snapshot.problems.length ? <p role="alert" className="text-xs text-destructive" data-testid="tool-gateway-problems">Secrets can't be read, so no server is approved: {snapshot.problems.join("; ")}</p> : null}
       {snapshot.importable > 0 && !importing ? (
         <Card>
           <Row label={`Import ${plural(snapshot.importable, "server")} from Agent Plugins`} testId="tool-gateway-import-banner">

@@ -20,6 +20,7 @@ const snapshot: ToolGatewaySnapshot = {
   providers: [{ id: "claude-code", name: "Claude Code", acp: false, access: true, servers: "all" }, { id: "acp-hermes", name: "Hermes", acp: true, access: true, servers: ["notes"] }],
   ready: 1,
   importable: 2,
+  problems: [],
 };
 
 let root: Root | null = null;

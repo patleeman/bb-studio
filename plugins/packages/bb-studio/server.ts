@@ -470,7 +470,8 @@ export default async function plugin(bb: BbPluginApi) {
       bot: bot ? bots.instructions(bot) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
       pages: !off.has("page"), minis: !off.has("mini"), appCards, work: true, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
     });
-    const gateway = toolGateway?.agentConfiguration({ providerId: context.provider.id, projectId: context.project.id }) ?? { tools: [], instructions: "" };
+    let gateway: { tools: string[]; instructions: string } = { tools: [], instructions: "" };
+    try { gateway = toolGateway?.agentConfiguration({ providerId: context.provider.id, projectId: context.project.id }) ?? gateway; } catch { /* Tool Gateway never breaks Studio's configure(). */ }
     return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...TASK_TOOLS, ...AREA_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : []), ...gateway.tools], skills: ["studio-code", "studio", ...(bot ? ["themes", "presences"] : [])], instructions: gateway.instructions ? `${instructions}\n\n${gateway.instructions}`.trim() : instructions };
   }));
   /** Which conversation a Bot's session is in (src/bot-threads.ts conversationInstructions); "" before Studio has placed it. */

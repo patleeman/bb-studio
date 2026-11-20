@@ -225,3 +225,66 @@ describe("13. smaller items", () => {
     expect(MAX_CALL_TIMEOUT_MS).toBe(600_000);
   });
 });
+
+describe("R1. a secrets file that can't be read", () => {
+  for (const file of ["servers.json", "oauth.json"]) {
+    it(`(${file}) hides the gateway's tools but never throws, and nothing overwrites it`, async () => {
+      h = await harness();
+      await h.rpc("toolGateway.addServer", { server: stdioServer("one") });
+      writeFileSync(join(secretsDir(h), file), "{not json");
+      await h.restart();
+      expect(h.gateway.agentConfiguration({ providerId: "claude-code", projectId: "prj_a" })).toEqual(file === "servers.json" ? { tools: [], instructions: "" } : expect.objectContaining({ tools: expect.any(Array) }));
+      const snapshot = await h.rpc("toolGateway.snapshot", null);
+      expect(snapshot.problems).toEqual([expect.stringContaining(file)]);
+      if (file === "servers.json") {
+        expect(snapshot.servers[0]).toMatchObject({ id: "one", approved: false, status: "needs-approval" });
+        expect(json(await h.agent("tool_gateway_search", {})).tools).toEqual([]);
+        await expect(h.rpc("toolGateway.addServer", { server: stdioServer("two") })).rejects.toThrow(/servers\.json can't be read/);
+        expect(readFileSync(join(secretsDir(h), file), "utf8")).toBe("{not json");
+      }
+    });
+  }
+
+  it("(the key) leaves the unreadable key alone, approves nothing and keeps answering", async () => {
+    h = await harness();
+    await h.rpc("toolGateway.addServer", { server: stdioServer("one") });
+    const keyFile = join(secretsDir(h), "approval.key");
+    const key = readFileSync(keyFile, "utf8");
+    chmodSync(keyFile, 0o000);
+    try {
+      await h.restart();
+      expect(h.gateway.agentConfiguration({ providerId: "claude-code", projectId: "prj_a" })).toEqual({ tools: [], instructions: "" });
+      const snapshot = await h.rpc("toolGateway.snapshot", null);
+      expect(snapshot.servers[0]).toMatchObject({ approved: false });
+      expect(snapshot.problems).toEqual([expect.stringContaining("approval.key")]);
+      await expect(h.rpc("toolGateway.approve", { id: "one" })).rejects.toThrow(/approval key can't be read/);
+    } finally {
+      chmodSync(keyFile, 0o600);
+    }
+    expect(readFileSync(keyFile, "utf8")).toBe(key);
+  });
+
+  it("guards configure(): a failure inside Tool Gateway hides only its tools, and is logged once", async () => {
+    h = await harness();
+    await h.rpc("toolGateway.addServer", { server: stdioServer("one") });
+    h.db.exec("DROP TABLE tool_gateway_servers");
+    expect(h.gateway.agentConfiguration({ providerId: "claude-code", projectId: "prj_a" })).toEqual({ tools: [], instructions: "" });
+    expect(h.gateway.agentConfiguration({ providerId: "codex", projectId: "prj_a" })).toEqual({ tools: [], instructions: "" });
+    expect(h.warnings.filter((line) => line.includes("tools are hidden from agents"))).toHaveLength(1);
+    h.db.exec("CREATE TABLE tool_gateway_servers (id TEXT PRIMARY KEY, record TEXT NOT NULL, updated_at INTEGER NOT NULL)");
+  });
+});
+
+describe("masking secret-named values and headers", () => {
+  it("always masks values of secret-named env variables and every header, short or plain; other values only when they look secret", async () => {
+    const { secretValuesOf } = await import("../server/config");
+    const values = secretValuesOf({
+      env: { API_KEY: "abc", db_password: "hunter", Session_Cookie: "plainword", AUTH_ENABLED: "true", LOG_LEVEL: "info", OTHER: "Zq8-looks-secret-1" },
+      headers: { "X-Api": "short", Authorization: "Bearer tok" },
+    });
+    expect(values.sort()).toEqual(["Bearer tok", "Zq8-looks-secret-1", "abc", "hunter", "plainword", "short", "tok"].sort());
+    h = await harness();
+    await h.rpc("toolGateway.addServer", { server: stdioServer("one", { env: { FAKE_TOKEN: "pw42" } }) });
+    expect(text(await h.agent("tool_gateway_call", { id: await idOf(h, "one", "leak"), args: {} }))).toBe("the token is •••");
+  });
+});

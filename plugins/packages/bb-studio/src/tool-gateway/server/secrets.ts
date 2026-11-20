@@ -8,6 +8,8 @@ import { join } from "node:path";
 import { EMPTY_SECRETS, secretValuesOf, type SecretValues } from "./config";
 import type { OAuthCredentialBackend, OAuthCredentialRecord } from "./oauth";
 
+const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
 const SERVERS_FILE = "servers.json";
 const OAUTH_FILE = "oauth.json";
 const KEY_FILE = "approval.key";
@@ -34,18 +36,36 @@ export class ToolGatewaySecrets {
   private servers: Record<string, SecretValues> = {};
   private oauth: Record<string, OAuthCredentialRecord> = {};
   private key = "";
+  private problems = new Map<string, string>();
   private queue: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly dir: string) {}
 
-  async load(): Promise<void> {
-    const servers = await readJson(join(this.dir, SERVERS_FILE));
-    this.servers = Object.fromEntries(Object.entries(servers).map(([id, value]) => [id, cleanValues(value)]));
-    this.oauth = await readJson(join(this.dir, OAUTH_FILE)) as Record<string, OAuthCredentialRecord>;
-    await this.loadKey();
+  /**
+   * Reads the key first, then each file on its own. A file that can't be read
+   * never throws: its problem is kept, nothing in it counts (so no server is
+   * approved), and it is never overwritten until it is fixed or removed.
+   */
+  async load(): Promise<string[]> {
+    this.problems = new Map();
+    await this.loadKey().catch((error) => { this.key = ""; this.problems.set(KEY_FILE, errorText(error)); });
+    try {
+      const servers = await readJson(join(this.dir, SERVERS_FILE));
+      this.servers = Object.fromEntries(Object.entries(servers).map(([id, value]) => [id, cleanValues(value)]));
+    } catch (error) {
+      this.servers = {};
+      this.problems.set(SERVERS_FILE, errorText(error));
+    }
+    try {
+      this.oauth = await readJson(join(this.dir, OAUTH_FILE)) as Record<string, OAuthCredentialRecord>;
+    } catch (error) {
+      this.oauth = {};
+      this.problems.set(OAUTH_FILE, errorText(error));
+    }
+    return [...this.problems].map(([file, problem]) => `${file}: ${problem}`);
   }
 
-  /** The approval hash's key: 32 random bytes made once, kept here (0600). */
+  /** The approval hash's key: 32 random bytes made once, kept here (0600). A key file that exists but can't be read is left alone. */
   private async loadKey(): Promise<void> {
     try {
       this.key = (await readFile(join(this.dir, KEY_FILE), "utf8")).trim();
@@ -53,13 +73,24 @@ export class ToolGatewaySecrets {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
     if (this.key.length >= 32) return;
+    if (this.key.length > 0) throw new Error("the key is too short");
     this.key = randomBytes(32).toString("base64url");
     await this.writeText(KEY_FILE, this.key);
   }
 
-  approvalKey(): string {
-    if (!this.key) throw new Error("Tool Gateway's approval key isn't loaded.");
-    return this.key;
+  /** null when the key couldn't be loaded: then nothing is approved, and nothing can be. */
+  approvalKey(): string | null {
+    return this.key || null;
+  }
+
+  /** Why the secrets can't be used as they are, for the page and the log; empty when all is well. */
+  loadProblems(): string[] {
+    return [...this.problems].map(([file, problem]) => `${file}: ${problem}`);
+  }
+
+  private refuseIfBroken(file: string): void {
+    const problem = this.problems.get(file);
+    if (problem !== undefined) throw new Error(`Tool Gateway's ${file} can't be read (${problem}). Fix or remove it in the secrets folder, then reload Studio.`);
   }
 
   stagedImportPath(): string {
@@ -72,6 +103,7 @@ export class ToolGatewaySecrets {
   }
 
   set(serverId: string, values: SecretValues): Promise<void> {
+    this.refuseIfBroken(SERVERS_FILE);
     const empty = Object.keys(values.env).length === 0 && Object.keys(values.headers).length === 0;
     const next = { ...this.servers };
     if (empty) delete next[serverId];
@@ -108,6 +140,7 @@ export class ToolGatewaySecrets {
     return {
       load: async () => JSON.parse(JSON.stringify(this.oauth)) as Record<string, OAuthCredentialRecord>,
       save: async (value) => {
+        this.refuseIfBroken(OAUTH_FILE);
         this.oauth = JSON.parse(JSON.stringify(value)) as Record<string, OAuthCredentialRecord>;
         await this.write(OAUTH_FILE, this.oauth);
       },

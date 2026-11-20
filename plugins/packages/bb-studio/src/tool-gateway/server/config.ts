@@ -153,18 +153,35 @@ export function looksSecret(value: string): boolean {
   return true;
 }
 
-/** The secret-looking values of one server, longest first so a longer value is replaced whole. */
+/** Env names whose values are always secrets, whatever they look like. */
+export const SECRET_ENV_NAME = /KEY|TOKEN|SECRET|PASSWORD|PASS|AUTH|CREDENTIAL|COOKIE/iu;
+
+/**
+ * Whether a value from a secret place (a secret-named env variable, any
+ * header) is masked: anything but an empty or flag-like value (`true`, `1`),
+ * since masking those would rewrite every such word in a result.
+ */
+export function maskable(value: string): boolean {
+  const text = value.trim();
+  return text.length >= 3 && !/^(true|false|null|yes|no|on|off|none)$/iu.test(text);
+}
+
+/**
+ * The values to mask for one server, longest first so a longer value is
+ * replaced whole: secret-named env values and every header value always;
+ * other env values when they look like secrets.
+ */
 export function secretValuesOf(secrets: SecretValues): string[] {
-  return [...Object.values(secrets.env), ...Object.values(secrets.headers)]
-    .flatMap((value) => {
-      const out = [value];
-      // A bearer header's token is a secret on its own too.
-      const bearer = /^(?:bearer|basic|token)\s+(.+)$/iu.exec(value)?.[1];
-      if (bearer) out.push(bearer);
-      return out;
-    })
-    .filter(looksSecret)
-    .sort((a, b) => b.length - a.length);
+  const out = new Set<string>();
+  const add = (value: string, always: boolean) => {
+    if (always ? maskable(value) : looksSecret(value)) out.add(value);
+    // A bearer header's token is a secret on its own too.
+    const bearer = /^(?:bearer|basic|token)\s+(.+)$/iu.exec(value)?.[1];
+    if (bearer && maskable(bearer)) out.add(bearer);
+  };
+  for (const [name, value] of Object.entries(secrets.env)) add(value, SECRET_ENV_NAME.test(name));
+  for (const value of Object.values(secrets.headers)) add(value, true);
+  return [...out].sort((a, b) => b.length - a.length);
 }
 
 export const MASK = "•••";
