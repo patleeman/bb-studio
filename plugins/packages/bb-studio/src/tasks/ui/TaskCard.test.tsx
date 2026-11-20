@@ -30,6 +30,13 @@ vi.mock("../../ui/live", () => ({
     return { data, loading: false, error: method === "tasks.get" ? state.errors[input.id ?? ""] ?? null : null, refresh: () => {} };
   },
 }));
+vi.mock("./task-views", () => ({
+  useTaskView: (id: string) => {
+    const error = state.errors[id] ?? null;
+    const missing = !!error && /not found/i.test(error);
+    return { data: missing ? null : state.views[id] ?? null, missing, error: missing ? null : error, loading: false, refresh: () => {} };
+  },
+}));
 vi.mock("../../kit/ui/index", async () => (await import("../../loops/ui/test-kit")).kitUi);
 vi.mock("../../kit/app/index", async () => ({ ...(await import("../../loops/ui/test-kit")).kitUi, remember: (_key: string, value: unknown) => value, openAppPath: vi.fn() }));
 vi.mock("../../kit/app/directive-card", () => ({ remember: (_key: string, value: unknown) => value }));

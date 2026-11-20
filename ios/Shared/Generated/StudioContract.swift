@@ -371,6 +371,7 @@ public enum Studio {
     public static let memory_profile = "memory.profile"
     public static let links_resolve = "links.resolve"
     public static let tasks_get = "tasks.get"
+    public static let tasks_getMany = "tasks.getMany"
     public static let tasks_list = "tasks.list"
     public static let tasks_inFlight = "tasks.inFlight"
     public static let tasks_act = "tasks.act"
@@ -1206,6 +1207,8 @@ public enum Studio {
   public typealias LinksResolve = LinksResolveOutput
 
   public typealias TasksGet = TasksGetOutput
+
+  public typealias TasksGetMany = TasksGetManyOutput
 
   public typealias TasksList = TasksListOutput
 
@@ -34924,6 +34927,1246 @@ public enum Studio {
       self.todo = todo
       self.threads = threads
       self.runs = runs
+    }
+  }
+
+  public struct TasksGetManyInput: Sendable, Hashable, Codable {
+    public var ids: [String]?
+
+    public init(ids: [String]? = nil) {
+      self.ids = ids
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewTaskState: Sendable, Hashable, Codable {
+    case todo
+    case in_progress
+    case waiting
+    case done
+    case dropped
+    case failed
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "todo": self = .todo
+      case "in_progress": self = .in_progress
+      case "waiting": self = .waiting
+      case "done": self = .done
+      case "dropped": self = .dropped
+      case "failed": self = .failed
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .todo: try container.encode("todo")
+      case .in_progress: try container.encode("in_progress")
+      case .waiting: try container.encode("waiting")
+      case .done: try container.encode("done")
+      case .dropped: try container.encode("dropped")
+      case .failed: try container.encode("failed")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewTaskKind: Sendable, Hashable, Codable {
+    case `do`
+    case decide
+    case read
+    case waiting_outside
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "do": self = .`do`
+      case "decide": self = .decide
+      case "read": self = .read
+      case "waiting-outside": self = .waiting_outside
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`do`: try container.encode("do")
+      case .decide: try container.encode("decide")
+      case .read: try container.encode("read")
+      case .waiting_outside: try container.encode("waiting-outside")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewTaskPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewTaskTimingTriggerType: Sendable, Hashable, Codable {
+    case none
+    case time
+    case event
+    case place
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "time": self = .time
+      case "event": self = .event
+      case "place": self = .place
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .time: try container.encode("time")
+      case .event: try container.encode("event")
+      case .place: try container.encode("place")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewTaskTimingTriggerDirection: Sendable, Hashable, Codable {
+    case arrive
+    case leave
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "arrive": self = .arrive
+      case "leave": self = .leave
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .arrive: try container.encode("arrive")
+      case .leave: try container.encode("leave")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewTaskTimingTrigger: Sendable, Hashable, Codable {
+    public var type: TasksGetManyOutputViewsItemViewTaskTimingTriggerType?
+    public var at: Double?
+    public var event: String?
+    public var place: String?
+    public var direction: TasksGetManyOutputViewsItemViewTaskTimingTriggerDirection?
+    public var label: String?
+
+    public init(type: TasksGetManyOutputViewsItemViewTaskTimingTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: TasksGetManyOutputViewsItemViewTaskTimingTriggerDirection? = nil, label: String? = nil) {
+      self.type = type
+      self.at = at
+      self.event = event
+      self.place = place
+      self.direction = direction
+      self.label = label
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewTaskTiming: Sendable, Hashable, Codable {
+    public var due: Double?
+    public var trigger: TasksGetManyOutputViewsItemViewTaskTimingTrigger?
+    public var snoozed: Bool?
+
+    public init(due: Double? = nil, trigger: TasksGetManyOutputViewsItemViewTaskTimingTrigger? = nil, snoozed: Bool? = nil) {
+      self.due = due
+      self.trigger = trigger
+      self.snoozed = snoozed
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewTaskAttentionQueue: Sendable, Hashable, Codable {
+    case queued
+    case surfaced
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "surfaced": self = .surfaced
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .surfaced: try container.encode("surfaced")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewTaskAttention: Sendable, Hashable, Codable {
+    public var queue: TasksGetManyOutputViewsItemViewTaskAttentionQueue?
+    public var push: Bool?
+
+    public init(queue: TasksGetManyOutputViewsItemViewTaskAttentionQueue? = nil, push: Bool? = nil) {
+      self.queue = queue
+      self.push = push
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewTaskProgress: Sendable, Hashable, Codable {
+    public var step: String?
+    public var line: String?
+
+    public init(step: String? = nil, line: String? = nil) {
+      self.step = step
+      self.line = line
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewTaskOutputsItem: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var title: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, title: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.title = title
+      self.url = url
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewTaskSource: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.url = url
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewTaskSchedule: Sendable, Hashable, Codable {
+    public var text: String?
+    public var cron: String?
+    public var timeZone: String?
+    public var automationId: String?
+    public var paused: Bool?
+
+    public init(text: String? = nil, cron: String? = nil, timeZone: String? = nil, automationId: String? = nil, paused: Bool? = nil) {
+      self.text = text
+      self.cron = cron
+      self.timeZone = timeZone
+      self.automationId = automationId
+      self.paused = paused
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewTaskCardKind: Sendable, Hashable, Codable {
+    case worker
+    case lead
+    case release
+    case todo
+    case task
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "worker": self = .worker
+      case "lead": self = .lead
+      case "release": self = .release
+      case "todo": self = .todo
+      case "task": self = .task
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .worker: try container.encode("worker")
+      case .lead: try container.encode("lead")
+      case .release: try container.encode("release")
+      case .todo: try container.encode("todo")
+      case .task: try container.encode("task")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewTaskCard: Sendable, Hashable, Codable {
+    public var kind: TasksGetManyOutputViewsItemViewTaskCardKind?
+    public var messageId: String?
+    public var messageSeq: Int?
+    public var dismissedAt: Double?
+
+    public init(kind: TasksGetManyOutputViewsItemViewTaskCardKind? = nil, messageId: String? = nil, messageSeq: Int? = nil, dismissedAt: Double? = nil) {
+      self.kind = kind
+      self.messageId = messageId
+      self.messageSeq = messageSeq
+      self.dismissedAt = dismissedAt
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewTaskAutomationKind: Sendable, Hashable, Codable {
+    case checkin
+    case runner
+    case watcher
+    case heartbeat
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "checkin": self = .checkin
+      case "runner": self = .runner
+      case "watcher": self = .watcher
+      case "heartbeat": self = .heartbeat
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .checkin: try container.encode("checkin")
+      case .runner: try container.encode("runner")
+      case .watcher: try container.encode("watcher")
+      case .heartbeat: try container.encode("heartbeat")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewTaskAutomationRole: Sendable, Hashable, Codable {
+    case schedule
+    case run
+    case finding
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "schedule": self = .schedule
+      case "run": self = .run
+      case "finding": self = .finding
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .schedule: try container.encode("schedule")
+      case .run: try container.encode("run")
+      case .finding: try container.encode("finding")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewTaskAutomationMode: Sendable, Hashable, Codable {
+    case dedupe
+    case each
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "dedupe": self = .dedupe
+      case "each": self = .each
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .dedupe: try container.encode("dedupe")
+      case .each: try container.encode("each")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewTaskAutomationSeverity: Sendable, Hashable, Codable {
+    case info
+    case warn
+    case critical
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "info": self = .info
+      case "warn": self = .warn
+      case "critical": self = .critical
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .info: try container.encode("info")
+      case .warn: try container.encode("warn")
+      case .critical: try container.encode("critical")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewTaskAutomation: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: TasksGetManyOutputViewsItemViewTaskAutomationKind?
+    public var role: TasksGetManyOutputViewsItemViewTaskAutomationRole?
+    public var thread: String?
+    public var keys: [String]?
+    public var count: Int?
+    public var lastAt: Double?
+    public var mode: TasksGetManyOutputViewsItemViewTaskAutomationMode?
+    public var clearedAt: Double?
+    public var posted: Bool?
+    public var sentAt: Double?
+    public var nudgedAt: Double?
+    public var nudged: String?
+    public var severity: TasksGetManyOutputViewsItemViewTaskAutomationSeverity?
+    public var pushedAt: Double?
+
+    public init(id: String? = nil, kind: TasksGetManyOutputViewsItemViewTaskAutomationKind? = nil, role: TasksGetManyOutputViewsItemViewTaskAutomationRole? = nil, thread: String? = nil, keys: [String]? = nil, count: Int? = nil, lastAt: Double? = nil, mode: TasksGetManyOutputViewsItemViewTaskAutomationMode? = nil, clearedAt: Double? = nil, posted: Bool? = nil, sentAt: Double? = nil, nudgedAt: Double? = nil, nudged: String? = nil, severity: TasksGetManyOutputViewsItemViewTaskAutomationSeverity? = nil, pushedAt: Double? = nil) {
+      self.id = id
+      self.kind = kind
+      self.role = role
+      self.thread = thread
+      self.keys = keys
+      self.count = count
+      self.lastAt = lastAt
+      self.mode = mode
+      self.clearedAt = clearedAt
+      self.posted = posted
+      self.sentAt = sentAt
+      self.nudgedAt = nudgedAt
+      self.nudged = nudged
+      self.severity = severity
+      self.pushedAt = pushedAt
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewTaskWaitingOnKind: Sendable, Hashable, Codable {
+    case user
+    case ci
+    case task
+    case outside
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "ci": self = .ci
+      case "task": self = .task
+      case "outside": self = .outside
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .ci: try container.encode("ci")
+      case .task: try container.encode("task")
+      case .outside: try container.encode("outside")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewTaskWaitingOn: Sendable, Hashable, Codable {
+    public var kind: TasksGetManyOutputViewsItemViewTaskWaitingOnKind?
+    public var ref: String?
+    public var text: String?
+
+    public init(kind: TasksGetManyOutputViewsItemViewTaskWaitingOnKind? = nil, ref: String? = nil, text: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.text = text
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewTaskOrigin: Sendable, Hashable, Codable {
+    case loop
+    case work
+    case task
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "loop": self = .loop
+      case "work": self = .work
+      case "task": self = .task
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .loop: try container.encode("loop")
+      case .work: try container.encode("work")
+      case .task: try container.encode("task")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewTask: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var why: String?
+    public var owner: String?
+    public var state: TasksGetManyOutputViewsItemViewTaskState?
+    public var kind: TasksGetManyOutputViewsItemViewTaskKind?
+    public var options: [String]?
+    public var needs: String?
+    public var priority: TasksGetManyOutputViewsItemViewTaskPriority?
+    public var conversation: String?
+    public var project: String?
+    public var area: String?
+    public var timing: TasksGetManyOutputViewsItemViewTaskTiming?
+    public var attention: TasksGetManyOutputViewsItemViewTaskAttention?
+    public var progress: TasksGetManyOutputViewsItemViewTaskProgress?
+    public var workers: [String]?
+    public var outputs: [TasksGetManyOutputViewsItemViewTaskOutputsItem]?
+    public var source: TasksGetManyOutputViewsItemViewTaskSource?
+    public var parentId: String?
+    public var schedule: TasksGetManyOutputViewsItemViewTaskSchedule?
+    public var card: TasksGetManyOutputViewsItemViewTaskCard?
+    public var automation: TasksGetManyOutputViewsItemViewTaskAutomation?
+    public var waitingOn: TasksGetManyOutputViewsItemViewTaskWaitingOn?
+    public var stale: Bool?
+    public var origin: TasksGetManyOutputViewsItemViewTaskOrigin?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var closedAt: Double?
+    public var closedBy: String?
+
+    public init(id: String? = nil, title: String? = nil, why: String? = nil, owner: String? = nil, state: TasksGetManyOutputViewsItemViewTaskState? = nil, kind: TasksGetManyOutputViewsItemViewTaskKind? = nil, options: [String]? = nil, needs: String? = nil, priority: TasksGetManyOutputViewsItemViewTaskPriority? = nil, conversation: String? = nil, project: String? = nil, area: String? = nil, timing: TasksGetManyOutputViewsItemViewTaskTiming? = nil, attention: TasksGetManyOutputViewsItemViewTaskAttention? = nil, progress: TasksGetManyOutputViewsItemViewTaskProgress? = nil, workers: [String]? = nil, outputs: [TasksGetManyOutputViewsItemViewTaskOutputsItem]? = nil, source: TasksGetManyOutputViewsItemViewTaskSource? = nil, parentId: String? = nil, schedule: TasksGetManyOutputViewsItemViewTaskSchedule? = nil, card: TasksGetManyOutputViewsItemViewTaskCard? = nil, automation: TasksGetManyOutputViewsItemViewTaskAutomation? = nil, waitingOn: TasksGetManyOutputViewsItemViewTaskWaitingOn? = nil, stale: Bool? = nil, origin: TasksGetManyOutputViewsItemViewTaskOrigin? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, closedAt: Double? = nil, closedBy: String? = nil) {
+      self.id = id
+      self.title = title
+      self.why = why
+      self.owner = owner
+      self.state = state
+      self.kind = kind
+      self.options = options
+      self.needs = needs
+      self.priority = priority
+      self.conversation = conversation
+      self.project = project
+      self.area = area
+      self.timing = timing
+      self.attention = attention
+      self.progress = progress
+      self.workers = workers
+      self.outputs = outputs
+      self.source = source
+      self.parentId = parentId
+      self.schedule = schedule
+      self.card = card
+      self.automation = automation
+      self.waitingOn = waitingOn
+      self.stale = stale
+      self.origin = origin
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.closedAt = closedAt
+      self.closedBy = closedBy
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewHistoryItem: Sendable, Hashable, Codable {
+    public var type: String?
+    public var at: Double?
+    public var data: String?
+
+    public init(type: String? = nil, at: Double? = nil, data: String? = nil) {
+      self.type = type
+      self.at = at
+      self.data = data
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewThreadsItem: Sendable, Hashable, Codable {
+    public var owner: String?
+    public var name: String?
+    public var threadId: String?
+
+    public init(owner: String? = nil, name: String? = nil, threadId: String? = nil) {
+      self.owner = owner
+      self.name = name
+      self.threadId = threadId
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewRunsItemState: Sendable, Hashable, Codable {
+    case todo
+    case in_progress
+    case waiting
+    case done
+    case dropped
+    case failed
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "todo": self = .todo
+      case "in_progress": self = .in_progress
+      case "waiting": self = .waiting
+      case "done": self = .done
+      case "dropped": self = .dropped
+      case "failed": self = .failed
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .todo: try container.encode("todo")
+      case .in_progress: try container.encode("in_progress")
+      case .waiting: try container.encode("waiting")
+      case .done: try container.encode("done")
+      case .dropped: try container.encode("dropped")
+      case .failed: try container.encode("failed")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewRunsItemKind: Sendable, Hashable, Codable {
+    case `do`
+    case decide
+    case read
+    case waiting_outside
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "do": self = .`do`
+      case "decide": self = .decide
+      case "read": self = .read
+      case "waiting-outside": self = .waiting_outside
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`do`: try container.encode("do")
+      case .decide: try container.encode("decide")
+      case .read: try container.encode("read")
+      case .waiting_outside: try container.encode("waiting-outside")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewRunsItemPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewRunsItemTimingTriggerType: Sendable, Hashable, Codable {
+    case none
+    case time
+    case event
+    case place
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "time": self = .time
+      case "event": self = .event
+      case "place": self = .place
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .time: try container.encode("time")
+      case .event: try container.encode("event")
+      case .place: try container.encode("place")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewRunsItemTimingTriggerDirection: Sendable, Hashable, Codable {
+    case arrive
+    case leave
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "arrive": self = .arrive
+      case "leave": self = .leave
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .arrive: try container.encode("arrive")
+      case .leave: try container.encode("leave")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewRunsItemTimingTrigger: Sendable, Hashable, Codable {
+    public var type: TasksGetManyOutputViewsItemViewRunsItemTimingTriggerType?
+    public var at: Double?
+    public var event: String?
+    public var place: String?
+    public var direction: TasksGetManyOutputViewsItemViewRunsItemTimingTriggerDirection?
+    public var label: String?
+
+    public init(type: TasksGetManyOutputViewsItemViewRunsItemTimingTriggerType? = nil, at: Double? = nil, event: String? = nil, place: String? = nil, direction: TasksGetManyOutputViewsItemViewRunsItemTimingTriggerDirection? = nil, label: String? = nil) {
+      self.type = type
+      self.at = at
+      self.event = event
+      self.place = place
+      self.direction = direction
+      self.label = label
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewRunsItemTiming: Sendable, Hashable, Codable {
+    public var due: Double?
+    public var trigger: TasksGetManyOutputViewsItemViewRunsItemTimingTrigger?
+    public var snoozed: Bool?
+
+    public init(due: Double? = nil, trigger: TasksGetManyOutputViewsItemViewRunsItemTimingTrigger? = nil, snoozed: Bool? = nil) {
+      self.due = due
+      self.trigger = trigger
+      self.snoozed = snoozed
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewRunsItemAttentionQueue: Sendable, Hashable, Codable {
+    case queued
+    case surfaced
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "surfaced": self = .surfaced
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .surfaced: try container.encode("surfaced")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewRunsItemAttention: Sendable, Hashable, Codable {
+    public var queue: TasksGetManyOutputViewsItemViewRunsItemAttentionQueue?
+    public var push: Bool?
+
+    public init(queue: TasksGetManyOutputViewsItemViewRunsItemAttentionQueue? = nil, push: Bool? = nil) {
+      self.queue = queue
+      self.push = push
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewRunsItemProgress: Sendable, Hashable, Codable {
+    public var step: String?
+    public var line: String?
+
+    public init(step: String? = nil, line: String? = nil) {
+      self.step = step
+      self.line = line
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewRunsItemOutputsItem: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var title: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, title: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.title = title
+      self.url = url
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewRunsItemSource: Sendable, Hashable, Codable {
+    public var kind: String?
+    public var ref: String?
+    public var url: String?
+
+    public init(kind: String? = nil, ref: String? = nil, url: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.url = url
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewRunsItemSchedule: Sendable, Hashable, Codable {
+    public var text: String?
+    public var cron: String?
+    public var timeZone: String?
+    public var automationId: String?
+    public var paused: Bool?
+
+    public init(text: String? = nil, cron: String? = nil, timeZone: String? = nil, automationId: String? = nil, paused: Bool? = nil) {
+      self.text = text
+      self.cron = cron
+      self.timeZone = timeZone
+      self.automationId = automationId
+      self.paused = paused
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewRunsItemCardKind: Sendable, Hashable, Codable {
+    case worker
+    case lead
+    case release
+    case todo
+    case task
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "worker": self = .worker
+      case "lead": self = .lead
+      case "release": self = .release
+      case "todo": self = .todo
+      case "task": self = .task
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .worker: try container.encode("worker")
+      case .lead: try container.encode("lead")
+      case .release: try container.encode("release")
+      case .todo: try container.encode("todo")
+      case .task: try container.encode("task")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewRunsItemCard: Sendable, Hashable, Codable {
+    public var kind: TasksGetManyOutputViewsItemViewRunsItemCardKind?
+    public var messageId: String?
+    public var messageSeq: Int?
+    public var dismissedAt: Double?
+
+    public init(kind: TasksGetManyOutputViewsItemViewRunsItemCardKind? = nil, messageId: String? = nil, messageSeq: Int? = nil, dismissedAt: Double? = nil) {
+      self.kind = kind
+      self.messageId = messageId
+      self.messageSeq = messageSeq
+      self.dismissedAt = dismissedAt
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewRunsItemAutomationKind: Sendable, Hashable, Codable {
+    case checkin
+    case runner
+    case watcher
+    case heartbeat
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "checkin": self = .checkin
+      case "runner": self = .runner
+      case "watcher": self = .watcher
+      case "heartbeat": self = .heartbeat
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .checkin: try container.encode("checkin")
+      case .runner: try container.encode("runner")
+      case .watcher: try container.encode("watcher")
+      case .heartbeat: try container.encode("heartbeat")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewRunsItemAutomationRole: Sendable, Hashable, Codable {
+    case schedule
+    case run
+    case finding
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "schedule": self = .schedule
+      case "run": self = .run
+      case "finding": self = .finding
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .schedule: try container.encode("schedule")
+      case .run: try container.encode("run")
+      case .finding: try container.encode("finding")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewRunsItemAutomationMode: Sendable, Hashable, Codable {
+    case dedupe
+    case each
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "dedupe": self = .dedupe
+      case "each": self = .each
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .dedupe: try container.encode("dedupe")
+      case .each: try container.encode("each")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewRunsItemAutomationSeverity: Sendable, Hashable, Codable {
+    case info
+    case warn
+    case critical
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "info": self = .info
+      case "warn": self = .warn
+      case "critical": self = .critical
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .info: try container.encode("info")
+      case .warn: try container.encode("warn")
+      case .critical: try container.encode("critical")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewRunsItemAutomation: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: TasksGetManyOutputViewsItemViewRunsItemAutomationKind?
+    public var role: TasksGetManyOutputViewsItemViewRunsItemAutomationRole?
+    public var thread: String?
+    public var keys: [String]?
+    public var count: Int?
+    public var lastAt: Double?
+    public var mode: TasksGetManyOutputViewsItemViewRunsItemAutomationMode?
+    public var clearedAt: Double?
+    public var posted: Bool?
+    public var sentAt: Double?
+    public var nudgedAt: Double?
+    public var nudged: String?
+    public var severity: TasksGetManyOutputViewsItemViewRunsItemAutomationSeverity?
+    public var pushedAt: Double?
+
+    public init(id: String? = nil, kind: TasksGetManyOutputViewsItemViewRunsItemAutomationKind? = nil, role: TasksGetManyOutputViewsItemViewRunsItemAutomationRole? = nil, thread: String? = nil, keys: [String]? = nil, count: Int? = nil, lastAt: Double? = nil, mode: TasksGetManyOutputViewsItemViewRunsItemAutomationMode? = nil, clearedAt: Double? = nil, posted: Bool? = nil, sentAt: Double? = nil, nudgedAt: Double? = nil, nudged: String? = nil, severity: TasksGetManyOutputViewsItemViewRunsItemAutomationSeverity? = nil, pushedAt: Double? = nil) {
+      self.id = id
+      self.kind = kind
+      self.role = role
+      self.thread = thread
+      self.keys = keys
+      self.count = count
+      self.lastAt = lastAt
+      self.mode = mode
+      self.clearedAt = clearedAt
+      self.posted = posted
+      self.sentAt = sentAt
+      self.nudgedAt = nudgedAt
+      self.nudged = nudged
+      self.severity = severity
+      self.pushedAt = pushedAt
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewRunsItemWaitingOnKind: Sendable, Hashable, Codable {
+    case user
+    case ci
+    case task
+    case outside
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "ci": self = .ci
+      case "task": self = .task
+      case "outside": self = .outside
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .ci: try container.encode("ci")
+      case .task: try container.encode("task")
+      case .outside: try container.encode("outside")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewRunsItemWaitingOn: Sendable, Hashable, Codable {
+    public var kind: TasksGetManyOutputViewsItemViewRunsItemWaitingOnKind?
+    public var ref: String?
+    public var text: String?
+
+    public init(kind: TasksGetManyOutputViewsItemViewRunsItemWaitingOnKind? = nil, ref: String? = nil, text: String? = nil) {
+      self.kind = kind
+      self.ref = ref
+      self.text = text
+    }
+  }
+
+  public enum TasksGetManyOutputViewsItemViewRunsItemOrigin: Sendable, Hashable, Codable {
+    case loop
+    case work
+    case task
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "loop": self = .loop
+      case "work": self = .work
+      case "task": self = .task
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .loop: try container.encode("loop")
+      case .work: try container.encode("work")
+      case .task: try container.encode("task")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemViewRunsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var why: String?
+    public var owner: String?
+    public var state: TasksGetManyOutputViewsItemViewRunsItemState?
+    public var kind: TasksGetManyOutputViewsItemViewRunsItemKind?
+    public var options: [String]?
+    public var needs: String?
+    public var priority: TasksGetManyOutputViewsItemViewRunsItemPriority?
+    public var conversation: String?
+    public var project: String?
+    public var area: String?
+    public var timing: TasksGetManyOutputViewsItemViewRunsItemTiming?
+    public var attention: TasksGetManyOutputViewsItemViewRunsItemAttention?
+    public var progress: TasksGetManyOutputViewsItemViewRunsItemProgress?
+    public var workers: [String]?
+    public var outputs: [TasksGetManyOutputViewsItemViewRunsItemOutputsItem]?
+    public var source: TasksGetManyOutputViewsItemViewRunsItemSource?
+    public var parentId: String?
+    public var schedule: TasksGetManyOutputViewsItemViewRunsItemSchedule?
+    public var card: TasksGetManyOutputViewsItemViewRunsItemCard?
+    public var automation: TasksGetManyOutputViewsItemViewRunsItemAutomation?
+    public var waitingOn: TasksGetManyOutputViewsItemViewRunsItemWaitingOn?
+    public var stale: Bool?
+    public var origin: TasksGetManyOutputViewsItemViewRunsItemOrigin?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var closedAt: Double?
+    public var closedBy: String?
+
+    public init(id: String? = nil, title: String? = nil, why: String? = nil, owner: String? = nil, state: TasksGetManyOutputViewsItemViewRunsItemState? = nil, kind: TasksGetManyOutputViewsItemViewRunsItemKind? = nil, options: [String]? = nil, needs: String? = nil, priority: TasksGetManyOutputViewsItemViewRunsItemPriority? = nil, conversation: String? = nil, project: String? = nil, area: String? = nil, timing: TasksGetManyOutputViewsItemViewRunsItemTiming? = nil, attention: TasksGetManyOutputViewsItemViewRunsItemAttention? = nil, progress: TasksGetManyOutputViewsItemViewRunsItemProgress? = nil, workers: [String]? = nil, outputs: [TasksGetManyOutputViewsItemViewRunsItemOutputsItem]? = nil, source: TasksGetManyOutputViewsItemViewRunsItemSource? = nil, parentId: String? = nil, schedule: TasksGetManyOutputViewsItemViewRunsItemSchedule? = nil, card: TasksGetManyOutputViewsItemViewRunsItemCard? = nil, automation: TasksGetManyOutputViewsItemViewRunsItemAutomation? = nil, waitingOn: TasksGetManyOutputViewsItemViewRunsItemWaitingOn? = nil, stale: Bool? = nil, origin: TasksGetManyOutputViewsItemViewRunsItemOrigin? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, closedAt: Double? = nil, closedBy: String? = nil) {
+      self.id = id
+      self.title = title
+      self.why = why
+      self.owner = owner
+      self.state = state
+      self.kind = kind
+      self.options = options
+      self.needs = needs
+      self.priority = priority
+      self.conversation = conversation
+      self.project = project
+      self.area = area
+      self.timing = timing
+      self.attention = attention
+      self.progress = progress
+      self.workers = workers
+      self.outputs = outputs
+      self.source = source
+      self.parentId = parentId
+      self.schedule = schedule
+      self.card = card
+      self.automation = automation
+      self.waitingOn = waitingOn
+      self.stale = stale
+      self.origin = origin
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.closedAt = closedAt
+      self.closedBy = closedBy
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItemView: Sendable, Hashable, Codable {
+    public var task: TasksGetManyOutputViewsItemViewTask?
+    public var history: [TasksGetManyOutputViewsItemViewHistoryItem]?
+    public var todo: Bool?
+    public var threads: [TasksGetManyOutputViewsItemViewThreadsItem]?
+    public var runs: [TasksGetManyOutputViewsItemViewRunsItem]?
+
+    public init(task: TasksGetManyOutputViewsItemViewTask? = nil, history: [TasksGetManyOutputViewsItemViewHistoryItem]? = nil, todo: Bool? = nil, threads: [TasksGetManyOutputViewsItemViewThreadsItem]? = nil, runs: [TasksGetManyOutputViewsItemViewRunsItem]? = nil) {
+      self.task = task
+      self.history = history
+      self.todo = todo
+      self.threads = threads
+      self.runs = runs
+    }
+  }
+
+  public struct TasksGetManyOutputViewsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var view: TasksGetManyOutputViewsItemView?
+
+    public init(id: String? = nil, view: TasksGetManyOutputViewsItemView? = nil) {
+      self.id = id
+      self.view = view
+    }
+  }
+
+  public struct TasksGetManyOutput: Sendable, Hashable, Codable {
+    public var views: [TasksGetManyOutputViewsItem]?
+
+    public init(views: [TasksGetManyOutputViewsItem]? = nil) {
+      self.views = views
     }
   }
 

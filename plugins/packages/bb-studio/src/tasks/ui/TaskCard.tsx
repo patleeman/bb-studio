@@ -7,6 +7,7 @@ import { Icon, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import { useTaskActions } from "./actions";
 import { TaskOutputs } from "./Outputs";
+import { useTaskView } from "./task-views";
 export { useTaskActions } from "./actions";
 import { BotAvatar } from "../../ui/bot/BotAvatar";
 import type { Loop } from "../../loops/contract";
@@ -50,9 +51,9 @@ export function TaskDirective({ attributes, message }: PluginMessageDirectivePro
 }
 
 export function LiveTask({ id, row, threadId, messageId }: { id: string; row: number | null; threadId: string | null; messageId: string | null }) {
-  const live = useLive("tasks.get", { id }, { pollMs: 120_000 });
+  const live = useTaskView(id);
   const call = useCall();
-  const missing = !!live.error && /not found/i.test(live.error);
+  const missing = live.missing;
   const view = remember<TaskView>(`task:${id}`, missing ? null : (live.data ?? undefined));
   const people = useLoopPeople();
   const anchored = useRef(false);
