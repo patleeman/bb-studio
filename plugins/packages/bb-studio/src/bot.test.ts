@@ -1337,7 +1337,7 @@ it("starts a new Bot on a signed-in model: the primary's default model, else the
 // Failure modes: nothing the Bot infers (its Main, a thread's model, a
 // provider) may break it. Each case is a row of the failure-mode table.
 
-it.skip("FM: a read after the Main is deleted keeps the check-in on, and the new Main gets it", async () => {
+it("FM: a read after the Main is deleted keeps the check-in on, and the new Main gets it", async () => {
   const x = await setup();
   await x.bots.create({ name: "Dot", avatar: "🟣" });
   await x.bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
@@ -1350,7 +1350,7 @@ it.skip("FM: a read after the Main is deleted keeps the check-in on, and the new
   expect(await checkins(x)).toEqual([{ key: PERSONAL_PROJECT_ID, threadId: made, prompt: botHeartbeat("Dot") }]);
 });
 
-it.skip("FM: the heal finds a primary Main that a read already forgot (deleted while Studio was off)", async () => {
+it("FM: the heal finds a primary Main that a read already forgot (deleted while Studio was off)", async () => {
   const x = await setup();
   await x.bots.create({ name: "Dot", avatar: "🟣" });
   await x.bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
