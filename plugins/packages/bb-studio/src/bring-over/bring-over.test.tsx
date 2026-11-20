@@ -154,6 +154,25 @@ describe("BringOverSection", () => {
     expect(calls.find((call) => call.method === "POST")?.body).toMatchObject({ settings: [{ id: "env", replace: true }] });
   });
 
+  it("offers Agent Plugins as an import into Tool Gateway, never as a plugin to add", async () => {
+    let staged = 0;
+    serve({
+      "GET /api/v1/fork/bring-over": () => json({ ...listing, plugins: [{ id: "agent-plugins", version: "0.4.0", source: "bb-plugins", sourceKind: "git", enabled: true, hasData: true, here: false, sourceMissing: false }] }),
+      "POST /api/v1/fork/bring-over/tool-gateway/stage": () => { staged += 1; return json({ staged: "x" }); },
+    });
+    await render();
+    const row = $('[data-testid="bring-over-plugin-agent-plugins"]')!;
+    expect(row.textContent).toContain("Import into Tool Gateway");
+    expect(button("Add…")).toBeUndefined();
+    const opened = vi.fn();
+    globalThis.addEventListener("studio-tool-gateway-import", opened);
+    await act(async () => { button("Import into Tool Gateway")!.click(); });
+    globalThis.removeEventListener("studio-tool-gateway-import", opened);
+    expect(staged).toBe(1);
+    expect(calls.find((call) => call.url.endsWith("/tool-gateway/stage"))?.token).toBe("token-from-the-app");
+    expect(opened).toHaveBeenCalledTimes(1);
+  });
+
   it("says it works only in the app when there is no app token", async () => {
     vi.stubGlobal("bbDesktop", undefined);
     serve({ "GET /api/v1/fork/bring-over": () => json(listing) });

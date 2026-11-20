@@ -409,9 +409,13 @@ export function ImportPanel({ writable, onChanged, onClose }: { writable: boolea
 
 // ── The section ────────────────────────────────────────────────────────
 
+const IMPORT_EVENT = "studio-tool-gateway-import";
 let importRequested = false;
-/** Opens the import list when the section next mounts (Bring things over). */
-export function requestToolGatewayImport(): void { importRequested = true; }
+/** Opens the import list (Bring things over): now if the section is showing, or when it next mounts. */
+export function requestToolGatewayImport(): void {
+  importRequested = true;
+  globalThis.dispatchEvent?.(new Event(IMPORT_EVENT));
+}
 
 export function ToolGatewaySection() {
   const [snapshot, setSnapshot] = useState<ToolGatewaySnapshot | null>(null);
@@ -420,6 +424,7 @@ export function ToolGatewaySection() {
   const [open, setOpen] = useState<string | null>(null);
   const [form, setForm] = useState<{ initial: FormState; mode: "add" | "edit"; requestId?: string } | null>(null);
   const [importing, setImporting] = useState(false);
+  const [importKey, setImportKey] = useState(0);
   const refresh = useCallback(() => {
     void call("toolGateway.snapshot", null).then((next) => { setSnapshot(next); setLoadError(null); }, (cause) => setLoadError(errorMessage(cause)));
   }, []);
@@ -427,12 +432,20 @@ export function ToolGatewaySection() {
     void canChange().then(setWritable);
     refresh();
     const timer = setInterval(refresh, POLL_MS);
-    if (importRequested) {
+    const openImport = () => {
+      if (!importRequested) return;
       importRequested = false;
       setImporting(true);
-      document.getElementById(TOOL_GATEWAY_SECTION_ANCHOR)?.scrollIntoView({ block: "start" });
-    }
-    return () => clearInterval(timer);
+      setImportKey((key) => key + 1);
+      refresh();
+      document.getElementById(TOOL_GATEWAY_SECTION_ANCHOR)?.scrollIntoView?.({ block: "start" });
+    };
+    openImport();
+    globalThis.addEventListener?.(IMPORT_EVENT, openImport);
+    return () => {
+      clearInterval(timer);
+      globalThis.removeEventListener?.(IMPORT_EVENT, openImport);
+    };
   }, [refresh]);
   const { busy, error, run } = useBusy(refresh);
 
@@ -450,7 +463,7 @@ export function ToolGatewaySection() {
           </Row>
         </Card>
       ) : null}
-      {importing ? <ImportPanel writable={writable} onChanged={refresh} onClose={() => setImporting(false)} /> : null}
+      {importing ? <ImportPanel key={importKey} writable={writable} onChanged={refresh} onClose={() => setImporting(false)} /> : null}
 
       {snapshot.requests.length ? (
         <Card>

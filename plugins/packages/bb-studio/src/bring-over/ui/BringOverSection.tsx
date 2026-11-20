@@ -17,6 +17,8 @@ import {
   readBringOver,
   readGate,
   secretLine,
+  stageToolGateway,
+  AGENT_PLUGINS_ID,
   startBringOver,
   uiToken,
   type BringOverPlugin,
@@ -27,6 +29,7 @@ import {
   type BringOverThread,
 } from "../api";
 import { StudioDataRow } from "./StudioDataRow";
+import { requestToolGatewayImport } from "../../tool-gateway/ui/ToolGatewaySection";
 
 export const BRING_OVER_SECTION_ANCHOR = "studio-settings-bring-over";
 
@@ -98,6 +101,29 @@ function ProjectRow({ project, picks, onChange }: { project: BringOverProject; p
         </ul>
       ) : null}
     </li>
+  );
+}
+
+/** Agent Plugins' row: its servers go into Tool Gateway, not the plugin itself. */
+function AgentPluginsRow({ plugin, token }: { plugin: BringOverPlugin; token: string | null }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const stage = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await stageToolGateway(token ?? "");
+      requestToolGatewayImport();
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Row label={plugin.id} description={<>{plugin.hasData ? "MCP servers" : "No data"}{error ? <span className="block text-destructive">{error}</span> : null}</>} testId={`bring-over-plugin-${plugin.id}`}>
+      {token === null || !plugin.hasData ? null : <Button size="sm" variant="outline" disabled={busy} onClick={() => void stage()}>{busy ? "Reading…" : "Import into Tool Gateway"}</Button>}
+    </Row>
   );
 }
 
@@ -261,7 +287,9 @@ export function BringOverSection() {
           <SubHeading>Plugins from bb</SubHeading>
           <Card>
             {(state.plugins ?? []).length === 0 ? <p className="px-3 py-2 text-sm text-muted-foreground">No plugins to add</p>
-              : (state.plugins ?? []).map((plugin) => <PluginRow key={plugin.id} plugin={plugin} token={allowed ? token : null} onAdded={() => {}} />)}
+              : (state.plugins ?? []).map((plugin) => plugin.id === AGENT_PLUGINS_ID
+                ? <AgentPluginsRow key={plugin.id} plugin={plugin} token={allowed ? token : null} />
+                : <PluginRow key={plugin.id} plugin={plugin} token={allowed ? token : null} onAdded={() => {}} />)}
           </Card>
         </>
       ) : null}

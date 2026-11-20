@@ -173,6 +173,9 @@ export function studioDataConfirm(preview: StudioDataPreview): string[] {
 }
 
 export const addOldPlugin = (id: string, token: string, load: typeof fetch = fetch) => send<{ id: string; data: boolean }>(`/plugins/${encodeURIComponent(id)}/add`, gatedPost(token), load);
+/** Agent Plugins isn't added: the fork stages a copy of its data for Tool Gateway's import. */
+export const AGENT_PLUGINS_ID = "agent-plugins";
+export const stageToolGateway = (token: string, load: typeof fetch = fetch) => send<{ staged: string }>("/tool-gateway/stage", gatedPost(token), load);
 
 /** What a secret setting will do, in one line: the variables it brings and the ones it replaces. */
 export function secretLine(setting: BringOverSetting, replace: boolean): string {
