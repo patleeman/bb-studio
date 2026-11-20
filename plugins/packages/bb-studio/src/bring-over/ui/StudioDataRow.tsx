@@ -51,6 +51,8 @@ export function StudioDataRow({ token, jobRunning, onJob }: { token: string | nu
     setError(null);
     try { await work(); } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(false); setAsk(null); await load(); }
   };
+  /** Opening or closing a confirm step starts fresh: the last action's error goes. */
+  const choose = (next: Ask) => { setError(null); setAsk(next); };
   const gated = token !== null;
   const state = server.journal?.state ?? status?.journal?.state ?? null;
   const preview = status?.preview ?? null;
@@ -93,13 +95,13 @@ export function StudioDataRow({ token, jobRunning, onJob }: { token: string | nu
     if (ask === "delete") lines.push("Deletes your old Studio data for good. This can't be undone.");
     if (gated) buttons = ask ? (
       <span className="flex gap-2">
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => setAsk(null)}>Cancel</Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => choose(null)}>Cancel</Button>
         <Button size="sm" disabled={busy} onClick={() => void act(() => (ask === "put-back" ? putBackStudioData(token ?? "") : deleteOldStudioData(token ?? "")))}>{ask === "put-back" ? "Put it back" : "Delete it"}</Button>
       </span>
     ) : (
       <span className="flex gap-2">
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => setAsk("delete")}>Delete old data…</Button>
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => setAsk("put-back")}>Put my old Studio data back…</Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => choose("delete")}>Delete old data…</Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => choose("put-back")}>Put my old Studio data back…</Button>
       </span>
     );
   } else if (state === "restore-requested" || state === "restoring") {
@@ -109,10 +111,10 @@ export function StudioDataRow({ token, jobRunning, onJob }: { token: string | nu
     if (status?.keptIn) lines.push(`bb's Studio data is kept in ${status.keptIn}.`);
     if (gated) buttons = ask === "delete" ? (
       <span className="flex gap-2">
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => setAsk(null)}>Cancel</Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => choose(null)}>Cancel</Button>
         <Button size="sm" disabled={busy} onClick={() => void act(() => deleteOldStudioData(token ?? ""))}>Delete it</Button>
       </span>
-    ) : <Button size="sm" variant="outline" disabled={busy} onClick={() => setAsk("delete")}>Delete bb's copy…</Button>;
+    ) : <Button size="sm" variant="outline" disabled={busy} onClick={() => choose("delete")}>Delete bb's copy…</Button>;
     if (ask === "delete") lines.push("Deletes bb's Studio data and anything you made in Studio while it was in use. This can't be undone.");
   } else {
     lines.push(journalError ?? "Bringing over bb's Studio data didn't finish.");

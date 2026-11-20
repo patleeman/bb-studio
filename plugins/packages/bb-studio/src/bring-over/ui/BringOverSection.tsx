@@ -219,7 +219,7 @@ export function BringOverSection() {
           <ul className="px-3 pb-2 text-xs text-destructive">{state.job.failures.slice(0, 10).map((failure) => <li key={failure.item}>{failure.item}: {failure.detail}</li>)}</ul>
         ) : null}
       </Card>
-      <StudioDataRow token={token} jobRunning={running} onJob={(next) => setState((previous) => (previous ? { ...previous, job: next } : previous))} />
+      <StudioDataRow token={allowed ? token : null} jobRunning={running} onJob={(next) => setState((previous) => (previous ? { ...previous, job: next } : previous))} />
       {state.projects ? (
         <>
           <SubHeading>Projects and threads</SubHeading>

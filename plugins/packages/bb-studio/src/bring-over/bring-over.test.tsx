@@ -220,12 +220,18 @@ describe("BB Studio data row", () => {
   const server = (journal: BringOverStudioData["journal"]): BringOverStudioData => ({ inBb: true, bots: 3, pages: 14, tasks: 6, journal });
   const journal = (state: Exclude<StudioImportState, "unreadable">, extra: object = {}) => ({ state, error: null, stagedAt: 1, ...extra });
   let calls: { url: string; method: string; body: unknown; token: string | null }[] = [];
-  function serve(read: () => BringOverStudioData) {
+  let gateMatches = true;
+  /** read: what GET /studio-data answers; null answers 404, as BB Studio 1.0.8 and older do. */
+  function serve(read: () => BringOverStudioData | null) {
     calls = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
       const method = init?.method ?? "GET";
       calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : null, token: new Headers(init?.headers).get("x-bb-studio-ui-token") });
-      if (url.endsWith("/studio-data") && method === "GET") return new Response(JSON.stringify(read()), { status: 200 });
+      if (url.endsWith("/gate")) return new Response(JSON.stringify({ fromApp: true, matches: gateMatches }), { status: 200 });
+      if (url.endsWith("/studio-data") && method === "GET") {
+        const data = read();
+        return data ? new Response(JSON.stringify(data), { status: 200 }) : new Response("Not Found", { status: 404 });
+      }
       if (url.endsWith("/studio-data")) return new Response(JSON.stringify({ studioData: read() }), { status: 200 });
       if (url.includes("/studio-data/")) return new Response(null, { status: 204 });
       if (url.endsWith("/jobs")) return new Response(JSON.stringify({ ...job, threadsTotal: 3, threadsDone: 0 }), { status: 202 });
@@ -236,12 +242,61 @@ describe("BB Studio data row", () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     resetUiTokenForTests();
     vi.stubGlobal("bbDesktop", { experimental_bringOverToken: async () => "token-from-the-app" });
+    gateMatches = true;
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
   });
   afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
   const settle = async () => { for (let i = 0; i < 3; i++) await act(async () => { await Promise.resolve(); }); };
+
+  it("is hidden on a BB Studio without the route, while the rest of the page shows", async () => {
+    rpc.status = { ownData: { has: false }, journal: null, keptIn: null, preview: null };
+    serve(() => null);
+    await act(async () => { root.render(<BringOverSection />); });
+    await settle();
+    expect($('[data-testid="bring-over-source"]')).not.toBeNull();
+    expect($('[data-testid="bring-over-studio-data"]')).toBeNull();
+    expect(host.textContent).not.toContain("BB Studio data");
+    expect(calls.some((call) => call.method === "POST")).toBe(false);
+  });
+
+  it("is hidden when the route answers in a shape it doesn't know", async () => {
+    rpc.status = { ownData: { has: false }, journal: null, keptIn: null, preview: null };
+    serve(() => ({ inBb: true, bots: 3 }) as unknown as BringOverStudioData);
+    await act(async () => { root.render(<BringOverSection />); });
+    await settle();
+    expect($('[data-testid="bring-over-studio-data"]')).toBeNull();
+  });
+
+  it("offers no action when the window's token doesn't pass the server's gate", async () => {
+    gateMatches = false;
+    rpc.status = { ownData: { has: false }, journal: null, keptIn: null, preview: null };
+    serve(() => server(null));
+    await act(async () => { root.render(<BringOverSection />); });
+    await settle();
+    expect(text()).toContain("3 Bots · 14 pages · 6 tasks");
+    expect(button("Bring over…")).toBeUndefined();
+    expect($('[data-testid="bring-over-attached"]')).not.toBeNull();
+  });
+
+  it("clears the last error when a new confirm step opens", async () => {
+    let fail = true;
+    rpc.status = { ownData: { has: false }, journal: journal("applied"), keptIn: "/data/plugins/studio/import-staged/before", preview: null };
+    serve(() => server(journal("applied", { appliedAt: Date.now() })));
+    const base = vi.mocked(fetch).getMockImplementation()!;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => (url.endsWith("/studio-data/forget") && fail ? new Response(JSON.stringify({ message: "folder busy" }), { status: 409 }) : base(url, init))));
+    await act(async () => { root.render(<BringOverSection />); });
+    await settle();
+    act(() => { button("Delete old data…")!.click(); });
+    await act(async () => { button("Delete it")!.click(); });
+    await settle();
+    expect(text()).toContain("folder busy");
+    fail = false;
+    act(() => { button("Put my old Studio data back…")!.click(); });
+    expect(text()).toContain("next time BB Studio starts");
+    expect(text()).not.toContain("folder busy");
+  });
 
   it("copies bb's Studio data, says plainly what it replaces, then brings the Bots' threads over as a job", async () => {
     let state = server(null);
@@ -255,7 +310,7 @@ describe("BB Studio data row", () => {
     await act(async () => { button("Bring over…")!.click(); });
     await settle();
     expect(calls.filter((call) => call.method === "POST").map((call) => [call.url, call.token])).toEqual([["/api/v1/fork/bring-over/studio-data", "token-from-the-app"]]);
-    for (const words of ["Project leads' heartbeats are off too", "Replaces everything in BB Studio's Studio", "3 Bots, 14 pages, 6 tasks, 40 memories, and 3 threads", "kept in a folder, not deleted", "arrive stopped", "stop it in bb so it doesn't run twice", "1 mini app' API keys and 2 watchers' environment values", "quit and reopen BB Studio"]) expect(text()).toContain(words);
+    for (const words of ["Project leads' heartbeats are off too", "Replaces everything in BB Studio's Studio", "3 Bots, 14 pages, 6 tasks, 40 memories, and 3 threads", "kept in a folder, not deleted", "arrive stopped", "stop it in bb so it doesn't run twice", "API keys in 1 mini app and environment values in 2 watchers", "quit and reopen BB Studio"]) expect(text()).toContain(words);
     await act(async () => { button("Bring over")!.click(); });
     await settle();
     expect(calls.find((call) => call.url.endsWith("/jobs"))).toMatchObject({ method: "POST", token: "token-from-the-app", body: { picks: [{ kind: "thread", id: "thr_main" }, { kind: "thread", id: "thr_conv" }, { kind: "thread", id: "thr_worker" }], settings: [], studioData: { required: ["thr_main"] } } });

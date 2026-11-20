@@ -2,6 +2,7 @@
 // routes): what the old bb install has, and a job that brings picked projects,
 // threads and settings over while BB Studio runs. On a BB without the routes,
 // or with no bb install, `available` is false and nothing is shown.
+import { plural } from "../kit/format";
 
 export interface BringOverProject { id: string; name: string; threads: number; threadsHere: number; lastActivityAt: number | null; joins: { id: string; name: string } | null }
 export interface BringOverThread { id: string; title: string; updatedAt: number; archived: boolean; attachments: number; here: boolean }
@@ -124,11 +125,19 @@ async function sendEmpty(path: string, init: RequestInit, load: typeof fetch): P
   if (!response.ok) throw new Error(await errorOf(response));
 }
 
-/** bb's Studio data and where a bring-over of it is; null on a BB without the route. */
+/**
+ * bb's Studio data and where a bring-over of it is. Null on a BB Studio
+ * without the route (1.0.8 and older answer 404) or with an answer of another
+ * shape, so the row stays hidden there.
+ */
 export async function readStudioData(load: typeof fetch = fetch): Promise<BringOverStudioData | null> {
   try {
     const response = await load(`${BASE}/studio-data`);
-    return response.ok ? ((await response.json()) as BringOverStudioData) : null;
+    if (!response.ok) return null;
+    const data = (await response.json()) as Partial<BringOverStudioData> | null;
+    const counts = typeof data?.bots === "number" && typeof data.pages === "number" && typeof data.tasks === "number";
+    const journal = data?.journal === null || (typeof data?.journal === "object" && typeof data.journal?.state === "string");
+    return typeof data?.inBb === "boolean" && counts && journal ? (data as BringOverStudioData) : null;
   } catch {
     return null;
   }
@@ -138,8 +147,6 @@ export const copyStudioData = (token: string, load: typeof fetch = fetch) => sen
 export const discardStudioData = (token: string, load: typeof fetch = fetch) => sendEmpty("/studio-data/discard", gatedPost(token), load);
 export const putBackStudioData = (token: string, load: typeof fetch = fetch) => sendEmpty("/studio-data/put-back", gatedPost(token), load);
 export const deleteOldStudioData = (token: string, load: typeof fetch = fetch) => sendEmpty("/studio-data/forget", gatedPost(token), load);
-
-const plural = (count: number, word: string, many = `${word}s`) => `${String(count)} ${count === 1 ? word : many}`;
 
 /** "2 Bots · 14 pages · 6 tasks". */
 export function studioDataLine(data: Pick<BringOverStudioData, "bots" | "pages" | "tasks">): string {
@@ -159,7 +166,7 @@ export function studioDataConfirm(preview: StudioDataPreview): string[] {
     "Project leads' heartbeats are off too; turn each back on in its lead's settings.",
     "Approvals you gave in bb (mini apps, dashboard scripts, the public skill registry) are asked for again here.",
   ];
-  const secrets = [preview.minisWithSecrets > 0 ? `${plural(preview.minisWithSecrets, "mini app")}' API keys` : null, preview.watchersWithEnv > 0 ? `${plural(preview.watchersWithEnv, "watcher")}' environment values` : null].filter(Boolean);
+  const secrets = [preview.minisWithSecrets > 0 ? `API keys in ${plural(preview.minisWithSecrets, "mini app")}` : null, preview.watchersWithEnv > 0 ? `environment values in ${plural(preview.watchersWithEnv, "watcher")}` : null].filter(Boolean);
   if (secrets.length > 0) lines.push(`Secrets kept in Studio's data come along: ${secrets.join(" and ")}.`);
   lines.push("Then quit and reopen BB Studio to finish. Open windows and the phone app reconnect after that.");
   return lines;

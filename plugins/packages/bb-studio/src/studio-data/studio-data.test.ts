@@ -363,6 +363,39 @@ const mode = (path: string) => statSync(path).mode & 0o777;
 const openStudio = (dataDir: string) => new Database(join(studioDir(dataDir), "data.db"), { readonly: true });
 
 describe("applying bb's Studio data at Studio's start", () => {
+  it("does nothing at all when nothing is staged, on a first start and on a reload", async () => {
+    const dataDir = temp("studio-nothing-staged-");
+    const h = host();
+    const fresh = await freshStudio(dataDir);
+    fresh.db.close();
+    const studio = studioDir(dataDir);
+    const before = readdirSync(studio).sort();
+    const dbBefore = readFileSync(join(studio, "data.db"));
+    const kv = memoryKv(OUR_KV);
+    const log = { info: vi.fn(), warn: vi.fn() };
+    const migrate = vi.fn((database: Database.Database, statements: string[]) => h.bb.storage.migrate(database, statements));
+    for (const firstLoad of [true, false]) {
+      expect(await finishStudioImport({ dataDir, kv, migrate, migrations: MIGRATIONS, log, firstLoad })).toBeNull();
+    }
+    expect(existsSync(importDir(dataDir))).toBe(false);
+    expect(readdirSync(studio).sort()).toEqual(before);
+    expect(readFileSync(join(studio, "data.db")).equals(dbBefore)).toBe(true);
+    expect(Object.fromEntries(kv.values)).toEqual(OUR_KV);
+    expect(migrate).not.toHaveBeenCalled();
+    expect(log.info).not.toHaveBeenCalled();
+    expect(log.warn).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when the data dir has no Studio folder yet (a brand-new install)", async () => {
+    const dataDir = temp("studio-no-folder-");
+    const kv = memoryKv();
+    const log = { info: vi.fn(), warn: vi.fn() };
+    expect(await finishStudioImport({ dataDir, kv, migrate: () => { throw new Error("not called"); }, migrations: MIGRATIONS, log, firstLoad: true })).toBeNull();
+    expect(readdirSync(dataDir)).toEqual([]);
+    expect(kv.values.size).toBe(0);
+    expect(log.warn).not.toHaveBeenCalled();
+  });
+
   it("swaps the data, keeps this install's set aside and its secrets in place, and leaves every Bot stopped", async () => {
     const x = await staged();
     const journal = await x.start();
