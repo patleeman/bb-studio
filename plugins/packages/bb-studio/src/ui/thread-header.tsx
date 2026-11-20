@@ -19,6 +19,8 @@ import { botPath } from "./bot/selection";
 import { avatarIcon, registerBotAvatarIcons, setAvatarSlots } from "./bot/avatar-icons";
 import { noteBotThread } from "./conversations/bot-thread-owners";
 import { hasGlobalWorkbench } from "../kit/app/host-sdk";
+import { toast } from "sonner";
+import { errorMessage } from "../kit/format";
 
 /** Header actions sort among themselves by group. */
 const HEADER_GROUP = "studio";
@@ -129,8 +131,53 @@ export const pageLinkHeaderAction: PluginThreadActionRegistration<ReadonlyMap<st
 };
 
 /** Registers Studio's header buttons; Page only while Pages is on. */
+interface MakeMainData {
+  owners: ReadonlyMap<string, string | null>;
+  bots: readonly { id: string; name: string; threadId: string | null }[];
+  call: ReturnType<typeof useCall>;
+}
+
+/**
+ * "Make this the Main" in every thread menu (the thread header's, the
+ * sidebar row's): on a Bot's conversation that isn't its Main. The old Main
+ * stays an ordinary conversation; check-ins and the rest move at once.
+ */
+export const makeMainAction: PluginThreadActionRegistration<MakeMainData> = {
+  id: "make-main",
+  title: "Make this the Main",
+  icon: "Star",
+  group: HEADER_GROUP,
+  order: 1,
+  useData: ({ threadIds }) => {
+    const call = useCall();
+    const load = useCallback(async (threadId: string) => (await call("bot_conversation_owner", { threadId })).botId ?? null, [call]);
+    const owners = useThreadLookup(threadIds, load);
+    const bots = useLive("bot_list", {}, { enabled: threadIds.length > 0, pollMs: LOOKUP_POLL_MS }).data?.bots ?? [];
+    return { owners, bots, call };
+  },
+  item: ({ thread, data }) => {
+    const botId = data.owners.get(thread.id);
+    const bot = botId ? data.bots.find((each) => each.id === botId) : undefined;
+    if (!bot || bot.threadId === thread.id) return null;
+    return {
+      label: "Make this the Main",
+      detail: `${bot.name}'s Main`,
+      icon: "Star",
+      run: async () => {
+        try {
+          await data.call("bot_make_main", { botId: bot.id, threadId: thread.id });
+          toast.success(`This is ${bot.name}'s Main now.`);
+        } catch (error) {
+          toast.error(errorMessage(error) || "Couldn't make it the Main.");
+        }
+      },
+    };
+  },
+};
+
 export function registerThreadHeader(app: PluginAppBuilder, options: { pages: boolean }): void {
   registerBotAvatarIcons(app);
+  app.slots.experimental_threadAction(makeMainAction);
   // Bot info is the top of BB's Info tab (src/ui/thread-context.tsx); on a BB with the Global workbench (the fork), its ⓘ tab is the way in, with no header button.
   if (!hasGlobalWorkbench) app.slots.experimental_threadAction(botInfoHeaderAction);
   if (options.pages) app.slots.experimental_threadAction(pageLinkHeaderAction);

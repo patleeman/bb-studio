@@ -406,6 +406,28 @@ create, update, pause, resume, delete) are noted in Main with a quiet line.
 BB's own completion notice for a finished child still goes to the thread
 that spawned it, which is the worker's conversation.
 
+**Main can be archived, deleted or replaced.** Archiving or deleting a
+Bot's Main, from anywhere (BB's thread menu, the CLI, a tool, Studio's
+sidebar), is allowed: Studio starts a new Main for the same Bot, on its
+default provider and model, with a short agent-only note
+(`Bots.replaceMain`). A paused or stopped Bot gets its new Main when it is
+resumed, not before. When the Main can't move to the new thread (its
+heartbeat can't go there), the new thread is deleted, and the heal waits
+longer after each failure (5 minutes doubling to an hour), saying each new
+error once. Its heartbeat moves there; check-ins,
+reminders, watchers and runner reports read the Main when they run. This
+happens on `thread.archived` and `thread.deleted`, at startup and every
+5 minutes (`main-heal`: a Main lost while Studio was off, or a new Main
+that couldn't start yet with no host connected), and when a due run finds
+its Main gone (the scheduler asks `onThreadGone` before it turns a run
+off). A heartbeat or check-in a lost Main already turned off comes back on
+with the new Main, from now (`EngineScheduler.revive`). **Make this the
+Main** (every thread menu on a Bot's conversation: the sidebar row and the
+thread header; RPC `bot_make_main`) makes a conversation the Main at once;
+the old Main stays an ordinary, open conversation. It takes only the Bot's
+own threads (its conversations and workers, or an older thread of its
+chat) in the personal project, never another Bot's or another project's.
+
 **Every conversation is the Bot**: its instructions (plus one short line
 saying which conversation it is), all of its tools (profile, skills,
 history, runners, automations, pause and stop) and its skills. A thread on
@@ -499,14 +521,20 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
 - **Top**, sticky: the Bot's space header (round 7, 7a), a band of its own
   with a bottom border: the avatar (36px), the name (15px, semibold), a
   status line with no model (each conversation has its own): "2 running",
-  "Paused", "Stopped", "Paused · in bb" on a BB Studio copy for a Bot its
-  import stopped (the Info tab's and the automations table's rule), or
-  nothing; and **···**: **Edit <name>…**, **Bot settings…** (the Bot's
-  Controls page), **Default model** (bb's provider
+  "Paused · Resume", "Stopped · Resume", "Paused · in bb · Run here" on a
+  BB Studio copy for a Bot its import stopped (the Info tab's and the
+  automations table's rule), or nothing; Resume and Run here are buttons
+  (`bot_resume`). **···**: **Resume <name>** (or **Run <name> here**) first
+  while the Bot is paused or stopped, **Edit <name>…**, **Bot settings…**
+  (the Bot's Controls page, which opens with its state and Pause, Resume and
+  Stop…), **Default model** (bb's provider
   and model picker in a small dialog, see Default model below),
-  then New Bot. Bot info and
-  Controls are on the Info tab's Bot block (Pause, Resume and Stop in its
-  icon group). Under it, the Bot's pages as rows:
+  then New Bot. The Info tab's Bot block has Pause, Resume and Stop in its
+  icon group too. A paused or stopped Bot always shows its Resume (or Run
+  here) in the header, Bot settings, the Bot page and the Info tab. After
+  "Bring over BB Studio data" no Bot is in bb: the swap brings a marker
+  (`plugins/studio/from-bb.json`) in with bb's files, so every Bot is this
+  install's and reads Stopped · Resume. Under it, the Bot's pages as rows:
   **Memory** (`/plugins/studio/studio/memory/<botId>`), **Library**
   (`/plugins/studio/studio`) and, for the primary Bot with Todos on, **Todos**
   (`/plugins/studio/studio/bot/<botId>/loops`) with what needs you now and,
@@ -2962,7 +2990,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `src/ui/bot/BotInfoRows.tsx`): **Bot** (its avatar and name, which opens
   the Bot page, with Pause or Resume and Stop as one header icon-button
   group), **Status** (Active, Paused, Stopped, or Paused · in bb on a BB
-  Studio copy for a Bot its import stopped, which has no controls),
+  Studio copy for a Bot its import stopped, whose Resume reads Run here),
   **Model** (the model this thread runs on now, read off the thread with
   `thread_model`, by its display name; not the Bot's default, which is only
   in Edit space and the ··· menu) and **Needs

@@ -19,7 +19,7 @@ afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 
 type Thread = ReturnType<typeof makeThreadResponse>;
 
-async function studio(threadList: string = "__automatic__", options: { refuseIdle?: boolean; idleThreads?: boolean } = {}) {
+async function studio(threadList: string = "__automatic__", options: { refuseIdle?: boolean; idleThreads?: boolean; noStoredModel?: boolean } = {}) {
   const providerStates: { providerId: string; status: string; loginCommand: string | null }[] = [{ providerId: "claude-code", status: "not_installed", loginCommand: "claude /login" }, { providerId: "codex", status: "unauthenticated", loginCommand: "codex login" }, { providerId: "acp-omp", status: "ready", loginCommand: null }];
   const prefs = new Map<string, { value: unknown; revision: number }>([["sidebar.threadListProvider", { value: threadList, revision: 1 }]]);
   const dataDir = mkdtempSync(join(tmpdir(), "studio-onboarding-"));
@@ -55,6 +55,10 @@ async function studio(threadList: string = "__automatic__", options: { refuseIdl
         return thread;
       }) as never,
       send: (async ({ threadId, input }: { threadId: string; input: unknown }) => {
+        // Like BB for a thread made before any provider was ready: no model stored, so no send.
+        if (options.noStoredModel && spawns[Number(threadId.replace("thr_", "")) - 1]?.input instanceof Array && (spawns[Number(threadId.replace("thr_", "")) - 1]!.input as unknown[]).length === 0) {
+          throw Object.assign(new Error(`Thread ${threadId} has no stored execution model`), { status: 500 });
+        }
         sends.push({ threadId, input });
         turns.push(threadId);
         threads.set(threadId, { ...threads.get(threadId)!, status: "active" } as Thread);
@@ -143,6 +147,22 @@ describe("first-run onboarding", () => {
     expect(env.bots.stored(BOT_ID)!.threadId).toBe("thr_2");
     expect(env.bots.list()).toHaveLength(1);
     expect(welcomeThreadOf(env.dataDir)).toEqual({ threadId: "thr_2", botId: BOT_ID, opened: false });
+  });
+
+  it("starts the first chat on a new Main when BB stored no model for the seeded one (made before any provider was ready)", async () => {
+    const env = await studio("__automatic__", { noStoredModel: true });
+    await env.run();
+    env.connect("codex");
+    const done = await env.run();
+    expect(done).toMatchObject({ state: "done", reason: "ran", welcomeThreadId: "thr_2" });
+    expect(env.sends).toEqual([]);
+    expect(env.spawns[1]).toMatchObject({ providerId: "codex", input: hidden(starterFirstChatPrompt(STARTER_BOT.name)), pluginMetadata: { handoffFrom: "thr_1" } });
+    expect(env.archived).toEqual(["thr_1"]);
+    expect(env.bots.stored(BOT_ID)!.threadId).toBe("thr_2");
+    expect(env.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("thr_2");
+    // Done: no more tries.
+    expect(await env.run()).toEqual(done);
+    expect(env.spawns).toHaveLength(2);
   });
 
   it("keeps the user's open of Main when it lands while the first chat starts", async () => {

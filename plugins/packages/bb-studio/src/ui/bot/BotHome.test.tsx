@@ -557,8 +557,9 @@ test("Controls: profile and history collapsed until asked, Memory, Skills, and p
   const { openAppPath } = await import("../../kit/app/index");
   await act(async () => click(container.querySelector('[aria-label="Open memory"]')));
   expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/pages/pg_mem");
-  // Pause and Stop are the main page's, not Controls'; the back link goes there.
-  expect(button("Pause")).toBeUndefined();
+  // Pause and Stop are in Controls too, once, in its state row; the back link goes to the main page.
+  expect([...container.querySelectorAll("button")].filter((each) => each.textContent === "Pause")).toHaveLength(1);
+  expect(container.querySelector('[data-testid="bot-state-controls"]')?.contains(button("Pause"))).toBe(true);
   await act(async () => click(button("Dot")));
   expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_main");
   expect(container.textContent).toContain("weekly-review");
@@ -634,11 +635,49 @@ test("the Bot's block at the top of BB's Info tab is BB's own rows: Bot with its
   expect(container.innerHTML).toBe("");
 });
 
-test("on a BB Studio copy, a Bot the import stopped reads Paused · in bb, with no controls", async () => {
+test("on a BB Studio copy, a Bot the import stopped reads Paused · in bb and still has its Resume, as Run here", async () => {
   state.data = { bot_thread_owner: { botId: "bot_main" }, bot_get: { bot: { ...dot, state: "stopped", inBb: true }, run: null }, bot_attention: { attention: null } };
   await show(<BotInfoSection threadId="thr_bot" />);
   expect(container.querySelector("[data-testid=bot-info-status]")?.textContent).toBe("Paused · in bb");
-  expect(container.querySelector("[role=group]")).toBeNull();
+  const group = container.querySelector("[role=group]")!;
+  expect([...group.querySelectorAll("button")].map((each) => each.getAttribute("aria-label"))).toEqual(["Run here"]);
+  await act(async () => click(group.querySelector("button")));
+  expect(state.call).toHaveBeenCalledWith("bot_resume", { botId: "bot_main" });
+});
+
+test("Bot settings has the Bot's state first: Resume for a stopped Bot, Pause and Stop for an active one, Run here for one in bb", async () => {
+  state.pathname = CONTROLS;
+  state.data = { bot_get: { bot: { ...dot, state: "stopped" }, run: null }, bot_activity: empty };
+  await show(<BotPanel />);
+  const controls = () => container.querySelector('[data-testid="bot-state-controls"]')!;
+  expect(controls().querySelector('[data-testid="bot-state-text"]')?.textContent).toBe("Stopped");
+  expect([...controls().querySelectorAll("button")].map((each) => each.textContent)).toEqual(["Resume"]);
+  await act(async () => click(controls().querySelector('[data-testid="bot-state-resume"]')));
+  expect(state.call).toHaveBeenCalledWith("bot_resume", { botId: "bot_main" });
+
+  state.data = { bot_get: { bot: { ...dot, state: "paused" }, run: null }, bot_activity: empty };
+  await show(<BotPanel />);
+  expect([...controls().querySelectorAll("button")].map((each) => each.textContent)).toEqual(["Resume", "Stop…"]);
+
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty };
+  await show(<BotPanel />);
+  expect(controls().querySelector('[data-testid="bot-state-text"]')?.textContent).toBe("Active");
+  expect([...controls().querySelectorAll("button")].map((each) => each.textContent)).toEqual(["Pause", "Stop…"]);
+
+  state.data = { bot_get: { bot: { ...dot, state: "stopped", inBb: true }, run: null }, bot_activity: empty };
+  await show(<BotPanel />);
+  expect(controls().querySelector('[data-testid="bot-state-text"]')?.textContent).toBe("Paused · in bb");
+  expect([...controls().querySelectorAll("button")].map((each) => each.textContent)).toEqual(["Run here"]);
+});
+
+test("the Bot page has Resume for a stopped Bot, and Run here for one in bb", async () => {
+  state.pathname = "/plugins/studio/studio/bot/bot_main";
+  state.data = { bot_get: { bot: { ...dot, state: "stopped" }, run: null }, bot_activity: empty };
+  await show(<BotPanel />);
+  expect(container.querySelector('[data-testid="bot-resume"]')?.textContent).toBe("Resume");
+  state.data = { bot_get: { bot: { ...dot, state: "stopped", inBb: true }, run: null }, bot_activity: empty };
+  await show(<BotPanel />);
+  expect(container.querySelector('[data-testid="bot-resume"]')?.textContent).toBe("Run here");
 });
 
 test("the Info tab leaves out Needs you when nothing waits on the user", async () => {

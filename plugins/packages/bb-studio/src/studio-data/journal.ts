@@ -22,7 +22,7 @@
 // A journal left in applying or restoring is finished at the next start; one
 // left in rolling-back is rolled back. A rollback that fails keeps every file
 // and says where they are.
-import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const STUDIO_ID = "studio";
@@ -34,6 +34,12 @@ export const BEFORE_DIR = "before";
 export const BEFORE_KV_FILE = "before-kv.json";
 export const REPLACED_DIR = "replaced";
 export const REPLACED_KV_FILE = "replaced-kv.json";
+/**
+ * Written into bb's staged Studio files at the apply, so it comes in with
+ * them (and leaves with them at a put-back): this install's Studio data is
+ * bb's, brought over, and its Bots run here, none "in bb".
+ */
+export const FROM_BB_FILE = "from-bb.json";
 
 /** What stays this install's at a swap: secrets, logs, host and bridge data, backup sessions, and this folder. */
 export const KEPT_HERE: ReadonlySet<string> = new Set(["secrets", "logs", "host-data", "bridge-data", "backup-sessions", IMPORT_DIR_NAME]);
@@ -62,6 +68,9 @@ export interface ImportJournal {
   restoredAt?: number | null;
   /** The thread ids the Bots can't do without (their Main threads). */
   required?: string[];
+  /** This install's own Bot threads (its onboarding Main and the like) that bb's data replaced; archived after the swap, unarchived at a put-back. */
+  replacedThreads?: string[];
+  replacedArchived?: boolean;
   /** What the swap stopped: the Bots and their schedules. */
   stopped?: StopSummary | null;
 }
@@ -116,4 +125,15 @@ export function readJson<T>(path: string): T {
 export function privateDir(path: string): void {
   mkdirSync(path, { recursive: true, mode: 0o700 });
   chmodSync(path, 0o700);
+}
+
+/**
+ * Whether the Studio data in use is bb's, brought over (applied): the marker
+ * that came in with it, or, for data applied before the marker, a journal
+ * that says so. Its Bots and automations belong to this install then.
+ */
+export function studioDataFromBb(dataDir: string): boolean {
+  if (existsSync(join(studioDir(dataDir), FROM_BB_FILE))) return true;
+  const journal = readJournal(dataDir);
+  return journal !== null && journal !== "unreadable" && (journal.state === "applied" || journal.state === "restore-requested");
 }

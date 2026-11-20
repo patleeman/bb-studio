@@ -49,7 +49,7 @@ import { useMainViewRect } from "./EditSpaceStage";
 import { DefaultModelDialog } from "../bot/DefaultModel";
 import { newConversationPath } from "./new-conversation";
 import { botLanding, threadLocator } from "../bot/threadListSwitch";
-import { SpaceHeader, spaceLine, spacePageAt, type SpacePage } from "./SpaceHeader";
+import { resumeWord, SpaceHeader, spaceLine, spacePageAt, type SpacePage } from "./SpaceHeader";
 import { useAppMode } from "./app-mode";
 import { accentOf } from "../../theme/engine";
 import { publishSceneSignals, workerSlots } from "../../theme/signals";
@@ -197,7 +197,10 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const pathname = usePathname();
   const page = spacePageAt(pathname);
   const list = useLive("bot_list", {}, { pollMs: 60_000 });
-  const welcome = useLive("bot_welcome", {}, { enabled: !!spaces.data && !bots.length, pollMs: 2_000 });
+  // Polled while onboarding runs: before the first Bot, and after it until its first chat starts (its problem shows on the header's line).
+  const welcomeSeen = useRef<boolean | null>(null);
+  const welcome = useLive("bot_welcome", {}, { enabled: !!spaces.data && (!bots.length || welcomeSeen.current !== false), pollMs: 2_000 });
+  if (welcome.data) welcomeSeen.current = welcome.data.pending;
   const loopsOn = useLoopsEnabled();
   const [editing, setEditing] = useState<string | null>(null);
   const [pickingModel, setPickingModel] = useState<string | null>(null);
@@ -392,8 +395,12 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
     <nav aria-label={bot ? bot.name : "Bot"} data-testid="bot-sidebar" ref={navRef} onWheel={onWheel} className={glass ? GLASS_NAV : "studio-root relative flex min-h-full shrink-0 flex-col px-1.5"}>
       <NoDragStyle />
       <div data-testid="bot-sidebar-rows" {...(glass ? { "data-fork-overlay-scroll": "" } : {})} className={glass ? GLASS_ROWS : "contents"} style={glass ? { maskImage: ROWS_FADE, WebkitMaskImage: ROWS_FADE } : undefined}>
-      <SpaceHeader bot={bot} line={spaceLine(botRow, running)} glass={glass} page={page} todos={todos} onPage={openPage}
+      <SpaceHeader bot={bot} line={welcome.data?.pending && welcome.data.problem ? welcome.data.problem : spaceLine(botRow, running)} resume={resumeWord(botRow)} glass={glass} page={page} todos={todos} onPage={openPage}
         menu={{
+          resume: () => {
+            if (!bot) return;
+            void call("bot_resume", { botId: bot.id }).then(() => list.refresh(), (cause: unknown) => { toast.error(errorMessage(cause) || `Couldn't resume ${bot.name}.`); });
+          },
           editSpace: () => { if (bot) setEditing(bot.id); },
           botSettings: () => { if (bot) toPanel(`bot/${encodeURIComponent(bot.id)}/controls`); },
           defaultModel: () => { if (bot) setPickingModel(bot.id); },

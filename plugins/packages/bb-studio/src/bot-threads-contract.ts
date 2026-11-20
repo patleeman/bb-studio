@@ -231,7 +231,7 @@ export const botThreadsSchemas = {
    * none), with a link to the worker first. Answers the conversation.
    */
   bot_worker_ask: { input: z.object({ threadId, text: z.string().trim().min(1).max(20_000) }), output: z.object({ conversationId: z.string(), projectId: z.string().nullable() }) },
-  /** The user renames a conversation (null: BB's title) or archives or brings it back. Main can't be archived. */
+  /** The user renames a conversation (null: BB's title) or archives or brings it back. Archiving Main archives its thread in BB, and the Bot gets a new Main. */
   bot_thread_update: { input: z.object({ threadId, title: z.string().max(200).nullable().optional(), archived: z.boolean().optional() }), output: z.object({ ok: z.boolean() }) },
   /** Marks a conversation as needing the user with a reason, or clears it (null). */
   bot_needs_you_set: { input: z.object({ threadId, reason: z.string().max(200).nullable() }), output: z.object({ ok: z.boolean() }) },

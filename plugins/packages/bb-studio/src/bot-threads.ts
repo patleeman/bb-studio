@@ -1108,7 +1108,6 @@ export class BotThreads {
     const now = this.now();
     if (patch.title !== undefined) this.deps.db.prepare("UPDATE bot_threads SET title = ?, updated_at = ? WHERE thread_id = ?").run(patch.title?.trim().slice(0, 200) || null, now, threadId);
     if (patch.archived !== undefined) {
-      if (rec.isMain && patch.archived) throw new Error("Main can't be archived.");
       this.deps.db.prepare("UPDATE bot_threads SET archived_at = ?, updated_at = ? WHERE thread_id = ?").run(patch.archived ? now : null, now, threadId);
     }
     if (patch.finishedSummary !== undefined) this.deps.db.prepare("UPDATE bot_threads SET finished_summary = ?, updated_at = ? WHERE thread_id = ?").run(patch.finishedSummary, now, threadId);
@@ -1206,6 +1205,27 @@ export class BotThreads {
     const after = this.get(threadId)!;
     this.deps.changed(rowChanges(before, after));
     return after;
+  }
+
+  /**
+   * The Bot's Main moved to `threadId` (a new Main, or Make this the Main):
+   * that conversation is its Main, in the sidebar, and every other one of
+   * the Bot's is not. The old Main stays an ordinary conversation.
+   */
+  setMain(botId: string, threadId: string): void {
+    const now = this.now();
+    const before = this.get(threadId);
+    const was = (this.deps.db.prepare("SELECT * FROM bot_threads WHERE bot_id = ? AND is_main = 1 AND thread_id <> ?").all(botId, threadId) as Row[]).map(record);
+    this.deps.db.transaction(() => {
+      this.deps.db.prepare("UPDATE bot_threads SET is_main = 0, updated_at = ? WHERE bot_id = ? AND is_main = 1 AND thread_id <> ?").run(now, botId, threadId);
+      this.deps.db.prepare(`INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, owner_conversation_id, source, created_at, updated_at, activity_at)
+          VALUES (?, ?, 'conversation', 1, NULL, 'user', ?, ?, ?)
+        ON CONFLICT(thread_id) DO UPDATE SET bot_id = excluded.bot_id, kind = 'conversation', is_main = 1, owner_conversation_id = NULL, archived_at = NULL,
+          forked_from_thread_id = NULL, forked_from_message_id = NULL, forked_from_turn_id = NULL, updated_at = excluded.updated_at`)
+        .run(threadId, botId, now, now, now);
+    })();
+    const changes = [...was.map((rec) => rowChanges(rec, this.get(rec.threadId)!)), rowChanges(before, this.get(threadId)!)].flat();
+    this.deps.changed(changes);
   }
 
   /** Writes a conversation's second line directly (Main's "Archived “…”"). */
