@@ -1314,7 +1314,7 @@ function MachineRowNote({
   if (daemon === "updating") {
     return (
       <>
-        <RowStateCaption state="in-progress">Updating bb</RowStateCaption>
+        <RowStateCaption state="in-progress">Updating BB Studio</RowStateCaption>
         <RowStateControl live state="in-progress" />
       </>
     );
@@ -1557,7 +1557,7 @@ export function AutoAppUpdateSetting({
     <div className="py-3.5 pr-4 pl-13">
       <SettingsWithControl
         label={label}
-        description="Checks every hour and restarts bb into a new version once no thread has run for 15 minutes."
+        description="Checks every hour and restarts BB Studio into a new version once no thread has run for 15 minutes."
       >
         <Switch
           checked={checked}
@@ -1840,7 +1840,7 @@ function blockedPluginReason(
 ): string {
   const version = item.version;
   return item.reasons.length === 0
-    ? `${version} isn’t compatible with this bb`
+    ? `${version} isn’t compatible with this BB Studio`
     : `${version}: ${item.reasons.join("; ")}`;
 }
 
@@ -1905,7 +1905,7 @@ function PluginUpdateRow({
               reason={
                 failure.detail.length > 0
                   ? failure.detail
-                  : `bb couldn’t activate ${failure.label} and restored ${plugin.version}.`
+                  : `BB Studio couldn’t activate ${failure.label} and restored ${plugin.version}.`
               }
             />
             <RowStateControl
@@ -2312,7 +2312,7 @@ export function UpdatesSettingsSection() {
             label={
               serverRunsSeparately
                 ? "Restart and update the server automatically"
-                : "Restart and update bb automatically"
+                : "Restart and update BB Studio automatically"
             }
             checked={
               setAutoAppUpdate.isPending

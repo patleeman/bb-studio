@@ -1083,7 +1083,7 @@ The published lede.
     );
     expect(row).not.toBeNull();
     expect(within(row as HTMLElement).getByText("homelab")).toBeDefined();
-    expect(within(row as HTMLElement).getByText("Updating bb")).toBeDefined();
+    expect(within(row as HTMLElement).getByText("Updating BB Studio")).toBeDefined();
     expect(
       row?.querySelector('[data-update-state="in-progress"]'),
     ).not.toBeNull();
@@ -2474,7 +2474,7 @@ The published lede.
     ).toEqual(["Update"]);
     expect(
       screen.queryByRole("switch", {
-        name: "Restart and update bb automatically",
+        name: "Restart and update BB Studio automatically",
       }) !== null,
     ).toBe(true);
   });
@@ -2498,7 +2498,7 @@ The published lede.
     renderSection();
     fireEvent.click(
       await screen.findByRole("switch", {
-        name: "Restart and update bb automatically",
+        name: "Restart and update BB Studio automatically",
       }),
     );
 
