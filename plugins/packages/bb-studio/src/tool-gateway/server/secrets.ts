@@ -3,13 +3,16 @@
 // (plugins/studio/secrets/tool-gateway, 0700, files 0600), never in the
 // database, a snapshot, a log line or anything an agent receives.
 import { randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { EMPTY_SECRETS, secretValuesOf, type SecretValues } from "./config";
 import type { OAuthCredentialBackend, OAuthCredentialRecord } from "./oauth";
 
 const SERVERS_FILE = "servers.json";
 const OAUTH_FILE = "oauth.json";
+const KEY_FILE = "approval.key";
+/** Where a staged copy of Agent Plugins' data waits for the import: plain-text values, so it lives with the secrets. */
+export const STAGED_IMPORT_FILE = "agent-plugins-import.db";
 
 async function readJson(path: string): Promise<Record<string, unknown>> {
   try {
@@ -30,6 +33,7 @@ function cleanValues(value: unknown): SecretValues {
 export class ToolGatewaySecrets {
   private servers: Record<string, SecretValues> = {};
   private oauth: Record<string, OAuthCredentialRecord> = {};
+  private key = "";
   private queue: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly dir: string) {}
@@ -38,6 +42,28 @@ export class ToolGatewaySecrets {
     const servers = await readJson(join(this.dir, SERVERS_FILE));
     this.servers = Object.fromEntries(Object.entries(servers).map(([id, value]) => [id, cleanValues(value)]));
     this.oauth = await readJson(join(this.dir, OAUTH_FILE)) as Record<string, OAuthCredentialRecord>;
+    await this.loadKey();
+  }
+
+  /** The approval hash's key: 32 random bytes made once, kept here (0600). */
+  private async loadKey(): Promise<void> {
+    try {
+      this.key = (await readFile(join(this.dir, KEY_FILE), "utf8")).trim();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    if (this.key.length >= 32) return;
+    this.key = randomBytes(32).toString("base64url");
+    await this.writeText(KEY_FILE, this.key);
+  }
+
+  approvalKey(): string {
+    if (!this.key) throw new Error("Tool Gateway's approval key isn't loaded.");
+    return this.key;
+  }
+
+  stagedImportPath(): string {
+    return join(this.dir, STAGED_IMPORT_FILE);
   }
 
   get(serverId: string): SecretValues {
@@ -64,13 +90,15 @@ export class ToolGatewaySecrets {
     }
   }
 
-  /** Every value to hide from logs, errors and anything an agent sees, longest first. */
-  values(): string[] {
+  /** Values to hide: one server's (its results), or every server's (logs and errors), longest first. */
+  values(serverId?: string): string[] {
     const out = new Set<string>();
-    for (const values of Object.values(this.servers)) for (const value of secretValuesOf(values)) out.add(value);
-    for (const record of Object.values(this.oauth)) {
+    const servers = serverId === undefined ? Object.values(this.servers) : this.servers[serverId] ? [this.servers[serverId]!] : [];
+    for (const values of servers) for (const value of secretValuesOf(values)) out.add(value);
+    const records = serverId === undefined ? Object.values(this.oauth) : this.oauth[serverId] ? [this.oauth[serverId]!] : [];
+    for (const record of records) {
       for (const value of [record.tokens?.access_token, record.tokens?.refresh_token, (record.clientInformation as { client_secret?: string } | undefined)?.client_secret, record.codeVerifier, record.state]) {
-        if (typeof value === "string" && value.length >= 4) out.add(value);
+        if (typeof value === "string" && value.length >= 8) out.add(value);
       }
     }
     return [...out].sort((a, b) => b.length - a.length);
@@ -91,12 +119,18 @@ export class ToolGatewaySecrets {
   }
 
   private write(file: string, value: unknown): Promise<void> {
+    return this.writeText(file, JSON.stringify(value));
+  }
+
+  private writeText(file: string, text: string): Promise<void> {
     const run = this.queue.then(async () => {
       await mkdir(this.dir, { recursive: true, mode: 0o700 });
+      // mkdir doesn't tighten a folder that is already there.
+      await chmod(this.dir, 0o700);
       const path = join(this.dir, file);
       const temp = `${path}.${randomBytes(6).toString("hex")}.tmp`;
       try {
-        await writeFile(temp, JSON.stringify(value), { encoding: "utf8", mode: 0o600 });
+        await writeFile(temp, text, { encoding: "utf8", mode: 0o600 });
         await rename(temp, path);
       } catch (error) {
         await rm(temp, { force: true });

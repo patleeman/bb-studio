@@ -2,7 +2,7 @@
 // hash binds an approval to one exact config: command, args, working folder,
 // env names, URL, header names and the secret values (hashed). The engine
 // starts a server only while its current config still has that hash.
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { accessSync, constants, statSync } from "node:fs";
 import { delimiter, isAbsolute, join } from "node:path";
 import { DEFAULT_CALL_TIMEOUT_MS, type ServerKind } from "../contract";
@@ -45,8 +45,12 @@ function secretsDigest(secrets: SecretValues): string {
   return createHash("sha256").update(canonical).digest("hex");
 }
 
-/** The hash an approval is bound to. Any change to the config or a secret value changes it. */
-export function configHash(config: ServerConfig, secrets: SecretValues): string {
+/**
+ * The hash an approval is bound to. Any change to the config or a secret value
+ * changes it. It is an HMAC keyed by a random key in the secrets folder, so
+ * something that can write only the database can't forge an approval.
+ */
+export function configHash(config: ServerConfig, secrets: SecretValues, key: string): string {
   const canonical = JSON.stringify({
     kind: config.kind,
     command: config.command,
@@ -58,7 +62,7 @@ export function configHash(config: ServerConfig, secrets: SecretValues): string 
     callTimeoutMs: config.callTimeoutMs,
     secrets: secretsDigest(secrets),
   });
-  return createHash("sha256").update(canonical).digest("hex");
+  return createHmac("sha256", key).update(canonical).digest("hex");
 }
 
 function isExecutableFile(path: string): boolean {
@@ -133,7 +137,23 @@ export function defaultConfig(kind: ServerKind): ServerConfig {
   return { kind, command: null, args: [], cwd: null, url: null, envNames: [], headerNames: [], callTimeoutMs: DEFAULT_CALL_TIMEOUT_MS };
 }
 
-/** Every secret value long enough to be worth hiding, longest first so a longer value is replaced whole. */
+/**
+ * Whether a value looks like a secret worth hiding: long enough, and not a
+ * plain word, number, flag, path or plain URL (`true`, `info`, `8080`,
+ * `production`, `/usr/local/bin`, `https://api.example.com`).
+ */
+export function looksSecret(value: string): boolean {
+  const text = value.trim();
+  if (text.length < 8) return false;
+  if (/^(true|false|null|yes|no|on|off|none)$/iu.test(text)) return false;
+  if (/^[0-9.:,_-]+$/u.test(text)) return false;
+  if (/^[A-Za-z]+(?:[_.:-][A-Za-z]+)*$/u.test(text) && (text === text.toLowerCase() || text === text.toUpperCase() || /^[A-Z][a-z]+(?:[_.:-][A-Z]?[a-z]+)*$/u.test(text))) return false;
+  if (/^[~.]?\/[^\s?=&]*$/u.test(text)) return false;
+  if (/^https?:\/\/[^\s?#@]+$/iu.test(text)) return false;
+  return true;
+}
+
+/** The secret-looking values of one server, longest first so a longer value is replaced whole. */
 export function secretValuesOf(secrets: SecretValues): string[] {
   return [...Object.values(secrets.env), ...Object.values(secrets.headers)]
     .flatMap((value) => {
@@ -143,7 +163,7 @@ export function secretValuesOf(secrets: SecretValues): string[] {
       if (bearer) out.push(bearer);
       return out;
     })
-    .filter((value) => value.length >= 4)
+    .filter(looksSecret)
     .sort((a, b) => b.length - a.length);
 }
 
@@ -155,3 +175,18 @@ export function redact(text: string, secrets: readonly string[]): string {
   for (const secret of secrets) if (secret && out.includes(secret)) out = out.split(secret).join(MASK);
   return out;
 }
+
+/** Masks secrets in every string of a value (a tool result), keys and structure untouched. */
+export function redactDeep<T>(value: T, secrets: readonly string[]): T {
+  if (secrets.length === 0) return value;
+  const walk = (item: unknown): unknown => {
+    if (typeof item === "string") return redact(item, secrets);
+    if (Array.isArray(item)) return item.map(walk);
+    if (item !== null && typeof item === "object") return Object.fromEntries(Object.entries(item as Record<string, unknown>).map(([key, child]) => [key, walk(child)]));
+    return item;
+  };
+  return walk(value) as T;
+}
+
+/** Whether a field holds the mask: it came from a masked view, not from the user. */
+export const hasMask = (value: string | null | undefined) => typeof value === "string" && value.includes(MASK);

@@ -29,6 +29,7 @@ export const toolGatewayHostContract = defineRpcContract({
       args: jsonRecordSchema,
       toolDefinition: jsonRecordSchema.optional(),
       timeoutMs: z.number().int().min(1000).max(600_000),
+      maxBytes: z.number().int().min(1024).max(64 * 1024 * 1024),
     }).strict(),
     output: jsonRecordSchema,
   },

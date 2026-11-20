@@ -104,7 +104,7 @@ describe("no secret value leaves the server", () => {
     const described = await h.agent("tool_gateway_describe", { ids: [leakId] });
     expect(text(described)).not.toContain(FAKE_SECRET);
     await new Promise((resolve) => setTimeout(resolve, 200));
-    const detail = await h.rpc("toolGateway.server", { id: "one" }, CLIENT);
+    const detail = await h.rpc("toolGateway.server", { id: "one" });
     expect(detail.log.some((line: { kind: string; text: string }) => line.kind === "stderr" && line.text.includes("•••"))).toBe(true);
     expect(JSON.stringify(detail)).not.toContain(FAKE_SECRET);
     expect(JSON.stringify(await h.rpc("toolGateway.snapshot", null, CLIENT))).not.toContain(FAKE_SECRET);

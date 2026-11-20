@@ -22,8 +22,10 @@ const sampleInput: Record<string, unknown> = {
   "toolGateway.signOut": { id: "one" },
   "toolGateway.testTool": { id: "one", tool: "echo", args: { pattern: "abc" } },
   "toolGateway.setProvider": { providerId: "codex", access: false, servers: "all" },
-  "toolGateway.import": { ids: ["one"] },
+  "toolGateway.import": { servers: [{ id: "one", digest: "x" }] },
   "toolGateway.removeOldPlugin": null,
+  "toolGateway.discardImport": null,
+  "toolGateway.serverConfig": { id: "one" },
 };
 
 describe("the app-window gate", () => {

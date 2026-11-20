@@ -9,7 +9,7 @@
  * backoff from 5 s doubling to 5 min, and an idle stop after 15 min.
  */
 import { createHash } from "node:crypto";
-import { mkdir } from "node:fs/promises";
+import { chmod, mkdir } from "node:fs/promises";
 import {
   Client,
   SSEClientTransport,
@@ -22,6 +22,9 @@ import { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/
 import type { ServerRecord } from "./store";
 import { serverEnvironment, type SecretValues } from "./config";
 import type { McpOAuthProvider } from "./oauth";
+import { capResult, type CallResult } from "../cap";
+
+export { capResult, type CallResult };
 
 export type JsonRecord = Record<string, unknown>;
 
@@ -38,12 +41,6 @@ export interface CatalogTool {
   error?: string;
 }
 
-export interface CallResult {
-  content: JsonRecord[];
-  isError?: boolean;
-  structuredContent?: unknown;
-  truncated?: boolean;
-}
 
 export interface StdioConfig { key: string; command: string; args: string[]; cwd: string; env: Record<string, string> }
 
@@ -51,7 +48,7 @@ export interface StdioHost {
   start(config: StdioConfig, signal?: AbortSignal): Promise<{ tools: Tool[] }>;
   refresh(key: string, signal?: AbortSignal): Promise<{ tools: Tool[] }>;
   close(key: string, signal?: AbortSignal): Promise<void>;
-  callTool(key: string, name: string, args: JsonRecord, toolDefinition: Tool | undefined, timeoutMs: number, signal?: AbortSignal): Promise<unknown>;
+  callTool(key: string, name: string, args: JsonRecord, toolDefinition: Tool | undefined, timeoutMs: number, maxBytes: number, signal?: AbortSignal): Promise<unknown>;
   stats?(): Promise<{ key: string; pid: number | null; rssBytes: number | null }[]>;
   onWorkerExit?(handler: () => void): () => void;
   onCatalogChanged?(handler: (key: string, error: string | null) => void): () => void;
@@ -101,6 +98,8 @@ export const DEFAULT_LIMITS: Limits = {
 };
 
 const MCP_CLIENT_INFO = { name: "bb-studio-tool-gateway", version: "1.0.0" };
+/** The longest message a stdio server may send: a few MB over the result cap. */
+export const STDIO_MAX_BUFFER = 8 * 1024 * 1024;
 const OAUTH_TIMEOUT_MS = 15_000;
 const CLOSE_TIMEOUT_MS = 2_000;
 
@@ -196,35 +195,6 @@ export function redirectGuardFetch(url: URL, baseHeaders: Record<string, string>
   };
 }
 
-/** The result an agent gets: content blocks, capped at the result limit with a note. */
-export function capResult(result: unknown, maxBytes: number): CallResult {
-  const record = asRecord(result) ?? {};
-  const content = (Array.isArray(record.content) ? record.content : []).filter((item): item is JsonRecord => asRecord(item) !== undefined);
-  const out: CallResult = { content };
-  if (typeof record.isError === "boolean") out.isError = record.isError;
-  if (record.structuredContent !== undefined) out.structuredContent = record.structuredContent;
-  const size = Buffer.byteLength(JSON.stringify(out), "utf8");
-  if (size <= maxBytes) return out;
-  // Keep text blocks in order until the cap, then a note.
-  const kept: JsonRecord[] = [];
-  let used = 0;
-  for (const block of content) {
-    const text = typeof block.text === "string" ? block.text : null;
-    const blockSize = Buffer.byteLength(JSON.stringify(block), "utf8");
-    if (used + blockSize <= maxBytes) {
-      kept.push(block);
-      used += blockSize;
-      continue;
-    }
-    if (text !== null && maxBytes - used > 256) {
-      const room = maxBytes - used - 256;
-      kept.push({ ...block, text: Buffer.from(text, "utf8").subarray(0, room).toString("utf8").replace(/�$/u, "") });
-    }
-    break;
-  }
-  kept.push({ type: "text", text: `[Tool Gateway: the result was ${Math.round(size / 1024)} KB, over the ${Math.round(maxBytes / 1024)} KB limit; this is the first part.]` });
-  return { content: kept, ...(out.isError === undefined ? {} : { isError: out.isError }), truncated: true };
-}
 
 interface Connected {
   kind: "local" | "host";
@@ -478,7 +448,10 @@ export class ToolGatewayEngine {
       if (config.kind === "stdio") {
         if (!config.command) throw new Error("A stdio server needs a command.");
         const cwd = config.cwd ?? this.deps.serverDir(id);
-        if (!config.cwd) await mkdir(cwd, { recursive: true, mode: 0o700 });
+        if (!config.cwd) {
+          await mkdir(cwd, { recursive: true, mode: 0o700 });
+          await chmod(cwd, 0o700);
+        }
         const stdio: StdioConfig = { key: id, command: config.command, args: config.args, cwd, env: serverEnvironment(this.deps.baseEnv, secrets, config.envNames) };
         if (this.deps.stdioHost) {
           const catalog = await withTimeout(this.deps.stdioHost.start(stdio, signal), this.limits.connectMs, `Starting ${id}`, () => this.connectControllers.get(id)?.abort(new Error(`Starting ${id} timed out`)));
@@ -486,7 +459,7 @@ export class ToolGatewayEngine {
         } else {
           // Tests and a BB without host workers: the same client, in this process.
           client = new Client(MCP_CLIENT_INFO, { capabilities: {}, versionNegotiation: { mode: "auto" } });
-          const stdioTransport = new StdioClientTransport({ command: stdio.command, args: stdio.args, cwd: stdio.cwd, env: stdio.env, stderr: "pipe" });
+          const stdioTransport = new StdioClientTransport({ command: stdio.command, args: stdio.args, cwd: stdio.cwd, env: stdio.env, stderr: "pipe", maxBufferSize: STDIO_MAX_BUFFER });
           stdioTransport.stderr?.on("data", (chunk: Buffer) => {
             for (const line of chunk.toString("utf8").split(/\r?\n/u)) if (line.trim()) this.deps.log(id, "stderr", line.trim().slice(0, 2000));
           });
@@ -681,7 +654,13 @@ export class ToolGatewayEngine {
       if (conn.expectedClose) throw new Error("The server stopped.");
       if (signal?.aborted) throw signal.reason instanceof Error ? signal.reason : new Error("Call cancelled");
       await new Promise<void>((resolve) => {
-        const wake = () => { signal?.removeEventListener("abort", wake); resolve(); };
+        const wake = () => {
+          signal?.removeEventListener("abort", wake);
+          // A cancelled waiter leaves the queue, so it never uses up a later release.
+          const at = conn.waiting.indexOf(wake);
+          if (at >= 0) conn.waiting.splice(at, 1);
+          resolve();
+        };
         conn.waiting.push(wake);
         signal?.addEventListener("abort", wake, { once: true });
       });
@@ -710,7 +689,7 @@ export class ToolGatewayEngine {
       conn.lastUsed = Date.now();
       let raw: unknown;
       if (conn.kind === "host") {
-        raw = await this.deps.stdioHost!.callTool(conn.hostKey!, toolName, args, tool, timeoutMs, options.signal);
+        raw = await this.deps.stdioHost!.callTool(conn.hostKey!, toolName, args, tool, timeoutMs, this.limits.resultBytes, options.signal);
       } else {
         raw = await conn.client!.callTool({ name: toolName, arguments: args }, { timeout: timeoutMs, ...(options.signal ? { signal: options.signal } : {}), toolDefinition: tool });
       }

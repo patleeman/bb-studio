@@ -8,11 +8,14 @@ import { experimental_defineHostEntry, type ExperimentalHostRpcContext } from "@
 import { Client, type Tool } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { toolGatewayHostContract, toolGatewayHostSignals, type HostCatalog } from "./src/tool-gateway/host-contract";
+import { capResult } from "./src/tool-gateway/cap";
 
 const CONNECT_TIMEOUT_MS = 15_000;
 const LIST_TIMEOUT_MS = 15_000;
 const CLOSE_TIMEOUT_MS = 2_000;
 const MCP_CLIENT_INFO = { name: "bb-studio-tool-gateway", version: "1.0.0" };
+/** The longest message a server may send, a few MB over the result cap. */
+const MAX_BUFFER = 8 * 1024 * 1024;
 
 type Context = ExperimentalHostRpcContext<typeof toolGatewayHostSignals>;
 type HostConnection = {
@@ -99,8 +102,13 @@ async function refresh(connection: HostConnection, signal: AbortSignal): Promise
 
 async function start(input: { key: string; command: string; args: string[]; cwd: string; env: Record<string, string> }, context: Context): Promise<HostCatalog> {
   if (context.signal.aborted) throw cancelled(context.signal);
+  // A start always runs what it is given: an old process under the same key
+  // (a close that failed, a worker that outlived a Studio reload) is replaced.
   const existing = connections.get(input.key);
-  if (existing) return existing.catalog;
+  if (existing) {
+    connections.delete(input.key);
+    await closeConnection(existing);
+  }
   const lease = context.experimental_retainWorker();
   const client = new Client(MCP_CLIENT_INFO, {
     capabilities: {},
@@ -109,7 +117,7 @@ async function start(input: { key: string; command: string; args: string[]; cwd:
       tools: { autoRefresh: true, onChanged: (error) => void context.experimental_emitSignal("catalogChanged", { key: input.key, error: error ? errorText(error) : null }).catch(() => {}) },
     },
   });
-  const transport = new StdioClientTransport({ command: input.command, args: input.args, cwd: input.cwd, env: input.env, stderr: "pipe" });
+  const transport = new StdioClientTransport({ command: input.command, args: input.args, cwd: input.cwd, env: input.env, stderr: "pipe", maxBufferSize: MAX_BUFFER });
   let pending = "";
   transport.stderr?.on("data", (chunk: Buffer) => {
     pending += chunk.toString("utf8");
@@ -164,33 +172,43 @@ function rssOf(pids: number[]): Promise<Map<number, number>> {
   });
 }
 
-export default experimental_defineHostEntry({
-  contract: toolGatewayHostContract,
-  experimental_signals: toolGatewayHostSignals,
-  handlers: {
-    start: (input, context) => start(input, context),
-    refresh: async ({ key }, context) => refresh(connectionFor(key), context.signal),
-    close: async ({ key }) => {
+/** The handlers, exported for tests. */
+export const hostHandlers = {
+    start: (input: Parameters<typeof start>[0], context: Context) => start(input, context),
+    refresh: async ({ key }: { key: string }, context: Context) => refresh(connectionFor(key), context.signal),
+    close: async ({ key }: { key: string }) => {
       const connection = connections.get(key);
       if (!connection) return { closed: false };
       connections.delete(key);
       await closeConnection(connection);
       return { closed: true };
     },
-    callTool: async ({ key, name, args, toolDefinition, timeoutMs }, context) => {
+    callTool: async ({ key, name, args, toolDefinition, timeoutMs, maxBytes }: { key: string; name: string; args: Record<string, unknown>; toolDefinition?: Record<string, unknown>; timeoutMs: number; maxBytes: number }, context: Context) => {
       const connection = connectionFor(key);
       const result = await connection.client.callTool(
         { name, arguments: args },
         { signal: context.signal, timeout: timeoutMs, ...(toolDefinition ? { toolDefinition: toolDefinition as Tool } : {}) },
       );
-      return result !== null && typeof result === "object" && !Array.isArray(result) ? result as Record<string, unknown> : {};
+      // Cut here, so a huge result never crosses to Studio's server whole.
+      return capResult(result, maxBytes) as unknown as Record<string, unknown>;
     },
     stats: async () => {
       const entries = [...connections.values()].map((connection) => ({ key: connection.key, pid: connection.transport.pid ?? null }));
       const rss = await rssOf(entries.flatMap((entry) => (entry.pid ? [entry.pid] : [])));
       return { servers: entries.map((entry) => ({ key: entry.key, pid: entry.pid, rssBytes: entry.pid ? rss.get(entry.pid) ?? null : null })) };
     },
-  },
+};
+
+export async function closeAllForTests(): Promise<void> {
+  const values = [...connections.values()];
+  connections.clear();
+  await Promise.all(values.map((connection) => closeConnection(connection)));
+}
+
+export default experimental_defineHostEntry({
+  contract: toolGatewayHostContract,
+  experimental_signals: toolGatewayHostSignals,
+  handlers: hostHandlers,
   dispose: async () => {
     const values = [...connections.values()];
     connections.clear();

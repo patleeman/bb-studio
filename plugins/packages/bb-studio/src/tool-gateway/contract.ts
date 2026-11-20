@@ -133,9 +133,12 @@ export const importCandidateSchema = z.object({
   kind: z.enum(SERVER_KINDS),
   command: z.string().nullable(),
   args: z.array(z.string()),
+  cwd: z.string().nullable(),
   url: z.string().nullable(),
   envNames: z.array(z.string()),
   headerNames: z.array(z.string()),
+  /** Changes when the row changes: the import takes only rows the user saw. */
+  digest: z.string(),
   wasApproved: z.boolean(),
   wasEnabled: z.boolean(),
   oauth: z.boolean(),
@@ -193,11 +196,18 @@ export const toolGatewayContract = defineRpcContract({
   },
   "toolGateway.setProvider": { input: providerAccessSchema.extend({ providerId: z.string().min(1).max(200) }), output: z.object({ providers: z.array(providerViewSchema) }) },
   "toolGateway.import": {
-    input: z.object({ ids: z.array(serverIdSchema).min(1).max(200) }),
+    input: z.object({ servers: z.array(z.object({ id: serverIdSchema, digest: z.string().min(1).max(64) })).min(1).max(200) }),
     output: z.object({ imported: z.array(z.string()), skipped: z.array(z.object({ id: z.string(), reason: z.string() })) }),
   },
-  /** After an import: removes the Agent Plugins plugin, so agents don't get both gateways. */
+  /** After an import: removes the Agent Plugins plugin and its data, so agents don't get both gateways. */
   "toolGateway.removeOldPlugin": { input: z.null(), output: ok },
+  /** Deletes the staged copy of bb's Agent Plugins data without importing. */
+  "toolGateway.discardImport": { input: z.null(), output: ok },
+  /** A server's command, args, folder and URL as stored, for the edit form. */
+  "toolGateway.serverConfig": {
+    input: idInput,
+    output: z.object({ command: z.string().nullable(), args: z.array(z.string()), cwd: z.string().nullable(), url: z.string().nullable() }),
+  },
 });
 
 /** The phone's view: servers, status and pending requests. Read-only. */
@@ -214,7 +224,16 @@ export const GATED_METHODS = [
   "toolGateway.addServer", "toolGateway.editServer", "toolGateway.approve", "toolGateway.decline",
   "toolGateway.setEnabled", "toolGateway.setToolEnabled", "toolGateway.setScope", "toolGateway.remove",
   "toolGateway.signIn", "toolGateway.finishSignIn", "toolGateway.signOut", "toolGateway.testTool",
-  "toolGateway.setProvider", "toolGateway.import", "toolGateway.removeOldPlugin",
+  "toolGateway.setProvider", "toolGateway.import", "toolGateway.removeOldPlugin", "toolGateway.discardImport", "toolGateway.serverConfig",
 ] as const satisfies readonly (keyof typeof toolGatewayContract)[];
+
+/**
+ * The methods anyone may call. They change nothing (a request only asks).
+ * Without the app-window flag, the views hold names, kinds and status only.
+ */
+export const READ_METHODS = [
+  "toolGateway.snapshot", "toolGateway.server", "toolGateway.providers", "toolGateway.whoami",
+  "toolGateway.request", "toolGateway.importPreview", "toolGateway.overview",
+] as const;
 
 export const APP_WINDOW_ONLY = "Approve this in the BB Studio app on this Mac.";

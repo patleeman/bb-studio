@@ -2,7 +2,8 @@
 // the RPCs (reads for everyone, changes for the app window only), requests
 // that become Todos, the 3 agent tools and their gate in configure(), the
 // OAuth callback route and `bb studio tool-gateway`.
-import { existsSync, statSync } from "node:fs";
+import { chmodSync, existsSync, statSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { Tool } from "@modelcontextprotocol/client";
@@ -11,6 +12,7 @@ import { z } from "zod";
 import {
   GATED_METHODS,
   TOOL_GATEWAY_TOOLS,
+  serverInputSchema,
   toolGatewayContract,
   toolGatewayPublicContract,
   type ImportPreview,
@@ -31,13 +33,16 @@ import {
   checkUrl,
   configHash,
   defaultConfig,
+  hasMask,
+  MASK,
   redact,
+  redactDeep,
   resolveCommand,
   type SecretValues,
   type ServerConfig,
 } from "./config";
 import { capResult, opaqueToolId, toolDigest, ToolGatewayEngine, ToolNotFoundError, type CallResult, type CatalogTool, type EngineDeps, type JsonRecord, type StdioHost } from "./engine";
-import { importSources, OLD_PLUGIN_ID, previewOf, readAgentPlugins, type ImportRow } from "./import";
+import { importSources, OLD_PLUGIN_ID, oldPluginDatabase, previewOf, readAgentPlugins, type ImportRow } from "./import";
 import { DeferredOAuthCredentialStore, McpOAuthProvider } from "./oauth";
 import { ToolGatewaySecrets } from "./secrets";
 import { ToolGatewayStore, type RequestRecord, type ServerRecord } from "./store";
@@ -81,6 +86,8 @@ export interface ToolGateway {
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const PROVIDER_CACHE_MS = 60_000;
+export const MAX_PENDING_REQUESTS = 20;
+const IMPORT_CACHE_MS = 30_000;
 
 /** MCP content blocks as agent tool content: text and images as they are, anything else as JSON text. */
 export function agentContent(result: CallResult): { type: "text"; text: string }[] | ({ type: "text"; text: string } | { type: "image"; data: string; mimeType: string })[] {
@@ -102,17 +109,24 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
   const secrets = new ToolGatewaySecrets(secretsDir);
   await secrets.load().catch((error) => bb.log.warn(`Tool Gateway: secrets unreadable: ${errorText(error)}`));
   const baseEnv = options.baseEnv ?? process.env;
+  /** Logs, errors, descriptions: every server's secret-looking values. */
   const hide = (text: string) => redact(text, secrets.values());
+  /** A server's own values, masked string by string in its results. */
+  const hideFor = <T,>(serverId: string, value: T): T => redactDeep(value, secrets.values(serverId));
 
   // ── Readiness: what configure() and the agent tools see ──────────────
-  const approvedNow = (record: ServerRecord): boolean => record.approvedHash !== null && record.approvedHash === configHash(record.config, secrets.get(record.id));
+  const approvedNow = (record: ServerRecord): boolean => record.approvedHash !== null && record.approvedHash === configHash(record.config, secrets.get(record.id), secrets.approvalKey());
   // Read from the database each time: a row edited outside Studio must not stay ready.
   const readyServers = (): ServerRecord[] => store.freshServers().filter((record) => record.enabled && approvedNow(record));
+  /**
+   * The servers a caller may use. A thread gets what its provider may use; a
+   * caller with no thread (a shell) only what every provider may use.
+   */
   const visibleServers = (providerId: string | null, projectId: string | null): ServerRecord[] => {
-    const access = providerId ? store.providerAccessFor(providerId) : { access: true, servers: "all" as const };
-    if (!access.access) return [];
+    const rules = providerId ? [store.providerAccessFor(providerId)] : Object.values(store.providers());
+    if (rules.some((rule) => !rule.access)) return [];
     return readyServers().filter((record) =>
-      (access.servers === "all" || access.servers.includes(record.id)) &&
+      rules.every((rule) => rule.servers === "all" || rule.servers.includes(record.id)) &&
       (record.projects === null || (projectId !== null && record.projects.includes(projectId))));
   };
 
@@ -161,7 +175,7 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
       start: async (config, signal) => await call("start", config, signal) as { tools: Tool[] },
       refresh: async (key, signal) => await call("refresh", { key }, signal) as { tools: Tool[] },
       close: async (key, signal) => { await call("close", { key }, signal); },
-      callTool: (key, name, args, toolDefinition, timeoutMs, signal) => call("callTool", { key, name, args, timeoutMs, ...(toolDefinition ? { toolDefinition } : {}) }, signal),
+      callTool: (key, name, args, toolDefinition, timeoutMs, maxBytes, signal) => call("callTool", { key, name, args, timeoutMs, maxBytes, ...(toolDefinition ? { toolDefinition } : {}) }, signal),
       stats: async () => ((await call("stats", {})) as { servers: { key: string; pid: number | null; rssBytes: number | null }[] }).servers,
       onWorkerExit: (handler) => client.experimental_onWorkerExit(() => handler()),
       onCatalogChanged: (handler) => client.experimental_onSignal("catalogChanged", ({ payload }) => handler(String(payload.key), (payload.error as string | null) ?? null)),
@@ -269,6 +283,10 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
       .sort((a, b) => Number(a.acp) - Number(b.acp) || a.name.localeCompare(b.name));
   }
 
+  /** What a caller without the app window sees: names, kinds and status. */
+  const briefServer = (view: ServerView): ServerView => ({ ...view, command: null, args: [], cwd: null, url: null, lastError: view.lastError === null ? null : "Open the server in the BB Studio app for details." });
+  const briefRequest = (view: RequestView): RequestView => ({ ...view, command: null, args: [], url: null });
+
   // ── Building a config from the app window's form ─────────────────────
   function buildConfig(input: ServerInput, previous: SecretValues | null): { config: ServerConfig; secrets: SecretValues } {
     const config = defaultConfig(input.kind);
@@ -309,7 +327,7 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
   async function approveRecord(record: ServerRecord, values: SecretValues): Promise<ServerRecord> {
     await secrets.set(record.id, values);
     const now = Date.now();
-    return store.saveServer({ ...record, approvedHash: configHash(record.config, values), approvedAt: now, status: "stopped", lastError: null });
+    return store.saveServer({ ...record, approvedHash: configHash(record.config, values, secrets.approvalKey()), approvedAt: now, status: "stopped", lastError: null });
   }
 
   async function closeRequest(requestId: string, state: "approved" | "declined"): Promise<void> {
@@ -322,6 +340,7 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
   async function addRequest(input: RequestInput, context: { threadId: string | null; projectId: string | null }): Promise<RequestRecord> {
     const pending = store.listRequests("pending").find((request) => request.input.name === input.name && request.threadId === context.threadId);
     if (pending) return pending;
+    if (store.listRequests("pending").length >= MAX_PENDING_REQUESTS) throw new ConfigError(`There are already ${MAX_PENDING_REQUESTS} requests waiting for the user. Wait for them to be approved or declined.`);
     const record = store.addRequest(input, context);
     const label = input.label ?? input.name;
     try {
@@ -343,11 +362,43 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
     }
   }
 
-  function importRows(): { source: ReturnType<typeof importSources>[number] | null; rows: ImportRow[]; skills: string[] } {
+  const stagedImport = () => secrets.stagedImportPath();
+
+  /** The checks addServer runs, for an imported row; a row that fails is not imported. */
+  function importInput(row: ImportRow): ServerInput {
+    return {
+      id: row.candidate.id,
+      label: row.candidate.label,
+      kind: row.candidate.kind,
+      ...(row.candidate.kind === "stdio"
+        ? { command: row.command ?? "", args: row.args, cwd: row.cwd, env: row.env }
+        : { url: row.url ?? "", headers: row.headers }),
+    };
+  }
+
+  function checkImportRow(row: ImportRow): string | null {
+    if (row.candidate.needsNewCommand) return row.candidate.needsNewCommand;
+    const parsed = serverInputSchema.safeParse(importInput(row));
+    if (!parsed.success) return parsed.error.issues[0]?.message ?? "It doesn't pass the server checks.";
+    try {
+      buildConfig(parsed.data, null);
+      return null;
+    } catch (error) {
+      return errorText(error);
+    }
+  }
+
+  let importCache: { at: number; value: ReturnType<typeof readImportRows> } | null = null;
+  function readImportRows(): { source: ReturnType<typeof importSources>[number] | null; rows: ImportRow[]; skills: string[] } {
     const existing = new Set(store.listServers().map((record) => record.id));
-    for (const source of importSources(options.dataDir)) {
+    for (const source of importSources(options.dataDir, stagedImport())) {
       try {
-        const { rows, skills } = readAgentPlugins(source, existing, baseEnv.PATH);
+        if (source.kind === "bb") chmodSync(source.path, 0o600);
+        const { rows, skills } = readAgentPlugins(source, existing);
+        for (const row of rows) {
+          const problem = row.candidate.exists ? null : checkImportRow(row);
+          if (problem) row.candidate.needsNewCommand = problem;
+        }
         if (rows.length > 0 || skills.length > 0) return { source, rows, skills };
       } catch (error) {
         bb.log.warn(`Tool Gateway: can't read Agent Plugins' data (${source.kind}): ${errorText(error)}`);
@@ -355,15 +406,27 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
     }
     return { source: null, rows: [], skills: [] };
   }
+  const importRows = (fresh = false) => {
+    if (fresh || !importCache || Date.now() - importCache.at > IMPORT_CACHE_MS) importCache = { at: Date.now(), value: readImportRows() };
+    return importCache.value;
+  };
 
-  async function importPreview(): Promise<ImportPreview> {
-    const { source, rows, skills } = importRows();
-    return previewOf(source, rows, skills, await oldPluginInstalled());
+  async function importPreview(full: boolean): Promise<ImportPreview> {
+    const { source, rows, skills } = importRows(true);
+    const preview = previewOf(source, rows, skills, await oldPluginInstalled());
+    if (full) return preview;
+    return { ...preview, servers: preview.servers.map((server) => ({ ...server, command: null, args: [], cwd: null, url: null, digest: "" })) };
   }
 
   const importableCount = () => {
     try { return importRows().rows.filter((row) => !row.candidate.exists && !row.candidate.needsNewCommand).length; } catch { return 0; }
   };
+
+  /** The staged copy holds plain-text values: it goes once the import has run, or failed. */
+  async function deleteStagedImport(): Promise<void> {
+    for (const suffix of ["", "-wal", "-shm"]) await rm(`${stagedImport()}${suffix}`, { force: true });
+    importCache = null;
+  }
 
   // ── Agent tools ───────────────────────────────────────────────────────
   const providerByThread = new Map<string, { providerId: string; at: number }>();
@@ -401,7 +464,7 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
     const argsBytes = Buffer.byteLength(JSON.stringify(args), "utf8");
     try {
       const result = await engine.call(found.serverId, found.name, args, { signal: context.signal });
-      const clean = hideResult(result);
+      const clean = hideResult(found.serverId, result);
       store.log(found.serverId, "call", `${found.name} by ${context.threadId ?? "cli"}: ${Date.now() - started} ms, ${result.isError ? "error" : "ok"}, args ${argsBytes} B, result ${Buffer.byteLength(JSON.stringify(result), "utf8")} B${result.truncated ? " (capped)" : ""}`);
       return clean;
     } catch (error) {
@@ -410,13 +473,9 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
     }
   }
 
-  /** A result never carries a known secret value back to an agent. */
-  function hideResult(result: CallResult): CallResult {
-    const values = secrets.values();
-    if (values.length === 0) return result;
-    const text = JSON.stringify(result);
-    const hidden = redact(text, values);
-    return hidden === text ? result : JSON.parse(hidden) as CallResult;
+  /** A result never carries the server's own secret values back to an agent. */
+  function hideResult(serverId: string, result: CallResult): CallResult {
+    return hideFor(serverId, result);
   }
 
   const toolError = (error: unknown) => ({ content: [{ type: "text" as const, text: hide(errorText(error)) }], isError: true });
@@ -483,39 +542,41 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
   const gated = new Set<string>(GATED_METHODS);
   const view = async (id: string) => serverView(store.requireServer(id));
   const handlers: Record<string, (input: never, context?: unknown) => Promise<unknown>> = {
-    "toolGateway.snapshot": async () => {
+    "toolGateway.snapshot": async (_input: null, context?: unknown) => {
       await engine.refreshMemory().catch(() => {});
+      const full = isAppWindow(context);
       return {
-        servers: await Promise.all(store.listServers().map(serverView)),
-        requests: store.listRequests("pending").map(requestView),
+        servers: (await Promise.all(store.freshServers().map(serverView))).map((view) => (full ? view : briefServer(view))),
+        requests: store.listRequests("pending").map(requestView).map((view) => (full ? view : briefRequest(view))),
         providers: await providerViews(),
         ready: readyServers().length,
         importable: importableCount(),
       };
     },
-    "toolGateway.server": async ({ id }: { id: string }) => {
+    "toolGateway.server": async ({ id }: { id: string }, context?: unknown) => {
       const record = store.requireServer(id);
+      const full = isAppWindow(context);
       const known = engine.knownTools(id);
       const approved = new Map((record.approvedTools ?? []).map((tool) => [tool.name, tool.digest]));
       return {
-        server: await serverView(record),
+        server: full ? await serverView(record) : briefServer(await serverView(record)),
         tools: known.map((tool) => ({
           name: tool.name,
-          description: hide(tool.description ?? ""),
+          description: full ? hide(tool.description ?? "") : "",
           enabled: !record.disabledTools.includes(tool.name),
-          inputSchema: (tool.inputSchema ?? {}) as Record<string, unknown>,
+          inputSchema: full ? (tool.inputSchema ?? {}) as Record<string, unknown> : {},
           added: record.approvedTools !== null && !approved.has(tool.name),
         })),
         removedTools: record.approvedTools ? [...approved.keys()].filter((name) => !known.some((tool) => tool.name === name)) : [],
-        log: store.logLines(id, 200),
+        log: full ? store.logLines(id, 200) : [],
       };
     },
     "toolGateway.providers": async () => ({ providers: await providerViews() }),
     "toolGateway.whoami": async (_input: null, context?: unknown) => ({ appWindow: isAppWindow(context) }),
     "toolGateway.request": async (input: RequestInput) => requestView(await addRequest(input, { threadId: null, projectId: null })),
-    "toolGateway.importPreview": async () => importPreview(),
+    "toolGateway.importPreview": async (_input: null, context?: unknown) => importPreview(isAppWindow(context)),
     "toolGateway.overview": async () => ({
-      servers: await Promise.all(store.listServers().map(async (record) => {
+      servers: await Promise.all(store.freshServers().map(async (record) => {
         const server = await serverView(record);
         return { id: server.id, label: server.label, kind: server.kind, status: server.status, enabled: server.enabled, tools: server.tools };
       })),
@@ -536,8 +597,12 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
     },
     "toolGateway.editServer": async ({ server }: { server: ServerInput }) => {
       const current = store.requireServer(server.id);
+      // A field that holds the mask came from a masked view: saving it would store ••• as the value.
+      if ([server.command, server.cwd, server.url, ...(server.args ?? [])].some(hasMask)) throw new ConfigError(`A field still holds ${MASK}. Open Edit again to load the stored values.`);
       const built = buildConfig(server, secrets.get(server.id));
       await engine.resetServer(server.id);
+      // A new address must not get the old one's sign-in.
+      if (current.config.url !== built.config.url) await oauthStore.delete(server.id);
       const record = await approveRecord({ ...current, label: server.label, config: built.config, approvedTools: null }, built.secrets);
       store.log(record.id, "event", "edited and approved");
       return serverView(record);
@@ -597,7 +662,7 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
       try {
         const result = await engine.call(id, tool, args, {});
         store.log(id, "call", `${tool} by the settings page: ${Date.now() - started} ms, ${result.isError ? "error" : "ok"}`);
-        return { ok: !result.isError, result: hideResult(result), error: null, ms: Date.now() - started };
+        return { ok: !result.isError, result: hideResult(id, result), error: null, ms: Date.now() - started };
       } catch (error) {
         return { ok: false, result: null, error: hide(errorText(error)), ms: Date.now() - started };
       }
@@ -606,35 +671,47 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
       await store.setProvider(providerId, { access, servers });
       return { providers: await providerViews() };
     },
-    "toolGateway.import": async ({ ids }: { ids: string[] }) => {
-      const { rows } = importRows();
+    "toolGateway.import": async ({ servers }: { servers: { id: string; digest: string }[] }) => {
       const imported: string[] = [];
       const skipped: { id: string; reason: string }[] = [];
-      for (const id of ids) {
-        const row = rows.find((candidate) => candidate.candidate.id === id);
-        if (!row) { skipped.push({ id, reason: "Not in Agent Plugins' data." }); continue; }
-        if (row.candidate.exists || store.getServer(id)) { skipped.push({ id, reason: "Already here." }); continue; }
-        if (row.candidate.needsNewCommand) { skipped.push({ id, reason: row.candidate.needsNewCommand }); continue; }
-        const config = defaultConfig(row.candidate.kind);
-        config.command = row.command;
-        config.args = row.args;
-        config.cwd = row.cwd;
-        config.url = row.url;
-        config.envNames = Object.keys(row.env).sort();
-        config.headerNames = Object.keys(row.headers).sort();
-        const now = Date.now();
-        await approveRecord({
-          id, label: row.candidate.label, config, enabled: row.candidate.wasEnabled, approvedHash: null, approvedAt: null,
-          disabledTools: [], projects: null, source: "import", status: "stopped", lastError: null, approvedTools: null, createdAt: now, updatedAt: now,
-        }, { env: row.env, headers: row.headers });
-        store.log(id, "event", "imported from Agent Plugins and approved");
-        imported.push(id);
+      try {
+        const { rows } = importRows(true);
+        for (const { id, digest } of servers) {
+          const row = rows.find((candidate) => candidate.candidate.id === id);
+          if (!row) { skipped.push({ id, reason: "Not in Agent Plugins' data." }); continue; }
+          if (row.candidate.digest !== digest) { skipped.push({ id, reason: "It changed since you reviewed it." }); continue; }
+          if (row.candidate.exists || store.getServer(id)) { skipped.push({ id, reason: "Already here." }); continue; }
+          // The same checks as Add server: the command is resolved, the URL, folder, names and values checked.
+          const problem = checkImportRow(row);
+          if (problem) { skipped.push({ id, reason: problem }); continue; }
+          const built = buildConfig(serverInputSchema.parse(importInput(row)), null);
+          const now = Date.now();
+          await approveRecord({
+            id, label: row.candidate.label, config: built.config, enabled: row.candidate.wasEnabled, approvedHash: null, approvedAt: null,
+            disabledTools: [], projects: null, source: "import", status: "stopped", lastError: null, approvedTools: null, createdAt: now, updatedAt: now,
+          }, built.secrets);
+          store.log(id, "event", "imported from Agent Plugins and approved");
+          imported.push(id);
+        }
+      } finally {
+        await deleteStagedImport();
       }
       return { imported, skipped };
     },
+    "toolGateway.discardImport": async () => {
+      await deleteStagedImport();
+      return { ok: true as const };
+    },
     "toolGateway.removeOldPlugin": async () => {
       await bb.sdk.plugins.remove({ pluginId: OLD_PLUGIN_ID });
+      // Its database holds the values in plain text; they are in the secret store now.
+      for (const suffix of ["", "-wal", "-shm"]) await rm(`${oldPluginDatabase(options.dataDir)}${suffix}`, { force: true });
+      importCache = null;
       return { ok: true as const };
+    },
+    "toolGateway.serverConfig": async ({ id }: { id: string }) => {
+      const { config } = store.requireServer(id);
+      return { command: config.command, args: config.args, cwd: config.cwd, url: config.url };
     },
   };
   for (const name of Object.keys(handlers)) {

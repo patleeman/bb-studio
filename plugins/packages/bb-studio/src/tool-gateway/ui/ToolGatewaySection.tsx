@@ -162,7 +162,7 @@ function ServerForm({ initial, mode, requestId, onDone, onCancel }: { initial: F
             {form.kind === "stdio" ? (
               <>
                 <Input aria-label="Command" className="font-mono text-xs" value={form.command} disabled={busy} placeholder="Absolute path, or a command on PATH (npx, uvx)" onChange={(event) => set({ command: event.target.value })} />
-                <Textarea aria-label="Arguments, one per line" className="min-h-16 font-mono text-xs" value={form.args} disabled={busy} placeholder="Arguments, one per line" onChange={(event) => set({ args: event.target.value })} />
+                <Textarea aria-label="Arguments, one per line" className="min-h-16 font-mono text-xs" value={form.args} disabled={busy} placeholder="Arguments, one per line; tokens go in Environment" onChange={(event) => set({ args: event.target.value })} />
                 <Input aria-label="Working folder" className="font-mono text-xs" value={form.cwd} disabled={busy} placeholder="Working folder (absolute; empty for its own folder)" onChange={(event) => set({ cwd: event.target.value })} />
                 <SecretRows label="Environment" rows={form.env} disabled={busy} onChange={(env) => set({ env })} />
               </>
@@ -378,7 +378,7 @@ export function ImportPanel({ writable, onChanged, onClose }: { writable: boolea
       <ul className="flex flex-col divide-y divide-border" data-testid="tool-gateway-import">
         {preview.servers.map((server) => {
           const blocked = server.exists ? "Already here" : server.needsNewCommand ? `Needs a new command: ${server.needsNewCommand}` : null;
-          const details = [KIND_LABEL[server.kind], server.kind === "stdio" ? [server.command, ...server.args].join(" ") : server.url, ...server.envNames.map((name) => `${name} = •••`), ...server.headerNames.map((name) => `${name}: •••`)].filter(Boolean).join(" · ");
+          const details = [KIND_LABEL[server.kind], server.kind === "stdio" ? [server.command, ...server.args].join(" ") : server.url, server.cwd ? `in ${server.cwd}` : null, ...server.envNames.map((name) => `${name} = •••`), ...server.headerNames.map((name) => `${name}: •••`)].filter(Boolean).join(" · ");
           const state = [server.wasApproved ? "approved" : "not approved", server.wasEnabled ? "on" : "off", server.oauth ? "sign in again" : null].filter(Boolean).join(" · ");
           return (
             <li key={server.id} className="flex items-start gap-2 px-4 py-2">
@@ -397,9 +397,10 @@ export function ImportPanel({ writable, onChanged, onClose }: { writable: boolea
       {result ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">Imported {plural(result.imported.length, "server")}{result.skipped.length ? `; skipped ${result.skipped.map((each) => `${each.id} (${each.reason})`).join(", ")}` : ""}</p> : null}
       <div className="flex flex-wrap gap-2 px-4 py-3">
         <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
-        {writable ? <Button size="sm" disabled={busy || picked.size === 0} onClick={() => void run(async () => setResult(await call("toolGateway.import", { ids: [...picked] })))}>{busy ? "Importing…" : `Import ${plural(picked.size, "server")}`}</Button> : null}
+        {writable && !result ? <Button size="sm" disabled={busy || picked.size === 0} onClick={() => void run(async () => setResult(await call("toolGateway.import", { servers: preview.servers.filter((server) => picked.has(server.id)).map((server) => ({ id: server.id, digest: server.digest })) })))}>{busy ? "Importing…" : `Import ${plural(picked.size, "server")}`}</Button> : null}
+        {writable && !result && preview.source === "bb" ? <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(async () => { await call("toolGateway.discardImport", null); onClose(); })}>Discard</Button> : null}
         {writable && result && preview.oldPluginInstalled && !removed ? (
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(async () => { await call("toolGateway.removeOldPlugin", null); setRemoved(true); })}>Remove Agent Plugins</Button>
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(async () => { await call("toolGateway.removeOldPlugin", null); setRemoved(true); })}>Remove Agent Plugins and its data</Button>
         ) : null}
       </div>
       <ErrorLine error={error} />
@@ -502,7 +503,7 @@ export function ToolGatewaySection() {
       </Card>
 
       {open && snapshot.servers.some((server) => server.id === open) ? (
-        <ServerPage id={open} writable={writable} onChanged={refresh} onClose={() => setOpen(null)} onEdit={(server) => setForm({ initial: formFromServer(server), mode: "edit" })} />
+        <ServerPage id={open} writable={writable} onChanged={refresh} onClose={() => setOpen(null)} onEdit={(server) => void call("toolGateway.serverConfig", { id: server.id }).then((stored) => setForm({ initial: formFromServer({ ...server, ...stored }), mode: "edit" }), (cause) => setLoadError(errorMessage(cause)))} />
       ) : null}
 
       <Providers providers={snapshot.providers} servers={snapshot.servers} writable={writable} onChanged={refresh} />

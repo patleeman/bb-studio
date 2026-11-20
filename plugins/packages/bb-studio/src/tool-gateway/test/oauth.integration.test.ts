@@ -21,7 +21,7 @@ function urlServer(id: string, url: string, headers: Record<string, string> = {}
   const config = { ...defaultConfig("streamable-http"), url, headerNames: Object.keys(headers) };
   const values = { env: {}, headers };
   return {
-    record: { id, label: id, config, enabled: true, approvedHash: configHash(config, values), approvedAt: 1, disabledTools: [], projects: null, source: "added", status: "stopped", lastError: null, approvedTools: null, createdAt: 1, updatedAt: 1 },
+    record: { id, label: id, config, enabled: true, approvedHash: configHash(config, values, "test-approval-key"), approvedAt: 1, disabledTools: [], projects: null, source: "added", status: "stopped", lastError: null, approvedTools: null, createdAt: 1, updatedAt: 1 },
     values,
   };
 }
