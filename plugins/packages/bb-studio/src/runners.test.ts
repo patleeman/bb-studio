@@ -462,6 +462,9 @@ it("reports failed phone push delivery instead of claiming success", async () =>
   const runner = await x.runners.create({ name: "Inbox", job: "Check", schedule });
   x.callRpc.mockRejectedValueOnce(new Error("push offline"));
   await expect(x.runners.alert(runner.id, "Needs you")).rejects.toThrow("push offline");
+  // A runner's urgent report says the push failed (the line was posted), not BB's raw error, so it isn't reported again.
+  x.callRpc.mockRejectedValueOnce(new Error("push offline"));
+  expect(await x.runners.report(runner.threadId!, { level: "urgent", summary: "Disk full" })).toMatch(/^Told the user; the phone push failed/);
 });
 
 it.each(["offline", "invalid"])("does not publish an empty schedule for an adopted runner on %s reads", async (failure) => {

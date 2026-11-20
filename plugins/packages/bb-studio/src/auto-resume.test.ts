@@ -1,4 +1,5 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
+import { PushFailed } from "./runners";
 import { afterEach, expect, it, vi } from "vitest";
 import { AutoResume, RESUME_CAP, resumedLine, resumeLog, transientReason, type ResumeTarget } from "./auto-resume";
 import { MIGRATIONS } from "./migrations";
@@ -138,6 +139,20 @@ it("retries an exhaustion notification until delivery succeeds, even after the c
   expect(x.exhausted).toHaveBeenCalledTimes(2);
   await x.auto.sweep();
   expect(x.exhausted).toHaveBeenCalledTimes(2);
+});
+
+it("FM: an exhaustion line that reached the Bot isn't posted again when only the phone push failed", async () => {
+  const x = await setup();
+  for (let i = 0; i < RESUME_CAP; i++) { x.failed(DISCONNECT); await x.auto.sweep(); x.advance(60000); }
+  x.failed(DISCONNECT);
+  x.exhausted.mockRejectedValueOnce(new PushFailed(new Error("push offline")));
+  await x.auto.sweep();
+  expect(x.exhausted).toHaveBeenCalledTimes(1);
+  // Before: delivered stayed 0, and every sweep (5 minutes) posted the ⚠️ line to the Bot again.
+  x.advance(5 * 60000);
+  await x.auto.sweep();
+  await x.auto.sweep();
+  expect(x.exhausted).toHaveBeenCalledTimes(1);
 });
 
 it.each(["automations_list", "automations_runs"])("logs failed %s reads and resumes after recovery", async (method) => {

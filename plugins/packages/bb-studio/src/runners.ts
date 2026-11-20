@@ -52,6 +52,8 @@ import { automationsPluginOff } from "./automations-plugin";
 import { fromHeartbeat, localZone } from "./schedule";
 import { isScheduleId, type EngineScheduler } from "./triggers/scheduler";
 import { turnStartedAt } from "./turn-started";
+import { threadModel } from "./thread-model";
+import { rpcErrorStatus } from "./kit/server/index";
 
 type Sdk = BbPluginApi["sdk"];
 /** SDK 0.6.104 overloads timeline (a delta read too); a full read has `rows`. */
@@ -475,10 +477,12 @@ export class Runners {
       VALUES (?, ?, ?, ?, NULL, ?, 'active', ?, ?, ?, ?, ?)`).run(id, bot.id, name, input.job.trim(), PERSONAL_PROJECT_ID, schedule.cadence, schedule.time, schedule.cron ?? null, now, now);
     this.changedRow(id, { machine: check.machine, machine_name: check.machineName });
     try {
+      // The Main's provider and model, filled when BB has none for it (src/thread-model.ts).
       const [botThread, defaults] = await Promise.all([
-        this.deps.sdk.threads.get({ threadId: bot.threadId }),
-        this.deps.sdk.threads.defaultExecutionOptions({ threadId: bot.threadId }).catch(() => null),
+        this.deps.sdk.threads.get({ threadId: bot.threadId }).catch((error) => { if (rpcErrorStatus(error) === 404) throw new Error(`${bot.name}'s Main conversation is gone. Pick a Main in Bot settings (or start a new one), then make the runner.`); throw error; }),
+        threadModel(this.deps.sdk, bot.threadId, this.deps.scheduler.preferredModel?.(bot.threadId)).catch(() => null),
       ]);
+      if (!defaults?.model) throw new Error(`${bot.name}'s Main conversation has no model yet. Choose one in it (or set the Bot's default model in Bot settings), then make the runner.`);
       // No parentThreadId and no lifecycle owner: BB posts nothing to the Bot.
       // Hidden: it lives under the Bot, not in BB's thread list (see the top of this file).
       const thread = await this.deps.sdk.threads.spawn({
@@ -526,9 +530,12 @@ export class Runners {
    */
   private async provision(row: RunnerRow): Promise<void> {
     if (!row.thread_id) throw new Error("This runner has no thread.");
-    const [thread, defaults] = await Promise.all([this.deps.sdk.threads.get({ threadId: row.thread_id }), this.deps.sdk.threads.defaultExecutionOptions({ threadId: row.thread_id }).catch(() => null)]);
+    const [thread, defaults] = await Promise.all([
+      this.deps.sdk.threads.get({ threadId: row.thread_id }).catch((error) => { if (rpcErrorStatus(error) === 404) throw new Error(`The runner's thread is gone. Delete "${row.name}" and make it again.`); throw error; }),
+      row.adopted ? this.deps.sdk.threads.defaultExecutionOptions({ threadId: row.thread_id }).catch(() => null) : threadModel(this.deps.sdk, row.thread_id, this.deps.scheduler.preferredModel?.(row.thread_id)).catch(() => null),
+    ]);
     if (!row.adopted) {
-      if (!thread.providerId || !defaults?.model) throw new Error("Choose a provider and model for the runner's thread first.");
+      if (!thread.providerId || !defaults?.model) throw new Error("The runner's thread has no model yet. Set the Bot's default model in Bot settings, then try again.");
       // One left from before the move to Studio's scheduler: its BB automation goes (best effort).
       if (row.automation_id && !isScheduleId(row.automation_id)) await this.call("automations_delete", { projectId: row.automation_project_id, automationId: row.automation_id }, z.unknown()).catch(() => {});
       const schedule = fromHeartbeat({ cadence: row.cadence, time: row.time, ...(row.cron ? { cron: row.cron } : {}) });
@@ -685,7 +692,14 @@ export class Runners {
     if (input.level === "log") return "Logged. Then reply exactly [PASS].";
     const bot = this.deps.bot(row.bot_id);
     if (!bot?.threadId) return "Logged; the Bot has no thread to tell. Then reply exactly [PASS].";
-    await this.tell(row, input.level, summary, bot as RunnerBot & { threadId: string }, extra);
+    try {
+      await this.tell(row, input.level, summary, bot as RunnerBot & { threadId: string }, extra);
+    } catch (error) {
+      // The report is kept either way: say what happened, so the runner doesn't report it again.
+      if (pushFailed(error)) return "Told the user; the phone push failed. Then reply exactly [PASS].";
+      console.warn(`[studio] runner ${row.id}: its report couldn't reach the Bot's Main`, error);
+      return "Logged; the Bot's Main couldn't take it right now, so the user sees it in the runner's report. Then reply exactly [PASS].";
+    }
     return input.level === "urgent" ? "Told the user and pushed to their phone. Then reply exactly [PASS]." : "Told the user. Then reply exactly [PASS].";
   }
 
@@ -796,9 +810,23 @@ export async function alertBot(sdk: Sdk, input: { botThreadId: string; senderThr
       pluginId: "mobile", method: "notify", outputSchema: z.unknown(),
       // turn-finished on the Bot's thread: the phone shows its Reply action, and a reply goes to the Bot.
       input: { title: input.push.title, body: input.push.body.slice(0, 4000), kind: "turn-finished", threadId: input.botThreadId, projectId: PERSONAL_PROJECT_ID, coalesceKey: input.push.coalesceKey, botId: input.push.botId, conversationId: input.botThreadId } as never,
-    }).catch((error) => { console.warn("[studio] Bot push delivery failed", error); throw error; });
+    }).catch((error) => { console.warn("[studio] Bot push delivery failed", error); throw new PushFailed(error); });
   }
 }
+
+/**
+ * The line reached the Bot's chat but the phone push didn't: callers that
+ * retry (auto-resume) count the line as delivered, so it isn't posted again.
+ */
+export class PushFailed extends Error {
+  override readonly name = "PushFailed";
+  constructor(cause: unknown) {
+    super(`The phone push failed: ${String((cause as Error)?.message ?? cause)}`);
+  }
+}
+
+/** Whether an error is PushFailed (by name, so it survives being passed through other modules). */
+export const pushFailed = (error: unknown): boolean => (error as Error)?.name === "PushFailed";
 
 /** A schedule as the bot or the UI gives it: cadence, time (default 09:00), cron for custom. */
 export function parseSchedule(schedule: RunnerSchedule | { cadence: HeartbeatRun["cadence"]; time?: string; cron?: string }): RunnerSchedule {
