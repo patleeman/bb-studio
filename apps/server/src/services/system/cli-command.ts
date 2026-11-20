@@ -14,7 +14,7 @@ import {
 } from "node:fs/promises";
 import { dirname, join, resolve, win32 } from "node:path";
 import { CLI_LAUNCHER_MARKER } from "@bb/config/cli-command";
-import { pointsAtOwnLauncher } from "./cli-command.fork.js";
+import { linkStudioCliAliases, pointsAtOwnLauncher, removeStudioCliAliases, STUDIO_CLI_NAME } from "./cli-command.fork.js";
 import type {
   SystemCliCommandShadow,
   SystemCliCommandStatus,
@@ -25,7 +25,7 @@ import { ApiError } from "../../errors.js";
 export const MACHINE_CLI_SHIM_MARKER =
   "No installed bb machine CLI is available.";
 const CLI_LAUNCHER_MAX_BYTES = 16_384;
-const CLI_COMMAND_NAME = "bb";
+const CLI_COMMAND_NAME = STUDIO_CLI_NAME;
 const WINDOWS_USER_PATH_SCRIPT = `
 $ErrorActionPreference = 'Stop'
 if ($env:BB_CLI_COMMAND_SET -eq '1') {
@@ -300,6 +300,7 @@ async function installUnix(context: CliCommandContext): Promise<void> {
   const existing = await findInstalledLink(context);
   if (existing !== null) {
     if ((await readLinkTarget(existing)) === context.launcherPath) {
+      await linkStudioCliAliases(dirname(existing), context.launcherPath);
       return;
     }
     try {
@@ -346,6 +347,7 @@ async function installUnix(context: CliCommandContext): Promise<void> {
       () => false,
     );
     if (linked) {
+      await linkStudioCliAliases(directory, context.launcherPath);
       return;
     }
   }
@@ -374,6 +376,7 @@ async function removeUnix(context: CliCommandContext): Promise<void> {
     context.platform,
   )) {
     const link = join(directory, CLI_COMMAND_NAME);
+    await removeStudioCliAliases(directory, context.launcherPath);
     if ((await isBbLauncherLink(link)) && (await pointsAtOwnLauncher(link, context.launcherPath))) {
       try {
         await rm(link);

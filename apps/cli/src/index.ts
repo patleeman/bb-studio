@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { guardStudioCliEnv } from "./studio-cli-env.fork.js";
+import { homedir } from "node:os";
 import { Command, CommanderError } from "commander";
 import { maybeReexecViaBbCli } from "./bb-cli-reexec.js";
 import {
@@ -14,6 +16,7 @@ if (process.env.FORCE_COLOR !== undefined) {
   delete process.env.NO_COLOR;
 }
 
+guardStudioCliEnv(process.env, homedir());
 maybeReexecViaBbCli();
 
 const program = new Command();
