@@ -26,7 +26,7 @@ import { readImportedAt } from "../automation-table";
 import { studioOwnData } from "./own-data";
 import { previewStaged, studioDataStatus } from "./preview";
 import { stopImportedStudio } from "./stop";
-import { claimFirstLoad, finishStudioImport, prepareKv } from "./start";
+import { claimFirstLoad, finishStudioImport, prepareKv, replacedMainThreads } from "./start";
 import type { StudioKv } from "./swap";
 import { studioThreads } from "./threads";
 
@@ -463,6 +463,27 @@ describe("applying bb's Studio data at Studio's start", () => {
     writeJournal(x.dataDir, { ...(readJournal(x.dataDir) as ImportJournal), state: "restore-requested" });
     expect(await x.start({ threads })).toMatchObject({ state: "restored", replacedArchived: false });
     expect(calls.at(-1)).toBe("unarchive thr_1");
+  });
+
+  it("archives only this install's Mains, never a project lead, worker, task or chat thread its data names", async () => {
+    const dir = temp("studio-replaced-");
+    const h = host();
+    const install = new Database(join(dir, "install.db"));
+    h.bb.storage.migrate(install, MIGRATIONS);
+    install.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, created_at, updated_at) VALUES ('bot_main', 'A', 'a', 'active', NULL, 0, 1, 1)").run();
+    const lead = install.prepare("INSERT INTO project_leads (project_id, lead_thread_id, created_at, updated_at) VALUES (?, ?, 1, 1)");
+    lead.run(PERSONAL_PROJECT_ID, "thr_ownmain");
+    lead.run("proj_code", "thr_codelead");
+    const bt = install.prepare("INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, owner_conversation_id, source, created_at, updated_at) VALUES (?, 'bot_main', ?, ?, ?, 'studio', 1, 1)");
+    bt.run("thr_ownmain", "conversation", 1, null);
+    bt.run("thr_conv", "conversation", 0, null);
+    bt.run("thr_worker", "worker", 0, "thr_conv");
+    install.prepare("INSERT INTO tasks (id, record, owner, state, origin, conversation, created_at, updated_at) VALUES ('task_1', ?, 'cos', 'todo', 'task', 'thr_task', 1, 1)").run(JSON.stringify({ workers: ["thr_taskworker"] }));
+    install.prepare("INSERT INTO chats (thread_id, page_id, created_at) VALUES ('thr_chat', 'pg_1', 1)").run();
+    install.close();
+    const { db } = await bbStudio(join(dir, "bb.db"), h);
+    db.close();
+    expect(replacedMainThreads(join(dir, "install.db"), join(dir, "bb.db"))).toEqual(["thr_ownmain"]);
   });
 
   it("puts the old data back when asked, keeping bb's in a folder", async () => {

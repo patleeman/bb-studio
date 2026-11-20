@@ -210,14 +210,14 @@ function settleRollBack(deps: StartDeps, ending: Ending, thrown: RolledBack): Im
   return settle(deps.dataDir, ending.undone({ ...thrown.journal, phase: null, undoing: undefined, updatedAt: now() }, reason), deps.log);
 }
 
-/** The Bot threads a Studio database names (threads.ts), or none when it can't be read. */
-function threadsIn(path: string): string[] {
+/** The Bots' own Main threads a Studio database names (threads.ts `required`), or none when it can't be read. */
+function mainThreadsIn(path: string): string[] {
   if (!existsSync(path)) return [];
   let db: Database.Database | null = null;
   try {
     db = new Database(path, { readonly: true, fileMustExist: true });
     db.pragma("busy_timeout = 1000");
-    return studioThreads(db).wanted;
+    return studioThreads(db).required;
   } catch {
     return [];
   } finally {
@@ -226,7 +226,17 @@ function threadsIn(path: string): string[] {
 }
 
 /**
- * After a swap, this install's own Bot threads (the Main onboarding made)
+ * This install's own Main threads that bb's data replaces: only the Bots'
+ * Mains (the one onboarding made, and one it handed off to), never a
+ * project lead, worker, task or chat thread the old data also names.
+ */
+export function replacedMainThreads(installDb: string, bbDb: string): string[] {
+  const bb = new Set(mainThreadsIn(bbDb));
+  return mainThreadsIn(installDb).filter((id) => !bb.has(id));
+}
+
+/**
+ * After a swap, this install's own Main threads (the Main onboarding made)
  * belong to no Bot: they are archived, so they don't linger as hidden
  * threads. A put-back unarchives them for the Bots that come back. Failures
  * are retried at the next start.
@@ -285,8 +295,7 @@ async function apply(deps: StartDeps, journal: ImportJournal): Promise<ImportJou
   const bbKv = readJson<BbKvFile>(plan.incomingKvFile);
   if (!bbKv.prepared) writePrivateJson(plan.incomingKvFile, prepareKv(bbKv));
 
-  const bbThreads = new Set(threadsIn(stagedDb));
-  const replacedThreads = threadsIn(join(studioDir(deps.dataDir), "data.db")).filter((id) => !bbThreads.has(id));
+  const replacedThreads = replacedMainThreads(join(studioDir(deps.dataDir), "data.db"), stagedDb);
   const incoming = readdirSync(plan.incomingDir).filter((name) => !KEPT_HERE.has(name)).sort();
   const applying: ImportJournal = { ...journal, state: "applying", phase: "out", incoming, stopped, replacedThreads, replacedArchived: false, error: null, updatedAt: now() };
   writeJournal(deps.dataDir, applying);
