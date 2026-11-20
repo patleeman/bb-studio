@@ -8,6 +8,12 @@ import { Card, Row, SubHeading, Switch } from "../../settings/ui/controls";
 import type { rpcContract as decisionsContract } from "../../decisions/contract";
 import { AUTO_ID, MAX_RULES, type Decision, type Policy, type Rule, type Target, type TargetCheck, type routerContract } from "../contract";
 
+/** A target with no label: the label key is dropped, since an undefined value is not JSON and the RPC refuses it. */
+function unlabeled<T extends { label?: string }>(target: T): Omit<T, "label"> {
+  const { label: _label, ...rest } = target;
+  return rest;
+}
+
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -34,7 +40,7 @@ function Chain({ chain, disabled, onChange, starter, problems }: { chain: readon
     setError(null);
     const start = chain.at(-1) ?? (await starter().catch(() => null));
     if (!start) return setError("No available provider has a model to add.");
-    onChange([...chain, { ...start, label: undefined }]);
+    onChange([...chain, unlabeled(start)]);
   };
   return (
     <div className="flex flex-col gap-2">
@@ -145,7 +151,7 @@ export function RouterSettingsSection() {
     const previous = policy;
     setPolicy(next);
     setError(null);
-    try { setPolicy(await rpc.call("router.policy.set", next)); check(); } catch (cause) { setPolicy(previous); setError(errorText(cause)); } finally { pending.current = false; setBusy(false); }
+    try { setPolicy(await rpc.call("router.policy.set", JSON.parse(JSON.stringify(next)) as Policy)); check(); } catch (cause) { setPolicy(previous); setError(errorText(cause)); } finally { pending.current = false; setBusy(false); }
   };
   const starter = async (): Promise<Target | null> => {
     const suggestion = await decisions.call("decisions.fallback.suggest", null);
@@ -181,7 +187,7 @@ export function RouterSettingsSection() {
           <Button type="button" size="sm" variant="outline" disabled={busy || policy.rules.length >= MAX_RULES} onClick={() => void (async () => {
             const first = policy.defaultChain[0] ?? (await starter().catch(() => null));
             if (!first) return setError("No available provider has a model to add.");
-            await save({ ...policy, rules: [...policy.rules, { id: newRuleId(policy.rules), text: "Describe the kind of task", chain: [{ ...first, label: undefined }] }] });
+            await save({ ...policy, rules: [...policy.rules, { id: newRuleId(policy.rules), text: "Describe the kind of task", chain: [unlabeled(first)] }] });
           })()}>Add rule</Button>
         </div>
       </Card>
