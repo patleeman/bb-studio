@@ -278,8 +278,10 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
     markLanded();
     if (activeThreadId || !isLaunchPage(window.location.pathname)) return;
     if (!first && newThreadAsked()) return;
-    const target = first ? landingThread(bot, lastConversation(bot.id), listed) : data.conversations.find((row) => row.isMain)?.threadId ?? landingThread(bot, null, null);
-    if (target) navigate.toThread(target);
+    const main = data.conversations.find((row) => row.isMain)?.threadId ?? landingThread(bot, null, null);
+    const target = first ? landingThread(bot, lastConversation(bot.id), listed) : main;
+    // Only somewhere that's there: a deleted or archived Main (being replaced) lands nowhere rather than on BB's not-found page.
+    if (target) void botLanding(target, main, threadLocator(sdk)).then((found) => { if (found) navigate.toThread(found.threadId); });
   }, [bot?.id, hasData, pathname, activeThreadId]); // eslint-disable-line react-hooks/exhaustive-deps
   const switchTo = useCallback((botId: string) => {
     const space = bots.find((each) => each.id === botId);

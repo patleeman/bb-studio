@@ -263,7 +263,8 @@ export class BotMaintenance {
           }
           const targetId = row.target === "main" ? bot.threadId : (this.deps.db.prepare("SELECT thread_id FROM bot_runners WHERE id = ?").get(row.target) as { thread_id: string | null } | undefined)?.thread_id;
           const target = targetId ? await this.deps.sdk.threads.get({ threadId: targetId }).catch((error) => { if ((error as { status?: number }).status === 404 || /not found/i.test(String(error))) return null; throw error; }) : null;
-          const retired = !target || !!target.archivedAt;
+          // One that follows the Main ("main") is never retired: a gone Main is replaced (Bots.replaceMain) and its runs go there.
+          const retired = row.target !== "main" && (!target || !!target.archivedAt);
           const signature = signatureOf([row.project_id, targetId, row.kind, JSON.parse(row.schedule_json), row.instruction.trim(), row.provider_id, row.model, row.reasoning, row.kind === "watcher" ? row.id : ""]);
           const duplicate = seen.has(signature); seen.add(signature);
           if (retired || duplicate) { await act(`Pause ${retired ? "retired target" : "duplicate"}: ${row.name}`, () => this.deps.automationPause(row.id, botId)); result.suggestions.push({ text: `${row.name}: ${retired ? "target retired or missing" : "duplicate schedule, instruction and target"}` }); continue; }

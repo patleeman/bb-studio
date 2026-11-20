@@ -567,8 +567,8 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
       const main = deps.bots().find((bot) => bot.id === botId)?.threadId ?? null;
       for (const candidate of [...new Set([last, main])]) {
         if (!candidate) continue;
-        const thread = await bb.sdk.threads.get({ threadId: candidate }).catch(() => null) as { deletedAt?: number | null } | null;
-        if (thread && !thread.deletedAt) return { threadId: candidate };
+        const thread = await bb.sdk.threads.get({ threadId: candidate }).catch(() => null) as { deletedAt?: number | null; archivedAt?: number | null } | null;
+        if (thread && !thread.deletedAt && !thread.archivedAt) return { threadId: candidate };
       }
       return { threadId: null };
     },

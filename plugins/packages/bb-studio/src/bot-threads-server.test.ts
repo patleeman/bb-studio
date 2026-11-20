@@ -434,3 +434,10 @@ it("lands on a Bot's last conversation while it exists, else its Main, else nowh
   expect(await server.rpc.bot_landing({ botId: "dot", last: "redesign" })).toEqual({ threadId: null });
   expect(await server.rpc.bot_landing({ botId: "home", last: null })).toEqual({ threadId: "thr_home" });
 });
+
+it("FM: never lands on an archived Main (it is being replaced)", async () => {
+  const { server, threads } = await setup();
+  threads.delete("redesign");
+  threads.set("thr_main", { ...threads.get("thr_main")!, archivedAt: 5 } as never);
+  expect(await server.rpc.bot_landing({ botId: "dot", last: "redesign" })).toEqual({ threadId: null });
+});
