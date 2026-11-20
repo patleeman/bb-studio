@@ -596,7 +596,7 @@ export function BbAppUpdateRows({
           state="restart-required"
           buttonLeading={<BbLogo className="size-3" />}
           buttonLabel="Relaunch"
-          actionLabel="Relaunch bb to finish updating"
+          actionLabel="Relaunch BB Studio to finish updating"
           onClick={() => onRelaunchDesktop?.()}
         />,
       );
@@ -782,7 +782,7 @@ function ScheduledUpdateSplitButton({
       primaryAction={{ label: "Update now", onSelect: onUpdateNow }}
       primaryTooltip="Restart into the update without waiting for threads"
       triggerLabel="More update options"
-      mobileTitle="Update bb"
+      mobileTitle="Update BB Studio"
       secondaryActions={[
         {
           id: "skip-version",
@@ -894,7 +894,7 @@ function InAppUpdateRow({
           failure === null ? undefined : (RETRY_ACTION_ICON as IconName)
         }
         actionTooltip={failure === null ? undefined : "Retry"}
-        actionLabel="Download the update and restart bb"
+        actionLabel="Download the update and restart BB Studio"
         loading={applyPending}
         onClick={onApply}
       />
@@ -905,7 +905,7 @@ function InAppUpdateRow({
       updateButton,
       <FailureIndicator
         reason="Last update failed"
-        openLabel="View the failed bb update"
+        openLabel="View the failed BB Studio update"
         openTooltip="View details"
         onOpen={onShowResult === null ? undefined : () => onShowResult(failure)}
       />,
@@ -1314,7 +1314,7 @@ function MachineRowNote({
   if (daemon === "updating") {
     return (
       <>
-        <RowStateCaption state="in-progress">Updating bb</RowStateCaption>
+        <RowStateCaption state="in-progress">Updating BB Studio</RowStateCaption>
         <RowStateControl live state="in-progress" />
       </>
     );
@@ -1557,7 +1557,7 @@ export function AutoAppUpdateSetting({
     <div className="py-3.5 pr-4 pl-13">
       <SettingsWithControl
         label={label}
-        description="Checks every hour and restarts bb into a new version once no thread has run for 15 minutes."
+        description="Checks every hour and restarts BB Studio into a new version once no thread has run for 15 minutes."
       >
         <Switch
           checked={checked}
@@ -1840,7 +1840,7 @@ function blockedPluginReason(
 ): string {
   const version = item.version;
   return item.reasons.length === 0
-    ? `${version} isn’t compatible with this bb`
+    ? `${version} isn’t compatible with this BB Studio`
     : `${version}: ${item.reasons.join("; ")}`;
 }
 
@@ -1905,7 +1905,7 @@ function PluginUpdateRow({
               reason={
                 failure.detail.length > 0
                   ? failure.detail
-                  : `bb couldn’t activate ${failure.label} and restored ${plugin.version}.`
+                  : `BB Studio couldn’t activate ${failure.label} and restored ${plugin.version}.`
               }
             />
             <RowStateControl
@@ -2312,7 +2312,7 @@ export function UpdatesSettingsSection() {
             label={
               serverRunsSeparately
                 ? "Restart and update the server automatically"
-                : "Restart and update bb automatically"
+                : "Restart and update BB Studio automatically"
             }
             checked={
               setAutoAppUpdate.isPending
