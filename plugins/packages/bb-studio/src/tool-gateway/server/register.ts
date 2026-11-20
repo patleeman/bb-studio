@@ -331,11 +331,11 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
   }
 
   async function approveRecord(record: ServerRecord, values: SecretValues): Promise<ServerRecord> {
-    if (secrets.approvalKey() === null) throw new ConfigError(`Tool Gateway's approval key can't be read (${secrets.loadProblems().join("; ")}). Fix or remove it in the secrets folder, then reload Studio.`);
+    if (secrets.approvalKey() === null) throw new ConfigError("Tool Gateway's approval key can't be read. Fix or remove it in the secrets folder, then reload Studio.");
     await secrets.set(record.id, values);
     const now = Date.now();
     const key = secrets.approvalKey();
-    if (key === null) throw new ConfigError(`Tool Gateway's approval key can't be read (${secrets.loadProblems().join("; ")}). Fix or remove it in the secrets folder, then reload Studio.`);
+    if (key === null) throw new ConfigError("Tool Gateway's approval key can't be read. Fix or remove it in the secrets folder, then reload Studio.");
     return store.saveServer({ ...record, approvedHash: configHash(record.config, values, key), approvedAt: now, status: "stopped", lastError: null });
   }
 

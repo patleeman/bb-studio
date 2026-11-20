@@ -8,7 +8,8 @@ import { join } from "node:path";
 import { EMPTY_SECRETS, secretValuesOf, type SecretValues } from "./config";
 import type { OAuthCredentialBackend, OAuthCredentialRecord } from "./oauth";
 
-const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+/** A fixed message: the error of a broken file can quote its contents, and these files hold secrets. */
+const CANT_READ = "can't be read";
 
 const SERVERS_FILE = "servers.json";
 const OAUTH_FILE = "oauth.json";
@@ -48,19 +49,19 @@ export class ToolGatewaySecrets {
    */
   async load(): Promise<string[]> {
     this.problems = new Map();
-    await this.loadKey().catch((error) => { this.key = ""; this.problems.set(KEY_FILE, errorText(error)); });
+    await this.loadKey().catch(() => { this.key = ""; this.problems.set(KEY_FILE, CANT_READ); });
     try {
       const servers = await readJson(join(this.dir, SERVERS_FILE));
       this.servers = Object.fromEntries(Object.entries(servers).map(([id, value]) => [id, cleanValues(value)]));
-    } catch (error) {
+    } catch {
       this.servers = {};
-      this.problems.set(SERVERS_FILE, errorText(error));
+      this.problems.set(SERVERS_FILE, CANT_READ);
     }
     try {
       this.oauth = await readJson(join(this.dir, OAUTH_FILE)) as Record<string, OAuthCredentialRecord>;
-    } catch (error) {
+    } catch {
       this.oauth = {};
-      this.problems.set(OAUTH_FILE, errorText(error));
+      this.problems.set(OAUTH_FILE, CANT_READ);
     }
     return [...this.problems].map(([file, problem]) => `${file}: ${problem}`);
   }
@@ -89,8 +90,7 @@ export class ToolGatewaySecrets {
   }
 
   private refuseIfBroken(file: string): void {
-    const problem = this.problems.get(file);
-    if (problem !== undefined) throw new Error(`Tool Gateway's ${file} can't be read (${problem}). Fix or remove it in the secrets folder, then reload Studio.`);
+    if (this.problems.has(file)) throw new Error(`Tool Gateway's ${file} can't be read. Fix or remove it in the secrets folder, then reload Studio.`);
   }
 
   stagedImportPath(): string {

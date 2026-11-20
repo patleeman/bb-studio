@@ -235,7 +235,10 @@ describe("R1. a secrets file that can't be read", () => {
       await h.restart();
       expect(h.gateway.agentConfiguration({ providerId: "claude-code", projectId: "prj_a" })).toEqual(file === "servers.json" ? { tools: [], instructions: "" } : expect.objectContaining({ tools: expect.any(Array) }));
       const snapshot = await h.rpc("toolGateway.snapshot", null);
-      expect(snapshot.problems).toEqual([expect.stringContaining(file)]);
+      expect(snapshot.problems).toEqual([`${file}: can't be read`]);
+      // A fixed message: nothing of the broken file is quoted to any reader.
+      expect(JSON.stringify(snapshot)).not.toContain("not json");
+      expect(JSON.stringify(await h.rpc("toolGateway.snapshot", null, CLIENT))).not.toContain("not json");
       if (file === "servers.json") {
         expect(snapshot.servers[0]).toMatchObject({ id: "one", approved: false, status: "needs-approval" });
         expect(json(await h.agent("tool_gateway_search", {})).tools).toEqual([]);
@@ -256,7 +259,7 @@ describe("R1. a secrets file that can't be read", () => {
       expect(h.gateway.agentConfiguration({ providerId: "claude-code", projectId: "prj_a" })).toEqual({ tools: [], instructions: "" });
       const snapshot = await h.rpc("toolGateway.snapshot", null);
       expect(snapshot.servers[0]).toMatchObject({ approved: false });
-      expect(snapshot.problems).toEqual([expect.stringContaining("approval.key")]);
+      expect(snapshot.problems).toEqual(["approval.key: can't be read"]);
       await expect(h.rpc("toolGateway.approve", { id: "one" })).rejects.toThrow(/approval key can't be read/);
     } finally {
       chmodSync(keyFile, 0o600);
