@@ -10,7 +10,7 @@ import { shownBot } from "../../ui/conversations/BotSidebarPanel";
 import { useAppMode } from "../../ui/conversations/app-mode";
 import { useCurrentBot } from "../../ui/conversations/state";
 import { useCall, useLive } from "../../ui/live";
-import type { Appearance } from "../appearance";
+import { resolveTheme, type Appearance } from "../appearance";
 import type { ThemeRegistry } from "../registry";
 import type { Mode } from "../schema";
 import type { PreviewHub } from "./preview";
@@ -36,7 +36,8 @@ export function ThemeGrid({ registry, mode, value, onPreview, onPick, makePrevie
   const groups = useMemo(() => popoverGroups(themeChoices(registry)), [registry]);
   const flat = useMemo(() => groups.flatMap((group) => group.choices), [groups]);
   const sizes = useMemo(() => groups.map((group) => group.choices.length), [groups]);
-  const checkedId = value?.themeId ?? null;
+  // A theme that is gone shows as the default theme, so that card is checked.
+  const checkedId = resolveTheme(registry, value).appearance?.themeId ?? value?.themeId ?? null;
   const [active, setActive] = useState(() => Math.max(0, flat.findIndex((choice) => choice.id === checkedId)));
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const hub = usePreviewHub(makePreviews);

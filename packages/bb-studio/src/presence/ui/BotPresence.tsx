@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useSceneSignals } from "../../theme/signals";
 import { shownAppearance, useAppearanceDraft, useThemeRegistry } from "../../theme/ui/state";
-import type { Appearance } from "../../theme/appearance";
+import { resolveTheme, type Appearance } from "../../theme/appearance";
 import { useAppMode } from "../../ui/conversations/app-mode";
 import { STATE_NAMES, type PresenceStateName } from "../forms";
 import { presenceLook } from "../look";
@@ -24,7 +24,7 @@ export function usePresenceLook(bot: PresenceBot, presence: Presence) {
   const registry = useThemeRegistry();
   const mode = useAppMode();
   const appearance = shownAppearance(bot, overrides);
-  const theme = appearance ? registry.get(appearance.themeId) : null;
+  const theme = resolveTheme(registry, appearance).theme;
   const color = JSON.stringify(presence.color);
   return useMemo(() => presenceLook(presence, theme, mode), [color, theme, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 }

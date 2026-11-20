@@ -28,13 +28,15 @@ export function isBuiltinTheme(id: string): boolean {
 }
 
 export interface ThemeRegistry {
+  /** False while the stored themes are still loading, so a theme missing now may yet appear. */
+  readonly ready?: boolean;
   list(): ThemeEntry[];
   get(id: string): ThemePackage | null;
   scenes(): ThemeEntry[];
   classics(): ThemeEntry[];
 }
 
-export function createThemeRegistry(stored: readonly unknown[] = []): ThemeRegistry {
+export function createThemeRegistry(stored: readonly unknown[] = [], options: { ready?: boolean } = {}): ThemeRegistry {
   const entries: ThemeEntry[] = BUILTIN_THEMES.map((theme) => ({ theme, source: "builtin" }));
   for (const each of stored) {
     const parsed = parseThemePackage(each);
@@ -42,6 +44,7 @@ export function createThemeRegistry(stored: readonly unknown[] = []): ThemeRegis
   }
   const byId = new Map(entries.map((entry) => [entry.theme.id, entry.theme]));
   return {
+    ready: options.ready ?? true,
     list: () => entries.slice(),
     get: (id) => byId.get(canonicalThemeId(id)) ?? null,
     scenes: () => entries.filter((entry) => entry.theme.kind === "scene"),

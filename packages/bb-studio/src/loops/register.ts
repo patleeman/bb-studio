@@ -26,7 +26,9 @@ export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:str
  const store=new LoopStore(db,()=>bb.realtime.publish(STUDIO_REALTIME_CHANNEL,{pluginId:'studio'}));
  let config=defaults;
  const scheduler=new LoopScheduler(store,()=>config,post,notify);
- const tick=()=>void scheduler.tick().catch(e=>bb.log.warn(String(e)));
+ // A tick that can't post (the Bot paused, or no Main) waits and tries again each minute; the reason is logged once, not every minute.
+ let lastTickError:string|null=null;
+ const tick=()=>void scheduler.tick().then(()=>{lastTickError=null;},e=>{const text=String((e as Error)?.message??e);if(text!==lastTickError)bb.log.warn(`Todos: ${text}`);lastTickError=text;});
  // Turning Todos on releases what queued while it was off, without waiting a minute.
  const refresh=(v:Record<string,unknown>)=>{const zone=timeZone();try{localCheck(zone);const was=config.enabled;config={enabled:v.loopsEnabled===true,timeZone:zone,dailyBudget:Math.max(0,Number(v.loopDailyBudget??5)),quietStart:Number(v.loopQuietStart??22),quietEnd:Number(v.loopQuietEnd??7)};if(!was&&config.enabled)tick();}catch(e){bb.log.warn(String(e));}};
  function localCheck(zone:string){new Intl.DateTimeFormat('en',{timeZone:zone}).format();}

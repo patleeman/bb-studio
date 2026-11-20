@@ -13,7 +13,7 @@ const rpc = vi.hoisted(() => {
 });
 vi.mock("@get-bb/plugin-sdk/app", async (original) => ({ ...(await original<object>()), useRpc: () => rpc.client }));
 
-import { jobLine, readBringOver, resetUiTokenForTests, secretLine, type BringOverJob, type BringOverState, type BringOverStudioData, type StudioImportState } from "./api";
+import { jobLine, presentRequired, readBringOver, requiredInBb, resetUiTokenForTests, secretLine, studioDataConfirm, type BringOverJob, type BringOverState, type BringOverStudioData, type StudioImportState } from "./api";
 import { BringOverSection, requestFrom } from "./ui/BringOverSection";
 import { BringOverLink, resetBringOverOfferForTests } from "./ui/FirstChatLink";
 
@@ -51,6 +51,21 @@ describe("api", () => {
     const env = { id: "env", label: "Environment variables", detail: "", secret: true, count: 1, names: ["A"], alreadyHere: ["A"] };
     expect(secretLine(env, false)).toBe("Brings over 1 environment variable: A.");
     expect(secretLine(env, true)).toBe("Brings over 1 environment variable: A. Replaces BB Studio's values for A.");
+  });
+  it("FM: a Bot's Main deleted in bb is left out of what the bring-over requires, and an unreadable listing keeps them all", async () => {
+    const thread = (id: string, archived = false) => ({ id, title: id, updatedAt: 1, archived, attachments: 0, here: false });
+    expect(presentRequired(["thr_main", "thr_gone", "thr_old"], [thread("thr_main"), thread("thr_old", true)])).toEqual({ required: ["thr_main", "thr_old"], missing: ["thr_gone"] });
+    expect(presentRequired(["thr_main"], { available: true })).toEqual({ required: ["thr_main"], missing: [] });
+    const urls: string[] = [];
+    const listed = await requiredInBb(["thr_main", "thr_gone"], async (url) => { urls.push(String(url)); return new Response(JSON.stringify([thread("thr_main")]), { status: 200 }); });
+    expect(listed).toEqual({ required: ["thr_main"], missing: ["thr_gone"] });
+    expect(urls).toEqual(["/api/v1/fork/bring-over/projects/proj_personal/threads"]);
+    expect(await requiredInBb(["thr_main", "thr_gone"], async () => new Response("boom", { status: 500 }))).toEqual({ required: ["thr_main", "thr_gone"], missing: [] });
+    expect(await requiredInBb(["thr_main"], async () => { throw new TypeError("offline"); })).toEqual({ required: ["thr_main"], missing: [] });
+    const preview = { bots: 2, pages: 0, tasks: 0, memories: 0, threads: { required: ["thr_a", "thr_b"], wanted: ["thr_a", "thr_b", "thr_c"] }, minisWithSecrets: 0, watchersWithEnv: 0, problem: null };
+    expect(studioDataConfirm(preview).join(" ")).not.toContain("deleted in bb");
+    expect(studioDataConfirm(preview, 2).join(" ")).toContain("2 Bots' Main conversations were deleted in bb; those Bots get a new Main here.");
+    expect(studioDataConfirm(preview, 2)[0]).toContain("and 1 thread.");
   });
   it("turns picks into a request", () => {
     expect(requestFrom({ projects: new Set(["proj_a"]), threads: new Set(["thr_b"]), settings: new Map([["env", false]]), attachments: true })).toEqual({
@@ -345,6 +360,40 @@ describe("BB Studio data row", () => {
     await settle();
     expect(calls.find((call) => call.url.endsWith("/jobs"))).toMatchObject({ method: "POST", token: "token-from-the-app", body: { picks: [{ kind: "thread", id: "thr_main" }, { kind: "thread", id: "thr_conv" }, { kind: "thread", id: "thr_worker" }], settings: [], studioData: { required: ["thr_main"] } } });
     expect($('[data-testid="bring-over-job"]')?.textContent).toContain("0 of 3 threads");
+  });
+
+  it("FM: a Bot's Main deleted in bb doesn't block bringing Studio data over; it is left out and its Bot gets a new Main here", async () => {
+    const gonePreview = { ...preview, threads: { required: ["thr_main", "thr_gone"], wanted: ["thr_main", "thr_gone", "thr_conv"] } };
+    rpc.status = { ownData: { has: false }, journal: journal("staged"), keptIn: null, preview: gonePreview };
+    serve(() => server(journal("staged")));
+    const base = vi.mocked(fetch).getMockImplementation()!;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === "/api/v1/fork/bring-over/projects/proj_personal/threads") {
+        calls.push({ url, method: "GET", body: null, token: null });
+        return new Response(JSON.stringify([{ id: "thr_main", title: "Main", updatedAt: 1, archived: true, attachments: 0, here: false }, { id: "thr_conv", title: "c", updatedAt: 1, archived: false, attachments: 0, here: false }]), { status: 200 });
+      }
+      return base(url, init);
+    }));
+    await act(async () => { root.render(<BringOverSection />); });
+    await settle();
+    expect(text()).toContain("1 Bot's Main conversation was deleted in bb; that Bot gets a new Main here.");
+    expect(text()).toContain("and 2 threads");
+    await act(async () => { button("Bring over")!.click(); });
+    await settle();
+    expect(calls.find((call) => call.url.endsWith("/jobs"))).toMatchObject({ method: "POST", body: { picks: [{ kind: "thread", id: "thr_main" }, { kind: "thread", id: "thr_conv" }], studioData: { required: ["thr_main"] } } });
+  });
+
+  it("FM: when bb's threads can't be listed, the confirm step says nothing about deleted Mains and asks for every Bot's thread, as before", async () => {
+    rpc.status = { ownData: { has: false }, journal: journal("staged"), keptIn: null, preview };
+    serve(() => server(journal("staged")));
+    const base = vi.mocked(fetch).getMockImplementation()!;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => (url.includes("/projects/") ? new Response("boom", { status: 500 }) : base(url, init))));
+    await act(async () => { root.render(<BringOverSection />); });
+    await settle();
+    expect(text()).not.toContain("deleted in bb");
+    await act(async () => { button("Bring over")!.click(); });
+    await settle();
+    expect(calls.find((call) => call.url.endsWith("/jobs"))).toMatchObject({ body: { picks: [{ kind: "thread", id: "thr_main" }, { kind: "thread", id: "thr_conv" }, { kind: "thread", id: "thr_worker" }], studioData: { required: ["thr_main"] } } });
   });
 
   it("is not offered while this install's Studio has data of its own, and says why", async () => {

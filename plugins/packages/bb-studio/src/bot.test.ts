@@ -1,5 +1,5 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "./migrations";
 import { defaultAppearance } from "./theme/appearance";
 import { NORD } from "./theme/builtin/classic";
@@ -61,8 +61,13 @@ async function setup(migrations = MIGRATIONS) {
     { id: "hermes", capabilities: { permissionModes: ["accept-edits", "full"] } },
     { id: "grok", capabilities: { permissionModes: ["full"] } },
   ];
+  const signedOut = new Set<string>();
   const update = vi.fn(async ({ threadId, ...fields }: { threadId: string; model?: string; reasoningLevel?: string }) => { execution.set(threadId, { ...execution.get(threadId)!, ...fields }); return {}; });
   const send = vi.fn(async (_args: { threadId: string; mode: string; input: { text: string }[] }) => ({}));
+  const providerDefaults = new Map<string, string>([["codex", "codex-default"]]);
+  // Threads BB has no stored model for (defaultExecutionOptions answers null).
+  const noModel = new Set<string>();
+  const projectDefault = { current: null as { providerId: string; model: string; reasoningLevel?: string } | null };
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: {
       send: send as never, spawn: spawn as never, get: get as never, archive: archive as never, delete: del as never, list: list as never, stop: stop as never,
@@ -74,10 +79,16 @@ async function setup(migrations = MIGRATIONS) {
         const hit = (thread: Thread) => ({ thread, matches: [{ text: `${thread.title} mentions ${query}`, highlightRanges: [], sourceKind: "assistant_message", sourceSeq: 1 }] });
         return { active: { results: [...threads.values()].filter((thread) => !thread.archivedAt).map(hit) }, archived: { results: [...threads.values()].filter((thread) => thread.archivedAt).map(hit) } };
       }) as never,
-      defaultExecutionOptions: (async ({ threadId }: { threadId: string }) => execution.get(threadId) ?? { model: "model", reasoningLevel: "high", permissionMode: "accept-edits" }) as never,
+      defaultExecutionOptions: (async ({ threadId }: { threadId: string }) => noModel.has(threadId) ? null : execution.get(threadId) ?? { model: "model", reasoningLevel: "high", permissionMode: "accept-edits" }) as never,
     },
     plugins: { callRpc: callRpc as never, list: async () => ({ plugins: [] }), experimental_discoverRpc: async () => [] },
-    providers: { list: (async () => providers) as never },
+    providers: {
+      list: (async () => providers) as never,
+      // BB's model list per provider: its default marked (none listed for an unknown provider).
+      // A signed-out provider's catalog can't be read.
+      models: (async ({ providerId }: { providerId: string }) => signedOut.has(providerId) ? Promise.reject(new Error(`${providerId} is signed out`)) : ({ models: providerDefaults.has(providerId) ? [{ id: "other", model: "other", isDefault: false }, { id: providerDefaults.get(providerId)!, model: providerDefaults.get(providerId)!, isDefault: true }] : [] })) as never,
+    },
+    projects: { defaultExecutionOptions: (async () => projectDefault.current) as never } as never,
   } });
   dispose.push(() => harness.lifecycle.dispose());
   const db = bb.storage.database();
@@ -91,7 +102,7 @@ async function setup(migrations = MIGRATIONS) {
   const userSkillsDir = await mkdtemp(join(tmpdir(), "bot-skills-"));
   const memory = { exists: (id: string) => pages.has(id), create: (page: { title: string; markdown: string }) => { const id = `pg${++made}`; pages.set(id, page); return id; } };
   bots.current = new Bots({ db, sdk: bb.sdk, leads, changed: () => {}, presenceChanged: () => {}, memory, userSkillsDir });
-  return { send, clock, engine, scheduler, bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir, update, list, pending, replies, get, del };
+  return { send, clock, engine, scheduler, bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir, update, list, pending, replies, get, del, execution, providerDefaults, projectDefault, noModel, signedOut };
 }
 
 /** What each check-in on Studio's scheduler sends when it runs: its key, the thread it wakes and the prompt after the marker. */
@@ -242,7 +253,8 @@ it("gives a Bot whose Main was deleted a new, empty Main that its check-in follo
   expect(await x.bots.restoreMain(id, "t2")).toBeNull();
 
   x.threads.set("t1", { ...x.threads.get("t1")!, deletedAt: 9 });
-  expect((await x.bots.get()).bot?.threadId).toBeNull();
+  // A read keeps the deleted lead (and its heartbeat) until the new Main takes them.
+  expect((await x.bots.get()).bot?.threadId).toBe("t1");
   const primary = await x.bots.restoreMain(BOT_ID, "t1");
   expect(primary).toBeTruthy();
   expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe(primary);
@@ -304,6 +316,91 @@ it("doesn't let a check-in die with an archived Main: the run finds the new Main
   expect(x.engine.list("heartbeat").find((trigger) => trigger.ownerId === `bot:${id}`)?.state).toBe("on");
   // A thread that was no Bot's Main still turns its run off.
   expect(await x.bots.rescueMain("t_other")).toBeNull();
+});
+
+describe("a new Main never goes without a model", () => {
+  /** Dot, the primary, with check-ins on; no model saved anywhere on it, and BB with none stored for its Main. */
+  async function bare() {
+    const x = await setup();
+    await x.bots.create({ name: "Dot", avatar: "🟣" });
+    await x.bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
+    x.db.prepare("UPDATE bots SET main_provider_id = NULL, main_model = NULL, main_reasoning = NULL, default_provider_id = NULL, default_model = NULL").run();
+    // Like BB for a thread with no stored model: it can't say what t1 runs on.
+    x.noModel.add("t1");
+    return x;
+  }
+  const spawnedOn = (x: Awaited<ReturnType<typeof setup>>) => x.spawn.mock.calls.at(-1)![0] as { providerId?: string; model?: string; executionInputSources?: Record<string, string> };
+
+  it("deletes a Main with no stored model: the new Main starts on its provider's default, takes the heartbeat, and a read never drops them first", async () => {
+    const x = await bare();
+    x.threads.delete("t1");
+    // A read before the new Main (bot_get from any window) keeps the lead and the heartbeat.
+    expect((await x.bots.get()).run?.enabled).toBe(true);
+    const made = await x.bots.heal(BOT_ID, "t1");
+    expect(made).toBeTruthy();
+    expect(spawnedOn(x)).toMatchObject({ providerId: "codex", model: "codex-default", executionInputSources: { providerId: "explicit", model: "explicit" } });
+    expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe(made);
+    expect((await checkins(x)).map((each) => each.threadId)).toEqual([made]);
+  });
+
+  it("archives a Main with no stored model: the same, on the provider's default", async () => {
+    const x = await bare();
+    x.threads.set("t1", { ...x.threads.get("t1")!, archivedAt: 9 });
+    const made = await x.bots.heal(BOT_ID, "t1");
+    expect(spawnedOn(x)).toMatchObject({ providerId: "codex", model: "codex-default" });
+    expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe(made);
+  });
+
+  it("heals at startup, also a primary an older Studio left with no lead at all", async () => {
+    const x = await bare();
+    x.threads.delete("t1");
+    x.db.prepare("UPDATE project_leads SET lead_thread_id = NULL").run();
+    const made = await x.bots.restoreMains();
+    expect(made).toHaveLength(1);
+    expect(spawnedOn(x)).toMatchObject({ providerId: "codex", model: "codex-default" });
+    expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe(made[0]);
+  });
+
+  it("starts on the old Main's model, saved while it could still be read, before any default", async () => {
+    const x = await setup();
+    await x.bots.create({ name: "Dot", avatar: "🟣" });
+    x.execution.set("t1", { model: "gpt-main", reasoningLevel: "high", permissionMode: "accept-edits" });
+    await x.bots.get();
+    x.db.prepare("UPDATE bots SET default_provider_id = 'claude', default_model = 'opus'").run();
+    x.threads.delete("t1");
+    await x.bots.heal(BOT_ID, "t1");
+    expect(spawnedOn(x)).toMatchObject({ providerId: "codex", model: "gpt-main", reasoningLevel: "high" });
+  });
+
+  it("falls back to the Bot's default model, then the project's, in that order", async () => {
+    const x = await bare();
+    x.db.prepare("UPDATE bots SET provider_id = 'claude', default_provider_id = 'claude', default_model = 'opus'").run();
+    x.threads.delete("t1");
+    await x.bots.heal(BOT_ID, "t1");
+    expect(spawnedOn(x)).toMatchObject({ providerId: "claude", model: "opus" });
+
+    const y = await bare();
+    y.db.prepare("UPDATE bots SET provider_id = 'claude'").run();
+    y.projectDefault.current = { providerId: "claude", model: "sonnet" };
+    y.threads.delete("t1");
+    await y.bots.heal(BOT_ID, "t1");
+    expect(spawnedOn(y)).toMatchObject({ providerId: "claude", model: "sonnet" });
+  });
+
+  it("with no model anywhere: no thread, no throw, a plain problem with Choose a model, and choosing one starts the Main", async () => {
+    const x = await bare();
+    x.db.prepare("UPDATE bots SET provider_id = 'claude'").run();
+    x.threads.delete("t1");
+    const before = x.spawn.mock.calls.length;
+    const warn = vi.fn();
+    expect(await x.bots.heal(BOT_ID, "t1", warn)).toBeNull();
+    expect(x.spawn.mock.calls.length).toBe(before);
+    expect(warn.mock.calls[0]![0]).toContain("Choose one in Default model.");
+    expect((await x.bots.get()).bot).toMatchObject({ mainProblem: "No model for a new Main", mainNeedsModel: true });
+    await x.bots.setDefaultModel({ botId: BOT_ID, providerId: "claude", model: "opus" });
+    expect(spawnedOn(x)).toMatchObject({ providerId: "claude", model: "opus" });
+    expect((await x.bots.get()).bot).toMatchObject({ mainProblem: null, mainNeedsModel: false, threadId: x.leads.storedLead(PERSONAL_PROJECT_ID) });
+  });
 });
 
 it("deletes the new thread when the Main can't move there, and backs off the heal: no empty Main every 5 minutes", async () => {
@@ -1234,4 +1331,269 @@ it("starts a new Bot on a signed-in model: the primary's default model, else the
   states = [{ providerId: "codex", status: "unauthenticated", loginCommand: "codex login" }];
   await bots.create({ name: "Echo", avatar: "🔔" });
   expect(spawned()).not.toHaveProperty("providerId");
+});
+
+// ---------------------------------------------------------------------------
+// Failure modes: nothing the Bot infers (its Main, a thread's model, a
+// provider) may break it. Each case is a row of the failure-mode table.
+
+it("FM: a read after the Main is deleted keeps the check-in on, and the new Main gets it", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  await x.bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
+  x.threads.delete("t1");
+  // The sidebar reads the Bot before Studio hears of the delete.
+  await x.bots.get();
+  const made = await x.bots.restoreMain(BOT_ID, "t1");
+  expect(made).toBeTruthy();
+  expect((await x.bots.get()).run?.enabled).toBe(true);
+  expect(await checkins(x)).toEqual([{ key: PERSONAL_PROJECT_ID, threadId: made, prompt: botHeartbeat("Dot") }]);
+});
+
+it("FM: the heal finds a primary Main that a read already forgot (deleted while Studio was off)", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  await x.bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
+  x.threads.delete("t1");
+  await x.bots.get();
+  const made = await x.bots.restoreMains();
+  expect(made).toHaveLength(1);
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe(made[0]);
+  expect(await checkins(x)).toEqual([{ key: PERSONAL_PROJECT_ID, threadId: made[0], prompt: botHeartbeat("Dot") }]);
+});
+
+it("FM: Make this the Main on a conversation with no model fills it from the Bot's default model, else the provider's, check-ins on or off", async () => {
+  const x = await setup();
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, conversationBot: (threadId) => threadId.startsWith("conv") ? BOT_ID : null });
+  await bots.create({ name: "Dot", avatar: "🟣" });
+  // Check-ins off: before, it moved and every later check-in failed in BB.
+  x.add({ id: "conv_a", projectId: PERSONAL_PROJECT_ID, providerId: "codex" });
+  x.execution.set("conv_a", { model: null as never, reasoningLevel: "high", permissionMode: "accept-edits" });
+  // The Bot's default (taken from its first Main) is on another provider, so the provider's default.
+  x.db.prepare("UPDATE bots SET default_provider_id = 'claude', default_model = 'claude-x'").run();
+  await bots.makeMain("conv_a");
+  expect(x.update).toHaveBeenLastCalledWith(expect.objectContaining({ threadId: "conv_a", model: "codex-default" }));
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("conv_a");
+  // With the Bot's default model on that provider, that one; check-ins on.
+  await bots.setDefaultModel({ botId: BOT_ID, providerId: "codex", model: "other", reasoning: "low" });
+  await bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
+  x.add({ id: "conv_b", projectId: PERSONAL_PROJECT_ID, providerId: "codex" });
+  x.execution.set("conv_b", { model: null as never, reasoningLevel: "high", permissionMode: "accept-edits" });
+  await bots.makeMain("conv_b");
+  expect(x.update).toHaveBeenLastCalledWith(expect.objectContaining({ threadId: "conv_b", model: "other", reasoningLevel: "low" }));
+  expect((await checkins(x))[0]?.threadId).toBe("conv_b");
+});
+
+it("FM: Make this the Main on a conversation with no model whose provider is signed out says what to do, and nothing moves", async () => {
+  const x = await setup();
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, conversationBot: (threadId) => threadId.startsWith("conv") ? BOT_ID : null });
+  await bots.create({ name: "Dot", avatar: "🟣" });
+  x.add({ id: "conv_c", projectId: PERSONAL_PROJECT_ID, providerId: "claude" });
+  x.execution.set("conv_c", { model: null as never, reasoningLevel: "high", permissionMode: "accept-edits" });
+  x.signedOut.add("claude");
+  await expect(bots.makeMain("conv_c")).rejects.toThrow(/has no model yet.*Choose a model/);
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("t1");
+});
+
+it("FM: Start a new Main: a fresh conversation on the Bot's default model becomes the Main; the old one stays a conversation", async () => {
+  const x = await setup();
+  const mainMoved = vi.fn();
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, mainMoved, providerStates: async () => [{ providerId: "codex", status: "ready" }, { providerId: "claude", status: "signed-out" }] as never });
+  await bots.create({ name: "Dot", avatar: "🟣" });
+  await bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
+  await bots.setDefaultModel({ botId: BOT_ID, providerId: "codex", model: "other" });
+  const view = await bots.newMain(BOT_ID);
+  const made = view.bot!.threadId!;
+  expect(made).not.toBe("t1");
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: PERSONAL_PROJECT_ID, providerId: "codex", model: "other", pluginMetadata: { bot: BOT_ID } }));
+  expect(mainMoved).toHaveBeenLastCalledWith(BOT_ID, made, "t1");
+  expect(x.threads.get("t1")?.archivedAt ?? null).toBeNull();
+  expect((await checkins(x))[0]?.threadId).toBe(made);
+  // The default's provider signed out: a signed-in one instead, not a spawn BB refuses.
+  // Set while claude was signed in; it signed out since (setDefaultModel now refuses a signed-out one).
+  x.db.prepare("UPDATE bots SET default_provider_id = 'claude', default_model = 'claude-x'").run();
+  await bots.newMain(BOT_ID);
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ providerId: "codex" }));
+  expect(x.spawn.mock.lastCall?.[0]).not.toHaveProperty("model", "claude-x");
+});
+
+it("FM: Start a new Main with no provider signed in says so in plain words and keeps the old Main", async () => {
+  const x = await setup();
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, providerStates: async () => [] });
+  await bots.create({ name: "Dot", avatar: "🟣" });
+  x.db.prepare("UPDATE bots SET provider_id = NULL").run();
+  await expect(bots.newMain(BOT_ID)).rejects.toThrow("Sign in to a provider");
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("t1");
+  // BB refusing the spawn for want of a model reads the same.
+  x.db.prepare("UPDATE bots SET provider_id = 'codex'").run();
+  x.spawn.mockRejectedValueOnce(new Error("Thread t9 has no stored execution model"));
+  await expect(bots.newMain(BOT_ID)).rejects.toThrow("Sign in to a provider");
+});
+
+it("FM: a rename with check-ins on goes through when the Main is gone or has no model", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  await x.bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
+  await x.bots.setRun({ botId: scout.id, enabled: true, cadence: "daily", time: "08:00" });
+  // Before: the rename was saved, then re-scheduling the check-in threw BB's 404 or "Choose a provider and model".
+  x.threads.delete(scout.threadId!);
+  await expect(x.bots.set({ botId: scout.id, name: "Scout II" })).resolves.toMatchObject({ bot: { name: "Scout II" } });
+  x.execution.set("t1", { model: null as never, reasoningLevel: "high", permissionMode: "accept-edits" });
+  x.signedOut.add("codex");
+  await expect(x.bots.set({ name: "Penny" })).resolves.toMatchObject({ bot: { name: "Penny" } });
+  // The check-in still carries the new name: its prompt is read when it runs.
+  x.execution.set("t1", { model: "model", reasoningLevel: "high", permissionMode: "accept-edits" });
+  x.send.mockClear();
+  await x.scheduler.runNow({ owner: "heartbeat", ownerId: PERSONAL_PROJECT_ID });
+  expect(x.send.mock.lastCall?.[0].input[0]!.text).toContain(botHeartbeat("Penny"));
+});
+
+it("FM: turning check-ins on for a Bot with no Main says what to do instead of storing them off and saying it worked", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  x.db.prepare("UPDATE bots SET thread_id = NULL WHERE id = ?").run(scout.id);
+  await expect(x.bots.setRun({ botId: scout.id, enabled: true, cadence: "daily", time: "08:00" })).rejects.toThrow("Pick one in Bot settings");
+  await expect(x.bots.checkinPreset("morning", scout.id)).rejects.toThrow("Pick one in Bot settings");
+  // Off is always fine.
+  await expect(x.bots.setRun({ botId: scout.id, enabled: false, cadence: "daily", time: "08:00" })).resolves.toBeTruthy();
+});
+
+it("FM: Resume works when the Main is gone and a new one can't start yet", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  await x.bots.pause(scout.id);
+  x.threads.delete(scout.threadId!);
+  x.spawn.mockRejectedValueOnce(new Error("Thread t9 has no stored execution model"));
+  // Before: the raw error, and the Bot stayed paused.
+  await expect(x.bots.resume(scout.id)).resolves.toMatchObject({ bot: { state: "active" } });
+});
+
+it("FM: an archived Memory page comes back instead of a blank one taking its place", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const first = x.bots.memoryPage()!;
+  const archived = new Set([first]);
+  const deps = (x.bots as unknown as { deps: { memory: { exists(id: string): boolean; unarchive?(id: string): boolean } } }).deps.memory;
+  const exists = deps.exists;
+  deps.exists = (id) => !archived.has(id) && exists(id);
+  deps.unarchive = (id) => archived.delete(id);
+  // Before: a new blank page, and the old memory dropped out of the Bot's instructions.
+  expect(x.bots.memoryPage()).toBe(first);
+  expect(x.pages.size).toBe(1);
+});
+
+it("FM: switching a worktree conversation to another provider keeps its workspace; a gone one is said plainly", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  x.add({ id: "wt", providerId: "codex", environmentId: "env_worktree" } as never);
+  await x.bots.switchModel("wt", { providerId: "claude", model: "sonnet" });
+  // Before: the new thread started in the project's default workspace, away from the worktree.
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ providerId: "claude", environment: { type: "reuse", environmentId: "env_worktree" } }));
+  x.add({ id: "plain", providerId: "codex", environmentId: null } as never);
+  await x.bots.switchModel("plain", { providerId: "claude", model: "sonnet" });
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ environment: { type: "project-default" } }));
+  await expect(x.bots.switchModel("gone", { providerId: "claude", model: "sonnet" })).rejects.toThrow("That conversation no longer exists.");
+});
+
+it("FM: the default model can't be set to a signed-out provider or a model its provider doesn't offer", async () => {
+  const x = await setup();
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, providerStates: async () => [{ providerId: "codex", status: "ready" }, { providerId: "claude", status: "signed-out" }] as never });
+  await bots.create({ name: "Dot", avatar: "🟣" });
+  // Before: both were saved, and every later + New, Ask and new Main failed with BB's raw error.
+  await expect(bots.setDefaultModel({ botId: BOT_ID, providerId: "claude", model: "opus" })).rejects.toThrow("isn't signed in");
+  await expect(bots.setDefaultModel({ botId: BOT_ID, providerId: "codex", model: "retired-model" })).rejects.toThrow("doesn't offer retired-model any more");
+  await expect(bots.setDefaultModel({ botId: BOT_ID, providerId: "codex", model: "codex-default" })).resolves.toMatchObject({ bot: { defaultModel: { providerId: "codex", model: "codex-default" } } });
+});
+
+it("FM (review F1): Resume with check-ins on and the Main gone goes through; check-ins come back with the new Main", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  await x.bots.setRun({ botId: scout.id, enabled: true, cadence: "daily", time: "07:30" });
+  await x.bots.pause(scout.id);
+  x.threads.delete(scout.threadId!);
+  x.spawn.mockRejectedValueOnce(new Error("Provider codex is busy"));
+  // Before: "The Bot's Main conversation is gone… then turn check-ins on", and the Bot stayed paused.
+  await expect(x.bots.resume(scout.id)).resolves.toMatchObject({ bot: { state: "active" } });
+  // The heal right after Resume makes the new Main, and the check-in is on there.
+  await vi.waitFor(() => expect(x.bots.stored(scout.id)?.threadId).not.toBe(scout.threadId));
+  const made = x.bots.stored(scout.id)!.threadId!;
+  await vi.waitFor(() => expect(x.leads.runs.get(`bot:${scout.id}`)?.enabled).toBe(true));
+  x.send.mockClear();
+  await x.scheduler.runNow({ owner: "heartbeat", ownerId: `bot:${scout.id}` });
+  expect(x.send.mock.lastCall?.[0].threadId).toBe(made);
+});
+
+it("FM (review F1): turning check-ins off forgets a heartbeat waiting for a new Main", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  await x.bots.setRun({ botId: scout.id, enabled: true, cadence: "daily", time: "07:30" });
+  await x.bots.pause(scout.id);
+  await x.bots.setRun({ botId: scout.id, enabled: false, cadence: "daily", time: "07:30" });
+  expect((x.db.prepare("SELECT heartbeat_was_on FROM bots WHERE id = ?").get(scout.id) as { heartbeat_was_on: number }).heartbeat_was_on).toBe(0);
+});
+
+it("FM (review F2): a Bot brought over from bb whose Main was deleted there gets a new Main on Resume (Run here)", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  await x.bots.setRun({ botId: scout.id, enabled: true, cadence: "daily", time: "07:30" });
+  await x.bots.stop(scout.id);
+  // Brought over: stopped, made before the import, its Main deleted in bb (left out of the bring-over).
+  const copy = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, importedAt: () => Date.now() + 1 });
+  x.threads.delete(scout.threadId!);
+  expect(copy.stored(scout.id)?.inBb).toBe(true);
+  // Before: Resume failed, Start a new Main was refused ("runs in bb"), and there was no way out.
+  await expect(copy.resume(scout.id)).resolves.toMatchObject({ bot: { state: "active", inBb: false } });
+  const made = copy.stored(scout.id)!.threadId!;
+  expect(made).not.toBe(scout.threadId);
+  expect(x.threads.has(made)).toBe(true);
+  expect(x.leads.runs.get(`bot:${scout.id}`)?.enabled).toBe(true);
+});
+
+it("FM (review F3): picking or starting a Main clears the sidebar's \"can't start a new Main\" line at once", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  x.threads.delete("t1");
+  x.spawn.mockRejectedValueOnce(new Error("Provider codex is busy"));
+  expect(await x.bots.heal(BOT_ID, "t1")).toBeNull();
+  expect((await x.bots.get()).bot?.mainProblem).toBe("Couldn't start a new Main yet; trying again");
+  // Before: the line stayed until the heal's next try (up to an hour).
+  await x.bots.newMain(BOT_ID);
+  expect((await x.bots.get()).bot?.mainProblem).toBeNull();
+});
+
+it("FM (review F4): Start a new Main on a paused Bot doesn't wake it: no first message", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  await x.bots.pause();
+  await x.bots.newMain(BOT_ID);
+  expect(x.spawn.mock.lastCall?.[0]).toMatchObject({ input: [] });
+});
+
+it("FM (review F6): the automatic new Main skips a signed-out provider; with none signed in, the sidebar says to sign in or choose a model", async () => {
+  const x = await setup();
+  const states = [{ providerId: "codex", status: "signed-out", loginCommand: "codex login" }, { providerId: "claude", status: "ready", loginCommand: "claude login" }];
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, providerStates: async () => states as never });
+  await bots.create({ name: "Dot", avatar: "🟣" });
+  x.threads.delete("t1");
+  // The old Main ran on codex, now signed out: claude, which is signed in.
+  const warn = vi.fn();
+  const first = await bots.heal(BOT_ID, "t1", warn);
+  expect(warn.mock.calls).toEqual([]);
+  expect(first).toBeTruthy();
+  expect(x.spawn.mock.lastCall?.[0]).toMatchObject({ providerId: "claude" });
+  // Nothing signed in: no spawn, and plain words with the action.
+  const main = x.leads.storedLead(PERSONAL_PROJECT_ID)!;
+  x.threads.delete(main);
+  states[1]!.status = "signed-out";
+  const before = x.spawn.mock.calls.length;
+  expect(await bots.heal(BOT_ID, main)).toBeNull();
+  expect(x.spawn.mock.calls.length).toBe(before);
+  // The Main last ran on Claude, so that is the one to sign in to.
+  expect((await bots.get()).bot).toMatchObject({ mainProblem: "Sign in to Claude or choose a model", mainNeedsModel: true });
 });

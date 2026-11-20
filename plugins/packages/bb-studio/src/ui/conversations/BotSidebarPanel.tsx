@@ -36,6 +36,7 @@ import { buttonVariants } from "../../kit/ui/button";
 import { cn } from "../../kit/ui/utils";
 import { usePathname } from "../../kit/app/route";
 import { BotPresence } from "../../presence/ui/BotPresence";
+import { resolveTheme } from "../../theme/appearance";
 import { useCall, useLive } from "../live";
 import { conversationLines, doneLabel, hiddenThreadTarget, landingThread, olderPath, secondLine, shortAge, spaceDots, splitWorkers, swipeStep, switchTarget, SWIPE_START, workerLines, type ConversationLine, type LiveThread, type WorkerLine } from "./model";
 import { currentBot, hasLanded, isLaunchPage, lastConversation, markLanded, newThreadAsked, rememberConversation, setBotSwitcher, setCurrentBot, setConversationStarter, setFocusHandler, setThreadOpener, useCurrentBot, watchNewThreadArrivals } from "./state";
@@ -278,8 +279,10 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
     markLanded();
     if (activeThreadId || !isLaunchPage(window.location.pathname)) return;
     if (!first && newThreadAsked()) return;
-    const target = first ? landingThread(bot, lastConversation(bot.id), listed) : data.conversations.find((row) => row.isMain)?.threadId ?? landingThread(bot, null, null);
-    if (target) navigate.toThread(target);
+    const main = data.conversations.find((row) => row.isMain)?.threadId ?? landingThread(bot, null, null);
+    const target = first ? landingThread(bot, lastConversation(bot.id), listed) : main;
+    // Only somewhere that's there: a deleted or archived Main (being replaced) lands nowhere rather than on BB's not-found page.
+    if (target) void botLanding(target, main, threadLocator(sdk)).then((found) => { if (found) navigate.toThread(found.threadId); });
   }, [bot?.id, hasData, pathname, activeThreadId]); // eslint-disable-line react-hooks/exhaustive-deps
   const switchTo = useCallback((botId: string) => {
     const space = bots.find((each) => each.id === botId);
@@ -332,7 +335,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const registry = useThemeRegistry();
   const appMode = useAppMode();
   const appearance = shownAppearance(bot, appearanceDraft);
-  const theme = appearance ? registry.get(appearance.themeId) : null;
+  const theme = resolveTheme(registry, appearance).theme;
   const glass = !!theme?.glass;
   const navRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -344,7 +347,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const slots = useMemo(() => (theme?.kind === "scene" && appearance?.effects.workers ? workerSlots(workers) : null), [theme, appearance?.effects.workers, workers]);
   const accents = useMemo(() => Object.fromEntries(bots.flatMap((each) => {
     const own = shownAppearance(each, appearanceDraft);
-    const accent = own ? accentOf(registry.get(own.themeId), appMode) : null;
+    const accent = own ? accentOf(resolveTheme(registry, own).theme, appMode) : null;
     return accent ? [[each.id, accent]] : [];
   })), [bots, appearanceDraft, registry, appMode]);
   const themes = useMemo(() => themeChoices(registry), [registry]);
@@ -395,7 +398,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
     <nav aria-label={bot ? bot.name : "Bot"} data-testid="bot-sidebar" ref={navRef} onWheel={onWheel} className={glass ? GLASS_NAV : "studio-root relative flex min-h-full shrink-0 flex-col px-1.5"}>
       <NoDragStyle />
       <div data-testid="bot-sidebar-rows" {...(glass ? { "data-fork-overlay-scroll": "" } : {})} className={glass ? GLASS_ROWS : "contents"} style={glass ? { maskImage: ROWS_FADE, WebkitMaskImage: ROWS_FADE } : undefined}>
-      <SpaceHeader bot={bot} line={welcome.data?.pending && welcome.data.problem ? welcome.data.problem : spaceLine(botRow, running)} resume={resumeWord(botRow)} glass={glass} page={page} todos={todos} onPage={openPage}
+      <SpaceHeader bot={bot} line={welcome.data?.pending && welcome.data.problem ? welcome.data.problem : botRow?.mainProblem ?? spaceLine(botRow, running)} resume={resumeWord(botRow)} chooseModel={!!botRow?.mainNeedsModel} glass={glass} page={page} todos={todos} onPage={openPage}
         menu={{
           resume: () => {
             if (!bot) return;

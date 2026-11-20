@@ -167,6 +167,31 @@ export type ModelTarget = {
 };
 
 /**
+ * The provider's model catalog: its model names and its default model
+ * (`isDefault`, else the first). Null when the catalog can't be read or lists
+ * nothing, so a caller never claims a model is gone without knowing.
+ */
+export async function providerCatalog(bb: BbPluginApi, providerId: string): Promise<{ models: string[]; defaultModel: string } | null> {
+  try {
+    const { models } = (await bb.sdk.providers.models({ providerId })) as { models: readonly { model: string; isDefault?: boolean }[] };
+    const first = models.find((candidate) => candidate.isDefault) ?? models[0];
+    return first ? { models: models.map((candidate) => candidate.model), defaultModel: first.model } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The model to run for a chosen fallback: the chosen one while the provider
+ * still offers it (or its catalog can't be read), else the provider's default.
+ */
+export async function fallbackModel(bb: BbPluginApi, providerId: string, model: string): Promise<{ model: string; replaced: boolean }> {
+  const catalog = await providerCatalog(bb, providerId);
+  if (!catalog || catalog.models.includes(model)) return { model, replaced: false };
+  return { model: catalog.defaultModel, replaced: true };
+}
+
+/**
  * Runs the prompt in a hidden, temporary thread and returns its final output.
  * In `thread` mode it uses the caller's provider and default model, so it
  * works with whatever the user has installed.
@@ -183,12 +208,21 @@ export async function runModel(
   const providerId = fallback.mode === "model" ? fallback.providerId : target.defaultProviderId;
   if (!providerId)
     throw new UnavailableError("The fallback model follows the thread's provider, and this request has none. Choose a model in Studio Decisions settings.");
-  const model = fallback.mode === "model" ? fallback.model : undefined;
   signal.throwIfAborted();
   const provider = (await bb.sdk.providers.list({ hostId: target.hostId })).find(
     (candidate) => candidate.id === providerId,
   );
-  if (!provider?.available) throw new Error(`Fallback provider ${providerId} is unavailable.`);
+  if (!provider?.available) {
+    // In thread mode the caller's provider is signed out; health and settings
+    // say so, so this is not a failure to log on every message.
+    if (fallback.mode === "thread")
+      throw new UnavailableError(`The thread's provider, ${providerId}, is signed out or unavailable, so the fallback model can't run. Sign in to it, or choose a fallback model in Studio Decisions settings.`);
+    throw new Error(`Fallback provider ${providerId} is unavailable.`);
+  }
+  // A chosen model the provider no longer offers runs on its default model instead.
+  const chosen = fallback.mode === "model" ? await fallbackModel(bb, providerId, fallback.model) : null;
+  const model = chosen?.model;
+  const chosenLevel = fallback.mode === "model" && !chosen?.replaced ? fallback.reasoningLevel : null;
   const levels = (provider.reasoningLevels ?? []).map((level) => level.id);
   const modes = provider.capabilities.permissionModes;
   let threadId: string | undefined;
@@ -204,7 +238,7 @@ export async function runModel(
       ...(fallback.mode === "model" && fallback.serviceTier ? { serviceTier: fallback.serviceTier } : {}),
       // A classifier needs no deliberation: use the lowest level unless the user chose one.
       reasoningLevel:
-        (fallback.mode === "model" && fallback.reasoningLevel) ||
+        chosenLevel ||
         (levels.includes("none") ? "none" : levels.includes("low") ? "low" : undefined),
       permissionMode: modes.includes("accept-edits") ? "accept-edits" : modes.includes("auto") ? "auto" : "full",
       executionInputSources: {

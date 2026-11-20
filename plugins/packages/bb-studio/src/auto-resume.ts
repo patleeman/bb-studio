@@ -207,7 +207,13 @@ export class AutoResume {
   }
 
   private async deliver(target: ResumeTarget, row: LogRow): Promise<void> {
-    await this.deps.exhausted(target, row.message ?? exhaustedLine(target.name, row.reason ?? "failed"));
+    try {
+      await this.deps.exhausted(target, row.message ?? exhaustedLine(target.name, row.reason ?? "failed"));
+    } catch (error) {
+      // The line reached the Bot and only the phone push failed: delivered, so it isn't posted again every sweep.
+      if ((error as Error)?.name !== "PushFailed") throw error;
+      this.deps.log?.(`Auto-resume of ${target.name}: told the Bot, but ${(error as Error).message}`);
+    }
     this.deps.db.prepare("UPDATE automation_auto_resumes SET delivered = 1 WHERE id = ?").run(row.id);
   }
 

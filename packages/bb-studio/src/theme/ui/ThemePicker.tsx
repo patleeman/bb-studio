@@ -4,7 +4,7 @@ import { Slider } from "../../kit/ui/slider";
 import { Switch } from "../../kit/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "../../kit/ui/toggle-group";
 import { cn } from "../../kit/ui/utils";
-import { defaultAppearance, withTheme, type Appearance, type EffectSwitch } from "../appearance";
+import { defaultAppearance, missingThemeNote, resolveTheme, withTheme, type Appearance, type EffectSwitch } from "../appearance";
 import { checkTheme, type CheckReport } from "../checks";
 import { browserCheckContext } from "../gpu";
 import { optionsOverRpc, optionValue, themeOptions, themeOptionsChanged, type ThemeOption, type ThemeOptionsClient, type ThemeOptionValues } from "../options";
@@ -225,8 +225,11 @@ export interface ThemePickerProps {
   options?: ThemeOptionsClient;
 }
 
-export function ThemePicker({ registry, mode, value, onChange, everyBot, onEveryBot, after, actions, actionsClassName, makePreviews, check = runInAppCheck, options = optionsOverRpc }: ThemePickerProps) {
-  const theme = value ? registry.get(value.themeId) : null;
+export function ThemePicker({ registry, mode, value: chosen, onChange, everyBot, onEveryBot, after, actions, actionsClassName, makePreviews, check = runInAppCheck, options = optionsOverRpc }: ThemePickerProps) {
+  // A theme that is gone shows, checks and edits as the default theme, with a note saying so.
+  const resolved = resolveTheme(registry, chosen);
+  const theme = resolved.theme;
+  const value = resolved.missing ? resolved.appearance : chosen;
   const scene = theme?.kind === "scene";
   const stored = !!theme && registry.list().some((entry) => entry.theme.id === theme.id && entry.source === "stored");
   const hub = usePreviewHub(makePreviews);
@@ -238,6 +241,7 @@ export function ThemePicker({ registry, mode, value, onChange, everyBot, onEvery
   const setEffect = (key: EffectSwitch, on: boolean) => { if (value) onChange({ ...value, effects: { ...value.effects, [key]: on } }); };
   return (
     <section aria-label="Appearance" data-testid="theme-picker" className="flex min-w-0 flex-col gap-3">
+      {resolved.missing ? <p role="status" data-testid="theme-missing" className="text-xs text-muted-foreground">{missingThemeNote(resolved.missing)}</p> : null}
       <h2 className={HEADING}>Scene</h2>
       <Row label="Scene" entries={registry.scenes()} value={value} mode={mode} onPick={pick} hub={hub} />
       <h2 className={cn(HEADING, "mt-2")}>Classic</h2>

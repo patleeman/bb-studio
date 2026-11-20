@@ -74,6 +74,7 @@ async function studio(threadList: string = "__automatic__", options: { refuseIdl
         delete: (async ({ queuedMessageId }: { queuedMessageId: string }) => { queued.delete(queuedMessageId); return {}; }) as never,
       },
     },
+    providers: { models: (async ({ providerId }: { providerId: string }) => ({ models: [{ id: `${providerId}-other`, model: `${providerId}-other`, isDefault: false }, { id: `${providerId}-default`, model: `${providerId}-default`, isDefault: true }] })) as never },
   } as never });
   dispose.push(() => harness.lifecycle.dispose());
   const db = bb.storage.database();
@@ -156,7 +157,8 @@ describe("first-run onboarding", () => {
     const done = await env.run();
     expect(done).toMatchObject({ state: "done", reason: "ran", welcomeThreadId: "thr_2" });
     expect(env.sends).toEqual([]);
-    expect(env.spawns[1]).toMatchObject({ providerId: "codex", input: hidden(starterFirstChatPrompt(STARTER_BOT.name)), pluginMetadata: { handoffFrom: "thr_1" } });
+    // On the provider's default model, so the new Main has one stored.
+    expect(env.spawns[1]).toMatchObject({ providerId: "codex", model: "codex-default", executionInputSources: { model: "explicit" }, input: hidden(starterFirstChatPrompt(STARTER_BOT.name)), pluginMetadata: { handoffFrom: "thr_1" } });
     expect(env.archived).toEqual(["thr_1"]);
     expect(env.bots.stored(BOT_ID)!.threadId).toBe("thr_2");
     expect(env.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("thr_2");

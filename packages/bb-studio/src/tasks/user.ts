@@ -129,6 +129,17 @@ export class UserTasks {
     return { task, history, todo: inLoopView(task), threads: await this.names([task, ...(runs ?? [])], history), ...(runs ? { runs } : {}) };
   }
 
+  /** Several task cards' views in one call; a task that is gone reads null. */
+  async views(ids: readonly string[]): Promise<{ views: { id: string; view: TaskView | null }[] }> {
+    const views = await Promise.all([...new Set(ids)].map(async (id) => {
+      try { return { id, view: await this.view(id) }; } catch (error) {
+        if (error instanceof Error && error.message === `Task ${id} not found`) return { id, view: null };
+        throw error;
+      }
+    }));
+    return { views };
+  }
+
   async list() {
     const since = this.store.now() - DONE_LIST_MS;
     const tasks = this.store.all().filter((t) => t.state !== "dropped" && (!isClosed(t) || (t.closedAt ?? 0) > since) && !(t.automation?.role === "run" && t.owner !== USER_OWNER));
@@ -357,6 +368,7 @@ export function registerUserTasks(bb: BbPluginApi, db: Database.Database, deps: 
   const tasks = new UserTasks(store, deps);
   bb.rpc.register(tasksContract, guardTasks(db, {
     "tasks.get": ({ id }: { id: string }) => tasks.view(id),
+    "tasks.getMany": ({ ids }: { ids: string[] }) => tasks.views(ids),
     "tasks.list": () => tasks.list(),
     "tasks.inFlight": ({ threadId }: { threadId: string }) => tasks.inFlight(threadId),
     "tasks.act": (x: TaskActInput) => tasks.act(x),

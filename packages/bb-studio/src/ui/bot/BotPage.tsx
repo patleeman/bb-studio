@@ -189,7 +189,12 @@ export function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
         </div>
       </header>
       {error ? <p role="alert" className="pb-2 text-xs text-destructive">{error}</p> : null}
-      {!bot.threadId ? <p className="pb-2 text-xs text-muted-foreground">{bot.name} has no chat.{bot.primary === false ? "" : " Make a thread your Bot from its ⋯ menu."}</p> : null}
+      {!bot.threadId ? (
+        <p className="flex flex-wrap items-center gap-2 pb-2 text-xs text-muted-foreground" data-testid="bot-no-main">
+          {bot.name} has no Main conversation. Pick one, or start a new one, in Bot settings.
+          <button type="button" className={OUTLINE_BUTTON} onClick={() => openAppPath(`${controlsPath(bot.id)}#main`)}>Pick a Main…</button>
+        </p>
+      ) : null}
       {quiet ? (
         <p className="flex items-center gap-2 border-y border-border py-3 text-sm text-muted-foreground" data-testid="bot-quiet">
           <Icon name="Check" className="size-4 text-success" aria-hidden /><span className="flex-1">Nothing running, and nothing needs you.</span>

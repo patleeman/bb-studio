@@ -12,6 +12,7 @@ import {
   askModel,
   classify,
   discardSession,
+  providerCatalog,
   runModel,
   sessionTitlePrefix,
   UnavailableError,
@@ -128,6 +129,18 @@ export async function registerDecisions(bb: BbPluginApi, settings: { get(): Prom
           title: `The fallback model's provider, ${current.providerId}, is unavailable`,
           detail: "Choose another fallback model, or sign in to that provider.",
         });
+      } else {
+        // Only a catalog that was read and lists models can say the chosen one is gone.
+        const catalog = await providerCatalog(bb, current.providerId);
+        if (catalog && !catalog.models.includes(current.model)) {
+          checks.push({
+            id: "fallback-model",
+            status: "degraded",
+            title: `The fallback model, ${current.model}, is no longer offered by ${current.providerId}`,
+            detail: `Decisions use ${current.providerId}'s default model, ${catalog.defaultModel}, until you choose another fallback model.`,
+            fix: { label: "Choose a model", path: pluginSettingsPath(bb.pluginId) },
+          });
+        }
       }
     }
     return checks.length ? checks : [{ id: "jev-route", status: "ok", title: `Jev answers through ${routes.map((route) => route.name).join(", ")}` }];

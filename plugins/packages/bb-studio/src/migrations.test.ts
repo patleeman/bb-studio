@@ -104,10 +104,42 @@ describe("migration history", () => {
     const initializer = declarations.find((declaration) => declaration.name.getText(source) === "MIGRATIONS")?.initializer;
     expect(initializer && ts.isArrayLiteralExpression(initializer)).toBe(true);
     if (!initializer || !ts.isArrayLiteralExpression(initializer)) return;
-    expect(initializer.elements.every((entry) =>
-      ts.isStringLiteral(entry) || ts.isNoSubstitutionTemplateLiteral(entry),
+    // Index 114 may be a hole (reserved, see RESERVED_SLOT); every other entry is a statement.
+    expect(initializer.elements.every((entry, index) =>
+      ts.isStringLiteral(entry) || ts.isNoSubstitutionTemplateLiteral(entry) || (index === RESERVED_SLOT && ts.isOmittedExpression(entry)),
     )).toBe(true);
     expect(initializer.elements).toHaveLength(MIGRATIONS.length);
+  });
+});
+
+/** The old Bot main_* migration ran at this index on staged installs, and unmerged branches used it too (see migrations.ts). */
+const RESERVED_SLOT = 114;
+
+describe("reserved migration slot 114", () => {
+  it("never holds a statement: absent until the next migration, then a hole", () => {
+    expect(MIGRATIONS.length).toBeGreaterThanOrEqual(RESERVED_SLOT);
+    expect(MIGRATIONS[RESERVED_SLOT]).toBeUndefined();
+    expect(RESERVED_SLOT in MIGRATIONS).toBe(false);
+  });
+
+  it("a migration at 115 behind a hole at 114 loads on a database whose 114 holds another statement", async () => {
+    const { createFakePluginHost } = await import("@get-bb/plugin-sdk/testing");
+    const { bb, harness } = createFakePluginHost({ pluginId: "studio" });
+    try {
+      const db = bb.storage.database();
+      const base = MIGRATIONS.slice(0, RESERVED_SLOT);
+      // A staged install: the old main_* migration at 114. Another branch's build: something else there.
+      bb.storage.migrate(db, [...base, "CREATE TABLE other_branch_marker (id TEXT PRIMARY KEY);"]);
+      const next: string[] = [...base];
+      next[RESERVED_SLOT + 1] = "CREATE TABLE next_migration_marker (id TEXT PRIMARY KEY);";
+      expect(RESERVED_SLOT in next).toBe(false);
+      expect(() => bb.storage.migrate(db, next)).not.toThrow();
+      expect(db.prepare("SELECT name FROM sqlite_master WHERE name = 'next_migration_marker'").get()).toBeTruthy();
+      // Whereas anything at 114 is refused there.
+      expect(() => bb.storage.migrate(db, [...base, "CREATE TABLE something (id TEXT);"])).toThrow(/does not match the recorded statement/);
+    } finally {
+      await harness.lifecycle.dispose();
+    }
   });
 });
 

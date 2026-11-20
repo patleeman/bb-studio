@@ -25,6 +25,7 @@ import { z } from "zod";
 import type { ChiefOfStaffView, HeartbeatRun, NewThreadRequestInput, ProjectLeadView } from "./contract";
 import { heartbeatRunSchema } from "./contract";
 import { fromHeartbeat, localZone } from "./schedule";
+import { threadModel } from "./thread-model";
 import { isScheduleId, type EngineScheduler, type RunTarget, type ScheduleStatus } from "./triggers/scheduler";
 
 type Sdk = BbPluginApi["sdk"];
@@ -44,6 +45,8 @@ export interface ProjectLeadDeps {
   changed(): void;
   /** The personal project's heartbeat prompt (the Bot's); CHIEF_HEARTBEAT when absent. */
   personalPrompt?(): string;
+  /** A project's lead thread was deleted or archived and its heartbeat went off: tell the user once, with what to do. */
+  leadLost?(projectId: string, why: "deleted" | "archived", heartbeatWasOn: boolean): void;
   /** An additional Bot's check-in prompt, for its run key (`bot:<id>`, src/bot.ts); null for other keys. */
   botPrompt?(key: string): string | null;
 }
@@ -86,16 +89,44 @@ export class ProjectLeads {
     return thread && thread.deletedAt == null ? thread : null;
   }
 
-  /** The project's lead; forgets a lead thread that was deleted and turns its heartbeat off. Transport errors keep it. */
+  /**
+   * The project's lead; forgets a lead thread that was deleted and turns its
+   * heartbeat off. Transport errors keep it. Not the personal project's: its
+   * lead is the primary Bot's Main, which Studio replaces with a new Main
+   * that takes the heartbeat (Bots.replaceMain), so neither is dropped here.
+   */
   private async read(projectId: string): Promise<ProjectLeadView> {
     let leadThreadId = this.storedLead(projectId);
-    if (leadThreadId && !(await this.thread(leadThreadId))) {
-      this.saveLead(projectId, null);
+    if (leadThreadId && projectId !== PERSONAL_PROJECT_ID && !(await this.thread(leadThreadId))) {
+      await this.forgetLead(projectId, "deleted");
       leadThreadId = null;
-      const run = this.runs.get(projectId);
-      if (run?.enabled) await this.runs.set(projectId, null, { ...run, enabled: false }).catch(() => {});
     }
     return { projectId, leadThreadId, run: this.runs.get(projectId) };
+  }
+
+  /** Forgets a project's gone lead and turns its heartbeat off, and says so (leadLost) rather than going quiet. */
+  private async forgetLead(projectId: string, why: "deleted" | "archived"): Promise<void> {
+    this.saveLead(projectId, null);
+    const run = this.runs.get(projectId);
+    if (run?.enabled) await this.runs.set(projectId, null, { ...run, enabled: false }).catch(() => {});
+    try { this.deps.leadLost?.(projectId, why, !!run?.enabled); } catch { /* Telling is best effort. */ }
+    this.deps.changed();
+  }
+
+  /**
+   * A due heartbeat found its lead thread deleted or archived (the
+   * scheduler's onThreadGone): a project's lead (not a Bot's Main, which gets
+   * a new Main) is forgotten, its heartbeat off and the user told. Null: no
+   * thread takes its place.
+   */
+  leadGone(threadId: string): Promise<null> {
+    return this.serial(async () => {
+      const projectId = this.ledBy(threadId);
+      if (!projectId || projectId === PERSONAL_PROJECT_ID) return null;
+      const thread = await this.deps.sdk.threads.get({ threadId }).catch(() => null) as { archivedAt?: number | null; deletedAt?: number | null } | null;
+      await this.forgetLead(projectId, thread && thread.deletedAt == null && thread.archivedAt != null ? "archived" : "deleted");
+      return null;
+    });
   }
 
   get(projectId: string): Promise<ProjectLeadView> {
@@ -352,8 +383,14 @@ export class ProjectRuns {
       this.changed();
       return;
     }
-    const [thread, defaults] = await Promise.all([this.sdk.threads.get({ threadId: leadThreadId }), this.sdk.threads.defaultExecutionOptions({ threadId: leadThreadId })]);
-    if (!thread.providerId || !defaults?.model) throw new Error("Choose a provider and model for the lead before turning on its heartbeat.");
+    const thread = await this.sdk.threads.get({ threadId: leadThreadId }).catch((error) => {
+      if (missing(error)) throw new Error(projectId === PERSONAL_PROJECT_ID || projectId.startsWith(BOT_RUN_PREFIX) ? "The Bot's Main conversation is gone. Pick a Main in Bot settings (or start a new one), then turn check-ins on." : "The project's lead thread is gone. Pick a new lead, then turn its heartbeat on.");
+      throw error;
+    });
+    if (thread.archivedAt != null) throw new Error(projectId === PERSONAL_PROJECT_ID || projectId.startsWith(BOT_RUN_PREFIX) ? "The Bot's Main conversation is archived. Pick a Main in Bot settings (or start a new one), then turn check-ins on." : "The project's lead thread is archived. Unarchive it or pick a new lead.");
+    // A thread BB has no model for gets the Bot's default, else its provider's (src/thread-model.ts).
+    const model = await threadModel(this.sdk, leadThreadId, this.scheduler.preferredModel?.(leadThreadId));
+    if (!model) throw new Error(`Choose a model for ${projectId === PERSONAL_PROJECT_ID || projectId.startsWith(BOT_RUN_PREFIX) ? "the Bot's Main conversation" : "the lead"} first (open it and pick one in the composer, or set the Bot's default model in Bot settings), then turn check-ins on.`);
     // The same schedule keeps its next time, so saving again (a new lead, the startup repair) does not push a run back.
     const id = this.scheduler.ensure(key, { schedule: fromHeartbeat(run), timeZone: localZone() }, true);
     this.db

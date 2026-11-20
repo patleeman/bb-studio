@@ -250,3 +250,78 @@ test("no Jev provider is not a problem while the fallback model answers, and is 
   const off = await handlers["decisions.studio_health"]!(null);
   assert.deepEqual(off.checks.map((check: { id: string; status: string }) => [check.id, check.status]), [["jev-route", "broken"]]);
 });
+
+function chosenProvider(models: () => Promise<{ models: { model: string; isDefault?: boolean }[] }>) {
+  return {
+    list: async () => [{ id: "chosen", available: true, reasoningLevels: [{ id: "low" }, { id: "high" }], capabilities: { permissionModes: ["accept-edits"] } }],
+    models,
+  };
+}
+
+test("FM: health says plainly when the fallback model is gone from its provider, and claims nothing when the catalog can't be read", async () => {
+  const { bb, handlers } = setup();
+  let catalog = async () => ({ models: [{ model: "other" }, { model: "newest", isDefault: true }] });
+  Object.assign(bb.sdk, { providers: chosenProvider(() => catalog()) });
+  await plugin(bb as never);
+  await handlers["decisions.fallback.set"]!({ mode: "model", providerId: "chosen", model: "removed", reasoningLevel: null });
+  const gone = (await handlers["decisions.studio_health"]!(null)).checks.find((check: { id: string }) => check.id === "fallback-model");
+  assert.ok(gone, "the missing model is reported");
+  assert.equal(gone.status, "degraded");
+  assert.equal(gone.title, "The fallback model, removed, is no longer offered by chosen");
+  assert.match(gone.detail, /default model, newest/);
+  assert.equal(gone.fix.label, "Choose a model");
+  catalog = async () => { throw new Error("HTTP 503"); };
+  const unread = (await handlers["decisions.studio_health"]!(null)).checks;
+  assert.equal(unread.some((check: { id: string }) => check.id === "fallback-model"), false);
+  catalog = async () => ({ models: [{ model: "removed" }] });
+  const present = (await handlers["decisions.studio_health"]!(null)).checks;
+  assert.equal(present.some((check: { id: string }) => check.id === "fallback-model"), false);
+});
+
+test("FM: a fallback model the provider no longer offers runs on the provider's default model instead of failing", async () => {
+  const { bb, handlers, warnings } = setup();
+  const spawn = vi.fn(async () => ({ id: "temporary" }));
+  Object.assign(bb.sdk, {
+    providers: chosenProvider(async () => ({ models: [{ model: "other" }, { model: "newest", isDefault: true }] })),
+    threads: { spawn, wait: async () => {}, output: async () => ({ output: "Answer" }), stop: async () => {}, delete: async () => {} },
+  });
+  await plugin(bb as never);
+  await handlers["decisions.fallback.set"]!({ mode: "model", providerId: "chosen", model: "removed", reasoningLevel: "high" });
+  const request = rpcContract["decisions.model.ask"].input.parse({ caller: "test", requestId: "one", hostId: "host", prompt: "Classify", providerId: null });
+  const result = await handlers["decisions.model.ask"]!(request);
+  assert.equal(result.ok, true);
+  assert.equal(result.via, "chosen/newest");
+  const call = (spawn.mock.calls[0] as any[])[0];
+  assert.equal(call.model, "newest");
+  // The removed model's reasoning level may not suit the default, so the lowest is used.
+  assert.equal(call.reasoningLevel, "low");
+  assert.deepEqual(warnings, []);
+});
+
+test("FM: a fallback model is kept when its provider's catalog can't be read", async () => {
+  const { bb, handlers } = setup();
+  const spawn = vi.fn(async () => ({ id: "temporary" }));
+  Object.assign(bb.sdk, {
+    providers: chosenProvider(async () => { throw new Error("HTTP 503"); }),
+    threads: { spawn, wait: async () => {}, output: async () => ({ output: "Answer" }), stop: async () => {}, delete: async () => {} },
+  });
+  await plugin(bb as never);
+  await handlers["decisions.fallback.set"]!({ mode: "model", providerId: "chosen", model: "kept", reasoningLevel: "high" });
+  const request = rpcContract["decisions.model.ask"].input.parse({ caller: "test", requestId: "one", hostId: "host", prompt: "Classify", providerId: null });
+  assert.equal((await handlers["decisions.model.ask"]!(request)).via, "chosen/kept");
+  assert.equal((spawn.mock.calls[0] as any[])[0].reasoningLevel, "high");
+});
+
+test("FM: a signed-out provider in thread mode is unavailable, not a failure logged on every message", async () => {
+  const { bb, handlers, warnings } = setup();
+  Object.assign(bb.sdk, { providers: { list: async () => [{ id: "codex", available: false, capabilities: { permissionModes: [] } }] } });
+  await plugin(bb as never);
+  const request = rpcContract["decisions.model.ask"].input.parse({ caller: "test", requestId: "one", hostId: "host", prompt: "Classify", providerId: "codex" });
+  const result = rpcContract["decisions.model.ask"].output.parse(await handlers["decisions.model.ask"]!(request));
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.unavailable, true);
+    assert.match(result.error, /signed out or unavailable.*Sign in to it, or choose a fallback model/);
+  }
+  assert.deepEqual(warnings, []);
+});

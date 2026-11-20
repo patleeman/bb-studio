@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AUTOMATIC_PROVIDER as AUTO, BOT_LIST_PROVIDER as BOT, botLanding, botThreadVisit, forgetLastBotThread, readLastBotThread, threadRoute, forgetListMode, isBotPath, isStudioPath, listSwitch, MODE_KEY, NATIVE_LIST_PROVIDER as NATIVE, nextListMode, providerForMode, readListMode, SAVED_KEY, STUDIO_LIST_PROVIDER as STUDIO, syncThreadList, threadIdForPath } from "./threadListSwitch";
+import { AUTOMATIC_PROVIDER as AUTO, BOT_LIST_PROVIDER as BOT, botLanding, botThreadVisit, threadLocator, forgetLastBotThread, readLastBotThread, threadRoute, forgetListMode, isBotPath, isStudioPath, listSwitch, MODE_KEY, NATIVE_LIST_PROVIDER as NATIVE, nextListMode, providerForMode, readListMode, SAVED_KEY, STUDIO_LIST_PROVIDER as STUDIO, syncThreadList, threadIdForPath } from "./threadListSwitch";
 
 describe("paths", () => {
   it("matches the Bot page and the Studio panel exactly", () => {
@@ -117,6 +117,17 @@ describe("the last Bot thread", () => {
     locate.mockClear();
     expect(await botLanding("thr_gone2", "thr_gone2", locate)).toBeNull();
     expect(locate).toHaveBeenCalledTimes(1);
+  });
+  it("FM: never lands on a deleted or archived Main (BB's not-found page, or a read-only Main being replaced)", async () => {
+    const threads: Record<string, { id: string; projectId: string; deletedAt?: number; archivedAt?: number }> = {
+      thr_main: { id: "thr_main", projectId: "proj_personal", archivedAt: 5 },
+      thr_conv: { id: "thr_conv", projectId: "proj_personal" },
+      thr_dead: { id: "thr_dead", projectId: "proj_personal", deletedAt: 5 },
+    };
+    const locate = threadLocator({ threads: { get: async ({ threadId }) => { const thread = threads[threadId]; if (!thread) throw new Error("Not found"); return thread; } } });
+    expect(await botLanding("thr_conv", "thr_main", locate)).toEqual({ threadId: "thr_conv", path: "/threads/thr_conv" });
+    expect(await botLanding("thr_dead", "thr_main", locate)).toBeNull();
+    expect(await botLanding("thr_missing", "thr_conv", locate)).toEqual({ threadId: "thr_conv", path: "/threads/thr_conv" });
   });
 });
 

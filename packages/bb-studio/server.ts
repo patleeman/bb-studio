@@ -127,11 +127,14 @@ import { runPresenceCli } from "./src/presence/cli";
 import { presenceAskText } from "./src/presence/contract";
 import { SideThreads } from "./src/bot-side-threads";
 import { alertBot, Runners } from "./src/runners";
+import { ensureColumns } from "./src/schema-columns";
 import { nudgeReason, BotNudges, type NudgeOwner } from "./src/bot-nudge";
 import { workerApprovalRpc } from "./src/worker-approvals";
 
 /** The note on a "stopped after failing" line in a Bot's chat: the Bot triages it (docs/needs-you/REDO.md). */
 const STOPPED_NOTE = "Studio notice: something you own stopped after failing. You decide what the user sees: if you can fix it (resume it, retry it), do. If the user must act, tell them in one or two short lines what stopped and what to do. If it needs nothing from them, reply exactly [PASS].";
+/** A Studio alert line the user reads as is: the Bot doesn't answer it. */
+const STUDIO_LINE_NOTE = "Studio notice, already shown to the user as is. Don't reply or acknowledge it; reply exactly [PASS].";
 import { AutoResume, type ResumeTarget } from "./src/auto-resume";
 import { ThreadResume, type ThreadOwner } from "./src/thread-resume";
 import { BotOwnedThreads } from "./src/bot-owned";
@@ -224,6 +227,8 @@ export default async function plugin(bb: BbPluginApi) {
   };
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
+  // Columns added by checking, not by index (src/schema-columns.ts).
+  ensureColumns(db);
   adoptAtStart(db, bb.log);
   const themes = new ThemeStore(db);
   // Pages and Apps: the item index (src/item-index.ts). Triggers keep it in
@@ -652,7 +657,14 @@ export default async function plugin(bb: BbPluginApi) {
 
   // Each project's optional lead thread and its heartbeat (src/project-lead.ts).
   // The heartbeat of the personal project is the Bot's check-in, under its name.
-  const projectLeads: ProjectLeads = new ProjectLeads({ db, sdk: bb.sdk, scheduler, changed: tagsChanged, personalPrompt: (): string => bots.prompt(), botPrompt: (key) => bots.promptFor(key) });
+  // A project's lead thread deleted or archived: one line in the Bot's chat with what to do, not a heartbeat that just stops.
+  const leadLost = (projectId: string, why: "deleted" | "archived", heartbeatWasOn: boolean) => void (async () => {
+    const bot = bots.stored();
+    if (!bot?.threadId) return;
+    const name = ((await bb.sdk.projects.list({ includePersonal: true }).catch(() => [])) as { id: string; name: string }[]).find((project) => project.id === projectId)?.name ?? projectId;
+    await alertBot(bb.sdk, { botThreadId: bot.threadId, line: `⚠️ ${name}'s lead thread was ${why}${heartbeatWasOn ? ", so its heartbeat is off" : ""}. Pick a new lead in Studio › Setup › Project leads to turn it back on.`, note: STUDIO_LINE_NOTE });
+  })().catch((error) => bb.log.warn(`Couldn't tell the Bot that ${projectId}'s lead is gone: ${errorText(error)}`));
+  const projectLeads: ProjectLeads = new ProjectLeads({ db, sdk: bb.sdk, scheduler, changed: tagsChanged, personalPrompt: (): string => bots.prompt(), botPrompt: (key) => bots.promptFor(key), leadLost });
   // The user's Bot (src/bot.ts): the personal project's lead, with a name, avatar and state.
   // Its Memory page is a Studio page in the personal project; a shared skill goes to BB's user skills.
   let loopsEnabled = () => false;
@@ -671,6 +683,7 @@ export default async function plugin(bb: BbPluginApi) {
       create: ({ botId, botName }) => memoryService.newProfile(botId, botName),
       addCheckin: (pageId, line) => pages.addCheckin(pageId, line),
       retitle: (pageId, from, to) => pages.retitle(pageId, from, to),
+      unarchive: (pageId) => { const page = pages.store.meta(pageId); if (!page?.archived_at) return false; return !!pages.store.update(pageId, { archived_at: null }, "studio"); },
     },
     userSkillsDir: join(bb.server.experimental_dataDir, "skills"),
     providerStates: async () => { const { primaryHostId } = await bb.sdk.system.config(); return (await bb.sdk.system.providerStates(primaryHostId ? { hostId: primaryHostId } : undefined)).providers; },
@@ -719,13 +732,16 @@ export default async function plugin(bb: BbPluginApi) {
   };
   const postToBot = async (text: string) => {
     const bot = bots.stored();
-    if (!bot?.threadId || bot.state !== 'active') throw new Error('An active Bot chat is required');
+    // Plain words with the action: the Todos page and task tools show this as is.
+    if (!bot) throw new Error('Make your Bot first; todos are posted in its chat.');
+    if (bot.state !== 'active') throw new Error(`${bot.name} is ${bot.state}. Resume it (Bot settings) and todos will be posted in its chat.`);
+    if (!bot.threadId) throw new Error(`${bot.name} has no Main conversation. Pick one in Bot settings (or start a new one), and todos will be posted there.`);
     await bb.sdk.threads.send({threadId:bot.threadId,mode:'auto',input:[{type:'text',text,mentions:[],visibility:'agent-only'}]} as never);
   };
   const taskPushedAt = new Map<string, number>();
   const pushLoop = async (loop: Loop) => {
     const bot = bots.stored();
-    if (!bot?.threadId) throw new Error('A Bot chat is required');
+    if (!bot?.threadId) throw new Error('Your Bot has no Main conversation for the push to open. Pick one in Bot settings.');
     taskPushedAt.set(bot.id, Date.now());
     await bb.sdk.plugins.callRpc({ pluginId: 'mobile', method: 'notify', outputSchema: z.unknown(), input: loopPushInput(loop, { id: bot.id, threadId: bot.threadId }, new TaskStore(db).find(loop.id), PERSONAL_PROJECT_ID) as never });
   };
@@ -826,6 +842,7 @@ export default async function plugin(bb: BbPluginApi) {
     findings: (watcherId, finding, raw, at, failed) => (tasksUnavailable(db) ? null : automationTasks.watcherRun(watcherId, finding, raw, at, failed)),
     copiedReminder: (id) => loops.enabled() && !!db.prepare("SELECT 1 FROM tasks WHERE id = ?").get(reminderLoopId(id)),
     bot: automationBot,
+    notify: async (botId, line) => { const bot = bots.stored(botId); if (bot?.threadId) await alertBot(bb.sdk, { botThreadId: bot.threadId, line, note: STUDIO_LINE_NOTE }); },
     // With bb's automations plugin off (a BB Studio copy), watchers run here and bb's rows are read from its data file (src/automation-table.ts).
     bbFile: () => bbFromFile(join(bb.server.experimental_dataDir, "plugins", "automations", "data.db")),
     importedAt,
@@ -1166,11 +1183,14 @@ export default async function plugin(bb: BbPluginApi) {
   const restoreMainFailed = (error: unknown) => bb.log.warn(`Couldn't start a new Main: ${errorText(error)}`);
   const mainGone = ({ thread }: { thread: { id: string } }) => {
     const bot = bots.list().find((each) => each.threadId === thread.id);
-    if (bot) void bots.restoreMain(bot.id, thread.id).catch(restoreMainFailed);
+    if (bot) void bots.heal(bot.id, thread.id, (message) => bb.log.warn(message)).catch(restoreMainFailed);
   };
   bb.events.on("thread.deleted", mainGone);
   bb.events.on("thread.archived", mainGone);
-  scheduler.onThreadGone((threadId) => bots.rescueMain(threadId));
+  // A run's thread is gone: a Bot's Main gets a new Main, a runner a new thread (src/runners.ts rescue).
+  scheduler.onThreadGone(async (threadId) => (await bots.rescueMain(threadId)) ?? (await runners.rescue(threadId).catch(() => null)) ?? (await projectLeads.leadGone(threadId).catch(() => null)));
+  // A run's thread with no model falls back on its Bot's default model (src/thread-model.ts).
+  scheduler.preferModel((threadId) => { const bot = bots.forThread(threadId); return bot ? bots.defaultModel(bot.id) : bots.defaultModel(); });
   const threadSeeds = new ThreadSeeds(db);
   const pushRpc = (call: Parameters<typeof bb.sdk.plugins.callRpc>[0]) => bb.sdk.plugins.callRpc(call);
   const botThreads = registerBotThreads(bb, db, {
@@ -1631,6 +1651,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_pause: ({ botId }) => bots.pause(botId),
     bot_resume: ({ botId }) => bots.resume(botId),
     bot_make_main: ({ botId, threadId }) => bots.makeMain(threadId, botId),
+    bot_new_main: ({ botId }) => bots.newMain(botId),
     bot_stop: ({ botId }) => bots.stop(botId),
     bot_maintenance_threads: async ({ botId }) => ({ threads: await maintenance.olderThreads(learnerId(botId)) }),
     bot_maintenance_get: ({ botId }) => maintenance.view(learnerId(botId)),

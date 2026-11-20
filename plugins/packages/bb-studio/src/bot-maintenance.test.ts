@@ -313,3 +313,11 @@ it("reports the task check's orphans and duplicates as suggestions and changes n
   const failing = new BotMaintenance({ ...deps, taskProblems: async () => { throw new Error("no threads"); } });
   expect((await failing.run("bot", { now: now + 1, dryRun: true }))?.suggestions).toEqual(expect.arrayContaining([{ text: "Tasks: the check could not run (no threads)" }]));
 });
+it("FM: never pauses a check-in or watcher that follows the Main while the Main is gone (a new Main takes it)", async () => {
+  const x = await setup(); await x.enable();
+  // No "main" thread: deleted, and the new Main not made yet.
+  x.local("brief", "checkin"); x.local("inbox", "watcher");
+  const r = await x.maintenance.run("bot", { now });
+  expect(x.pause).not.toHaveBeenCalled();
+  expect(r?.suggestions.some((s) => s.text.includes("target retired"))).toBe(false);
+});

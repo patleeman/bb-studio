@@ -95,3 +95,11 @@ it("moves by arrows across a three-column grid of two groups", () => {
   expect(gridMove(sizes, 7, "ArrowUp")).toBe(4);
   expect(gridMove(sizes, 1, "ArrowUp")).toBe(1);
 });
+
+it("FM: cycling from a saved theme that is gone moves on from the default theme it shows", async () => {
+  const save = vi.fn(async (_botId: string, _appearance: unknown) => {});
+  const ids = choices.map((choice) => choice.id);
+  setThemeQuickRuntime({ bots: [{ id: "cos", appearance: { ...mine, themeId: "deleted-theme" } }], shownBotId: "cos", registry, save });
+  expect(await cycleTheme(1)).toBe(true);
+  expect(save.mock.lastCall![1]).toMatchObject({ themeId: ids[ids.indexOf("bb-default") + 1] });
+});

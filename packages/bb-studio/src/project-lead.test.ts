@@ -42,12 +42,17 @@ async function setup(migrations = MIGRATIONS) {
     return {};
   });
   const send = vi.fn(async (_args: { threadId: string; mode: string; input: { text: string }[]; permissionMode?: string }) => ({}));
+  // Threads BB stored no model for, and providers whose catalog can't be read (signed out).
+  const noModel = new Set<string>();
+  const signedOut = new Set<string>();
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: {
       send: send as never, spawn: spawn as never, get: get as never, archive: archive as never, list: async () => [] as never,
       unpin: async () => ({}) as never, output: async () => ({ output: "Planted the seeds." }),
-      defaultExecutionOptions: async () => ({ model: "model", reasoningLevel: "high", permissionMode: "accept-edits" }) as never,
+      defaultExecutionOptions: (async ({ threadId }: { threadId: string }) => ({ model: noModel.has(threadId) ? null : "model", reasoningLevel: "high", permissionMode: "accept-edits" })) as never,
+      update: (async () => ({})) as never,
     },
+    providers: { models: (async ({ providerId }: { providerId: string }) => { if (signedOut.has(providerId)) throw new Error("signed out"); return { models: [{ model: `${providerId}-default`, isDefault: true }] }; }) as never },
     plugins: { callRpc: callRpc as never, list: async () => ({ plugins: [] }), experimental_discoverRpc: async () => [] },
   } });
   dispose.push(() => harness.lifecycle.dispose());
@@ -56,10 +61,11 @@ async function setup(migrations = MIGRATIONS) {
   const changed = vi.fn();
   const clock = { now: Date.now() };
   const { engine, scheduler } = testScheduler(db, bb.sdk, clock);
-  const leads = new ProjectLeads({ db, sdk: bb.sdk, scheduler, changed });
+  const leadLost = vi.fn();
+  const leads = new ProjectLeads({ db, sdk: bb.sdk, scheduler, changed, leadLost });
   /** Runs the heartbeats that are due after their next time. */
   const fire = async (projectId: string) => { clock.now = engine.get("heartbeat", projectId)!.nextAt! + 1; await engine.tick(); };
-  return { send, fire, clock, engine, scheduler, bb, db, leads, threads, spawn, get, archive, callRpc, automations, changed, failGets: (fail: boolean) => { failGets = fail; } };
+  return { send, fire, clock, engine, scheduler, bb, db, leads, threads, spawn, get, archive, callRpc, automations, changed, leadLost, noModel, signedOut, failGets: (fail: boolean) => { failGets = fail; } };
 }
 
 it.each<[HeartbeatRun["cadence"], string]>([
@@ -274,4 +280,55 @@ it("still turns migrated heartbeats on when the automations plugin can't delete 
   await x.leads.runs.repair((projectId) => x.leads.storedLead(projectId));
   expect(x.callRpc.mock.calls.map(([arg]) => [arg.method, arg.input.automationId])).toEqual([["automations_delete", "old"]]);
   expect(x.db.prepare("SELECT COUNT(*) AS n FROM space_retired_automations").get()).toEqual({ n: 0 });
+});
+
+it("FM: a project's lead deleted or archived turns its heartbeat off and says so once, instead of going quiet", async () => {
+  const x = await setup();
+  x.scheduler.onThreadGone((threadId) => x.leads.leadGone(threadId));
+  const lead = await x.spawn({ projectId: "proj_a", title: "Lead" });
+  await x.leads.setLead("proj_a", lead.id);
+  await x.leads.setRun("proj_a", { enabled: true, cadence: "daily", time: "08:00" });
+  // Archived: the due heartbeat finds it gone.
+  x.threads.set(lead.id, { ...x.threads.get(lead.id)!, archivedAt: 5 });
+  await x.fire("proj_a");
+  expect(x.leadLost).toHaveBeenCalledWith("proj_a", "archived", true);
+  expect((await x.leads.get("proj_a"))).toMatchObject({ leadThreadId: null, run: { enabled: false } });
+  // Deleted, found by a read.
+  const next = await x.spawn({ projectId: "proj_b", title: "Lead B" });
+  await x.leads.setLead("proj_b", next.id);
+  x.threads.delete(next.id);
+  await x.leads.get("proj_b");
+  expect(x.leadLost).toHaveBeenLastCalledWith("proj_b", "deleted", false);
+  expect(x.leadLost).toHaveBeenCalledTimes(2);
+});
+
+it("FM (#5): turning check-ins on when the Main has no model fills it, and with a signed-out provider says to choose a model", async () => {
+  const x = await setup();
+  const main = await x.spawn({ projectId: PERSONAL_PROJECT_ID, title: "Dot" });
+  await x.leads.setLead(PERSONAL_PROJECT_ID, main.id);
+  x.noModel.add(main.id);
+  // The provider's default fills it.
+  await expect(x.leads.setRun(PERSONAL_PROJECT_ID, { enabled: true, cadence: "daily", time: "08:00" })).resolves.toMatchObject({ run: { enabled: true } });
+  await x.leads.setRun(PERSONAL_PROJECT_ID, { enabled: false, cadence: "daily", time: "08:00" });
+  x.signedOut.add("codex");
+  await expect(x.leads.setRun(PERSONAL_PROJECT_ID, { enabled: true, cadence: "daily", time: "08:00" })).rejects.toThrow("Choose a model for the Bot's Main conversation first");
+  // A project's lead says "the lead".
+  const lead = await x.spawn({ projectId: "proj_a", title: "Lead" });
+  await x.leads.setLead("proj_a", lead.id);
+  x.noModel.add(lead.id);
+  await expect(x.leads.setRun("proj_a", { enabled: true, cadence: "daily", time: "08:00" })).rejects.toThrow("Choose a model for the lead first");
+});
+
+it("FM (#6): turning check-ins on when the Main is deleted or archived says so with the action, not BB's 404", async () => {
+  const x = await setup();
+  const main = await x.spawn({ projectId: PERSONAL_PROJECT_ID, title: "Dot" });
+  await x.leads.setLead(PERSONAL_PROJECT_ID, main.id);
+  x.threads.set(main.id, { ...x.threads.get(main.id)!, archivedAt: 5 });
+  await expect(x.leads.runs.set(PERSONAL_PROJECT_ID, main.id, { enabled: true, cadence: "daily", time: "08:00" })).rejects.toThrow("The Bot's Main conversation is archived. Pick a Main in Bot settings");
+  x.threads.delete(main.id);
+  await expect(x.leads.runs.set(PERSONAL_PROJECT_ID, main.id, { enabled: true, cadence: "daily", time: "08:00" })).rejects.toThrow("The Bot's Main conversation is gone. Pick a Main in Bot settings");
+  await expect(x.leads.runs.set("bot:bot_two", main.id, { enabled: true, cadence: "daily", time: "08:00" })).rejects.toThrow("The Bot's Main conversation is gone");
+  const lead = await x.spawn({ projectId: "proj_a", title: "Lead" });
+  x.threads.delete(lead.id);
+  await expect(x.leads.runs.set("proj_a", lead.id, { enabled: true, cadence: "daily", time: "08:00" })).rejects.toThrow("The project's lead thread is gone. Pick a new lead");
 });

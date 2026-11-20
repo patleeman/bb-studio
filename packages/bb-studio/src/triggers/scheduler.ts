@@ -33,11 +33,13 @@ import type Database from "better-sqlite3";
 import type { Schedule } from "../schedule";
 import type { Trigger, TriggerEngine, TriggerRun } from "./engine";
 import { parseCron } from "./next-run";
+import { missingModel, threadModel, type PreferredModel } from "../thread-model";
 
 type Sdk = BbPluginApi["sdk"];
 export type SchedulerOwner = "heartbeat" | "runner" | "automation" | "watcher";
 export interface SchedulerKey { owner: SchedulerOwner; ownerId: string }
-export interface RunTarget { threadId: string; prompt: string; permissionMode?: string }
+/** `skip`: not this run, and why (its Bot is paused); the schedule stays on and the next run comes as usual. */
+export interface RunTarget { threadId: string; prompt: string; permissionMode?: string; skip?: string }
 export type RunResolver = (ownerId: string) => RunTarget | null | Promise<RunTarget | null>;
 /** Runs an owner's script and says how it went; null when there is nothing to run any more. */
 /** A thread a run was for is gone: the thread that takes its place, or null. */
@@ -67,6 +69,8 @@ const PREFIX = "trg_";
 /** Statuses in which a thread can't take a message yet; it will soon. */
 const NOT_READY = new Set(["pending", "starting", "stopping"]);
 const KEEP_RUNS = 200;
+/** How long a due run waits for a thread that is pending, starting or stopping before that run is skipped. */
+export const STUCK_MS = 30 * 60_000;
 const OUTPUT_LIMIT = 4000;
 
 type RunRow = { id: number; trigger_id: string; thread_id: string | null; status: RunStatus; reason: "time" | "manual"; scheduled_for: number | null; started_at: number; finished_at: number | null; error: string | null; output: string | null };
@@ -89,6 +93,12 @@ export const dueMessage = (id: string, prompt: string) => `[bb automation due:${
 const errorText = (error: unknown) => String((error as Error)?.message ?? error).slice(0, 500);
 const notFound = (error: unknown) => (error as { status?: number })?.status === 404 || /not found/i.test(String((error as Error)?.message ?? ""));
 
+/** A run whose thread has no model and nothing to fall back on: what to do, not BB's error. */
+export function noModelText(thread: { title?: string | null }): string {
+  const name = thread.title?.trim() ? `"${thread.title.trim()}"` : "Its thread";
+  return `${name} has no model yet, so it can't run. Open it and choose a model, or set the Bot's default model in Bot settings.`;
+}
+
 /** Why a run turned its trigger off when its thread was gone; revive() looks for it. */
 export const THREAD_GONE = "Its thread was deleted or archived.";
 
@@ -97,6 +107,9 @@ export class EngineScheduler {
   private readonly scripts = new Map<SchedulerOwner, ScriptRunner>();
   private startHook: RunStartHook | null = null;
   private goneHook: ThreadGoneHook | null = null;
+  private preferred: ((threadId: string) => PreferredModel) | null = null;
+  /** Threads Studio just started in place of a gone one (onThreadGone): a run waiting on one says so, not "open it". */
+  private readonly replacements = new Set<string>();
   /** Why the latest run-now of a trigger did not start. */
   private readonly refused = new Map<string, string>();
 
@@ -105,6 +118,14 @@ export class EngineScheduler {
   }
 
   private now() { return this.deps.now?.() ?? Date.now(); }
+
+  /** The model a run's thread falls back on when BB has none for it (the Bot's default model). */
+  preferModel(pick: (threadId: string) => PreferredModel): void { this.preferred = pick; }
+
+  /** The model a thread falls back on (preferModel's), for features that check a thread before scheduling it. */
+  preferredModel(threadId: string): PreferredModel {
+    try { return this.preferred?.(threadId) ?? null; } catch { return null; }
+  }
 
   /** How a feature's runs find their thread and prompt. One resolver per owner. */
   resolve(owner: SchedulerOwner, resolver: RunResolver): void { this.resolvers.set(owner, resolver); }
@@ -264,6 +285,11 @@ export class EngineScheduler {
     const resolver = this.resolvers.get(owner);
     const first = resolver ? await resolver(trigger.ownerId) : null;
     if (!first) return retire("Nothing to run: what it was for is gone.");
+    if (first.skip) {
+      this.record(id, run, scheduledFor, { status: "skipped", error: first.skip });
+      if (manual) this.refused.set(id, first.skip);
+      return;
+    }
     let target: RunTarget = first;
     let thread: Awaited<ReturnType<Sdk["threads"]["get"]>> | null = null;
     // A gone thread may have a successor (a Bot's new Main): one more read of the target, then off.
@@ -279,9 +305,19 @@ export class EngineScheduler {
       const moved: RunTarget | null = next && resolver ? await resolver(trigger.ownerId) : null;
       if (!moved || moved.threadId === target.threadId) return retire(THREAD_GONE);
       target = moved;
+      this.replacements.add(moved.threadId);
     }
     if (!thread) return retire(THREAD_GONE);
-    if (NOT_READY.has(thread.status)) return wait("Its thread was starting or stopping.", false);
+    if (NOT_READY.has(thread.status)) {
+      // Said once in its runs (not every minute); a thread stuck like this past STUCK_MS skips the run, and the next one comes as usual.
+      const why = this.replacements.has(thread.id) ? "Its thread was deleted or archived, so Studio started a new one; the run goes out once that is ready."
+        : thread.status === "pending" ? "Its thread hasn't started yet (it may have no model)." : "Its thread was starting or stopping.";
+      if (!manual && scheduledFor !== null && this.now() - scheduledFor > STUCK_MS) {
+        this.record(id, run, scheduledFor, { status: "skipped", threadId: thread.id, error: `${why} This run was skipped.` });
+        return;
+      }
+      return wait(why);
+    }
     if (!await this.hostUp(thread)) return wait("No host connected.");
     const going = this.deps.db.prepare("SELECT * FROM trigger_runs WHERE trigger_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1").get(id) as RunRow | undefined;
     if (going) {
@@ -294,9 +330,16 @@ export class EngineScheduler {
       // Its end was missed (Studio was restarting): the thread is not running it any more.
       this.deps.db.prepare("UPDATE trigger_runs SET status = ?, finished_at = ? WHERE trigger_id = ? AND status = 'running'").run(thread.status === "error" && going.thread_id === thread.id ? "failed" : "succeeded", this.now(), id);
     }
-    const permissionMode = target.permissionMode
-      ?? (await Promise.resolve().then(() => this.deps.sdk.threads.defaultExecutionOptions({ threadId: target.threadId })).catch(() => null))?.permissionMode
-      ?? "accept-edits";
+    // Its model, never assumed: a thread BB has no model for gets the Bot's default or its provider's (src/thread-model.ts).
+    // With neither, the run fails in plain words and the schedule stays on, so it runs once a model is chosen.
+    const model = await threadModel(this.deps.sdk, thread.id, this.preferredModel(thread.id)).catch(() => undefined);
+    if (model === null) {
+      this.record(id, run, scheduledFor, { status: "failed", threadId: thread.id, error: noModelText(thread) });
+      if (manual) this.refused.set(id, noModelText(thread));
+      return;
+    }
+    const permissionMode = target.permissionMode ?? model?.permissionMode ?? "accept-edits";
+    this.replacements.delete(thread.id);
     const runId = this.record(id, run, scheduledFor, { status: "running", threadId: thread.id });
     let started: ReturnType<RunStartHook> = null;
     try { started = this.startHook?.(key, thread.id) ?? null; } catch (error) { this.deps.warn?.(`Run task for ${id} could not be made: ${errorText(error)}`); }
@@ -304,9 +347,12 @@ export class EngineScheduler {
       await this.deps.sdk.threads.send({ threadId: thread.id, mode: "steer-if-active", input: [{ type: "text", text: dueMessage(id, started?.prompt ? `${target.prompt}\n${started.prompt}` : target.prompt), mentions: [] }], permissionMode } as never);
       try { started?.sent?.(); } catch { }
     } catch (error) {
-      try { started?.failed(errorText(error)); } catch { }
-      this.deps.db.prepare("UPDATE trigger_runs SET status = 'failed', finished_at = ?, error = ? WHERE id = ?").run(this.now(), errorText(error), runId);
-      if (manual) { this.refused.set(id, errorText(error)); return; }
+      const why = missingModel(error) ? noModelText(thread) : errorText(error);
+      try { started?.failed(why); } catch { }
+      this.deps.db.prepare("UPDATE trigger_runs SET status = 'failed', finished_at = ?, error = ? WHERE id = ?").run(this.now(), why, runId);
+      if (manual) { this.refused.set(id, why); return; }
+      // BB's "no stored execution model" said plainly, and the schedule goes on.
+      if (missingModel(error)) return;
       throw error;
     }
   }

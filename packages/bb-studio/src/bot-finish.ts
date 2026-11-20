@@ -273,8 +273,10 @@ export class BotFinish {
         input: [{ type: "text", text: finishInstruction({ threadId, title }), mentions: [], visibility: "agent-only" }],
       } as never);
     } catch (error) {
-      this.deps.db.prepare("DELETE FROM bot_finishes WHERE thread_id = ?").run(threadId);
-      throw error;
+      // The conversation can't take a turn (no model, its provider signed out, BB refused): Studio sums it up elsewhere instead of failing Finish.
+      this.deps.log(`Finish: ${threadId} couldn't sum itself up (${error instanceof Error ? error.message : String(error)}); summing it up elsewhere.`);
+      await this.summarizeElsewhere(threadId, title, lines);
+      return;
     }
     this.deps.changed([{ botId: botId, kinds: ["conversations"] }]);
   }

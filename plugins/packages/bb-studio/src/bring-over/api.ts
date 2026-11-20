@@ -3,6 +3,7 @@
 // threads and settings over while BB Studio runs. On a BB without the routes,
 // or with no bb install, `available` is false and nothing is shown.
 import { plural } from "../kit/format";
+import { PERSONAL_LEAD_PROJECT } from "../primary-thread";
 
 export interface BringOverProject { id: string; name: string; threads: number; threadsHere: number; lastActivityAt: number | null; joins: { id: string; name: string } | null }
 export interface BringOverThread { id: string; title: string; updatedAt: number; archived: boolean; attachments: number; here: boolean }
@@ -42,7 +43,7 @@ export interface BringOverRequest {
   picks: { kind: "project" | "thread"; id: string }[];
   attachments: boolean;
   settings: { id: string; replace: boolean }[];
-  /** Bringing over BB Studio data: the Bots' own threads, which must all come over. */
+  /** Bringing over BB Studio data: the Bots' own threads still in bb, which must all come over. */
   studioData?: { required: string[] };
 }
 
@@ -156,10 +157,43 @@ export function studioDataLine(data: Pick<BringOverStudioData, "bots" | "pages" 
 /** What a staged copy holds (Studio's studioData.status preview). */
 export interface StudioDataPreview { bots: number; pages: number; tasks: number; memories: number; threads: { required: string[]; wanted: string[] }; minisWithSecrets: number; watchersWithEnv: number; problem: string | null }
 
+/** The Bots' own threads split by whether bb still has them. */
+export interface RequiredThreads { required: string[]; missing: string[] }
+
+/**
+ * Which of the Bots' own threads (their Mains, all in the personal project)
+ * bb still has, given bb's threads there (archived ones included). A Main
+ * deleted in bb is dropped: its Bot gets a new Main here after the swap. A
+ * listing of another shape keeps them all, as before.
+ */
+export function presentRequired(required: readonly string[], threads: unknown): RequiredThreads {
+  if (!Array.isArray(threads)) return { required: [...required], missing: [] };
+  const inBb = new Set(threads.map((thread) => (thread as Partial<BringOverThread> | null)?.id).filter((id): id is string => typeof id === "string"));
+  return { required: required.filter((id) => inBb.has(id)), missing: required.filter((id) => !inBb.has(id)) };
+}
+
+/** presentRequired against bb's personal project; when bb can't be listed, every thread stays required. */
+export async function requiredInBb(required: readonly string[], load: typeof fetch = fetch): Promise<RequiredThreads> {
+  if (required.length === 0) return { required: [], missing: [] };
+  try {
+    return presentRequired(required, await listProjectThreads(PERSONAL_LEAD_PROJECT, load));
+  } catch {
+    return { required: [...required], missing: [] };
+  }
+}
+
+/** One plain line when some Bots' Mains were deleted in bb; null when none were. */
+export function missingMainsLine(missing: number): string | null {
+  if (missing <= 0) return null;
+  return missing === 1
+    ? "1 Bot's Main conversation was deleted in bb; that Bot gets a new Main here."
+    : `${missing.toLocaleString()} Bots' Main conversations were deleted in bb; those Bots get a new Main here.`;
+}
+
 /** The confirm step, in plain words: what is replaced, what comes over, what happens next. */
-export function studioDataConfirm(preview: StudioDataPreview): string[] {
+export function studioDataConfirm(preview: StudioDataPreview, missingMains = 0): string[] {
   const lines = [
-    `Replaces everything in BB Studio's Studio (your Assistant, its chats, pages, memory, tasks and Studio settings) with bb's: ${[plural(preview.bots, "Bot"), plural(preview.pages, "page"), plural(preview.tasks, "task"), plural(preview.memories, "memory", "memories")].join(", ")}, and ${plural(preview.threads.wanted.length, "thread")}.`,
+    `Replaces everything in BB Studio's Studio (your Assistant, its chats, pages, memory, tasks and Studio settings) with bb's: ${[plural(preview.bots, "Bot"), plural(preview.pages, "page"), plural(preview.tasks, "task"), plural(preview.memories, "memory", "memories")].join(", ")}, and ${plural(Math.max(0, preview.threads.wanted.length - missingMains), "thread")}.`,
     "Your current Studio data is kept in a folder, not deleted, and you can put it back. Your Assistant's chat stays as a thread with no Bot.",
     "The threads come over first, like any thread you bring over, and stay here even if you put your old data back.",
     "bb's Bots arrive stopped, with their check-ins, runners and watchers off, and Task reminders off. If you resume a Bot here, stop it in bb so it doesn't run twice.",
@@ -168,6 +202,8 @@ export function studioDataConfirm(preview: StudioDataPreview): string[] {
   ];
   const secrets = [preview.minisWithSecrets > 0 ? `API keys in ${plural(preview.minisWithSecrets, "mini app")}` : null, preview.watchersWithEnv > 0 ? `environment values in ${plural(preview.watchersWithEnv, "watcher")}` : null].filter(Boolean);
   if (secrets.length > 0) lines.push(`Secrets kept in Studio's data come along: ${secrets.join(" and ")}.`);
+  const gone = missingMainsLine(missingMains);
+  if (gone) lines.push(gone);
   lines.push("Then quit and reopen BB Studio to finish. Open windows and the phone app reconnect after that.");
   return lines;
 }

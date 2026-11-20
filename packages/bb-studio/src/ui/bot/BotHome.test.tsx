@@ -97,6 +97,11 @@ vi.mock("../../kit/ui/index", () => ({
   DropdownMenuLabel: ({ children }: { children: React.ReactNode }) => React.createElement("span", null, children),
   DropdownMenuSeparator: () => null,
   Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => React.createElement("input", props),
+  Select: ({ children }: { children: React.ReactNode }) => React.createElement("div", { "data-select": true }, children),
+  SelectTrigger: ({ children }: { children: React.ReactNode }) => React.createElement("span", null, children),
+  SelectValue: () => null,
+  SelectContent: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
+  SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => React.createElement("span", { "data-option": value }, children),
   Textarea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => React.createElement("textarea", props),
   Dialog: ({ children }: { children: React.ReactNode }) => React.createElement("div", { role: "dialog" }, children),
   DialogContent: ({ children }: { children: React.ReactNode }) => React.createElement("div", null, children),
@@ -537,7 +542,7 @@ test("Controls: profile and history collapsed until asked, Memory, Skills, and p
   expect(container.querySelector('[data-testid="page-bar-title"]')?.textContent).toBe("Bot settings");
   expect(container.querySelector('[data-testid="page-bar-detail"]')?.textContent).toBe("Dot");
   expect(container.querySelector('[data-testid="bot-controls-page"] h1')?.textContent).toBe("Bot settings");
-  expect([...container.querySelectorAll("[data-controls]")].map((each) => each.getAttribute("data-controls"))).toEqual(["profile", "model", "memory", "skills", "checkins", "cache", "maintenance"]);
+  expect([...container.querySelectorAll("[data-controls]")].map((each) => each.getAttribute("data-controls"))).toEqual(["profile", "main", "model", "memory", "skills", "checkins", "cache", "maintenance"]);
   // The components Bot info had, moved: one each.
   expect(container.querySelectorAll('[data-controls="profile"] [data-testid="bot-profile-section"]')).toHaveLength(1);
   expect(container.querySelectorAll('[data-controls="maintenance"] [data-testid="bot-maintenance"]')).toHaveLength(1);
@@ -869,7 +874,7 @@ test("an external bot shows its provider's logo; Controls keeps Profile, Model a
   expect(container.querySelector('section[aria-label="Runners"]')).toBeNull();
   state.pathname = "/plugins/studio/studio/bot/bot_h/controls";
   await show(<BotPanel />);
-  expect([...container.querySelectorAll("[data-controls]")].map((each) => each.getAttribute("data-controls"))).toEqual(["profile", "model", "checkins"]);
+  expect([...container.querySelectorAll("[data-controls]")].map((each) => each.getAttribute("data-controls"))).toEqual(["profile", "main", "model", "checkins"]);
   expect(container.querySelector('[data-testid="bot-external-note"]')).toBeNull();
   expect(container.textContent).toContain("Hermes · Hermes Agent");
   expect(button("Open")).toBeUndefined();
@@ -964,6 +969,9 @@ test("the bare Bot page falls back to the Bot's chat when the last thread is gon
   await show(<BotPanel />);
   expect(state.toThread).not.toHaveBeenCalled();
   expect(container.querySelector("[data-testid=bot-info-status]")).not.toBeNull();
+  // FM: with no Main, the page says so and links to the picker (it pointed at a ⋯ menu item that doesn't exist).
+  expect(container.querySelector("[data-testid=bot-no-main]")?.textContent).toContain("has no Main conversation");
+  expect([...container.querySelectorAll("[data-testid=bot-no-main] button")].map((each) => each.textContent)).toEqual(["Pick a Main…"]);
 });
 
 test("a Bot's Info by id (its ⓘ, Bot info) isn't redirected", async () => {
@@ -1161,6 +1169,6 @@ test("the sidebar has no Todos row or Needs you list under the primary Bot: its 
 test("Controls name the model a Bot runs on by its display name, never its id", () => {
   expect(runsOn({ kind: "studio", providerId: "claude-code", model: "claude-haiku-4-5-20251001", modelName: "Haiku 4.5" })).toBe("Haiku 4.5");
   expect(runsOn({ kind: "studio", providerId: "claude-code", model: "claude-opus-5-5", modelName: null })).toBe("Opus 5.5");
-  expect(runsOn({ kind: "studio", providerId: null, model: null, modelName: null })).toBe("Its thread's model");
+  expect(runsOn({ kind: "studio", providerId: null, model: null, modelName: null })).toBe("No model yet: choose one");
   expect(runsOn({ kind: "external", providerId: "hermes", model: "grok-4", modelName: "Grok 4" })).toBe("Hermes · Grok 4");
 });

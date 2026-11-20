@@ -53,7 +53,7 @@ async function setup(extra: Partial<RunnerDeps> = {}) {
       timeline: timeline as never, spawn: spawn as never, get: get as never, send: send as never, update: update as never, archive: archive as never,
       defaultExecutionOptions: async () => ({ model: "model", reasoningLevel: "high", permissionMode: "accept-edits" }) as never,
     },
-    hosts: { list: async () => hosts as never, get: async ({ hostId }) => { const host = hosts.find(h => h.id === hostId); if (!host) throw new Error("Unknown host"); return host as never; }, providerCliStatus: async () => cli as never, pathsExist, installProviderCli },
+    hosts: { list: async () => hosts as never, get: async ({ hostId }) => { const host = hosts.find(h => h.id === hostId); if (!host) throw Object.assign(new Error("Unknown host"), { status: 404 }); return host as never; }, providerCliStatus: async () => cli as never, pathsExist, installProviderCli },
     providers: { list: async () => [{ id: "codex", displayName: "Codex", strings: { signInHint: "Run codex login" } }] as never },
     system: { providerStates: async () => providerStates as never },
     environments: { listProviders: (async (args: { projectId?: string; hostId?: string }) => { if (args?.hostId && !args.projectId) throw new Error("HTTP 400: hostId requires projectId"); return environmentProviders; }) as never },
@@ -462,6 +462,9 @@ it("reports failed phone push delivery instead of claiming success", async () =>
   const runner = await x.runners.create({ name: "Inbox", job: "Check", schedule });
   x.callRpc.mockRejectedValueOnce(new Error("push offline"));
   await expect(x.runners.alert(runner.id, "Needs you")).rejects.toThrow("push offline");
+  // A runner's urgent report says the push failed (the line was posted), not BB's raw error, so it isn't reported again.
+  x.callRpc.mockRejectedValueOnce(new Error("push offline"));
+  expect(await x.runners.report(runner.threadId!, { level: "urgent", summary: "Disk full" })).toMatch(/^Told the user; the phone push failed/);
 });
 
 it.each(["offline", "invalid"])("does not publish an empty schedule for an adopted runner on %s reads", async (failure) => {
@@ -742,4 +745,61 @@ it("with runs as tasks: each run is a child task of the runner's task, a report 
   await x.runners.setState(id, "paused");
   tasks.sync();
   expect(store.get(parentIdOf(id))).toMatchObject({ state: "waiting", schedule: { paused: true } });
+});
+
+it("FM: a paused Bot's runners wait: the run is skipped with the reason, and they run again on Resume", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });
+  x.scheduler.threadSettled(runner.threadId!, "succeeded", "[PASS]");
+  x.bot.state = "paused";
+  x.send.mockClear();
+  // Before: the run went to the runner and its reports into the paused Bot's Main.
+  await fire(x, runner.id);
+  expect(sentTo(x, runner.threadId!)).toEqual([]);
+  expect(x.scheduler.runs({ owner: "runner", ownerId: runner.id })[0]).toMatchObject({ status: "skipped", error: expect.stringContaining("Jarvis is paused, so its runners wait") });
+  expect(trigger(x, runner.id)?.state).toBe("on");
+  x.bot.state = "active";
+  await fire(x, runner.id);
+  expect(sentTo(x, runner.threadId!)).toHaveLength(1);
+});
+
+it("FM: a runner whose thread was deleted gets a new thread and keeps running, instead of turning off", async () => {
+  const x = await setup();
+  x.scheduler.onThreadGone((threadId) => x.runners.rescue(threadId));
+  const runner = await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });
+  const old = runner.threadId!;
+  x.threads.delete(old);
+  await fire(x, runner.id);
+  const now = (await x.runners.get(runner.id)).threadId!;
+  expect(now).not.toBe(old);
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ visibility: "hidden", title: "Inbox · Runner", pluginMetadata: { runner: runner.id, bot: "bot_main" } }));
+  expect(trigger(x, runner.id)?.state).toBe("on");
+  // Archived and turned off before (no rescue hooked): Resume makes a new thread rather than going off again at the next run.
+  x.threads.set(now, { ...x.threads.get(now)!, archivedAt: 9 } as never);
+  await x.runners.setState(runner.id, "paused");
+  const resumed = await x.runners.setState(runner.id, "active");
+  expect(resumed.threadId).not.toBe(now);
+  expect(resumed.state).toBe("active");
+});
+
+it("FM: a runner whose machine was removed (not just offline) says so and what to do, not \"until it reconnects\"", async () => {
+  const x = await setup();
+  await x.runners.create({ name: "Files", job: "Check files", schedule, machine: "homelab" });
+  // The machine removed from BB: hosts.get answers not found.
+  x.hosts.splice(0, 1);
+  await x.runners.checkMachines();
+  const lines = sentTo(x, "bot1").map((each) => each.input[0]!.text);
+  expect(lines).toEqual([expect.stringContaining("Machine removed: homelab")]);
+  expect(lines[0]).toContain("move \"Files\" to another machine");
+  expect(lines[0]).not.toContain("until it reconnects");
+});
+
+it("FM (#9): making a runner when the Main is gone or has no model says so with the action", async () => {
+  const x = await setup();
+  x.threads.delete("bot1");
+  await expect(x.runners.create({ name: "Inbox", job: "Check mail.", schedule })).rejects.toThrow("Jarvis's Main conversation is gone. Pick a Main in Bot settings");
+  // No model, and its provider's catalog can't be read: nothing to fall back on.
+  x.add({ id: "bot1", title: "Jarvis", providerId: null as never });
+  await expect(x.runners.create({ name: "Inbox", job: "Check mail.", schedule })).rejects.toThrow("Jarvis's Main conversation has no model yet. Choose one in it");
+  expect(await x.runners.list()).toEqual([]);
 });

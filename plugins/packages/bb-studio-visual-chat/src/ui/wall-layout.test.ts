@@ -33,7 +33,7 @@ function findChrome(): string | null {
 const chrome = findChrome();
 
 function dumpDom(file: string): string {
-  const run = spawnSync(chrome!, ["--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars", "--window-size=1400,1000", "--virtual-time-budget=5000", "--dump-dom", pathToFileURL(file).href], { encoding: "utf8", timeout: 60_000, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
+  const run = spawnSync(chrome!, ["--headless=new", "--use-mock-keychain", "--password-store=basic", `--user-data-dir=${mkdtempSync(join(tmpdir(), "wall-chrome-"))}`, "--no-first-run", "--disable-gpu", "--no-sandbox", "--hide-scrollbars", "--window-size=1400,1000", "--virtual-time-budget=5000", "--dump-dom", pathToFileURL(file).href], { encoding: "utf8", timeout: 60_000, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024 });
   if (run.error || !run.stdout.includes("data-result=")) throw new Error(`Chrome returned no measurement (exit ${run.status}, ${run.signal ?? "no signal"}): ${run.error?.message ?? run.stderr.split("\n").slice(-5).join(" | ")}`);
   return run.stdout;
 }

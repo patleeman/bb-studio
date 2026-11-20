@@ -1,7 +1,8 @@
 // A Bot's Controls (bot/<botId>/controls): every setting, off the main page,
 // with a back link to it. Its state comes first, under the title: Pause, or
 // Resume while paused or stopped, and Stop. Section links on the left: Profile (with Profile
-// changes and Revert), Model, Memory, Skills (with Learn from work and its
+// changes and Revert), Main conversation (MainPicker.tsx: pick any of its
+// conversations, or start a new Main), Model (Choose a model… when its Main has none), Memory, Skills (with Learn from work and its
 // history), Check-ins, Attention (the primary Bot's Todos: daily budget and
 // quiet hours), Prompt cache (the only place tokens and cost show) and
 // Maintenance (the switch, rules and history). An external Bot has no
@@ -18,6 +19,8 @@ import { BotFace } from "../../presence/ui/BotFace";
 import { botProvider } from "./BotAvatar";
 import { BotProfileEditor, PRESETS, presetOf, runningCount, SkillsList, statusLabel, useBotControls } from "./BotHome";
 import { SwitchModelDialog } from "./BotModel";
+import { DefaultModelDialog } from "./DefaultModel";
+import { MainPicker } from "./MainPicker";
 import { ProfileChanges } from "./ProfileChanges";
 import { BotCacheSection } from "./BotCache";
 import { BotMaintenance } from "./BotMaintenance";
@@ -34,10 +37,10 @@ type Section = { id: string; label: string };
 /** The sections an internal Bot has, and the three an external one keeps. Attention is the primary Bot's (Todos are its). */
 export function controlSections(external: boolean, primary = false): Section[] {
   const all: Section[] = [
-    { id: "profile", label: "Profile" }, { id: "model", label: "Model" }, { id: "memory", label: "Memory" }, { id: "skills", label: "Skills" },
+    { id: "profile", label: "Profile" }, { id: "main", label: "Main conversation" }, { id: "model", label: "Model" }, { id: "memory", label: "Memory" }, { id: "skills", label: "Skills" },
     { id: "checkins", label: "Check-ins" }, { id: "attention", label: "Attention" }, { id: "cache", label: "Prompt cache" }, { id: "maintenance", label: "Maintenance" },
   ];
-  if (external) return all.filter((each) => ["profile", "model", "checkins"].includes(each.id));
+  if (external) return all.filter((each) => ["profile", "main", "model", "checkins"].includes(each.id));
   return primary ? all : all.filter((each) => each.id !== "attention");
 }
 
@@ -52,7 +55,7 @@ export function checkinWords(run: BotView["run"]): string {
 export function runsOn(bot: Pick<NonNullable<BotView["bot"]>, "kind" | "providerId" | "model" | "modelName">): string {
   const model = bot.model ? bot.modelName || formatModelName(bot.model) : null;
   if (bot.kind === "external") return `${externalName(bot.providerId)}${model ? ` · ${model}` : ""}`;
-  return model ?? "Its thread's model";
+  return model ?? "No model yet: choose one";
 }
 
 export function BotControls({ view, refresh }: { view: BotView; refresh(): void }) {
@@ -60,6 +63,7 @@ export function BotControls({ view, refresh }: { view: BotView; refresh(): void 
   const running = runningCount(activity.data);
   const { bot, profile, run, busy, error, setSheet, openMemory, saveProfile, sheets } = useBotControls(view, refresh, running);
   const [switching, setSwitching] = useState(false);
+  const [pickingDefault, setPickingDefault] = useState(false);
   const external = bot.kind === "external";
   const primary = !!bot.primary;
   const sections = controlSections(external, primary);
@@ -111,9 +115,15 @@ export function BotControls({ view, refresh }: { view: BotView; refresh(): void 
               </BotProfileEditor>
             </div>
           </Part>
+          <Part id="main" title="Main conversation">
+            <div className="flex min-h-9 items-start gap-4 text-sm">
+              <span className="w-36 shrink-0 pt-1.5 text-muted-foreground">Main</span>
+              <div className="min-w-0 flex-1"><MainPicker botId={bot.id} botName={bot.name} mainThreadId={bot.threadId} disabled={!!busy} onChanged={refresh} /></div>
+            </div>
+          </Part>
           <Part id="model" title="Model">
             <Row label="Runs on" value={runsOn(bot)}
-              action={bot.threadId && bot.providerId && bot.model ? <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => setSwitching(true)}>Switch model…</button> : null} />
+              action={bot.threadId && bot.providerId && bot.model ? <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => setSwitching(true)}>Switch model…</button> : <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => setPickingDefault(true)}>Choose a model…</button>} />
           </Part>
           {external ? null : (
             <Part id="memory" title="Memory">
@@ -151,6 +161,7 @@ export function BotControls({ view, refresh }: { view: BotView; refresh(): void 
       {switching && bot.threadId && bot.providerId && bot.model
         ? <SwitchModelDialog threadId={bot.threadId} providerId={bot.providerId} model={bot.model} modelName={bot.modelName} onClose={() => setSwitching(false)} onSwitched={() => refresh()} />
         : null}
+      {pickingDefault ? <DefaultModelDialog botId={bot.id} onClose={() => { setPickingDefault(false); refresh(); }} /> : null}
       {sheets}
     </div>
   );

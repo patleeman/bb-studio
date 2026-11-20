@@ -3,7 +3,8 @@
 // which changes Studio while it runs:
 //   1. Copy: the server copies bb's Studio data into a staging folder.
 //   2. Confirm: Studio says what the copy holds and what happens; Bring over
-//      brings the Bots' threads over as an ordinary job.
+//      brings the Bots' threads over as an ordinary job. A Bot's Main deleted
+//      in bb is left out (requiredInBb); that Bot gets a new Main here.
 //   3. Restart: Studio applies the copy at its next start, with every Bot
 //      stopped (src/studio-data/start.ts).
 // Afterwards the old data can be put back (at the next start too) or deleted.
@@ -20,11 +21,13 @@ import {
   discardStudioData,
   putBackStudioData,
   readStudioData,
+  requiredInBb,
   startBringOver,
   studioDataConfirm,
   studioDataLine,
   type BringOverJob,
   type BringOverStudioData,
+  type RequiredThreads,
 } from "../api";
 
 const LABEL = "BB Studio data (Bots, pages, memory, tasks)";
@@ -44,6 +47,16 @@ export function StudioDataRow({ token, jobRunning, onJob }: { token: string | nu
     setStatus(nextStatus);
   }, [rpc]);
   useEffect(() => { void load(); }, [load, jobRunning]);
+  // Which Bots' Mains bb still has, for the confirm step's line about deleted ones.
+  const [mains, setMains] = useState<RequiredThreads | null>(null);
+  const requiredKey = status?.preview?.threads?.required?.join(",") ?? "";
+  useEffect(() => {
+    setMains(null);
+    if (!requiredKey) return;
+    let live = true;
+    void requiredInBb(requiredKey.split(",")).then((next) => { if (live) setMains(next); });
+    return () => { live = false; };
+  }, [requiredKey]);
   if (!server?.inBb && !server?.journal) return null;
 
   const act = async (work: () => Promise<unknown>) => {
@@ -73,13 +86,18 @@ export function StudioDataRow({ token, jobRunning, onJob }: { token: string | nu
     if (journalError) lines.push(journalError);
     if (preview?.problem) lines.push(preview.problem);
     else if (own) lines.push(`BB Studio has data of its own now (${own}), so bb's can't replace it.`);
-    else if (preview) lines.push(...studioDataConfirm(preview));
+    else if (preview) lines.push(...studioDataConfirm(preview, mains?.missing.length ?? 0));
     if (gated) {
       const ready = !!preview && !preview.problem && !own;
       buttons = (
         <span className="flex gap-2">
           {discard()}
-          {ready ? <Button size="sm" disabled={busy || jobRunning} onClick={() => void act(async () => onJob(await startBringOver({ picks: preview.threads.wanted.map((id) => ({ kind: "thread" as const, id })), attachments: true, settings: [], studioData: { required: preview.threads.required } }, token ?? "")))}>{jobRunning ? "Bringing over…" : "Bring over"}</Button> : null}
+          {ready ? <Button size="sm" disabled={busy || jobRunning} onClick={() => void act(async () => {
+            // Only the Mains bb still has are required; asking for a deleted one would refuse the whole job.
+            const present = await requiredInBb(preview.threads.required);
+            const gone = new Set(present.missing);
+            onJob(await startBringOver({ picks: preview.threads.wanted.filter((id) => !gone.has(id)).map((id) => ({ kind: "thread" as const, id })), attachments: true, settings: [], studioData: { required: present.required } }, token ?? ""));
+          })}>{jobRunning ? "Bringing over…" : "Bring over"}</Button> : null}
         </span>
       );
     }

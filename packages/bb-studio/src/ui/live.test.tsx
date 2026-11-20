@@ -108,3 +108,28 @@ it("refreshes runner create, update and delete signals, and reconciles missed si
     expect(api.data?.runners).toEqual(runners);
   } finally { act(() => root.unmount()); realtime.connection = "connected"; vi.useRealTimers(); }
 });
+
+it("a signal whose refetch returns the same data does not render the readers again", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.useFakeTimers();
+  let runners = [{ id: "security", name: "Security" }];
+  rpc.call.mockReset().mockImplementation(async () => ({ runners: runners.map((each) => ({ ...each })), adoptable: [] }));
+  let renders = 0;
+  let api!: ReturnType<typeof useLive<"bot_runners">>;
+  function Reader() { renders++; api = useLive("bot_runners", { botId: "same-data" }, { pollMs: 0 }); return null; }
+  const root = createRoot(document.createElement("div"));
+  const signal = () => act(async () => { for (const listener of realtime.listeners) listener(); await vi.advanceTimersByTimeAsync(250); });
+  try {
+    await act(async () => root.render(<Reader />));
+    const shown = api.data;
+    const settled = renders;
+    for (let i = 0; i < 5; i++) await signal();
+    expect(rpc.call).toHaveBeenCalledTimes(6);
+    expect(renders).toBe(settled);
+    expect(api.data).toBe(shown);
+    runners = [{ id: "security", name: "Security audit" }];
+    await signal();
+    expect(renders).toBe(settled + 1);
+    expect(api.data?.runners).toEqual(runners);
+  } finally { act(() => root.unmount()); vi.useRealTimers(); }
+});

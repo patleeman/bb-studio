@@ -249,6 +249,17 @@ it("writes the summary on a signed-in model when the conversation's own provider
   expect(y.send.mock.calls.map((call) => (call[0] as { threadId: string }).threadId)).toEqual(["thr_main"]);
 });
 
+it("FM: Finish on a conversation BB can't send to (no model) sums it up elsewhere instead of failing", async () => {
+  const summarize = vi.fn(async (_input: { threadId: string; title: string; prompt: string }) => SUMMARY);
+  const x = await setup({ summarize });
+  x.events.mockResolvedValue([{ data: { item: { type: "agentMessage", text: "Kobo for the dark mode." } } }]);
+  // Before: BB's raw "no stored execution model" came back from bot_finish.
+  x.send.mockRejectedValueOnce(new Error("Thread prep has no stored execution model"));
+  await expect(x.finish.rpc.bot_finish({ threadId: "prep" })).resolves.toBeTruthy();
+  expect(summarize).toHaveBeenCalledTimes(1);
+  expect(x.store.get("prep")!.finishedSummary).toBe(SUMMARY);
+});
+
 it("reopens a finished conversation: back in the sidebar and unarchived in BB, the summary kept", async () => {
   const x = await setup();
   await x.finish.rpc.bot_finish({ threadId: "prep" });

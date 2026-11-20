@@ -18,6 +18,7 @@ import { BotThreads, forkUndecided, botActivity, botNeedsYou, conversationsPage,
 import { ConversationText, plainLine, queryWords, snippetOf, summaryBody, summaryPreview } from "./conversation-text";
 import { isWorkerApproval, viewOf, waitingOn, workerApprovalPush, type Interaction, type WorkerApprovalPush } from "./worker-approvals";
 import { PERSONAL_PROJECT_ID } from "./project-lead";
+import { modelProblem } from "./thread-model";
 import { isFinishing } from "./bot-finish";
 import { kindOf, type BotChange } from "./bot-signal";
 import type { BotChangeKind } from "./bot-threads-contract";
@@ -508,7 +509,19 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
   const startConversation = async ({ botId, request }: { botId: string; request: NewConversationRequest }) => {
     if (!deps.bots().some((bot) => bot.id === botId)) throw new Error(`No Bot "${botId}".`);
     store.setFocus(botId);
-    const thread = await bb.sdk.threads.spawn({ ...request, pluginMetadata: { botConversation: botId } } as never) as { id: string; projectId?: string | null };
+    let thread: { id: string; projectId?: string | null };
+    try {
+      thread = await bb.sdk.threads.spawn({ ...request, pluginMetadata: { botConversation: botId } } as never) as typeof thread;
+    } catch (error) {
+      // The composer was seeded with the Bot's default model, which can't start now (its provider signed out, the model gone):
+      // BB's default instead, so + New still works. A model the user picked themselves fails as BB says.
+      const preset = deps.defaultModel(botId);
+      const asked = request as { providerId?: string; model?: string };
+      if (!preset || asked.providerId !== preset.providerId || asked.model !== preset.model || !modelProblem(error)) throw error;
+      deps.log(`The default model ${preset.providerId}/${preset.model} couldn't start a conversation (${String((error as Error)?.message ?? error).slice(0, 200)}); using BB's default.`);
+      const { providerId: _providerId, model: _model, reasoningLevel: _reasoning, executionInputSources: _sources, ...rest } = request as Record<string, unknown>;
+      thread = await bb.sdk.threads.spawn({ ...rest, pluginMetadata: { botConversation: botId } } as never) as typeof thread;
+    }
     store.recordConversation(thread.id, botId);
     threadChanged(thread.id);
     return { threadId: thread.id, projectId: thread.projectId ?? null };
@@ -527,17 +540,25 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     const id = botOrCurrent(to.botId ?? undefined);
     const bot = deps.bots().find((each) => each.id === id);
     if (!bot) throw new Error(to.botId ? `No Bot "${to.botId}".` : "Make your Bot first.");
-    const projectId = bot.threadId ? (await facts([bot.threadId])).get(bot.threadId)?.projectId ?? null : null;
-    if (!projectId) throw new Error(`${bot.name} has no chat to start from.`);
+    // A Bot's conversations live in the personal project; a Main that is gone (being replaced) doesn't stop a new one.
+    const projectId = (bot.threadId ? (await facts([bot.threadId])).get(bot.threadId)?.projectId ?? null : null) ?? PERSONAL_PROJECT_ID;
     const preset = deps.defaultModel(bot.id);
     const model = preset ? {
       providerId: preset.providerId, model: preset.model, ...(preset.reasoning ? { reasoningLevel: preset.reasoning } : {}),
       executionInputSources: { providerId: "explicit", model: "explicit", ...(preset.reasoning ? { reasoningLevel: "explicit" } : {}) },
     } : {};
     store.setFocus(bot.id);
-    const thread = await bb.sdk.threads.spawn({
-      projectId, environment: { type: "project-default" }, input: [{ type: "text", text, mentions: [] }], pluginMetadata: { botConversation: bot.id }, ...model,
-    } as never) as { id: string; projectId?: string | null };
+    const request = { projectId, environment: { type: "project-default" }, input: [{ type: "text", text, mentions: [] }], pluginMetadata: { botConversation: bot.id } };
+    let thread: { id: string; projectId?: string | null };
+    try {
+      thread = await bb.sdk.threads.spawn({ ...request, ...model } as never) as typeof thread;
+    } catch (error) {
+      // The Bot's default model can't start (its provider signed out, or the model gone): the project's default instead.
+      // Only then: a timeout may have made the thread already, and retrying would make a second conversation.
+      if (!preset || !modelProblem(error)) throw error;
+      deps.log(`${bot.name}'s default model ${preset.providerId}/${preset.model} couldn't start a conversation (${String((error as Error)?.message ?? error).slice(0, 200)}); using the project's default.`);
+      thread = await bb.sdk.threads.spawn(request as never) as typeof thread;
+    }
     store.recordConversation(thread.id, bot.id);
     threadChanged(thread.id);
     return { threadId: thread.id, projectId: thread.projectId ?? projectId };
@@ -567,8 +588,8 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
       const main = deps.bots().find((bot) => bot.id === botId)?.threadId ?? null;
       for (const candidate of [...new Set([last, main])]) {
         if (!candidate) continue;
-        const thread = await bb.sdk.threads.get({ threadId: candidate }).catch(() => null) as { deletedAt?: number | null } | null;
-        if (thread && !thread.deletedAt) return { threadId: candidate };
+        const thread = await bb.sdk.threads.get({ threadId: candidate }).catch(() => null) as { deletedAt?: number | null; archivedAt?: number | null } | null;
+        if (thread && !thread.deletedAt && !thread.archivedAt) return { threadId: candidate };
       }
       return { threadId: null };
     },

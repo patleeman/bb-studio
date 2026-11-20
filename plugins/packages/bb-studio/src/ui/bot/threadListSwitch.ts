@@ -142,8 +142,9 @@ export async function botLanding(last: string | null, chatId: string | null, loc
 
 export const threadLocator = (sdk: { threads: { get(input: { threadId: string }): Promise<unknown> } }) => async (threadId: string): Promise<string | null> => {
   try {
-    const thread = await sdk.threads.get({ threadId }) as { id: string; projectId: string; deletedAt?: number | null } | null;
-    return thread && !thread.deletedAt ? threadRoute(thread.id, thread.projectId) : null;
+    // A deleted or archived thread isn't somewhere to land (an archived Main is being replaced).
+    const thread = await sdk.threads.get({ threadId }) as { id: string; projectId: string; deletedAt?: number | null; archivedAt?: number | null } | null;
+    return thread && !thread.deletedAt && !thread.archivedAt ? threadRoute(thread.id, thread.projectId) : null;
   } catch { return null; }
 };
 

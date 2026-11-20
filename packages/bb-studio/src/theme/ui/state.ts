@@ -74,7 +74,10 @@ export function useThemeList() {
 }
 
 export function useThemeRegistry(): ThemeRegistry {
-  const themes = useThemeList().data?.themes;
-  return useMemo(() => createThemeRegistry((themes ?? []).filter((entry) => entry.source === "stored").map((entry) => entry.theme)), [themes]);
+  const list = useThemeList();
+  const themes = list.data?.themes;
+  // Ready once stored themes are read, or their read failed (then the default stands in for a missing one).
+  const ready = !!themes || !!list.error;
+  return useMemo(() => createThemeRegistry((themes ?? []).filter((entry) => entry.source === "stored").map((entry) => entry.theme), { ready }), [themes, ready]);
 }
 

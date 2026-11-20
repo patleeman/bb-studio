@@ -2,6 +2,7 @@ import { z } from "zod";
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { hold, ownerInfo } from "../loops/contract";
 import { task, taskEvent } from "./contract";
+import { TASKS_GET_MANY_MAX } from "./limits";
 
 export const SNOOZE_PRESETS = ["later_today", "tonight", "tomorrow_morning", "this_weekend", "home", "mac"] as const;
 export const TASK_ACTIONS = ["done", "drop", "got_it", "choose", "snooze", "nudge", "keep", "hand_off", "take_back", "reopen"] as const;
@@ -59,6 +60,10 @@ export type TaskActInput = z.infer<typeof taskActInput>;
 
 export const tasksContract = defineRpcContract({
   "tasks.get": { input: z.object({ id: z.string().min(1) }), output: taskView },
+  "tasks.getMany": {
+    input: z.object({ ids: z.array(z.string().min(1)).min(1).max(TASKS_GET_MANY_MAX) }),
+    output: z.object({ views: z.array(z.object({ id: z.string(), view: taskView.nullable().describe("Null when the task is gone") })) }),
+  },
   "tasks.list": { input: z.object({}), output: z.object({ tasks: z.array(task), threads: z.array(ownerInfo), held: z.array(hold) }) },
   "tasks.inFlight": { input: z.object({ threadId: z.string().min(1) }), output: z.object({ tasks: z.array(task), threads: z.array(ownerInfo) }) },
   "tasks.act": { input: taskActInput, output: z.object({ task, note: z.string().nullable() }) },

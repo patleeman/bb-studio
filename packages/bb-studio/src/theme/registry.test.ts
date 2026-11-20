@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseAppearance } from "./appearance";
+import { defaultAppearance, missingThemeNote, parseAppearance, resolveTheme } from "./appearance";
 import { AURORA_FJORD } from "./builtin/aurora-fjord";
 import { KYOTO_GARDEN } from "./builtin/kyoto-garden";
-import { canonicalThemeId, createThemeRegistry, isBuiltinTheme } from "./registry";
+import { GRID } from "./builtin/grid";
+import { canonicalThemeId, createThemeRegistry, DEFAULT_THEME_ID, isBuiltinTheme } from "./registry";
 
 describe("theme ids that were renamed", () => {
   it("resolves cabin-aurora to Aurora Fjord, and leaves other ids alone", () => {
@@ -38,5 +39,30 @@ describe("theme ids that were renamed", () => {
     const registry = createThemeRegistry([{ ...AURORA_FJORD, id: "cabin-aurora", name: "Impostor" }]);
     expect(registry.get("cabin-aurora")).toBe(AURORA_FJORD);
     expect(registry.list().map((entry) => entry.theme.name)).not.toContain("Impostor");
+  });
+});
+
+describe("a Bot's saved theme that is gone", () => {
+  const custom = { ...structuredClone(GRID), id: "after-dark", name: "After Dark" };
+  const saved = { ...defaultAppearance(custom), intensity: 0.31, effects: { workers: false, finished: true, needsYou: false, error: true } };
+
+  it("FM: shows the default theme and names the missing id when a saved custom theme is deleted", () => {
+    const resolved = resolveTheme(createThemeRegistry(), saved);
+    expect(resolved.missing).toBe("after-dark");
+    expect(resolved.theme?.id).toBe(DEFAULT_THEME_ID);
+    expect(resolved.appearance?.themeId).toBe(DEFAULT_THEME_ID);
+    expect(resolved.appearance?.effects).toEqual(saved.effects);
+    expect(missingThemeNote("after-dark")).toBe('The theme "after-dark" is gone; showing the default. Pick another.');
+  });
+
+  it("FM: keeps a saved theme that is still there, and shows nothing for no theme", () => {
+    const resolved = resolveTheme(createThemeRegistry([custom]), saved);
+    expect(resolved).toEqual({ theme: expect.objectContaining({ id: "after-dark" }), appearance: saved, missing: null });
+    expect(resolveTheme(createThemeRegistry(), null)).toEqual({ theme: null, appearance: null, missing: null });
+  });
+
+  it("FM: does not call a custom theme gone while the stored themes are still loading", () => {
+    expect(resolveTheme(createThemeRegistry([], { ready: false }), saved)).toEqual({ theme: null, appearance: null, missing: null });
+    expect(resolveTheme(createThemeRegistry([], { ready: false }), defaultAppearance(GRID)).theme?.id).toBe("grid");
   });
 });

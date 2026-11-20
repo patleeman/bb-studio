@@ -27,8 +27,24 @@ export function areaChips(areas: readonly string[] | undefined, selected: string
 export const INLINE_OPTIONS = 3;
 
 const DAY = 86_400_000;
-const time = (at: number, zone?: string) => new Date(at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", ...zoneOption(zone) });
-const weekday = (at: number, zone?: string) => new Date(at).toLocaleDateString("en-US", { weekday: "short", ...zoneOption(zone) });
+// toLocale*String builds a new Intl.DateTimeFormat on every call, which is slow
+// in a list of cards that re-renders; one formatter per shape and zone instead.
+const formatters = new Map<string, Intl.DateTimeFormat>();
+function formatter(shape: "time" | "weekday" | "day" | "date", zone?: string): Intl.DateTimeFormat {
+  const key = `${shape}|${zone ?? ""}`;
+  let found = formatters.get(key);
+  if (!found) {
+    const options: Intl.DateTimeFormatOptions = shape === "time" ? { hour: "numeric", minute: "2-digit" }
+      : shape === "weekday" ? { weekday: "short" }
+      : shape === "day" ? { month: "short", day: "numeric" }
+      : { weekday: "short", month: "short", day: "numeric" };
+    found = new Intl.DateTimeFormat("en-US", { ...options, ...zoneOption(zone) });
+    formatters.set(key, found);
+  }
+  return found;
+}
+const time = (at: number, zone?: string) => formatter("time", zone).format(at);
+const weekday = (at: number, zone?: string) => formatter("weekday", zone).format(at);
 const daysFrom = (now: number, at: number, zone?: string) => dayNumber(at, zone) - dayNumber(now, zone);
 const hasClock = (at: number, zone?: string) => { const clock = wall(at, zone); const minute = clock.hour * 60 + clock.minute; return minute !== 0 && minute !== 24 * 60 - 1; };
 
@@ -37,7 +53,7 @@ export function shortWhen(at: number, now = Date.now(), zone?: string): string {
   const days = daysFrom(now, at, zone);
   if (days === 0) return time(at, zone);
   if (Math.abs(days) < 7) return weekday(at, zone);
-  return new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric", ...zoneOption(zone) });
+  return formatter("day", zone).format(at);
 }
 
 /** "Fri 3:00 PM", "Mon Nov 9, 9:00 AM" past a week. */
@@ -46,7 +62,7 @@ export function fullWhen(at: number, now = Date.now(), zone?: string): string {
   if (days === 0) return `Today ${time(at, zone)}`;
   if (days === 1) return `Tomorrow ${time(at, zone)}`;
   if (days > 0 && days < 7) return `${weekday(at, zone)} ${time(at, zone)}`;
-  return `${new Date(at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", ...zoneOption(zone) })}, ${time(at, zone)}`;
+  return `${formatter("date", zone).format(at)}, ${time(at, zone)}`;
 }
 
 /** The due label and whether it's pressing (today or past). */

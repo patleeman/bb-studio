@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { sameAppearance, withTheme, type Appearance } from "../appearance";
+import { resolveTheme, sameAppearance, withTheme, type Appearance } from "../appearance";
 import type { ThemeRegistry } from "../registry";
 import type { ThemePackage } from "../schema";
 import { appearanceOverrides, forgetSavedAppearance, markAppearanceSaved, shownAppearance } from "./state";
@@ -91,7 +91,9 @@ export async function applyThemeToShownBot(themeId: string | null): Promise<bool
 export async function cycleTheme(step: 1 | -1): Promise<boolean> {
   const bot = shown();
   if (!runtime || !bot) return false;
-  const next = cycledChoice(themeChoices(runtime.registry), appliedAppearance(bot)?.themeId ?? null, step);
+  // A theme that is gone counts as the default theme it shows, so cycling moves on from there.
+  const applied = appliedAppearance(bot);
+  const next = cycledChoice(themeChoices(runtime.registry), resolveTheme(runtime.registry, applied).appearance?.themeId ?? applied?.themeId ?? null, step);
   return next ? saveTheme({ bot, themeId: next.id, registry: runtime.registry, save: runtime.save }) : false;
 }
 

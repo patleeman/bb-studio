@@ -52,6 +52,8 @@ import { automationsPluginOff } from "./automations-plugin";
 import { fromHeartbeat, localZone } from "./schedule";
 import { isScheduleId, type EngineScheduler } from "./triggers/scheduler";
 import { turnStartedAt } from "./turn-started";
+import { threadModel } from "./thread-model";
+import { rpcErrorStatus } from "./kit/server/index";
 
 type Sdk = BbPluginApi["sdk"];
 /** SDK 0.6.104 overloads timeline (a delta read too); a full read has `rows`. */
@@ -138,7 +140,11 @@ export class Runners {
     // A due run reads the runner as it is now: its thread (a move to another machine changes it) and its job.
     deps.scheduler.resolve("runner", (id) => {
       const row = this.deps.db.prepare("SELECT * FROM bot_runners WHERE id = ?").get(id) as RunnerRow | undefined;
-      return row && !row.adopted && !row.cleanup_pending && row.thread_id ? { threadId: row.thread_id, prompt: runnerPrompt(row) } : null;
+      if (!row || row.adopted || row.cleanup_pending || !row.thread_id) return null;
+      // A paused or stopped Bot's runners wait: the run is skipped (said in its runs) and the schedule stays as it is.
+      const bot = this.deps.bot(row.bot_id);
+      if (bot && bot.state !== "active") return { threadId: row.thread_id, prompt: runnerPrompt(row), skip: `${bot.name} is ${bot.state}, so its runners wait. Resume it to run them.` };
+      return { threadId: row.thread_id, prompt: runnerPrompt(row) };
     });
   }
 
@@ -171,8 +177,13 @@ export class Runners {
   async preflight(input: { machine?: string | null; job: string; id?: string }, botId?: string) {
     const bot = this.bot(botId);
     const row = input.id ? this.row(input.id, botId) : null;
-    const thread = await this.deps.sdk.threads.get({ threadId: row?.thread_id ?? bot.threadId });
+    const thread = await this.threadOrSay(row?.thread_id ?? bot.threadId, row ? `"${row.name}"'s thread is gone. Delete the runner and make it again.` : `${bot.name}'s Main conversation is gone. Pick a Main in Bot settings (or start a new one), then make the runner.`);
     return runnerMachineCheck(this.deps.sdk, { ...input, providerId: thread.providerId ?? "" });
+  }
+
+  /** A thread BB has, or `gone` in plain words instead of BB's 404. */
+  private async threadOrSay(threadId: string, gone: string) {
+    return this.deps.sdk.threads.get({ threadId }).catch((error) => { if (rpcErrorStatus(error) === 404) throw new Error(gone); throw error; });
   }
 
   async machines() {
@@ -182,7 +193,7 @@ export class Runners {
   async installProvider(input: { id?: string; machine: string }, botId?: string) {
     const bot = this.bot(botId);
     const row = input.id ? this.row(input.id, botId) : null;
-    const thread = await this.deps.sdk.threads.get({ threadId: row?.thread_id ?? bot.threadId });
+    const thread = await this.threadOrSay(row?.thread_id ?? bot.threadId, row ? `"${row.name}"'s thread is gone. Delete the runner and make it again.` : `${bot.name}'s Main conversation is gone. Pick a Main in Bot settings (or start a new one).`);
     const host = await resolveRunnerMachine(this.deps.sdk, input.machine);
     if (!host || !thread.providerId) throw new Error("Choose a machine and provider first.");
     await this.deps.sdk.hosts.installProviderCli({ hostId: host.id, provider: thread.providerId, actionKind: "install" });
@@ -193,7 +204,9 @@ export class Runners {
   async available(id: string, notify = true): Promise<boolean> {
     let row = this.row(id);
     if (!row.machine) return true;
-    const host = await this.deps.sdk.hosts.get({ hostId: row.machine }).catch(() => null);
+    // BB answering "not found" (or nothing) means the machine was removed, not just offline: it won't reconnect.
+    let removed = false;
+    const host = await this.deps.sdk.hosts.get({ hostId: row.machine }).then((found) => { removed = !found; return found; }, (error) => { removed = rpcErrorStatus(error) === 404; return null; });
     row = this.row(id);
     const offline = host?.status !== "connected";
     if (!offline && row.machine_offline) this.changedRow(row.id, { machine_offline: 0 });
@@ -203,7 +216,10 @@ export class Runners {
     if (offline && notify && row.machine_offline !== 2) {
       this.changedRow(row.id, { machine_offline: 2 });
       const bot = this.deps.bot(row.bot_id);
-      if (bot?.threadId) await this.tell(row, "tell", `Machine offline: ${row.machine_name ?? row.machine}. Runs are skipped until it reconnects.`, bot as RunnerBot & { threadId: string });
+      const line = removed
+        ? `Machine removed: ${row.machine_name ?? row.machine}. Runs are skipped; move "${row.name}" to another machine (Runners › Move) to run it again.`
+        : `Machine offline: ${row.machine_name ?? row.machine}. Runs are skipped until it reconnects.`;
+      if (bot?.threadId) await this.tell(row, "tell", line, bot as RunnerBot & { threadId: string });
     }
     return !offline;
   }
@@ -475,10 +491,12 @@ export class Runners {
       VALUES (?, ?, ?, ?, NULL, ?, 'active', ?, ?, ?, ?, ?)`).run(id, bot.id, name, input.job.trim(), PERSONAL_PROJECT_ID, schedule.cadence, schedule.time, schedule.cron ?? null, now, now);
     this.changedRow(id, { machine: check.machine, machine_name: check.machineName });
     try {
+      // The Main's provider and model, filled when BB has none for it (src/thread-model.ts).
       const [botThread, defaults] = await Promise.all([
-        this.deps.sdk.threads.get({ threadId: bot.threadId }),
-        this.deps.sdk.threads.defaultExecutionOptions({ threadId: bot.threadId }).catch(() => null),
+        this.deps.sdk.threads.get({ threadId: bot.threadId }).catch((error) => { if (rpcErrorStatus(error) === 404) throw new Error(`${bot.name}'s Main conversation is gone. Pick a Main in Bot settings (or start a new one), then make the runner.`); throw error; }),
+        threadModel(this.deps.sdk, bot.threadId, this.deps.scheduler.preferredModel?.(bot.threadId)).catch(() => null),
       ]);
+      if (!defaults?.model) throw new Error(`${bot.name}'s Main conversation has no model yet. Choose one in it (or set the Bot's default model in Bot settings), then make the runner.`);
       // No parentThreadId and no lifecycle owner: BB posts nothing to the Bot.
       // Hidden: it lives under the Bot, not in BB's thread list (see the top of this file).
       const thread = await this.deps.sdk.threads.spawn({
@@ -526,9 +544,12 @@ export class Runners {
    */
   private async provision(row: RunnerRow): Promise<void> {
     if (!row.thread_id) throw new Error("This runner has no thread.");
-    const [thread, defaults] = await Promise.all([this.deps.sdk.threads.get({ threadId: row.thread_id }), this.deps.sdk.threads.defaultExecutionOptions({ threadId: row.thread_id }).catch(() => null)]);
+    const [thread, defaults] = await Promise.all([
+      this.deps.sdk.threads.get({ threadId: row.thread_id }).catch((error) => { if (rpcErrorStatus(error) === 404) throw new Error(`The runner's thread is gone. Delete "${row.name}" and make it again.`); throw error; }),
+      row.adopted ? this.deps.sdk.threads.defaultExecutionOptions({ threadId: row.thread_id }).catch(() => null) : threadModel(this.deps.sdk, row.thread_id, this.deps.scheduler.preferredModel?.(row.thread_id)).catch(() => null),
+    ]);
     if (!row.adopted) {
-      if (!thread.providerId || !defaults?.model) throw new Error("Choose a provider and model for the runner's thread first.");
+      if (!thread.providerId || !defaults?.model) throw new Error("The runner's thread has no model yet. Set the Bot's default model in Bot settings, then try again.");
       // One left from before the move to Studio's scheduler: its BB automation goes (best effort).
       if (row.automation_id && !isScheduleId(row.automation_id)) await this.call("automations_delete", { projectId: row.automation_project_id, automationId: row.automation_id }, z.unknown()).catch(() => {});
       const schedule = fromHeartbeat({ cadence: row.cadence, time: row.time, ...(row.cron ? { cron: row.cron } : {}) });
@@ -576,13 +597,58 @@ export class Runners {
   }
 
   async setState(id: string, state: "active" | "paused", botId?: string): Promise<RunnerView> {
-    const row = this.row(id, botId);
+    let row = this.row(id, botId);
     this.requireNotMoving(row);
     if (state === "active") this.bot(row.bot_id);
+    // Its thread deleted or archived (the schedule went off for that): a new thread first, so Resume doesn't go off again at the next run.
+    if (state === "active" && !row.adopted && row.thread_id && await this.threadGone(row.thread_id)) {
+      if (!await this.rescue(row.thread_id)) throw new Error(`"${row.name}"'s thread is gone and a new one couldn't start. Check the Bot's Main has a model (Bot settings), then try again.`);
+      row = this.row(row.id);
+    }
     if (state === "active" && !await this.available(row.id)) { this.changedRow(row.id, { state }); await this.checkMachines(); return this.one(row.id); }
     await this.setOn(row, state === "active");
     this.changedRow(row.id, { state });
     return this.one(row.id);
+  }
+
+  /** Whether BB says a thread is deleted or archived (not when BB can't answer). */
+  private async threadGone(threadId: string): Promise<boolean> {
+    try {
+      const thread = await this.deps.sdk.threads.get({ threadId }) as { deletedAt?: number | null; archivedAt?: number | null } | null;
+      return !thread || thread.deletedAt != null || thread.archivedAt != null;
+    } catch (error) {
+      return rpcErrorStatus(error) === 404;
+    }
+  }
+
+  /**
+   * A runner's thread was deleted or archived (src/triggers/scheduler.ts
+   * onThreadGone, or Resume): a new hidden thread on the Bot's Main's provider
+   * and model takes its place, and its runs go there. Null when it isn't a
+   * runner Studio made, or no new thread can start (no Main, no model).
+   */
+  async rescue(goneThreadId: string): Promise<string | null> {
+    const row = this.deps.db.prepare("SELECT * FROM bot_runners WHERE thread_id = ? AND adopted = 0 AND cleanup_pending = 0").get(goneThreadId) as RunnerRow | undefined;
+    if (!row) return null;
+    const bot = this.deps.bot(row.bot_id);
+    if (!bot?.threadId) return null;
+    const [botThread, defaults] = await Promise.all([
+      this.deps.sdk.threads.get({ threadId: bot.threadId }).catch(() => null),
+      threadModel(this.deps.sdk, bot.threadId, this.deps.scheduler.preferredModel?.(bot.threadId)).catch(() => null),
+    ]);
+    if (!botThread?.providerId || !defaults?.model) return null;
+    const environment = await runnerEnvironment(this.deps.sdk, row.machine ?? null).catch(() => ({ type: "project-default" as const }));
+    const thread = await this.deps.sdk.threads.spawn({
+      projectId: PERSONAL_PROJECT_ID, visibility: "hidden", title: `${row.name} · Runner`, environment,
+      providerId: botThread.providerId, model: defaults.model, pluginMetadata: { runner: row.id, bot: row.bot_id },
+      input: [{ type: "text", text: `${runnerPrompt(row)}
+Your previous thread was deleted or archived, so this is your new one. Reply exactly [PASS]; your next run comes on schedule.`, mentions: [], visibility: "agent-only" }],
+    } as never);
+    const now = Date.now();
+    this.deps.db.prepare("UPDATE bot_runners SET thread_id = ?, project_id = ?, hidden = 1, updated_at = ? WHERE id = ?").run(thread.id, thread.projectId ?? PERSONAL_PROJECT_ID, now, row.id);
+    this.deps.db.prepare("INSERT OR IGNORE INTO bot_hidden_threads (thread_id, bot_id, reason, hidden_at) VALUES (?, ?, 'runner', ?)").run(thread.id, row.bot_id, now);
+    this.deps.changed();
+    return thread.id;
   }
 
   /** Pauses every active runner (the Bot was stopped); `onPaused` hears each as it goes, so a failure midway loses none. */
@@ -685,7 +751,14 @@ export class Runners {
     if (input.level === "log") return "Logged. Then reply exactly [PASS].";
     const bot = this.deps.bot(row.bot_id);
     if (!bot?.threadId) return "Logged; the Bot has no thread to tell. Then reply exactly [PASS].";
-    await this.tell(row, input.level, summary, bot as RunnerBot & { threadId: string }, extra);
+    try {
+      await this.tell(row, input.level, summary, bot as RunnerBot & { threadId: string }, extra);
+    } catch (error) {
+      // The report is kept either way: say what happened, so the runner doesn't report it again.
+      if (pushFailed(error)) return "Told the user; the phone push failed. Then reply exactly [PASS].";
+      console.warn(`[studio] runner ${row.id}: its report couldn't reach the Bot's Main`, error);
+      return "Logged; the Bot's Main couldn't take it right now, so the user sees it in the runner's report. Then reply exactly [PASS].";
+    }
     return input.level === "urgent" ? "Told the user and pushed to their phone. Then reply exactly [PASS]." : "Told the user. Then reply exactly [PASS].";
   }
 
@@ -796,9 +869,23 @@ export async function alertBot(sdk: Sdk, input: { botThreadId: string; senderThr
       pluginId: "mobile", method: "notify", outputSchema: z.unknown(),
       // turn-finished on the Bot's thread: the phone shows its Reply action, and a reply goes to the Bot.
       input: { title: input.push.title, body: input.push.body.slice(0, 4000), kind: "turn-finished", threadId: input.botThreadId, projectId: PERSONAL_PROJECT_ID, coalesceKey: input.push.coalesceKey, botId: input.push.botId, conversationId: input.botThreadId } as never,
-    }).catch((error) => { console.warn("[studio] Bot push delivery failed", error); throw error; });
+    }).catch((error) => { console.warn("[studio] Bot push delivery failed", error); throw new PushFailed(error); });
   }
 }
+
+/**
+ * The line reached the Bot's chat but the phone push didn't: callers that
+ * retry (auto-resume) count the line as delivered, so it isn't posted again.
+ */
+export class PushFailed extends Error {
+  override readonly name = "PushFailed";
+  constructor(cause: unknown) {
+    super(`The phone push failed: ${String((cause as Error)?.message ?? cause)}`);
+  }
+}
+
+/** Whether an error is PushFailed (by name, so it survives being passed through other modules). */
+export const pushFailed = (error: unknown): boolean => (error as Error)?.name === "PushFailed";
 
 /** A schedule as the bot or the UI gives it: cadence, time (default 09:00), cron for custom. */
 export function parseSchedule(schedule: RunnerSchedule | { cadence: HeartbeatRun["cadence"]; time?: string; cron?: string }): RunnerSchedule {

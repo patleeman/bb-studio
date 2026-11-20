@@ -428,6 +428,19 @@ describe("the Bot's space (round 7)", () => {
     delete state.live.bot_welcome;
   });
 
+  it("says plainly when a new Main has no model, with Choose a model opening the Bot's Default model; never a raw error", async () => {
+    state.live.bot_list = { bots: [{ id: "cos", state: "active", mainProblem: "No model for a new Main", mainNeedsModel: true }] };
+    await mount();
+    expect($('[data-testid="bot-sidebar-status"]')!.textContent).toBe("No model for a new Main·Choose a model");
+    await act(async () => { $('[data-testid="bot-sidebar-choose-model"]')!.click(); });
+    expect($('[data-testid="default-model-dialog"]')?.dataset.botId).toBe("cos");
+    await act(async () => { $('[data-testid="default-model-close"]')!.click(); });
+    // Another failure: the plain words, and no model action.
+    state.live.bot_list = { bots: [{ id: "cos", state: "active", mainProblem: "Couldn't start a new Main yet; trying again", mainNeedsModel: false }] };
+    await mount();
+    expect($('[data-testid="bot-sidebar-status"]')!.textContent).toBe("Couldn't start a new Main yet; trying again");
+  });
+
   it("puts Resume beside a stopped or paused Bot's status and first in its menu; an active Bot has none", async () => {
     state.live.bot_list = { bots: [{ id: "cos", state: "stopped" }] };
     await mount();

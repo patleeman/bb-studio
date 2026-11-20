@@ -179,3 +179,14 @@ it("shows a theme's options under the sliders only for a theme that declares the
   expect(changed).toHaveLength(1);
   stop();
 });
+
+it("FM: a saved theme that is gone shows the default theme checked, with a plain note to pick another", () => {
+  render({ ...defaultAppearance(GRID), themeId: "deleted-theme" });
+  expect($('[data-testid="theme-missing"]')!.textContent).toBe('The theme "deleted-theme" is gone; showing the default. Pick another.');
+  expect($('[data-theme-id="bb-default"]')!.getAttribute("aria-checked")).toBe("true");
+  expect($('[data-theme-id="none"]')!.getAttribute("aria-checked")).toBe("false");
+  click($('[data-theme-id="grid"]'));
+  expect(onChange.mock.lastCall![0]).toMatchObject({ themeId: "grid" });
+  render(defaultAppearance(GRID));
+  expect($('[data-testid="theme-missing"]')).toBeNull();
+});

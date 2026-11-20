@@ -413,6 +413,43 @@ it("Ask from the omnibar sends to a conversation (a worker's goes to its convers
   await expect(server.rpc.bot_ask({ text: "Hi", to: { kind: "new", botId: "nope" } })).rejects.toThrow(/No Bot/);
 });
 
+it("FM: + New seeded with a default model that can't start (provider signed out) starts on BB's default; a model the user picked fails as BB says", async () => {
+  const { server, spawn, defaults } = await setup();
+  defaults.set("home", { providerId: "claude", model: "opus-gone", reasoning: null });
+  spawn.mockRejectedValueOnce(new Error("Provider claude is not signed in"));
+  const made = await server.rpc.bot_conversation_start({ botId: "home", request: newRequest("opus-gone") });
+  expect(spawn.mock.lastCall?.[0]).not.toHaveProperty("model");
+  expect(server.store.get(made.threadId)).toMatchObject({ botId: "home", kind: "conversation" });
+  spawn.mockRejectedValueOnce(new Error("Provider claude is not signed in"));
+  await expect(server.rpc.bot_conversation_start({ botId: "home", request: newRequest("sonnet") })).rejects.toThrow("not signed in");
+});
+
+it("FM (review F7): Ask and + New retry without the model only for a model or provider error, never a timeout", async () => {
+  const { server, spawn, defaults } = await setup();
+  defaults.set("home", { providerId: "claude", model: "opus-gone", reasoning: null });
+  const calls = spawn.mock.calls.length;
+  spawn.mockRejectedValueOnce(new Error("Request timed out after 30000ms"));
+  await expect(server.rpc.bot_ask({ text: "Hi", to: { kind: "new", botId: "home" } })).rejects.toThrow("timed out");
+  spawn.mockRejectedValueOnce(new Error("Request timed out after 30000ms"));
+  await expect(server.rpc.bot_conversation_start({ botId: "home", request: newRequest("opus-gone") })).rejects.toThrow("timed out");
+  // One try each: no second conversation behind the user's back.
+  expect(spawn.mock.calls.length - calls).toBe(2);
+});
+
+it("FM: Ask the Bot starts a conversation when its default model can't start, or its Main is gone", async () => {
+  const { server, spawn, defaults, threads } = await setup();
+  // Its default model's provider is signed out: BB refuses it, so the project's default.
+  defaults.set("home", { providerId: "claude", model: "opus-gone", reasoning: null });
+  spawn.mockRejectedValueOnce(new Error("Provider claude is not signed in"));
+  const made = await server.rpc.bot_ask({ text: "Plan the trip", to: { kind: "new", botId: "home" } });
+  expect(spawn.mock.lastCall?.[0]).not.toHaveProperty("model");
+  expect(server.store.get(made.threadId)).toMatchObject({ botId: "home", kind: "conversation" });
+  // Its Main is gone (being replaced): before, "has no chat to start from".
+  threads.delete("thr_home");
+  defaults.delete("home");
+  expect((await server.rpc.bot_ask({ text: "Hi", to: { kind: "new", botId: "home" } })).projectId).toBe("proj_personal");
+});
+
 it("a fork from a message starts on the Bot's default model on the fork's provider, else keeps its source's", async () => {
   const { server, update, defaults } = await setup();
   defaults.set("dot", { providerId: "claude", model: "sonnet", reasoning: "medium" });
@@ -433,4 +470,11 @@ it("lands on a Bot's last conversation while it exists, else its Main, else nowh
   threads.set("thr_main", { ...threads.get("thr_main")!, deletedAt: 5 } as never);
   expect(await server.rpc.bot_landing({ botId: "dot", last: "redesign" })).toEqual({ threadId: null });
   expect(await server.rpc.bot_landing({ botId: "home", last: null })).toEqual({ threadId: "thr_home" });
+});
+
+it("FM: never lands on an archived Main (it is being replaced)", async () => {
+  const { server, threads } = await setup();
+  threads.delete("redesign");
+  threads.set("thr_main", { ...threads.get("thr_main")!, archivedAt: 5 } as never);
+  expect(await server.rpc.bot_landing({ botId: "dot", last: "redesign" })).toEqual({ threadId: null });
 });
