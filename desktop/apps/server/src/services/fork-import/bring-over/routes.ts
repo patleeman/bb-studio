@@ -13,7 +13,9 @@ import {
 } from "./job.js";
 import { listProjects, listThreads } from "./listing.js";
 import { addPlugin, listPlugins, type PluginInstaller } from "./plugins.js";
+import { stageToolGateway } from "./tool-gateway.js";
 import { listSettings } from "./settings.js";
+import { restoreBroughtOverWorkspaces } from "./workspace-restore.js";
 import {
   UI_TOKEN_HEADER,
   uiTokenConfigured,
@@ -283,13 +285,23 @@ export function registerBringOverRoutes(
       ...(studioData === undefined
         ? {}
         : {
-            onFinished: (finished: BringOverJob) =>
+            onFinished: (finished: BringOverJob) => {
               finishStudioJob({
                 dataDir: dataDir(),
                 target: deps.db.$client,
                 job: finished,
                 required: studioData.required,
-              }),
+              });
+              if (finished.state === "cancelled") return;
+              const restoring = restoreBroughtOverWorkspaces(
+                deps,
+                studioData.required,
+              );
+              deps.logger.info(
+                { restoring: restoring.length },
+                "Bring-over restores the workspaces of the Bots' own threads",
+              );
+            },
           }),
     });
     if (job === null) {
@@ -383,6 +395,23 @@ export function registerBringOverRoutes(
     requireUi(context, "studio-data/forget");
     await forgetStudioData(dataDir()).catch(studioError);
     return context.body(null, 204);
+  });
+
+  app.post("/fork/bring-over/tool-gateway/stage", async (context) => {
+    requireUi(context, "tool-gateway/stage");
+    try {
+      return context.json(
+        await stageToolGateway({
+          sourceDataDir: await source(),
+          dataDir: dataDir(),
+        }),
+      );
+    } catch (error) {
+      if (error instanceof BringOverError) {
+        throw new ApiError(422, "invalid_request", error.message);
+      }
+      throw error;
+    }
   });
 
   app.post("/fork/bring-over/plugins/:pluginId/add", async (context) => {
