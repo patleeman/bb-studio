@@ -38,7 +38,8 @@ import { missingModel, threadModel, type PreferredModel } from "../thread-model"
 type Sdk = BbPluginApi["sdk"];
 export type SchedulerOwner = "heartbeat" | "runner" | "automation" | "watcher";
 export interface SchedulerKey { owner: SchedulerOwner; ownerId: string }
-export interface RunTarget { threadId: string; prompt: string; permissionMode?: string }
+/** `skip`: not this run, and why (its Bot is paused); the schedule stays on and the next run comes as usual. */
+export interface RunTarget { threadId: string; prompt: string; permissionMode?: string; skip?: string }
 export type RunResolver = (ownerId: string) => RunTarget | null | Promise<RunTarget | null>;
 /** Runs an owner's script and says how it went; null when there is nothing to run any more. */
 /** A thread a run was for is gone: the thread that takes its place, or null. */
@@ -68,6 +69,8 @@ const PREFIX = "trg_";
 /** Statuses in which a thread can't take a message yet; it will soon. */
 const NOT_READY = new Set(["pending", "starting", "stopping"]);
 const KEEP_RUNS = 200;
+/** How long a due run waits for a thread that is pending, starting or stopping before that run is skipped. */
+export const STUCK_MS = 30 * 60_000;
 const OUTPUT_LIMIT = 4000;
 
 type RunRow = { id: number; trigger_id: string; thread_id: string | null; status: RunStatus; reason: "time" | "manual"; scheduled_for: number | null; started_at: number; finished_at: number | null; error: string | null; output: string | null };
@@ -280,6 +283,11 @@ export class EngineScheduler {
     const resolver = this.resolvers.get(owner);
     const first = resolver ? await resolver(trigger.ownerId) : null;
     if (!first) return retire("Nothing to run: what it was for is gone.");
+    if (first.skip) {
+      this.record(id, run, scheduledFor, { status: "skipped", error: first.skip });
+      if (manual) this.refused.set(id, first.skip);
+      return;
+    }
     let target: RunTarget = first;
     let thread: Awaited<ReturnType<Sdk["threads"]["get"]>> | null = null;
     // A gone thread may have a successor (a Bot's new Main): one more read of the target, then off.
@@ -297,7 +305,15 @@ export class EngineScheduler {
       target = moved;
     }
     if (!thread) return retire(THREAD_GONE);
-    if (NOT_READY.has(thread.status)) return wait("Its thread was starting or stopping.", false);
+    if (NOT_READY.has(thread.status)) {
+      // Said once in its runs (not every minute); a thread stuck like this past STUCK_MS skips the run, and the next one comes as usual.
+      const why = thread.status === "pending" ? "Its thread hasn't started yet (it may have no model; open it to check)." : "Its thread was starting or stopping.";
+      if (!manual && scheduledFor !== null && this.now() - scheduledFor > STUCK_MS) {
+        this.record(id, run, scheduledFor, { status: "skipped", threadId: thread.id, error: `${why} This run was skipped.` });
+        return;
+      }
+      return wait(why);
+    }
     if (!await this.hostUp(thread)) return wait("No host connected.");
     const going = this.deps.db.prepare("SELECT * FROM trigger_runs WHERE trigger_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1").get(id) as RunRow | undefined;
     if (going) {

@@ -56,10 +56,11 @@ async function setup(migrations = MIGRATIONS) {
   const changed = vi.fn();
   const clock = { now: Date.now() };
   const { engine, scheduler } = testScheduler(db, bb.sdk, clock);
-  const leads = new ProjectLeads({ db, sdk: bb.sdk, scheduler, changed });
+  const leadLost = vi.fn();
+  const leads = new ProjectLeads({ db, sdk: bb.sdk, scheduler, changed, leadLost });
   /** Runs the heartbeats that are due after their next time. */
   const fire = async (projectId: string) => { clock.now = engine.get("heartbeat", projectId)!.nextAt! + 1; await engine.tick(); };
-  return { send, fire, clock, engine, scheduler, bb, db, leads, threads, spawn, get, archive, callRpc, automations, changed, failGets: (fail: boolean) => { failGets = fail; } };
+  return { send, fire, clock, engine, scheduler, bb, db, leads, threads, spawn, get, archive, callRpc, automations, changed, leadLost, failGets: (fail: boolean) => { failGets = fail; } };
 }
 
 it.each<[HeartbeatRun["cadence"], string]>([
@@ -274,4 +275,24 @@ it("still turns migrated heartbeats on when the automations plugin can't delete 
   await x.leads.runs.repair((projectId) => x.leads.storedLead(projectId));
   expect(x.callRpc.mock.calls.map(([arg]) => [arg.method, arg.input.automationId])).toEqual([["automations_delete", "old"]]);
   expect(x.db.prepare("SELECT COUNT(*) AS n FROM space_retired_automations").get()).toEqual({ n: 0 });
+});
+
+it("FM: a project's lead deleted or archived turns its heartbeat off and says so once, instead of going quiet", async () => {
+  const x = await setup();
+  x.scheduler.onThreadGone((threadId) => x.leads.leadGone(threadId));
+  const lead = await x.spawn({ projectId: "proj_a", title: "Lead" });
+  await x.leads.setLead("proj_a", lead.id);
+  await x.leads.setRun("proj_a", { enabled: true, cadence: "daily", time: "08:00" });
+  // Archived: the due heartbeat finds it gone.
+  x.threads.set(lead.id, { ...x.threads.get(lead.id)!, archivedAt: 5 });
+  await x.fire("proj_a");
+  expect(x.leadLost).toHaveBeenCalledWith("proj_a", "archived", true);
+  expect((await x.leads.get("proj_a"))).toMatchObject({ leadThreadId: null, run: { enabled: false } });
+  // Deleted, found by a read.
+  const next = await x.spawn({ projectId: "proj_b", title: "Lead B" });
+  await x.leads.setLead("proj_b", next.id);
+  x.threads.delete(next.id);
+  await x.leads.get("proj_b");
+  expect(x.leadLost).toHaveBeenLastCalledWith("proj_b", "deleted", false);
+  expect(x.leadLost).toHaveBeenCalledTimes(2);
 });

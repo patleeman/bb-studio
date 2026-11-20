@@ -132,6 +132,8 @@ import { workerApprovalRpc } from "./src/worker-approvals";
 
 /** The note on a "stopped after failing" line in a Bot's chat: the Bot triages it (docs/needs-you/REDO.md). */
 const STOPPED_NOTE = "Studio notice: something you own stopped after failing. You decide what the user sees: if you can fix it (resume it, retry it), do. If the user must act, tell them in one or two short lines what stopped and what to do. If it needs nothing from them, reply exactly [PASS].";
+/** A Studio alert line the user reads as is: the Bot doesn't answer it. */
+const STUDIO_LINE_NOTE = "Studio notice, already shown to the user as is. Don't reply or acknowledge it; reply exactly [PASS].";
 import { AutoResume, type ResumeTarget } from "./src/auto-resume";
 import { ThreadResume, type ThreadOwner } from "./src/thread-resume";
 import { BotOwnedThreads } from "./src/bot-owned";
@@ -652,7 +654,14 @@ export default async function plugin(bb: BbPluginApi) {
 
   // Each project's optional lead thread and its heartbeat (src/project-lead.ts).
   // The heartbeat of the personal project is the Bot's check-in, under its name.
-  const projectLeads: ProjectLeads = new ProjectLeads({ db, sdk: bb.sdk, scheduler, changed: tagsChanged, personalPrompt: (): string => bots.prompt(), botPrompt: (key) => bots.promptFor(key) });
+  // A project's lead thread deleted or archived: one line in the Bot's chat with what to do, not a heartbeat that just stops.
+  const leadLost = (projectId: string, why: "deleted" | "archived", heartbeatWasOn: boolean) => void (async () => {
+    const bot = bots.stored();
+    if (!bot?.threadId) return;
+    const name = ((await bb.sdk.projects.list({ includePersonal: true }).catch(() => [])) as { id: string; name: string }[]).find((project) => project.id === projectId)?.name ?? projectId;
+    await alertBot(bb.sdk, { botThreadId: bot.threadId, line: `⚠️ ${name}'s lead thread was ${why}${heartbeatWasOn ? ", so its heartbeat is off" : ""}. Pick a new lead in Studio › Setup › Project leads to turn it back on.`, note: STUDIO_LINE_NOTE });
+  })().catch((error) => bb.log.warn(`Couldn't tell the Bot that ${projectId}'s lead is gone: ${errorText(error)}`));
+  const projectLeads: ProjectLeads = new ProjectLeads({ db, sdk: bb.sdk, scheduler, changed: tagsChanged, personalPrompt: (): string => bots.prompt(), botPrompt: (key) => bots.promptFor(key), leadLost });
   // The user's Bot (src/bot.ts): the personal project's lead, with a name, avatar and state.
   // Its Memory page is a Studio page in the personal project; a shared skill goes to BB's user skills.
   let loopsEnabled = () => false;
@@ -1173,7 +1182,8 @@ export default async function plugin(bb: BbPluginApi) {
   };
   bb.events.on("thread.deleted", mainGone);
   bb.events.on("thread.archived", mainGone);
-  scheduler.onThreadGone((threadId) => bots.rescueMain(threadId));
+  // A run's thread is gone: a Bot's Main gets a new Main, a runner a new thread (src/runners.ts rescue).
+  scheduler.onThreadGone(async (threadId) => (await bots.rescueMain(threadId)) ?? (await runners.rescue(threadId).catch(() => null)) ?? (await projectLeads.leadGone(threadId).catch(() => null)));
   // A run's thread with no model falls back on its Bot's default model (src/thread-model.ts).
   scheduler.preferModel((threadId) => { const bot = bots.forThread(threadId); return bot ? bots.defaultModel(bot.id) : bots.defaultModel(); });
   const threadSeeds = new ThreadSeeds(db);

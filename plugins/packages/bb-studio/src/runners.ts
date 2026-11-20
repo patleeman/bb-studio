@@ -140,7 +140,11 @@ export class Runners {
     // A due run reads the runner as it is now: its thread (a move to another machine changes it) and its job.
     deps.scheduler.resolve("runner", (id) => {
       const row = this.deps.db.prepare("SELECT * FROM bot_runners WHERE id = ?").get(id) as RunnerRow | undefined;
-      return row && !row.adopted && !row.cleanup_pending && row.thread_id ? { threadId: row.thread_id, prompt: runnerPrompt(row) } : null;
+      if (!row || row.adopted || row.cleanup_pending || !row.thread_id) return null;
+      // A paused or stopped Bot's runners wait: the run is skipped (said in its runs) and the schedule stays as it is.
+      const bot = this.deps.bot(row.bot_id);
+      if (bot && bot.state !== "active") return { threadId: row.thread_id, prompt: runnerPrompt(row), skip: `${bot.name} is ${bot.state}, so its runners wait. Resume it to run them.` };
+      return { threadId: row.thread_id, prompt: runnerPrompt(row) };
     });
   }
 
@@ -583,13 +587,58 @@ export class Runners {
   }
 
   async setState(id: string, state: "active" | "paused", botId?: string): Promise<RunnerView> {
-    const row = this.row(id, botId);
+    let row = this.row(id, botId);
     this.requireNotMoving(row);
     if (state === "active") this.bot(row.bot_id);
+    // Its thread deleted or archived (the schedule went off for that): a new thread first, so Resume doesn't go off again at the next run.
+    if (state === "active" && !row.adopted && row.thread_id && await this.threadGone(row.thread_id)) {
+      if (!await this.rescue(row.thread_id)) throw new Error(`"${row.name}"'s thread is gone and a new one couldn't start. Check the Bot's Main has a model (Bot settings), then try again.`);
+      row = this.row(row.id);
+    }
     if (state === "active" && !await this.available(row.id)) { this.changedRow(row.id, { state }); await this.checkMachines(); return this.one(row.id); }
     await this.setOn(row, state === "active");
     this.changedRow(row.id, { state });
     return this.one(row.id);
+  }
+
+  /** Whether BB says a thread is deleted or archived (not when BB can't answer). */
+  private async threadGone(threadId: string): Promise<boolean> {
+    try {
+      const thread = await this.deps.sdk.threads.get({ threadId }) as { deletedAt?: number | null; archivedAt?: number | null } | null;
+      return !thread || thread.deletedAt != null || thread.archivedAt != null;
+    } catch (error) {
+      return rpcErrorStatus(error) === 404;
+    }
+  }
+
+  /**
+   * A runner's thread was deleted or archived (src/triggers/scheduler.ts
+   * onThreadGone, or Resume): a new hidden thread on the Bot's Main's provider
+   * and model takes its place, and its runs go there. Null when it isn't a
+   * runner Studio made, or no new thread can start (no Main, no model).
+   */
+  async rescue(goneThreadId: string): Promise<string | null> {
+    const row = this.deps.db.prepare("SELECT * FROM bot_runners WHERE thread_id = ? AND adopted = 0 AND cleanup_pending = 0").get(goneThreadId) as RunnerRow | undefined;
+    if (!row) return null;
+    const bot = this.deps.bot(row.bot_id);
+    if (!bot?.threadId) return null;
+    const [botThread, defaults] = await Promise.all([
+      this.deps.sdk.threads.get({ threadId: bot.threadId }).catch(() => null),
+      threadModel(this.deps.sdk, bot.threadId, this.deps.scheduler.preferredModel?.(bot.threadId)).catch(() => null),
+    ]);
+    if (!botThread?.providerId || !defaults?.model) return null;
+    const environment = await runnerEnvironment(this.deps.sdk, row.machine ?? null).catch(() => ({ type: "project-default" as const }));
+    const thread = await this.deps.sdk.threads.spawn({
+      projectId: PERSONAL_PROJECT_ID, visibility: "hidden", title: `${row.name} · Runner`, environment,
+      providerId: botThread.providerId, model: defaults.model, pluginMetadata: { runner: row.id, bot: row.bot_id },
+      input: [{ type: "text", text: `${runnerPrompt(row)}
+Your previous thread was deleted or archived, so this is your new one. Reply exactly [PASS]; your next run comes on schedule.`, mentions: [], visibility: "agent-only" }],
+    } as never);
+    const now = Date.now();
+    this.deps.db.prepare("UPDATE bot_runners SET thread_id = ?, project_id = ?, hidden = 1, updated_at = ? WHERE id = ?").run(thread.id, thread.projectId ?? PERSONAL_PROJECT_ID, now, row.id);
+    this.deps.db.prepare("INSERT OR IGNORE INTO bot_hidden_threads (thread_id, bot_id, reason, hidden_at) VALUES (?, ?, 'runner', ?)").run(thread.id, row.bot_id, now);
+    this.deps.changed();
+    return thread.id;
   }
 
   /** Pauses every active runner (the Bot was stopped); `onPaused` hears each as it goes, so a failure midway loses none. */

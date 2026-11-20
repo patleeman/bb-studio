@@ -746,3 +746,38 @@ it("with runs as tasks: each run is a child task of the runner's task, a report 
   tasks.sync();
   expect(store.get(parentIdOf(id))).toMatchObject({ state: "waiting", schedule: { paused: true } });
 });
+
+it("FM: a paused Bot's runners wait: the run is skipped with the reason, and they run again on Resume", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });
+  x.scheduler.threadSettled(runner.threadId!, "succeeded", "[PASS]");
+  x.bot.state = "paused";
+  x.send.mockClear();
+  // Before: the run went to the runner and its reports into the paused Bot's Main.
+  await fire(x, runner.id);
+  expect(sentTo(x, runner.threadId!)).toEqual([]);
+  expect(x.scheduler.runs({ owner: "runner", ownerId: runner.id })[0]).toMatchObject({ status: "skipped", error: expect.stringContaining("Jarvis is paused, so its runners wait") });
+  expect(trigger(x, runner.id)?.state).toBe("on");
+  x.bot.state = "active";
+  await fire(x, runner.id);
+  expect(sentTo(x, runner.threadId!)).toHaveLength(1);
+});
+
+it("FM: a runner whose thread was deleted gets a new thread and keeps running, instead of turning off", async () => {
+  const x = await setup();
+  x.scheduler.onThreadGone((threadId) => x.runners.rescue(threadId));
+  const runner = await x.runners.create({ name: "Inbox", job: "Check mail.", schedule });
+  const old = runner.threadId!;
+  x.threads.delete(old);
+  await fire(x, runner.id);
+  const now = (await x.runners.get(runner.id)).threadId!;
+  expect(now).not.toBe(old);
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ visibility: "hidden", title: "Inbox · Runner", pluginMetadata: { runner: runner.id, bot: "bot_main" } }));
+  expect(trigger(x, runner.id)?.state).toBe("on");
+  // Archived and turned off before (no rescue hooked): Resume makes a new thread rather than going off again at the next run.
+  x.threads.set(now, { ...x.threads.get(now)!, archivedAt: 9 } as never);
+  await x.runners.setState(runner.id, "paused");
+  const resumed = await x.runners.setState(runner.id, "active");
+  expect(resumed.threadId).not.toBe(now);
+  expect(resumed.state).toBe("active");
+});

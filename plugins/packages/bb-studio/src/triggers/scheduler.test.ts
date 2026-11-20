@@ -110,7 +110,8 @@ it.each(["pending", "starting", "stopping"] as const)("waits while the thread is
   x.clock.now += 60_000;
   await x.engine.tick();
   expect(x.send).toHaveBeenCalledTimes(1);
-  expect(x.scheduler.runs(KEY)).toMatchObject([{ status: "running", scheduledFor: dueAt }]);
+  // The wait is said once in its runs (it used to leave no trace), then the run itself.
+  expect(x.scheduler.runs(KEY)).toMatchObject([{ status: "running", scheduledFor: dueAt }, { status: "skipped", scheduledFor: dueAt }]);
   expect(x.engine.get("runner", "run_1")!.nextAt).toBe(Date.parse("2026-11-10T14:00:00Z"));
 });
 
@@ -284,4 +285,32 @@ it("FM: BB refusing a run for want of a model is said plainly, and the schedule 
   expect(x.scheduler.runs(KEY)[0]).toMatchObject({ status: "failed", error: expect.stringContaining("has no model yet") });
   expect(x.scheduler.runs(KEY)[0]!.error).not.toContain("stored execution model");
   expect(x.scheduler.status(KEY).on).toBe(true);
+});
+
+it("FM: a thread stuck pending is said once in its runs, and the run is skipped after 30 minutes instead of retried every minute forever", async () => {
+  const x = await setup();
+  x.scheduler.ensure(KEY, HOURLY, true);
+  x.set("thr", { status: "pending" });
+  const dueAt = x.engine.get("runner", "run_1")!.nextAt!;
+  await x.due();
+  x.clock.now += 60_000; await x.engine.tick();
+  x.clock.now += 60_000; await x.engine.tick();
+  // One line, not one a minute.
+  expect(x.scheduler.runs(KEY)).toEqual([expect.objectContaining({ status: "skipped", error: expect.stringContaining("hasn't started yet") })]);
+  expect(x.send).not.toHaveBeenCalled();
+  x.clock.now = dueAt + 31 * 60_000; await x.engine.tick();
+  expect(x.scheduler.runs(KEY)[0]).toMatchObject({ status: "skipped", error: expect.stringContaining("This run was skipped") });
+  // The next run comes on schedule.
+  expect(x.engine.get("runner", "run_1")!.nextAt).toBeGreaterThan(x.clock.now);
+});
+
+it("FM: a resolver's skip (the Bot is paused) records why and keeps the schedule", async () => {
+  const x = await setup();
+  x.scheduler.ensure(KEY, HOURLY, true);
+  x.target.current = { threadId: "thr", prompt: "Check.", skip: "Dot is paused, so its runners wait." };
+  await x.due();
+  expect(x.send).not.toHaveBeenCalled();
+  expect(x.scheduler.runs(KEY)[0]).toMatchObject({ status: "skipped", error: "Dot is paused, so its runners wait." });
+  expect(x.scheduler.status(KEY).on).toBe(true);
+  await expect(x.scheduler.runNow(KEY)).rejects.toThrow("Dot is paused");
 });
