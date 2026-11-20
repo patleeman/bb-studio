@@ -9,7 +9,8 @@ export default async function personalWorkspacePlugin(
     contract: personalWorkspaceHostContract,
   });
 
-  bb.experimental_environments.register({
+  type Provider = Parameters<typeof bb.experimental_environments.register>[0];
+  const provider: Provider = {
     id: PERSONAL_WORKSPACE_ENVIRONMENT_PROVIDER_ID,
     displayName: "Personal workspace",
     description: "Create a personal directory without a project.",
@@ -37,6 +38,9 @@ export default async function personalWorkspacePlugin(
         };
       }
     },
+    async restore(context) {
+      return provider.create!({ ...context, suggestedBranchName: "" });
+    },
     async remove({ hostId, path, pathKey, signal }) {
       if (hostId === null) {
         return {
@@ -59,5 +63,6 @@ export default async function personalWorkspacePlugin(
         };
       }
     },
-  });
+  };
+  bb.experimental_environments.register(provider);
 }
