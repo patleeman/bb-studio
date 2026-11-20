@@ -108,6 +108,8 @@ export class EngineScheduler {
   private startHook: RunStartHook | null = null;
   private goneHook: ThreadGoneHook | null = null;
   private preferred: ((threadId: string) => PreferredModel) | null = null;
+  /** Threads Studio just started in place of a gone one (onThreadGone): a run waiting on one says so, not "open it". */
+  private readonly replacements = new Set<string>();
   /** Why the latest run-now of a trigger did not start. */
   private readonly refused = new Map<string, string>();
 
@@ -303,11 +305,13 @@ export class EngineScheduler {
       const moved: RunTarget | null = next && resolver ? await resolver(trigger.ownerId) : null;
       if (!moved || moved.threadId === target.threadId) return retire(THREAD_GONE);
       target = moved;
+      this.replacements.add(moved.threadId);
     }
     if (!thread) return retire(THREAD_GONE);
     if (NOT_READY.has(thread.status)) {
       // Said once in its runs (not every minute); a thread stuck like this past STUCK_MS skips the run, and the next one comes as usual.
-      const why = thread.status === "pending" ? "Its thread hasn't started yet (it may have no model; open it to check)." : "Its thread was starting or stopping.";
+      const why = this.replacements.has(thread.id) ? "Its thread was deleted or archived, so Studio started a new one; the run goes out once that is ready."
+        : thread.status === "pending" ? "Its thread hasn't started yet (it may have no model)." : "Its thread was starting or stopping.";
       if (!manual && scheduledFor !== null && this.now() - scheduledFor > STUCK_MS) {
         this.record(id, run, scheduledFor, { status: "skipped", threadId: thread.id, error: `${why} This run was skipped.` });
         return;
@@ -335,6 +339,7 @@ export class EngineScheduler {
       return;
     }
     const permissionMode = target.permissionMode ?? model?.permissionMode ?? "accept-edits";
+    this.replacements.delete(thread.id);
     const runId = this.record(id, run, scheduledFor, { status: "running", threadId: thread.id });
     let started: ReturnType<RunStartHook> = null;
     try { started = this.startHook?.(key, thread.id) ?? null; } catch (error) { this.deps.warn?.(`Run task for ${id} could not be made: ${errorText(error)}`); }

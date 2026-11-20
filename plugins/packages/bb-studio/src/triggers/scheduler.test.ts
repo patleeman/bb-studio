@@ -314,3 +314,19 @@ it("FM: a resolver's skip (the Bot is paused) records why and keeps the schedule
   expect(x.scheduler.status(KEY).on).toBe(true);
   await expect(x.scheduler.runNow(KEY)).rejects.toThrow("Dot is paused");
 });
+
+it("FM (review F8): a run waiting on a thread Studio just started in place of a gone one says what happened, not \"open it\"", async () => {
+  const x = await setup();
+  x.scheduler.ensure(KEY, HOURLY, true);
+  // The runner's thread deleted; Studio starts a new one, still pending when the run resolves.
+  x.threads.delete("thr");
+  x.add({ id: "thr_new", status: "pending" });
+  x.scheduler.onThreadGone(async () => { x.target.current = { threadId: "thr_new", prompt: "Check the inbox." }; return "thr_new"; });
+  await x.due();
+  const [skipped] = x.scheduler.runs(KEY);
+  expect(skipped).toMatchObject({ status: "skipped", error: "Its thread was deleted or archived, so Studio started a new one; the run goes out once that is ready." });
+  expect(skipped!.error).not.toMatch(/open it/);
+  x.set("thr_new", { status: "idle" });
+  x.clock.now += 60_000; await x.engine.tick();
+  expect(x.send).toHaveBeenCalledTimes(1);
+});
