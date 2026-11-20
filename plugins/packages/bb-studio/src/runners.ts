@@ -199,7 +199,9 @@ export class Runners {
   async available(id: string, notify = true): Promise<boolean> {
     let row = this.row(id);
     if (!row.machine) return true;
-    const host = await this.deps.sdk.hosts.get({ hostId: row.machine }).catch(() => null);
+    // BB answering "not found" (or nothing) means the machine was removed, not just offline: it won't reconnect.
+    let removed = false;
+    const host = await this.deps.sdk.hosts.get({ hostId: row.machine }).then((found) => { removed = !found; return found; }, (error) => { removed = rpcErrorStatus(error) === 404; return null; });
     row = this.row(id);
     const offline = host?.status !== "connected";
     if (!offline && row.machine_offline) this.changedRow(row.id, { machine_offline: 0 });
@@ -209,7 +211,10 @@ export class Runners {
     if (offline && notify && row.machine_offline !== 2) {
       this.changedRow(row.id, { machine_offline: 2 });
       const bot = this.deps.bot(row.bot_id);
-      if (bot?.threadId) await this.tell(row, "tell", `Machine offline: ${row.machine_name ?? row.machine}. Runs are skipped until it reconnects.`, bot as RunnerBot & { threadId: string });
+      const line = removed
+        ? `Machine removed: ${row.machine_name ?? row.machine}. Runs are skipped; move "${row.name}" to another machine (Runners › Move) to run it again.`
+        : `Machine offline: ${row.machine_name ?? row.machine}. Runs are skipped until it reconnects.`;
+      if (bot?.threadId) await this.tell(row, "tell", line, bot as RunnerBot & { threadId: string });
     }
     return !offline;
   }

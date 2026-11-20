@@ -53,7 +53,7 @@ async function setup(extra: Partial<RunnerDeps> = {}) {
       timeline: timeline as never, spawn: spawn as never, get: get as never, send: send as never, update: update as never, archive: archive as never,
       defaultExecutionOptions: async () => ({ model: "model", reasoningLevel: "high", permissionMode: "accept-edits" }) as never,
     },
-    hosts: { list: async () => hosts as never, get: async ({ hostId }) => { const host = hosts.find(h => h.id === hostId); if (!host) throw new Error("Unknown host"); return host as never; }, providerCliStatus: async () => cli as never, pathsExist, installProviderCli },
+    hosts: { list: async () => hosts as never, get: async ({ hostId }) => { const host = hosts.find(h => h.id === hostId); if (!host) throw Object.assign(new Error("Unknown host"), { status: 404 }); return host as never; }, providerCliStatus: async () => cli as never, pathsExist, installProviderCli },
     providers: { list: async () => [{ id: "codex", displayName: "Codex", strings: { signInHint: "Run codex login" } }] as never },
     system: { providerStates: async () => providerStates as never },
     environments: { listProviders: (async (args: { projectId?: string; hostId?: string }) => { if (args?.hostId && !args.projectId) throw new Error("HTTP 400: hostId requires projectId"); return environmentProviders; }) as never },
@@ -780,4 +780,16 @@ it("FM: a runner whose thread was deleted gets a new thread and keeps running, i
   const resumed = await x.runners.setState(runner.id, "active");
   expect(resumed.threadId).not.toBe(now);
   expect(resumed.state).toBe("active");
+});
+
+it("FM: a runner whose machine was removed (not just offline) says so and what to do, not \"until it reconnects\"", async () => {
+  const x = await setup();
+  const runner = await x.runners.create({ name: "Files", job: "Check files", schedule, machine: "homelab" });
+  // The machine removed from BB: hosts.get answers not found.
+  x.hosts.splice(0, 1);
+  await x.runners.checkMachines();
+  const lines = sentTo(x, "bot1").map((each) => each.input[0]!.text);
+  expect(lines).toEqual([expect.stringContaining("Machine removed: homelab")]);
+  expect(lines[0]).toContain("move \"Files\" to another machine");
+  expect(lines[0]).not.toContain("until it reconnects");
 });
