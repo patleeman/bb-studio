@@ -1,12 +1,13 @@
 // A Bot's Controls (bot/<botId>/controls): every setting, off the main page,
-// with a back link to it. Section links on the left: Profile (with Profile
+// with a back link to it. Its state comes first, under the title: Pause, or
+// Resume while paused or stopped, and Stop. Section links on the left: Profile (with Profile
 // changes and Revert), Model, Memory, Skills (with Learn from work and its
 // history), Check-ins, Attention (the primary Bot's Todos: daily budget and
 // quiet hours), Prompt cache (the only place tokens and cost show) and
 // Maintenance (the switch, rules and history). An external Bot has no
 // Memory page, skills or maintenance here: Profile, Model and Check-ins.
 // The components are the ones Bot info always had, moved here.
-import { OUTLINE_BUTTON, openAppPath } from "../../kit/app/index";
+import { GHOST_BUTTON, OUTLINE_BUTTON, PRIMARY_BUTTON, openAppPath } from "../../kit/app/index";
 import { Icon } from "../../kit/ui/index";
 import { useEffect, useState, type ReactNode } from "react";
 import type { BotView } from "../../contract";
@@ -24,6 +25,8 @@ import { BotAttention } from "./BotAttention";
 import { botPath } from "./selection";
 import { skillsPagePath } from "../skills/paths";
 import { PageBar } from "../page-bar";
+import { resumeWord } from "./bot-state";
+import { botStatusText } from "./BotInfoRows";
 
 const STATE_DOT = { active: "bg-success", paused: "bg-warning", stopped: "bg-muted-foreground/50" } as const;
 type Section = { id: string; label: string };
@@ -55,7 +58,7 @@ export function runsOn(bot: Pick<NonNullable<BotView["bot"]>, "kind" | "provider
 export function BotControls({ view, refresh }: { view: BotView; refresh(): void }) {
   const activity = useLive("bot_activity", { botId: view.bot!.id }, { pollMs: 30_000 });
   const running = runningCount(activity.data);
-  const { bot, profile, busy, error, setSheet, openMemory, saveProfile, sheets } = useBotControls(view, refresh, running);
+  const { bot, profile, run, busy, error, setSheet, openMemory, saveProfile, sheets } = useBotControls(view, refresh, running);
   const [switching, setSwitching] = useState(false);
   const external = bot.kind === "external";
   const primary = !!bot.primary;
@@ -78,6 +81,18 @@ export function BotControls({ view, refresh }: { view: BotView; refresh(): void 
       <h1 className="flex items-center gap-3 pt-3 pb-6 text-xl font-semibold">
         <BotFace botId={bot.id} size={30} provider={botProvider(bot)} />Bot settings
       </h1>
+      {/* Its state, first: Pause, or Resume ("Run here" for one in bb) while paused or stopped, and Stop. */}
+      <div role="group" aria-label={`${bot.name} state`} data-testid="bot-state-controls" className="flex flex-wrap items-center gap-x-3 gap-y-2 pb-6">
+        <span className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground" data-testid="bot-state-text">
+          <span className={`size-2 shrink-0 rounded-full ${STATE_DOT[bot.state]}`} aria-hidden />{botStatusText(bot)}
+        </span>
+        <span className="flex items-center gap-1.5">
+          {bot.state === "active"
+            ? <button type="button" className={OUTLINE_BUTTON} data-testid="bot-state-pause" disabled={!!busy} onClick={() => void run("bot_pause")}><Icon name="Pause" />Pause</button>
+            : <button type="button" className={PRIMARY_BUTTON} data-testid="bot-state-resume" disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />{resumeWord(bot)}</button>}
+          {bot.state !== "stopped" ? <button type="button" className={GHOST_BUTTON} data-testid="bot-state-stop" disabled={!!busy} onClick={() => setSheet("stop")}><Icon name="Square" />Stop…</button> : null}
+        </span>
+      </div>
       {error ? <p role="alert" className="pb-2 text-xs text-destructive">{error}</p> : null}
       <div className="flex items-start gap-10">
         <nav aria-label="Bot settings sections" className="sticky top-4 hidden w-44 shrink-0 flex-col gap-0.5 @3xl/page:flex">

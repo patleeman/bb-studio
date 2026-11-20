@@ -254,6 +254,26 @@ it("gives a Bot whose Main was deleted a new, empty Main that its check-in follo
   expect(x.bots.stored(id)?.threadId).toBe(made);
 });
 
+it("on a BB Studio copy, a stopped Bot from before the import is in bb, and Resume runs it here: active and no longer in bb", async () => {
+  const x = await setup();
+  const made = await x.bots.create({ name: "Scout", avatar: "🛰️" });
+  const id = made.bot!.id;
+  expect(made.bot).toMatchObject({ state: "active", inBb: false });
+  await x.bots.stop(id);
+  const copy = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, importedAt: () => Date.now() + 1 });
+  expect((await copy.get(id)).bot).toMatchObject({ state: "stopped", inBb: true });
+  expect((await copy.resume(id)).bot).toMatchObject({ state: "active", inBb: false });
+});
+
+it("starts a new Bot active, never in bb, on a copy whose import ran before it was made", async () => {
+  const x = await setup();
+  const copy = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, importedAt: () => Date.now() - 60_000 });
+  const made = await copy.create({ name: "First", avatar: "🧭" });
+  expect(made.bot).toMatchObject({ state: "active", inBb: false });
+  await copy.pause(made.bot!.id);
+  expect((await copy.get(made.bot!.id)).bot).toMatchObject({ state: "paused", inBb: false });
+});
+
 it("keeps a drawn avatar and a role it's told, with the emoji as a fallback", async () => {
   const x = await setup();
   const view = await x.bots.create({ name: "Dot", avatar: "🤖", shape: "blob", color: "#5b8def" });

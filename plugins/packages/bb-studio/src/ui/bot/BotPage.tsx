@@ -28,6 +28,7 @@ import { openLoops, useLoopActions, useLoopsEnabled, useTodosZone } from "../../
 import { dueLabel } from "../../loops/ui/model";
 import { Elapsed, ProviderStatusMark, runningLabel } from "./ProviderStatusMark";
 import { useAuthNeeds } from "../../auth/ui/needs";
+import { resumeWord } from "./bot-state";
 
 const DAY = 86_400_000;
 const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -182,7 +183,7 @@ export function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
           {bot.threadId ? <button type="button" className={PRIMARY_BUTTON} data-testid="bot-open-chat" onClick={() => openThread(bot.threadId!)}><Icon name="MessageSquare" />Open chat</button> : null}
           {bot.state === "active"
             ? <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_pause")}><Icon name="Pause" />Pause</button>
-            : <button type="button" className={OUTLINE_BUTTON} disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />Resume</button>}
+            : <button type="button" className={OUTLINE_BUTTON} data-testid="bot-resume" disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" />{resumeWord(bot)}</button>}
           {bot.state !== "stopped" ? <button type="button" className={GHOST_BUTTON} disabled={!!busy} onClick={() => setSheet("stop")}><Icon name="Square" />Stop…</button> : null}
           <button type="button" className={OUTLINE_BUTTON} data-testid="bot-controls" onClick={() => openAppPath(controlsPath(bot.id))}><Icon name="SlidersHorizontal" />Bot settings</button>
         </div>

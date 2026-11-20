@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -163,6 +163,26 @@ describe("reading the sources", () => {
     writeFileSync(join(dir, "fork-import.json"), JSON.stringify({ version: 1, sourceDataDir: "/Users/x/.bb", importedAt: IMPORTED }));
     expect(readImportedAt(dir)).toBe(IMPORTED);
     writeFileSync(join(dir, "fork-import.json"), JSON.stringify({ version: 2, sourceDataDir: "/Users/x/.bb" }));
+    expect(readImportedAt(dir)).toBeNull();
+  });
+
+  it("after bb's Studio data is brought over (its marker, or an applied journal), nothing is in bb; put back, the mirror rule is back", () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, "fork-import.json"), JSON.stringify({ version: 1, sourceDataDir: "/Users/x/.bb", importedAt: IMPORTED }));
+    const studio = join(dir, "plugins", "studio");
+    mkdirSync(join(studio, "import-staged"), { recursive: true });
+    const journal = (state: string) => writeFileSync(join(studio, "import-staged", "journal.json"), JSON.stringify({ version: 1, id: "imp_1", state, stagedAt: 1, snapshotAt: 1, updatedAt: 1, error: null }));
+    journal("ready");
+    expect(readImportedAt(dir)).toBe(IMPORTED);
+    journal("applied");
+    expect(readImportedAt(dir)).toBeNull();
+    journal("restore-requested");
+    expect(readImportedAt(dir)).toBeNull();
+    journal("restored");
+    expect(readImportedAt(dir)).toBe(IMPORTED);
+    // Set-aside data deleted (no journal): the marker that came in with bb's data still says so.
+    rmSync(join(studio, "import-staged"), { recursive: true });
+    writeFileSync(join(studio, "from-bb.json"), JSON.stringify({ version: 1, journalId: "imp_1", at: 2 }));
     expect(readImportedAt(dir)).toBeNull();
   });
 

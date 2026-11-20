@@ -499,14 +499,20 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
 - **Top**, sticky: the Bot's space header (round 7, 7a), a band of its own
   with a bottom border: the avatar (36px), the name (15px, semibold), a
   status line with no model (each conversation has its own): "2 running",
-  "Paused", "Stopped", "Paused · in bb" on a BB Studio copy for a Bot its
-  import stopped (the Info tab's and the automations table's rule), or
-  nothing; and **···**: **Edit <name>…**, **Bot settings…** (the Bot's
-  Controls page), **Default model** (bb's provider
+  "Paused · Resume", "Stopped · Resume", "Paused · in bb · Run here" on a
+  BB Studio copy for a Bot its import stopped (the Info tab's and the
+  automations table's rule), or nothing; Resume and Run here are buttons
+  (`bot_resume`). **···**: **Resume <name>** (or **Run <name> here**) first
+  while the Bot is paused or stopped, **Edit <name>…**, **Bot settings…**
+  (the Bot's Controls page, which opens with its state and Pause, Resume and
+  Stop…), **Default model** (bb's provider
   and model picker in a small dialog, see Default model below),
-  then New Bot. Bot info and
-  Controls are on the Info tab's Bot block (Pause, Resume and Stop in its
-  icon group). Under it, the Bot's pages as rows:
+  then New Bot. The Info tab's Bot block has Pause, Resume and Stop in its
+  icon group too. A paused or stopped Bot always shows its Resume (or Run
+  here) in the header, Bot settings, the Bot page and the Info tab. After
+  "Bring over BB Studio data" no Bot is in bb: the swap brings a marker
+  (`plugins/studio/from-bb.json`) in with bb's files, so every Bot is this
+  install's and reads Stopped · Resume. Under it, the Bot's pages as rows:
   **Memory** (`/plugins/studio/studio/memory/<botId>`), **Library**
   (`/plugins/studio/studio`) and, for the primary Bot with Todos on, **Todos**
   (`/plugins/studio/studio/bot/<botId>/loops`) with what needs you now and,
@@ -2962,7 +2968,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `src/ui/bot/BotInfoRows.tsx`): **Bot** (its avatar and name, which opens
   the Bot page, with Pause or Resume and Stop as one header icon-button
   group), **Status** (Active, Paused, Stopped, or Paused · in bb on a BB
-  Studio copy for a Bot its import stopped, which has no controls),
+  Studio copy for a Bot its import stopped, whose Resume reads Run here),
   **Model** (the model this thread runs on now, read off the thread with
   `thread_model`, by its display name; not the Bot's default, which is only
   in Edit space and the ··· menu) and **Needs

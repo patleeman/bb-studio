@@ -11,7 +11,9 @@
 //      this Studio's migrations;
 //   3. everything in it is stopped (stop.ts); Task reminders and the public
 //      skill registry's approval are turned off in bb's key-value rows;
-//   4. the swap (swap.ts): this install's files and kv rows go to before/,
+//   4. a marker (FROM_BB_FILE) goes in with bb's files: its Bots run here
+//      now, none "in bb" (automation-table.ts readImportedAt);
+//   5. the swap (swap.ts): this install's files and kv rows go to before/,
 //      bb's come in, and the journal ends "applied".
 // "restore-requested" ("Put my old Studio data back") swaps back: bb's go to
 // replaced/, before/ comes back. "applying" and "restoring" left by a crash
@@ -23,7 +25,7 @@ import { join } from "node:path";
 import { SETTINGS_KV_KEY } from "../settings/store";
 import { SKILLS_REGISTRY_KV_KEY } from "../skills-registry";
 import {
-  BB_KV_FILE, BEFORE_DIR, BEFORE_KV_FILE, KEPT_HERE, REPLACED_DIR, REPLACED_KV_FILE, STAGED_DIR,
+  BB_KV_FILE, BEFORE_DIR, BEFORE_KV_FILE, FROM_BB_FILE, KEPT_HERE, REPLACED_DIR, REPLACED_KV_FILE, STAGED_DIR,
   importPath, readJournal, readJson, studioDir, writeJournal, writePrivateJson, type ImportJournal,
 } from "./journal";
 import { studioOwnData, type OwnData } from "./own-data";
@@ -232,6 +234,7 @@ async function apply(deps: StartDeps, journal: ImportJournal): Promise<ImportJou
   }
   for (const suffix of ["-wal", "-shm", "-journal"]) rmSync(`${stagedDb}${suffix}`, { force: true });
   prepareOnboarding(plan.incomingDir, now());
+  writePrivateJson(join(plan.incomingDir, FROM_BB_FILE), { version: 1, journalId: journal.id, at: now() });
   const bbKv = readJson<BbKvFile>(plan.incomingKvFile);
   if (!bbKv.prepared) writePrivateJson(plan.incomingKvFile, prepareKv(bbKv));
 

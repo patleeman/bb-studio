@@ -14,6 +14,7 @@ import { BotPresence } from "../../presence/ui/BotPresence";
 import { botProvider, ProviderLogo } from "./BotAvatar";
 import { useBotControls } from "./BotHome";
 import { botPath } from "./selection";
+import { resumeWord } from "./bot-state";
 
 type Bot = NonNullable<BotView["bot"]>;
 const CONTROL = `${COARSE_POINTER_HEADER_ICON_BUTTON_CLASS} text-subtle-foreground/75 hover:text-muted-foreground`;
@@ -34,11 +35,12 @@ export function BotInfoRows({ threadId, view, refresh, openPath }: { threadId: s
   const needs = todosOn ? loops.data?.needsYouNow.length ?? null : attention.data ? attention.data.attention?.count ?? 0 : null;
   const running = useLive("thread_model", { threadId }, { pollMs: 30_000 });
   const model = running.data?.model?.modelName ?? null;
-  const controls = bot.inBb ? null : (
+  // A paused or stopped Bot always has its Resume ("Run here" for one in bb).
+  const controls = (
     <span role="group" aria-label={`${bot.name} controls`} className="ml-auto flex shrink-0 items-center">
       {bot.state === "active"
         ? <Button type="button" variant="ghost" size="icon" className={CONTROL} aria-label="Pause" disabled={!!busy} onClick={() => void run("bot_pause")}><Icon name="Pause" /></Button>
-        : <Button type="button" variant="ghost" size="icon" className={CONTROL} aria-label="Resume" disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" /></Button>}
+        : <Button type="button" variant="ghost" size="icon" className={CONTROL} aria-label={resumeWord(bot)!} disabled={!!busy} onClick={() => void run("bot_resume")}><Icon name="Play" /></Button>}
       {bot.state !== "stopped" ? <Button type="button" variant="ghost" size="icon" className={CONTROL} aria-label="Stop" disabled={!!busy} onClick={() => setSheet("stop")}><Icon name="Square" /></Button> : null}
     </span>
   );

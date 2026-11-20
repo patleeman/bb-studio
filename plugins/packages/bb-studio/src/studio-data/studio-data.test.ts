@@ -21,7 +21,8 @@ import { fromHeartbeat, localZone } from "../schedule";
 import { SETTINGS_KV_KEY } from "../settings/store";
 import { SKILLS_REGISTRY_KV_KEY } from "../skills-registry";
 import { testScheduler } from "../test/scheduler-fixture";
-import { BB_KV_FILE, BEFORE_DIR, BEFORE_KV_FILE, REPLACED_DIR, STAGED_DIR, importDir, importPath, readJournal, studioDir, writeJournal, type ImportJournal } from "./journal";
+import { BB_KV_FILE, BEFORE_DIR, BEFORE_KV_FILE, FROM_BB_FILE, REPLACED_DIR, STAGED_DIR, importDir, importPath, readJournal, studioDataFromBb, studioDir, writeJournal, type ImportJournal } from "./journal";
+import { readImportedAt } from "../automation-table";
 import { studioOwnData } from "./own-data";
 import { previewStaged, studioDataStatus } from "./preview";
 import { stopImportedStudio } from "./stop";
@@ -420,6 +421,28 @@ describe("applying bb's Studio data at Studio's start", () => {
     expect(existsSync(importPath(x.dataDir, BB_KV_FILE))).toBe(false);
     // A second start changes nothing.
     expect(await x.start()).toMatchObject({ state: "applied" });
+  });
+
+  it("makes the brought-over Bots this install's: none is in bb on a BB Studio copy, even with the set-aside data deleted", async () => {
+    const x = await staged();
+    writeFileSync(join(x.dataDir, "fork-import.json"), JSON.stringify({ version: 1, sourceDataDir: "/Users/x/.bb", importedAt: Date.now() + 60_000 }));
+    expect(readImportedAt(x.dataDir)).not.toBeNull();
+    await x.start();
+    expect(JSON.parse(readFileSync(join(x.studio, FROM_BB_FILE), "utf8"))).toMatchObject({ version: 1 });
+    expect(studioDataFromBb(x.dataDir)).toBe(true);
+    expect(readImportedAt(x.dataDir)).toBeNull();
+    rmSync(importDir(x.dataDir), { recursive: true });
+    expect(readImportedAt(x.dataDir)).toBeNull();
+  });
+
+  it("takes the marker away with bb's data when the old data is put back", async () => {
+    const x = await staged();
+    await x.start();
+    writeJournal(x.dataDir, { ...(readJournal(x.dataDir) as ImportJournal), state: "restore-requested" });
+    await x.start();
+    expect(existsSync(join(x.studio, FROM_BB_FILE))).toBe(false);
+    expect(readdirSync(importPath(x.dataDir, REPLACED_DIR))).toContain(FROM_BB_FILE);
+    expect(studioDataFromBb(x.dataDir)).toBe(false);
   });
 
   it("puts the old data back when asked, keeping bb's in a folder", async () => {
