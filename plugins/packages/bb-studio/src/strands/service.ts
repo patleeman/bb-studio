@@ -4,6 +4,7 @@
 import type Database from "better-sqlite3";
 import { type StrandItemView, type StrandList, type StrandView } from "./contract";
 import { JEV_DAILY_CAP, StrandDetector, type DetectorDeps, type OpenTask } from "./detector";
+import { approvalDecisions, isWorkerApproval, shortApproval, type Interaction } from "../worker-approvals";
 import { byState, liveState, type AskSignal, type Signals, type TaskSignal, type WorkerSignal, type WorkerStatus } from "./states";
 import { StrandStore, type Strand } from "./store";
 import { USER_OWNER } from "../tasks/contract";
@@ -17,7 +18,7 @@ export interface StrandServiceDeps extends Omit<DetectorDeps, "store" | "openTas
   /** The conversation's workers, with BB's status. */
   workers(threadId: string): Promise<WorkerFact[]>;
   /** Pending BB questions and approvals in a thread. */
-  interactions(threadId: string): Promise<{ id: string; createdAt: number; label: string }[]>;
+  interactions(threadId: string): Promise<(Interaction & { createdAt?: number })[]>;
   /** Whether the thread is in a turn. */
   busy(threadId: string): Promise<boolean>;
 }
@@ -33,6 +34,14 @@ export function openAgentTasks(db: Database.Database, threadId: string): (OpenTa
     .map((row) => { try { return JSON.parse(row.record) as TaskRecord; } catch { return null; } })
     .filter((task): task is TaskRecord => !!task && !!task.title && task.owner !== USER_OWNER && !task.automation && !task.id.startsWith("task_auto-") && !task.id.startsWith("loop_"))
     .map((task) => ({ id: task.id, title: task.title!, updatedAt: task.updatedAt ?? 0, waitingOn: task.waitingOn ?? null }));
+}
+
+/** A pending BB interaction as an ask: an approval with BB's choices, or a question by its first prompt. */
+export function askOf(interaction: Interaction & { createdAt?: number }, threadId: string, strandId: string | null): AskSignal {
+  if (isWorkerApproval(interaction)) return { id: interaction.id, kind: "approval", strandId, threadId, label: `Approve: ${shortApproval(interaction)}`, decisions: approvalDecisions(interaction) };
+  const questions = (interaction.payload as { questions?: { prompt?: string; shortLabel?: string }[] } | null | undefined)?.questions;
+  const prompt = questions?.[0]?.shortLabel?.trim() || questions?.[0]?.prompt?.trim();
+  return { id: interaction.id, kind: "question", strandId, threadId, label: prompt ? (prompt.length > 120 ? `${prompt.slice(0, 119)}…` : prompt) : "A question is waiting", decisions: [] };
 }
 
 export class StrandService {
@@ -82,11 +91,17 @@ export class StrandService {
     const runningStrandId = busy ? this.detector.runningStrand(threadId) : null;
     const workers: WorkerSignal[] = workerFacts.map((worker) => ({ ...worker, strandId: this.workerStrand(threadId, worker, busy) }));
     const turnStrand = (at: number) => (busy && this.detector.hasRunningTurn(threadId) ? runningStrandId : this.store.strandAt(threadId, at)?.strandId ?? null);
-    const asks: AskSignal[] = interactions.map((ask) => ({ id: ask.id, kind: "question", strandId: turnStrand(ask.createdAt), label: ask.label }));
+    const asks: AskSignal[] = interactions.map((ask) => askOf(ask, threadId, turnStrand(ask.createdAt ?? now)));
+    // A worker that needs the user: what it waits on, with its approval's choices.
+    for (const worker of workers.filter((each) => each.status === "needs-you")) {
+      const pending = await this.deps.interactions(worker.threadId).catch(() => []);
+      asks.push(...pending.map((ask) => ({ ...askOf(ask, worker.threadId, worker.strandId), label: `${worker.title}: ${askOf(ask, worker.threadId, null).label}` })));
+    }
     for (const request of this.gatewayRequests()) {
       const worker = workers.find((each) => each.threadId === request.threadId);
-      if (request.threadId === threadId) asks.push({ id: request.id, kind: "gateway", strandId: turnStrand(request.createdAt), label: `Tool Gateway: ${request.input?.label ?? request.input?.name ?? "a server"}` });
-      else if (worker) asks.push({ id: request.id, kind: "gateway", strandId: worker.strandId, label: `${worker.title}: Tool Gateway request` });
+      const label = `Add MCP server: ${request.input?.label ?? request.input?.name ?? "a server"}`;
+      if (request.threadId === threadId) asks.push({ id: request.id, kind: "gateway", strandId: turnStrand(request.createdAt), label, threadId, decisions: [] });
+      else if (worker) asks.push({ id: request.id, kind: "gateway", strandId: worker.strandId, label: `${worker.title}: ${label}`, threadId: worker.threadId, decisions: [] });
     }
     const tasks: TaskSignal[] = openAgentTasks(this.deps.db, threadId).flatMap((task) => {
       const strand = this.store.byTask(task.id);
@@ -137,7 +152,8 @@ export class StrandService {
       const latest = this.store.latest(strand.id, threadId);
       const count = counts.get(strand.id);
       return {
-        id: strand.id, title: strand.title, summary: strand.summary, named: strand.named, state: live.state, detail: live.detail, workers: live.workers,
+        id: strand.id, title: strand.title, summary: strand.summary, named: strand.named, state: live.state, detail: live.detail,
+        asks: live.asks.map(({ id, kind, threadId: askThread, label, decisions }) => ({ id, kind, threadId: askThread, label, decisions })), workers: live.workers,
         lastAt: strand.lastAt, latestSeq: latest?.seq ?? null, latestTurnId: latest?.turnId ?? null, messages: count?.messages ?? 0, unsure: count?.unsure ?? 0,
         pinned: strand.pinned, origin: strand.origin, taskId: strand.taskId,
       };
@@ -155,10 +171,10 @@ export class StrandService {
     return this.store.items(threadId, limit, ["user", "report", "worker"]).map((item) => ({ ...item }));
   }
 
-  tags(threadId: string): { tags: { turnId: string; strandId: string | null }[]; strands: { id: string; title: string }[] } {
-    const rows = this.store.db.prepare("SELECT turn_id, strand_id FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND turn_id IS NOT NULL ORDER BY seq DESC LIMIT 2000").all(threadId) as { turn_id: string; strand_id: string | null }[];
+  tags(threadId: string): { tags: { turnId: string; seq: number; strandId: string | null }[]; strands: { id: string; title: string }[] } {
+    const rows = this.store.db.prepare("SELECT turn_id, seq, strand_id FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND turn_id IS NOT NULL ORDER BY seq DESC LIMIT 2000").all(threadId) as { turn_id: string; seq: number; strand_id: string | null }[];
     return {
-      tags: rows.map((row) => ({ turnId: row.turn_id, strandId: row.strand_id })),
+      tags: rows.reverse().map((row) => ({ turnId: row.turn_id, seq: row.seq, strandId: row.strand_id })),
       strands: this.store.list(threadId).map((strand) => ({ id: strand.id, title: strand.title })),
     };
   }

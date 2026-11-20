@@ -121,7 +121,9 @@ import { VSCODE_MAIN_PATH } from "./src/launcher/shared";
 import { readKindsSnapshot, whenOn } from "./src/ui/kinds-snapshot";
 import { LoopsDirective } from "./src/loops/ui/LoopCard";
 import { TaskDirective } from "./src/tasks/ui/TaskCard";
-import { InFlightBanner } from "./src/work/ui/InFlight";
+import { STRANDS_TAB, StrandsOrInFlightBanner } from "./src/strands/ui/Strip";
+import { StrandTag } from "./src/strands/ui/Tag";
+import { StrandsTab } from "./src/strands/ui/Tab";
 import "./src/work/ui/work.css";
 import { LOOPS_PANE, LoopsPane } from "./src/loops/ui/LoopsPane";
 import { TodosTabName } from "./src/loops/ui/tab-name";
@@ -386,7 +388,10 @@ export default definePluginApp((app) => {
   app.slots.messageDirective({ id: "loop", component: TaskDirective });
   app.slots.messageDirective({ id: "loops", component: LoopsDirective });
   app.slots.messageDirective({ id: "work", component: TaskDirective });
-  app.composer.customize({ id: "in-flight", scopes: ["thread"], banners: [{ id: "in-flight", component: InFlightBanner }] });
+  // Where strands run (phase 1: a Bot's Main) their strip takes the In flight strip's place (src/strands/ui).
+  app.composer.customize({ id: "in-flight", scopes: ["thread"], banners: [{ id: "in-flight", component: StrandsOrInFlightBanner }] });
+  app.slots.experimental_messageMetadata({ id: "strand-tag", placement: "above", component: StrandTag });
+  registerThreadTab(app, { id: STRANDS_TAB, title: "Strands", icon: "ListTree", layout: "flush", component: StrandsTab, ...OFF_NEW_TAB });
   // The Todos pane: the todo list in a tab beside the chat.
   registerThreadTab(app, { id: LOOPS_PANE, title: newTabTitle(LOOPS_PANE) ?? "Tasks", icon: "ListTodo", layout: "flush", component: LoopsPane, ...newTabFields(LOOPS_PANE) });
   // The Bot's other pages as tabs (Memory, Library, Automations, the Archive) and the New Tab page's "New …" actions (src/tab-kinds.ts).

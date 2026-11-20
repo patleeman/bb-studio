@@ -4,6 +4,7 @@ import { strandList } from "./contract";
 import { StrandService, type WorkerFact } from "./service";
 import { DONE_SHOWN_MS, EARLIER_AFTER_MS, liveState, QUIET_AFTER_MS, type Signals } from "./states";
 import type { Strand } from "./store";
+import type { Interaction } from "../worker-approvals";
 import { database, FakeThread, fakeJev, fakeModel } from "./test/fixture";
 import { turnsOf } from "./turns";
 
@@ -40,9 +41,9 @@ const signals = (over: Partial<Signals> = {}): Signals => ({ now: NOW, runningSt
 
 describe("live states come only from real signals", () => {
   it("needs you: a pending question or approval, a worker that needs you", () => {
-    expect(liveState(strand(), signals({ asks: [{ id: "i", kind: "question", strandId: "s1", label: "A question is waiting" }] }))).toMatchObject({ state: "needs-you", detail: "A question is waiting" });
+    expect(liveState(strand(), signals({ asks: [{ id: "i", kind: "question", strandId: "s1", label: "A question is waiting", threadId: "t", decisions: [] }] }))).toMatchObject({ state: "needs-you", detail: "A question is waiting" });
     expect(liveState(strand(), signals({ workers: [{ threadId: "w", title: "Router fix", status: "needs-you", strandId: "s1", endedAt: null }] }))).toMatchObject({ state: "needs-you", detail: "Router fix needs you" });
-    expect(liveState(strand(), signals({ asks: [{ id: "i", kind: "question", strandId: "other", label: "x" }] })).state).toBe("active");
+    expect(liveState(strand(), signals({ asks: [{ id: "i", kind: "question", strandId: "other", label: "x", threadId: "t", decisions: [] }] })).state).toBe("active");
   });
 
   it("running: its turn or one of its workers", () => {
@@ -71,13 +72,13 @@ describe("live states come only from real signals", () => {
   });
 });
 
-function service(options: { workers?: WorkerFact[]; asks?: { id: string; createdAt: number; label: string }[]; busy?: boolean } = {}) {
+function service(options: { workers?: WorkerFact[]; asks?: Record<string, (Interaction & { createdAt?: number })[]>; busy?: boolean } = {}) {
   const db = database();
   const thread = new FakeThread();
   const svc = new StrandService({
     db, conversations: () => [thread.id], events: thread.events, jev: fakeJev(), model: fakeModel(), changed: () => {}, log: () => {}, now: () => NOW,
     setTimer: () => null, clearTimer: () => {},
-    workers: async () => options.workers ?? [], interactions: async () => options.asks ?? [], busy: async () => options.busy ?? false,
+    workers: async () => options.workers ?? [], interactions: async (threadId) => options.asks?.[threadId] ?? [], busy: async () => options.busy ?? false,
   });
   return { db, thread, svc };
 }
@@ -110,6 +111,23 @@ describe("strands.list", () => {
     expect(x.svc.items(x.thread.id, 10).find((item) => item.kind === "worker")).toMatchObject({ ref: "thr_worker", by: "inherit" });
   });
 
+  it("lists what waits on the user in a strand: an approval with BB's choices, a worker's question", async () => {
+    const workers: WorkerFact[] = [];
+    const asks: Record<string, (Interaction & { createdAt?: number })[]> = {};
+    const x = service({ workers, asks });
+    await x.svc.idle(x.thread.id);
+    x.thread.turn("Look at the router", "Starting a worker.", { at: NOW - 2 * HOUR });
+    x.thread.turn("Book the dentist", "Ok.", { at: NOW - HOUR });
+    await x.svc.idle(x.thread.id);
+    asks.thr_main = [{ id: "int_1", status: "pending", createdAt: NOW - HOUR + 5, payload: { kind: "approval", availableDecisions: ["allow_once", "deny"], subject: { kind: "command", command: "npm publish" } } }];
+    workers.push({ threadId: "thr_worker", title: "Router fix", status: "needs-you", createdAt: NOW - 2 * HOUR + 2, endedAt: null });
+    asks.thr_worker = [{ id: "int_2", status: "pending", payload: { kind: "user_question", questions: [{ prompt: "Which fallback model?" }] } as never }];
+    const list = await x.svc.list(x.thread.id);
+    expect(list.strands.map((each) => [each.title, each.state])).toEqual([["Book the dentist", "needs-you"], ["Look at the router", "needs-you"]]);
+    expect(list.strands[0]!.asks).toEqual([{ id: "int_1", kind: "approval", threadId: "thr_main", label: "Approve: npm publish", decisions: ["deny", "allow_once"] }]);
+    expect(list.strands[1]!.asks).toEqual([{ id: "int_2", kind: "question", threadId: "thr_worker", label: "Router fix: Which fallback model?", decisions: [] }]);
+  });
+
   it("marks a strand opened, so what finished before isn't 'done, not seen'", async () => {
     const workers: WorkerFact[] = [{ threadId: "thr_worker", title: "Router fix", status: "done", createdAt: NOW - 2 * HOUR + 2, endedAt: NOW - HOUR }];
     const x = service({ workers });
@@ -129,7 +147,7 @@ describe("strands.list", () => {
     const b = x.thread.turn("thanks", "Sure.");
     await x.svc.idle(x.thread.id);
     const { tags, strands } = x.svc.tags(x.thread.id);
-    expect(tags).toEqual(expect.arrayContaining([{ turnId: a.turnId, strandId: strands[0]!.id }, { turnId: b.turnId, strandId: null }]));
+    expect(tags).toEqual([{ turnId: a.turnId, seq: a.seq, strandId: strands[0]!.id }, { turnId: b.turnId, seq: b.seq, strandId: null }]);
   });
 });
 

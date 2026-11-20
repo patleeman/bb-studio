@@ -22,7 +22,9 @@ export const DONE_SHOWN_MS = 24 * 60 * 60 * 1000;
 
 export type WorkerStatus = "running" | "needs-you" | "failed" | "done";
 export interface WorkerSignal { threadId: string; title: string; status: WorkerStatus; strandId: string | null; endedAt: number | null }
-export interface AskSignal { id: string; kind: "question" | "gateway"; strandId: string | null; label: string }
+export type AskDecision = "allow_once" | "allow_for_session" | "deny";
+/** Something waiting on the user: a BB question or approval (in the conversation or one of its workers), or a Tool Gateway request. */
+export interface AskSignal { id: string; kind: "question" | "approval" | "gateway"; strandId: string | null; label: string; threadId: string; decisions: AskDecision[] }
 export interface TaskSignal { id: string; strandId: string; waitingOn: { kind: string; text: string | null; ref: string | null } | null }
 
 export interface Signals {
@@ -36,6 +38,8 @@ export interface Signals {
 
 export interface StrandLive {
   state: StrandState;
+  /** What waits on the user in it, oldest first. */
+  asks: AskSignal[];
   /** One line on why: who it waits on, the worker that needs you. */
   detail: string | null;
   workers: { threadId: string; title: string; status: WorkerStatus }[];
@@ -47,7 +51,7 @@ export function liveState(strand: Strand, signals: Signals): StrandLive {
   const workers = signals.workers.filter((worker) => worker.strandId === strand.id);
   const asks = signals.asks.filter((ask) => ask.strandId === strand.id);
   const shown = workers.map(({ threadId, title, status }) => ({ threadId, title, status }));
-  const done = (state: StrandState, detail: string | null): StrandLive => ({ state, detail, workers: shown, earlier: false });
+  const done = (state: StrandState, detail: string | null): StrandLive => ({ state, detail, asks, workers: shown, earlier: false });
   const needs = workers.find((worker) => worker.status === "needs-you");
   if (asks.length) return done("needs-you", asks[0]!.label);
   if (needs) return done("needs-you", `${needs.title} needs you`);
@@ -61,7 +65,7 @@ export function liveState(strand: Strand, signals: Signals): StrandLive {
   if (task) return done("waiting", task.waitingOn!.text ?? task.waitingOn!.ref ?? (task.waitingOn!.kind === "ci" ? "CI" : "someone outside"));
   const idle = signals.now - strand.lastAt;
   if (idle < QUIET_AFTER_MS) return done("active", null);
-  return { state: "quiet", detail: null, workers: shown, earlier: !strand.pinned && idle >= QUIET_AFTER_MS + EARLIER_AFTER_MS };
+  return { state: "quiet", detail: null, asks, workers: shown, earlier: !strand.pinned && idle >= QUIET_AFTER_MS + EARLIER_AFTER_MS };
 }
 
 const RANK: Record<StrandState, number> = { "needs-you": 0, running: 1, "done-unseen": 2, waiting: 3, active: 4, quiet: 5 };

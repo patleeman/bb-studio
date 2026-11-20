@@ -11,6 +11,7 @@ import { EVENT_TYPES, type EventRow } from "./turns";
 import { STRANDS_CALLER } from "./detector";
 import { StrandService, type WorkerFact } from "./service";
 import { StrandStore } from "./store";
+import type { Interaction } from "../worker-approvals";
 
 type Failure = { ok: false; unavailable: boolean; error: string };
 export interface StrandsDecisions {
@@ -59,9 +60,8 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
     },
     workers: deps.workers,
     interactions: async (threadId) => {
-      const list = await bb.sdk.threads.interactions.list({ threadId }) as unknown as { id: string; status?: string; createdAt?: number; payload?: { kind?: string } }[];
-      return list.filter((each) => each.status === undefined || each.status === "pending")
-        .map((each) => ({ id: each.id, createdAt: each.createdAt ?? Date.now(), label: each.payload?.kind === "approval" ? "An approval is waiting" : "A question is waiting" }));
+      const list = await bb.sdk.threads.interactions.list({ threadId }) as unknown as (Interaction & { createdAt?: number })[];
+      return list.filter((each) => each.status === undefined || each.status === "pending");
     },
     busy: async (threadId) => BUSY.has((await threadOf(threadId))?.status ?? ""),
     changed,

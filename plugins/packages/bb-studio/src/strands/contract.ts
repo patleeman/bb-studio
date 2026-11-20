@@ -9,6 +9,17 @@ const defineRpcContract: typeof sdkDefineRpcContract = (contract) => contract;
 const threadId = z.string().min(1).max(200);
 const workerStatus = z.enum(["running", "needs-you", "failed", "done"]);
 
+export const strandAsk = z.object({
+  id: z.string(),
+  kind: z.enum(["question", "approval", "gateway"]),
+  /** The thread it waits in: the conversation, or one of its workers. */
+  threadId: z.string(),
+  label: z.string(),
+  /** An approval's choices (BB's own), for its buttons. */
+  decisions: z.array(z.enum(["allow_once", "allow_for_session", "deny"])),
+});
+export type StrandAsk = z.infer<typeof strandAsk>;
+
 export const strandView = z.object({
   id: z.string(),
   title: z.string(),
@@ -17,6 +28,7 @@ export const strandView = z.object({
   named: z.boolean(),
   state: z.enum(STATES),
   detail: z.string().nullable(),
+  asks: z.array(strandAsk),
   workers: z.array(z.object({ threadId: z.string(), title: z.string(), status: workerStatus })),
   lastAt: z.number(),
   /** The strand's newest message (jump-to-latest opens #msg=<seq>); null when it has none (a task with no message yet). */
@@ -73,7 +85,11 @@ export const rpcContract = defineRpcContract({
   "strands.tags": {
     experimental_description: "Each sorted turn's strand, for the tag on its messages.",
     input: z.object({ threadId }).strict(),
-    output: z.object({ tags: z.array(z.object({ turnId: z.string(), strandId: z.string().nullable() })), strands: z.array(z.object({ id: z.string(), title: z.string() })) }),
+    output: z.object({
+      /** Sorted turns, oldest first: each turn's first message (its seq) and its strand, null for none. */
+      tags: z.array(z.object({ turnId: z.string(), seq: z.number(), strandId: z.string().nullable() })),
+      strands: z.array(z.object({ id: z.string(), title: z.string() })),
+    }),
   },
   "strands.opened": {
     experimental_description: "The user opened a strand: what finished in it since counts as seen.",
