@@ -25,13 +25,17 @@
 // and sets every bb automation `enabled = 0`, so the copy never runs them a
 // second time beside the live bb install; the plugin sync never copies those
 // tables again. On such an install a row made before the import that is
-// still paused is "in bb": shown as Paused · in bb and read-only here. The
+// still paused is "in bb": shown as Paused · in bb and read-only here,
+// unless bb's Studio data was brought over (studio-data/), which makes its
+// Bots and automations this install's. A Bot in bb still has its Resume,
+// as "Run here". The
 // fork's take-over covers threads only; automations have none.
 import Database from "better-sqlite3";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import type { AutomationTable, AutomationTableKind, AutomationTableRow } from "./automation-table-contract";
+import { studioDataFromBb } from "./studio-data/journal";
 import { at12, cronValues, DAY_WORDS, describeCron, fromHeartbeat, minuteOf, type Schedule } from "./schedule";
 
 // ---- When, in a few words ---------------------------------------------------
@@ -293,8 +297,14 @@ export function bbFromFile(path: string): BbEntry[] {
   }
 }
 
-/** When BB Studio's one-way import from bb ran (`fork-import.json` in the server's data folder), or null on an install without it or once it is cut over from bb. */
+/**
+ * When BB Studio's one-way import from bb ran (`fork-import.json` in the
+ * server's data folder), or null on an install without it, once it is cut
+ * over from bb, or once bb's Studio data is brought over (studio-data): its
+ * Bots and automations are this install's then, none "in bb".
+ */
 export function readImportedAt(dataDir: string): number | null {
+  if (studioDataFromBb(dataDir)) return null;
   try {
     const state = JSON.parse(readFileSync(join(dataDir, "fork-import.json"), "utf8")) as { version?: unknown; sourceDataDir?: unknown; importedAt?: unknown; cutoverAt?: unknown };
     if (state.version !== 1 || typeof state.sourceDataDir !== "string") return null;

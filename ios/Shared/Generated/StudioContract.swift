@@ -88,6 +88,7 @@ public enum Studio {
     public static let bot_set_run = "bot_set_run"
     public static let bot_pause = "bot_pause"
     public static let bot_resume = "bot_resume"
+    public static let bot_make_main = "bot_make_main"
     public static let bot_stop = "bot_stop"
     public static let bot_maintenance_threads = "bot_maintenance_threads"
     public static let bot_maintenance_get = "bot_maintenance_get"
@@ -110,6 +111,7 @@ public enum Studio {
     public static let bot_listed_threads = "bot_listed_threads"
     public static let bot_side_thread_open = "bot_side_thread_open"
     public static let bot_thread_owner = "bot_thread_owner"
+    public static let bot_conversation_owner = "bot_conversation_owner"
     public static let bot_thread_adopt = "bot_thread_adopt"
     public static let bot_thread_release = "bot_thread_release"
     public static let bot_welcome = "bot_welcome"
@@ -386,6 +388,7 @@ public enum Studio {
     public static let areas_list = "areas.list"
     public static let areas_get = "areas.get"
     public static let areas_itemTask = "areas.itemTask"
+    public static let toolGateway_overview = "toolGateway.overview"
   }
 
   public enum Channel {
@@ -602,6 +605,8 @@ public enum Studio {
 
   public typealias BotResume = BotResumeOutput
 
+  public typealias BotMakeMain = BotMakeMainOutput
+
   public typealias BotStop = BotStopOutput
 
   public typealias BotMaintenanceThreads = BotMaintenanceThreadsOutput
@@ -645,6 +650,8 @@ public enum Studio {
   public typealias BotSideThreadOpen = BotSideThreadOpenOutput
 
   public typealias BotThreadOwner = BotThreadOwnerOutput
+
+  public typealias BotConversationOwner = BotConversationOwnerOutput
 
   public typealias BotThreadAdopt = BotThreadAdoptOutput
 
@@ -1233,6 +1240,10 @@ public enum Studio {
   public typealias AreasGet = AreasGetOutput
 
   public typealias AreasItemTask = AreasItemTaskOutput
+
+  public typealias ToolGatewayOverviewInput = StudioJSONValue
+
+  public typealias ToolGatewayOverview = ToolGatewayOverviewOutput
 
   public struct LoopsListInput: Sendable, Hashable, Codable {
     public var area: String?
@@ -12088,6 +12099,283 @@ public enum Studio {
     }
   }
 
+  public struct BotMakeMainInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var threadId: String?
+
+    public init(botId: String? = nil, threadId: String? = nil) {
+      self.botId = botId
+      self.threadId = threadId
+    }
+  }
+
+  public enum BotMakeMainOutputBotState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case stopped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      case "stopped": self = .stopped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .stopped: try container.encode("stopped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotMakeMainOutputBotKind: Sendable, Hashable, Codable {
+    case studio
+    case external
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "studio": self = .studio
+      case "external": self = .external
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .studio: try container.encode("studio")
+      case .external: try container.encode("external")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotMakeMainOutputBotAppearanceEffects: Sendable, Hashable, Codable {
+    public var workers: Bool?
+    public var finished: Bool?
+    public var needsYou: Bool?
+    public var error: Bool?
+
+    public init(workers: Bool? = nil, finished: Bool? = nil, needsYou: Bool? = nil, error: Bool? = nil) {
+      self.workers = workers
+      self.finished = finished
+      self.needsYou = needsYou
+      self.error = error
+    }
+  }
+
+  public struct BotMakeMainOutputBotAppearance: Sendable, Hashable, Codable {
+    public var themeId: String?
+    public var intensity: Double?
+    public var glass: Double?
+    public var motion: Double?
+    public var effects: BotMakeMainOutputBotAppearanceEffects?
+
+    public init(themeId: String? = nil, intensity: Double? = nil, glass: Double? = nil, motion: Double? = nil, effects: BotMakeMainOutputBotAppearanceEffects? = nil) {
+      self.themeId = themeId
+      self.intensity = intensity
+      self.glass = glass
+      self.motion = motion
+      self.effects = effects
+    }
+  }
+
+  public struct BotMakeMainOutputBotPresence: Sendable, Hashable, Codable {
+    public var form: String?
+    public var color: StudioJSONValue?
+    public var motion: Double?
+
+    public init(form: String? = nil, color: StudioJSONValue? = nil, motion: Double? = nil) {
+      self.form = form
+      self.color = color
+      self.motion = motion
+    }
+  }
+
+  public enum BotMakeMainOutputBotDefaultModelReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotMakeMainOutputBotDefaultModel: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: BotMakeMainOutputBotDefaultModelReasoningLevel?
+    public var modelName: String?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: BotMakeMainOutputBotDefaultModelReasoningLevel? = nil, modelName: String? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.modelName = modelName
+    }
+  }
+
+  public struct BotMakeMainOutputBot: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var avatar: String?
+    public var state: BotMakeMainOutputBotState?
+    public var threadId: String?
+    public var memoryPageId: String?
+    public var shape: String?
+    public var color: String?
+    public var role: String?
+    public var primary: Bool?
+    public var kind: BotMakeMainOutputBotKind?
+    public var providerId: String?
+    public var model: String?
+    public var modelName: String?
+    public var appearance: BotMakeMainOutputBotAppearance?
+    public var presence: BotMakeMainOutputBotPresence?
+    public var defaultModel: BotMakeMainOutputBotDefaultModel?
+    public var inBb: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, state: BotMakeMainOutputBotState? = nil, threadId: String? = nil, memoryPageId: String? = nil, shape: String? = nil, color: String? = nil, role: String? = nil, primary: Bool? = nil, kind: BotMakeMainOutputBotKind? = nil, providerId: String? = nil, model: String? = nil, modelName: String? = nil, appearance: BotMakeMainOutputBotAppearance? = nil, presence: BotMakeMainOutputBotPresence? = nil, defaultModel: BotMakeMainOutputBotDefaultModel? = nil, inBb: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.avatar = avatar
+      self.state = state
+      self.threadId = threadId
+      self.memoryPageId = memoryPageId
+      self.shape = shape
+      self.color = color
+      self.role = role
+      self.primary = primary
+      self.kind = kind
+      self.providerId = providerId
+      self.model = model
+      self.modelName = modelName
+      self.appearance = appearance
+      self.presence = presence
+      self.defaultModel = defaultModel
+      self.inBb = inBb
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public enum BotMakeMainOutputRunCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case every5minutes
+    case every15minutes
+    case every30minutes
+    case every2hours
+    case every6hours
+    case weekly
+    case custom
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "every5minutes": self = .every5minutes
+      case "every15minutes": self = .every15minutes
+      case "every30minutes": self = .every30minutes
+      case "every2hours": self = .every2hours
+      case "every6hours": self = .every6hours
+      case "weekly": self = .weekly
+      case "custom": self = .custom
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .every5minutes: try container.encode("every5minutes")
+      case .every15minutes: try container.encode("every15minutes")
+      case .every30minutes: try container.encode("every30minutes")
+      case .every2hours: try container.encode("every2hours")
+      case .every6hours: try container.encode("every6hours")
+      case .weekly: try container.encode("weekly")
+      case .custom: try container.encode("custom")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotMakeMainOutputRun: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var cadence: BotMakeMainOutputRunCadence?
+    public var time: String?
+    public var cron: String?
+
+    public init(enabled: Bool? = nil, cadence: BotMakeMainOutputRunCadence? = nil, time: String? = nil, cron: String? = nil) {
+      self.enabled = enabled
+      self.cadence = cadence
+      self.time = time
+      self.cron = cron
+    }
+  }
+
+  public struct BotMakeMainOutput: Sendable, Hashable, Codable {
+    public var bot: BotMakeMainOutputBot?
+    public var run: BotMakeMainOutputRun?
+
+    public init(bot: BotMakeMainOutputBot? = nil, run: BotMakeMainOutputRun? = nil) {
+      self.bot = bot
+      self.run = run
+    }
+  }
+
   public struct BotStopInput: Sendable, Hashable, Codable {
     public var botId: String?
 
@@ -13632,6 +13920,22 @@ public enum Studio {
     }
   }
 
+  public struct BotConversationOwnerInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct BotConversationOwnerOutput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
   public struct BotThreadAdoptInput: Sendable, Hashable, Codable {
     public var botId: String?
     public var threadId: String?
@@ -13734,12 +14038,14 @@ public enum Studio {
     public var threadId: String?
     public var opened: Bool?
     public var pending: Bool?
+    public var problem: String?
     public var bot: BotWelcomeOutputBot?
 
-    public init(threadId: String? = nil, opened: Bool? = nil, pending: Bool? = nil, bot: BotWelcomeOutputBot? = nil) {
+    public init(threadId: String? = nil, opened: Bool? = nil, pending: Bool? = nil, problem: String? = nil, bot: BotWelcomeOutputBot? = nil) {
       self.threadId = threadId
       self.opened = opened
       self.pending = pending
+      self.problem = problem
       self.bot = bot
     }
   }
@@ -39891,6 +40197,114 @@ public enum Studio {
       self.taskId = taskId
       self.title = title
       self.created = created
+    }
+  }
+
+  public enum ToolGatewayOverviewOutputServersItemKind: Sendable, Hashable, Codable {
+    case stdio
+    case streamable_http
+    case sse
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "stdio": self = .stdio
+      case "streamable-http": self = .streamable_http
+      case "sse": self = .sse
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .stdio: try container.encode("stdio")
+      case .streamable_http: try container.encode("streamable-http")
+      case .sse: try container.encode("sse")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ToolGatewayOverviewOutputServersItemStatus: Sendable, Hashable, Codable {
+    case needs_approval
+    case stopped
+    case starting
+    case running
+    case needs_sign_in
+    case error
+    case off
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "needs-approval": self = .needs_approval
+      case "stopped": self = .stopped
+      case "starting": self = .starting
+      case "running": self = .running
+      case "needs-sign-in": self = .needs_sign_in
+      case "error": self = .error
+      case "off": self = .off
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .needs_approval: try container.encode("needs-approval")
+      case .stopped: try container.encode("stopped")
+      case .starting: try container.encode("starting")
+      case .running: try container.encode("running")
+      case .needs_sign_in: try container.encode("needs-sign-in")
+      case .error: try container.encode("error")
+      case .off: try container.encode("off")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ToolGatewayOverviewOutputServersItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+    public var kind: ToolGatewayOverviewOutputServersItemKind?
+    public var status: ToolGatewayOverviewOutputServersItemStatus?
+    public var enabled: Bool?
+    public var tools: Int?
+
+    public init(id: String? = nil, label: String? = nil, kind: ToolGatewayOverviewOutputServersItemKind? = nil, status: ToolGatewayOverviewOutputServersItemStatus? = nil, enabled: Bool? = nil, tools: Int? = nil) {
+      self.id = id
+      self.label = label
+      self.kind = kind
+      self.status = status
+      self.enabled = enabled
+      self.tools = tools
+    }
+  }
+
+  public struct ToolGatewayOverviewOutputRequestsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+    public var why: String?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, label: String? = nil, why: String? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.label = label
+      self.why = why
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct ToolGatewayOverviewOutput: Sendable, Hashable, Codable {
+    public var servers: [ToolGatewayOverviewOutputServersItem]?
+    public var requests: [ToolGatewayOverviewOutputRequestsItem]?
+
+    public init(servers: [ToolGatewayOverviewOutputServersItem]? = nil, requests: [ToolGatewayOverviewOutputRequestsItem]? = nil) {
+      self.servers = servers
+      self.requests = requests
     }
   }
 

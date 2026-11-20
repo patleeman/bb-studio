@@ -11,7 +11,9 @@
 //      this Studio's migrations;
 //   3. everything in it is stopped (stop.ts); Task reminders and the public
 //      skill registry's approval are turned off in bb's key-value rows;
-//   4. the swap (swap.ts): this install's files and kv rows go to before/,
+//   4. a marker (FROM_BB_FILE) goes in with bb's files: its Bots run here
+//      now, none "in bb" (automation-table.ts readImportedAt);
+//   5. the swap (swap.ts): this install's files and kv rows go to before/,
 //      bb's come in, and the journal ends "applied".
 // "restore-requested" ("Put my old Studio data back") swaps back: bb's go to
 // replaced/, before/ comes back. "applying" and "restoring" left by a crash
@@ -23,11 +25,12 @@ import { join } from "node:path";
 import { SETTINGS_KV_KEY } from "../settings/store";
 import { SKILLS_REGISTRY_KV_KEY } from "../skills-registry";
 import {
-  BB_KV_FILE, BEFORE_DIR, BEFORE_KV_FILE, KEPT_HERE, REPLACED_DIR, REPLACED_KV_FILE, STAGED_DIR,
+  BB_KV_FILE, BEFORE_DIR, BEFORE_KV_FILE, FROM_BB_FILE, KEPT_HERE, REPLACED_DIR, REPLACED_KV_FILE, STAGED_DIR,
   importPath, readJournal, readJson, studioDir, writeJournal, writePrivateJson, type ImportJournal,
 } from "./journal";
 import { studioOwnData, type OwnData } from "./own-data";
 import { stopImportedStudio } from "./stop";
+import { studioThreads } from "./threads";
 import { isRolledBack, rollBack, runSwap, type KvFile, type RolledBack, type StudioKv, type SwapPlan } from "./swap";
 
 export interface StartDeps {
@@ -44,6 +47,8 @@ export interface StartDeps {
    * key-value rows, so a swap waits for the next real start.
    */
   firstLoad: boolean;
+  /** BB's threads, to archive this install's replaced Bot threads after a swap and unarchive them at a put-back. */
+  threads?: { archive(threadId: string): Promise<unknown>; unarchive(threadId: string): Promise<unknown> };
 }
 
 const LOADED = Symbol.for("bb-studio.studio-data.loaded");
@@ -205,6 +210,60 @@ function settleRollBack(deps: StartDeps, ending: Ending, thrown: RolledBack): Im
   return settle(deps.dataDir, ending.undone({ ...thrown.journal, phase: null, undoing: undefined, updatedAt: now() }, reason), deps.log);
 }
 
+/** The Bots' own Main threads a Studio database names (threads.ts `required`), or none when it can't be read. */
+function mainThreadsIn(path: string): string[] {
+  if (!existsSync(path)) return [];
+  let db: Database.Database | null = null;
+  try {
+    db = new Database(path, { readonly: true, fileMustExist: true });
+    db.pragma("busy_timeout = 1000");
+    return studioThreads(db).required;
+  } catch {
+    return [];
+  } finally {
+    db?.close();
+  }
+}
+
+/**
+ * This install's own Main threads that bb's data replaces: only the Bots'
+ * Mains (the one onboarding made, and one it handed off to), never a
+ * project lead, worker, task or chat thread the old data also names.
+ */
+export function replacedMainThreads(installDb: string, bbDb: string): string[] {
+  const bb = new Set(mainThreadsIn(bbDb));
+  return mainThreadsIn(installDb).filter((id) => !bb.has(id));
+}
+
+/**
+ * After a swap, this install's own Main threads (the Main onboarding made)
+ * belong to no Bot: they are archived, so they don't linger as hidden
+ * threads. A put-back unarchives them for the Bots that come back. Failures
+ * are retried at the next start.
+ */
+async function tidyReplacedThreads(deps: StartDeps, journal: ImportJournal): Promise<ImportJournal> {
+  const ids = journal.replacedThreads ?? [];
+  if (!deps.threads || ids.length === 0) return journal;
+  const archive = journal.state === "applied" && !journal.replacedArchived;
+  const unarchive = journal.state === "restored" && journal.replacedArchived === true;
+  if (!archive && !unarchive) return journal;
+  let failed = 0;
+  for (const threadId of ids) {
+    try {
+      await (archive ? deps.threads.archive(threadId) : deps.threads.unarchive(threadId));
+    } catch (error) {
+      if (!/not found|404/i.test(errorText(error))) failed += 1;
+    }
+  }
+  if (failed > 0) {
+    deps.log.warn(`BB Studio data from bb: ${failed} of this install's replaced Bot threads could not be ${archive ? "archived" : "unarchived"}; trying again at the next start.`);
+    return journal;
+  }
+  const next: ImportJournal = { ...journal, replacedArchived: archive, updatedAt: (deps.now ?? Date.now)() };
+  writeJournal(deps.dataDir, next);
+  return next;
+}
+
 async function apply(deps: StartDeps, journal: ImportJournal): Promise<ImportJournal> {
   const now = deps.now ?? Date.now;
   const plan = applyPlan(deps.dataDir);
@@ -232,11 +291,13 @@ async function apply(deps: StartDeps, journal: ImportJournal): Promise<ImportJou
   }
   for (const suffix of ["-wal", "-shm", "-journal"]) rmSync(`${stagedDb}${suffix}`, { force: true });
   prepareOnboarding(plan.incomingDir, now());
+  writePrivateJson(join(plan.incomingDir, FROM_BB_FILE), { version: 1, journalId: journal.id, at: now() });
   const bbKv = readJson<BbKvFile>(plan.incomingKvFile);
   if (!bbKv.prepared) writePrivateJson(plan.incomingKvFile, prepareKv(bbKv));
 
+  const replacedThreads = replacedMainThreads(join(studioDir(deps.dataDir), "data.db"), stagedDb);
   const incoming = readdirSync(plan.incomingDir).filter((name) => !KEPT_HERE.has(name)).sort();
-  const applying: ImportJournal = { ...journal, state: "applying", phase: "out", incoming, stopped, error: null, updatedAt: now() };
+  const applying: ImportJournal = { ...journal, state: "applying", phase: "out", incoming, stopped, replacedThreads, replacedArchived: false, error: null, updatedAt: now() };
   writeJournal(deps.dataDir, applying);
   return swapOrRollBack(deps, plan, applying, "out", applyEnding(deps, plan));
 }
@@ -265,6 +326,11 @@ export async function finishStudioImport(deps: StartDeps): Promise<ImportJournal
     deps.log.info(`BB Studio data from bb: ${journal.state}; Studio was reloaded, not restarted, so this waits for BB Studio to be quit and reopened.`);
     return journal;
   }
+  const result = await act(deps, journal);
+  return result.state === "applied" || result.state === "restored" ? tidyReplacedThreads(deps, result) : result;
+}
+
+async function act(deps: StartDeps, journal: ImportJournal): Promise<ImportJournal> {
   switch (journal.state) {
     case "ready": return apply(deps, journal);
     case "restore-requested": return restore(deps, journal);

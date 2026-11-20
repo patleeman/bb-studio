@@ -21,11 +21,12 @@ import { fromHeartbeat, localZone } from "../schedule";
 import { SETTINGS_KV_KEY } from "../settings/store";
 import { SKILLS_REGISTRY_KV_KEY } from "../skills-registry";
 import { testScheduler } from "../test/scheduler-fixture";
-import { BB_KV_FILE, BEFORE_DIR, BEFORE_KV_FILE, REPLACED_DIR, STAGED_DIR, importDir, importPath, readJournal, studioDir, writeJournal, type ImportJournal } from "./journal";
+import { BB_KV_FILE, BEFORE_DIR, BEFORE_KV_FILE, FROM_BB_FILE, REPLACED_DIR, STAGED_DIR, importDir, importPath, readJournal, studioDataFromBb, studioDir, writeJournal, type ImportJournal } from "./journal";
+import { readImportedAt } from "../automation-table";
 import { studioOwnData } from "./own-data";
 import { previewStaged, studioDataStatus } from "./preview";
 import { stopImportedStudio } from "./stop";
-import { claimFirstLoad, finishStudioImport, prepareKv } from "./start";
+import { claimFirstLoad, finishStudioImport, prepareKv, replacedMainThreads } from "./start";
 import type { StudioKv } from "./swap";
 import { studioThreads } from "./threads";
 
@@ -420,6 +421,69 @@ describe("applying bb's Studio data at Studio's start", () => {
     expect(existsSync(importPath(x.dataDir, BB_KV_FILE))).toBe(false);
     // A second start changes nothing.
     expect(await x.start()).toMatchObject({ state: "applied" });
+  });
+
+  it("makes the brought-over Bots this install's: none is in bb on a BB Studio copy, even with the set-aside data deleted", async () => {
+    const x = await staged();
+    writeFileSync(join(x.dataDir, "fork-import.json"), JSON.stringify({ version: 1, sourceDataDir: "/Users/x/.bb", importedAt: Date.now() + 60_000 }));
+    expect(readImportedAt(x.dataDir)).not.toBeNull();
+    await x.start();
+    expect(JSON.parse(readFileSync(join(x.studio, FROM_BB_FILE), "utf8"))).toMatchObject({ version: 1 });
+    expect(studioDataFromBb(x.dataDir)).toBe(true);
+    expect(readImportedAt(x.dataDir)).toBeNull();
+    rmSync(importDir(x.dataDir), { recursive: true });
+    expect(readImportedAt(x.dataDir)).toBeNull();
+  });
+
+  it("takes the marker away with bb's data when the old data is put back", async () => {
+    const x = await staged();
+    await x.start();
+    writeJournal(x.dataDir, { ...(readJournal(x.dataDir) as ImportJournal), state: "restore-requested" });
+    await x.start();
+    expect(existsSync(join(x.studio, FROM_BB_FILE))).toBe(false);
+    expect(readdirSync(importPath(x.dataDir, REPLACED_DIR))).toContain(FROM_BB_FILE);
+    expect(studioDataFromBb(x.dataDir)).toBe(false);
+  });
+
+  it("archives this install's own Main once the swap applies, unarchives it at a put-back, and retries what failed", async () => {
+    const x = await staged();
+    const calls: string[] = [];
+    let refuse = true;
+    const threads = {
+      archive: async (threadId: string) => { calls.push(`archive ${threadId}`); if (refuse) throw new Error("host offline"); return {}; },
+      unarchive: async (threadId: string) => { calls.push(`unarchive ${threadId}`); return {}; },
+    };
+    const first = await x.start({ threads });
+    expect(first).toMatchObject({ state: "applied", replacedThreads: ["thr_1"], replacedArchived: false });
+    expect(calls).toEqual(["archive thr_1"]);
+    refuse = false;
+    expect(await x.start({ threads })).toMatchObject({ state: "applied", replacedArchived: true });
+    expect(await x.start({ threads })).toMatchObject({ replacedArchived: true });
+    expect(calls).toEqual(["archive thr_1", "archive thr_1"]);
+    writeJournal(x.dataDir, { ...(readJournal(x.dataDir) as ImportJournal), state: "restore-requested" });
+    expect(await x.start({ threads })).toMatchObject({ state: "restored", replacedArchived: false });
+    expect(calls.at(-1)).toBe("unarchive thr_1");
+  });
+
+  it("archives only this install's Mains, never a project lead, worker, task or chat thread its data names", async () => {
+    const dir = temp("studio-replaced-");
+    const h = host();
+    const install = new Database(join(dir, "install.db"));
+    h.bb.storage.migrate(install, MIGRATIONS);
+    install.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, heartbeat_was_on, created_at, updated_at) VALUES ('bot_main', 'A', 'a', 'active', NULL, 0, 1, 1)").run();
+    const lead = install.prepare("INSERT INTO project_leads (project_id, lead_thread_id, created_at, updated_at) VALUES (?, ?, 1, 1)");
+    lead.run(PERSONAL_PROJECT_ID, "thr_ownmain");
+    lead.run("proj_code", "thr_codelead");
+    const bt = install.prepare("INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, owner_conversation_id, source, created_at, updated_at) VALUES (?, 'bot_main', ?, ?, ?, 'studio', 1, 1)");
+    bt.run("thr_ownmain", "conversation", 1, null);
+    bt.run("thr_conv", "conversation", 0, null);
+    bt.run("thr_worker", "worker", 0, "thr_conv");
+    install.prepare("INSERT INTO tasks (id, record, owner, state, origin, conversation, created_at, updated_at) VALUES ('task_1', ?, 'cos', 'todo', 'task', 'thr_task', 1, 1)").run(JSON.stringify({ workers: ["thr_taskworker"] }));
+    install.prepare("INSERT INTO chats (thread_id, page_id, created_at) VALUES ('thr_chat', 'pg_1', 1)").run();
+    install.close();
+    const { db } = await bbStudio(join(dir, "bb.db"), h);
+    db.close();
+    expect(replacedMainThreads(join(dir, "install.db"), join(dir, "bb.db"))).toEqual(["thr_ownmain"]);
   });
 
   it("puts the old data back when asked, keeping bb's in a folder", async () => {

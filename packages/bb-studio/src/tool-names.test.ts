@@ -124,7 +124,7 @@ describe("tool names agents read", () => {
           .map((name) => `${relative(root, path)}:${line} ${name}`));
     });
     expect(bad).toEqual([]);
-  });
+  }, 30_000); // It parses every source file; under the full suite's load that takes more than the default 5 s.
 
   it("names no retired tool in the docs, except RPCs of the same name", () => {
     const rpcs = new Set(Object.keys(rpcContract));

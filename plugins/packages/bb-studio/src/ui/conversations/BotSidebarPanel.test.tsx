@@ -417,6 +417,44 @@ describe("the Bot's space (round 7)", () => {
     expect($('[data-testid="bot-sidebar-line"]')).toBeNull();
   });
 
+  it("shows onboarding's problem on the header's line while the first chat can't start, and the status again once it has", async () => {
+    state.live.bot_list = { bots: [{ id: "cos", state: "active" }] };
+    state.live.bot_welcome = { threadId: "fork", opened: false, pending: true, problem: "Your Bot's first chat didn't start yet (Host is not connected). Trying again in 20 s.", bot: null };
+    await mount();
+    expect($('[data-testid="bot-sidebar-line"]')!.textContent).toBe("Your Bot's first chat didn't start yet (Host is not connected). Trying again in 20 s.");
+    state.live.bot_welcome = { threadId: "fork", opened: true, pending: false, problem: null, bot: null };
+    await mount();
+    expect($('[data-testid="bot-sidebar-line"]')!.textContent).toBe("2 running");
+    delete state.live.bot_welcome;
+  });
+
+  it("puts Resume beside a stopped or paused Bot's status and first in its menu; an active Bot has none", async () => {
+    state.live.bot_list = { bots: [{ id: "cos", state: "stopped" }] };
+    await mount();
+    expect($('[data-testid="bot-sidebar-status"]')!.textContent).toBe("Stopped·Resume");
+    expect($$('[data-testid="menu"] [role="menuitem"]').map((item) => item.textContent)).toEqual(["Resume Chief of Staff", "Edit Chief of Staff…", "Bot settings…", "Default model", "New Bot"]);
+    state.call.mockClear();
+    await act(async () => { $('[data-testid="bot-sidebar-resume"]')!.click(); });
+    expect(state.call).toHaveBeenCalledWith("bot_resume", { botId: "cos" });
+    state.call.mockClear();
+    await act(async () => { $$('[data-testid="menu"] [role="menuitem"]')[0]!.click(); });
+    expect(state.call).toHaveBeenCalledWith("bot_resume", { botId: "cos" });
+
+    state.live.bot_list = { bots: [{ id: "cos", state: "paused" }] };
+    await mount();
+    expect($('[data-testid="bot-sidebar-status"]')!.textContent).toBe("Paused·Resume");
+    // One a BB Studio copy imported and bb runs: Run here.
+    state.live.bot_list = { bots: [{ id: "cos", state: "stopped", inBb: true }] };
+    await mount();
+    expect($('[data-testid="bot-sidebar-status"]')!.textContent).toBe("Paused · in bb·Run here");
+    expect($$('[data-testid="menu"] [role="menuitem"]')[0]!.textContent).toBe("Run Chief of Staff here");
+
+    state.live.bot_list = { bots: [{ id: "cos", state: "active" }] };
+    await mount();
+    expect($('[data-testid="bot-sidebar-resume"]')).toBeNull();
+    expect($$('[data-testid="menu"] [role="menuitem"]').map((item) => item.textContent)).not.toContain("Resume Chief of Staff");
+  });
+
   it("opens the shown Bot's Controls from Bot settings… in its menu", async () => {
     await mount();
     await act(async () => { $$('[data-testid="menu"] [role="menuitem"]').find((item) => item.textContent === "Bot settings…")!.click(); });

@@ -22,8 +22,9 @@
 //     stopping: not now; the run stays due and is tried at the next tick;
 //   - missed runs are not replayed: one overdue run fires, the next time is
 //     worked out from now;
-//   - the thread is deleted or archived, or the feature has nothing to run:
-//     the trigger turns off;
+//   - the thread is deleted or archived: a successor (a Bot's new Main, from
+//     onThreadGone) takes the run; with none, or nothing to run, the trigger
+//     turns off;
 //   - one run at a time: while a run of this trigger is going, a due run is
 //     skipped;
 //   - a run ends when its thread goes idle (succeeded) or fails (failed).
@@ -39,6 +40,8 @@ export interface SchedulerKey { owner: SchedulerOwner; ownerId: string }
 export interface RunTarget { threadId: string; prompt: string; permissionMode?: string }
 export type RunResolver = (ownerId: string) => RunTarget | null | Promise<RunTarget | null>;
 /** Runs an owner's script and says how it went; null when there is nothing to run any more. */
+/** A thread a run was for is gone: the thread that takes its place, or null. */
+export type ThreadGoneHook = (threadId: string) => Promise<string | null>;
 export type RunStartHook = (key: SchedulerKey, threadId: string) => { prompt: string; sent?(): void; failed(error: string): void } | null;
 export type ScriptRunner = (ownerId: string) => Promise<{ status: "succeeded" | "failed"; output: string | null; error: string | null } | null>;
 export type RunStatus = "succeeded" | "failed" | "running" | "skipped";
@@ -86,10 +89,14 @@ export const dueMessage = (id: string, prompt: string) => `[bb automation due:${
 const errorText = (error: unknown) => String((error as Error)?.message ?? error).slice(0, 500);
 const notFound = (error: unknown) => (error as { status?: number })?.status === 404 || /not found/i.test(String((error as Error)?.message ?? ""));
 
+/** Why a run turned its trigger off when its thread was gone; revive() looks for it. */
+export const THREAD_GONE = "Its thread was deleted or archived.";
+
 export class EngineScheduler {
   private readonly resolvers = new Map<SchedulerOwner, RunResolver>();
   private readonly scripts = new Map<SchedulerOwner, ScriptRunner>();
   private startHook: RunStartHook | null = null;
+  private goneHook: ThreadGoneHook | null = null;
   /** Why the latest run-now of a trigger did not start. */
   private readonly refused = new Map<string, string>();
 
@@ -103,6 +110,13 @@ export class EngineScheduler {
   resolve(owner: SchedulerOwner, resolver: RunResolver): void { this.resolvers.set(owner, resolver); }
 
   onRunStart(hook: RunStartHook): void { this.startHook = hook; }
+
+  /**
+   * Asked when a due run's thread is deleted or archived, before the trigger
+   * turns off: a Bot's Main gets a new Main (Bots.restoreMain) and the run
+   * goes there, read again from its resolver.
+   */
+  onThreadGone(hook: ThreadGoneHook): void { this.goneHook = hook; }
 
   /** How an owner's runs run a script instead of waking a thread. */
   script(owner: SchedulerOwner, runner: ScriptRunner): void { this.scripts.set(owner, runner); }
@@ -123,6 +137,20 @@ export class EngineScheduler {
   }
 
   has(key: SchedulerKey): boolean { return !!this.deps.engine.get(key.owner, key.ownerId); }
+
+  /**
+   * Turns back on a trigger that went off only because its thread was
+   * deleted or archived (a Bot's old Main), now that its runs have a thread
+   * again. Its next time is worked out from now. True when it came back on.
+   */
+  revive(key: SchedulerKey): boolean {
+    const trigger = this.deps.engine.get(key.owner, key.ownerId);
+    if (trigger?.state !== "off") return false;
+    const last = this.deps.db.prepare("SELECT status, error FROM trigger_runs WHERE trigger_id = ? ORDER BY id DESC LIMIT 1").get(scheduleId(key)) as { status: string; error: string | null } | undefined;
+    if (last?.status !== "skipped" || last.error !== THREAD_GONE) return false;
+    this.deps.engine.setState(key.owner, key.ownerId, "on");
+    return true;
+  }
 
   /** Runs it now, outside its schedule: its next time stays, and a one-time schedule is not used up. Throws when it can't start. */
   async runNow(key: SchedulerKey): Promise<void> {
@@ -234,16 +262,25 @@ export class EngineScheduler {
     const script = this.scripts.get(owner);
     if (script) return this.fireScript(script, owner, trigger, run, scheduledFor);
     const resolver = this.resolvers.get(owner);
-    const target = resolver ? await resolver(trigger.ownerId) : null;
-    if (!target) return retire("Nothing to run: what it was for is gone.");
-    let thread: Awaited<ReturnType<Sdk["threads"]["get"]>> | null;
-    try {
-      thread = await this.deps.sdk.threads.get({ threadId: target.threadId });
-    } catch (error) {
-      if (!notFound(error)) return wait(`BB did not answer: ${errorText(error)}`, false);
-      thread = null;
+    const first = resolver ? await resolver(trigger.ownerId) : null;
+    if (!first) return retire("Nothing to run: what it was for is gone.");
+    let target: RunTarget = first;
+    let thread: Awaited<ReturnType<Sdk["threads"]["get"]>> | null = null;
+    // A gone thread may have a successor (a Bot's new Main): one more read of the target, then off.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        thread = await this.deps.sdk.threads.get({ threadId: target.threadId });
+      } catch (error) {
+        if (!notFound(error)) return wait(`BB did not answer: ${errorText(error)}`, false);
+        thread = null;
+      }
+      if (thread && thread.deletedAt == null && thread.archivedAt == null) break;
+      const next: string | null = attempt === 0 && this.goneHook ? await this.goneHook(target.threadId).catch(() => null) : null;
+      const moved: RunTarget | null = next && resolver ? await resolver(trigger.ownerId) : null;
+      if (!moved || moved.threadId === target.threadId) return retire(THREAD_GONE);
+      target = moved;
     }
-    if (!thread || thread.deletedAt != null || thread.archivedAt != null) return retire("Its thread was deleted or archived.");
+    if (!thread) return retire(THREAD_GONE);
     if (NOT_READY.has(thread.status)) return wait("Its thread was starting or stopping.", false);
     if (!await this.hostUp(thread)) return wait("No host connected.");
     const going = this.deps.db.prepare("SELECT * FROM trigger_runs WHERE trigger_id = ? AND status = 'running' ORDER BY id DESC LIMIT 1").get(id) as RunRow | undefined;

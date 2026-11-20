@@ -1,6 +1,9 @@
 import type Database from "better-sqlite3";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
+import { statSync } from "node:fs";
+import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
+import { GENERATED_ID_ALPHABET, GENERATED_ID_SUFFIX_LENGTH } from "@bb/domain";
 import { quote, rowExists, selectList, sharedColumns } from "../sync.js";
 import {
   copyFileIfMissing,
@@ -8,7 +11,11 @@ import {
   removeCreated,
   throwIfCancelled,
 } from "./files.js";
-import { settleBroughtOverThread } from "./settle.js";
+import {
+  BROUGHT_OVER_OPERATION,
+  settleBroughtOverThread,
+  type BroughtOverWorkspace,
+} from "./settle.js";
 
 type Sqlite = Database.Database;
 type Row = Record<string, unknown>;
@@ -41,6 +48,8 @@ export interface ThreadImportContext {
 export interface ThreadImportResult {
   imported: boolean;
   files: number;
+  /** A thread brought over earlier, with no workspace, that got this Mac's project folder. */
+  repaired?: boolean;
 }
 
 function insertIfMissing(
@@ -179,6 +188,247 @@ export function managedByBb(row: Row, sourceDataDir: string): boolean {
   );
 }
 
+function createEnvironmentId(): string {
+  let suffix = "";
+  for (let index = 0; index < GENERATED_ID_SUFFIX_LENGTH; index += 1) {
+    suffix += GENERATED_ID_ALPHABET[randomInt(GENERATED_ID_ALPHABET.length)];
+  }
+  return `env_${suffix}`;
+}
+
+function isFolder(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** Folders a brought-over thread must never work in: bb's data, BB Studio's own. */
+function outOfBounds(
+  context: Pick<ThreadImportContext, "sourceDataDir" | "dataDir">,
+  path: string,
+): boolean {
+  return [context.sourceDataDir, context.dataDir, join(homedir(), ".bb")].some(
+    (folder) => insideFolder(path, folder),
+  );
+}
+
+/**
+ * bb's workspace for a thread stays in bb (a worktree, or a folder a bb
+ * plugin owns). Here the thread works in the project's own folder on this
+ * Mac: the environment BB Studio already has for it, or a new one that no
+ * provider owns, so BB Studio's cleanup never removes the folder. Null when
+ * the project has no folder on this Mac, or it is missing or inside bb's
+ * or BB Studio's data.
+ */
+export function checkoutHere(
+  context: Pick<
+    ThreadImportContext,
+    "target" | "ourHostId" | "sourceDataDir" | "dataDir"
+  >,
+  projectId: string,
+): string | null {
+  const { target, ourHostId } = context;
+  if (ourHostId === null) return null;
+  const source = target
+    .prepare<[string, string], { path: string }>(
+      "SELECT path FROM project_sources WHERE project_id = ? AND host_id = ? AND path IS NOT NULL ORDER BY is_default DESC LIMIT 1",
+    )
+    .get(projectId, ourHostId);
+  if (source === undefined) return null;
+  const path = resolve(source.path);
+  if (outOfBounds(context, path) || !isFolder(path)) {
+    return null;
+  }
+  const existing = target
+    .prepare<[string, string, string], { id: string }>(
+      `SELECT id FROM environments
+       WHERE project_id = ? AND host_id = ? AND path = ? AND status = 'ready'
+         AND is_worktree = 0 AND provider_owns_path = 0 AND owner_thread_id IS NULL
+       ORDER BY environment_provider_id IS NOT NULL, created_at LIMIT 1`,
+    )
+    .get(projectId, ourHostId, path);
+  if (existing !== undefined) return existing.id;
+  const id = createEnvironmentId();
+  const now = Date.now();
+  target
+    .prepare(
+      `INSERT INTO environments (id, project_id, host_id, path, is_git_repo, is_worktree, status, created_at, updated_at, provider_owns_path)
+       VALUES (?, ?, ?, ?, ?, 0, 'ready', ?, ?, 0)`,
+    )
+    .run(
+      id,
+      projectId,
+      ourHostId,
+      path,
+      isFolder(join(path, ".git")) ? 1 : 0,
+      now,
+      now,
+    );
+  return id;
+}
+
+/**
+ * A thread brought over before BB Studio gave such threads a workspace:
+ * attach this Mac's project folder now. Returns whether it changed.
+ */
+const GIT_WORKTREE_PROVIDER_ID = "git-worktree";
+const RESTORED_BRANCH_SUFFIX = "-bb-studio";
+
+function parseSelection(
+  value: unknown,
+): { machine?: unknown; inputs?: unknown } | null {
+  if (typeof value !== "string") return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return typeof parsed === "object" && parsed !== null
+      ? (parsed as { machine?: unknown; inputs?: unknown })
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function restorableHere(
+  context: Pick<
+    ThreadImportContext,
+    | "source"
+    | "target"
+    | "sourceHostId"
+    | "ourHostId"
+    | "sourceDataDir"
+    | "dataDir"
+  >,
+  row: Row,
+  projectId: string,
+): string | null {
+  const { target, ourHostId } = context;
+  if (ourHostId === null || row.host_id !== context.sourceHostId) return null;
+  if (typeof row.environment_provider_id !== "string") return null;
+  if (typeof row.environment_provider_plugin_id !== "string") return null;
+  const selection = parseSelection(row.environment_provider_selection);
+  if (selection === null) return null;
+  let branchName = row.branch_name ?? null;
+  let inputs = selection.inputs ?? null;
+  if (row.environment_provider_id === GIT_WORKTREE_PROVIDER_ID) {
+    if (typeof row.branch_name !== "string" || row.branch_name.length === 0) {
+      return null;
+    }
+    const checkout = target
+      .prepare<[string, string], { path: string }>(
+        "SELECT path FROM project_sources WHERE project_id = ? AND host_id = ? AND path IS NOT NULL ORDER BY is_default DESC LIMIT 1",
+      )
+      .get(projectId, ourHostId);
+    if (
+      checkout !== undefined &&
+      outOfBounds(context, resolve(checkout.path))
+    ) {
+      return null;
+    }
+    inputs = { branch: { kind: "named", name: row.branch_name } };
+    branchName = `${row.branch_name}${RESTORED_BRANCH_SUFFIX}`;
+  }
+  const id = String(row.id);
+  if (rowExists(target, "environments", id)) return id;
+  const columns = sharedColumns(context.source, target, "environments");
+  insertIfMissing(target, "environments", columns, [
+    {
+      ...row,
+      host_id: ourHostId,
+      project_id: projectId,
+      path: null,
+      status: "destroyed",
+      status_message: null,
+      branch_name: branchName,
+      environment_provider_selection: JSON.stringify({
+        machine: { type: "existing", hostId: ourHostId },
+        inputs,
+      }),
+      owner_thread_id: null,
+      retire_at: null,
+      teardown_status: "removed",
+      teardown_message: null,
+      teardown_attempt: 0,
+      resource: null,
+      claim_path: null,
+      pending_log: "",
+    },
+  ]);
+  return rowExists(target, "environments", id) ? id : null;
+}
+
+function sourceEnvironmentOf(
+  context: Pick<ThreadImportContext, "source">,
+  threadId: string,
+): Row | null {
+  const environmentId = context.source
+    .prepare<[string], { environment_id: string | null }>(
+      "SELECT environment_id FROM threads WHERE id = ?",
+    )
+    .get(threadId)?.environment_id;
+  if (typeof environmentId !== "string") return null;
+  return (
+    context.source
+      .prepare<[string], Row>("SELECT * FROM environments WHERE id = ?")
+      .get(environmentId) ?? null
+  );
+}
+
+export function attachWorkspaceToBroughtOverThread(
+  context: Pick<
+    ThreadImportContext,
+    "target" | "ourHostId" | "sourceDataDir" | "dataDir"
+  > &
+    Partial<Pick<ThreadImportContext, "source" | "sourceHostId">>,
+  threadId: string,
+): boolean {
+  const { target } = context;
+  const thread = target
+    .prepare<[string], { project_id: string; environment_id: string | null }>(
+      "SELECT project_id, environment_id FROM threads WHERE id = ? AND deleted_at IS NULL",
+    )
+    .get(threadId);
+  if (thread === undefined || thread.environment_id !== null) return false;
+  const broughtOver = target
+    .prepare<[string, string], { found: number }>(
+      `SELECT 1 AS found FROM events WHERE thread_id = ? AND type = 'system/operation'
+       AND json_extract(data, '$.operation') = ? LIMIT 1`,
+    )
+    .get(threadId, BROUGHT_OVER_OPERATION);
+  if (broughtOver === undefined) return false;
+  return target.transaction(() => {
+    let environmentId = checkoutHere(context, thread.project_id);
+    if (environmentId === null && context.source !== undefined) {
+      const previous = sourceEnvironmentOf(
+        { source: context.source },
+        threadId,
+      );
+      if (previous !== null && managedByBb(previous, context.sourceDataDir)) {
+        environmentId = restorableHere(
+          {
+            source: context.source,
+            target,
+            sourceHostId: context.sourceHostId ?? null,
+            ourHostId: context.ourHostId,
+            sourceDataDir: context.sourceDataDir,
+            dataDir: context.dataDir,
+          },
+          previous,
+          thread.project_id,
+        );
+      }
+    }
+    if (environmentId === null) return false;
+    const changed = target
+      .prepare(
+        "UPDATE threads SET environment_id = ?, updated_at = ? WHERE id = ? AND environment_id IS NULL",
+      )
+      .run(environmentId, Date.now(), threadId).changes;
+    return changed > 0;
+  })();
+}
+
 function ensureEnvironment(
   context: ThreadImportContext,
   environmentId: string,
@@ -193,7 +443,12 @@ function ensureEnvironment(
     )
     .get(environmentId);
   if (row === undefined) return null;
-  if (managedByBb(row, context.sourceDataDir)) return null;
+  if (managedByBb(row, context.sourceDataDir)) {
+    return (
+      checkoutHere(context, projectId) ??
+      restorableHere(context, row, projectId)
+    );
+  }
   let hostId = String(row.host_id);
   if (hostId === context.sourceHostId && context.ourHostId !== null) {
     hostId = context.ourHostId;
@@ -281,6 +536,28 @@ export function referencedFirst(
   return ordered;
 }
 
+function workspaceOutcome(
+  context: ThreadImportContext,
+  sourceEnvironmentId: unknown,
+  environmentId: string | null,
+): BroughtOverWorkspace {
+  if (typeof sourceEnvironmentId !== "string") return { kind: "none" };
+  if (environmentId === null) return { kind: "missing" };
+  const source = context.source
+    .prepare<[string], Row>("SELECT * FROM environments WHERE id = ?")
+    .get(sourceEnvironmentId);
+  if (source !== undefined && !managedByBb(source, context.sourceDataDir)) {
+    return { kind: "same" };
+  }
+  const here = context.target
+    .prepare<[string], { path: string | null; status: string }>(
+      "SELECT path, status FROM environments WHERE id = ?",
+    )
+    .get(environmentId);
+  if (here?.status === "destroyed") return { kind: "restorable" };
+  return { kind: "project-folder", path: here?.path ?? null };
+}
+
 export const eventChunking = { threshold: 5_000, size: 2_000 };
 
 export async function importThread(
@@ -289,8 +566,13 @@ export async function importThread(
 ): Promise<ThreadImportResult> {
   const { source, target } = context;
   throwIfCancelled(context.signal);
-  if (rowExists(target, "threads", threadId))
-    return { imported: false, files: 0 };
+  if (rowExists(target, "threads", threadId)) {
+    return {
+      imported: false,
+      files: 0,
+      repaired: attachWorkspaceToBroughtOverThread(context, threadId),
+    };
+  }
   const threadColumns = sharedColumns(source, target, "threads");
   const thread = source
     .prepare<[string], Row>(
@@ -493,12 +775,18 @@ export async function importThread(
             `INSERT OR IGNORE INTO main.events (${selectList(eventColumns)}) SELECT ${selectList(eventColumns)} FROM temp.${staging}`,
           );
         }
+        const environmentId =
+          typeof prepared.environment_id === "string"
+            ? prepared.environment_id
+            : null;
         settleBroughtOverThread(target, {
           threadId,
-          environmentId:
-            typeof prepared.environment_id === "string"
-              ? prepared.environment_id
-              : null,
+          environmentId,
+          workspace: workspaceOutcome(
+            context,
+            thread.environment_id,
+            environmentId,
+          ),
           now: Date.now(),
         });
         finishRows();

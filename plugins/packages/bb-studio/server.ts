@@ -36,6 +36,7 @@ import { registerQuietTurnClassifier } from "./src/kit/quiet-turns";
 import { quietByDefault, repliesAllowed } from "./src/push-levels";
 import { MainPushes } from "./src/main-push";
 import { registerDecisions } from "./src/decisions/server";
+import { registerToolGateway, type ToolGateway } from "./src/tool-gateway/server/register";
 import { BotMaintenance } from "./src/bot-maintenance";
 import { registerChat } from "./src/chat/server";
 import { ARTIFACT_TOOLS, registerArtifacts } from "./src/artifacts/server";
@@ -107,7 +108,7 @@ import { registerMemory } from "./src/memory/register";
 import { recordLine } from "./src/memory/shared";
 import { BotPageState, registerGroupTool } from "./src/bot-page-state";
 import { BotCacheWarmer } from "./src/bot-cache";
-import { botControlRefusal, Bots, SKILL_NAME } from "./src/bot";
+import { botControlRefusal, Bots, MAIN_HEAL_MS, SKILL_NAME } from "./src/bot";
 import { ThemeStore } from "./src/theme/store";
 import { forestContract } from "./src/theme/forest/contract";
 import { ForestWeather } from "./src/theme/forest/weather";
@@ -208,7 +209,7 @@ export default async function plugin(bb: BbPluginApi) {
   // "Bring over BB Studio data" from bb is applied here, before Studio opens
   // its database (src/studio-data/start.ts). A failure leaves the journal for
   // the next start and this install's data as it was.
-  await finishStudioImport({ dataDir: bb.server.experimental_dataDir, kv: bb.storage.kv, migrate: (database, statements) => bb.storage.migrate(database, statements), migrations: MIGRATIONS, log: bb.log, firstLoad: claimFirstLoad() })
+  await finishStudioImport({ dataDir: bb.server.experimental_dataDir, kv: bb.storage.kv, migrate: (database, statements) => bb.storage.migrate(database, statements), migrations: MIGRATIONS, log: bb.log, firstLoad: claimFirstLoad(), threads: { archive: (threadId) => bb.sdk.threads.archive({ threadId }), unarchive: (threadId) => bb.sdk.threads.unarchive({ threadId }) } })
     .catch((error) => bb.log.warn(`BB Studio data from bb could not be applied; this install's data is unchanged: ${errorText(error)}`));
   registerQuietTurnClassifier(bb);
   await registerChat(bb);
@@ -432,6 +433,8 @@ export default async function plugin(bb: BbPluginApi) {
   // the Pages plugin gave them. A kind turned off gives neither, from the next
   // session start or resume on (BB doesn't change a running session).
   // Memory (src/memory): every Bot conversation and worker also gets the memory tools and the core profile, at MEMORY_SLOT.
+  // Tool Gateway (src/tool-gateway): its 3 tools, only while a server this provider and project may use is approved and on.
+  let toolGateway: ToolGateway | null = null;
   bb.agents.configure(withMemory(() => memoryService, (context) => isCanvasThreadOrigin(context.origin) || !!learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string", (context) => {
     if (Date.now() - routesCheckedAt > 30_000) void refreshRoutes();
     // A Visual Chat thread works with that plugin's canvas tools only (src/voice/live/canvas-plugin.ts).
@@ -467,7 +470,9 @@ export default async function plugin(bb: BbPluginApi) {
       bot: bot ? bots.instructions(bot) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
       pages: !off.has("page"), minis: !off.has("mini"), appCards, work: true, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
     });
-    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...TASK_TOOLS, ...AREA_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio", ...(bot ? ["themes", "presences"] : [])], instructions };
+    let gateway: { tools: string[]; instructions: string } = { tools: [], instructions: "" };
+    try { gateway = toolGateway?.agentConfiguration({ providerId: context.provider.id, projectId: context.project.id }) ?? gateway; } catch { /* Tool Gateway never breaks Studio's configure(). */ }
+    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...TASK_TOOLS, ...AREA_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : []), ...gateway.tools], skills: ["studio-code", "studio", ...(bot ? ["themes", "presences"] : [])], instructions: gateway.instructions ? `${instructions}\n\n${gateway.instructions}`.trim() : instructions };
   }));
   /** Which conversation a Bot's session is in (src/bot-threads.ts conversationInstructions); "" before Studio has placed it. */
   const conversationNote = (threadId: string): string => {
@@ -673,6 +678,10 @@ export default async function plugin(bb: BbPluginApi) {
     hiddenThreads: () => new Set([...learning.reviewThreads(), ...sideThreads.threadIds()]),
     ownedThreads: (botId) => ownedThreads.owned(botId),
     claimChains: () => ownedThreads.claimChains(),
+    // Read when a Main moves, after the conversation records are registered below.
+    mainMoved: (botId, threadId) => botThreads.store.setMain(botId, threadId),
+    conversationBot: (threadId) => botThreads.store.get(threadId)?.botId ?? null,
+    revive: (key) => scheduler.revive(key),
     runners: { threads: (botId) => runners.threads(botId), pauseAll: (botId, onPaused) => runners.pauseAll(botId, onPaused), restore: (id) => runners.restore(id) },
     automations: {
       pauseAll: (botId, onPaused) => automations.pauseAll(botId, onPaused),
@@ -728,7 +737,18 @@ export default async function plugin(bb: BbPluginApi) {
   const linkStore = new TaskStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); });
   const spawnLinks = new SpawnLinks({ store: linkStore, dir: taskThreads, thread: async (threadId) => asFact(await bb.sdk.threads.get({ threadId }).catch(() => null)), log: (message) => bb.log.warn(message) });
   const threadFacts = () => listThreadFacts(bb.sdk as never);
-  registerTasks(bb, db, postToBot, undefined, movedToUser, { links: spawnLinks, check: async () => (await userTasks.check()).problems });
+  const taskApi = registerTasks(bb, db, postToBot, undefined, movedToUser, { links: spawnLinks, check: async () => (await userTasks.check()).problems });
+  // Requests for an MCP server become Todos for the user; approving or declining closes them.
+  toolGateway = await registerToolGateway(bb, {
+    db,
+    dataDir: bb.server.experimental_dataDir,
+    pluginId: STUDIO_PLUGIN_ID,
+    todos: {
+      create: async ({ title, why, requestId, threadId }) => (await taskApi.create({ title, owner: "user", state: "waiting", kind: "decide", why, needs: "Approve or decline it in Settings › Studio › Tool Gateway, in the BB Studio app on your Mac.", source: { kind: "tool-gateway", ref: requestId } }, threadId ? { threadId } : {})).task.id,
+      close: async (taskId, state) => { await taskApi.update({ id: taskId, state }); },
+    },
+  });
+  { const gateway = toolGateway; bb.onDispose(() => gateway.dispose()); }
   const userTasks = registerUserTasks(bb, db, {
     zone: () => loopTimeZone(process.env, studioSettings.current().todosTimeZone),
     dir: taskThreads,
@@ -880,12 +900,6 @@ export default async function plugin(bb: BbPluginApi) {
   triggers.every("area-leads", 30 * 60_000, () => { void readAreaLeads(); });
   triggers.every("automation-tasks", 60_000, () => { syncAutomationTasks(); areaStep("sync", () => areas.sync()); });
   triggers.every("automation-tasks-prune", 60 * 60_000, () => { taskStep("prune", () => automationTasks.prune()); });
-  const restoreMainFailed = (error: unknown) => bb.log.warn(`Couldn't start a new Main: ${errorText(error)}`);
-  bb.events.on("thread.deleted", ({ thread }) => {
-    const bot = bots.list().find((each) => each.threadId === thread.id);
-    if (bot) void bots.restoreMain(bot.id, thread.id).catch(restoreMainFailed);
-  });
-  void bots.restoreMains().catch(restoreMainFailed);
   bb.rpc.register(scheduledContract, {
     "loops.scheduled": async ({ threadId }) => ({
       items: scheduledItems({
@@ -1146,6 +1160,17 @@ export default async function plugin(bb: BbPluginApi) {
     botThreadsSignal ??= setTimeout(() => { botThreadsSignal = null; bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }); }, 250);
     botSignal.add(changes);
   };
+  // A Bot's Main deleted or archived (from anywhere: BB's menu, the CLI, a tool): a new Main
+  // takes over, and its heartbeat, check-ins and runner reports go there. At startup too, and
+  // when a due run finds its Main gone (the scheduler asks before it turns the run off).
+  const restoreMainFailed = (error: unknown) => bb.log.warn(`Couldn't start a new Main: ${errorText(error)}`);
+  const mainGone = ({ thread }: { thread: { id: string } }) => {
+    const bot = bots.list().find((each) => each.threadId === thread.id);
+    if (bot) void bots.restoreMain(bot.id, thread.id).catch(restoreMainFailed);
+  };
+  bb.events.on("thread.deleted", mainGone);
+  bb.events.on("thread.archived", mainGone);
+  scheduler.onThreadGone((threadId) => bots.rescueMain(threadId));
   const threadSeeds = new ThreadSeeds(db);
   const pushRpc = (call: Parameters<typeof bb.sdk.plugins.callRpc>[0]) => bb.sdk.plugins.callRpc(call);
   const botThreads = registerBotThreads(bb, db, {
@@ -1183,6 +1208,11 @@ export default async function plugin(bb: BbPluginApi) {
       WHERE bot_id = ? AND source_kind = 'conversation' AND topic = ? AND replaced_by_id IS NULL AND archived = 0 AND source_id IS NOT NULL
       ORDER BY created_at ASC`).all(botId, FINISH_TOPIC) as { source_id: string; text: string }[]).map((row) => [row.source_id, row.text])),
   });
+  // Startup, and every 5 minutes: a Bot whose Main was deleted or archived while Studio was off, or
+  // when a new Main couldn't start (no host connected yet), gets a new Main. One thread read per Bot.
+  const healMains = () => void bots.restoreMains((message) => bb.log.warn(message)).catch(restoreMainFailed);
+  healMains();
+  triggers.every("main-heal", MAIN_HEAL_MS, healMains);
   // Workers from before that default get it once, after the first classification settles.
   const quietWorkersOnce = setTimeout(() => void (async () => {
     if (await bb.storage.kv.get(WORKER_LEVELS_KEY)) return;
@@ -1600,6 +1630,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_set_run: (run) => bots.setRun(run),
     bot_pause: ({ botId }) => bots.pause(botId),
     bot_resume: ({ botId }) => bots.resume(botId),
+    bot_make_main: ({ botId, threadId }) => bots.makeMain(threadId, botId),
     bot_stop: ({ botId }) => bots.stop(botId),
     bot_maintenance_threads: async ({ botId }) => ({ threads: await maintenance.olderThreads(learnerId(botId)) }),
     bot_maintenance_get: ({ botId }) => maintenance.view(learnerId(botId)),
@@ -1632,6 +1663,7 @@ export default async function plugin(bb: BbPluginApi) {
     bot_listed_threads: () => ({ threadIds: [...new Set([...ownedThreads.all(), ...sideThreads.threadIds()])] }),
     bot_side_thread_open: async ({ threadId, messageId }) => { const opened = await botThreads.messageThreads.reply({ threadId, messageId }); return { threadId: opened.threadId, created: opened.created }; },
     bot_thread_owner: async ({ threadId }) => ({ botId: ownedThreads.ownerOf(threadId) ?? runners.forThread(threadId)?.bot_id ?? await botThreads.owner(threadId) }),
+    bot_conversation_owner: ({ threadId }) => ({ botId: botThreads.store.conversationBot(threadId) ?? bots.list().find((bot) => bot.threadId === threadId)?.id ?? null }),
     bot_thread_release: ({ threadId }) => ownedThreads.release(threadId),
     bot_welcome: onboarding.bot_welcome,
     bot_welcome_opened: onboarding.bot_welcome_opened,
@@ -2610,6 +2642,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "minis", summary: "List mini apps, read their records and state, and run their actions", usage: "bb studio minis <list|show|data|state|watch|actions|do> …" },
       { name: "theme", summary: "List, show, check, create, update, apply and delete Bot themes", usage: "bb studio theme <list|show|create|update|apply|check|delete|template> …" },
       { name: "presence", summary: "List, show, check, create, update, apply and delete Bot presences", usage: "bb studio presence <list|show|create|update|apply|check|delete|template> …" },
+      { name: "tool-gateway", summary: "Your MCP servers: list them, search and run their tools, and ask the user to add one", usage: "bb studio tool-gateway <list|tools|describe|call|request|status> …" },
       { name: "work", summary: "Live work cards: create one, update it in place, show and list a conversation's In flight cards, remove finished ones from the list", usage: "bb studio work <create|update|show|list|dismiss|clear> …" },
     ],
     async run(argv, ctx) {
@@ -2627,6 +2660,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (argv[0] === "presence") return runPresenceCli(argv.slice(1), { service: presenceService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)) });
       if (argv[0] === "theme") return runThemeCli(argv.slice(1), { service: themeService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)), weather: { sky: () => forestWeather.sky(Intl.DateTimeFormat().resolvedOptions().timeZone ?? null), setCity: (city) => forestWeather.setCity(city) }, sky: { place: () => forestWeather.place(Intl.DateTimeFormat().resolvedOptions().timeZone ?? null), preview: () => readPreview(bb.storage.kv), setPreview: (at) => writePreview(bb.storage.kv, at), view: () => readView(bb.storage.kv), setView: (view) => writeView(bb.storage.kv, view), now: () => Date.now(), zoneOffsetMinutes: () => -new Date().getTimezoneOffset() } });
       if (argv[0] === "work") return runWorkCli(argv.slice(1), work, ctx);
+      if (argv[0] === "tool-gateway") return toolGateway ? toolGateway.cli(argv.slice(1), { threadId: ctx.threadId ?? null }) : { exitCode: 1, stderr: "Tool Gateway isn't loaded.\n" };
       if (argv[0] === "pages") return argv[1] === "explore" ? explore.cli(argv.slice(2), ctx) : pages.cli(argv.slice(1), ctx);
       const { command, rest: raw } = subcommand(argv);
       const USAGE: Record<string, string> = {
@@ -2725,7 +2759,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|starred|move|providers|health|setup|reindex|backup|restore|pages|artifacts|whiteboards|designs|recordings|minis|theme|presence|decisions|work> …");
+            return usage("bb studio <list|tags|starred|move|providers|health|setup|reindex|backup|restore|pages|artifacts|whiteboards|designs|recordings|minis|theme|presence|decisions|work|tool-gateway> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

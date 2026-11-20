@@ -1,10 +1,12 @@
 // The top of the Bot sidebar (round 7, 7a/7b): the Bot's space header, a
 // band of its own (BB's sidebar color and a bottom border; under a scene theme
 // no band, as the sidebar is one glass card) with its avatar (36px),
-// its name, a status line ("2 running", "Paused", "Paused · in bb" for a
-// Bot a BB Studio copy imported and doesn't run, or nothing), and a ···
-// menu (Edit <name>…, Bot settings…: its Controls page, Default model: what
-// its new conversations start on, New Bot); then the Bot's pages as rows: Memory, Skills,
+// its name, a status line ("2 running", "Paused · Resume", "Stopped · Resume",
+// "Paused · in bb · Run here" for a Bot a BB Studio copy imported and doesn't
+// run, or nothing; Resume and Run here are buttons), and a ··· menu (Resume
+// <name> while it is paused or stopped, Edit <name>…, Bot settings…: its
+// Controls page, Default model: what its new conversations start on, New
+// Bot); then the Bot's pages as rows: Memory, Skills,
 // Library, Todos (with the Todos list on, the primary Bot's Todos page and
 // what needs the user now; else the Todos page at studio/automations; for any
 // other Bot, Scheduled, its automations, as todos are the primary's) and
@@ -16,6 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { BotPresence } from "../../presence/ui/BotPresence";
 import { dragSourceProps, refDragItem } from "../../kit/app/item-drag";
 import type { TabKindId } from "../../tab-kinds";
+export { resumeWord } from "../bot/bot-state";
 
 export const STUDIO_ROOT_PATH = "/plugins/studio/studio";
 export const AUTOMATIONS_PATH = "/plugins/studio/automations";
@@ -47,24 +50,36 @@ export function spaceLine(bot: { state: string; inBb?: boolean } | null | undefi
   return running ? `${running} running` : null;
 }
 
-function SpaceLine({ line }: { line: string | null }) {
+function SpaceLine({ line, resume, onResume }: { line: string | null; resume: string | null; onResume?: () => void }) {
   if (!line) return null;
-  return <span data-testid="bot-sidebar-line" className="truncate text-xs text-muted-foreground">{line}</span>;
+  return (
+    <span data-testid="bot-sidebar-status" className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+      <span data-testid="bot-sidebar-line" className="truncate" title={line}>{line}</span>
+      {resume && onResume ? <>
+        <span aria-hidden>·</span>
+        <button type="button" data-testid="bot-sidebar-resume" onClick={onResume} className="shrink-0 rounded-sm text-foreground underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">{resume}</button>
+      </> : null}
+    </span>
+  );
 }
 
 const PAGE_ROW = "flex h-7 w-full min-w-0 items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-foreground/85 outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring aria-[current=page]:bg-state-active aria-[current=page]:text-foreground";
 const MENU_BUTTON = "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:bg-state-active";
 
 export interface SpaceMenu {
+  /** Turns a paused or stopped Bot back on (bot_resume). */
+  resume?(): void;
   editSpace(): void;
   botSettings(): void;
   defaultModel(): void;
   newBot(): void;
 }
 
-export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
+export function SpaceHeader({ bot, line, resume = null, glass, page, todos, onPage, menu }: {
   bot: BotSpace | null;
   line: string | null;
+  /** The Bot's resume word (resumeWord) while it is paused or stopped: a button after the line and the menu's first item. */
+  resume?: string | null;
   /** Under a scene theme: no band, border or sticking, so the sidebar reads as one card. */
   glass: boolean;
   page: SpacePage | null;
@@ -88,13 +103,17 @@ export function SpaceHeader({ bot, line, glass, page, todos, onPage, menu }: {
         {bot ? <BotPresence bot={bot} size={36} /> : <span className="size-9" />}
         <div className="flex min-w-0 flex-1 flex-col">
           <h2 data-testid="bot-sidebar-name" className="truncate text-[15px] font-semibold leading-tight text-foreground">{bot?.name ?? ""}</h2>
-          <SpaceLine line={line} />
+          <SpaceLine line={line} resume={resume} onResume={menu.resume} />
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button type="button" data-testid="bot-menu" className={MENU_BUTTON} aria-label="Bot menu"><Icon name="MoreHorizontal" className="size-4" /></button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {bot && resume && menu.resume ? <>
+              <DropdownMenuItem data-testid="bot-menu-resume" onSelect={menu.resume}>{resume === "Resume" ? `Resume ${bot.name}` : `Run ${bot.name} here`}</DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </> : null}
             <DropdownMenuItem disabled={!bot} onSelect={menu.editSpace}>{bot ? `Edit ${bot.name}…` : "Edit…"}</DropdownMenuItem>
             <DropdownMenuItem disabled={!bot} onSelect={menu.botSettings}>Bot settings…</DropdownMenuItem>
             <DropdownMenuItem disabled={!bot} onSelect={menu.defaultModel}>Default model</DropdownMenuItem>

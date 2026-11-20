@@ -2402,3 +2402,463 @@ describe("bring-over API and review fixes", () => {
     }
   });
 });
+
+describe("a brought-over thread whose workspace stays in bb", () => {
+  async function worktreeThread(f: Fixture, projectFolder: string) {
+    const bb = new Database(join(f.source, "bb.db"));
+    const env = bb
+      .prepare("SELECT * FROM environments WHERE id = ?")
+      .get(f.ids.env1) as Record<string, unknown>;
+    const managed = {
+      ...env,
+      id: "env_worktree",
+      project_id: f.ids.p2,
+      path: join(
+        f.source,
+        "plugins",
+        "environment-git-worktree",
+        "host-data",
+        "worktrees",
+        "k1",
+        "hive",
+      ),
+      is_worktree: 1,
+      provider_owns_path: 1,
+      environment_provider_id: "git-worktree",
+      environment_provider_plugin_id: "environment-git-worktree",
+      owner_thread_id: f.ids.t3,
+    };
+    const names = Object.keys(managed);
+    bb.prepare(
+      `INSERT INTO environments (${names.join(", ")}) VALUES (${names.map((name) => `@${name}`).join(", ")})`,
+    ).run(managed);
+    bb.prepare(
+      "UPDATE threads SET environment_id = 'env_worktree' WHERE id = ?",
+    ).run(f.ids.t3);
+    bb.prepare(
+      "UPDATE events SET environment_id = 'env_worktree' WHERE thread_id = ?",
+    ).run(f.ids.t3);
+    bb.prepare("UPDATE project_sources SET path = ? WHERE project_id = ?").run(
+      projectFolder,
+      f.ids.p2,
+    );
+    bb.close();
+    return takeSourceSnapshot({
+      dataDir: f.target,
+      sourceDataDir: f.source,
+      now: 9000,
+    });
+  }
+
+  const environmentOf = (f: Fixture) =>
+    (
+      f.db
+        .prepare("SELECT environment_id FROM threads WHERE id = ?")
+        .get(f.ids.t3) as { environment_id: string | null }
+    ).environment_id;
+
+  const broughtOverNote = (f: Fixture) =>
+    (
+      JSON.parse(
+        (
+          f.db
+            .prepare(
+              "SELECT data FROM events WHERE thread_id = ? AND type = 'system/operation' ORDER BY sequence DESC LIMIT 1",
+            )
+            .get(f.ids.t3) as { data: string }
+        ).data,
+      ) as { operation: string; message: string }
+    ).message;
+
+  it("works in the project's folder on this Mac, in an environment no provider owns", async () => {
+    const f = await fixture();
+    const folder = join(f.root, "code", "hive");
+    await mkdir(join(folder, ".git"), { recursive: true });
+    const snapshot = await worktreeThread(f, folder);
+
+    await run(
+      { ...f, snapshot },
+      { picks: [{ kind: "thread", id: f.ids.t3 }] },
+    );
+
+    const environmentId = environmentOf(f);
+    expect(environmentId).not.toBeNull();
+    expect(
+      f.db
+        .prepare(
+          "SELECT project_id, host_id, path, is_git_repo, is_worktree, provider_owns_path, environment_provider_id, owner_thread_id, status FROM environments WHERE id = ?",
+        )
+        .get(environmentId),
+    ).toEqual({
+      project_id: f.ids.p2,
+      host_id: "host_here",
+      path: folder,
+      is_git_repo: 1,
+      is_worktree: 0,
+      provider_owns_path: 0,
+      environment_provider_id: null,
+      owner_thread_id: null,
+      status: "ready",
+    });
+    expect(
+      count(
+        f.db,
+        "SELECT COUNT(*) AS n FROM environments WHERE path LIKE ?",
+        `${f.source}%`,
+      ),
+    ).toBe(0);
+    expect(
+      count(
+        f.db,
+        "SELECT COUNT(*) AS n FROM events WHERE thread_id = ? AND environment_id IS NOT NULL AND environment_id != ?",
+        f.ids.t3,
+        environmentId,
+      ),
+    ).toBe(0);
+    expect(broughtOverNote(f)).toContain(
+      `works in the project's folder ${folder}`,
+    );
+  });
+
+  it("reuses the environment BB Studio already has for that folder", async () => {
+    const f = await fixture();
+    const folder = join(f.root, "code", "hive");
+    await mkdir(folder, { recursive: true });
+    const snapshot = await worktreeThread(f, folder);
+    insertRow(f.db, "projects", {
+      id: f.ids.p2,
+      name: "hive",
+      deleted_at: null,
+    });
+    insertRow(f.db, "project_sources", {
+      id: "src_here",
+      project_id: f.ids.p2,
+      type: "local_path",
+      owns_path: 0,
+      host_id: "host_here",
+      path: folder,
+      is_default: 1,
+    });
+    insertRow(f.db, "environments", {
+      id: "env_here",
+      project_id: f.ids.p2,
+      host_id: "host_here",
+      path: folder,
+      is_worktree: 0,
+      provider_owns_path: 0,
+      environment_provider_id: null,
+      owner_thread_id: null,
+      status: "ready",
+      created_at: 1,
+      updated_at: 1,
+    });
+
+    await run(
+      { ...f, snapshot },
+      { picks: [{ kind: "thread", id: f.ids.t3 }] },
+    );
+
+    expect(environmentOf(f)).toBe("env_here");
+    expect(count(f.db, "SELECT COUNT(*) AS n FROM environments")).toBe(1);
+  });
+
+  it("says the workspace is not on this Mac when the folder is missing or inside bb's data, and still archives and deletes", async () => {
+    for (const folderOf of [
+      (f: Fixture) => join(f.root, "code", "not-here"),
+      (f: Fixture) => join(f.source, "seed-workspaces", "hive"),
+    ]) {
+      const f = await fixture();
+      const folder = folderOf(f);
+      if (folder.startsWith(f.source)) await mkdir(folder, { recursive: true });
+      const snapshot = await worktreeThread(f, folder);
+
+      await run(
+        { ...f, snapshot },
+        { picks: [{ kind: "thread", id: f.ids.t3 }] },
+      );
+
+      expect(environmentOf(f)).toBeNull();
+      expect(count(f.db, "SELECT COUNT(*) AS n FROM environments")).toBe(0);
+      expect(broughtOverNote(f)).toContain("Workspace not on this Mac");
+    }
+  });
+
+  it("gives a thread brought over earlier with no workspace the project's folder when it is brought over again", async () => {
+    const f = await fixture();
+    const folder = join(f.root, "code", "hive");
+    const snapshot = await worktreeThread(f, folder);
+    await run(
+      { ...f, snapshot },
+      { picks: [{ kind: "thread", id: f.ids.t3 }] },
+    );
+    expect(environmentOf(f)).toBeNull();
+
+    await mkdir(folder, { recursive: true });
+    const again = await run(
+      { ...f, snapshot },
+      { picks: [{ kind: "project", id: f.ids.p2 }] },
+    );
+
+    expect(again.threadsImported).toBe(0);
+    const environmentId = environmentOf(f);
+    expect(environmentId).not.toBeNull();
+    expect(
+      f.db
+        .prepare("SELECT path FROM environments WHERE id = ?")
+        .get(environmentId),
+    ).toEqual({ path: folder });
+  });
+});
+
+describe("a brought-over thread whose workspace bb manages comes over restorable", () => {
+  async function managedThread(
+    f: Fixture,
+    overrides: Record<string, unknown>,
+    projectFolder = join(f.root, "not-on-this-mac"),
+  ) {
+    const bb = new Database(join(f.source, "bb.db"));
+    const env = bb
+      .prepare("SELECT * FROM environments WHERE id = ?")
+      .get(f.ids.env1) as Record<string, unknown>;
+    const managed = {
+      ...env,
+      id: "env_managed",
+      project_id: f.ids.p2,
+      provider_owns_path: 1,
+      owner_thread_id: f.ids.t3,
+      ...overrides,
+    };
+    const names = Object.keys(managed);
+    bb.prepare(
+      `INSERT INTO environments (${names.join(", ")}) VALUES (${names.map((name) => `@${name}`).join(", ")})`,
+    ).run(managed);
+    bb.prepare(
+      "UPDATE threads SET environment_id = 'env_managed' WHERE id = ?",
+    ).run(f.ids.t3);
+    bb.prepare(
+      "UPDATE events SET environment_id = 'env_managed' WHERE thread_id = ?",
+    ).run(f.ids.t3);
+    bb.prepare("UPDATE project_sources SET path = ? WHERE project_id = ?").run(
+      projectFolder,
+      f.ids.p2,
+    );
+    bb.close();
+    return takeSourceSnapshot({
+      dataDir: f.target,
+      sourceDataDir: f.source,
+      now: 9000,
+    });
+  }
+
+  const environmentRow = (f: Fixture) =>
+    f.db
+      .prepare(
+        `SELECT environments.id, environments.host_id, environments.project_id, environments.path, environments.status, environments.branch_name,
+                environments.environment_provider_id, environments.environment_provider_plugin_id, environments.environment_provider_selection,
+                environments.owner_thread_id, environments.teardown_status, environments.retire_at, environments.resource
+         FROM threads JOIN environments ON environments.id = threads.environment_id WHERE threads.id = ?`,
+      )
+      .get(f.ids.t3) as Record<string, unknown> | undefined;
+
+  const note = (f: Fixture) =>
+    (
+      JSON.parse(
+        (
+          f.db
+            .prepare(
+              "SELECT data FROM events WHERE thread_id = ? AND type = 'system/operation' ORDER BY sequence DESC LIMIT 1",
+            )
+            .get(f.ids.t3) as { data: string }
+        ).data,
+      ) as { message: string }
+    ).message;
+
+  it("keeps a personal workspace inside bb's data as a destroyed environment of this Mac that restore can provision again, which no sweep touches", async () => {
+    const f = await fixture();
+    const snapshot = await managedThread(f, {
+      path: join(
+        f.source,
+        "plugins",
+        "environment-personal-workspace",
+        "host-data",
+        "workspaces",
+        f.ids.t3,
+      ),
+      environment_provider_id: "personal-workspace",
+      environment_provider_plugin_id: "environment-personal-workspace",
+      environment_provider_selection: JSON.stringify({
+        machine: { type: "existing", hostId: f.ids.sourceHost },
+        inputs: null,
+      }),
+      environment_provider_instance_key: f.ids.t3,
+      resource: '{"owned":true}',
+    });
+    await run(
+      { ...f, snapshot },
+      { picks: [{ kind: "thread", id: f.ids.t3 }] },
+    );
+    expect(environmentRow(f)).toMatchObject({
+      id: "env_managed",
+      host_id: "host_here",
+      project_id: f.ids.p2,
+      path: null,
+      status: "destroyed",
+      environment_provider_id: "personal-workspace",
+      environment_provider_plugin_id: "environment-personal-workspace",
+      environment_provider_selection: JSON.stringify({
+        machine: { type: "existing", hostId: "host_here" },
+        inputs: null,
+      }),
+      owner_thread_id: null,
+      teardown_status: "removed",
+      retire_at: null,
+      resource: null,
+    });
+    expect(
+      count(
+        f.db,
+        "SELECT COUNT(*) AS n FROM environments WHERE path LIKE ?",
+        `${f.source}%`,
+      ),
+    ).toBe(0);
+    const connection = createConnection(join(f.target, "bb.db"));
+    try {
+      expect(
+        listProviderLifecycleEnvironments(connection, "personal-workspace", {
+          pluginId: "environment-personal-workspace",
+          teardownMessage: "x",
+        }),
+      ).toEqual([]);
+    } finally {
+      connection.$client.close();
+    }
+    expect(note(f)).toContain("restore the workspace to get a new one");
+  });
+
+  it("restores a git worktree on a new branch that starts from bb's branch, and stays without a workspace when bb's has no branch", async () => {
+    const worktreePath = (f: Fixture) =>
+      join(
+        f.source,
+        "plugins",
+        "environment-git-worktree",
+        "host-data",
+        "worktrees",
+        "k1",
+        "hive",
+      );
+    const f = await fixture();
+    const snapshot = await managedThread(f, {
+      path: worktreePath(f),
+      is_worktree: 1,
+      branch_name: "bot-main",
+      environment_provider_id: "git-worktree",
+      environment_provider_plugin_id: "environment-git-worktree",
+      environment_provider_selection: JSON.stringify({
+        machine: { type: "existing", hostId: f.ids.sourceHost },
+        inputs: { kind: "existing", path: worktreePath(f) },
+      }),
+    });
+    await run(
+      { ...f, snapshot },
+      { picks: [{ kind: "thread", id: f.ids.t3 }] },
+    );
+    expect(environmentRow(f)).toMatchObject({
+      status: "destroyed",
+      path: null,
+      branch_name: "bot-main-bb-studio",
+      environment_provider_selection: JSON.stringify({
+        machine: { type: "existing", hostId: "host_here" },
+        inputs: { branch: { kind: "named", name: "bot-main" } },
+      }),
+    });
+
+    const g = await fixture();
+    const without = await managedThread(g, {
+      path: worktreePath(g),
+      is_worktree: 1,
+      branch_name: null,
+      environment_provider_id: "git-worktree",
+      environment_provider_plugin_id: "environment-git-worktree",
+      environment_provider_selection: JSON.stringify({
+        machine: { type: "existing", hostId: g.ids.sourceHost },
+        inputs: { branch: { kind: "default" } },
+      }),
+    });
+    await run(
+      { ...g, snapshot: without },
+      { picks: [{ kind: "thread", id: g.ids.t3 }] },
+    );
+    expect(environmentRow(g)).toBeUndefined();
+    expect(note(g)).toContain("Workspace not on this Mac");
+  });
+
+  it("never makes a git worktree restorable when this Mac's project folder is inside bb's data, so no git command runs in a repo there", async () => {
+    const f = await fixture();
+    const repo = join(f.source, "repos", "hive");
+    await mkdir(join(repo, ".git"), { recursive: true });
+    const snapshot = await managedThread(
+      f,
+      {
+        path: join(f.source, "worktrees", "k1", "hive"),
+        is_worktree: 1,
+        branch_name: "bot-main",
+        environment_provider_id: "git-worktree",
+        environment_provider_plugin_id: "environment-git-worktree",
+        environment_provider_selection: JSON.stringify({
+          machine: { type: "existing", hostId: f.ids.sourceHost },
+          inputs: { branch: { kind: "default" } },
+        }),
+      },
+      repo,
+    );
+    await run(
+      { ...f, snapshot },
+      { picks: [{ kind: "thread", id: f.ids.t3 }] },
+    );
+    expect(environmentRow(f)).toBeUndefined();
+    expect(
+      count(
+        f.db,
+        "SELECT COUNT(*) AS n FROM environments WHERE environment_provider_id = 'git-worktree'",
+      ),
+    ).toBe(0);
+    expect(note(f)).toContain("Workspace not on this Mac");
+  });
+
+  it("gives a thread brought over earlier with no workspace a restorable one when it is brought over again", async () => {
+    const f = await fixture();
+    const settings = {
+      path: join(f.source, "workspaces", f.ids.t3),
+      environment_provider_id: "personal-workspace",
+      environment_provider_plugin_id: "environment-personal-workspace",
+      environment_provider_selection: JSON.stringify({
+        machine: { type: "existing", hostId: f.ids.sourceHost },
+        inputs: null,
+      }),
+    };
+    const snapshot = await managedThread(f, settings);
+    await run(
+      { ...f, snapshot },
+      { picks: [{ kind: "thread", id: f.ids.t3 }] },
+    );
+    f.db
+      .prepare("UPDATE threads SET environment_id = NULL WHERE id = ?")
+      .run(f.ids.t3);
+    f.db.prepare("DELETE FROM environments WHERE id = 'env_managed'").run();
+    const again = await takeSourceSnapshot({
+      dataDir: f.target,
+      sourceDataDir: f.source,
+      now: 9500,
+    });
+    await run(
+      { ...f, snapshot: again },
+      { picks: [{ kind: "thread", id: f.ids.t3 }] },
+    );
+    expect(environmentRow(f)).toMatchObject({
+      id: "env_managed",
+      status: "destroyed",
+      path: null,
+      host_id: "host_here",
+    });
+  });
+});
