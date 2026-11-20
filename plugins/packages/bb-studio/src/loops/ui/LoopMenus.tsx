@@ -19,7 +19,6 @@ export const CARD_GHOST = "inline-flex h-7 shrink-0 items-center gap-1.5 rounded
 
 /** Snooze ▾: the presets, then Pick a time…, which asks for a date and time. */
 export function SnoozeMenu({ disabled, onSnooze, onPick, className = CARD_BUTTON, label = "Snooze" }: { disabled?: boolean; onSnooze(preset: SnoozePreset): void; onPick(at: number): void; className?: string; label?: string }) {
-  const zone = useTodosZone();
   const [picking, setPicking] = useState(false);
   return (
     <>
@@ -29,16 +28,7 @@ export function SnoozeMenu({ disabled, onSnooze, onPick, className = CARD_BUTTON
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-60">
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Snooze until</DropdownMenuLabel>
-          {SNOOZE.map((preset, index) => (
-            <span key={preset.id} className="contents">
-              {index === 4 ? <DropdownMenuSeparator /> : null}
-              <DropdownMenuItem onSelect={() => onSnooze(preset.id)}>
-                <Icon name={preset.icon} />
-                <span className="flex-1">{preset.label}</span>
-                <span className="text-xs text-muted-foreground">{snoozeHint(preset.id, Date.now(), zone)}</span>
-              </DropdownMenuItem>
-            </span>
-          ))}
+          <SnoozePresets onSnooze={onSnooze} />
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setPicking(true)}><Icon name="Calendar" />Pick a time…</DropdownMenuItem>
         </DropdownMenuContent>
@@ -46,6 +36,26 @@ export function SnoozeMenu({ disabled, onSnooze, onPick, className = CARD_BUTTON
       {picking ? <PickTime onClose={() => setPicking(false)} onPick={(at) => { setPicking(false); onPick(at); }} /> : null}
     </>
   );
+}
+
+/**
+ * The presets with their times. Its own component so the times are worked out
+ * only while the menu is open: every card has a Snooze menu, and a long
+ * conversation re-renders its cards often.
+ */
+function SnoozePresets({ onSnooze }: { onSnooze(preset: SnoozePreset): void }) {
+  const zone = useTodosZone();
+  const now = Date.now();
+  return SNOOZE.map((preset, index) => (
+    <span key={preset.id} className="contents">
+      {index === 4 ? <DropdownMenuSeparator /> : null}
+      <DropdownMenuItem onSelect={() => onSnooze(preset.id)}>
+        <Icon name={preset.icon} />
+        <span className="flex-1">{preset.label}</span>
+        <span className="text-xs text-muted-foreground">{snoozeHint(preset.id, now, zone)}</span>
+      </DropdownMenuItem>
+    </span>
+  ));
 }
 
 export function PickTime({ onClose, onPick }: { onClose(): void; onPick(at: number): void }) {

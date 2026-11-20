@@ -35,6 +35,8 @@ interface LiveEntry {
   poll: ReturnType<typeof setInterval> | null;
   visible: (() => void) | null;
   loadedAt: number;
+  /** The last loaded data as JSON, to tell a refetch that changed nothing. */
+  json: string | null;
 }
 const liveEntries = new Map<string, LiveEntry>();
 const COALESCE_MS = 250;
@@ -42,7 +44,7 @@ const DISABLED: LiveState<never> = { data: null, error: null, loading: false };
 function liveEntry(key: string): LiveEntry {
   let entry = liveEntries.get(key);
   if (!entry) {
-    entry = { state: { data: null, error: null, loading: true }, listeners: new Set(), subscribers: new Map(), call: null, requests: requestGeneration(), inflight: false, again: false, timer: null, poll: null, visible: null, loadedAt: 0 };
+    entry = { state: { data: null, error: null, loading: true }, listeners: new Set(), subscribers: new Map(), call: null, requests: requestGeneration(), inflight: false, again: false, timer: null, poll: null, visible: null, loadedAt: 0, json: null };
     liveEntries.set(key, entry);
   }
   return entry;
@@ -58,14 +60,28 @@ function loadLive(entry: LiveEntry, invalidate = true) {
   entry.inflight = true;
   const current = entry.requests.begin();
   entry.call().then((data) => {
-    if (current()) { entry.loadedAt = Date.now(); setLive(entry, { data, error: null, loading: false }); }
+    if (!current()) return;
+    entry.loadedAt = Date.now();
+    // Every Studio signal refetches every query on screen, and most refetches
+    // return what is already shown. Keeping the same state then spares every
+    // reader a render (a long conversation has dozens of task cards).
+    const json = jsonOf(data);
+    if (json !== null && json === entry.json && !entry.state.loading && entry.state.error === null) return;
+    entry.json = json;
+    setLive(entry, { data, error: null, loading: false });
   }, (cause: unknown) => {
-    if (current()) setLive(entry, { ...entry.state, error: errorMessage(cause), loading: false });
+    if (!current()) return;
+    entry.json = null;
+    setLive(entry, { ...entry.state, error: errorMessage(cause), loading: false });
   }).finally(() => {
     if (!current()) return;
     entry.inflight = false;
     if (entry.again) { entry.again = false; loadLive(entry); }
   });
+}
+/** The data as JSON, or null when it can't be compared that way. */
+function jsonOf(data: unknown): string | null {
+  try { return JSON.stringify(data) ?? null; } catch { return null; }
 }
 function scheduleLive(entry: LiveEntry) {
   if (entry.timer || !entry.listeners.size) return;
