@@ -1,0 +1,31 @@
+// Columns Studio adds by checking whether they are there, not by migration
+// index. BB's migrate (bb.storage.migrate) records each statement's index and
+// refuses to load when a database already has that index with a different
+// statement, which happens when a build from another branch appended its own
+// migration at the same position. A column added here can't collide that way:
+// ensureColumns runs after the migrations at every start, adds what is
+// missing and leaves the rest. Each column is nullable, so adding it later is
+// always safe.
+import type Database from "better-sqlite3";
+
+/** Table → [column, type] added when missing. */
+export const ENSURED_COLUMNS: Readonly<Record<string, readonly (readonly [string, string])[]>> = {
+  // The model a Bot's Main last ran on (src/bot.ts), saved whenever Studio reads it, so a new
+  // Main can start on it after the old one is deleted and can't be read any more.
+  bots: [["main_provider_id", "TEXT"], ["main_model", "TEXT"], ["main_reasoning", "TEXT"]],
+};
+
+/** Adds each missing column (a table that isn't there yet is left alone); returns what it added. */
+export function ensureColumns(db: Database.Database, columns: Readonly<Record<string, readonly (readonly [string, string])[]>> = ENSURED_COLUMNS): string[] {
+  const added: string[] = [];
+  for (const [table, wanted] of Object.entries(columns)) {
+    const have = new Set((db.prepare(`PRAGMA table_info("${table}")`).all() as { name: string }[]).map((column) => column.name));
+    if (!have.size) continue;
+    for (const [name, type] of wanted) {
+      if (have.has(name)) continue;
+      db.exec(`ALTER TABLE "${table}" ADD COLUMN "${name}" ${type}`);
+      added.push(`${table}.${name}`);
+    }
+  }
+  return added;
+}

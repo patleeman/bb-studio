@@ -42,6 +42,7 @@ import { BOT_SHAPES } from "./bot-shapes";
 import { readyProvider, type OnboardingProviderState } from "./onboarding";
 import { rpcErrorStatus } from "./kit/server/index";
 import { threadModel } from "./thread-model";
+import { ensureColumns } from "./schema-columns";
 import { turnStartedAt } from "./turn-started";
 import { botAttention, pendingInteractions, threadWaitingFor, type BotAttention } from "./bot-attention";
 import { lineDiff, lintSkill } from "./skill-learning";
@@ -443,7 +444,10 @@ export function newMainNote(name: string, gone: "deleted" | "archived"): string 
 }
 
 export class Bots {
-  constructor(private readonly deps: BotDeps) {}
+  constructor(private readonly deps: BotDeps) {
+    // Its main_* columns are added by checking (src/schema-columns.ts); the server does it too, after the migrations.
+    try { ensureColumns(deps.db); } catch { /* A database without the bots table yet: saveMainModel tolerates it. */ }
+  }
 
   /** Every Bot, the primary first (BOT_ID, else the oldest). */
   private rows(): BotRow[] {

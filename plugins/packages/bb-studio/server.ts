@@ -127,6 +127,7 @@ import { runPresenceCli } from "./src/presence/cli";
 import { presenceAskText } from "./src/presence/contract";
 import { SideThreads } from "./src/bot-side-threads";
 import { alertBot, Runners } from "./src/runners";
+import { ensureColumns } from "./src/schema-columns";
 import { nudgeReason, BotNudges, type NudgeOwner } from "./src/bot-nudge";
 import { workerApprovalRpc } from "./src/worker-approvals";
 
@@ -226,6 +227,8 @@ export default async function plugin(bb: BbPluginApi) {
   };
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
+  // Columns added by checking, not by index (src/schema-columns.ts).
+  ensureColumns(db);
   adoptAtStart(db, bb.log);
   const themes = new ThemeStore(db);
   // Pages and Apps: the item index (src/item-index.ts). Triggers keep it in
