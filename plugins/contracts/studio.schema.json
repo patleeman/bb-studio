@@ -54842,6 +54842,101 @@
         ],
         "additionalProperties": false
       }
+    },
+    "toolGateway.overview": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "servers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "stdio",
+                    "streamable-http",
+                    "sse"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "needs-approval",
+                    "stopped",
+                    "starting",
+                    "running",
+                    "needs-sign-in",
+                    "error",
+                    "off"
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "tools": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "id",
+                "label",
+                "kind",
+                "status",
+                "enabled",
+                "tools"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "why": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "label",
+                "why",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "servers",
+          "requests"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "events": {

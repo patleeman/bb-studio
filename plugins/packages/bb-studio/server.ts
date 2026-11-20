@@ -36,6 +36,7 @@ import { registerQuietTurnClassifier } from "./src/kit/quiet-turns";
 import { quietByDefault, repliesAllowed } from "./src/push-levels";
 import { MainPushes } from "./src/main-push";
 import { registerDecisions } from "./src/decisions/server";
+import { registerToolGateway, type ToolGateway } from "./src/tool-gateway/server/register";
 import { BotMaintenance } from "./src/bot-maintenance";
 import { registerChat } from "./src/chat/server";
 import { ARTIFACT_TOOLS, registerArtifacts } from "./src/artifacts/server";
@@ -432,6 +433,8 @@ export default async function plugin(bb: BbPluginApi) {
   // the Pages plugin gave them. A kind turned off gives neither, from the next
   // session start or resume on (BB doesn't change a running session).
   // Memory (src/memory): every Bot conversation and worker also gets the memory tools and the core profile, at MEMORY_SLOT.
+  // Tool Gateway (src/tool-gateway): its 3 tools, only while a server this provider and project may use is approved and on.
+  let toolGateway: ToolGateway | null = null;
   bb.agents.configure(withMemory(() => memoryService, (context) => isCanvasThreadOrigin(context.origin) || !!learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string", (context) => {
     if (Date.now() - routesCheckedAt > 30_000) void refreshRoutes();
     // A Visual Chat thread works with that plugin's canvas tools only (src/voice/live/canvas-plugin.ts).
@@ -467,7 +470,8 @@ export default async function plugin(bb: BbPluginApi) {
       bot: bot ? bots.instructions(bot) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
       pages: !off.has("page"), minis: !off.has("mini"), appCards, work: true, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
     });
-    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...TASK_TOOLS, ...AREA_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio", ...(bot ? ["themes", "presences"] : [])], instructions };
+    const gateway = toolGateway?.agentConfiguration({ providerId: context.provider.id, projectId: context.project.id }) ?? { tools: [], instructions: "" };
+    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...TASK_TOOLS, ...AREA_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : []), ...gateway.tools], skills: ["studio-code", "studio", ...(bot ? ["themes", "presences"] : [])], instructions: gateway.instructions ? `${instructions}\n\n${gateway.instructions}`.trim() : instructions };
   }));
   /** Which conversation a Bot's session is in (src/bot-threads.ts conversationInstructions); "" before Studio has placed it. */
   const conversationNote = (threadId: string): string => {
@@ -728,7 +732,18 @@ export default async function plugin(bb: BbPluginApi) {
   const linkStore = new TaskStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); });
   const spawnLinks = new SpawnLinks({ store: linkStore, dir: taskThreads, thread: async (threadId) => asFact(await bb.sdk.threads.get({ threadId }).catch(() => null)), log: (message) => bb.log.warn(message) });
   const threadFacts = () => listThreadFacts(bb.sdk as never);
-  registerTasks(bb, db, postToBot, undefined, movedToUser, { links: spawnLinks, check: async () => (await userTasks.check()).problems });
+  const taskApi = registerTasks(bb, db, postToBot, undefined, movedToUser, { links: spawnLinks, check: async () => (await userTasks.check()).problems });
+  // Requests for an MCP server become Todos for the user; approving or declining closes them.
+  toolGateway = await registerToolGateway(bb, {
+    db,
+    dataDir: bb.server.experimental_dataDir,
+    pluginId: STUDIO_PLUGIN_ID,
+    todos: {
+      create: async ({ title, why, requestId, threadId }) => (await taskApi.create({ title, owner: "user", state: "waiting", kind: "decide", why, needs: "Approve or decline it in Settings › Studio › Tool Gateway, in the BB Studio app on your Mac.", source: { kind: "tool-gateway", ref: requestId } }, threadId ? { threadId } : {})).task.id,
+      close: async (taskId, state) => { await taskApi.update({ id: taskId, state }); },
+    },
+  });
+  { const gateway = toolGateway; bb.onDispose(() => gateway.dispose()); }
   const userTasks = registerUserTasks(bb, db, {
     zone: () => loopTimeZone(process.env, studioSettings.current().todosTimeZone),
     dir: taskThreads,
@@ -2610,6 +2625,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "minis", summary: "List mini apps, read their records and state, and run their actions", usage: "bb studio minis <list|show|data|state|watch|actions|do> …" },
       { name: "theme", summary: "List, show, check, create, update, apply and delete Bot themes", usage: "bb studio theme <list|show|create|update|apply|check|delete|template> …" },
       { name: "presence", summary: "List, show, check, create, update, apply and delete Bot presences", usage: "bb studio presence <list|show|create|update|apply|check|delete|template> …" },
+      { name: "tool-gateway", summary: "Your MCP servers: list them, search and run their tools, and ask the user to add one", usage: "bb studio tool-gateway <list|tools|describe|call|request|status> …" },
       { name: "work", summary: "Live work cards: create one, update it in place, show and list a conversation's In flight cards, remove finished ones from the list", usage: "bb studio work <create|update|show|list|dismiss|clear> …" },
     ],
     async run(argv, ctx) {
@@ -2627,6 +2643,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (argv[0] === "presence") return runPresenceCli(argv.slice(1), { service: presenceService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)) });
       if (argv[0] === "theme") return runThemeCli(argv.slice(1), { service: themeService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)), weather: { sky: () => forestWeather.sky(Intl.DateTimeFormat().resolvedOptions().timeZone ?? null), setCity: (city) => forestWeather.setCity(city) }, sky: { place: () => forestWeather.place(Intl.DateTimeFormat().resolvedOptions().timeZone ?? null), preview: () => readPreview(bb.storage.kv), setPreview: (at) => writePreview(bb.storage.kv, at), view: () => readView(bb.storage.kv), setView: (view) => writeView(bb.storage.kv, view), now: () => Date.now(), zoneOffsetMinutes: () => -new Date().getTimezoneOffset() } });
       if (argv[0] === "work") return runWorkCli(argv.slice(1), work, ctx);
+      if (argv[0] === "tool-gateway") return toolGateway ? toolGateway.cli(argv.slice(1), { threadId: ctx.threadId ?? null }) : { exitCode: 1, stderr: "Tool Gateway isn't loaded.\n" };
       if (argv[0] === "pages") return argv[1] === "explore" ? explore.cli(argv.slice(2), ctx) : pages.cli(argv.slice(1), ctx);
       const { command, rest: raw } = subcommand(argv);
       const USAGE: Record<string, string> = {
@@ -2725,7 +2742,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|starred|move|providers|health|setup|reindex|backup|restore|pages|artifacts|whiteboards|designs|recordings|minis|theme|presence|decisions|work> …");
+            return usage("bb studio <list|tags|starred|move|providers|health|setup|reindex|backup|restore|pages|artifacts|whiteboards|designs|recordings|minis|theme|presence|decisions|work|tool-gateway> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

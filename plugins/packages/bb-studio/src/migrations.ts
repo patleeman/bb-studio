@@ -1150,4 +1150,9 @@ export const MIGRATIONS = [
        tokenize='unicode61 remove_diacritics 2'
      );
    CREATE TABLE conversation_text_state (thread_id TEXT PRIMARY KEY, seen_seq INTEGER NOT NULL, done INTEGER NOT NULL, read_at INTEGER NOT NULL);`,
+  `CREATE TABLE tool_gateway_servers (id TEXT PRIMARY KEY, record TEXT NOT NULL, updated_at INTEGER NOT NULL);
+   CREATE TABLE tool_gateway_requests (id TEXT PRIMARY KEY, record TEXT NOT NULL, state TEXT NOT NULL, created_at INTEGER NOT NULL);
+   CREATE INDEX tool_gateway_requests_state ON tool_gateway_requests (state, created_at);
+   CREATE TABLE tool_gateway_log (seq INTEGER PRIMARY KEY AUTOINCREMENT, server_id TEXT NOT NULL, at INTEGER NOT NULL, kind TEXT NOT NULL, text TEXT NOT NULL);
+   CREATE INDEX tool_gateway_log_server ON tool_gateway_log (server_id, seq);`,
 ];

@@ -386,6 +386,7 @@ public enum Studio {
     public static let areas_list = "areas.list"
     public static let areas_get = "areas.get"
     public static let areas_itemTask = "areas.itemTask"
+    public static let toolGateway_overview = "toolGateway.overview"
   }
 
   public enum Channel {
@@ -1233,6 +1234,10 @@ public enum Studio {
   public typealias AreasGet = AreasGetOutput
 
   public typealias AreasItemTask = AreasItemTaskOutput
+
+  public typealias ToolGatewayOverviewInput = StudioJSONValue
+
+  public typealias ToolGatewayOverview = ToolGatewayOverviewOutput
 
   public struct LoopsListInput: Sendable, Hashable, Codable {
     public var area: String?
@@ -39891,6 +39896,114 @@ public enum Studio {
       self.taskId = taskId
       self.title = title
       self.created = created
+    }
+  }
+
+  public enum ToolGatewayOverviewOutputServersItemKind: Sendable, Hashable, Codable {
+    case stdio
+    case streamable_http
+    case sse
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "stdio": self = .stdio
+      case "streamable-http": self = .streamable_http
+      case "sse": self = .sse
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .stdio: try container.encode("stdio")
+      case .streamable_http: try container.encode("streamable-http")
+      case .sse: try container.encode("sse")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ToolGatewayOverviewOutputServersItemStatus: Sendable, Hashable, Codable {
+    case needs_approval
+    case stopped
+    case starting
+    case running
+    case needs_sign_in
+    case error
+    case off
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "needs-approval": self = .needs_approval
+      case "stopped": self = .stopped
+      case "starting": self = .starting
+      case "running": self = .running
+      case "needs-sign-in": self = .needs_sign_in
+      case "error": self = .error
+      case "off": self = .off
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .needs_approval: try container.encode("needs-approval")
+      case .stopped: try container.encode("stopped")
+      case .starting: try container.encode("starting")
+      case .running: try container.encode("running")
+      case .needs_sign_in: try container.encode("needs-sign-in")
+      case .error: try container.encode("error")
+      case .off: try container.encode("off")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ToolGatewayOverviewOutputServersItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+    public var kind: ToolGatewayOverviewOutputServersItemKind?
+    public var status: ToolGatewayOverviewOutputServersItemStatus?
+    public var enabled: Bool?
+    public var tools: Int?
+
+    public init(id: String? = nil, label: String? = nil, kind: ToolGatewayOverviewOutputServersItemKind? = nil, status: ToolGatewayOverviewOutputServersItemStatus? = nil, enabled: Bool? = nil, tools: Int? = nil) {
+      self.id = id
+      self.label = label
+      self.kind = kind
+      self.status = status
+      self.enabled = enabled
+      self.tools = tools
+    }
+  }
+
+  public struct ToolGatewayOverviewOutputRequestsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+    public var why: String?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, label: String? = nil, why: String? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.label = label
+      self.why = why
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct ToolGatewayOverviewOutput: Sendable, Hashable, Codable {
+    public var servers: [ToolGatewayOverviewOutputServersItem]?
+    public var requests: [ToolGatewayOverviewOutputRequestsItem]?
+
+    public init(servers: [ToolGatewayOverviewOutputServersItem]? = nil, requests: [ToolGatewayOverviewOutputRequestsItem]? = nil) {
+      self.servers = servers
+      self.requests = requests
     }
   }
 
