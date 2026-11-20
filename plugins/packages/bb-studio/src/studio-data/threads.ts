@@ -4,8 +4,10 @@
 //
 // Only threads that Studio's data is built around come over:
 //   - required: each Bot's own thread (the primary Bot's is the personal
-//     project's lead) and its Main (bot_threads.is_main);
-//     without them a Bot is broken, so the bring-over refuses;
+//     project's lead) and its Main (bot_threads.is_main); the bring-over
+//     refuses unless each one it asks for comes over. The row asks only for
+//     the ones bb still has (bring-over/api.ts requiredInBb): a Main deleted
+//     in bb is left out, and its Bot gets a new Main here (Bots.restoreMain);
 //   - wanted: the Bots' conversations and workers (bot_threads, with the
 //     conversation a worker belongs to), runners, side threads, the Chief of
 //     Staff, project and space leads and the threads their heartbeats wake,
