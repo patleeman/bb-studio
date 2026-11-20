@@ -13,6 +13,7 @@ import {
 } from "./job.js";
 import { listProjects, listThreads } from "./listing.js";
 import { addPlugin, listPlugins, type PluginInstaller } from "./plugins.js";
+import { stageToolGateway } from "./tool-gateway.js";
 import { listSettings } from "./settings.js";
 import {
   UI_TOKEN_HEADER,
@@ -383,6 +384,23 @@ export function registerBringOverRoutes(
     requireUi(context, "studio-data/forget");
     await forgetStudioData(dataDir()).catch(studioError);
     return context.body(null, 204);
+  });
+
+  app.post("/fork/bring-over/tool-gateway/stage", async (context) => {
+    requireUi(context, "tool-gateway/stage");
+    try {
+      return context.json(
+        await stageToolGateway({
+          sourceDataDir: await source(),
+          dataDir: dataDir(),
+        }),
+      );
+    } catch (error) {
+      if (error instanceof BringOverError) {
+        throw new ApiError(422, "invalid_request", error.message);
+      }
+      throw error;
+    }
   });
 
   app.post("/fork/bring-over/plugins/:pluginId/add", async (context) => {

@@ -4,6 +4,7 @@ import semver from "semver";
 import { join } from "node:path";
 import { BringOverError, errorDetail, exists } from "./files.js";
 import { snapshotDatabases } from "./snapshot.js";
+import { AGENT_PLUGINS_ID } from "./tool-gateway.js";
 
 type Sqlite = Database.Database;
 
@@ -278,6 +279,11 @@ async function addPluginOnce(
   args: Parameters<typeof addPlugin>[0],
 ): Promise<{ id: string; data: boolean }> {
   const { source, target } = args;
+  if (args.id === AGENT_PLUGINS_ID) {
+    throw new BringOverError(
+      "Agent Plugins isn't added to BB Studio: import its servers into Tool Gateway",
+    );
+  }
   const row = sourceRows(source).find((plugin) => plugin.id === args.id);
   if (
     row === undefined ||
