@@ -2611,7 +2611,11 @@ describe("a brought-over thread whose workspace stays in bb", () => {
 });
 
 describe("a brought-over thread whose workspace bb manages comes over restorable", () => {
-  async function managedThread(f: Fixture, overrides: Record<string, unknown>) {
+  async function managedThread(
+    f: Fixture,
+    overrides: Record<string, unknown>,
+    projectFolder = join(f.root, "not-on-this-mac"),
+  ) {
     const bb = new Database(join(f.source, "bb.db"));
     const env = bb
       .prepare("SELECT * FROM environments WHERE id = ?")
@@ -2635,7 +2639,7 @@ describe("a brought-over thread whose workspace bb manages comes over restorable
       "UPDATE events SET environment_id = 'env_managed' WHERE thread_id = ?",
     ).run(f.ids.t3);
     bb.prepare("UPDATE project_sources SET path = ? WHERE project_id = ?").run(
-      join(f.root, "not-on-this-mac"),
+      projectFolder,
       f.ids.p2,
     );
     bb.close();
@@ -2786,6 +2790,39 @@ describe("a brought-over thread whose workspace bb manages comes over restorable
     );
     expect(environmentRow(g)).toBeUndefined();
     expect(note(g)).toContain("Workspace not on this Mac");
+  });
+
+  it("never makes a git worktree restorable when this Mac's project folder is inside bb's data, so no git command runs in a repo there", async () => {
+    const f = await fixture();
+    const repo = join(f.source, "repos", "hive");
+    await mkdir(join(repo, ".git"), { recursive: true });
+    const snapshot = await managedThread(
+      f,
+      {
+        path: join(f.source, "worktrees", "k1", "hive"),
+        is_worktree: 1,
+        branch_name: "bot-main",
+        environment_provider_id: "git-worktree",
+        environment_provider_plugin_id: "environment-git-worktree",
+        environment_provider_selection: JSON.stringify({
+          machine: { type: "existing", hostId: f.ids.sourceHost },
+          inputs: { branch: { kind: "default" } },
+        }),
+      },
+      repo,
+    );
+    await run(
+      { ...f, snapshot },
+      { picks: [{ kind: "thread", id: f.ids.t3 }] },
+    );
+    expect(environmentRow(f)).toBeUndefined();
+    expect(
+      count(
+        f.db,
+        "SELECT COUNT(*) AS n FROM environments WHERE environment_provider_id = 'git-worktree'",
+      ),
+    ).toBe(0);
+    expect(note(f)).toContain("Workspace not on this Mac");
   });
 
   it("gives a thread brought over earlier with no workspace a restorable one when it is brought over again", async () => {
