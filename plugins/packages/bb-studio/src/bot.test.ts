@@ -61,6 +61,7 @@ async function setup(migrations = MIGRATIONS) {
     { id: "hermes", capabilities: { permissionModes: ["accept-edits", "full"] } },
     { id: "grok", capabilities: { permissionModes: ["full"] } },
   ];
+  const signedOut = new Set<string>();
   const update = vi.fn(async ({ threadId, ...fields }: { threadId: string; model?: string; reasoningLevel?: string }) => { execution.set(threadId, { ...execution.get(threadId)!, ...fields }); return {}; });
   const send = vi.fn(async (_args: { threadId: string; mode: string; input: { text: string }[] }) => ({}));
   const providerDefaults = new Map<string, string>([["codex", "codex-default"]]);
@@ -84,7 +85,8 @@ async function setup(migrations = MIGRATIONS) {
     providers: {
       list: (async () => providers) as never,
       // BB's model list per provider: its default marked (none listed for an unknown provider).
-      models: (async ({ providerId }: { providerId: string }) => ({ models: providerDefaults.has(providerId) ? [{ id: "other", model: "other", isDefault: false }, { id: providerDefaults.get(providerId)!, model: providerDefaults.get(providerId)!, isDefault: true }] : [] })) as never,
+      // A signed-out provider's catalog can't be read.
+      models: (async ({ providerId }: { providerId: string }) => signedOut.has(providerId) ? Promise.reject(new Error(`${providerId} is signed out`)) : ({ models: providerDefaults.has(providerId) ? [{ id: "other", model: "other", isDefault: false }, { id: providerDefaults.get(providerId)!, model: providerDefaults.get(providerId)!, isDefault: true }] : [] })) as never,
     },
     projects: { defaultExecutionOptions: (async () => projectDefault.current) as never } as never,
   } });
@@ -100,7 +102,7 @@ async function setup(migrations = MIGRATIONS) {
   const userSkillsDir = await mkdtemp(join(tmpdir(), "bot-skills-"));
   const memory = { exists: (id: string) => pages.has(id), create: (page: { title: string; markdown: string }) => { const id = `pg${++made}`; pages.set(id, page); return id; } };
   bots.current = new Bots({ db, sdk: bb.sdk, leads, changed: () => {}, presenceChanged: () => {}, memory, userSkillsDir });
-  return { send, clock, engine, scheduler, bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir, update, list, pending, replies, get, del, execution, providerDefaults, projectDefault, noModel };
+  return { send, clock, engine, scheduler, bb, db, leads, bots: bots.current, threads, add, spawn, stop, callRpc, automations, pages, userSkillsDir, update, list, pending, replies, get, del, execution, providerDefaults, projectDefault, noModel, signedOut };
 }
 
 /** What each check-in on Studio's scheduler sends when it runs: its key, the thread it wakes and the prompt after the marker. */
@@ -1329,4 +1331,141 @@ it("starts a new Bot on a signed-in model: the primary's default model, else the
   states = [{ providerId: "codex", status: "unauthenticated", loginCommand: "codex login" }];
   await bots.create({ name: "Echo", avatar: "🔔" });
   expect(spawned()).not.toHaveProperty("providerId");
+});
+
+// ---------------------------------------------------------------------------
+// Failure modes: nothing the Bot infers (its Main, a thread's model, a
+// provider) may break it. Each case is a row of the failure-mode table.
+
+it.skip("FM: a read after the Main is deleted keeps the check-in on, and the new Main gets it", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  await x.bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
+  x.threads.delete("t1");
+  // The sidebar reads the Bot before Studio hears of the delete.
+  await x.bots.get();
+  const made = await x.bots.restoreMain(BOT_ID, "t1");
+  expect(made).toBeTruthy();
+  expect((await x.bots.get()).run?.enabled).toBe(true);
+  expect(await checkins(x)).toEqual([{ key: PERSONAL_PROJECT_ID, threadId: made, prompt: botHeartbeat("Dot") }]);
+});
+
+it.skip("FM: the heal finds a primary Main that a read already forgot (deleted while Studio was off)", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  await x.bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
+  x.threads.delete("t1");
+  await x.bots.get();
+  const made = await x.bots.restoreMains();
+  expect(made).toHaveLength(1);
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe(made[0]);
+  expect(await checkins(x)).toEqual([{ key: PERSONAL_PROJECT_ID, threadId: made[0], prompt: botHeartbeat("Dot") }]);
+});
+
+it("FM: Make this the Main on a conversation with no model fills it from the Bot's default model, else the provider's, check-ins on or off", async () => {
+  const x = await setup();
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, conversationBot: (threadId) => threadId.startsWith("conv") ? BOT_ID : null });
+  await bots.create({ name: "Dot", avatar: "🟣" });
+  // Check-ins off: before, it moved and every later check-in failed in BB.
+  x.add({ id: "conv_a", projectId: PERSONAL_PROJECT_ID, providerId: "codex" });
+  x.execution.set("conv_a", { model: null as never, reasoningLevel: "high", permissionMode: "accept-edits" });
+  // The Bot's default (taken from its first Main) is on another provider, so the provider's default.
+  x.db.prepare("UPDATE bots SET default_provider_id = 'claude', default_model = 'claude-x'").run();
+  await bots.makeMain("conv_a");
+  expect(x.update).toHaveBeenLastCalledWith(expect.objectContaining({ threadId: "conv_a", model: "codex-default" }));
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("conv_a");
+  // With the Bot's default model on that provider, that one; check-ins on.
+  await bots.setDefaultModel({ botId: BOT_ID, providerId: "codex", model: "codex-other", reasoning: "low" });
+  await bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
+  x.add({ id: "conv_b", projectId: PERSONAL_PROJECT_ID, providerId: "codex" });
+  x.execution.set("conv_b", { model: null as never, reasoningLevel: "high", permissionMode: "accept-edits" });
+  await bots.makeMain("conv_b");
+  expect(x.update).toHaveBeenLastCalledWith(expect.objectContaining({ threadId: "conv_b", model: "codex-other", reasoningLevel: "low" }));
+  expect((await checkins(x))[0]?.threadId).toBe("conv_b");
+});
+
+it("FM: Make this the Main on a conversation with no model whose provider is signed out says what to do, and nothing moves", async () => {
+  const x = await setup();
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, conversationBot: (threadId) => threadId.startsWith("conv") ? BOT_ID : null });
+  await bots.create({ name: "Dot", avatar: "🟣" });
+  x.add({ id: "conv_c", projectId: PERSONAL_PROJECT_ID, providerId: "claude" });
+  x.execution.set("conv_c", { model: null as never, reasoningLevel: "high", permissionMode: "accept-edits" });
+  x.signedOut.add("claude");
+  await expect(bots.makeMain("conv_c")).rejects.toThrow(/has no model yet.*Choose a model/);
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("t1");
+});
+
+it("FM: Start a new Main: a fresh conversation on the Bot's default model becomes the Main; the old one stays a conversation", async () => {
+  const x = await setup();
+  const mainMoved = vi.fn();
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, mainMoved, providerStates: async () => [{ providerId: "codex", status: "ready" }, { providerId: "claude", status: "signed-out" }] as never });
+  await bots.create({ name: "Dot", avatar: "🟣" });
+  await bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
+  await bots.setDefaultModel({ botId: BOT_ID, providerId: "codex", model: "codex-other" });
+  const view = await bots.newMain(BOT_ID);
+  const made = view.bot!.threadId!;
+  expect(made).not.toBe("t1");
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: PERSONAL_PROJECT_ID, providerId: "codex", model: "codex-other", pluginMetadata: { bot: BOT_ID } }));
+  expect(mainMoved).toHaveBeenLastCalledWith(BOT_ID, made, "t1");
+  expect(x.threads.get("t1")?.archivedAt ?? null).toBeNull();
+  expect((await checkins(x))[0]?.threadId).toBe(made);
+  // The default's provider signed out: a signed-in one instead, not a spawn BB refuses.
+  await bots.setDefaultModel({ botId: BOT_ID, providerId: "claude", model: "claude-x" });
+  await bots.newMain(BOT_ID);
+  expect(x.spawn).toHaveBeenLastCalledWith(expect.objectContaining({ providerId: "codex" }));
+  expect(x.spawn.mock.lastCall?.[0]).not.toHaveProperty("model", "claude-x");
+});
+
+it("FM: Start a new Main with no provider signed in says so in plain words and keeps the old Main", async () => {
+  const x = await setup();
+  const bots = new Bots({ db: x.db, sdk: x.bb.sdk, leads: x.leads, changed: () => {}, presenceChanged: () => {}, providerStates: async () => [] });
+  await bots.create({ name: "Dot", avatar: "🟣" });
+  x.db.prepare("UPDATE bots SET provider_id = NULL").run();
+  await expect(bots.newMain(BOT_ID)).rejects.toThrow("Sign in to a provider");
+  expect(x.leads.storedLead(PERSONAL_PROJECT_ID)).toBe("t1");
+  // BB refusing the spawn for want of a model reads the same.
+  x.db.prepare("UPDATE bots SET provider_id = 'codex'").run();
+  x.spawn.mockRejectedValueOnce(new Error("Thread t9 has no stored execution model"));
+  await expect(bots.newMain(BOT_ID)).rejects.toThrow("Sign in to a provider");
+});
+
+it("FM: a rename with check-ins on goes through when the Main is gone or has no model", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  await x.bots.setRun({ enabled: true, cadence: "daily", time: "08:00" });
+  await x.bots.setRun({ botId: scout.id, enabled: true, cadence: "daily", time: "08:00" });
+  // Before: the rename was saved, then re-scheduling the check-in threw BB's 404 or "Choose a provider and model".
+  x.threads.delete(scout.threadId!);
+  await expect(x.bots.set({ botId: scout.id, name: "Scout II" })).resolves.toMatchObject({ bot: { name: "Scout II" } });
+  x.execution.set("t1", { model: null as never, reasoningLevel: "high", permissionMode: "accept-edits" });
+  x.signedOut.add("codex");
+  await expect(x.bots.set({ name: "Penny" })).resolves.toMatchObject({ bot: { name: "Penny" } });
+  // The check-in still carries the new name: its prompt is read when it runs.
+  x.execution.set("t1", { model: "model", reasoningLevel: "high", permissionMode: "accept-edits" });
+  x.send.mockClear();
+  await x.scheduler.runNow({ owner: "heartbeat", ownerId: PERSONAL_PROJECT_ID });
+  expect(x.send.mock.lastCall?.[0].input[0]!.text).toContain(botHeartbeat("Penny"));
+});
+
+it("FM: turning check-ins on for a Bot with no Main says what to do instead of storing them off and saying it worked", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  x.db.prepare("UPDATE bots SET thread_id = NULL WHERE id = ?").run(scout.id);
+  await expect(x.bots.setRun({ botId: scout.id, enabled: true, cadence: "daily", time: "08:00" })).rejects.toThrow("Pick one in Bot settings");
+  await expect(x.bots.checkinPreset("morning", scout.id)).rejects.toThrow("Pick one in Bot settings");
+  // Off is always fine.
+  await expect(x.bots.setRun({ botId: scout.id, enabled: false, cadence: "daily", time: "08:00" })).resolves.toBeTruthy();
+});
+
+it("FM: Resume works when the Main is gone and a new one can't start yet", async () => {
+  const x = await setup();
+  await x.bots.create({ name: "Dot", avatar: "🟣" });
+  const scout = (await x.bots.create({ name: "Scout", avatar: "🛰️" })).bot!;
+  await x.bots.pause(scout.id);
+  x.threads.delete(scout.threadId!);
+  x.spawn.mockRejectedValueOnce(new Error("Thread t9 has no stored execution model"));
+  // Before: the raw error, and the Bot stayed paused.
+  await expect(x.bots.resume(scout.id)).resolves.toMatchObject({ bot: { state: "active" } });
 });

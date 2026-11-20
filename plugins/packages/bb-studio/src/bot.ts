@@ -1097,13 +1097,8 @@ export class Bots {
       ...(input.role !== undefined ? { role: input.role.trim() || null } : {}),
     });
     if (input.name && input.name !== before.name) await this.retitle(before, input.name);
-    // The heartbeat's prompt carries the name.
-    const key = this.runKey(before);
-    const run = this.deps.leads.runs.get(key);
-    if (input.name && input.name !== before.name && run?.enabled) {
-      if (key === PERSONAL_PROJECT_ID) await this.deps.leads.setRun(PERSONAL_PROJECT_ID, run);
-      else await this.deps.leads.runs.set(key, this.view(before).threadId, run);
-    }
+    // The heartbeat's prompt carries the name, but it is read when the check-in runs (ProjectRuns.target),
+    // so a rename schedules nothing: it can't fail half-way on a Main that is gone or has no model.
     return this.get(before.id);
   }
 
@@ -1227,6 +1222,8 @@ export class Bots {
     const row = this.row(botId);
     if (botId && !row) throw new Error(`No Bot "${botId}".`);
     if (run.enabled && row && row.state !== "active") throw new Error(`${row.name} is ${row.state}. Resume it before turning its check-ins on.`);
+    // Check-ins need a Main to wake: with none, say so with the action, not store them off and report success.
+    if (run.enabled && row && !this.view(row).threadId) throw new Error(`${row.name} has no Main conversation, so check-ins have nowhere to run. Pick one in Bot settings (or start a new one), then turn check-ins on.`);
     if (!row || this.isPrimary(row)) {
       await this.deps.leads.setRun(PERSONAL_PROJECT_ID, run);
       return this.get();
@@ -1308,7 +1305,8 @@ export class Bots {
     let row = this.need(botId);
     if (row.state !== "active") {
       // A Main lost while it was put away is replaced now, before its heartbeat comes back there.
-      if (await this.restoreMain(row.id, undefined, true)) row = this.need(row.id);
+      // If that fails the Bot still resumes: the heal keeps trying, and Bot settings can pick a Main.
+      if (await this.restoreMain(row.id, undefined, true).catch(() => null)) row = this.need(row.id);
       // The heartbeat comes back first: if that fails the Bot stays paused and remembers it, so Resume can be retried.
       const run = this.deps.leads.runs.get(this.runKey(row));
       if (row.heartbeat_was_on && run && this.view(row).threadId) await this.writeRun(row, { ...run, enabled: true });
