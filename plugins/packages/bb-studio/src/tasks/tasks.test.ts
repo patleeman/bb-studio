@@ -272,7 +272,7 @@ it("adds a typed todo as the user's own, in Today, with no Bot turn; a spoken on
   expect(loops.scheduler.held()).toEqual([]);
   const spoken = await loops.add("Call the vet");
   expect(spoken).toMatchObject({ owner: "cos", status: "in_progress" });
-  expect(posts).toEqual([`Fill in draft todo ${spoken.id} from this typed line using todos_update, then queue it: "Call the vet"`]);
+  expect(posts).toEqual([`Fill in draft task ${spoken.id} from this typed line using task_update, then queue it: "Call the vet"`]);
 });
 
 function legacy(target: Database.Database) {
@@ -462,9 +462,19 @@ it("shows a clear error in Todos, In flight and the tools when adoption failed, 
   await expect(Promise.resolve().then(() => handlers["loops.list"]!({}))).rejects.toThrow(/^Tasks could not be loaded\. Nothing was lost\. Restart BB Studio to try again\.$/);
   await expect(Promise.resolve().then(() => handlers["work.list"]!({ threadId: "thr_lead" }))).rejects.toThrow(/Tasks could not be loaded/);
   await expect(Promise.resolve().then(() => handlers["loops.add"]!({ text: "x" }))).rejects.toThrow(/Tasks could not be loaded/);
-  await expect(Promise.resolve().then(() => tools.todos_list!.execute({}, {}))).rejects.toThrow(/Tasks could not be loaded: disk I\/O error\. Nothing was lost/);
+  await expect(Promise.resolve().then(() => tools.task_morning!.execute({}, {}))).rejects.toThrow(/Tasks could not be loaded: disk I\/O error\. Nothing was lost/);
   await expect(Promise.resolve().then(() => tools.work_card_get!.execute({ id: "wc_x" }, {}))).rejects.toThrow(/Tasks could not be loaded/);
   expect((await call("task_list", {})).error).toMatch(/Tasks could not be loaded/);
+});
+
+it("attaches a live card to an existing task with task_update(card: true)", async () => {
+  const { call } = setup();
+  const created = await call("task_create", { title: "Ship patch", owner: "me" });
+  expect(created.task.card).toBeNull();
+  const updated = await call("task_update", { id: created.task.id, card: true }, { threadId: "thr_lead" });
+  expect(updated.card).toMatchObject({ kind: "task" });
+  expect(updated.conversation).toBe("thr_lead");
+  expect(updated.directive).toBe(`::work{id="${created.task.id}"}`);
 });
 
 it("adopts even when the backup fails, says why, and leaves the file in the way alone", () => {

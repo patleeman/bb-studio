@@ -408,8 +408,8 @@ export function registerBotFinish(bb: Bb, deps: Omit<FinishDeps, "sdk">) {
 
   bb.agents.registerTool({
     name: "bot_finish_done",
-    description: "Archive this conversation with its summary (the decisions, what was left open, what was made), after you saved it with memory_add. Studio archives the conversation, posts the summary to Main as a card, and keeps it findable in Search and the Library. Use it when Studio asks you to archive it, or when the user asks you to archive or finish this conversation. Not in Main or a worker.",
-    parameters: z.object({ summary: z.string().trim().min(1).max(6000).describe("The summary in short markdown: **Decisions**, **Left open**, **Made**") }),
+    description: "Archive this conversation with its summary (after memory_add) and post the summary to Main. Not in Main or a worker.",
+    parameters: z.object({ summary: z.string().trim().min(1).max(6000).describe("Short markdown: **Decisions**, **Left open**, **Made**") }),
     execute: async ({ summary }, ctx) => {
       if (!ctx.threadId) return "This isn't a conversation.";
       const rec = deps.threads.get(ctx.threadId);

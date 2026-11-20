@@ -116,7 +116,7 @@ export class ThemeService {
   async create(input: unknown, creator: ThemeCreator | null): Promise<ThemeOutcome> {
     const id = idOf(input);
     if (id && isBuiltinTheme(id)) return { ok: false, reasons: [`${id} is a built-in theme. Pick another id.`], report: null };
-    if (id && this.deps.store.has(id)) return { ok: false, reasons: [`A theme ${id} exists. theme_update changes it; pick another id for a new one.`], report: null };
+    if (id && this.deps.store.has(id)) return { ok: false, reasons: [`A theme ${id} exists. theme op "update" changes it; pick another id for a new one.`], report: null };
     return this.save(input, creator);
   }
 
@@ -143,7 +143,7 @@ export class ThemeService {
       return { ok: true, bot: { id: bot.id, name: bot.name }, appearance: null };
     }
     const theme = this.deps.store.get(input.themeId);
-    if (!theme) return { ok: false, reasons: [`No theme ${input.themeId}. theme_list lists them.`] };
+    if (!theme) return { ok: false, reasons: [`No theme ${input.themeId}. theme op "list" lists them.`] };
     const current = bot.appearance;
     const base = current && current.themeId === theme.id ? current : withTheme(current, theme);
     const effects = { ...base.effects };
@@ -164,7 +164,7 @@ export class ThemeService {
     if (isBuiltinTheme(id)) return { ok: false, reasons: [`${id} is a built-in theme and can't be deleted.`] };
     if (!this.deps.store.has(id)) return { ok: false, reasons: [`No stored theme ${id}.`] };
     const users = this.usedBy(id);
-    if (users.length) return { ok: false, reasons: [`${id} is in use by ${users.map((user) => user.name).join(", ")}. Apply another theme to ${users.length === 1 ? "that Bot" : "those Bots"} first (theme_apply).`] };
+    if (users.length) return { ok: false, reasons: [`${id} is in use by ${users.map((user) => user.name).join(", ")}. Apply another theme to ${users.length === 1 ? "that Bot" : "those Bots"} first (theme op "apply").`] };
     this.deps.store.remove(id);
     return { ok: true, id };
   }

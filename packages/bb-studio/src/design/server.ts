@@ -21,7 +21,7 @@ import { z } from "zod";
 import { rpcContract } from "./contract";
 import { printCsp, printPage } from "./server/print";
 import { applyTextEdit } from "./server/text-edit";
-import { DESIGN_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, ROUTE_SEGMENT, SCREEN_ID, VIEWPORT_NAMES, VIEWPORTS, MIN_SIDE, MAX_SIDE, frameSize, parseViewport, designHref, parseSteps, QUESTIONS_RENDERER, screenUrl } from "./shared";
+import { DESIGN_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, ROUTE_SEGMENT, SCREEN_ID, VIEWPORT_NAMES, MIN_SIDE, MAX_SIDE, frameSize, parseViewport, designHref, parseSteps, QUESTIONS_RENDERER, screenUrl } from "./shared";
 import { DesignStore, displayName, type Writer } from "./server/store";
 import { designProvider, screenText } from "./server/provider";
 import { designBackupHandlers } from "./server/backup";
@@ -44,7 +44,7 @@ export const answersSchema = z.record(z.string().max(40), z.union([z.string().ma
 const MAX_SCREEN_CHARS = 400_000;
 /** A style's CSS: tokens and base rules, not whole screens. */
 const MAX_STYLE_CSS = 40_000;
-/** Above this, design_read lists screens instead of inlining their HTML. */
+/** Above this, reading a design (pages_read) lists screens instead of inlining their HTML. */
 const MAX_READ_CHARS = 120_000;
 
 export const DESIGNS_USAGE = [
@@ -56,8 +56,8 @@ export const DESIGNS_USAGE = [
   "  delete <id>                Delete a design",
 ].join("\n");
 
-/** Available in every agent session. */
-export const DESIGN_TOOLS = ["design_save_style", "design_styles", "design_list", "design_create", "design_rename", "design_read", "design_ask", "design_ready", "design_write_screen", "design_edit_screen", "design_comments", "design_resolve_comments"];
+/** Available in every agent session (list/read/create go through pages_list, pages_read, pages_create). */
+export const DESIGN_TOOLS = ["design_save_style", "design_styles", "design_rename", "design_ask", "design_ready", "design_write_screen", "design_edit_screen", "design_comments", "design_resolve_comments"];
 
 export interface BuiltinDesigns {
   store: DesignStore;
@@ -104,7 +104,7 @@ const SCREEN_CSP = [
 ].join("; ");
 
 /** Where findings go matches review(): the design's own thread, not necessarily the caller's. */
-export const DESIGN_READY_DESCRIPTION = "Call when a round (or a change) is ready for the user. A separate reviewer checks the screens in the background: it loads them at their size, takes screenshots, and checks layout, errors, steps and the design rules. It only reports back when something needs fixing, and then in the design's own thread (the thread that made the design, which may not be this one). Don't call the work done until then. Pass skipReview for trivial edits (a word, a color).";
+export const DESIGN_READY_DESCRIPTION = "Mark a round ready for background review (reports findings in the design's own thread only if something needs fixing). Pass skipReview for trivial edits.";
 
 /**
  * A screen as the canvas loads it, with the canvas script added; or, for
@@ -259,7 +259,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
     return [
       `Design "${displayName(view)}" (id ${view.id}, link ${designHref(view.id)}).`,
       rounds.length ? rounds.join("\n\n") : "It has no screens yet.",
-      "Read its HTML with design_read before changing it.",
+      "Read its HTML with pages_read before changing it.",
     ].join("\n\n");
   }
 
@@ -313,7 +313,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
     parameters: z.object({}),
     execute() {
       const rows = store.list({ limit: 100 });
-      if (!rows.length) return "No designs yet. Use design_create to make one.";
+      if (!rows.length) return 'No designs yet. Use pages_create type "design" to make one.';
       return `Designs:\n${rows.map((row) => `- ${displayName(row)} (id ${row.id}): ${store.screens(row.id).length} screen(s), updated ${new Date(row.updated_at).toISOString()}, link ${designHref(row.id)}`).join("\n")}`;
     },
   });
@@ -372,16 +372,17 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
 
   bb.agents.registerTool({
     name: "design_write_screen",
-    description: "Create or replace one screen of a design. The screen id names its round and option: \"1a\" is round 1, option a. Start a new round with a new number; keep earlier rounds unchanged. Pass a complete, self-contained HTML document. For a slide deck, write the whole deck as one screen at viewport \"slide\" with one step per slide. For a multi-step prototype, declare its steps so the canvas splays them out side by side: <meta name=\"bb-design-steps\" content=\"welcome=Welcome; address=Delivery address\">, and open the prototype at the step named by location.hash (#address), on load and on hashchange. The user's open canvas updates live.",
+    description: 'Create or replace one self-contained HTML screen ("1a", "2b"). For slide decks use viewport "slide" with steps; for multi-step prototypes declare `<meta name="bb-design-steps">` (see design skill).',
+    instructions: 'For UI design work (prototypes, screens, flows) and for slides and slide decks, create with pages_create (type "design"), use the design_* tools, and follow the design skill.',
     presentation: { label: { pending: "Writing a screen", completed: "Wrote a screen" } },
     parameters: z.object({
       designId: z.string().min(1),
       screenId: screenIdSchema,
       html: z.string().min(1).max(MAX_SCREEN_CHARS),
-      caption: z.string().max(300).optional().describe("One line on what this option tries, shown above its frame."),
-      viewport: z.string().optional().describe(`Frame size on the canvas. Defaults to desktop. A preset: ${VIEWPORT_NAMES.map((name) => `${name} (${VIEWPORTS[name].width}×${VIEWPORTS[name].height})`).join(", ")}. Use slide for presentation slides and decks. Or any size as "WIDTHxHEIGHT", ${MIN_SIDE}–${MAX_SIDE} px a side, like "1200x630" for a link preview.`),
-      roundTitle: z.string().max(200).optional().describe("Sets the round's heading."),
-      roundIntro: z.string().max(2000).optional().describe("Sets the round's short intro: what this round explores and how the options differ."),
+      caption: z.string().max(300).optional().describe("Short label above frame"),
+      viewport: z.string().optional().describe(`Preset (${VIEWPORT_NAMES.join(", ")}) or "WIDTHxHEIGHT"`),
+      roundTitle: z.string().max(200).optional(),
+      roundIntro: z.string().max(2000).optional(),
     }),
     execute({ designId, screenId, html, caption, viewport: size, roundTitle, roundIntro }, ctx) {
       const row = store.get(designId);
@@ -418,9 +419,9 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
       const row = store.get(designId);
       if (!row) return notFound(designId);
       const screen = store.screen(designId, screenId);
-      if (!screen) return fail(`Screen ${screenId} not found in "${displayName(row)}". Read the design with design_read.`);
+      if (!screen) return fail(`Screen ${screenId} not found in "${displayName(row)}". Read the design with pages_read.`);
       const first = screen.html.indexOf(find);
-      if (first < 0) return fail(`The snippet isn't in screen ${screenId}. Read it again with design_read; the user or another edit may have changed it.`);
+      if (first < 0) return fail(`The snippet isn't in screen ${screenId}. Read it again with pages_read; the user or another edit may have changed it.`);
       if (screen.html.indexOf(find, first + 1) >= 0) return fail("The snippet appears more than once. Include more surrounding markup so it matches one place.");
       const html = screen.html.slice(0, first) + replace + screen.html.slice(first + find.length);
       if (html.length > MAX_SCREEN_CHARS) return fail(`The screen would be over ${MAX_SCREEN_CHARS} characters.`);
@@ -432,7 +433,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
 
   bb.agents.registerTool({
     name: "design_ask",
-    description: "Ask the user a short form of questions before designing, when the answers would change what you build and you can't find them yourself: the look is open (no design system, references or art direction), or the brief leaves out the platform, audience or flows. One round, at most 12 questions; never ask what the chat already settled, and don't ask for small follow-up edits. Kinds: choice (one option), multi (several), text (short answer), scale (1 to 5 between two labels). Every question gets a \"Decide for me\". The user's answers come back as this tool's result.",
+    description: "Ask the user up to 12 brief design questions (choice, multi, text, scale 1–5; each gets \"Decide for me\") before designing when key direction is open.",
     presentation: { label: { pending: "Waiting for answers", completed: "Got answers" } },
     parameters: z.object({
       title: z.string().trim().min(1).max(120).optional().describe("Defaults to \"A few questions\"."),
@@ -521,14 +522,14 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
 
   bb.agents.registerTool({
     name: "design_save_style",
-    description: "Save the look of a design as a named style, so later designs and decks can start from it: after the user picks a direction, or when they ask to reuse a look. Saving under a name that exists updates that style.",
+    description: "Save or update a named design style (notes + reusable CSS tokens/base rules) for future designs.",
     presentation: { label: { pending: "Saving a style", completed: "Saved a style" } },
     parameters: z.object({
-      name: z.string().trim().min(1).max(80).describe("Short and specific: \"Forkful editorial\", not \"Style 1\"."),
-      notes: z.string().trim().min(1).max(4000).describe("The system in words: fonts and their roles, colors and their roles, type scale, spacing and grid, and the rules that make it this look."),
-      css: z.string().trim().min(1).max(MAX_STYLE_CSS).describe("The CSS that carries it, ready to paste into a screen's <style>: font @import lines, :root custom properties, and base rules for type and layout. No page-specific rules."),
-      designId: z.string().optional().describe("The design it comes from."),
-      screenId: screenIdSchema.optional().describe("The option it comes from, like \"1b\"."),
+      name: z.string().trim().min(1).max(80).describe('Short name, e.g. "Forkful editorial"'),
+      notes: z.string().trim().min(1).max(4000).describe("Fonts, colors, type scale, spacing and rules"),
+      css: z.string().trim().min(1).max(MAX_STYLE_CSS).describe("Reusable @import, :root tokens and base rules"),
+      designId: z.string().optional(),
+      screenId: screenIdSchema.optional(),
     }),
     execute({ name, notes, css, designId, screenId }) {
       if (designId && !store.get(designId)) return notFound(designId);

@@ -377,8 +377,8 @@ export function registerLiveActivity(bb: Bb, db: Database.Database, deps: LiveAc
 
   bb.agents.registerTool({
     name: "bot_activity_lookup",
-    description: "Look up one of your conversations or workers in detail: what it is doing now, its latest reply, whether it needs the user, the conversation it works for or the workers it started, a finished conversation's summary, and its last tool calls. Use it on a thread id from the \"Elsewhere\" digest at the start of your turn, or from bot_conversations.",
-    parameters: z.object({ threadId: z.string().trim().min(1).max(200).describe("The conversation's or worker's thread id (thr_…)") }),
+    description: "Inspect one of your conversations or workers (status, latest reply, needs-user, workers, summary, recent tool calls).",
+    parameters: z.object({ threadId: z.string().trim().min(1).max(200).describe("Thread id (thr_…)") }),
     execute: async ({ threadId }, ctx) => {
       const mine = (ctx.threadId ? deps.threads.get(ctx.threadId)?.botId : null) ?? await deps.actingBot(ctx.threadId);
       const target = deps.threads.get(threadId);

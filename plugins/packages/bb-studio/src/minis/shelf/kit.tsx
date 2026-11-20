@@ -93,7 +93,7 @@ export function useRecords(name: string, query: Query = {}): { records: Record_[
   return { ...state, collection };
 }
 
-/** Exposes actions the agent can run (`minis_live` op `do`). */
+/** Exposes actions the agent can run (`apps_live` op `do`). */
 export function useActions(actions: Record<string, (...args: never[]) => unknown>, deps: React.DependencyList = []) {
   React.useEffect(() => playground().expose(actions), deps); // eslint-disable-line react-hooks/exhaustive-deps
 }

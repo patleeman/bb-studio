@@ -105,7 +105,7 @@ export class PresenceService {
   async create(input: unknown, creator: PresenceCreator | null): Promise<PresenceOutcome> {
     const id = isObject(input) && typeof input.id === "string" ? input.id : null;
     if (id && isBuiltinPresence(id)) return { ok: false, reasons: [`${id} is a built-in form. Pick another id.`], report: null };
-    if (id && this.deps.store.has(id)) return { ok: false, reasons: [`A presence ${id} exists. presence_update changes it; pick another id for a new one.`], report: null };
+    if (id && this.deps.store.has(id)) return { ok: false, reasons: [`A presence ${id} exists. presence op "update" changes it; pick another id for a new one.`], report: null };
     return this.save(input, creator);
   }
 
@@ -124,7 +124,7 @@ export class PresenceService {
   async apply(input: ApplyInput): Promise<ApplyOutcome> {
     const bot = this.deps.bots().find((each) => each.id === input.botId);
     if (!bot) return { ok: false, reasons: [`No Bot ${input.botId}.`] };
-    if (input.form !== undefined && !this.exists(input.form)) return { ok: false, reasons: [`No presence ${input.form}. presence_list lists them.`] };
+    if (input.form !== undefined && !this.exists(input.form)) return { ok: false, reasons: [`No presence ${input.form}. presence op "list" lists them.`] };
     const parsed = presenceSchema.safeParse({
       form: input.form ?? bot.presence.form,
       color: input.color ?? bot.presence.color,
@@ -139,7 +139,7 @@ export class PresenceService {
     if (isBuiltinPresence(id)) return { ok: false, reasons: [`${id} is a built-in form and can't be deleted.`] };
     if (!this.deps.store.has(id)) return { ok: false, reasons: [`No stored presence ${id}.`] };
     const users = this.usedBy(id);
-    if (users.length) return { ok: false, reasons: [`${id} is in use by ${users.map((user) => user.name).join(", ")}. Apply another presence to ${users.length === 1 ? "that Bot" : "those Bots"} first (presence_apply).`] };
+    if (users.length) return { ok: false, reasons: [`${id} is in use by ${users.map((user) => user.name).join(", ")}. Apply another presence to ${users.length === 1 ? "that Bot" : "those Bots"} first (presence op "apply").`] };
     this.deps.store.remove(id);
     return { ok: true, id };
   }

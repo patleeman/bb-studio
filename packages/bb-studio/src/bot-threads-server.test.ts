@@ -137,8 +137,6 @@ it("lets a conversation raise something with the user, and refuses it in a worke
   const listed = String(await harness.callAgentTool("bot_conversations", {}, { threadId: "redesign" }));
   expect(listed).toContain("- Main (/threads/thr_main) [Main]");
   expect(listed).toContain("- Fable lead: sidebar rewrite (/threads/lead): running, from Fork redesign, in bb-studio-native (exp/studio-native)");
-  // The old name lists the same.
-  expect(String(await harness.callAgentTool("bot_threads_list", {}, { threadId: "redesign" }))).toBe(listed);
 });
 
 it("follows BB's archive and delete", async () => {

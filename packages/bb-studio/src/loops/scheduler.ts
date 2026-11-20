@@ -69,7 +69,7 @@ export class LoopScheduler {
  }
  // A todo the Bot or a thread owns starts when its time comes (a latched event is a due time): no card, no budget.
  for(const l of this.store.all().filter(l=>l.owner!=='patrick'&&waitsForTrigger(l)&&l.trigger.type==='time'&&isDue(l,now))){if(!this.settings().enabled)return;
- await this.post(`Todo ${l.id} is due: ${JSON.stringify(l.title)}. Owner: ${l.owner}. ${l.owner==='cos'?'Carry out the next step now':'Ask that thread to carry out the next step'}, and record progress with todos_update or todos_act.`);
+ await this.post(`Todo ${l.id} is due: ${JSON.stringify(l.title)}. Owner: ${l.owner}. ${l.owner==='cos'?'Carry out the next step now':'Ask that thread to carry out the next step'}, and record progress with task_update or task_act.`);
  this.store.update(l.id,{status:'in_progress'});this.store.event(l.id,'started');
  }
  for(const l of this.store.all().filter(l=>l.status==='surfaced'&&(l.push||l.priority==='urgent'))){if(!this.settings().enabled)return;if(quiet&&l.priority!=='urgent')continue;const notified=sinceHandedToUser(this.store.history(l.id)).filter(e=>e.type==='notified');if(notified.length&&!(l.due!==null&&l.due<now&&local(notified.at(-1)!.at,s.timeZone).date!==p.date))continue;await this.notify(l);this.store.event(l.id,'notified');}

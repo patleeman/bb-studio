@@ -32,7 +32,7 @@ const kind: StudioKind = {
   create: null,
   canArchive: false,
   blurb: "",
-  agentHint: "Read it with excalidraw_get_drawing.",
+  agentHint: "Read it with pages_read.",
 };
 
 describe("pointerNote", () => {
@@ -41,7 +41,7 @@ describe("pointerNote", () => {
     expect(note).toContain('Studio drawing open while they talk to you: "Launch flow"');
     expect(note).toContain("drawing id drw_1");
     expect(note).toContain("/plugins/excalidraw/drawings/drw_1");
-    expect(note).toContain("excalidraw_get_drawing");
+    expect(note).toContain("pages_read");
   });
 
   it("falls back to studio_list_items without a hint or kind", () => {

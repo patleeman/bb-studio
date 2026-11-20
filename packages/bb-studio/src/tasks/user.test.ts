@@ -209,7 +209,7 @@ it("the morning list has the user's Today, decisions, due tasks and what was han
   expect(morning.items.map((l) => l.id)).toEqual([task.id, today.id]);
   expect(morning.items.map((l) => l.id)).not.toContain(later.id);
   expect(morning.movedToYou).toEqual([task.id]);
-  const forAgent = JSON.parse(await tools.todos_morning!.execute({}, {}));
+  const forAgent = JSON.parse(await tools.task_morning!.execute({}, {}));
   expect(forAgent.items.map((l: { id: string }) => l.id)).toEqual([task.id, today.id]);
   expect(forAgent.items.map((l: { id: string }) => l.id).some((id: string) => id.startsWith("wc_"))).toBe(false);
   expect(forAgent.movedToYou).toEqual([task.id]);
@@ -217,13 +217,15 @@ it("the morning list has the user's Today, decisions, due tasks and what was han
   expect(loops.scheduler.morning().movedToYou).toEqual([]);
 });
 
-it("asks for every morning row as row=\"N\"", async () => {
+it("asks for every morning row as row=\"N\" in the studio skill and exposes task_morning", async () => {
   const { tools } = setup();
   const tool = (await import("../loops/register")).LOOP_TOOLS;
-  expect(tool).toContain("todos_morning");
-  const description = (tools as unknown as Record<string, { description: string }>).todos_morning!.description;
-  expect(description).toContain('::loop{id="<id>" row="N"}');
-  expect(description).toContain("movedToYou");
+  expect(tool).toContain("task_morning");
+  const description = (tools as unknown as Record<string, { description: string }>).task_morning!.description;
+  expect(description).toContain("studio skill");
+  const { readFileSync } = await import("node:fs");
+  const skill = readFileSync(new URL("../../skills/studio/SKILL.md", import.meta.url), "utf8");
+  expect(skill).toContain('::loop{id="<id>" row="N"}');
 });
 
 it("an agent's task with a trigger and no state waits for it, so it files under Scheduled, not Agents on it", async () => {

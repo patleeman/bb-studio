@@ -26,5 +26,5 @@ export const presenceRpcSchemas = {
 } as const;
 
 export function presenceAskText(prompt: string): string {
-  return `Make a presence (my living icon) with presence_create from this description, then put it on with presence_apply: ${prompt.trim()}`;
+  return `Make a presence (my living icon) with presence op "create" from this description, then put it on with presence op "apply": ${prompt.trim()}`;
 }

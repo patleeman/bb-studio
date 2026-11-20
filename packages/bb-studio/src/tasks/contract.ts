@@ -23,7 +23,7 @@ export type TaskKind = (typeof TASK_KINDS)[number];
 
 const OWNER = /^(patrick|cos|thread:.+)$/;
 export const storedOwner = z.string().regex(OWNER);
-export const ownerInput = z.string().regex(/^(user|patrick|cos|me|thread:.+)$/).describe('"user" (the user), "cos" (the Bot), "me" (the calling thread) or "thread:<id>"');
+export const ownerInput = z.string().regex(/^(user|patrick|cos|me|thread:.+)$/).describe('"user", "cos", "me" or "thread:<id>"');
 export const isClosed = (task: { state: TaskState }) => CLOSED_STATES.includes(task.state);
 export const KEPT_CLOSED = "The user closed this task, so it stays closed and your update went only into its history. Ask them before reopening it (task_update with reopen: true).";
 export const closedByUser = (task: { state: TaskState; closedBy: string | null }) => isClosed(task) && task.closedBy === USER_OWNER;
@@ -64,7 +64,7 @@ export const waitingOn = z.object({
   kind: z.enum(WAITING_ON),
   ref: z.string().max(500).nullable().default(null),
   text: z.string().trim().max(200).nullable().default(null),
-}).describe('What a waiting task waits on: "user" (the user), "ci" (a build or check; ref the run or PR), "task" (another task; ref its id) or "outside" (someone outside; text says who)');
+}).describe('Wait target: user, ci (ref run/PR), task (ref id) or outside (text)');
 export type WaitingOn = z.infer<typeof waitingOn>;
 export const card = z.object({
   kind: z.enum(WORK_KINDS),
@@ -120,20 +120,20 @@ const fields = {
   why: z.string().max(4000).optional(),
   kind: z.enum(TASK_KINDS).optional(),
   options: z.array(text(200).min(1)).max(12).optional(),
-  needs: text(300).nullable().optional().describe("What the owner must do or answer"),
+  needs: text(300).nullable().optional().describe("What the owner must do"),
   priority: z.enum(PRIORITIES).optional(),
   project: z.string().max(200).nullable().optional(),
   area: z.string().max(200).nullable().optional(),
-  due: z.number().nullable().optional().describe("Due time, ms since epoch"),
-  trigger: trigger.optional().describe("When it comes up: none, time (at), event (event, label) or place (place, direction)"),
-  push: z.boolean().optional().describe("Send it to the user's phone when it comes up"),
-  step: text(120).nullable().optional().describe('The current step, e.g. "3/5 Tests"'),
-  line: text(300).nullable().optional().describe("The latest one-line status"),
-  workers: z.array(z.string().min(1)).max(20).optional().describe("Thread ids doing the work"),
-  outputs: z.array(output).max(50).optional().describe("What it produced: pages, apps, designs, PRs, builds, releases"),
-  source: source.nullable().optional().describe("Where it came from: an email, URL, message or runner report"),
-  parentId: z.string().nullable().optional().describe("The parent task, for a subtask"),
-  schedule: schedule.nullable().optional().describe("A recurring schedule"),
+  due: z.number().nullable().optional().describe("Due ms since epoch"),
+  trigger: trigger.optional().describe("Release trigger: none, time (at), event (event, label) or place (place, direction)"),
+  push: z.boolean().optional().describe("Phone push when surfaced"),
+  step: text(120).nullable().optional().describe('Step, e.g. "3/5 Tests"'),
+  line: text(300).nullable().optional().describe("Latest status line"),
+  workers: z.array(z.string().min(1)).max(20).optional().describe("Worker thread ids"),
+  outputs: z.array(output).max(50).optional().describe("Produced items/PRs/builds"),
+  source: source.nullable().optional().describe("Origin ref/url"),
+  parentId: z.string().nullable().optional().describe("Parent task id"),
+  schedule: schedule.nullable().optional(),
   waitingOn: waitingOn.nullable().optional(),
 };
 
@@ -141,8 +141,8 @@ export const createInput = z.object({
   title: text(500).min(1),
   owner: ownerInput,
   state: z.enum(["todo", "in_progress", "waiting"]).optional(),
-  conversation: z.string().min(1).optional().describe("The conversation (thread id) the task lives in; defaults to the calling thread when card is true"),
-  card: z.boolean().optional().describe("Return a live card line to post once in the conversation"),
+  conversation: z.string().min(1).optional().describe("Thread id; defaults to caller when card is true"),
+  card: z.boolean().optional().describe("Return ::work{id} card line to post once"),
   ...fields,
 });
 export type TaskCreateInput = z.infer<typeof createInput>;
@@ -151,8 +151,9 @@ export const updateInput = z.object({
   id: z.string().min(1),
   title: text(500).min(1).optional(),
   state: z.enum(TASK_STATES).optional(),
-  reopen: z.boolean().optional().describe("Reopen a task the user closed; only when they asked for it"),
+  reopen: z.boolean().optional().describe("Reopen user-closed task (only when asked)"),
   conversation: z.string().min(1).nullable().optional(),
+  card: z.boolean().optional().describe("Attach a live ::work{id} card if none yet"),
   ...fields,
 });
 export type TaskUpdateInput = z.infer<typeof updateInput>;

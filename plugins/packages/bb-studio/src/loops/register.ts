@@ -1,26 +1,24 @@
 import type { BbPluginApi } from '@get-bb/plugin-sdk';
 import type Database from 'better-sqlite3';
 import { z } from 'zod';
-import { rpcContract, add, act, update, filters, ownerInfo, type Loop } from './contract';
+import { rpcContract, act, update, filters, ownerInfo, type Loop } from './contract';
 import { LoopStore, placeKey } from './store';
 import { assertTasksReady, guardTasks } from '../tasks/store';
-import { isClosed as isTaskClosed } from '../tasks/contract';
 import { inLoopView, toLoop } from '../tasks/views';
 import { LoopScheduler, defaults, snooze, systemTimeZone } from './scheduler';
 /** The lock-screen actions a todo's push offers, by kind (the app's BB_LOOP categories). */
 export function loopPushActions(kind:Loop['kind']):('done'|'snooze'|'got_it'|'choose')[]{return kind==='read'?['got_it','snooze']:kind==='decide'?['choose','snooze']:['done','snooze'];}
 import { STUDIO_REALTIME_CHANNEL } from '../kit/contract';
 import { defineItemMention } from '../kit/server/mention';
-import { LOOP_MENTION, LOOP_TOPIC_HINT, loopContext, ownerText } from './reference';
+import { LOOP_MENTION, loopContext, ownerText } from './reference';
 import { KIND } from './ui/model';
 type ThreadLike={title?:string|null;titleFallback?:string|null;archivedAt?:number|null;deletedAt?:number|null};
 /** A `thread:<id>` owner by name. A deleted or missing thread has no link. */
 export function threadOwner(owner:string,thread:ThreadLike|null):z.infer<typeof ownerInfo>{const threadId=owner.slice('thread:'.length);
  if(!thread||thread.deletedAt)return {owner,name:'A thread that was removed',threadId:null};
  const title=(thread.title||thread.titleFallback||'').trim()||'Untitled thread';return {owner,name:thread.archivedAt?`${title} (archived)`:title,threadId};}
-const TOOL_VERBS=['add','list','get','update','act','fire','morning'];
-/** Every tool under both names: todos_x, and loops_x, its alias from before the rename. */
-export const LOOP_TOOLS=[...TOOL_VERBS.map(v=>`todos_${v}`),...TOOL_VERBS.map(v=>`loops_${v}`)];
+/** Task action helpers backed by the tasks store/scheduler (unified under task_*). */
+export const LOOP_TOOLS=['task_act','task_fire','task_morning'];
 /** Todos' settings are Studio settings (src/settings): loopsEnabled under Threads, the rest under Bot ▸ Controls ▸ Attention, the time zone (todosTimeZone) included. */
 type LoopSettings={get():Promise<Record<string,unknown>>;onChange(listener:(next:Record<string,unknown>)=>void):void};
 export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:string)=>Promise<void>,notify:ConstructorParameters<typeof LoopScheduler>[3],settings:LoopSettings,timeZone:()=>string=()=>systemTimeZone(),every:(name:string,everyMs:number,work:()=>void)=>void=(_name,everyMs,work)=>{const timer=setInterval(work,everyMs);bb.onDispose(()=>clearInterval(timer));}){
@@ -38,10 +36,10 @@ export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:str
  const list=async(x:z.infer<typeof filters>)=>{const g=store.groups(x);const ids=new Set([...g.needsYouNow,...g.comingUp,...g.agentsOnIt,...g.waitingOnOthers,...g.done].map(l=>l.owner));return {...g,held:scheduler.held(),areas:store.areas(),owners:(await Promise.all([...ids].map(owner))).filter((o):o is z.infer<typeof ownerInfo>=>!!o)};};
  let route:((x:z.infer<typeof act>)=>Promise<Loop|null>)|null=null;
  const action=async(x:z.infer<typeof act>)=>{if(route){const routed=await route(x);if(routed)return routed;}return direct(x);};
- const direct=async(x:z.infer<typeof act>)=>{const l=store.act(x,p=>snooze(p,config));if(x.action==='nudge')await post(`Todo ${l.id}: nudge. Draft the nudge message and show it to the user in this chat for approval. Do not send it until they approve.`);else if(['hand_off','choose'].includes(x.action))await post(`Todo ${l.id}: ${x.action}. ${x.option??''} Owner: ${ownerText(l.owner)}. Use todos_list to review and carry out the next step.`);return l;};
+ const direct=async(x:z.infer<typeof act>)=>{const l=store.act(x,p=>snooze(p,config));if(x.action==='nudge')await post(`Task ${l.id}: nudge. Draft the nudge message and show it to the user in this chat for approval. Do not send it until they approve.`);else if(['hand_off','choose'].includes(x.action))await post(`Task ${l.id}: ${x.action}. ${x.option??''} Owner: ${ownerText(l.owner)}. Use task_list to review and carry out the next step.`);return l;};
  const change=(x:z.infer<typeof update>)=>store.update(x.id,{...x.changes,...(x.surfaceNow?{status:'queued' as const,trigger:{type:'none' as const}}:{})});
  // A spoken line becomes a draft todo the Bot fills in.
- const addLine=async(text:string)=>{const l=store.add({title:text,status:'in_progress',owner:'cos'});await post(`Fill in draft todo ${l.id} from this typed line using todos_update, then queue it: ${JSON.stringify(text)}`);return l;};
+ const addLine=async(text:string)=>{const l=store.add({title:text,status:'in_progress',owner:'cos'});await post(`Fill in draft task ${l.id} from this typed line using task_update, then queue it: ${JSON.stringify(text)}`);return l;};
  const addTyped=(text:string)=>{const l=store.add({title:text,status:'surfaced',owner:'patrick'});store.event(l.id,'added_by_you');return l;};
  const get=async(id:string)=>{const t=store.tasks.find(id);const l=t&&!inLoopView(t)?toLoop(t):store.get(id),o=await owner(l.owner);return {loop:l,history:store.history(id),...(o?{owner:o}:{})};};
  bb.rpc.register(rpcContract,guardTasks(db,{
@@ -49,15 +47,11 @@ export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:str
  'loops.add':({text})=>addTyped(text),
  'loops.update':async(x:z.infer<typeof update>)=>{if(!x.surfaceNow)return change(x);if(x.changes)store.update(x.id,x.changes);return scheduler.surfaceNow(x.id);},'loops.act':action,'loops.fire':({event})=>scheduler.fire(event),'loops.place':({place,direction})=>scheduler.fire(`place:${placeKey(place)}:${direction}`),'loops.setPlaces':({names})=>({names:store.setPlaces(names)}),'loops.places':()=>({names:store.places()}),'loops.morning':()=>scheduler.morning(),
  },false,(message:string)=>bb.log.warn(message)));
- // Each tool is registered twice: todos_x, and loops_x as its alias.
- const tool=<S extends z.ZodTypeAny>(verb:string,description:string,parameters:S,execute:(x:z.infer<S>)=>string|Promise<string>)=>{const run=(x:z.infer<S>)=>{assertTasksReady(db);return execute(x);};bb.agents.registerTool({name:`todos_${verb}`,description,parameters,execute:run});bb.agents.registerTool({name:`loops_${verb}`,description:`Alias of todos_${verb}.`,parameters,execute:run});};
- tool('add','Track an open obligation, decision or item to read as a task (the task_* tools are the full set; this is the older name). Set its owner and release trigger; give an event trigger a short label in words ("when Unraid fixes the PHP CVE"). Avoid duplicating pending chat questions.',add,x=>JSON.stringify(store.add(x)));
- tool('list','Review tracked tasks, grouped by who needs to act. Filter by area or owner. When the user wants to go through their tasks with you, post ::loops{open="pane"} once on its own line: a card that opens the Tasks list beside your chat, so it stays up while you talk. '+LOOP_TOPIC_HINT,filters,async x=>JSON.stringify(await list(x)));
- tool('get','Read one task by id: its record, history and owner. '+LOOP_TOPIC_HINT,z.object({id:z.string().min(1)}),async({id})=>JSON.stringify(await get(id)));
- tool('update','Fill in a captured draft or change a task and its trigger. Surface now (from you, the Bot) still respects the attention budget; the user\'s own Remind me now button releases at once.',update,x=>{const t=store.tasks.find(x.id);if(t&&t.closedBy==='patrick'&&isTaskClosed(t)&&x.changes?.status&&!['done','dropped'].includes(x.changes.status)){const {status:_status,...rest}=x.changes;return JSON.stringify({...change({...x,changes:rest,surfaceNow:false}),note:'The user closed this task, so it stays closed. Ask them before reopening it.'});}return JSON.stringify(change(x));});
- tool('act','Close, snooze, choose an option, nudge, keep or hand off a task when there is evidence or the user asks.',act,async x=>JSON.stringify(await action(x)));
- tool('fire','Signal a named event such as reply:sam to release tasks waiting on it.',z.object({event:z.string().min(1)}),({event})=>JSON.stringify(scheduler.fire(event)));
- tool('morning','Get the user\'s top five tasks for today (due, decisions, Today, and anything handed to them in the last day, whose ids are in movedToYou) and the remaining count for the morning message. Write the morning message in exactly this shape, one card in the chat: a "## <Weekday, Mon D>" heading; "**Calendar**" then "- <time> · <event>" lines; "**On today\'s list**" then one ::loop{id="<id>" row="N"} line per item, in order, N counting from 1; ::loops{more="<more>"} when more is above 0; "**Good to know**" then at most 3 "- " lines (personal only, no Larkspur or tech news). Leave out an empty section. Put a blank line before each bold label (**Calendar**, **On today\'s list**, **Good to know**), or the markdown runs the label into the bullet above it.',z.object({}),()=>JSON.stringify(scheduler.morning()));
+ // Unified task_* action helpers (CRUD lives in src/tasks/register.ts).
+ const tool=<S extends z.ZodTypeAny>(verb:string,description:string,parameters:S,execute:(x:z.infer<S>)=>string|Promise<string>)=>{const run=(x:z.infer<S>)=>{assertTasksReady(db);return execute(x);};bb.agents.registerTool({name:`task_${verb}`,description,parameters,execute:run});};
+ tool('act','Close, snooze, choose an option, nudge, keep or hand off a task.',act,async x=>JSON.stringify(await action(x)));
+ tool('fire','Signal a named event (e.g. reply:sam) to release waiting tasks.',z.object({event:z.string().min(1)}),({event})=>JSON.stringify(scheduler.fire(event)));
+ tool('morning','Get the user\'s top five tasks for today and remaining count for the morning card. Load the studio skill ("Morning card") for the exact markdown format.',z.object({}),()=>JSON.stringify(scheduler.morning()));
  // `@loop` in any composer, and the chip Discuss puts in the Bot chat: the Bot gets the todo as context.
  // A todo deleted since is said so rather than thrown, which would block the send.
  bb.ui.registerMentionProvider(defineItemMention({id:LOOP_MENTION,label:'Tasks',

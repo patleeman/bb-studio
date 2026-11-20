@@ -43,14 +43,10 @@ carry `::drawing{id="…"}` cards; those still show.
 
 | Tool | Use it to |
 | --- | --- |
-| `whiteboard_list` | List whiteboards with ids, names, element counts and the page each is in. |
-| `whiteboard_get` | Read a whiteboard's current scene (`whiteboardId`) before changing it. |
-| `whiteboard_create` | Add an empty whiteboard to a page (`pageId`, `name`, optional `afterBlockId` from `pages_read`), or, without `pageId`, make a new page holding just the whiteboard. Returns its id and the page's card. |
+| `pages_list` (`type: "whiteboard"`) | List whiteboards with ids, names, element counts and the page each is in. |
+| `pages_read` (`page: "drw_…"`) | Read a whiteboard's current scene before changing it. |
+| `pages_create` (`type: "whiteboard"`) | Add an empty whiteboard to a page (`title`, optional `pageId`, optional `afterBlockId` from `pages_read`), or without `pageId` make a new page holding just the whiteboard. Returns its id and the page's card. |
 | `whiteboard_update` | Upsert elements, delete elements by id, or patch appState (`whiteboardId`). An upsert of an existing id merges: send `id`, `type` and just the properties to change. |
-
-The old names (`excalidraw_list_drawings`, `excalidraw_get_drawing`,
-`excalidraw_create_drawing`, `excalidraw_update_drawing`, taking `drawingId`)
-still work for now, but use the new ones.
 
 To find a whiteboard in a page you're reading, take the `target` of its
 `{"kind":"drawing"}` embed.
@@ -73,7 +69,7 @@ thread's host.
 
 ## Working on a whiteboard
 
-1. Read the latest scene first (`whiteboard_get` or `show`); the user may
+1. Read the latest scene first (`pages_read` or `show`); the user may
    have changed it since you last looked.
 2. Write only the elements you're adding or changing. Give new elements
    fresh ids; to change one, send it with its existing id. Elements you send

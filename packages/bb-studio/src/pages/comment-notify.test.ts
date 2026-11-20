@@ -66,7 +66,8 @@ it("tells the user's comment to the page's agent", () => {
   ]);
   expect(text).toContain('The user left a comment on the page "Plan" (id pg_a');
   expect(text).toContain('New thread t1 on "Friday":\n> Move it\n> please');
-  expect(text).toContain("pages_comment_reply");
+  expect(text).toContain('pages_comments op "reply"');
+  expect(text).toContain('pages_comments op "resolve"');
 });
 
 describe("comments on a page an agent made", () => {
@@ -101,7 +102,8 @@ describe("comments on a page an agent made", () => {
       expect(send.mock.calls[0]![0]).toMatchObject({ threadId: "thr_maker", mode: "queue-if-active" });
       expect(send.mock.calls[0]![0].input[0]!.text).toContain(`New thread ${threadId} on "Friday":\n> Can it be Monday?`);
 
-      await host.harness.behavior.callAgentTool("pages_comment_reply", { page: id, thread: threadId, text: "Done." }, { threadId: "thr_maker" });
+      expect(await host.harness.behavior.callAgentTool("pages_comments", { op: "reply", page: id, thread: threadId }, { threadId: "thr_maker" })).toEqual({ content: [{ type: "text", text: 'op "reply" needs thread and text.' }], isError: true });
+      await host.harness.behavior.callAgentTool("pages_comments", { op: "reply", page: id, thread: threadId, text: "Done." }, { threadId: "thr_maker" });
       await call("pages.commentResolve", { id, thread: threadId, resolved: true });
       await call("pages.commentResolve", { id, thread: threadId, resolved: false });
       await vi.advanceTimersByTimeAsync(1500);

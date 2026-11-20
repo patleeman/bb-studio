@@ -599,7 +599,7 @@ export const rpcContract = defineRpcContract({
   bot_checkin_preset: { input: z.object({ botId, preset: z.enum(["morning", "evening", "working", "off"]) }), output: botView },
   /** The Bot's own skills. */
   bot_skills: { input: forBot, output: z.object({ skills: z.array(botSkill) }) },
-  /** Adds or replaces one of the Bot's skills (as its bot_skill_write tool does). */
+  /** Adds or replaces one of the Bot's skills (as its bot_skill_edit tool does with op "write"). */
   bot_skill_write: { input: z.object({ botId, name: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(64), description: z.string().trim().min(1).max(500), body: z.string().min(1).max(20_000) }), output: botSkill },
   /** Shares a Bot skill: it moves into BB's user skills, for every agent. */
   bot_skill_share: { input: z.object({ botId, name: z.string().min(1).max(100) }), output: z.object({ path: z.string() }) },

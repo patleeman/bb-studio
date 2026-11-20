@@ -8,6 +8,7 @@ import { threadImageReader } from "./local-image-reader";
 import { skippedNote } from "./local-images";
 import { errorText, pageUrl, truncate, type PagesService } from "./service";
 import type { PageMeta } from "./store";
+import { opNeeds } from "../op-errors";
 
 const MAX_READ_CHARS = 60_000;
 
@@ -17,9 +18,6 @@ export const TOOL_NAMES = [
   "pages_create",
   "pages_edit",
   "pages_comments",
-  "pages_comment",
-  "pages_comment_reply",
-  "pages_comment_resolve",
 ] as const;
 
 export const AGENT_INSTRUCTIONS = [
@@ -29,24 +27,24 @@ export const AGENT_INSTRUCTIONS = [
   'Chart JSON: {"type":"bar|line|area|pie","title":"…","x":"label","series":["Revenue"],"unit":"$","data":[{"label":"Q1","Revenue":10}]}. Stats JSON: [{"label":"ARR","value":"$1.2M","delta":"+8%","trend":"up"}] (1–6 items). Embed JSON: {"kind":"bookmark|thread|page|drawing|artifact|recording|mini|table|item","target":"https://… or an id","title":"…"}; item targets are plugin:id from studio_list_items; a table target may be <table id>/view/<view id>; a drawing (whiteboard) embed may set "height" in pixels (160–1200).',
   "An ```html block renders its HTML in a sandboxed iframe: scripts run, but with no same-origin access (no cookies, storage or BB APIs), and don't assume network access. Keep it self-contained with inline <style> and <script>, follow light and dark with prefers-color-scheme, and keep it under 200,000 characters (longer ones show as code). Use ```html only for something to render; show HTML source as code with ```html source (or another language such as ```xml).",
   "Images: prefer an artifact embed (save the image as an artifact, then ```embed {\"kind\":\"artifact\",\"target\":\"art_…\"}). Local image paths (`![](/…/chart.png)`) are imported into the page when supported: PNG, JPEG, GIF or WebP up to 10 MB from your thread's workspace or thread storage. The tool result names any image it couldn't import.",
-  "Answer comments with pages_comment_reply in the same thread; start new threads with pages_comment on the text you are discussing.",
+  "Manage page comments with pages_comments (op: list, create, reply, resolve): answer in the same thread with op \"reply\"; start new threads with op \"create\" on the block/quote you are discussing.",
   'When you create or change a page, put its card on its own line in your reply, `::page{id="pg_…"}`, so the user can open it beside the chat.',
 ].join("\n");
 
-const ref = z.string().min(1).describe("Page id (pg_…) or exact page title");
-const block = z.string().min(4).describe("Block id or its first 8 characters, from the `<!-- ^id -->` markers in pages_read");
+const ref = z.string().min(1).describe("Page id (pg_…) or title");
+const block = z.string().min(4).describe("Block id or 8-char prefix");
 
 const opSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("insert_after"), block, markdown: z.string() }),
   z.object({ op: z.literal("insert_before"), block, markdown: z.string() }),
-  z.object({ op: z.literal("replace"), block, markdown: z.string().describe("Replacement Markdown; may be several blocks. The block's nested blocks stay unless this Markdown nests its own") }),
+  z.object({ op: z.literal("replace"), block, markdown: z.string() }),
   z.object({ op: z.literal("append"), markdown: z.string() }),
   z.object({ op: z.literal("prepend"), markdown: z.string() }),
   z.object({ op: z.literal("delete"), block }),
   z.object({ op: z.literal("set_checked"), block, checked: z.boolean() }),
   z.object({
     op: z.literal("replace_text"),
-    block: block.optional().describe("Limit to one block; otherwise the first match in the page"),
+    block: block.optional(),
     find: z.string().min(1),
     replace: z.string(),
   }),
@@ -101,8 +99,7 @@ export function registerTools(
 
   bb.agents.registerTool({
     name: "pages_read",
-    description:
-      "Read a BB Page as Markdown with a `<!-- ^id -->` block-id marker on the line before each block (it names the block below it), plus its open comment threads. Always read right before editing: the user may have changed it.",
+    description: "Read a BB Page as Markdown with `<!-- ^id -->` block ids and open comments. Read right before pages_edit.",
     parameters: z.object({ page: ref }),
     execute({ page }, ctx) {
       const meta = service.requirePage(page, ctx.projectId);
@@ -124,8 +121,7 @@ export function registerTools(
 
   bb.agents.registerTool({
     name: "pages_create",
-    description:
-      "Create a BB Page from Markdown (GFM plus chart/stats/embed JSON fences, mermaid, sandboxed ```html blocks, callouts and mentions). Pages belong to the current project unless global is true; set parent to nest it. For images, prefer an artifact embed; local image paths in your thread's workspace or thread storage are imported into the page when supported (PNG, JPEG, GIF, WebP, up to 10 MB), and the result names any it couldn't import.",
+    description: "Create a BB Page from Markdown (GFM, chart/stats/embed/mermaid/html blocks, callouts, mentions; see studio skill). Local image paths in workspace/thread storage are imported. In this project unless global: true.",
     parameters: z.object({
       title: z.string().min(1).max(200),
       markdown: z.string().max(200_000).optional(),
@@ -151,8 +147,7 @@ export function registerTools(
 
   bb.agents.registerTool({
     name: "pages_edit",
-    description:
-      "Edit a BB Page live with targeted operations: insert_after/insert_before/replace/delete/set_checked by block id, append/prepend, replace_text (keeps formatting), or replace_all. Markdown may use the Pages extensions, including sandboxed ```html blocks. Optionally set the title or icon. Ops apply in order as one change. Local image paths in the Markdown are imported into the page as with pages_create.",
+    description: "Edit a BB Page live with targeted ops (insert_after/insert_before/replace/delete/set_checked/append/prepend/replace_text/replace_all), or update title/icon.",
     parameters: z.object({
       page: ref,
       ops: z.array(opSchema).max(100).default([]),
@@ -185,67 +180,44 @@ export function registerTools(
 
   bb.agents.registerTool({
     name: "pages_comments",
-    description: "List comment threads on a BB Page with their ids, the commented text and replies.",
-    parameters: z.object({ page: ref, includeResolved: z.boolean().optional() }),
-    execute({ page, includeResolved }, ctx) {
-      const meta = service.requirePage(page, ctx.projectId);
-      const threads = listThreads(service.hub.open(meta.id).doc, { includeResolved });
-      return threads.length ? truncate(threads.map(threadSummary).join("\n"), MAX_READ_CHARS) : "No comments.";
-    },
-  });
-
-  bb.agents.registerTool({
-    name: "pages_comment",
-    description: "Start a comment thread on a block of a BB Page, optionally anchored to an exact quote from that block.",
+    description: "Manage comment threads on a BB Page. op: list (default; includeResolved?), create (block, text, quote?), reply (thread, text), resolve (thread, resolved? default true).",
     parameters: z.object({
       page: ref,
-      block,
-      quote: z.string().max(500).optional().describe("Exact text in the block to highlight; defaults to the whole block"),
-      text: z.string().min(1).max(8000),
+      op: z.enum(["list", "create", "reply", "resolve"]).default("list"),
+      includeResolved: z.boolean().optional(),
+      block: block.optional(),
+      quote: z.string().max(500).optional().describe("Exact text in the block to highlight; defaults to whole block"),
+      thread: z.string().min(1).optional(),
+      text: z.string().min(1).max(8000).optional(),
+      resolved: z.boolean().optional(),
     }),
     async execute(params, ctx) {
       const meta = service.requirePage(params.page, ctx.projectId);
+      const op = params.op ?? "list";
+      if (op === "list") {
+        const threads = listThreads(service.hub.open(meta.id).doc, { includeResolved: params.includeResolved });
+        return threads.length ? truncate(threads.map(threadSummary).join("\n"), MAX_READ_CHARS) : "No comments.";
+      }
       const { actor } = await service.actorForThread(ctx.threadId);
       const live = service.hub.open(meta.id);
       try {
-        const { threadId, blockId } = await createThread(live.doc, actor.key, params, actor.key);
-        service.hub.showPresence(live, actor, blockId);
-        return `Started comment thread ${threadId} on block ^${shortId(blockId)}.`;
-      } catch (error) {
-        return { content: [{ type: "text", text: errorText(error) }], isError: true };
-      }
-    },
-  });
-
-  bb.agents.registerTool({
-    name: "pages_comment_reply",
-    description: "Reply in a comment thread on a BB Page.",
-    parameters: z.object({ page: ref, thread: z.string().min(1), text: z.string().min(1).max(8000) }),
-    async execute(params, ctx) {
-      const meta = service.requirePage(params.page, ctx.projectId);
-      const { actor } = await service.actorForThread(ctx.threadId);
-      const live = service.hub.open(meta.id);
-      try {
-        reply(live.doc, actor.key, params.thread, params.text, actor.key);
-        const anchor = listThreads(live.doc, { includeResolved: true }).find((thread) => thread.id === params.thread);
-        service.hub.showPresence(live, actor, anchor?.blockId ?? null);
-        return "Replied.";
-      } catch (error) {
-        return { content: [{ type: "text", text: errorText(error) }], isError: true };
-      }
-    },
-  });
-
-  bb.agents.registerTool({
-    name: "pages_comment_resolve",
-    description: "Resolve (or reopen) a comment thread on a BB Page once it has been addressed.",
-    parameters: z.object({ page: ref, thread: z.string().min(1), resolved: z.boolean().default(true) }),
-    async execute(params, ctx) {
-      const meta = service.requirePage(params.page, ctx.projectId);
-      const { actor } = await service.actorForThread(ctx.threadId);
-      try {
-        setResolved(service.hub.open(meta.id).doc, actor.key, params.thread, params.resolved, actor.key);
-        return params.resolved ? "Resolved." : "Reopened.";
+        if (op === "create") {
+          if (!params.block || !params.text) return opNeeds("create", ["block", "text"]);
+          const { threadId, blockId } = await createThread(live.doc, actor.key, { block: params.block, text: params.text, quote: params.quote }, actor.key);
+          service.hub.showPresence(live, actor, blockId);
+          return `Started comment thread ${threadId} on block ^${shortId(blockId)}.`;
+        }
+        if (!params.thread) return opNeeds(op, op === "reply" ? ["thread", "text"] : ["thread"]);
+        if (op === "reply") {
+          if (!params.text) return opNeeds("reply", ["thread", "text"]);
+          reply(live.doc, actor.key, params.thread, params.text, actor.key);
+          const anchor = listThreads(live.doc, { includeResolved: true }).find((thread) => thread.id === params.thread);
+          service.hub.showPresence(live, actor, anchor?.blockId ?? null);
+          return "Replied.";
+        }
+        const resolved = params.resolved ?? true;
+        setResolved(live.doc, actor.key, params.thread, resolved, actor.key);
+        return resolved ? "Resolved." : "Reopened.";
       } catch (error) {
         return { content: [{ type: "text", text: errorText(error) }], isError: true };
       }

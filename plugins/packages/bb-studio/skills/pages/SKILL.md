@@ -37,10 +37,7 @@ chat. `pages_create` and `pages_edit` print the line for you.
 | `pages_read` | Read a page as Markdown. Each block is preceded by a `<!-- ^id -->` marker naming it; use those ids in edits. Given a design's id (`dsn_…`) or a whiteboard's (`drw_…`), it reads that. |
 | `pages_create` | Create a page from Markdown. Set `global` for a global page, `parent` to nest it. Pass `type: "design"` or `"whiteboard"` to make one of those, named by `title`. |
 | `pages_edit` | Apply small edit operations to a page (see below). |
-| `pages_comments` | List comment threads with their ids, commented text, and replies. |
-| `pages_comment` | Start a comment thread on a block, optionally on an exact quote from it. |
-| `pages_comment_reply` | Reply in a comment thread. |
-| `pages_comment_resolve` | Resolve or reopen a thread. |
+| `pages_comments` | Manage comment threads (`op`: `list`, `create`, `reply`, `resolve`). |
 
 Pages can be referenced by id (`pg_…`) or exact title.
 
@@ -98,7 +95,7 @@ Pages reads and writes GitHub-flavoured Markdown plus:
   whiteboard), `artifact`, and `recording` take the item's id. `item` embeds
   anything in Studio, with `plugin:id` as the target (`studio_list_items`
   lists ids). A whiteboard shows its scene and may carry `"height"` in pixels
-  (160–1200, 320 when left out); make one with `whiteboard_create`. An
+  (160–1200, 320 when left out); make one with `pages_create` (`type: "whiteboard"`). An
   artifact shows its content,
   a recording its player and transcript, and the
   rest a card. To track work in a page, use checklists.

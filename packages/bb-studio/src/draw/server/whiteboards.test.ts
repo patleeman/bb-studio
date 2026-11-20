@@ -105,9 +105,9 @@ it("makes no drawing when the page is missing or the embed fails", async () => {
   const { api } = fakePages({ pg_plan: { title: "Plan" } });
   host.drawings.connectPages(api);
   try {
-    const missing = await host.harness.behavior.callAgentTool("excalidraw_create_drawing", { pageId: "pg_gone", name: "Flow" }, { threadId: "thr_1" }) as { isError?: boolean };
+    const missing = await host.harness.behavior.callAgentTool("whiteboard_create", { pageId: "pg_gone", name: "Flow" }, { threadId: "thr_1" }) as { isError?: boolean };
     expect(missing.isError).toBe(true);
-    const failed = await host.harness.behavior.callAgentTool("excalidraw_create_drawing", { pageId: "pg_plan", name: "Flow", afterBlockId: "missing" }, { threadId: "thr_1" }) as { isError?: boolean };
+    const failed = await host.harness.behavior.callAgentTool("whiteboard_create", { pageId: "pg_plan", name: "Flow", afterBlockId: "missing" }, { threadId: "thr_1" }) as { isError?: boolean };
     expect(failed.isError).toBe(true);
     expect(host.drawings.store.list({ includeArchived: true })).toEqual([]);
     expect(await host.drawings.cli(["create", "Flow"], {})).toMatchObject({ exitCode: 1 });
@@ -135,18 +135,18 @@ it("whiteboard_create without a page makes a whiteboard page, tall, titled with 
   }
 });
 
-it("keeps the old excalidraw_* tool names working, with their drawingId", async () => {
+it("creates, updates, reads and lists whiteboards via whiteboard_* tools only", async () => {
   const host = drawHost();
   const { api, pages } = fakePages({ pg_plan: { title: "Plan" } });
   host.drawings.connectPages(api);
   try {
-    const made = String(await host.harness.behavior.callAgentTool("excalidraw_create_drawing", { pageId: "pg_plan", name: "Old" }, { threadId: "thr_1" }));
+    const made = String(await host.harness.behavior.callAgentTool("whiteboard_create", { pageId: "pg_plan", name: "Board" }, { threadId: "thr_1" }));
     const id = /\(id (drw_[0-9a-f]+)\)/.exec(made)![1]!;
     expect(embeddedDrawingIds(pages.get("pg_plan")!.markdown)).toEqual([id]);
-    await host.harness.behavior.callAgentTool("excalidraw_update_drawing", { drawingId: id, elements: [{ id: "box", type: "rectangle" }] }, { threadId: "thr_1" });
-    const read = JSON.parse(String(await host.harness.behavior.callAgentTool("excalidraw_get_drawing", { drawingId: id })));
+    await host.harness.behavior.callAgentTool("whiteboard_update", { whiteboardId: id, elements: [{ id: "box", type: "rectangle" }] }, { threadId: "thr_1" });
+    const read = JSON.parse(String(await host.harness.behavior.callAgentTool("whiteboard_get", { whiteboardId: id })));
     expect(read.scene.elements.map((el: { id: string }) => el.id)).toEqual(["box"]);
-    expect(String(await host.harness.behavior.callAgentTool("excalidraw_list_drawings", {}))).toContain(`Old (id ${id})`);
+    expect(String(await host.harness.behavior.callAgentTool("whiteboard_list", {}))).toContain(`Board (id ${id})`);
   } finally {
     await host.harness.lifecycle.dispose();
   }

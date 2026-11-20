@@ -70,7 +70,7 @@ const NO_PALETTE_ROW = "Cmd+K lists no such rows; a typed bb:// link, app route 
 const NO_DIFF_LINK = "Replies don't link a diff; bb's change cards open it.";
 const NO_PAGE_ROW = "No Bot page lists one.";
 const BOT_PAGE_ROWS: readonly TabKindId[] = ["conversation", "worker", "page", "whiteboard", "design", "app", "artifact", "automation", "todo", "record"];
-const NO_AGENT_TERMINAL = "A terminal opens by starting one; workbench_focus selects an open one.";
+const NO_AGENT_TERMINAL = 'A terminal opens by starting one; workbench_tab action "focus" selects an open one.';
 
 function cell(kind: TabKindId, source: LinkSource): LinkAuditCell {
   if (source === "design") return { na: DESIGN_FRAMES };

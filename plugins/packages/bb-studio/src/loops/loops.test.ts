@@ -120,11 +120,9 @@ it('releases the user\'s own Surface now at once, past the morning hold, the bud
  const cos=loops.store.add({title:'CoS job',owner:'cos'});await expect(handlers['loops.update']!({id:cos.id,surfaceNow:true})).rejects.toThrow('Only your own tasks');
  loops.store.act({id:low.id,action:'done'},()=>({type:'none'}));await expect(handlers['loops.update']!({id:low.id,surfaceNow:true})).rejects.toThrow('already closed');
  onChange({loopsEnabled:false});const off=loops.store.add({title:'With reminders off',trigger:{type:'time',at:Date.now()+86400000}});expect(await handlers['loops.update']!({id:off.id,surfaceNow:true})).toMatchObject({status:'surfaced'});expect(post).toHaveBeenCalledTimes(3);expect(post.mock.calls[2]![0]).toContain(`::loop{id="${off.id}"}`);
- // The Bot's own surfaceNow keeps the policy: queued, trigger none, held for the morning.
- const botLow=loops.store.add({title:'Bot low',priority:'low',trigger:{type:'time',at:Date.now()+3600000}});const tool=(bb.agents.registerTool as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0]).find((t:{name:string})=>t.name==='loops_update');
- expect(JSON.parse(await tool.execute({id:botLow.id,surfaceNow:true}))).toMatchObject({status:'queued',trigger:{type:'none'}});});
+});
 
-it('gives the Bot a mentioned or referenced todo: the @loop provider, todos_get, and the hint in the tool descriptions',async()=>{
+it('gives the Bot a mentioned or referenced todo via the @loop provider',async()=>{
  const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:vi.fn()},
   settings:{define:()=>({get:async()=>({loopsEnabled:true}),onChange:()=>{}})},sdk:{threads:{get:async()=>null}}};
  const loops=registerLoops(bb as never,db,post,notify,(bb.settings.define as () => never)());await vi.advanceTimersByTimeAsync(0);
@@ -137,24 +135,18 @@ it('gives the Bot a mentioned or referenced todo: the @loop provider, todos_get,
  for(const part of [`id: ${l.id}`,'title: Reply to Sam about the planning doc','why: The doc locks Friday.','trigger: event reply:sam (when Sam replies)','it is the topic'])expect(context).toContain(part);
  // A todo deleted since doesn't block the send.
  expect((await provider.resolve('loop_gone')).context).toContain('no longer exists');
- const tools=(bb.agents.registerTool as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0]);
- const get=tools.find((t:{name:string})=>t.name==='todos_get');
- expect(JSON.parse(await get.execute({id:l.id})).loop.id).toBe(l.id);
- for(const name of ['todos_get','todos_list'])expect(tools.find((t:{name:string})=>t.name===name).description).toContain('::loop{id="…"} line');
 });
 
-it('registers every tool as todos_x and keeps loops_x as its alias, with the same parameters and handler',async()=>{
+it('registers the unified task_act, task_fire and task_morning tools without legacy loops_*/todos_* duplicates',async()=>{
  const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:vi.fn()},
   settings:{define:()=>({get:async()=>({loopsEnabled:true}),onChange:()=>{}})},sdk:{threads:{get:async()=>null}}};
  const loops=registerLoops(bb as never,db,post,notify,(bb.settings.define as () => never)());await vi.advanceTimersByTimeAsync(0);
  const tools=(bb.agents.registerTool as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0]) as {name:string;description:string;parameters:unknown;execute(x:unknown):Promise<string>|string}[];
  const named=(name:string)=>tools.find(t=>t.name===name)!;
  expect(tools.map(t=>t.name).sort()).toEqual([...LOOP_TOOLS].sort());
- for(const verb of ['add','list','get','update','act','fire','morning']){expect(LOOP_TOOLS).toContain(`todos_${verb}`);expect(LOOP_TOOLS).toContain(`loops_${verb}`);
-  expect(named(`loops_${verb}`).description).toBe(`Alias of todos_${verb}.`);expect(named(`loops_${verb}`).parameters).toBe(named(`todos_${verb}`).parameters);expect(named(`todos_${verb}`).description).not.toMatch(/loops_|\bloops?\b(?!\{)/i);}
+ expect(LOOP_TOOLS).toEqual(['task_act','task_fire','task_morning']);
  const l=loops.store.add({title:'Pay the tax',status:'surfaced'});
- const ids=async(name:string)=>JSON.parse(await named(name).execute({})).needsYouNow.map((x:{id:string})=>x.id);
- expect(await ids('todos_list')).toEqual([l.id]);expect(await ids('loops_list')).toEqual([l.id]);
+ expect(JSON.parse(await named('task_morning').execute({})).items.map((x:{id:string})=>x.id)).toEqual([l.id]);
 });
 it("decides due, quiet hours, snoozes and the morning card in Todos' time zone",()=>{
  const l=store.add({title:'Call the dentist',due:Date.parse('2026-11-03T05:00:00Z')});
@@ -173,21 +165,20 @@ it('follows a changed time zone setting on the next settings change',async()=>{
  zone='Asia/Tokyo';onChange({loopsEnabled:true,todosTimeZone:zone});
  expect((handlers['loops.morning']!({}) as {date:string}).date).toBe('2026-11-03');
 });
-it('takes "user" or "patrick" as the user in every todo and loop tool, whose schema lists both, and stores the value older agents know',async()=>{
+it('takes "user" or "patrick" as the user in task_act and RPC contracts, and stores the value older agents know',async()=>{
  let handlers:Record<string,(x:unknown)=>unknown>={};
  const bb={realtime:{publish:vi.fn()},log:{warn:vi.fn()},onDispose:vi.fn(),agents:{registerTool:vi.fn()},ui:{registerMentionProvider:vi.fn()},rpc:{register:(_c:unknown,h:typeof handlers)=>Object.assign(handlers,h)},
   settings:{define:()=>({get:async()=>({loopsEnabled:false}),onChange:()=>{}})},sdk:{threads:{get:async()=>{throw Error('Not found');}}}};
  const loops=registerLoops(bb as never,db,post,notify,(bb.settings.define as () => never)());await vi.advanceTimersByTimeAsync(0);
  const tools=(bb.agents.registerTool as ReturnType<typeof vi.fn>).mock.calls.map(c=>c[0] as {name:string;parameters:import('zod').ZodTypeAny;execute:(x:unknown)=>Promise<string>|string});
- for(const name of ['todos_add','loops_add','todos_update','loops_update','todos_act','loops_act']){
-  const owner=(z.toJSONSchema(tools.find(t=>t.name===name)!.parameters,{io:'input'}) as {properties:Record<string,{pattern?:string;properties?:Record<string,{pattern?:string}>}>}).properties;
-  expect(owner.owner?.pattern??owner.changes?.properties?.owner?.pattern).toBe('^(user|patrick|cos|thread:.+)$');
- }
+ const owner=(z.toJSONSchema(tools.find(t=>t.name==='task_act')!.parameters,{io:'input'}) as {properties:Record<string,{pattern?:string}>}).properties;
+ expect(owner.owner?.pattern).toBe('^(user|patrick|cos|thread:.+)$');
  const run=async(name:string,input:unknown)=>{const t=tools.find(x=>x.name===name)!;return JSON.parse(await t.execute(t.parameters.parse(input)));};
- const made=await run('loops_add',{title:'Mine',owner:'user'});
+ const made=loops.store.add({title:'Mine',owner:'patrick',status:'surfaced'});
  expect(made.owner).toBe('patrick');
- await run('todos_act',{id:made.id,action:'hand_off',owner:'cos'});
- expect((await run('todos_update',{id:made.id,changes:{owner:'user',status:'surfaced'}})).owner).toBe('patrick');
+ await run('task_act',{id:made.id,action:'hand_off',owner:'cos'});
+ expect((await run('task_act',{id:made.id,action:'hand_off',owner:'user'})).owner).toBe('patrick');
+ await handlers['loops.update']!({id:made.id,changes:{owner:'user',status:'surfaced'}});
  expect(rpcContract['loops.act'].input.parse({id:'x',action:'hand_off',owner:'user'}).owner).toBe('patrick');
  expect(rpcContract['loops.list'].input.parse({owner:'user'}).owner).toBe('patrick');
  expect(loops.store.groups({owner:'patrick'}).needsYouNow.map(l=>l.title)).toEqual(['Mine']);

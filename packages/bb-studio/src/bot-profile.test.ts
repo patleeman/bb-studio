@@ -54,19 +54,21 @@ it("refuses the user's fields: state, model, provider, permissions, check-ins", 
   expect(bots.profileChanges()).toEqual([]);
 });
 
-it("bot_profile_update edits the calling Bot from its own thread only, and its schema takes no other fields", async () => {
+it("bot_profile_update records a Bot's own edits, changes the user's Bot from other threads, and takes no other fields", async () => {
   const { harness, bots } = await withTools();
   expect(await harness.callAgentTool("bot_profile_update", { name: "Scouty", avatar: "🛰️", shape: "star" }, { threadId: "thr_scout" })).toMatch(/^Changed your name, avatar, shape\. You are now 🛰️ Scouty/);
   expect(bots.stored("bot_scout")).toMatchObject({ name: "Scouty", avatar: "🛰️", shape: "star" });
   expect(bots.stored()?.name).toBe("Dot");
-  // A thread the Bot started, or no Bot's thread, can't.
-  expect(await harness.callAgentTool("bot_profile_update", { name: "Worker" }, { threadId: "thr_child" })).toMatch(/^Only a Bot's own thread/);
-  expect(await harness.callAgentTool("bot_profile_update", { name: "Worker" }, { threadId: "thr_loose" })).toMatch(/^Only a Bot's own thread/);
+  // A thread the Bot started edits that Bot, recorded for the user to revert (as bot_set did).
+  expect(await harness.callAgentTool("bot_profile_update", { role: "Scouts ahead" }, { threadId: "thr_child" })).toMatch(/^Changed the Bot's role\. It is now 🛰️ Scouty: Scouts ahead\. The user can revert it/);
+  // A loose thread edits the primary Bot when the user asks, shape and color included.
+  expect(await harness.callAgentTool("bot_profile_update", { name: "Dotty", shape: "star", color: "#112233" }, { threadId: "thr_loose" })).toContain("Dotty");
+  expect(bots.stored()).toMatchObject({ name: "Dotty", shape: "star", color: "#112233" });
   // The user's fields don't parse.
   await expect(harness.callAgentTool("bot_profile_update", { state: "paused" }, { threadId: "thr_scout" })).rejects.toThrow();
   await expect(harness.callAgentTool("bot_profile_update", { name: "X", model: "gpt" }, { threadId: "thr_scout" })).rejects.toThrow();
   expect(bots.stored("bot_scout")).toMatchObject({ name: "Scouty", state: "active" });
-  expect(bots.profileChanges("bot_scout").map((each) => each.field)).toEqual(["shape", "avatar", "name"]);
+  expect(bots.profileChanges("bot_scout").map((each) => each.field)).toEqual(["role", "shape", "avatar", "name"]);
 });
 
 it("still reads a Bot with an old image avatar and its old avatarImage change, which can't be reverted", async () => {

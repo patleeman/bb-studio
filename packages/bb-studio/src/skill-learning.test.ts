@@ -65,7 +65,7 @@ it("moves unused skills active → stale → archived; pinned and used ones stay
 });
 
 it("gives a review fork only the skill tools, the profile's pages_read and the memory tools, and a lessons-not-logs prompt", () => {
-  expect([...REVIEW_TOOLS]).toEqual(["bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_skill_lint", "pages_read", "memory_search", "memory_add", "memory_update"]);
+  expect([...REVIEW_TOOLS]).toEqual(["bot_skill_list", "bot_skill_view", "bot_skill_edit", "bot_skill_lint", "pages_read", "memory_search", "memory_add", "memory_update"]);
   const prompt = reviewPrompt({ name: "Dot", memoryPageId: "pg1", reason: "tools" });
   expect(prompt).toMatch(/Lessons, not logs/);
   expect(prompt).toMatch(/remember this/);

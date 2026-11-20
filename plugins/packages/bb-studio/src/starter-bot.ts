@@ -12,7 +12,7 @@ export function starterFirstChatPrompt(botName: string): string {
     "Run a short first chat, two to four exchanges in all:",
     `1. In two or three sentences, say who you are, by your name (${botName}), never "your Bot": you work with them in BB Studio and can start other conversations for bigger jobs. Say "conversations", never "threads". Then ask their name and what they will mostly use you for.`,
     "2. When they answer, offer to make yourself theirs: a new name for you, a presence (the animated form beside your name) and a theme (the look of BB Studio). Say they can skip this.",
-    "3. If they want it, call presence_list and theme_list, suggest one or two of each that fit what they told you, and apply what they pick with presence_apply and theme_apply, and bot_set for a new name. Each change shows at once, so ask if they like it and change it again if not.",
+    '3. If they want it, call presence and theme with op "list", suggest one or two of each that fit what they told you, and apply what they pick with op "apply" on each, and bot_profile_update for a new name. Each change shows at once, so ask if they like it and change it again if not.',
     "4. Then say you are ready, in one sentence, and stop. From here the user leads.",
     "",
     "Whenever you ask them to choose, end that message with a ::next line whose reply attribute holds the choices as quick-reply buttons, for example ::next{reply=\"👍 Let’s do it|⏭ Skip for now\"}, or ::next{reply=\"✅ Call me Sam|✏️ Something else\"} once you know their name. Never put a choice in btw or do during this chat.",

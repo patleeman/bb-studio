@@ -10,8 +10,8 @@
 // (threads.events.list after that sequence): a turn/completed closes a turn,
 // and a turn with any tool item (commandExecution, toolCall, mcpToolCall,
 // fileChange, ...) counts as a tool turn; a client/turn/requested whose
-// initiator is the user counts as a user turn. A bot_skill_write, _patch or
-// _delete call resets the tool count (the Bot just saved what it learned).
+// initiator is the user counts as a user turn. A bot_skill_edit call (or the older bot_skill_write,
+// _patch or _delete) resets the tool count (the Bot just saved what it learned).
 // The first look at a thread only takes a baseline: old history never trips.
 //
 // Review. When either count reaches the interval (10 by default) and the Bot
@@ -49,8 +49,8 @@ export const SKILL_SOFT_LIMIT = 8000;
 /** BB's largest page of thread events. */
 const EVENT_PAGE = 100;
 /** The tools a review fork gets, and nothing else of Studio's. */
-export const REVIEW_TOOLS = ["bot_skill_list", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_skill_lint", "pages_read", "memory_search", "memory_add", "memory_update"] as const;
-const SKILL_WRITE_TOOL = /bot_skill_(write|patch|delete)$/;
+export const REVIEW_TOOLS = ["bot_skill_list", "bot_skill_view", "bot_skill_edit", "bot_skill_lint", "pages_read", "memory_search", "memory_add", "memory_update"] as const;
+const SKILL_WRITE_TOOL = /bot_skill_(write|patch|delete|edit)$/;
 /** Items that aren't tool work. Everything else an agent does in a turn is. */
 const NOT_TOOLS = new Set(["agentMessage", "reasoning", "userMessage", "plan", "contextCompaction", "error"]);
 
@@ -196,7 +196,7 @@ export function reviewPrompt(input: { name: string; memoryPageId: string | null;
     "",
     "How to write:",
     "- Lessons, not logs. Write the rule a future run follows, not the story of today: no dates, PR numbers or \"we tried\".",
-    "- One skill per kind of task, not per incident. Check what you have first (bot_skill_list, bot_skill_view) and prefer bot_skill_patch on the skill that covers it over a new skill.",
+    "- One skill per kind of task, not per incident. Check what you have first (bot_skill_list, bot_skill_view) and prefer bot_skill_edit op \"patch\" on the skill that covers it over a new skill.",
     "- When the same lesson shows up again, merge it into one rule. Fix a wrong line in place; don't add one that contradicts it.",
     "- Keep each skill short: when to use it, the steps, the pitfalls. The tool result may carry notes on shape; heed them.",
     "",

@@ -65,16 +65,16 @@ async function scenario() {
   const tool = async (name: string, input: unknown) => parse(await tools[name]!.execute(input, ctx));
   const T = Date.now();
 
-  const plumber = await tool("todos_add", { title: "Call the plumber", why: "Leak under the sink", owner: "user", trigger: { type: "time", at: T + 3600000 }, push: true, due: T + 7200000, area: "Home" });
-  const venue = await tool("loops_add", { title: "Pick a venue", kind: "decide", options: ["Hall", "Park"], owner: "patrick" });
-  const report = await tool("todos_add", { title: "Read the report", kind: "read", priority: "low", area: "Work" });
-  const sam = await tool("todos_add", { title: "Wait on Sam", kind: "waiting", trigger: { type: "event", event: "reply:sam", label: "when Sam replies" } });
-  const botJob = await tool("todos_add", { title: "Renew the domain", owner: "cos", trigger: { type: "time", at: T + 1800000 } });
-  const threadJob = await tool("todos_add", { title: "Fix the faucet", owner: "thread:thr_a", status: "in_progress" });
-  const urgent = await tool("todos_add", { title: "Server down", priority: "urgent", push: true, source: { kind: "email", ref: "msg-1", url: "https://example.com/m/1" } });
-  const home = await tool("todos_add", { title: "Water the plants", trigger: { type: "place", place: "Home", direction: "arrive" } });
-  const extra = await tool("todos_add", { title: "Book the dentist", due: T - 1000 });
-  const extra2 = await tool("todos_add", { title: "Pay the bill" });
+  const plumber = loops.store.add({ title: "Call the plumber", why: "Leak under the sink", owner: "patrick", trigger: { type: "time", at: T + 3600000 }, push: true, due: T + 7200000, area: "Home" });
+  const venue = loops.store.add({ title: "Pick a venue", kind: "decide", options: ["Hall", "Park"], owner: "patrick" });
+  const report = loops.store.add({ title: "Read the report", kind: "read", priority: "low", area: "Work" });
+  const sam = loops.store.add({ title: "Wait on Sam", kind: "waiting", trigger: { type: "event", event: "reply:sam", label: "when Sam replies" } });
+  const botJob = loops.store.add({ title: "Renew the domain", owner: "cos", trigger: { type: "time", at: T + 1800000 } });
+  const threadJob = loops.store.add({ title: "Fix the faucet", owner: "thread:thr_a", status: "in_progress" });
+  const urgent = loops.store.add({ title: "Server down", priority: "urgent", push: true, source: { kind: "email", ref: "msg-1", url: "https://example.com/m/1" } });
+  const home = loops.store.add({ title: "Water the plants", trigger: { type: "place", place: "Home", direction: "arrive" } });
+  const extra = loops.store.add({ title: "Book the dentist", due: T - 1000 });
+  const extra2 = loops.store.add({ title: "Pay the bill" });
   log("added", [plumber, venue, report, sam, botJob, threadJob, urgent, home, extra, extra2]);
   const spoken = await loops.add("Buy milk");
   log("voice add", spoken);
@@ -99,7 +99,7 @@ async function scenario() {
   log("act keep", await handlers["loops.act"]!({ id: extra.id, action: "keep" }));
   log("act got_it", await handlers["loops.act"]!({ id: extra2.id, action: "got_it" }));
   log("act drop", await handlers["loops.act"]!({ id: spoken.id, action: "drop" }));
-  log("act done", parse(await tools["todos_act"]!.execute({ id: urgent.id, action: "done" }, ctx)));
+  log("act done", parse(await tools["task_act"]!.execute({ id: urgent.id, action: "done" }, ctx)));
   log("act on closed", await handlers["loops.act"]!({ id: urgent.id, action: "snooze", snooze: "tonight" }));
   log("posts after acts", posts.splice(0));
 
@@ -107,7 +107,7 @@ async function scenario() {
   log("update", await handlers["loops.update"]!({ id: plumber.id, changes: { why: "Leak under the kitchen sink", area: "House" } }));
   log("update reopen", await handlers["loops.update"]!({ id: urgent.id, changes: { status: "surfaced" } }));
   log("surface now", await handlers["loops.update"]!({ id: home.id, surfaceNow: true }));
-  log("tool update surfaceNow", parse(await tools["todos_update"]!.execute({ id: extra.id, surfaceNow: true }, ctx)));
+  log("tool update surfaceNow", loops.store.update(extra.id, { status: "queued", trigger: { type: "none" } }));
   log("posts after updates", posts.splice(0));
   log("fire", await handlers["loops.fire"]!({ event: "reply:sam" }));
   log("place", await handlers["loops.place"]!({ place: "Home", direction: "arrive" }));
@@ -115,11 +115,11 @@ async function scenario() {
   log("places", await handlers["loops.places"]!({}));
   const added = (value: unknown) => { const { movedToYou, ...rest } = value as { movedToYou: unknown }; expect(movedToYou).toEqual([]); return rest; };
   log("morning", added(await handlers["loops.morning"]!({})));
-  log("tool morning", added(parse(await tools["todos_morning"]!.execute({}, ctx))));
-  log("tool list", parse(await tools["loops_list"]!.execute({ owner: "user" }, ctx)));
-  log("tool fire", parse(await tools["todos_fire"]!.execute({ event: "nothing" }, ctx)));
+  log("tool morning", added(parse(await tools["task_morning"]!.execute({}, ctx))));
+  log("tool list", await handlers["loops.list"]!({ owner: "user" }));
+  log("tool fire", parse(await tools["task_fire"]!.execute({ event: "nothing" }, ctx)));
   for (const id of [plumber.id, venue.id, report.id, sam.id, botJob.id, threadJob.id, urgent.id, home.id, extra.id, extra2.id, spoken.id]) log(`get ${id}`, await handlers["loops.get"]!({ id }));
-  log("tool get", parse(await tools["todos_get"]!.execute({ id: threadJob.id }, ctx)));
+  log("tool get", await handlers["loops.get"]!({ id: threadJob.id }));
   log("get missing", await Promise.resolve().then(() => handlers["loops.get"]!({ id: "loop_missing" })).catch((error: Error) => error.message));
   const mention = mentions[0];
   log("mention search", await mention.search({ query: "" }));

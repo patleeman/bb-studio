@@ -254,7 +254,7 @@
  {
   "step": "posts after voice add",
   "value": [
-   "Fill in draft todo loop_00000000-0000-4000-8000-000000000011 from this typed line using todos_update, then queue it: \"Buy milk\""
+   "Fill in draft task loop_00000000-0000-4000-8000-000000000011 from this typed line using task_update, then queue it: \"Buy milk\""
   ]
  },
  {
@@ -626,7 +626,7 @@
  {
   "step": "posts after an hour",
   "value": [
-   "Todo loop_00000000-0000-4000-8000-000000000005 is due: \"Renew the domain\". Owner: cos. Carry out the next step now, and record progress with todos_update or todos_act."
+   "Todo loop_00000000-0000-4000-8000-000000000005 is due: \"Renew the domain\". Owner: cos. Carry out the next step now, and record progress with task_update or task_act."
   ]
  },
  {
@@ -866,9 +866,9 @@
  {
   "step": "posts after acts",
   "value": [
-   "Todo loop_00000000-0000-4000-8000-000000000002: choose. Hall Owner: the user. Use todos_list to review and carry out the next step.",
-   "Todo loop_00000000-0000-4000-8000-000000000004: hand_off.  Owner: thread:thr_a. Use todos_list to review and carry out the next step.",
-   "Todo loop_00000000-0000-4000-8000-000000000006: nudge. Draft the nudge message and show it to the user in this chat for approval. Do not send it until they approve."
+   "Task loop_00000000-0000-4000-8000-000000000002: choose. Hall Owner: the user. Use task_list to review and carry out the next step.",
+   "Task loop_00000000-0000-4000-8000-000000000004: hand_off.  Owner: thread:thr_a. Use task_list to review and carry out the next step.",
+   "Task loop_00000000-0000-4000-8000-000000000006: nudge. Draft the nudge message and show it to the user in this chat for approval. Do not send it until they approve."
   ]
  },
  {
@@ -1795,7 +1795,7 @@
  {
   "step": "mention resolve",
   "value": {
-   "context": "The user brought this task into the chat to discuss it; it is the topic of their message. Use todos_get for its history and todos_update or todos_act to change it.\nid: loop_00000000-0000-4000-8000-000000000001\ntitle: Call the plumber\nwhy: Leak under the kitchen sink\ntrigger: time, 2026-11-02T16:00:00.000Z, sends to iPhone\nkind: do · status: queued · owner: the user · priority: normal · area: House\ndue: 2026-11-02T17:00:00.000Z"
+   "context": "The user brought this task into the chat to discuss it; it is the topic of their message. Use task_get for its history and task_update or task_act to change it.\nid: loop_00000000-0000-4000-8000-000000000001\ntitle: Call the plumber\nwhy: Leak under the kitchen sink\ntrigger: time, 2026-11-02T16:00:00.000Z, sends to iPhone\nkind: do · status: queued · owner: the user · priority: normal · area: House\ndue: 2026-11-02T17:00:00.000Z"
   }
  },
  {

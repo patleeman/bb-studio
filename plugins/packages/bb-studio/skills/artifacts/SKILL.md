@@ -39,11 +39,7 @@ Give each artifact a short, human title ("Q3 revenue chart", not
 | `apps_create` with type `"artifact"` | Save a file by `path` (workspace or thread storage; relative paths are from the workspace root), or short text by `content` plus a file `name`, as its `input`. Pass `title`, optionally `description`, and `artifactId` to add a version to a specific artifact. |
 | `apps_list` with type `"artifact"` | List saved artifacts with ids and links. |
 | `apps_read` | Read an artifact's details and, for text types, its contents. |
-| `artifacts_live` | Read and drive a live HTML artifact (below). |
-
-`artifacts_save`, `artifacts_list` and `artifacts_read` are aliases of these
-with the same fields; `artifacts_list` also takes `thisThread`, to list only
-this thread's.
+| `apps_live` | Read and drive a live HTML artifact (below). |
 
 `apps_create` returns the card line to show: `::artifact{id="art_…"}`, or
 `::app{id="art_…"}` when your instructions say to write `::app` (Studio's App
@@ -91,7 +87,7 @@ playgrounds, so a playground's HTML works saved as an artifact unchanged:
 - `send(label, data)`, called from a click, puts an @artifact pill in the
   thread's composer. When the user sends their message, you get the data.
 
-Read and drive one with the `artifacts_live` tool (`op`: `state`, `set`,
+Read and drive one with the `apps_live` tool (`op`: `state`, `set`,
 `events`, `actions`, `do`) or:
 
 ```sh

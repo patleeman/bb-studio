@@ -264,7 +264,7 @@ describe("the first-chat prompt", () => {
   it("asks for a short chat that personalizes through the Bot's own tools, then hands off", () => {
     const prompt = starterFirstChatPrompt("Assistant");
     expect(prompt).toContain("You are Assistant");
-    for (const tool of ["presence_list", "theme_list", "presence_apply", "theme_apply", "bot_set"]) expect(prompt).toContain(tool);
+    for (const call of ["call presence and theme with op \"list\"", "op \"apply\"", "bot_profile_update"]) expect(prompt).toContain(call);
     expect(prompt).toMatch(/two to four exchanges/);
     expect(prompt).toMatch(/skip/);
     expect(prompt).toContain("by your name (Assistant), never \"your Bot\"");

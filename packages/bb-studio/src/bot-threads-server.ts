@@ -612,12 +612,11 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
       return botId ? describe(botId) : "The user has no Bot yet.";
     },
   });
-  conversationsTool("bot_conversations", "List your conversations with the user (Main first, then the others: their titles, thread links, which one each was forked from, whether it's working, and why it needs the user) and your workers (the agents you started, with their status, the conversation that started each, and the repo it runs in). Use it to see what else is going on before you start something, or when the user asks about another conversation; read one with the normal thread tools.");
-  conversationsTool("bot_threads_list", "Alias of bot_conversations. Reply-in-thread side threads are conversations now: forks of a message, listed with what they were forked from.");
+  conversationsTool("bot_conversations", "List your conversations with the user (Main first) and your workers (status, owner conversation, repo/branch).");
   bb.agents.registerTool({
     name: "bot_needs_you",
-    description: "Mark this conversation as needing the user, with a short reason they see in the sidebar (\"Pick a date for the trip\"), when only they can answer something: a worker's question you can't settle, a decision, an approval. It clears when the user replies here. Pass reason null to clear it yourself. Don't use it for things you can handle.",
-    parameters: z.object({ reason: z.string().trim().max(200).nullable().describe("One short line; null clears") }),
+    description: "Flag this conversation in the sidebar with a short reason when only the user can answer/approve; pass reason null to clear.",
+    parameters: z.object({ reason: z.string().trim().max(200).nullable().describe("Short line; null clears") }),
     execute: async ({ reason }, ctx) => {
       const rec = ctx.threadId ? store.get(ctx.threadId) : null;
       if (!rec) return "This thread isn't one of your conversations.";
@@ -680,5 +679,5 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     return { classified, linked: linked.length };
   };
 
-  return { store, text, rpc, start, reconcile, threadChanged, catchUp, messageThreads, owner, pushIds, approvalPush, tools: ["bot_conversations", "bot_threads_list", "bot_needs_you"] as const };
+  return { store, text, rpc, start, reconcile, threadChanged, catchUp, messageThreads, owner, pushIds, approvalPush, tools: ["bot_conversations", "bot_needs_you"] as const };
 }

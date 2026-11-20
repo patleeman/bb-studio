@@ -133,10 +133,11 @@ it("serves the RPC: create, update, list with the placed message, anchor", async
   expect(() => rpcContract["work.update"].input.parse({ id: card.id, state: "paused" })).toThrow();
 });
 
-it("gives agents tools that create in the caller's thread and update in place", async () => {
+it("keeps legacy work_card_* handlers callable directly while WORK_TOOLS stays empty", async () => {
   const { bb, tools } = fakeBb();
   registerWorkCards(bb as never, db, { read: async () => page([]) });
-  expect(Object.keys(tools).sort()).toEqual([...WORK_TOOLS].sort());
+  expect(WORK_TOOLS).toEqual([]);
+  expect(Object.keys(tools).sort()).toEqual(["work_card_create", "work_card_get", "work_card_update"]);
   const made = JSON.parse(await tools.work_card_create!.execute({ title: "Worker: fix tests", kind: "worker" }, { threadId: "thr_lead" })) as { id: string; directive: string };
   expect(made.directive).toBe(`::work{id="${made.id}"}`);
   expect(store.get(made.id)).toMatchObject({ threadId: "thr_lead", kind: "worker", state: "running" });

@@ -25,12 +25,12 @@ type Ctx = { threadId?: string | null };
 type Post = (text: string) => Promise<void>;
 type Send = (threadId: string, text: string) => Promise<void>;
 
-const CREATE = `Track one piece of work as a task: one task per job. Set its owner ("user", "cos" for the Bot, "me" for your own thread, or "thread:<id>"). With card true it returns a ::work{id="…"} line to post once, on its own line, in the conversation; the card redraws in place. Report progress with task_update instead of posting status messages, and hand it to the user with task_handoff when you need them. ${SPAWN_RULE}`;
-const UPDATE = "Change a task in place: state (todo, in_progress, waiting, done, dropped, failed), step (e.g. \"3/5 Tests\"), line (the latest one-liner), needs, timing, workers, outputs and the rest. Progress and state changes go into its history. Use task_handoff to change its owner. When it waits, say on what with waitingOn (user, ci, task or outside). The conversation is set once, where the task started. A worker's first task_update on a task joins that task when the worker has none yet.";
-const CHECK = "Check tasks for orphans and duplicates and report them, changing nothing: a running worker thread with no task, a task or worker shown twice, a work card with no task, and an open subtask under a closed parent.";
-const GET = "Read one task by id (task_…, loop_… or wc_…): its record, history and subtasks.";
-const LIST = "List tasks, open ones by default, newest change first. Filter by owner (\"user\", \"cos\", \"me\", \"thread:<id>\"), state (a state, open or closed), conversation, area, project or parent.";
-const HANDOFF = "Hand a task to another owner and keep its history: to the user when you need a decision or an action from them (say what in needs, give options for a decision), or to the Bot or a thread to carry it on. The task's card updates; a task without a card handed to the user comes up in the Bot chat.";
+const CREATE = 'Track a task (one per job or to-do). Set owner ("user", "cos", "me" or "thread:<id>"). With card: true returns a ::work{id} line to post once; report progress with task_update and pass task:<id> to workers (see studio skill).';
+const UPDATE = "Update a task in place (state, step, line, needs, timing, workers, outputs, card). Progress goes to history; use task_handoff to change owner. When waiting, set waitingOn.";
+const CHECK = "Report task orphans and duplicates without changing anything.";
+const GET = "Read one task (task_…, loop_… or wc_…): record, history and subtasks.";
+const LIST = 'List tasks (open by default, newest first). Filter by owner ("user", "cos", "me", "thread:<id>"), state, conversation, area, project or parent.';
+const HANDOFF = "Hand a task to another owner (user, cos, me, thread:<id>) keeping history; pass needs and options when asking the user.";
 
 export type TaskToolOptions = { links?: SpawnLinks; check?: () => Promise<TaskProblem[]> };
 
@@ -109,6 +109,7 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
     const kept = closedByUser(current) && !x.reopen;
     const joined = kept ? false : await links.touched(x.id, ctx.threadId);
     const keepConversation = x.conversation !== undefined && current.conversation !== null && x.conversation !== current.conversation;
+    const attachedCard = x.card === true && !current.card;
     const changed = store.change(x.id, (t) => {
       if (t.stale && !kept) { t.stale = false; if (x.state === undefined) t.state = "in_progress"; }
       if (x.title !== undefined) t.title = x.title;
@@ -119,6 +120,10 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
       if (x.needs !== undefined && !kept) t.needs = x.needs || null;
       if (x.priority !== undefined) t.priority = x.priority;
       if (x.conversation !== undefined && !keepConversation) t.conversation = x.conversation;
+      if (attachedCard) {
+        t.card = { kind: "task", messageId: null, messageSeq: null, dismissedAt: null };
+        if (!t.conversation && ctx.threadId) t.conversation = ctx.threadId;
+      }
       if (x.project !== undefined) t.project = x.project;
       if (x.area !== undefined) t.area = x.area;
       if (x.due !== undefined) t.timing.due = x.due;
@@ -142,8 +147,9 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
       if (x.step !== undefined || x.line !== undefined) store.event(x.id, "progress", { step: x.step ?? null, line: x.line ?? null, by: caller(ctx), kept: true });
       return { ...task, note: KEPT_CLOSED };
     }
-    const note = notes(keepConversation ? CONVERSATION_SET : null, linked, joined ? `This thread joined task ${task.id}; report on it from now on.` : null, x.state === "waiting" && !task.waitingOn ? WAITING_NOTE : null);
-    return note ? { ...task, note } : task;
+    const posted = attachedCard && task.card ? await postCard(task, ctx) : null;
+    const note = notes(posted, keepConversation ? CONVERSATION_SET : null, linked, joined ? `This thread joined task ${task.id}; report on it from now on.` : null, x.state === "waiting" && !task.waitingOn ? WAITING_NOTE : null);
+    return { ...task, ...(attachedCard && task.card ? { directive: directiveFor(task.id) } : {}), ...(note ? { note } : {}) };
   };
 
   const get = (id: string) => {

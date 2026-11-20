@@ -960,17 +960,17 @@ it("searches only the calling Bot's skills, ranked by title, then description, t
   expect(x.bots.searchSkills("own").map((hit) => hit.name)).toEqual([]);
 });
 
-it("lists eight skills in the Bot's instructions, pinned and recent first, and points at skill_search for the rest", async () => {
+it("lists eight skills in the Bot's instructions, pinned and recent first, and points at bot_skill_list for the rest", async () => {
   const x = await setup();
   x.add({ id: "bot1" });
   await x.bots.setThread("bot1");
   for (let n = 0; n < 10; n += 1) x.bots.writeSkill({ name: `task-${n}`, description: `Task ${n}`, body: "b" });
   x.bots.pinSkill("task-0", true);
   const text = x.bots.instructions(x.bots.forThread("bot1")!);
-  expect(text).toContain("find one with skill_search");
+  expect(text).toContain("bot_skill_list");
   expect(text).toContain("- task-0: Task 0");
   expect(text.match(/^- task-/gm)).toHaveLength(8);
-  expect(text).toContain("2 more: find them with skill_search.");
+  expect(text).toContain("2 more: search with bot_skill_list.");
 });
 
 it("keeps one skill's history apart, reverts to an old version and restores a deleted skill", async () => {

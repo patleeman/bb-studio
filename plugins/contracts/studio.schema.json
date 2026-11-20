@@ -47153,7 +47153,7 @@
                       "text"
                     ],
                     "additionalProperties": false,
-                    "description": "What a waiting task waits on: \"user\" (the user), \"ci\" (a build or check; ref the run or PR), \"task\" (another task; ref its id) or \"outside\" (someone outside; text says who)"
+                    "description": "Wait target: user, ci (ref run/PR), task (ref id) or outside (text)"
                   },
                   {
                     "type": "null"
@@ -47913,7 +47913,7 @@
                         "text"
                       ],
                       "additionalProperties": false,
-                      "description": "What a waiting task waits on: \"user\" (the user), \"ci\" (a build or check; ref the run or PR), \"task\" (another task; ref its id) or \"outside\" (someone outside; text says who)"
+                      "description": "Wait target: user, ci (ref run/PR), task (ref id) or outside (text)"
                     },
                     {
                       "type": "null"
@@ -48639,7 +48639,7 @@
                         "text"
                       ],
                       "additionalProperties": false,
-                      "description": "What a waiting task waits on: \"user\" (the user), \"ci\" (a build or check; ref the run or PR), \"task\" (another task; ref its id) or \"outside\" (someone outside; text says who)"
+                      "description": "Wait target: user, ci (ref run/PR), task (ref id) or outside (text)"
                     },
                     {
                       "type": "null"
@@ -49421,7 +49421,7 @@
                         "text"
                       ],
                       "additionalProperties": false,
-                      "description": "What a waiting task waits on: \"user\" (the user), \"ci\" (a build or check; ref the run or PR), \"task\" (another task; ref its id) or \"outside\" (someone outside; text says who)"
+                      "description": "Wait target: user, ci (ref run/PR), task (ref id) or outside (text)"
                     },
                     {
                       "type": "null"
@@ -50214,7 +50214,7 @@
                       "text"
                     ],
                     "additionalProperties": false,
-                    "description": "What a waiting task waits on: \"user\" (the user), \"ci\" (a build or check; ref the run or PR), \"task\" (another task; ref its id) or \"outside\" (someone outside; text says who)"
+                    "description": "Wait target: user, ci (ref run/PR), task (ref id) or outside (text)"
                   },
                   {
                     "type": "null"
@@ -51018,7 +51018,7 @@
                         "text"
                       ],
                       "additionalProperties": false,
-                      "description": "What a waiting task waits on: \"user\" (the user), \"ci\" (a build or check; ref the run or PR), \"task\" (another task; ref its id) or \"outside\" (someone outside; text says who)"
+                      "description": "Wait target: user, ci (ref run/PR), task (ref id) or outside (text)"
                     },
                     {
                       "type": "null"
@@ -51927,7 +51927,7 @@
                         "text"
                       ],
                       "additionalProperties": false,
-                      "description": "What a waiting task waits on: \"user\" (the user), \"ci\" (a build or check; ref the run or PR), \"task\" (another task; ref its id) or \"outside\" (someone outside; text says who)"
+                      "description": "Wait target: user, ci (ref run/PR), task (ref id) or outside (text)"
                     },
                     {
                       "type": "null"
@@ -52858,7 +52858,7 @@
                         "text"
                       ],
                       "additionalProperties": false,
-                      "description": "What a waiting task waits on: \"user\" (the user), \"ci\" (a build or check; ref the run or PR), \"task\" (another task; ref its id) or \"outside\" (someone outside; text says who)"
+                      "description": "Wait target: user, ci (ref run/PR), task (ref id) or outside (text)"
                     },
                     {
                       "type": "null"

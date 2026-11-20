@@ -115,7 +115,7 @@ describe("the user's focus and choices", () => {
     expect(text).toBe('Opened "Release notes" (key "k2") behind the selected tab, marked new: the user is typing in the panel.');
     expect(state.opened[1]).toMatchObject({ focus: false, spec: { title: `${NEW_MARK}Release notes` } });
     expect(state.selectedKey).toBe("k1");
-    expect(await call("workbench_focus", { key: "k2" })).toMatch(/^Not switched: the user is typing/);
+    expect(await call("workbench_tab", { action: "focus", key: "k2" })).toMatch(/^Not switched: the user is typing/);
     expect(state.selectedKey).toBe("k1");
   });
 
@@ -149,7 +149,7 @@ describe("the user's focus and choices", () => {
     const { wb } = fakeWorkbench();
     const { call } = harness({ thr_1: wb });
     await call("workbench_open", { type: "page", id: "pg_plan" });
-    expect(await call("workbench_close", { key: "k1" })).toBe('Closed "Plan".');
+    expect(await call("workbench_tab", { action: "close", key: "k1" })).toBe('Closed "Plan".');
     expect(await call("workbench_open", { type: "page", id: "pg_plan" })).toBe('Opened "Plan" (key "k2") and selected it.');
     wb.close("k2");
     await wb.open({ kind: "tab", tab: { id: "studio" }, params: { kind: "page", id: "pg_plan" }, title: "Plan" }, { focus: false });
@@ -466,10 +466,10 @@ describe("a tab in a window of its own", () => {
       { key: "web", title: "Docs", closable: true, detail: { kind: "browser", url: "https://example.com" } },
       { key: "board", title: "Election night", closable: true, detail: { kind: "plugin", pluginId: "studio-visual-chat", tab: { id: "board" }, params: { threadId: "thr_b" } } },
     );
-    for (const key of ["term", "info", "new", "fixed", "web"]) expect(await call("workbench_pop_out", { key })).toMatch(/can't open in a window of its own\. Pages, whiteboards/);
+    for (const key of ["term", "info", "new", "fixed", "web"]) expect(await call("workbench_tab", { action: "pop_out", key })).toMatch(/can't open in a window of its own\. Pages, whiteboards/);
     expect(popped).toEqual([]);
-    expect(await call("workbench_pop_out", { key: "gone" })).toBe('No tab has key "gone". Call workbench_list for the current keys.');
-    expect(await call("workbench_pop_out", { key: "board" })).toBe('Opened "Election night" in a window of its own. Its Return to workbench button puts it back.');
+    expect(await call("workbench_tab", { action: "pop_out", key: "gone" })).toBe('No tab has key "gone". Call workbench_list for the current keys.');
+    expect(await call("workbench_tab", { action: "pop_out", key: "board" })).toBe('Opened "Election night" in a window of its own. Its Return to workbench button puts it back.');
     expect(popped).toEqual(["board"]);
   });
 
@@ -479,13 +479,13 @@ describe("a tab in a window of its own", () => {
     const first = harness({ thr_1: typing.wb });
     expect(await first.call("workbench_open", { type: "page", id: "pg_plan", pane: "window" })).toBe(`Opened "Plan" (key "k1") behind the selected tab, marked new: the user is typing in the panel. Not in a window: the user is typing in the workbench. Pass force: true only when the user asks for it.`);
     expect(typing.popped).toEqual([]);
-    expect(await first.call("workbench_pop_out", { key: "k1" })).toMatch(/^Not opened in a window: the user is typing/);
-    expect(await first.call("workbench_pop_out", { key: "k1", force: true })).toMatch(/^Opened ".*Plan" in a window of its own/);
+    expect(await first.call("workbench_tab", { action: "pop_out", key: "k1" })).toMatch(/^Not opened in a window: the user is typing/);
+    expect(await first.call("workbench_tab", { action: "pop_out", key: "k1", force: true })).toMatch(/^Opened ".*Plan" in a window of its own/);
     const declined = windowWorkbench(false);
     expect(await harness({ thr_1: declined.wb }).call("workbench_open", { type: "conversation", id: "thr_other", pane: "window" })).toMatch(/^"Release notes" is in the workbench \(key "k1"\): BB didn't open it in a window of its own\./);
     const { wb } = fakeWorkbench();
     expect(await harness({ thr_1: wb }).call("workbench_open", { type: "page", id: "pg_plan", pane: "window" })).toBe("Opened \"Plan\" (key \"k1\") and selected it. This BB can't open workbench tabs in windows of their own.");
-    expect(await harness({ thr_1: wb }).call("workbench_pop_out", { key: "k1" })).toBe("This BB can't open workbench tabs in windows of their own.");
+    expect(await harness({ thr_1: wb }).call("workbench_tab", { action: "pop_out", key: "k1" })).toBe("This BB can't open workbench tabs in windows of their own.");
   });
 
   it("passes BB's popOut through, where BB has it", async () => {
