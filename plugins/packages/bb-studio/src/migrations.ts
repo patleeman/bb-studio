@@ -1157,4 +1157,11 @@ export const MIGRATIONS = [
    CREATE INDEX tool_gateway_log_server ON tool_gateway_log (server_id, seq);`,
   // Columns added after this are in src/schema-columns.ts (ensureColumns), not here: they are added
   // when missing, so an index another branch already used on a database can't skip or refuse them.
+  //
+  // SLOT 114 IS RESERVED FOREVER. Staged installs ran the old Bot main_* migration there, and
+  // unmerged branches (quiet-compact, r3-owner) put their own statements there too. BB refuses to
+  // load a database whose recorded statement at an index differs from ours, so nothing may ever
+  // sit at 114. The next migration starts at 115: leave 114 as a hole, written `, ,` after the
+  // entry above (BB's migrate skips holes, so 114 is neither run nor checked). migrations.test.ts
+  // fails if anything is put at 114.
 ];
