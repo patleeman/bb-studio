@@ -124,7 +124,7 @@ the rule above; **n/a** says why it can't.
 [5] Cmd+K lists no such rows; a typed bb:// link, app route or web address goes through the router.
 [6] Replies don't link a diff; bb's change cards open it.
 [7] A terminal has no id; nothing links one.
-[8] A terminal opens by starting one; workbench_focus selects an open one.
+[8] A terminal opens by starting one; workbench_tab action "focus" selects an open one.
 
 ## Sources
 

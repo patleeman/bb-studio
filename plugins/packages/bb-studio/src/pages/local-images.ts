@@ -3,7 +3,7 @@
 // A path like that only works where something resolves it against the
 // writer's thread, and stops working when the thread's storage is cleaned.
 // So when an agent writes a page, each such image it may read (inside its
-// thread's workspace or thread storage, the same rule as artifacts_save) is
+// thread's workspace or thread storage, the same rule as saving an artifact) is
 // copied into the page's files and its src becomes the page-file URL, which
 // the full editor, the chat card and the phone all load. Anything else stays
 // as written, and the tool result names it.

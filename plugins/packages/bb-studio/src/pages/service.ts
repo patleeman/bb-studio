@@ -277,7 +277,7 @@ export class PagesService {
       ...lines.slice(1),
       "",
       `Page: "${untitled(page.title)}" (id ${page.id}, ${pageUrl(page.id)}).`,
-      "Use pages_read to see the page with block ids, pages_edit to change it, and the pages_comment tools to answer in the page. The user sees your edits live.",
+      "Use pages_read to see the page with block ids, pages_edit to change it, and pages_comments to answer in the page. The user sees your edits live.",
     ].join("\n");
   }
 

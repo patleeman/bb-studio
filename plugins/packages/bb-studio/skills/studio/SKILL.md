@@ -40,10 +40,10 @@ Not found tab.
   `family:page` lists every page type (docs, designs, whiteboards) and
   `family:app` every app (mini apps, artifacts); `type:design`
   lists one type.
-- Apps have their own tools: `apps_list`, `apps_read` (any app by id) and
-  `apps_create`; `artifacts_list|read|save` and `minis_list|read|create` are
-  aliases of them. Pages, designs and whiteboards share `pages_list`,
-  `pages_read` and `pages_create`. The older per-type tools still work.
+- Apps have their own tools: `apps_list`, `apps_read` (any app by id),
+  `apps_create` (`type: "mini"` or `"artifact"`) and `apps_live` (drive an
+  open one). Pages, designs and whiteboards share `pages_list`, `pages_read`
+  and `pages_create` (`type: "design"` or `"whiteboard"`).
   Fields are `kind:`, `project:` (a name, or `global`), `tag:` (a name, or
   `none`) and `is:archived` / `is:template`; `-` excludes, a repeated
   field matches any of its values, and the remaining words match titles and
@@ -236,8 +236,8 @@ job, keep it updated, and hand it over instead of posting status messages.
   time still ahead), you are told to stop too.
 - `::loop{id="…"}` and `::work{id="…"}` both draw the same task card; a
   morning row is `::loop{id="…" row="N"}`. A card is how a task is drawn:
-  `work_card_create` with `taskId` draws that task, and a worker card for a
-  worker that already has a task draws that task instead of a second one.
+  `task_create` or `task_update` with `card: true` draws that task, and a
+  worker's card draws the task it already has instead of a second one.
 - **Workers and their task.** Every worker thread belongs to exactly one
   task. Before or right after you spawn a worker, make its task
   (`task_create` with owner `"thread:<worker>"` or `workers: ["<worker>"]`,
@@ -282,23 +282,21 @@ job, keep it updated, and hand it over instead of posting status messages.
   way), and `{"severity": "info" | "warn" | "critical"}` (or a line starting
   `[warn]` or `[critical]`) wakes you again when the same finding gets worse.
   Open findings are listed in each check-in's prompt.
-- The older names keep working: `todos_*` and `loops_*` for the user's tasks,
-  `work_card_*` for a card.
+- Older names are gone: use `task_*` for the user's tasks (not `todos_*` or
+  `loops_*`) and for cards (not `work_card_*`).
 
-- `work_card_create { title, kind, state?, step?, line? }` (kind: worker,
-  lead, release, todo, task) returns a `::work{id="wc_…"}` line. Post it once,
-  on its own line, in the conversation where the user follows the work. The
-  card stays where it was posted and redraws from live state; the
-  conversation's In flight list above the composer has a row for it, and a
-  click on the row scrolls back to the card.
-- `work_card_update { id, state?, step?, line?, needs? }` changes it in place:
-  state is running, waiting, needs-you, done or failed; step is short ("3/5
-  Tests"); line is the latest one-liner; needs says what the user must do
-  (with state needs-you). Don't post a new message for progress; update the
+- `task_create { title, card: true, … }` returns a `::work{id="…"}` line.
+  Post it once, on its own line, in the conversation where the user follows
+  the work. The card stays where it was posted and redraws from live state;
+  the conversation's In flight list above the composer has a row for it, and
+  a click on the row scrolls back to the card.
+- `task_update { id, state?, step?, line?, needs? }` changes it in place:
+  step is short ("3/5 Tests"); line is the latest one-liner; needs says what
+  the user must do. Don't post a new message for progress; update the
   card. Post a message only for a result or a question the user must read.
-- Starting a worker: create its card first (kind worker, `workerThreadId`
-  once you know it) and give the worker the card id, so it updates the card
-  itself.
+- Starting a worker: make its task first (`task_create` with `workers:
+  ["<worker>"]` once you know it) and put `task:<id>` in the worker's first
+  message, so it updates the task, and so the card, itself.
 - A done or failed card leaves the In flight list a day after it finished.
   The list folds finished cards into one "N done" line under the live ones;
   the user can clear them with Clear done or remove one row with its ×. The
@@ -339,18 +337,22 @@ palette with solid surfaces. The user picks one in Edit space, under Appearance
 (Shift reverses; rebindable in Settings → Keyboard), or a right-click on a Bot's
 icon → Theme.
 
-- `theme_list` lists themes (id, kind, who made it, which Bots use it);
-  `theme_list { id }` prints one package as JSON.
-- `theme_create { theme }` saves a new package after every check passes:
-  contrast on every surface, frame time (a GPU in an open window, else a
-  static estimate), backdrop brightness and a reduced-motion still. Write it
-  from the user's description, starting from the template in the tool's
-  description. A failure saves nothing; fix each failed check and call again.
-- `theme_update { id, theme, newId? }` merges a change and re-checks.
+The `theme` tool takes an `op`:
+
+- `theme { op: "list" }` lists themes (id, kind, who made it, which Bots use
+  it); `theme { op: "list", id }` prints one package as JSON.
+- `theme { op: "create", theme }` saves a new package after every check
+  passes: contrast on every surface, frame time (a GPU in an open window,
+  else a static estimate), backdrop brightness and a reduced-motion still.
+  Write it from the user's description, starting from the template in the
+  themes skill (load it first). A failure saves nothing; fix each failed
+  check and call again.
+- `theme { op: "update", id, theme, newId? }` merges a change and re-checks.
   Built-ins can't change; `newId` saves a copy.
-- `theme_apply { themeId, bot?, intensity?, glass?, motion?, effects? }`
-  puts it on a Bot (default: the Bot this thread works for); null removes it.
-- `theme_delete { id }` refuses while a Bot uses the theme.
+- `theme { op: "apply", themeId, bot?, intensity?, glass?, motion?, effects? }`
+  puts it on a Bot (default: the Bot this thread works for); `themeId: null`
+  removes it.
+- `theme { op: "delete", id }` refuses while a Bot uses the theme.
 
 CLI: `bb studio theme list|show|create --file|update <id> --file [--new-id]|apply <id|none> [--bot]|check --file|delete|template|weather [--city <name> | --clear]` (Forest's place) `|sky [--date <yyyy-mm-dd[Thh:mm]> [--time <hh:mm>] | --clear]` (Tonight's Sky: prints the Moon, planets up, meteor showers and events for the place; `--date` previews that night in the window until `--clear`).
 
@@ -358,11 +360,13 @@ CLI: `bb studio theme list|show|create --file|update <id> --file [--new-id]|appl
 
 A Bot's icon is its presence: a live form (orb, tesseract, knot, swarm, mobius, poly, attractor, klein, or a stored one) that shows idle, thinking, working (one satellite per running worker) and needs you.
 
-- `presence_list { id? }` lists built-in and stored presences; with an id, a stored one's package and code.
-- `presence_create { id, name, description?, code }` makes one from the user's description. `code` is plain JavaScript declaring `function draw(ctx, t, state, palette, size)`; the tool's description has the contract and a template. It runs sealed in a sandboxed worker (no network, DOM, timers, eval or classes) and is saved only when every check passes, which needs an open BB Studio window.
-- `presence_update { id, name?, description?, code?, newId? }` re-checks and saves; `newId` saves a copy.
-- `presence_apply { form?, bot?, color?, motion? }` puts a form on a Bot; `color` is `theme` or `#rrggbb`, `motion` 0–2.
-- `presence_delete { id }` refuses while a Bot uses it.
+The `presence` tool takes an `op`:
+
+- `presence { op: "list", id? }` lists built-in and stored presences; with an id, a stored one's package and code.
+- `presence { op: "create", id, name, description?, code }` makes one from the user's description. `code` is plain JavaScript declaring `function draw(ctx, t, state, palette, size)`; the presences skill has the contract and a template (load it first). It runs sealed in a sandboxed worker (no network, DOM, timers, eval or classes) and is saved only when every check passes, which needs an open BB Studio window.
+- `presence { op: "update", id, name?, description?, code?, newId? }` re-checks and saves; `newId` saves a copy.
+- `presence { op: "apply", form?, bot?, color?, motion? }` puts a form on a Bot; `color` is `theme` or `#rrggbb`, `motion` 0–2.
+- `presence { op: "delete", id }` refuses while a Bot uses it.
 
 CLI: `bb studio presence list|show <id>|template [--guide]|check --file [--code]|create --file [--code]|update <id> [--file] [--code] [--new-id]|apply <id> [--bot] [--color theme|#rrggbb] [--motion 0-2]|delete <id>`.
 

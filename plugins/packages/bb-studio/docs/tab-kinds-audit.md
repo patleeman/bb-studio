@@ -62,7 +62,7 @@ as it).
 [13] Replies don't link a diff; bb's change cards open it.
 [14] bb keeps no recent browser tabs.
 [15] bb keeps no recent terminals.
-[16] A terminal opens by starting one; the agent has no terminal id to open. workbench_focus selects an open one.
+[16] A terminal opens by starting one; the agent has no terminal id to open. workbench_tab action "focus" selects an open one.
 [17] Replies don't link a terminal.
 [18] bb keeps no recent workflow runs.
 

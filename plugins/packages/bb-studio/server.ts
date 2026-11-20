@@ -2033,7 +2033,7 @@ export default async function plugin(bb: BbPluginApi) {
       return [describeBot(result), `Stopped ${result.stoppedThreadIds.length} thread(s); paused ${result.pausedAutomationIds.length} automation(s).`].join("\n");
     },
   });
-  // bot_threads_list is an alias of bot_conversations now (src/bot-threads-server.ts): side threads are conversations.
+  // bot_conversations replaced bot_threads_list (src/bot-threads-server.ts): side threads are conversations.
   bb.agents.registerTool({
     name: "bot_activity", description: "What the user's Bot is doing: what waits on the user in its chat, threads in progress (and which wait on an answer), scheduled check-ins and automations, and recently completed threads it started.", parameters: z.object({}),
     execute: async (_input, ctx) => {

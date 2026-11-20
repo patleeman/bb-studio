@@ -3,7 +3,7 @@ import type { StudioChanged } from "../kit/server/core";
 import type { StudioServices } from "../services";
 // Artifacts, built into Studio: keep the files agents make.
 //
-// Saving is explicit: an agent calls `artifacts_save` (or
+// Saving is explicit: an agent calls `apps_create` type "artifact" (or
 // `bb studio artifacts save`), or the user picks files from a reply with
 // "Save to Studio". Either way the bytes are copied at save time, since
 // workspace and thread-storage files change and vanish. Saving the same file

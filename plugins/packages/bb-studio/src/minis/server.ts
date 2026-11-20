@@ -111,7 +111,7 @@ const API_HELP = `Source: files keyed by path. mini.json is the manifest: {"entr
 Write React 19 JSX; export default the root component and Studio mounts it. No npm and no build: import only other files of the app and shelf modules: ${SHELF.map((lib) => `${lib.id} (${lib.modules.length ? lib.modules.map((name) => `"${name}"`).join(", ") : "no import"}${lib.always ? ", always loaded" : ""})`).join("; ")}.
 Style with Tailwind classes; BB's colors are theme tokens (bg-background, bg-card, text-foreground, text-muted-foreground, border-border, bg-primary, text-primary-foreground, bg-state-hover, text-destructive-text, …) and dark mode follows BB.
 @studio/kit: Button, Input, Textarea, Select/SelectTrigger/SelectValue/SelectContent/SelectItem, Checkbox, Card/CardHeader/CardTitle/CardDescription/CardContent/CardFooter, Dialog…, DropdownMenu…, Popover…, Tooltip, Badge (tone), Tabs/TabsList/TabsTrigger/TabsContent, Table parts and DataTable (rows, columns), Field, EmptyState, Toolbar, Spinner, cn; hooks useRecords(collection, query) -> {records, loading, collection}, useCollection(name), usePlaygroundState(initial), useActions(actions), useTheme(). @studio/kit/charts: <Chart type data x series stacked unit title/> and <Stats items/>.
-window.playground: state/save/onState (small shared UI state), db.collection(name).find({where, order: "field" or "-field", limit})/get/insert/update(id, data, {rev})/patch(id, fields)/remove/count/subscribe, fetch(url, {method, headers, body, auth: "<secret name>"}) through Studio for approved public hosts (a secret only over https, to the hosts approved when the user stored it), expose(actions) for minis_live do, emit(name, data), send(label, data) to the thread's composer, bb.threads.list(), bb.studio.list({query, kind}), bb.open(target). A record is {id, rev, createdAt, updatedAt, createdBy, data}.`;
+window.playground: state/save/onState (small shared UI state), db.collection(name).find({where, order: "field" or "-field", limit})/get/insert/update(id, data, {rev})/patch(id, fields)/remove/count/subscribe, fetch(url, {method, headers, body, auth: "<secret name>"}) through Studio for approved public hosts (a secret only over https, to the hosts approved when the user stored it), expose(actions) for apps_live op do, emit(name, data), send(label, data) to the thread's composer, bb.threads.list(), bb.studio.list({query, kind}), bb.open(target). A record is {id, rev, createdAt, updatedAt, createdBy, data}.`;
 
 /** Registers mini apps' RPC, HTTP routes, agent tools and mention provider on Studio. Studio has run the migrations. */
 export function registerMinis(
@@ -315,7 +315,7 @@ export function registerMinis(
     const copy = [...open(id).entries()]
       .filter(([, session]) => session.actions.includes(action))
       .sort(([, a], [, b]) => b.touched - a.touched || b.seen - a.seen)[0];
-    if (!copy) throw new Error(open(id).size ? `No open copy exposes "${action}". See its actions with minis_live op actions.` : "The mini app isn't open anywhere. Ask the user to open it, then try again.");
+    if (!copy) throw new Error(open(id).size ? `No open copy exposes "${action}". See its actions with apps_live op actions.` : "The mini app isn't open anywhere. Ask the user to open it, then try again.");
     const [clientId] = copy;
     const commandId = randomUUID();
     store.log(id, "command", action, args, "agent");
@@ -650,7 +650,7 @@ export function registerMinis(
 
   bb.agents.registerTool({
     name: "minis_update",
-    description: "Change a mini app's source: pass the files to add or replace, and paths to delete. The rest stay. It compiles first; on an error nothing changes. Open copies reload; records and state stay. Read it with minis_read first: the user may have edited it.",
+    description: "Change a mini app's source: pass the files to add or replace, and paths to delete. The rest stay. It compiles first; on an error nothing changes. Open copies reload; records and state stay. Read it with apps_read first: the user may have edited it.",
     parameters: z.object({
       miniId: z.string().min(1).max(100),
       files: filesParam.optional(),
@@ -704,7 +704,7 @@ export function registerMinis(
     parameters: z.object({}),
     execute() {
       const rows = store.list();
-      if (!rows.length) return "No mini apps yet. Make one with minis_create.";
+      if (!rows.length) return 'No mini apps yet. Make one with apps_create type "mini".';
       return rows.map((row) => `- ${link(row)} (id ${row.id}) · ${store.collections(row.id).reduce((sum, each) => sum + each.count, 0)} records · updated ${new Date(row.updated_at).toISOString()}`).join("\n");
     },
   });
@@ -818,7 +818,7 @@ export function registerMinis(
       const row = store.get(itemId);
       if (!row) throw new Error(`Mini app ${itemId} not found`);
       const mini = view(row);
-      return { context: `The mini app ${link(row)} (id ${row.id}): ${mini.manifest?.description ?? "no description"}. Files: ${Object.keys(mini.files).join(", ")}. Collections: ${mini.collections.map((each) => `${each.name} (${each.count})`).join(", ") || "none"}. Read it with minis_read, change it with minis_update and minis_data, drive it with minis_live.` };
+      return { context: `The mini app ${link(row)} (id ${row.id}): ${mini.manifest?.description ?? "no description"}. Files: ${Object.keys(mini.files).join(", ")}. Collections: ${mini.collections.map((each) => `${each.name} (${each.count})`).join(", ") || "none"}. Read it with apps_read, change it with minis_update and minis_data, drive it with apps_live.` };
     },
   }));
 
@@ -890,4 +890,4 @@ export function registerMinis(
 
 /** Every session's instructions while mini apps are on. */
 export const MINI_INSTRUCTIONS = `${MINIS_DOC}
-When the user wants something to interact with (a tracker, board, calculator, form, poll, small tool or a visualization to play with), or data they'll come back to, make a Studio mini app with minis_create and show it with ::mini{id="mini_…"} on its own line in your reply, rather than a playground or a one-off HTML file. Embed one in a page with an embed block {"kind":"mini","target":"mini_…"}. Change it with minis_update (it compiles before saving), its data with minis_data, and drive an open copy with minis_live.`;
+When the user wants something to interact with (a tracker, board, calculator, form, poll, small tool or a visualization to play with), or data they'll come back to, make a Studio mini app with apps_create (type "mini") and show it with ::mini{id="mini_…"} on its own line in your reply, rather than a playground or a one-off HTML file. Embed one in a page with an embed block {"kind":"mini","target":"mini_…"}. Change it with minis_update (it compiles before saving), its data with minis_data, and drive an open copy with apps_live.`;

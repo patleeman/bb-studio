@@ -1,13 +1,13 @@
-// Agent tools by family (src/item-model.ts). Every type keeps the tools it
-// had (`design_*`, `artifacts_*`, `minis_*`, `whiteboard_*`),
-// with the same parameters. The family names sit on top and run those same
-// handlers:
+// Agent tools by family (src/item-model.ts). Each type keeps its own list,
+// read and create handlers (`design_*`, `artifacts_*`, `minis_*`,
+// `whiteboard_*`) in the ToolBook, but Studio doesn't give them to sessions
+// (INTERNAL_ONLY_TOOLS in server.ts). Agents use the family tools, which run
+// those handlers:
 // - pages_list, pages_read and pages_create also take a design or a
 //   whiteboard: `type` on list and create, the item's id on read.
-// - apps_list, apps_read and apps_create cover mini apps and artifacts, and
-//   are the documented ones; minis_* and artifacts_* list, read and create
-//   are their aliases, still registered and given to sessions.
-// Each older tool's description says which family tool does the same.
+// - apps_list, apps_read, apps_create and apps_live cover mini apps and
+//   artifacts.
+// A handler's errors name the family tool the agent called, not the handler.
 import { z } from "zod";
 import type { IndexedItem, IndexListOptions } from "./item-index";
 import { familyHref, itemType, typeOfId, type ItemType } from "./item-model";
@@ -34,12 +34,15 @@ export class ToolBook {
     return this.tools.get(name) ?? null;
   }
 
-  /** Runs a tool as BB would: its own parameters parse the input, then its handler runs. */
-  async run(name: string, input: unknown, ctx: unknown): Promise<unknown> {
+  /**
+   * Runs a tool as BB would: its own parameters parse the input, then its
+   * handler runs. `as` is the tool the agent called, which errors name.
+   */
+  async run(name: string, input: unknown, ctx: unknown, as = name): Promise<unknown> {
     const tool = this.tools.get(name);
-    if (!tool) return fail(`${name} isn't available.`);
+    if (!tool) return fail(`${as} isn't available.`);
     const parsed = tool.parameters.safeParse(input);
-    if (!parsed.success) return fail(`${name} can't take that: ${parsed.error.issues.map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`).join("; ")}`);
+    if (!parsed.success) return fail(`${as} can't take that: ${parsed.error.issues.map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`).join("; ")}`);
     return await tool.execute(parsed.data as never, ctx as never);
   }
 }
@@ -72,7 +75,7 @@ const offMessage = (type: Exclude<ItemType, "doc">) => fail(`${TYPE_TOOLS[type].
 export function familyTool<T extends AgentTool>(tool: T, deps: FamilyToolDeps): T {
   const own = tool.execute as (input: Record<string, unknown>, ctx: unknown) => unknown;
   const viaType = (type: "design" | "whiteboard", action: "list" | "read" | "create", input: unknown, ctx: unknown) =>
-    deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type][action], input, ctx) : offMessage(type);
+    deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type][action], input, ctx, `pages_${action}`) : offMessage(type);
   if (tool.name === "pages_list") {
     return {
       ...tool,
@@ -138,7 +141,7 @@ export function appTools(deps: AppToolDeps): AgentTool[] {
       parameters: z.object({ type: typeParam.optional(), query: z.string().max(200).optional().describe("Words a title must contain") }),
       execute: (async ({ type, query }: { type?: (typeof APP_TYPES)[number]; query?: string }, ctx: ToolContext) => {
         const needle = query?.trim().toLowerCase();
-        if (type && !needle) return deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type].list, {}, ctx) : offMessage(type);
+        if (type && !needle) return deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type].list, {}, ctx, "apps_list") : offMessage(type);
         const items = deps.index.list({ family: "app", ...(type ? { type } : {}), limit: 500 })
           .filter((item) => deps.typeOn(item.type) && (!needle || item.title.toLowerCase().includes(needle)));
         if (!items.length) return needle ? `No apps match "${query}".` : "No apps yet. Make one with apps_create.";
@@ -153,7 +156,7 @@ export function appTools(deps: AppToolDeps): AgentTool[] {
         // The index knows every app; an id it doesn't have yet is read from its prefix.
         const type = deps.index.get(id.trim())?.type ?? typeOfId(id.trim())?.type;
         if (type !== "mini" && type !== "artifact") return fail(`No app with id ${id}. apps_list shows the ids.`);
-        return deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type].read, { [TYPE_TOOLS[type].idParam]: id.trim() }, ctx) : offMessage(type);
+        return deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type].read, { [TYPE_TOOLS[type].idParam]: id.trim() }, ctx, "apps_read") : offMessage(type);
       }) as never,
     },
     {
@@ -161,7 +164,7 @@ export function appTools(deps: AppToolDeps): AgentTool[] {
       description: 'Create a Studio app. type "mini": {name, files?, fromArtifactId?, note?} (see minis skill). type "artifact": {title, path?, content?, name?, description?, artifactId?} (see artifacts skill).',
       parameters: z.object({ type: typeParam, input: z.record(z.string(), z.unknown()).describe("Input fields for mini or artifact") }),
       execute: (async ({ type, input }: { type: (typeof APP_TYPES)[number]; input: Record<string, unknown> }, ctx: ToolContext) =>
-        deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type].create, input, ctx) : offMessage(type)) as never,
+        deps.typeOn(type) ? deps.book.run(TYPE_TOOLS[type].create, input, ctx, `apps_create type "${type}" input`) : offMessage(type)) as never,
     },
     {
       name: "apps_live",
@@ -180,7 +183,7 @@ export function appTools(deps: AppToolDeps): AgentTool[] {
         const type = deps.index.get(trimmed)?.type ?? typeOfId(trimmed)?.type;
         if (type !== "mini" && type !== "artifact") return fail(`No app with id ${id}. apps_list shows the ids.`);
         if (!deps.typeOn(type)) return offMessage(type);
-        return deps.book.run(TYPE_TOOLS[type].live!, { [TYPE_TOOLS[type].idParam]: trimmed, ...rest }, ctx);
+        return deps.book.run(TYPE_TOOLS[type].live!, { [TYPE_TOOLS[type].idParam]: trimmed, ...rest }, ctx, "apps_live");
       }) as never,
     },
   ];

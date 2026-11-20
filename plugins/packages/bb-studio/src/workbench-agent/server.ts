@@ -1,5 +1,5 @@
 // The workbench tools on the server: workbench_list, workbench_open,
-// workbench_close, workbench_focus and workbench_arrange act on the calling
+// workbench_tab (close, focus, pop_out) and workbench_arrange act on the calling
 // conversation's workbench. The workbench lives in the app, so each call is
 // published on WORKBENCH_CHANNEL; the window showing that conversation claims
 // it, runs it (exec.ts) and replies (contract.ts). No claim within CLAIM_MS

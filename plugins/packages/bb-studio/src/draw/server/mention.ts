@@ -78,7 +78,7 @@ export function mentionContext(row: DrawingRowLike): string {
     head.push(`Scene data (JSON):\n${cleanScene}`);
   } else {
     head.push(
-      `Scene data is ${cleanScene.length} bytes — too large to inline. Use the bb studio whiteboards show <id> command or the whiteboard_get tool to read it.`,
+      `Scene data is ${cleanScene.length} bytes — too large to inline. Use the bb studio whiteboards show <id> command or pages_read with its id to read it.`,
     );
   }
   return head.join("\n\n");

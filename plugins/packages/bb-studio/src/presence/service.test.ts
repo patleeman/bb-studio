@@ -114,7 +114,7 @@ describe("the presence service", () => {
     expect(await service.apply({ botId: "home", form: "klein" })).toEqual({ ok: true, bot: { id: "home", name: "Home" }, presence: { form: "klein", color: { source: "custom", hex: "#ffaa00" }, motion: 0.5 } });
     expect(await service.apply({ botId: "home", color: { source: "theme" }, motion: 2 })).toMatchObject({ ok: true, presence: { form: "klein", color: { source: "theme" }, motion: 2 } });
     expect(bots[1]!.presence.form).toBe("klein");
-    expect(await service.apply({ botId: "home", form: "nope" })).toEqual({ ok: false, reasons: ["No presence nope. presence_list lists them."] });
+    expect(await service.apply({ botId: "home", form: "nope" })).toEqual({ ok: false, reasons: ["No presence nope. presence op \"list\" lists them."] });
     expect(await service.apply({ botId: "ghost", form: "orb" })).toEqual({ ok: false, reasons: ["No Bot ghost."] });
     expect((await service.apply({ botId: "home", motion: 5 })).ok).toBe(false);
     expect(setPresence).toHaveBeenCalledTimes(2);
@@ -124,7 +124,7 @@ describe("the presence service", () => {
     const { service } = setup();
     await service.create(crane(), null);
     await service.apply({ botId: "cos", form: "crane" });
-    expect(service.remove("crane")).toEqual({ ok: false, reasons: ["crane is in use by Chief of Staff. Apply another presence to that Bot first (presence_apply)."] });
+    expect(service.remove("crane")).toEqual({ ok: false, reasons: ["crane is in use by Chief of Staff. Apply another presence to that Bot first (presence op \"apply\")."] });
     await service.apply({ botId: "cos", form: "tesseract" });
     expect(service.remove("crane")).toEqual({ ok: true, id: "crane" });
     expect(service.remove("crane").ok).toBe(false);
@@ -174,8 +174,8 @@ describe("the presence tools", () => {
     expect(await run.execute({ op: "update", id: "tesseract", name: "Cube" }, {})).toContain("built-in form");
   });
 
-  it("the picker's Create field asks the Bot to call presence_create", () => {
-    expect(presenceAskText("  a lava lamp ")).toBe("Make a presence (my living icon) with presence_create from this description, then put it on with presence_apply: a lava lamp");
+  it("the picker's Create field asks the Bot to call presence op create", () => {
+    expect(presenceAskText("  a lava lamp ")).toBe('Make a presence (my living icon) with presence op "create" from this description, then put it on with presence op "apply": a lava lamp');
   });
 });
 

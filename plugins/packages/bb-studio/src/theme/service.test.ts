@@ -97,7 +97,7 @@ describe("theme tools", () => {
     const run = tool("theme");
     expect(await run.execute({ op: "create", theme: { ...ember(), id: "grid" } }, {})).toContain("- grid is a built-in theme. Pick another id.");
     await service.create(ember(), null);
-    expect(await run.execute({ op: "create", theme: ember() }, {})).toContain("- A theme ember exists. theme_update changes it");
+    expect(await run.execute({ op: "create", theme: ember() }, {})).toContain("- A theme ember exists. theme op \"update\" changes it");
   });
 
   it("op update merges a partial change and re-runs the checks; a failing change leaves the theme as it was", async () => {
@@ -135,7 +135,7 @@ describe("theme tools", () => {
     expect(bots[0]!.appearance).toMatchObject({ intensity: 0.3, motion: 0.9, effects: { workers: false } });
     expect(await run.execute({ op: "apply", themeId: null }, {})).toBe("Chief of Staff has no theme now.");
     expect(bots[0]!.appearance).toBeNull();
-    expect(await run.execute({ op: "apply", themeId: "nope" }, {})).toBe("Not applied.\n- No theme nope. theme_list lists them.");
+    expect(await run.execute({ op: "apply", themeId: "nope" }, {})).toBe("Not applied.\n- No theme nope. theme op \"list\" lists them.");
     expect(await run.execute({ op: "apply", themeId: "grid", bot: "Lab" }, {})).toBe("No Bot Lab.");
   });
 
@@ -145,7 +145,7 @@ describe("theme tools", () => {
     await service.create(ember(), null);
     await run.execute({ op: "apply", themeId: "ember", bot: "cos" }, {});
     expect(await run.execute({ op: "delete", id: "grid" }, {})).toBe("Not deleted.\n- grid is a built-in theme and can't be deleted.");
-    expect(await run.execute({ op: "delete", id: "ember" }, {})).toBe("Not deleted.\n- ember is in use by Chief of Staff. Apply another theme to that Bot first (theme_apply).");
+    expect(await run.execute({ op: "delete", id: "ember" }, {})).toBe("Not deleted.\n- ember is in use by Chief of Staff. Apply another theme to that Bot first (theme op \"apply\").");
     expect(service.get("ember")).not.toBeNull();
     await run.execute({ op: "apply", themeId: "nord", bot: "cos" }, {});
     expect(await run.execute({ op: "delete", id: "ember" }, {})).toBe("Deleted ember.");

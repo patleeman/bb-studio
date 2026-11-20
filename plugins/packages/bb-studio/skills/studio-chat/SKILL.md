@@ -13,7 +13,7 @@ into a short note for you:
 
 - which item it is: kind, title, id, plugin and link;
 - which tools read and change it (for example `pages_read` / `pages_edit`,
-  or `whiteboard_get` / `whiteboard_update`).
+  or `pages_read` / `whiteboard_update` for a whiteboard).
 
 The note is a pointer, not the content. Read the item with those tools
 before you answer about it, and read it again after the user says they

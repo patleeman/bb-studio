@@ -4,6 +4,13 @@ An audit, 2026-11-01. Nothing has been removed yet. This lists every
 standalone-Drawings piece still in Studio and iOS, with a recommendation for
 each.
 
+## Status (later): the agent tools changed again
+
+The `excalidraw_*` and `whiteboard_list|get|create` tools named below are no
+longer given to agents. Agents list, read and create whiteboards with
+`pages_list`, `pages_read` and `pages_create` (`type: "whiteboard"`), and edit
+one with `whiteboard_update`. The tables below are the audit as it was.
+
 ## Status (2026-11-06): one concept, Whiteboards
 
 The user asked for one concept, and approved a follow-up plan that reverses

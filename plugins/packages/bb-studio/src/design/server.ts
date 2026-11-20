@@ -44,7 +44,7 @@ export const answersSchema = z.record(z.string().max(40), z.union([z.string().ma
 const MAX_SCREEN_CHARS = 400_000;
 /** A style's CSS: tokens and base rules, not whole screens. */
 const MAX_STYLE_CSS = 40_000;
-/** Above this, design_read lists screens instead of inlining their HTML. */
+/** Above this, reading a design (pages_read) lists screens instead of inlining their HTML. */
 const MAX_READ_CHARS = 120_000;
 
 export const DESIGNS_USAGE = [
@@ -259,7 +259,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
     return [
       `Design "${displayName(view)}" (id ${view.id}, link ${designHref(view.id)}).`,
       rounds.length ? rounds.join("\n\n") : "It has no screens yet.",
-      "Read its HTML with design_read before changing it.",
+      "Read its HTML with pages_read before changing it.",
     ].join("\n\n");
   }
 
@@ -313,7 +313,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
     parameters: z.object({}),
     execute() {
       const rows = store.list({ limit: 100 });
-      if (!rows.length) return "No designs yet. Use design_create to make one.";
+      if (!rows.length) return 'No designs yet. Use pages_create type "design" to make one.';
       return `Designs:\n${rows.map((row) => `- ${displayName(row)} (id ${row.id}): ${store.screens(row.id).length} screen(s), updated ${new Date(row.updated_at).toISOString()}, link ${designHref(row.id)}`).join("\n")}`;
     },
   });
@@ -419,9 +419,9 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
       const row = store.get(designId);
       if (!row) return notFound(designId);
       const screen = store.screen(designId, screenId);
-      if (!screen) return fail(`Screen ${screenId} not found in "${displayName(row)}". Read the design with design_read.`);
+      if (!screen) return fail(`Screen ${screenId} not found in "${displayName(row)}". Read the design with pages_read.`);
       const first = screen.html.indexOf(find);
-      if (first < 0) return fail(`The snippet isn't in screen ${screenId}. Read it again with design_read; the user or another edit may have changed it.`);
+      if (first < 0) return fail(`The snippet isn't in screen ${screenId}. Read it again with pages_read; the user or another edit may have changed it.`);
       if (screen.html.indexOf(find, first + 1) >= 0) return fail("The snippet appears more than once. Include more surrounding markup so it matches one place.");
       const html = screen.html.slice(0, first) + replace + screen.html.slice(first + find.length);
       if (html.length > MAX_SCREEN_CHARS) return fail(`The screen would be over ${MAX_SCREEN_CHARS} characters.`);

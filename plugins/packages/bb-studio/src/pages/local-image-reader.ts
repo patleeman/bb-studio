@@ -1,4 +1,4 @@
-// Reads a page's local images through a thread, with the rules artifacts_save
+// Reads a page's local images through a thread, with the rules saving an artifact
 // uses: only files inside the thread's workspace or thread storage, read with
 // that root set so the host refuses symlinks that lead out of it.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";

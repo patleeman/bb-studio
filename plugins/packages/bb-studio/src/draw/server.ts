@@ -6,7 +6,7 @@ import type { StudioServices } from "../services";
 // (src/draw/server/store.ts). The app edits them with the real
 // @excalidraw/excalidraw component, loaded only when a drawing opens, and
 // autosaves through the `drawings.*` RPCs. Agents read and edit the live
-// scene with the excalidraw_* tools; writes from either side go through the
+// scene with pages_read and whiteboard_update; writes from either side go through the
 // same element-level merge, so both survive.
 //
 // This was the Draw plugin (id `excalidraw`). Its items keep that id as their
@@ -122,7 +122,7 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
     return { row, page };
   }
 
-  /** A new page holding one tall whiteboard: New → Whiteboard, or whiteboard_create without a page. */
+  /** A new page holding one tall whiteboard: New → Whiteboard, or pages_create type "whiteboard" without a pageId. */
   function createWhiteboardPage(input: { projectId: string | null; title: string; name: string; by: Writer }): { row: DrawingRow; page: WhiteboardPage } {
     const target = needPages();
     const row = create(input.name, input.by, input.projectId);
@@ -292,14 +292,14 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
 
   // ---------------------------------------------------------------------
   // Agent tools — the "multiplayer" path: while the user has a whiteboard
-  // open, the agent reads the live scene (whiteboard_get), edits it
+  // open, the agent reads the live scene (pages_read on its drw_ id), edits it
   // (whiteboard_update), and the open editor and the page's whiteboard apply
   // the change live (realtime + polling sync). Writes go through the same
   // element-level merge as editor autosaves, so both writers' edits survive.
   //
-  // Each tool is also registered under its old excalidraw_* name, taking the
-  // old `drawingId`, so automations, saved prompts and skills keep working.
-  // The aliases go after two releases (see TOOL_ALIASES).
+  // whiteboard_list, whiteboard_get and whiteboard_create are handlers that
+  // pages_list, pages_read and pages_create run (src/family-tools.ts); Studio
+  // doesn't give them to sessions. whiteboard_update is the agent's own tool.
   // ---------------------------------------------------------------------
 
   const excalidrawElementSchema = z.object({ id: z.string().min(1), type: z.string().min(1) }).passthrough();
@@ -309,7 +309,7 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
 
   function listWhiteboards(): ToolResult {
     const rows = store.list();
-    if (!rows.length) return "No whiteboards yet. Use whiteboard_create to add one to a page, or to make a whiteboard page.";
+    if (!rows.length) return 'No whiteboards yet. Use pages_create type "whiteboard" to add one to a page (pageId), or to make a whiteboard page.';
     const embeddings = pages?.embeddings() ?? new Map<string, WhiteboardPage[]>();
     const lines = rows.map((r) => {
       const m = toMeta(r);

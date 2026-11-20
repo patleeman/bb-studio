@@ -36,7 +36,7 @@ export async function findCardMessage(read: TimelineReader, card: Pick<WorkCard,
 /** Work card agent tools are unified into task_create(card: true), task_update and task_get. */
 export const WORK_TOOLS: readonly string[] = [];
 
-export const CREATE_DESCRIPTION = "Start a live work card for one piece of work (a worker's or lead's job, a release, a task in progress). A card is how a task is drawn in chat: with taskId it draws that task, and a worker card for a worker thread that already has a task draws that task instead of making a second one. It returns a ::work{id=\"…\"} line: post it ONCE, on its own line, in the conversation where the user follows the work. The card stays put and redraws in place; it also shows in that conversation's In flight list above the composer. From then on report progress with work_card_update instead of posting status messages. Pass the card id to a worker you start so it can update the card itself. Link its thread with a bare @thread:thr_… mention or [text](/threads/thr_…), never [text](@thread:thr_…). A worker card with workerThreadId gives that thread the card's title, so both carry one name.";
+export const CREATE_DESCRIPTION = "Start a live work card for one piece of work (a worker's or lead's job, a release, a task in progress). A card is how a task is drawn in chat: with taskId it draws that task, and a worker card for a worker thread that already has a task draws that task instead of making a second one. It returns a ::work{id=\"…\"} line: post it ONCE, on its own line, in the conversation where the user follows the work. The card stays put and redraws in place; it also shows in that conversation's In flight list above the composer. From then on report progress with task_update instead of posting status messages. Pass the card id to a worker you start so it can update the card itself. Link its thread with a bare @thread:thr_… mention or [text](/threads/thr_…), never [text](@thread:thr_…). A worker card with workerThreadId gives that thread the card's title, so both carry one name.";
 export const UPDATE_DESCRIPTION = "Change a work card in place: state (running, waiting, needs-you, done, failed), step (e.g. \"3/5 Tests\"), line (the latest one-liner) and needs (what the user must do; with state needs-you). Use it for progress instead of posting a new message. A finished card (done or failed) leaves the In flight list after a day. A worker card still running when its worker thread ends or is archived shows as ended without a final update until the next update.";
 
 export function endsCard(card: WorkCard, thread: WorkerThread): boolean {
@@ -169,7 +169,7 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
       if (!threadId) return "Pass threadId: the conversation the card goes in.";
       const made = create({ ...input, threadId });
       const { card, directive } = made;
-      if ("posted" in made) return JSON.stringify({ id: card.id, directive, note: `This task already has its card in thread ${made.posted}; don't post it again. Update it with work_card_update or task_update.` });
+      if ("posted" in made) return JSON.stringify({ id: card.id, directive, note: `This task already has its card in thread ${made.posted}; don't post it again. Update it with task_update.` });
       return JSON.stringify({ id: card.id, directive, post: `Post this line once, on its own line, in thread ${threadId}: ${directive}` });
     },
   });

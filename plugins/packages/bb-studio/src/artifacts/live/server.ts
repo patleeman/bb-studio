@@ -3,7 +3,7 @@
 // An HTML artifact's page can save shared state, log events, expose actions
 // and send a take to the agent. State is kept per artifact and pushed to
 // every open copy over realtime. An agent reads and sets the state, watches
-// the log, and runs the page's actions, through `artifacts_live` or
+// the log, and runs the page's actions, through `apps_live` or
 // `bb studio artifacts state|watch|actions|do`. An action runs in the open
 // copy the user touched last; it fails when no copy is open.
 //
