@@ -1,3 +1,4 @@
+import { toStudioGuide } from "@bb/config/cli-command";
 import { Command } from "commander";
 import { createGuideArea } from "@bb/sdk/node";
 import { action, CliUsageError } from "../action.js";
@@ -118,7 +119,7 @@ export function registerGuideCommand(program: Command): void {
             }
             return;
           }
-          const rendered = createGuideArea().render({ chapter });
+          const rendered = toStudioGuide(createGuideArea().render({ chapter }));
           if (chapter) {
             if (outputJson(opts, rendered)) return;
             console.log(rendered.content);
