@@ -542,7 +542,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     } catch (error) {
       // The Bot's default model can't start (its provider signed out, or the model gone): the project's default instead.
       if (!preset) throw error;
-      bb.log.warn(`${bot.name}'s default model ${preset.providerId}/${preset.model} couldn't start a conversation (${String((error as Error)?.message ?? error).slice(0, 200)}); using the project's default.`);
+      deps.log(`${bot.name}'s default model ${preset.providerId}/${preset.model} couldn't start a conversation (${String((error as Error)?.message ?? error).slice(0, 200)}); using the project's default.`);
       thread = await bb.sdk.threads.spawn(request as never) as typeof thread;
     }
     store.recordConversation(thread.id, bot.id);
