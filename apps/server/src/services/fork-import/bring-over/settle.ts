@@ -13,6 +13,24 @@ export const BROUGHT_OVER_OPERATION = "brought_over_from_bb";
 export const BROUGHT_OVER_MESSAGE =
   "Brought over from bb. Anything that was running there was not resumed here.";
 
+/** Where a brought-over thread works now. */
+export type BroughtOverWorkspace =
+  | { kind: "same" }
+  | { kind: "none" }
+  | { kind: "project-folder"; path: string | null }
+  | { kind: "missing" };
+
+export function broughtOverMessage(workspace: BroughtOverWorkspace): string {
+  switch (workspace.kind) {
+    case "project-folder":
+      return `${BROUGHT_OVER_MESSAGE} Its workspace in bb (a worktree or a folder bb manages) stays in bb; here it works in the project's folder${workspace.path ? ` ${workspace.path}` : ""}.`;
+    case "missing":
+      return `${BROUGHT_OVER_MESSAGE} Workspace not on this Mac: its workspace stays in bb and this project has no folder here, so it can't run until you add the project's folder on this Mac and bring it over again. You can still read, archive or delete it.`;
+    default:
+      return BROUGHT_OVER_MESSAGE;
+  }
+}
+
 interface OpenTaskRow {
   data: string;
   environment_id: string | null;
@@ -69,7 +87,12 @@ function parseTask(row: OpenTaskRow) {
 
 export function settleBroughtOverThread(
   target: Sqlite,
-  args: { threadId: string; environmentId: string | null; now: number },
+  args: {
+    threadId: string;
+    environmentId: string | null;
+    workspace?: BroughtOverWorkspace;
+    now: number;
+  },
 ): void {
   const columns = new Set(
     target
@@ -137,7 +160,7 @@ export function settleBroughtOverThread(
       operation: BROUGHT_OVER_OPERATION,
       operationId: createEventId(),
       status: "completed",
-      message: BROUGHT_OVER_MESSAGE,
+      message: broughtOverMessage(args.workspace ?? { kind: "same" }),
     }),
   });
 }

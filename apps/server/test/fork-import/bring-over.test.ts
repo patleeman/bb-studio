@@ -2402,3 +2402,210 @@ describe("bring-over API and review fixes", () => {
     }
   });
 });
+
+describe("a brought-over thread whose workspace stays in bb", () => {
+  async function worktreeThread(f: Fixture, projectFolder: string) {
+    const bb = new Database(join(f.source, "bb.db"));
+    const env = bb
+      .prepare("SELECT * FROM environments WHERE id = ?")
+      .get(f.ids.env1) as Record<string, unknown>;
+    const managed = {
+      ...env,
+      id: "env_worktree",
+      project_id: f.ids.p2,
+      path: join(
+        f.source,
+        "plugins",
+        "environment-git-worktree",
+        "host-data",
+        "worktrees",
+        "k1",
+        "hive",
+      ),
+      is_worktree: 1,
+      provider_owns_path: 1,
+      environment_provider_id: "git-worktree",
+      environment_provider_plugin_id: "environment-git-worktree",
+      owner_thread_id: f.ids.t3,
+    };
+    const names = Object.keys(managed);
+    bb.prepare(
+      `INSERT INTO environments (${names.join(", ")}) VALUES (${names.map((name) => `@${name}`).join(", ")})`,
+    ).run(managed);
+    bb.prepare(
+      "UPDATE threads SET environment_id = 'env_worktree' WHERE id = ?",
+    ).run(f.ids.t3);
+    bb.prepare(
+      "UPDATE events SET environment_id = 'env_worktree' WHERE thread_id = ?",
+    ).run(f.ids.t3);
+    bb.prepare("UPDATE project_sources SET path = ? WHERE project_id = ?").run(
+      projectFolder,
+      f.ids.p2,
+    );
+    bb.close();
+    return takeSourceSnapshot({
+      dataDir: f.target,
+      sourceDataDir: f.source,
+      now: 9000,
+    });
+  }
+
+  const environmentOf = (f: Fixture) =>
+    (
+      f.db
+        .prepare("SELECT environment_id FROM threads WHERE id = ?")
+        .get(f.ids.t3) as { environment_id: string | null }
+    ).environment_id;
+
+  const broughtOverNote = (f: Fixture) =>
+    (
+      JSON.parse(
+        (
+          f.db
+            .prepare(
+              "SELECT data FROM events WHERE thread_id = ? AND type = 'system/operation' ORDER BY sequence DESC LIMIT 1",
+            )
+            .get(f.ids.t3) as { data: string }
+        ).data,
+      ) as { operation: string; message: string }
+    ).message;
+
+  it("works in the project's folder on this Mac, in an environment no provider owns", async () => {
+    const f = await fixture();
+    const folder = join(f.root, "code", "hive");
+    await mkdir(join(folder, ".git"), { recursive: true });
+    const snapshot = await worktreeThread(f, folder);
+
+    await run(
+      { ...f, snapshot },
+      { picks: [{ kind: "thread", id: f.ids.t3 }] },
+    );
+
+    const environmentId = environmentOf(f);
+    expect(environmentId).not.toBeNull();
+    expect(
+      f.db
+        .prepare(
+          "SELECT project_id, host_id, path, is_git_repo, is_worktree, provider_owns_path, environment_provider_id, owner_thread_id, status FROM environments WHERE id = ?",
+        )
+        .get(environmentId),
+    ).toEqual({
+      project_id: f.ids.p2,
+      host_id: "host_here",
+      path: folder,
+      is_git_repo: 1,
+      is_worktree: 0,
+      provider_owns_path: 0,
+      environment_provider_id: null,
+      owner_thread_id: null,
+      status: "ready",
+    });
+    expect(
+      count(
+        f.db,
+        "SELECT COUNT(*) AS n FROM environments WHERE path LIKE ?",
+        `${f.source}%`,
+      ),
+    ).toBe(0);
+    expect(
+      count(
+        f.db,
+        "SELECT COUNT(*) AS n FROM events WHERE thread_id = ? AND environment_id IS NOT NULL AND environment_id != ?",
+        f.ids.t3,
+        environmentId,
+      ),
+    ).toBe(0);
+    expect(broughtOverNote(f)).toContain(
+      `works in the project's folder ${folder}`,
+    );
+  });
+
+  it("reuses the environment BB Studio already has for that folder", async () => {
+    const f = await fixture();
+    const folder = join(f.root, "code", "hive");
+    await mkdir(folder, { recursive: true });
+    const snapshot = await worktreeThread(f, folder);
+    insertRow(f.db, "projects", {
+      id: f.ids.p2,
+      name: "hive",
+      deleted_at: null,
+    });
+    insertRow(f.db, "project_sources", {
+      id: "src_here",
+      project_id: f.ids.p2,
+      type: "local_path",
+      owns_path: 0,
+      host_id: "host_here",
+      path: folder,
+      is_default: 1,
+    });
+    insertRow(f.db, "environments", {
+      id: "env_here",
+      project_id: f.ids.p2,
+      host_id: "host_here",
+      path: folder,
+      is_worktree: 0,
+      provider_owns_path: 0,
+      environment_provider_id: null,
+      owner_thread_id: null,
+      status: "ready",
+      created_at: 1,
+      updated_at: 1,
+    });
+
+    await run(
+      { ...f, snapshot },
+      { picks: [{ kind: "thread", id: f.ids.t3 }] },
+    );
+
+    expect(environmentOf(f)).toBe("env_here");
+    expect(count(f.db, "SELECT COUNT(*) AS n FROM environments")).toBe(1);
+  });
+
+  it("says the workspace is not on this Mac when the folder is missing or inside bb's data, and still archives and deletes", async () => {
+    for (const folderOf of [
+      (f: Fixture) => join(f.root, "code", "not-here"),
+      (f: Fixture) => join(f.source, "seed-workspaces", "hive"),
+    ]) {
+      const f = await fixture();
+      const folder = folderOf(f);
+      if (folder.startsWith(f.source)) await mkdir(folder, { recursive: true });
+      const snapshot = await worktreeThread(f, folder);
+
+      await run(
+        { ...f, snapshot },
+        { picks: [{ kind: "thread", id: f.ids.t3 }] },
+      );
+
+      expect(environmentOf(f)).toBeNull();
+      expect(count(f.db, "SELECT COUNT(*) AS n FROM environments")).toBe(0);
+      expect(broughtOverNote(f)).toContain("Workspace not on this Mac");
+    }
+  });
+
+  it("gives a thread brought over earlier with no workspace the project's folder when it is brought over again", async () => {
+    const f = await fixture();
+    const folder = join(f.root, "code", "hive");
+    const snapshot = await worktreeThread(f, folder);
+    await run(
+      { ...f, snapshot },
+      { picks: [{ kind: "thread", id: f.ids.t3 }] },
+    );
+    expect(environmentOf(f)).toBeNull();
+
+    await mkdir(folder, { recursive: true });
+    const again = await run(
+      { ...f, snapshot },
+      { picks: [{ kind: "project", id: f.ids.p2 }] },
+    );
+
+    expect(again.threadsImported).toBe(0);
+    const environmentId = environmentOf(f);
+    expect(environmentId).not.toBeNull();
+    expect(
+      f.db
+        .prepare("SELECT path FROM environments WHERE id = ?")
+        .get(environmentId),
+    ).toEqual({ path: folder });
+  });
+});
