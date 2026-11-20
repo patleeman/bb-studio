@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { withoutForkUiTokenHash } from "./fork-ui-token-env.js";
+import { guardStudioCliEnv } from "@bb/config/cli-command";
 import {
   hostToolchain,
   nodeNetworkArgs,
@@ -2786,6 +2787,7 @@ export async function runBundledCliCommand(
 export async function runBbCli(
   cliArgs: string[] = process.argv.slice(2),
 ): Promise<void> {
+  guardStudioCliEnv(process.env, homedir());
   const runtime = await resolveBbAppRuntimeState({
     entrypointUrl: import.meta.url,
     env: process.env,

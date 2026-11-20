@@ -1,3 +1,4 @@
+import { writeStudioCliAliases } from "../../../scripts/fork/studio-cli-aliases.mjs";
 import { chmod, copyFile, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -69,6 +70,7 @@ async function main() {
     resolve(packageRoot, "dist", "bb.cmd"),
     '@echo off\r\nnode "%~dp0bb" %*\r\n',
   );
+  await writeStudioCliAliases(resolve(packageRoot, "dist"));
 }
 
 void main().catch((error) => {
