@@ -3007,9 +3007,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   "drawn") with no **Revert**.
 - **Self-managed profile**: a Bot can change its own name, description
   (role), emoji, and drawn shape and color with `bot_profile_update`, from
-  its own thread only.
-  `bot_set` called from a Bot's threads counts as the Bot's edit too. Every
-  such edit lands in `bot_profile_changes`, an append-only table (triggers
+  its own thread or a thread it started; from any other thread the same tool
+  changes the user's Bot directly, when the user asks. Every Bot-made
+  edit lands in `bot_profile_changes`, an append-only table (triggers
   refuse updates and deletes): who, when, from which thread, the field, the
   old and the new value. Open Info's **Profile changes** link to see the list
   ("Changed by Dot · description: … → …") with **Revert**, which restores the

@@ -214,8 +214,8 @@ export function setupInput(goal: string): { type: "text"; text: string; mentions
 }
 
 /**
- * What a Bot may change about itself (bot_profile_update, and bot_set from
- * its thread). Every such edit is recorded in
+ * What a Bot may change about itself (bot_profile_update from its own thread
+ * or one it started). Every such edit is recorded in
  * bot_profile_changes, and the user can revert it.
  */
 export const SELF_EDITABLE = ["name", "role", "avatar", "shape", "color"] as const;
