@@ -811,7 +811,7 @@ describe("Rail", () => {
 
     expect(railLabels()).not.toContain("New chat here");
     fireEvent.keyDown(railButton("More"), { key: "Enter" });
-    await screen.findByRole("menuitem", { name: "Search threads" });
+    await screen.findByRole("menuitem", { name: "Search" });
     expect(
       screen.queryByRole("menuitem", { name: "New chat here" }),
     ).toBeNull();
@@ -822,7 +822,7 @@ describe("Rail", () => {
 
     fireEvent.keyDown(railButton("More"), { key: "Enter" });
     fireEvent.click(
-      await screen.findByRole("menuitem", { name: "Search threads" }),
+      await screen.findByRole("menuitem", { name: "Search" }),
     );
 
     expect(mocks.dispatch).toHaveBeenCalledWith("thread.search", null);
@@ -852,9 +852,9 @@ describe("Rail", () => {
 
   it.each([
     { name: "Docs", isCompactViewport: false },
-    { name: "Search threads", isCompactViewport: false },
+    { name: "Search", isCompactViewport: false },
     { name: "Docs", isCompactViewport: true },
-    { name: "Search threads", isCompactViewport: true },
+    { name: "Search", isCompactViewport: true },
   ])(
     "toggles $name visibility from its customization row (compact: $isCompactViewport) without activating it",
     async ({ name, isCompactViewport }) => {
@@ -914,11 +914,11 @@ describe("Rail", () => {
       "Settings",
     ]);
     fireEvent.click(
-      within(list).getByRole("checkbox", { name: /Search threads/u }),
+      within(list).getByRole("checkbox", { name: /Show Search in sidebar/u }),
     );
     expect(railLabels()).toEqual([
       "Home",
-      "Search threads",
+      "Search",
       "Plugins",
       "Docs",
       "More",
@@ -1021,7 +1021,7 @@ describe("Rail", () => {
         .getAllByRole("checkbox")
         .map((checkbox) => checkbox.getAttribute("aria-label")),
     ).toEqual([
-      "Show Search threads in sidebar",
+      "Show Search in sidebar",
       "Show Plugins in sidebar",
       "Show Skills in sidebar",
       "Show Docs in sidebar",
