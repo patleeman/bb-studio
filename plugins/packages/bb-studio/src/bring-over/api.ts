@@ -26,7 +26,9 @@ export interface BringOverState {
   settings?: BringOverSetting[];
   plugins?: BringOverPlugin[];
   job?: BringOverJob | null;
+  studioData?: BringOverStudioData;
 }
+export interface BringOverStudioData { inBb: boolean; offered: boolean; reason: string | null; bots: number; pages: number; tasks: number }
 export interface BringOverRequest {
   picks: { kind: "project" | "thread"; id: string }[];
   attachments: boolean;
@@ -105,6 +107,14 @@ export async function readGate(token: string, load: typeof fetch = fetch): Promi
   } catch {
     return null;
   }
+}
+
+export const bringOverStudioData = (token: string, load: typeof fetch = fetch) => send<{ threads: number; threadsHere: number; bots: number }>("/studio-data", gatedPost(token), load);
+
+/** "2 Bots · 14 pages · 6 tasks". */
+export function studioDataLine(data: BringOverStudioData): string {
+  const plural = (count: number, word: string) => `${String(count)} ${word}${count === 1 ? "" : "s"}`;
+  return [plural(data.bots, "Bot"), plural(data.pages, "page"), plural(data.tasks, "task")].join(" · ");
 }
 
 export const addOldPlugin = (id: string, token: string, load: typeof fetch = fetch) => send<{ id: string; data: boolean }>(`/plugins/${encodeURIComponent(id)}/add`, gatedPost(token), load);

@@ -27,6 +27,7 @@ const listing: BringOverState = {
     { id: "future-tool", version: null, source: "/src/future", sourceKind: "path", enabled: true, hasData: false, here: false, sourceMissing: false, needsNewer: ">=99.0.0" },
   ],
   job: null,
+  studioData: { inBb: true, offered: true, reason: null, bots: 2, pages: 14, tasks: 1 },
 };
 
 const job: BringOverJob = { id: "j", state: "running", threadsTotal: 40, threadsDone: 12, threadsImported: 9, threadsSkipped: 3, files: 0, settingsApplied: [], failures: [] };
@@ -201,6 +202,49 @@ describe("BringOverSection", () => {
     act(() => { [...row.querySelectorAll("button")].find((each) => each.textContent === "Add…")!.click(); });
     await act(async () => { [...row.querySelectorAll("button")].find((each) => each.textContent === "Add")!.click(); });
     expect($('[data-testid="bring-over-plugin-acme-tool"]')?.textContent).toContain("Added with its data");
+  });
+});
+
+describe("BB Studio data row", () => {
+  let root: Root;
+  let host: HTMLDivElement;
+  const $ = (selector: string) => host.querySelector<HTMLElement>(selector);
+  const button = (text: string) => [...host.querySelectorAll("button")].find((each) => each.textContent === text);
+  beforeEach(() => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    resetUiTokenForTests();
+    vi.stubGlobal("bbDesktop", { experimental_bringOverToken: async () => "token-from-the-app" });
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+  });
+  afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
+
+  it("asks before replacing, then brings it over", async () => {
+    const posts: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST") posts.push(url);
+      if (url.endsWith("/studio-data")) return new Response(JSON.stringify({ threads: 3, threadsHere: 0, bots: 2 }), { status: 200 });
+      return new Response(JSON.stringify(listing), { status: 200 });
+    }));
+    await act(async () => { root.render(<BringOverSection />); });
+    await act(async () => { await Promise.resolve(); });
+    expect($('[data-testid="bring-over-studio-data"]')?.textContent).toContain("2 Bots · 14 pages · 1 task");
+    act(() => { button("Bring over…")!.click(); });
+    expect(posts).toEqual([]);
+    expect($('[data-testid="bring-over-studio-data"]')?.textContent).toContain("Replaces this install's Assistant");
+    const row = $('[data-testid="bring-over-studio-data"]')!;
+    await act(async () => { [...row.querySelectorAll("button")].find((each) => each.textContent === "Bring over")!.click(); });
+    expect(posts).toEqual(["/api/v1/fork/bring-over/studio-data"]);
+    expect($('[data-testid="bring-over-studio-data"]')?.textContent).toContain("Brought over with 3 of its threads");
+  });
+
+  it("shows why when it is not offered", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...listing, studioData: { inBb: true, offered: false, reason: "BB Studio already has Bots, pages or tasks of its own", bots: 1, pages: 0, tasks: 0 } }), { status: 200 })));
+    await act(async () => { root.render(<BringOverSection />); });
+    await act(async () => { await Promise.resolve(); });
+    expect($('[data-testid="bring-over-studio-data"]')?.textContent).toContain("of its own");
+    expect(button("Bring over…")).toBeUndefined();
   });
 });
 

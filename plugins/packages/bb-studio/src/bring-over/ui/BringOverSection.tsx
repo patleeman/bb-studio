@@ -9,6 +9,9 @@ import { Button } from "../../kit/ui/index";
 import { Card, Row, SubHeading, Switch } from "../../settings/ui/controls";
 import {
   addOldPlugin,
+  bringOverStudioData,
+  studioDataLine,
+  type BringOverStudioData,
   cancelBringOver,
   currentJob,
   jobLine,
@@ -96,6 +99,48 @@ function ProjectRow({ project, picks, onChange }: { project: BringOverProject; p
         </ul>
       ) : null}
     </li>
+  );
+}
+
+function StudioDataRow({ data, token, onDone }: { data: BringOverStudioData; token: string | null; onDone(): void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+  const run = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await bringOverStudioData(token ?? "");
+      setDone(`Brought over with ${String(result.threads + result.threadsHere)} of its threads. Reload BB Studio to see bb's Bots.`);
+      onDone();
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+      setConfirming(false);
+    }
+  };
+  const description = (
+    <>
+      {studioDataLine(data)}
+      {!data.offered && data.reason ? <span className="block">{data.reason}</span> : null}
+      {confirming ? <span className="block text-foreground">Replaces this install's Assistant with bb's Bots, pages, memory and tasks. Studio restarts.</span> : null}
+      {error ? <span className="block text-destructive">{error}</span> : null}
+      {done ? <span className="block text-foreground">{done}</span> : null}
+    </>
+  );
+  return (
+    <Row label="BB Studio data (Bots, pages, memory, tasks)" description={description} testId="bring-over-studio-data">
+      {done ? <Button size="sm" variant="outline" onClick={() => window.location.reload()}>Reload</Button>
+        : !data.offered || token === null ? null
+        : confirming ? (
+          <span className="flex gap-2">
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirming(false)}>Cancel</Button>
+            <Button size="sm" disabled={busy} onClick={() => void run()}>{busy ? "Bringing over…" : "Bring over"}</Button>
+          </span>
+        ) : <Button size="sm" variant="outline" onClick={() => setConfirming(true)}>Bring over…</Button>}
+    </Row>
   );
 }
 
@@ -255,6 +300,12 @@ export function BringOverSection() {
               <Button disabled={nothingPicked || running || !allowed} onClick={() => { if (pickedSecrets.length > 0) setConfirmingSecrets(true); else void start(); }} data-testid="bring-over-start">Bring over</Button>
             </div>
           )}
+          {state.studioData?.inBb ? (
+            <>
+              <SubHeading>BB Studio data</SubHeading>
+              <Card><StudioDataRow data={state.studioData} token={token} onDone={() => {}} /></Card>
+            </>
+          ) : null}
           <SubHeading>Plugins from bb</SubHeading>
           <Card>
             {(state.plugins ?? []).length === 0 ? <p className="px-3 py-2 text-sm text-muted-foreground">No plugins to add</p>
