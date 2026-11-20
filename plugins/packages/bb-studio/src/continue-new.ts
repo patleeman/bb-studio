@@ -10,10 +10,10 @@ export const CONTINUE_TOOL = "conversation_continue_new";
 export const HANDOFF_MAX = 4_000;
 
 export const continueInput = z.object({
-  title: z.string().trim().min(1).max(120).describe("The new conversation's title: the topic, a few words"),
-  handoff: z.string().trim().min(1).max(HANDOFF_MAX).describe("Short markdown the new conversation starts from: decisions, open questions, links and cards that matter. Not the transcript."),
-  workCards: z.array(z.string().regex(WORK_ID)).max(12).optional().describe("Work cards (wc_…) of this conversation that belong to the topic; they move to the new conversation"),
-  openingMessage: z.string().trim().max(500).optional().describe("What the new conversation does first; default: a one-line recap and the next step"),
+  title: z.string().trim().min(1).max(120).describe("New conversation title"),
+  handoff: z.string().trim().min(1).max(HANDOFF_MAX).describe("Short markdown handoff (decisions, open questions, links)"),
+  workCards: z.array(z.string().regex(WORK_ID)).max(12).optional().describe("Task/card ids to move to the new conversation"),
+  openingMessage: z.string().trim().max(500).optional().describe("First step for the new conversation"),
 });
 export type ContinueInput = z.input<typeof continueInput>;
 
@@ -106,7 +106,7 @@ export async function continueInNew(deps: ContinueDeps, sourceThreadId: string, 
   return { threadId: made.id, projectId: made.projectId ?? thread.projectId, title: input.title, moved, skipped, post: continuedLines(made.id, input.title) };
 }
 
-export const CONTINUE_DESCRIPTION = "Continue a topic in a NEW conversation of yours, seeded with a short handoff you write (decisions, open questions, links, cards), not the transcript. Propose it first (\"Pick up the HUD in its own conversation?\") and call it only when the user agrees or asks. workCards move the topic's work cards there, out of this conversation's In flight list. It returns a `post` text: put it in your reply here, as given, on lines of its own.";
+export const CONTINUE_DESCRIPTION = "Continue a topic in a new conversation seeded with a short handoff (call only when the user agrees or asks). Post the returned `post` lines as given.";
 
 export function continueResult(result: ContinueResult): string {
   return JSON.stringify({

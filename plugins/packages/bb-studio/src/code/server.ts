@@ -378,8 +378,7 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
 
   bb.agents.registerTool({
     name: "code_show",
-    description:
-      "Point the user at code: their VS Code opens the file, scrolls to the lines, selects and highlights them. Use it when you refer to specific code, so they see what you mean. path: full, or relative to your working folder. Lines are 1-based.",
+    description: "Open a file in the user's VS Code and highlight 1-based lines (path full or relative to workspace).",
     parameters: z.object({
       path: z.string().trim().min(1).max(4096),
       startLine: z.number().int().min(1).optional(),
@@ -400,8 +399,7 @@ export function registerCode(bb: BbPluginApi, db: import("better-sqlite3").Datab
 
   bb.agents.registerTool({
     name: "code_edit",
-    description:
-      "Edit a file live in the user's VS Code: they watch the text typed in, it merges with their unsaved changes, and it's one undo step for them. Prefer it over writing the file when they have it open, and always for files with unsaved changes. Each edit replaces oldText, which must appear exactly once (include enough around it), with newText; an empty oldText appends. With no editor open, the edits go to the file on disk.",
+    description: "Edit a file live in VS Code (merges with unsaved changes; falls back to disk if closed). Each oldText must match once; empty oldText appends.",
     parameters: z.object({
       path: z.string().trim().min(1).max(4096),
       edits: z.array(editSchema).min(1).max(20),

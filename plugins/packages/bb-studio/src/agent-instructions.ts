@@ -20,7 +20,7 @@ export const APP_POINTER = 'An app is a saved output or an interactive tool with
 
 export const CONTINUE_POINTER = 'New topic? Offer a new conversation for it; call conversation_continue_new only when they agree or ask.';
 
-export const WORK_POINTER = 'For work that runs a while (a worker, a release, a long job), post one live work card: work_card_create gives a ::work{id="wc_…"} line to post once; report progress with work_card_update, not new status messages.';
+export const WORK_POINTER = 'For work that runs a while (a worker, a release, a long job), post one live work card: task_create with card: true gives a ::work{id="…"} line to post once; report progress with task_update, not new status messages.';
 
 /**
  * The end-of-reply line: the Next row (with which attributes are on and the

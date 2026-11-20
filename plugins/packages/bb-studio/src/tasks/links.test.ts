@@ -95,11 +95,11 @@ function setup(threads: ThreadFact[] = THREADS) {
 
 const ids = (rows: { id: string; under: string | null }[]) => rows.map((r) => (r.under ? `  ${r.id}` : r.id));
 
-it("adds task_check to the task tools and documents the spawn rule in task_create", () => {
+it("adds task_check to the task tools and documents worker task:<id> in task_create", () => {
   const { tools } = setup();
   expect(TASK_TOOLS).toContain("task_check");
   expect(tools.task_create!.name).toBe("task_create");
-  expect((tools.task_create as unknown as { description: string }).description).toMatch(/Every worker thread belongs to exactly one task.*task:<id>/);
+  expect((tools.task_create as unknown as { description: string }).description).toContain("task:<id>");
 });
 
 it("says what a waiting task waits on: the user, the outside, or what the agent names", async () => {

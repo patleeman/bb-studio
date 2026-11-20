@@ -23,7 +23,7 @@ import { z } from "zod";
 import { rpcContract, type artifactSchema, type candidateSchema } from "./contract";
 import { artifactBackupHandlers } from "./server/backup";
 import { contentHeaders, rangeResponse, utf8Prefix, withQuoteScript } from "./server/content";
-import { LIVE_TOOLS, LIVE_USAGE, registerLive } from "./live/server";
+import { LIVE_USAGE, registerLive } from "./live/server";
 import { withLiveScript } from "./live/shim";
 import { LiveStore } from "./live/store";
 import { importedFile } from "./server/import-file";
@@ -100,7 +100,7 @@ function toDto(artifact: ArtifactWithVersion): ArtifactDto {
 }
 
 
-export const ARTIFACT_TOOLS = ["artifacts_save", "artifacts_list", "artifacts_read", ...LIVE_TOOLS];
+export const ARTIFACT_TOOLS: readonly string[] = [];
 
 export interface BuiltinArtifacts {
   store: ArtifactStore;

@@ -133,12 +133,15 @@ describe("the presence service", () => {
 });
 
 describe("the presence tools", () => {
-  it("are presence_list, presence_create, presence_update, presence_apply and presence_delete", () => {
+  it("are presence_list, presence_create, presence_update, presence_apply and presence_delete", async () => {
     const { tools } = setup();
     expect(tools.map((tool) => tool.name)).toEqual([...PRESENCE_TOOLS]);
     const create = tools.find((tool) => tool.name === "presence_create")!;
-    expect(create.description).toContain("function draw(ctx, t, state, palette, size)");
-    expect(create.description).toContain('"id": "three-rings"');
+    expect(create.description).toContain("presences skill");
+    const { readFileSync } = await import("node:fs");
+    const skill = readFileSync(new URL("../../skills/presences/SKILL.md", import.meta.url), "utf8");
+    expect(skill).toContain("function draw(ctx, t, state, palette, size)");
+    expect(skill).toContain("ctx.ellipse");
   });
 
   it("create from a module, credit the Bot whose thread made it, then apply and delete", async () => {

@@ -116,38 +116,38 @@ export interface WorkbenchToolDeps {
   workspacePath(threadId: string, path: string): Promise<string>;
 }
 
-const force = z.boolean().optional().describe("Override the user's choice: reopen what they closed, or change what they set. Only when the user asked.");
-const tabKey = z.string().trim().min(1).max(500).describe("The tab's key, from workbench_list");
+const force = z.boolean().optional().describe("Override user choice when explicitly asked");
+const tabKey = z.string().trim().min(1).max(500).describe("Tab key from workbench_list");
 
 const studioKinds = TAB_KIND_REGISTRY.filter((entry) => entry.agentType && entry.owner !== "bb");
 const typesBy = (ref: TabKindEntry["ref"]) => studioKinds.filter((entry) => entry.ref === ref).map((entry) => entry.agentType).join(", ");
 const pane = z.union([z.literal(1), z.literal(2), z.literal("new"), z.literal("window")]).optional()
-  .describe(`Which workbench pane: 1 (left), 2 (right), or "new" for a second pane; or "window" for a window of its own, out of the workbench. Default: the pane in use. ${PANE_LIMITS} ${WINDOW_KINDS}`);
+  .describe('Pane 1 (left), 2 (right), "new", or "window"');
 
 /** workbench_open's input: `type` is every kind of the tab kinds registry (src/tab-kinds.ts) the agent may open. */
 const openInput = z.object({
-  type: z.enum(AGENT_TYPES as [string, ...string[]]).optional().describe("What to open; or give link instead"),
+  type: z.enum(AGENT_TYPES as [string, ...string[]]).optional().describe("Kind to open (or use link)"),
   link: z.string().trim().min(1).max(4096).optional()
-    .describe("A link instead of type and id: bb://<kind>/<id> (bb://page/pg_…, bb://conversation/thr_…), a BB address (/plugins/studio/studio/pages/pg_…, /threads/thr_…), a card directive (::page{id=\"pg_…\"}), a file:// URL, or an http(s) URL"),
+    .describe("Link instead of type+id (bb://…, /plugins/…, /threads/…, ::page{…}, file://, https://)"),
   id: z.string().trim().min(1).max(200).optional()
-    .describe(`${typesBy("thread")}: the thread id; ${typesBy("item")}: its id; bot: the Bot's id; ${studioKinds.filter((entry) => entry.ref === "bot" && entry.id !== "bot").map((entry) => entry.agentType).join(", ")}: the Bot's id, or leave out for the Bot on screen; workflow: the run's id (wfr_…)`),
-  path: z.string().trim().min(1).max(4096).optional().describe("file, diff: full, or relative to your working folder"),
-  line: z.number().int().min(1).optional().describe("file: the line to show"),
-  endLine: z.number().int().min(1).optional().describe("file: the last line of a range"),
-  url: z.string().trim().url().max(4096).optional().describe("url: an http(s) address"),
+    .describe(`Target id for ${typesBy("thread")}, ${typesBy("item")}, bot, workflow, or entry`),
+  path: z.string().trim().min(1).max(4096).optional().describe("File/diff path"),
+  line: z.number().int().min(1).optional(),
+  endLine: z.number().int().min(1).optional(),
+  url: z.string().trim().url().max(4096).optional(),
   pane,
-  index: z.number().int().min(0).max(500).optional().describe("Its place in the pane's tab strip, from 0. Default: after the others."),
-  focus: z.boolean().optional().describe("false opens it behind the selected tab. Default true; while the user is typing in the panel it always opens behind, marked new."),
+  index: z.number().int().min(0).max(500).optional(),
+  focus: z.boolean().optional().describe("Default true; false opens behind active tab"),
   force,
 });
 
 const arrangeInput = z.object({
   layout: z.enum(["side by side", "panel only", "conversation only", "stacked"]).optional()
-    .describe(`side by side: the workbench open beside the conversation; panel only: the conversation collapsed; conversation only: the workbench closed. Stacked isn't available: ${PANE_LIMITS}`),
-  widthPercent: z.number().min(MIN_WIDTH_PERCENT).max(MAX_WIDTH_PERCENT).optional().describe(`The workbench's share of the view's width, ${MIN_WIDTH_PERCENT} to ${MAX_WIDTH_PERCENT}`),
-  panes: z.union([z.literal(1), z.literal(2)]).optional().describe("1: one pane (the second's tabs join the first); 2: two panes side by side"),
+    .describe("side by side | panel only | conversation only (stacked unavailable)"),
+  widthPercent: z.number().min(MIN_WIDTH_PERCENT).max(MAX_WIDTH_PERCENT).optional().describe(`Workbench width % (${MIN_WIDTH_PERCENT}–${MAX_WIDTH_PERCENT})`),
+  panes: z.union([z.literal(1), z.literal(2)]).optional(),
   paneWidths: z.tuple([z.number().positive(), z.number().positive()]).optional()
-    .describe(`With two panes: their widths as a ratio, left first, such as [2, 1] or [60, 40]; each pane keeps at least ${MIN_PANE_PERCENT}% of the workbench`),
+    .describe(`Two-pane ratio, e.g. [2, 1] (min ${MIN_PANE_PERCENT}% each)`),
   force,
 });
 
@@ -249,13 +249,13 @@ export function workbenchTools(deps: WorkbenchToolDeps) {
   return [
     {
       name: "workbench_list",
-      description: "List the tabs open in this conversation's workbench (the panel beside the chat), with their keys, which is selected, which you opened, and the panel's layout. Only while the conversation is on screen in BB.",
+      description: "List tabs and layout of this conversation's workbench (while on screen in BB).",
       parameters: z.object({}),
       execute: async (_input: Record<string, never>, ctx: { threadId: string }) => run(ctx.threadId, { type: "list" }),
     },
     {
       name: "workbench_open",
-      description: `Open something as a tab in this conversation's workbench, beside the chat: ${TAB_KIND_REGISTRY.filter((entry) => entry.agentType).map((entry) => entry.agentType === "url" ? "a URL (desktop app only)" : `a ${entry.name.toLowerCase()}`).join(", ")}. Name it with type and id, or with link (a bb://<kind>/<id> link, a BB address, a card directive, a file:// or http(s) URL). pane and index place it, and pane "window" opens it in a window of its own; ${PANE_LIMITS} Already open: selects it. It won't reopen what the user closed after you opened it, and won't take the screen while they type.`,
+      description: "Open a tab in this conversation's workbench (or pane \"window\" for its own window) by type+id/path/url or link. Selects if already open.",
       parameters: openInput,
       execute: async (input: OpenInput, ctx: { threadId: string }) => {
         const op = await openOp(input, ctx.threadId, deps);
@@ -264,25 +264,25 @@ export function workbenchTools(deps: WorkbenchToolDeps) {
     },
     {
       name: "workbench_close",
-      description: "Close a tab in this conversation's workbench by its key (from workbench_list).",
+      description: "Close a workbench tab by key (from workbench_list).",
       parameters: z.object({ key: tabKey, force }),
       execute: async (input: { key: string; force?: boolean }, ctx: { threadId: string }) => run(ctx.threadId, { type: "close", key: input.key, force: input.force === true }),
     },
     {
       name: "workbench_focus",
-      description: "Select a tab in this conversation's workbench by its key (from workbench_list), showing the panel. Refused while the user is typing in the panel.",
+      description: "Focus a workbench tab by key (from workbench_list).",
       parameters: z.object({ key: tabKey, force }),
       execute: async (input: { key: string; force?: boolean }, ctx: { threadId: string }) => run(ctx.threadId, { type: "focus", key: input.key, force: input.force === true }),
     },
     {
       name: "workbench_pop_out",
-      description: `Open a tab of this conversation's workbench in a window of its own, by its key (from workbench_list); it leaves the workbench, and the window's Return to workbench puts it back. ${WINDOW_KINDS} Refused while the user is typing in the panel.`,
+      description: "Pop a workbench tab out into its own window by key (from workbench_list).",
       parameters: z.object({ key: tabKey, force }),
       execute: async (input: { key: string; force?: boolean }, ctx: { threadId: string }) => run(ctx.threadId, { type: "popOut", key: input.key, force: input.force === true }),
     },
     {
       name: "workbench_arrange",
-      description: `Arrange this conversation's workbench: side by side (the workbench beside the chat), panel only, or conversation only; its width (${MIN_WIDTH_PERCENT} to ${MAX_WIDTH_PERCENT}% of the view); one or two panes and their widths. ${PANE_LIMITS} A setting the user changed after you set it stays theirs.`,
+      description: `Arrange the workbench: layout (side by side, panel only, conversation only), widthPercent (${MIN_WIDTH_PERCENT}–${MAX_WIDTH_PERCENT}), panes (1|2), paneWidths.`,
       parameters: arrangeInput,
       execute: async (input: z.infer<typeof arrangeInput>, ctx: { threadId: string }) => {
         if (input.layout === "stacked") return STACKED;

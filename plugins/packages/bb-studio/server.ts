@@ -258,9 +258,12 @@ export default async function plugin(bb: BbPluginApi) {
   let typeIsOn = (_type: ItemType): boolean => true;
   const familyDeps = { book: toolBook, typeOn: (type: ItemType) => typeIsOn(type) };
   const registerTool = bb.agents.registerTool.bind(bb.agents);
+  // Internal handlers kept in toolBook for apps_* / legacy tests, not exposed to agent sessions.
+  const INTERNAL_ONLY_TOOLS = new Set(["artifacts_save", "artifacts_list", "artifacts_read", "artifacts_live", "minis_create", "minis_list", "minis_read", "minis_live", "work_card_create", "work_card_update", "work_card_get"]);
   bb.agents.registerTool = ((tool: Parameters<typeof registerTool>[0]) => {
     const named = familyTool(withTagHint(tool as never, () => tagNames.list().map((tag) => tag.name)) as AgentTool, familyDeps);
     toolBook.add(named);
+    if (INTERNAL_ONLY_TOOLS.has(named.name)) return undefined as never;
     return registerTool(withToolLabel(named) as never);
   }) as typeof bb.agents.registerTool;
   // Kinds built into Studio (docs/merging-add-ons.md); the hub calls them in-process.
@@ -411,7 +414,7 @@ export default async function plugin(bb: BbPluginApi) {
   void refreshRoutes();
   const BOT_TOOLS = ["bot_get", "bot_set", "bot_pause", "bot_resume", "bot_stop", "bot_activity"] as const;
   /** Only the Bot's own thread gets these: its skills and its history. */
-  const BOT_OWN_TOOLS = ["bot_profile_update", "bot_skill_list", "skill_search", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_skill_lint", "bot_history_search", "bot_threads_list", "runner_create", "runner_update", "runner_migrate", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
+  const BOT_OWN_TOOLS = ["bot_profile_update", "bot_skill_list", "skill_search", "bot_skill_view", "bot_skill_write", "bot_skill_patch", "bot_skill_delete", "bot_skill_lint", "bot_history_search", "runner_create", "runner_update", "runner_migrate", "runner_pause", "runner_resume", "runner_delete", "runner_list", "runner_run_now", "automation_list", "automation_create", "automation_update", "automation_pause", "automation_resume", "automation_run_now", "automation_delete"] as const;
   /**
    * Every conversation of a Bot gets these too (src/bot-threads-server.ts):
    * its conversations and workers, and raising something with the user. A
@@ -463,7 +466,7 @@ export default async function plugin(bb: BbPluginApi) {
       bot: bot ? bots.instructions(bot) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
       pages: !off.has("page"), minis: !off.has("mini"), appCards, work: true, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
     });
-    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...TASK_TOOLS, ...AREA_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio"], instructions };
+    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...TASK_TOOLS, ...AREA_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : [])], skills: ["studio-code", "studio", ...(bot ? ["themes", "presences"] : [])], instructions };
   }));
   /** Which conversation a Bot's session is in (src/bot-threads.ts conversationInstructions); "" before Studio has placed it. */
   const conversationNote = (threadId: string): string => {
@@ -2198,13 +2201,13 @@ export default async function plugin(bb: BbPluginApi) {
         return result;
       } catch (error) { if (error instanceof RunnerPreflightError) return JSON.stringify({ warnings: error.warnings, blocked: error.blocked, confirmRequired: !error.blocked }); throw error; }
     } });
-  runnerTool("runner_create", "Make a runner: a long-lived thread that does a recurring job on its own schedule and stays quiet unless it has something to report (it tells you or the user through runner_report). Use it when a task becomes recurring, so your chat stays for the user. Its first run starts now.",
-    z.object({ name: z.string().trim().min(1).max(60), job: z.string().trim().min(1).max(2000).describe("A short instruction: what to check or do each run, and what counts as worth reporting"), schedule: scheduleParam, machine: z.string().nullable().optional(), confirm: z.boolean().optional() }),
+  runnerTool("runner_create", "Create a runner: a scheduled thread that stays quiet unless it reports via runner_report. First run starts now.",
+    z.object({ name: z.string().trim().min(1).max(60), job: z.string().trim().min(1).max(2000).describe("What to check/do each run and what to report"), schedule: scheduleParam, machine: z.string().nullable().optional(), confirm: z.boolean().optional() }),
     async (input: { name: string; job: string; schedule: z.infer<typeof scheduleParam>; machine?: string | null; confirm?: boolean }, botId) => `Made the runner:\n${describeRunner(await runners.create({ ...input, schedule: parseSchedule(input.schedule) }, botId))}`);
   runnerTool("runner_update", "Change a runner's name, job or schedule.",
     z.object({ id: z.string().min(1).describe("Runner id or name"), name: z.string().trim().min(1).max(60).optional(), job: z.string().trim().min(1).max(2000).optional(), schedule: scheduleParam.optional(), machine: z.string().nullable().optional(), confirm: z.boolean().optional() }),
     async (input: { id: string; name?: string; job?: string; schedule?: z.infer<typeof scheduleParam>; machine?: string | null; confirm?: boolean }, botId) => describeRunner(await runners.update({ ...input, schedule: input.schedule ? parseSchedule(input.schedule) : undefined }, botId)));
-  runnerTool("runner_migrate", "Move a runner to a machine (host id or name); null moves it to the server. Keeps its schedule and reports. Refuses during a run. Review preflight warnings and retry with confirm: true. Installation and sign-in on the target are required.",
+  runnerTool("runner_migrate", "Move a runner to a machine (host id/name, or null for server). Review preflight warnings and retry with confirm: true.",
     z.object({ id: z.string().min(1), machine: z.string().nullable(), confirm: z.boolean().optional() }),
     async (input: { id: string; machine: string | null; confirm?: boolean }, botId) => describeRunner(await runners.migrate(input, botId)));
   runnerTool("runner_pause", "Pause a runner: its schedule stops until resumed.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => describeRunner(await runners.setState(id, "paused", botId)));
@@ -2216,15 +2219,15 @@ export default async function plugin(bb: BbPluginApi) {
   // The Bot's automations: check-ins, reminders, watchers and runners in one list (src/automations.ts).
   const hhmm = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
   const toolSchedule = z.object({
-    times: z.array(hhmm).max(24).optional().describe("HH:MM run times, e.g. [\"08:00\",\"18:00\"]"),
-    every: z.string().regex(/^\d+\s*(m|min|minutes?|h|hours?)$/).optional().describe("Instead of times: an interval, e.g. 15m or 2h"),
-    from: hhmm.optional().describe("With every: active window start"), to: hhmm.optional().describe("With every: window end"),
-    days: z.array(z.number().int().min(0).max(6)).optional().describe("0=Sun..6=Sat; default every day"),
-    quiet: z.object({ from: hhmm, to: hhmm }).optional().describe("Skip runs in these hours, e.g. 22:00-07:00"),
-    until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Last day, YYYY-MM-DD"),
-    cron: z.string().max(100).optional().describe("Raw five-field cron instead"),
+    times: z.array(hhmm).max(24).optional().describe('HH:MM times, e.g. ["08:00"]'),
+    every: z.string().regex(/^\d+\s*(m|min|minutes?|h|hours?)$/).optional().describe("Interval, e.g. 15m or 2h"),
+    from: hhmm.optional(), to: hhmm.optional(),
+    days: z.array(z.number().int().min(0).max(6)).optional().describe("0=Sun..6=Sat"),
+    quiet: z.object({ from: hhmm, to: hhmm }).optional(),
+    until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    cron: z.string().max(100).optional(),
     timezone: z.string().max(100).optional(),
-    at: z.string().max(60).optional().describe("Reminders: ISO date-time"), in: z.string().max(20).optional().describe("Reminders: delay like 30m, 2h, 1d"),
+    at: z.string().max(60).optional().describe("ISO date-time"), in: z.string().max(20).optional().describe("Delay, e.g. 30m, 2h"),
   });
   const toSchedule = (input: z.infer<typeof toolSchedule>): Schedule => {
     if (input.at || input.in) {
@@ -2245,13 +2248,13 @@ export default async function plugin(bb: BbPluginApi) {
   const describeAutomation = (each: Awaited<ReturnType<typeof automations.list>>[number]) =>
     `- ${each.name} (${each.kind}, ${each.id}, ${each.state}): ${each.scheduleText}${each.nextRunAt ? `, next ${new Date(each.nextRunAt).toLocaleString()}` : ""}${each.kind === "watcher" ? ` → wakes ${each.targetName}` : ""}. ${each.kind === "watcher" ? `Script (${each.script?.interpreter})` : each.instruction}${each.model?.model ? ` [${each.model.model}${each.model.reasoning ? `/${each.model.reasoning}` : ""}]` : ""}${each.lastOutcome ? `\n  Last: ${each.lastOutcome}` : ""}`;
   const automationFields = {
-    instruction: z.string().trim().max(2000).optional().describe("Check-in/reminder: what to do when it fires. Runner: its job. Watcher: what to do with the script's output"),
+    instruction: z.string().trim().max(2000).optional(),
     schedule: toolSchedule.optional(),
-    model: z.string().max(200).optional().describe("Check-in/reminder: a cheaper model on your provider for routine runs"),
+    model: z.string().max(200).optional(),
     reasoning: z.string().max(40).optional(),
-    script: z.string().max(262_144).optional().describe("Watcher: the script. Exit 0 and print the finding to stdout to wake you; print nothing when nothing changed"),
+    script: z.string().max(262_144).optional().describe("Watcher script (stdout wakes you)"),
     interpreter: z.enum(["bash", "sh", "node", "python3"]).optional(),
-    target: z.string().max(200).optional().describe("Watcher: \"main\" (you, default) or a runner id/name to wake"),
+    target: z.string().max(200).optional().describe('"main" or runner id/name'),
   };
   type AutomationToolInput = { name?: string; instruction?: string; schedule?: z.infer<typeof toolSchedule>; model?: string; reasoning?: string; script?: string; interpreter?: "bash" | "sh" | "node" | "python3"; target?: string };
   const automationChanges = (input: AutomationToolInput) => ({
@@ -2263,7 +2266,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
   runnerTool("automation_list", "List what you have scheduled: check-ins, reminders, watchers and runners, with schedule, state, next run and last outcome. The user sees them under Scheduled on the Tasks page; call them scheduled items, never automations.", z.object({}),
     async (_input: unknown, botId) => (await automations.list(botId)).map(describeAutomation).join("\n") || "Nothing scheduled yet.");
-  runnerTool("automation_create", "Schedule something for yourself. kind checkin: wakes your thread on a schedule with an instruction. reminder: once, with schedule.at or schedule.in (\"tomorrow 9:00 remind me…\", \"in 2h check the deploy\"); with Tasks on it becomes a task you own with that time, listed on the Tasks page. watcher: a script on a schedule that wakes you only when it prints something (zero tokens otherwise). A watcher folds repeats of the same output (numbers aside) into one finding with no new wake-up until it clears; its script can end with one JSON line: {\"each\": true} wakes you every run (a reminder), {\"key\": \"…\"} names the finding, {\"severity\": \"info\"|\"warn\"|\"critical\"} (or a line starting [warn]/[critical]) wakes you again when the same finding gets worse, {\"clear\": true} closes its findings. runner: a recurring job in its own thread. The user sees these under Scheduled on the Tasks page; call them scheduled items, never automations.",
+  runnerTool("automation_create", "Create a scheduled item (checkin, reminder, watcher, or runner). Reminders with at/in become timed tasks when Tasks is on. Watchers run a script and wake only on stdout (trailing JSON line supports each/key/severity/clear). Call them scheduled items to the user.",
     z.object({ kind: z.enum(["checkin", "reminder", "watcher", "runner"]), name: z.string().trim().min(1).max(60), ...automationFields, schedule: toolSchedule }),
     async (input: AutomationToolInput & { kind: "checkin" | "reminder" | "watcher" | "runner"; name: string }, botId) => {
       const schedule = toSchedule(input.schedule!);
@@ -2271,11 +2274,11 @@ export default async function plugin(bb: BbPluginApi) {
         const bot = bots.stored(botId);
         const owner = !bot || bot.primary !== false || !bot.threadId ? "cos" : `thread:${bot.threadId}`;
         const todo = loops.store.add({ title: input.name, why: input.instruction?.trim() ?? "", owner, kind: "do", trigger: { type: "time", at: schedule.at } });
-        return `Made a task (a reminder is a task you own): ${todo.title}, due ${new Date(schedule.at).toISOString()}, id ${todo.id}. Change it with todos_update.`;
+        return `Made a task (a reminder is a task you own): ${todo.title}, due ${new Date(schedule.at).toISOString()}, id ${todo.id}. Change it with task_update.`;
       }
       return `Made:\n${describeAutomation(await automations.create({ kind: input.kind, name: input.name, schedule, ...automationChanges(input) } as never, botId))}`;
     });
-  runnerTool("automation_update", "Change an automation's name, instruction, schedule, model or script. A watcher folds repeats of the same output (numbers aside) into one finding with no new wake-up until it clears; its script can end with one JSON line: {\"each\": true} wakes you every run (a reminder), {\"key\": \"…\"} names the finding, {\"severity\": \"info\"|\"warn\"|\"critical\"} (or a line starting [warn]/[critical]) wakes you again when the same finding gets worse, {\"clear\": true} closes its findings.",
+  runnerTool("automation_update", "Update a scheduled item's name, instruction, schedule, model or watcher script.",
     z.object({ id: z.string().min(1).describe("Automation id or name"), name: z.string().trim().min(1).max(60).optional(), ...automationFields }),
     async (input: AutomationToolInput & { id: string }, botId) => describeAutomation(await automations.update({ id: input.id, ...automationChanges(input) } as never, botId)));
   runnerTool("automation_pause", "Pause an automation.", z.object({ id: z.string().min(1) }), async ({ id }: { id: string }, botId) => describeAutomation(await automations.setState(id, "paused", botId)));

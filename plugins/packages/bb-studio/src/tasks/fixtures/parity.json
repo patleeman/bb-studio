@@ -254,7 +254,7 @@
  {
   "step": "posts after voice add",
   "value": [
-   "Fill in draft todo loop_00000000-0000-4000-8000-000000000011 from this typed line using todos_update, then queue it: \"Buy milk\""
+   "Fill in draft task loop_00000000-0000-4000-8000-000000000011 from this typed line using task_update, then queue it: \"Buy milk\""
   ]
  },
  {
@@ -866,9 +866,9 @@
  {
   "step": "posts after acts",
   "value": [
-   "Todo loop_00000000-0000-4000-8000-000000000002: choose. Hall Owner: the user. Use todos_list to review and carry out the next step.",
-   "Todo loop_00000000-0000-4000-8000-000000000004: hand_off.  Owner: thread:thr_a. Use todos_list to review and carry out the next step.",
-   "Todo loop_00000000-0000-4000-8000-000000000006: nudge. Draft the nudge message and show it to the user in this chat for approval. Do not send it until they approve."
+   "Task loop_00000000-0000-4000-8000-000000000002: choose. Hall Owner: the user. Use task_list to review and carry out the next step.",
+   "Task loop_00000000-0000-4000-8000-000000000004: hand_off.  Owner: thread:thr_a. Use task_list to review and carry out the next step.",
+   "Task loop_00000000-0000-4000-8000-000000000006: nudge. Draft the nudge message and show it to the user in this chat for approval. Do not send it until they approve."
   ]
  },
  {

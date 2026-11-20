@@ -24,9 +24,11 @@ const ORIGINALS: Record<string, z.ZodType> = {
   minis_list: z.object({}),
   minis_read: z.object({ miniId: z.string().min(1) }),
   minis_create: z.object({ name: z.string().min(1), files: z.record(z.string(), z.string()).optional() }),
+  minis_live: z.object({ miniId: z.string().min(1), op: z.enum(["state", "set", "events", "actions", "do"]), state: z.unknown().optional(), action: z.string().optional(), args: z.array(z.unknown()).optional() }),
   artifacts_list: z.object({ thisThread: z.boolean().optional(), query: z.string().optional() }),
   artifacts_read: z.object({ artifactId: z.string().min(1) }),
   artifacts_save: z.object({ path: z.string().optional(), content: z.string().optional(), name: z.string().optional(), title: z.string().min(1) }),
+  artifacts_live: z.object({ artifactId: z.string().min(1), op: z.enum(["state", "set", "events", "actions", "do"]), state: z.unknown().optional(), action: z.string().optional(), args: z.array(z.unknown()).optional() }),
 };
 
 function setup(off: ItemType[] = []) {
@@ -62,10 +64,10 @@ describe("every type's own tool", () => {
     expect(handlers.design_read).toHaveBeenCalledWith({ designId: DESIGN }, ctx);
   });
 
-  it("says which family tool does the same", () => {
+  it("keeps each type's own description clean while pages_* and apps_* route to them", () => {
     const { registered } = setup();
-    for (const type of ["design", "whiteboard"] as const) for (const action of ["list", "read", "create"] as const) expect(registered.get(TYPE_TOOLS[type][action])!.description).toMatch(/Original .+ type of page: pages_(list|read|create)/);
-    for (const type of ["mini", "artifact"] as const) for (const action of ["list", "read", "create"] as const) expect(registered.get(TYPE_TOOLS[type][action])!.description).toMatch(/Original .+ type of app \((an interactive|a saved) one\), and this is an alias of apps_(list|read|create)\b.*Prefer apps_(list|read|create)\.$/);
+    for (const type of ["design", "whiteboard"] as const) for (const action of ["list", "read", "create"] as const) expect(registered.get(TYPE_TOOLS[type][action])!.description).toBe(`Original ${TYPE_TOOLS[type][action]}.`);
+    for (const type of ["mini", "artifact"] as const) for (const action of ["list", "read", "create"] as const) expect(registered.get(TYPE_TOOLS[type][action])!.description).toBe(`Original ${TYPE_TOOLS[type][action]}.`);
   });
 });
 
@@ -158,6 +160,17 @@ describe("apps_*", () => {
     const { call, handlers } = setup(["mini"]);
     expect(await call("apps_list", {})).not.toContain(MINI);
     expect(await call("apps_read", { id: MINI })).toMatchObject({ isError: true });
+    expect(await call("apps_live", { id: MINI, op: "state" })).toMatchObject({ isError: true });
     expect(handlers.minis_read).not.toHaveBeenCalled();
+    expect(handlers.minis_live).not.toHaveBeenCalled();
+  });
+
+  it("drives any live app by id through minis_live or artifacts_live", async () => {
+    const { call, handlers } = setup();
+    expect(await call("apps_live", { id: MINI, op: "do", action: "reset", args: [1] })).toBe("ran minis_live");
+    expect(handlers.minis_live).toHaveBeenLastCalledWith({ miniId: MINI, op: "do", action: "reset", args: [1] }, ctx);
+    expect(await call("apps_live", { id: ARTIFACT, op: "state" })).toBe("ran artifacts_live");
+    expect(handlers.artifacts_live).toHaveBeenLastCalledWith({ artifactId: ARTIFACT, op: "state" }, ctx);
+    expect(await call("apps_live", { id: DESIGN, op: "state" })).toMatchObject({ isError: true });
   });
 });

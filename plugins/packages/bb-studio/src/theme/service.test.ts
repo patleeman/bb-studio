@@ -48,11 +48,13 @@ describe("the template", () => {
 });
 
 describe("theme tools", () => {
-  it("registers the five tools, and theme_create's description carries the shader contract and the template", () => {
+  it("registers the five tools, and the themes skill carries the shader contract and template", async () => {
     const { tool } = setup();
     expect(THEME_TOOLS).toEqual(["theme_list", "theme_create", "theme_update", "theme_apply", "theme_delete"]);
-    const description = tool("theme_create").description;
-    for (const part of ["uniform vec3 u_palette[4];", "u_workers", "u_ripples", "gl_FragColor", "backdrop.light", '"id": "northern-lights"']) expect(description).toContain(part);
+    expect(tool("theme_create").description).toContain("themes skill");
+    const { readFileSync } = await import("node:fs");
+    const skill = readFileSync(new URL("../../skills/themes/SKILL.md", import.meta.url), "utf8");
+    for (const part of ["uniform vec3 u_palette[4];", "u_workers", "u_ripples", "gl_FragColor", "backdrop.light", '"id": "northern-lights"']) expect(skill).toContain(part);
   });
 
   it("theme_list lists built-ins and stored themes with kind, maker and the Bots using each", async () => {

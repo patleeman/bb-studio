@@ -50,20 +50,8 @@ export const DRAWINGS_USAGE = [
   "  remove-elements <id> <element-id…>    Delete elements by id",
 ].join("\n");
 
-/**
- * The old excalidraw_* names, kept as aliases of the whiteboard tools for two
- * releases (from the release that renamed them, Nov 2026). Remove them, and
- * this map, after that.
- */
-export const TOOL_ALIASES = {
-  excalidraw_list_drawings: "whiteboard_list",
-  excalidraw_get_drawing: "whiteboard_get",
-  excalidraw_create_drawing: "whiteboard_create",
-  excalidraw_update_drawing: "whiteboard_update",
-} as const;
-
 /** Available in every agent session. */
-export const DRAW_TOOLS = ["whiteboard_list", "whiteboard_get", "whiteboard_create", "whiteboard_update", ...Object.keys(TOOL_ALIASES)];
+export const DRAW_TOOLS = ["whiteboard_list", "whiteboard_get", "whiteboard_create", "whiteboard_update"];
 
 export interface BuiltinDrawings {
   store: DrawingStore;
@@ -408,52 +396,32 @@ export function registerDraw(bb: BbPluginApi, db: Database.Database, services: P
     name: z.string().min(1).max(200).describe("The whiteboard's name; without pageId, also the new page's title"),
     afterBlockId: z.string().min(1).optional().describe("Put the whiteboard after this block instead of at the end"),
   };
-  const alias = (name: string) => `Old name of ${name}; it does the same. Use ${name}.`;
-
   bb.agents.registerTool({
     name: "whiteboard_list",
-    description:
-      "List the whiteboards in the user's BB Studio pages: id, name, element count, last updated, and the page each one is in. Use when the user asks you to work with a whiteboard, sketch or diagram. To read or edit one, pass its id to whiteboard_get or whiteboard_update.",
+    description: "List whiteboards in BB Studio pages (id, name, element count, page).",
     parameters: z.object({}),
     execute: () => listWhiteboards(),
   });
-  bb.agents.registerTool({ name: "excalidraw_list_drawings", description: alias("whiteboard_list"), parameters: z.object({}), execute: () => listWhiteboards() });
 
   bb.agents.registerTool({
     name: "whiteboard_get",
-    description:
-      "Read the current scene of a whiteboard (Excalidraw elements; a page embeds it as ```embed {\"kind\":\"drawing\",\"target\":\"<id>\"}```, and whiteboard_list lists them): element JSON, appState, a text summary, and each image file's id, mimeType and size (image data is left out; `bb studio whiteboards show <id>` prints it). Always call this immediately before editing so you see the user's latest changes. To edit, use whiteboard_update.",
+    description: "Read a whiteboard's Excalidraw scene (elements, appState, summary, image metadata). Always read right before whiteboard_update.",
     parameters: z.object({ whiteboardId: z.string().min(1) }),
     execute: ({ whiteboardId }) => getWhiteboard(whiteboardId),
   });
-  bb.agents.registerTool({ name: "excalidraw_get_drawing", description: alias("whiteboard_get"), parameters: z.object({ drawingId: z.string().min(1) }), execute: ({ drawingId }) => getWhiteboard(drawingId) });
 
   bb.agents.registerTool({
     name: "whiteboard_create",
-    description:
-      "Add a new empty whiteboard to a BB Studio page and return its id. It goes at the end of the page, or after afterBlockId (a block id from pages_read). Without pageId it makes a new page holding just the whiteboard, titled with name. Then draw on it with whiteboard_update; the user sees it in the page. A whiteboard's height in a page is the embed's \"height\" in pixels (160–1200; pages_edit can change it).",
-    parameters: z.object({ pageId: z.string().min(1).optional().describe("The page to add the whiteboard to, e.g. pg_…; leave out to make a whiteboard page"), ...createFields }),
-    execute: (input, ctx) => createWhiteboardTool(input, ctx),
-  });
-  bb.agents.registerTool({
-    name: "excalidraw_create_drawing",
-    description: alias("whiteboard_create"),
-    parameters: z.object({ pageId: z.string().min(1), ...createFields }),
+    description: "Create an empty whiteboard in a BB Studio page (or a new whiteboard page if pageId is omitted). Draw on it with whiteboard_update.",
+    parameters: z.object({ pageId: z.string().min(1).optional().describe("Target page id (pg_…); omit for a new page"), ...createFields }),
     execute: (input, ctx) => createWhiteboardTool(input, ctx),
   });
 
   bb.agents.registerTool({
     name: "whiteboard_update",
-    description:
-      "Edit a whiteboard the user may have open right now, in a page or full size: upsert elements and/or delete elements by id. The user's open editor and the page's whiteboard update live. Merge is element-level: only the elements you send change, and any element you send wins (its version is bumped) unless it was already deleted (re-add it with a new id), so concurrent user edits to other elements are preserved. Fetch the latest scene with whiteboard_get first. Element objects must match Excalidraw's shape (id, type, x, y, width, height, strokeColor, backgroundColor, fillStyle, strokeWidth, roughness, opacity, seed, groupIds, frameId, roundness, ...) — safest to copy an existing element from whiteboard_get and change id/type/position/text. Upserting an existing id merges into it, so {id, type, x, y} moves an element and keeps the rest. `index` (z-order) is assigned automatically when omitted. deletedElementIds removes elements for the user, not just hides them.",
+    description: "Upsert or delete Excalidraw elements on a whiteboard live (element-level merge; read with whiteboard_get first). Load the whiteboards skill for element shapes.",
     parameters: z.object({ whiteboardId: z.string().min(1), ...editFields }),
     execute: ({ whiteboardId, ...rest }, ctx) => updateWhiteboard({ id: whiteboardId, ...rest }, ctx),
-  });
-  bb.agents.registerTool({
-    name: "excalidraw_update_drawing",
-    description: alias("whiteboard_update"),
-    parameters: z.object({ drawingId: z.string().min(1), ...editFields }),
-    execute: ({ drawingId, ...rest }, ctx) => updateWhiteboard({ id: drawingId, ...rest }, ctx),
   });
 
   // Studio calls bb.agents.configure once, with DRAW_TOOLS (BB allows one configuration per plugin).

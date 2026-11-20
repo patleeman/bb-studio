@@ -2,7 +2,6 @@ import { z } from "zod";
 import { EFFECTS } from "./appearance";
 import { formatListing, formatReport, type ThemeOutcome, type ThemeService } from "./service";
 import type { ThemeCreator } from "./store";
-import { THEME_FORMAT_GUIDE, themeTemplateJson } from "./template";
 
 export const THEME_TOOLS = ["theme_list", "theme_create", "theme_update", "theme_apply", "theme_delete"] as const;
 
@@ -46,8 +45,8 @@ export function themeTools(deps: ThemeToolDeps): ThemeTool[] {
   };
   const create: ThemeTool = {
     name: "theme_create",
-    description: `Create a BB Studio theme from a full theme package you write from the user's description: a GLSL shader scene (or none for a classic theme), palette, glass, type and state effects. It runs every check first and saves only when all pass; a failure saves nothing and lists each failed check. Then theme_apply puts it on a Bot. The id must be new.\n\n${THEME_FORMAT_GUIDE}\n\nA working template (change the id, name, colors, shader and effects to match the description):\n${themeTemplateJson()}`,
-    parameters: z.object({ theme: themeObject.describe("The full theme package") }),
+    description: "Create a BB Studio theme from a full theme package (GLSL shader scene or classic, palette, glass, type, state effects). Load the themes skill first for the schema, shader contract, checks and template. Runs all checks before saving; then theme_apply puts it on a Bot.",
+    parameters: z.object({ theme: themeObject.describe("Full theme package JSON (see themes skill)") }),
     execute: async (input: { theme: Record<string, unknown> }, ctx) => outcomeText(await service.create(input.theme, await deps.creator(ctx.threadId)), "Saved"),
   };
   const update: ThemeTool = {

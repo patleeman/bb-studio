@@ -3,7 +3,6 @@ import { formatReport } from "./checks";
 import { MAX_MOTION } from "./schema";
 import { formatListing, formatPresence, type PresenceOutcome, type PresenceService } from "./service";
 import type { PresenceCreator } from "./store";
-import { PRESENCE_FORMAT_GUIDE, presenceTemplateJson } from "./template";
 
 export const PRESENCE_TOOLS = ["presence_list", "presence_create", "presence_update", "presence_apply", "presence_delete"] as const;
 
@@ -49,12 +48,12 @@ export function presenceTools(deps: PresenceToolDeps): PresenceTool[] {
   };
   const create: PresenceTool = {
     name: "presence_create",
-    description: `Create a presence from the user's description (e.g. "a slowly unfolding origami crane", "a lava lamp"): you write a small canvas module. It runs every check first, in a sandbox in an open BB Studio window, and saves only when all pass; a failure saves nothing and lists each failed check. Then presence_apply puts it on a Bot. The id must be new.\n\n${PRESENCE_FORMAT_GUIDE}\n\nA working template (change the id, name, description and drawing to match the description):\n${presenceTemplateJson()}`,
+    description: "Create a Bot presence (living icon) as a 2D canvas JS module declaring draw(ctx, t, state, palette, size). Load the presences skill first for the contract, four states, limits, checks and template. Validates in a sandbox before saving; then presence_apply puts it on a Bot.",
     parameters: z.object({
       id: z.string().min(2).max(40).describe("Lowercase letters, digits and dashes"),
       name: z.string().min(1).max(40),
       description: z.string().max(200).optional().describe("One line: what it shows"),
-      code: z.string().min(1).describe("The module: plain JavaScript declaring function draw(ctx, t, state, palette, size)"),
+      code: z.string().min(1).describe("Plain JS declaring function draw(ctx, t, state, palette, size)"),
     }),
     execute: async (input: { id: string; name: string; description?: string; code: string }, ctx) =>
       outcomeText(await service.create({ id: input.id, name: input.name, description: input.description ?? "", code: input.code }, await deps.creator(ctx.threadId)), "Saved"),

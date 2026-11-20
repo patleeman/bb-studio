@@ -33,20 +33,20 @@ export const AGENT_INSTRUCTIONS = [
   'When you create or change a page, put its card on its own line in your reply, `::page{id="pg_…"}`, so the user can open it beside the chat.',
 ].join("\n");
 
-const ref = z.string().min(1).describe("Page id (pg_…) or exact page title");
-const block = z.string().min(4).describe("Block id or its first 8 characters, from the `<!-- ^id -->` markers in pages_read");
+const ref = z.string().min(1).describe("Page id (pg_…) or title");
+const block = z.string().min(4).describe("Block id or 8-char prefix");
 
 const opSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("insert_after"), block, markdown: z.string() }),
   z.object({ op: z.literal("insert_before"), block, markdown: z.string() }),
-  z.object({ op: z.literal("replace"), block, markdown: z.string().describe("Replacement Markdown; may be several blocks. The block's nested blocks stay unless this Markdown nests its own") }),
+  z.object({ op: z.literal("replace"), block, markdown: z.string() }),
   z.object({ op: z.literal("append"), markdown: z.string() }),
   z.object({ op: z.literal("prepend"), markdown: z.string() }),
   z.object({ op: z.literal("delete"), block }),
   z.object({ op: z.literal("set_checked"), block, checked: z.boolean() }),
   z.object({
     op: z.literal("replace_text"),
-    block: block.optional().describe("Limit to one block; otherwise the first match in the page"),
+    block: block.optional(),
     find: z.string().min(1),
     replace: z.string(),
   }),
@@ -101,8 +101,7 @@ export function registerTools(
 
   bb.agents.registerTool({
     name: "pages_read",
-    description:
-      "Read a BB Page as Markdown with a `<!-- ^id -->` block-id marker on the line before each block (it names the block below it), plus its open comment threads. Always read right before editing: the user may have changed it.",
+    description: "Read a BB Page as Markdown with `<!-- ^id -->` block ids and open comments. Read right before pages_edit.",
     parameters: z.object({ page: ref }),
     execute({ page }, ctx) {
       const meta = service.requirePage(page, ctx.projectId);
@@ -124,8 +123,7 @@ export function registerTools(
 
   bb.agents.registerTool({
     name: "pages_create",
-    description:
-      "Create a BB Page from Markdown (GFM plus chart/stats/embed JSON fences, mermaid, sandboxed ```html blocks, callouts and mentions). Pages belong to the current project unless global is true; set parent to nest it. For images, prefer an artifact embed; local image paths in your thread's workspace or thread storage are imported into the page when supported (PNG, JPEG, GIF, WebP, up to 10 MB), and the result names any it couldn't import.",
+    description: "Create a BB Page from Markdown (GFM, chart/stats/embed/mermaid/html blocks, callouts, mentions; see studio skill). Local image paths in workspace/thread storage are imported.",
     parameters: z.object({
       title: z.string().min(1).max(200),
       markdown: z.string().max(200_000).optional(),
@@ -151,8 +149,7 @@ export function registerTools(
 
   bb.agents.registerTool({
     name: "pages_edit",
-    description:
-      "Edit a BB Page live with targeted operations: insert_after/insert_before/replace/delete/set_checked by block id, append/prepend, replace_text (keeps formatting), or replace_all. Markdown may use the Pages extensions, including sandboxed ```html blocks. Optionally set the title or icon. Ops apply in order as one change. Local image paths in the Markdown are imported into the page as with pages_create.",
+    description: "Edit a BB Page live with targeted ops (insert_after/insert_before/replace/delete/set_checked/append/prepend/replace_text/replace_all), or update title/icon.",
     parameters: z.object({
       page: ref,
       ops: z.array(opSchema).max(100).default([]),

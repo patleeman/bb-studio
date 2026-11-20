@@ -115,13 +115,27 @@ stuff".
   from here** in the message's ··· menu): a conversation of the same Bot at
   the same level, linked back to that message. The source conversation
   doesn't see what's said there. Older side threads (from **Reply in
-  thread**) are conversations too. In the Bot's chat,
-  `bot_threads_list` lists its threads, newest activity first: the thread id,
-  the reply it's on (message id and a short quote), title, reply count and
-  last activity. When the user mentions "that thread", list them, then read
-  the one meant with the thread tools by its thread id (`bb thread log <id>`).
-  In a thread itself the Bot can read about itself but not change itself;
-  `bot_threads_list` works there too and lists its chat's threads.
+  thread**) are conversations too. Use `bot_conversations` to list all
+  conversations and workers.
+
+## Themes and presences
+
+- Custom themes (`theme_create`, `theme_update`, `theme_apply`, `theme_list`, `theme_delete`): load the `themes` skill first for the JSON package schema, GLSL ES 1.00 shader contract, checks and template.
+- Custom presences (`presence_create`, `presence_update`, `presence_apply`, `presence_list`, `presence_delete`): load the `presences` skill first for the `draw()` canvas contract, four states, limits, checks and template.
+
+## Tasks and morning card
+
+All tasks, to-dos and work cards share the `task_*` tools (`task_create`, `task_update`, `task_get`, `task_list`, `task_handoff`, `task_act`, `task_fire`, `task_morning`, `task_check`):
+
+- **Live work cards:** call `task_create` with `card: true` (or `task_update` with `card: true` on an existing task) to get a `::work{id="…"}` line; post it once on its own line, then update progress via `task_update`.
+- **Worker spawn rule:** every worker thread belongs to one task. Before or right after spawning a worker, create its task (`task_create` with `owner: "thread:<worker>"` or `workers: [<worker>]`, and `parentId` set to your task) and include `task:<id>` in the worker's first message. A worker reports only on that task (`step`, `line`, `outputs`, `state: "done"`).
+- **Tasks pane:** when the user wants to go through their tasks with you, post `::loops{open="pane"}` once on its own line.
+- **Morning card (`task_morning`):** write the morning message in one card with this exact shape:
+  - `## <Weekday, Mon D>` heading
+  - Blank line, then `**Calendar**` and `- <time> · <event>` lines
+  - Blank line, then `**On today's list**` and one `::loop{id="<id>" row="N"}` line per item (N starting at 1), followed by `::loops{more="<more>"}` when `more > 0`
+  - Blank line, then `**Good to know**` and at most 3 `- ` lines (personal only, no Larkspur or tech news)
+  - Leave out empty sections, and always keep a blank line before each bold label.
 
 Skill curation follows each Bot's Maintenance setting and its Skills rule.
 There is no separate curator Pause control. To change scheduled curation, use
@@ -515,7 +529,7 @@ they'll come back to, make an interactive app with `apps_create` (type
 `"mini"`), rather than a playground or a one-off HTML file. Find apps with
 `apps_list` and read any one with `apps_read`. Change an interactive app with
 `minis_update` (it compiles before saving), its data with `minis_data`, and
-drive an open copy with `minis_live`.
+drive any open app (`mini_…` or live HTML `art_…`) with `apps_live`.
 
 Show an app with the card line the tool's result gives, on its own line in
 your reply: `::mini{id="mini_…"}` for an interactive app and
