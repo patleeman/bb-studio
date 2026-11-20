@@ -19185,8 +19185,10 @@ public enum Studio {
     public var running: Bool?
     public var needsYou: BotThreadsViewOutputConversationsItemNeedsYou?
     public var mirrored: Bool?
+    public var providerId: String?
+    public var modelName: String?
 
-    public init(threadId: String? = nil, title: String? = nil, isMain: Bool? = nil, forkedFrom: BotThreadsViewOutputConversationsItemForkedFrom? = nil, projectId: String? = nil, updatedAt: Double? = nil, latest: String? = nil, running: Bool? = nil, needsYou: BotThreadsViewOutputConversationsItemNeedsYou? = nil, mirrored: Bool? = nil) {
+    public init(threadId: String? = nil, title: String? = nil, isMain: Bool? = nil, forkedFrom: BotThreadsViewOutputConversationsItemForkedFrom? = nil, projectId: String? = nil, updatedAt: Double? = nil, latest: String? = nil, running: Bool? = nil, needsYou: BotThreadsViewOutputConversationsItemNeedsYou? = nil, mirrored: Bool? = nil, providerId: String? = nil, modelName: String? = nil) {
       self.threadId = threadId
       self.title = title
       self.isMain = isMain
@@ -19197,6 +19199,8 @@ public enum Studio {
       self.running = running
       self.needsYou = needsYou
       self.mirrored = mirrored
+      self.providerId = providerId
+      self.modelName = modelName
     }
   }
 
@@ -19242,8 +19246,10 @@ public enum Studio {
     public var branch: String?
     public var mirrored: Bool?
     public var sameTitle: Int?
+    public var providerId: String?
+    public var modelName: String?
 
-    public init(threadId: String? = nil, title: String? = nil, status: BotThreadsViewOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil) {
+    public init(threadId: String? = nil, title: String? = nil, status: BotThreadsViewOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil, providerId: String? = nil, modelName: String? = nil) {
       self.threadId = threadId
       self.title = title
       self.status = status
@@ -19255,6 +19261,8 @@ public enum Studio {
       self.branch = branch
       self.mirrored = mirrored
       self.sameTitle = sameTitle
+      self.providerId = providerId
+      self.modelName = modelName
     }
   }
 
@@ -19319,8 +19327,10 @@ public enum Studio {
     public var running: Bool?
     public var needsYou: BotThreadsOlderOutputConversationsItemNeedsYou?
     public var mirrored: Bool?
+    public var providerId: String?
+    public var modelName: String?
 
-    public init(threadId: String? = nil, title: String? = nil, isMain: Bool? = nil, forkedFrom: BotThreadsOlderOutputConversationsItemForkedFrom? = nil, projectId: String? = nil, updatedAt: Double? = nil, latest: String? = nil, running: Bool? = nil, needsYou: BotThreadsOlderOutputConversationsItemNeedsYou? = nil, mirrored: Bool? = nil) {
+    public init(threadId: String? = nil, title: String? = nil, isMain: Bool? = nil, forkedFrom: BotThreadsOlderOutputConversationsItemForkedFrom? = nil, projectId: String? = nil, updatedAt: Double? = nil, latest: String? = nil, running: Bool? = nil, needsYou: BotThreadsOlderOutputConversationsItemNeedsYou? = nil, mirrored: Bool? = nil, providerId: String? = nil, modelName: String? = nil) {
       self.threadId = threadId
       self.title = title
       self.isMain = isMain
@@ -19331,6 +19341,8 @@ public enum Studio {
       self.running = running
       self.needsYou = needsYou
       self.mirrored = mirrored
+      self.providerId = providerId
+      self.modelName = modelName
     }
   }
 
@@ -19376,8 +19388,10 @@ public enum Studio {
     public var branch: String?
     public var mirrored: Bool?
     public var sameTitle: Int?
+    public var providerId: String?
+    public var modelName: String?
 
-    public init(threadId: String? = nil, title: String? = nil, status: BotThreadsOlderOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil) {
+    public init(threadId: String? = nil, title: String? = nil, status: BotThreadsOlderOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil, providerId: String? = nil, modelName: String? = nil) {
       self.threadId = threadId
       self.title = title
       self.status = status
@@ -19389,6 +19403,8 @@ public enum Studio {
       self.branch = branch
       self.mirrored = mirrored
       self.sameTitle = sameTitle
+      self.providerId = providerId
+      self.modelName = modelName
     }
   }
 
@@ -19522,8 +19538,10 @@ public enum Studio {
     public var branch: String?
     public var mirrored: Bool?
     public var sameTitle: Int?
+    public var providerId: String?
+    public var modelName: String?
 
-    public init(threadId: String? = nil, title: String? = nil, status: BotConversationsAllOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil) {
+    public init(threadId: String? = nil, title: String? = nil, status: BotConversationsAllOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil, providerId: String? = nil, modelName: String? = nil) {
       self.threadId = threadId
       self.title = title
       self.status = status
@@ -19535,6 +19553,8 @@ public enum Studio {
       self.branch = branch
       self.mirrored = mirrored
       self.sameTitle = sameTitle
+      self.providerId = providerId
+      self.modelName = modelName
     }
   }
 
