@@ -24,7 +24,7 @@
 //   view goes to that Bot's last-open conversation, else its Main.
 // The server's view (bot_threads_view) and BB's live thread state are merged
 // in model.ts. The header and the switcher are marked no-drag.
-import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, experimental_useSidebarThreads, useBbNavigate, useSdk, type PluginThreadActionTarget, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
+import { experimental_ThreadActionsContextMenu as ThreadActionsContextMenu, experimental_useProviders as useProviders, experimental_useSidebarThreads, useBbNavigate, useSdk, type PluginThreadActionTarget, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type WheelEvent } from "react";
 import type { BotSpace } from "../../bot-threads-contract";
 import { Icon } from "../../kit/app/index";
@@ -55,6 +55,8 @@ import { accentOf } from "../../theme/engine";
 import { publishSceneSignals, workerSlots } from "../../theme/signals";
 import { treeOf, workerGroups, workersUnder } from "../../tasks/ui/board-model";
 import { WorkerTasks } from "./WorkerTasks";
+import { ProviderMark, type RowProvider } from "./ProviderMark";
+import type { ProviderCatalogEntry } from "../bot/ProviderStatusMark";
 import { shownAppearance, useAppearanceDraft, useThemeRegistry } from "../../theme/ui/state";
 import { NONE_ID, saveTheme, themeChoices, type ThemeChoice } from "../../theme/ui/quick";
 import { errorMessage } from "../../kit/format";
@@ -83,7 +85,7 @@ function StatusGlyph({ status, slot }: { status: WorkerLine["status"]; slot?: nu
   return <Icon name="Check" className="size-3 shrink-0 text-success" aria-label="Done" />;
 }
 
-export function ConversationRowView({ row, now, onOpen, menuTarget }: { row: ConversationLine; now: number; onOpen(row: ConversationLine): void; menuTarget: PluginThreadActionTarget | null }) {
+export function ConversationRowView({ row, now, onOpen, menuTarget, providers = NO_PROVIDERS }: { row: ConversationLine; now: number; onOpen(row: ConversationLine): void; menuTarget: PluginThreadActionTarget | null; providers?: readonly ProviderCatalogEntry[] }) {
   const line = secondLine(row);
   const button = (
     <button type="button" data-testid="conversation-row" data-thread-id={row.threadId} data-needs-you={row.needsYou ? "" : undefined} aria-current={row.selected ? "page" : undefined}
@@ -92,6 +94,7 @@ export function ConversationRowView({ row, now, onOpen, menuTarget }: { row: Con
       className={`flex w-full min-w-0 flex-col rounded-md px-2 py-[5px] text-left outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring aria-[current=page]:bg-state-active ${row.needsYou ? "bg-warning/10 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--warning)_45%,transparent)]" : ""}`}>
       <span className="flex min-w-0 items-baseline gap-2">
         <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
+          <ProviderMark provider={row} providers={providers} />
           <span data-testid="conversation-title" className="min-w-0 truncate text-[13px] font-medium leading-[18px] text-foreground">{row.title}</span>
         </span>
         <span data-testid="conversation-time" className={`shrink-0 text-xs tabular-nums ${INK_55}`}>{shortAge(row.updatedAt, now)}</span>
@@ -109,13 +112,14 @@ export function ConversationRowView({ row, now, onOpen, menuTarget }: { row: Con
   return menuTarget ? <ThreadActionsContextMenu thread={menuTarget}><div>{button}</div></ThreadActionsContextMenu> : button;
 }
 
-function WorkerRowView({ row, now, onOpen, menuTarget, slot }: { row: WorkerLine; now: number; onOpen(row: WorkerLine): void; menuTarget: PluginThreadActionTarget | null; slot?: number }) {
+export function WorkerRowView({ row, now, onOpen, menuTarget, slot, providers = NO_PROVIDERS }: { row: WorkerLine; now: number; onOpen(row: WorkerLine): void; menuTarget: PluginThreadActionTarget | null; slot?: number; providers?: readonly ProviderCatalogEntry[] }) {
   const button = (
     <button type="button" data-testid="worker-row" data-thread-id={row.threadId} data-status={row.status} aria-current={row.selected ? "page" : undefined}
       onClick={() => onOpen(row)}
       draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "all"; writeDragItem(event.dataTransfer, threadDragItem({ id: row.threadId, title: row.title })); }}
       className="flex h-7 w-full min-w-0 items-center gap-1.5 rounded-md px-2 text-left text-[13px] text-foreground outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring aria-[current=page]:bg-state-active">
       <span className="flex w-3 shrink-0 justify-center"><StatusGlyph status={row.status} slot={slot} /></span>
+      <ProviderMark provider={row} providers={providers} />
       <span data-testid="worker-title" className="min-w-0 flex-1 truncate">{row.title}</span>
       {row.sameTitle > 1 ? <span data-testid="worker-repeats" aria-label={`${row.sameTitle} with this title`} className={`shrink-0 text-xs tabular-nums ${INK_55}`}>×{row.sameTitle}</span> : null}
       {row.tag ? <span data-testid="worker-tag" aria-label={row.branch ? `${row.tag} · ${row.branch}` : row.tag} className="max-w-[72px] shrink-0 truncate rounded bg-foreground/[0.06] px-1.5 text-[11px] leading-4 text-muted-foreground">{row.tag}</span> : null}
@@ -189,6 +193,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const bot = shownBot(bots, chosen, spaces.data?.currentBotId ?? null);
   const view = useLive("bot_threads_view", bot ? { botId: bot.id } : {}, { enabled: !!bot, pollMs: 15_000 });
   const sidebar = experimental_useSidebarThreads();
+  const providers = useProviders().providers;
   const pathname = usePathname();
   const page = spacePageAt(pathname);
   const list = useLive("bot_list", {}, { pollMs: 60_000 });
@@ -217,6 +222,11 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const conversations = useMemo(() => conversationLines(data?.conversations ?? [], live, activeThreadId), [data, live, activeThreadId]);
   const workers = useMemo(() => workerLines(data?.workers ?? [], live, activeThreadId), [data, live, activeThreadId]);
   const split = useMemo(() => splitWorkers(workers), [workers]);
+  // A task's workers are rows of their own: their provider from the view, else BB's live list.
+  const providerOf = useMemo(() => {
+    const known = new Map<string, RowProvider>([...conversations, ...workers].map((row) => [row.threadId, { providerId: row.providerId ?? null, modelName: row.modelName ?? null }]));
+    return (threadId: string): RowProvider | null => known.get(threadId) ?? (live.get(threadId)?.providerId ? { providerId: live.get(threadId)!.providerId!, modelName: null } : null);
+  }, [conversations, workers, live]);
   const rowTargets = useMemo(() => {
     const all = new Map(targets);
     for (const row of conversations) if (!all.has(row.threadId)) { const target = hiddenThreadTarget(row, row.running ? "running" : "idle"); if (target) all.set(row.threadId, target); }
@@ -397,7 +407,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
           <button type="button" data-testid="new-conversation" onClick={newConversation} disabled={!bot} aria-label="New conversation"
             className={cn(buttonVariants({ variant: "ghost", size: "sm" }), NEW_BUTTON)}>+ New</button>
         </div>
-        {conversations.map((row) => <ConversationRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} />)}
+        {conversations.map((row) => <ConversationRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} providers={providers} />)}
         {data && !conversations.length ? <Note>No conversations yet</Note> : null}
         {!data && view.error ? <Note>{view.error}</Note> : null}
       </section>
@@ -405,17 +415,17 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
         <div className={SECTION_HEAD}><h3>Workers</h3></div>
         {taskWorkers.data ? (
           <WorkerTasks groups={workerTaskGroups} done={workerTasksDone} now={now} activeThreadId={activeThreadId} onOpenThread={openThread}
-            targetOf={(id) => rowTargets.get(id) ?? null} slotOf={(id) => slots?.get(id)} showNames empty={<Note>No workers right now</Note>}
-            loose={looseWorkers.length ? <div role="group" aria-label="Working without a task" data-testid="worker-loose">{looseWorkers.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} slot={slots?.get(row.threadId)} />)}</div> : null} />
+            targetOf={(id) => rowTargets.get(id) ?? null} slotOf={(id) => slots?.get(id)} providerOf={providerOf} providers={providers} showNames empty={<Note>No workers right now</Note>}
+            loose={looseWorkers.length ? <div role="group" aria-label="Working without a task" data-testid="worker-loose">{looseWorkers.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} slot={slots?.get(row.threadId)} providers={providers} />)}</div> : null} />
         ) : <>
-          {split.active.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} slot={slots?.get(row.threadId)} />)}
+          {split.active.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} slot={slots?.get(row.threadId)} providers={providers} />)}
           {split.done.length ? (
             <button type="button" data-testid="workers-done" aria-expanded={doneOpen} onClick={() => setDoneOpen((open) => !open)}
               className="flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none">
               <Icon name={doneOpen ? "ChevronDown" : "ChevronRight"} className="size-3 shrink-0" />{doneLabel(split.done.length)}
             </button>
           ) : null}
-          {doneOpen ? split.done.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} />) : null}
+          {doneOpen ? split.done.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} providers={providers} />) : null}
           {data && !workers.length ? <Note>No workers yet</Note> : null}
         </>}
       </section>
@@ -435,3 +445,4 @@ function Note({ children }: { children: ReactNode }) {
 }
 
 const NO_BOTS: never[] = [];
+const NO_PROVIDERS: readonly ProviderCatalogEntry[] = [];

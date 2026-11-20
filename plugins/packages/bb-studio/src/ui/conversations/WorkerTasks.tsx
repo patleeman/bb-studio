@@ -5,6 +5,8 @@ import { cn } from "../../kit/ui/utils";
 import { threadDragItem, writeDragItem } from "../../kit/app/item-drag";
 import { flightLook, plural, workersUnder, type FlightNode, type WorkerGroup, type WorkerInfo } from "../../tasks/ui/board-model";
 import { shortAge } from "./model";
+import { ProviderMark, providerLabel, type RowProvider } from "./ProviderMark";
+import type { ProviderCatalogEntry } from "../bot/ProviderStatusMark";
 
 const INK_55 = "text-[color-mix(in_oklab,var(--foreground)_55%,transparent)]";
 const ROW = "flex h-7 w-full min-w-0 items-center gap-1.5 rounded-md px-2 text-left text-[13px] text-foreground outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring aria-[current=page]:bg-state-active";
@@ -23,6 +25,8 @@ function workerStatus(status: string | null): string {
   return status === "active" || status === "running" ? "Running" : status === "error" || status === "failed" ? "Failed" : "Idle";
 }
 
+const NO_PROVIDERS: readonly ProviderCatalogEntry[] = [];
+
 export type WorkerTaskProps = {
   node: FlightNode;
   now: number;
@@ -30,9 +34,24 @@ export type WorkerTaskProps = {
   onOpenThread(threadId: string): void;
   targetOf(threadId: string): PluginThreadActionTarget | null;
   slotOf(threadId: string): number | undefined;
+  /** The provider each worker thread runs on; without it the rows show no mark. */
+  providerOf?(threadId: string): RowProvider | null;
+  providers?: readonly ProviderCatalogEntry[];
 };
 
-export function WorkerTaskRow({ node, now, activeThreadId, onOpenThread, targetOf, slotOf }: WorkerTaskProps) {
+/**
+ * A task row's mark: its worker's provider; with several, theirs when they
+ * share one, else the generic mark named with each of them.
+ */
+export function taskProvider(threadIds: readonly string[], providerOf: (threadId: string) => RowProvider | null, providers: readonly Pick<ProviderCatalogEntry, "id" | "displayName">[]): { provider: RowProvider | null; label?: string } {
+  const each = threadIds.map((id) => providerOf(id));
+  if (each.length === 1) return { provider: each[0] ?? null };
+  const ids = [...new Set(each.map((provider) => provider?.providerId ?? null))];
+  if (ids.length === 1) return { provider: { providerId: ids[0] ?? null, modelName: null } };
+  return { provider: null, label: ids.map((id) => providerLabel({ providerId: id, modelName: null }, providers)).join(", ") };
+}
+
+export function WorkerTaskRow({ node, now, activeThreadId, onOpenThread, targetOf, slotOf, providerOf, providers = NO_PROVIDERS }: WorkerTaskProps) {
   const workers = workersUnder(node);
   const [open, setOpen] = useState(() => workers.some((w) => w.threadId === activeThreadId));
   const single = workers.length === 1 ? workers[0]! : null;
@@ -40,12 +59,14 @@ export function WorkerTaskRow({ node, now, activeThreadId, onOpenThread, targetO
   const slot = workers.map((w) => slotOf(w.threadId)).find((s) => s !== undefined);
   const look = flightLook(node.task, node.row.needsYou, node.row.stalled);
   const label = `${node.task.title}, ${look === "needs-you" ? "needs you" : look}${workers.length > 1 ? `, ${plural(workers.length, "worker")}` : ""}`;
+  const mark = providerOf && workers.length ? taskProvider(workers.map((w) => w.threadId), providerOf, providers) : null;
   const main = (
     <button type="button" data-testid="worker-task" data-task-id={node.task.id} data-look={look} aria-label={label} aria-current={selected && !open ? "page" : undefined}
       onClick={() => (single ? onOpenThread(single.threadId) : setOpen(!open))}
       draggable={!!single} onDragStart={single ? (event) => { event.dataTransfer.effectAllowed = "all"; writeDragItem(event.dataTransfer, threadDragItem({ id: single.threadId, title: node.task.title })); } : undefined}
       className={ROW}>
       <span className="flex w-3 shrink-0 justify-center"><TaskGlyph node={node} slot={slot} /></span>
+      {mark ? <ProviderMark provider={mark.provider} providers={providers} {...(mark.label ? { label: mark.label } : {})} /> : null}
       <span data-testid="worker-title" className="min-w-0 flex-1 truncate">{node.task.title}</span>
       {workers.length > 1 ? <span data-testid="worker-count" aria-hidden className={`shrink-0 text-xs tabular-nums ${INK_55}`}>×{workers.length}</span> : null}
       <span data-testid="worker-time" className={`shrink-0 text-[11px] tabular-nums ${INK_55}`}>{shortAge(node.task.updatedAt, now)}</span>
@@ -65,14 +86,14 @@ export function WorkerTaskRow({ node, now, activeThreadId, onOpenThread, targetO
       </div>
       {open && workers.length > 1 ? (
         <ul aria-label={`Workers on ${node.task.title}`} className="flex flex-col">
-          {workers.map((w) => <WorkerThreadRow key={w.threadId} worker={w} selected={w.threadId === activeThreadId} onOpen={onOpenThread} target={targetOf(w.threadId)} />)}
+          {workers.map((w) => <WorkerThreadRow key={w.threadId} worker={w} selected={w.threadId === activeThreadId} onOpen={onOpenThread} target={targetOf(w.threadId)} provider={providerOf ? providerOf(w.threadId) : undefined} providers={providers} />)}
         </ul>
       ) : null}
     </li>
   );
 }
 
-function WorkerThreadRow({ worker, selected, onOpen, target }: { worker: WorkerInfo; selected: boolean; onOpen(threadId: string): void; target: PluginThreadActionTarget | null }) {
+function WorkerThreadRow({ worker, selected, onOpen, target, provider, providers }: { worker: WorkerInfo; selected: boolean; onOpen(threadId: string): void; target: PluginThreadActionTarget | null; provider: RowProvider | null | undefined; providers: readonly ProviderCatalogEntry[] }) {
   const status = workerStatus(worker.status);
   const button = (
     <button type="button" data-testid="worker-row" data-thread-id={worker.threadId} data-status={status.toLowerCase()} aria-current={selected ? "page" : undefined} aria-label={`${worker.name}, ${status.toLowerCase()}`} onClick={() => onOpen(worker.threadId)}
@@ -81,14 +102,17 @@ function WorkerThreadRow({ worker, selected, onOpen, target }: { worker: WorkerI
       <span className="flex w-3 shrink-0 justify-center">
         {status === "Running" ? <span aria-hidden className="size-2 animate-spin rounded-full border-[1.5px] border-success border-r-transparent motion-reduce:animate-none" /> : status === "Failed" ? <Icon name="X" aria-hidden className="size-2.5 text-destructive" /> : <span aria-hidden className="size-1.5 rounded-full bg-muted-foreground/60" />}
       </span>
+      {provider !== undefined ? <ProviderMark provider={provider} providers={providers} /> : null}
       <span className="min-w-0 flex-1 truncate">{worker.name}</span>
     </button>
   );
   return <li>{target ? <ThreadActionsContextMenu thread={target}><div>{button}</div></ThreadActionsContextMenu> : button}</li>;
 }
 
-export function WorkerTasks({ groups, done, now, activeThreadId, onOpenThread, targetOf, slotOf, empty, showNames, loose = null }: {
+export function WorkerTasks({ groups, done, now, activeThreadId, onOpenThread, targetOf, slotOf, providerOf, providers, empty, showNames, loose = null }: {
   loose?: ReactNode;
+  providerOf?(threadId: string): RowProvider | null;
+  providers?: readonly ProviderCatalogEntry[];
   groups: readonly WorkerGroup[];
   done: readonly FlightNode[];
   now: number;
@@ -100,7 +124,7 @@ export function WorkerTasks({ groups, done, now, activeThreadId, onOpenThread, t
   showNames: boolean;
 }) {
   const [doneOpen, setDoneOpen] = useState(() => done.some((n) => workersUnder(n).some((w) => w.threadId === activeThreadId)));
-  const row = (node: FlightNode) => <WorkerTaskRow key={node.task.id} node={node} now={now} activeThreadId={activeThreadId} onOpenThread={onOpenThread} targetOf={targetOf} slotOf={slotOf} />;
+  const row = (node: FlightNode) => <WorkerTaskRow key={node.task.id} node={node} now={now} activeThreadId={activeThreadId} onOpenThread={onOpenThread} targetOf={targetOf} slotOf={slotOf} {...(providerOf ? { providerOf } : {})} {...(providers ? { providers } : {})} />;
   return (
     <>
       {groups.map((group) => (

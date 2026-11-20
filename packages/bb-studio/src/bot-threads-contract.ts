@@ -53,6 +53,10 @@ const conversation = z.object({
   needsYou: needsYou.nullable(),
   /** Mirrored from bb and not taken over: `running` and `needsYou` are bb's, which the app's live view of the copy here doesn't know. */
   mirrored: z.boolean(),
+  /** The agent provider it runs on (BB's provider id, e.g. `claude-code`); null when BB doesn't say. */
+  providerId: z.string().nullable().optional(),
+  /** Its model's display name ("Opus 5.5"); null when not included in the loaded thread data. */
+  modelName: z.string().nullable().optional(),
 });
 
 const worker = z.object({
@@ -71,6 +75,9 @@ const worker = z.object({
   mirrored: z.boolean(),
   /** How many finished workers with this title the sidebar row stands for (it is the newest; the older list has the rest); 1 when alone. */
   sameTitle: z.number().int().min(1),
+  /** As a conversation's. */
+  providerId: z.string().nullable().optional(),
+  modelName: z.string().nullable().optional(),
 });
 
 /** A row of the Conversations page: a conversation, active or archived. */

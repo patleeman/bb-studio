@@ -15,6 +15,8 @@ export interface LiveThread {
   hasPendingInteraction?: boolean;
   updatedAt?: number;
   displayTitle?: string;
+  /** The agent provider it runs on. */
+  providerId?: string;
 }
 
 const BUSY = new Set(["starting", "active", "stopping", "provisioning", "pending"]);
@@ -98,7 +100,7 @@ export function conversationLines(rows: readonly ConversationRow[], live: Readon
     const needsYou = row.needsYou ?? (thread?.hasPendingInteraction ? { reason: "Asked you a question", at: thread.updatedAt ?? row.updatedAt } : null);
     // BB's updatedAt counts only while it works: the importer moves it without any use.
     const failed = !!thread && !isBusy(thread) && (thread.status === "error" || thread.runtimeStatus === "error");
-    return { ...row, running: thread ? isBusy(thread) : row.running, needsYou, failed, updatedAt: isBusy(thread) ? Math.max(row.updatedAt, thread?.updatedAt ?? 0) : row.updatedAt, selected: row.threadId === activeThreadId };
+    return { ...row, running: thread ? isBusy(thread) : row.running, needsYou, failed, updatedAt: isBusy(thread) ? Math.max(row.updatedAt, thread?.updatedAt ?? 0) : row.updatedAt, selected: row.threadId === activeThreadId, providerId: row.providerId ?? live.get(row.threadId)?.providerId ?? null };
   });
 }
 
@@ -112,7 +114,7 @@ export function workerLines(rows: readonly WorkerRow[], live: ReadonlyMap<string
   return rows.map((row) => {
     const thread = row.mirrored ? undefined : live.get(row.threadId);
     const status = !thread ? row.status : thread.hasPendingInteraction ? "needs-you" : isBusy(thread) ? "running" : thread.status === "error" ? "failed" : row.status === "running" || row.status === "needs-you" ? "done" : row.status;
-    return { ...row, status, selected: row.threadId === activeThreadId };
+    return { ...row, status, selected: row.threadId === activeThreadId, providerId: row.providerId ?? live.get(row.threadId)?.providerId ?? null };
   });
 }
 

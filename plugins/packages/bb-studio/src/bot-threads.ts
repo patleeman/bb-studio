@@ -153,6 +153,9 @@ export interface ThreadFacts {
   title?: string | null;
   titleFallback?: string | null;
   projectId?: string | null;
+  /** The agent provider it runs on (BB's thread list says it). */
+  providerId?: string | null;
+  modelName?: string | null;
   status?: string;
   queuedMessageCount?: number;
   hasPendingInteraction?: boolean;
@@ -357,6 +360,9 @@ export interface ConversationView {
   needsYou: { reason: string; at: number } | null;
   /** Mirrored from bb: its state is bb's (src/mirror-live.ts). */
   mirrored: boolean;
+  /** The agent provider it runs on, and its model's display name when included in the loaded facts. */
+  providerId: string | null;
+  modelName: string | null;
 }
 
 export interface WorkerView {
@@ -373,6 +379,9 @@ export interface WorkerView {
   mirrored: boolean;
   /** How many finished workers with this title the row stands for (it is the newest of them); 1 when alone. */
   sameTitle: number;
+  /** As a conversation's. */
+  providerId: string | null;
+  modelName: string | null;
 }
 
 export interface BotThreadsView {
@@ -526,6 +535,7 @@ function allRows(botId: string, records: readonly BotThreadRecord[], threads: Re
         forkedFrom: rec.forkedFrom ? { ...rec.forkedFrom, title: name(rec.forkedFrom.threadId) ?? "a conversation" } : null,
         projectId: thread?.projectId ?? null, updatedAt: at(rec), latest: rec.latest?.text ?? null,
         running: threadRunning(thread), needsYou: needsYouOf(rec, thread), mirrored: !!thread?.mirroredPending,
+        providerId: thread?.providerId ?? null, modelName: thread?.modelName ?? null,
       };
     });
   const rank: Record<WorkerStatus, number> = { "needs-you": 0, running: 1, failed: 2, done: 3 };
@@ -537,6 +547,7 @@ function allRows(botId: string, records: readonly BotThreadRecord[], threads: Re
       threadId: rec.threadId, title: rec.title?.trim() || titleOf(thread) || "Worker", status: workerStatus(thread),
       ownerConversationId: rec.ownerConversationId, ownerTitle: name(rec.ownerConversationId), projectId: thread?.projectId ?? null,
       updatedAt: at(rec), tag: tag?.tag ?? null, branch: tag?.branch ?? null, mirrored: !!thread?.mirroredPending, sameTitle: 1,
+      providerId: thread?.providerId ?? null, modelName: thread?.modelName ?? null,
     };
   }).sort((a, b) => rank[a.status] - rank[b.status] || b.updatedAt - a.updatedAt);
   return { conversations: listed, workers: all };

@@ -22,6 +22,8 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   useSdk: () => ({ threads: { get: async ({ threadId }: { threadId: string }) => { if (state.gone.has(threadId)) throw Object.assign(new Error("Not found"), { status: 404 }); return { id: threadId, projectId: "proj_personal" }; } } }),
   experimental_useSidebarThreads: () => ({ threads: state.sidebarThreads, projects: [] }),
   experimental_ThreadActionsContextMenu: ({ children }: { children: ReactNode }) => children,
+  experimental_useProviders: () => ({ status: "ready", providers: [{ id: "claude-code", displayName: "Claude Code", logoUrl: "/logo/claude-code" }] }),
+  experimental_ProviderIcon: ({ provider }: { provider: { id: string } }) => <i data-logo={provider.id} />,
 }));
 vi.mock("../live", () => ({
   useLive: (method: string, input: { botId?: string }, options: { enabled?: boolean } = {}) => ({ data: options.enabled === false ? null : (state.live[`${method}:${input?.botId ?? ""}`] ?? state.live[method] ?? null), error: null, loading: false, refresh: () => {} }),
@@ -54,7 +56,7 @@ vi.mock("../../kit/ui/context-menu", () => ({
   ContextMenuCheckboxItem: ({ children, checked, onSelect }: { children: ReactNode; checked?: boolean; onSelect?: () => void }) => <div role="menuitemcheckbox" aria-checked={!!checked} data-testid="context-check" onClick={() => onSelect?.()}>{children}</div>,
 }));
 vi.mock("../../loops/ui/hooks", () => ({ useLoopsEnabled: () => state.loopsOn, loopsPath: (botId: string) => `/plugins/studio/studio/bot/${botId}/loops` }));
-vi.mock("../bot/BotAvatar", () => ({ BotAvatar: ({ emoji }: { emoji: string }) => <span data-testid="avatar">{emoji}</span> }));
+vi.mock("../bot/BotAvatar", () => ({ ProviderLogo: ({ provider }: { provider: { id: string } }) => <i data-logo={provider.id} />, BotAvatar: ({ emoji }: { emoji: string }) => <span data-testid="avatar">{emoji}</span> }));
 
 import { BotSidebarPanel } from "./BotSidebarPanel";
 import { defaultAppearance } from "../../theme/appearance";

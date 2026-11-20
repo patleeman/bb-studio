@@ -2,10 +2,12 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it } from "vitest";
+import { installTestPluginRuntime } from "@get-bb/plugin-sdk/testing/app";
 import { ConversationRowView } from "./BotSidebarPanel";
 import type { ConversationLine } from "./model";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+installTestPluginRuntime();
 
 it("draws no ⑂ parent label on a row", async () => {
   const row = {
