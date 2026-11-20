@@ -839,6 +839,7 @@ export default async function plugin(bb: BbPluginApi) {
     findings: (watcherId, finding, raw, at, failed) => (tasksUnavailable(db) ? null : automationTasks.watcherRun(watcherId, finding, raw, at, failed)),
     copiedReminder: (id) => loops.enabled() && !!db.prepare("SELECT 1 FROM tasks WHERE id = ?").get(reminderLoopId(id)),
     bot: automationBot,
+    notify: async (botId, line) => { const bot = bots.stored(botId); if (bot?.threadId) await alertBot(bb.sdk, { botThreadId: bot.threadId, line, note: STUDIO_LINE_NOTE }); },
     // With bb's automations plugin off (a BB Studio copy), watchers run here and bb's rows are read from its data file (src/automation-table.ts).
     bbFile: () => bbFromFile(join(bb.server.experimental_dataDir, "plugins", "automations", "data.db")),
     importedAt,

@@ -79,6 +79,9 @@ export function plainReason(error: unknown): string {
   return (text || "something went wrong").replace(/[.\s]+$/, "").slice(0, 200);
 }
 /** A watcher whose bb automation was deleted in bb and couldn't be made again. */
+/** What the Bot's chat says when a watcher deleted in bb is set up again. */
+export const watcherRemadeLine = (name: string) => `⚠️ The watcher "${name}" was deleted in bb's Automations, so Studio set it up again. To remove it for good, delete it in Studio: Bot › Automations › ${name} › Delete.`;
+
 export const WATCHER_GONE = "Its bb automation was deleted in bb; turn it off and on to set it up again.";
 
 type Row = {
@@ -178,6 +181,8 @@ export interface AutomationDeps {
   bbFile?: () => BbEntry[];
   /** When the BB Studio copy's import from bb ran; null (or absent) on an install without it. */
   importedAt?: () => number | null;
+  /** One line in a Bot's chat the user reads as is (a watcher deleted in bb was set up again). */
+  notify?(botId: string, line: string): Promise<void> | void;
   /** Runs a watcher's script when Studio runs watchers itself. */
   runScript?: RunWatcherScript;
   /** Where Studio-run watchers keep their files (one folder each). */
@@ -1103,6 +1108,8 @@ export class Automations {
       const done = await this.provision(row);
       for (const id of this.ids(done)) if (!before.has(id)) this.remade.add(id);
       console.warn(`[studio] watcher ${row.id} (${row.name}): its bb automation was deleted in bb; set it up again.`);
+      // Said once: if the delete in bb was on purpose, the user deletes the watcher in Studio, which removes it for good.
+      try { await this.deps.notify?.(row.bot_id, watcherRemadeLine(row.name)); } catch (error) { console.warn(`[studio] watcher ${row.id}: couldn't tell the Bot it was set up again`, error); }
     } catch (error) {
       markGone(plainReason(error));
     }

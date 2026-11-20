@@ -4,7 +4,7 @@ import { MIGRATIONS } from "./migrations";
 import { fromHeartbeat, localZone, type Weekday } from "./schedule";
 import { nextRun } from "./triggers/next-run";
 import { testScheduler } from "./test/scheduler-fixture";
-import { Automations, checkinPrompt, plainReason, retryDelay, WATCHER_GONE, watcherFinding, watcherMessage, type AutomationDeps, type AutomationRunner } from "./automations";
+import { Automations, watcherRemadeLine, checkinPrompt, plainReason, retryDelay, WATCHER_GONE, watcherFinding, watcherMessage, type AutomationDeps, type AutomationRunner } from "./automations";
 import { AutomationTasks, parentIdOf, readSources } from "./tasks/automations";
 import { TaskStore } from "./tasks/store";
 import type { HeartbeatRun } from "./contract";
@@ -863,4 +863,19 @@ it("FM: a watcher whose bb automation was deleted in bb and can't be made again 
   expect(on).toMatchObject({ state: "active", lastOutcome: null });
   expect(on.nextRunAt).not.toBeNull();
   expect(x.automations).toMatchObject([{ enabled: true }]);
+});
+
+it("FM (review F5): setting up again a watcher deleted in bb tells the user once, with how to delete it for good", async () => {
+  quietWarn();
+  const notify = vi.fn();
+  const x = await setup(null, { notify });
+  const made = await x.auto.create({ ...watcher, schedule: { type: "cron", cron: "0 8 * * *" } });
+  runsAnswer404(x);
+  x.automations.splice(0, 1, { id: "elsewhere", projectId: "proj_other" });
+  await x.auto.tick();
+  expect(notify).toHaveBeenCalledTimes(1);
+  expect(notify).toHaveBeenCalledWith("bot_main", watcherRemadeLine(made.name));
+  expect(notify.mock.calls[0]![1]).toContain("delete it in Studio");
+  await x.auto.tick();
+  expect(notify).toHaveBeenCalledTimes(1);
 });
