@@ -1,4 +1,9 @@
-import type { Host } from "@bb/domain";
+import type {
+  Host,
+  PermissionMode,
+  ReasoningLevel,
+  ServiceTier,
+} from "@bb/domain";
 import type { ReadonlyJsonValue } from "./json-value.js";
 import type { ThreadResponse } from "@bb/server-contract";
 
@@ -108,7 +113,11 @@ export interface ForkPluginHooks {
    * system's and draws it as one quiet row. Experimental: see
    * docs/api_to_audit.fork.md.
    */
-  readonly experimental_features: { readonly threadNotices: true };
+  readonly experimental_features: {
+    readonly threadNotices: true;
+    readonly autoRouter: true;
+    readonly textCompletion: true;
+  };
   /**
    * Answer "what kind of turn was this?" for every turn that finishes. One
    * classifier per plugin; a second call replaces the first. A turn is quiet
@@ -162,6 +171,88 @@ export interface ForkPluginHooks {
   experimental_threadForkPoint(
     threadId: string,
   ): Promise<ExperimentalThreadForkPoint | null>;
+  /**
+   * Answer "Auto": bb lists an Auto provider (id `auto`, model `auto`) in the
+   * model pickers while a router is registered and enabled, and resolves a
+   * new thread created with it (or, when the router says Auto is the
+   * default, one created without a provider) to the real provider and model
+   * the router returns, before the thread exists. The thread never runs as
+   * Auto. bb waits at most 8 seconds and cancels `signal` after that; a
+   * router that returns null, throws or is late leaves the thread on the
+   * usual defaults. One router per bb: a second registration replaces the
+   * first. Experimental: see docs/api_to_audit.fork.md.
+   */
+  experimental_autoRouter(router: ExperimentalAutoRouter): void;
+  /**
+   * Answer one short prompt with the AI service the user picked for thread
+   * titles (Settings → AI services): a single model call with no tools, no
+   * thread and no workspace, which is what bb itself uses for titles. The
+   * reply is cleaned to one line, as titles are. bb waits at most
+   * `timeoutMs` (500-8000, default 8000) and the prompt is capped at 32,000
+   * characters. Resolves `{ ok: false }` when the task is turned off, no
+   * service is ready, or it failed or timed out. Experimental: see
+   * docs/api_to_audit.fork.md.
+   */
+  experimental_completeText(
+    request: ExperimentalTextCompletionRequest,
+  ): Promise<ExperimentalTextCompletionResult>;
+}
+
+export interface ExperimentalTextCompletionRequest {
+  prompt: string;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
+export type ExperimentalTextCompletionResult =
+  | { ok: true; text: string; service: string; ms: number }
+  | {
+      ok: false;
+      reason: "off" | "unavailable" | "timeout" | "failed" | "cancelled";
+      message: string;
+      ms: number;
+    };
+
+/** The provider id the pickers use for Auto. */
+export const EXPERIMENTAL_AUTO_PROVIDER_ID = "auto";
+
+/** What bb asks an Auto router about a thread it is about to create. */
+export interface ExperimentalAutoRouteRequest {
+  projectId: string;
+  /** The text of the first message, without agent-only context. */
+  text: string;
+  parentThreadId: string | null;
+  originPluginId: string | null;
+  /**
+   * The permission mode asked for. bb narrows it to one the chosen provider
+   * supports, never wider; a target that supports no mode at or below it
+   * cannot honor it, so a router should skip it.
+   */
+  permissionMode: PermissionMode | null;
+  signal: AbortSignal;
+}
+
+/** A real provider and model for the thread. */
+export interface ExperimentalAutoRouteTarget {
+  providerId: string;
+  model: string;
+  reasoningLevel?: ReasoningLevel | null;
+  serviceTier?: ServiceTier | null;
+}
+
+export interface ExperimentalAutoRouter {
+  /** Shown in the pickers; defaults to "Auto". */
+  label?: string;
+  /** Whether Auto is offered now. Defaults to true. */
+  enabled?: () => boolean;
+  /** Whether a thread created without a provider goes through Auto. */
+  isDefault?: () => boolean;
+  resolve(
+    request: ExperimentalAutoRouteRequest,
+  ):
+    | ExperimentalAutoRouteTarget
+    | null
+    | Promise<ExperimentalAutoRouteTarget | null>;
 }
 
 /**
