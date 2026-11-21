@@ -2,6 +2,7 @@ import { useMemo, useSyncExternalStore } from "react";
 import type { ExperimentalMessageClassificationContext } from "@get-bb/plugin-sdk";
 import { getPluginSlotSnapshot, subscribePluginSlots } from "./plugin-slots";
 import type { PluginReplyClassifierSlot } from "./fork-slots";
+import { useTimelineFilterExpanded } from "./fork-timeline-filter";
 
 export type ReplyClassifiers = readonly PluginReplyClassifierSlot[];
 
@@ -31,7 +32,9 @@ export function isQuietReply(
 
 export function useQuietReply(text: string | null | undefined): boolean {
   const read = () => isQuietReply(text);
-  return useSyncExternalStore(subscribePluginSlots, read, read);
+  const quiet = useSyncExternalStore(subscribePluginSlots, read, read);
+  const expanded = useTimelineFilterExpanded();
+  return quiet && !expanded;
 }
 
 function wellFormedClassification(

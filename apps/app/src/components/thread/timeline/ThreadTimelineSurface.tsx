@@ -1,3 +1,4 @@
+import { withTimelineFilter } from "./timelineFilter.fork.js";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ActiveThinking, ThreadRuntimeDisplayStatus } from "@bb/domain";
 import type { TimelineRow } from "@bb/server-contract";
@@ -127,7 +128,8 @@ function useTimelineRowsWithPendingStop({
   }, [rows, isStopping, stoppingAnchorAt, threadId]);
 }
 
-export function ThreadTimelineSurface({
+export const ThreadTimelineSurface = withTimelineFilter(ThreadTimelineSurfaceView);
+function ThreadTimelineSurfaceView({
   activeThinking,
   canSpawnChild,
   contextBoundarySeq,
