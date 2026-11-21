@@ -809,6 +809,9 @@ enum BotSpacesDemo {
                         return ok(["found": true, "title": NSNull(), "spec": NSNull()])
                     }
                 }
+            case "designs.getDesign" where DesignDemo.on:
+                let design: Any = input["id"] as? String == DesignDemo.id ? DesignDemo.design() : NSNull()
+                return ok(["design": design])
             case "bot_get":
                 // Home's default is Auto (the model router); Research names none, so it starts on the project's defaults.
                 switch input["botId"] as? String {

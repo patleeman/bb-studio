@@ -131,7 +131,12 @@ struct DesignView: View {
                     ForEach(round.screens ?? [], id: \.id) { screen in
                         Button { playing = screen } label: { thumbnail(screen) }
                             .buttonStyle(.plain)
+                            // Pinching a screen opens it full screen, where pinch zooms and a drag pans.
+                            .simultaneousGesture(MagnifyGesture().onEnded { value in
+                                if value.magnification > 1.1 { playing = screen }
+                            })
                             .accessibilityLabel("Play screen \(screen.id ?? ""), \(screen.title ?? screen.caption ?? "")")
+                            .accessibilityIdentifier("designScreen-\(screen.id ?? "")")
                     }
                 }
                 .padding(.horizontal)
@@ -159,6 +164,8 @@ struct DesignView: View {
             }
             .frame(width: size.width * scale, alignment: .leading)
         }
+        // The page takes no touches, so without this only the caption was a target: the whole card plays the screen.
+        .contentShape(.rect)
     }
 
     @ViewBuilder
@@ -253,20 +260,33 @@ struct DesignView: View {
 extension DesignScreen: Identifiable {}
 
 /// One screen, live, played full screen: Fit shows it whole, Fill uses the
-/// phone's width and scrolls. A prototype's steps start it part-way through.
+/// phone's width and scrolls. Pinch zooms (to 6×) and pans, and a double tap
+/// zooms in and out, in the web view's own scroll view (the screen's page laid
+/// out at the width it was written for), so taps still play the prototype. A
+/// prototype's steps start it part-way through.
 private struct DesignPlayer: View {
     private let operation = ServerOperation()
     let designId: String
     let screen: DesignScreen
     @State private var fill = false
     @State private var step = ""
+    @State private var zoom: CGFloat = 0
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
-            // Pinch to zoom and pan over the screen in Fit and Fill; taps still play the prototype.
-            Zoomable { player }
+            DesignFrame(url: operation.client.designScreenURL(designId, screen, step: step), interactive: true,
+                        zoom: .init(width: screen.size.width, height: screen.size.height, fill: fill)) { zoom = $0 }
+                .id(step)
                 .background(Color(.secondarySystemBackground))
+                .overlay(alignment: .bottomTrailing) {
+                    // The page's zoom scale, for the UI tests.
+                    Color.clear.frame(width: 1, height: 1)
+                        .accessibilityElement()
+                        .accessibilityLabel("Zoom")
+                        .accessibilityValue(String(format: "%.4f", zoom))
+                        .accessibilityIdentifier("designZoom")
+                }
             .navigationTitle([screen.id, screen.title?.isEmpty == false ? screen.title : screen.caption].compactMap { $0 }.joined(separator: " · "))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -289,48 +309,123 @@ private struct DesignPlayer: View {
             }
         }
     }
-
-    private var player: some View {
-        GeometryReader { proxy in
-            let size = screen.size
-            let scale = fill ? proxy.size.width / size.width : min(1, proxy.size.width / size.width, proxy.size.height / size.height)
-            DesignFrame(url: operation.client.designScreenURL(designId, screen, step: step), interactive: true)
-                .id(step)
-                .frame(width: size.width, height: fill ? proxy.size.height / scale : size.height)
-                .scaleEffect(scale, anchor: .topLeading)
-                .frame(width: size.width * scale, height: fill ? proxy.size.height : size.height * scale, alignment: .topLeading)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
 }
 
-/// A design screen's page. Previews take no touches, so the row scrolls.
+/// A design screen's page. Previews take no touches, so the row scrolls. With
+/// `zoom` (the player) the page is laid out at the screen's own width and the
+/// web view's scroll view zooms: it starts at Fit (the whole screen) or Fill
+/// (its width), pinch goes to 6×, and WebKit's double tap zooms in and out.
 private struct DesignFrame: UIViewRepresentable {
+    struct Zoom: Equatable {
+        var width: Double
+        var height: Double
+        var fill: Bool
+    }
+
     let url: URL
     let interactive: Bool
+    var zoom: Zoom? = nil
+    /// The web view's zoom scale, as it changes.
+    var zoomed: ((CGFloat) -> Void)? = nil
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.allowsInlineMediaPlayback = true
+        if let zoom {
+            configuration.userContentController.addUserScript(Self.viewport(width: zoom.width))
+            // Pinch works even where the page's viewport forbids it.
+            configuration.ignoresViewportScaleLimits = true
+        }
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.isUserInteractionEnabled = interactive
         view.scrollView.contentInsetAdjustmentBehavior = .never
         view.isOpaque = false
-        view.load(URLRequest(url: url))
-        context.coordinator.loaded = url
+        if zoom != nil {
+            view.accessibilityIdentifier = "designPlayerPage"
+            view.scrollView.bouncesZoom = true
+            view.navigationDelegate = context.coordinator
+            context.coordinator.watch(view)
+        }
+        context.coordinator.parent = self
+        context.coordinator.load(url, in: view)
         return view
     }
 
     func updateUIView(_ view: WKWebView, context: Context) {
         view.isUserInteractionEnabled = interactive
+        let before = context.coordinator.parent.zoom
+        context.coordinator.parent = self
+        if before?.fill != zoom?.fill { context.coordinator.fit(view, animated: true) }
         guard context.coordinator.loaded != url else { return }
-        context.coordinator.loaded = url
-        view.load(URLRequest(url: url))
+        context.coordinator.load(url, in: view)
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
 
-    final class Coordinator {
+    /// The page's viewport at the screen's width, zoomable (designs often say `user-scalable=no`).
+    static func viewport(width: Double) -> WKUserScript {
+        WKUserScript(source: """
+            (function () {
+              var content = 'width=\(Int(width)), minimum-scale=0.1, maximum-scale=6, user-scalable=yes';
+              function apply() {
+                var meta = document.querySelector('meta[name=viewport]');
+                if (!meta) { meta = document.createElement('meta'); meta.name = 'viewport'; (document.head || document.documentElement).appendChild(meta); }
+                meta.content = content;
+              }
+              if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply); else apply();
+            })();
+            """, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+    }
+
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        var parent: DesignFrame
         var loaded: URL?
+        private var reported: CGFloat = 0
+        /// WebKit's scroll view doesn't post zoom changes, so the zoom is read four times a second.
+        private var timer: Timer?
+
+        init(parent: DesignFrame) { self.parent = parent }
+
+        deinit { timer?.invalidate() }
+
+        func load(_ url: URL, in view: WKWebView) {
+            loaded = url
+            #if DEBUG
+            if let html = DesignDemo.html(for: url) {
+                view.loadHTMLString(html, baseURL: nil)
+                return
+            }
+            #endif
+            view.load(URLRequest(url: url))
+        }
+
+        func watch(_ view: WKWebView) {
+            timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self, weak view] _ in
+                guard let self, let view else { return }
+                let current = view.scrollView.zoomScale
+                guard abs(current - self.reported) > 0.0005 else { return }
+                self.reported = current
+                self.parent.zoomed?(current)
+            }
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            // The viewport changes after the page lays out; fit once it has.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self, weak webView] in
+                guard let self, let webView else { return }
+                self.fit(webView, animated: false)
+            }
+        }
+
+        /// Fit: the whole screen in view. Fill: the screen's width across the view.
+        func fit(_ view: WKWebView, animated: Bool) {
+            guard let zoom = parent.zoom, view.bounds.width > 0, zoom.width > 0, zoom.height > 0 else { return }
+            let across = view.bounds.width / zoom.width
+            let scale = zoom.fill ? across : min(across, view.bounds.height / zoom.height)
+            view.scrollView.minimumZoomScale = min(scale, across) * 0.5
+            view.scrollView.maximumZoomScale = across * 6
+            // WebKit keeps a page at least as wide as the view, so a phone screen's Fit fills the width.
+            view.scrollView.setZoomScale(scale, animated: animated)
+        }
     }
 }
