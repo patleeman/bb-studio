@@ -1,6 +1,5 @@
 import type { ProjectSource } from "@bb/domain";
 import type { SystemEnvironmentProvider } from "@bb/server-contract";
-import modalLogoUrl from "../../../../../plugins/environment-modal-sandbox/modal-logo.svg?url";
 import { EnvironmentPickerUI } from "./EnvironmentPicker";
 import { ProjectSelector } from "./ProjectSelector";
 import { StoryCard, StoryRow } from "../../../.ladle/story-card";
@@ -10,6 +9,9 @@ import {
   makeHost,
   STORY_ENVIRONMENT_PROVIDERS,
 } from "../../../.ladle/story-fixtures";
+
+const modalLogoUrl =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E";
 
 const localHost = makeHost({ id: HOST_IDS.local });
 const remoteHost = makeHost({ id: HOST_IDS.local, name: "studio-mac-mini" });
