@@ -105,7 +105,12 @@ export function fakeJev(calls: { state: unknown; questions: Record<string, unkno
     const state = input.state as { message?: string; strands: Strandish[]; messages?: { id: string; message: string }[] };
     const answers: Record<string, unknown> = {};
     if (state.messages) for (const message of state.messages) answers[message.id] = { type: "choice", probabilities: {}, ...pick(message.message, state.strands) };
-    else answers.strand = { type: "choice", probabilities: {}, ...pick(state.message ?? "", state.strands) };
+    else if (state.strands) answers.strand = { type: "choice", probabilities: {}, ...pick(state.message ?? "", state.strands) };
+    // The reply question (src/strands/reply.ts): needs-you when the reply's end asks or hands the user something to do.
+    if (input.questions.reply) {
+      const end = (input.state as { replyEnd?: string }).replyEnd ?? "";
+      answers.reply = /\?|\bdecide\b|\bsign in\b|\bon your phone\b/i.test(end) ? { type: "choice", probabilities: {}, choice: "needs-you", confidence: 0.85 } : { type: "choice", probabilities: {}, choice: "status", confidence: 0.9 };
+    }
     return { ok: true, answers };
   };
 }

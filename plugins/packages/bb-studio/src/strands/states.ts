@@ -1,7 +1,8 @@
 // A strand's live state, worked out on each read from real signals only
 // (engineering plan, "Live states"); nothing here is guessed or stored.
 //
-//   needs-you   a pending BB question or approval in a turn of the strand, a
+//   needs-you   a reply in the strand that needs the user (src/strands/reply.ts)
+//               and isn't answered yet, a pending BB question or approval in a turn of the strand, a
 //               worker of the strand in needs-you, a Tool Gateway request
 //               from the conversation or one of the strand's workers, or an
 //               area's item that needs the user, on the strand its report sits in,
@@ -39,7 +40,7 @@ export type WorkerStatus = "running" | "needs-you" | "failed" | "done";
 export interface WorkerSignal { threadId: string; title: string; status: WorkerStatus; strandId: string | null; endedAt: number | null }
 export type AskDecision = "allow_once" | "allow_for_session" | "deny";
 /** Something waiting on the user: a BB question or approval (in the conversation or one of its workers), or a Tool Gateway request. */
-export interface AskSignal { id: string; kind: "question" | "approval" | "gateway" | "area" | "flag"; strandId: string | null; label: string; threadId: string; decisions: AskDecision[]; /** An approval's full command, working folder, actions and session grant, in BB's words. */ details: string[]; /** The conversation's turn it waits in (its rows stay in view under any strand filter); null for a worker's. */ turnId?: string | null }
+export interface AskSignal { id: string; kind: "question" | "approval" | "gateway" | "area" | "flag" | "reply"; strandId: string | null; label: string; threadId: string; decisions: AskDecision[]; /** An approval's full command, working folder, actions and session grant, in BB's words. */ details: string[]; /** The conversation's turn it waits in (its rows stay in view under any strand filter); null for a worker's. */ turnId?: string | null; /** A reply that needs the user: its message's seq. */ seq?: number | null }
 export interface TaskSignal { id: string; strandId: string; waitingOn: { kind: string; text: string | null; ref: string | null } | null }
 
 export interface Signals {

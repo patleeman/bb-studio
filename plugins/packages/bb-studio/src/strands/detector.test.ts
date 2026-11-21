@@ -183,7 +183,9 @@ describe("a running turn", () => {
     const calls = x.jevCalls.length;
     x.thread.finish(turn.turnId, "Released.");
     await x.detector.idle(x.thread.id);
-    expect(x.jevCalls.length).toBe(calls);
+    // Not sorted again: the one call at its end only tags its reply (src/strands/reply.ts).
+    expect(x.jevCalls.length).toBe(calls + 1);
+    expect(Object.keys(x.jevCalls.at(-1)!.questions)).toEqual(["reply"]);
     expect(x.detector.hasRunningTurn(x.thread.id)).toBe(false);
     expect(x.store.items(x.thread.id, 10, ["reply"])).toHaveLength(1);
   });

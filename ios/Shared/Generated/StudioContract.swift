@@ -392,6 +392,7 @@ public enum Studio {
     public static let strands_overview = "strands.overview"
     public static let strands_tags = "strands.tags"
     public static let strands_opened = "strands.opened"
+    public static let strands_resolveReply = "strands.resolveReply"
     public static let router_notice_get = "router.notice.get"
     public static let router_notice_dismiss = "router.notice.dismiss"
     public static let router_handoff = "router.handoff"
@@ -1256,6 +1257,8 @@ public enum Studio {
   public typealias StrandsTags = StrandsTagsOutput
 
   public typealias StrandsOpened = StrandsOpenedOutput
+
+  public typealias StrandsResolveReply = StrandsResolveReplyOutput
 
   public typealias RouterNoticeGet = RouterNoticeGetOutput
 
@@ -41297,6 +41300,7 @@ public enum Studio {
     case gateway
     case area
     case flag
+    case reply
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
@@ -41307,6 +41311,7 @@ public enum Studio {
       case "gateway": self = .gateway
       case "area": self = .area
       case "flag": self = .flag
+      case "reply": self = .reply
       default: self = .unknown(value)
       }
     }
@@ -41319,6 +41324,7 @@ public enum Studio {
       case .gateway: try container.encode("gateway")
       case .area: try container.encode("area")
       case .flag: try container.encode("flag")
+      case .reply: try container.encode("reply")
       case .unknown(let value): try container.encode(value)
       }
     }
@@ -41359,8 +41365,9 @@ public enum Studio {
     public var details: [String]?
     public var turnId: String?
     public var decisions: [StrandsListOutputStrandsItemAsksItemDecisionsItem]?
+    public var seq: Double?
 
-    public init(id: String? = nil, kind: StrandsListOutputStrandsItemAsksItemKind? = nil, threadId: String? = nil, label: String? = nil, details: [String]? = nil, turnId: String? = nil, decisions: [StrandsListOutputStrandsItemAsksItemDecisionsItem]? = nil) {
+    public init(id: String? = nil, kind: StrandsListOutputStrandsItemAsksItemKind? = nil, threadId: String? = nil, label: String? = nil, details: [String]? = nil, turnId: String? = nil, decisions: [StrandsListOutputStrandsItemAsksItemDecisionsItem]? = nil, seq: Double? = nil) {
       self.id = id
       self.kind = kind
       self.threadId = threadId
@@ -41368,6 +41375,7 @@ public enum Studio {
       self.details = details
       self.turnId = turnId
       self.decisions = decisions
+      self.seq = seq
     }
   }
 
@@ -41532,6 +41540,7 @@ public enum Studio {
     case gateway
     case area
     case flag
+    case reply
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
@@ -41542,6 +41551,7 @@ public enum Studio {
       case "gateway": self = .gateway
       case "area": self = .area
       case "flag": self = .flag
+      case "reply": self = .reply
       default: self = .unknown(value)
       }
     }
@@ -41554,6 +41564,7 @@ public enum Studio {
       case .gateway: try container.encode("gateway")
       case .area: try container.encode("area")
       case .flag: try container.encode("flag")
+      case .reply: try container.encode("reply")
       case .unknown(let value): try container.encode(value)
       }
     }
@@ -41594,8 +41605,9 @@ public enum Studio {
     public var details: [String]?
     public var turnId: String?
     public var decisions: [StrandsListOutputEarlierItemAsksItemDecisionsItem]?
+    public var seq: Double?
 
-    public init(id: String? = nil, kind: StrandsListOutputEarlierItemAsksItemKind? = nil, threadId: String? = nil, label: String? = nil, details: [String]? = nil, turnId: String? = nil, decisions: [StrandsListOutputEarlierItemAsksItemDecisionsItem]? = nil) {
+    public init(id: String? = nil, kind: StrandsListOutputEarlierItemAsksItemKind? = nil, threadId: String? = nil, label: String? = nil, details: [String]? = nil, turnId: String? = nil, decisions: [StrandsListOutputEarlierItemAsksItemDecisionsItem]? = nil, seq: Double? = nil) {
       self.id = id
       self.kind = kind
       self.threadId = threadId
@@ -41603,6 +41615,7 @@ public enum Studio {
       self.details = details
       self.turnId = turnId
       self.decisions = decisions
+      self.seq = seq
     }
   }
 
@@ -41843,6 +41856,7 @@ public enum Studio {
     case gateway
     case area
     case flag
+    case reply
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
@@ -41853,6 +41867,7 @@ public enum Studio {
       case "gateway": self = .gateway
       case "area": self = .area
       case "flag": self = .flag
+      case "reply": self = .reply
       default: self = .unknown(value)
       }
     }
@@ -41865,6 +41880,7 @@ public enum Studio {
       case .gateway: try container.encode("gateway")
       case .area: try container.encode("area")
       case .flag: try container.encode("flag")
+      case .reply: try container.encode("reply")
       case .unknown(let value): try container.encode(value)
       }
     }
@@ -41905,8 +41921,9 @@ public enum Studio {
     public var details: [String]?
     public var turnId: String?
     public var decisions: [StrandsOverviewOutputConversationsItemStrandsItemAsksItemDecisionsItem]?
+    public var seq: Double?
 
-    public init(id: String? = nil, kind: StrandsOverviewOutputConversationsItemStrandsItemAsksItemKind? = nil, threadId: String? = nil, label: String? = nil, details: [String]? = nil, turnId: String? = nil, decisions: [StrandsOverviewOutputConversationsItemStrandsItemAsksItemDecisionsItem]? = nil) {
+    public init(id: String? = nil, kind: StrandsOverviewOutputConversationsItemStrandsItemAsksItemKind? = nil, threadId: String? = nil, label: String? = nil, details: [String]? = nil, turnId: String? = nil, decisions: [StrandsOverviewOutputConversationsItemStrandsItemAsksItemDecisionsItem]? = nil, seq: Double? = nil) {
       self.id = id
       self.kind = kind
       self.threadId = threadId
@@ -41914,6 +41931,7 @@ public enum Studio {
       self.details = details
       self.turnId = turnId
       self.decisions = decisions
+      self.seq = seq
     }
   }
 
@@ -42094,13 +42112,55 @@ public enum Studio {
     }
   }
 
+  public enum StrandsTagsOutputRepliesItemTag: Sendable, Hashable, Codable {
+    case needs_you
+    case status
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "needs-you": self = .needs_you
+      case "status": self = .status
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .needs_you: try container.encode("needs-you")
+      case .status: try container.encode("status")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct StrandsTagsOutputRepliesItem: Sendable, Hashable, Codable {
+    public var turnId: String?
+    public var seq: Double?
+    public var tag: StrandsTagsOutputRepliesItemTag?
+    public var ask: String?
+    public var resolved: Bool?
+
+    public init(turnId: String? = nil, seq: Double? = nil, tag: StrandsTagsOutputRepliesItemTag? = nil, ask: String? = nil, resolved: Bool? = nil) {
+      self.turnId = turnId
+      self.seq = seq
+      self.tag = tag
+      self.ask = ask
+      self.resolved = resolved
+    }
+  }
+
   public struct StrandsTagsOutput: Sendable, Hashable, Codable {
     public var tags: [StrandsTagsOutputTagsItem]?
     public var strands: [StrandsTagsOutputStrandsItem]?
+    public var replies: [StrandsTagsOutputRepliesItem]?
 
-    public init(tags: [StrandsTagsOutputTagsItem]? = nil, strands: [StrandsTagsOutputStrandsItem]? = nil) {
+    public init(tags: [StrandsTagsOutputTagsItem]? = nil, strands: [StrandsTagsOutputStrandsItem]? = nil, replies: [StrandsTagsOutputRepliesItem]? = nil) {
       self.tags = tags
       self.strands = strands
+      self.replies = replies
     }
   }
 
@@ -42113,6 +42173,24 @@ public enum Studio {
   }
 
   public struct StrandsOpenedOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct StrandsResolveReplyInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var seq: Int?
+
+    public init(threadId: String? = nil, seq: Int? = nil) {
+      self.threadId = threadId
+      self.seq = seq
+    }
+  }
+
+  public struct StrandsResolveReplyOutput: Sendable, Hashable, Codable {
     public var ok: Bool?
 
     public init(ok: Bool? = nil) {

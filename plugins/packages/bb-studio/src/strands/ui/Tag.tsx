@@ -3,6 +3,12 @@
 // before, otherwise the strand's name, muted. Text only. While a strand is
 // selected, the other strands' messages dim. On hover, "Move to…" moves the
 // message's turn to another strand, or starts a new strand from it.
+//
+// A reply that needs the user (src/strands/reply.ts; design "Replies that
+// need you", option a) carries one amber line above its last message: "Needs
+// you", its ask in the reply's own words, and Done. It stays until the user
+// answers in its strand or presses Done. A status reply's messages are
+// slightly muted.
 import type { ExperimentalMessageMetadataProps } from "@get-bb/plugin-sdk/app";
 import { useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -10,12 +16,39 @@ import { errorMessage } from "../../kit/format";
 import { Icon, Popover, PopoverContent, PopoverTrigger } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import { useIsBotThread } from "../../ui/conversations/bot-thread-owners";
-import { tagOf, type Tags } from "./model";
+import type { ReplyTagView } from "../contract";
+import { replyOf, tagOf, type Tags } from "./model";
+import { useNewestInTurn } from "./reply-marks";
 import { ensureDimStyle, timelineFiltersInHost, useSelection } from "./selection";
 import { moveFocus, useSelectStrand } from "./Strip";
 
 const ROW = "[data-timeline-row-id]";
 const DIM = "data-studio-strand-dim";
+const STATUS = "data-studio-reply-status";
+
+/** The amber line above a reply that needs the user: its ask, and Done. */
+export function ReplyAsk({ threadId, reply }: { threadId: string; reply: Pick<ReplyTagView, "seq" | "ask"> }) {
+  const call = useCall();
+  const [busy, setBusy] = useState(false);
+  const done = async () => {
+    setBusy(true);
+    try { if (!(await call("strands.resolveReply", { threadId, seq: reply.seq })).ok) toast.error("Couldn't mark it done."); }
+    catch (error) { toast.error("Couldn't mark it done.", { description: errorMessage(error) }); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div data-reply-needs-you={reply.seq} className="mt-0.5 flex w-full basis-full items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-2.5 py-1.5">
+      <span className="flex shrink-0 items-center gap-1.5 text-[11.5px] font-semibold leading-5 text-warning">
+        <span aria-hidden className="size-1.5 rounded-full bg-warning" />Needs you
+      </span>
+      <span data-reply-ask="" className="min-w-0 flex-1 text-[13px] font-medium leading-5 text-foreground">{reply.ask ?? "This reply asks you something"}</span>
+      <button type="button" disabled={busy} onClick={() => void done()}
+        className="h-[22px] shrink-0 cursor-pointer rounded-md border border-border bg-transparent px-2 text-[11.5px] text-foreground hover:bg-accent disabled:opacity-50">
+        Done
+      </button>
+    </div>
+  );
+}
 
 export function StrandTag({ message }: ExperimentalMessageMetadataProps) {
   const bots = useIsBotThread(message.threadId);
@@ -68,6 +101,11 @@ function Tag({ message }: ExperimentalMessageMetadataProps) {
   const choose = useSelectStrand(message.threadId);
   const ref = useRef<HTMLElement | null>(null);
   const tag = tagOf(tags.data, message.turnId);
+  const reply = message.role === "assistant" ? replyOf(tags.data, message.turnId) : null;
+  const asking = reply?.tag === "needs-you" && !reply.resolved;
+  // Only the turn's newest message carries the line.
+  const newest = useNewestInTurn(message.threadId, message.turnId, message.id, message.createdAt, asking);
+  const status = reply?.tag === "status";
   // BB's timeline filter hides the other strands' messages; without it, they dim.
   const dim = !!selection && selection.strandId !== tag?.strandId && !timelineFiltersInHost();
   useLayoutEffect(() => {
@@ -75,9 +113,14 @@ function Tag({ message }: ExperimentalMessageMetadataProps) {
     if (!row) return;
     ensureDimStyle(row.ownerDocument);
     if (dim) row.setAttribute(DIM, ""); else row.removeAttribute(DIM);
-    return () => row.removeAttribute(DIM);
-  }, [dim]);
-  if (!tag || !tags.data) return selection ? <span ref={ref} hidden /> : null;
+    if (status) row.setAttribute(STATUS, ""); else row.removeAttribute(STATUS);
+    return () => { row.removeAttribute(DIM); row.removeAttribute(STATUS); };
+  }, [dim, status]);
+  const ask = asking && newest && reply ? <ReplyAsk threadId={message.threadId} reply={reply} /> : null;
+  if (!tag || !tags.data) {
+    if (ask) return <><span ref={ref} hidden />{ask}</>;
+    return selection || status ? <span ref={ref} hidden /> : null;
+  }
   const open = () => choose({ id: tag.strandId, latestSeq: null });
   const move = <MoveMenu threadId={message.threadId} seq={tag.seq} current={tag.strandId} strands={tags.data.strands} />;
   // Under a filter for another strand, this message is kept in view because it waits for an answer.
@@ -93,12 +136,15 @@ function Tag({ message }: ExperimentalMessageMetadataProps) {
     );
   }
   return (
-    <span ref={(element) => { ref.current = element; }} className="inline-flex items-center gap-1.5">
-      <button type="button" data-strand-tag={tag.strandId} onClick={open} aria-label={`Strand: ${tag.title}`}
-        className="cursor-pointer text-[11px] text-muted-foreground/70 hover:text-foreground">
-        {name}
-      </button>
-      {move}
-    </span>
+    <>
+      <span ref={(element) => { ref.current = element; }} className="inline-flex items-center gap-1.5">
+        <button type="button" data-strand-tag={tag.strandId} onClick={open} aria-label={`Strand: ${tag.title}`}
+          className="cursor-pointer text-[11px] text-muted-foreground/70 hover:text-foreground">
+          {name}
+        </button>
+        {move}
+      </span>
+      {ask}
+    </>
   );
 }

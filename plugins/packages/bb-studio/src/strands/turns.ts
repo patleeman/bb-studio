@@ -19,6 +19,8 @@ export interface Turn {
   text: string;
   /** The reply's text so far (agent messages, in order). */
   reply: string;
+  /** The reply's last agent message: what the turn ends on, tagged needs-you or status. */
+  finalReply?: string;
   /** The seq of the reply's last agent message. */
   replySeq: number | null;
   /** The last seq that belongs to it. */
@@ -112,6 +114,7 @@ export function turnsOf(rows: readonly EventRow[], options: { settled?: boolean;
       const message = messageText(row);
       if (message?.kind === "assistant") {
         turn.reply = [turn.reply, message.text].filter(Boolean).join("\n\n");
+        turn.finalReply = message.text;
         turn.replySeq = seq;
       }
     } else if (row.type === "turn/completed") {

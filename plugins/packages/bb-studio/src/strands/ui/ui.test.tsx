@@ -12,12 +12,12 @@ const view = (id: string, title: string, over: Partial<StrandView> = {}): Strand
   id, title, summary: null, named: true, state: "active", detail: null, asks: [], workers: [], lastAt: NOW - 10 * MIN, firstAt: NOW - 3 * 60 * MIN, firstSeq: 4,
   latestSeq: 10, latestTurnId: `t_${id}`, messages: 1, unsure: 0, pinned: false, origin: "jev", taskId: null, ...over,
 });
-const approval = (id: string, label: string) => ({ id, kind: "approval" as const, threadId: "thr_main", label, details: ["Command: npm publish --tag latest --access public --otp-from-env", "Cwd: /tmp/release"], turnId: "t5" as string | null, decisions: ["deny", "allow_once"] as ("deny" | "allow_once")[] });
+const approval = (id: string, label: string) => ({ id, kind: "approval" as const, threadId: "thr_main", label, details: ["Command: npm publish --tag latest --access public --otp-from-env", "Cwd: /tmp/release"], turnId: "t5" as string | null, decisions: ["deny", "allow_once"] as ("deny" | "allow_once")[], seq: null as number | null });
 const LIST: StrandList = {
   threadId: "thr_main", enabled: true, backfill: { done: true, at: NOW - 60 * MIN, messages: 300, sorted: 300 }, jevCallsToday: 12, jevDailyCap: 300, sortingTurn: false,
   strands: [
     view("s_doc", "Blood pressure log", { state: "needs-you", asks: [approval("int_1", "Approve: npm publish")] }),
-    view("s_pr", "bb-plugins PR #15", { state: "needs-you", asks: [{ id: "int_2", kind: "question", threadId: "thr_worker", label: "PR fix: Which branch?", details: [], turnId: null, decisions: [] }] }),
+    view("s_pr", "bb-plugins PR #15", { state: "needs-you", asks: [{ id: "int_2", kind: "question", threadId: "thr_worker", label: "PR fix: Which branch?", details: [], turnId: null, decisions: [], seq: null }] }),
     view("s_hvac", "Furnace tune-up", { state: "needs-you", detail: "Router fix needs you" }),
     view("s_cx", "CodexBar quota", { state: "running", detail: "codexbar-fix", summary: "Moving the quota read to the new usage endpoint.", latestSeq: 40, messages: 4, workers: [{ threadId: "thr_w", title: "codexbar-fix tests", status: "running", endedAt: null }] }),
     view("s_red4", "red4 mitigation", { state: "waiting", detail: "Unraid's fix" }),
@@ -329,6 +329,57 @@ describe("the tag above each message", () => {
     registerTimelineFilter({ experimental_timelineFilter: () => {} });
     act(() => select("thr_main", { strandId: "s_cx", seq: null }));
     expect(container.querySelectorAll("[data-studio-strand-dim]")).toHaveLength(0);
+  });
+});
+
+describe("replies that need you (design: Replies that need you, option a)", () => {
+  const msg = (id: string, turnId: string, createdAt: number) => ({ id, threadId: "thr_main", turnId, role: "assistant" as const, createdAt });
+  const replies: Tags["replies"] = [
+    { turnId: "t5", seq: 22, tag: "needs-you", ask: "Want me to book Ace for Saturday 9 AM?", resolved: false },
+    { turnId: "t4", seq: 18, tag: "status", ask: null, resolved: false },
+    { turnId: "t6", seq: 26, tag: "needs-you", ask: "Should I merge it?", resolved: true },
+  ];
+
+  it("draws one amber line with the ask above the turn's newest message, and mutes a status reply", () => {
+    state.tags = { ...TAGS, replies };
+    render(<>
+      <div data-timeline-row-id="a"><StrandTag message={msg("m5a", "t5", NOW - 2_000) as never} /></div>
+      <div data-timeline-row-id="b"><StrandTag message={msg("m5b", "t5", NOW - 1_000) as never} /></div>
+      <div data-timeline-row-id="c"><StrandTag message={msg("m4", "t4", NOW - 5_000) as never} /></div>
+      <div data-timeline-row-id="d"><StrandTag message={msg("m6", "t6", NOW) as never} /></div>
+    </>);
+    const lines = [...container.querySelectorAll("[data-reply-needs-you]")];
+    expect(lines).toHaveLength(1);
+    expect(lines[0]!.closest("[data-timeline-row-id]")!.getAttribute("data-timeline-row-id")).toBe("b");
+    expect(text(lines[0]!.querySelector("[data-reply-ask]"))).toBe("Want me to book Ace for Saturday 9 AM?");
+    expect(text(lines[0])).toContain("Needs you");
+    // A status reply is muted; a needs-you one and an answered one aren't.
+    expect([...container.querySelectorAll("[data-timeline-row-id]")].map((row) => row.hasAttribute("data-studio-reply-status"))).toEqual([false, false, true, false]);
+  });
+
+  it("Done marks the reply done", async () => {
+    state.tags = { ...TAGS, replies };
+    state.call.mockResolvedValueOnce({ ok: true });
+    render(<div data-timeline-row-id="a"><StrandTag message={msg("m5a", "t5", NOW) as never} /></div>);
+    await act(async () => { (container.querySelector("[data-reply-needs-you] button") as HTMLElement).click(); });
+    expect(state.call).toHaveBeenCalledWith("strands.resolveReply", { threadId: "thr_main", seq: 22 });
+  });
+
+  it("lists the reply in the box under Needs you; picking it or Jump to reply opens the reply, Done marks it done", async () => {
+    const ask = { id: "reply:22", kind: "reply" as const, threadId: "thr_main", label: "Want me to book Ace for Saturday 9 AM?", details: [], decisions: [], turnId: "t5", seq: 22 };
+    state.list = { ...LIST, strands: [view("s_hvac", "Furnace tune-up", { state: "needs-you", asks: [ask], latestSeq: 30 }), ...LIST.strands.filter((strand) => strand.id !== "s_hvac" && strand.state !== "needs-you")] };
+    render(<StrandsBoxBanner />);
+    expect(text(box2())).toContain("1 need you");
+    click(box2()!.querySelector("[data-strands-needs]"));
+    const row = box2()!.querySelector('[data-strand-row="s_hvac"]')!;
+    expect(text(row)).toContain("Want me to book Ace for Saturday 9 AM?");
+    click(row.querySelector("[data-reply-jump]"));
+    expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=22", { replace: true });
+    state.call.mockResolvedValueOnce({ ok: true });
+    await act(async () => { (row.querySelector("[data-reply-done]") as HTMLElement).click(); });
+    expect(state.call).toHaveBeenCalledWith("strands.resolveReply", { threadId: "thr_main", seq: 22 });
+    click(row.querySelector('[data-strand-option="s_hvac"]'));
+    expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=22", { replace: true });
   });
 });
 

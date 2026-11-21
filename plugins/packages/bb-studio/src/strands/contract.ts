@@ -11,8 +11,8 @@ const workerStatus = z.enum(["running", "needs-you", "failed", "done"]);
 
 export const strandAsk = z.object({
   id: z.string(),
-  /** "area": an area's item that needs the user; "flag": the conversation flagged with bot_needs_you. Both are answered in the chat. */
-  kind: z.enum(["question", "approval", "gateway", "area", "flag"]),
+  /** "area": an area's item that needs the user; "flag": the conversation flagged with bot_needs_you. Both are answered in the chat. "reply": a reply that asks the user something; `label` is its ask line, `seq` its message. */
+  kind: z.enum(["question", "approval", "gateway", "area", "flag", "reply"]),
   /** The thread it waits in: the conversation, or one of its workers. */
   threadId: z.string(),
   label: z.string(),
@@ -22,6 +22,8 @@ export const strandAsk = z.object({
   turnId: z.string().nullable().default(null),
   /** An approval's choices (BB's own), for its buttons. */
   decisions: z.array(z.enum(["allow_once", "allow_for_session", "deny"])),
+  /** A reply's message (its #msg= seq); null for every other kind. */
+  seq: z.number().nullable().default(null),
 });
 export type StrandAsk = z.infer<typeof strandAsk>;
 
@@ -82,6 +84,16 @@ export const strandItemView = z.object({
 });
 export type StrandItemView = z.infer<typeof strandItemView>;
 
+export const replyTagView = z.object({
+  turnId: z.string(),
+  seq: z.number(),
+  tag: z.enum(["needs-you", "status"]),
+  ask: z.string().nullable(),
+  /** Answered, marked done, its strand marked done, or a week old. */
+  resolved: z.boolean(),
+});
+export type ReplyTagView = z.infer<typeof replyTagView>;
+
 export const overviewConversation = z.object({
   threadId: z.string(),
   title: z.string(),
@@ -124,6 +136,8 @@ export const rpcContract = defineRpcContract({
       /** Sorted turns, oldest first: each turn's first message (its seq) and its strand, null for none. */
       tags: z.array(z.object({ turnId: z.string(), seq: z.number(), strandId: z.string().nullable() })),
       strands: z.array(z.object({ id: z.string(), title: z.string() })),
+      /** Tagged replies, oldest first: each turn's reply needs-you or status, its ask line, and whether the user is past it. */
+      replies: z.array(replyTagView).default([]),
     }),
   },
   "strands.overview": {
@@ -166,6 +180,16 @@ export const rpcContract = defineRpcContract({
     input: z.object({ threadId, seq: z.number().int().min(0) }).strict(),
     output: ok,
   },
+  "strands.resolveReply": {
+    experimental_description: "The user marked a reply that needs them as done: it stops counting as needing them.",
+    input: z.object({ threadId, seq: z.number().int().min(0) }).strict(),
+    output: ok,
+  },
+  "strands.replyPush": {
+    experimental_description: "Whether the conversation's newest reply is worth a phone push: needs-you pushes (with its ask line), status doesn't; unknown when it isn't tagged in time.",
+    input: z.object({ threadId, waitMs: z.number().int().min(0).max(30_000).default(20_000) }).strict(),
+    output: z.object({ decision: z.enum(["push", "quiet", "unknown"]), ask: z.string().nullable() }),
+  },
   "strands.opened": {
     experimental_description: "The user opened a strand: what finished in it since counts as seen.",
     input: z.object({ strandId: z.string().min(1).max(200) }).strict(),
@@ -179,4 +203,5 @@ export const strandsPublicContract = defineRpcContract({
   "strands.overview": rpcContract["strands.overview"],
   "strands.tags": rpcContract["strands.tags"],
   "strands.opened": rpcContract["strands.opened"],
+  "strands.resolveReply": rpcContract["strands.resolveReply"],
 });

@@ -56494,7 +56494,8 @@
                           "approval",
                           "gateway",
                           "area",
-                          "flag"
+                          "flag",
+                          "reply"
                         ]
                       },
                       "threadId": {
@@ -56526,6 +56527,13 @@
                             "deny"
                           ]
                         }
+                      },
+                      "seq": {
+                        "default": null,
+                        "type": [
+                          "number",
+                          "null"
+                        ]
                       }
                     },
                     "required": [
@@ -56535,7 +56543,8 @@
                       "label",
                       "details",
                       "turnId",
-                      "decisions"
+                      "decisions",
+                      "seq"
                     ],
                     "additionalProperties": false
                   }
@@ -56705,7 +56714,8 @@
                           "approval",
                           "gateway",
                           "area",
-                          "flag"
+                          "flag",
+                          "reply"
                         ]
                       },
                       "threadId": {
@@ -56737,6 +56747,13 @@
                             "deny"
                           ]
                         }
+                      },
+                      "seq": {
+                        "default": null,
+                        "type": [
+                          "number",
+                          "null"
+                        ]
                       }
                     },
                     "required": [
@@ -56746,7 +56763,8 @@
                       "label",
                       "details",
                       "turnId",
-                      "decisions"
+                      "decisions",
+                      "seq"
                     ],
                     "additionalProperties": false
                   }
@@ -57005,7 +57023,8 @@
                                 "approval",
                                 "gateway",
                                 "area",
-                                "flag"
+                                "flag",
+                                "reply"
                               ]
                             },
                             "threadId": {
@@ -57037,6 +57056,13 @@
                                   "deny"
                                 ]
                               }
+                            },
+                            "seq": {
+                              "default": null,
+                              "type": [
+                                "number",
+                                "null"
+                              ]
                             }
                           },
                           "required": [
@@ -57046,7 +57072,8 @@
                             "label",
                             "details",
                             "turnId",
-                            "decisions"
+                            "decisions",
+                            "seq"
                           ],
                           "additionalProperties": false
                         }
@@ -57254,11 +57281,51 @@
               ],
               "additionalProperties": false
             }
+          },
+          "replies": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "turnId": {
+                  "type": "string"
+                },
+                "seq": {
+                  "type": "number"
+                },
+                "tag": {
+                  "type": "string",
+                  "enum": [
+                    "needs-you",
+                    "status"
+                  ]
+                },
+                "ask": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "resolved": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "turnId",
+                "seq",
+                "tag",
+                "ask",
+                "resolved"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
           "tags",
-          "strands"
+          "strands",
+          "replies"
         ],
         "additionalProperties": false
       }
@@ -57276,6 +57343,42 @@
         },
         "required": [
           "strandId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "strands.resolveReply": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "threadId",
+          "seq"
         ],
         "additionalProperties": false
       },

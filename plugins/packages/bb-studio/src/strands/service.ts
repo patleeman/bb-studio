@@ -6,12 +6,14 @@
 // finished), only when it was active in the last 14 days, one at a time,
 // the most recently active first.
 import type Database from "better-sqlite3";
-import { type OverviewConversation, type StrandItemView, type StrandList, type StrandView } from "./contract";
+import { type OverviewConversation, type ReplyTagView, type StrandItemView, type StrandList, type StrandView } from "./contract";
 import { firstLineTitle } from "./naming";
 import { JEV_DAILY_CAP, StrandDetector, type DetectorDeps, type OpenTask } from "./detector";
 import { approvalDecisions, approvalLines, isWorkerApproval, shortApproval, type Interaction } from "../worker-approvals";
 import { byState, liveState, strayWorkersOf, type AskSignal, type Signals, type TaskSignal, type WorkerSignal, type WorkerStatus } from "./states";
 import { StrandStore, type Strand } from "./store";
+import { REPLY_OPEN_MS } from "./reply";
+import { isPingRequest } from "../bot-cache";
 import { USER_OWNER } from "../tasks/contract";
 
 export interface WorkerFact { threadId: string; title: string; status: WorkerStatus; createdAt: number; endedAt: number | null }
@@ -175,6 +177,10 @@ export class StrandService {
     }
     // An area's item that needs the user, or the conversation's flag: on the strand of the turn it was raised in.
     for (const ask of this.deps.extraAsks?.(threadId) ?? []) asks.push({ id: ask.id, kind: ask.kind, strandId: turnStrand(ask.at), label: ask.label, threadId, details: [], decisions: [], turnId: turnOf(ask.at) });
+    // A reply that asks the user something, until they answer in its strand or mark it done.
+    for (const reply of this.store.openReplies(threadId, now - REPLY_OPEN_MS)) {
+      asks.push({ id: `reply:${reply.seq}`, kind: "reply", strandId: reply.strandId, label: reply.ask ?? "A reply needs you", threadId, details: [], decisions: [], turnId: reply.turnId, seq: reply.seq });
+    }
     const tasks: TaskSignal[] = openAgentTasks(this.deps.db, threadId).flatMap((task) => {
       const strand = this.store.byTask(task.id);
       return strand ? [{ id: task.id, strandId: strand.id, waitingOn: task.waitingOn ?? null }] : [];
@@ -230,7 +236,7 @@ export class StrandService {
       const count = counts.get(strand.id);
       return {
         id: strand.id, title: strand.title, summary: strand.summary, named: strand.named, state: live.state, detail: live.detail,
-        asks: live.asks.map(({ id, kind, threadId: askThread, label, details, decisions, turnId }) => ({ id, kind, threadId: askThread, label, details, decisions, turnId: turnId ?? null })), workers: live.workers,
+        asks: live.asks.map(({ id, kind, threadId: askThread, label, details, decisions, turnId, seq }) => ({ id, kind, threadId: askThread, label, details, decisions, turnId: turnId ?? null, seq: seq ?? null })), workers: live.workers,
         lastAt: strand.lastAt, firstAt: first?.at ?? null, firstSeq: first?.seq ?? null, latestSeq: latest?.seq ?? null, latestTurnId: latest?.turnId ?? null, messages: count?.messages ?? 0, unsure: count?.unsure ?? 0,
         pinned: strand.pinned, origin: strand.origin, taskId: strand.taskId,
       };
@@ -250,13 +256,47 @@ export class StrandService {
     return this.store.items(threadId, limit, ["user", "report", "worker"]).map((item) => ({ ...item }));
   }
 
-  tags(threadId: string): { tags: { turnId: string; seq: number; strandId: string | null }[]; strands: { id: string; title: string }[] } {
-    if (!this.enabled(threadId)) return { tags: [], strands: [] };
+  tags(threadId: string): { tags: { turnId: string; seq: number; strandId: string | null }[]; strands: { id: string; title: string }[]; replies: ReplyTagView[] } {
+    if (!this.enabled(threadId)) return { tags: [], strands: [], replies: [] };
     const rows = this.store.db.prepare("SELECT turn_id, seq, strand_id FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND turn_id IS NOT NULL ORDER BY seq DESC LIMIT 2000").all(threadId) as { turn_id: string; seq: number; strand_id: string | null }[];
     return {
       tags: rows.reverse().map((row) => ({ turnId: row.turn_id, seq: row.seq, strandId: row.strand_id })),
       strands: this.store.list(threadId).map((strand) => ({ id: strand.id, title: strand.title })),
+      replies: this.store.replies(threadId, this.now() - REPLY_OPEN_MS).flatMap((reply) => (reply.turnId ? [{ turnId: reply.turnId, seq: reply.seq, tag: reply.tag, ask: reply.ask, resolved: reply.resolved }] : [])),
     };
+  }
+
+  /** The seq of the conversation's newest message (not a cache keepalive), among its newest events; 0 when they can't be read. */
+  private async newestRequest(threadId: string): Promise<number> {
+    const rows = await this.deps.events({ threadId, order: "desc", limit: 50 }).catch(() => []);
+    return rows.filter((row) => row.type === "client/turn/requested" && !isPingRequest(row.data)).reduce((max, row) => Math.max(max, row.seq ?? 0), 0);
+  }
+
+  /** The user marked a reply that needs them done (or acted on it). */
+  resolveReply(threadId: string, seq: number): boolean {
+    if (!this.enabled(threadId) || !this.store.resolveReply(threadId, seq)) return false;
+    this.deps.changed(threadId);
+    return true;
+  }
+
+  /**
+   * Whether the newest reply is worth a phone push (Main's own push and
+   * Studio Mobile's check of BB's): its tag once the turn is sorted, waiting
+   * up to `waitMs` for the sort. Unknown where strands don't run, or when it
+   * isn't tagged in time: the caller pushes as before.
+   */
+  async replyPush(threadId: string, waitMs = 20_000): Promise<{ decision: "push" | "quiet" | "unknown"; ask: string | null }> {
+    if (this.disposed || !this.enabled(threadId) || this.detector.needsBackfill(threadId)) return { decision: "unknown", ask: null };
+    const deadline = this.now() + waitMs;
+    // The newest message's seq: a reply from before it is an older turn's.
+    const after = await this.newestRequest(threadId);
+    for (;;) {
+      await Promise.race([this.detector.settled(threadId), new Promise((resolve) => setTimeout(resolve, Math.max(0, Math.min(1_000, deadline - this.now()))))]);
+      const reply = this.store.latestReply(threadId);
+      if (reply && reply.seq > after && this.store.replyTag(threadId, reply.seq)) return reply.tag === "needs-you" ? { decision: "push", ask: reply.ask } : { decision: "quiet", ask: null };
+      if (this.disposed || this.now() >= deadline) return { decision: "unknown", ask: null };
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
   }
 
   /** Every conversation of a Bot with strands showing (not only Earlier), needs you first, then the most recently active. */

@@ -49,6 +49,7 @@ import { FILE_KIND_LABELS, isArtifactId } from "./src/artifacts/shared";
 import { registerTalk, TALK_TOOLS, type TalkSettingsHandle } from "./src/talk/server";
 import { PAGE_TOOLS, registerPages } from "./src/pages/server";
 import { registerExploreBuiltin } from "./src/explore/server";
+import { preferredReplies } from "./src/explore/next";
 import { importReactionsSettings, REACTIONS_PLUGIN_ID, REACTIONS_SETTINGS_IMPORTED } from "./src/reactions/server";
 import { BUILTIN_PLUGIN_IDS, builtinItemAt } from "./src/builtins";
 import { builtinProviderContract } from "./src/builtin-provider";
@@ -1284,6 +1285,7 @@ export default async function plugin(bb: BbPluginApi) {
       const keys = Object.keys(STUDIO_KEY_SETTINGS).map((key) => values[key]).filter((value): value is string => typeof value === "string");
       return [...keys, ...(toolGateway?.secretValues() ?? [])];
     },
+    quickReplies: async () => preferredReplies((await settings.get().catch(() => ({} as Record<string, unknown>))).explore_replyItems) ?? [],
     log: (message) => bb.log.warn(message),
   });
   // Startup, and every 5 minutes: a Bot whose Main was deleted or archived while Studio was off, or
@@ -1309,6 +1311,8 @@ export default async function plugin(bb: BbPluginApi) {
     notify: async (input) => { await bb.sdk.plugins.callRpc({ pluginId: "mobile", method: "notify", outputSchema: z.unknown(), input: input as never }); },
     needsUser: (card) => { const store = new TaskStore(db); return cardNeedsUser(store.find(card.id), card.kind, store.find(card.id) ? store.history(card.id) : []); },
     pushedTaskSince: (botId, since) => (taskPushedAt.get(botId) ?? 0) >= since,
+    // Only a reply that needs the user pushes (src/strands/reply.ts); untagged in time, it pushes as before.
+    ...(strands.service ? { replyTag: (threadId: string) => strands.service!.replyPush(threadId, 20_000) } : {}),
     defaultProjectId: PERSONAL_PROJECT_ID,
     log: (message) => bb.log.warn(message),
   });

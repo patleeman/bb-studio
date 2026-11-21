@@ -4,6 +4,7 @@
 // sorting (when Jev isn't set up) and the backfill's first strands.
 import { plainLine } from "../conversation-text";
 import { checkName, firstLineTitle, NAMING_RULES, tidyName } from "./naming";
+import { REPLY_QUESTION, replyEnd, replyQuestion } from "./reply";
 
 /** Jev's answer below this: the previous turn's strand, marked unsure. */
 export const MIN_CONFIDENCE = 0.5;
@@ -51,18 +52,26 @@ const strandState = (open: readonly OpenStrand[]) => open.map((strand, index) =>
   id: `s${index + 1}`, title: strand.title, summary: strand.summary ?? "", lastUserLine: cut(plainLine(strand.lastLine ?? ""), LAST_LINE_MAX),
 }));
 
-/** One turn's question and state. */
-export function turnQuestion(message: Message, open: readonly OpenStrand[], previous: string | null) {
+/**
+ * One turn's question and state. With `finalReply` (a finished turn whose
+ * reply the structured signals didn't tag), the same call also asks whether
+ * the reply needs the user (src/strands/reply.ts), from the reply's end.
+ */
+export function turnQuestion(message: Message, open: readonly OpenStrand[], previous: string | null, finalReply: string | null = null) {
   const shown = open.slice(0, MAX_OPEN);
   const prevIndex = previous ? shown.findIndex((strand) => strand.id === previous) : -1;
   return {
     state: {
       message: cut(message.text, MESSAGE_MAX),
       replyStart: cut(message.reply, REPLY_MAX),
+      ...(finalReply !== null ? { replyEnd: replyEnd(finalReply) } : {}),
       previousStrand: prevIndex >= 0 ? `s${prevIndex + 1}` : previous ? "an earlier strand" : NONE,
       strands: strandState(shown),
     },
-    questions: { strand: { type: "choice" as const, instructions: SORT_INSTRUCTIONS, criteria: criteria(shown) } },
+    questions: {
+      strand: { type: "choice" as const, instructions: SORT_INSTRUCTIONS, criteria: criteria(shown) },
+      ...(finalReply !== null ? { [REPLY_QUESTION]: replyQuestion() } : {}),
+    },
     shown,
   };
 }

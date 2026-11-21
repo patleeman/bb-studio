@@ -59,6 +59,8 @@ const NOTIFIED_WORKERS_KEY = "notified-workers";
 const DESK_HOLD_KEY = "desk-hold";
 const deskOutput = z.object({ enabled: z.boolean(), atDesk: z.boolean().nullable(), held: z.number().int().min(0) });
 const STUDIO_PLUGIN_ID = "studio";
+/** How long BB's reply push waits for Studio to tag the reply (Jev answers within 15 seconds). */
+const REPLY_TAG_WAIT_MS = 20_000;
 const pushIdsOutput = z.object({ botId: z.string().optional(), conversationId: z.string().optional(), workerId: z.string().optional() }).passthrough();
 /** Reading a thread has no event, so notified threads are checked this often. */
 const CLEAR_INTERVAL_MS = 60_000;
@@ -345,6 +347,29 @@ export default async function plugin(bb: BbPluginApi) {
     return turns.get(threadId)!;
   }
 
+  const replyTag = z.object({ decision: z.enum(["push", "quiet", "unknown"]), ask: z.string().nullable() }).passthrough();
+  /**
+   * BB's own push for a finished turn in a Bot conversation, checked against
+   * Studio's tag for its reply (strands.replyPush): a status reply is dropped,
+   * one that needs the user goes out with its ask line as the body. When
+   * Studio doesn't answer or can't tell in time, the push goes out as is.
+   */
+  async function statusReply(message: ExpoMessage, tags: Map<string, Promise<z.infer<typeof replyTag> | null>>): Promise<boolean> {
+    const data = message.data;
+    if (data?.kind !== "turn-finished" || typeof data.subscriptionId !== "string" || typeof data.threadId !== "string" || data.botId !== undefined) return false;
+    const threadId = data.threadId;
+    if (!tags.has(threadId)) {
+      tags.set(threadId, bb.sdk.plugins.callRpc({
+        pluginId: STUDIO_PLUGIN_ID, method: "strands.replyPush", input: { threadId, waitMs: REPLY_TAG_WAIT_MS } as never, outputSchema: replyTag,
+        signal: AbortSignal.timeout(REPLY_TAG_WAIT_MS + 5_000),
+      }).then((tag) => tag as z.infer<typeof replyTag>, () => null));
+    }
+    const tag = await tags.get(threadId)!;
+    if (tag?.decision === "quiet") return true;
+    if (tag?.decision === "push" && tag.ask) message.body = tag.ask;
+    return false;
+  }
+
   const windows = new PushWindows(async ({ key, messages, shown, held, since }) => {
     const thread = await bb.sdk.threads.get({ threadId: key }).catch(() => null);
     const lastReadAt = thread?.lastReadAt ?? 0;
@@ -387,7 +412,8 @@ export default async function plugin(bb: BbPluginApi) {
     const lookups: Lookups = new Map();
     const owners = new Map<string, Promise<boolean>>();
     const turns = new Map<string, Promise<boolean>>();
-    const studios = await Promise.all(messages.map(async (message) => isQuietCompletion(message) || await quietTurn(message, turns) || await sentByStudio(message, lookups, owners)));
+    const tags = new Map<string, Promise<z.infer<typeof replyTag> | null>>();
+    const studios = await Promise.all(messages.map(async (message) => isQuietCompletion(message) || await quietTurn(message, turns) || await statusReply(message, tags) || await sentByStudio(message, lookups, owners)));
     messages.forEach((message, index) => {
       if (studios[index]) {
         tickets[index] = { status: "ok" };

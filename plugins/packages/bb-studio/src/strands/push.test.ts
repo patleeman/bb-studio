@@ -6,7 +6,7 @@ const strand = (id: string, state: StrandView["state"], asks: StrandAsk[] = [], 
   id, title: `Strand ${id}`, summary: null, named: true, state, detail: state === "needs-you" && !asks.length ? "Release worker needs you" : null, asks, workers: [],
   lastAt: 1, firstAt: 1, firstSeq: 1, latestSeq: 2, latestTurnId: "turn_1", messages: 2, unsure: 0, pinned: false, origin: "jev", taskId: null, ...over,
 });
-const ask = (threadId: string, kind: StrandAsk["kind"] = "question"): StrandAsk => ({ id: `ask_${threadId}`, kind, threadId, label: "Merge the PR?", details: [], turnId: "turn_1", decisions: [] });
+const ask = (threadId: string, kind: StrandAsk["kind"] = "question"): StrandAsk => ({ id: `ask_${threadId}`, kind, threadId, label: "Merge the PR?", details: [], turnId: "turn_1", decisions: [], seq: null });
 const conversation = (threadId: string, strands: StrandView[]): OverviewConversation => ({ threadId, title: threadId === "thr_main" ? "Main" : "BB Studio", isMain: threadId === "thr_main", lastActiveAt: 1, strands });
 
 function harness(over: Partial<StrandPushDeps> = {}) {

@@ -34,6 +34,8 @@ export interface StrandsRegisterDeps {
   extraAsks?(threadId: string): { id: string; kind: "area" | "flag"; label: string; at: number }[];
   /** Secret values to keep out of what strands send and keep: Studio's API keys, Tool Gateway's secrets. */
   secrets(): Promise<readonly string[]>;
+  /** The user's usual quick replies (a ::next row offering only these doesn't make a reply need them). */
+  quickReplies?(): Promise<readonly string[]>;
   log(message: string): void;
 }
 
@@ -64,6 +66,7 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
     } as never) as unknown as EventRow[],
     jev: (input) => deps.decisions.systemOne({ ...input, questions: input.questions as never }, AbortSignal.timeout(JEV_TIMEOUT_MS)),
     secrets: deps.secrets,
+    ...(deps.quickReplies ? { quickReplies: deps.quickReplies } : {}),
     ...(completeText ? {
       completeText: async ({ prompt }: { prompt: string }) => {
         const result = await completeText({ prompt, timeoutMs: 8_000 });
@@ -102,6 +105,8 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
     "strands.items": ({ threadId, limit }) => ({ items: service.items(threadId, limit ?? 200) }),
     "strands.tags": ({ threadId }) => service.tags(threadId),
     "strands.opened": ({ strandId }) => ({ ok: service.opened(strandId) }),
+    "strands.resolveReply": ({ threadId, seq }) => ({ ok: service.resolveReply(threadId, seq) }),
+    "strands.replyPush": ({ threadId, waitMs }) => service.replyPush(threadId, waitMs ?? 20_000),
     "strands.overview": ({ botId }) => service.overview(botId),
     "strands.move": ({ threadId, seq, strandId }) => ({ ok: service.move(threadId, seq, strandId) }),
     "strands.split": ({ threadId, seq }) => { const strandId = service.split(threadId, seq); return { ok: !!strandId, strandId }; },

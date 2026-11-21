@@ -7,6 +7,10 @@
 // thread (a runner's or worker's report, BB's notice that a child finished)
 // unless the answer carries a card that needs the user. Studio Mobile groups them:
 // one push per conversation per few minutes (push-window.ts there).
+//
+// Where strands tag replies (src/strands/reply.ts), only a reply that needs
+// the user pushes, with its ask line as the body; a status reply doesn't.
+// When the tag isn't known in time, the reply pushes as before.
 import { isPassOutput } from "./kit/silent";
 import { isPingRequest } from "./bot-cache";
 
@@ -78,6 +82,8 @@ export interface MainPushDeps {
   notify(input: MainPushInput): Promise<void>;
   needsUser?(card: { kind: "work" | "loop"; id: string }): boolean;
   pushedTaskSince?(botId: string, since: number): boolean;
+  /** The newest reply's tag (src/strands/service.ts replyPush): push with its ask line, stay quiet, or unknown. */
+  replyTag?(threadId: string): Promise<{ decision: "push" | "quiet" | "unknown"; ask: string | null }>;
   defaultProjectId: string;
   delayMs?: number;
   log?(message: string): void;
@@ -117,8 +123,11 @@ export class MainPushes {
     const cards = plainPreview(reply) ? [] : cardsIn(reply);
     if (cards.length && this.deps.needsUser && !cards.some((card) => this.deps.needsUser!(card))) return false;
     if (this.deps.pushedTaskSince?.(bot.botId, Date.now() - TASK_PUSH_QUIET_MS)) return false;
+    // A status reply stays off the phone; one that needs the user leads with its ask.
+    const tag = await this.deps.replyTag?.(threadId).catch(() => null) ?? null;
+    if (tag?.decision === "quiet") return false;
     await this.deps.notify({
-      title: bot.name, body: previewOf(reply), kind: "turn-finished", threadId,
+      title: bot.name, body: tag?.decision === "push" && tag.ask ? tag.ask : previewOf(reply), kind: "turn-finished", threadId,
       projectId: thread.projectId || this.deps.defaultProjectId, botId: bot.botId, conversationId: threadId,
     });
     return true;

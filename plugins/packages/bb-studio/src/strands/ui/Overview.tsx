@@ -45,7 +45,7 @@ function Card({ row, now }: { row: OverviewConversation; now: number }) {
       {shown.map(({ strand, ask }) => (
         <div key={`${strand.id}:${ask?.id ?? ""}`} data-strand-ask={ask?.id ?? strand.id} className="mt-1.5">
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => open(row.threadId, strand)} className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left">
+            <button type="button" onClick={() => open(row.threadId, ask?.kind === "reply" && ask.seq !== null ? { ...strand, latestSeq: ask.seq } : strand)} className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left">
               <span role="img" aria-label="Needs you" className="size-1.5 shrink-0 rounded-full bg-warning" />
               <span className="truncate text-[12.5px] font-semibold">{strand.title}</span>
               <span className="truncate text-[11.5px] text-muted-foreground/70">· {ask?.label ?? strand.detail ?? "Needs you"}</span>

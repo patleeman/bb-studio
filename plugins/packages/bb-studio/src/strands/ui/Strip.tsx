@@ -23,7 +23,7 @@ import { Icon, Tooltip, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import { messageLinkPath } from "../../work/ui/in-flight-model";
 import type { StrandAsk, StrandView } from "../contract";
-import { ageOf, boxGroups, countsOf, currentOf, decisionButtons, filterTurnsOf, hasOpen, rowWorkersOf, seqsOf, stepSeq, strayCountsOf, stripShown } from "./model";
+import { ageOf, boxGroups, countsOf, currentOf, decisionButtons, filterTurnsOf, hasOpen, replyAskOf, rowWorkersOf, seqsOf, stepSeq, strayCountsOf, stripShown } from "./model";
 import { hostContextSegments, useHidePromptStack } from "./prompt-stack";
 import { select, selectionOf, setStrandTurns, useSelection } from "./selection";
 
@@ -92,10 +92,35 @@ export function StateMark({ strand, now }: { strand: StrandView; now: number }) 
 
 const smallButton = "h-6 cursor-pointer whitespace-nowrap rounded-md border px-2 text-[11.5px] disabled:opacity-50";
 
+/** Opens message `seq` of a conversation: in place when it is open, else by its link. */
+function useOpenMessage() {
+  const navigate = useBbNavigate();
+  const pathname = usePathname();
+  return useCallback((threadId: string, seq: number) => {
+    const here = messageLinkPath(pathname, threadId, seq);
+    if (!toAppPathOf(navigate)?.(here ?? `/threads/${encodeURIComponent(threadId)}#msg=${seq}`, here ? { replace: true } : undefined)) navigate.toThread(threadId);
+  }, [navigate, pathname]);
+}
+
 export function AskButtonsFor({ ask, threadId }: { ask: StrandAsk; threadId: string }) {
   const call = useCall();
   const navigate = useBbNavigate();
+  const openMessage = useOpenMessage();
   const [busy, setBusy] = useState(false);
+  // A reply that needs you: open it, or mark it done.
+  if (ask.kind === "reply") {
+    const done = async () => {
+      if (ask.seq === null) return;
+      setBusy(true);
+      try { if (!(await call("strands.resolveReply", { threadId: ask.threadId, seq: ask.seq })).ok) toast.error("Couldn't mark it done."); }
+      catch (error) { toast.error("Couldn't mark it done.", { description: errorMessage(error) }); }
+      finally { setBusy(false); }
+    };
+    return <>
+      {ask.seq !== null ? <button type="button" data-reply-jump={ask.seq} onClick={() => openMessage(ask.threadId, ask.seq!)} className={cn(smallButton, "border-transparent bg-foreground font-semibold text-background")}>Jump to reply</button> : null}
+      <button type="button" data-reply-done={ask.seq ?? ""} disabled={busy || ask.seq === null} onClick={() => void done()} className={cn(smallButton, "border-border bg-transparent hover:bg-accent")}>Done</button>
+    </>;
+  }
   const decide = async (decision: StrandAsk["decisions"][number]) => {
     setBusy(true);
     try { await call("bot_worker_approval_resolve", { threadId: ask.threadId, interactionId: ask.id, decision }); }
@@ -247,7 +272,8 @@ export function StrandsBox({ threadId, now = Date.now() }: { threadId: string; n
   const stray = data.strayWorkers ?? [];
   const strayCounts = strayCountsOf(data);
   const strayShown = needle ? stray.filter((worker) => worker.title.toLowerCase().includes(needle)) : stray;
-  const pick = (strand: StrandView) => { choose(strand, true); setExpanded(false); setQuery(""); };
+  // A strand waiting on a reply opens at that reply.
+  const pick = (strand: StrandView) => { const reply = replyAskOf(strand); choose(reply ? { ...strand, latestSeq: reply.seq } : strand, true); setExpanded(false); setQuery(""); };
   const openTab = () => { setExpanded(false); if (panel) openThreadTab(panel, { actionId: STRANDS_TAB, title: "Strands" }); };
   const onInputKey = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter" && matches[0]) { event.preventDefault(); pick(matches[0]); }

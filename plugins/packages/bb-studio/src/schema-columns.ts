@@ -14,7 +14,8 @@ export const ENSURED_COLUMNS: Readonly<Record<string, readonly (readonly [string
   // Main can start on it after the old one is deleted and can't be read any more.
   bots: [["main_provider_id", "TEXT"], ["main_model", "TEXT"], ["main_reasoning", "TEXT"]],
   // The strand an item was in before the user's (or a merge's) last move, so it can be undone (src/strands/store.ts).
-  strand_items: [["prev_strand_id", "TEXT"]],
+  // A reply's tag (src/strands/reply.ts): needs-you or status, its ask line, who tagged it, and when the user marked it done.
+  strand_items: [["prev_strand_id", "TEXT"], ["reply_tag", "TEXT"], ["reply_ask", "TEXT"], ["reply_by", "TEXT"], ["reply_resolved_at", "INTEGER"]],
   // When an agent marked a strand done (strand_note): it folds into Earlier until its next activity (src/strands/store.ts).
   strands: [["done_at", "INTEGER"]],
 };

@@ -24,6 +24,11 @@ settings, see [`skills/mobile-push/SKILL.md`](skills/mobile-push/SKILL.md).
   the push. Actions target only that exact request.
 - **Quiet completions.** A finished turn with no text, or only `[PASS]`, is not
   sent to APNs or Expo. The relay still reports success.
+- **Status replies.** For BB's own push of a finished turn, the relay asks
+  Studio how it tagged the reply (`strands.replyPush`, waiting up to 20
+  seconds for the tag): a status reply is dropped, and a reply that needs
+  you goes out with its ask line as the body. When Studio can't tell, the
+  push goes out as before.
 - **Turns nobody needs to hear about.** For BB's own push of a finished turn,
   the relay reads the turn: what started it and its final reply. It drops the
   push for Studio's cache keepalive (whatever it replied), for a final reply

@@ -92,7 +92,7 @@ describe("push levels", () => {
 });
 
 describe("Main's pushes", () => {
-  type Setup = { request?: unknown; read?: boolean; allowed?: boolean; needs?: Record<string, boolean>; taskPushAt?: number };
+  type Setup = { request?: unknown; read?: boolean; allowed?: boolean; needs?: Record<string, boolean>; taskPushAt?: number; tags?: Record<string, { decision: "push" | "quiet" | "unknown"; ask: string | null }> };
   function main(options: Setup = {}) {
     vi.useFakeTimers();
     const sent: MainPushInput[] = [];
@@ -104,6 +104,7 @@ describe("Main's pushes", () => {
       notify: async (input) => { sent.push(input); },
       ...(options.needs ? { needsUser: (card: { id: string }) => options.needs![card.id] ?? true } : {}),
       ...(options.taskPushAt !== undefined ? { pushedTaskSince: (_botId: string, since: number) => options.taskPushAt! >= since } : {}),
+      ...(options.tags ? { replyTag: async () => { const next = Object.values(options.tags!).shift(); const key = Object.keys(options.tags!)[0]!; delete options.tags![key]; return next ?? { decision: "unknown" as const, ask: null }; } } : {}),
       defaultProjectId: "proj_personal",
     });
     dispose.push(async () => pushes.dispose());
@@ -118,6 +119,18 @@ describe("Main's pushes", () => {
     const { sent, idle } = main();
     await idle("The new iOS build is on TestFlight: **20261114.0604**.");
     expect(sent).toEqual([{ title: "Dot", body: "The new iOS build is on TestFlight: 20261114.0604.", kind: "turn-finished", threadId: "thr_main", projectId: "proj_personal", botId: "bot_dot", conversationId: "thr_main" }]);
+  });
+
+  it("pushes only a reply that needs the user, with its ask line; a status reply stays off the phone; untagged pushes as before", async () => {
+    const { sent, idle } = main({ tags: {
+      a: { decision: "quiet", ask: null },
+      b: { decision: "push", ask: "Please sign in to the Ace portal so I can book Saturday." },
+      c: { decision: "unknown", ask: null },
+    } });
+    await idle("Cleared DerivedData: 7.8 GB back.");
+    await idle("Ace has Saturday 9 AM open; their page needs your account. Please sign in to the Ace portal so I can book Saturday.");
+    await idle("Shipped as v1.2.");
+    expect(sent.map((input) => input.body)).toEqual(["Please sign in to the Ace portal so I can book Saturday.", "Shipped as v1.2."]);
   });
 
   it("pushes the morning card, and a reply that is only a loop or a work card", async () => {

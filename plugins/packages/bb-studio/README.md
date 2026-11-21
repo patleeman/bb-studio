@@ -195,10 +195,11 @@ row counts the strands that need you.
 A strand needs you when a BB question or approval waits in it, one of its
 workers needs you, a Tool Gateway request waits, an area's open item needs
 you (on the strand that holds the area's report), or the conversation is
-flagged with `bot_needs_you`. When a strand turns "needs you", the phone gets
+flagged with `bot_needs_you`, or a reply in it asks you something (see
+"Replies that need you" under Strands). When a strand turns "needs you", the phone gets
 one push (`src/strands/push.ts`), unless BB pushes that ask itself or the ask
-waits in a turn another thread started. Studio Mobile holds it while you are
-at the desk.
+waits in a turn another thread started; a reply that asks you has its own
+push. Studio Mobile holds it while you are at the desk.
 
 Agents have one strands tool, `strand_note`: mark a strand waiting on someone
 or something, done, or renamed. There are no task tools, no work cards and
@@ -4380,6 +4381,36 @@ Earlier after 3 more quiet days unless pinned.
   pins or merges it; a merge asks first and can be undone for 10 seconds.
 - **The overview** (Settings → Strands overview, off by default): a Strands
   page beside Tasks with every conversation's open strands, needs you first.
+
+### Replies that need you
+
+Each finished turn's reply is tagged **needs you** (it asks you to decide,
+choose, answer or approve, or to do something only you can: run a command,
+sign in, click, test on a device) or **status** (progress, a result, an FYI)
+(`src/strands/reply.ts`). Structured signals decide first, with no model: a
+quiet `[PASS]` is status; an approval card, a `::next` row whose quick
+replies aren't only the stock ones or your usual ones, or an explicit ask in
+the last paragraph ("Want me to…?", "Should I…?", "Please sign in…") needs
+you. Otherwise the reply question rides on the same Jev call that sorts the
+turn (no extra call); a turn sorted early gets one reply-only call at its
+end, within the same daily caps. With no Jev, or no calls left, the rule
+decides: the last paragraph asks you a question. What Jev reads is scrubbed
+of secrets like the rest of strands. The backfill doesn't tag old replies.
+
+- A needs-you reply draws one amber line above its last message: **Needs
+  you**, the asking sentence in the reply's own words, and **Done**. Status
+  replies are slightly muted.
+- It counts as an ask on its strand ("N need you" in the box, the overview,
+  the sidebar), with **Jump to reply** and **Done**; picking the strand opens
+  the reply.
+- It stops counting when you write in its strand (or answer right after it
+  with a message that has no strand of its own, such as "ok, do it"), press
+  Done, its strand is marked done, or after a week.
+- Phone pushes follow the tag: Main's reply pushes only when it needs you,
+  with the ask line as the body; for other conversations Studio Mobile drops
+  BB's push of a status reply (`strands.replyPush`). A reply not tagged
+  within 20 seconds pushes as before. Thread levels still apply: muted and
+  input-only threads push no replies at all.
 
 `bb studio strands [<conversation>|main] [--items <n>] [--sort] [--json]`
 shows how a conversation was sorted. An agent sees only its own Bot's

@@ -13,6 +13,11 @@
 // only records what already needs the user, so an update never floods the
 // phone.
 //
+// A strand that needs the user only because a reply asks them something
+// isn't pushed here: that reply's own push covers it (Main's in
+// src/main-push.ts, BB's checked by Studio Mobile), and it doesn't count as
+// pushed, so a real ask on the same strand later still pushes.
+//
 // The push-flood rules still hold:
 // - no push for an ask BB pushes itself: a question or approval in a thread
 //   BB shows (Main and workers' threads aside, BB pushes those); a Tool
@@ -65,6 +70,11 @@ export interface StrandPushDeps {
   delayMs?: number;
 }
 
+/** A strand that needs the user only for replies that ask them something (no BB ask, no worker waiting on them). */
+export function onlyReplies(strand: Pick<StrandView, "asks" | "workers">): boolean {
+  return strand.asks.length > 0 && strand.asks.every((ask) => ask.kind === "reply") && !strand.workers.some((worker) => worker.status === "needs-you");
+}
+
 /** What to push for a strand that turned "needs you", or null when the phone hears of it otherwise or not at all. */
 export async function pushFor(strand: StrandView, conversation: Pick<OverviewConversation, "threadId" | "title">, deps: Pick<StrandPushDeps, "bbPushesAsks" | "startedByAnotherThread">): Promise<{ body: string; threadId: string } | null> {
   const ask: StrandAsk | undefined = strand.asks[0];
@@ -113,7 +123,7 @@ export class StrandPushes {
       for (const threadId of read ?? []) checked.add(threadId);
       for (const conversation of conversations) {
         for (const strand of conversation.strands) {
-          if (strand.state !== "needs-you") continue;
+          if (strand.state !== "needs-you" || onlyReplies(strand)) continue;
           now.add(strand.id);
           if (!seen.has(strand.id)) sends.push({ botId: bot.id, strand, conversation });
         }

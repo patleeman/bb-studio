@@ -172,8 +172,8 @@ describe("strands.list", () => {
     asks.thr_worker = [{ id: "int_2", status: "pending", payload: { kind: "user_question", questions: [{ prompt: "Which fallback model?" }] } as never }];
     const list = await x.svc.list(x.thread.id);
     expect(list.strands.map((each) => [each.title, each.state])).toEqual([["Book the dentist", "needs-you"], ["Look at the router", "needs-you"]]);
-    expect(list.strands[0]!.asks).toEqual([{ id: "int_1", kind: "approval", threadId: "thr_main", label: "Approve: npm publish", details: ["Command: npm publish"], decisions: ["deny", "allow_once"], turnId: expect.any(String) }]);
-    expect(list.strands[1]!.asks).toEqual([{ id: "int_2", kind: "question", threadId: "thr_worker", label: "Router fix: Which fallback model?", details: [], decisions: [], turnId: null }]);
+    expect(list.strands[0]!.asks).toEqual([{ id: "int_1", kind: "approval", threadId: "thr_main", label: "Approve: npm publish", details: ["Command: npm publish"], decisions: ["deny", "allow_once"], turnId: expect.any(String), seq: null }]);
+    expect(list.strands[1]!.asks).toEqual([{ id: "int_2", kind: "question", threadId: "thr_worker", label: "Router fix: Which fallback model?", details: [], decisions: [], turnId: null, seq: null }]);
   });
 
   it("puts a worker's completion notice into the worker's strand, without asking Jev", async () => {

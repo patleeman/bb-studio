@@ -1,8 +1,21 @@
 // What the strands UI shows, as pure functions (design dsn_398fde78c3b1f6b8,
 // screen 4a): text only, neutral marks, amber only for "needs you".
-import type { StrandAsk, StrandList, StrandView } from "../contract";
+import type { ReplyTagView, StrandAsk, StrandList, StrandView } from "../contract";
 
-export type Tags = { tags: readonly { turnId: string; seq: number; strandId: string | null }[]; strands: readonly { id: string; title: string }[] };
+export type Tags = { tags: readonly { turnId: string; seq: number; strandId: string | null }[]; strands: readonly { id: string; title: string }[]; replies?: readonly ReplyTagView[] };
+
+/** A turn's reply tag: needs-you (still open, or answered) or status; null when it has none. */
+export function replyOf(tags: Tags | null | undefined, turnId: string | null): ReplyTagView | null {
+  if (!tags?.replies || !turnId) return null;
+  for (let index = tags.replies.length - 1; index >= 0; index--) if (tags.replies[index]!.turnId === turnId) return tags.replies[index]!;
+  return null;
+}
+
+/** A needs-you strand's reply ask, when that's what it waits on first: its message is where picking it goes. */
+export function replyAskOf(strand: Pick<StrandView, "state" | "asks">): (StrandAsk & { seq: number }) | null {
+  const ask = strand.state === "needs-you" ? strand.asks[0] : undefined;
+  return ask?.kind === "reply" && ask.seq !== null ? ask as StrandAsk & { seq: number } : null;
+}
 
 /** A message's tag: its turn's strand, and whether a divider goes above it (the strand changed since the last sorted turn). */
 export function tagOf(tags: Tags | null | undefined, turnId: string | null): { strandId: string; title: string; divider: boolean; seq: number } | null {
