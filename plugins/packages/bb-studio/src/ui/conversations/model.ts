@@ -159,6 +159,91 @@ export function splitWorkers<Worker extends { status: WorkerRow["status"] }>(wor
 /** "3 done": the folded workers' row or chip. */
 export const doneLabel = (count: number): string => `${count} done`;
 
+/** A worker in the sidebar's nest, with the workers it started under it. */
+export interface WorkerNode<Worker> { row: Worker; children: WorkerNode<Worker>[] }
+
+/** The workers under one conversation row (or under "Other workers"), and what its toggle shows while closed. */
+export interface WorkerNest<Worker> {
+  nodes: WorkerNode<Worker>[];
+  total: number;
+  running: number;
+  needsYou: number;
+}
+
+type NestedWorker = Pick<WorkerRow, "threadId" | "status" | "ownerConversationId" | "spawnedBy" | "nestUnder">;
+
+/**
+ * The sidebar's workers nested under their conversations: each worker under
+ * the worker that started it when that one is listed too, and each top
+ * worker under its conversation's row (the server's `nestUnder`, else its
+ * owner when that is listed). Workers whose conversation has no row go to
+ * `other`. Order stays the server's (needs you, running, then newest).
+ */
+export function workerNests<Worker extends NestedWorker>(conversations: readonly { threadId: string }[], workers: readonly Worker[]): { nests: Map<string, WorkerNest<Worker>>; other: WorkerNest<Worker> | null } {
+  const listed = new Set(conversations.map((row) => row.threadId));
+  const nodes = new Map(workers.map((row) => [row.threadId, { row, children: [] as WorkerNode<Worker>[] }]));
+  // A worker's parent: the listed worker that started it, unless that loops back to it.
+  const parentOf = (row: Worker): string | null => {
+    const seen = new Set([row.threadId]);
+    let at = row.spawnedBy ?? null;
+    while (at && nodes.has(at)) {
+      if (seen.has(at)) return null;
+      seen.add(at);
+      at = nodes.get(at)!.row.spawnedBy ?? null;
+    }
+    return row.spawnedBy && nodes.has(row.spawnedBy) ? row.spawnedBy : null;
+  };
+  const roots: WorkerNode<Worker>[] = [];
+  for (const node of nodes.values()) {
+    const parent = parentOf(node.row);
+    if (parent) nodes.get(parent)!.children.push(node);
+    else roots.push(node);
+  }
+  const nests = new Map<string, WorkerNest<Worker>>();
+  let other: WorkerNest<Worker> | null = null;
+  const empty = (): WorkerNest<Worker> => ({ nodes: [], total: 0, running: 0, needsYou: 0 });
+  for (const root of roots) {
+    const home = root.row.nestUnder !== undefined ? root.row.nestUnder : root.row.ownerConversationId;
+    const key = home && listed.has(home) ? home : null;
+    const nest = key ? nests.get(key) ?? nests.set(key, empty()).get(key)! : (other ??= empty());
+    nest.nodes.push(root);
+    for (const each of subtree(root)) {
+      nest.total += 1;
+      if (each.status === "running") nest.running += 1;
+      if (each.status === "needs-you") nest.needsYou += 1;
+    }
+  }
+  return { nests, other };
+}
+
+/** A worker and every worker under it. */
+export function subtree<Worker>(node: WorkerNode<Worker>): Worker[] {
+  return [node.row, ...node.children.flatMap(subtree)];
+}
+
+const activeStatus = (status: WorkerRow["status"]) => status === "running" || status === "needs-you";
+
+/** A fold holds at least this many workers; fewer show as they are (a fold of one takes the same row). */
+export const FOLD_MIN = 2;
+
+/**
+ * One level of a nest: the workers shown (running or waiting, or with such a
+ * worker under them) and the rest, folded into "N done" with the count of
+ * every worker they hold. Fewer than FOLD_MIN finished: nothing folds.
+ */
+export function foldLevel<Worker extends { status: WorkerRow["status"] }>(nodes: readonly WorkerNode<Worker>[]): { shown: WorkerNode<Worker>[]; done: WorkerNode<Worker>[]; doneCount: number } {
+  const live = (node: WorkerNode<Worker>) => subtree(node).some((row) => activeStatus(row.status));
+  const done = nodes.filter((node) => !live(node));
+  const doneCount = done.reduce((sum, node) => sum + subtree(node).length, 0);
+  if (doneCount < FOLD_MIN) return { shown: [...nodes], done: [], doneCount: 0 };
+  return { shown: nodes.filter(live), done, doneCount };
+}
+
+/** The toggle's label: "3 workers, 1 running, 1 needs you". */
+export function nestLabel(nest: Pick<WorkerNest<unknown>, "total" | "running" | "needsYou">): string {
+  return [`${nest.total} ${nest.total === 1 ? "worker" : "workers"}`, nest.running ? `${nest.running} running` : "", nest.needsYou ? `${nest.needsYou} ${nest.needsYou === 1 ? "needs" : "need"} you` : ""].filter(Boolean).join(", ");
+}
+
 export interface SummarySection {
   /** "Decisions", "Left open", "Made"; "" for text before the first heading. */
   heading: string;

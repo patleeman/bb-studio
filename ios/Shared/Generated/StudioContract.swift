@@ -19895,8 +19895,10 @@ public enum Studio {
     public var sameTitle: Int?
     public var providerId: String?
     public var modelName: String?
+    public var spawnedBy: String?
+    public var nestUnder: String?
 
-    public init(threadId: String? = nil, title: String? = nil, status: BotThreadsViewOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil, providerId: String? = nil, modelName: String? = nil) {
+    public init(threadId: String? = nil, title: String? = nil, status: BotThreadsViewOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil, providerId: String? = nil, modelName: String? = nil, spawnedBy: String? = nil, nestUnder: String? = nil) {
       self.threadId = threadId
       self.title = title
       self.status = status
@@ -19910,6 +19912,8 @@ public enum Studio {
       self.sameTitle = sameTitle
       self.providerId = providerId
       self.modelName = modelName
+      self.spawnedBy = spawnedBy
+      self.nestUnder = nestUnder
     }
   }
 
@@ -20037,8 +20041,10 @@ public enum Studio {
     public var sameTitle: Int?
     public var providerId: String?
     public var modelName: String?
+    public var spawnedBy: String?
+    public var nestUnder: String?
 
-    public init(threadId: String? = nil, title: String? = nil, status: BotThreadsOlderOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil, providerId: String? = nil, modelName: String? = nil) {
+    public init(threadId: String? = nil, title: String? = nil, status: BotThreadsOlderOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil, providerId: String? = nil, modelName: String? = nil, spawnedBy: String? = nil, nestUnder: String? = nil) {
       self.threadId = threadId
       self.title = title
       self.status = status
@@ -20052,6 +20058,8 @@ public enum Studio {
       self.sameTitle = sameTitle
       self.providerId = providerId
       self.modelName = modelName
+      self.spawnedBy = spawnedBy
+      self.nestUnder = nestUnder
     }
   }
 
@@ -20187,8 +20195,10 @@ public enum Studio {
     public var sameTitle: Int?
     public var providerId: String?
     public var modelName: String?
+    public var spawnedBy: String?
+    public var nestUnder: String?
 
-    public init(threadId: String? = nil, title: String? = nil, status: BotConversationsAllOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil, providerId: String? = nil, modelName: String? = nil) {
+    public init(threadId: String? = nil, title: String? = nil, status: BotConversationsAllOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil, providerId: String? = nil, modelName: String? = nil, spawnedBy: String? = nil, nestUnder: String? = nil) {
       self.threadId = threadId
       self.title = title
       self.status = status
@@ -20202,6 +20212,8 @@ public enum Studio {
       self.sameTitle = sameTitle
       self.providerId = providerId
       self.modelName = modelName
+      self.spawnedBy = spawnedBy
+      self.nestUnder = nestUnder
     }
   }
 

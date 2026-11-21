@@ -25979,6 +25979,18 @@
                     "string",
                     "null"
                   ]
+                },
+                "spawnedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "nestUnder": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -26231,6 +26243,18 @@
                   ]
                 },
                 "modelName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "spawnedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "nestUnder": {
                   "type": [
                     "string",
                     "null"
@@ -26494,6 +26518,18 @@
                   ]
                 },
                 "modelName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "spawnedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "nestUnder": {
                   "type": [
                     "string",
                     "null"

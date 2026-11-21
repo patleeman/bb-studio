@@ -3,11 +3,15 @@
 // - which Bot the sidebar shows (per window in sessionStorage; a new window
 //   starts on the one used last, in localStorage);
 // - each Bot's last-open conversation or worker (localStorage), where a
-//   switch to that Bot lands.
+//   switch to that Bot lands;
+// - the conversations whose workers are open under their row (localStorage).
 import { useSyncExternalStore } from "react";
 
 const BOT_KEY = "studio.sidebar.bot";
 const LAST_KEY = "studio.sidebar.last-conversation";
+const NESTS_KEY = "studio.sidebar.open-workers";
+/** The open-workers list keeps this many conversations, the latest opened last. */
+const NESTS_KEPT = 200;
 
 const listeners = new Set<() => void>();
 const emit = () => { for (const listener of listeners) listener(); };
@@ -163,6 +167,23 @@ export function rememberConversation(botId: string, threadId: string): void {
   try { localStorage.setItem(LAST_KEY, JSON.stringify(map)); } catch { /* private mode */ }
 }
 
+/** The conversations whose workers the user opened under their row. */
+export function openWorkerNests(): Set<string> {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(NESTS_KEY) ?? "[]");
+    return new Set(Array.isArray(value) ? value.filter((each): each is string => typeof each === "string") : []);
+  } catch { return new Set(); }
+}
+
+/** Remembers a conversation's workers open or closed. */
+export function setWorkerNestOpen(threadId: string, open: boolean): Set<string> {
+  const ids = [...openWorkerNests()].filter((id) => id !== threadId);
+  if (open) ids.push(threadId);
+  const kept = ids.slice(-NESTS_KEPT);
+  try { localStorage.setItem(NESTS_KEY, JSON.stringify(kept)); } catch { /* private mode */ }
+  return new Set(kept);
+}
+
 /**
  * Opens BB's sidebar if it is folded. BB's plugin API has no call for it, so
  * this presses BB's own sidebar button (`data-sidebar="trigger"`) when that
@@ -185,6 +206,6 @@ export function resetSidebarState(): void {
   threadOpener = null;
   conversationStarter = null;
   switcher = null;
-  try { for (const key of [BOT_KEY, LAST_KEY]) { sessionStorage.removeItem(key); localStorage.removeItem(key); } } catch { /* private mode */ }
+  try { for (const key of [BOT_KEY, LAST_KEY, NESTS_KEY]) { sessionStorage.removeItem(key); localStorage.removeItem(key); } } catch { /* private mode */ }
   emit();
 }

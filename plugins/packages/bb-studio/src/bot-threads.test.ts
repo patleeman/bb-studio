@@ -1,7 +1,7 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it } from "vitest";
 import { MIGRATIONS } from "./migrations";
-import { ADOPT_RECENT, agentFork, BotThreads, botNeedsYou, classifyThread, forkMessageIdOf, latestLine, olderView, repoTag, threadRunning, threadsView, workerStatus, type Signals, type ThreadFacts } from "./bot-threads";
+import { ADOPT_RECENT, agentFork, BotThreads, botNeedsYou, classifyThread, forkMessageIdOf, latestLine, olderView, repoTag, threadRunning, threadsView, workerStatus, WORKER_FINISHED_SHOWN, type Signals, type ThreadFacts } from "./bot-threads";
 
 const dispose: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
@@ -381,22 +381,61 @@ it("lists recent conversations and workers only, and counts the rest for the old
   expect(older.workers.map((each) => each.threadId)).toEqual(["w_done_3d", "w_failed_8d"]);
 });
 
-it("shows every running or waiting worker, then the five newest finished, one title folded into ×N; the rest are counted, today's apart", () => {
+it("shows every running or waiting worker, then the newest finished up to the limit, one title folded into ×N; the rest are counted, today's apart", () => {
   const now = 100 * 24 * HOUR;
   const at = (hours: number) => now - hours * HOUR;
+  const fillers = Array.from({ length: WORKER_FINISHED_SHOWN - 5 }, (_, index): [string, string, string, number] => [`n${index}`, `Newer ${index}`, "idle", (index + 1) / 100]);
   const workers: [string, string, string, number][] = [
-    ["run1", "Runner", "active", 50 * 24], ["ask", "Codex", "idle", 30 * 24],
+    ["run1", "Runner", "active", 50 * 24], ["ask", "Codex", "idle", 30 * 24], ...fillers,
     ["rev1", "Chief of Staff · skill review", "idle", 1], ["rev2", "Chief of Staff · skill review", "idle", 2], ["rev3", "Chief of Staff · skill review", "idle", 3],
     ["a", "A", "idle", 4], ["b", "B", "error", 5], ["c", "C", "idle", 6], ["d", "D", "idle", 7], ["e", "E", "idle", 8], ["f", "F", "idle", 30],
   ];
   const records = [rec({ threadId: "main", isMain: true }), ...workers.map(([id]) => rec({ threadId: id, kind: "worker", ownerConversationId: "main" }))];
   const threads = new Map<string, ThreadFacts>([["main", { id: "main" }], ...workers.map(([id, title, status, hours]): [string, ThreadFacts] => [id, { id, title, status, updatedAt: at(hours), hasPendingInteraction: id === "ask" }])]);
   const view = threadsView("bot_dot", records, threads, now);
-  expect(view.workers.map((each) => [each.threadId, each.sameTitle])).toEqual([["ask", 1], ["run1", 1], ["rev1", 3], ["a", 1], ["b", 1], ["c", 1], ["d", 1]]);
+  expect(view.workers.map((each) => [each.threadId, each.sameTitle])).toEqual([["ask", 1], ["run1", 1], ...fillers.map(([id]) => [id, 1]), ["rev1", 3], ["a", 1], ["b", 1], ["c", 1], ["d", 1]]);
   // e (8h) and f (30h) are left out; e finished today.
   expect([view.hiddenWorkers, view.hiddenToday]).toEqual([2, 1]);
   // The older list has the folded namesakes too, newest first.
   expect(olderView("bot_dot", records, threads, now).workers.map((each) => each.threadId)).toEqual(["rev2", "rev3", "e", "f"]);
+});
+
+it("folds a title only within one conversation, and says which worker started a worker and which row each nests under", () => {
+  const now = 100 * 24 * HOUR;
+  const records = [
+    rec({ threadId: "main", isMain: true }),
+    rec({ threadId: "conv", title: "Launch" }),
+    rec({ threadId: "at_msg", forkedFrom: { threadId: "conv", messageId: "m1", turnId: null } }),
+    rec({ threadId: "stale" }),
+    rec({ threadId: "lead", kind: "worker", ownerConversationId: "conv" }),
+    rec({ threadId: "sub", kind: "worker", ownerConversationId: "conv" }),
+    rec({ threadId: "forked_sub", kind: "worker", ownerConversationId: "conv" }),
+    rec({ threadId: "on_fork", kind: "worker", ownerConversationId: "at_msg" }),
+    rec({ threadId: "old_owner", kind: "worker", ownerConversationId: "stale" }),
+    rec({ threadId: "review_main", kind: "worker", ownerConversationId: "main" }),
+    rec({ threadId: "review_conv", kind: "worker", ownerConversationId: "conv" }),
+    rec({ threadId: "other_bot", botId: "bot_scout", kind: "worker", ownerConversationId: "scout_main" }),
+    rec({ threadId: "scouted", kind: "worker", ownerConversationId: "conv" }),
+  ];
+  const threads = new Map<string, ThreadFacts>([
+    ["main", { id: "main", updatedAt: now }],
+    ["conv", { id: "conv", updatedAt: now - HOUR }],
+    ["at_msg", { id: "at_msg", updatedAt: now - HOUR }],
+    ["stale", { id: "stale", updatedAt: now - 30 * 24 * HOUR }],
+    ["lead", { id: "lead", status: "active", updatedAt: now, parentThreadId: "conv" }],
+    ["sub", { id: "sub", status: "active", updatedAt: now, parentThreadId: "lead" }],
+    ["forked_sub", { id: "forked_sub", status: "active", updatedAt: now, originKind: "fork", sourceThreadId: "sub", parentThreadId: "conv" }],
+    ["on_fork", { id: "on_fork", status: "active", updatedAt: now, parentThreadId: "at_msg" }],
+    ["old_owner", { id: "old_owner", status: "active", updatedAt: now, parentThreadId: "stale" }],
+    ["review_main", { id: "review_main", title: "Review", status: "idle", updatedAt: now - HOUR }],
+    ["review_conv", { id: "review_conv", title: "Review", status: "idle", updatedAt: now - 2 * HOUR }],
+    ["scouted", { id: "scouted", status: "active", updatedAt: now, lifecycleOwnerThreadId: "other_bot" }],
+  ]);
+  const view = threadsView("bot_dot", records, threads, now);
+  const of = (id: string) => view.workers.find((each) => each.threadId === id)!;
+  expect([of("review_main").sameTitle, of("review_conv").sameTitle]).toEqual([1, 1]);
+  expect([of("lead").spawnedBy, of("sub").spawnedBy, of("forked_sub").spawnedBy, of("scouted").spawnedBy]).toEqual([null, "lead", "sub", null]);
+  expect([of("lead").nestUnder, of("on_fork").nestUnder, of("old_owner").nestUnder, of("review_main").nestUnder]).toEqual(["conv", "conv", null, "main"]);
 });
 
 it("finishes a conversation (archived with its summary, needs-you cleared) and reopens it; Main and workers can't be", async () => {

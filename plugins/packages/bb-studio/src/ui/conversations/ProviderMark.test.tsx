@@ -8,7 +8,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { installTestPluginRuntime } from "@get-bb/plugin-sdk/testing/app";
 import { ConversationRowView, WorkerRowView } from "./BotSidebarPanel";
 import { ProviderMark, providerLabel, UNKNOWN_PROVIDER } from "./ProviderMark";
-import { taskProvider } from "./WorkerTasks";
 import type { ConversationLine, WorkerLine } from "./model";
 import type { ProviderCatalogEntry } from "../bot/ProviderStatusMark";
 
@@ -116,18 +115,5 @@ describe("rows", () => {
     expect(row.querySelector('[data-status="running"]')).not.toBeNull();
     expect(mark().nextElementSibling?.getAttribute("data-testid")).toBe("worker-title");
     expect(mark().title).toBe("Codex · gpt 5.5");
-  });
-});
-
-describe("a task's mark", () => {
-  const of = (map: Record<string, string | null>) => (threadId: string) => (threadId in map ? { providerId: map[threadId] ?? null, modelName: threadId === "a" ? "Opus 5.5" : null } : null);
-  it("is its worker's provider", () => {
-    expect(taskProvider(["a"], of({ a: "claude-code" }), PROVIDERS)).toEqual({ provider: { providerId: "claude-code", modelName: "Opus 5.5" } });
-  });
-  it("is the shared provider of several workers", () => {
-    expect(taskProvider(["a", "b"], of({ a: "codex", b: "codex" }), PROVIDERS)).toEqual({ provider: { providerId: "codex", modelName: null } });
-  });
-  it("is the generic mark named with each provider when they differ", () => {
-    expect(taskProvider(["a", "b"], of({ a: "claude-code", b: "codex" }), PROVIDERS)).toEqual({ provider: null, label: "Claude Code, Codex" });
   });
 });
