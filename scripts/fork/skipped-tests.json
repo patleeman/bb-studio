@@ -803,6 +803,18 @@
     {
       "file": "apps/cli/src/commands/machine-enrollment.test.ts",
       "title": "uses the default BB data directory only when it already holds this machine"
+    },
+    {
+      "file": "packages/provider-bridge-acp/src/session-params.test.ts",
+      "title": "appends sanitized skill instructions after the base instructions"
+    },
+    {
+      "file": "packages/provider-bridge-acp/src/session-params.test.ts",
+      "title": "starts with the skill block when the session has no base instructions"
+    },
+    {
+      "file": "packages/provider-bridge-acp/src/bridge/bridge.test.ts",
+      "title": "lists skills/configure roots in canonical session instructions"
     }
   ],
   "removeLines": [
