@@ -394,6 +394,9 @@ public enum Studio {
     public static let strands_list = "strands.list"
     public static let strands_tags = "strands.tags"
     public static let strands_opened = "strands.opened"
+    public static let router_notice_get = "router.notice.get"
+    public static let router_notice_dismiss = "router.notice.dismiss"
+    public static let router_handoff = "router.handoff"
   }
 
   public enum Channel {
@@ -1259,6 +1262,12 @@ public enum Studio {
   public typealias StrandsTags = StrandsTagsOutput
 
   public typealias StrandsOpened = StrandsOpenedOutput
+
+  public typealias RouterNoticeGet = RouterNoticeGetOutput
+
+  public typealias RouterNoticeDismiss = RouterNoticeDismissOutput
+
+  public typealias RouterHandoff = RouterHandoffOutput
 
   public struct LoopsListInput: Sendable, Hashable, Codable {
     public var area: String?
@@ -42609,6 +42618,212 @@ public enum Studio {
 
     public init(ok: Bool? = nil) {
       self.ok = ok
+    }
+  }
+
+  public struct RouterNoticeGetInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public enum RouterNoticeGetOutputKind: Sendable, Hashable, Codable {
+    case usage_limit
+    case sign_in
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "usage-limit": self = .usage_limit
+      case "sign-in": self = .sign_in
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .usage_limit: try container.encode("usage-limit")
+      case .sign_in: try container.encode("sign-in")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum RouterNoticeGetOutputTargetReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct RouterNoticeGetOutputTarget: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: RouterNoticeGetOutputTargetReasoningLevel?
+    public var label: String?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: RouterNoticeGetOutputTargetReasoningLevel? = nil, label: String? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.label = label
+    }
+  }
+
+  public struct RouterNoticeGetOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var requestId: String?
+    public var kind: RouterNoticeGetOutputKind?
+    public var failedProviderId: String?
+    public var failedProviderName: String?
+    public var reason: String?
+    public var target: RouterNoticeGetOutputTarget?
+    public var targetName: String?
+    public var text: String?
+    public var createdAt: Double?
+
+    public init(threadId: String? = nil, requestId: String? = nil, kind: RouterNoticeGetOutputKind? = nil, failedProviderId: String? = nil, failedProviderName: String? = nil, reason: String? = nil, target: RouterNoticeGetOutputTarget? = nil, targetName: String? = nil, text: String? = nil, createdAt: Double? = nil) {
+      self.threadId = threadId
+      self.requestId = requestId
+      self.kind = kind
+      self.failedProviderId = failedProviderId
+      self.failedProviderName = failedProviderName
+      self.reason = reason
+      self.target = target
+      self.targetName = targetName
+      self.text = text
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct RouterNoticeDismissInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct RouterNoticeDismissOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct RouterHandoffInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public enum RouterHandoffOutputTargetReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct RouterHandoffOutputTarget: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: RouterHandoffOutputTargetReasoningLevel?
+    public var label: String?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: RouterHandoffOutputTargetReasoningLevel? = nil, label: String? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.label = label
+    }
+  }
+
+  public struct RouterHandoffOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var target: RouterHandoffOutputTarget?
+    public var cancelledRetries: Double?
+
+    public init(threadId: String? = nil, target: RouterHandoffOutputTarget? = nil, cancelledRetries: Double? = nil) {
+      self.threadId = threadId
+      self.target = target
+      self.cancelledRetries = cancelledRetries
     }
   }
 

@@ -100,3 +100,10 @@ export const routerContract = defineRpcContract({
    */
   "router.handoff": { input: threadInput, output: z.object({ threadId: z.string(), target: targetSchema, cancelledRetries: z.number() }) },
 });
+
+/** What the phone reads and does: a conversation's usage-limit or sign-in notice, dismissing it, and Hand off without the app. */
+export const routerPublicContract = defineRpcContract({
+  "router.notice.get": routerContract["router.notice.get"],
+  "router.notice.dismiss": routerContract["router.notice.dismiss"],
+  "router.handoff": routerContract["router.handoff"],
+});
