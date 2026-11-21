@@ -944,6 +944,24 @@
       "coverage": "generated method"
     },
     {
+      "file": "ios/iOS/Bot/RouterNotice.swift",
+      "plugin": "studio",
+      "method": "router.notice.get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/RouterNotice.swift",
+      "plugin": "studio",
+      "method": "router.notice.dismiss",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/RouterNotice.swift",
+      "plugin": "studio",
+      "method": "router.handoff",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/iOS/Capture/CaptureSheet.swift",
       "plugin": "studio",
       "method": "pages.create",
@@ -1158,6 +1176,12 @@
       "plugin": "mobile",
       "method": "mute_set",
       "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "ios/iOS/Tools/ToolGatewayView.swift",
+      "plugin": "studio",
+      "method": "toolGateway.overview",
+      "coverage": "generated method"
     },
     {
       "file": "ios/iOS/VisualChat/VisualChatModel.swift",

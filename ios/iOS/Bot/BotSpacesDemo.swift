@@ -14,6 +14,9 @@ enum BotSpacesDemo {
     /// `-qaStrandsDemo`: Studio answers `strands.*`, and the Bot's view nests more workers (a worker's worker, runners under Main).
     static var strands: Bool { ProcessInfo.processInfo.arguments.contains("-qaStrandsDemo") }
 
+    /// `-qaRouterDemo`: Studio answers the model router's notice for Main (a usage limit with Hand off).
+    static var router: Bool { ProcessInfo.processInfo.arguments.contains("-qaRouterDemo") }
+
     static var late: Duration? {
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "-qaSpacesLate") else { return nil }
@@ -250,6 +253,7 @@ enum BotSpacesDemo {
         private var strandsResolved = false
         /// Juniper's state for Pause, Resume and Stop (`-qaSpacesDemo`).
         private var juniperState = "active"
+        private var routerHandedOff = false
         private(set) var mainMadeFrom: String?
 
         /// `strands.tags` for the demo's Main: its first turn in Lisbon trip, the PR turns in the fork's strand, today's in Theme stills.
@@ -497,6 +501,29 @@ enum BotSpacesDemo {
                         "approval": approvalView("pending"),
                     ] as [String: Any]]])
                 }
+            case "router.notice.get":
+                guard BotSpacesDemo.router else { return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
+                guard threadId == BotDemo.threadId, !lock.withLock({ routerHandedOff }) else { return ok(NSNull()) }
+                let target: [String: Any] = ["providerId": "codex", "model": "gpt-5.2", "reasoningLevel": NSNull()]
+                let notice: [String: Any] = ["threadId": threadId, "requestId": "req_demo", "kind": "usage-limit", "failedProviderId": "claude-code",
+                                             "failedProviderName": "Claude Code", "reason": "usage limit", "target": target, "targetName": "GPT-5.2",
+                                             "text": "Claude Code hit its usage limit. Hand off to GPT-5.2 to keep going.", "createdAt": Self.now - 60_000]
+                return ok(notice)
+            case "router.notice.dismiss":
+                lock.withLock { routerHandedOff = true }
+                return ok(["ok": true])
+            case "router.handoff":
+                lock.withLock { routerHandedOff = true }
+                let target: [String: Any] = ["providerId": "codex", "model": "gpt-5.2", "reasoningLevel": NSNull()]
+                return ok(["threadId": "thr_demo_interview", "target": target, "cancelledRetries": 0])
+            case "toolGateway.overview":
+                let servers: [[String: Any]] = [
+                    ["id": "gw_github", "label": "GitHub", "kind": "streamable-http", "status": "running", "enabled": true, "tools": 12],
+                    ["id": "gw_calendar", "label": "Google Calendar", "kind": "streamable-http", "status": "needs-sign-in", "enabled": true, "tools": 4],
+                    ["id": "gw_files", "label": "Files", "kind": "stdio", "status": "off", "enabled": false, "tools": 6],
+                ]
+                let requests: [[String: Any]] = [["id": "gwr_1", "label": "Google Calendar: read events", "why": "To find a free slot for the furnace tune-up", "createdAt": Self.now - 300_000]]
+                return ok(["servers": servers, "requests": requests])
             case "bot_pause", "bot_resume", "bot_stop":
                 lock.withLock { juniperState = name == "bot_resume" ? "active" : name == "bot_pause" ? "paused" : "stopped" }
                 return ok(["id": "bot_juniper", "name": "Juniper", "state": lock.withLock { juniperState }])

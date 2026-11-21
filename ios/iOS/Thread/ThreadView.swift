@@ -1641,6 +1641,13 @@ struct ThreadView: View {
 
     private var strands: StrandsModel { StrandsModel.shared }
 
+    /// The thread Hand off continued in: a conversation of the Bot pages to it, any other thread opens over this one.
+    private func openRouterThread(_ threadId: String) {
+        guard let conversation else { return }
+        conversation.refresh()
+        conversation.openConversation(threadId)
+    }
+
     /// Make this the Main (`bot_make_main`): the old Main stays an ordinary conversation.
     private func makeMain(_ conversation: BotConversationContext) {
         let client = app.client
@@ -1673,6 +1680,10 @@ struct ThreadView: View {
                     BotQuickReplies(items: replies, tint: BotPalette.color(botChrome.bot.color)) { send(text: $0) }
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
+            }
+            if conversation != nil {
+                RouterNoticeBanner(threadId: model.threadId, openThread: openRouterThread)
+                    .padding(.trailing, stackClear)
             }
             if let conversation, let pause = conversation.botPause {
                 BotPausedBanner(botId: conversation.botId, botName: conversation.botName, stopped: pause == "stopped",
@@ -1891,6 +1902,11 @@ struct ThreadView: View {
             guard id == model.threadId else { return }
             composerFocused = true
             app.replyThreadId = nil
+        }
+        .task(id: conversation != nil ? model.threadId : "") {
+            // The model router's usage-limit notice (`RouterNoticeBanner`).
+            guard conversation != nil else { return }
+            await RouterNotices.shared.poll(model.threadId)
         }
         .task(id: conversation != nil || botChrome != nil ? model.threadId : "") {
             guard conversation != nil || botChrome != nil else { return }

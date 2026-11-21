@@ -64,6 +64,10 @@ struct SettingsView: View {
                 NavigationLink { PluginStatusView() } label: {
                     Label("Plugins", systemImage: "puzzlepiece.extension")
                 }
+                NavigationLink { ToolGatewayView() } label: {
+                    Label("Tool Gateway", systemImage: "point.3.connected.trianglepath.dotted")
+                }
+                .accessibilityIdentifier("settingsToolGateway")
                 if runningPlugins.split(separator: ",").contains("account-pool") {
                     NavigationLink { UsageView() } label: {
                         Label("Usage", systemImage: "gauge.with.dots.needle.33percent")
