@@ -14,6 +14,7 @@ interface HiddenHostEntries {
   settings: ReadonlySet<string>;
   settingsSections: ReadonlySet<string>;
   footer: ReadonlySet<string>;
+  promptStack: ReadonlySet<string>;
 }
 
 export function useForkHiddenHostEntries(): HiddenHostEntries {
@@ -28,6 +29,7 @@ export function useForkHiddenHostEntries(): HiddenHostEntries {
         entries.flatMap((entry) => entry.settingsSections ?? []),
       ),
       footer: new Set(entries.flatMap((entry) => entry.footer ?? [])),
+      promptStack: new Set(entries.flatMap((entry) => entry.promptStack ?? [])),
     };
   }, [registrations]);
 }
