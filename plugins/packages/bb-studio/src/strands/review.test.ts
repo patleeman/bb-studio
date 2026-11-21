@@ -262,6 +262,37 @@ describe("secrets stay out of what strands send and keep", () => {
     expect(scrub("Look at the router fallback chain")).toBe("Look at the router fallback chain");
   });
 
+  it("scrubs passwords in URLs, keeping the user and host", () => {
+    const scrub = scrubber();
+    const out = scrub("db is postgres://admin:Sup3rS3cret!@db.internal:5432/app and https://bot:tok-123abc@git.example.com/repo.git, see https://example.com/a@b");
+    expect(out).not.toContain("Sup3rS3cret!");
+    expect(out).not.toContain("tok-123abc");
+    expect(out).toContain(`postgres://admin:${REDACTED}@db.internal:5432/app`);
+    expect(out).toContain(`https://bot:${REDACTED}@git.example.com/repo.git`);
+    expect(out).toContain("https://example.com/a@b");
+  });
+
+  it("scrubs the value of a pair named like a secret, keeping the name", () => {
+    const scrub = scrubber();
+    const cases: [string, string][] = [
+      ["token: abc123def", "token: "],
+      ["password=hunter2", "password="],
+      ["api_key: k-998877", "api_key: "],
+      ["apiKey=\"q1w2e3\"", "apiKey=\""],
+      ["DB_PASSWORD=pa55word", "DB_PASSWORD="],
+      ["GITHUB_TOKEN=gh-plain-value", "GITHUB_TOKEN="],
+      ["client_secret: s3cr3t", "client_secret: "],
+      ["passwd = letmein", "passwd = "],
+    ];
+    for (const [input, kept] of cases) {
+      const out = scrub(`set ${input} now`);
+      expect(out, input).toContain(`${kept}${REDACTED}`);
+      expect(out, input).not.toMatch(/abc123def|hunter2|k-998877|q1w2e3|pa55word|gh-plain-value|s3cr3t|letmein/);
+    }
+    // Ordinary words that only look like the names stay.
+    expect(scrub("the token is in the vault; password rules: 12 characters")).toBe("the token is in the vault; password rules: 12 characters");
+  });
+
   it("sends Jev, the small model and the stored lines no secret", async () => {
     const x = setup({ secrets: [KNOWN] });
     x.thread.turn(`router: my key is ${KEY}, the vault phrase is ${KNOWN}`, `Set OPENAI_API_KEY=${OPENAI} and retried.`);
