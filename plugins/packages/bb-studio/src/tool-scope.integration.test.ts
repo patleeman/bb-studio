@@ -15,6 +15,7 @@ let dispose: () => Promise<void> = async () => {};
 let botId: string;
 let registeredNames: Set<string>;
 let callRpc: (method: string, input: unknown, options?: unknown) => Promise<unknown>;
+let db: () => { prepare(sql: string): { get(): unknown; run(...args: unknown[]): unknown } };
 
 const context = (threadId: string, providerId: string, model: string, extra: { title?: string | null; metadata?: Record<string, unknown> } = {}) => ({
   pluginMetadata: extra.metadata ?? {}, thread: { id: threadId, title: extra.title ?? null, parentThreadId: null, sourceThreadId: null },
@@ -39,13 +40,14 @@ beforeAll(async () => {
   registeredNames = new Set(registered.map((tool) => tool.name));
   callRpc = (method, input, options) => (host.harness as unknown as { callRpc(method: string, input: unknown, options?: unknown): Promise<unknown> }).callRpc(method, input, options);
   // The Bot whose Main the test threads stand in for (a fresh install's, or one seeded here).
-  const db = host.bb.storage.database() as unknown as { prepare(sql: string): { get(): { id: string } | undefined; run(...args: unknown[]): unknown } };
-  if (!db.prepare("SELECT id FROM bots LIMIT 1").get()) db.prepare("INSERT INTO bots (id, name, avatar, state, created_at, updated_at) VALUES ('bot_main', 'Chief', 'C', 'active', 1, 1)").run();
-  botId = db.prepare("SELECT id FROM bots LIMIT 1").get()!.id;
+  const database = host.bb.storage.database() as unknown as { prepare(sql: string): { get(): { id: string } | undefined; run(...args: unknown[]): unknown } };
+  db = () => database as never;
+  if (!database.prepare("SELECT id FROM bots LIMIT 1").get()) database.prepare("INSERT INTO bots (id, name, avatar, state, created_at, updated_at) VALUES ('bot_main', 'Chief', 'C', 'active', 1, 1)").run();
+  botId = database.prepare("SELECT id FROM bots LIMIT 1").get()!.id;
   // One thread of each kind: a worker of the Bot, a project's lead, a runner.
-  db.prepare("INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, source, created_at, updated_at) VALUES ('thr_kind_worker', ?, 'worker', 0, 'created', 1, 1)").run(botId);
-  db.prepare("INSERT INTO project_leads (project_id, lead_thread_id, created_at, updated_at) VALUES ('proj_other', 'thr_kind_lead', 1, 1)").run();
-  db.prepare("INSERT INTO bot_runners (id, bot_id, name, job, thread_id, project_id, state, cadence, time, created_at, updated_at) VALUES ('run_t', ?, 'Inbox', 'Read the inbox.', 'thr_kind_runner', 'proj_personal', 'active', 'daily', '09:00', 1, 1)").run(botId);
+  database.prepare("INSERT INTO bot_threads (thread_id, bot_id, kind, is_main, source, created_at, updated_at) VALUES ('thr_kind_worker', ?, 'worker', 0, 'created', 1, 1)").run(botId);
+  database.prepare("INSERT INTO project_leads (project_id, lead_thread_id, created_at, updated_at) VALUES ('proj_other', 'thr_kind_lead', 1, 1)").run();
+  database.prepare("INSERT INTO bot_runners (id, bot_id, name, job, thread_id, project_id, state, cadence, time, created_at, updated_at) VALUES ('run_t', ?, 'Inbox', 'Read the inbox.', 'thr_kind_runner', 'proj_personal', 'active', 'daily', '09:00', 1, 1)").run(botId);
   dispose = () => host.harness.lifecycle.dispose();
 });
 afterAll(() => dispose());
@@ -238,5 +240,23 @@ describe("reading a design", () => {
     expect(listed).not.toContain("filler text");
     const one = await run("pages_read", { page: designId, screenIds: ["1a"] }, thread);
     expect(one).toContain("filler text");
+  });
+});
+
+describe("a loaded merged tool's shown ops", () => {
+  const opsShown = (entries: Entry[], name: string) => {
+    const entry = entries.find((each) => typeof each === "object" && each.name === name) as { parameters?: { properties?: { op?: { enum?: string[] } } } } | undefined;
+    return entry?.parameters?.properties?.op?.enum ?? null;
+  };
+  it("through the trio, shows the loaded ops only, yet runs the others; Claude Code shows them all", async () => {
+    db().prepare("INSERT OR IGNORE INTO bot_threads (thread_id, bot_id, kind, is_main, source, created_at, updated_at) VALUES ('thr_kind_worker2', ?, 'worker', 0, 'created', 1, 1)").run(botId);
+    const acp = configure(context("thr_kind_worker2", "acp-opencode", "glm"));
+    expect(opsShown(acp.tools, "memory")).toEqual(["search", "add"]);
+    expect(JSON.stringify(acp.tools.find((each) => typeof each === "object" && each.name === "pages_read"))).not.toContain("comments");
+    const added = await run("memory", { op: "add", topic: "T", text: "A fact." }, "thr_kind_worker2");
+    const id = /mem_[a-z0-9]+/.exec(added)![0];
+    expect(await run("memory", { op: "update", id, text: "A corrected fact." }, "thr_kind_worker2")).not.toMatch(/isn't available|can't take/);
+    const claude = configure(context("thr_kind_worker2", "claude-code", "claude-opus-5-5"));
+    expect(opsShown(claude.tools, "memory")).toEqual(["search", "add", "update"]);
   });
 });

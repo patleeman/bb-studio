@@ -82,7 +82,19 @@ export function callRuns(item: { tool?: string; name?: string; arguments?: unkno
 }
 
 /** For tool scope: loaded and on-demand old names → merged names, and the ops each merged tool may run. */
-export function presentScope(scope: { loaded: readonly string[]; onDemand: readonly string[] }): { loaded: string[]; onDemand: string[]; ops: Map<string, string[]> } {
+export function presentScope(scope: { loaded: readonly string[]; onDemand: readonly string[] }): { loaded: string[]; onDemand: string[]; ops: Map<string, string[]>; loadedOps: Map<string, string[]> } {
+  const opsOf = (names: readonly string[]) => {
+    const out = new Map<string, string[]>();
+    for (const name of names) {
+      const alias = ALIASES.get(name);
+      const merged = alias?.merged ?? (ABSORBS[name] ? name : null);
+      if (!merged) continue;
+      const op = alias?.op ?? Object.entries(ABSORBS[name]!).find(([, old]) => old === name)![0];
+      out.set(merged, [...(out.get(merged) ?? []), op]);
+    }
+    return out;
+  };
+  const loadedOps = opsOf(scope.loaded);
   const ops = new Map<string, string[]>();
   for (const name of [...scope.loaded, ...scope.onDemand]) {
     const alias = ALIASES.get(name);
@@ -93,8 +105,14 @@ export function presentScope(scope: { loaded: readonly string[]; onDemand: reado
   }
   const loaded = [...new Set(scope.loaded.map(presentedName))];
   const onDemand = [...new Set(scope.onDemand.map(presentedName))].filter((name) => !loaded.includes(name));
-  return { loaded, onDemand, ops };
+  return { loaded, onDemand, ops, loadedOps };
 }
+
+/** For an absorb (pages_read, code_comments): the fields each op adds, to leave out of a shown schema without that op. */
+export const ABSORB_FIELDS: Readonly<Record<string, Record<string, readonly string[]>>> = {
+  pages_read: { list: ["query", "type"], comments: ["comments"] },
+  code_comments: { reply: ["op", "id", "body", "resolve"] },
+};
 
 interface BookTool { name: string; description: string; parameters: z.ZodType; execute(input: never, ctx: never): unknown }
 interface Book { get(name: string): BookTool | null; run(name: string, input: unknown, ctx: unknown, as?: string): Promise<unknown> }

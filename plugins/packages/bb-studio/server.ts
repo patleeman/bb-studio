@@ -40,7 +40,7 @@ import { sessionTitlePrefix } from "./src/decisions/server/classifier";
 import { ON_DEMAND_EXTRAS, scopeEntries, scopeTools, trioInstructions, type Scope, type ScopeKind } from "./src/tool-scope";
 import { registerScopedTools, ScopeMemory } from "./src/tool-scope-tools";
 import { slim, slimmedIfSmaller } from "./src/slim-schema";
-import { INTERNAL_RENAMES, MERGES, mergedParameters, mergedTools, presentScope } from "./src/merged-tools";
+import { ABSORB_FIELDS, INTERNAL_RENAMES, MERGES, mergedParameters, mergedTools, presentScope } from "./src/merged-tools";
 import { LeanStore, leanFor } from "./src/context-lean";
 import { contextLeanContract } from "./src/context-lean-contract";
 import { requireAppWindow } from "./src/tool-gateway/server/caller";
@@ -495,6 +495,16 @@ export default async function plugin(bb: BbPluginApi) {
   const mergedShown = (name: string, ops: ReadonlyMap<string, string[]>): Record<string, unknown> | null => {
     const merge = MERGES.find((each) => each.name === name);
     const allowed = ops.get(name);
+    const absorb = ABSORB_FIELDS[name];
+    if (absorb && allowed) {
+      // An absorb shows only its allowed ops' fields; without the list op, page is required.
+      const base = slimFor(name) ?? fullSchema(name);
+      if (!base) return null;
+      const drop = Object.entries(absorb).filter(([op]) => !allowed.includes(op)).flatMap(([, fields]) => fields);
+      const properties = Object.fromEntries(Object.entries((base.properties ?? {}) as Record<string, unknown>).filter(([key]) => !drop.includes(key)));
+      const required = name === "pages_read" && !allowed.includes("list") ? ["page"] : (base.required as string[] | undefined);
+      return { ...base, properties, ...(required ? { required } : {}) };
+    }
     if (!merge || !allowed) return null;
     const key = `${name}:${allowed.join(",")}`;
     if (!mergedShownCache.has(key)) {
@@ -511,8 +521,12 @@ export default async function plugin(bb: BbPluginApi) {
   /** The configure() entries for a scope in old names: merged names, each merged tool showing only the ops it may run. */
   const presentedEntries = (scope: Scope) => {
     const presented = presentScope(scope);
+    // Through the search trio (or with nothing on demand), a loaded merged tool shows only its loaded ops: the
+    // others still run (BB checks the full schema, and the op check allows them) and studio_tool_describe shows them.
+    // Claude Code and Codex defer what isn't loaded anyway, so they see every allowed op.
+    const shownOps = scope.delivery === "trio" || scope.delivery === "none" ? presented.loadedOps : presented.ops;
     const shown = {
-      slim: (name: string) => mergedShown(name, presented.ops) ?? slimFor(name),
+      slim: (name: string) => mergedShown(name, shownOps.has(name) ? shownOps : presented.ops) ?? slimFor(name),
       schema: (name: string) => mergedShown(name, presented.ops) ?? slimFor(name) ?? fullSchema(name),
     };
     return { entries: scopeEntries({ ...scope, loaded: presented.loaded, onDemand: presented.onDemand }, shown), onDemand: presented.onDemand };
