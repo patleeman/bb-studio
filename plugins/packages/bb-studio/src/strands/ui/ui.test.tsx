@@ -373,12 +373,15 @@ describe("replies that need you (design: Replies that need you, option a)", () =
     click(box2()!.querySelector("[data-strands-needs]"));
     const row = box2()!.querySelector('[data-strand-row="s_hvac"]')!;
     expect(text(row)).toContain("Want me to book Ace for Saturday 9 AM?");
-    click(row.querySelector("[data-reply-jump]"));
-    expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=22", { replace: true });
     state.call.mockResolvedValueOnce({ ok: true });
     await act(async () => { (row.querySelector("[data-reply-done]") as HTMLElement).click(); });
     expect(state.call).toHaveBeenCalledWith("strands.resolveReply", { threadId: "thr_main", seq: 22 });
-    click(row.querySelector('[data-strand-option="s_hvac"]'));
+    // Jump to reply opens it, and the box closes so the reply shows.
+    click(row.querySelector("[data-reply-jump]"));
+    expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=22", { replace: true });
+    expect(container.querySelector('[data-testid="strands-menu"]')).toBeNull();
+    click(box2()!.querySelector("[data-strands-needs]"));
+    click(box2()!.querySelector('[data-strand-option="s_hvac"]'));
     expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=22", { replace: true });
   });
 });

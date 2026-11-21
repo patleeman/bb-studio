@@ -32,6 +32,12 @@ describe("the structured signals (no model)", () => {
     expect(signalTag("Ran it:\n\n```\nShould I continue? [y/N]\n```\n\nAll 412 tests pass.")).toBeNull();
   });
 
+  it("leads a short ask with the sentence that names the choice", () => {
+    expect(signalTag("Two options: bbs (short) or bb-studio (clear). Both are free on npm. Your call.")).toMatchObject({ tag: "needs-you", ask: "Two options: bbs (short) or bb-studio (clear). … Your call." });
+    expect(askLineOf("Tests pass. OK to merge?")).toBe("Tests pass. OK to merge?");
+    expect(askLineOf("Want me to restart the containers now, or wait for tonight?")).toBe("Want me to restart the containers now, or wait for tonight?");
+  });
+
   it("leaves the rest to Jev", () => {
     expect(signalTag("The cleanup freed 18 GB. Looking at what else is big.")).toBeNull();
   });
@@ -88,7 +94,7 @@ describe("tagging each finished turn's reply", () => {
     expect(x.jevCalls.map((call) => Object.keys(call.questions))).toEqual([["strand", "reply"], ["strand"], ["strand", "reply"]]);
     expect(tagsOf(x.svc)).toEqual([
       ["needs-you", "You decide: required labels, or filled from the first match.", false],
-      ["needs-you", "Want me to book it?", false],
+      ["needs-you", "Ace has Saturday 9 AM. Want me to book it?", false],
       ["status", null, false],
     ]);
     expect(x.db.prepare("SELECT reply_by FROM strand_items WHERE kind = 'reply' ORDER BY seq").all()).toEqual([{ reply_by: "jev" }, { reply_by: "signal" }, { reply_by: "jev" }]);
@@ -111,7 +117,7 @@ describe("tagging each finished turn's reply", () => {
     down.thread.turn("Disk?", "Freed 18 GB.", { at: NOW - HOUR });
     await down.svc.idle(down.thread.id);
     // With no Jev both turns stay in one strand, so the second message already answers the first reply.
-    expect(tagsOf(down.svc).map(([tag, ask]) => [tag, ask])).toEqual([["needs-you", "OK to deploy?"], ["status", null]]);
+    expect(tagsOf(down.svc).map(([tag, ask]) => [tag, ask])).toEqual([["needs-you", "Patched it. OK to deploy?"], ["status", null]]);
     expect(down.db.prepare("SELECT DISTINCT reply_by FROM strand_items WHERE kind = 'reply'").all()).toEqual([{ reply_by: "rule" }]);
 
     const x = service();
@@ -169,7 +175,7 @@ describe("a reply that needs you, in the strands", () => {
     x.thread.turn("Look at the router", "Patched it. Want me to deploy?", { at: NOW - 2 * HOUR });
     x.thread.turn("ok", "Deploying.", { at: NOW - HOUR });
     await x.svc.idle(x.thread.id);
-    expect(tagsOf(x.svc)[0]).toEqual(["needs-you", "Want me to deploy?", true]);
+    expect(tagsOf(x.svc)[0]).toEqual(["needs-you", "Patched it. Want me to deploy?", true]);
   });
 
   it("is resolved by Done, by its strand marked done, or a week on", async () => {

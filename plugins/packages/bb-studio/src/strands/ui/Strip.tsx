@@ -102,7 +102,7 @@ function useOpenMessage() {
   }, [navigate, pathname]);
 }
 
-export function AskButtonsFor({ ask, threadId }: { ask: StrandAsk; threadId: string }) {
+export function AskButtonsFor({ ask, threadId, onOpen }: { ask: StrandAsk; threadId: string; /** After Jump to reply opens the reply (the box closes so it shows). */ onOpen?(): void }) {
   const call = useCall();
   const navigate = useBbNavigate();
   const openMessage = useOpenMessage();
@@ -117,7 +117,7 @@ export function AskButtonsFor({ ask, threadId }: { ask: StrandAsk; threadId: str
       finally { setBusy(false); }
     };
     return <>
-      {ask.seq !== null ? <button type="button" data-reply-jump={ask.seq} onClick={() => openMessage(ask.threadId, ask.seq!)} className={cn(smallButton, "border-transparent bg-foreground font-semibold text-background")}>Jump to reply</button> : null}
+      {ask.seq !== null ? <button type="button" data-reply-jump={ask.seq} onClick={() => { openMessage(ask.threadId, ask.seq!); onOpen?.(); }} className={cn(smallButton, "border-transparent bg-foreground font-semibold text-background")}>Jump to reply</button> : null}
       <button type="button" data-reply-done={ask.seq ?? ""} disabled={busy || ask.seq === null} onClick={() => void done()} className={cn(smallButton, "border-border bg-transparent hover:bg-accent")}>Done</button>
     </>;
   }
@@ -186,7 +186,7 @@ function WorkerLine({ worker }: { worker: StrandView["workers"][number] }) {
 }
 
 /** One strand in the box's list: mark, name, its running workers and age, its one-line summary, its workers, and an ask with its whole details and buttons. */
-function StrandOption({ strand, threadId, active, now, onPick }: { strand: StrandView; threadId: string; active: boolean; now: number; onPick(): void }) {
+function StrandOption({ strand, threadId, active, now, onPick, onClose }: { strand: StrandView; threadId: string; active: boolean; now: number; onPick(): void; onClose(): void }) {
   const ask = strand.state === "needs-you" ? strand.asks[0] ?? null : null;
   const workers = rowWorkersOf(strand, now);
   const running = workers.filter((worker) => worker.status === "running").length;
@@ -214,7 +214,7 @@ function StrandOption({ strand, threadId, active, now, onPick }: { strand: Stran
               {ask.details.map((line, index) => <li key={index} className="whitespace-pre-wrap break-all">{line}</li>)}
             </ul>
           ) : null}
-          <div className="mt-1.5 flex flex-wrap gap-1.5"><AskButtonsFor ask={ask} threadId={threadId} /></div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5"><AskButtonsFor ask={ask} threadId={threadId} onOpen={onClose} /></div>
         </div>
       ) : null}
     </li>
@@ -346,7 +346,7 @@ export function StrandsBox({ threadId, now = Date.now() }: { threadId: string; n
               <section key={group.label} aria-label={group.label}>
                 <div className="px-2 pb-0.5 pt-1.5 text-[11px] font-semibold text-muted-foreground/70">{group.label}</div>
                 <ul className="flex flex-col gap-px">
-                  {group.strands.map((strand) => <StrandOption key={strand.id} strand={strand} threadId={threadId} now={now} active={selection?.strandId === strand.id} onPick={() => pick(strand)} />)}
+                  {group.strands.map((strand) => <StrandOption key={strand.id} strand={strand} threadId={threadId} now={now} active={selection?.strandId === strand.id} onPick={() => pick(strand)} onClose={() => { setExpanded(false); setQuery(""); }} />)}
                 </ul>
               </section>
             ))}

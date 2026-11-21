@@ -102,13 +102,24 @@ const EXPLICIT = new RegExp([
 /** A question that's only rhetorical or the agent's own ("What did I find?"). */
 const SELF_QUESTION = /^\s*(?:what|why|how|where) (?:did|do|does|is|was) (?:i|it|this|that)\b/iu;
 
+/** An ask this short ("Your call.") says nothing alone: it leads with its paragraph's first sentence, which names the choice. */
+const SHORT_ASK = 40;
+
+/** The ask line for `sentences[index]`: the sentence, after its paragraph's first sentence when it is too short to read alone. */
+function lineFor(sentences: readonly string[], index: number): string {
+  const sentence = sentences[index]!;
+  if (sentence.length >= SHORT_ASK || index === 0) return cut(sentence, ASK_MAX);
+  return cut(`${sentences[0]}${index > 1 ? " … " : " "}${sentence}`, ASK_MAX);
+}
+
 /** The sentence that asks the user, from the reply's last paragraphs (the last ask wins). Null when none does. */
 export function askLineOf(text: string): string | null {
   const paragraphs = proseOf(text);
   for (const paragraph of [...paragraphs].reverse().slice(0, 4)) {
     const sentences = sentencesOf(paragraph);
-    for (const sentence of [...sentences].reverse()) {
-      if (EXPLICIT.test(sentence) || (sentence.endsWith("?") && !SELF_QUESTION.test(sentence))) return cut(sentence, ASK_MAX);
+    for (let index = sentences.length - 1; index >= 0; index--) {
+      const sentence = sentences[index]!;
+      if (EXPLICIT.test(sentence) || (sentence.endsWith("?") && !SELF_QUESTION.test(sentence))) return lineFor(sentences, index);
     }
   }
   return null;
@@ -149,8 +160,10 @@ export function signalTag(text: string, stock: readonly string[] = []): ReplyVer
     return { tag: "needs-you", ask: askLineOf(text) ?? cut(`Choose: ${replies.map((item) => item.replace(/^[^\p{L}\p{N}]+/u, "").trim()).join(" / ")}`, ASK_MAX), by: "signal" };
   }
   const last = proseOf(text).at(-1);
-  const explicit = last ? [...sentencesOf(last)].reverse().find((sentence) => EXPLICIT.test(sentence)) : undefined;
-  if (explicit) return { tag: "needs-you", ask: cut(explicit, ASK_MAX), by: "signal" };
+  const sentences = last ? sentencesOf(last) : [];
+  for (let index = sentences.length - 1; index >= 0; index--) {
+    if (EXPLICIT.test(sentences[index]!)) return { tag: "needs-you", ask: lineFor(sentences, index), by: "signal" };
+  }
   return null;
 }
 
