@@ -1,3 +1,4 @@
+import { buildForkAcpSkillsInstructions } from "./skills-listing.fork.js";
 import type {
   DynamicTool,
   PermissionMode,
@@ -93,6 +94,8 @@ function sanitizeAcpSkillDescription(description: string): string {
 function buildAcpSkillsInstructions(
   skillRoots: readonly AcpSkillRoot[] | undefined,
 ): string | undefined {
+  const forkListing = buildForkAcpSkillsInstructions(skillRoots, sanitizeAcpSkillDescription);
+  if (forkListing !== undefined) return forkListing;
   if (!skillRoots || skillRoots.length === 0) {
     return undefined;
   }
