@@ -24,6 +24,9 @@ export const TOPICS: Record<string, string> = {
 const WORDS = Object.keys(TOPICS);
 export const topicOf = (text: string): string | null => WORDS.find((word) => text.toLowerCase().includes(word)) ?? null;
 
+/** The fixture's turns happen at this time (plus their seq in ms) unless a test gives one; the tests' clocks sit here too. */
+export const FIXTURE_AT = Date.parse("2026-11-20T12:00:00Z");
+
 export function database(): Database.Database {
   const db = new Database(":memory:");
   for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
@@ -47,7 +50,7 @@ export class FakeThread {
 
   /** A turn: the request, the turn's start, `tools` tool items, the reply, and (when done) its end. */
   turn(text: string, reply: string, options: { at?: number; kind?: "user" | "report" | "ping"; done?: boolean; tools?: number } = {}): { seq: number; turnId: string } {
-    const at = options.at ?? 1_000 + this.seq;
+    const at = options.at ?? FIXTURE_AT + this.seq;
     const turnId = `turn_${++this.turns}`;
     const kind = options.kind ?? "user";
     const input = kind === "ping" ? [{ type: "text", text: "[bb ping] keep warm", visibility: "agent-only" }]
@@ -62,7 +65,7 @@ export class FakeThread {
   }
 
   /** Ends the newest turn. */
-  finish(turnId: string, reply = "Done.", at = 1_000 + this.seq): void {
+  finish(turnId: string, reply = "Done.", at = FIXTURE_AT + this.seq): void {
     this.push({ type: "item/completed", createdAt: at, scope: { kind: "turn", turnId }, data: { item: { type: "agentMessage", text: reply } } });
     this.push({ type: "turn/completed", createdAt: at + 1, scope: { kind: "turn", turnId }, data: {} });
   }

@@ -53,6 +53,19 @@ export function formatStrands(list: StrandList, items: readonly StrandItemView[]
   return `${lines.join("\n")}\n`;
 }
 
+/**
+ * Which conversation `bb studio strands [ref]` may show: an agent only its own
+ * Bot's Main; the user's terminal (no calling thread) any Bot's Main. Null
+ * when the ref isn't one of those.
+ */
+export function strandsThreadFor(ref: string | null, caller: string | null, mains: readonly string[], botMainFor: (threadId: string) => string | null): string | null {
+  const own = caller ? botMainFor(caller) : null;
+  const allowed = caller ? (own && mains.includes(own) ? [own] : []) : [...mains];
+  const wanted = ref && ref !== "main" ? ref.replace(/^@?thread:/, "") : null;
+  if (wanted) return allowed.includes(wanted) ? wanted : null;
+  return allowed[0] ?? null;
+}
+
 export async function runStrandsCli(argv: readonly string[], deps: StrandsCliDeps): Promise<{ exitCode: number; stdout?: string; stderr?: string }> {
   const parsed = parseCliArgs(argv, { flags: ["--json", "--sort"], options: ["--items"] });
   if (!parsed.ok || parsed.positional.length > 1) return { exitCode: 1, stderr: `usage: ${STRANDS_USAGE}\n${parsed.ok ? "" : `${parsed.error}\n`}` };

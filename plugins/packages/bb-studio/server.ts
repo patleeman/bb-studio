@@ -151,6 +151,7 @@ import type { ModelSelection } from "./src/decisions/contract";
 import { studioInstructions } from "./src/agent-instructions";
 import { activityOf, conversationInstructions, workerStatus } from "./src/bot-threads";
 import { registerStrands } from "./src/strands/register";
+import { STUDIO_KEY_SETTINGS } from "./src/settings/keys";
 import { STRANDS_USAGE } from "./src/strands/cli";
 import { newTabRecents, newTabSearch, VISUAL_CHAT_PLUGIN_ID, type EntryRow, type NewTabSearchSources, type NewTabSources } from "./src/newtab";
 import { automationRefId, parseAutomationRefId } from "./src/automation-table-contract";
@@ -1246,6 +1247,16 @@ export default async function plugin(bb: BbPluginApi) {
         return { threadId: rec.threadId, title: rec.title?.trim() || fact?.title?.trim() || "Worker", status, createdAt: rec.createdAt,
           endedAt: status === "done" || status === "failed" ? rec.activityAt ?? fact?.updatedAt ?? rec.updatedAt : null };
       });
+    },
+    botMainFor: (threadId) => {
+      const rec = botThreads.store.get(threadId);
+      const botId = rec?.botId ?? bots.list().find((bot) => bot.threadId === threadId)?.id;
+      return botId ? bots.stored(botId)?.threadId ?? null : null;
+    },
+    secrets: async () => {
+      const values = await settings.get().catch(() => ({} as Record<string, unknown>));
+      const keys = Object.keys(STUDIO_KEY_SETTINGS).map((key) => values[key]).filter((value): value is string => typeof value === "string");
+      return [...keys, ...(toolGateway?.secretValues() ?? [])];
     },
     log: (message) => bb.log.warn(message),
   });

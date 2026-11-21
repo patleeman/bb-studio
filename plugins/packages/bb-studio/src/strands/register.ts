@@ -5,10 +5,10 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { primaryHostId } from "../kit/server/project";
-import { runStrandsCli } from "./cli";
+import { runStrandsCli, strandsThreadFor } from "./cli";
 import { rpcContract } from "./contract";
 import { EVENT_TYPES, type EventRow } from "./turns";
-import { STRANDS_CALLER } from "./detector";
+import { JEV_TIMEOUT_MS, STRANDS_CALLER } from "./detector";
 import { StrandService, type WorkerFact } from "./service";
 import { StrandStore } from "./store";
 import type { Interaction } from "../worker-approvals";
@@ -24,6 +24,10 @@ export interface StrandsRegisterDeps {
   /** Each Bot's Main thread. */
   mains(): string[];
   workers(threadId: string): Promise<WorkerFact[]>;
+  /** The Main of the Bot a thread belongs to (a conversation or a worker of it); null for a thread of no Bot. */
+  botMainFor(threadId: string): string | null;
+  /** Secret values to keep out of what strands send and keep: Studio's API keys, Tool Gateway's secrets. */
+  secrets(): Promise<readonly string[]>;
   log(message: string): void;
 }
 
@@ -50,7 +54,8 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
       threadId, order, limit: String(limit), types: [...EVENT_TYPES],
       ...(afterSeq !== undefined ? { afterSeq: String(afterSeq) } : {}), ...(beforeSeq !== undefined ? { beforeSeq: String(beforeSeq) } : {}),
     } as never) as unknown as EventRow[],
-    jev: (input) => deps.decisions.systemOne({ ...input, questions: input.questions as never }),
+    jev: (input) => deps.decisions.systemOne({ ...input, questions: input.questions as never }, AbortSignal.timeout(JEV_TIMEOUT_MS)),
+    secrets: deps.secrets,
     model: async ({ threadId, requestId, prompt }) => {
       const hostId = await primaryHostId(bb).catch(() => null);
       if (!hostId) return { ok: false, unavailable: true, error: "BB has no primary host to run the model on." };
@@ -68,8 +73,9 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
     log: deps.log,
   });
   const run = (what: string, job: () => Promise<unknown> | void) => { try { void Promise.resolve(job()).catch((error) => deps.log(`Strands ${what}: ${error instanceof Error ? error.message : String(error)}`)); } catch (error) { deps.log(`Strands ${what}: ${String(error)}`); } };
-  bb.events.on("thread.idle", ({ thread }) => run("sort", () => service.idle(thread.id)));
-  bb.events.on("thread.failed", ({ thread }) => run("sort", () => service.idle(thread.id)));
+  // BB says the thread is idle or failed: no turn of it is still running.
+  bb.events.on("thread.idle", ({ thread }) => run("sort", () => service.idle(thread.id, true)));
+  bb.events.on("thread.failed", ({ thread }) => run("sort", () => service.idle(thread.id, true)));
   bb.events.on("thread.active", ({ thread }) => run("early sort", () => service.active(thread.id)));
   bb.events.on("interaction.pending", ({ thread }) => run("early sort", () => service.asked(thread.id)));
   bb.events.on("thread.deleted", ({ thread }) => run("forget", () => service.forget(thread.id)));
@@ -84,13 +90,7 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
   });
 
   const cli = (argv: readonly string[], ctx: { threadId?: string | null }) => runStrandsCli(argv, {
-    resolve: async (ref) => {
-      const mains = deps.mains();
-      if (ref && ref !== "main") return ref.replace(/^@?thread:/, "");
-      // The caller's own conversation when strands run there, else the first Bot's Main.
-      if (!ref && ctx.threadId && mains.includes(ctx.threadId)) return ctx.threadId;
-      return mains[0] ?? null;
-    },
+    resolve: async (ref) => strandsThreadFor(ref, ctx.threadId ?? null, deps.mains(), deps.botMainFor),
     list: (threadId) => service.list(threadId),
     items: (threadId, limit) => service.items(threadId, limit),
     sort: (threadId) => service.idle(threadId),

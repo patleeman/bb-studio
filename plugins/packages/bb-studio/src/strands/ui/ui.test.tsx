@@ -12,12 +12,12 @@ const view = (id: string, title: string, over: Partial<StrandView> = {}): Strand
   id, title, summary: null, named: true, state: "active", detail: null, asks: [], workers: [], lastAt: NOW - 10 * MIN,
   latestSeq: 10, latestTurnId: `t_${id}`, messages: 1, unsure: 0, pinned: false, origin: "jev", taskId: null, ...over,
 });
-const approval = (id: string, label: string) => ({ id, kind: "approval" as const, threadId: "thr_main", label, decisions: ["deny", "allow_once"] as ("deny" | "allow_once")[] });
+const approval = (id: string, label: string) => ({ id, kind: "approval" as const, threadId: "thr_main", label, details: ["Command: npm publish --tag latest --access public --otp-from-env", "Cwd: /tmp/release"], decisions: ["deny", "allow_once"] as ("deny" | "allow_once")[] });
 const LIST: StrandList = {
   threadId: "thr_main", enabled: true, backfill: { done: true, at: NOW - 60 * MIN, messages: 300, sorted: 300 }, jevCallsToday: 12, jevDailyCap: 300, sortingTurn: false,
   strands: [
     view("s_doc", "Blood pressure log", { state: "needs-you", asks: [approval("int_1", "Approve: npm publish")] }),
-    view("s_pr", "bb-plugins PR #15", { state: "needs-you", asks: [{ id: "int_2", kind: "question", threadId: "thr_worker", label: "PR fix: Which branch?", decisions: [] }] }),
+    view("s_pr", "bb-plugins PR #15", { state: "needs-you", asks: [{ id: "int_2", kind: "question", threadId: "thr_worker", label: "PR fix: Which branch?", details: [], decisions: [] }] }),
     view("s_hvac", "Furnace tune-up", { state: "needs-you", detail: "Router fix needs you" }),
     view("s_cx", "CodexBar quota", { state: "running", detail: "codexbar-fix", latestSeq: 40 }),
     view("s_red4", "red4 mitigation", { state: "waiting", detail: "Unraid's fix" }),

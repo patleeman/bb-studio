@@ -24,7 +24,12 @@ export interface Turn {
   /** The last seq that belongs to it. */
   lastSeq: number;
   done: boolean;
+  /** Finished without its turn/completed: a later turn started, the thread went idle or failed, or it ran too long. */
+  abandoned?: boolean;
 }
+
+/** A turn with no end after this long counts as finished, so one lost turn/completed can't hold the read position. */
+export const UNFINISHED_MAX_MS = 2 * 60 * 60 * 1000;
 
 const QUIET_REPLY = /^\s*(?:\[PASS\]|PASS|\[SILENT\])?\s*$/i;
 
@@ -48,13 +53,21 @@ export function readTurns(rows: readonly EventRow[]): Turn[] {
  * `restFrom`: the first seq of what isn't finished (a running turn, a
  * request BB hasn't started), where the next read starts again; null when
  * everything read is finished.
+ *
+ * A turn that never got its turn/completed (a crash, a host lost mid-turn)
+ * counts as finished, marked abandoned, once a later turn starts, once the
+ * thread is known to be settled (idle or failed: `settled`, which also
+ * drops requests BB never started), or once it is older than `staleBefore`.
  */
-export function turnsOf(rows: readonly EventRow[]): { turns: Turn[]; restFrom: number | null } {
+export function turnsOf(rows: readonly EventRow[], options: { settled?: boolean; staleBefore?: number } = {}): { turns: Turn[]; restFrom: number | null } {
   const turns: Turn[] = [];
   const byId = new Map<string, Turn>();
   let waiting: Open["request"][] = [];
   let current: Turn | null = null;
+  const abandon = (turn: Turn | null) => { if (turn && !turn.done) { turn.done = true; turn.abandoned = true; } };
   const start = (turnId: string | null, at: number, seq: number): Turn => {
+    // A new turn: the one before it is over, whether or not its end was recorded.
+    abandon(turns.at(-1) ?? null);
     const request = waiting.shift();
     const rest = waiting;
     waiting = [];
@@ -105,7 +118,8 @@ export function turnsOf(rows: readonly EventRow[]): { turns: Turn[]; restFrom: n
       turn.done = true;
     }
   }
-  const open = [...turns.filter((turn) => !turn.done).map((turn) => turn.seq), ...waiting.map((request) => request.seq)];
+  for (const turn of turns) if (options.settled || (options.staleBefore !== undefined && turn.at < options.staleBefore)) abandon(turn);
+  const open = [...turns.filter((turn) => !turn.done).map((turn) => turn.seq), ...(options.settled ? [] : waiting.map((request) => request.seq))];
   return {
     // A turn whose start wasn't read (the read began inside it) has no message: not a turn to sort.
     turns: turns.filter((turn) => !(turn.kind === "report" && !turn.text && !turn.reply && !turn.done)),

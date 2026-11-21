@@ -33,8 +33,13 @@ function Row({ strand, threadId, selected, now }: { strand: StrandView; threadId
       ) : null}
       {strand.state === "needs-you" && strand.asks[0] ? (
         // Buttons answer; they don't select the row.
-        <div className="mt-[7px] flex flex-wrap gap-[5px]" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-          <AskButtonsFor ask={strand.asks[0]} threadId={threadId} />
+        <div className="mt-[7px]" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+          {strand.asks[0].details.length ? (
+            <ul className="mb-1.5 space-y-0.5 rounded bg-muted/40 px-1.5 py-1 font-mono text-[11px] text-foreground/90">
+              {strand.asks[0].details.map((line, index) => <li key={index} className="whitespace-pre-wrap break-all">{line}</li>)}
+            </ul>
+          ) : null}
+          <div className="flex flex-wrap gap-[5px]"><AskButtonsFor ask={strand.asks[0]} threadId={threadId} /></div>
         </div>
       ) : null}
     </div>

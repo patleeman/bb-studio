@@ -1,0 +1,236 @@
+// The failure paths the review asked for: a turn that never ends, Jev
+// errors and timeouts, the summary refresh, the small model's daily cap,
+// backfill once, non-Main threads, and secrets kept out of what is sent.
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { strandsThreadFor } from "./cli";
+import { JEV_BACKOFF_MS, JEV_DAILY_CAP, JEV_TIMEOUT_MS, MODEL_DAILY_CAP, StrandDetector, type DetectorDeps } from "./detector";
+import { REDACTED, scrubber } from "./scrub";
+import { StrandService } from "./service";
+import { StrandStore } from "./store";
+import { database, FakeThread, fakeJev, fakeModel, manualTimers } from "./test/fixture";
+
+const DAY = "2026-11-20";
+const START = Date.parse(`${DAY}T12:00:00Z`);
+const MIN = 60_000;
+
+function setup(options: { jev?: DetectorDeps["jev"]; model?: DetectorDeps["model"]; secrets?: string[] } = {}) {
+  const clock = { now: START };
+  const db = database();
+  const store = new StrandStore(db, () => clock.now);
+  const thread = new FakeThread();
+  const jevCalls: { state: unknown; questions: Record<string, unknown> }[] = [];
+  const modelCalls: string[] = [];
+  const logs: string[] = [];
+  const timers = manualTimers();
+  const detector = new StrandDetector({
+    store, events: thread.events, jev: options.jev ?? fakeJev(jevCalls), model: options.model ?? fakeModel(modelCalls),
+    openTasks: () => [], changed: () => {}, log: (line) => logs.push(line), now: () => clock.now,
+    setTimer: timers.setTimer, clearTimer: timers.clearTimer, secrets: () => options.secrets ?? [],
+  });
+  const run = () => timers.runAll(() => detector.settled(thread.id));
+  return { db, store, thread, detector, jevCalls, modelCalls, logs, clock, run };
+}
+
+afterEach(() => { vi.useRealTimers(); });
+
+describe("a turn that never gets its turn/completed", () => {
+  it("doesn't hold the read: the next turn's start ends it, and a long read moves on page by page", async () => {
+    const x = setup();
+    await x.detector.backfill(x.thread.id);
+    const lost = x.thread.turn("Look at the router", "Looking…", { done: false });
+    for (let index = 0; index < 70; index++) x.thread.turn(`Disk note ${index}`, "Ok.", { tools: 100 });
+    const pages = x.thread.pages;
+    await x.detector.idle(x.thread.id);
+    // Wait for the reads it queued itself (each moved forward).
+    for (let guard = 0; guard < 20 && x.store.read(x.thread.id)!.seenSeq < x.thread.rows.length; guard++) await x.detector.settled(x.thread.id);
+    expect(x.store.read(x.thread.id)!.seenSeq).toBe(x.thread.rows.length);
+    // Every event read about once: 70 turns × 104 events, 100 per page.
+    expect(x.thread.pages - pages).toBeLessThan(90);
+    expect(x.store.item(x.thread.id, "user", lost.seq)).toMatchObject({ by: "jev" });
+    expect(x.store.items(x.thread.id, 1000)).toHaveLength(71);
+  });
+
+  it("is finished once BB says the thread is idle, or after 2 hours", async () => {
+    const x = setup();
+    await x.detector.backfill(x.thread.id);
+    const last = x.thread.turn("Book the furnace service", "Asking…", { done: false });
+    await x.detector.idle(x.thread.id);
+    expect(x.store.item(x.thread.id, "user", last.seq)).toBeNull();
+    expect(x.store.read(x.thread.id)!.seenSeq).toBe(last.seq - 1);
+    await x.detector.idle(x.thread.id, true);
+    expect(x.store.item(x.thread.id, "user", last.seq)).not.toBeNull();
+    expect(x.store.read(x.thread.id)!.seenSeq).toBe(x.thread.rows.length);
+
+    const y = setup();
+    await y.detector.backfill(y.thread.id);
+    const stale = y.thread.turn("Book the dentist", "Asking…", { done: false, at: START });
+    y.clock.now = START + 3 * 60 * MIN;
+    await y.detector.idle(y.thread.id);
+    expect(y.store.item(y.thread.id, "user", stale.seq)).not.toBeNull();
+  });
+
+  it("never reads the same window twice when a full read can't move past it", async () => {
+    const x = setup();
+    await x.detector.backfill(x.thread.id);
+    // A running turn followed by more than a read's worth of its own events.
+    const running = x.thread.turn("Run the big migration", "", { done: false, tools: 7_000 });
+    const pages = x.thread.pages;
+    await x.detector.idle(x.thread.id);
+    await x.detector.settled(x.thread.id);
+    for (let guard = 0; guard < 5; guard++) await x.detector.settled(x.thread.id);
+    // Each window read once: about one page per 100 events, never the first 60 pages again.
+    expect(x.thread.pages - pages).toBeLessThanOrEqual(Math.ceil(x.thread.rows.length / 100) + 2);
+    expect(x.store.read(x.thread.id)!.seenSeq).toBe(x.thread.rows.length);
+    expect(running.seq).toBeLessThan(x.thread.rows.length);
+    expect(x.logs.some((line) => line.includes("has no end"))).toBe(true);
+  });
+});
+
+describe("Jev failing or slow", () => {
+  it("backs off after errors in a row, sends turns to the previous strand meanwhile, and logs once per back-off", async () => {
+    let fail = false;
+    const calls: unknown[] = [];
+    const good = fakeJev();
+    const x = setup({ jev: async (input) => { calls.push(input); return fail ? { ok: false, unavailable: false, error: "provider error" } : good(input); } });
+    await x.detector.backfill(x.thread.id);
+    x.thread.turn("Look at the router", "Ok.");
+    await x.detector.idle(x.thread.id);
+    fail = true;
+    for (let index = 0; index < 5; index++) x.thread.turn(`Disk note ${index}`, "Ok.");
+    await x.detector.idle(x.thread.id);
+    expect(calls).toHaveLength(3);
+    expect(x.logs.filter((line) => line.includes("Jev failed"))).toHaveLength(1);
+    const items = x.store.items(x.thread.id, 10);
+    expect(items.filter((item) => item.by === "fallback")).toHaveLength(5);
+    expect(x.store.pending(x.thread.id, 10)).toHaveLength(0);
+    // After the back-off, Jev is asked again; a success clears it.
+    fail = false;
+    x.clock.now += JEV_BACKOFF_MS + 1;
+    x.thread.turn("Book the dentist", "Ok.");
+    await x.detector.idle(x.thread.id);
+    expect(calls).toHaveLength(4);
+    expect(x.store.read(x.thread.id)!.jevCalls).toBe(4);
+  });
+
+  it("gives Jev 15 seconds, then counts a timeout as a failure", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const x = setup({ jev: () => new Promise(() => {}) });
+    await x.detector.backfill(x.thread.id);
+    const turn = x.thread.turn("Look at the router", "Ok.");
+    const sorting = x.detector.idle(x.thread.id);
+    await vi.advanceTimersByTimeAsync(JEV_TIMEOUT_MS + 10);
+    await sorting;
+    expect(x.store.item(x.thread.id, "user", turn.seq)).toMatchObject({ by: "fallback" });
+  });
+
+  it("in the backfill, a Jev failure leaves the batch unsorted instead of asking the small model", async () => {
+    const x = setup({ jev: async () => ({ ok: false, unavailable: false, error: "provider error" }) });
+    for (let index = 0; index < 40; index++) x.thread.turn(`Router note ${index}`, "Ok.");
+    const report = await x.detector.backfill(x.thread.id);
+    expect(report).toMatchObject({ messages: 40, sorted: 0, unsorted: 40 });
+    expect(x.modelCalls.filter((prompt) => prompt.includes("Sort each message"))).toHaveLength(0);
+  });
+});
+
+describe("the small model", () => {
+  it("refreshes a summary at most once a day, even when it gives none", async () => {
+    const prompts: string[] = [];
+    const naming = fakeModel();
+    const x = setup({ model: async (input) => { prompts.push(input.prompt); return input.prompt.includes("Strands to refresh") ? { ok: true, text: "{}" } : naming(input); } });
+    await x.detector.backfill(x.thread.id);
+    x.thread.turn("Look at the router", "Ok.");
+    await x.detector.idle(x.thread.id);
+    await x.run();
+    for (let index = 0; index < 30; index++) {
+      x.clock.now += 3 * MIN;
+      x.thread.turn(`router step ${index}`, "Ok.");
+      await x.detector.idle(x.thread.id);
+      await x.run();
+    }
+    expect(prompts.filter((prompt) => prompt.includes("Strands to refresh")).length).toBeLessThanOrEqual(1);
+  });
+
+  it("stops at its daily cap: names wait, with no try counted", async () => {
+    const x = setup();
+    await x.detector.backfill(x.thread.id);
+    x.store.saveRead(x.thread.id, { day: DAY, modelCalls: MODEL_DAILY_CAP });
+    x.thread.turn("Look at the router", "Ok.");
+    await x.detector.idle(x.thread.id);
+    const before = x.modelCalls.length;
+    await x.detector.nameNow(x.thread.id);
+    expect(x.modelCalls.length).toBe(before);
+    expect(x.store.list(x.thread.id)[0]).toMatchObject({ named: false, nameTries: 0 });
+    // A new day: both counts start again.
+    x.clock.now += 24 * 60 * MIN;
+    expect(x.store.callsLeft(x.thread.id, "model", "2026-11-21", MODEL_DAILY_CAP)).toBe(MODEL_DAILY_CAP);
+    expect(x.store.callsLeft(x.thread.id, "jev", "2026-11-21", JEV_DAILY_CAP)).toBe(JEV_DAILY_CAP);
+  });
+});
+
+describe("the backfill and the conversations strands run in", () => {
+  it("backfills once", async () => {
+    const x = setup();
+    x.thread.turn("Look at the router", "Ok.");
+    expect(await x.detector.backfill(x.thread.id)).not.toBeNull();
+    expect(await x.detector.backfill(x.thread.id)).toBeNull();
+    expect(x.modelCalls.filter((prompt) => prompt.includes("Propose at most"))).toHaveLength(1);
+  });
+
+  it("does nothing for a thread that isn't a Bot's Main, and reads nothing back for one", async () => {
+    const db = database();
+    const thread = new FakeThread("thr_other");
+    thread.turn("Look at the router", "Ok.");
+    const svc = new StrandService({
+      db, conversations: () => ["thr_main"], events: thread.events, jev: fakeJev(), model: fakeModel(), changed: () => {}, log: () => {},
+      setTimer: () => null, clearTimer: () => {}, workers: async () => [], interactions: async () => [], busy: async () => false,
+    });
+    await svc.idle("thr_other", true);
+    expect(thread.pages).toBe(0);
+    new StrandStore(db).create({ threadId: "thr_other", title: "Stored", origin: "jev", seq: 1, at: 1 });
+    expect((await svc.list("thr_other")).strands).toEqual([]);
+    expect(svc.items("thr_other", 10)).toEqual([]);
+    expect(svc.tags("thr_other")).toEqual({ tags: [], strands: [] });
+  });
+
+  it("lets an agent's `bb studio strands` see only its own Bot's Main", () => {
+    const mains = ["thr_main_a", "thr_main_b"];
+    const botMainFor = (threadId: string) => (threadId.startsWith("thr_a") || threadId === "thr_main_a" ? "thr_main_a" : threadId.startsWith("thr_b") ? "thr_main_b" : null);
+    expect(strandsThreadFor(null, "thr_a_worker", mains, botMainFor)).toBe("thr_main_a");
+    expect(strandsThreadFor("thr_main_b", "thr_a_worker", mains, botMainFor)).toBeNull();
+    expect(strandsThreadFor("main", "thr_b_chat", mains, botMainFor)).toBe("thr_main_b");
+    expect(strandsThreadFor(null, "thr_nobody", mains, botMainFor)).toBeNull();
+    // The user's terminal: any Bot's Main.
+    expect(strandsThreadFor("thr_main_b", null, mains, botMainFor)).toBe("thr_main_b");
+    expect(strandsThreadFor("thr_elsewhere", null, mains, botMainFor)).toBeNull();
+  });
+});
+
+describe("secrets stay out of what strands send and keep", () => {
+  const KEY = `sk-ant-api03-${"A1b2C3d4".repeat(6)}`;
+  const OPENAI = `sk-proj-${"Zz9Yy8Xx".repeat(5)}`;
+  const KNOWN = "correct-horse-battery-staple";
+  const PEM = "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQ\n-----END OPENSSH PRIVATE KEY-----";
+
+  it("scrubs known values and token-shaped text", () => {
+    const scrub = scrubber([KNOWN, "short"]);
+    const out = scrub(`key ${KEY} and OPENAI_API_KEY=${OPENAI}, Bearer abcdefghij1234567890, ${KNOWN}, AKIAABCDEFGHIJKLMNOP, short words\n${PEM}`);
+    for (const secret of [KEY, OPENAI, KNOWN, "abcdefghij1234567890", "AKIAABCDEFGHIJKLMNOP", "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQ"]) expect(out).not.toContain(secret);
+    expect(out).toContain(REDACTED);
+    expect(out).toContain("short words");
+    expect(scrub("Look at the router fallback chain")).toBe("Look at the router fallback chain");
+  });
+
+  it("sends Jev, the small model and the stored lines no secret", async () => {
+    const x = setup({ secrets: [KNOWN] });
+    x.thread.turn(`router: my key is ${KEY}, the vault phrase is ${KNOWN}`, `Set OPENAI_API_KEY=${OPENAI} and retried.`);
+    await x.detector.backfill(x.thread.id);
+    x.thread.turn(`router again with ${KEY}`, `Still ${OPENAI}`);
+    await x.detector.idle(x.thread.id);
+    await x.run();
+    const sent = JSON.stringify([x.jevCalls, x.modelCalls]);
+    const kept = JSON.stringify(x.db.prepare("SELECT line FROM strand_items").all()) + JSON.stringify(x.db.prepare("SELECT title, summary FROM strands").all());
+    for (const secret of [KEY, OPENAI, KNOWN]) { expect(sent).not.toContain(secret); expect(kept).not.toContain(secret); }
+    expect(x.jevCalls.length).toBeGreaterThan(0);
+    expect(x.modelCalls.length).toBeGreaterThan(0);
+  });
+});

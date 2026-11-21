@@ -9,7 +9,9 @@
  * BB's migrate skips holes. Code that runs the statements itself must skip
  * it too (`for (const sql of MIGRATIONS.filter(Boolean))`), and a copy for
  * migrate must keep it (`MIGRATIONS.concat(…)`, never `[...MIGRATIONS]`,
- * which turns the hole into undefined).
+ * which turns the hole into undefined). `find` and `findIndex` visit the
+ * hole as undefined too: guard the callback (`(sql) => sql?.includes(…)`)
+ * when what it looks for may sit past 114 or be missing.
  */
 // @ts-expect-error The hole at 114 is deliberate (reserved slot); every entry that exists is a string.
 export const MIGRATIONS: string[] = [
@@ -1217,6 +1219,7 @@ export const MIGRATIONS: string[] = [
        seen_seq INTEGER NOT NULL,
        day TEXT,
        jev_calls INTEGER NOT NULL DEFAULT 0,
+       model_calls INTEGER NOT NULL DEFAULT 0,
        named_at INTEGER,
        batched_at INTEGER,
        backfill TEXT,

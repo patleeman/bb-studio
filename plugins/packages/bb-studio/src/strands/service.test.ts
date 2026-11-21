@@ -41,9 +41,9 @@ const signals = (over: Partial<Signals> = {}): Signals => ({ now: NOW, runningSt
 
 describe("live states come only from real signals", () => {
   it("needs you: a pending question or approval, a worker that needs you", () => {
-    expect(liveState(strand(), signals({ asks: [{ id: "i", kind: "question", strandId: "s1", label: "A question is waiting", threadId: "t", decisions: [] }] }))).toMatchObject({ state: "needs-you", detail: "A question is waiting" });
+    expect(liveState(strand(), signals({ asks: [{ id: "i", kind: "question", strandId: "s1", label: "A question is waiting", threadId: "t", details: [], decisions: [] }] }))).toMatchObject({ state: "needs-you", detail: "A question is waiting" });
     expect(liveState(strand(), signals({ workers: [{ threadId: "w", title: "Router fix", status: "needs-you", strandId: "s1", endedAt: null }] }))).toMatchObject({ state: "needs-you", detail: "Router fix needs you" });
-    expect(liveState(strand(), signals({ asks: [{ id: "i", kind: "question", strandId: "other", label: "x", threadId: "t", decisions: [] }] })).state).toBe("active");
+    expect(liveState(strand(), signals({ asks: [{ id: "i", kind: "question", strandId: "other", label: "x", threadId: "t", details: [], decisions: [] }] })).state).toBe("active");
   });
 
   it("running: its turn or one of its workers", () => {
@@ -124,8 +124,8 @@ describe("strands.list", () => {
     asks.thr_worker = [{ id: "int_2", status: "pending", payload: { kind: "user_question", questions: [{ prompt: "Which fallback model?" }] } as never }];
     const list = await x.svc.list(x.thread.id);
     expect(list.strands.map((each) => [each.title, each.state])).toEqual([["Book the dentist", "needs-you"], ["Look at the router", "needs-you"]]);
-    expect(list.strands[0]!.asks).toEqual([{ id: "int_1", kind: "approval", threadId: "thr_main", label: "Approve: npm publish", decisions: ["deny", "allow_once"] }]);
-    expect(list.strands[1]!.asks).toEqual([{ id: "int_2", kind: "question", threadId: "thr_worker", label: "Router fix: Which fallback model?", decisions: [] }]);
+    expect(list.strands[0]!.asks).toEqual([{ id: "int_1", kind: "approval", threadId: "thr_main", label: "Approve: npm publish", details: ["Command: npm publish"], decisions: ["deny", "allow_once"] }]);
+    expect(list.strands[1]!.asks).toEqual([{ id: "int_2", kind: "question", threadId: "thr_worker", label: "Router fix: Which fallback model?", details: [], decisions: [] }]);
   });
 
   it("puts a worker's completion notice into the worker's strand, without asking Jev", async () => {

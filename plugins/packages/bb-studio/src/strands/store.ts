@@ -45,7 +45,7 @@ export interface StrandItem {
   unsure: boolean;
 }
 
-export interface StrandRead { threadId: string; seenSeq: number; day: string | null; jevCalls: number; namedAt: number | null; batchedAt: number | null; backfill: string | null }
+export interface StrandRead { threadId: string; seenSeq: number; day: string | null; jevCalls: number; modelCalls: number; namedAt: number | null; batchedAt: number | null; backfill: string | null }
 
 type StrandRow = {
   id: string; thread_id: string; title: string; summary: string | null; named: number; name_tries: number; summary_at: number | null;
@@ -129,6 +129,11 @@ export class StrandStore {
 
   summarized(id: string, summary: string): void {
     this.db.prepare("UPDATE strands SET summary = ?, summary_at = ? WHERE id = ?").run(summary, this.now(), id);
+  }
+
+  /** A summary refresh was tried (with or without a new summary): the next is a day away. */
+  summaryTried(id: string): void {
+    this.db.prepare("UPDATE strands SET summary_at = ? WHERE id = ?").run(this.now(), id);
   }
 
   opened(id: string): void {
@@ -226,26 +231,33 @@ export class StrandStore {
   // ---- reads ----
 
   read(threadId: string): StrandRead | null {
-    const row = this.db.prepare("SELECT * FROM strand_reads WHERE thread_id = ?").get(threadId) as { thread_id: string; seen_seq: number; day: string | null; jev_calls: number; named_at: number | null; batched_at: number | null; backfill: string | null } | undefined;
-    return row ? { threadId: row.thread_id, seenSeq: row.seen_seq, day: row.day, jevCalls: row.jev_calls, namedAt: row.named_at, batchedAt: row.batched_at, backfill: row.backfill } : null;
+    const row = this.db.prepare("SELECT * FROM strand_reads WHERE thread_id = ?").get(threadId) as { thread_id: string; seen_seq: number; day: string | null; jev_calls: number; model_calls: number; named_at: number | null; batched_at: number | null; backfill: string | null } | undefined;
+    return row ? { threadId: row.thread_id, seenSeq: row.seen_seq, day: row.day, jevCalls: row.jev_calls, modelCalls: row.model_calls, namedAt: row.named_at, batchedAt: row.batched_at, backfill: row.backfill } : null;
   }
 
   saveRead(threadId: string, changes: Partial<Omit<StrandRead, "threadId">>): void {
-    const before = this.read(threadId) ?? { threadId, seenSeq: 0, day: null, jevCalls: 0, namedAt: null, batchedAt: null, backfill: null };
+    const before = this.read(threadId) ?? { threadId, seenSeq: 0, day: null, jevCalls: 0, modelCalls: 0, namedAt: null, batchedAt: null, backfill: null };
     const next = { ...before, ...changes };
-    this.db.prepare(`INSERT INTO strand_reads (thread_id, seen_seq, day, jev_calls, named_at, batched_at, backfill, read_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(thread_id) DO UPDATE SET seen_seq = excluded.seen_seq, day = excluded.day, jev_calls = excluded.jev_calls, named_at = excluded.named_at,
-        batched_at = excluded.batched_at, backfill = excluded.backfill, read_at = excluded.read_at`)
-      .run(threadId, next.seenSeq, next.day, next.jevCalls, next.namedAt, next.batchedAt, next.backfill, this.now());
+    this.db.prepare(`INSERT INTO strand_reads (thread_id, seen_seq, day, jev_calls, model_calls, named_at, batched_at, backfill, read_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(thread_id) DO UPDATE SET seen_seq = excluded.seen_seq, day = excluded.day, jev_calls = excluded.jev_calls, model_calls = excluded.model_calls,
+        named_at = excluded.named_at, batched_at = excluded.batched_at, backfill = excluded.backfill, read_at = excluded.read_at`)
+      .run(threadId, next.seenSeq, next.day, next.jevCalls, next.modelCalls, next.namedAt, next.batchedAt, next.backfill, this.now());
   }
 
-  /** Counts one Jev call against today's cap; false when the cap is reached. */
-  takeJevCall(threadId: string, day: string, cap: number): boolean {
+  /** Counts one call (Jev's or the small model's) against today's cap; false when the cap is reached. Both counts start again each day. */
+  takeCall(threadId: string, kind: "jev" | "model", day: string, cap: number): boolean {
     const read = this.read(threadId);
-    const used = read?.day === day ? read.jevCalls : 0;
+    const today = read?.day === day;
+    const used = today ? (kind === "jev" ? read!.jevCalls : read!.modelCalls) : 0;
     if (used >= cap) return false;
-    this.saveRead(threadId, { day, jevCalls: used + 1 });
+    this.saveRead(threadId, { day, jevCalls: kind === "jev" ? used + 1 : today ? read!.jevCalls : 0, modelCalls: kind === "model" ? used + 1 : today ? read!.modelCalls : 0 });
     return true;
+  }
+
+  /** Calls left today. */
+  callsLeft(threadId: string, kind: "jev" | "model", day: string, cap: number): number {
+    const read = this.read(threadId);
+    return read?.day === day ? Math.max(0, cap - (kind === "jev" ? read.jevCalls : read.modelCalls)) : cap;
   }
 
   forget(threadId: string): void {

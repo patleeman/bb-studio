@@ -15,6 +15,8 @@ export const strandAsk = z.object({
   /** The thread it waits in: the conversation, or one of its workers. */
   threadId: z.string(),
   label: z.string(),
+  /** An approval's full details before its buttons: the whole command, working folder, actions and session grant. */
+  details: z.array(z.string()),
   /** An approval's choices (BB's own), for its buttons. */
   decisions: z.array(z.enum(["allow_once", "allow_for_session", "deny"])),
 });

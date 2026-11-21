@@ -24,7 +24,7 @@ export type WorkerStatus = "running" | "needs-you" | "failed" | "done";
 export interface WorkerSignal { threadId: string; title: string; status: WorkerStatus; strandId: string | null; endedAt: number | null }
 export type AskDecision = "allow_once" | "allow_for_session" | "deny";
 /** Something waiting on the user: a BB question or approval (in the conversation or one of its workers), or a Tool Gateway request. */
-export interface AskSignal { id: string; kind: "question" | "approval" | "gateway"; strandId: string | null; label: string; threadId: string; decisions: AskDecision[] }
+export interface AskSignal { id: string; kind: "question" | "approval" | "gateway"; strandId: string | null; label: string; threadId: string; decisions: AskDecision[]; /** An approval's full command, working folder, actions and session grant, in BB's words. */ details: string[] }
 export interface TaskSignal { id: string; strandId: string; waitingOn: { kind: string; text: string | null; ref: string | null } | null }
 
 export interface Signals {

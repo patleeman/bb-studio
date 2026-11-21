@@ -4,7 +4,7 @@
 import type Database from "better-sqlite3";
 import { type StrandItemView, type StrandList, type StrandView } from "./contract";
 import { JEV_DAILY_CAP, StrandDetector, type DetectorDeps, type OpenTask } from "./detector";
-import { approvalDecisions, isWorkerApproval, shortApproval, type Interaction } from "../worker-approvals";
+import { approvalDecisions, approvalLines, isWorkerApproval, shortApproval, type Interaction } from "../worker-approvals";
 import { byState, liveState, type AskSignal, type Signals, type TaskSignal, type WorkerSignal, type WorkerStatus } from "./states";
 import { StrandStore, type Strand } from "./store";
 import { USER_OWNER } from "../tasks/contract";
@@ -38,10 +38,10 @@ export function openAgentTasks(db: Database.Database, threadId: string): (OpenTa
 
 /** A pending BB interaction as an ask: an approval with BB's choices, or a question by its first prompt. */
 export function askOf(interaction: Interaction & { createdAt?: number }, threadId: string, strandId: string | null): AskSignal {
-  if (isWorkerApproval(interaction)) return { id: interaction.id, kind: "approval", strandId, threadId, label: `Approve: ${shortApproval(interaction)}`, decisions: approvalDecisions(interaction) };
+  if (isWorkerApproval(interaction)) return { id: interaction.id, kind: "approval", strandId, threadId, label: `Approve: ${shortApproval(interaction)}`, details: approvalLines(interaction), decisions: approvalDecisions(interaction) };
   const questions = (interaction.payload as { questions?: { prompt?: string; shortLabel?: string }[] } | null | undefined)?.questions;
   const prompt = questions?.[0]?.shortLabel?.trim() || questions?.[0]?.prompt?.trim();
-  return { id: interaction.id, kind: "question", strandId, threadId, label: prompt ? (prompt.length > 120 ? `${prompt.slice(0, 119)}…` : prompt) : "A question is waiting", decisions: [] };
+  return { id: interaction.id, kind: "question", strandId, threadId, label: prompt ? (prompt.length > 120 ? `${prompt.slice(0, 119)}…` : prompt) : "A question is waiting", details: [], decisions: [] };
 }
 
 export class StrandService {
@@ -64,11 +64,11 @@ export class StrandService {
 
   // ---- events ----
 
-  /** A turn finished (or failed): backfill first if it never ran, then sort. */
-  async idle(threadId: string): Promise<void> {
+  /** A turn finished (or failed): backfill first if it never ran, then sort. `settled`: BB said the thread is idle or failed. */
+  async idle(threadId: string, settled = false): Promise<void> {
     if (!this.enabled(threadId)) return;
     if (this.detector.needsBackfill(threadId)) await this.detector.backfill(threadId);
-    await this.detector.idle(threadId);
+    await this.detector.idle(threadId, settled);
   }
   active(threadId: string): void { if (this.enabled(threadId) && !this.detector.needsBackfill(threadId)) this.detector.active(threadId); }
   async asked(threadId: string): Promise<void> { if (this.enabled(threadId) && !this.detector.needsBackfill(threadId)) await this.detector.asked(threadId); }
@@ -106,8 +106,8 @@ export class StrandService {
     for (const request of this.gatewayRequests()) {
       const worker = workers.find((each) => each.threadId === request.threadId);
       const label = `Add MCP server: ${request.input?.label ?? request.input?.name ?? "a server"}`;
-      if (request.threadId === threadId) asks.push({ id: request.id, kind: "gateway", strandId: turnStrand(request.createdAt), label, threadId, decisions: [] });
-      else if (worker) asks.push({ id: request.id, kind: "gateway", strandId: worker.strandId, label: `${worker.title}: ${label}`, threadId: worker.threadId, decisions: [] });
+      if (request.threadId === threadId) asks.push({ id: request.id, kind: "gateway", strandId: turnStrand(request.createdAt), label, threadId, details: [], decisions: [] });
+      else if (worker) asks.push({ id: request.id, kind: "gateway", strandId: worker.strandId, label: `${worker.title}: ${label}`, threadId: worker.threadId, details: [], decisions: [] });
     }
     const tasks: TaskSignal[] = openAgentTasks(this.deps.db, threadId).flatMap((task) => {
       const strand = this.store.byTask(task.id);
@@ -149,7 +149,7 @@ export class StrandService {
       backfill: { done: !!backfill, at: backfill?.at ?? null, messages: backfill?.messages ?? 0, sorted: backfill?.sorted ?? 0 },
       jevCallsToday: read?.day === day ? read.jevCalls : 0, jevDailyCap: JEV_DAILY_CAP,
     };
-    const strands = this.store.list(threadId);
+    const strands = enabled ? this.store.list(threadId) : [];
     if (!strands.length) return { ...base, sortingTurn: false, strands: [], earlier: [] };
     const signals = await this.signals(threadId);
     const counts = this.store.counts(threadId);
@@ -159,7 +159,7 @@ export class StrandService {
       const count = counts.get(strand.id);
       return {
         id: strand.id, title: strand.title, summary: strand.summary, named: strand.named, state: live.state, detail: live.detail,
-        asks: live.asks.map(({ id, kind, threadId: askThread, label, decisions }) => ({ id, kind, threadId: askThread, label, decisions })), workers: live.workers,
+        asks: live.asks.map(({ id, kind, threadId: askThread, label, details, decisions }) => ({ id, kind, threadId: askThread, label, details, decisions })), workers: live.workers,
         lastAt: strand.lastAt, latestSeq: latest?.seq ?? null, latestTurnId: latest?.turnId ?? null, messages: count?.messages ?? 0, unsure: count?.unsure ?? 0,
         pinned: strand.pinned, origin: strand.origin, taskId: strand.taskId,
       };
@@ -174,10 +174,12 @@ export class StrandService {
   }
 
   items(threadId: string, limit: number): StrandItemView[] {
+    if (!this.enabled(threadId)) return [];
     return this.store.items(threadId, limit, ["user", "report", "worker"]).map((item) => ({ ...item }));
   }
 
   tags(threadId: string): { tags: { turnId: string; seq: number; strandId: string | null }[]; strands: { id: string; title: string }[] } {
+    if (!this.enabled(threadId)) return { tags: [], strands: [] };
     const rows = this.store.db.prepare("SELECT turn_id, seq, strand_id FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND turn_id IS NOT NULL ORDER BY seq DESC LIMIT 2000").all(threadId) as { turn_id: string; seq: number; strand_id: string | null }[];
     return {
       tags: rows.reverse().map((row) => ({ turnId: row.turn_id, seq: row.seq, strandId: row.strand_id })),
