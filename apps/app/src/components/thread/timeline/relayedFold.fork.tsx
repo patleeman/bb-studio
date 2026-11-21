@@ -19,6 +19,7 @@ import {
   type ReplyClassifiers,
 } from "@/lib/fork-reply-classifiers";
 import { QuietTurnMarker } from "./ForkQuietTurnMarker.js";
+import { useTimelineFilterExpanded } from "@/lib/fork-timeline-filter";
 import {
   noticeFoldOf,
   noticeOf,
@@ -315,15 +316,18 @@ export function useRelayedFold(
     getPluginSlotSnapshot,
     getPluginSlotSnapshot,
   );
+  const unfold = useTimelineFilterExpanded();
   return useMemo(
     () =>
-      foldRelayedRows(
-        rows,
-        scopeActive ? findStreamingAssistantMessageId(rows) : null,
-        slots.replyClassifiers,
-        scopeActive,
-      ),
-    [rows, scopeActive, findStreamingAssistantMessageId, slots.replyClassifiers],
+      unfold
+        ? { rows, folded: NO_FOLDS }
+        : foldRelayedRows(
+            rows,
+            scopeActive ? findStreamingAssistantMessageId(rows) : null,
+            slots.replyClassifiers,
+            scopeActive,
+          ),
+    [rows, scopeActive, findStreamingAssistantMessageId, slots.replyClassifiers, unfold],
   );
 }
 
