@@ -17,6 +17,8 @@ struct BotConversationContext {
     var openConversation: (String) -> Void
     var showList: () -> Void
     var refresh: () -> Void
+    /// The Bot is paused or stopped (`bot_spaces` state); "stopped" or "paused", nil while active.
+    var botPause: String? = nil
 
     func worker(_ threadId: String) -> WorkerInfo? {
         allWorkers.first { $0.threadId == threadId }.map { WorkerInfo($0, botName: botName, mainThreadId: mainThreadId) }
@@ -133,13 +135,31 @@ struct ConversationTitle: View {
     let title: String
     let model: String?
     var pages: RoomChatPages? = nil
+    /// Tapping the name opens the conversation list (the conversation is home).
+    var openList: (() -> Void)? = nil
     let choose: () -> Void
 
     var body: some View {
         VStack(spacing: 1) {
-            Text(title).font(.headline).lineLimit(1)
-                .id(title)
-                .transition(.push(from: .trailing).combined(with: .opacity))
+            Group {
+                if let openList {
+                    Button(action: openList) {
+                        HStack(spacing: 3) {
+                            Text(title).lineLimit(1)
+                            Image(systemName: "chevron.down").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
+                        }
+                        .font(.headline)
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(title), conversations")
+                    .accessibilityIdentifier("conversationTitleList")
+                } else {
+                    Text(title).font(.headline).lineLimit(1)
+                }
+            }
+            .id(title)
+            .transition(.push(from: .trailing).combined(with: .opacity))
             HStack(spacing: 6) {
                 if let pages, pages.count > 1 {
                     HStack(spacing: 4) {

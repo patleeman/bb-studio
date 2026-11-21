@@ -176,7 +176,10 @@ struct RoomView: View {
     private func lifecycle<Content: View>(_ content: Content) -> some View {
         content
             .task { applyQAMode() }
-            .task(id: pager.shown) { await session.start(app) }
+            .task(id: pager.shown) {
+                if room.home { RoomHome.remember(pager.shown, botId: bot.id) }
+                await session.start(app)
+            }
             .onDisappear { pager.current.stop() }
             .overlay(alignment: .top) { toastView }
             .task { await showToast() }
@@ -244,7 +247,7 @@ struct RoomView: View {
     }
 
     private func pollMorning() async {
-        guard phase == .active else { return }
+        guard phase == .active, !room.home else { return }
         while !Task.isCancelled {
             await loadMorning()
             await EnergyGate.shared.pollWait(.seconds(60))
@@ -252,7 +255,7 @@ struct RoomView: View {
     }
 
     private func pollFlight() async {
-        guard phase == .active, tasks.supported != false else { return }
+        guard phase == .active, tasks.supported != false, !room.home else { return }
         while !Task.isCancelled {
             await tasks.loadFlight(pager.shown)
             await EnergyGate.shared.pollWait(.seconds(20))
@@ -318,9 +321,13 @@ struct RoomView: View {
             .toolbar {
                 if room.standing && !columnHeader {
                     ToolbarItem(placement: .topBarLeading) {
-                        Button { layDown() } label: { Image(systemName: "chevron.down") }
-                            .accessibilityLabel("Back to the room")
-                            .accessibilityIdentifier("roomLayDown")
+                        if room.home {
+                            RoomHomeButton(bot: bot, view: view, needsYou: BotShell.needsYou(bot, view: view), action: showList)
+                        } else {
+                            Button { layDown() } label: { Image(systemName: "chevron.down") }
+                                .accessibilityLabel("Back to the room")
+                                .accessibilityIdentifier("roomLayDown")
+                        }
                     }
                 }
             }
@@ -329,7 +336,11 @@ struct RoomView: View {
         .sheet(item: placeBinding) { place in
             RoomPlaceSheet(place: place, bot: bot, store: store, mainThreadId: mainThreadId, todayCount: todayCount,
                            open: openItem, startedConversation: { id in openItem(.conversation(id)) },
-                           closeToRoom: { room.show(.rest) }, theme: look.theme.id, chooseTheme: chooseTheme)
+                           closeToRoom: { room.show(.rest) }, theme: look.theme.id, chooseTheme: chooseTheme,
+                           home: room.home, shown: pager.shown, settings: {
+                               room.handle(.closePlace)
+                               openSettings()
+                           })
                 .presentationDetents([.height(max(320, proxy.size.height + proxy.safeAreaInsets.bottom - RoomPlaceSheet.sliver))])
                 .presentationCornerRadius(14)
                 .presentationDragIndicator(.visible)
@@ -341,8 +352,19 @@ struct RoomView: View {
         ZStack {
             RoomCanvas(pages: pages, layout: layout) {
                 ZStack(alignment: .bottom) {
-                    stage(proxy, menuButton: false)
-                    if room.showsMenu { menu(closeInColumn: true) }
+                    if room.home {
+                        RoomContextPane(bot: bot, view: view, shown: pager.shown, mainThreadId: mainThreadId, order: order,
+                                        pick: { id in
+                                            shell.detailPath = []
+                                            show(id)
+                                        },
+                                        openThread: { id in shell.detailPath = [.thread(id: id)] },
+                                        openPlace: { room.showPlace($0) }, settings: openSettings,
+                                        refresh: { [store] in await store.refresh() })
+                    } else {
+                        stage(proxy, menuButton: false)
+                        if room.showsMenu { menu(closeInColumn: true) }
+                    }
                 }
                 .padding(.trailing, pages == .stacked ? max(0, FoldedChrome.column - proxy.safeAreaInsets.trailing) : 0)
                 .padding(.top, proxy.safeAreaInsets.top)
@@ -371,7 +393,7 @@ struct RoomView: View {
             .opacity(spreadOpen ? 0 : 1)
             .allowsHitTesting(!spreadOpen)
             .accessibilityHidden(spreadOpen)
-            if !spreadOpen {
+            if !spreadOpen && !room.home {
                 FoldedColumn {
                     RoomColumnMenuButton(open: room.showsMenu, reduceMotion: reduceMotion) {
                         if room.showsMenu { closeMenu() } else { openMenu() }
@@ -579,8 +601,10 @@ struct RoomView: View {
         .offset(x: pages == nil && room.mode == .rest ? 0 : pageOffset)
         .environment(\.botConversation, context(pager.shown, kind: .conversation))
         .environment(\.roomChat, RoomChat(focusRequests: room.focusRequests, away: !standing, layDown: layDown,
+                                          showList: room.home && pages == nil ? showList : nil,
                                           page: order.count > 1 ? chatPage : nil,
-                                          pages: RoomChatPages(index: order.firstIndex(of: pager.shown) ?? 0, count: order.count)))
+                                          pages: RoomChatPages(index: order.firstIndex(of: pager.shown) ?? 0, count: order.count),
+                                          strandsBeside: room.home && pages != nil))
         .environment(\.openTaskThread, { openItem(.conversation($0)) })
     }
 
@@ -725,6 +749,12 @@ struct RoomView: View {
         if pages == nil { room.handle(.openChat) } else { room.focusInput() }
     }
 
+    /// The conversation list over the conversation (the conversation is home).
+    private func showList() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        room.showPlace(.conversations)
+    }
+
     private func layDown() {
         guard room.standing else { return }
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
@@ -862,7 +892,7 @@ struct RoomView: View {
                          openConversation: { id in openItem(.conversation(id)) },
                          showList: { [shell] in
                              shell.detailPath = []
-                             layDown()
+                             if room.home { showList() } else { layDown() }
                          },
                          refresh: { [store] in Task { await store.refresh() } })
     }
@@ -886,6 +916,9 @@ struct RoomView: View {
         if let id = RoomQA.value("-qaRoomConversation"), order.contains(id) {
             slide = .trailing
             pager.show(id)
+        } else if room.home {
+            let opening = RoomHome.opening(main: mainThreadId, order: order, botId: bot.id)
+            if opening != pager.shown { pager.show(opening) }
         }
         guard let mode = RoomQA.mode else { return }
         switch mode {

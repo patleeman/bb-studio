@@ -157,6 +157,10 @@ struct RoomPlaceSheet: View {
     var chooseTheme: (String) -> Void = { _ in }
     var path: Binding<[Route]>? = nil
     var back: (() -> Void)? = nil
+    /// The conversation is home: the list carries the Bot and its places; `shown` is the open conversation.
+    var home = false
+    var shown: String? = nil
+    var settings: (() -> Void)? = nil
     @State private var ownPath: [Route] = []
     @EnvironmentObject private var app: AppModel
     @Environment(\.look) private var look
@@ -181,7 +185,9 @@ struct RoomPlaceSheet: View {
         .accessibilityIdentifier("RoomSheet-\(place.rawValue)")
     }
 
-    @ViewBuilder private var content: some View {
+    @ViewBuilder private var content: some View { content(for: place) }
+
+    @ViewBuilder private func content(for place: RoomPlace) -> some View {
         switch place {
         case .tasks:
             TasksView(openChat: { open(.conversation(mainThreadId)) })
@@ -200,7 +206,9 @@ struct RoomPlaceSheet: View {
             ArchivePageView(botId: bot.id, open: open, refresh: { Task { await store.refresh() } })
         case .conversations:
             RoomConversations(bot: bot, store: store, mainThreadId: mainThreadId, open: open,
-                              started: startedConversation, closeToRoom: closeToRoom)
+                              started: startedConversation, closeToRoom: closeToRoom,
+                              home: home, shown: shown ?? mainThreadId, settings: settings,
+                              placeView: { AnyView(content(for: $0)) })
         }
     }
 }
@@ -212,6 +220,10 @@ struct RoomConversations: View {
     var open: (BotShellItem) -> Void
     var started: (String) -> Void
     var closeToRoom: () -> Void
+    var home = false
+    var shown: String? = nil
+    var settings: (() -> Void)? = nil
+    var placeView: ((RoomPlace) -> AnyView)? = nil
     @EnvironmentObject private var app: AppModel
     @State private var starting = false
     @State private var removed: Set<String> = []
@@ -227,6 +239,10 @@ struct RoomConversations: View {
         let lines = BotShell.lines(view).filter { !removed.contains($0.threadId) }
         let nests = BotWorkerNests.make(conversations: lines.map(\.threadId), workers: view?.workers ?? [])
         List {
+            if home {
+                Section { RoomListHeader(bot: bot, view: view, refresh: { await store.refresh() }) }
+                    .listRowBackground(Color.clear)
+            }
             Section {
                 ForEach(lines) { line in
                     let nest = nests.nests[line.threadId]
@@ -236,7 +252,7 @@ struct RoomConversations: View {
                         } label: {
                             HStack {
                                 BotConversationRow(line: line)
-                                if line.threadId == mainThreadId {
+                                if line.threadId == (shown ?? mainThreadId) {
                                     Text("You're here").font(.footnote).foregroundStyle(look.success)
                                 }
                             }
@@ -262,12 +278,23 @@ struct RoomConversations: View {
                 }
             }
             Section {
+                if home, let placeView {
+                    ForEach(RoomPlace.homeList) { place in
+                        NavigationLink { placeView(place) } label: { Label(place.title, systemImage: place.symbol) }
+                            .accessibilityIdentifier("roomPlace-\(place.rawValue)")
+                    }
+                }
                 NavigationLink {
                     ArchivePageView(botId: bot.id, open: open, refresh: { Task { await store.refresh() } })
                 } label: {
                     Label("Archive", systemImage: "archivebox")
                 }
                 .accessibilityIdentifier("roomArchive")
+                if home, let settings {
+                    Button(action: settings) { Label("Settings", systemImage: "gearshape") }
+                        .tint(.primary)
+                        .accessibilityIdentifier("roomSettings")
+                }
             }
         }
         .listStyle(.insetGrouped)

@@ -234,7 +234,7 @@ enum BotSpacesDemo {
         func spacesJSON() -> Data {
             let all = #"""
                 {"bots":[
-                  {"id":"bot_juniper","name":"Juniper","avatar":"🌿","shape":"blob","color":"#2ba59a","primary":true,"mainThreadId":"\#(BotDemo.threadId)","needsYou":\#(lock.withLock { approvalPending }),"activity":{"turn":false,"workers":1}},
+                  {"id":"bot_juniper","name":"Juniper","avatar":"🌿","shape":"blob","color":"#2ba59a","primary":true,"mainThreadId":"\#(BotDemo.threadId)","needsYou":\#(lock.withLock { approvalPending }),"activity":{"turn":false,"workers":1},"state":"\#(lock.withLock { juniperState })"},
                   {"id":"bot_home","name":"Home","avatar":"🏠","shape":"star","color":"#e0803a","primary":false,"mainThreadId":"thr_home_main","needsYou":true,"activity":{"turn":false,"workers":0}},
                   {"id":"bot_research","name":"Research","avatar":"🔭","shape":"hexagon","color":"#5b6ee1","primary":false,"mainThreadId":"thr_research_main","needsYou":false,"activity":{"turn":false,"workers":0}}
                 ],"currentBotId":"bot_juniper"}
@@ -248,6 +248,9 @@ enum BotSpacesDemo {
 
         private var chosenTheme: String?
         private var strandsResolved = false
+        /// Juniper's state for Pause, Resume and Stop (`-qaSpacesDemo`).
+        private var juniperState = "active"
+        private(set) var mainMadeFrom: String?
 
         /// `strands.list` for the demo's Main and Launch prep: two asks, two running strands with workers, a finished one, a quiet one.
         static func strandsJSON(_ threadId: String, now: Double, resolved: Bool) -> [String: Any] {
@@ -481,6 +484,12 @@ enum BotSpacesDemo {
                         "approval": approvalView("pending"),
                     ] as [String: Any]]])
                 }
+            case "bot_pause", "bot_resume", "bot_stop":
+                lock.withLock { juniperState = name == "bot_resume" ? "active" : name == "bot_pause" ? "paused" : "stopped" }
+                return ok(["id": "bot_juniper", "name": "Juniper", "state": lock.withLock { juniperState }])
+            case "bot_make_main", "bot_new_main":
+                lock.withLock { mainMadeFrom = threadId.isEmpty ? "new" : threadId }
+                return ok(["id": "bot_juniper", "name": "Juniper"])
             case "strands.list":
                 guard BotSpacesDemo.strands else { return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
                 return ok(Self.strandsJSON(threadId, now: Self.now, resolved: lock.withLock { strandsResolved }))

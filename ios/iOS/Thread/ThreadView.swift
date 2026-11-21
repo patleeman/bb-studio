@@ -565,6 +565,10 @@ struct ThreadView: View {
         // One menu rather than a row of buttons, so the title has room.
         Menu {
             Button { finding = true } label: { Label("Find in thread", systemImage: "magnifyingglass") }
+            if let conversation, conversation.mainThreadId != model.threadId {
+                Button { makeMain(conversation) } label: { Label("Make this the Main", systemImage: "star") }
+                    .accessibilityIdentifier("makeMain")
+            }
             Button {
                 newTitle = model.thread?.title ?? model.thread?.displayTitle ?? ""
                 renaming = true
@@ -1561,7 +1565,8 @@ struct ThreadView: View {
 
     private var conversationTitle: some View {
         ConversationTitle(title: model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? conversation?.conversation?.title ?? "Conversation",
-                          model: conversationModel?.chip ?? executionLabel, pages: roomChat?.pages) { choosingModel = true }
+                          model: conversationModel?.chip ?? executionLabel, pages: roomChat?.pages,
+                          openList: roomChat?.showList) { choosingModel = true }
     }
 
     /// Replaces the `@word` being typed with the mention.
@@ -1636,6 +1641,20 @@ struct ThreadView: View {
 
     private var strands: StrandsModel { StrandsModel.shared }
 
+    /// Make this the Main (`bot_make_main`): the old Main stays an ordinary conversation.
+    private func makeMain(_ conversation: BotConversationContext) {
+        let client = app.client
+        Task {
+            do {
+                try await client.makeMain(botId: conversation.botId, threadId: model.threadId)
+                conversation.refresh()
+                app.flash("This is \(conversation.botName)'s Main now")
+            } catch {
+                app.flash("It didn't become the Main: " + BBClient.describe(error, server: client.baseURL))
+            }
+        }
+    }
+
     /// A strand's worker, or the thread a worker's question waits in.
     private func openStrandThread(_ threadId: String) {
         if let conversation { conversation.push(.thread(id: threadId)) } else { open(.thread(id: threadId)) }
@@ -1655,10 +1674,17 @@ struct ThreadView: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            if let conversation, let pause = conversation.botPause {
+                BotPausedBanner(botId: conversation.botId, botName: conversation.botName, stopped: pause == "stopped",
+                                refresh: { conversation.refresh() })
+                    .padding(.trailing, stackClear)
+            }
             if stackLine {
                 if strands.replacesInFlight() {
-                    StrandsBox(threadId: model.threadId, typing: composerFocused, openThread: openStrandThread)
-                        .padding(.trailing, stackClear)
+                    if roomChat?.strandsBeside != true {
+                        StrandsBox(threadId: model.threadId, typing: composerFocused, openThread: openStrandThread)
+                            .padding(.trailing, stackClear)
+                    }
                 } else {
                     InFlightBar(threadId: model.threadId, typing: composerFocused, liveStep: liveStep,
                                 workers: conversation?.workers.workers.count ?? 0)
@@ -2146,7 +2172,10 @@ extension ThreadView {
         // The Bot's chat has its buttons from the Bot tab (`BotTab`). A
         // thread: back out of whichever stack it's on, and its own actions.
         if botChrome == nil {
-            if let roomChat {
+            if let showList = roomChat?.showList {
+                Button(action: showList) { Label("Conversations", systemImage: "list.bullet") }
+                    .accessibilityIdentifier("roomList")
+            } else if let roomChat {
                 Button { roomChat.layDown() } label: { Label("Back to the room", systemImage: "chevron.down") }
                     .accessibilityIdentifier("roomLayDown")
             } else {

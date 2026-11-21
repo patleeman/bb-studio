@@ -25732,6 +25732,14 @@
                     "workers"
                   ],
                   "additionalProperties": false
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "paused",
+                    "stopped"
+                  ]
                 }
               },
               "required": [

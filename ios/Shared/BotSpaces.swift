@@ -27,6 +27,10 @@ public struct BotSpace: Codable, Hashable, Sendable, Identifiable {
     public var appearance: Studio.BotSpacesOutputBotsItemAppearance?
     public var presence: Presence?
     public var activity: Activity
+    /// Paused or stopped (`bot_pause`, `bot_stop`): it takes no new work until resumed. Nil on an older Studio.
+    public var state: String?
+
+    public var paused: Bool { state == "paused" || state == "stopped" }
 
     init?(_ wire: Studio.BotSpacesOutputBotsItem) {
         guard let id = wire.id, !id.isEmpty else { return nil }
@@ -51,6 +55,13 @@ public struct BotSpace: Codable, Hashable, Sendable, Identifiable {
             }
         }
         activity = Activity(turn: wire.activity?.turn ?? false, workers: max(0, wire.activity?.workers ?? 0))
+        state = switch wire.state {
+        case .active: "active"
+        case .paused: "paused"
+        case .stopped: "stopped"
+        case .unknown(let value): value
+        case nil: nil
+        }
     }
 
     public func presenceState(live view: BotThreadsView? = nil) -> BotPresenceState {

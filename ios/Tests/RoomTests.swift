@@ -28,7 +28,7 @@ final class RoomTests: XCTestCase {
     }
 
     func testTheInputStandsTheChatUpAndTheChevronOrATapOutsideLaysItDown() {
-        let room = RoomModel()
+        let room = RoomModel(home: false)
         XCTAssertEqual(room.mode, .rest)
         XCTAssertEqual(room.handle(.tapInput), .focus)
         XCTAssertTrue(room.standing)
@@ -45,7 +45,7 @@ final class RoomTests: XCTestCase {
     }
 
     func testTheMenuOpensPlacesAndPullingDownGoesBackToTheMenu() {
-        let room = RoomModel()
+        let room = RoomModel(home: false)
         room.handle(.menuButton)
         XCTAssertTrue(room.showsMenu)
         XCTAssertFalse(room.showsDay)
@@ -61,7 +61,7 @@ final class RoomTests: XCTestCase {
     }
 
     func testTheInputDoesNothingFromTheMenu() {
-        let room = RoomModel()
+        let room = RoomModel(home: false)
         room.handle(.menuButton)
         room.handle(.tapInput)
         XCTAssertEqual(room.mode, .menu)
@@ -75,7 +75,7 @@ final class RoomTests: XCTestCase {
         XCTAssertEqual(RoomModel.mode(.record(locked: false), talk: .idle), .rest)
         XCTAssertEqual(RoomModel.mode(.talk, talk: .recording), .talk, "the standing chat keeps its own mic")
         XCTAssertEqual(RoomModel.mode(.menu, talk: .idle), .menu)
-        let room = RoomModel()
+        let room = RoomModel(home: false)
         room.sync(talk: .recording)
         XCTAssertTrue(room.showsDay, "the day stays while recording")
         XCTAssertTrue(room.mode.recording)
@@ -193,7 +193,7 @@ final class RoomTests: XCTestCase {
     }
 
     func testAPlaceOpenedFromALinkOrACardClosesToTheRoom() {
-        let room = RoomModel()
+        let room = RoomModel(home: false)
         room.showPlace(.archive)
         XCTAssertEqual(room.place, .archive)
         room.handle(.closePlace)
@@ -319,4 +319,33 @@ final class LockedBox<Value>: @unchecked Sendable {
     init(_ value: Value) { self.value = value }
     func get() -> Value { lock.withLock { value } }
     func set(_ next: Value) { lock.withLock { value = next } }
+}
+
+@MainActor
+final class RoomHomeTests: XCTestCase {
+    func testAtHomeTheConversationAlwaysStandsAndPlacesOpenOverIt() {
+        let room = RoomModel(home: true)
+        XCTAssertTrue(room.standing, "it opens on the conversation")
+        XCTAssertEqual(room.handle(.chevron), .dismissKeyboard)
+        XCTAssertTrue(room.standing, "nothing lays it down")
+        room.showPlace(.conversations)
+        XCTAssertEqual(room.place, .conversations)
+        XCTAssertTrue(room.standing, "the list opens over it")
+        room.handle(.closePlace)
+        XCTAssertNil(room.place)
+        room.show(.menu, place: .memory)
+        XCTAssertEqual(room.place, .memory)
+        XCTAssertTrue(room.standing)
+        room.show(.rest)
+        XCTAssertNil(room.place)
+        XCTAssertTrue(room.standing, "rest is the conversation at home")
+    }
+
+    func testItOpensOnTheLastConversationWhileListed() {
+        let bot = "bot_home_test_\(UUID().uuidString)"
+        XCTAssertEqual(RoomHome.opening(main: "main", order: ["main", "a"], botId: bot), "main")
+        RoomHome.remember("a", botId: bot)
+        XCTAssertEqual(RoomHome.opening(main: "main", order: ["main", "a"], botId: bot), "a")
+        XCTAssertEqual(RoomHome.opening(main: "main", order: ["main"], botId: bot), "main", "not once it's gone")
+    }
 }

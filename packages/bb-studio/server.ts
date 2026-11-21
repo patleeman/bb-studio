@@ -1200,7 +1200,7 @@ export default async function plugin(bb: BbPluginApi) {
   const threadSeeds = new ThreadSeeds(db);
   const pushRpc = (call: Parameters<typeof bb.sdk.plugins.callRpc>[0]) => bb.sdk.plugins.callRpc(call);
   const botThreads = registerBotThreads(bb, db, {
-    bots: () => bots.list().map((bot) => ({ id: bot.id, name: bot.name, avatar: bot.avatar, shape: bot.shape ?? null, color: bot.color ?? null, primary: !!bot.primary, threadId: bot.threadId, appearance: bot.appearance ?? null, presence: bots.presenceOf(bot.id) })),
+    bots: () => bots.list().map((bot) => ({ id: bot.id, name: bot.name, avatar: bot.avatar, shape: bot.shape ?? null, color: bot.color ?? null, primary: !!bot.primary, threadId: bot.threadId, appearance: bot.appearance ?? null, presence: bots.presenceOf(bot.id), state: bot.state })),
     signals: () => ({
       bots: bots.list().map((bot) => ({ id: bot.id, threadId: bot.threadId, chain: bots.chain(bot.id) })),
       sideThread: (threadId) => sideThreads.forThread(threadId),

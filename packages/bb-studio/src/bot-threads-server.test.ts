@@ -67,7 +67,7 @@ async function setup() {
   bb.storage.migrate(db, MIGRATIONS);
   const changed = vi.fn();
   const server = registerBotThreads(bb, db, {
-    bots: () => [{ id: "dot", name: "Dot", avatar: "🤖", primary: true, threadId: "thr_main" }, { id: "home", name: "Home", avatar: "🏠", threadId: "thr_home", theme: { colors: ["#22c55e"], mode: "light", grain: 0 } } as never],
+    bots: () => [{ id: "dot", name: "Dot", avatar: "🤖", primary: true, threadId: "thr_main", state: "active" }, { id: "home", name: "Home", avatar: "🏠", threadId: "thr_home", state: "paused", theme: { colors: ["#22c55e"], mode: "light", grain: 0 } } as never],
     signals: () => ({ bots: [{ id: "dot", threadId: "thr_main", chain: ["thr_main"] }, { id: "home", threadId: "thr_home", chain: ["thr_home"] }], sideThread: () => null, runnerBot: () => null, leadThreads: new Set(), internal: new Set(), managedBot: () => null }),
     items: () => [],
     originThreads: () => new Map(),
@@ -109,6 +109,8 @@ it("follows the Bot the sidebar shows: the user's next thread is its conversatio
   const spaces = await server.rpc.bot_spaces();
   expect(spaces.currentBotId).toBe("home");
   expect(spaces.bots.map((bot) => [bot.id, bot.needsYou])).toEqual([["dot", false], ["home", true]]);
+  // The phone shows Resume for a paused or stopped Bot.
+  expect(spaces.bots.map((bot) => [bot.id, bot.state])).toEqual([["dot", "active"], ["home", "paused"]]);
   for (const each of spaces.bots) expect(each).not.toHaveProperty("theme");
 });
 

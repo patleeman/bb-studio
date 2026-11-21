@@ -205,6 +205,8 @@ struct PresenceView: View {
     var size: CGFloat = 36
     var room: CGFloat = 1
     var paused = false
+    /// Only the cached still for the state, never the live form: the conversation header's small mark.
+    var stillOnly = false
     @Environment(\.look) private var look
     @Environment(\.displayScale) private var scale
     @Environment(\.scenePhase) private var phase
@@ -220,7 +222,7 @@ struct PresenceView: View {
         return spec
     }
 
-    var live: Bool { state != .idle && phase == .active && store.motionAllowed }
+    var live: Bool { !stillOnly && state != .idle && phase == .active && store.motionAllowed }
 
     var body: some View {
         let spec = spec

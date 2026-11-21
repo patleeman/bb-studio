@@ -58,6 +58,8 @@ final class StrandsModel {
 struct StrandsBox: View {
     let threadId: String
     var typing = false
+    /// Always open, under a heading, without its own scroller: the unfolded Duo's left screen.
+    var panel = false
     var openThread: (String) -> Void
     @State private var model = StrandsModel.shared
     @State private var open = false
@@ -69,7 +71,20 @@ struct StrandsBox: View {
 
     var body: some View {
         let list = model.list(threadId)
-        if StrandsBoxModel.shown(list), let list {
+        if panel {
+            VStack(alignment: .leading, spacing: 0) {
+                if StrandsBoxModel.shown(list), let list {
+                    content(list)
+                } else {
+                    Text("Nothing open in this conversation").font(.footnote).foregroundStyle(.secondary)
+                        .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .background(look.stackFill, in: .rect(cornerRadius: 14, style: .continuous))
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("strands-panel")
+            .task(id: threadId) { await model.load(threadId) }
+        } else if StrandsBoxModel.shown(list), let list {
             VStack(spacing: 0) {
                 header(list)
                 if open && !typing {
@@ -267,6 +282,23 @@ struct StrandMark: View {
         case .doneUnseen: Image(systemName: "checkmark").font(.caption2.weight(.bold)).foregroundStyle(.secondary).accessibilityLabel("Finished")
         case .waiting: Image(systemName: "pause").font(.caption2.weight(.bold)).foregroundStyle(.secondary).accessibilityLabel("Waiting")
         case .active, .quiet, .other: Circle().strokeBorder(.secondary, lineWidth: 1).frame(width: 7, height: 7).accessibilityHidden(true)
+        }
+    }
+}
+
+/// The strands of one conversation, always open: the unfolded Duo's left screen
+/// (the conversation on the right polls them).
+struct StrandsPanel: View {
+    let threadId: String
+    let title: String
+    var openThread: (String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("\(title) · strands".uppercased())
+                .font(.caption2.weight(.semibold)).foregroundStyle(.tertiary)
+                .accessibilityAddTraits(.isHeader)
+            StrandsBox(threadId: threadId, panel: true, openThread: openThread)
         }
     }
 }
