@@ -19,6 +19,17 @@ export type StrandState = (typeof STATES)[number];
 export const QUIET_AFTER_MS = 24 * 60 * 60 * 1000;
 export const EARLIER_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
 export const DONE_SHOWN_MS = 24 * 60 * 60 * 1000;
+/** A failed worker with no strand is listed this long, as the sidebar lists failed workers. */
+export const STRAY_FAILED_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Workers of the conversation that no strand holds: running or waiting on the user, or failed in the last 7 days; waiting first, then running, then failed, newest first. */
+export function strayWorkersOf(signals: Pick<Signals, "now" | "workers">): { threadId: string; title: string; status: WorkerStatus; endedAt: number | null }[] {
+  const rank: Record<WorkerStatus, number> = { "needs-you": 0, running: 1, failed: 2, done: 3 };
+  return signals.workers
+    .filter((worker) => worker.strandId === null && (worker.status === "running" || worker.status === "needs-you" || (worker.status === "failed" && (worker.endedAt === null || signals.now - worker.endedAt < STRAY_FAILED_MS))))
+    .sort((a, b) => rank[a.status] - rank[b.status] || (b.endedAt ?? 0) - (a.endedAt ?? 0))
+    .map(({ threadId, title, status, endedAt }) => ({ threadId, title, status, endedAt }));
+}
 
 export type WorkerStatus = "running" | "needs-you" | "failed" | "done";
 export interface WorkerSignal { threadId: string; title: string; status: WorkerStatus; strandId: string | null; endedAt: number | null }
@@ -42,7 +53,7 @@ export interface StrandLive {
   asks: AskSignal[];
   /** One line on why: who it waits on, the worker that needs you. */
   detail: string | null;
-  workers: { threadId: string; title: string; status: WorkerStatus }[];
+  workers: { threadId: string; title: string; status: WorkerStatus; endedAt: number | null }[];
   /** Out of the strip and the tab, in "Earlier". */
   earlier: boolean;
 }
@@ -50,7 +61,7 @@ export interface StrandLive {
 export function liveState(strand: Strand, signals: Signals): StrandLive {
   const workers = signals.workers.filter((worker) => worker.strandId === strand.id);
   const asks = signals.asks.filter((ask) => ask.strandId === strand.id);
-  const shown = workers.map(({ threadId, title, status }) => ({ threadId, title, status }));
+  const shown = workers.map(({ threadId, title, status, endedAt }) => ({ threadId, title, status, endedAt }));
   const done = (state: StrandState, detail: string | null): StrandLive => ({ state, detail, asks, workers: shown, earlier: false });
   const needs = workers.find((worker) => worker.status === "needs-you");
   if (asks.length) return done("needs-you", asks[0]!.label);

@@ -32,15 +32,15 @@
 import { experimental_DetailRow as DetailRow, useBbNavigate, type ExperimentalThreadInfoProps, type PluginAppBuilder } from "@get-bb/plugin-sdk/app";
 import { useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from "react";
 import type { BotThreadInfo } from "../../bot-threads-contract";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Icon } from "../../kit/app/index";
+import { Icon } from "../../kit/app/index";
 import { registerThreadBanner, registerThreadHeader, type ThreadHeaderDecoration } from "../../kit/app/host-sdk";
 import { useComposerThread } from "../../kit/composer";
 import { errorMessage } from "../../kit/format";
 import { useCall, useLive } from "../live";
 import { isReadOnlyMirror, MirrorBox, useMirrorStatus } from "../mirror-banner";
-import { doneLabel, splitWorkers } from "./model";
 import { FinishedBox, isFinished } from "./finish";
 import { ConversationApprovals, ConversationApprovalsBanner } from "./ConversationApprovals";
+import { StrandsBoxFor } from "../../strands/ui/Strip";
 
 export type ReadOnlyKind = "worker" | "mirror" | "finished" | null;
 
@@ -284,8 +284,8 @@ export function WorkerAskBox({ info, onSent }: { info: BotThreadInfo; onSent?(co
 /**
  * What replaces the composer for one thread: the worker's box, the mirror's,
  * or a finished conversation's. `replaced`: BB drew it in the composer's
- * place (its banners, the workers line among them, are gone); false for the
- * banner fallback, where the line is a banner of its own.
+ * place (its banners, the strands box among them, are gone), so the box is
+ * drawn here; false for the banner fallback, where the box is a banner of its own.
  */
 export function ReadOnlyComposer({ threadId, replaced = true }: { threadId: string; replaced?: boolean }) {
   const info = useThreadInfo(threadId);
@@ -294,7 +294,7 @@ export function ReadOnlyComposer({ threadId, replaced = true }: { threadId: stri
   if (!kind) return null;
   return (
     <div data-studio-readonly={kind} data-testid="readonly-composer" className="studio-root w-full px-1 pb-2">
-      {kind !== "worker" && replaced ? <ConversationWorkersLine threadId={threadId} /> : null}
+      {kind !== "worker" && replaced ? <StrandsBoxFor threadId={threadId} /> : null}
       {kind === "mirror" && mirror ? <MirrorBox threadId={threadId} status={mirror} title={info ? (info.isMain ? "Main" : info.title) : "this thread"} /> : kind === "finished" && info ? <FinishedBox info={info} /> : info ? <WorkerAskBox info={info} /> : null}
     </div>
   );
@@ -318,62 +318,6 @@ export function ReadOnlyFallbackBanner() {
   );
 }
 
-const CHIP = "inline-flex h-5 min-w-0 max-w-[240px] shrink-0 items-center gap-1 rounded-md border border-border px-1.5 text-foreground hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:bg-state-active";
-
-function WorkerGlyph({ status }: { status: BotThreadInfo["workers"][number]["status"] }) {
-  if (status === "running") return <span role="img" aria-label="Running" className="size-2 shrink-0 animate-spin rounded-full border-[1.5px] border-success border-r-transparent" />;
-  if (status === "needs-you") return <span role="img" aria-label="Waiting on an answer" className="size-1.5 shrink-0 rounded-full bg-warning" />;
-  if (status === "failed") return <Icon name="X" className="size-3 shrink-0 text-destructive" aria-label="Failed" />;
-  return <Icon name="Check" className="size-3 shrink-0 text-success" aria-label="Done" />;
-}
-
-/**
- * A conversation's workers above its composer: a chip for each one running
- * or needing the user (its full title up to 240px) that has no work card in
- * the conversation (the card and In flight show that one), and the rest folded into
- * one "N done" chip whose menu lists them. Nothing without workers. A banner
- * of BB's composer, and, where the composer is replaced (Main mirrored from
- * bb, a finished conversation), part of the box that replaces it, since BB
- * then draws no composer banners.
- */
-export function ConversationWorkersLine({ threadId: given }: { threadId?: string } = {}) {
-  const composerThread = useComposerThread();
-  const threadId = given ?? composerThread;
-  const navigate = useBbNavigate();
-  const info = useThreadInfo(threadId ?? null);
-  const cards = useLive("work.list", { threadId: threadId ?? "" }, { enabled: !!threadId, pollMs: 60_000 }).data?.cards ?? [];
-  if (!info || info.kind !== "conversation" || !info.workers.length) return null;
-  const carded = new Set(cards.map((card) => card.workerThreadId));
-  const split = splitWorkers(info.workers);
-  const active = split.active.filter((worker) => !carded.has(worker.threadId));
-  const done = split.done;
-  if (!active.length && !done.length) return null;
-  return (
-    <div data-testid="conversation-workers" aria-label="Workers" className="flex min-w-0 flex-wrap items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground">
-      {active.map((worker) => (
-        <button key={worker.threadId} type="button" data-testid="conversation-worker" data-status={worker.status} onClick={() => navigate.toThread(worker.threadId)} className={CHIP}>
-          <WorkerGlyph status={worker.status} />
-          <span className="min-w-0 truncate">{worker.title}</span>
-        </button>
-      ))}
-      {done.length ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button type="button" data-testid="conversation-workers-done" className={CHIP}><Icon name="Check" className="size-3 shrink-0 text-success" />{doneLabel(done.length)}</button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="start" className="max-w-80">
-            {done.map((worker) => (
-              <DropdownMenuItem key={worker.threadId} data-testid="conversation-worker-done" onSelect={() => navigate.toThread(worker.threadId)}>
-                <WorkerGlyph status={worker.status} /><span className="min-w-0 truncate">{worker.title}</span>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : null}
-    </div>
-  );
-}
-
 /**
  * Registers the replacement (with its banner fallback) and the workers line.
  * `experimental_replace` is ignored by a BB that doesn't know it; there the
@@ -389,7 +333,6 @@ export function registerReadOnlyComposer(app: PluginAppBuilder): void {
   if (typeof infoRow === "function") infoRow.call(app.slots, { id: "worker-from", group: "1_thread", order: 49, component: WorkerFromRow });
   const replace: object = { experimental_replace: { useActive: ({ threadId }: { threadId: string }) => useReadOnly(threadId) !== null, component: ReadOnlyComposer } };
   app.composer.customize({ id: "readonly", scopes: ["thread"], banners: [{ id: "readonly-fallback", chrome: "bare", component: ReadOnlyFallbackBanner }], ...replace });
-  app.composer.customize({ id: "conversation-workers", scopes: ["thread"], banners: [{ id: "workers", chrome: "bare", component: ConversationWorkersLine }] });
   // A conversation's live approval cards (ConversationApprovals.tsx): under its header, else above its composer.
   if (!registerThreadBanner(app.slots, { id: "approvals", component: ConversationApprovals })) {
     app.composer.customize({ id: "conversation-approvals", scopes: ["thread"], banners: [{ id: "approvals", chrome: "bare", component: ConversationApprovalsBanner }] });

@@ -26,8 +26,9 @@ vi.mock("../../kit/app/index", () => ({
   DropdownMenu: () => null, DropdownMenuTrigger: () => null, DropdownMenuContent: () => null, DropdownMenuItem: () => null,
 }));
 vi.mock("./ConversationApprovals", () => ({ ConversationApprovals: () => null, ConversationApprovalsBanner: () => null }));
+vi.mock("../../strands/ui/Strip", () => ({ StrandsBoxFor: () => <div data-testid="strands-box" /> }));
 
-import { ConversationWorkersLine, ReadOnlyFallbackBanner } from "./ReadOnlyComposer";
+import { ReadOnlyFallbackBanner } from "./ReadOnlyComposer";
 
 const mirrors: Record<string, { mirrored: boolean; readOnly?: boolean }> = { main: { mirrored: true, readOnly: true }, panel: { mirrored: false } };
 
@@ -50,7 +51,7 @@ afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals(
 
 async function render(composer: string) {
   state.composer = composer;
-  await act(async () => { root.render(<><ReadOnlyFallbackBanner /><ConversationWorkersLine /></>); });
+  await act(async () => { root.render(<ReadOnlyFallbackBanner />); });
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
 }
 
@@ -58,10 +59,10 @@ it("draws no read-only box over a writable panel thread beside a mirrored Main, 
   await render("panel");
   expect($('[data-testid="mirror-banner"]')).toBeNull();
   expect($("[data-studio-readonly-fallback]")).toBeNull();
-  expect($('[data-testid="conversation-workers"]')).toBeNull();
   await act(async () => { root.unmount(); });
   root = createRoot(host);
   await render("main");
   expect($('[data-studio-readonly="mirror"] [data-testid="mirror-banner"]')?.textContent).toContain("Read-only");
-  expect($('[data-testid="conversation-workers"]')?.textContent).toContain("Main's worker");
+  // Under BB's own composer the strands box is a banner of its own: the fallback draws no second one.
+  expect($('[data-testid="strands-box"]')).toBeNull();
 });

@@ -33,7 +33,8 @@ export const strandView = z.object({
   state: z.enum(STATES),
   detail: z.string().nullable(),
   asks: z.array(strandAsk),
-  workers: z.array(z.object({ threadId: z.string(), title: z.string(), status: workerStatus })),
+  /** Its workers; a finished or failed one with when it ended. */
+  workers: z.array(z.object({ threadId: z.string(), title: z.string(), status: workerStatus, endedAt: z.number().nullable().default(null) })),
   lastAt: z.number(),
   /** Its first message's time and seq (a filter pages back to it); null when it has none yet. */
   firstAt: z.number().nullable(),
@@ -61,6 +62,8 @@ export const strandList = z.object({
   strands: z.array(strandView),
   /** Quiet for 3 days and not pinned: folded away. */
   earlier: z.array(strandView),
+  /** Workers no strand holds: running or waiting on the user, or failed in the last 7 days. The box counts and lists them. */
+  strayWorkers: z.array(z.object({ threadId: z.string(), title: z.string(), status: workerStatus, endedAt: z.number().nullable() })).default([]),
 });
 export type StrandList = z.infer<typeof strandList>;
 

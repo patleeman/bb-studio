@@ -205,7 +205,7 @@ ${GLASS} :is([data-fork-header-group="history"], [data-fork-header-group="action
 export const PROMPT_CARDS = `${GLASS} [data-sidebar="inset"] :is([data-testid="approval-banner"], [data-testid="user-question-banner"], [data-testid="plugin-request-banner"], [data-testid="plan-review-banner"], section[aria-label="Queued messages"])`;
 export const PROMPT_CARD_LINES = `${PROMPT_CARDS} :is([class~="border-b"], [class~="border-t"], [class~="border"]:not(button, input, textarea, [role="radio"], [role="checkbox"]))`;
 export const TOAST_CARD = `${GLASS} .bb-app-toast > div`;
-export const GLASS_CHIPS = `${GLASS} [data-sidebar="inset"] :is([data-promptbox-expanded-only] .rounded-full.border, .cursor-zoom-in.border, [data-testid="conversation-workers"] button)`;
+export const GLASS_CHIPS = `${GLASS} [data-sidebar="inset"] :is([data-promptbox-expanded-only] .rounded-full.border, .cursor-zoom-in.border)`;
 export const STUDIO_RULE = `${GLASS} [data-studio-rule]`;
 export const DIFF_HOST = "diffs-container";
 export const GLASS_DIFF_CARD = `${GLASS} :is(.rounded-lg, .rounded-md)[class~="border"]:has(${DIFF_HOST})`;

@@ -1029,10 +1029,9 @@ A conversation is BB's own thread view. Its header is one row: its title
 text (6a); renaming from the header still edits the real title (the fork's
 `slots.experimental_threadHeader`; BB's own title on a BB without it).
 Every header Studio draws or decorates is one row of muted text after the
-title, with no pills or chips that aren't actions. Above its composer, a line shows the workers it started: a chip for
-each one running or waiting on you (its title up to 240px; a click opens
-it), then one "N done" chip whose menu lists the finished ones. No line
-without workers.
+title, with no pills or chips that aren't actions. Above its composer is
+one box, the strands box (see Strands): the workers it started show there,
+on their strand's row.
 
 A **worker** opens read-only (6c). Its header is one row in BB's style:
 the title, then a small status dot and its state in muted text (Running,
@@ -4387,15 +4386,25 @@ Earlier after 3 more quiet days unless pinned.
   its tag saying "from" that strand. On a BB with the timeline filter (desktop with
   `slots.experimental_timelineFilter`), the timeline shows only that strand's
   messages, with folded and grouped rows open, and loads back to its first
-  message; an older BB dims the other messages instead. Nothing open, no box.
+  message; an older BB dims the other messages instead. It is the one box
+  above the composer: a strand's row counts its running workers and lists
+  each worker (running, needs you, failed in the last 7 days, finished in
+  the last 2). Workers no strand holds count in the line ("1 running",
+  "1 failed") and are listed under "In no strand"; a click opens one. There
+  is no row of worker chips, and on BB Studio 1.0.12 and later BB's own
+  Active child threads list is hidden too (a child waiting on you stays in
+  BB's card with its question; `promptStack` in
+  `src/ui/footer/hide-bb-chrome.ts`). Where Studio replaces the composer (a
+  Main mirrored from bb), the box is drawn inside the replacement. Nothing
+  open, no box.
 - **Above each message**: a divider with the strand's name where the strand
   changes, else the name, muted. On hover, **Move to…** moves the message's
   turn to another strand, or **New strand from here** starts one with it and
   the later messages of its strand. Your moves are never re-sorted, and a
   move can be undone for 10 seconds.
 - **The Strands tab** in the workbench: each strand as a card with its name,
-  summary, state, messages, first and last activity, workers and any ask's
-  buttons. Clicking a card filters the conversation to it; its ⋯ renames,
+  summary, state, messages, first and last activity, workers (running,
+  needs you, finished or failed) and any ask's buttons. Clicking a card filters the conversation to it; its ⋯ renames,
   pins or merges it; a merge asks first and can be undone for 10 seconds.
 - **The overview** (Settings → Strands overview, off by default): a Strands
   page beside Tasks with every conversation's open strands, needs you first.

@@ -87,7 +87,7 @@ function stateLabel(strand: StrandView, now: number): string {
 const WORKER_MARK: Record<StrandView["workers"][number]["status"], { icon: string; label: string; spin?: boolean }> = {
   running: { icon: "Spinner", label: "running", spin: true },
   "needs-you": { icon: "AlertCircle", label: "needs you" },
-  done: { icon: "Check", label: "done" },
+  done: { icon: "Check", label: "finished" },
   failed: { icon: "X", label: "failed" },
 };
 

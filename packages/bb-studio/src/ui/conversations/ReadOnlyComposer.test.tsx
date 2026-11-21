@@ -40,8 +40,9 @@ vi.mock("../../kit/app/index", () => ({
   DropdownMenuItem: ({ children, onSelect, ...rest }: { children: React.ReactNode; onSelect?: () => void }) => <div role="menuitem" {...rest} onClick={() => onSelect?.()}>{children}</div>,
 }));
 vi.mock("./ConversationApprovals", () => ({ ConversationApprovals: () => null, ConversationApprovalsBanner: () => null }));
+vi.mock("../../strands/ui/Strip", () => ({ StrandsBoxFor: ({ threadId }: { threadId: string }) => <div data-testid="strands-box" data-thread={threadId} /> }));
 
-import { ConversationWorkersLine, ReadOnlyComposer, ReadOnlyFallbackBanner, readOnlyKind, registerReadOnlyComposer, setWorkerStatusInHeader, setWorkerStatusOnTop, useReadOnly, useStudioThreadHeader, WorkerFromRow, WorkerStatusBanner } from "./ReadOnlyComposer";
+import { ReadOnlyComposer, ReadOnlyFallbackBanner, readOnlyKind, registerReadOnlyComposer, setWorkerStatusInHeader, setWorkerStatusOnTop, useReadOnly, useStudioThreadHeader, WorkerFromRow, WorkerStatusBanner } from "./ReadOnlyComposer";
 
 const worker: BotThreadInfo = {
   threadId: "w1", botId: "dot", botName: "Chief of Staff", kind: "worker", isMain: false, title: "Fable lead: sidebar rewrite", forkedFrom: null,
@@ -135,46 +136,18 @@ it("on a BB that can't replace the composer, draws the box as a banner that hide
   expect(host.innerHTML).toBe("");
 });
 
-it("shows a conversation's active workers as chips, the one that needs the user first, and folds the done ones into one chip", async () => {
+it("draws the strands box, not worker chips, in a conversation's replaced composer; a worker's has neither", async () => {
   state.threadId = "conv";
-  await act(async () => { root.render(<ConversationWorkersLine />); });
-  expect($('[data-testid="conversation-workers"]')?.textContent).not.toContain("from here");
-  const chips = [...host.querySelectorAll<HTMLElement>('[data-testid="conversation-worker"]')];
-  expect(chips.map((chip) => [chip.textContent, chip.dataset.status])).toEqual([["Codex", "needs-you"], ["Fable lead", "running"]]);
-  expect(chips[0]!.className).toContain("max-w-[240px]");
-  await act(async () => { chips[1]!.click(); });
-  expect(state.toThread).toHaveBeenCalledWith("w1");
-  expect($('[data-testid="conversation-workers-done"]')?.textContent).toBe("1 done");
-  const listed = [...host.querySelectorAll<HTMLElement>('[data-testid="conversation-worker-done"]')];
-  expect(listed.map((item) => item.textContent)).toEqual(["UX review"]);
-  await act(async () => { listed[0]!.click(); });
-  expect(state.toThread).toHaveBeenLastCalledWith("w2");
-  // A worker has no such line.
-  state.threadId = "w1";
-  await act(async () => { root.render(<ConversationWorkersLine />); });
-  expect(host.innerHTML).toBe("");
-});
-
-it("leaves out the chip of a worker that has a work card in the conversation: the card and In flight show it", async () => {
-  state.threadId = "conv";
-  state.cards = [{ workerThreadId: "w1" }, { workerThreadId: null }];
-  await act(async () => { root.render(<ConversationWorkersLine />); });
-  expect([...host.querySelectorAll<HTMLElement>('[data-testid="conversation-worker"]')].map((chip) => chip.textContent)).toEqual(["Codex"]);
-  expect($('[data-testid="conversation-workers-done"]')?.textContent).toBe("1 done");
-  state.infos = { ...state.infos, conv: { ...conversation, workers: [{ threadId: "w1", title: "Fable lead", status: "running" }] } };
-  await act(async () => { root.render(<ConversationWorkersLine />); });
-  expect(host.innerHTML).toBe("");
-});
-
-it("shows only the done chip when nothing is active, and nothing without workers", async () => {
-  state.threadId = "conv";
-  state.infos = { ...state.infos, conv: { ...conversation, workers: [{ threadId: "w2", title: "UX review", status: "done" }, { threadId: "w4", title: "Lint", status: "failed" }] } };
-  await act(async () => { root.render(<ConversationWorkersLine />); });
-  expect(host.querySelectorAll('[data-testid="conversation-worker"]')).toHaveLength(0);
-  expect($('[data-testid="conversation-workers-done"]')?.textContent).toBe("2 done");
-  state.infos = { ...state.infos, conv: { ...conversation, workers: [] } };
-  await act(async () => { root.render(<ConversationWorkersLine />); });
-  expect(host.innerHTML).toBe("");
+  state.mirror = { mirrored: true, readOnly: true };
+  await act(async () => { root.render(<ReadOnlyComposer threadId="conv" />); });
+  expect($('[data-studio-readonly="mirror"] [data-testid="strands-box"]')?.dataset.thread).toBe("conv");
+  expect($('[data-testid="conversation-workers"]')).toBeNull();
+  // The banner fallback is under BB's own composer, where the box is a banner of its own.
+  await act(async () => { root.render(<ReadOnlyComposer threadId="conv" replaced={false} />); });
+  expect($('[data-testid="strands-box"]')).toBeNull();
+  state.mirror = null;
+  await act(async () => { root.render(<ReadOnlyComposer threadId="w1" />); });
+  expect($('[data-testid="strands-box"]')).toBeNull();
 });
 
 it("lets the user answer a waiting worker's own question themselves: its composer comes back in this window", async () => {
@@ -189,14 +162,15 @@ it("lets the user answer a waiting worker's own question themselves: its compose
   expect($('[data-testid="worker-answer-here"]')).toBeNull();
 });
 
-it("registers the replacement with BB's experimental_replace, the banner fallback beside it, and the workers line", () => {
+it("registers the replacement with BB's experimental_replace, the banner fallback beside it, and no workers line", () => {
   const customize = vi.fn();
   registerReadOnlyComposer({ composer: { customize }, slots: {} } as never);
   expect(customize.mock.calls[0]![0]).toMatchObject({ id: "readonly", scopes: ["thread"], banners: [{ id: "readonly-fallback", chrome: "bare" }], experimental_replace: { component: ReadOnlyComposer } });
   expect(typeof customize.mock.calls[0]![0].experimental_replace.useActive).toBe("function");
-  expect(customize.mock.calls[1]![0]).toMatchObject({ id: "conversation-workers", banners: [{ id: "workers", component: ConversationWorkersLine }] });
+  // No row of worker chips above the composer: the strands box shows the workers.
+  expect(customize.mock.calls.map((call) => call[0].id)).not.toContain("conversation-workers");
   // Without thread banners, the live approval cards sit above the composer.
-  expect(customize.mock.calls[2]![0]).toMatchObject({ id: "conversation-approvals", banners: [{ id: "approvals", chrome: "bare" }] });
+  expect(customize.mock.calls[1]![0]).toMatchObject({ id: "conversation-approvals", banners: [{ id: "approvals", chrome: "bare" }] });
 });
 
 it("opens a finished conversation read-only, with when it was finished and Reopen", async () => {
@@ -239,19 +213,6 @@ it("puts the status line at the top of a worker where BB has no header slot, and
   // A conversation gets no banner.
   await act(async () => { root.render(<WorkerStatusBanner threadId="conv" />); });
   expect(host.innerHTML).toBe("");
-});
-
-it("keeps a conversation's workers line where the composer is replaced (Main mirrored from bb): BB draws no banners there", async () => {
-  state.mirror = { mirrored: true, readOnly: true };
-  await act(async () => { root.render(<ReadOnlyComposer threadId="conv" />); });
-  expect($('[data-studio-readonly="mirror"] [data-testid="conversation-workers"]')).not.toBeNull();
-  expect($('[data-testid="mirror-banner"]')).not.toBeNull();
-  // The banner fallback leaves the line to its own banner, and a worker has none.
-  await act(async () => { root.render(<ReadOnlyComposer threadId="conv" replaced={false} />); });
-  expect($('[data-testid="conversation-workers"]')).toBeNull();
-  state.mirror = null;
-  await act(async () => { root.render(<ReadOnlyComposer threadId="w1" />); });
-  expect($('[data-testid="conversation-workers"]')).toBeNull();
 });
 
 function Header({ threadId }: { threadId: string }) {

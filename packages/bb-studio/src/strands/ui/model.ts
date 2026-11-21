@@ -46,7 +46,33 @@ export function countsOf(list: StrandList | null | undefined): { needs: number; 
 }
 
 /** Whether anything is open: a strand that isn't quiet. With none, the line takes no space. */
-export const hasOpen = (list: StrandList | null | undefined) => (list?.strands ?? []).some((strand) => strand.state !== "quiet");
+export const hasOpen = (list: StrandList | null | undefined) => (list?.strands ?? []).some((strand) => strand.state !== "quiet") || !!list?.strayWorkers?.length;
+
+/** Done workers stay on their strand's row this long, failed ones this long (as the sidebar lists them). */
+export const ROW_DONE_MS = 2 * 24 * 60 * 60 * 1000;
+export const ROW_FAILED_MS = 7 * 24 * 60 * 60 * 1000;
+
+const WORKER_RANK: Record<StrandView["workers"][number]["status"], number> = { "needs-you": 0, running: 1, failed: 2, done: 3 };
+
+/** A strand's workers for its row in the box: waiting on you and running ones always, failed ones for 7 days, finished ones for 2; in that order, newest first. */
+export function rowWorkersOf(strand: Pick<StrandView, "workers">, now: number): StrandView["workers"] {
+  return strand.workers
+    .filter((worker) => worker.status === "running" || worker.status === "needs-you"
+      || (worker.status === "done" && (worker.endedAt === null || now - worker.endedAt < ROW_DONE_MS))
+      || (worker.status === "failed" && (worker.endedAt === null || now - worker.endedAt < ROW_FAILED_MS)))
+    .sort((a, b) => WORKER_RANK[a.status] - WORKER_RANK[b.status] || (b.endedAt ?? 0) - (a.endedAt ?? 0));
+}
+
+/** The workers no strand holds, counted for the line: waiting on you, running, failed. */
+export function strayCountsOf(list: StrandList | null | undefined): { needs: number; running: number; failed: number } {
+  const counts = { needs: 0, running: 0, failed: 0 };
+  for (const worker of list?.strayWorkers ?? []) {
+    if (worker.status === "needs-you") counts.needs++;
+    else if (worker.status === "running") counts.running++;
+    else if (worker.status === "failed") counts.failed++;
+  }
+  return counts;
+}
 
 /** The line's strand: the selected one, else the one the newest sorted message is in. */
 export function currentOf(list: StrandList | null | undefined, selection: { strandId: string } | null): StrandView | null {
@@ -87,7 +113,7 @@ export function decisionButtons(ask: StrandAsk): { decision: StrandAsk["decision
 }
 
 /** Whether the strands strip takes the In flight strip's place in this conversation. */
-export const stripShown = (list: StrandList | null | undefined) => !!list?.enabled && list.strands.length > 0;
+export const stripShown = (list: StrandList | null | undefined) => !!list?.enabled && (list.strands.length > 0 || !!list.strayWorkers?.length);
 
 /** A strand's turns and its first message, from the conversation's tags (the newest 2,000 sorted turns). */
 export function turnsOfStrand(tags: Tags | null | undefined, strandId: string): { turnIds: string[]; firstSeq: number | null } {

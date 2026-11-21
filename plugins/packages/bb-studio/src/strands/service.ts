@@ -10,7 +10,7 @@ import { type OverviewConversation, type StrandItemView, type StrandList, type S
 import { firstLineTitle } from "./naming";
 import { JEV_DAILY_CAP, StrandDetector, type DetectorDeps, type OpenTask } from "./detector";
 import { approvalDecisions, approvalLines, isWorkerApproval, shortApproval, type Interaction } from "../worker-approvals";
-import { byState, liveState, type AskSignal, type Signals, type TaskSignal, type WorkerSignal, type WorkerStatus } from "./states";
+import { byState, liveState, strayWorkersOf, type AskSignal, type Signals, type TaskSignal, type WorkerSignal, type WorkerStatus } from "./states";
 import { StrandStore, type Strand } from "./store";
 import { USER_OWNER } from "../tasks/contract";
 
@@ -204,8 +204,10 @@ export class StrandService {
       jevCallsToday: read?.day === day ? read.jevCalls : 0, jevDailyCap: JEV_DAILY_CAP,
     };
     const strands = enabled ? this.store.list(threadId) : [];
-    if (!strands.length) return { ...base, sortingTurn: false, strands: [], earlier: [] };
+    if (!enabled) return { ...base, sortingTurn: false, strands: [], earlier: [], strayWorkers: [] };
     const signals = await this.signals(threadId);
+    const strayWorkers = strayWorkersOf(signals);
+    if (!strands.length) return { ...base, sortingTurn: false, strands: [], earlier: [], strayWorkers };
     const counts = this.store.counts(threadId);
     const rows = strands.map((strand) => ({ strand, live: liveState(strand, signals) }));
     const view = ({ strand, live }: { strand: Strand; live: ReturnType<typeof liveState> }): StrandView => {
@@ -225,6 +227,7 @@ export class StrandService {
       sortingTurn: (await this.deps.busy(threadId).catch(() => false)) && this.detector.hasRunningTurn(threadId) && !this.detector.runningStrand(threadId),
       strands: ordered.filter((row) => !row.live.earlier).map(view),
       earlier: ordered.filter((row) => row.live.earlier).map(view),
+      strayWorkers,
     };
   }
 
