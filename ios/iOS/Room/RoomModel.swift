@@ -6,8 +6,22 @@ enum RoomPlace: String, CaseIterable, Identifiable, Hashable {
     case tasks, conversations, memory, library, schedules, archive, theme
 
     static let menu: [RoomPlace] = [.tasks, .conversations, .memory, .library, .schedules]
+    /// The places at the foot of the conversation list (the conversation is home; strands replace Tasks).
+    static let homeList: [RoomPlace] = [.memory, .library, .schedules, .theme]
 
     var id: String { rawValue }
+
+    var symbol: String {
+        switch self {
+        case .tasks: "checklist"
+        case .conversations: "bubble.left.and.bubble.right"
+        case .memory: "brain"
+        case .library: "books.vertical"
+        case .schedules: "clock"
+        case .archive: "archivebox"
+        case .theme: "paintpalette"
+        }
+    }
 
     var title: String {
         switch self {
@@ -40,10 +54,17 @@ enum RoomEvent: Equatable {
 
 @MainActor @Observable
 final class RoomModel {
-    private(set) var mode: RoomMode = .rest
+    private(set) var mode: RoomMode
     var place: RoomPlace?
     private(set) var focusRequests = 0
     private(set) var closesToRest = false
+    /// The conversation is home (`RoomHome`): it always stands; the menu's places open over it.
+    let home: Bool
+
+    init(home: Bool = RoomHome.enabled) {
+        self.home = home
+        mode = home ? .talk : .rest
+    }
 
     var standing: Bool { mode == .talk }
     var showsDay: Bool { mode == .rest || mode.recording }
@@ -53,6 +74,7 @@ final class RoomModel {
 
     @discardableResult
     func handle(_ event: RoomEvent) -> Effect {
+        if home { return handleHome(event) }
         var (next, effect) = Self.transition(mode, event)
         if case .open(let place) = event, next == .menu {
             self.place = place
@@ -68,6 +90,21 @@ final class RoomModel {
         mode = next
         if effect == .focus { focusRequests += 1 }
         return effect
+    }
+
+    /// At home nothing leaves the conversation: places open over it and close back to it.
+    private func handleHome(_ event: RoomEvent) -> Effect {
+        switch event {
+        case .open(let place): self.place = place
+        case .closePlace, .closeMenu: place = nil
+        case .tapInput:
+            focusRequests += 1
+            return .focus
+        case .chevron, .tapOutside: return .dismissKeyboard
+        case .openChat, .menuButton: break
+        }
+        if mode != .talk && !mode.recording { mode = .talk }
+        return .none
     }
 
     func focusInput() {
@@ -97,15 +134,15 @@ final class RoomModel {
     }
 
     func show(_ mode: RoomMode, place: RoomPlace? = nil) {
-        self.mode = mode
+        self.mode = home && (mode == .rest || mode == .menu) ? .talk : mode
         self.place = mode == .menu ? place : nil
         closesToRest = false
     }
 
     func showPlace(_ place: RoomPlace) {
-        mode = .menu
+        mode = home ? .talk : .menu
         self.place = place
-        closesToRest = true
+        closesToRest = !home
     }
 
     nonisolated static func transition(_ mode: RoomMode, _ event: RoomEvent) -> (RoomMode, Effect) {
@@ -365,10 +402,14 @@ struct RoomChat {
     var focusRequests: Int
     var away: Bool
     var layDown: () -> Void
+    /// The conversation is home: the header opens the conversation list instead of going back to the room.
+    var showList: (() -> Void)? = nil
     /// Swiping sideways on the messages pages between the Bot's conversations.
     var page: ((CGFloat, CGFloat?) -> Void)? = nil
     /// Where this conversation is among them, for the dots under its name.
     var pages: RoomChatPages? = nil
+    /// The unfolded Duo's left screen shows its strands: no box above the composer.
+    var strandsBeside = false
 }
 
 struct RoomChatPages: Equatable {

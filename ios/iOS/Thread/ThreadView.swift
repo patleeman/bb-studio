@@ -1561,7 +1561,8 @@ struct ThreadView: View {
 
     private var conversationTitle: some View {
         ConversationTitle(title: model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? conversation?.conversation?.title ?? "Conversation",
-                          model: conversationModel?.chip ?? executionLabel, pages: roomChat?.pages) { choosingModel = true }
+                          model: conversationModel?.chip ?? executionLabel, pages: roomChat?.pages,
+                          openList: roomChat?.showList) { choosingModel = true }
     }
 
     /// Replaces the `@word` being typed with the mention.
@@ -1657,8 +1658,10 @@ struct ThreadView: View {
             }
             if stackLine {
                 if strands.replacesInFlight() {
-                    StrandsBox(threadId: model.threadId, typing: composerFocused, openThread: openStrandThread)
-                        .padding(.trailing, stackClear)
+                    if roomChat?.strandsBeside != true {
+                        StrandsBox(threadId: model.threadId, typing: composerFocused, openThread: openStrandThread)
+                            .padding(.trailing, stackClear)
+                    }
                 } else {
                     InFlightBar(threadId: model.threadId, typing: composerFocused, liveStep: liveStep,
                                 workers: conversation?.workers.workers.count ?? 0)
@@ -2146,7 +2149,10 @@ extension ThreadView {
         // The Bot's chat has its buttons from the Bot tab (`BotTab`). A
         // thread: back out of whichever stack it's on, and its own actions.
         if botChrome == nil {
-            if let roomChat {
+            if let showList = roomChat?.showList {
+                Button(action: showList) { Label("Conversations", systemImage: "list.bullet") }
+                    .accessibilityIdentifier("roomList")
+            } else if let roomChat {
                 Button { roomChat.layDown() } label: { Label("Back to the room", systemImage: "chevron.down") }
                     .accessibilityIdentifier("roomLayDown")
             } else {
