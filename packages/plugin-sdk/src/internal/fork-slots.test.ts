@@ -406,3 +406,18 @@ describe("slots.experimental_hideHostEntries promptStack", () => {
     ).toThrow(/promptStack must be an array of non-empty strings/u);
   });
 });
+
+describe("slots.experimental_hideHostEntries promptStackFor", () => {
+  it("keeps a per-thread source of parts to hide, and rejects one without get and subscribe", () => {
+    const source = { get: (threadId: string) => (threadId === "thr_1" ? (["thread-context"] as const) : []), subscribe: () => () => {} };
+    const collected = collect((app) => {
+      app.slots.experimental_hideHostEntries({ id: "stack", promptStackFor: source });
+    });
+    const entry = collected.hiddenHostEntries[0]!;
+    expect(entry.promptStackFor?.get("thr_1")).toEqual(["thread-context"]);
+    expect(entry.promptStackFor?.get("thr_2")).toEqual([]);
+    expect(() =>
+      collect((app) => app.slots.experimental_hideHostEntries({ id: "bad", promptStackFor: { get: () => [] } } as never)),
+    ).toThrow(/promptStackFor must have get and subscribe functions/u);
+  });
+});

@@ -230,7 +230,7 @@ not remount, and they return to the bar when the host or the flag goes.
 ## Hide bb's own entries
 
 - `app.slots.experimental_hideHostEntries({ id, navigation?, pages?,
-settings?, settingsSections?, footer?, promptStack? })` → takes bb's own entries out of
+settings?, settingsSections?, footer?, promptStack?, promptStackFor? })` → takes bb's own entries out of
   the app: sidebar navigation keys (`__bb__/skills`, `__bb__/extensions`, …
   or `<pluginId>/<panelId>`), pages (`"skills"`: its address goes home),
   settings (`"cli-skills"`, also left out of settings search), Settings
@@ -238,8 +238,14 @@ settings?, settingsSections?, footer?, promptStack? })` → takes bb's own entri
   address goes to General) and sidebar footer items by key
   (`builtin:mobile`, `builtin:report-bug`, `plugin:<pluginId>/<itemId>`:
   out of the footer, More and Customize) and parts of the stack above a
-  thread's composer (`"active-child-threads"`: running children leave the
-  Active child threads card; a child waiting on the user stays). UI only.
+  thread's composer, everywhere (`promptStack`) or per thread
+  (`promptStackFor: { get(threadId), subscribe }`): `"active-child-threads"`
+  (running children leave the Active child threads card; a child waiting on
+  the user stays) and `"thread-context"` (the parent/changed files/pull
+  request row; an archived or removed workspace row stays). UI only.
+- `experimental_ThreadContextSegments({ threadId, projectId, environment })`
+  → bb's thread context row for one thread, wherever the plugin draws it
+  (for example an `experimental_threadInfoSection`).
 
 ## The skill registry
 
