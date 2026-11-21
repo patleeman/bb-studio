@@ -4396,12 +4396,14 @@ context. With no Jev, or no calls left, the reply stays untagged and pushes
 as it always did. What Jev reads is scrubbed of secrets like the rest of
 strands. Quiet `[PASS]` replies and the backfill's history aren't tagged.
 
-- A needs-you reply draws one amber line above its last message: **Needs
-  you**, the asking sentence in the reply's own words, and **Done**. Status
-  replies are slightly muted.
+- A needs-you reply has its asking sentence marked in place: a faint amber
+  highlight on that sentence in its newest message, nothing added around it
+  (the reply's last paragraph when Jev named no sentence). **Done** shows
+  beside the sentence on hover or keyboard focus. Status replies look as
+  they always did.
 - It counts as an ask on its strand ("N need you" in the box, the overview,
   the sidebar), with **Jump to reply** and **Done**; picking the strand opens
-  the reply.
+  the reply. Jump to reply lands on the marked sentence and flashes it.
 - It stops counting when Jev says a message of yours answers it or acts on
   it: the call that sorts your message also asks, for each open ask, whether
   the message answers it ("ok, do it" after "Should I…?" does; "thanks!" or

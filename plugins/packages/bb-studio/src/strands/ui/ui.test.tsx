@@ -112,6 +112,7 @@ const { StrandsOverview } = await import("./Overview");
 const { StrandTag } = await import("./Tag");
 const { StrandsTab } = await import("./Tab");
 const { select, registerTimelineFilter, timelineFilterOf, resetSelectionForTests } = await import("./selection");
+const { flashReply, resetAskMarksForTests, takeFlash } = await import("./ask-mark");
 
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
@@ -332,53 +333,97 @@ describe("the tag above each message", () => {
   });
 });
 
-describe("replies that need you (design: Replies that need you, option a)", () => {
+describe("replies that need you, marked in place (design: Replies that need you, round 3 option a)", () => {
+  // The Custom Highlight API and range geometry, which jsdom lacks.
+  class FakeHighlight { ranges = new Set<Range>(); add(range: Range) { this.ranges.add(range); } delete(range: Range) { this.ranges.delete(range); } }
+  const highlights = new Map<string, FakeHighlight>();
+  beforeEach(() => {
+    highlights.clear();
+    resetAskMarksForTests();
+    vi.stubGlobal("Highlight", FakeHighlight);
+    (globalThis.CSS as unknown as { highlights?: unknown }) = Object.assign(globalThis.CSS ?? {}, { highlights });
+    (Range.prototype as unknown as { getClientRects: () => DOMRect[] }).getClientRects = () => [{ left: 10, right: 300, top: 40, bottom: 58, width: 290, height: 18 } as DOMRect];
+  });
+  const marked = (name = "studio-reply-ask") => [...(highlights.get(name)?.ranges ?? [])].map((range) => range.toString());
   const msg = (id: string, turnId: string, createdAt: number) => ({ id, threadId: "thr_main", turnId, role: "assistant" as const, createdAt });
+  const row = (key: string, id: string, turnId: string, createdAt: number, text: string) => (
+    <div key={key} data-timeline-row-id={key}>
+      <div aria-label="Message metadata"><StrandTag message={msg(id, turnId, createdAt) as never} /></div>
+      <p>{text}</p>
+    </div>
+  );
   const replies: Tags["replies"] = [
     { turnId: "t5", seq: 22, tag: "needs-you", ask: "Want me to book Ace for Saturday 9 AM?", resolved: false },
     { turnId: "t4", seq: 18, tag: "status", ask: null, resolved: false },
     { turnId: "t6", seq: 26, tag: "needs-you", ask: "Should I merge it?", resolved: true },
   ];
 
-  it("draws one amber line with the ask above the turn's newest message, and mutes a status reply", () => {
+  it("highlights only the asking sentence of the turn's newest message; nothing is added above it, and status replies look as they are", () => {
     state.tags = { ...TAGS, replies };
     render(<>
-      <div data-timeline-row-id="a"><StrandTag message={msg("m5a", "t5", NOW - 2_000) as never} /></div>
-      <div data-timeline-row-id="b"><StrandTag message={msg("m5b", "t5", NOW - 1_000) as never} /></div>
-      <div data-timeline-row-id="c"><StrandTag message={msg("m4", "t4", NOW - 5_000) as never} /></div>
-      <div data-timeline-row-id="d"><StrandTag message={msg("m6", "t6", NOW) as never} /></div>
+      {row("a", "m5a", "t5", NOW - 2_000, "Looking at the slots now.")}
+      {row("b", "m5b", "t5", NOW - 1_000, "Ace has Saturday 9 AM open. Want me to book Ace for Saturday 9 AM? I'll confirm by email.")}
+      {row("c", "m4", "t4", NOW - 5_000, "Freed 18 GB.")}
+      {row("d", "m6", "t6", NOW, "Merged. Should I merge it?")}
     </>);
-    const lines = [...container.querySelectorAll("[data-reply-needs-you]")];
-    expect(lines).toHaveLength(1);
-    expect(lines[0]!.closest("[data-timeline-row-id]")!.getAttribute("data-timeline-row-id")).toBe("b");
-    expect(text(lines[0]!.querySelector("[data-reply-ask]"))).toBe("Want me to book Ace for Saturday 9 AM?");
-    expect(text(lines[0])).toContain("Needs you");
-    // A status reply is muted; a needs-you one and an answered one aren't.
-    expect([...container.querySelectorAll("[data-timeline-row-id]")].map((row) => row.hasAttribute("data-studio-reply-status"))).toEqual([false, false, true, false]);
+    expect(marked()).toEqual(["Want me to book Ace for Saturday 9 AM?"]);
+    expect(container.querySelector("[data-reply-needs-you]")).toBeNull();
+    expect(container.textContent).not.toContain("Needs you");
+    expect(container.querySelectorAll("[data-studio-reply-status]")).toHaveLength(0);
+    expect(container.querySelectorAll("[data-reply-done-mark]")).toHaveLength(1);
   });
 
-  it("Done marks the reply done", async () => {
+  it("marks the last paragraph when Jev named no sentence", () => {
+    state.tags = { ...TAGS, replies: [{ turnId: "t5", seq: 22, tag: "needs-you", ask: null, resolved: false }] };
+    render(row("a", "m5", "t5", NOW, "Ace has Saturday 9 AM open; it needs your account."));
+    expect(marked()).toEqual(["Ace has Saturday 9 AM open; it needs your account."]);
+  });
+
+  it("Done shows on hover or keyboard focus of the sentence, and marks the reply done", async () => {
     state.tags = { ...TAGS, replies };
+    render(row("b", "m5b", "t5", NOW, "Ace has Saturday 9 AM open. Want me to book Ace for Saturday 9 AM?"));
+    const done = container.querySelector<HTMLButtonElement>("[data-reply-done-mark]")!;
+    expect(done.getAttribute("aria-label")).toBe("Done: this reply no longer needs you");
+    expect(done.hasAttribute("data-shown")).toBe(false);
+    act(() => { container.querySelector("[data-timeline-row-id]")!.dispatchEvent(new MouseEvent("mousemove", { clientX: 100, clientY: 50, bubbles: true })); });
+    expect(done.hasAttribute("data-shown")).toBe(true);
+    act(() => { container.querySelector("[data-timeline-row-id]")!.dispatchEvent(new MouseEvent("mousemove", { clientX: 100, clientY: 200, bubbles: true })); });
+    expect(done.hasAttribute("data-shown")).toBe(false);
+    act(() => { done.focus(); });
+    expect(done.hasAttribute("data-shown")).toBe(true);
     state.call.mockResolvedValueOnce({ ok: true });
-    render(<div data-timeline-row-id="a"><StrandTag message={msg("m5a", "t5", NOW) as never} /></div>);
-    await act(async () => { (container.querySelector("[data-reply-needs-you] button") as HTMLElement).click(); });
+    await act(async () => { done.click(); });
     expect(state.call).toHaveBeenCalledWith("strands.resolveReply", { threadId: "thr_main", seq: 22 });
   });
 
-  it("lists the reply in the box under Needs you; picking it or Jump to reply opens the reply, Done marks it done", async () => {
+  it("Jump to reply flashes the marked sentence", () => {
+    vi.useFakeTimers();
+    try {
+      state.tags = { ...TAGS, replies };
+      render(row("b", "m5b", "t5", NOW, "Ace has Saturday 9 AM open. Want me to book Ace for Saturday 9 AM?"));
+      act(() => flashReply("thr_main", 22));
+      act(() => { vi.advanceTimersByTime(350); });
+      expect(marked("studio-reply-ask-flash")).toEqual(["Want me to book Ace for Saturday 9 AM?"]);
+      act(() => { vi.advanceTimersByTime(1_300); });
+      expect(marked("studio-reply-ask-flash")).toEqual([]);
+      expect(marked()).toEqual(["Want me to book Ace for Saturday 9 AM?"]);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("lists the reply in the box under Needs you; Jump to reply opens it and asks for the flash, Done marks it done", async () => {
     const ask = { id: "reply:22", kind: "reply" as const, threadId: "thr_main", label: "Want me to book Ace for Saturday 9 AM?", details: [], decisions: [], turnId: "t5", seq: 22 };
     state.list = { ...LIST, strands: [view("s_hvac", "Furnace tune-up", { state: "needs-you", asks: [ask], latestSeq: 30 }), ...LIST.strands.filter((strand) => strand.id !== "s_hvac" && strand.state !== "needs-you")] };
     render(<StrandsBoxBanner />);
     expect(text(box2())).toContain("1 need you");
     click(box2()!.querySelector("[data-strands-needs]"));
-    const row = box2()!.querySelector('[data-strand-row="s_hvac"]')!;
-    expect(text(row)).toContain("Want me to book Ace for Saturday 9 AM?");
+    const boxRow = box2()!.querySelector('[data-strand-row="s_hvac"]')!;
+    expect(text(boxRow)).toContain("Want me to book Ace for Saturday 9 AM?");
     state.call.mockResolvedValueOnce({ ok: true });
-    await act(async () => { (row.querySelector("[data-reply-done]") as HTMLElement).click(); });
+    await act(async () => { (boxRow.querySelector("[data-reply-done]") as HTMLElement).click(); });
     expect(state.call).toHaveBeenCalledWith("strands.resolveReply", { threadId: "thr_main", seq: 22 });
-    // Jump to reply opens it, and the box closes so the reply shows.
-    click(row.querySelector("[data-reply-jump]"));
+    click(boxRow.querySelector("[data-reply-jump]"));
     expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=22", { replace: true });
+    expect(takeFlash("thr_main", 22)).toBe(true);
     expect(container.querySelector('[data-testid="strands-menu"]')).toBeNull();
     click(box2()!.querySelector("[data-strands-needs]"));
     click(box2()!.querySelector('[data-strand-option="s_hvac"]'));

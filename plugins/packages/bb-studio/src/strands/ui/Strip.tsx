@@ -25,6 +25,7 @@ import { messageLinkPath } from "../../work/ui/in-flight-model";
 import type { StrandAsk, StrandView } from "../contract";
 import { ageOf, boxGroups, countsOf, currentOf, decisionButtons, filterTurnsOf, hasOpen, replyAskOf, rowWorkersOf, seqsOf, stepSeq, strayCountsOf, stripShown } from "./model";
 import { hostContextSegments, useHidePromptStack } from "./prompt-stack";
+import { flashReply } from "./ask-mark";
 import { select, selectionOf, setStrandTurns, useSelection } from "./selection";
 
 export const STRANDS_TAB = "strands";
@@ -117,7 +118,7 @@ export function AskButtonsFor({ ask, threadId, onOpen }: { ask: StrandAsk; threa
       finally { setBusy(false); }
     };
     return <>
-      {ask.seq !== null ? <button type="button" data-reply-jump={ask.seq} onClick={() => { openMessage(ask.threadId, ask.seq!); onOpen?.(); }} className={cn(smallButton, "border-transparent bg-foreground font-semibold text-background")}>Jump to reply</button> : null}
+      {ask.seq !== null ? <button type="button" data-reply-jump={ask.seq} onClick={() => { flashReply(ask.threadId, ask.seq!); openMessage(ask.threadId, ask.seq!); onOpen?.(); }} className={cn(smallButton, "border-transparent bg-foreground font-semibold text-background")}>Jump to reply</button> : null}
       <button type="button" data-reply-done={ask.seq ?? ""} disabled={busy || ask.seq === null} onClick={() => void done()} className={cn(smallButton, "border-border bg-transparent hover:bg-accent")}>Done</button>
     </>;
   }
@@ -273,7 +274,7 @@ export function StrandsBox({ threadId, now = Date.now() }: { threadId: string; n
   const strayCounts = strayCountsOf(data);
   const strayShown = needle ? stray.filter((worker) => worker.title.toLowerCase().includes(needle)) : stray;
   // A strand waiting on a reply opens at that reply.
-  const pick = (strand: StrandView) => { const reply = replyAskOf(strand); choose(reply ? { ...strand, latestSeq: reply.seq } : strand, true); setExpanded(false); setQuery(""); };
+  const pick = (strand: StrandView) => { const reply = replyAskOf(strand); if (reply) flashReply(threadId, reply.seq); choose(reply ? { ...strand, latestSeq: reply.seq } : strand, true); setExpanded(false); setQuery(""); };
   const openTab = () => { setExpanded(false); if (panel) openThreadTab(panel, { actionId: STRANDS_TAB, title: "Strands" }); };
   const onInputKey = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter" && matches[0]) { event.preventDefault(); pick(matches[0]); }

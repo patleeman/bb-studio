@@ -23,7 +23,7 @@ export interface TimelineFilter { turnIds: readonly string[]; firstSeq: number |
 const selected = new Map<string, Selection>();
 const filters = new Map<string, TimelineFilter>();
 const listeners = new Set<() => void>();
-const DIM_STYLE_ID = "studio-strand-dim-style-2";
+const DIM_STYLE_ID = "studio-strand-dim-style-3";
 let hostFilters = false;
 
 const notify = () => { for (const listener of listeners) listener(); };
@@ -137,9 +137,7 @@ export function ensureDimStyle(doc: Document = document): void {
   const style = doc.createElement("style");
   style.id = DIM_STYLE_ID;
   // Dimmed rows; and a tag's "Move to…" shows while its message is hovered or the menu is open.
-  // A status reply's messages are slightly muted (a reply that needs the user isn't); dimming still wins.
-  style.textContent = "[data-studio-reply-status]{opacity:.8;transition:opacity .2s}[data-studio-reply-status]:hover,[data-studio-reply-status]:focus-within{opacity:1}"
-    + "[data-studio-strand-dim]{opacity:.3;transition:opacity .2s}@media (prefers-reduced-motion:reduce){[data-studio-strand-dim],[data-studio-reply-status]{transition:none}}"
+  style.textContent = "[data-studio-strand-dim]{opacity:.3;transition:opacity .2s}@media (prefers-reduced-motion:reduce){[data-studio-strand-dim]{transition:none}}"
     + "[data-strand-move]{opacity:0}[data-timeline-row-id]:hover [data-strand-move],[data-strand-move]:focus-visible,[data-strand-move][data-state=open]{opacity:1}";
   doc.head.appendChild(style);
 }
