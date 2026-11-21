@@ -557,9 +557,9 @@
       "budget": 5
     },
     "apps/app/src/components/promptbox/banner/ThreadPromptContextBanner.tsx": {
-      "seam": "host-copy",
-      "intent": "The parent section's relationship is ParentRelationship (parentRelationship.fork.ts, imported at the top of the file), which adds \"reply\": a fork a plugin made reads \"Reply to <title>\" with its own icon; copy and icon come from REPLY_SECTION_COPY and REPLY_SECTION_ICON.",
-      "budget": 5
+      "seam": "host-copy, host-entries",
+      "intent": "The parent section's relationship is ParentRelationship (parentRelationship.fork.ts, imported at the top of the file), which adds \"reply\": a fork a plugin made reads \"Reply to <title>\" with its own icon; copy and icon come from REPLY_SECTION_COPY and REPLY_SECTION_ICON. ThreadChildThreadsBanner takes its prop as hostChildThreads and draws useForkChildThreads(hostChildThreads) (components/fork/ForkPromptStack.ts, imported at the top of the file), so a plugin's promptStack \"active-child-threads\" leaves only the children waiting on the user.",
+      "budget": 9
     },
     "apps/app/src/views/thread-detail/useParentThreadSection.ts": {
       "seam": "host-copy",

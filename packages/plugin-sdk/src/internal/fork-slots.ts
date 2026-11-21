@@ -354,6 +354,7 @@ export function forkSlotMethods(
           registration.settingsSections,
         ),
         footer: list("footer", registration.footer),
+        promptStack: list("promptStack", registration.promptStack),
       });
     },
     experimental_threadHeader(registration) {
