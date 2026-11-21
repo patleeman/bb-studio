@@ -734,6 +734,12 @@
       "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
+      "file": "ios/Shared/StrandTimeline.swift",
+      "plugin": "studio",
+      "method": "strands.tags",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/Shared/Strands.swift",
       "plugin": "studio",
       "method": "strands.list",
@@ -935,6 +941,24 @@
       "file": "ios/iOS/Bot/BotPagesModel.swift",
       "plugin": "studio",
       "method": "bot_reopen",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/RouterNotice.swift",
+      "plugin": "studio",
+      "method": "router.notice.get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/RouterNotice.swift",
+      "plugin": "studio",
+      "method": "router.notice.dismiss",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Bot/RouterNotice.swift",
+      "plugin": "studio",
+      "method": "router.handoff",
       "coverage": "generated method"
     },
     {
@@ -1152,6 +1176,12 @@
       "plugin": "mobile",
       "method": "mute_set",
       "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "ios/iOS/Tools/ToolGatewayView.swift",
+      "plugin": "studio",
+      "method": "toolGateway.overview",
+      "coverage": "generated method"
     },
     {
       "file": "ios/iOS/VisualChat/VisualChatModel.swift",

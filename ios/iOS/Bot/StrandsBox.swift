@@ -8,6 +8,10 @@ final class StrandsModel {
     static let shared = StrandsModel()
 
     private(set) var lists: [String: StrandList] = [:]
+    /// Each conversation's sorted turns (`strands.tags`): the dividers and "Only this strand".
+    private(set) var tags: [String: StrandTags] = [:]
+    /// The strand a conversation shows only (a divider or a strand tapped); nil shows everything.
+    var only: [String: String] = [:]
     /// Per server: nil until asked, false when Studio has no strands.
     private(set) var supported: [URL: Bool] = [:]
     private var client: BBClient { AppModel.shared.client }
@@ -26,7 +30,19 @@ final class StrandsModel {
             if lists[threadId] != next { lists[threadId] = next }
         } catch where BBClient.isUnknownRPC(error) {
             supported[base] = false
-        } catch {}
+            return
+        } catch {
+            return
+        }
+        if let next = try? await client.strandsTags(threadId: threadId), base == client.baseURL, tags[threadId] != next { tags[threadId] = next }
+    }
+
+    /// The strand's name for the filter bar.
+    func title(_ strandId: String, in threadId: String) -> String {
+        let list = lists[threadId]
+        return (list?.strands ?? []).first { $0.id == strandId }?.title
+            ?? (list?.earlier ?? []).first { $0.id == strandId }?.title
+            ?? tags[threadId]?.title(strandId) ?? "This strand"
     }
 
     /// Polls one conversation while its screen shows; the caller's task ends it.
@@ -189,6 +205,8 @@ struct StrandsBox: View {
         VStack(alignment: .leading, spacing: 4) {
             Button {
                 if strand.state == .doneUnseen { Task { await model.opened(strand, in: threadId) } }
+                if !panel { withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { open = false } }
+                model.only[threadId] = strand.id
             } label: {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     StrandMark(state: strand.state).frame(width: 12)

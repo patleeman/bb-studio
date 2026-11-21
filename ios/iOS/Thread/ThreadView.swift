@@ -1641,6 +1641,13 @@ struct ThreadView: View {
 
     private var strands: StrandsModel { StrandsModel.shared }
 
+    /// The thread Hand off continued in: a conversation of the Bot pages to it, any other thread opens over this one.
+    private func openRouterThread(_ threadId: String) {
+        guard let conversation else { return }
+        conversation.refresh()
+        conversation.openConversation(threadId)
+    }
+
     /// Make this the Main (`bot_make_main`): the old Main stays an ordinary conversation.
     private func makeMain(_ conversation: BotConversationContext) {
         let client = app.client
@@ -1674,10 +1681,20 @@ struct ThreadView: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
+            if conversation != nil {
+                RouterNoticeBanner(threadId: model.threadId, openThread: openRouterThread)
+                    .padding(.trailing, stackClear)
+            }
             if let conversation, let pause = conversation.botPause {
                 BotPausedBanner(botId: conversation.botId, botName: conversation.botName, stopped: pause == "stopped",
                                 refresh: { conversation.refresh() })
                     .padding(.trailing, stackClear)
+            }
+            if stackLine, let only = strands.only[model.threadId] {
+                StrandFilterBar(title: strands.title(only, in: model.threadId)) {
+                    withAnimation(.snappy) { strands.only[model.threadId] = nil }
+                }
+                .padding(.trailing, stackClear)
             }
             if stackLine {
                 if strands.replacesInFlight() {
@@ -1885,6 +1902,11 @@ struct ThreadView: View {
             guard id == model.threadId else { return }
             composerFocused = true
             app.replyThreadId = nil
+        }
+        .task(id: conversation != nil ? model.threadId : "") {
+            // The model router's usage-limit notice (`RouterNoticeBanner`).
+            guard conversation != nil else { return }
+            await RouterNotices.shared.poll(model.threadId)
         }
         .task(id: conversation != nil || botChrome != nil ? model.threadId : "") {
             guard conversation != nil || botChrome != nil else { return }
@@ -2308,12 +2330,17 @@ extension ThreadView {
         let rows = ThreadTranscriptRow.thread(items: items, hasOlder: model.hasOlder, unread: unreadItem(in: items), match: currentMatch,
             editableId: worker == nil ? lastUserRowId : nil, pending: pending, interactions: shownInteractions,
             working: showsWorking, thinking: model.shelf.thinking, sideThreads: conversation != nil ? sideThreads : [:])
-        return inRoom ? RoomText.rows(rows) : rows
+        let shown = inRoom ? RoomText.rows(rows) : rows
+        // Strands in a Bot conversation: dividers where the strand changes, or only one strand.
+        guard conversation != nil, strands.replacesInFlight() else { return shown }
+        return ThreadTranscriptRow.strands(shown, tags: strands.tags[model.threadId], only: strands.only[model.threadId])
     }
 
     fileprivate var transcriptV2Actions: ThreadTranscriptActions {
         let inConversation = conversation != nil
+        let threadId = model.threadId
         return ThreadTranscriptActions(
+            onlyStrand: inConversation ? { strandId in withAnimation(.snappy) { StrandsModel.shared.only[threadId] = strandId } } : nil,
             bot: botChrome?.bot, projectId: model.thread?.projectId, reactionItems: reactionSettings.items, cached: model.showsCache,
             draftReply: { draftReply($0) }, sendReply: { send(text: $0) }, quote: { quote($0) },
             select: { selecting = SelectionText(text: $0) }, edit: startEditing,

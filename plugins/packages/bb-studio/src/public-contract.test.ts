@@ -19,3 +19,7 @@ it("includes Tasks and In flight for the phone", () => {
 it("includes the strands the phone reads", () => {
   expect(Object.keys(rpcContract)).toEqual(expect.arrayContaining(["strands.list", "strands.tags", "strands.opened"]));
 });
+
+it("includes the router's notice and Hand off for the phone", () => {
+  expect(Object.keys(rpcContract)).toEqual(expect.arrayContaining(["router.notice.get", "router.notice.dismiss", "router.handoff", "toolGateway.overview"]));
+});

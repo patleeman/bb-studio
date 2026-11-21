@@ -44,6 +44,8 @@ struct TranscriptV2Toggle: View {
 /// What a row in the new transcript needs from its thread to act: the
 /// same closures the SwiftUI transcript passes its rows.
 struct ThreadTranscriptActions {
+    /// Shows only one strand (a divider tapped); nil where strands don't run.
+    var onlyStrand: ((String) -> Void)? = nil
     var bot: BotInfo?
     var projectId: String?
     var reactionItems: [String]
@@ -77,6 +79,8 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
     case pending(Outbox.Message)
     case interaction(PendingInteraction)
     case working(BotInfo?, thinking: String?)
+    /// Strands in the timeline: a divider where the strand changes, or "N other messages" under a filter.
+    case strand(StrandTimeline.Mark, key: String)
 
     struct BotState: Equatable {
         var editable = false
@@ -104,6 +108,7 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
         case .pending(let message): "pending-message:\(message.id)"
         case .interaction(let interaction): interaction.id
         case .working: "transcript:working"
+        case .strand(_, let key): "strand:\(key)"
         }
     }
 
@@ -116,6 +121,7 @@ enum ThreadTranscriptRow: Identifiable, Equatable {
         case let (.pending(x), .pending(y)): x == y
         case let (.interaction(x), .interaction(y)): x == y
         case let (.working(x, s), .working(y, t)): x == y && s == t
+        case let (.strand(x, k), .strand(y, l)): x == y && k == l
         default: false
         }
     }
@@ -242,6 +248,10 @@ struct ThreadTranscriptRowView: View {
                             openWeb: actions.openWeb)
         case .working(let bot, let thinking):
             if let bot { BotTypingRow(bot: bot, thinking: thinking) } else { WorkingIndicator(thinking: thinking) }
+        case .strand(.divider(let strandId, let title), _):
+            StrandDividerRow(title: title, only: actions.onlyStrand.map { only in { only(strandId) } })
+        case .strand(.gap(let count), _):
+            StrandGapRow(count: count)
         }
     }
 
@@ -267,5 +277,31 @@ struct ThreadTranscriptRowView: View {
                 if let id = event.threadId { actions.openThread(id) }
             }
         }
+    }
+}
+
+extension ThreadTranscriptRow {
+    /// Strands in a conversation's rows (`StrandTimeline.plan`): dividers where
+    /// the strand changes, or, showing only one strand, its rows with the others
+    /// folded into "N other messages". Rows that aren't from a turn stay.
+    static func strands(_ rows: [Self], tags: StrandTags?, only: String?) -> [Self] {
+        guard let tags, !tags.tags.isEmpty else { return rows }
+        let seqs: [Double?] = rows.map { row in
+            if case .item(let item, _) = row { return item.rows.compactMap(\.sourceSeqEnd).max() }
+            return nil
+        }
+        let messages: [Bool] = rows.map { row in
+            if case .item(.message, _) = row { return true }
+            return false
+        }
+        let plan = StrandTimeline.plan(seqs: seqs, messages: messages, tags: tags, only: only)
+        var out: [Self] = []
+        out.reserveCapacity(rows.count + plan.marks.count)
+        for (index, row) in rows.enumerated() {
+            for (n, mark) in (plan.marks[index] ?? []).enumerated() { out.append(.strand(mark, key: "\(row.id):\(n)")) }
+            if plan.keep[index] { out.append(row) }
+        }
+        for (n, mark) in (plan.marks[rows.count] ?? []).enumerated() { out.append(.strand(mark, key: "end:\(n)")) }
+        return out
     }
 }
