@@ -4,7 +4,7 @@ import { parseCliArgs } from "../cli-args";
 import { relativeTime } from "../kit/format";
 import type { StrandItemView, StrandList, StrandView } from "./contract";
 
-export const STRANDS_USAGE = "bb studio strands [<thread>|main] [--items <n>] [--sort] [--json]";
+export const STRANDS_USAGE = "bb studio strands [<conversation>|main] [--items <n>] [--sort] [--json]";
 
 export interface StrandsCliDeps {
   /** A thread id, "main" or nothing (the caller's Bot's Main) to the conversation's id. */
@@ -30,7 +30,7 @@ function strandLine(strand: StrandView, now: number): string {
 export function formatStrands(list: StrandList, items: readonly StrandItemView[], now: number): string {
   const lines: string[] = [];
   const backfill = list.backfill.done ? `backfilled ${list.backfill.sorted} of ${list.backfill.messages} messages${list.backfill.at ? ` ${relativeTime(list.backfill.at, now)}` : ""}` : "not backfilled yet";
-  lines.push(`${list.threadId} · ${list.enabled ? "strands on" : "strands off (phase 1 sorts a Bot's Main only)"} · ${backfill} · Jev calls today ${list.jevCallsToday}/${list.jevDailyCap}${list.sortingTurn ? " · a running turn isn't sorted yet" : ""}`);
+  lines.push(`${list.threadId} · ${list.enabled ? "strands on" : "strands off (they run in a Bot's conversations)"} · ${backfill} · Jev calls today ${list.jevCallsToday}/${list.jevDailyCap}${list.sortingTurn ? " · a running turn isn't sorted yet" : ""}`);
   if (!list.strands.length && !list.earlier.length) {
     lines.push("No strands yet.");
   } else {
@@ -58,12 +58,32 @@ export function formatStrands(list: StrandList, items: readonly StrandItemView[]
  * Bot's Main; the user's terminal (no calling thread) any Bot's Main. Null
  * when the ref isn't one of those.
  */
-export function strandsThreadFor(ref: string | null, caller: string | null, mains: readonly string[], botMainFor: (threadId: string) => string | null): string | null {
-  const own = caller ? botMainFor(caller) : null;
-  const allowed = caller ? (own && mains.includes(own) ? [own] : []) : [...mains];
-  const wanted = ref && ref !== "main" ? ref.replace(/^@?thread:/, "") : null;
-  if (wanted) return allowed.includes(wanted) ? wanted : null;
-  return allowed[0] ?? null;
+export interface StrandsScope {
+  /** Strands run in this conversation. */
+  enabled(threadId: string): boolean;
+  /** The Bot a thread belongs to (a conversation, or a worker of one). */
+  botOf(threadId: string): string | null;
+  mainOf(botId: string): string | null;
+  /** The primary Bot's Main, for the user's terminal. */
+  defaultMain(): string | null;
+}
+
+/**
+ * Which conversation `bb studio strands [ref]` shows. An agent sees only its
+ * own Bot's conversations: with no ref its own conversation (a worker: its
+ * Bot's Main); "main" is its Bot's Main. The user's terminal (no calling
+ * thread) sees any; with no ref, the primary Bot's Main. Null when not allowed.
+ */
+export function strandsThreadFor(ref: string | null, caller: string | null, scope: StrandsScope): string | null {
+  const named = ref && ref !== "main" ? ref.replace(/^@?thread:/, "") : null;
+  if (!caller) {
+    const wanted = named ?? scope.defaultMain();
+    return wanted && scope.enabled(wanted) ? wanted : null;
+  }
+  const bot = scope.botOf(caller);
+  if (!bot) return null;
+  const wanted = named ?? (ref === "main" ? scope.mainOf(bot) : scope.enabled(caller) ? caller : scope.mainOf(bot));
+  return wanted && scope.enabled(wanted) && scope.botOf(wanted) === bot ? wanted : null;
 }
 
 export async function runStrandsCli(argv: readonly string[], deps: StrandsCliDeps): Promise<{ exitCode: number; stdout?: string; stderr?: string }> {

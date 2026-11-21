@@ -17,6 +17,8 @@ export const strandAsk = z.object({
   label: z.string(),
   /** An approval's full details before its buttons: the whole command, working folder, actions and session grant. */
   details: z.array(z.string()),
+  /** The conversation's turn it waits in: under a filter for another strand, that turn stays in view. Null for a worker's ask. */
+  turnId: z.string().nullable().default(null),
   /** An approval's choices (BB's own), for its buttons. */
   decisions: z.array(z.enum(["allow_once", "allow_for_session", "deny"])),
 });
@@ -33,6 +35,9 @@ export const strandView = z.object({
   asks: z.array(strandAsk),
   workers: z.array(z.object({ threadId: z.string(), title: z.string(), status: workerStatus })),
   lastAt: z.number(),
+  /** Its first message's time and seq (a filter pages back to it); null when it has none yet. */
+  firstAt: z.number().nullable(),
+  firstSeq: z.number().nullable(),
   /** The strand's newest message (jump-to-latest opens #msg=<seq>); null when it has none (a task with no message yet). */
   latestSeq: z.number().nullable(),
   latestTurnId: z.string().nullable(),
@@ -46,7 +51,7 @@ export type StrandView = z.infer<typeof strandView>;
 
 export const strandList = z.object({
   threadId: z.string(),
-  /** Strands are on for this conversation (phase 1: a Bot's Main). */
+  /** Strands are on for this conversation (any Bot's conversation, Main included; not workers). */
   enabled: z.boolean(),
   backfill: z.object({ done: z.boolean(), at: z.number().nullable(), messages: z.number(), sorted: z.number() }),
   jevCallsToday: z.number(),
@@ -73,6 +78,19 @@ export const strandItemView = z.object({
 });
 export type StrandItemView = z.infer<typeof strandItemView>;
 
+export const overviewConversation = z.object({
+  threadId: z.string(),
+  title: z.string(),
+  isMain: z.boolean(),
+  lastActiveAt: z.number(),
+  /** Its strands that aren't in Earlier, needs you first. */
+  strands: z.array(strandView),
+});
+export type OverviewConversation = z.infer<typeof overviewConversation>;
+
+const strandId = z.string().min(1).max(200);
+const ok = z.object({ ok: z.boolean() });
+
 export const rpcContract = defineRpcContract({
   "strands.list": {
     experimental_description: "A conversation's strands (its lines of work) with live states.",
@@ -92,6 +110,46 @@ export const rpcContract = defineRpcContract({
       tags: z.array(z.object({ turnId: z.string(), seq: z.number(), strandId: z.string().nullable() })),
       strands: z.array(z.object({ id: z.string(), title: z.string() })),
     }),
+  },
+  "strands.overview": {
+    experimental_description: "Every conversation of a Bot with open strands, needs you first: the overview beside the Tasks page.",
+    input: z.object({ botId: z.string().min(1).max(200) }).strict(),
+    output: z.object({ conversations: z.array(overviewConversation), needs: z.number(), running: z.number() }),
+  },
+  "strands.move": {
+    experimental_description: "Move a message's turn to another strand (the user's choice; never re-sorted).",
+    input: z.object({ threadId, seq: z.number().int().min(0), strandId }).strict(),
+    output: ok,
+  },
+  "strands.split": {
+    experimental_description: "New strand from here: this message's turn and the later ones in its strand start a strand of their own.",
+    input: z.object({ threadId, seq: z.number().int().min(0) }).strict(),
+    output: z.object({ ok: z.boolean(), strandId: z.string().nullable() }),
+  },
+  "strands.rename": {
+    experimental_description: "Rename a strand (the user's name; the model never renames it).",
+    input: z.object({ strandId, title: z.string().trim().min(1).max(80) }).strict(),
+    output: ok,
+  },
+  "strands.pin": {
+    experimental_description: "Pin a strand (it never goes to Earlier) or unpin it.",
+    input: z.object({ strandId, pinned: z.boolean() }).strict(),
+    output: ok,
+  },
+  "strands.merge": {
+    experimental_description: "Fold one strand into another of the same conversation.",
+    input: z.object({ strandId, into: strandId }).strict(),
+    output: ok,
+  },
+  "strands.unmerge": {
+    experimental_description: "Undo a merge: the strand and its items come back.",
+    input: z.object({ strandId }).strict(),
+    output: ok,
+  },
+  "strands.unmove": {
+    experimental_description: "Undo a message's last move: its turn goes back to the strand it was in.",
+    input: z.object({ threadId, seq: z.number().int().min(0) }).strict(),
+    output: ok,
   },
   "strands.opened": {
     experimental_description: "The user opened a strand: what finished in it since counts as seen.",

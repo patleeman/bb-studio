@@ -13,6 +13,8 @@ export const ENSURED_COLUMNS: Readonly<Record<string, readonly (readonly [string
   // The model a Bot's Main last ran on (src/bot.ts), saved whenever Studio reads it, so a new
   // Main can start on it after the old one is deleted and can't be read any more.
   bots: [["main_provider_id", "TEXT"], ["main_model", "TEXT"], ["main_reasoning", "TEXT"]],
+  // The strand an item was in before the user's (or a merge's) last move, so it can be undone (src/strands/store.ts).
+  strand_items: [["prev_strand_id", "TEXT"]],
 };
 
 /** Adds each missing column (a table that isn't there yet is left alone); returns what it added. */

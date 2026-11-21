@@ -218,12 +218,12 @@ describe("the backfill and the conversations strands run in", () => {
     expect(x.modelCalls.filter((prompt) => prompt.includes("Propose at most"))).toHaveLength(1);
   });
 
-  it("does nothing for a thread that isn't a Bot's Main, and reads nothing back for one", async () => {
+  it("does nothing for a thread that isn't a Bot's conversation (a worker), and reads nothing back for one", async () => {
     const db = database();
     const thread = new FakeThread("thr_other");
     thread.turn("Look at the router", "Ok.");
     const svc = new StrandService({
-      db, conversations: () => ["thr_main"], events: thread.events, jev: fakeJev(), model: fakeModel(), changed: () => {}, log: () => {},
+      db, conversation: (id) => (id === "thr_main" ? { botId: "bot", lastActiveAt: START } : null), conversationsOf: async () => [], events: thread.events, jev: fakeJev(), model: fakeModel(), changed: () => {}, log: () => {},
       setTimer: () => null, clearTimer: () => {}, workers: async () => [], interactions: async () => [], busy: async () => false,
     });
     await svc.idle("thr_other", true);
@@ -234,16 +234,26 @@ describe("the backfill and the conversations strands run in", () => {
     expect(svc.tags("thr_other")).toEqual({ tags: [], strands: [] });
   });
 
-  it("lets an agent's `bb studio strands` see only its own Bot's Main", () => {
-    const mains = ["thr_main_a", "thr_main_b"];
-    const botMainFor = (threadId: string) => (threadId.startsWith("thr_a") || threadId === "thr_main_a" ? "thr_main_a" : threadId.startsWith("thr_b") ? "thr_main_b" : null);
-    expect(strandsThreadFor(null, "thr_a_worker", mains, botMainFor)).toBe("thr_main_a");
-    expect(strandsThreadFor("thr_main_b", "thr_a_worker", mains, botMainFor)).toBeNull();
-    expect(strandsThreadFor("main", "thr_b_chat", mains, botMainFor)).toBe("thr_main_b");
-    expect(strandsThreadFor(null, "thr_nobody", mains, botMainFor)).toBeNull();
-    // The user's terminal: any Bot's Main.
-    expect(strandsThreadFor("thr_main_b", null, mains, botMainFor)).toBe("thr_main_b");
-    expect(strandsThreadFor("thr_elsewhere", null, mains, botMainFor)).toBeNull();
+  it("lets an agent's `bb studio strands` see only its own Bot's conversations", () => {
+    // Bot a: Main thr_main_a, conversation thr_a_chat, worker thr_a_worker. Bot b: Main thr_main_b, conversation thr_b_chat.
+    const conversations = new Set(["thr_main_a", "thr_a_chat", "thr_main_b", "thr_b_chat"]);
+    const scope = {
+      enabled: (id: string) => conversations.has(id),
+      botOf: (id: string) => (id.includes("_a") ? "a" : id.includes("_b") ? "b" : null),
+      mainOf: (bot: string) => `thr_main_${bot}`,
+      defaultMain: () => "thr_main_a",
+    };
+    expect(strandsThreadFor(null, "thr_a_chat", scope)).toBe("thr_a_chat");
+    expect(strandsThreadFor(null, "thr_a_worker", scope)).toBe("thr_main_a");
+    expect(strandsThreadFor("main", "thr_a_chat", scope)).toBe("thr_main_a");
+    expect(strandsThreadFor("thr_a_chat", "thr_a_worker", scope)).toBe("thr_a_chat");
+    expect(strandsThreadFor("thr_b_chat", "thr_a_worker", scope)).toBeNull();
+    expect(strandsThreadFor("thr_main_b", "thr_a_chat", scope)).toBeNull();
+    expect(strandsThreadFor(null, "thr_nobody", scope)).toBeNull();
+    // The user's terminal: any Bot's conversation; with none named, the primary Bot's Main.
+    expect(strandsThreadFor("thr_b_chat", null, scope)).toBe("thr_b_chat");
+    expect(strandsThreadFor(null, null, scope)).toBe("thr_main_a");
+    expect(strandsThreadFor("thr_a_worker", null, scope)).toBeNull();
   });
 });
 

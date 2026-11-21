@@ -23,7 +23,7 @@ it("FM (migration): a database where another branch already used the next migrat
   // Back on this build: the migrations load (no index of ours collides), and the columns are added by checking.
   expect(() => bb.storage.migrate(db, MIGRATIONS)).not.toThrow();
   expect(columns(db)).not.toContain("main_model");
-  expect(ensureColumns(db)).toEqual(["bots.main_provider_id", "bots.main_model", "bots.main_reasoning"]);
+  expect(ensureColumns(db)).toEqual(["bots.main_provider_id", "bots.main_model", "bots.main_reasoning", "strand_items.prev_strand_id"]);
   expect(columns(db)).toEqual(expect.arrayContaining(["main_provider_id", "main_model", "main_reasoning"]));
   // Every start: nothing more to add, nothing thrown.
   expect(ensureColumns(db)).toEqual([]);
@@ -34,7 +34,7 @@ it("FM (migration): a database that already has the columns (an earlier build's 
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   db.exec("ALTER TABLE bots ADD COLUMN main_provider_id TEXT; ALTER TABLE bots ADD COLUMN main_model TEXT;");
-  expect(ensureColumns(db)).toEqual(["bots.main_reasoning"]);
+  expect(ensureColumns(db)).toEqual(["bots.main_reasoning", "strand_items.prev_strand_id"]);
 });
 
 it("leaves a table that isn't there yet alone", async () => {

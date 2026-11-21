@@ -23,7 +23,7 @@ export { resumeWord } from "../bot/bot-state";
 export const STUDIO_ROOT_PATH = "/plugins/studio/studio";
 export const AUTOMATIONS_PATH = "/plugins/studio/automations";
 
-export type SpacePage = "memory" | "skills" | "library" | "automations" | "todos" | "conversations";
+export type SpacePage = "memory" | "skills" | "library" | "automations" | "todos" | "strands" | "conversations";
 
 /** Which of the Bot's pages the main view shows, if any. */
 export function spacePageAt(pathname: string): SpacePage | null {
@@ -33,6 +33,7 @@ export function spacePageAt(pathname: string): SpacePage | null {
   if (/^\/plugins\/studio\/studio\/skills(?:\/|$)/.test(path)) return "skills";
   if (path === AUTOMATIONS_PATH || path.startsWith(`${AUTOMATIONS_PATH}/`)) return "automations";
   if (/^\/plugins\/studio\/studio\/bot\/[^/]+\/loops$/.test(path)) return "todos";
+  if (/^\/plugins\/studio\/studio\/bot\/[^/]+\/strands$/.test(path)) return "strands";
   if (/^\/plugins\/studio\/studio\/conversations(?:\/|$)/.test(path)) return "conversations";
   return null;
 }
@@ -79,7 +80,7 @@ export interface SpaceMenu {
   newBot(): void;
 }
 
-export function SpaceHeader({ bot, line, resume = null, chooseModel = false, glass, page, todos, onPage, menu }: {
+export function SpaceHeader({ bot, line, resume = null, chooseModel = false, glass, page, todos, strands = null, onPage, menu }: {
   /** Its new Main can't start for want of a model: Choose a model after the line opens its Default model. */
   chooseModel?: boolean;
   bot: BotSpace | null;
@@ -91,13 +92,15 @@ export function SpaceHeader({ bot, line, resume = null, chooseModel = false, gla
   page: SpacePage | null;
   /** Todos' count, or null where the Bot has no Todos page. */
   todos: number | null;
+  /** The strands overview's needs-you count, or null when the overview is off (Settings → Strands overview). */
+  strands?: number | null;
   onPage(page: SpacePage): void;
   menu: SpaceMenu;
 }) {
   // Each row drags as its page (src/tab-kinds.ts), for the workbench: a drop opens that page as a tab.
   const row = (id: SpacePage, label: string, glyph: ReactNode, extra?: ReactNode) => (
     <button key={id} type="button" data-testid={`space-page-${id}`} aria-current={page === id || (id === "todos" && page === "automations") ? "page" : undefined} onClick={() => onPage(id)} className={PAGE_ROW}
-      {...dragSourceProps(bot ? refDragItem({ kind: (id === "conversations" ? "archive" : id) satisfies TabKindId, id: bot.id }, label) : null)}>
+      {...dragSourceProps(bot && id !== "strands" ? refDragItem({ kind: (id === "conversations" ? "archive" : id) satisfies TabKindId, id: bot.id }, label) : null)}>
       <span aria-hidden className="flex w-4 shrink-0 justify-center text-muted-foreground">{glyph}</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {extra}
@@ -136,6 +139,7 @@ export function SpaceHeader({ bot, line, resume = null, chooseModel = false, gla
           ? row("todos", "Tasks", <Icon name="ListTodo" className="size-4" />, todos > 0 ? <span data-testid="space-todos-count" className="shrink-0 text-xs tabular-nums text-warning">{todos}</span> : null)
           : bot && !bot.primary ? row("automations", "Scheduled", <Icon name="Clock" className="size-4" />)
             : row("automations", "Tasks", <Icon name="ListTodo" className="size-4" />)}
+        {strands !== null ? row("strands", "Strands", <Icon name="LayoutList" className="size-4" />, strands > 0 ? <span data-testid="space-strands-count" className="shrink-0 text-xs tabular-nums text-warning">{strands}</span> : null) : null}
         {row("conversations", "Conversations", <Icon name="studio/conversations" className="size-4" />)}
       </nav>
     </header>

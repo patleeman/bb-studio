@@ -27,6 +27,9 @@ export const STRANDS_CALLER = "strands";
 export const JEV_DAILY_CAP = 300;
 /** Small-model calls (naming, summaries, batch sorting, the backfill's proposal) per conversation per day. */
 export const MODEL_DAILY_CAP = 40;
+/** The same, across every conversation together. */
+export const JEV_TOTAL_DAILY_CAP = 3_000;
+export const MODEL_TOTAL_DAILY_CAP = 300;
 /** Jev gets this long per call before it counts as a failure. */
 export const JEV_TIMEOUT_MS = 15_000;
 /** After this many Jev failures in a row (errors, timeouts), back off: twice as long each time, up to an hour. */
@@ -131,6 +134,8 @@ export class StrandDetector {
   runningStrand(threadId: string): string | null { return this.running.get(threadId)?.strandId ?? null; }
   /** Whether a running turn is known for the conversation (read but not finished). */
   hasRunningTurn(threadId: string): boolean { return this.running.has(threadId); }
+  /** The seq of the conversation's running turn's message, once read. */
+  runningSeq(threadId: string): number | null { return this.running.get(threadId)?.seq ?? null; }
 
   // ---- live sorting ----
 
@@ -256,7 +261,7 @@ export class StrandDetector {
     }
     if (this.now() < this.jevDownUntil) { this.batchSoon(threadId); return put(previous, "pending", null); }
     if (this.now() < this.jevBackoffUntil) return put(previous, "fallback", null);
-    if (!this.store.takeCall(threadId, "jev", dayOf(this.now()), JEV_DAILY_CAP)) return put(previous, "fallback", null);
+    if (!this.store.takeCall(threadId, "jev", dayOf(this.now()), JEV_DAILY_CAP, JEV_TOTAL_DAILY_CAP)) return put(previous, "fallback", null);
     const question = turnQuestion({ text: turn.text, reply: turn.reply }, this.openStrands(threadId, previous), previous);
     const result = await this.askJev({ caller: STRANDS_CALLER, state: question.state, questions: question.questions });
     if (!result.ok) {
@@ -291,7 +296,7 @@ export class StrandDetector {
    */
   private async askNaming(threadId: string, requestId: string, prompt: string): Promise<ModelResult | null> {
     if (this.deps.completeText) {
-      if (!this.store.takeCall(threadId, "model", dayOf(this.now()), MODEL_DAILY_CAP)) return null;
+      if (!this.store.takeCall(threadId, "model", dayOf(this.now()), MODEL_DAILY_CAP, MODEL_TOTAL_DAILY_CAP)) return null;
       const quick = await this.deps.completeText({ prompt }).catch((error) => ({ ok: false as const, error: message(error) }));
       const json = quick.ok ? jsonIn(quick.text) : null;
       if (quick.ok && json && typeof json === "object") return { ok: true, text: quick.text };
@@ -301,7 +306,7 @@ export class StrandDetector {
 
   /** One small-model call, counted against the conversation's daily cap; null when the cap is reached. */
   private async askModel(threadId: string, requestId: string, prompt: string): Promise<ModelResult | null> {
-    if (!this.store.takeCall(threadId, "model", dayOf(this.now()), MODEL_DAILY_CAP)) return null;
+    if (!this.store.takeCall(threadId, "model", dayOf(this.now()), MODEL_DAILY_CAP, MODEL_TOTAL_DAILY_CAP)) return null;
     return this.deps.model({ threadId, requestId, prompt }).catch((error): ModelResult => ({ ok: false, unavailable: false, error: message(error) }));
   }
 
@@ -336,7 +341,7 @@ export class StrandDetector {
     const refresh = named.filter((strand) => strand.lastAt > (strand.summaryAt ?? 0) && now - (strand.summaryAt ?? 0) >= SUMMARY_EVERY_MS).slice(0, REFRESH_PER_CALL);
     if (!fresh.length && !refresh.length) return;
     // Out of today's small-model calls: names wait for tomorrow (no try is counted).
-    if (!this.store.callsLeft(threadId, "model", dayOf(now), MODEL_DAILY_CAP)) return;
+    if (!this.store.callsLeft(threadId, "model", dayOf(now), MODEL_DAILY_CAP, MODEL_TOTAL_DAILY_CAP)) return;
     this.store.saveRead(threadId, { namedAt: now });
     const lines = (strand: Strand, newest: boolean) => (newest ? this.store.newest(strand.id, threadId, 3) : this.store.first(strand.id, threadId, 3)).map((item) => item.line ?? "").filter(Boolean);
     const prompt = namingPrompt({
@@ -462,7 +467,7 @@ export class StrandDetector {
       const batch = done.slice(start, start + BATCH);
       const open = this.openStrands(threadId, previous, 30);
       const messages: Message[] = batch.map((turn) => ({ text: turn.text, reply: turn.reply }));
-      const jevUp = this.now() >= this.jevDownUntil && this.now() >= this.jevBackoffUntil && this.store.takeCall(threadId, "jev", dayOf(this.now()), JEV_DAILY_CAP);
+      const jevUp = this.now() >= this.jevDownUntil && this.now() >= this.jevBackoffUntil && this.store.takeCall(threadId, "jev", dayOf(this.now()), JEV_DAILY_CAP, JEV_TOTAL_DAILY_CAP);
       const asked = jevUp ? batchQuestions(messages, open) : null;
       const result: JevResult | null = asked ? await this.askJev({ caller: STRANDS_CALLER, state: asked.state, questions: asked.questions }) : null;
       if (asked && result) report.jevCalls++;

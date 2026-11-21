@@ -76,7 +76,8 @@ function service(options: { workers?: WorkerFact[]; asks?: Record<string, (Inter
   const db = database();
   const thread = new FakeThread();
   const svc = new StrandService({
-    db, conversations: () => [thread.id], events: thread.events, jev: fakeJev(), model: fakeModel(), changed: () => {}, log: () => {}, now: () => NOW,
+    db, conversation: (id) => (id === thread.id ? { botId: "bot", lastActiveAt: NOW } : null),
+    conversationsOf: async () => [{ threadId: thread.id, title: "Main", isMain: true, lastActiveAt: NOW }], events: thread.events, jev: fakeJev(), model: fakeModel(), changed: () => {}, log: () => {}, now: () => NOW,
     setTimer: () => null, clearTimer: () => {},
     workers: async () => options.workers ?? [], interactions: async (threadId) => options.asks?.[threadId] ?? [], busy: async () => options.busy ?? false,
   });
@@ -124,8 +125,8 @@ describe("strands.list", () => {
     asks.thr_worker = [{ id: "int_2", status: "pending", payload: { kind: "user_question", questions: [{ prompt: "Which fallback model?" }] } as never }];
     const list = await x.svc.list(x.thread.id);
     expect(list.strands.map((each) => [each.title, each.state])).toEqual([["Book the dentist", "needs-you"], ["Look at the router", "needs-you"]]);
-    expect(list.strands[0]!.asks).toEqual([{ id: "int_1", kind: "approval", threadId: "thr_main", label: "Approve: npm publish", details: ["Command: npm publish"], decisions: ["deny", "allow_once"] }]);
-    expect(list.strands[1]!.asks).toEqual([{ id: "int_2", kind: "question", threadId: "thr_worker", label: "Router fix: Which fallback model?", details: [], decisions: [] }]);
+    expect(list.strands[0]!.asks).toEqual([{ id: "int_1", kind: "approval", threadId: "thr_main", label: "Approve: npm publish", details: ["Command: npm publish"], decisions: ["deny", "allow_once"], turnId: expect.any(String) }]);
+    expect(list.strands[1]!.asks).toEqual([{ id: "int_2", kind: "question", threadId: "thr_worker", label: "Router fix: Which fallback model?", details: [], decisions: [], turnId: null }]);
   });
 
   it("puts a worker's completion notice into the worker's strand, without asking Jev", async () => {

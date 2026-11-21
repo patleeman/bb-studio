@@ -1502,7 +1502,7 @@ is the Bot's short handoff, starting
 "Continued from @thread:<source>#msg=<your last message>". Nothing is forked
 and no transcript is copied. The listed work cards move: their `threadId`
 becomes the new conversation and their message anchor is cleared, so they
-leave the source's In flight list and appear in the new one. The new
+belong to the new one. The new
 conversation's first reply re-posts each `::work{id}` line, which re-anchors
 it. The old card in the source message still redraws live.
 
@@ -4350,6 +4350,59 @@ The header no longer has a **Chat** button. Pages keeps its page-chat history.
 Old draft keys and quote storage are retained.
 
 ![Studio item chat: a staged image on the left, and in a split beside it a new-thread composer quoting a cropped area of it, with a note and an attached file](assets/chat-preview.png)
+
+## Strands
+
+Each of a Bot's conversations (Main included, not workers) is sorted into
+strands: its separate lines of work (`src/strands`). When a turn finishes,
+Jev puts it into an open strand, a new one, or none (thanks, ok); the chat
+never waits. A turn that asks you something, or runs past 30 seconds, is
+sorted early. New strands start with the message's first line as their name;
+BB's one-line model call (or Decisions' model) names them in batches: 1 to 4
+words, a concrete noun phrase, unique in the conversation, kept once given.
+At most 300 Jev calls and 40 model calls per conversation per day, and
+3,000 and 300 across every conversation. Secrets
+are taken out of everything sent to Jev or the model, and out of what is kept.
+
+A conversation is backfilled once, when you open it or a turn ends there, if
+it was active in the last 14 days: its newest 300 messages from you, and its
+open agent tasks as strands. One conversation at a time, the most recently
+active first. A failed backfill (the host not connected, say) waits 5
+minutes before the next try, twice as long each time up to an hour.
+
+States come only from real signals: needs you (a pending question or
+approval, a worker that needs you, a Tool Gateway request), running (its turn
+or a worker), finished (a worker ended since you opened the strand), waiting
+(a linked task waits on CI or someone outside), quiet after 24 hours, and
+Earlier after 3 more quiet days unless pinned.
+
+- **The box above the composer** (In flight's old place): one line by
+  default, the current strand, what it is about (its summary) and the counts
+  ("1 need you · 2 running"); amber only for need you. It expands in place
+  into a filter field: type to narrow the strands by name and summary,
+  grouped needs you, active and quiet, each with its summary and an ask's
+  whole command and buttons. Picking one applies it as a filter (a token with
+  ×; Esc clears it, and the conversation scrolls back exactly where it was).
+  A message still waiting for your answer in another strand stays in view,
+  its tag saying "from" that strand. On a BB with the timeline filter (desktop with
+  `slots.experimental_timelineFilter`), the timeline shows only that strand's
+  messages, with folded and grouped rows open, and loads back to its first
+  message; an older BB dims the other messages instead. Nothing open, no box.
+- **Above each message**: a divider with the strand's name where the strand
+  changes, else the name, muted. On hover, **Move to…** moves the message's
+  turn to another strand, or **New strand from here** starts one with it and
+  the later messages of its strand. Your moves are never re-sorted, and a
+  move can be undone for 10 seconds.
+- **The Strands tab** in the workbench: each strand as a card with its name,
+  summary, state, messages, first and last activity, workers and any ask's
+  buttons. Clicking a card filters the conversation to it; its ⋯ renames,
+  pins or merges it; a merge asks first and can be undone for 10 seconds.
+- **The overview** (Settings → Strands overview, off by default): a Strands
+  page beside Tasks with every conversation's open strands, needs you first.
+
+`bb studio strands [<conversation>|main] [--items <n>] [--sort] [--json]`
+shows how a conversation was sorted. An agent sees only its own Bot's
+conversations.
 
 ## Model router
 

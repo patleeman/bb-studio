@@ -203,7 +203,7 @@ File not found.
   there: **Decisions**, **Open questions**, the links and cards that matter
   (`bb://page/pg_…`, `@thread:thr_…`). It is not the transcript; no history is
   copied. `workCards` are this conversation's `wc_…` cards for the topic:
-  they move to the new conversation and leave this one's In flight list.
+  they move to the new conversation.
   `openingMessage` says what the new conversation does first. Studio starts
   a conversation of the same Bot whose first message is the handoff, linked
   back to the user's last message here. Put the returned `post` text in your
@@ -287,9 +287,7 @@ job, keep it updated, and hand it over instead of posting status messages.
 
 - `task_create { title, card: true, … }` returns a `::work{id="…"}` line.
   Post it once, on its own line, in the conversation where the user follows
-  the work. The card stays where it was posted and redraws from live state;
-  the conversation's In flight list above the composer has a row for it, and
-  a click on the row scrolls back to the card.
+  the work. The card stays where it was posted and redraws from live state.
 - `task_update { id, state?, step?, line?, needs? }` changes it in place:
   step is short ("3/5 Tests"); line is the latest one-liner; needs says what
   the user must do. Don't post a new message for progress; update the
@@ -297,10 +295,7 @@ job, keep it updated, and hand it over instead of posting status messages.
 - Starting a worker: make its task first (`task_create` with `workers:
   ["<worker>"]` once you know it) and put `task:<id>` in the worker's first
   message, so it updates the task, and so the card, itself.
-- A done or failed card leaves the In flight list a day after it finished.
-  The list folds finished cards into one "N done" line under the live ones;
-  the user can clear them with Clear done or remove one row with its ×. The
-  card stays in the transcript.
+- A done or failed card stays in the transcript as it finished.
 - A worker card still running when its worker thread ends its turn, fails or
   is archived shows as ended without a final update (`state: "done"`,
   `stale: true`). Your next update to the card takes over, so finish your

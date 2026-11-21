@@ -1,8 +1,13 @@
-// Strands for Studio (phase 1: a Bot's Main, read-only): the detector fed
-// from BB's thread events, the live signals each read is worked out from,
-// and the RPCs the workbench tab, the composer strip and the message tags read.
+// Strands for Studio, in every Bot conversation (Main included, not workers):
+// the detector fed from BB's thread events, the live signals each read is
+// worked out from, the user's edits (move, new strand from here, rename,
+// pin, merge), and the RPCs the strip, the message tags, the Strands tab and
+// the overview read. A conversation is backfilled lazily (opened, or a turn
+// finished), only when it was active in the last 14 days, one at a time,
+// the most recently active first.
 import type Database from "better-sqlite3";
-import { type StrandItemView, type StrandList, type StrandView } from "./contract";
+import { type OverviewConversation, type StrandItemView, type StrandList, type StrandView } from "./contract";
+import { firstLineTitle } from "./naming";
 import { JEV_DAILY_CAP, StrandDetector, type DetectorDeps, type OpenTask } from "./detector";
 import { approvalDecisions, approvalLines, isWorkerApproval, shortApproval, type Interaction } from "../worker-approvals";
 import { byState, liveState, type AskSignal, type Signals, type TaskSignal, type WorkerSignal, type WorkerStatus } from "./states";
@@ -13,8 +18,10 @@ export interface WorkerFact { threadId: string; title: string; status: WorkerSta
 
 export interface StrandServiceDeps extends Omit<DetectorDeps, "store" | "openTasks"> {
   db: Database.Database;
-  /** The conversations strands run in (phase 1: each Bot's Main). */
-  conversations(): string[];
+  /** A conversation strands run in (a Bot's, Main included; not a worker, not archived): its Bot and last activity. Null for any other thread. */
+  conversation(threadId: string): { botId: string; lastActiveAt: number } | null;
+  /** A Bot's conversations, for the overview. */
+  conversationsOf(botId: string): Promise<{ threadId: string; title: string; isMain: boolean; lastActiveAt: number }[]>;
   /** The conversation's workers, with BB's status. */
   workers(threadId: string): Promise<WorkerFact[]>;
   /** Pending BB questions and approvals in a thread. */
@@ -44,9 +51,20 @@ export function askOf(interaction: Interaction & { createdAt?: number }, threadI
   return { id: interaction.id, kind: "question", strandId, threadId, label: prompt ? (prompt.length > 120 ? `${prompt.slice(0, 119)}…` : prompt) : "A question is waiting", details: [], decisions: [] };
 }
 
+/** A failed backfill waits this long before the next try, twice as long each time, up to an hour. */
+export const BACKFILL_RETRY_MS = 5 * 60 * 1000;
+export const BACKFILL_RETRY_MAX_MS = 60 * 60 * 1000;
+
+/** Only conversations active this recently are backfilled. */
+export const BACKFILL_ACTIVE_MS = 14 * 24 * 60 * 60 * 1000;
+
 export class StrandService {
   readonly store: StrandStore;
   readonly detector: StrandDetector;
+  private readonly backfillWanted = new Set<string>();
+  /** Conversations whose backfill failed: not tried again until `until` (5 minutes, doubling up to an hour). */
+  private readonly backfillFailed = new Map<string, { until: number; delay: number }>();
+  private backfilling: Promise<void> | null = null;
 
   constructor(private readonly deps: StrandServiceDeps) {
     this.store = new StrandStore(deps.db, deps.now);
@@ -60,27 +78,55 @@ export class StrandService {
   }
 
   private now() { return this.deps.now?.() ?? Date.now(); }
-  enabled(threadId: string): boolean { return this.deps.conversations().includes(threadId); }
+  enabled(threadId: string): boolean { return !!this.deps.conversation(threadId); }
 
   // ---- events ----
 
-  /** A turn finished (or failed): backfill first if it never ran, then sort. `settled`: BB said the thread is idle or failed. */
+  /** A turn finished (or failed): sort it, or backfill first if the conversation never was. `settled`: BB said the thread is idle or failed. */
   async idle(threadId: string, settled = false): Promise<void> {
     if (!this.enabled(threadId)) return;
-    if (this.detector.needsBackfill(threadId)) await this.detector.backfill(threadId);
+    if (this.detector.needsBackfill(threadId)) { await this.requestBackfill(threadId, true); return; }
     await this.detector.idle(threadId, settled);
+  }
+
+  /**
+   * Asks for a conversation's backfill (it was opened, or a turn just ended:
+   * `active`). Only one active in the last 14 days; one at a time, the most
+   * recently active first. Resolves when the queue it joined is done.
+   */
+  requestBackfill(threadId: string, active = false): Promise<void> {
+    const conversation = this.deps.conversation(threadId);
+    if (!conversation || !this.detector.needsBackfill(threadId)) return Promise.resolve();
+    if (!active && this.now() - conversation.lastActiveAt > BACKFILL_ACTIVE_MS) return Promise.resolve();
+    const failed = this.backfillFailed.get(threadId);
+    if (failed && this.now() < failed.until) return Promise.resolve();
+    this.backfillWanted.add(threadId);
+    this.backfilling ??= this.drain().finally(() => { this.backfilling = null; });
+    return this.backfilling;
+  }
+
+  private async drain(): Promise<void> {
+    while (this.backfillWanted.size) {
+      const next = [...this.backfillWanted].sort((a, b) => (this.deps.conversation(b)?.lastActiveAt ?? 0) - (this.deps.conversation(a)?.lastActiveAt ?? 0))[0]!;
+      this.backfillWanted.delete(next);
+      try {
+        await this.detector.backfill(next);
+        this.backfillFailed.delete(next);
+        await this.detector.idle(next);
+      } catch (error) {
+        if (!this.detector.needsBackfill(next)) continue;
+        // Wait before trying again (the host may be down); say so once, not on every open, signal and poll.
+        const before = this.backfillFailed.get(next);
+        const delay = before ? Math.min(before.delay * 2, BACKFILL_RETRY_MAX_MS) : BACKFILL_RETRY_MS;
+        this.backfillFailed.set(next, { until: this.now() + delay, delay });
+        if (!before) this.deps.log(`Strands: backfill of ${next} failed (${error instanceof Error ? error.message : String(error)}); trying again later, waiting longer each time.`);
+      }
+    }
   }
   active(threadId: string): void { if (this.enabled(threadId) && !this.detector.needsBackfill(threadId)) this.detector.active(threadId); }
   async asked(threadId: string): Promise<void> { if (this.enabled(threadId) && !this.detector.needsBackfill(threadId)) await this.detector.asked(threadId); }
   forget(threadId: string): void { this.store.forget(threadId); }
 
-  /** Backfills every enabled conversation that hasn't been, one at a time. */
-  async backfillAll(): Promise<void> {
-    for (const threadId of this.deps.conversations()) {
-      if (!this.detector.needsBackfill(threadId)) continue;
-      try { await this.detector.backfill(threadId); await this.detector.idle(threadId); } catch (error) { this.deps.log(`Strands: backfill of ${threadId} failed: ${error instanceof Error ? error.message : String(error)}`); }
-    }
-  }
 
   dispose(): void { this.detector.dispose(); }
 
@@ -97,7 +143,13 @@ export class StrandService {
     const runningStrandId = busy ? this.detector.runningStrand(threadId) : null;
     const workers: WorkerSignal[] = workerFacts.map((worker) => ({ ...worker, strandId: this.workerStrand(threadId, worker, busy) }));
     const turnStrand = (at: number) => (busy && this.detector.hasRunningTurn(threadId) ? runningStrandId : this.store.strandAt(threadId, at)?.strandId ?? null);
-    const asks: AskSignal[] = interactions.map((ask) => askOf(ask, threadId, turnStrand(ask.createdAt ?? now)));
+    // The turn an ask waits in: the running turn, else the newest sorted one at or before it.
+    const turnOf = (at: number) => {
+      const seq = busy && this.detector.hasRunningTurn(threadId) ? this.detector.runningSeq(threadId) : this.store.strandAt(threadId, at)?.seq ?? null;
+      if (seq === null) return null;
+      return (this.store.item(threadId, "user", seq) ?? this.store.item(threadId, "report", seq))?.turnId ?? null;
+    };
+    const asks: AskSignal[] = interactions.map((ask) => ({ ...askOf(ask, threadId, turnStrand(ask.createdAt ?? now)), turnId: turnOf(ask.createdAt ?? now) }));
     // A worker that needs the user: what it waits on, with its approval's choices.
     for (const worker of workers.filter((each) => each.status === "needs-you")) {
       const pending = await this.deps.interactions(worker.threadId).catch(() => []);
@@ -141,6 +193,8 @@ export class StrandService {
 
   async list(threadId: string): Promise<StrandList> {
     const enabled = this.enabled(threadId);
+    // Opened: backfill it in the background when it never was (and was active lately).
+    if (enabled && this.detector.needsBackfill(threadId)) void this.requestBackfill(threadId);
     const read = this.store.read(threadId);
     const backfill = read?.backfill ? (() => { try { return JSON.parse(read.backfill!) as { at?: number; messages?: number; sorted?: number }; } catch { return {}; } })() : null;
     const day = new Date(this.now()).toISOString().slice(0, 10);
@@ -156,11 +210,12 @@ export class StrandService {
     const rows = strands.map((strand) => ({ strand, live: liveState(strand, signals) }));
     const view = ({ strand, live }: { strand: Strand; live: ReturnType<typeof liveState> }): StrandView => {
       const latest = this.store.latest(strand.id, threadId);
+      const first = this.store.first(strand.id, threadId, 1)[0] ?? null;
       const count = counts.get(strand.id);
       return {
         id: strand.id, title: strand.title, summary: strand.summary, named: strand.named, state: live.state, detail: live.detail,
-        asks: live.asks.map(({ id, kind, threadId: askThread, label, details, decisions }) => ({ id, kind, threadId: askThread, label, details, decisions })), workers: live.workers,
-        lastAt: strand.lastAt, latestSeq: latest?.seq ?? null, latestTurnId: latest?.turnId ?? null, messages: count?.messages ?? 0, unsure: count?.unsure ?? 0,
+        asks: live.asks.map(({ id, kind, threadId: askThread, label, details, decisions, turnId }) => ({ id, kind, threadId: askThread, label, details, decisions, turnId: turnId ?? null })), workers: live.workers,
+        lastAt: strand.lastAt, firstAt: first?.at ?? null, firstSeq: first?.seq ?? null, latestSeq: latest?.seq ?? null, latestTurnId: latest?.turnId ?? null, messages: count?.messages ?? 0, unsure: count?.unsure ?? 0,
         pinned: strand.pinned, origin: strand.origin, taskId: strand.taskId,
       };
     };
@@ -185,6 +240,95 @@ export class StrandService {
       tags: rows.reverse().map((row) => ({ turnId: row.turn_id, seq: row.seq, strandId: row.strand_id })),
       strands: this.store.list(threadId).map((strand) => ({ id: strand.id, title: strand.title })),
     };
+  }
+
+  /** Every conversation of a Bot with strands showing (not only Earlier), needs you first, then the most recently active. */
+  async overview(botId: string): Promise<{ conversations: OverviewConversation[]; needs: number; running: number }> {
+    const since = this.now() - BACKFILL_ACTIVE_MS;
+    const candidates = (await this.deps.conversationsOf(botId))
+      .filter((conversation) => conversation.lastActiveAt >= since && this.store.list(conversation.threadId).length > 0)
+      .sort((a, b) => b.lastActiveAt - a.lastActiveAt);
+    const conversations: OverviewConversation[] = [];
+    for (const conversation of candidates) {
+      const list = await this.list(conversation.threadId);
+      if (list.strands.length) conversations.push({ ...conversation, strands: list.strands });
+    }
+    const needs = (row: OverviewConversation) => row.strands.filter((strand) => strand.state === "needs-you").length;
+    conversations.sort((a, b) => Number(needs(b) > 0) - Number(needs(a) > 0) || Number(b.isMain) - Number(a.isMain) || b.lastActiveAt - a.lastActiveAt);
+    return {
+      conversations,
+      needs: conversations.reduce((sum, row) => sum + needs(row), 0),
+      running: conversations.reduce((sum, row) => sum + row.strands.filter((strand) => strand.state === "running").length, 0),
+    };
+  }
+
+  // ---- the user's edits: their choice always wins ----
+
+  /** A strand of a conversation strands run in, else null. */
+  private own(strandId: string): ReturnType<StrandStore["get"]> {
+    const strand = this.store.get(strandId);
+    return strand && !strand.mergedInto && this.enabled(strand.threadId) ? strand : null;
+  }
+
+  /** Moves a message's turn to another strand of the same conversation. */
+  move(threadId: string, seq: number, strandId: string): boolean {
+    const to = this.own(strandId);
+    if (!to || to.threadId !== threadId || !this.store.item(threadId, "user", seq) && !this.store.item(threadId, "report", seq)) return false;
+    this.store.moveTurn(threadId, seq, to.id);
+    this.deps.changed(threadId);
+    return true;
+  }
+
+  /** New strand from here: this turn and the later ones in its strand. Named like any new strand (the user can rename it). */
+  split(threadId: string, seq: number): string | null {
+    if (!this.enabled(threadId)) return null;
+    const head = this.store.item(threadId, "user", seq) ?? this.store.item(threadId, "report", seq);
+    if (!head) return null;
+    const strand = this.store.create({ threadId, title: firstLineTitle(head.line ?? ""), origin: "user", seq, at: head.at });
+    this.store.moveTurn(threadId, seq, strand.id, !!head.strandId);
+    this.detector.nameSoon(threadId);
+    this.deps.changed(threadId);
+    return strand.id;
+  }
+
+  /** Undoes a merge: the strand and its items come back. */
+  unmerge(strandId: string): boolean {
+    const strand = this.store.get(strandId);
+    if (!strand?.mergedInto || !this.enabled(strand.threadId) || !this.store.unmerge(strand.id)) return false;
+    this.deps.changed(strand.threadId);
+    return true;
+  }
+
+  /** Undoes a message's last move: its turn goes back to the strand it was in. */
+  unmove(threadId: string, seq: number): boolean {
+    if (!this.enabled(threadId) || !this.store.unmoveTurn(threadId, seq)) return false;
+    this.deps.changed(threadId);
+    return true;
+  }
+
+  rename(strandId: string, title: string): boolean {
+    const strand = this.own(strandId);
+    const name = title.replace(/\s+/g, " ").trim().slice(0, 80);
+    if (!strand || !name) return false;
+    this.store.rename(strand.id, name);
+    this.deps.changed(strand.threadId);
+    return true;
+  }
+
+  pin(strandId: string, pinned: boolean): boolean {
+    const strand = this.own(strandId);
+    if (!strand) return false;
+    this.store.setPinned(strand.id, pinned);
+    this.deps.changed(strand.threadId);
+    return true;
+  }
+
+  merge(strandId: string, into: string): boolean {
+    const from = this.own(strandId);
+    const target = this.own(into);
+    if (!from || !target || from.threadId !== target.threadId || !this.store.merge(from.id, target.id, true)) return false;
+    this.deps.changed(from.threadId);
+    return true;
   }
 
   opened(strandId: string): boolean {

@@ -5,7 +5,7 @@ import type { StrandAsk, StrandList, StrandView } from "../contract";
 export type Tags = { tags: readonly { turnId: string; seq: number; strandId: string | null }[]; strands: readonly { id: string; title: string }[] };
 
 /** A message's tag: its turn's strand, and whether a divider goes above it (the strand changed since the last sorted turn). */
-export function tagOf(tags: Tags | null | undefined, turnId: string | null): { strandId: string; title: string; divider: boolean } | null {
+export function tagOf(tags: Tags | null | undefined, turnId: string | null): { strandId: string; title: string; divider: boolean; seq: number } | null {
   if (!tags || !turnId) return null;
   const at = tags.tags.findIndex((tag) => tag.turnId === turnId);
   const tag = at >= 0 ? tags.tags[at] : undefined;
@@ -14,7 +14,7 @@ export function tagOf(tags: Tags | null | undefined, turnId: string | null): { s
   if (!title) return null;
   let before: string | null = null;
   for (let index = at - 1; index >= 0; index--) { const strandId = tags.tags[index]!.strandId; if (strandId) { before = strandId; break; } }
-  return { strandId: tag.strandId, title, divider: before !== tag.strandId };
+  return { strandId: tag.strandId, title, divider: before !== tag.strandId, seq: tag.seq };
 }
 
 /** The strand's messages (each sorted turn's first seq), oldest first, for stepping through it. */
@@ -88,3 +88,41 @@ export function decisionButtons(ask: StrandAsk): { decision: StrandAsk["decision
 
 /** Whether the strands strip takes the In flight strip's place in this conversation. */
 export const stripShown = (list: StrandList | null | undefined) => !!list?.enabled && list.strands.length > 0;
+
+/** A strand's turns and its first message, from the conversation's tags (the newest 2,000 sorted turns). */
+export function turnsOfStrand(tags: Tags | null | undefined, strandId: string): { turnIds: string[]; firstSeq: number | null } {
+  const mine = (tags?.tags ?? []).filter((tag) => tag.strandId === strandId);
+  return { turnIds: mine.map((tag) => tag.turnId), firstSeq: mine.length ? mine[0]!.seq : null };
+}
+
+const fold = (text: string) => text.toLowerCase().normalize("NFKD").replace(/\p{M}/gu, "");
+
+/** Whether every word of the query starts a word of the strand's name or summary. */
+export function matchesStrand(strand: Pick<StrandView, "title" | "summary">, query: string): boolean {
+  const words = fold(query).split(/[^\p{L}\p{N}#]+/u).filter(Boolean);
+  if (!words.length) return true;
+  const hay = fold(`${strand.title} ${strand.summary ?? ""}`);
+  return words.every((word) => new RegExp(`(?:^|[^\\p{L}\\p{N}])${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "u").test(hay));
+}
+
+/** The box's list: needs you, active (running, finished, waiting, open), quiet; with a query, matches only, and Earlier's too. */
+export function boxGroups(list: StrandList | null | undefined, query: string): { label: string; strands: StrandView[] }[] {
+  const all = [...(list?.strands ?? []), ...(query.trim() ? list?.earlier ?? [] : [])].filter((strand) => matchesStrand(strand, query));
+  return [
+    { label: "Needs you", strands: all.filter((strand) => strand.state === "needs-you") },
+    { label: "Active", strands: all.filter((strand) => strand.state !== "needs-you" && strand.state !== "quiet") },
+    { label: "Quiet", strands: all.filter((strand) => strand.state === "quiet") },
+  ].filter((group) => group.strands.length);
+}
+
+/**
+ * A filter's turns: the strand's, plus each turn of this conversation still
+ * waiting for the user's answer in another strand (a pending question,
+ * approval or form stays in view, marked with its strand).
+ */
+export function filterTurnsOf(tags: Tags | null | undefined, list: StrandList | null | undefined, strandId: string, threadId: string): { turnIds: string[]; firstSeq: number | null } {
+  const own = turnsOfStrand(tags, strandId);
+  const waiting = (list?.strands ?? []).filter((strand) => strand.id !== strandId)
+    .flatMap((strand) => strand.asks.filter((ask) => ask.threadId === threadId && ask.turnId).map((ask) => ask.turnId!));
+  return { turnIds: [...new Set([...own.turnIds, ...waiting])], firstSeq: own.firstSeq };
+}

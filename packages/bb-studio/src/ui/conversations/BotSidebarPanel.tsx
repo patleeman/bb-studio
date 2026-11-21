@@ -44,6 +44,7 @@ import { currentBot, hasLanded, isLaunchPage, lastConversation, markLanded, newT
 import { MEMORY_SUBPATH } from "../../memory/shared";
 import { skillsPagePath } from "../skills/paths";
 import { loopsPath, useLoopsEnabled } from "../../loops/ui/hooks";
+import { strandsPath, useStrandsOverviewEnabled } from "../../strands/ui/overview-route";
 import { EditSpace } from "./EditSpace";
 import { setLinkActionHandler } from "../../links/actions";
 import { useMainViewRect } from "./EditSpaceStage";
@@ -370,6 +371,10 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   const todosOn = loopsOn && !!bot?.primary;
   const loops = useLive("loops.list", {}, { enabled: todosOn, pollMs: 60_000 });
   const todos = todosOn ? loops.data?.needsYouNow.length ?? 0 : null;
+  // The strands overview (Settings → Strands overview): its row shows the needs-you count.
+  const strandsOn = useStrandsOverviewEnabled() && !!bot;
+  const overview = useLive("strands.overview", { botId: bot?.id ?? "" }, { enabled: strandsOn, pollMs: 60_000 });
+  const strands = strandsOn ? overview.data?.needs ?? 0 : null;
   const openPage = (next: SpacePage) => {
     if (!bot) return;
     if (next === "memory") toPanel(`${MEMORY_SUBPATH}/${encodeURIComponent(bot.id)}`);
@@ -377,6 +382,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
     else if (next === "library") toPanel();
     else if (next === "automations") { navigate.toPluginPanel("automations"); onNavigate(); }
     else if (next === "conversations") toPanel(olderPath(bot.id));
+    else if (next === "strands") openAppPathTo(strandsPath(bot.id));
     else openAppPathTo(loopsPath(bot.id));
   };
   const openAppPathTo = (path: string) => { navigate.toPluginPanel("studio", { subPath: path.replace(/^\/plugins\/studio\/studio\/?/, "") }); onNavigate(); };
@@ -398,7 +404,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
     <nav aria-label={bot ? bot.name : "Bot"} data-testid="bot-sidebar" ref={navRef} onWheel={onWheel} className={glass ? GLASS_NAV : "studio-root relative flex min-h-full shrink-0 flex-col px-1.5"}>
       <NoDragStyle />
       <div data-testid="bot-sidebar-rows" {...(glass ? { "data-fork-overlay-scroll": "" } : {})} className={glass ? GLASS_ROWS : "contents"} style={glass ? { maskImage: ROWS_FADE, WebkitMaskImage: ROWS_FADE } : undefined}>
-      <SpaceHeader bot={bot} line={welcome.data?.pending && welcome.data.problem ? welcome.data.problem : botRow?.mainProblem ?? spaceLine(botRow, running)} resume={resumeWord(botRow)} chooseModel={!!botRow?.mainNeedsModel} glass={glass} page={page} todos={todos} onPage={openPage}
+      <SpaceHeader bot={bot} line={welcome.data?.pending && welcome.data.problem ? welcome.data.problem : botRow?.mainProblem ?? spaceLine(botRow, running)} resume={resumeWord(botRow)} chooseModel={!!botRow?.mainNeedsModel} glass={glass} page={page} todos={todos} strands={strands} onPage={openPage}
         menu={{
           resume: () => {
             if (!bot) return;
