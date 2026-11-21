@@ -230,6 +230,44 @@ export interface ExperimentalReplyClassifierRegistration {
 }
 
 /**
+ * A plugin's filter on a thread's timeline (see
+ * {@link ExperimentalTimelineFilterRegistration}). Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalTimelineFilter {
+  /**
+   * The turns to keep. Every other row (other turns, and rows with no turn
+   * id) is hidden, and everything collapsed in the kept rows opens: quiet
+   * replies draw in full, relayed and notice folds unfold, and step and
+   * command groups ("Ran N commands") open.
+   */
+  turnIds: readonly string[];
+  /**
+   * The sequence of the filter's first message (the event sequence, the
+   * same space as a timeline row's `sourceSeqStart`): older rows keep
+   * loading, one page at a time, until the loaded rows reach it or there
+   * are no older rows. Null: no paging.
+   */
+  firstSeq: number | null;
+}
+
+/**
+ * Registration for `slots.experimental_timelineFilter`: a plugin narrows a
+ * thread's timeline to some of its turns (Studio's strands). `get` runs
+ * while the thread view renders: cheap and pure, and the same object while
+ * the filter is unchanged. Registrations are asked in plugin-id order; the
+ * first that returns a filter wins. Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalTimelineFilterRegistration {
+  id: string;
+  /** The filter for a thread's timeline, or null for none. */
+  get(threadId: string): ExperimentalTimelineFilter | null;
+  /** Calls `listener` whenever any thread's filter changes; returns the unsubscribe. */
+  subscribe(listener: () => void): () => void;
+}
+
+/**
  * What bb knows about a message it asks a classifier about. `initiator` is
  * null for `part: "body"`. Experimental: see docs/api_to_audit.fork.md.
  */
@@ -904,6 +942,35 @@ export type ExperimentalHostSetting = "cli-skills";
 
 export type ExperimentalHostSettingsSection = "mobile";
 
+/**
+ * A part of bb's stack above a thread's composer a plugin can hide.
+ * `"active-child-threads"`: the Active child threads card's list of running
+ * children. A child waiting on the user still shows, with its question.
+ * `"thread-context"`: the thread context row (the parent thread, changed
+ * files, the pull request). An archived thread's or a removed workspace's
+ * row, with Unarchive or Restore, still shows. A plugin that hides it can
+ * draw the same row elsewhere with {@link ForkPluginSdkApp.experimental_ThreadContextSegments}.
+ */
+export type ExperimentalHostPromptStackEntry = "active-child-threads" | "thread-context";
+
+/**
+ * Which parts of the stack above the composer a plugin hides in one thread
+ * (see {@link ExperimentalHideHostEntriesRegistration.promptStackFor}).
+ * `get` must return the same array while nothing changed; `subscribe` is
+ * called with a listener to run when it may have.
+ */
+export interface ExperimentalPromptStackSource {
+  get(threadId: string): readonly ExperimentalHostPromptStackEntry[];
+  subscribe(listener: () => void): () => void;
+}
+
+/** Props of {@link ForkPluginSdkApp.experimental_ThreadContextSegments}: the thread, as the Info tab gives it. */
+export interface ExperimentalThreadContextSegmentsProps {
+  threadId: string;
+  projectId: string;
+  environment: { id: string } | null;
+}
+
 export interface ExperimentalHideHostEntriesRegistration {
   id: string;
   navigation?: readonly string[];
@@ -911,6 +978,10 @@ export interface ExperimentalHideHostEntriesRegistration {
   settings?: readonly ExperimentalHostSetting[];
   settingsSections?: readonly ExperimentalHostSettingsSection[];
   footer?: readonly string[];
+  /** Parts of the stack above every thread's composer (see {@link ExperimentalHostPromptStackEntry}). */
+  promptStack?: readonly ExperimentalHostPromptStackEntry[];
+  /** Parts of the stack above some threads' composers, thread by thread. */
+  promptStackFor?: ExperimentalPromptStackSource;
 }
 
 /**
@@ -1035,6 +1106,14 @@ export interface ForkPluginAppSlots {
    */
   experimental_replyClassifier(
     registration: ExperimentalReplyClassifierRegistration,
+  ): void;
+  /**
+   * Narrow a thread's timeline to some of its turns (see
+   * {@link ExperimentalTimelineFilterRegistration}). Experimental: see
+   * docs/api_to_audit.fork.md.
+   */
+  experimental_timelineFilter(
+    registration: ExperimentalTimelineFilterRegistration,
   ): void;
   /**
    * Add a section of the plugin's own rows to the sidebar, below the thread
@@ -1472,6 +1551,15 @@ export interface ForkPluginSdkApp {
    * see docs/api_to_audit.fork.md.
    */
   experimental_useContextCard(): ExperimentalContextCard;
+  /**
+   * bb's thread context row (the parent thread, changed files, the pull
+   * request: every `experimental_threadContextSegment`, with their actions
+   * and details) for one thread, drawn where the plugin puts it, for example
+   * an Info tab section of a plugin that hides it above the composer
+   * (`promptStack` `"thread-context"`). Nothing when no segment shows.
+   * Experimental: see docs/api_to_audit.fork.md.
+   */
+  experimental_ThreadContextSegments: ComponentType<ExperimentalThreadContextSegmentsProps>;
   /**
    * Open, close and style the plugin's own windows. Experimental: see
    * docs/api_to_audit.fork.md.

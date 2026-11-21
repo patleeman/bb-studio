@@ -13,10 +13,12 @@ import type {
   ExperimentalNewConversationRegistration,
   ExperimentalModelPickerGateRegistration,
   ExperimentalHideHostEntriesRegistration,
+  ExperimentalPromptStackSource,
   ExperimentalThreadBannerRegistration,
   ExperimentalThreadHeaderRegistration,
   ExperimentalPaletteSearchRegistration,
   ExperimentalReplyClassifierRegistration,
+  ExperimentalTimelineFilterRegistration,
   ExperimentalSidebarSectionPlacement,
   ExperimentalSidebarSectionRegistration,
   ExperimentalWindowRegistration,
@@ -51,6 +53,7 @@ export interface ForkSlotRegistrations {
   newTabItems: ExperimentalNewTabItemsRegistration[];
   commandPalettes: ExperimentalCommandPaletteRegistration[];
   appBackdrops: ExperimentalAppBackdropRegistration[];
+  timelineFilters: ExperimentalTimelineFilterRegistration[];
 }
 
 export const FORK_SLOT_KINDS = [
@@ -73,6 +76,7 @@ export const FORK_SLOT_KINDS = [
   "newTabItems",
   "commandPalettes",
   "appBackdrops",
+  "timelineFilters",
 ] as const satisfies readonly (keyof ForkSlotRegistrations)[];
 
 export function emptyForkSlots(): ForkSlotRegistrations {
@@ -96,6 +100,7 @@ export function emptyForkSlots(): ForkSlotRegistrations {
     newTabItems: [],
     commandPalettes: [],
     appBackdrops: [],
+    timelineFilters: [],
   };
 }
 
@@ -122,6 +127,7 @@ export function forkSlotMethods(
     newTabItems: new Set<string>(),
     commandPalette: new Set<string>(),
     appBackdrop: new Set<string>(),
+    timelineFilter: new Set<string>(),
   };
   return {
     experimental_sidebarSection(registration) {
@@ -156,6 +162,22 @@ export function forkSlotMethods(
         ...(registration.classifyMessage
           ? { classifyMessage: registration.classifyMessage }
           : {}),
+      });
+    },
+    experimental_timelineFilter(registration) {
+      const kind = "slots.experimental_timelineFilter";
+      const id = requireSlotId(kind, registration?.id);
+      requireUniqueId(kind, seenIds.timelineFilter, id);
+      if (typeof registration.get !== "function") {
+        throw new Error(`${kind} "${id}": get must be a function`);
+      }
+      if (typeof registration.subscribe !== "function") {
+        throw new Error(`${kind} "${id}": subscribe must be a function`);
+      }
+      collected.timelineFilters.push({
+        id,
+        get: registration.get,
+        subscribe: registration.subscribe,
       });
     },
     experimental_linkHandler(registration) {
@@ -333,6 +355,10 @@ export function forkSlotMethods(
           registration.settingsSections,
         ),
         footer: list("footer", registration.footer),
+        promptStack: list("promptStack", registration.promptStack),
+        ...(registration.promptStackFor === undefined
+          ? {}
+          : { promptStackFor: promptStackSource(kind, id, registration.promptStackFor) }),
       });
     },
     experimental_threadHeader(registration) {
@@ -499,4 +525,12 @@ function requireFunction<T>(kind: string, field: string, value: unknown): T {
     throw new Error(`${kind}: "${field}" must be a function`);
   }
   return value as T;
+}
+
+function promptStackSource(kind: string, id: string, source: unknown): ExperimentalPromptStackSource {
+  const value = source as Partial<ExperimentalPromptStackSource> | null;
+  if (typeof value?.get !== "function" || typeof value.subscribe !== "function") {
+    throw new Error(`${kind} "${id}": promptStackFor must have get and subscribe functions`);
+  }
+  return { get: value.get.bind(value), subscribe: value.subscribe.bind(value) };
 }

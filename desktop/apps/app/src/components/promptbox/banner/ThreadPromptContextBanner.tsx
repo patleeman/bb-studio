@@ -1,4 +1,5 @@
 import { REPLY_SECTION_COPY, REPLY_SECTION_ICON, type ParentRelationship } from "./parentRelationship.fork";
+import { useForkThreadContextRowHidden } from "@/components/fork/ForkPromptStack";
 import {
   experimental_THREAD_CONTEXT_SEGMENT_GROUPS,
   type ExperimentalThreadContextSegmentInput,
@@ -1179,6 +1180,7 @@ export function ThreadPromptContextBanner({
     () => onToggleSegment(PARENT_THREAD_KEY),
   );
   const context: CoreThreadContextValue = { ...core, parentFocus };
+  const forkRowHidden = useForkThreadContextRowHidden(input.threadId);
   if (isReadOnly) {
     const environmentGoneCopy = environmentGoneSection
       ? ENVIRONMENT_GONE_STATUS_COPY[environmentGoneSection.status]
@@ -1216,6 +1218,7 @@ export function ThreadPromptContextBanner({
       </CoreThreadContextContext.Provider>
     );
   }
+  if (forkRowHidden) return null;
   return (
     <CoreThreadContextContext.Provider value={context}>
       <WritableContextBanner
