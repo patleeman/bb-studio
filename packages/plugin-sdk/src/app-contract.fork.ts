@@ -942,6 +942,13 @@ export type ExperimentalHostSetting = "cli-skills";
 
 export type ExperimentalHostSettingsSection = "mobile";
 
+/**
+ * A part of bb's stack above a thread's composer a plugin can hide.
+ * `"active-child-threads"`: the Active child threads card's list of running
+ * children. A child waiting on the user still shows, with its question.
+ */
+export type ExperimentalHostPromptStackEntry = "active-child-threads";
+
 export interface ExperimentalHideHostEntriesRegistration {
   id: string;
   navigation?: readonly string[];
@@ -949,6 +956,8 @@ export interface ExperimentalHideHostEntriesRegistration {
   settings?: readonly ExperimentalHostSetting[];
   settingsSections?: readonly ExperimentalHostSettingsSection[];
   footer?: readonly string[];
+  /** Parts of the stack above a thread's composer (see {@link ExperimentalHostPromptStackEntry}). */
+  promptStack?: readonly ExperimentalHostPromptStackEntry[];
 }
 
 /**
