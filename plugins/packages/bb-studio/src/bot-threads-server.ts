@@ -192,18 +192,22 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
 
   // Thread events. A reload stops the reconciles still waiting: the old instance's handles are stale.
   const reconciles = new Set<ReturnType<typeof setTimeout>>();
-  bb.onDispose(() => { for (const timer of reconciles) clearTimeout(timer); reconciles.clear(); });
+  // After a reload the old instance's database is closed: work it started that ends later must not touch it or reject unhandled.
+  let disposed = false;
+  const quiet = (error: unknown) => { if (!disposed) deps.log(`Studio threads: ${error instanceof Error ? error.message : String(error)}`); };
+  bb.onDispose(() => { disposed = true; for (const timer of reconciles) clearTimeout(timer); reconciles.clear(); });
   bb.events.on("thread.created", ({ thread }) => {
     void store.created(thread as ThreadFacts).then(() => {
+      if (disposed) return;
       const rec = store.get(thread.id);
       if (rec?.kind === "conversation" && rec.forkedFrom && !rec.forkedFrom.messageId) return lookUpForkPoint(thread.id);
-    });
+    }).catch(quiet);
     // A side chat learns its reply a moment later, a runner its thread: apply them.
     const later = setTimeout(() => { reconciles.delete(later); try { store.reconcile(); } catch { /* the next sweep */ } }, 8_000);
     reconciles.add(later);
   });
   bb.events.on("thread.archived", ({ thread }) => store.archived(thread.id, true));
-  bb.events.on("thread.unarchived", ({ thread }) => { if (known(thread.id)) store.archived(thread.id, false); else void store.created(thread as ThreadFacts); });
+  bb.events.on("thread.unarchived", ({ thread }) => { if (known(thread.id)) store.archived(thread.id, false); else void store.created(thread as ThreadFacts).catch(quiet); });
   bb.events.on("thread.deleted", ({ thread }) => { store.deleted(thread.id); text.forget(thread.id); });
   bb.events.on("thread.idle", ({ thread, lastAssistantText }) => {
     if (!known(thread.id)) return;
@@ -340,14 +344,14 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
       latest: (rec) => latestLine(replies.get(rec.threadId), title),
     });
     // The page is open: read what isn't read yet, for its search.
-    void text.readAll(page.conversations.map((row) => row.threadId));
+    void text.readAll(page.conversations.map((row) => row.threadId)).catch(quiet);
     return { page, summaries };
   };
   const conversationsSearch = async ({ botId, query }: { botId?: string; query: string }) => {
     const { page, summaries } = await conversationsAll(botId);
     const ids = page.conversations.map((row) => row.threadId);
     let timer: ReturnType<typeof setTimeout> | undefined;
-    await Promise.race([text.readAll(ids), new Promise((resolve) => { timer = setTimeout(resolve, SEARCH_READ_WAIT_MS); })]);
+    await Promise.race([text.readAll(ids).catch(quiet), new Promise((resolve) => { timer = setTimeout(resolve, SEARCH_READ_WAIT_MS); })]);
     clearTimeout(timer);
     const hits = text.search(query, page.conversations.map((row) => ({ threadId: row.threadId, title: row.title, summary: summaries.get(row.threadId) ?? null })))
       .map((hit) => ({ ...hit, kind: "conversation" as const }));
@@ -697,6 +701,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
   const catchUp = async (): Promise<{ classified: number; linked: number }> => {
     let classified = 0;
     try { classified = (await mirrorCatchUp?.run()) ?? 0; } catch (error) { deps.log(`Sorting mirrored threads failed: ${error instanceof Error ? error.message : String(error)}`); }
+    if (disposed) return { classified, linked: 0 };
     const linked = sides.linkForks();
     for (const threadId of linked) void sides.recount(threadId).catch(() => undefined);
     try { await sides.correctKinds(); } catch (error) { deps.log(`Correcting reply and fork kinds failed: ${error instanceof Error ? error.message : String(error)}`); }

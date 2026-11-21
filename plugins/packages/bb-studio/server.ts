@@ -1339,7 +1339,7 @@ export default async function plugin(bb: BbPluginApi) {
   const botThreadsStart = setTimeout(() => void botThreads.start().then(() => liveActivity.start()).catch((error) => bb.log.warn(`Conversations and workers start: ${errorText(error)}`)), 5_000);
   bb.onDispose(() => clearTimeout(botThreadsStart));
   triggers.every("bot-threads", 2 * 60_000, () => botThreads.reconcile());
-  triggers.every("mirror-catch-up", 60_000, () => void botThreads.catchUp());
+  triggers.every("mirror-catch-up", 60_000, () => void botThreads.catchUp().catch((error) => { if (!disposed) bb.log.warn(`Mirrored threads catch-up: ${errorText(error)}`); }));
   triggers.every("bot-finish", 60_000, () => botFinish.finish.sweep());
   /** A Studio bot's id for its learning settings (the primary without one). */
   const pageState = new BotPageState(db);
@@ -1352,10 +1352,10 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.failed", ({ thread, error }) => void learning.failed(thread.id, error).catch(() => {}));
   // Watchers' findings and end dates, once a minute; Maintenance and stuck reviews too.
   void runners.checkMachines().catch(error => bb.log.warn(`Runner machines: ${errorText(error)}`));
-  void runners.retryCleanup();
+  void runners.retryCleanup().catch((error) => { if (!disposed) bb.log.warn(`Runner cleanup: ${errorText(error)}`); });
   triggers.every("automations", 60_000, () => {
     if (!hostEvents.listening) void runners.checkMachines().catch(error => bb.log.warn(`Runner machines: ${errorText(error)}`));
-    void runners.retryCleanup();
+    void runners.retryCleanup().catch((error) => { if (!disposed) bb.log.warn(`Runner cleanup: ${errorText(error)}`); });
     void automations.tick().catch((error) => bb.log.warn(`Automations tick failed: ${errorText(error)}`));
     void maintenance.tick().catch((error) => bb.log.warn(`Maintenance tick failed: ${errorText(error)}`));
     void learning.tick().catch((error) => bb.log.warn(`Skill learning tick failed: ${errorText(error)}`));
@@ -2829,4 +2829,7 @@ export default async function plugin(bb: BbPluginApi) {
       }
     },
   });
+  // BB runs dispose hooks last-registered first, then closes the database. Registered last, this
+  // runs first: no scheduled work starts once a reload has begun, and `disposed` guards see it.
+  bb.onDispose(() => { disposed = true; triggers.stop(); });
 }
