@@ -453,6 +453,8 @@ describe("the strands overview", () => {
     expect(container.querySelectorAll("[data-overview-conversation]")).toHaveLength(2);
     const main = container.querySelector('[data-overview-conversation="thr_main"]')!;
     expect(main.querySelectorAll("[data-strand-ask]")).toHaveLength(2);
+    // Main's card says "Main" once.
+    expect(text(main.querySelector("header"))).toBe("MainOpen");
     expect(text(main)).toContain("1 more need you");
     expect(text(main)).toContain("Command: npm publish --tag latest --access public --otp-from-env");
     expect([...main.querySelectorAll("[data-strand-chip]")].map((chip) => chip.getAttribute("data-strand-chip"))).toEqual(["s_cx", "s_red4", "s_macos"]);

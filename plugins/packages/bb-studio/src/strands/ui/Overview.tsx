@@ -37,7 +37,7 @@ function Card({ row, now }: { row: OverviewConversation; now: number }) {
       <header className="flex items-center gap-2">
         {needs.length ? <span role="img" aria-label="Needs you" className="size-1.5 rounded-full bg-warning" /> : null}
         <h2 className="min-w-0 truncate text-[13.5px] font-semibold">{row.title}</h2>
-        {row.isMain ? <span className="text-[12px] text-muted-foreground">Main</span> : null}
+        {row.isMain && row.title.trim().toLowerCase() !== "main" ? <span className="text-[12px] text-muted-foreground">Main</span> : null}
         <button type="button" onClick={() => open(row.threadId, null)} className="ml-auto inline-flex cursor-pointer items-center gap-1 rounded px-1 text-[12px] text-muted-foreground hover:bg-accent hover:text-foreground">
           Open<Icon name="ArrowUpRight" className="size-3" />
         </button>
