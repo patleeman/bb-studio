@@ -602,9 +602,9 @@
       "budget": 3
     },
     "plugins/provider-codex/src/bridge/bridge.ts": {
-      "seam": "sign-in-errors, codex-computer-use",
-      "intent": "handleChildNotification passes the translator's deltas through failFastOnAuthError (auth-fail-fast.fork.ts, imported right under the shebang): a reconnect whose error shows missing credentials, or the second 401 reconnect in a row, becomes the turn's final unauthorized error and the bridge interrupts that Codex turn (requestCodexTurnInterrupt), so a signed-out Codex fails at once instead of after its own reconnects, while a single 401 can still recover after a token refresh. decodeCodexOptions spreads forkCodexSessionOptions(options.providerOptions) (src/computer-use.fork.ts, imported under the shebang), which carries computerUseEnabled: false into the session options, and constructionSignature includes computerUseEnabled, so a change rebuilds the session on the next turn.",
-      "budget": 9
+      "seam": "sign-in-errors, codex-computer-use, codex-defer-loading",
+      "intent": "handleChildNotification passes the translator's deltas through failFastOnAuthError (auth-fail-fast.fork.ts, imported right under the shebang): a reconnect whose error shows missing credentials, or the second 401 reconnect in a row, becomes the turn's final unauthorized error and the bridge interrupts that Codex turn (requestCodexTurnInterrupt), so a signed-out Codex fails at once instead of after its own reconnects, while a single 401 can still recover after a token refresh. decodeCodexOptions spreads forkCodexSessionOptions(options.providerOptions) (src/computer-use.fork.ts, imported under the shebang), which carries computerUseEnabled: false into the session options, and constructionSignature includes computerUseEnabled, so a change rebuilds the session on the next turn. initializeChild passes the app-server's version to forkNoteCodexVersion (src/defer-loading.fork.ts, imported at the top, below the shebang), so deferred tools are grouped only on a Codex they were checked on.",
+      "budget": 11
     },
     "apps/app/src/views/thread-detail/ThreadDetailPromptArea.tsx": {
       "seam": "host-copy, sign-in-errors, host-entries",
@@ -707,9 +707,9 @@
       "budget": 2
     },
     "plugins/provider-codex/src/session-params.ts": {
-      "seam": "codex-computer-use",
-      "intent": "CodexSessionOptions has computerUseEnabled, and buildCodexConfig calls applyForkCodexConfig(config, args.options) (src/computer-use.fork.ts, imported at the top) last: with computerUseEnabled false it turns off the unified-computer-use plugin and adds a disabled cua_repl entry, so Codex's Computer Use server does not start in that thread. Without it the config is unchanged.",
-      "budget": 3
+      "seam": "codex-computer-use, codex-defer-loading",
+      "intent": "CodexSessionOptions has computerUseEnabled, and buildCodexConfig calls applyForkCodexConfig(config, args.options) (src/computer-use.fork.ts, imported at the top) last: with computerUseEnabled false it turns off the unified-computer-use plugin and adds a disabled cua_repl entry, so Codex's Computer Use server does not start in that thread. Without it the config is unchanged. toCodexDynamicTools passes its list through forkGroupDeferredCodexTools (src/defer-loading.fork.ts, imported at the top): a tool whose inputSchema carries the vendor key x-bb-defer-loading (true or a namespace name) goes to Codex without the key, with deferLoading: true, inside a namespace of that name. On a Codex older than DEFER_LOADING_MIN_CODEX, or of unknown version, the key is removed and every tool goes eagerly.",
+      "budget": 8
     },
     "apps/cli/src/commands/thread/actions.ts": {
       "seam": "thread-successor",
@@ -755,6 +755,16 @@
       "seam": "timeline-filter",
       "intent": "ThreadTimelineSurface is the upstream surface (renamed ThreadTimelineSurfaceView) wrapped in withTimelineFilter (timelineFilter.fork.tsx, imported at the top of the file), which applies a plugin's slots.experimental_timelineFilter to its rows and paging props and provides the expand context. With no filter the props pass through unchanged.",
       "budget": 4
+    },
+    "packages/provider-bridge-acp/src/session-params.ts": {
+      "seam": "acp-skills-listing",
+      "intent": "buildAcpSkillsInstructions first calls buildForkAcpSkillsInstructions(skillRoots, sanitizeAcpSkillDescription) (skills-listing.fork.ts, imported at the top) and returns its listing when it has one: each skill root's folder is named once (<root>/<name>/SKILL.md), then one name: description line per skill. Upstream's per-skill path lines below it are reached only when there is nothing to list.",
+      "budget": 3
+    },
+    "apps/server/src/services/threads/thread-runtime-config.ts": {
+      "seam": "agents-md-once",
+      "intent": "The <dataDir>/AGENTS.md section is added unless forkProviderReadsDataDirAgentsMd({ providerId, workspacePath, dataDir }) (agents-md-dedupe.fork.ts, imported at the top) says the provider reads that same file itself: Pi walks every parent folder for AGENTS.md, and the personal workspace sits inside the data dir.",
+      "budget": 3
     }
   }
 }
