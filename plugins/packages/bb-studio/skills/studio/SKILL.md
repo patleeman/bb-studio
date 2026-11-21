@@ -179,14 +179,15 @@ mention or `[text](/threads/thr_…)`. Never put `@thread:` inside a Markdown
 link (`[full report](@thread:thr_…)`): the app reads it as a file and opens
 File not found.
 
-- **Elsewhere**: each turn in a conversation starts with a short digest of
+- **Elsewhere**: a conversation's first turn starts with a short digest of
   what your other conversations (active in the last day) and your workers
   (running, or failed or finished in the last 6 hours) are doing, newest
   first, with their thread ids. It is for you; the user doesn't see it.
   `bot_activity_lookup { threadId }` gives one of them in detail: what it is
   doing now, its latest reply, whether it needs the user, the conversation it
   works for or the workers it started, a finished conversation's summary and
-  its last tool calls. Bring something from another conversation into this
+  its last tool calls. Later turns don't repeat the digest: for a fresh view,
+  call `bot_conversations` or `bot_activity_lookup`. Bring something from another conversation into this
   one only when it matters here.
 - **Archiving a conversation**: when the user archives a conversation (Studio
   then asks you to in that conversation) or asks you to finish it, write its summary for someone who wasn't

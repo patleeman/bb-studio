@@ -433,8 +433,12 @@ conversations and workers are doing. Nothing shows on screen for it.
   fills rows for listed threads that have none from BB's records.
 - **The digest**: on a BB with the fork's per-turn context hook
   (`bb.experimental_hooks.experimental_turnContext`, feature-detected by
-  name; elsewhere nothing is registered), each turn of a conversation gets
-  an agent-only digest with its input, not stored in the thread. It is read
+  name; elsewhere nothing is registered), a conversation gets an agent-only
+  digest with its input, not stored in the thread. bb attaches turn context
+  only to a turn it starts in "start" mode, which in practice is the
+  thread's first turn: later messages (the composer, `bb thread tell`) go in
+  "auto" mode and carry none. That is kept on purpose: every turn would add
+  up to 1,500 characters to the history each time. It is read
   from Studio's database only (bb waits at most 500 ms for all plugins): one
   line per other conversation of the same Bot that isn't archived and was
   active in the last 24 hours (title, thread id, working / idle / needs the
@@ -3721,6 +3725,45 @@ of Staff", with the same thread and check-ins; rename it from its page.
 - No per-action rules or approval gates: the Bot works like any agent. `chief_of_staff`,
   `chief_of_staff_set` and `chief_of_staff_set_run` remain as deprecated
   aliases for one release.
+
+## Tool scope and lean context
+
+Each session loads only the Studio tools its thread kind uses (`src/tool-scope.ts`,
+chosen from a week of tool-call history). The rest stay reachable on demand:
+
+| Kind | Loaded | On demand |
+|---|---|---|
+| Main | pages, memory, strand_note, conversation and Bot tools, schedules, skills, areas, design, code_show | everything else |
+| A Bot conversation (any thread the user starts) | pages, memory, strand_note, conversation tools | everything else |
+| Project lead | pages, memory | everything but the Bot's own schedules and skills, themes and presence |
+| Worker | pages_read, pages_create, pages_edit, memory_search, memory_add | designs, apps, recordings, whiteboards, memory_update, pages_list, pages_comments |
+| Runner | runner_report, pages_read, pages_edit, memory_search | nothing |
+| Studio Decisions classifier thread | nothing | nothing |
+
+How the on-demand tools reach the agent depends on the provider:
+
+- **Claude Code** gets them all and defers them behind its own tool search.
+- **Codex** gets them with `deferLoading` when BB supports it
+  (`experimental_hooks.experimental_features.deferredAgentTools`): each one's
+  `parameters` override carries `x-bb-defer-loading: true`.
+- **Pi, ACP agents**, and Codex on a BB without that flag, get
+  `studio_tool_search`, `studio_tool_describe` and `studio_tool_call`
+  (`src/tool-scope-tools.ts`), Tool Gateway's search → describe → call shape.
+  When the thread also has Tool Gateway, the same three reach its MCP tools
+  (ids `tg_…`) and Tool Gateway's own three aren't loaded.
+
+Shown schemas are slimmed (`src/slim-schema.ts`): a union told apart by one
+`const` field (pages_edit's ops) becomes one object with an enum and a
+"Needs:" note per value. BB still checks each call against the tool's own zod
+schema, so the agent gets the same error for bad input.
+
+**Lean context** (Settings › Agent context, `src/context-lean.ts`): per
+provider, Auto, Lean or Full. Lean loads only `strand_note` (Main and
+conversations) or `runner_report` (runners) plus the three search tools, and
+lists none of Studio's skills. Auto is Lean for an ACP agent whose model id
+names a local endpoint (`local`, `ollama`, `lmstudio`, `llama.cpp`, `vllm`,
+`mlx`, `localhost`, `desktop`), Full otherwise. RPCs: `contextLean.get`,
+`contextLean.set`; kv `context:lean`.
 
 ## Memory
 
