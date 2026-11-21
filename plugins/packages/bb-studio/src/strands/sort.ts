@@ -128,7 +128,7 @@ export function namingPrompt(input: {
 }): string {
   return [
     "You name the strands of a conversation between a user and their assistant: its separate lines of work.",
-    "Answer with one JSON object and nothing else. Do not use tools.",
+    "Answer with one JSON object on a single line and nothing else. Do not use tools.",
     "",
     "Rules for names:",
     NAMING_RULES,

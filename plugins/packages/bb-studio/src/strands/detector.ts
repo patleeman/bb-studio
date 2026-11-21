@@ -16,7 +16,7 @@
 // open agent tasks as strands, then Jev sorting 32 messages per call.
 import { checkName, firstLineTitle } from "./naming";
 import {
-  BATCH, batchQuestions, MAX_OPEN, namingPrompt, proposePrompt, readAnswer, readNaming, readProposal, readSort, sortPrompt, taskTitle, turnQuestion,
+  BATCH, batchQuestions, jsonIn, MAX_OPEN, namingPrompt, proposePrompt, readAnswer, readNaming, readProposal, readSort, sortPrompt, taskTitle, turnQuestion,
   type Choice, type Message, type OpenStrand,
 } from "./sort";
 import type { ItemBy, Strand, StrandStore } from "./store";
@@ -60,6 +60,12 @@ export interface DetectorDeps {
   events(input: { threadId: string; afterSeq?: number; beforeSeq?: number; order: "asc" | "desc"; limit: number }): Promise<EventRow[]>;
   jev(input: { caller: string; state: unknown; questions: Record<string, unknown> }): Promise<JevResult>;
   model(input: { threadId: string; requestId: string; prompt: string }): Promise<ModelResult>;
+  /**
+   * BB's one-line model call (experimental_completeText: the AI service the
+   * user picked for thread titles, no tools, no thread), when this BB has it.
+   * Naming and summaries try it first and fall back to `model`.
+   */
+  completeText?(input: { prompt: string }): Promise<{ ok: true; text: string } | { ok: false; error: string }>;
   /** Open agent tasks linked to the conversation (not the user's own to-dos, not automation runs). */
   openTasks(threadId: string): OpenTask[];
   changed(threadId: string): void;
@@ -278,6 +284,21 @@ export class StrandDetector {
     return result;
   }
 
+  /**
+   * Naming's model call: BB's one-line call first (no tools, no thread), when
+   * this BB has it and its answer is a JSON object; else the small model.
+   * Both count against the daily cap; null when the cap is reached.
+   */
+  private async askNaming(threadId: string, requestId: string, prompt: string): Promise<ModelResult | null> {
+    if (this.deps.completeText) {
+      if (!this.store.takeCall(threadId, "model", dayOf(this.now()), MODEL_DAILY_CAP)) return null;
+      const quick = await this.deps.completeText({ prompt }).catch((error) => ({ ok: false as const, error: message(error) }));
+      const json = quick.ok ? jsonIn(quick.text) : null;
+      if (quick.ok && json && typeof json === "object") return { ok: true, text: quick.text };
+    }
+    return this.askModel(threadId, requestId, prompt);
+  }
+
   /** One small-model call, counted against the conversation's daily cap; null when the cap is reached. */
   private async askModel(threadId: string, requestId: string, prompt: string): Promise<ModelResult | null> {
     if (!this.store.takeCall(threadId, "model", dayOf(this.now()), MODEL_DAILY_CAP)) return null;
@@ -323,7 +344,7 @@ export class StrandDetector {
       open: open.map((strand, index) => ({ key: `s${index + 1}`, title: strand.title, summary: strand.summary })),
       refresh: refresh.map((strand, index) => ({ key: `r${index + 1}`, title: strand.title, messages: lines(strand, true) })),
     });
-    const result = await this.askModel(threadId, `${threadId} name ${now}`, prompt) ?? { ok: false as const, unavailable: true, error: "daily cap" };
+    const result = await this.askNaming(threadId, `${threadId} name ${now}`, prompt) ?? { ok: false as const, unavailable: true, error: "daily cap" };
     // A refresh is tried at most once a day, whatever the model answers.
     const refreshed = (summaries: ReadonlyMap<string, string>) => refresh.forEach((strand, index) => { const summary = summaries.get(`r${index + 1}`); if (summary) this.store.summarized(strand.id, summary); else this.store.summaryTried(strand.id); });
     if (!result.ok) {

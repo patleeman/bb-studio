@@ -46,6 +46,9 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
     if (disposed || signal) return;
     signal = setTimeout(() => { signal = null; void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); }, 250);
   };
+  // BB's one-line model call (desktop 1.0.11): naming and summaries use it when this BB has it.
+  const hooks = (bb as { experimental_hooks?: { experimental_completeText?: (request: { prompt: string; timeoutMs?: number; signal?: AbortSignal }) => Promise<{ ok: true; text: string } | { ok: false; reason?: string; message?: string }> } }).experimental_hooks;
+  const completeText = typeof hooks?.experimental_completeText === "function" ? hooks.experimental_completeText.bind(hooks) : null;
   const threadOf = async (threadId: string) => await bb.sdk.threads.get({ threadId }).catch(() => null) as { status?: string; providerId?: string | null } | null;
   const service = new StrandService({
     db,
@@ -56,6 +59,12 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
     } as never) as unknown as EventRow[],
     jev: (input) => deps.decisions.systemOne({ ...input, questions: input.questions as never }, AbortSignal.timeout(JEV_TIMEOUT_MS)),
     secrets: deps.secrets,
+    ...(completeText ? {
+      completeText: async ({ prompt }: { prompt: string }) => {
+        const result = await completeText({ prompt, timeoutMs: 8_000 });
+        return result.ok ? { ok: true as const, text: result.text } : { ok: false as const, error: result.message ?? result.reason ?? "no answer" };
+      },
+    } : {}),
     model: async ({ threadId, requestId, prompt }) => {
       const hostId = await primaryHostId(bb).catch(() => null);
       if (!hostId) return { ok: false, unavailable: true, error: "BB has no primary host to run the model on." };

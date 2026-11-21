@@ -13,7 +13,7 @@ const DAY = "2026-11-20";
 const START = Date.parse(`${DAY}T12:00:00Z`);
 const MIN = 60_000;
 
-function setup(options: { jev?: DetectorDeps["jev"]; model?: DetectorDeps["model"]; secrets?: string[] } = {}) {
+function setup(options: { jev?: DetectorDeps["jev"]; model?: DetectorDeps["model"]; secrets?: string[]; completeText?: DetectorDeps["completeText"] } = {}) {
   const clock = { now: START };
   const db = database();
   const store = new StrandStore(db, () => clock.now);
@@ -26,6 +26,7 @@ function setup(options: { jev?: DetectorDeps["jev"]; model?: DetectorDeps["model
     store, events: thread.events, jev: options.jev ?? fakeJev(jevCalls), model: options.model ?? fakeModel(modelCalls),
     openTasks: () => [], changed: () => {}, log: (line) => logs.push(line), now: () => clock.now,
     setTimer: timers.setTimer, clearTimer: timers.clearTimer, secrets: () => options.secrets ?? [],
+    ...(options.completeText ? { completeText: options.completeText } : {}),
   });
   const run = () => timers.runAll(() => detector.settled(thread.id));
   return { db, store, thread, detector, jevCalls, modelCalls, logs, clock, run };
@@ -164,6 +165,47 @@ describe("the small model", () => {
     x.clock.now += 24 * 60 * MIN;
     expect(x.store.callsLeft(x.thread.id, "model", "2026-11-21", MODEL_DAILY_CAP)).toBe(MODEL_DAILY_CAP);
     expect(x.store.callsLeft(x.thread.id, "jev", "2026-11-21", JEV_DAILY_CAP)).toBe(JEV_DAILY_CAP);
+  });
+});
+
+describe("BB's one-line model call for naming", () => {
+  /** The one-line call: the naming fake's JSON, on its own line (BB keeps the first clean line). */
+  const quick = (prompts: string[], answer: "json" | "prose" | "fail" = "json"): NonNullable<DetectorDeps["completeText"]> => {
+    const naming = fakeModel();
+    return async ({ prompt }) => {
+      prompts.push(prompt);
+      if (answer === "fail") return { ok: false, error: "The title task is off" };
+      if (answer === "prose") return { ok: true, text: "Model router" };
+      const reply = await naming({ threadId: "thr_main", requestId: "x", prompt });
+      return reply.ok ? { ok: true, text: JSON.stringify(JSON.parse(reply.text!.slice(reply.text!.indexOf("{")))) } : { ok: false, error: reply.error };
+    };
+  };
+
+  it("names strands with it when this BB has it, and doesn't start the small model", async () => {
+    const prompts: string[] = [];
+    const x = setup({ completeText: quick(prompts) });
+    await x.detector.backfill(x.thread.id);
+    x.thread.turn("Look at the router", "Ok.");
+    await x.detector.idle(x.thread.id);
+    const before = x.modelCalls.length;
+    await x.detector.nameNow(x.thread.id);
+    expect(prompts.some((prompt) => prompt.includes("You name the strands"))).toBe(true);
+    expect(x.modelCalls.length).toBe(before);
+    expect(x.store.list(x.thread.id).map((strand) => strand.title)).toEqual(["Model router"]);
+    expect(x.store.read(x.thread.id)!.modelCalls).toBeGreaterThan(0);
+  });
+
+  it("falls back to the small model when its answer isn't JSON or it fails", async () => {
+    for (const answer of ["prose", "fail"] as const) {
+      const x = setup({ completeText: quick([], answer) });
+      await x.detector.backfill(x.thread.id);
+      x.thread.turn("Look at the router", "Ok.");
+      await x.detector.idle(x.thread.id);
+      const before = x.modelCalls.length;
+      await x.detector.nameNow(x.thread.id);
+      expect(x.modelCalls.length).toBe(before + 1);
+      expect(x.store.list(x.thread.id).map((strand) => strand.title)).toEqual(["Model router"]);
+    }
   });
 });
 
