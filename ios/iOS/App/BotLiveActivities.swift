@@ -5,7 +5,8 @@ import UIKit
 import WidgetKit
 
 /// Each Bot's Live Activity, from the app's side. While the app is open it
-/// starts, updates and ends them from `bot_spaces` and `bot_threads_view`.
+/// starts, updates and ends them from `bot_spaces` and `bot_threads_view`,
+/// only for turns the user started from the phone (`PhoneTurns`).
 /// It registers the push-to-start token and each activity's update token with
 /// the Mobile relay, so Studio can drive them while the app is closed
 /// (`docs/live-activity-server.md`). It also redraws the widgets when what they
@@ -24,6 +25,9 @@ final class BotLiveActivities {
     private var pushToStartToken: String?
     private var registered: Set<String> = []
     private var widgetKey = ""
+    /// Phone turns seen running: once one stops, it has finished.
+    private var ran: Set<String> = []
+    private var graceTask: Task<Void, Never>?
     /// Whether this process may talk to the relay (not in tests or QA runs).
     private let registers = PushRegistration.allowed(arguments: CommandLine.arguments, environment: ProcessInfo.processInfo.environment)
 
@@ -38,6 +42,22 @@ final class BotLiveActivities {
         store.$spaces.combineLatest(store.$views)
             .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
             .sink { [weak self] _, _ in self?.scheduleSync() }
+            .store(in: &subscriptions)
+        // A message just sent from the phone: show its turn now, and look again
+        // once the grace is over in case BB never said it ran.
+        NotificationCenter.default.publisher(for: PhoneTurns.recorded)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] note in
+                guard let self else { return }
+                // A new turn: whether an earlier one in the thread ran doesn't count.
+                if let threadId = note.object as? String { self.ran.remove(threadId) }
+                self.scheduleSync()
+                self.graceTask?.cancel()
+                self.graceTask = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(PhoneTurns.grace + 1))
+                    if !Task.isCancelled { self?.scheduleSync() }
+                }
+            }
             .store(in: &subscriptions)
         observeTokens()
     }
@@ -54,20 +74,25 @@ final class BotLiveActivities {
         guard let store, let spaces = store.spaces, let server, let client else { return }
         reloadWidgetsIfChanged(spaces, views: store.views)
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        var turns = PhoneTurns.active(serverURL: client.baseURL)
         for bot in spaces.bots {
             if Task.isCancelled { return }
             let view = store.view(for: bot.id)
-            var state = BotActivityAttributes.ContentState.make(bot: bot, view: view)
+            for id in settle(BotActivityAttributes.ContentState.phoneTurns(bot: bot, view: view, turns: turns), serverURL: client.baseURL) {
+                turns[id] = nil
+            }
+            var state = BotActivityAttributes.ContentState.make(bot: bot, view: view, turns: turns, ran: ran)
             if state?.presence == .needs, let conversationId = state?.conversationId {
                 let approval = (try? await client.conversationApprovals(threadId: conversationId))?
                     .first { $0.state == .pending }
                     .map { BotActivityAttributes.Approval($0) }
-                if let approval { state = .make(bot: bot, view: view, approval: approval) }
+                if let approval { state = .make(bot: bot, view: view, turns: turns, ran: ran, approval: approval) }
             }
             let running = Activity<BotActivityAttributes>.activities.filter {
                 $0.attributes.botId == bot.id && $0.attributes.belongs(to: server) && $0.activityState == .active
             }
             guard let state else {
+                // The turn finished: its reply's notification says so, so end at once.
                 for activity in running {
                     await activity.end(ActivityContent(state: activity.content.state, staleDate: nil), dismissalPolicy: .immediate)
                 }
@@ -93,6 +118,23 @@ final class BotLiveActivities {
             await activity.end(nil, dismissalPolicy: .immediate)
         }
         registerPushToStart(for: spaces)
+    }
+
+    /// Notes phone turns seen running, and forgets ones that have finished:
+    /// not running, not asking anything, and either seen running or past the
+    /// grace. Returns the finished ones.
+    private func settle(_ turns: [BotActivityAttributes.ContentState.PhoneTurn], serverURL: URL) -> [String] {
+        var finished: [String] = []
+        for turn in turns {
+            if turn.running {
+                ran.insert(turn.threadId)
+            } else if !turn.needsYou, ran.contains(turn.threadId) || Date.now.timeIntervalSince(turn.sent) >= PhoneTurns.grace {
+                finished.append(turn.threadId)
+                ran.remove(turn.threadId)
+            }
+        }
+        if !finished.isEmpty { PhoneTurns.clear(finished, serverURL: serverURL) }
+        return finished
     }
 
     // MARK: Tokens

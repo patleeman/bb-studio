@@ -159,6 +159,7 @@ extension BBClient {
         let output: Studio.BotConversationStartOutput = try await rpc("studio", Studio.Method.bot_conversation_start,
                                                                       ["botId": .string(botId), "request": request])
         guard let id = output.threadId, !id.isEmpty else { throw BBError(status: 200, message: "Studio didn't start the conversation.") }
+        PhoneTurns.record(id, serverURL: baseURL)
         return id
     }
 

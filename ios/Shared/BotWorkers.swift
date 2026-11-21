@@ -138,6 +138,7 @@ extension BBClient {
         let output: Studio.BotWorkerAskOutput = try await rpc("studio", Studio.Method.bot_worker_ask,
                                                               ["threadId": .string(threadId), "text": .string(message)])
         guard let id = output.conversationId, !id.isEmpty else { throw BBError(status: 200, message: "Studio didn't say where it asked.") }
+        PhoneTurns.record(id, serverURL: baseURL)
         return WorkerAsked(conversationId: id, projectId: output.projectId)
     }
 }

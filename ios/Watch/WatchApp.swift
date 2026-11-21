@@ -196,7 +196,7 @@ struct WatchThreadView: View {
         do {
             let page = try await page
             rows = Array(page.rows.filter { $0.isConversation && !($0.text ?? "").isEmpty }.suffix(6))
-            if talkFirst, let latest = rows.last(where: { !$0.isUser })?.text, latest != AppGroup.defaults.string(forKey: ServerScope.key("chiefLatest", serverURL: client.baseURL)) {
+            if talkFirst, let latest = rows.last(where: { !$0.isUser && !$0.isPassReply })?.text, latest != AppGroup.defaults.string(forKey: ServerScope.key("chiefLatest", serverURL: client.baseURL)) {
                 AppGroup.defaults.set(latest, forKey: ServerScope.key("chiefLatest", serverURL: client.baseURL))
                 WidgetCenter.shared.reloadTimelines(ofKind: "BBGoChief")
             }

@@ -35,63 +35,115 @@ final class NativeSurfacesTests: XCTestCase {
 
     // MARK: Live Activity
 
+    private let now = Date(timeIntervalSince1970: 1_800_000_000)
+    private func sent(_ secondsAgo: TimeInterval) -> Date { now - secondsAgo }
+
     func testIdleBotHasNoActivity() throws {
         let bot = try XCTUnwrap(spaces().bots.first)
-        XCTAssertNil(BotActivityAttributes.ContentState.make(bot: bot, view: try view()))
+        XCTAssertNil(BotActivityAttributes.ContentState.make(bot: bot, view: try view(), turns: [:], now: now))
     }
 
-    func testRunningTurnThinksWithMainsLatestLine() throws {
-        let bot = try XCTUnwrap(spaces(turn: true).bots.first)
-        let state = try XCTUnwrap(BotActivityAttributes.ContentState.make(bot: bot, view: try view(mainRunning: true)))
+    /// Workers and turns the phone didn't start never show one: no always-on "N workers" card.
+    func testWorkersAndOtherTurnsAloneShowNothing() throws {
+        let bot = try XCTUnwrap(spaces(turn: true, workers: 4).bots.first)
+        let busy = try view(mainRunning: true, interviewNeeds: true, workers: [("Port", "running"), ("Push", "needs-you")])
+        XCTAssertNil(BotActivityAttributes.ContentState.make(bot: bot, view: busy, turns: [:], now: now))
+        XCTAssertNil(BotActivityAttributes.ContentState.make(bot: bot, view: nil, turns: [:], now: now))
+    }
+
+    func testPhoneTurnThinksWithoutTheOldLine() throws {
+        let bot = try XCTUnwrap(spaces(turn: true, workers: 2).bots.first)
+        let state = try XCTUnwrap(BotActivityAttributes.ContentState.make(
+            bot: bot, view: try view(mainRunning: true, workers: [("Port", "running"), ("Tests", "running")]),
+            turns: ["thr_main": sent(60)], now: now))
         XCTAssertEqual(state.presence, .thinking)
         XCTAssertEqual(state.workers, 0)
         XCTAssertEqual(state.conversationId, "thr_main")
         XCTAssertEqual(state.conversationTitle, "Main")
-        XCTAssertEqual(state.line, "Fable moved the bridge onto the contract.")
+        XCTAssertNil(state.line, "status only: never Main's old latest line")
         XCTAssertNil(state.needsYou)
     }
 
-    func testWorkersRunningShowsTheCount() throws {
-        let bot = try XCTUnwrap(spaces(workers: 2).bots.first)
+    func testAPassNeverShows() throws {
+        let bot = try XCTUnwrap(spaces(turn: true).bots.first)
         let state = try XCTUnwrap(BotActivityAttributes.ContentState.make(
-            bot: bot, view: try view(workers: [("Port", "running"), ("Tests", "running"), ("Old", "done")])))
-        XCTAssertEqual(state.presence, .working)
-        XCTAssertEqual(state.workers, 2)
+            bot: bot, view: try view(mainRunning: true, mainLatest: "[PASS]"), turns: ["thr_main": sent(60)], now: now))
+        XCTAssertNil(state.line)
     }
 
-    func testNeedsYouSpeaksForThatConversationInAmber() throws {
+    func testAJustSentTurnShowsUntilBBSaysItRuns() throws {
         let bot = try XCTUnwrap(spaces().bots.first)
-        let state = try XCTUnwrap(BotActivityAttributes.ContentState.make(bot: bot, view: try view(interviewNeeds: true)))
+        let idle = try view()
+        let fresh = try XCTUnwrap(BotActivityAttributes.ContentState.make(bot: bot, view: idle, turns: ["thr_main": sent(5)], now: now))
+        XCTAssertEqual(fresh.presence, .thinking)
+        // Past the grace, still not running: it finished, or never started.
+        XCTAssertNil(BotActivityAttributes.ContentState.make(bot: bot, view: idle, turns: ["thr_main": sent(25)], now: now))
+        // Seen running and stopped: a quick reply ends it inside the grace.
+        XCTAssertNil(BotActivityAttributes.ContentState.make(bot: bot, view: idle, turns: ["thr_main": sent(5)], ran: ["thr_main"], now: now))
+    }
+
+    func testAFinishedPhoneTurnEndsTheActivity() throws {
+        let bot = try XCTUnwrap(spaces(workers: 3).bots.first)
+        let after = try view(workers: [("Port", "running")])
+        XCTAssertNil(BotActivityAttributes.ContentState.make(bot: bot, view: after, turns: ["thr_main": sent(120)], ran: ["thr_main"], now: now))
+    }
+
+    func testPhoneTurnThatNeedsYouSpeaksInAmber() throws {
+        let bot = try XCTUnwrap(spaces().bots.first)
+        let state = try XCTUnwrap(BotActivityAttributes.ContentState.make(
+            bot: bot, view: try view(interviewNeeds: true), turns: ["thr_iv": sent(120)], now: now))
         XCTAssertEqual(state.presence, .needs)
         XCTAssertEqual(state.conversationId, "thr_iv")
         XCTAssertEqual(state.conversationTitle, "Launch prep")
-        XCTAssertEqual(state.line, "Which day works?")
+        XCTAssertNil(state.line)
         XCTAssertEqual(state.needsYou, "Asked you a question")
     }
 
-    func testWorkerApprovalBecomesTheNeedsLine() throws {
+    func testANeedingTurnLeadsAndCarriesTheApproval() throws {
         let bot = try XCTUnwrap(spaces().bots.first)
         let approval = BotActivityAttributes.Approval(workerThreadId: "w0", interactionId: "int_1", summary: "Push: git push origin main")
         let state = try XCTUnwrap(BotActivityAttributes.ContentState.make(
-            bot: bot, view: try view(workers: [("Push", "needs-you")]), approval: approval))
-        XCTAssertEqual(state.presence, .needs)
-        XCTAssertEqual(state.needsYou, "Approve: Push: git push origin main")
+            bot: bot, view: try view(mainRunning: true, interviewNeeds: true),
+            turns: ["thr_main": sent(10), "thr_iv": sent(300)], approval: approval, now: now))
+        XCTAssertEqual(state.conversationId, "thr_iv")
         XCTAssertEqual(state.approval, approval)
+        let thinking = try XCTUnwrap(BotActivityAttributes.ContentState.make(
+            bot: bot, view: try view(mainRunning: true), turns: ["thr_main": sent(10)], approval: approval, now: now))
+        XCTAssertNil(thinking.approval, "an approval only goes with needs")
     }
 
-    func testWithoutAViewTheBotsOwnActivityCounts() throws {
-        let bot = try XCTUnwrap(spaces(workers: 3).bots.first)
-        let state = try XCTUnwrap(BotActivityAttributes.ContentState.make(bot: bot, view: nil))
-        XCTAssertEqual(state.presence, .working)
-        XCTAssertEqual(state.workers, 3)
+    func testOtherBotsTurnsDontCount() throws {
+        let bot = try XCTUnwrap(spaces().bots.first)
+        XCTAssertNil(BotActivityAttributes.ContentState.make(bot: bot, view: try view(mainRunning: true), turns: ["thr_b_main": sent(5)], now: now))
+    }
+
+    func testWithoutAViewMainFollowsTheBotsTurn() throws {
+        let running = try XCTUnwrap(spaces(turn: true, workers: 3).bots.first)
+        let state = try XCTUnwrap(BotActivityAttributes.ContentState.make(bot: running, view: nil, turns: ["thr_main": sent(60)], now: now))
+        XCTAssertEqual(state.presence, .thinking)
+        XCTAssertEqual(state.workers, 0)
         XCTAssertEqual(state.conversationId, "thr_main")
         XCTAssertNil(state.line)
+        let idle = try XCTUnwrap(spaces(workers: 3).bots.first)
+        XCTAssertNil(BotActivityAttributes.ContentState.make(bot: idle, view: nil, turns: ["thr_main": sent(60)], now: now))
+        XCTAssertNil(BotActivityAttributes.ContentState.make(bot: running, view: nil, turns: ["thr_iv": sent(5)], now: now))
+    }
+
+    func testPhoneTurnsReportRunningAndNeeds() throws {
+        let bot = try XCTUnwrap(spaces().bots.first)
+        let turns = BotActivityAttributes.ContentState.phoneTurns(
+            bot: bot, view: try view(mainRunning: true, interviewNeeds: true),
+            turns: ["thr_main": sent(1), "thr_iv": sent(2), "thr_elsewhere": sent(3)])
+        XCTAssertEqual(turns.map(\.threadId).sorted(), ["thr_iv", "thr_main"])
+        XCTAssertEqual(turns.first { $0.threadId == "thr_main" }?.running, true)
+        XCTAssertEqual(turns.first { $0.threadId == "thr_iv" }?.needsYou, true)
     }
 
     func testOnlyShownChangesCountAsDifferent() throws {
         let bot = try XCTUnwrap(spaces(turn: true).bots.first)
-        let a = try XCTUnwrap(BotActivityAttributes.ContentState.make(bot: bot, view: try view(mainRunning: true), now: Date(timeIntervalSince1970: 1)))
-        var b = try XCTUnwrap(BotActivityAttributes.ContentState.make(bot: bot, view: try view(mainRunning: true), now: Date(timeIntervalSince1970: 2)))
+        let turns = ["thr_main": sent(60)]
+        let a = try XCTUnwrap(BotActivityAttributes.ContentState.make(bot: bot, view: try view(mainRunning: true), turns: turns, now: now))
+        var b = try XCTUnwrap(BotActivityAttributes.ContentState.make(bot: bot, view: try view(mainRunning: true), turns: turns, now: now + 1))
         XCTAssertFalse(a.differs(from: b))
         b.workers = 1
         XCTAssertTrue(a.differs(from: b))

@@ -166,11 +166,11 @@ struct BotProvider: AppIntentTimelineProvider {
             async let page = client.timeline(threadId, segments: 2)
             async let pending = client.interactions(threadId)
             if let rows = try? await page.rows {
-                let reply = rows.last { $0.isConversation && $0.role == "assistant" }
+                let reply = latestReply(rows)
                 entry.message = reply?.text.map(plain)
                 entry.history = history(rows, before: reply?.id)
             } else {
-                entry.message = facts.view?.main?.latest.map(plain)
+                entry.message = fallbackMessage(facts.view?.main?.latest)
             }
             entry.approval = (try? await pending)?
                 .first { $0.status == "pending" && $0.payload.kind == "approval" }
@@ -226,8 +226,7 @@ struct BotProvider: AppIntentTimelineProvider {
             async let activity = Self.wantsActivity(family) ? try? await client.botActivity() : nil
             entry.threadId = threadId
             let rows = try await page.rows
-            // As `latestReply`: the newest assistant message.
-            let reply = rows.last { $0.isConversation && $0.role == "assistant" }
+            let reply = Self.latestReply(rows)
             entry.message = reply?.text.map(Self.plain)
             entry.history = Self.history(rows, before: reply?.id)
             entry.running = try await thread.isRunning
@@ -259,7 +258,9 @@ struct BotProvider: AppIntentTimelineProvider {
         let key = key ?? (BotWidgetData.usesSpaces(serverURL: ServerScope.selectedURL) ? Self.cacheKey(botId) : "chief-widget")
         guard let value = DiskCache.load(BotCache.self, key: key) else { return nil }
         let client = BBClient()
-        var entry = BotEntry(date: .now, threadId: value.threadId, message: value.message, running: value.running, approval: value.approval,
+        // A cache from before `[PASS]` was skipped may hold one.
+        let message = SilentOutput.isPass(value.message) ? nil : value.message
+        var entry = BotEntry(date: .now, threadId: value.threadId, message: message, running: value.running, approval: value.approval,
                              title: value.title ?? client.cachedBotName, look: client.cachedBotLook, history: value.history ?? [],
                              tracking: value.tracking ?? [])
         if let botId = value.botId {
@@ -269,6 +270,17 @@ struct BotProvider: AppIntentTimelineProvider {
             entry.look = BotLook(shape: value.shape, color: value.color, emoji: value.avatar?.isEmpty == false ? value.avatar! : BotInfo.defaultAvatar)
         }
         return entry
+    }
+
+    /// The newest real reply: never a `[PASS]` (`SilentOutput`), which says nothing.
+    static func latestReply(_ rows: [TimelineRow]) -> TimelineRow? {
+        rows.last { $0.isConversation && $0.role == "assistant" && !$0.isPassReply }
+    }
+
+    /// Main's latest line from `bot_threads_view`, when the timeline didn't load; nil for a `[PASS]`.
+    static func fallbackMessage(_ latest: String?) -> String? {
+        guard let latest, !SilentOutput.isPass(latest) else { return nil }
+        return plain(latest)
     }
 
     /// The four messages before the latest reply, newest first, each cut short:

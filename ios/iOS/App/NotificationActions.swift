@@ -54,6 +54,25 @@ enum NotificationActions {
         return fixed.union(LoopCategories.fixed())
     }
 
+    /// Categories that ask something of the user.
+    static let askCategories = ["BB_APPROVAL", "BB_PLAN", "BB_QUESTION", "BB_CHOICE", LoopCategories.category]
+
+    /// How a push shows while the app is open. A plain reply (`turn-finished` or
+    /// `needs-you` without an ask's category) goes to the list only: the user is
+    /// already in the app. Asks, approvals, errors and the rest still banner and
+    /// sound. `category` is `content.categoryIdentifier`; `aps.category` and the
+    /// relay's `category` field count too.
+    static func foregroundOptions(_ info: [AnyHashable: Any], category: String?) -> UNNotificationPresentationOptions {
+        let kind = info["kind"] as? String
+        guard kind == "turn-finished" || kind == "needs-you" else { return [.banner, .sound] }
+        let categories = [category, (info["aps"] as? [String: Any])?["category"] as? String, info["category"] as? String]
+            .compactMap { $0 }
+        let asks = categories.contains { name in
+            askCategories.contains { name == $0 || name.hasPrefix($0 + ".") }
+        }
+        return asks ? [.banner, .sound] : [.list]
+    }
+
     static func taskRoute(_ info: [AnyHashable: Any]) -> (id: String, conversation: String?)? {
         guard let id = info["loopId"] as? String, !id.isEmpty else { return nil }
         let conversation = [info["conversationId"], info["threadId"]].lazy.compactMap { $0 as? String }.first { !$0.isEmpty }
