@@ -52,10 +52,32 @@ export interface InstructionParts {
   endOfReply: string | null;
   /** The kinds routing line (src/kinds.ts routingInstructions), or "". */
   routing: string;
+  /**
+   * Whether the session has strand_note (src/tool-scope.ts): Main, a Bot
+   * conversation and a project lead. Default: a conversation or runner note
+   * is set, as before tool scope.
+   */
+  strands?: boolean;
+  /** False when the session lists none of Studio's skills (lean context): the pointers then don't send the agent to one. */
+  skills?: boolean;
+}
+
+/** The pointers' "load the studio skill" phrases, for a session without Studio's skills. */
+const SKILL_PHRASES: readonly [string, string][] = [
+  [" Page formats (charts, embeds, html, mentions): load the studio skill.", ""],
+  ["; details are in the studio skill.", "."],
+  ['; load the studio skill ("The Next row") for its rules before you write one.', "."],
+  ['; its rules are in the studio skill ("Explore").', "."],
+];
+
+export function withoutSkillPointers(text: string): string {
+  return SKILL_PHRASES.reduce((out, [phrase, replacement]) => out.split(phrase).join(replacement), text);
 }
 
 /** The instructions with MEMORY_SLOT where the memory block goes (src/memory/service.ts withMemory fills it). */
 export function studioInstructions(parts: InstructionParts): string {
-  return [parts.bot, parts.conversation, parts.runner, MEMORY_SLOT, parts.pages ? PAGE_POINTER : "", parts.minis ? (parts.appCards ? APP_POINTER : MINI_POINTER) : "", parts.conversation || parts.runner ? STRAND_POINTER : "", parts.conversation ? CONTINUE_POINTER : "", parts.endOfReply ?? "", parts.routing]
+  const strands = parts.strands ?? !!(parts.conversation || parts.runner);
+  const text = [parts.bot, parts.conversation, parts.runner, MEMORY_SLOT, parts.pages ? PAGE_POINTER : "", parts.minis ? (parts.appCards ? APP_POINTER : MINI_POINTER) : "", strands ? STRAND_POINTER : "", parts.conversation ? CONTINUE_POINTER : "", parts.endOfReply ?? "", parts.routing]
     .filter(Boolean).join("\n\n");
+  return parts.skills === false ? withoutSkillPointers(text) : text;
 }

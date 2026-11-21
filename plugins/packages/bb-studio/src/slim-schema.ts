@@ -5,8 +5,8 @@
 //
 // - A union of objects told apart by one `const` field (pages_edit's ops,
 //   minis_data's actions…) becomes one object: that field an enum, every
-//   other field optional, and a one-line note saying which fields each value
-//   needs.
+//   other field optional (its schema as the variants give it: anyOf when
+//   they differ), and a one-line note saying which fields each value needs.
 // - `additionalProperties: false` and `$schema` go.
 
 type Json = Record<string, unknown>;
@@ -29,16 +29,22 @@ function flattenUnion(variants: Json[]): Json | null {
   if (!key) return null;
   const values: string[] = [];
   const properties: Json = {};
+  // Each field's schema in every variant that has it: one when they agree, else anyOf of the distinct ones.
+  const fieldSchemas: Record<string, unknown[]> = {};
   // Which fields each value needs, grouped: "insert_after, replace: block, markdown".
   const needs = new Map<string, string[]>();
   for (const variant of variants) {
     const props = variant.properties as Json;
     const value = String((props[key] as Json).const);
     values.push(value);
-    for (const [name, schema] of Object.entries(props)) if (name !== key && !(name in properties)) properties[name] = slim(schema);
+    for (const [name, schema] of Object.entries(props)) if (name !== key) (fieldSchemas[name] ??= []).push(slim(schema));
     const required = (Array.isArray(variant.required) ? variant.required : []).filter((name): name is string => typeof name === "string" && name !== key);
     const label = required.join(", ") || "nothing else";
     needs.set(label, [...(needs.get(label) ?? []), value]);
+  }
+  for (const [name, schemas] of Object.entries(fieldSchemas)) {
+    const distinct = [...new Map(schemas.map((schema) => [JSON.stringify(schema), schema])).values()];
+    properties[name] = distinct.length === 1 ? distinct[0] : { anyOf: distinct };
   }
   const note = [...needs.entries()].map(([fields, ops]) => `${ops.join("/")}: ${fields}`).join("; ");
   return { type: "object", properties: { [key]: { type: "string", enum: values, description: `Needs: ${note}` }, ...properties }, required: [key] };

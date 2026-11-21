@@ -19,16 +19,22 @@ const GATEWAY_ID = /^tg_/;
 
 /** The last scope each thread's session was configured with. */
 export class ScopeMemory {
-  private readonly scopes = new Map<string, Scope>();
+  private readonly scopes = new Map<string, { scope: Scope; providerId: string; model: string | null }>();
 
-  remember(threadId: string, scope: Scope): void {
+  /** Keeps the provider and model the scope was worked out for. */
+  remember(threadId: string, scope: Scope, session: { providerId: string; model: string | null }): void {
     this.scopes.delete(threadId);
-    this.scopes.set(threadId, scope);
+    this.scopes.set(threadId, { scope, ...session });
     while (this.scopes.size > MAX_SCOPES) this.scopes.delete(this.scopes.keys().next().value!);
   }
 
   get(threadId: string): Scope | undefined {
-    return this.scopes.get(threadId);
+    return this.scopes.get(threadId)?.scope;
+  }
+
+  session(threadId: string): { providerId: string; model: string | null } | undefined {
+    const entry = this.scopes.get(threadId);
+    return entry ? { providerId: entry.providerId, model: entry.model } : undefined;
   }
 }
 
@@ -43,9 +49,9 @@ export function registerScopedTools(bb: Registrar, deps: {
   /** The input schema the agent reads: the slimmed one when smaller. */
   schemaFor(name: string): unknown;
   /** Works a thread's scope out again (after Studio reloaded mid-session). */
-  recompute(threadId: string, projectId: string | undefined): Scope | null;
+  recompute(threadId: string, projectId: string | undefined): Promise<Scope | null>;
 }): void {
-  const scopeOf = (ctx: ToolCtx): Scope | null => (ctx.threadId ? deps.scopes.get(ctx.threadId) ?? deps.recompute(ctx.threadId, ctx.projectId) : null);
+  const scopeOf = async (ctx: ToolCtx): Promise<Scope | null> => (ctx.threadId ? deps.scopes.get(ctx.threadId) ?? await deps.recompute(ctx.threadId, ctx.projectId) : null);
   // The trio reaches the on-demand tools and, for an agent that searches anyway, the loaded ones.
   const reachable = (scope: Scope | null): string[] => (scope ? [...scope.onDemand, ...scope.loaded].filter((name) => !name.startsWith("studio_tool_") && !name.startsWith("tool_gateway_") && deps.book.get(name)) : []);
   const error = (message: string) => JSON.stringify({ error: message });
@@ -56,7 +62,7 @@ export function registerScopedTools(bb: Registrar, deps: {
     parameters: z.object({ query: z.string().max(500).optional().describe("Words to match; empty lists every tool") }),
     presentation: { label: { pending: "Finding tools", completed: "Found tools" } },
     execute: async (input: { query?: string }, ctx: ToolCtx) => {
-      const scope = scopeOf(ctx);
+      const scope = await scopeOf(ctx);
       const names = reachable(scope);
       const loaded = new Set(scope?.loaded ?? []);
       const tools: unknown[] = searchScoped(names.map((name) => deps.book.get(name)!).map((tool) => ({ name: tool.name, description: tool.description })), input.query)
@@ -78,7 +84,7 @@ export function registerScopedTools(bb: Registrar, deps: {
     parameters: z.object({ ids: z.array(z.string().min(1).max(100)).min(1).max(MAX_DESCRIBE).describe("Tool ids from studio_tool_search") }),
     presentation: { label: { pending: "Reading tool schemas", completed: "Read tool schemas" } },
     execute: async (input: { ids: string[] }, ctx: ToolCtx) => {
-      const scope = scopeOf(ctx);
+      const scope = await scopeOf(ctx);
       const allowed = new Set(reachable(scope));
       const tools: unknown[] = input.ids.filter((id) => allowed.has(id)).map((id) => {
         const tool = deps.book.get(id)!;
@@ -101,7 +107,7 @@ export function registerScopedTools(bb: Registrar, deps: {
     parameters: z.object({ id: z.string().min(1).max(100), args: z.record(z.string(), z.unknown()).optional() }),
     presentation: { label: { pending: "Running a tool", completed: "Ran a tool" } },
     execute: async (input: { id: string; args?: Record<string, unknown> }, ctx: ToolCtx) => {
-      const scope = scopeOf(ctx);
+      const scope = await scopeOf(ctx);
       if (scope?.gateway && GATEWAY_ID.test(input.id)) return await deps.book.run("tool_gateway_call", { id: input.id, args: input.args ?? {} }, ctx);
       if (!reachable(scope).includes(input.id)) return error(`${input.id} isn't available in this thread. Search with studio_tool_search.`);
       return await deps.book.run(input.id, input.args ?? {}, ctx, input.id);

@@ -36,11 +36,12 @@ describe("tool scope by thread kind", () => {
     expect(worker.onDemand).toEqual(expect.arrayContaining(["design_write_screen", "apps_create", "talk_read", "memory_update", "pages_comments"]));
   });
 
-  it("gives a runner runner_report, two page tools and memory_search, and nothing on demand", () => {
+  it("gives a runner runner_report, two page tools and memory_search, and the rest of its allowed set on demand", () => {
     const runner = scope("runner", "acp-opencode", { full: [...CONVERSATION_FULL, "runner_report"] });
     expect([...runner.loaded].sort()).toEqual(["memory_search", "pages_edit", "pages_read", "runner_report"]);
-    expect(runner.onDemand).toEqual([]);
-    expect(runner.delivery).toBe("none");
+    expect(runner.delivery).toBe("trio");
+    expect(runner.onDemand).toEqual(expect.arrayContaining(["pages_create", "design_write_screen", "apps_create", "talk_read", "area_update", "memory_add"]));
+    for (const name of ["strand_note", "bot_get", "bot_conversations", "automation_create", "code_show", "workbench_open", "theme"]) expect(runner.onDemand).not.toContain(name);
   });
 
   it("gives a classifier nothing", () => {
@@ -85,7 +86,8 @@ describe("delivery by provider", () => {
     // A lean runner still reaches the page and memory tools it uses, through the trio.
     const runner = scope("runner", "acp-opencode", { lean: true, full: [...CONVERSATION_FULL, "runner_report"] });
     expect(runner).toMatchObject({ loaded: ["runner_report"], delivery: "trio" });
-    expect([...runner.onDemand].sort()).toEqual(["memory_search", "pages_edit", "pages_read"]);
+    expect(runner.onDemand).toEqual(expect.arrayContaining(["memory_search", "pages_edit", "pages_read", "pages_create"]));
+    expect(runner.onDemand).not.toContain("strand_note");
   });
 
   it("folds Tool Gateway's trio into Studio's when the trio is used, and leaves it alone otherwise", () => {
@@ -108,7 +110,7 @@ describe("delivery by provider", () => {
 
 describe("the trio's helpers", () => {
   it("names the groups it reaches", () => {
-    expect(trioInstructions(["design_ask", "apps_create", "talk_read"])).toBe("Studio tools (designs, apps, recordings): find one with studio_tool_search, read its input with studio_tool_describe, then run it by id with studio_tool_call.");
+    expect(trioInstructions(["design_ask", "apps_create", "talk_read"])).toBe('Studio tools (designs, apps, recordings): find one with studio_tool_search, read its input with studio_tool_describe, then run it by id with studio_tool_call. Any Studio tool named in your instructions, skills or this chat\'s context that isn\'t in your tool list: call studio_tool_call { id: "<that name>", args } (studio_tool_describe { ids: ["<that name>"] } for its input).');
   });
 
   it("ranks name matches first and lists everything for an empty query", () => {

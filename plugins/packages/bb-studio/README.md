@@ -3735,9 +3735,9 @@ chosen from a week of tool-call history). The rest stay reachable on demand:
 |---|---|---|
 | Main | pages, memory, strand_note, conversation and Bot tools, schedules, skills, areas, design, code_show | everything else |
 | A Bot conversation (any thread the user starts) | pages, memory, strand_note, conversation tools | everything else |
-| Project lead | pages, memory | everything but the Bot's own schedules and skills, themes and presence |
+| Project lead | pages, memory, strand_note | everything but the Bot's own schedules and skills, themes and presence |
 | Worker | pages_read, pages_create, pages_edit, memory_search, memory_add | designs, apps, recordings, whiteboards, memory_update, pages_list, pages_comments |
-| Runner | runner_report, pages_read, pages_edit, memory_search | nothing |
+| Runner | runner_report, pages_read, pages_edit, memory_search | pages, designs, apps, recordings, whiteboards, areas, memory (never the user's screen, strands or the Bot's tools) |
 | Studio Decisions classifier thread | nothing | nothing |
 
 How the on-demand tools reach the agent depends on the provider:
@@ -3751,7 +3751,10 @@ How the on-demand tools reach the agent depends on the provider:
   `studio_tool_search`, `studio_tool_describe` and `studio_tool_call`
   (`src/tool-scope-tools.ts`), Tool Gateway's search → describe → call shape.
   When the thread also has Tool Gateway, the same three reach its MCP tools
-  (ids `tg_…`) and Tool Gateway's own three aren't loaded.
+  (ids `tg_…`) and Tool Gateway's own three aren't loaded. Their instruction
+  line says that any Studio tool named in the instructions, a skill or the
+  chat's context that isn't in the tool list goes through `studio_tool_call`
+  with its bare name as the id.
 
 Shown schemas are slimmed (`src/slim-schema.ts`): a union told apart by one
 `const` field (pages_edit's ops) becomes one object with an enum and a
@@ -3759,12 +3762,16 @@ Shown schemas are slimmed (`src/slim-schema.ts`): a union told apart by one
 schema, so the agent gets the same error for bad input.
 
 **Lean context** (Settings › Agent context, `src/context-lean.ts`): per
-provider, Auto, Lean or Full. Lean loads only `strand_note` (Main and
-conversations) or `runner_report` (runners) plus the three search tools, and
-lists none of Studio's skills. Auto is Lean for an ACP agent whose model id
-names a local endpoint (`local`, `ollama`, `lmstudio`, `llama.cpp`, `vllm`,
-`mlx`, `localhost`, `desktop`), Full otherwise. RPCs: `contextLean.get`,
-`contextLean.set`; kv `context:lean`.
+provider, Auto, Lean or Full. Lean loads only `strand_note` (Main,
+conversations, leads) or `runner_report` (runners) plus the three search
+tools, lists none of Studio's skills, and its pointers don't send the agent to
+one. Auto is Lean for an ACP agent whose model id names a local endpoint
+(`local`, `localhost`, `ollama`, `lmstudio`, `llama.cpp`, `vllm`; `mlx/` or
+`mlx-community/` first; Ollama's `name:tag` such as `qwen3:8b`) or whose
+provider slug does (`acp-ollama`, also on `acp-default`), Full otherwise.
+RPCs: `contextLean.get`, `contextLean.set` (BB Studio's app window only, as
+Tool Gateway's changes; any other caller is refused, and the section is
+read-only there); kv `context:lean`.
 
 ## Memory
 

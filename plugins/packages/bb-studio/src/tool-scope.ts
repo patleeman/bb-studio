@@ -40,7 +40,7 @@ export const LOADED: Record<ScopeKind, readonly string[]> = {
   // Main: design 114 calls and code_show 34 in a week, so they load here.
   main: [...PAGES, ...MEMORY, "strand_note", ...CONVERSATION, ...BOT, ...BOT_OWN, ...AREA, ...DESIGN, "code_show"],
   conversation: [...PAGES, ...MEMORY, "strand_note", ...CONVERSATION],
-  lead: [...PAGES, ...MEMORY],
+  lead: [...PAGES, ...MEMORY, "strand_note"],
   worker: ["pages_read", "pages_create", "pages_edit", "memory_search", "memory_add"],
   runner: ["runner_report", "pages_read", "pages_edit", "memory_search"],
   classifier: [],
@@ -50,7 +50,7 @@ export const LOADED: Record<ScopeKind, readonly string[]> = {
 export const LEAN_LOADED: Record<ScopeKind, readonly string[]> = {
   main: ["strand_note"],
   conversation: ["strand_note"],
-  lead: [],
+  lead: ["strand_note"],
   worker: [],
   runner: ["runner_report"],
   classifier: [],
@@ -62,7 +62,8 @@ const NEVER: Record<ScopeKind, readonly string[] | "all"> = {
   conversation: [],
   lead: [...BOT_OWN, ...LOOKS],
   worker: [...CONVERSATION, ...BOT, ...BOT_OWN, ...AREA, ...CODE, ...WORKBENCH, ...LOOKS, "strand_note"],
-  runner: "all",
+  // A runner's job is free text: it reaches pages, designs, apps, recordings and memory on demand, never the user's screen or the Bot's own tools.
+  runner: [...CONVERSATION, ...BOT, ...BOT_OWN, ...CODE, ...WORKBENCH, ...LOOKS, "strand_note"],
   classifier: "all",
 };
 
@@ -140,7 +141,7 @@ const GROUP_LABELS: [RegExp, string][] = [
 export function trioInstructions(onDemand: readonly string[], gateway = false): string {
   const groups = [...new Set(onDemand.map((name) => GROUP_LABELS.find(([pattern]) => pattern.test(name))?.[1]).filter((label): label is string => !!label))];
   if (gateway) groups.push("your MCP servers");
-  return `Studio tools (${groups.join(", ")}): find one with studio_tool_search, read its input with studio_tool_describe, then run it by id with studio_tool_call.`;
+  return `Studio tools (${groups.join(", ")}): find one with studio_tool_search, read its input with studio_tool_describe, then run it by id with studio_tool_call. Any Studio tool named in your instructions, skills or this chat's context that isn't in your tool list: call studio_tool_call { id: "<that name>", args } (studio_tool_describe { ids: ["<that name>"] } for its input).`;
 }
 
 /** Ranks on-demand tools for a query: name hits first, then description hits; empty lists all. */

@@ -4,13 +4,17 @@ import { describeRow } from "./settings/ui/AgentContextSection";
 
 describe("lean context", () => {
   it("knows a local model by its id", () => {
-    for (const model of ["inkling-local/inkling-2-mini", "ollama/qwen3", "lmstudio/glm", "desktop-vllm/qwen3.8", "llama.cpp/x", "localhost:8080/m", "127.0.0.1/m"]) expect(isLocalModel(model)).toBe(true);
-    for (const model of ["claude-opus-5-5", "opencode-go/glm-5.3", "gpt-5.5-codex", "", null]) expect(isLocalModel(model)).toBe(false);
+    for (const model of ["inkling-local/inkling-2-mini", "ollama/qwen3", "lmstudio/glm", "local-vllm/qwen3.8", "llama.cpp/x", "localhost:8080/m", "127.0.0.1/m", "mlx-community/Qwen3-8B-4bit", "mlx/glm", "qwen3:8b", "llama3.1:latest", "qwen2.5:7b-instruct-q4_K_M"]) expect(isLocalModel(model), model).toBe(true);
+    for (const model of ["claude-opus-5-5", "opencode-go/glm-5.3", "gpt-5.5-codex", "openrouter/vendor/model-mlx-tuned", "desktop-assistant-pro", "openai:gpt-5", "acp-default", "", null]) expect(isLocalModel(model), String(model)).toBe(false);
   });
 
-  it("Auto is lean only for an ACP agent on a local model; Lean and Full win", () => {
+  it("Auto is lean only for an ACP agent on a local model or a local agent; Lean and Full win", () => {
     expect(leanFor({}, "acp-opencode", "inkling-local/inkling-2-mini")).toBe(true);
+    expect(leanFor({}, "acp-opencode", "qwen3:8b")).toBe(true);
     expect(leanFor({}, "acp-opencode", "opencode-go/glm-5.3")).toBe(false);
+    expect(leanFor({}, "acp-ollama", "acp-default")).toBe(true);
+    expect(leanFor({}, "acp-lm-studio", "acp-default")).toBe(true);
+    expect(leanFor({}, "acp-opencode", "acp-default")).toBe(false);
     expect(leanFor({}, "pi", "inkling-desktop-local/x")).toBe(false);
     expect(leanFor({ "acp-opencode": "full" }, "acp-opencode", "inkling-local/x")).toBe(false);
     expect(leanFor({ codex: "lean" }, "codex", "gpt-5.5")).toBe(true);

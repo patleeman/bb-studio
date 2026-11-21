@@ -31,6 +31,17 @@ describe("slim schemas", () => {
     expect(JSON.stringify(out)).not.toContain("$schema");
   });
 
+  it("keeps every variant's shape for a field they type differently", () => {
+    const union = z.object({ action: z.discriminatedUnion("op", [
+      z.object({ op: z.literal("set"), value: z.string(), key: z.string() }),
+      z.object({ op: z.literal("count"), value: z.number().int(), key: z.string() }),
+      z.object({ op: z.literal("clear") }),
+    ]) });
+    const out = slim(union.toJSONSchema()) as { properties: { action: { properties: Record<string, unknown> } } };
+    expect(out.properties.action.properties.value).toEqual({ anyOf: [{ type: "string" }, { type: "integer", minimum: expect.any(Number), maximum: expect.any(Number) }] });
+    expect(out.properties.action.properties.key).toEqual({ type: "string" });
+  });
+
   it("is used only when it saves enough", () => {
     expect(slimmedIfSmaller(edit.toJSONSchema())).not.toBeNull();
     expect(slimmedIfSmaller(z.object({ query: z.string() }).toJSONSchema())).toBeNull();
