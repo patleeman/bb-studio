@@ -1,3 +1,4 @@
+import { forkGroupDeferredCodexTools } from "./defer-loading.fork.js";
 import { applyForkCodexConfig } from "./computer-use.fork.js";
 import { experimental_selectedSkillMentions as selectedSkillMentions } from "@get-bb/plugin-sdk/provider-bridge";
 import {
@@ -679,10 +680,10 @@ interface CodexDynamicToolInput {
 export function toCodexDynamicTools(
   dynamicTools: readonly CodexDynamicToolInput[] | undefined,
 ): DynamicToolSpec[] | undefined {
-  return dynamicTools?.map((tool) => ({
+  return forkGroupDeferredCodexTools(dynamicTools?.map((tool) => ({
     type: "function",
     name: tool.name,
     description: tool.description,
     inputSchema: jsonValueSchema.parse(tool.inputSchema),
-  }));
+  })));
 }

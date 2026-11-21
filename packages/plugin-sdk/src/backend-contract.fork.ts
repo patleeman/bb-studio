@@ -117,6 +117,14 @@ export interface ForkPluginHooks {
     readonly threadNotices: true;
     readonly autoRouter: true;
     readonly textCompletion: true;
+    /**
+     * configure() may mark a tool for deferred loading with the JSON Schema
+     * vendor key `x-bb-defer-loading` (true, or a namespace name) at the top
+     * of its `parameters` override. Codex then lists it in that namespace and
+     * loads its schema only when the model searches for it (deferLoading);
+     * other providers ignore the key.
+     */
+    readonly deferredAgentTools: true;
   };
   /**
    * Answer "what kind of turn was this?" for every turn that finishes. One

@@ -31,6 +31,7 @@ export function forkFakeHooks(): ForkPluginHooks {
       threadNotices: true,
       autoRouter: true,
       textCompletion: true,
+      deferredAgentTools: true,
     },
     experimental_autoRouter() {},
     experimental_completeText: () =>

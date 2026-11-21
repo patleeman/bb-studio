@@ -50,6 +50,7 @@ export function forkPluginHooks(args: {
       threadNotices: true,
       autoRouter: true,
       textCompletion: true,
+      deferredAgentTools: true,
     },
     experimental_classifyTurns(classifier) {
       args.assertLive();
