@@ -252,6 +252,19 @@ enum BotSpacesDemo {
         private var juniperState = "active"
         private(set) var mainMadeFrom: String?
 
+        /// `strands.tags` for the demo's Main: its first turn in Lisbon trip, the PR turns in the fork's strand, today's in Theme stills.
+        static func strandTagsJSON(_ threadId: String) -> [String: Any] {
+            guard threadId == BotDemo.threadId else { return ["tags": [Any](), "strands": [Any]()] }
+            let tags: [[String: Any]] = [
+                ["turnId": "t1", "seq": 1, "strandId": "str_lisbon"],
+                ["turnId": "t2", "seq": 2, "strandId": "str_fork"],
+                ["turnId": "t3", "seq": 5, "strandId": "str_stills"],
+            ]
+            let names: [[String: Any]] = [["id": "str_lisbon", "title": "Lisbon trip"], ["id": "str_fork", "title": "Studio-native BB fork"],
+                                          ["id": "str_stills", "title": "Theme stills"]]
+            return ["tags": tags, "strands": names]
+        }
+
         /// `strands.list` for the demo's Main and Launch prep: two asks, two running strands with workers, a finished one, a quiet one.
         static func strandsJSON(_ threadId: String, now: Double, resolved: Bool) -> [String: Any] {
             func strand(_ id: String, _ title: String, _ summary: String, _ state: String, seq: Double, asks: [[String: Any]] = [], workers: [[String: Any]] = []) -> [String: Any] {
@@ -495,7 +508,8 @@ enum BotSpacesDemo {
                 return ok(Self.strandsJSON(threadId, now: Self.now, resolved: lock.withLock { strandsResolved }))
             case "strands.opened", "strands.tags":
                 guard BotSpacesDemo.strands else { return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
-                return ok(name == "strands.tags" ? ["tags": [Any](), "strands": [Any]()] : ["ok": true])
+                let answer: [String: Any] = name == "strands.tags" ? Self.strandTagsJSON(threadId) : ["ok": true]
+                return ok(answer)
             case "bot_worker_approval_resolve":
                 if (input["interactionId"] as? String) == "ask_demo_push" {
                     lock.withLock { strandsResolved = true }

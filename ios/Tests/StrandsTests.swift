@@ -116,3 +116,33 @@ final class StrandsDemoTests: XCTestCase {
         XCTAssertEqual(StrandsBoxModel.counts(list).needs, 2)
     }
 }
+
+final class StrandTimelineTests: XCTestCase {
+    private let tags = StrandTags(tags: [.init(turnId: "a", seq: 10, strandId: "s1"), .init(turnId: "b", seq: 20, strandId: "s2"),
+                                         .init(turnId: "c", seq: 30, strandId: "s1")])
+
+    func testARowBelongsToTheTurnThatStartsAtOrBeforeIt() {
+        XCTAssertNil(tags.strand(atSeq: 5), "older than every sorted turn")
+        XCTAssertEqual(tags.strand(atSeq: 10), "s1")
+        XCTAssertEqual(tags.strand(atSeq: 25), "s2")
+        XCTAssertEqual(tags.strand(atSeq: 99), "s1")
+        XCTAssertNil(tags.strand(atSeq: nil))
+    }
+
+    func testDividersWhereTheStrandChangesAndGapsUnderAFilter() throws {
+        let named = try JSONDecoder().decode(StrandTags.self, from: Data(#"{"tags":[{"turnId":"a","seq":10,"strandId":"s1"},{"turnId":"b","seq":20,"strandId":"s2"},{"turnId":"c","seq":30,"strandId":"s1"}],"strands":[{"id":"s1","title":"One"},{"id":"s2","title":"Two"}]}"#.utf8))
+        let seqs: [Double?] = [11, 12, 21, 31, nil]
+        let messages = [true, false, true, true, false]
+        let all = StrandTimeline.plan(seqs: seqs, messages: messages, tags: named, only: nil)
+        XCTAssertEqual(all.keep, [true, true, true, true, true])
+        XCTAssertEqual(all.marks[0], [.divider(strandId: "s1", title: "One")])
+        XCTAssertNil(all.marks[1], "same strand, no divider")
+        XCTAssertEqual(all.marks[2], [.divider(strandId: "s2", title: "Two")])
+        XCTAssertEqual(all.marks[3], [.divider(strandId: "s1", title: "One")])
+
+        let only = StrandTimeline.plan(seqs: seqs, messages: messages, tags: named, only: "s1")
+        XCTAssertEqual(only.keep, [true, true, false, true, true], "a row from no turn stays")
+        XCTAssertEqual(only.marks[3], [.gap(count: 1)])
+        XCTAssertNil(only.marks[0])
+    }
+}

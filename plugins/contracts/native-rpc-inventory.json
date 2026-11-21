@@ -734,6 +734,12 @@
       "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
+      "file": "ios/Shared/StrandTimeline.swift",
+      "plugin": "studio",
+      "method": "strands.tags",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/Shared/Strands.swift",
       "plugin": "studio",
       "method": "strands.list",
