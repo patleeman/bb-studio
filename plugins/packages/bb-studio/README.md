@@ -3745,7 +3745,8 @@ How the on-demand tools reach the agent depends on the provider:
 - **Claude Code** gets them all and defers them behind its own tool search.
 - **Codex** gets them with `deferLoading` when BB supports it
   (`experimental_hooks.experimental_features.deferredAgentTools`): each one's
-  `parameters` override carries `x-bb-defer-loading: true`.
+  `parameters` override carries `x-bb-defer-loading: "studio"`, and BB puts
+  them in a `studio` namespace (Codex takes deferred tools only inside one).
 - **Pi, ACP agents**, and Codex on a BB without that flag, get
   `studio_tool_search`, `studio_tool_describe` and `studio_tool_call`
   (`src/tool-scope-tools.ts`), Tool Gateway's search → describe → call shape.

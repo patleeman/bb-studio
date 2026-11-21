@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFER_LOADING_KEY, LEAN_LOADED, LOADED, scopeEntries, scopeTools, searchScoped, TRIO_TOOLS, trioInstructions, type ScopeKind } from "./tool-scope";
+import { DEFER_LOADING_KEY, DEFER_NAMESPACE, LEAN_LOADED, LOADED, scopeEntries, scopeTools, searchScoped, TRIO_TOOLS, trioInstructions, type ScopeKind } from "./tool-scope";
 
 // A conversation's full list, as Studio's configure() builds it (memory included).
 const CONVERSATION_FULL = [
@@ -62,9 +62,9 @@ describe("delivery by provider", () => {
 
   it("Codex marks the on-demand tools `defer` when BB supports it, else uses the trio", () => {
     const deferred = scopeEntries(scope("conversation", "codex", { defer: true }), NONE);
-    const marked = deferred.filter((entry) => typeof entry === "object" && entry.parameters[DEFER_LOADING_KEY] === true);
+    const marked = deferred.filter((entry) => typeof entry === "object" && entry.parameters[DEFER_LOADING_KEY] === DEFER_NAMESPACE);
     expect(marked).toHaveLength(CONVERSATION_FULL.length - 14);
-    expect(marked[0]).toEqual({ name: expect.any(String), parameters: { type: "object", [DEFER_LOADING_KEY]: true } });
+    expect(marked[0]).toEqual({ name: expect.any(String), parameters: { type: "object", [DEFER_LOADING_KEY]: "studio" } });
     expect(names(deferred)).not.toEqual(expect.arrayContaining([...TRIO_TOOLS]));
     expect(names(scopeEntries(scope("conversation", "codex"), NONE))).toEqual(expect.arrayContaining([...TRIO_TOOLS]));
   });

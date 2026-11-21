@@ -7,7 +7,8 @@
 // - Codex defers the on-demand ones when BB supports it
 //   (experimental_hooks.experimental_features.deferredAgentTools): each one's
 //   `parameters` override carries the JSON Schema vendor key
-//   `x-bb-defer-loading: true`, which BB's Codex bridge turns into deferLoading.
+//   `x-bb-defer-loading: "studio"`, which BB's Codex bridge turns into
+//   deferLoading inside a "studio" namespace.
 // - Every other provider, and any provider in lean mode, gets the loaded tools
 //   plus three tools to reach the rest: studio_tool_search, studio_tool_describe
 //   and studio_tool_call, the same search → describe → call shape as Tool
@@ -69,6 +70,8 @@ const NEVER: Record<ScopeKind, readonly string[] | "all"> = {
 export const ON_DEMAND_EXTRAS = ["studio_tag_items"] as const;
 
 export const DEFER_LOADING_KEY = "x-bb-defer-loading";
+/** The Codex namespace Studio's deferred tools go in (Codex takes deferred tools only inside one). */
+export const DEFER_NAMESPACE = "studio";
 
 export type ToolEntry = string | { name: string; parameters: Record<string, unknown> };
 
@@ -116,7 +119,7 @@ export function scopeEntries(scope: Scope, shown: { slim(name: string): Record<s
   };
   const deferred = (name: string): ToolEntry => {
     const schema = shown.schema(name);
-    return schema ? { name, parameters: { ...schema, [DEFER_LOADING_KEY]: true } } : name;
+    return schema ? { name, parameters: { ...schema, [DEFER_LOADING_KEY]: DEFER_NAMESPACE } } : name;
   };
   const loaded = scope.loaded.map(entry);
   switch (scope.delivery) {
