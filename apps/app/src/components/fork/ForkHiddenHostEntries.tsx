@@ -1,6 +1,7 @@
 import type {
   ExperimentalHostPage,
   ExperimentalHostSetting,
+  ExperimentalPromptStackSource,
 } from "@get-bb/plugin-sdk/app";
 import { useMemo, type ReactElement } from "react";
 import { Navigate } from "react-router-dom";
@@ -15,6 +16,7 @@ interface HiddenHostEntries {
   settingsSections: ReadonlySet<string>;
   footer: ReadonlySet<string>;
   promptStack: ReadonlySet<string>;
+  promptStackSources: readonly ExperimentalPromptStackSource[];
 }
 
 export function useForkHiddenHostEntries(): HiddenHostEntries {
@@ -30,6 +32,7 @@ export function useForkHiddenHostEntries(): HiddenHostEntries {
       ),
       footer: new Set(entries.flatMap((entry) => entry.footer ?? [])),
       promptStack: new Set(entries.flatMap((entry) => entry.promptStack ?? [])),
+      promptStackSources: entries.flatMap((entry) => (entry.promptStackFor ? [entry.promptStackFor] : [])),
     };
   }, [registrations]);
 }

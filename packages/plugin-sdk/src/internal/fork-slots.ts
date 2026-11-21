@@ -13,6 +13,7 @@ import type {
   ExperimentalNewConversationRegistration,
   ExperimentalModelPickerGateRegistration,
   ExperimentalHideHostEntriesRegistration,
+  ExperimentalPromptStackSource,
   ExperimentalThreadBannerRegistration,
   ExperimentalThreadHeaderRegistration,
   ExperimentalPaletteSearchRegistration,
@@ -355,6 +356,9 @@ export function forkSlotMethods(
         ),
         footer: list("footer", registration.footer),
         promptStack: list("promptStack", registration.promptStack),
+        ...(registration.promptStackFor === undefined
+          ? {}
+          : { promptStackFor: promptStackSource(kind, id, registration.promptStackFor) }),
       });
     },
     experimental_threadHeader(registration) {
@@ -521,4 +525,12 @@ function requireFunction<T>(kind: string, field: string, value: unknown): T {
     throw new Error(`${kind}: "${field}" must be a function`);
   }
   return value as T;
+}
+
+function promptStackSource(kind: string, id: string, source: unknown): ExperimentalPromptStackSource {
+  const value = source as Partial<ExperimentalPromptStackSource> | null;
+  if (typeof value?.get !== "function" || typeof value.subscribe !== "function") {
+    throw new Error(`${kind} "${id}": promptStackFor must have get and subscribe functions`);
+  }
+  return { get: value.get.bind(value), subscribe: value.subscribe.bind(value) };
 }
