@@ -1561,7 +1561,7 @@ struct ThreadView: View {
 
     private var conversationTitle: some View {
         ConversationTitle(title: model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? conversation?.conversation?.title ?? "Conversation",
-                          model: conversationModel?.chip ?? executionLabel) { choosingModel = true }
+                          model: conversationModel?.chip ?? executionLabel, pages: roomChat?.pages) { choosingModel = true }
     }
 
     /// Replaces the `@word` being typed with the mention.
@@ -1634,6 +1634,13 @@ struct ThreadView: View {
 
     private var stackLine: Bool { conversation != nil || botChrome != nil }
 
+    private var strands: StrandsModel { StrandsModel.shared }
+
+    /// A strand's worker, or the thread a worker's question waits in.
+    private func openStrandThread(_ threadId: String) {
+        if let conversation { conversation.push(.thread(id: threadId)) } else { open(.thread(id: threadId)) }
+    }
+
     private var stackClear: CGFloat { duoLayout.twoPages ? duoLayout.statusColumn : 0 }
 
     private var threadComposer: some View {
@@ -1649,19 +1656,24 @@ struct ThreadView: View {
                 }
             }
             if stackLine {
-                InFlightBar(threadId: model.threadId, typing: composerFocused, liveStep: liveStep,
-                            workers: conversation?.workers.workers.count ?? 0)
-                    .padding(.trailing, stackClear)
+                if strands.replacesInFlight() {
+                    StrandsBox(threadId: model.threadId, typing: composerFocused, openThread: openStrandThread)
+                        .padding(.trailing, stackClear)
+                } else {
+                    InFlightBar(threadId: model.threadId, typing: composerFocused, liveStep: liveStep,
+                                workers: conversation?.workers.workers.count ?? 0)
+                        .padding(.trailing, stackClear)
+                }
             }
             if let conversation {
                 WorkerApprovalCards(approvals: approvals, openWorker: { conversation.push(.thread(id: $0)) }, decide: decideApproval)
             }
-            if !composerFocused, let conversation, let workers = unlistedWorkers(conversation.workers) {
+            if !composerFocused, let conversation, !(stackLine && strands.replacesInFlight()), let workers = unlistedWorkers(conversation.workers) {
                 WorkersLineView(line: workers) { conversation.push(.thread(id: $0)) }
                     .padding(.trailing, stackClear)
             }
             if !(composerFocused && stackLine) {
-                ThreadShelf(model: model, showsBackground: !(stackLine && InFlightBar.shows(model.threadId)))
+                ThreadShelf(model: model, showsBackground: !(stackLine && !strands.replacesInFlight() && InFlightBar.shows(model.threadId)))
                     .padding(.trailing, stackClear)
             }
             if let error = outbox.storageError {
@@ -1850,6 +1862,9 @@ struct ThreadView: View {
         }
         .task(id: conversation != nil || botChrome != nil ? model.threadId : "") {
             guard conversation != nil || botChrome != nil else { return }
+            // Strands take In flight's place; a Studio without them keeps In flight.
+            await StrandsModel.shared.poll(model.threadId)
+            guard !Task.isCancelled, !StrandsModel.shared.replacesInFlight() else { return }
             await InFlightBar.poll(model.threadId)
         }
     }
@@ -2153,6 +2168,7 @@ extension ThreadView {
             },
             onNearTop: { transcriptV2LoadOlder() },
             onEmptyTap: roomChat?.layDown,
+            onPage: lying || composerFocused ? nil : roomChat?.page,
             rowsHidden: lying,
             onPillChange: { state in
                 let next = TranscriptPillState(shown: state.shown, unseen: min(state.unseen, 1), note: state.note)

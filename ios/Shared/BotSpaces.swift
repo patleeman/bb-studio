@@ -109,6 +109,9 @@ public struct BotConversation: Codable, Hashable, Sendable, Identifiable {
     public var running: Bool
     public var needsYou: NeedsYou?
     public var mirrored: Bool
+    /// The agent provider it runs on (BB's provider id, e.g. `claude-code`), and its model's name.
+    public var providerId: String?
+    public var modelName: String?
 
     init?(_ wire: Studio.BotThreadsViewOutputConversationsItem) {
         guard let threadId = wire.threadId, !threadId.isEmpty else { return nil }
@@ -126,6 +129,8 @@ public struct BotConversation: Codable, Hashable, Sendable, Identifiable {
         running = wire.running ?? false
         needsYou = wire.needsYou.map { NeedsYou(reason: $0.reason ?? "", at: $0.at ?? 0) }
         mirrored = wire.mirrored ?? false
+        providerId = wire.providerId
+        modelName = wire.modelName
     }
 
     public var updated: Date { Date(timeIntervalSince1970: updatedAt / 1000) }
@@ -188,6 +193,12 @@ public struct BotWorker: Codable, Hashable, Sendable, Identifiable {
     public var branch: String?
     public var mirrored: Bool
     public var sameTitle: Int
+    public var providerId: String?
+    public var modelName: String?
+    /// The worker of this Bot that started it (a worker of a worker); nil when a conversation did.
+    public var spawnedBy: String?
+    /// The conversation row it nests under (its owner, or the row a fork made at a message folds into).
+    public var nestUnder: String?
 
     init?(_ wire: Studio.BotThreadsViewOutputWorkersItem) {
         guard let threadId = wire.threadId, !threadId.isEmpty else { return nil }
@@ -202,7 +213,14 @@ public struct BotWorker: Codable, Hashable, Sendable, Identifiable {
         branch = wire.branch
         mirrored = wire.mirrored ?? false
         sameTitle = max(1, wire.sameTitle ?? 1)
+        providerId = wire.providerId
+        modelName = wire.modelName
+        spawnedBy = wire.spawnedBy
+        nestUnder = wire.nestUnder
     }
+
+    /// The conversation row it belongs under: Studio's `nestUnder`, else its owner (an older Studio).
+    public var home: String? { nestUnder ?? ownerConversationId }
 
     public var updated: Date { Date(timeIntervalSince1970: updatedAt / 1000) }
 }
@@ -238,8 +256,9 @@ public struct BotThreadsView: Codable, Hashable, Sendable {
         conversations.filter { $0.forkedFrom?.threadId == conversationId && $0.threadId != conversationId }
     }
 
+    /// The workers under a conversation's row, a fork made at a message's included (Studio's `nestUnder`).
     public func workers(of conversationId: String) -> [BotWorker] {
-        workers.filter { $0.ownerConversationId == conversationId }
+        workers.filter { $0.home == conversationId }
     }
 }
 

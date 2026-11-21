@@ -734,6 +734,18 @@
       "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
+      "file": "ios/Shared/Strands.swift",
+      "plugin": "studio",
+      "method": "strands.list",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/Shared/Strands.swift",
+      "plugin": "studio",
+      "method": "strands.opened",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/Shared/Studio.swift",
       "plugin": "studio",
       "method": "overview",

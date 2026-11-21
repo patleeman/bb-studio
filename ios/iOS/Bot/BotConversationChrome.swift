@@ -132,11 +132,33 @@ struct ConversationReplyRow: View {
 struct ConversationTitle: View {
     let title: String
     let model: String?
+    var pages: RoomChatPages? = nil
     let choose: () -> Void
 
     var body: some View {
         VStack(spacing: 1) {
             Text(title).font(.headline).lineLimit(1)
+                .id(title)
+                .transition(.push(from: .trailing).combined(with: .opacity))
+            HStack(spacing: 6) {
+                if let pages, pages.count > 1 {
+                    HStack(spacing: 4) {
+                        ForEach(0..<min(pages.count, 9), id: \.self) { at in
+                            Capsule().fill(.primary.opacity(at == pages.index ? 0.8 : 0.25))
+                                .frame(width: at == pages.index ? 10 : 4, height: 4)
+                        }
+                    }
+                    .animation(.snappy, value: pages.index)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Conversation \(pages.index + 1) of \(pages.count)")
+                    .accessibilityIdentifier("conversationPageDots")
+                }
+                chip
+            }
+        }
+    }
+
+    private var chip: some View {
             Button(action: choose) {
                 HStack(spacing: 3) {
                     Text(model ?? "Model").lineLimit(1)
@@ -152,7 +174,6 @@ struct ConversationTitle: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Model: \(model ?? "unknown")")
             .accessibilityIdentifier("conversationModelChip")
-        }
     }
 }
 

@@ -350,6 +350,9 @@ struct BotConversationRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
+                if let logo = ProviderLogo(line.providerId) {
+                    logo.frame(width: 14, height: 14).alignmentGuide(.firstTextBaseline) { $0[.bottom] - 2 }.accessibilityHidden(true)
+                }
                 Text(line.title).font(.body.weight(.semibold)).lineLimit(1)
                 if let parent = line.forkedFrom {
                     Text("⑂ " + parent)

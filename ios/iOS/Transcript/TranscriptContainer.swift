@@ -49,6 +49,7 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
     var pill: (TranscriptPillState, @escaping () -> Void) -> Pill
     var onNearTop: (() -> Void)?
     var onEmptyTap: (() -> Void)?
+    var onPage: ((CGFloat, CGFloat?) -> Void)?
     var rowsHidden = false
     var onPillChange: ((TranscriptPillState) -> Void)?
     var log: ((String) -> Void)?
@@ -78,6 +79,7 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         let coordinator = context.coordinator
         controller.onNearTop = onNearTop
         controller.onEmptyTap = onEmptyTap
+        controller.onPage = onPage
         controller.rowsHidden = rowsHidden
         controller.onPillChange = onPillChange
         controller.log = log

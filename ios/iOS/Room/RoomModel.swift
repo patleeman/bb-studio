@@ -365,6 +365,15 @@ struct RoomChat {
     var focusRequests: Int
     var away: Bool
     var layDown: () -> Void
+    /// Swiping sideways on the messages pages between the Bot's conversations.
+    var page: ((CGFloat, CGFloat?) -> Void)? = nil
+    /// Where this conversation is among them, for the dots under its name.
+    var pages: RoomChatPages? = nil
+}
+
+struct RoomChatPages: Equatable {
+    var index: Int
+    var count: Int
 }
 
 private struct RoomChatKey: EnvironmentKey {
