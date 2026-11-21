@@ -5,7 +5,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { primaryHostId } from "../kit/server/project";
-import { runStrandsCli, strandsThreadFor } from "./cli";
+import { runStrandsCli, strandsThreadFor, type StrandsScope } from "./cli";
 import { rpcContract } from "./contract";
 import { EVENT_TYPES, type EventRow } from "./turns";
 import { JEV_TIMEOUT_MS, STRANDS_CALLER } from "./detector";
@@ -21,18 +21,18 @@ export interface StrandsDecisions {
 
 export interface StrandsRegisterDeps {
   decisions: StrandsDecisions;
-  /** Each Bot's Main thread. */
-  mains(): string[];
+  /** A conversation strands run in (a Bot's, Main included; not a worker, not archived): its Bot and last activity. */
+  conversation(threadId: string): { botId: string; lastActiveAt: number } | null;
+  /** A Bot's conversations, for the overview. */
+  conversationsOf(botId: string): Promise<{ threadId: string; title: string; isMain: boolean; lastActiveAt: number }[]>;
   workers(threadId: string): Promise<WorkerFact[]>;
-  /** The Main of the Bot a thread belongs to (a conversation or a worker of it); null for a thread of no Bot. */
-  botMainFor(threadId: string): string | null;
+  /** Who may see which conversation's strands from `bb studio strands`. */
+  scope: Omit<StrandsScope, "enabled">;
   /** Secret values to keep out of what strands send and keep: Studio's API keys, Tool Gateway's secrets. */
   secrets(): Promise<readonly string[]>;
   log(message: string): void;
 }
 
-/** Backfill this long after Studio starts, so start-up work goes first. */
-const BACKFILL_DELAY_MS = 90_000;
 const BUSY = new Set(["active", "pending", "starting", "stopping"]);
 
 export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: StrandsRegisterDeps): { service: StrandService | null; cli(argv: readonly string[], ctx: { threadId?: string | null }): Promise<{ exitCode: number; stdout?: string; stderr?: string }> } {
@@ -52,7 +52,8 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
   const threadOf = async (threadId: string) => await bb.sdk.threads.get({ threadId }).catch(() => null) as { status?: string; providerId?: string | null } | null;
   const service = new StrandService({
     db,
-    conversations: deps.mains,
+    conversation: deps.conversation,
+    conversationsOf: deps.conversationsOf,
     events: async ({ threadId, afterSeq, beforeSeq, order, limit }) => await bb.sdk.threads.events.list({
       threadId, order, limit: String(limit), types: [...EVENT_TYPES],
       ...(afterSeq !== undefined ? { afterSeq: String(afterSeq) } : {}), ...(beforeSeq !== undefined ? { beforeSeq: String(beforeSeq) } : {}),
@@ -88,18 +89,23 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
   bb.events.on("thread.active", ({ thread }) => run("early sort", () => service.active(thread.id)));
   bb.events.on("interaction.pending", ({ thread }) => run("early sort", () => service.asked(thread.id)));
   bb.events.on("thread.deleted", ({ thread }) => run("forget", () => service.forget(thread.id)));
-  const backfill = setTimeout(() => run("backfill", () => service.backfillAll()), BACKFILL_DELAY_MS);
-  bb.onDispose(() => { disposed = true; clearTimeout(backfill); if (signal) clearTimeout(signal); service.dispose(); });
+  bb.onDispose(() => { disposed = true; if (signal) clearTimeout(signal); service.dispose(); });
 
   bb.rpc.register(rpcContract, {
     "strands.list": ({ threadId }) => service.list(threadId),
     "strands.items": ({ threadId, limit }) => ({ items: service.items(threadId, limit ?? 200) }),
     "strands.tags": ({ threadId }) => service.tags(threadId),
     "strands.opened": ({ strandId }) => ({ ok: service.opened(strandId) }),
+    "strands.overview": ({ botId }) => service.overview(botId),
+    "strands.move": ({ threadId, seq, strandId }) => ({ ok: service.move(threadId, seq, strandId) }),
+    "strands.split": ({ threadId, seq }) => { const strandId = service.split(threadId, seq); return { ok: !!strandId, strandId }; },
+    "strands.rename": ({ strandId, title }) => ({ ok: service.rename(strandId, title) }),
+    "strands.pin": ({ strandId, pinned }) => ({ ok: service.pin(strandId, pinned) }),
+    "strands.merge": ({ strandId, into }) => ({ ok: service.merge(strandId, into) }),
   });
 
   const cli = (argv: readonly string[], ctx: { threadId?: string | null }) => runStrandsCli(argv, {
-    resolve: async (ref) => strandsThreadFor(ref, ctx.threadId ?? null, deps.mains(), deps.botMainFor),
+    resolve: async (ref) => strandsThreadFor(ref, ctx.threadId ?? null, { ...deps.scope, enabled: (threadId) => service.enabled(threadId) }),
     list: (threadId) => service.list(threadId),
     items: (threadId, limit) => service.items(threadId, limit),
     sort: (threadId) => service.idle(threadId),

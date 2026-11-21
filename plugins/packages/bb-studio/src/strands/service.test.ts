@@ -76,7 +76,8 @@ function service(options: { workers?: WorkerFact[]; asks?: Record<string, (Inter
   const db = database();
   const thread = new FakeThread();
   const svc = new StrandService({
-    db, conversations: () => [thread.id], events: thread.events, jev: fakeJev(), model: fakeModel(), changed: () => {}, log: () => {}, now: () => NOW,
+    db, conversation: (id) => (id === thread.id ? { botId: "bot", lastActiveAt: NOW } : null),
+    conversationsOf: async () => [{ threadId: thread.id, title: "Main", isMain: true, lastActiveAt: NOW }], events: thread.events, jev: fakeJev(), model: fakeModel(), changed: () => {}, log: () => {}, now: () => NOW,
     setTimer: () => null, clearTimer: () => {},
     workers: async () => options.workers ?? [], interactions: async (threadId) => options.asks?.[threadId] ?? [], busy: async () => options.busy ?? false,
   });

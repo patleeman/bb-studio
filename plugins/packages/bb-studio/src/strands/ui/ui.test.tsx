@@ -39,7 +39,7 @@ const TAGS: Tags = {
 
 describe("the strands UI model (design 4a)", () => {
   it("puts a divider where the strand changes from the last sorted turn, skipping turns in none", () => {
-    expect(tagOf(TAGS, "t1")).toEqual({ strandId: "s_cx", title: "CodexBar quota", divider: true });
+    expect(tagOf(TAGS, "t1")).toEqual({ strandId: "s_cx", title: "CodexBar quota", divider: true, seq: 4 });
     expect(tagOf(TAGS, "t2")?.divider).toBe(false);
     expect(tagOf(TAGS, "t3")).toBeNull();
     expect(tagOf(TAGS, "t4")?.divider).toBe(false);
@@ -84,23 +84,26 @@ const state = vi.hoisted(() => ({
   toThread: vi.fn(),
   openTab: vi.fn(() => true),
   composerThread: "thr_main" as string | null,
+  overview: null as unknown,
 }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => ({ toThread: state.toThread, experimental_toAppPath: state.toAppPath }),
   experimental_useAppPanel: () => ({ openTab: state.openTab }),
 }));
 vi.mock("../../ui/live", () => ({
-  useLive: (method: string) => ({ data: method === "strands.list" ? state.list : method === "strands.tags" ? state.tags : null, error: null, loading: false, refresh: vi.fn() }),
+  useLive: (method: string) => ({ data: method === "strands.list" ? state.list : method === "strands.tags" ? state.tags : method === "strands.overview" ? state.overview : null, error: null, loading: false, refresh: vi.fn() }),
   useCall: () => state.call,
 }));
 vi.mock("../../kit/ui/index", async () => ({ ...(await import("../../loops/ui/test-kit")).kitUi, Tooltip: ({ children }: { children?: React.ReactNode }) => <>{children}</> }));
 vi.mock("../../kit/app/route", () => ({ usePathname: () => "/threads/thr_main" }));
 vi.mock("../../kit/composer", () => ({ useComposerThread: () => state.composerThread }));
-vi.mock("../../work/ui/InFlight", () => ({ InFlightBanner: () => <div data-testid="in-flight" /> }));
+vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ values: { strandsOverview: true } }) }));
+vi.mock("../../kit/app/index", () => ({ PageColumn: ({ children }: { children?: React.ReactNode }) => <div>{children}</div> }));
 vi.mock("../../ui/conversations/bot-thread-owners", () => ({ useIsBotThread: () => true }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
-const { InFlightUnlessStrands, StrandsLineBanner } = await import("./Strip");
+const { StrandsLineBanner } = await import("./Strip");
+const { StrandsOverview } = await import("./Overview");
 const { StrandTag } = await import("./Tag");
 const { StrandsTab } = await import("./Tab");
 const { select } = await import("./selection");
@@ -120,21 +123,19 @@ const render = (node: React.ReactNode) => act(() => root.render(node));
 const click = (element: Element | null | undefined) => act(() => { (element as HTMLElement).click(); });
 const text = (element: Element | null | undefined) => element?.textContent ?? "";
 
-describe("the strands line above Main's composer", () => {
-  const Banners = () => <><InFlightUnlessStrands /><StrandsLineBanner /></>;
+describe("the strands line above a conversation's composer", () => {
+  const Banners = () => <StrandsLineBanner />;
   const line = () => container.querySelector('[data-testid="strands-strip"]');
 
-  it("takes In flight's place where strands run, and takes no space when nothing is open", () => {
+  it("shows where strands run, and takes no space when nothing is open or strands don't run there", () => {
     render(<Banners />);
     expect(line()).not.toBeNull();
-    expect(container.querySelector('[data-testid="in-flight"]')).toBeNull();
     state.list = { ...LIST, strands: [view("q", "Quiet one", { state: "quiet" })] };
     render(<Banners />);
     expect(container.innerHTML).toBe("");
     state.list = { ...LIST, enabled: false, strands: [], earlier: [] };
     render(<Banners />);
-    expect(container.querySelector('[data-testid="in-flight"]')).not.toBeNull();
-    expect(line()).toBeNull();
+    expect(container.innerHTML).toBe("");
   });
 
   it("is one line of text: the current strand, then counts, amber only for need you; no pills, no ask rows", () => {
@@ -213,7 +214,7 @@ describe("the tag above each message", () => {
   it("draws a divider with the strand's name where the strand changes, and the muted name otherwise", () => {
     render(<>{row("t4", "user")}{row("t5", "user")}{row("t5", "assistant")}</>);
     expect(container.querySelectorAll("[data-strand-divider]")).toHaveLength(1);
-    expect(text(container.querySelector('[data-strand-divider="s_hvac"]'))).toBe("Furnace tune-up");
+    expect(text(container.querySelector('[data-strand-divider="s_hvac"] button'))).toBe("Furnace tune-up");
     expect([...container.querySelectorAll("[data-strand-tag]")].map(text)).toEqual(["CodexBar quota", "Furnace tune-up"]);
   });
 
@@ -227,13 +228,81 @@ describe("the tag above each message", () => {
   });
 });
 
+describe("Move to… on a message's tag", () => {
+  const message = { id: "m_t4", threadId: "thr_main", turnId: "t4", role: "user" as const, initiator: "user" as const, createdAt: NOW };
+
+  it("moves the message's turn to another strand, or starts a new strand from it", async () => {
+    render(<div data-timeline-row-id="t4"><StrandTag message={message as never} /></div>);
+    click(container.querySelector("[data-strand-move]"));
+    const menu = container.querySelector('[data-testid="strand-move-menu"]')!;
+    const options = [...menu.querySelectorAll<HTMLButtonElement>("[data-strand-option]")];
+    expect(options.map((option) => option.getAttribute("data-strand-option"))).toEqual([...TAGS.strands.map((strand) => strand.id), "new"]);
+    // Its own strand is checked and can't be picked.
+    expect(options.find((option) => option.getAttribute("data-strand-option") === "s_cx")!.disabled).toBe(true);
+    state.call.mockResolvedValue({ ok: true });
+    await act(async () => { options.find((option) => option.getAttribute("data-strand-option") === "s_red4")!.click(); });
+    expect(state.call).toHaveBeenCalledWith("strands.move", { threadId: "thr_main", seq: 16, strandId: "s_red4" });
+    click(container.querySelector("[data-strand-move]"));
+    await act(async () => { (container.querySelector('[data-strand-option="new"]') as HTMLElement).click(); });
+    expect(state.call).toHaveBeenCalledWith("strands.split", { threadId: "thr_main", seq: 16 });
+  });
+});
+
+describe("the Strands tab's row menu", () => {
+  it("renames inline, pins, and merges into another strand", async () => {
+    state.call.mockResolvedValue({ ok: true });
+    render(<StrandsTab threadId="thr_main" environment={null} params={null} />);
+    const row = () => container.querySelector('[data-strand-row="s_cx"]')!;
+    const item = (label: string) => [...row().querySelectorAll("button")].find((button) => text(button) === label) as HTMLElement;
+    click(item("Rename…"));
+    const input = row().querySelector<HTMLInputElement>("[data-strand-rename]")!;
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      setter.call(input, "Quota fix");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => { input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); });
+    expect(state.call).toHaveBeenCalledWith("strands.rename", { strandId: "s_cx", title: "Quota fix" });
+    await act(async () => { item("Pin").click(); });
+    expect(state.call).toHaveBeenCalledWith("strands.pin", { strandId: "s_cx", pinned: true });
+    await act(async () => { item("red4 mitigation").click(); });
+    expect(state.call).toHaveBeenCalledWith("strands.merge", { strandId: "s_cx", into: "s_red4" });
+    // The menu's clicks don't select the row.
+    expect(state.toAppPath).not.toHaveBeenCalled();
+  });
+});
+
+describe("the strands overview", () => {
+  it("shows each conversation with up to 2 asks, then chips; a chip opens the conversation at that strand", () => {
+    state.overview = {
+      needs: 3, running: 1,
+      conversations: [
+        { threadId: "thr_main", title: "Main", isMain: true, lastActiveAt: NOW, strands: LIST.strands },
+        { threadId: "thr_studio", title: "BB Studio", isMain: false, lastActiveAt: NOW, strands: [view("s_ws", "Workspace fix", { state: "running", latestSeq: 7 })] },
+      ],
+    };
+    render(<StrandsOverview botId="bot_1" now={NOW} />);
+    expect(text(container.querySelector("h1"))).toBe("Strands3 need you · 1 running");
+    expect(container.querySelectorAll("[data-overview-conversation]")).toHaveLength(2);
+    const main = container.querySelector('[data-overview-conversation="thr_main"]')!;
+    expect(main.querySelectorAll("[data-strand-ask]")).toHaveLength(2);
+    expect(text(main)).toContain("1 more need you");
+    expect(text(main)).toContain("Command: npm publish --tag latest --access public --otp-from-env");
+    expect([...main.querySelectorAll("[data-strand-chip]")].map((chip) => chip.getAttribute("data-strand-chip"))).toEqual(["s_cx", "s_red4", "s_macos"]);
+    click(container.querySelector('[data-overview-conversation="thr_studio"] [data-strand-chip="s_ws"]'));
+    expect(state.toAppPath.mock.calls.at(-1)?.[0]).toBe("/threads/thr_studio#msg=7");
+    click([...container.querySelectorAll('[data-overview-conversation="thr_studio"] button')].find((button) => text(button).startsWith("Open")));
+    expect(state.toThread).toHaveBeenCalledWith("thr_studio");
+  });
+});
+
 describe("the Strands tab", () => {
   it("lists strands by state, needs you first with its buttons, and folds Earlier", () => {
     render(<StrandsTab threadId="thr_main" environment={null} params={null} />);
     const groups = [...container.querySelectorAll("section")].map((section) => section.getAttribute("aria-label"));
     expect(groups).toEqual(["Needs you", "Running", "Waiting on someone else", "Quiet", "Earlier"]);
     const needs = container.querySelector('[data-strand-row="s_doc"]');
-    expect([...needs!.querySelectorAll("button")].map(text)).toEqual(["Approve", "Deny"]);
+    expect([...needs!.querySelectorAll("[data-strand-ask-buttons] button")].map(text)).toEqual(["Approve", "Deny"]);
     expect(container.querySelector('[data-strand-row="s_old"]')).toBeNull();
     click([...container.querySelectorAll("button")].find((button) => text(button).startsWith("Earlier")));
     expect(container.querySelector('[data-strand-row="s_old"]')).not.toBeNull();

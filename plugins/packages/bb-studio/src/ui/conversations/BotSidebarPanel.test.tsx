@@ -56,6 +56,7 @@ vi.mock("../../kit/ui/context-menu", () => ({
   ContextMenuCheckboxItem: ({ children, checked, onSelect }: { children: ReactNode; checked?: boolean; onSelect?: () => void }) => <div role="menuitemcheckbox" aria-checked={!!checked} data-testid="context-check" onClick={() => onSelect?.()}>{children}</div>,
 }));
 vi.mock("../../loops/ui/hooks", () => ({ useLoopsEnabled: () => state.loopsOn, loopsPath: (botId: string) => `/plugins/studio/studio/bot/${botId}/loops` }));
+vi.mock("../../strands/ui/overview-route", () => ({ useStrandsOverviewEnabled: () => false, strandsPath: (botId: string) => `/plugins/studio/studio/bot/${botId}/strands` }));
 vi.mock("../bot/BotAvatar", () => ({ ProviderLogo: ({ provider }: { provider: { id: string } }) => <i data-logo={provider.id} />, BotAvatar: ({ emoji }: { emoji: string }) => <span data-testid="avatar">{emoji}</span> }));
 
 import { BotSidebarPanel } from "./BotSidebarPanel";

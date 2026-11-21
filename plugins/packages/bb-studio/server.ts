@@ -149,7 +149,7 @@ import { FINISH_TOPIC, registerBotFinish } from "./src/bot-finish";
 import { askModel } from "./src/kit/decisions";
 import type { ModelSelection } from "./src/decisions/contract";
 import { studioInstructions } from "./src/agent-instructions";
-import { activityOf, conversationInstructions, workerStatus } from "./src/bot-threads";
+import { activityOf, conversationInstructions, conversationTitle, workerStatus } from "./src/bot-threads";
 import { registerStrands } from "./src/strands/register";
 import { STUDIO_KEY_SETTINGS } from "./src/settings/keys";
 import { STRANDS_USAGE } from "./src/strands/cli";
@@ -1234,10 +1234,18 @@ export default async function plugin(bb: BbPluginApi) {
       WHERE bot_id = ? AND source_kind = 'conversation' AND topic = ? AND replaced_by_id IS NULL AND archived = 0 AND source_id IS NOT NULL
       ORDER BY created_at ASC`).all(botId, FINISH_TOPIC) as { source_id: string; text: string }[]).map((row) => [row.source_id, row.text])),
   });
-  // Strands (src/strands): each turn of a Bot's Main sorted into a line of work, with live states. Phase 1: Main only, read-only.
+  // Strands (src/strands): each turn of a Bot's conversations sorted into a line of work, with live states.
   const strands = registerStrands(bb, db, {
     decisions: decisions.ask,
-    mains: () => bots.list().flatMap((bot) => (bot.threadId ? [bot.threadId] : [])),
+    conversation: (threadId) => {
+      const rec = botThreads.store.get(threadId);
+      return rec && rec.kind === "conversation" && !rec.archivedAt ? { botId: rec.botId, lastActiveAt: Math.max(rec.activityAt ?? 0, rec.latest?.at ?? 0, rec.createdAt) } : null;
+    },
+    conversationsOf: async (botId) => {
+      const recs = botThreads.store.listed(botId).filter((rec) => rec.kind === "conversation" && !rec.archivedAt);
+      const facts = await botThreads.store.facts(recs.map((rec) => rec.threadId)).catch(() => new Map());
+      return recs.map((rec) => ({ threadId: rec.threadId, title: conversationTitle(rec, facts.get(rec.threadId)), isMain: rec.isMain, lastActiveAt: Math.max(rec.activityAt ?? 0, rec.latest?.at ?? 0, rec.createdAt) }));
+    },
     workers: async (threadId) => {
       const records = botThreads.store.workersOf(threadId);
       const facts = await botThreads.store.facts(records.map((rec) => rec.threadId));
@@ -1248,10 +1256,10 @@ export default async function plugin(bb: BbPluginApi) {
           endedAt: status === "done" || status === "failed" ? rec.activityAt ?? fact?.updatedAt ?? rec.updatedAt : null };
       });
     },
-    botMainFor: (threadId) => {
-      const rec = botThreads.store.get(threadId);
-      const botId = rec?.botId ?? bots.list().find((bot) => bot.threadId === threadId)?.id;
-      return botId ? bots.stored(botId)?.threadId ?? null : null;
+    scope: {
+      botOf: (threadId) => botThreads.store.get(threadId)?.botId ?? bots.list().find((bot) => bot.threadId === threadId)?.id ?? null,
+      mainOf: (botId) => bots.stored(botId)?.threadId ?? null,
+      defaultMain: () => (bots.list().find((bot) => bot.primary) ?? bots.list()[0])?.threadId ?? null,
     },
     secrets: async () => {
       const values = await settings.get().catch(() => ({} as Record<string, unknown>));

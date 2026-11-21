@@ -4,8 +4,8 @@
 // you". It opens a compact list (one line per strand; an ask with its
 // buttons inline), keyboard-navigable. Picking a strand selects it: its
 // messages stay, the rest dim, and the line steps through them. Nothing
-// open, no line. It takes the In flight strip's place where strands run
-// (phase 1: Main); the workbench Strands tab is the full view.
+// open, no line. It runs in every Bot conversation and replaced the In
+// flight strip; the workbench Strands tab is the full view.
 import { experimental_useAppPanel, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useCallback, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
@@ -17,7 +17,6 @@ import { errorMessage } from "../../kit/format";
 import { Icon, Popover, PopoverContent, PopoverTrigger, Tooltip, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import { messageLinkPath } from "../../work/ui/in-flight-model";
-import { InFlightBanner } from "../../work/ui/InFlight";
 import type { StrandAsk, StrandList, StrandView } from "../contract";
 import { ageOf, countsOf, currentOf, decisionButtons, hasOpen, seqsOf, stepSeq, stripShown } from "./model";
 import { select, selectionOf, useSelection } from "./selection";
@@ -48,14 +47,6 @@ export function useSelectStrand(threadId: string) {
     if (seq !== null) jump(seq);
     void call("strands.opened", { strandId: strand.id }).catch(() => undefined);
   }, [call, jump, tags.data, threadId]);
-}
-
-/** In flight's banner, except where strands run (phase 1: Main): there the strands line takes its place. */
-export function InFlightUnlessStrands() {
-  const threadId = useComposerThread();
-  const list = useLive("strands.list", { threadId: threadId ?? "" }, { enabled: !!threadId, pollMs: STRANDS_POLL_MS });
-  if (!threadId || stripShown(list.data)) return null;
-  return <InFlightBanner />;
 }
 
 /** The strands line, unframed, right above the composer; nothing where strands don't run or nothing is open. */
@@ -115,7 +106,7 @@ function IconButton({ label, icon, onClick }: { label: string; icon: string; onC
 }
 
 /** Arrow keys, Home and End move between the list's options. */
-function moveFocus(event: KeyboardEvent<HTMLElement>): void {
+export function moveFocus(event: KeyboardEvent<HTMLElement>): void {
   const keys: Record<string, number> = { ArrowDown: 1, ArrowUp: -1, Home: -Infinity, End: Infinity };
   const step = keys[event.key];
   if (step === undefined) return;

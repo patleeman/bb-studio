@@ -27,6 +27,8 @@ export function ensureDimStyle(doc: Document = document): void {
   if (doc.getElementById(DIM_STYLE_ID)) return;
   const style = doc.createElement("style");
   style.id = DIM_STYLE_ID;
-  style.textContent = "[data-studio-strand-dim]{opacity:.3;transition:opacity .2s}@media (prefers-reduced-motion:reduce){[data-studio-strand-dim]{transition:none}}";
+  // Dimmed rows; and a tag's "Move to…" shows while its message is hovered or the menu is open.
+  style.textContent = "[data-studio-strand-dim]{opacity:.3;transition:opacity .2s}@media (prefers-reduced-motion:reduce){[data-studio-strand-dim]{transition:none}}"
+    + "[data-strand-move]{opacity:0}[data-timeline-row-id]:hover [data-strand-move],[data-strand-move]:focus-visible,[data-strand-move][data-state=open]{opacity:1}";
   doc.head.appendChild(style);
 }

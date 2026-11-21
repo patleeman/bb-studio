@@ -16,6 +16,8 @@ import { BotInfoRows } from "./BotInfoRows";
 import { BotControls } from "./BotControls";
 import { TodosPage } from "../../loops/ui/TodosPage";
 import { isLoopsPath, useLoopsEnabled } from "../../loops/ui/hooks";
+import { StrandsOverview } from "../../strands/ui/Overview";
+import { isStrandsPath, useStrandsOverviewEnabled } from "../../strands/ui/overview-route";
 
 /** The Bot page (nav panel `bot`): the selected Bot's Info, or the create flow. */
 export function BotPanel() {
@@ -26,7 +28,9 @@ export function BotPanel() {
 function InfoPage({ view, refresh }: { view: BotView; refresh(): void }) {
   const pathname = usePathname();
   const loopsOn = useLoopsEnabled() && view.bot!.primary !== false;
+  const strandsOn = useStrandsOverviewEnabled();
   if (loopsOn && isLoopsPath(pathname)) return <TodosPage view={view} />;
+  if (strandsOn && isStrandsPath(pathname)) return <StrandsOverview botId={view.bot!.id} />;
   const body = isControlsPath(pathname) ? <BotControls view={view} refresh={refresh} /> : <BotPage view={view} refresh={refresh} />;
   return (
     <PageColumn className="max-w-6xl pt-0 pb-0 @max-3xl/page:pt-0">

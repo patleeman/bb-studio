@@ -5,7 +5,7 @@ import type { StrandAsk, StrandList, StrandView } from "../contract";
 export type Tags = { tags: readonly { turnId: string; seq: number; strandId: string | null }[]; strands: readonly { id: string; title: string }[] };
 
 /** A message's tag: its turn's strand, and whether a divider goes above it (the strand changed since the last sorted turn). */
-export function tagOf(tags: Tags | null | undefined, turnId: string | null): { strandId: string; title: string; divider: boolean } | null {
+export function tagOf(tags: Tags | null | undefined, turnId: string | null): { strandId: string; title: string; divider: boolean; seq: number } | null {
   if (!tags || !turnId) return null;
   const at = tags.tags.findIndex((tag) => tag.turnId === turnId);
   const tag = at >= 0 ? tags.tags[at] : undefined;
@@ -14,7 +14,7 @@ export function tagOf(tags: Tags | null | undefined, turnId: string | null): { s
   if (!title) return null;
   let before: string | null = null;
   for (let index = at - 1; index >= 0; index--) { const strandId = tags.tags[index]!.strandId; if (strandId) { before = strandId; break; } }
-  return { strandId: tag.strandId, title, divider: before !== tag.strandId };
+  return { strandId: tag.strandId, title, divider: before !== tag.strandId, seq: tag.seq };
 }
 
 /** The strand's messages (each sorted turn's first seq), oldest first, for stepping through it. */

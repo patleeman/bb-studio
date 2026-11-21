@@ -140,12 +140,12 @@ export class StrandStore {
     this.db.prepare("UPDATE strands SET opened_at = ? WHERE id = ?").run(this.now(), id);
   }
 
-  /** Folds `from` into `into`: its items move, its span joins. Your choice always wins: a strand you made isn't folded by the model. */
-  merge(from: string, into: string): boolean {
+  /** Folds `from` into `into`: its items move, its span joins. Your choice always wins: the model never folds a strand you made; you can fold any. */
+  merge(from: string, into: string, byUser = false): boolean {
     if (from === into) return false;
     const a = this.get(from);
     const b = this.get(into);
-    if (!a || !b || a.threadId !== b.threadId || a.mergedInto || b.mergedInto || a.origin === "user") return false;
+    if (!a || !b || a.threadId !== b.threadId || a.mergedInto || b.mergedInto || (a.origin === "user" && !byUser)) return false;
     this.db.transaction(() => {
       this.db.prepare("UPDATE strand_items SET strand_id = ? WHERE thread_id = ? AND strand_id = ?").run(into, a.threadId, from);
       this.db.prepare("UPDATE strands SET merged_into = ? WHERE id = ?").run(into, from);
@@ -153,6 +153,47 @@ export class StrandStore {
         task_id = COALESCE(task_id, ?), pinned = MAX(pinned, ?) WHERE id = ?`).run(a.firstSeq, a.lastSeq, a.lastAt, a.taskId, a.pinned ? 1 : 0, into);
     })();
     return true;
+  }
+
+  rename(id: string, title: string): void {
+    this.db.prepare("UPDATE strands SET title = ?, named = 1 WHERE id = ?").run(title, id);
+  }
+
+  setPinned(id: string, pinned: boolean): void {
+    this.db.prepare("UPDATE strands SET pinned = ? WHERE id = ?").run(pinned ? 1 : 0, id);
+  }
+
+  /** A strand's span again from its messages (after some moved out). With none left, it keeps its last activity and starts empty. */
+  recompute(id: string): void {
+    const strand = this.get(id);
+    if (!strand) return;
+    const span = this.db.prepare("SELECT MIN(seq) AS first, MAX(seq) AS last, MAX(at) AS at FROM strand_items WHERE thread_id = ? AND strand_id = ? AND kind IN ('user', 'report')").get(strand.threadId, id) as { first: number | null; last: number | null; at: number | null };
+    this.db.prepare("UPDATE strands SET first_seq = ?, last_seq = ?, last_at = ? WHERE id = ?")
+      .run(span.first ?? Number.MAX_SAFE_INTEGER, span.last ?? 0, span.at ?? strand.lastAt, id);
+  }
+
+  /**
+   * The user moves a turn (its message, reply and the workers it started) to
+   * another strand; with `andLater`, the turns after it in the same strand
+   * go too ("New strand from here"). Answers the strands it moved out of.
+   */
+  moveTurn(threadId: string, seq: number, to: string, andLater = false): string[] {
+    const head = this.db.prepare("SELECT * FROM strand_items WHERE thread_id = ? AND seq = ? AND kind IN ('user', 'report') LIMIT 1").get(threadId, seq) as ItemRow | undefined;
+    if (!head) return [];
+    const from = head.strand_id;
+    const turnIds = [head.turn_id];
+    const seqs = [seq];
+    if (andLater && from) {
+      const later = this.db.prepare("SELECT seq, turn_id FROM strand_items WHERE thread_id = ? AND strand_id = ? AND seq > ? AND kind IN ('user', 'report')").all(threadId, from, seq) as { seq: number; turn_id: string | null }[];
+      for (const row of later) { seqs.push(row.seq); turnIds.push(row.turn_id); }
+    }
+    const move = this.db.prepare("UPDATE strand_items SET strand_id = ?, by = 'user', unsure = 0, confidence = NULL WHERE thread_id = ? AND ((seq = ? AND kind IN ('user', 'report', 'worker')) OR (? IS NOT NULL AND turn_id = ?))");
+    this.db.transaction(() => {
+      seqs.forEach((each, index) => move.run(to, threadId, each, turnIds[index] ?? null, turnIds[index] ?? null));
+    })();
+    this.recompute(to);
+    if (from && from !== to) this.recompute(from);
+    return from && from !== to ? [from] : [];
   }
 
   /** A turn joined a strand: its span grows. A waiting note clears on the next activity. */

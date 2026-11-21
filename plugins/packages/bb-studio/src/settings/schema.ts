@@ -95,6 +95,7 @@ export const STUDIO_SETTINGS = {
   loopDailyBudget: { group: "attention", type: "number", label: "Interruptions a day", description: "After this many, new tasks wait in the Tasks list until tomorrow.", default: 5, min: 0, max: 100, integer: true },
   loopQuietStart: { group: "attention", type: "number", label: "Quiet hours start", description: "The hour, 0 to 23, when interruptions stop.", default: 22, min: 0, max: 23, integer: true },
   loopQuietEnd: { group: "attention", type: "number", label: "Quiet hours end", description: "The hour, 0 to 23, when interruptions start again.", default: 7, min: 0, max: 23, integer: true },
+  strandsOverview: { group: "attention", type: "boolean", label: "Strands overview", description: "A Strands page beside Tasks: every conversation's open strands, needs you first.", default: false },
   todosTimeZone: { group: "attention", type: "string", label: "Time zone", description: "Tasks show and come due in this zone. Empty uses this computer’s.", default: "", maxLength: 100, timeZone: true },
 } as const satisfies Record<string, StudioSetting>;
 
