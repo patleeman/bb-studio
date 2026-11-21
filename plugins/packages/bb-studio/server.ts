@@ -39,7 +39,7 @@ import { registerToolGateway, type ToolGateway } from "./src/tool-gateway/server
 import { sessionTitlePrefix } from "./src/decisions/server/classifier";
 import { ON_DEMAND_EXTRAS, scopeEntries, scopeTools, trioInstructions, type Scope, type ScopeKind } from "./src/tool-scope";
 import { registerScopedTools, ScopeMemory } from "./src/tool-scope-tools";
-import { slimmedIfSmaller } from "./src/slim-schema";
+import { slim, slimmedIfSmaller } from "./src/slim-schema";
 import { INTERNAL_RENAMES, MERGES, mergedParameters, mergedTools, presentScope } from "./src/merged-tools";
 import { LeanStore, leanFor } from "./src/context-lean";
 import { contextLeanContract } from "./src/context-lean-contract";
@@ -500,8 +500,9 @@ export default async function plugin(bb: BbPluginApi) {
     if (!mergedShownCache.has(key)) {
       let schema: Record<string, unknown> | null = null;
       try {
-        const json = mergedParameters(merge, toolBook as never, Object.keys(merge.ops).filter((op) => allowed.includes(op))).toJSONSchema() as Record<string, unknown>;
-        schema = slimmedIfSmaller(json) ?? json;
+        // Always flattened: BB takes a parameters override only with an object at its root, never a bare oneOf.
+        const flat = slim(mergedParameters(merge, toolBook as never, Object.keys(merge.ops).filter((op) => allowed.includes(op))).toJSONSchema()) as Record<string, unknown>;
+        schema = flat.type === "object" ? flat : null;
       } catch { /* Shown as registered. */ }
       mergedShownCache.set(key, schema);
     }

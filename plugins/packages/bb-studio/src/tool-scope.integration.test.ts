@@ -149,6 +149,8 @@ describe("every tool an instruction names is there", () => {
 
   async function configureAndCheck(threadId: string, provider: string, model: string, metadata: Record<string, unknown>, kind: string) {
     const result = configure(context(threadId, provider, model, { metadata }));
+    // BB refuses a parameters override without an object at its root (and then gives the session none of Studio's tools).
+    for (const entry of result.tools) if (typeof entry === "object" && entry.parameters !== undefined) expect((entry.parameters as { type?: string }).type, `${kind} ${provider} ${entry.name}`).toBe("object");
     const loaded = new Set(names(result.tools));
     const named = [...new Set(result.instructions.match(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g) ?? [])].filter((name) => registeredNames.has(name));
     expect(named.length, `${kind} names some tools`).toBeGreaterThan(0);
