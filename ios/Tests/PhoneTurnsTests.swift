@@ -94,7 +94,12 @@ final class PhoneTurnsTests: XCTestCase {
 
     func testPlainRepliesGoToTheListWhileTheAppIsOpen() {
         XCTAssertEqual(NotificationActions.foregroundOptions(["kind": "turn-finished"], category: "BB_REPLY"), [.list])
-        XCTAssertEqual(NotificationActions.foregroundOptions(["kind": "needs-you"], category: ""), [.list])
+        XCTAssertEqual(NotificationActions.foregroundOptions(["kind": "turn-finished"], category: ""), [.list])
+    }
+
+    func testNeedsYouBannersWhileTheAppIsOpen() {
+        XCTAssertEqual(NotificationActions.foregroundOptions(["kind": "needs-you"], category: ""), [.banner, .sound])
+        XCTAssertEqual(NotificationActions.foregroundOptions(["kind": "needs-you", "aps": ["category": ""]], category: nil), [.banner, .sound])
     }
 
     func testAsksErrorsAndTheRestStillBanner() {
