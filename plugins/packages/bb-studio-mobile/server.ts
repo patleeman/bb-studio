@@ -32,6 +32,7 @@ import {
 } from "./apns.js";
 import { CLEAR_BATCH, clearPayload, keptWorkers, noteNotified, noteWorkers, partition, settled, type Notified, type NotifiedWorkers, type ThreadReadState } from "./clear.js";
 import { DeskHold, holdable } from "./desk.js";
+import { appendJournal, JOURNAL_KEY, journalEntry, journalSummary, type JournalEntry, type JournalOutcome } from "./journal.js";
 import { isQuietCompletion, triggerOf, turnPushAllowed, type TurnTrigger } from "./notifications.js";
 import { collapseIdFor, PushWindows, summaryBody, windowKey } from "./push-window.js";
 import { StudioApprovals } from "./studio-approvals.js";
@@ -349,7 +350,7 @@ export default async function plugin(bb: BbPluginApi) {
     const lastReadAt = thread?.lastReadAt ?? 0;
     if (thread && lastReadAt >= thread.latestAttentionAt) return false;
     const count = thread && lastReadAt >= since ? held : shown;
-    const tickets = await deliver(messages.map((message) => ({ ...message, body: summaryBody(message.body, count), collapseId: collapseIdFor(key) })), { windowed: false });
+    const tickets = await deliver(messages.map((message) => ({ ...message, body: summaryBody(message.body, count), collapseId: collapseIdFor(key) })), { windowed: false, later: "window" });
     return tickets.some((ticket) => ticket.status === "ok");
   });
   bb.onDispose(() => windows.dispose());
@@ -360,7 +361,7 @@ export default async function plugin(bb: BbPluginApi) {
       const state = await readState(threadId, workerId ? [workerId] : []);
       return state === undefined ? undefined : settled(state);
     },
-    send: async (messages) => { await deliver(messages, { windowed: false, held: false }); },
+    send: async (messages) => { await deliver(messages, { windowed: false, held: false, later: "desk" }); },
     log: (message) => bb.log.info(message),
   });
   bb.onDispose(() => desk.dispose());
@@ -369,7 +370,17 @@ export default async function plugin(bb: BbPluginApi) {
     return { enabled: deskHoldEnabled, atDesk, held };
   };
 
-  async function deliver(messages: ExpoMessage[], options: { windowed?: boolean; held?: boolean } = {}): Promise<ExpoTicket[]> {
+  let journalQueue: Promise<void> = Promise.resolve();
+  function journal(entries: JournalEntry[]): Promise<void> {
+    if (entries.length === 0) return journalQueue;
+    journalQueue = journalQueue.then(async () => {
+      await bb.storage.kv.set(JOURNAL_KEY, appendJournal((await bb.storage.kv.get<JournalEntry[]>(JOURNAL_KEY)) ?? [], entries));
+    }).catch((error: unknown) => bb.log.warn(`delivery journal: ${error instanceof Error ? error.message : String(error)}`));
+    return journalQueue;
+  }
+
+  async function deliver(messages: ExpoMessage[], options: { windowed?: boolean; held?: boolean; later?: "desk" | "window" } = {}): Promise<ExpoTicket[]> {
+    const outcomes: (JournalOutcome | undefined)[] = new Array(messages.length);
     const tickets: ExpoTicket[] = new Array(messages.length);
     const expoIndexes: number[] = [];
     const apnsIndexes: number[] = [];
@@ -380,6 +391,7 @@ export default async function plugin(bb: BbPluginApi) {
     messages.forEach((message, index) => {
       if (studios[index]) {
         tickets[index] = { status: "ok" };
+        outcomes[index] = "quiet";
         return;
       }
       (message.to.startsWith(APNS_TOKEN_PREFIX) ? apnsIndexes : expoIndexes).push(index);
@@ -393,6 +405,7 @@ export default async function plugin(bb: BbPluginApi) {
         const data = messages[index]!.data;
         if ([data?.threadId, data?.workerId].some((id) => typeof id === "string" && muted.has(id))) {
           tickets[index] = { status: "ok" };
+          outcomes[index] = "muted";
           apnsIndexes.splice(position, 1);
         }
       }
@@ -402,7 +415,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (deskHoldEnabled && options.held !== false && apnsIndexes.length > 0) {
       const holding = apnsIndexes.filter((index) => holdable(messages[index]!));
       if (desk.hold(holding.map((index) => messages[index]!))) {
-        for (const index of holding) tickets[index] = { status: "ok" };
+        for (const index of holding) { tickets[index] = { status: "ok" }; outcomes[index] = "desk"; }
         apnsIndexes.splice(0, apnsIndexes.length, ...apnsIndexes.filter((index) => !holding.includes(index)));
       }
     }
@@ -419,7 +432,7 @@ export default async function plugin(bb: BbPluginApi) {
         if (windows.offer(key, indexes.map((index) => messages[index]!))) {
           for (const index of indexes) messages[index] = { ...messages[index]!, collapseId: collapseIdFor(key) };
         } else {
-          for (const index of indexes) { held.add(index); tickets[index] = { status: "ok" }; }
+          for (const index of indexes) { held.add(index); tickets[index] = { status: "ok" }; outcomes[index] = "window"; }
         }
       }
       if (held.size > 0) apnsIndexes.splice(0, apnsIndexes.length, ...apnsIndexes.filter((index) => !held.has(index)));
@@ -453,6 +466,12 @@ export default async function plugin(bb: BbPluginApi) {
       return tickets[index]?.status === "ok" && typeof threadId === "string"
         ? [{ threadId, ...(typeof workerId === "string" && workerId !== threadId ? { workerId } : {}) }]
         : [];
+    }));
+    const now = Date.now();
+    await journal(messages.map((message, index) => {
+      const outcome = outcomes[index] ?? (tickets[index]?.status === "ok" ? "sent" : "error");
+      const category = outcome === "sent" && message.to.startsWith(APNS_TOKEN_PREFIX) ? notificationCategory(message.data ?? {}) : undefined;
+      return journalEntry(message, outcome, now, { ...(category ? { category } : {}), ...(options.later && outcome === "sent" ? { later: options.later } : {}) });
     }));
     const errors = tickets.flatMap((ticket) => (ticket.status === "error" ? [ticket.message ?? "unknown"] : []));
     for (const error of new Set(errors)) bb.log.warn(`push delivery failed: ${error}`);
@@ -767,16 +786,38 @@ export default async function plugin(bb: BbPluginApi) {
     commands: [
       { name: "status", summary: "Show APNs setup and the last delivery", usage: "bb mobile status [--json]" },
       { name: "live-activities", summary: "List the Live Activity tokens phones registered, per device and Bot", usage: "bb mobile live-activities [--json]" },
+      { name: "deliveries", summary: "What the relay did with each push: per hour, sent by kind, and the last ones", usage: "bb mobile deliveries [--hours N] [--json]" },
     ],
     async run(argv) {
       const [command] = argv.filter((arg) => arg !== "--json");
+      if (command === "deliveries") {
+        const hoursArg = argv.indexOf("--hours");
+        const hours = hoursArg >= 0 ? Number(argv[hoursArg + 1]) : 24;
+        if (!Number.isFinite(hours) || hours <= 0) return { exitCode: 1, stderr: "Usage: bb mobile deliveries [--hours N] [--json]" };
+        const since = Date.now() - hours * 3_600_000;
+        const entries = ((await bb.storage.kv.get<JournalEntry[]>(JOURNAL_KEY)) ?? []).filter((entry) => entry.at >= since);
+        const hourOf = (at: number) => { const date = new Date(at); return `${date.toISOString().slice(0, 10)} ${String(date.getHours()).padStart(2, "0")}:00`; };
+        const summary = journalSummary(entries, since, hourOf);
+        if (argv.includes("--json")) return { exitCode: 0, stdout: JSON.stringify({ since, summary, entries }) };
+        if (entries.length === 0) return { exitCode: 0, stdout: `No pushes in the last ${hours} h.` };
+        const counts = (record: Record<string, number | undefined>) => Object.entries(record).map(([key, value]) => `${key} ${value}`).join(", ");
+        return {
+          exitCode: 0,
+          stdout: [
+            ...summary.map((row) => `${row.hour}  ${counts(row.outcomes)}${Object.keys(row.sent).length ? `  · sent: ${counts(row.sent)}` : ""}`),
+            "",
+            "Last 20:",
+            ...entries.slice(-20).map((entry) => `${new Date(entry.at).toISOString()}  ${entry.outcome}${entry.later ? ` (${entry.later})` : ""}  ${entry.kind}  ${entry.threadId ?? "-"}${entry.conversationId ? ` in ${entry.conversationId}` : ""}${entry.category ? `  ${entry.category}` : ""}${entry.keyed ? "  keyed" : ""}`),
+          ].join("\n"),
+        };
+      }
       if (command === "live-activities") {
         const rows = activityTokens.all().map(({ deviceId, botId, kind, updatedAt }) => ({ deviceId, botId, kind, updatedAt }));
         if (argv.includes("--json")) return { exitCode: 0, stdout: JSON.stringify({ tokens: rows }) };
         return { exitCode: 0, stdout: rows.length ? rows.map((row) => `${row.deviceId}  ${row.botId}  ${row.kind}  ${new Date(row.updatedAt).toISOString()}`).join("\n") : "No Live Activity tokens." };
       }
       if (command !== undefined && command !== "status") {
-        return { exitCode: 1, stderr: "Usage: bb mobile status [--json] | bb mobile live-activities [--json]" };
+        return { exitCode: 1, stderr: "Usage: bb mobile status [--json] | bb mobile live-activities [--json] | bb mobile deliveries [--hours N] [--json]" };
       }
       const apns = await apnsConfig();
       const last = await bb.storage.kv.get<LastDelivery>(LAST_DELIVERY_KEY);

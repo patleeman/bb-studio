@@ -150,3 +150,27 @@ describe("hold phone notifications while at the desk", () => {
     } finally { await host.harness.lifecycle.dispose(); }
   });
 });
+
+describe("the delivery journal", () => {
+  it("records what happened to each push, with no titles or bodies, and `bb mobile deliveries` counts them per hour", async () => {
+    const host = await relay();
+    try {
+      await host.beat("active");
+      await host.push("thr_a", "Alpha");
+      await host.beat("away");
+      await host.settle();
+      await host.push("thr_b", "Beta");
+      await host.settle();
+      const out = JSON.parse((await host.harness.behavior.runCli(["deliveries", "--json"])).stdout ?? "{}");
+      expect(out.entries.map((entry: { outcome: string; later?: string; threadId: string }) => [entry.outcome, entry.later ?? null, entry.threadId])).toEqual([
+        ["desk", null, "thr_a"], ["sent", "desk", "thr_a"], ["sent", null, "thr_b"],
+      ]);
+      expect(JSON.stringify(out)).not.toMatch(/Alpha|Beta|Done|eeee/);
+      expect(out.summary).toHaveLength(1);
+      expect(out.summary[0].outcomes).toEqual({ desk: 1, sent: 2 });
+      expect(out.summary[0].sent).toEqual({ "needs-you (desk)": 1, "needs-you": 1 });
+      const text = (await host.harness.behavior.runCli(["deliveries"])).stdout ?? "";
+      expect(text).toContain("sent: needs-you (desk) 1, needs-you 1");
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+});

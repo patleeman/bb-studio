@@ -28,10 +28,12 @@ settings, see [`skills/mobile-push/SKILL.md`](skills/mobile-push/SKILL.md).
   the relay reads the turn: what started it and its final reply. It drops the
   push for Studio's cache keepalive (whatever it replied), for a final reply
   of `[PASS]` or only an approval card, and for a turn with no reply at all
-  unless the user started it. A relayed message (another thread, BB's child
-  notices, Studio, an automation) or a turn the provider went on with by
-  itself pushes only when it ends in a real reply. When the turn can't be
-  read, the push goes out.
+  unless the user started it. A turn another thread started (a message from
+  it, or BB's notice that a child thread completed, failed or stopped) never
+  pushes: a lead answering its workers is not news for the phone; a worker's
+  own asks and errors push by themselves. Another relayed message (Studio, an
+  automation) or a turn the provider went on with by itself pushes only when
+  it ends in a real reply. When the turn can't be read, the push goes out.
 - **One push per conversation per 3 minutes.** A plain reply push
   (`turn-finished` or `needs-you`, no `coalesceKey`, no loop, no interaction)
   goes out at once and opens a window for its conversation (else its thread).
@@ -43,9 +45,13 @@ settings, see [`skills/mobile-push/SKILL.md`](skills/mobile-push/SKILL.md).
   settings, Phone notifications; on by default; `desk_hold_set`). Studio's
   overlay on the desktop app and on computer browsers calls `desk_beat`:
   "active" every 45 seconds while the user is there, "away" once when they
-  leave. Here means the Mac is unlocked and had keyboard or mouse input in the
-  last 2 minutes (the desktop app's `experimental_systemActivity`; older apps
-  report only their own window's input and focus). While any client's last
+  leave. Here means a key, click or scroll in a Studio window in the last 10
+  minutes, while the Mac is unlocked and its idle time (the desktop app's
+  `experimental_systemActivity`) is under 2 minutes. The Mac's idle time alone
+  doesn't count: a mouse or receiver that sends events by itself keeps it at
+  zero. Focus and pointer drift don't count, and a browser an agent drives
+  reports nothing. Older apps report their own window's input over 2 minutes.
+  A beat that doesn't arrive (Studio reloading) is retried at the next check. While any client's last
   beat is "active" and under 2 minutes old, replies, asks and errors about a
   thread are held, not sent. When every client is away or silent, the held
   pushes whose thread is still unread (or whose ask is still open) go out: the
@@ -144,6 +150,12 @@ kind, last registered; not the tokens). Nothing in Studio calls
   the last delivery.
 - `bb mobile live-activities [--json]` lists the registered Live Activity
   tokens.
+- `bb mobile deliveries [--hours N] [--json]` shows what the relay did with
+  each push over the last N hours (24 by default): per hour, how many were
+  sent, quiet, muted, held at the desk, folded into a window or failed, and
+  the sent ones by kind; then the last 20. The journal keeps the last 1,000
+  pushes in the plugin's storage: time, kind, thread, conversation and
+  worker ids, category and outcome. No titles, bodies or device tokens.
 - RPC: `notify`, `mute_list`, `mute_set`, `push_status`, `push_test`,
   `live_activity_register`, `live_activity_unregister`, `live_activity_push`.
 - Settings (`bb plugin config mobile`): `apnsKey` (secret) and `apnsKeyId`.

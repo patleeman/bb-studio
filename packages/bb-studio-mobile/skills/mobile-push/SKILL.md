@@ -67,6 +67,7 @@ directly. Threads are tracked for three days.
 - `bb mobile status [--json]` — whether APNs is configured, and the last delivery result.
 - RPC `push_status` and `push_test` — the same status, and a test push to every remembered phone.
 - `bb mobile live-activities [--json]` — the Live Activity tokens phones registered, by device, Bot and kind (`push-to-start` or `update`), without the tokens.
+- `bb mobile deliveries [--hours N] [--json]` — what the relay did with each push (sent, quiet, muted, held at the desk, folded into a window, failed), per hour and by kind, then the last 20. No titles, bodies or tokens.
 
 ## Settings (`bb plugin config mobile`)
 

@@ -6,6 +6,8 @@ import type { IndexedItem } from "./item-index";
 import { MIGRATIONS } from "./migrations";
 
 const dispose: (() => Promise<void>)[] = [];
+/** While set, BB's thread reads wait on it (a reload while Studio still waits on BB). */
+let getGate: Promise<void> | null = null;
 afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
 
 /**
@@ -47,7 +49,7 @@ async function setup() {
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: {
       list: (async (args: { threadIds?: string[]; offset?: number; limit?: number }) => [...threads.values()].filter((thread) => !args.threadIds || args.threadIds.includes(thread.id)).slice(args.offset ?? 0, (args.offset ?? 0) + (args.limit ?? 200))) as never,
-      get: (async ({ threadId }: { threadId: string }) => { const thread = threads.get(threadId); if (!thread) throw new Error("Not found"); return thread; }) as never,
+      get: (async ({ threadId }: { threadId: string }) => { if (getGate) await getGate; const thread = threads.get(threadId); if (!thread) throw new Error("Not found"); return thread; }) as never,
       output: (async ({ threadId }: { threadId: string }) => ({ output: threadId === "redesign" ? "UX review is back with two notes" : null })) as never,
       send: send as never,
       fork: fork as never,
@@ -477,4 +479,28 @@ it("FM: never lands on an archived Main (it is being replaced)", async () => {
   threads.delete("redesign");
   threads.set("thr_main", { ...threads.get("thr_main")!, archivedAt: 5 } as never);
   expect(await server.rpc.bot_landing({ botId: "dot", last: "redesign" })).toEqual({ threadId: null });
+});
+
+it("lets a new thread still waiting on BB end quietly when Studio reloads: nothing touches the closed database or rejects unhandled", async () => {
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    const { harness, threads } = await setup();
+    let release!: () => void;
+    getGate = new Promise((resolve) => { release = resolve; });
+    // A fork BB doesn't say the maker of: Studio reads its source first.
+    const fork = { id: "fork_late", title: "Fork", projectId: "proj_studio", originKind: "fork", sourceThreadId: "thr_main", createdAt: 11, status: "idle" } as ThreadFacts;
+    threads.set(fork.id, fork);
+    void harness.emitThreadEvent("thread.created", { thread: fork as never });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await harness.lifecycle.dispose();
+    getGate = null;
+    release();
+    for (let i = 0; i < 20; i++) await new Promise((resolve) => setImmediate(resolve));
+    expect(unhandled).toEqual([]);
+  } finally {
+    getGate = null;
+    process.off("unhandledRejection", onUnhandled);
+  }
 });

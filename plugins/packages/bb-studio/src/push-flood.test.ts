@@ -99,7 +99,7 @@ describe("Main's pushes", () => {
     const pushes = new MainPushes({
       mainOf: (id) => (id === "thr_main" ? { botId: "bot_dot", name: "Dot" } : null),
       thread: async (id) => ({ id, visibility: "hidden", projectId: "proj_personal", lastReadAt: options.read ? 10 : 1, latestAttentionAt: 5 }),
-      lastRequest: async () => options.request ?? { initiator: "user", input: [{ type: "text", text: "[bb message from thread:thr_w] CI is green." }] },
+      lastRequest: async () => options.request ?? { initiator: "user", input: [{ type: "text", text: "Is CI green?" }] },
       allowed: async () => options.allowed ?? true,
       notify: async (input) => { sent.push(input); },
       ...(options.needs ? { needsUser: (card: { id: string }) => options.needs![card.id] ?? true } : {}),
@@ -154,6 +154,27 @@ describe("Main's pushes", () => {
     await idle(null);
     await idle('::approval{thread="thr_w" id="int_1"}');
     expect(sent).toEqual([]);
+  });
+
+  it("pushes nothing when Main answers a runner, a worker or BB's child notice, unless a card in it needs the user", async () => {
+    for (const request of [
+      { initiator: "agent", senderThreadId: "thr_runner", input: [{ type: "text", text: "[bb message from thread:thr_runner] Disk is fine." }] },
+      { initiator: "system", systemMessageKind: "child-completed", input: [{ type: "text", text: "[bb system] @thread:thr_w completed" }] },
+      { initiator: "user", input: [{ type: "text", text: "[bb message from thread:thr_w] CI is green." }] },
+    ]) {
+      const { sent, idle } = main({ request, needs: { loop_mine: true, task_running: false } });
+      await idle("I stopped the bb-agent container on red4.");
+      await idle('Noted.\n::work{id="task_running"}');
+      expect(sent).toEqual([]);
+      await idle('Your key expires tomorrow.\n::loop{id="loop_mine"}');
+      expect(sent.map((input) => input.body)).toEqual(["Your key expires tomorrow."]);
+    }
+  });
+
+  it("still pushes Main's answer to an automation (the morning card)", async () => {
+    const { sent, idle } = main({ request: { initiator: "user", input: [{ type: "text", text: "[bb automation due:2026-11-20T13:00:00Z] Morning card" }] } });
+    await idle("## Friday, Nov 20");
+    expect(sent).toHaveLength(1);
   });
 
   it("pushes nothing for a cache keepalive, even when the reply isn't [PASS]", async () => {

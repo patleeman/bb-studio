@@ -65,6 +65,8 @@ export class StrandService {
   /** Conversations whose backfill failed: not tried again until `until` (5 minutes, doubling up to an hour). */
   private readonly backfillFailed = new Map<string, { until: number; delay: number }>();
   private backfilling: Promise<void> | null = null;
+  /** After a reload the old instance's database is closed: nothing new starts, and work in flight ends quietly. */
+  private disposed = false;
 
   constructor(private readonly deps: StrandServiceDeps) {
     this.store = new StrandStore(deps.db, deps.now);
@@ -84,7 +86,7 @@ export class StrandService {
 
   /** A turn finished (or failed): sort it, or backfill first if the conversation never was. `settled`: BB said the thread is idle or failed. */
   async idle(threadId: string, settled = false): Promise<void> {
-    if (!this.enabled(threadId)) return;
+    if (this.disposed || !this.enabled(threadId)) return;
     if (this.detector.needsBackfill(threadId)) { await this.requestBackfill(threadId, true); return; }
     await this.detector.idle(threadId, settled);
   }
@@ -95,6 +97,7 @@ export class StrandService {
    * recently active first. Resolves when the queue it joined is done.
    */
   requestBackfill(threadId: string, active = false): Promise<void> {
+    if (this.disposed) return Promise.resolve();
     const conversation = this.deps.conversation(threadId);
     if (!conversation || !this.detector.needsBackfill(threadId)) return Promise.resolve();
     if (!active && this.now() - conversation.lastActiveAt > BACKFILL_ACTIVE_MS) return Promise.resolve();
@@ -106,7 +109,7 @@ export class StrandService {
   }
 
   private async drain(): Promise<void> {
-    while (this.backfillWanted.size) {
+    while (!this.disposed && this.backfillWanted.size) {
       const next = [...this.backfillWanted].sort((a, b) => (this.deps.conversation(b)?.lastActiveAt ?? 0) - (this.deps.conversation(a)?.lastActiveAt ?? 0))[0]!;
       this.backfillWanted.delete(next);
       try {
@@ -114,6 +117,7 @@ export class StrandService {
         this.backfillFailed.delete(next);
         await this.detector.idle(next);
       } catch (error) {
+        if (this.disposed) return;
         if (!this.detector.needsBackfill(next)) continue;
         // Wait before trying again (the host may be down); say so once, not on every open, signal and poll.
         const before = this.backfillFailed.get(next);
@@ -123,12 +127,12 @@ export class StrandService {
       }
     }
   }
-  active(threadId: string): void { if (this.enabled(threadId) && !this.detector.needsBackfill(threadId)) this.detector.active(threadId); }
-  async asked(threadId: string): Promise<void> { if (this.enabled(threadId) && !this.detector.needsBackfill(threadId)) await this.detector.asked(threadId); }
-  forget(threadId: string): void { this.store.forget(threadId); }
+  active(threadId: string): void { if (!this.disposed && this.enabled(threadId) && !this.detector.needsBackfill(threadId)) this.detector.active(threadId); }
+  async asked(threadId: string): Promise<void> { if (!this.disposed && this.enabled(threadId) && !this.detector.needsBackfill(threadId)) await this.detector.asked(threadId); }
+  forget(threadId: string): void { if (!this.disposed) this.store.forget(threadId); }
 
 
-  dispose(): void { this.detector.dispose(); }
+  dispose(): void { this.disposed = true; this.backfillWanted.clear(); this.detector.dispose(); }
 
   // ---- reads ----
 
@@ -194,7 +198,7 @@ export class StrandService {
   async list(threadId: string): Promise<StrandList> {
     const enabled = this.enabled(threadId);
     // Opened: backfill it in the background when it never was (and was active lately).
-    if (enabled && this.detector.needsBackfill(threadId)) void this.requestBackfill(threadId);
+    if (enabled && this.detector.needsBackfill(threadId)) void this.requestBackfill(threadId).catch((error) => this.deps.log(`Strands: backfill of ${threadId}: ${error instanceof Error ? error.message : String(error)}`));
     const read = this.store.read(threadId);
     const backfill = read?.backfill ? (() => { try { return JSON.parse(read.backfill!) as { at?: number; messages?: number; sorted?: number }; } catch { return {}; } })() : null;
     const day = new Date(this.now()).toISOString().slice(0, 10);

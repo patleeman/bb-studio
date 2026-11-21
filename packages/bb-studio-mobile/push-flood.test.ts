@@ -115,14 +115,18 @@ describe("BB's push for a finished turn", () => {
     } finally { await host.harness.lifecycle.dispose(); }
   });
 
-  it("goes out for a real reply, whoever started the turn", async () => {
+  it("goes out for a real reply to the user or an automation, never for a lead answering its workers", async () => {
     const host = await relay({ threads: {
       thr_user: [{ request: user("Ship it?"), reply: "Shipped as v1.2." }],
-      thr_relay: [{ request: system("[bb system]\n\n@thread:thr_w completed:"), reply: "The build failed: the signing key expired. Renew it in Keychain." }],
+      thr_relay: [{ request: automation("Check the build"), reply: "The build failed: the signing key expired. Renew it in Keychain." }],
+      thr_lead: [{ request: system("[bb system]\n\n@thread:thr_w completed:"), reply: "The review passed; I merged it." }],
+      thr_peer: [{ request: agent("Phase 1 is built."), reply: "Thanks, sending it to review." }],
     } });
     try {
       await host.push("thr_user", "Shipped as v1.2.");
       await host.push("thr_relay", "The build failed: the signing key expired.");
+      await host.push("thr_lead", "The review passed; I merged it.");
+      await host.push("thr_peer", "Thanks, sending it to review.");
       expect(host.requests.map((request) => request.body.threadId)).toEqual(["thr_user", "thr_relay"]);
       expect(host.requests[0]!.body).toMatchObject({ aps: { alert: { body: "Shipped as v1.2." }, category: "BB_REPLY" } });
     } finally { await host.harness.lifecycle.dispose(); }
@@ -200,8 +204,11 @@ describe("rules", () => {
     [user("Hi"), "user"],
     [keepalive, "keepalive"],
     [{ initiator: "user", input: [{ type: "text", text: "x" }], pluginSubmission: { pluginId: "studio", data: { kind: "cache-keepalive" } } }, "keepalive"],
-    [system("[bb system] done"), "relayed"],
-    [agent("hello"), "relayed"],
+    [system("[bb system] done"), "thread"],
+    [{ initiator: "system", systemMessageKind: "child-failed", input: [{ type: "text", text: "[bb system] failed" }] }, "thread"],
+    [{ initiator: "system", systemMessageKind: "environment-directory-updated", input: [{ type: "text", text: "[bb system] moved" }] }, "relayed"],
+    [agent("hello"), "thread"],
+    [{ initiator: "user", input: [{ type: "text", text: "[bb message from thread:thr_w] done" }] }, "thread"],
     [automation("Reminder"), "relayed"],
     [{ initiator: "user", input: [{ type: "text", text: "[bb studio] Watcher x: y" }] }, "relayed"],
     [{ initiator: "user", input: [{ type: "text", text: "note", visibility: "agent-only" }] }, "relayed"],
@@ -216,6 +223,11 @@ describe("rules", () => {
     expect(turnPushAllowed({ trigger: "user", reply: null })).toBe(true);
     expect(turnPushAllowed({ trigger: "relayed", reply: '::loop{id="loop_1"}' })).toBe(true);
     expect(turnPushAllowed({ trigger: "continuation", reply: "CI is green." })).toBe(true);
+  });
+
+  it("never pushes a turn another thread started: a lead's answer to its worker", () => {
+    expect(turnPushAllowed({ trigger: "thread", reply: "The build is done; I merged it." })).toBe(false);
+    expect(turnPushAllowed({ trigger: "thread", reply: null })).toBe(false);
   });
 
   it("keys only plain replies, and summarises a window", () => {

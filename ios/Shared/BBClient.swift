@@ -407,6 +407,8 @@ extension BBClient {
         PermissionMode.apply(threadId, to: &body, serverURL: baseURL)
         let result: SendResult = try await post("/api/v1/threads/\(threadId)/send", .object(body))
         PermissionMode.sent(threadId, body, serverURL: baseURL)
+        // A turn the user started from the phone: the Bot Live Activity follows it.
+        PhoneTurns.record(threadId, serverURL: baseURL)
         return result
     }
 

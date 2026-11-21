@@ -181,8 +181,8 @@ private struct WidgetsDemo: View {
         private let attributes = BotActivityAttributes(botId: "bot_juniper", botName: "Juniper", server: "demo")
         private var state: BotActivityAttributes.ContentState {
             BotActivityAttributes.ContentState(
-                state: "needs", workers: 2, conversationId: "thr_main", conversationTitle: "Main",
-                line: "Fable moved the bridge onto the Studio contract.", needsYou: "Push bb-studio-native to origin?",
+                state: "needs", workers: 0, conversationId: "thr_main", conversationTitle: "Main",
+                needsYou: "Push bb-studio-native to origin?",
                 approval: .init(workerThreadId: "thr_w", interactionId: "int_1", summary: "git push origin bb-studio-native"),
                 updatedAt: Date.now.timeIntervalSince1970)
         }
@@ -197,7 +197,7 @@ private struct WidgetsDemo: View {
                 HStack(spacing: 0) {
                     BotActivityGlyph(botId: attributes.botId, state: state.presence, size: 22)
                     Spacer(minLength: 126)
-                    Text("\(state.workers)").font(.callout.weight(.semibold)).foregroundStyle(BotActivityStyle.amber)
+                    BotActivityCompactTrailing(state: state)
                 }
                 .padding(.horizontal, 12)
                 .frame(width: 250, height: 37)

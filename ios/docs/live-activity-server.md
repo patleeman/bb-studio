@@ -1,21 +1,38 @@
 # Bot Live Activity: what Studio must send
 
-The phone shows one Live Activity per Bot (plan section 4, design 10e) while
-a turn or any worker runs, or while something needs Patrick. While the app is
-open it starts, updates and ends the activity itself. While the app is closed
-only Studio can, through the Mobile relay's `live_activity_push`. That Studio
+The phone shows one Live Activity per Bot (plan section 4, design 10e) only
+while a turn the user started from the phone runs or asks them something.
+Push notifications are the one way to say something needs the user or
+finished; the activity is not. Workers alone never start or keep one, and
+there is no always-on "N workers" card. While the app is open the phone starts,
+updates and ends the activity itself. While the app is closed only Studio can
+update or end it, through the Mobile relay's `live_activity_push`. That Studio
 side does not exist yet. This is what it needs to do.
 
 The phone side is done: `LiveActivity/BotActivityAttributes.swift` (the
-types below), `iOS/App/BotLiveActivities.swift` (local updates and token
+types below and the rules), `Shared/PhoneTurns.swift` (the turns sent from the
+phone), `iOS/App/BotLiveActivities.swift` (local updates and token
 registration) and `Widgets/BotLiveActivity.swift` (the views).
+
+## The phone's rules
+
+- `BBClient.send` (not a scheduled send), a new conversation and a question
+  about a worker record the thread and the time in `PhoneTurns`. Entries go
+  after 30 minutes, or once the turn is seen finished.
+- The activity shows for such a turn while its conversation is running or
+  needs the user. A turn sent less than 20 seconds ago counts as running until
+  BB says it runs, unless it was already seen running.
+- It shows status only: `line` is left out, `workers` is 0, `state` is
+  `thinking` or `needs`. Never an old reply, never a `[PASS]`.
+- When the turn finishes it ends at once (`dismissalPolicy: .immediate`): the
+  reply's push says it's done.
 
 ## Tokens (done on the phone)
 
 At every launch, the app registers with `mobile.live_activity_register`:
 
 - its push-to-start token for every Bot in `bot_spaces`
-  (`kind: "push-to-start"`);
+  (`kind: "push-to-start"`; Studio must not use it to start an activity);
 - each running activity's update token (`kind: "update"`), for activities the
   app started and ones Studio started by push.
 
@@ -24,9 +41,13 @@ from the `botId`, so Studio never sees them.
 
 ## When to push
 
+Studio never starts an activity: it can't tell a turn sent from the phone.
+It only updates and ends one the phone started (it has the update token).
+Open point: Studio needs that activity's conversation. Proposed: the phone
+sends `conversationId` with the `update` token in `live_activity_register`.
 Hook the `BotSignal` flush in `plugins/packages/bb-studio/src/bot-signal.ts`:
-every `bot_threads_changed` event (`conversations`, `workers`, `needs-you` or
-`presence`) for a Bot. For that Bot:
+every `bot_threads_changed` event (`conversations` or `needs-you`) for a Bot
+with an activity. For that Bot:
 
 1. Work out the content state (below) from the same data as `bot_spaces` and
    `bot_threads_view`.
@@ -36,20 +57,15 @@ every `bot_threads_changed` event (`conversations`, `workers`, `needs-you` or
 
 | Before | Now | Event |
 | --- | --- | --- |
-| idle or nothing sent | active | `start` |
 | active | active, changed | `update` |
-| active | idle | `end` |
+| active | finished | `end` |
 
-"Active" means presence state `thinking`, `working` or `needs`, as
-`BotSpace.presenceState` works it out on the phone: needs-you on the Bot, a
-conversation or a worker → `needs`; else any running worker → `working`;
-else a running turn in any conversation → `thinking`; else `idle`.
+"Active" means the activity's conversation (`conversationId`) is running
+(`thinking`) or needs the user (`needs`). "Finished" means neither. Running
+workers don't count.
 
 Throttle updates to one every 5 seconds per Bot (APNs budgets Live Activity
-updates). Never throttle `start`, `end`, or a change into or out of `needs`.
-
-On a Studio restart, nothing is remembered: send `start` for active Bots. The
-phone ends a duplicate itself.
+updates). Never throttle `end`, or a change into or out of `needs`.
 
 ## Calls
 
@@ -57,20 +73,6 @@ All three go to `mobile.live_activity_push`
 (`bb.sdk.plugins.callRpc({ pluginId: "mobile", method: "live_activity_push", … })`).
 With no token registered the relay sends nothing and returns `{ sent: 0 }`, so
 Studio can call it unconditionally. A failed call must not affect Studio.
-
-Start:
-
-```json
-{
-  "event": "start",
-  "botId": "bot_juniper",
-  "attributesType": "BotActivityAttributes",
-  "attributes": { "botId": "bot_juniper", "botName": "Juniper", "server": "<mobile server identity namespace>" },
-  "contentState": { … },
-  "alert": { "title": "Juniper", "body": "Push bb-studio-native to origin?" },
-  "staleDate": 1794490069
-}
-```
 
 Update:
 
@@ -87,47 +89,40 @@ End:
 { "event": "end", "botId": "bot_juniper", "contentState": { …last state, "state": "idle" }, "dismissalDate": 1794488400 }
 ```
 
-`dismissalDate` now + 60 s keeps the final state on the lock screen briefly.
+`dismissalDate` now: the activity goes at once; the reply's push covers it.
 `staleDate` now + 30 minutes greys out an activity Studio stopped updating.
 
-`attributes.server` is how the phone scopes taps and buttons to a server. It
-must equal `ServerScope.namespace(<server URL>)` on the phone: the SHA-256 hex of
-the BB server URL the phone uses. Studio can't know that URL, so **the phone
-should send it**. Proposed: add an optional `server` field to
-`live_activity_register`, stored with the token, which the relay puts into
-`attributes.server` on `start`. Until then, Studio sends `"server": ""`, and the
-phone treats an empty server as the selected one (done:
-`BotActivityAttributes.belongs(to:)`, the decision intent, and the tap link).
+`attributes.server` is how the phone scopes taps and buttons to a server. The
+phone sets it when it starts the activity. An activity with an empty server
+(from an older Studio push) counts as the selected server's
+(`BotActivityAttributes.belongs(to:)`, the decision intent, and the tap link).
 
 ## Content state
 
 The `contentState` JSON. Keys are exactly these; every key but `state`,
 `workers` and `updatedAt` may be left out or null. Keep the whole payload
-under 4 KB (the relay refuses larger ones).
+under 4 KB (the relay refuses larger ones). Keep the phone's shape: `workers`
+0, no `line`, and keep `conversationId` as the phone set it.
 
 | Key | Type | Value |
 | --- | --- | --- |
-| `state` | string | `idle`, `thinking`, `working` or `needs` |
-| `workers` | int | running workers (`bot_threads_view` workers with status `running`) |
-| `conversationId` | string | the conversation the line comes from (below) |
+| `state` | string | `thinking` or `needs` (`idle` and `working` still decode) |
+| `workers` | int | 0 (the view shows a count only when it's above 0) |
+| `conversationId` | string | the conversation of the phone's turn |
 | `conversationTitle` | string | `"Main"` for Main, else the conversation's title |
-| `line` | string | that conversation's `latest`, plain text (Markdown removed), at most 160 characters |
-| `needsYou` | string | only when `state` is `needs`: the conversation's `needsYou.reason`, else `"Approve: <summary>"` for a worker approval, else `"<worker title> is waiting on you"`; at most 120 characters |
+| `line` | string | left out: the view shows "Main · Thinking…". If ever sent, plain text, at most 160 characters, never a `[PASS]` (the view hides one) |
+| `needsYou` | string | only when `state` is `needs`: the conversation's `needsYou.reason`, else `"Approve: <summary>"` for a worker approval; at most 120 characters |
 | `approval` | object | the first pending worker approval in that conversation (`bot_conversation_approvals`): `{ workerThreadId, interactionId, summary, canApprove, canDeny }`. `summary` is "<worker title>: <short or title>", at most 140 characters; `canApprove` is `decisions` contains `allow_once`, `canDeny` contains `deny` |
 | `updatedAt` | number | Unix seconds |
-
-Which conversation: the newest one with `needsYou`, else the newest running
-one, else Main, else the newest.
 
 Example (design 10e):
 
 ```json
 {
   "state": "needs",
-  "workers": 2,
+  "workers": 0,
   "conversationId": "thr_main",
   "conversationTitle": "Main",
-  "line": "Fable moved the bridge onto the Studio contract.",
   "needsYou": "Push bb-studio-native to origin?",
   "approval": {
     "workerThreadId": "thr_w1",
@@ -140,13 +135,15 @@ Example (design 10e):
 }
 ```
 
-`NativeSurfacesTests.testServerContentStateDecodes` decodes this example.
+`NativeSurfacesTests.testServerContentStateDecodes` decodes a state like this
+one (with the older `line` and worker count too).
 
 ## What the phone does with it
 
-- Lock screen: the presence still for `state`, the Bot's name, "N workers",
-  "conversationTitle · line", and `needsYou` in amber (#f2b04a).
-- Island compact: the presence still and the worker count (amber while
+- Lock screen: the presence still for `state`, the Bot's name, "Main ·
+  Thinking…" (or the title alone while `needs`), and `needsYou` in amber
+  (#f2b04a).
+- Island compact: the presence still and a mark for the state (amber while
   `needs`). Minimal: the still.
 - Island expanded: the same as the lock screen, plus Deny and Approve when
   `approval` is set. They call `bot_worker_approval_resolve`.

@@ -3,7 +3,9 @@
 // Main's replies meant for the user itself: a real message, a work card or a
 // loop, the morning card. Not a quiet pass, an approval card alone (its own
 // push covers it), a cache keepalive, a reply the user already read, or a
-// Main whose own BB level is input-only or muted. Studio Mobile groups them:
+// Main whose own BB level is input-only or muted, nor Main answering another
+// thread (a runner's or worker's report, BB's notice that a child finished)
+// unless the answer carries a card that needs the user. Studio Mobile groups them:
 // one push per conversation per few minutes (push-window.ts there).
 import { isPassOutput } from "./kit/silent";
 import { isPingRequest } from "./bot-cache";
@@ -48,6 +50,18 @@ function plainPreview(text: string): string {
   }
   const joined = lines.join(" · ");
   return joined.length > PREVIEW_MAX ? `${joined.slice(0, PREVIEW_MAX - 1).trimEnd()}…` : joined;
+}
+
+const THREAD_HEADER = /^\s*\[bb message from thread:[^\]\n]*\]/u;
+
+/** A turn another thread started: a message from it, or BB's notice that a child thread completed, failed or stopped. */
+export function fromAnotherThread(request: unknown): boolean {
+  if (!request || typeof request !== "object") return false;
+  const data = request as { senderThreadId?: string | null; systemMessageKind?: string; input?: { type?: string; text?: string }[] };
+  if (data.senderThreadId) return true;
+  if (typeof data.systemMessageKind === "string" && data.systemMessageKind.startsWith("child-")) return true;
+  const first = (Array.isArray(data.input) ? data.input : []).find((part) => part.type === "text" && typeof part.text === "string")?.text ?? "";
+  return THREAD_HEADER.test(first);
 }
 
 type Thread = { id: string; visibility?: string; projectId?: string | null; lastReadAt?: number | null; latestAttentionAt?: number };
@@ -95,6 +109,11 @@ export class MainPushes {
     if (!thread || isPingRequest(request)) return false;
     if ((thread.lastReadAt ?? 0) >= (thread.latestAttentionAt ?? 0) && thread.latestAttentionAt !== undefined) return false;
     if (!(await this.deps.allowed(threadId))) return false;
+    if (fromAnotherThread(request)) {
+      // Main answering a runner or a worker: only a card that needs the user is worth the phone.
+      const cards = cardsIn(reply);
+      if (!cards.length || !this.deps.needsUser || !cards.some((card) => this.deps.needsUser!(card))) return false;
+    }
     const cards = plainPreview(reply) ? [] : cardsIn(reply);
     if (cards.length && this.deps.needsUser && !cards.some((card) => this.deps.needsUser!(card))) return false;
     if (this.deps.pushedTaskSince?.(bot.botId, Date.now() - TASK_PUSH_QUIET_MS)) return false;

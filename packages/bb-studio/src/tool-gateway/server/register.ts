@@ -140,10 +140,13 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
 
   // ── Change notice ─────────────────────────────────────────────────────
   let publishTimer: ReturnType<typeof setTimeout> | null = null;
+  // After dispose (a reload: the database is closed) a late store change arms no timer, and one already armed does nothing.
+  let disposed = false;
   const changed = () => {
-    if (publishTimer) return;
+    if (disposed || publishTimer) return;
     publishTimer = setTimeout(() => {
       publishTimer = null;
+      if (disposed) return;
       recordApprovedTools();
       void Promise.resolve(bb.realtime.publish(TOOL_GATEWAY_CHANNEL, {} as never)).catch(() => {});
     }, 100);
@@ -873,6 +876,7 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
     handlers,
     ready: async () => { await oauthStore.flush().catch(() => {}); },
     dispose: async () => {
+      disposed = true;
       if (publishTimer) clearTimeout(publishTimer);
       await engine.close();
     },

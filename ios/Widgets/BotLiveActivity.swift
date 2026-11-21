@@ -2,9 +2,10 @@ import ActivityKit
 import SwiftUI
 import WidgetKit
 
-/// The Bot Live Activity (design 10e): the presence glyph, the Bot's name,
-/// "N workers", the conversation's latest line, and what needs you in amber.
-/// The expanded island answers a worker approval with Deny and Approve.
+/// The Bot Live Activity (design 10e), while a turn sent from the phone runs:
+/// the presence glyph, the Bot's name, the conversation and its state
+/// ("Main · Thinking…"), and what needs you in amber. The expanded island
+/// answers a worker approval with Deny and Approve.
 struct BotLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: BotActivityAttributes.self) { context in
@@ -41,11 +42,7 @@ struct BotLiveActivity: Widget {
             } compactLeading: {
                 BotActivityGlyph(botId: context.attributes.botId, state: state.presence, size: 22)
             } compactTrailing: {
-                Text("\(state.workers)")
-                    .font(.callout.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(state.presence == .needs ? BotActivityStyle.amber : .white)
-                    .accessibilityLabel(BotActivityWorkers.label(state.workers))
+                BotActivityCompactTrailing(state: state)
             } minimal: {
                 BotActivityGlyph(botId: context.attributes.botId, state: state.presence, size: 22)
             }
@@ -127,18 +124,40 @@ struct BotActivityWorkers: View {
     static func label(_ count: Int) -> String { count == 1 ? "1 worker" : "\(count) workers" }
 }
 
-/// "Main · the latest line".
+/// The island's compact right side: the worker count when Studio sends one,
+/// else a mark for the state.
+struct BotActivityCompactTrailing: View {
+    let state: BotActivityAttributes.ContentState
+
+    var body: some View {
+        Group {
+            if state.workers > 0 {
+                Text("\(state.workers)")
+                    .font(.callout.weight(.semibold))
+                    .monospacedDigit()
+                    .accessibilityLabel(BotActivityWorkers.label(state.workers))
+            } else {
+                Image(systemName: state.presence == .needs ? "exclamationmark.circle.fill" : "ellipsis")
+                    .font(.callout.weight(.semibold))
+                    .accessibilityLabel(BotActivityGlyph.label(state.presence))
+            }
+        }
+        .foregroundStyle(state.presence == .needs ? BotActivityStyle.amber : .white)
+    }
+}
+
+/// "Main · Thinking…", or "Main · a line" when Studio sends one.
 struct BotActivityLine: View {
     let state: BotActivityAttributes.ContentState
 
     var body: some View {
-        if let line = state.line {
+        if let line = state.line, !SilentOutput.isPass(line) {
             (Text("\(state.conversationTitle ?? "Main") · ").foregroundStyle(.white.opacity(0.55))
                 + Text(line).foregroundStyle(.white.opacity(0.85)))
                 .font(.subheadline)
                 .lineLimit(2)
         } else if let title = state.conversationTitle {
-            Text(state.presence == .thinking ? "\(title) · Thinking…" : title)
+            Text(state.presence == .thinking || state.presence == .working ? "\(title) · Thinking…" : title)
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.7))
                 .lineLimit(1)

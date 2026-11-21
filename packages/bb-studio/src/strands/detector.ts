@@ -117,10 +117,18 @@ export class StrandDetector {
   }
   private clear(handle: unknown) { if (this.deps.clearTimer) this.deps.clearTimer(handle); else clearTimeout(handle as ReturnType<typeof setTimeout>); }
 
-  /** One job per conversation at a time, in order. */
-  private queue<T>(threadId: string, job: () => Promise<T>): Promise<T> {
+  /**
+   * One job per conversation at a time, in order. After dispose (a reload: the
+   * database is closed) a job that hasn't started doesn't, and one still
+   * running ends quietly with `idle` instead of failing on the closed database.
+   */
+  private queue<T>(threadId: string, job: () => Promise<T>, idle: T): Promise<T> {
     const before = this.queues.get(threadId) ?? Promise.resolve();
-    const next = before.catch(() => undefined).then(job);
+    const run = async (): Promise<T> => {
+      if (this.disposed) return idle;
+      try { return await job(); } catch (error) { if (this.disposed) return idle; throw error; }
+    };
+    const next = before.catch(() => undefined).then(run);
     const tail = next.catch(() => undefined);
     this.queues.set(threadId, tail);
     void tail.then(() => { if (this.queues.get(threadId) === tail) this.queues.delete(threadId); });
@@ -147,7 +155,7 @@ export class StrandDetector {
     const key = `early:${threadId}`;
     const handle = this.timers.get(key);
     if (handle !== undefined) { this.clear(handle); this.timers.delete(key); }
-    return this.queue(threadId, () => this.sortNew(threadId, settled));
+    return this.queue(threadId, () => this.sortNew(threadId, settled), 0);
   }
 
   /** A turn started: if it runs long, sort it before it ends. */
@@ -168,7 +176,7 @@ export class StrandDetector {
       const strandId = item ? item.strandId : await this.sortTurn(threadId, turn);
       this.running.set(threadId, { seq: turn.seq, strandId, sorted: true });
       this.deps.changed(threadId);
-    });
+    }, undefined);
   }
 
   private async scrub(): Promise<Scrub> {
@@ -231,7 +239,7 @@ export class StrandDetector {
     this.store.saveRead(threadId, { seenSeq });
     if (sorted) { this.nameSoon(threadId); this.deps.changed(threadId); }
     // More to read, and this read moved forward: read on (never the same window twice).
-    if (more && seenSeq > read.seenSeq) void this.idle(threadId, settled);
+    if (more && seenSeq > read.seenSeq && !this.disposed) void this.idle(threadId, settled).catch((error) => this.deps.log(`Strands: ${message(error)}`));
     return sorted;
   }
 
@@ -323,13 +331,13 @@ export class StrandDetector {
   /** Names new strands within 2 minutes of the last naming. */
   nameSoon(threadId: string): void {
     const last = this.store.read(threadId)?.namedAt ?? 0;
-    this.timer(`name:${threadId}`, Math.max(0, last + NAME_EVERY_MS - this.now()), () => this.queue(threadId, () => this.nameNow(threadId)));
+    this.timer(`name:${threadId}`, Math.max(0, last + NAME_EVERY_MS - this.now()), () => this.queue(threadId, () => this.nameNow(threadId), undefined));
   }
 
   /** Sorts what Jev couldn't within 5 minutes of the last batch. */
   batchSoon(threadId: string): void {
     const last = this.store.read(threadId)?.batchedAt ?? 0;
-    this.timer(`batch:${threadId}`, Math.max(0, last + BATCH_EVERY_MS - this.now()), () => this.queue(threadId, () => this.batchNow(threadId)));
+    this.timer(`batch:${threadId}`, Math.max(0, last + BATCH_EVERY_MS - this.now()), () => this.queue(threadId, () => this.batchNow(threadId), undefined));
   }
 
   /** One naming call: new strands named or folded into open ones; stale summaries refreshed. */
@@ -408,7 +416,7 @@ export class StrandDetector {
   needsBackfill(threadId: string): boolean { return (this.store.read(threadId)?.backfill ?? null) === null; }
 
   backfill(threadId: string): Promise<BackfillReport | null> {
-    return this.queue(threadId, () => this.backfillNow(threadId));
+    return this.queue(threadId, () => this.backfillNow(threadId), null);
   }
 
   private async backfillNow(threadId: string): Promise<BackfillReport | null> {
