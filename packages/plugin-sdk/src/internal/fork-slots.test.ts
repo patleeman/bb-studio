@@ -390,3 +390,19 @@ describe("slots.experimental_timelineFilter", () => {
     ).toThrow();
   });
 });
+
+describe("slots.experimental_hideHostEntries promptStack", () => {
+  it("keeps the parts of the stack above the composer to hide, none when not given, and rejects a non-string", () => {
+    const collected = collect((app) => {
+      app.slots.experimental_hideHostEntries({ id: "stack", promptStack: ["active-child-threads"] });
+      app.slots.experimental_hideHostEntries({ id: "other", footer: ["builtin:mobile"] });
+    });
+    expect(collected.hiddenHostEntries.map((entry) => [entry.id, entry.promptStack])).toEqual([
+      ["stack", ["active-child-threads"]],
+      ["other", []],
+    ]);
+    expect(() =>
+      collect((app) => app.slots.experimental_hideHostEntries({ id: "bad", promptStack: [""] } as never)),
+    ).toThrow(/promptStack must be an array of non-empty strings/u);
+  });
+});
