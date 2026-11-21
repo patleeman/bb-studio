@@ -26,6 +26,19 @@ describe("Jev decides; no keywords", () => {
     expect(Object.keys(asked.questions.askSentence!.criteria)).toEqual(["p1", "p2", "p3", "none"]);
   });
 
+  it("ends a sentence only at . ! ? before a space or the end: file names, versions and e.g. stay whole", () => {
+    expect(reply.sentencesOf("Should I update main-push.ts and push to v1.2 now? Tests pass, e.g. the push suite. Done!")).toEqual([
+      "Should I update main-push.ts and push to v1.2 now?", "Tests pass, e.g. the push suite.", "Done!",
+    ]);
+    expect(askCandidates("See https://x.test/a.b?c=1 first. OK to ship 2.3.1?")).toEqual(["See https://x.test/a.b?c=1 first.", "OK to ship 2.3.1?"]);
+  });
+
+  it("reads the reply as shown: emphasis, escapes, autolinks and entities off", () => {
+    expect(reply.proseOf("Should I *really* drop \\_tmp\\_ and snake_case_name? See <https://x.test/a> &amp; **bold** `code`.")).toEqual([
+      "Should I really drop _tmp_ and snake_case_name? See https://x.test/a & bold code.",
+    ]);
+  });
+
   it("reads Jev's tag and its sentence word for word; unsure or malformed answers leave the reply untagged", () => {
     const candidates = askCandidates("Ace has Saturday 9 AM. Please sign in to the Ace portal so I can book it. Then I'll confirm.");
     expect(readReplyAnswers({ reply: choice("needs-you"), askSentence: choice("p2") }, candidates)).toEqual({ tag: "needs-you", ask: "Please sign in to the Ace portal so I can book it." });
@@ -173,6 +186,17 @@ describe("clearing: Jev says which open asks a message answers", () => {
     expect(tagsOf(x.svc).map((row) => row[2])).toEqual([true, true, false]);
   });
 
+  it("a strand marked done settles the asks open then, once: an ask its turn makes after still counts, and reopening brings none back", async () => {
+    const x = await open();
+    // An agent marks the router done mid-turn, then ends the turn asking.
+    x.svc.note(x.thread.id, { strand: "Look at the router", done: true });
+    x.thread.turn("router: and the branch?", "Merged and deployed. Want me to delete the router branch?", { at: NOW - HOUR });
+    await x.svc.idle(x.thread.id);
+    expect(tagsOf(x.svc).map((row) => row[2])).toEqual([false, true, false]);
+    x.svc.note(x.thread.id, { strand: "Look at the router", done: false });
+    expect(tagsOf(x.svc).map((row) => row[2])).toEqual([false, true, false]);
+  });
+
   it("without Jev an ask stays open; Done, the strand marked done and a week still clear it", async () => {
     const x = await open();
     outOfCalls(x.db);
@@ -207,6 +231,16 @@ describe("the push check matches the reply to its own turn", () => {
     // An earlier turn's push asks about its own reply.
     expect(await x.svc.replyPush(x.thread.id, 0, first.seq)).toEqual({ decision: "push", ask: "Want me to book Saturday?" });
     expect(rpcContract["strands.replyPush"].output.parse(await pending)).toEqual({ decision: "quiet", ask: null });
+  });
+
+  it("finds a turn that a keepalive started, without waiting", async () => {
+    const x = service();
+    await x.svc.idle(x.thread.id);
+    const turn = x.thread.turn("Book the furnace", "Want me to book Saturday?", { at: NOW - HOUR, pingFirst: true });
+    await x.svc.idle(x.thread.id);
+    expect(turn.seq).not.toBe(turn.requestSeq);
+    expect(await x.svc.newestRequest(x.thread.id)).toBe(turn.requestSeq);
+    expect(await x.svc.replyPush(x.thread.id, 0)).toEqual({ decision: "push", ask: "Want me to book Saturday?" });
   });
 
   it("Done is the app window's only: the phone's contract doesn't carry it", () => {

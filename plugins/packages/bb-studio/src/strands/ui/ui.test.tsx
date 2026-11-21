@@ -379,6 +379,20 @@ describe("replies that need you, marked in place (design: Replies that need you,
     expect(marked()).toEqual(["Ace has Saturday 9 AM open; it needs your account."]);
   });
 
+  it("marks nothing when the named sentence isn't there, and the reply's own one when it was quoted earlier", () => {
+    state.tags = { ...TAGS, replies };
+    render(row("b", "m5b", "t5", NOW, "Ace has Saturday 9 AM open; it needs your account."));
+    expect(marked()).toEqual([]);
+    render(<div data-timeline-row-id="q">
+      <div aria-label="Message metadata"><StrandTag message={msg("m5q", "t5", NOW) as never} /></div>
+      <p>You asked: Want me to book Ace for Saturday 9 AM?</p>
+      <p>Two slots are open. Want me to book Ace for Saturday 9 AM?</p>
+    </div>);
+    const ranges = [...(highlights.get("studio-reply-ask")?.ranges ?? [])];
+    expect(ranges).toHaveLength(1);
+    expect(ranges[0]!.startContainer.textContent).toBe("Two slots are open. Want me to book Ace for Saturday 9 AM?");
+  });
+
   it("Done shows on hover or keyboard focus of the sentence, and marks the reply done", async () => {
     state.tags = { ...TAGS, replies };
     render(row("b", "m5b", "t5", NOW, "Ace has Saturday 9 AM open. Want me to book Ace for Saturday 9 AM?"));

@@ -51,19 +51,22 @@ export class FakeThread {
   }
 
   /** A turn: the request, the turn's start, `tools` tool items, the reply, and (when done) its end. */
-  turn(text: string, reply: string, options: { at?: number; kind?: "user" | "report" | "ping"; done?: boolean; tools?: number } = {}): { seq: number; turnId: string } {
+  turn(text: string, reply: string, options: { at?: number; kind?: "user" | "report" | "ping"; done?: boolean; tools?: number; pingFirst?: boolean } = {}): { seq: number; turnId: string; requestSeq: number } {
     const at = options.at ?? FIXTURE_AT + this.seq;
     const turnId = `turn_${++this.turns}`;
     const kind = options.kind ?? "user";
     const input = kind === "ping" ? [{ type: "text", text: "[bb ping] keep warm", visibility: "agent-only" }]
       : kind === "report" ? [{ type: "text", text: "Runner report, already shown.", visibility: "agent-only" }, { type: "text", text }]
       : [{ type: "text", text }];
-    const seq = this.push({ type: "client/turn/requested", createdAt: at, scope: { kind: "thread" }, data: { initiator: kind === "user" ? "user" : "system", input, target: { kind: "new-turn" } } });
+    // A keepalive queued ahead of the message: the turn starts with it.
+    const ping = options.pingFirst ? this.push({ type: "client/turn/requested", createdAt: at, scope: { kind: "thread" }, data: { initiator: "system", input: [{ type: "text", text: "[bb ping] keep warm", visibility: "agent-only" }], target: { kind: "new-turn" } } }) : null;
+    const requestSeq = this.push({ type: "client/turn/requested", createdAt: at, scope: { kind: "thread" }, data: { initiator: kind === "user" ? "user" : "system", input, target: { kind: "new-turn" } } });
+    const seq = ping ?? requestSeq;
     this.push({ type: "turn/started", createdAt: at + 1, scope: { kind: "turn", turnId }, data: {} });
     for (let tool = 0; tool < (options.tools ?? 0); tool++) this.push({ type: "item/completed", createdAt: at + 2, scope: { kind: "turn", turnId }, data: { item: { type: "commandExecution", command: "ls" } } });
     if (reply) this.push({ type: "item/completed", createdAt: at + 3, scope: { kind: "turn", turnId }, data: { item: { type: "agentMessage", text: reply } } });
     if (options.done !== false) this.push({ type: "turn/completed", createdAt: at + 4, scope: { kind: "turn", turnId }, data: {} });
-    return { seq, turnId };
+    return { seq, turnId, requestSeq };
   }
 
   /** Ends the newest turn. */

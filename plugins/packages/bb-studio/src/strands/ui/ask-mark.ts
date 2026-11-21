@@ -67,7 +67,8 @@ export function findText(root: Element, text: string): Range | null {
       map.push({ node, offset: index });
     }
   }
-  const at = flat.indexOf(want);
+  // The reply's own sentence, not an earlier quote of it: from the end.
+  const at = flat.lastIndexOf(want);
   if (at < 0) return null;
   const start = map[at]!;
   const end = map[at + want.length - 1]!;
@@ -77,7 +78,7 @@ export function findText(root: Element, text: string): Range | null {
   return range;
 }
 
-/** The reply's last paragraph: what is marked when Jev named no sentence, or it can't be found. */
+/** The reply's last paragraph: what is marked when Jev named no sentence. */
 export function lastParagraph(root: Element): Range | null {
   const paragraphs = [...root.querySelectorAll("p,li")].filter((element) => !element.closest(METADATA) && element.textContent?.trim());
   const last = paragraphs.at(-1);

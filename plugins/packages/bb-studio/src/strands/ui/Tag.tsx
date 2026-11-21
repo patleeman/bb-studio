@@ -48,7 +48,8 @@ export function AskMark({ threadId, reply }: { threadId: string; reply: Pick<Rep
     let unmark = () => {};
     const mark = () => {
       unmark();
-      range.current = (reply.ask ? findText(row, reply.ask) : null) ?? lastParagraph(row);
+      // The named sentence, or nothing when it can't be found (never a wrong one); the last paragraph only when Jev named none.
+      range.current = reply.ask ? findText(row, reply.ask) : lastParagraph(row);
       unmark = range.current ? markRange(range.current) : () => {};
     };
     mark();

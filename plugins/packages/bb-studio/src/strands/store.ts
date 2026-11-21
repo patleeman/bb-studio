@@ -74,10 +74,9 @@ const itemOf = (row: ItemRow): StrandItem => ({
 export interface ReplyRow { seq: number; turnId: string | null; at: number; strandId: string | null; tag: ReplyTag | null; ask: string | null; by: ReplyBy | null; resolved: boolean }
 type ReplyDbRow = { seq: number; turn_id: string | null; at: number; strand_id: string | null; reply_tag: string | null; reply_ask: string | null; reply_by: string | null; resolved: number };
 
-/** A reply's columns and whether it's resolved: answered (Jev) or marked done, or its strand marked done (strand_note) after it. */
+/** A reply's columns and whether it's resolved: answered (Jev), marked done, or open when its strand was marked done (a stored fact: reopening the strand doesn't bring it back). */
 const REPLY_COLUMNS = `r.seq, r.turn_id, r.at, r.strand_id, r.reply_tag, r.reply_ask, r.reply_by,
-  (r.reply_resolved_at IS NOT NULL
-    OR EXISTS (SELECT 1 FROM strands s WHERE s.id = r.strand_id AND s.done_at IS NOT NULL AND s.done_at >= r.at)) AS resolved`;
+  (r.reply_resolved_at IS NOT NULL) AS resolved`;
 const replyOf = (row: ReplyDbRow): ReplyRow => ({
   seq: row.seq, turnId: row.turn_id, at: row.at, strandId: row.strand_id,
   tag: row.reply_tag === "needs-you" || row.reply_tag === "status" ? row.reply_tag : null,
@@ -184,6 +183,8 @@ export class StrandStore {
   note(id: string, note: { waitingOn?: string | null; done?: boolean }, at: number): void {
     if (note.waitingOn !== undefined) this.db.prepare("UPDATE strands SET waiting_on = ?, waiting_at = ? WHERE id = ?").run(note.waitingOn, note.waitingOn === null ? null : at, id);
     if (note.done !== undefined) this.db.prepare("UPDATE strands SET done_at = ? WHERE id = ?").run(note.done ? at : null, id);
+    // Marked done: the asks open in it now are settled, once. An ask its turn makes after this still counts.
+    if (note.done) this.db.prepare("UPDATE strand_items SET reply_resolved_at = ? WHERE strand_id = ? AND kind = 'reply' AND reply_tag = 'needs-you' AND reply_resolved_at IS NULL").run(at, id);
   }
 
   setPinned(id: string, pinned: boolean): void {
@@ -335,6 +336,20 @@ export class StrandStore {
   reply(threadId: string, seq: number): ReplyRow | null {
     const row = this.db.prepare(`SELECT ${REPLY_COLUMNS} FROM strand_items r WHERE r.thread_id = ? AND r.kind = 'reply' AND r.seq = ? AND r.ref = '' AND r.reply_by IS NOT NULL`).get(threadId, seq) as ReplyDbRow | undefined;
     return row ? replyOf(row) : null;
+  }
+
+  /**
+   * The sorted turn that request `seq` started or joined: the newest
+   * message at or before it whose reply (once there) came after it; null
+   * while that turn isn't sorted, or the newest is an earlier, finished turn.
+   */
+  turnOfRequest(threadId: string, seq: number): StrandItem | null {
+    const row = this.db.prepare("SELECT * FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND seq <= ? ORDER BY seq DESC LIMIT 1").get(threadId, seq) as ItemRow | undefined;
+    if (!row) return null;
+    if (row.seq === seq) return itemOf(row);
+    // A turn whose first request was a keepalive or a queued message: it covers `seq` only if its reply came after it.
+    const reply = row.turn_id ? this.db.prepare("SELECT seq FROM strand_items WHERE thread_id = ? AND kind = 'reply' AND turn_id = ? ORDER BY seq DESC LIMIT 1").get(threadId, row.turn_id) as { seq: number } | undefined : undefined;
+    return reply && reply.seq > seq ? itemOf(row) : null;
   }
 
   /** The reply of a turn (by its id), tagged or not yet; null when the turn has no reply item. */

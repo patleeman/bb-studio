@@ -303,7 +303,7 @@ export class StrandService {
     if (!request) return unknown;
     for (;;) {
       await Promise.race([this.detector.settled(threadId), new Promise((resolve) => { const timer = setTimeout(resolve, Math.max(0, Math.min(1_000, deadline - this.now()))); (timer as { unref?: () => void }).unref?.(); })]);
-      const turn = this.store.item(threadId, "user", request) ?? this.store.item(threadId, "report", request);
+      const turn = this.store.turnOfRequest(threadId, request);
       const reply = turn?.turnId ? this.store.replyOfTurn(threadId, turn.turnId) : null;
       if (reply?.by === "none") return unknown;
       if (reply?.tag) return reply.tag === "needs-you" ? { decision: "push", ask: reply.ask } : { decision: "quiet", ask: null };

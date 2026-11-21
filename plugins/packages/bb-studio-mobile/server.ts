@@ -59,6 +59,9 @@ const NOTIFIED_WORKERS_KEY = "notified-workers";
 const DESK_HOLD_KEY = "desk-hold";
 const deskOutput = z.object({ enabled: z.boolean(), atDesk: z.boolean().nullable(), held: z.number().int().min(0) });
 const STUDIO_PLUGIN_ID = "studio";
+/** A BB reply push already checked against its turn and Studio's tag. Copies ({ ...message }) keep it; JSON (the APNs payload) never carries it. */
+const CHECKED = Symbol("reply-push-checked");
+type CheckedMessage = ExpoMessage & { [CHECKED]?: true };
 /** How long BB's reply push waits for Studio to tag the reply (Jev answers within 15 seconds). */
 const REPLY_TAG_WAIT_MS = 20_000;
 const pushIdsOutput = z.object({ botId: z.string().optional(), conversationId: z.string().optional(), workerId: z.string().optional() }).passthrough();
@@ -364,6 +367,8 @@ export default async function plugin(bb: BbPluginApi) {
   async function quietTurn(message: ExpoMessage, lookup: Lookup): Promise<boolean> {
     const data = message.data;
     if (data?.kind !== "turn-finished" || typeof data.subscriptionId !== "string" || typeof data.threadId !== "string" || data.botId !== undefined) return false;
+    // Held and sent later (the conversation's window, the desk): decided on its first pass, about its own turn; its "N new" summary stays.
+    if ((message as CheckedMessage)[CHECKED]) return false;
     const threadId = data.threadId;
     if (!lookup.turns.has(threadId)) lookup.turns.set(threadId, latestTurn(threadId));
     const turn = await lookup.turns.get(threadId)!;
@@ -371,8 +376,12 @@ export default async function plugin(bb: BbPluginApi) {
     // A keepalive, a quiet reply or a turn with nothing to say never pushes; a turn another thread started pushes only for an ask.
     if (!allowed && !(turn!.trigger === "thread" && isUserFacingReply(turn!.reply))) return true;
     const tag = await studioTag(threadId, lookup);
-    if (tag?.decision === "push") { if (tag.ask) message.body = tag.ask; return false; }
-    return !allowed || tag?.decision === "quiet";
+    const drop = tag?.decision === "push" ? false : !allowed || tag?.decision === "quiet";
+    if (!drop) {
+      if (tag?.decision === "push" && tag.ask) message.body = tag.ask;
+      (message as CheckedMessage)[CHECKED] = true;
+    }
+    return drop;
   }
 
   const windows = new PushWindows(async ({ key, messages, shown, held, since }) => {

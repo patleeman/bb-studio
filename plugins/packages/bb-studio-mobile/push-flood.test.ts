@@ -140,6 +140,22 @@ describe("BB's push for a finished turn, by the reply's tag (strands)", () => {
     } finally { await host.harness.lifecycle.dispose(); }
   });
 
+  it("decides a held push on its first pass: the window's flush keeps its 'N new' summary and asks Studio no more", async () => {
+    vi.useFakeTimers();
+    const asked: string[] = [];
+    const host = await relay({ asked, threads: { thr_ask: [{ request: user("book it?"), reply: "Want me to book Ace?" }] }, replyTags: { thr_ask: { decision: "push", ask: "Want me to book Ace?" } } });
+    try {
+      await host.push("thr_ask", "first");
+      await host.push("thr_ask", "second");
+      expect(asked).toEqual(["thr_ask", "thr_ask"]);
+      await vi.advanceTimersByTimeAsync(PUSH_WINDOW_MS);
+      expect(host.requests).toHaveLength(2);
+      expect(host.requests[1]!.body).toMatchObject({ aps: { alert: { body: "2 new · Want me to book Ace?" } } });
+      expect(asked).toEqual(["thr_ask", "thr_ask"]);
+      expect(JSON.stringify(host.requests[1]!.body)).not.toContain("checked");
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+
   it("leaves Studio's own pushes and turns nobody needs to hear about alone", async () => {
     const asked: string[] = [];
     const host = await relay({ asked, threads: { thr_pass: [{ request: user("Anything new?"), reply: "[PASS]" }] }, replyTags: { thr_pass: { decision: "push", ask: "x" } } });

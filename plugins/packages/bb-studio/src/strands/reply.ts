@@ -70,11 +70,7 @@ export function proseOf(text: string): string[] {
     if (/^\s*(```|~~~)/u.test(raw)) { fenced = !fenced; end(); continue; }
     if (fenced) continue;
     if (!raw.trim() || DIRECTIVE.test(raw) || /^\s{0,3}\|/u.test(raw) || /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/u.test(raw)) { end(); continue; }
-    const line = raw
-      .replace(/^\s*(?:#{1,6}\s+|>\s?)/u, "")
-      .replace(/!?\[([^\]\n]*)\]\([^)\s]*\)/gu, "$1")
-      .replace(/(\*\*|__|`|~~)/gu, "")
-      .trim();
+    const line = shownText(raw.replace(/^\s*(?:#{1,6}\s+|>\s?)/u, "")).trim();
     // A list item is a paragraph of its own.
     if (/^(?:[-*+]|\d+[.)])\s+/u.test(line)) { end(); current.push(line.replace(/^(?:[-*+]|\d+[.)])\s+/u, "")); end(); continue; }
     if (line) current.push(line);
@@ -83,9 +79,26 @@ export function proseOf(text: string): string[] {
   return paragraphs.filter(Boolean);
 }
 
-/** A paragraph's sentences. */
+/** A paragraph's sentences. One ends only where its . ! or ? is followed by a space or the end: "main-push.ts", "v1.2" and "e.g." stay inside. */
 export function sentencesOf(paragraph: string): string[] {
-  return (paragraph.match(/[^.!?]+(?:[.!?]+["”’)\]]*|$)/gu) ?? [paragraph]).map((each) => each.trim()).filter(Boolean);
+  return (paragraph.match(/\S[\s\S]*?(?:[.!?]+["”’)\]]*(?=\s|$)|$)/gu) ?? [paragraph])
+    .map((each) => each.trim()).filter(Boolean)
+    // "e.g." and "i.e." end no sentence: join what follows.
+    .reduce<string[]>((out, each) => { const last = out.at(-1); if (last && /\b(?:e\.g|i\.e|etc|vs)\.$/iu.test(last)) out[out.length - 1] = `${last} ${each}`; else out.push(each); return out; }, []);
+}
+
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " " };
+
+/** Markdown down to the text a reader sees: emphasis, code marks, escapes, links, autolinks and entities. */
+function shownText(line: string): string {
+  return line
+    .replace(/!?\[([^\]\n]*)\]\([^)\s]*\)/gu, "$1")
+    .replace(/<((?:https?|mailto):[^>\s]+)>/gu, "$1")
+    .replace(/(\*\*|__|`|~~)/gu, "")
+    .replace(/(?<![\\\p{L}\p{N}])\*(?=\S)|(?<=\S)(?<!\\)\*(?![\p{L}\p{N}])/gu, "")
+    .replace(/(?<![\\\p{L}\p{N}])_+|(?<!\\)_+(?![\p{L}\p{N}])/gu, "")
+    .replace(/\\([\\`*_{}\[\]()#+\-.!>|~<"'])/gu, "$1")
+    .replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/giu, (whole, dec, hex, name) => (dec ? String.fromCodePoint(Number(dec)) : hex ? String.fromCodePoint(parseInt(hex, 16)) : ENTITIES[String(name).toLowerCase()] ?? whole));
 }
 
 /** The sentences of the reply's end Jev picks the ask from, oldest first. */
