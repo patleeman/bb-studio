@@ -358,3 +358,35 @@ describe("slots.experimental_appBackdrop", () => {
     ).toThrow(/scene/u);
   });
 });
+
+describe("slots.experimental_timelineFilter", () => {
+  it("keeps the filter's get and subscribe", () => {
+    const get = () => null;
+    const subscribe = () => () => {};
+    const collected = collect((app) => {
+      app.slots.experimental_timelineFilter({ id: "strands", get, subscribe });
+    });
+    expect(collected.timelineFilters).toEqual([{ id: "strands", get, subscribe }]);
+  });
+
+  it("refuses a filter without get or subscribe, and a second one with the same id", () => {
+    const get = () => null;
+    const subscribe = () => () => {};
+    expect(() =>
+      collect((app) => {
+        app.slots.experimental_timelineFilter({ id: "a", subscribe } as never);
+      }),
+    ).toThrow(/get must be a function/u);
+    expect(() =>
+      collect((app) => {
+        app.slots.experimental_timelineFilter({ id: "a", get } as never);
+      }),
+    ).toThrow(/subscribe must be a function/u);
+    expect(() =>
+      collect((app) => {
+        app.slots.experimental_timelineFilter({ id: "a", get, subscribe });
+        app.slots.experimental_timelineFilter({ id: "a", get, subscribe });
+      }),
+    ).toThrow();
+  });
+});
