@@ -168,10 +168,10 @@ export interface MergedToolDeps {
 /** The merged tools, to register after every member tool is in the book. */
 export function mergedTools(deps: MergedToolDeps) {
   const tools = MERGES.filter((merge) => Object.values(merge.ops).every((old) => deps.book.get(old))).map((merge) => {
-    const lines = Object.entries(merge.ops).map(([op, old]) => `${op}: ${firstSentence(deps.book.get(old)!.description)}`);
+    // Short: the schema's "Needs:" note gives each op's fields; studio_tool_describe and the skills say more.
     return {
       name: merge.name,
-      description: `${merge.summary}. ${merge.field === "op" ? "Ops" : "Views"}: ${lines.join("; ")}. Replaces ${Object.values(merge.ops).join(", ")}.`,
+      description: `${merge.summary} (${merge.field}: ${Object.keys(merge.ops).join(", ")}). Replaces ${Object.values(merge.ops).join(", ")}.`,
       parameters: mergedParameters(merge, deps.book),
       execute: async (input: Record<string, unknown>, ctx: unknown) => {
         const { [merge.field]: op, ...rest } = input;
