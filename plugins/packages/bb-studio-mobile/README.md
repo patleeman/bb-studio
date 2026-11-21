@@ -25,17 +25,18 @@ settings, see [`skills/mobile-push/SKILL.md`](skills/mobile-push/SKILL.md).
 - **Quiet completions.** A finished turn with no text, or only `[PASS]`, is not
   sent to APNs or Expo. The relay still reports success.
 - **Status replies.** For BB's own push of a finished turn, the relay asks
-  Studio how it tagged the reply (`strands.replyPush`, waiting up to 20
-  seconds for the tag): a status reply is dropped, and a reply that needs
-  you goes out with its ask line as the body. When Studio can't tell, the
-  push goes out as before.
+  Studio how Jev tagged the reply (`strands.replyPush`, waiting up to 20
+  seconds): a status reply is dropped, and a reply that needs you goes out
+  with its ask as the body, even when another thread started the turn. When
+  Studio can't tell, the turn's own rules below decide as before.
 - **Turns nobody needs to hear about.** For BB's own push of a finished turn,
   the relay reads the turn: what started it and its final reply. It drops the
   push for Studio's cache keepalive (whatever it replied), for a final reply
   of `[PASS]` or only an approval card, and for a turn with no reply at all
   unless the user started it. A turn another thread started (a message from
-  it, or BB's notice that a child thread completed, failed or stopped) never
-  pushes: a lead answering its workers is not news for the phone; a worker's
+  it, or BB's notice that a child thread completed, failed or stopped)
+  pushes only when Studio tags its reply as needing you: a lead answering its
+  workers is not news for the phone; a worker's
   own asks and errors push by themselves. Another relayed message (Studio, an
   automation) or a turn the provider went on with by itself pushes only when
   it ends in a real reply. When the turn can't be read, the push goes out.

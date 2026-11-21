@@ -69,8 +69,11 @@ export function liveState(strand: Strand, signals: Signals): StrandLive {
   const shown = workers.map(({ threadId, title, status, endedAt }) => ({ threadId, title, status, endedAt }));
   const done = (state: StrandState, detail: string | null): StrandLive => ({ state, detail, asks, workers: shown, earlier: false });
   const needs = workers.find((worker) => worker.status === "needs-you");
-  if (asks.length) return done("needs-you", asks[0]!.label);
+  // A reply's ask is told last: a BB ask or a worker waiting on the user says more, and the reply has pushed its own ask.
+  const ask = asks.find((each) => each.kind !== "reply");
+  if (ask) return done("needs-you", ask.label);
   if (needs) return done("needs-you", `${needs.title} needs you`);
+  if (asks.length) return done("needs-you", asks[0]!.label);
   const running = workers.filter((worker) => worker.status === "running");
   if (signals.runningStrandId === strand.id || running.length) return done("running", running.length ? running.map((worker) => worker.title).join(", ") : null);
   const since = Math.max(strand.openedAt ?? 0, signals.now - DONE_SHOWN_MS);

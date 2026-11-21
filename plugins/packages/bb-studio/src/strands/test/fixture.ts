@@ -73,9 +73,13 @@ export class FakeThread {
   }
 
   /** BB's events.list: after or before a seq, either order, a page at a time. Rows are in seq order, so pages are slices. */
-  events = async (input: { threadId: string; afterSeq?: number; beforeSeq?: number; order: "asc" | "desc"; limit: number }): Promise<EventRow[]> => {
+  events = async (input: { threadId: string; afterSeq?: number; beforeSeq?: number; order: "asc" | "desc"; limit: number; types?: readonly string[] }): Promise<EventRow[]> => {
     this.pages++;
     if (input.threadId !== this.id) return [];
+    if (input.types) {
+      const rows = this.rows.filter((row) => input.types!.includes(row.type ?? "") && (row.seq ?? 0) > (input.afterSeq ?? 0) && (row.seq ?? 0) < (input.beforeSeq ?? Number.MAX_SAFE_INTEGER));
+      return (input.order === "asc" ? rows : [...rows].reverse()).slice(0, input.limit);
+    }
     // seq n sits at index n - 1.
     if (input.order === "asc") {
       const from = input.afterSeq ?? 0;
@@ -106,11 +110,27 @@ export function fakeJev(calls: { state: unknown; questions: Record<string, unkno
     const answers: Record<string, unknown> = {};
     if (state.messages) for (const message of state.messages) answers[message.id] = { type: "choice", probabilities: {}, ...pick(message.message, state.strands) };
     else if (state.strands) answers.strand = { type: "choice", probabilities: {}, ...pick(state.message ?? "", state.strands) };
-    // The reply question (src/strands/reply.ts): needs-you when the reply's end asks or hands the user something to do.
+    // The reply questions (src/strands/reply.ts). This stand-in for Jev decides by words; the real one reads the reply.
+    const asks = /\?|\bdecide\b|\bsign in\b|\bon your phone\b/i;
     if (input.questions.reply) {
       const end = (input.state as { replyEnd?: string }).replyEnd ?? "";
-      answers.reply = /\?|\bdecide\b|\bsign in\b|\bon your phone\b/i.test(end) ? { type: "choice", probabilities: {}, choice: "needs-you", confidence: 0.85 } : { type: "choice", probabilities: {}, choice: "status", confidence: 0.9 };
+      answers.reply = asks.test(end) ? { type: "choice", probabilities: {}, choice: "needs-you", confidence: 0.85 } : { type: "choice", probabilities: {}, choice: "status", confidence: 0.9 };
     }
+    if (input.questions.askSentence) {
+      const sentences = Object.entries((input.state as { sentences?: Record<string, string> }).sentences ?? {});
+      const found = [...sentences].reverse().find(([, sentence]) => asks.test(sentence));
+      answers.askSentence = { type: "choice", probabilities: {}, choice: found?.[0] ?? "none", confidence: 0.8 };
+    }
+    // Clearing: a message answers an ask on its topic, or is a go-ahead for the newest ask; thanks answers none.
+    const open = (input.state as { openAsks?: { id: string; ask: string; strand: string | null }[] }).openAsks ?? [];
+    const message = (input.state as { message?: string }).message ?? "";
+    open.forEach((ask, index) => {
+      const topic = topicOf(message);
+      const both = /\bboth\b/i.test(message);
+      const goAhead = /^\s*(?:ok|okay|yes|sure|go ahead|do it)\b/i.test(message) && !/^\s*(?:thanks|thank you)\b/i.test(message);
+      const hit = (topic !== null && topic === topicOf(`${ask.ask} ${ask.strand ?? ""}`)) || (both && goAhead) || (goAhead && topic === null && index === open.length - 1);
+      answers[`clear_${ask.id}`] = { type: "choice", probabilities: {}, choice: hit ? "answers" : "other", confidence: 0.85 };
+    });
     return { ok: true, answers };
   };
 }

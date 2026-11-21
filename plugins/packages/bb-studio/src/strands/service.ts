@@ -14,6 +14,7 @@ import { byState, liveState, strayWorkersOf, type AskSignal, type Signals, type 
 import { StrandStore, type Strand } from "./store";
 import { REPLY_OPEN_MS } from "./reply";
 import { isPingRequest } from "../bot-cache";
+import type { EventRow } from "./turns";
 import { USER_OWNER } from "../tasks/contract";
 
 export interface WorkerFact { threadId: string; title: string; status: WorkerStatus; createdAt: number; endedAt: number | null }
@@ -262,17 +263,23 @@ export class StrandService {
     return {
       tags: rows.reverse().map((row) => ({ turnId: row.turn_id, seq: row.seq, strandId: row.strand_id })),
       strands: this.store.list(threadId).map((strand) => ({ id: strand.id, title: strand.title })),
-      replies: this.store.replies(threadId, this.now() - REPLY_OPEN_MS).flatMap((reply) => (reply.turnId ? [{ turnId: reply.turnId, seq: reply.seq, tag: reply.tag, ask: reply.ask, resolved: reply.resolved }] : [])),
+      replies: this.store.replies(threadId, this.now() - REPLY_OPEN_MS).flatMap((reply) => (reply.turnId && reply.tag ? [{ turnId: reply.turnId, seq: reply.seq, tag: reply.tag, ask: reply.ask, resolved: reply.resolved }] : [])),
     };
   }
 
-  /** The seq of the conversation's newest message (not a cache keepalive), among its newest events; 0 when they can't be read. */
-  private async newestRequest(threadId: string): Promise<number> {
-    const rows = await this.deps.events({ threadId, order: "desc", limit: 50 }).catch(() => []);
-    return rows.filter((row) => row.type === "client/turn/requested" && !isPingRequest(row.data)).reduce((max, row) => Math.max(max, row.seq ?? 0), 0);
+  /**
+   * The seq of the conversation's newest message that starts a turn (not a
+   * cache keepalive, not a steer), read by type so a long turn's tool events
+   * can't hide it; null when there is none or it can't be read.
+   */
+  async newestRequest(threadId: string): Promise<number | null> {
+    const rows = await this.deps.events({ threadId, order: "desc", limit: 10, types: ["client/turn/requested"] }).catch(() => [] as EventRow[]);
+    const request = rows.filter((row) => row.type === "client/turn/requested" && !isPingRequest(row.data) && (row.data as { target?: { kind?: string } } | undefined)?.target?.kind !== "steer")
+      .sort((x, y) => (y.seq ?? 0) - (x.seq ?? 0))[0];
+    return request?.seq ?? null;
   }
 
-  /** The user marked a reply that needs them done (or acted on it). */
+  /** The user marked a reply that needs them done. */
   resolveReply(threadId: string, seq: number): boolean {
     if (!this.enabled(threadId) || !this.store.resolveReply(threadId, seq)) return false;
     this.deps.changed(threadId);
@@ -280,22 +287,28 @@ export class StrandService {
   }
 
   /**
-   * Whether the newest reply is worth a phone push (Main's own push and
-   * Studio Mobile's check of BB's): its tag once the turn is sorted, waiting
-   * up to `waitMs` for the sort. Unknown where strands don't run, or when it
-   * isn't tagged in time: the caller pushes as before.
+   * Whether a turn's reply is worth a phone push (Main's own push and Studio
+   * Mobile's check of BB's): the turn `requestSeq` started (by default the
+   * newest, read once when called, so a later turn's tag is never taken),
+   * once Jev tagged its reply, waiting up to `waitMs` for the sort. Unknown
+   * where strands don't run, when the turn or its reply can't be found, when
+   * Jev couldn't tag it, or when it isn't tagged in time: the caller pushes
+   * as before.
    */
-  async replyPush(threadId: string, waitMs = 20_000): Promise<{ decision: "push" | "quiet" | "unknown"; ask: string | null }> {
-    if (this.disposed || !this.enabled(threadId) || this.detector.needsBackfill(threadId)) return { decision: "unknown", ask: null };
+  async replyPush(threadId: string, waitMs = 20_000, requestSeq?: number | null): Promise<{ decision: "push" | "quiet" | "unknown"; ask: string | null }> {
+    const unknown = { decision: "unknown" as const, ask: null };
+    if (this.disposed || !this.enabled(threadId) || this.detector.needsBackfill(threadId)) return unknown;
     const deadline = this.now() + waitMs;
-    // The newest message's seq: a reply from before it is an older turn's.
-    const after = await this.newestRequest(threadId);
+    const request = requestSeq ?? await this.newestRequest(threadId);
+    if (!request) return unknown;
     for (;;) {
-      await Promise.race([this.detector.settled(threadId), new Promise((resolve) => setTimeout(resolve, Math.max(0, Math.min(1_000, deadline - this.now()))))]);
-      const reply = this.store.latestReply(threadId);
-      if (reply && reply.seq > after && this.store.replyTag(threadId, reply.seq)) return reply.tag === "needs-you" ? { decision: "push", ask: reply.ask } : { decision: "quiet", ask: null };
-      if (this.disposed || this.now() >= deadline) return { decision: "unknown", ask: null };
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await Promise.race([this.detector.settled(threadId), new Promise((resolve) => { const timer = setTimeout(resolve, Math.max(0, Math.min(1_000, deadline - this.now()))); (timer as { unref?: () => void }).unref?.(); })]);
+      const turn = this.store.item(threadId, "user", request) ?? this.store.item(threadId, "report", request);
+      const reply = turn?.turnId ? this.store.replyOfTurn(threadId, turn.turnId) : null;
+      if (reply?.by === "none") return unknown;
+      if (reply?.tag) return reply.tag === "needs-you" ? { decision: "push", ask: reply.ask } : { decision: "quiet", ask: null };
+      if (this.disposed || this.now() >= deadline) return unknown;
+      await new Promise((resolve) => { const timer = setTimeout(resolve, 250); (timer as { unref?: () => void }).unref?.(); });
     }
   }
 

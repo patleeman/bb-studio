@@ -33,7 +33,7 @@ import {
 import { CLEAR_BATCH, clearPayload, keptWorkers, noteNotified, noteWorkers, partition, settled, type Notified, type NotifiedWorkers, type ThreadReadState } from "./clear.js";
 import { DeskHold, holdable } from "./desk.js";
 import { appendJournal, JOURNAL_KEY, journalEntry, journalSummary, type JournalEntry, type JournalOutcome } from "./journal.js";
-import { isQuietCompletion, triggerOf, turnPushAllowed, type TurnTrigger } from "./notifications.js";
+import { isQuietCompletion, isUserFacingReply, triggerOf, turnPushAllowed, type TurnTrigger } from "./notifications.js";
 import { collapseIdFor, PushWindows, summaryBody, windowKey } from "./push-window.js";
 import { StudioApprovals } from "./studio-approvals.js";
 import { activityTokenSchema, botIdSchema, deviceIdSchema, liveActivityPayload, liveActivityPriority, liveActivityPushSchema, LiveActivityTokens, MOBILE_MIGRATIONS, tokenKindSchema } from "./live-activities.js";
@@ -338,36 +338,41 @@ export default async function plugin(bb: BbPluginApi) {
     }
   }
 
-  /** BB's own push for a finished turn (push-notifications: it has a subscription), checked against the turn it is about. */
-  async function quietTurn(message: ExpoMessage, turns: Map<string, Promise<boolean>>): Promise<boolean> {
-    const data = message.data;
-    if (data?.kind !== "turn-finished" || typeof data.subscriptionId !== "string" || typeof data.threadId !== "string" || data.botId !== undefined) return false;
-    const threadId = data.threadId;
-    if (!turns.has(threadId)) turns.set(threadId, latestTurn(threadId).then((turn) => turn !== null && !turnPushAllowed(turn)));
-    return turns.get(threadId)!;
-  }
 
   const replyTag = z.object({ decision: z.enum(["push", "quiet", "unknown"]), ask: z.string().nullable() }).passthrough();
+  type ReplyTag = z.infer<typeof replyTag>;
+  type Lookup = { turns: Map<string, Promise<{ trigger: TurnTrigger; reply: string | null } | null>>; tags: Map<string, Promise<ReplyTag | null>> };
+  /** Studio's tag for the thread's newest reply (strands.replyPush); null when Studio doesn't answer. */
+  function studioTag(threadId: string, lookup: Lookup): Promise<ReplyTag | null> {
+    if (!lookup.tags.has(threadId)) {
+      lookup.tags.set(threadId, bb.sdk.plugins.callRpc({
+        pluginId: STUDIO_PLUGIN_ID, method: "strands.replyPush", input: { threadId, waitMs: REPLY_TAG_WAIT_MS } as never, outputSchema: replyTag,
+        signal: AbortSignal.timeout(REPLY_TAG_WAIT_MS + 5_000),
+      }).then((tag) => tag as ReplyTag, () => null));
+    }
+    return lookup.tags.get(threadId)!;
+  }
+
   /**
-   * BB's own push for a finished turn in a Bot conversation, checked against
-   * Studio's tag for its reply (strands.replyPush): a status reply is dropped,
-   * one that needs the user goes out with its ask line as the body. When
-   * Studio doesn't answer or can't tell in time, the push goes out as is.
+   * BB's own push for a finished turn (push-notifications: it has a
+   * subscription), checked against the turn it is about, then against
+   * Studio's tag for its reply: a status reply is dropped, and one that needs
+   * the user goes out with its ask as the body, even when another thread
+   * started the turn (a worker's notice). When Studio can't tell, the turn's
+   * own rules decide as before. True: drop it.
    */
-  async function statusReply(message: ExpoMessage, tags: Map<string, Promise<z.infer<typeof replyTag> | null>>): Promise<boolean> {
+  async function quietTurn(message: ExpoMessage, lookup: Lookup): Promise<boolean> {
     const data = message.data;
     if (data?.kind !== "turn-finished" || typeof data.subscriptionId !== "string" || typeof data.threadId !== "string" || data.botId !== undefined) return false;
     const threadId = data.threadId;
-    if (!tags.has(threadId)) {
-      tags.set(threadId, bb.sdk.plugins.callRpc({
-        pluginId: STUDIO_PLUGIN_ID, method: "strands.replyPush", input: { threadId, waitMs: REPLY_TAG_WAIT_MS } as never, outputSchema: replyTag,
-        signal: AbortSignal.timeout(REPLY_TAG_WAIT_MS + 5_000),
-      }).then((tag) => tag as z.infer<typeof replyTag>, () => null));
-    }
-    const tag = await tags.get(threadId)!;
-    if (tag?.decision === "quiet") return true;
-    if (tag?.decision === "push" && tag.ask) message.body = tag.ask;
-    return false;
+    if (!lookup.turns.has(threadId)) lookup.turns.set(threadId, latestTurn(threadId));
+    const turn = await lookup.turns.get(threadId)!;
+    const allowed = turn === null || turnPushAllowed(turn);
+    // A keepalive, a quiet reply or a turn with nothing to say never pushes; a turn another thread started pushes only for an ask.
+    if (!allowed && !(turn!.trigger === "thread" && isUserFacingReply(turn!.reply))) return true;
+    const tag = await studioTag(threadId, lookup);
+    if (tag?.decision === "push") { if (tag.ask) message.body = tag.ask; return false; }
+    return !allowed || tag?.decision === "quiet";
   }
 
   const windows = new PushWindows(async ({ key, messages, shown, held, since }) => {
@@ -411,9 +416,8 @@ export default async function plugin(bb: BbPluginApi) {
     const apnsIndexes: number[] = [];
     const lookups: Lookups = new Map();
     const owners = new Map<string, Promise<boolean>>();
-    const turns = new Map<string, Promise<boolean>>();
-    const tags = new Map<string, Promise<z.infer<typeof replyTag> | null>>();
-    const studios = await Promise.all(messages.map(async (message) => isQuietCompletion(message) || await quietTurn(message, turns) || await statusReply(message, tags) || await sentByStudio(message, lookups, owners)));
+    const lookup: Lookup = { turns: new Map(), tags: new Map() };
+    const studios = await Promise.all(messages.map(async (message) => isQuietCompletion(message) || await sentByStudio(message, lookups, owners) || await quietTurn(message, lookup)));
     messages.forEach((message, index) => {
       if (studios[index]) {
         tickets[index] = { status: "ok" };

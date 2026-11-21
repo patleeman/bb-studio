@@ -70,24 +70,18 @@ const itemOf = (row: ItemRow): StrandItem => ({
   strandId: row.strand_id, confidence: row.confidence, by: row.by as ItemBy, unsure: !!row.unsure,
 });
 
-/** A tagged reply: its item, tag, ask line, and whether the user is past it. */
-export interface ReplyRow { seq: number; turnId: string | null; at: number; strandId: string | null; tag: ReplyTag; ask: string | null; by: ReplyBy; resolved: boolean }
-type ReplyDbRow = { seq: number; turn_id: string | null; at: number; strand_id: string | null; reply_tag: string; reply_ask: string | null; reply_by: string | null; resolved: number };
+/** A reply: its item, its tag (null while untagged), ask sentence, who tagged it (null: not yet), and whether the user is past it. */
+export interface ReplyRow { seq: number; turnId: string | null; at: number; strandId: string | null; tag: ReplyTag | null; ask: string | null; by: ReplyBy | null; resolved: boolean }
+type ReplyDbRow = { seq: number; turn_id: string | null; at: number; strand_id: string | null; reply_tag: string | null; reply_ask: string | null; reply_by: string | null; resolved: number };
 
-/**
- * A reply's columns and whether it's resolved: marked done; a later message
- * from the user in its strand; the user's very next message with no strand
- * of its own ("ok, do it"); or its strand marked done (strand_note) after it.
- */
+/** A reply's columns and whether it's resolved: answered (Jev) or marked done, or its strand marked done (strand_note) after it. */
 const REPLY_COLUMNS = `r.seq, r.turn_id, r.at, r.strand_id, r.reply_tag, r.reply_ask, r.reply_by,
   (r.reply_resolved_at IS NOT NULL
-    OR EXISTS (SELECT 1 FROM strand_items u WHERE u.thread_id = r.thread_id AND u.kind = 'user' AND u.seq > r.seq AND u.strand_id IS NOT NULL AND u.strand_id = r.strand_id)
-    OR EXISTS (SELECT 1 FROM strand_items u WHERE u.thread_id = r.thread_id AND u.kind = 'user' AND u.strand_id IS NULL
-      AND u.seq = (SELECT MIN(n.seq) FROM strand_items n WHERE n.thread_id = r.thread_id AND n.kind IN ('user', 'report') AND n.seq > r.seq))
     OR EXISTS (SELECT 1 FROM strands s WHERE s.id = r.strand_id AND s.done_at IS NOT NULL AND s.done_at >= r.at)) AS resolved`;
 const replyOf = (row: ReplyDbRow): ReplyRow => ({
-  seq: row.seq, turnId: row.turn_id, at: row.at, strandId: row.strand_id, tag: row.reply_tag === "needs-you" ? "needs-you" : "status",
-  ask: row.reply_ask, by: (row.reply_by ?? "rule") as ReplyBy, resolved: !!row.resolved,
+  seq: row.seq, turnId: row.turn_id, at: row.at, strandId: row.strand_id,
+  tag: row.reply_tag === "needs-you" || row.reply_tag === "status" ? row.reply_tag : null,
+  ask: row.reply_ask, by: row.reply_by === "jev" || row.reply_by === "none" ? row.reply_by : null, resolved: !!row.resolved,
 });
 
 /** The last user line kept with an item, for the prompt's "last user line". */
@@ -331,31 +325,28 @@ export class StrandStore {
 
   // ---- replies that need the user (src/strands/reply.ts) ----
 
-  /** Tags a turn's reply item (it must exist): needs-you or status, with its ask line. */
-  tagReply(threadId: string, seq: number, verdict: { tag: ReplyTag; ask: string | null; by: ReplyBy }): void {
+  /** Tags a turn's reply item (it must exist): needs-you or status with its ask sentence; null: Jev couldn't, it stays untagged ("none"). */
+  tagReply(threadId: string, seq: number, verdict: { tag: ReplyTag; ask: string | null } | null): void {
     this.db.prepare("UPDATE strand_items SET reply_tag = ?, reply_ask = ?, reply_by = ? WHERE thread_id = ? AND kind = 'reply' AND seq = ? AND ref = ''")
-      .run(verdict.tag, verdict.ask?.slice(0, LINE_MAX) ?? null, verdict.by, threadId, seq);
+      .run(verdict?.tag ?? null, verdict?.ask?.slice(0, LINE_MAX) ?? null, verdict ? "jev" : "none", threadId, seq);
   }
 
-  /** A reply's tag, or null when it has none (not tagged yet, or from before tags). */
-  replyTag(threadId: string, seq: number): ReplyRow | null {
-    const row = this.db.prepare(`SELECT ${REPLY_COLUMNS} FROM strand_items r WHERE r.thread_id = ? AND r.kind = 'reply' AND r.seq = ? AND r.ref = '' AND r.reply_tag IS NOT NULL`).get(threadId, seq) as ReplyDbRow | undefined;
+  /** A reply once tagged (or marked untagged), else null. */
+  reply(threadId: string, seq: number): ReplyRow | null {
+    const row = this.db.prepare(`SELECT ${REPLY_COLUMNS} FROM strand_items r WHERE r.thread_id = ? AND r.kind = 'reply' AND r.seq = ? AND r.ref = '' AND r.reply_by IS NOT NULL`).get(threadId, seq) as ReplyDbRow | undefined;
     return row ? replyOf(row) : null;
   }
 
-  /** The conversation's newest reply, when it belongs to the newest turn (a later message isn't sorted yet: null). */
-  latestReply(threadId: string): ReplyRow | null {
-    const row = this.db.prepare(`SELECT ${REPLY_COLUMNS} FROM strand_items r WHERE r.thread_id = ? AND r.kind = 'reply' ORDER BY r.seq DESC LIMIT 1`).get(threadId) as ReplyDbRow | undefined;
-    if (!row) return null;
-    const later = this.db.prepare("SELECT 1 FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND seq > ? LIMIT 1").get(threadId, row.seq);
-    return later ? null : replyOf(row);
+  /** The reply of a turn (by its id), tagged or not yet; null when the turn has no reply item. */
+  replyOfTurn(threadId: string, turnId: string): ReplyRow | null {
+    const row = this.db.prepare(`SELECT ${REPLY_COLUMNS} FROM strand_items r WHERE r.thread_id = ? AND r.kind = 'reply' AND r.turn_id = ? ORDER BY r.seq DESC LIMIT 1`).get(threadId, turnId) as ReplyDbRow | undefined;
+    return row ? replyOf(row) : null;
   }
 
   /**
    * Its tagged replies (the newest 2,000), oldest first, each with whether it
-   * is resolved: marked done, the user wrote later in its strand (or their
-   * very next message has no strand: "ok, do it"), its strand was marked
-   * done after it, or it is older than `since`.
+   * is resolved: Jev said a later message answers it, the user marked it
+   * done, its strand was marked done after it, or it is older than `since`.
    */
   replies(threadId: string, since: number): ReplyRow[] {
     return (this.db.prepare(`SELECT ${REPLY_COLUMNS} FROM strand_items r WHERE r.thread_id = ? AND r.kind = 'reply' AND r.reply_tag IS NOT NULL ORDER BY r.seq DESC LIMIT 2000`).all(threadId) as ReplyDbRow[])
@@ -368,9 +359,9 @@ export class StrandStore {
       .map(replyOf).filter((reply) => !reply.resolved);
   }
 
-  /** The user marked a reply done (or acted on it). False when it isn't a tagged reply. */
+  /** The user answered a reply (Jev said so) or marked it done. False when it isn't a tagged reply. */
   resolveReply(threadId: string, seq: number): boolean {
-    return this.db.prepare("UPDATE strand_items SET reply_resolved_at = ? WHERE thread_id = ? AND kind = 'reply' AND seq = ? AND ref = '' AND reply_tag IS NOT NULL").run(this.now(), threadId, seq).changes > 0;
+    return this.db.prepare("UPDATE strand_items SET reply_resolved_at = COALESCE(reply_resolved_at, ?) WHERE thread_id = ? AND kind = 'reply' AND seq = ? AND ref = '' AND reply_tag IS NOT NULL").run(this.now(), threadId, seq).changes > 0;
   }
 
   // ---- reads ----

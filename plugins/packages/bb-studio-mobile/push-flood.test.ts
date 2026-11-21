@@ -122,6 +122,24 @@ describe("BB's push for a finished turn, by the reply's tag (strands)", () => {
     } finally { await host.harness.lifecycle.dispose(); }
   });
 
+  it("lets a reply that needs you through when a worker's notice started the turn; a status or untagged one there stays off", async () => {
+    const asked: string[] = [];
+    const host = await relay({
+      asked,
+      threads: {
+        thr_merge: [{ request: system("[bb system]\n\n@thread:thr_w completed:"), reply: "The worker finished and the tests pass. Want me to merge it?" }],
+        thr_done: [{ request: system("[bb system]\n\n@thread:thr_w completed:"), reply: "The worker finished." }],
+        thr_lost: [{ request: system("[bb system]\n\n@thread:thr_w completed:"), reply: "The worker finished." }],
+      },
+      replyTags: { thr_merge: { decision: "push", ask: "Want me to merge it?" }, thr_done: { decision: "quiet", ask: null } },
+    });
+    try {
+      for (const threadId of ["thr_merge", "thr_done", "thr_lost"]) await host.push(threadId, "reply");
+      expect(host.requests.map((request) => request.body.threadId)).toEqual(["thr_merge"]);
+      expect(host.requests[0]!.body).toMatchObject({ aps: { alert: { body: "Want me to merge it?" } } });
+    } finally { await host.harness.lifecycle.dispose(); }
+  });
+
   it("leaves Studio's own pushes and turns nobody needs to hear about alone", async () => {
     const asked: string[] = [];
     const host = await relay({ asked, threads: { thr_pass: [{ request: user("Anything new?"), reply: "[PASS]" }] }, replyTags: { thr_pass: { decision: "push", ask: "x" } } });

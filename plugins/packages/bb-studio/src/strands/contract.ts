@@ -181,13 +181,13 @@ export const rpcContract = defineRpcContract({
     output: ok,
   },
   "strands.resolveReply": {
-    experimental_description: "The user marked a reply that needs them as done: it stops counting as needing them.",
+    experimental_description: "The user marked a reply that needs them as done: it stops counting as needing them. Studio's app window only.",
     input: z.object({ threadId, seq: z.number().int().min(0) }).strict(),
     output: ok,
   },
   "strands.replyPush": {
     experimental_description: "Whether the conversation's newest reply is worth a phone push: needs-you pushes (with its ask line), status doesn't; unknown when it isn't tagged in time.",
-    input: z.object({ threadId, waitMs: z.number().int().min(0).max(30_000).default(20_000) }).strict(),
+    input: z.object({ threadId, waitMs: z.number().int().min(0).max(30_000).default(20_000), requestSeq: z.number().int().min(1).optional() }).strict(),
     output: z.object({ decision: z.enum(["push", "quiet", "unknown"]), ask: z.string().nullable() }),
   },
   "strands.opened": {
@@ -203,5 +203,4 @@ export const strandsPublicContract = defineRpcContract({
   "strands.overview": rpcContract["strands.overview"],
   "strands.tags": rpcContract["strands.tags"],
   "strands.opened": rpcContract["strands.opened"],
-  "strands.resolveReply": rpcContract["strands.resolveReply"],
 });

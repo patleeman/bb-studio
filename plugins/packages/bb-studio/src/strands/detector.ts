@@ -21,7 +21,7 @@ import {
 } from "./sort";
 import type { ItemBy, Strand, StrandStore } from "./store";
 import { scrubber, type Scrub } from "./scrub";
-import { readReplyAnswer, REPLY_QUESTION, replyEnd, replyQuestion, ruleTag, signalTag, type ReplyVerdict } from "./reply";
+import { clearQuestions, readClears, readReplyAnswers, REPLY_OPEN_MS, replyQuestions, taggable, type ReplyVerdict } from "./reply";
 import { sortable, turnsOf, UNFINISHED_MAX_MS, type EventRow, type Turn } from "./turns";
 
 export const STRANDS_CALLER = "strands";
@@ -61,7 +61,8 @@ export interface OpenTask { id: string; title: string; updatedAt: number }
 
 export interface DetectorDeps {
   store: StrandStore;
-  events(input: { threadId: string; afterSeq?: number; beforeSeq?: number; order: "asc" | "desc"; limit: number }): Promise<EventRow[]>;
+  /** The thread's events of strands' types, or of `types` when given. */
+  events(input: { threadId: string; afterSeq?: number; beforeSeq?: number; order: "asc" | "desc"; limit: number; types?: readonly string[] }): Promise<EventRow[]>;
   jev(input: { caller: string; state: unknown; questions: Record<string, unknown> }): Promise<JevResult>;
   model(input: { threadId: string; requestId: string; prompt: string }): Promise<ModelResult>;
   /**
@@ -76,8 +77,6 @@ export interface DetectorDeps {
   log(message: string): void;
   /** Secret values to keep out of prompts and stored lines (Studio's API keys, Tool Gateway's secrets). */
   secrets?(): Promise<readonly string[]> | readonly string[];
-  /** The user's usual quick replies: a ::next row offering only these (or the stock ones) doesn't by itself make a reply need the user. */
-  quickReplies?(): Promise<readonly string[]> | readonly string[];
   /** The strand of one of the conversation's workers (the turn it started in); undefined when it isn't one. */
   workerStrand?(threadId: string, workerThreadId: string): Promise<string | null | undefined>;
   now?(): number;
@@ -218,17 +217,16 @@ export class StrandDetector {
     if (!read || read.backfill === null) return 0;
     const { turns, restFrom, last, more } = await this.readFrom(threadId, settled);
     let sorted = 0;
-    const stock = await this.quickReplies();
     for (const turn of turns) {
       if (!turn.done) continue;
       if (this.disposed) return sorted;
       if (!sortable(turn)) continue;
       const existing = this.store.item(threadId, turn.kind, turn.seq);
-      const result = existing ? { strandId: existing.strandId, reply: undefined } : await this.sortTurn(threadId, turn, stock);
+      const result = existing ? { strandId: existing.strandId, reply: undefined } : await this.sortTurn(threadId, turn, true);
       if (!existing) sorted++;
       if (turn.replySeq !== null) {
         this.store.put({ threadId, seq: turn.replySeq, kind: "reply", turnId: turn.turnId, at: turn.at, line: null, strandId: result.strandId, confidence: null, by: "inherit" });
-        if (await this.tagReply(threadId, turn, stock, result.reply)) sorted++;
+        if (await this.tagReply(threadId, turn, result.reply)) sorted++;
       }
     }
     const open = turns.find((turn) => !turn.done);
@@ -260,42 +258,39 @@ export class StrandDetector {
     return recent.map((strand) => ({ id: strand.id, title: strand.title, summary: strand.summary, lastLine: this.store.latest(strand.id, threadId)?.line ?? null }));
   }
 
-  private async quickReplies(): Promise<readonly string[]> {
-    return await Promise.resolve(this.deps.quickReplies?.() ?? []).catch(() => [] as readonly string[]);
-  }
-
   /**
-   * Tags a finished turn's reply needs-you or status (src/strands/reply.ts),
-   * once: the structured signals; else Jev's answer from the call that sorted
-   * the turn (`asked`: that call carried the reply question), or one
-   * reply-only call within the same caps; else the rule. True when it tagged.
+   * Tags a finished turn's reply once (src/strands/reply.ts): Jev's answers
+   * from the call that sorted the turn (`asked`: it carried the reply
+   * questions), else one reply-only call within the same caps. Without a
+   * usable answer the reply is marked untagged ("none"): it pushes as
+   * before. True when it tagged (or marked) it.
    */
-  private async tagReply(threadId: string, turn: Turn, stock: readonly string[], asked?: { answer: unknown }): Promise<boolean> {
-    const text = turn.finalReply ?? "";
-    if (turn.replySeq === null || !text.trim() || this.store.replyTag(threadId, turn.replySeq)) return false;
-    const verdict = signalTag(text, stock)
-      ?? (asked ? readReplyAnswer(asked.answer, text) : await this.askReply(threadId, text))
-      ?? ruleTag(text);
-    this.store.tagReply(threadId, turn.replySeq, verdict);
+  private async tagReply(threadId: string, turn: Turn, asked?: { answers: Record<string, unknown> | undefined; candidates: string[] }): Promise<boolean> {
+    const text = turn.finalReply;
+    if (turn.replySeq === null || !taggable(text) || this.store.reply(threadId, turn.replySeq)) return false;
+    const verdict = asked ? readReplyAnswers(asked.answers, asked.candidates) : await this.askReply(threadId, text);
+    this.store.tagReply(threadId, turn.replySeq, verdict ?? null);
     return true;
   }
 
-  /** The reply question alone (a turn sorted early, or sorted without Jev); undefined with no Jev, no calls left, or no usable answer. */
+  /** The reply questions alone (a turn sorted early, or sorted without Jev); undefined with no Jev, no calls left, or no usable answer. */
   private async askReply(threadId: string, text: string): Promise<ReplyVerdict | undefined> {
     if (this.now() < this.jevDownUntil || this.now() < this.jevBackoffUntil) return undefined;
     if (!this.store.takeCall(threadId, "jev", dayOf(this.now()), JEV_DAILY_CAP, JEV_TOTAL_DAILY_CAP)) return undefined;
-    const result = await this.askJev({ caller: STRANDS_CALLER, state: { replyEnd: replyEnd(text) }, questions: { [REPLY_QUESTION]: replyQuestion() } });
+    const asked = replyQuestions(text);
+    const result = await this.askJev({ caller: STRANDS_CALLER, state: asked.state, questions: asked.questions });
     if (!result.ok) { if (result.unavailable) this.jevDownUntil = this.now() + JEV_DOWN_MS; return undefined; }
-    return readReplyAnswer(result.answers[REPLY_QUESTION], text);
+    return readReplyAnswers(result.answers, asked.candidates);
   }
 
   /**
-   * Sorts one turn, stores its item, and answers its strand. With `stock`
-   * (a finished turn, sorted live), the same Jev call also asks whether its
-   * reply needs the user, unless the structured signals already say:
-   * `reply` holds that answer when it was asked.
+   * Sorts one turn, stores its item, and answers its strand. The same Jev
+   * call carries, when they apply, the reply questions (`final`: a finished
+   * turn sorted live; `reply` holds the answers) and, for a message from the
+   * user with asks open in the conversation, whether it answers or acts on
+   * each of them: those clear.
    */
-  private async sortTurn(threadId: string, turn: Turn, stock?: readonly string[]): Promise<{ strandId: string | null; reply?: { answer: unknown } }> {
+  private async sortTurn(threadId: string, turn: Turn, final = false): Promise<{ strandId: string | null; reply?: { answers: Record<string, unknown> | undefined; candidates: string[] } }> {
     const previous = this.store.previous(threadId, turn.seq);
     const put = (strandId: string | null, by: ItemBy, confidence: number | null, unsure = false) => {
       this.store.put({ threadId, seq: turn.seq, kind: turn.kind, turnId: turn.turnId, at: turn.at, line: turn.text, strandId, confidence, by, unsure });
@@ -311,11 +306,22 @@ export class StrandDetector {
     if (this.now() < this.jevDownUntil) { this.batchSoon(threadId); return put(previous, "pending", null); }
     if (this.now() < this.jevBackoffUntil) return put(previous, "fallback", null);
     if (!this.store.takeCall(threadId, "jev", dayOf(this.now()), JEV_DAILY_CAP, JEV_TOTAL_DAILY_CAP)) return put(previous, "fallback", null);
-    const final = stock && turn.replySeq !== null && turn.finalReply?.trim() && !signalTag(turn.finalReply, stock) ? turn.finalReply : null;
-    const question = turnQuestion({ text: turn.text, reply: turn.reply }, this.openStrands(threadId, previous), previous, final);
-    const result = await this.askJev({ caller: STRANDS_CALLER, state: question.state, questions: question.questions });
-    // The reply question rode on this call: when it failed, the rule tags the reply (no second call).
-    const reply = final !== null ? { reply: { answer: result.ok ? result.answers[REPLY_QUESTION] : undefined } } : {};
+    const question = turnQuestion({ text: turn.text, reply: turn.reply }, this.openStrands(threadId, previous), previous);
+    const replyAsked = final && turn.replySeq !== null && taggable(turn.finalReply) ? replyQuestions(turn.finalReply) : null;
+    const open = turn.kind === "user" ? this.openAsks(threadId, turn.seq) : [];
+    const clearAsked = open.length ? clearQuestions(open) : null;
+    const result = await this.askJev({
+      caller: STRANDS_CALLER,
+      state: { ...question.state, ...replyAsked?.state, ...clearAsked?.state },
+      questions: { ...question.questions, ...replyAsked?.questions, ...clearAsked?.questions },
+    });
+    // The reply questions rode on this call: when it failed, the reply stays untagged (no second call).
+    const reply = replyAsked ? { reply: { answers: result.ok ? result.answers : undefined, candidates: replyAsked.candidates } } : {};
+    if (result.ok && clearAsked) {
+      const cleared = readClears(result.answers, clearAsked.keys);
+      for (const seq of cleared) this.store.resolveReply(threadId, seq);
+      if (cleared.length) this.deps.changed(threadId);
+    }
     if (!result.ok) {
       if (result.unavailable) { this.jevDownUntil = this.now() + JEV_DOWN_MS; this.batchSoon(threadId); return { ...put(previous, "pending", null), ...reply }; }
       return { ...put(previous, "fallback", null), ...reply };
@@ -323,6 +329,12 @@ export class StrandDetector {
     const choice = readAnswer(result.answers.strand, question.shown, previous);
     if (!choice) return { ...put(previous, "fallback", null), ...reply };
     return { strandId: this.apply(threadId, choice, turn, "jev", (...args) => put(...args).strandId), ...reply };
+  }
+
+  /** The needs-you asks open in the conversation before message `seq`, oldest first, with their strands' names. */
+  private openAsks(threadId: string, seq: number): { seq: number; ask: string | null; strand: string | null }[] {
+    return this.store.openReplies(threadId, this.now() - REPLY_OPEN_MS).filter((reply) => reply.seq < seq)
+      .map((reply) => ({ seq: reply.seq, ask: reply.ask, strand: reply.strandId ? this.store.get(reply.strandId)?.title ?? null : null }));
   }
 
   /** One Jev call with its own deadline. Errors and timeouts count toward the back-off; a success resets it. */

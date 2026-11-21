@@ -15,8 +15,10 @@
 //
 // A strand that needs the user only because a reply asks them something
 // isn't pushed here: that reply's own push covers it (Main's in
-// src/main-push.ts, BB's checked by Studio Mobile), and it doesn't count as
-// pushed, so a real ask on the same strand later still pushes.
+// src/main-push.ts, BB's checked by Studio Mobile; a reply that needs the user
+// pushes even in a turn another thread started), unless the user read it or
+// muted the thread. It doesn't count as pushed, so a real ask on the same
+// strand later still pushes, and its body never repeats a reply's ask.
 //
 // The push-flood rules still hold:
 // - no push for an ask BB pushes itself: a question or approval in a thread
@@ -77,7 +79,8 @@ export function onlyReplies(strand: Pick<StrandView, "asks" | "workers">): boole
 
 /** What to push for a strand that turned "needs you", or null when the phone hears of it otherwise or not at all. */
 export async function pushFor(strand: StrandView, conversation: Pick<OverviewConversation, "threadId" | "title">, deps: Pick<StrandPushDeps, "bbPushesAsks" | "startedByAnotherThread">): Promise<{ body: string; threadId: string } | null> {
-  const ask: StrandAsk | undefined = strand.asks[0];
+  // A reply's ask pushed with the reply itself: the strand's push tells the rest.
+  const ask: StrandAsk | undefined = strand.asks.find((each) => each.kind !== "reply");
   if (ask && (ask.kind === "question" || ask.kind === "approval")) {
     if (await deps.bbPushesAsks(ask.threadId)) return null;
     if (ask.threadId === conversation.threadId && await deps.startedByAnotherThread(conversation.threadId)) return null;

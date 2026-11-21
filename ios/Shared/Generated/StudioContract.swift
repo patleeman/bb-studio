@@ -392,7 +392,6 @@ public enum Studio {
     public static let strands_overview = "strands.overview"
     public static let strands_tags = "strands.tags"
     public static let strands_opened = "strands.opened"
-    public static let strands_resolveReply = "strands.resolveReply"
     public static let router_notice_get = "router.notice.get"
     public static let router_notice_dismiss = "router.notice.dismiss"
     public static let router_handoff = "router.handoff"
@@ -1257,8 +1256,6 @@ public enum Studio {
   public typealias StrandsTags = StrandsTagsOutput
 
   public typealias StrandsOpened = StrandsOpenedOutput
-
-  public typealias StrandsResolveReply = StrandsResolveReplyOutput
 
   public typealias RouterNoticeGet = RouterNoticeGetOutput
 
@@ -42173,24 +42170,6 @@ public enum Studio {
   }
 
   public struct StrandsOpenedOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-
-    public init(ok: Bool? = nil) {
-      self.ok = ok
-    }
-  }
-
-  public struct StrandsResolveReplyInput: Sendable, Hashable, Codable {
-    public var threadId: String?
-    public var seq: Int?
-
-    public init(threadId: String? = nil, seq: Int? = nil) {
-      self.threadId = threadId
-      self.seq = seq
-    }
-  }
-
-  public struct StrandsResolveReplyOutput: Sendable, Hashable, Codable {
     public var ok: Bool?
 
     public init(ok: Bool? = nil) {
