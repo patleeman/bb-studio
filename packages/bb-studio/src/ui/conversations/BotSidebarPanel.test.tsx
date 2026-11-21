@@ -780,4 +780,40 @@ describe("workers under their conversations", () => {
     expect($$('[data-testid="workers-toggle"]')).toHaveLength(0);
     expect($('[data-testid="other-workers"]')).toBeNull();
   });
+
+  it("folds the Bot's runners into Runners inside Main's nest: closed, with a count, amber while one needs the user; no Other workers for them", async () => {
+    setWorkers([
+      worker("task", "done", "main"),
+      worker("security", "running", "old_main", { nestUnder: "main", fold: "runners", title: "Security · Runner" }),
+      worker("comms", "needs-you", "old_main", { nestUnder: "main", fold: "runners", title: "Comms · Runner" }),
+      worker("checkin", "done", "old_main", { nestUnder: "main", fold: "runners", title: "Daily check-in" }),
+    ]);
+    await mount(null);
+    expect($('[data-testid="other-workers"]')).toBeNull();
+    // Main's toggle counts the runners too, and turns amber for the one that needs the user.
+    expect([toggleOf("main")!.dataset.tone, toggleOf("main")!.textContent]).toEqual(["needs-you", "4"]);
+    await act(async () => { toggleOf("main")!.click(); });
+    const fold = nestOf("main")!.querySelector<HTMLElement>('[data-testid="runners-fold"]')!;
+    expect([fold.dataset.tone, fold.textContent, fold.getAttribute("aria-expanded")]).toEqual(["needs-you", "Runners3", "false"]);
+    expect(fold.getAttribute("aria-label")).toBe("Show runners: 3 threads, 1 running, 1 needs you");
+    expect(fold.querySelector('[data-testid="runners-fold-amber"]')).not.toBeNull();
+    expect(ids(nestOf("main")!)).toEqual(["task"]);
+    await act(async () => { fold.click(); });
+    const runners = nestOf("main")!.querySelector<HTMLElement>('[data-testid="runners"]')!;
+    expect(ids(runners)).toEqual(["security", "comms", "checkin"]);
+    await act(async () => { nestOf("main")!.querySelector<HTMLElement>('[data-testid="runners-fold"]')!.click(); });
+    expect(nestOf("main")!.querySelector('[data-testid="runners"]')).toBeNull();
+  });
+
+  it("opens Main's nest and its Runners fold when a runner is on screen, and shows a spinner on a fold whose runners run", async () => {
+    setWorkers([
+      worker("security", "running", "main", { nestUnder: "main", fold: "runners" }),
+      worker("systems", "done", "main", { nestUnder: "main", fold: "runners" }),
+    ]);
+    await mount("systems");
+    const fold = nestOf("main")!.querySelector<HTMLElement>('[data-testid="runners-fold"]')!;
+    expect([fold.dataset.tone, fold.getAttribute("aria-expanded")]).toEqual(["running", "true"]);
+    expect(fold.querySelector('[data-testid="runners-fold-spinner"]')).not.toBeNull();
+    expect($('[data-testid="worker-row"][data-thread-id="systems"]')!.getAttribute("aria-current")).toBe("page");
+  });
 });

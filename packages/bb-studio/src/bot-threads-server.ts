@@ -14,7 +14,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import type { ThreadSeeds } from "./thread-seeds";
-import { BotThreads, forkUndecided, botActivity, botNeedsYou, conversationsPage, conversationTitle, conversationWorkers, latestLine, needsYouOf, olderView, repoTag, staleRaises, threadsView, workerStatus, type BotThreadRecord, type Signals, type ThreadFacts } from "./bot-threads";
+import { BotThreads, botOwnThread, forkUndecided, botActivity, botNeedsYou, conversationsPage, conversationTitle, conversationWorkers, latestLine, needsYouOf, olderView, repoTag, staleRaises, threadsView, workerStatus, type BotThreadRecord, type Signals, type ThreadFacts } from "./bot-threads";
 import { ConversationText, plainLine, queryWords, snippetOf, summaryBody, summaryPreview } from "./conversation-text";
 import { isWorkerApproval, viewOf, waitingOn, workerApprovalPush, type Interaction, type WorkerApprovalPush } from "./worker-approvals";
 import { PERSONAL_PROJECT_ID } from "./project-lead";
@@ -289,7 +289,8 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
     const id = botOrCurrent(botId);
     if (!id) return { botId: null, conversations: [], workers: [], hiddenWorkers: 0, hiddenToday: 0, olderConversations: 0 };
     const { records, threads } = await botRows(id);
-    return threadsView(id, records, threads, Date.now());
+    const { runnerBot } = deps.signals();
+    return threadsView(id, records, threads, Date.now(), (threadId, thread) => botOwnThread(threadId, thread, runnerBot));
   };
   /** What the sidebar leaves out, and the finished conversations, newest first. */
   const older = async (botId: string | undefined) => {

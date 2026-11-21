@@ -1,5 +1,6 @@
 import { forkPlaceholder, type ForkPlaceholderState } from "@/components/promptbox/follow-up-placeholder.fork";
 import { signInRecoveryExitDraft, signInRecoveryHandoffDraft, signInRecoveryTitle, type SignInRecovery } from "./signInRecovery.fork";
+import { useForkChildThreads } from "@/components/fork/ForkPromptStack";
 import { createCoreComposerActions } from "@/lib/plugin-composer-handle";
 import { visibleQueuedMessages } from "@/lib/queued-system-notice";
 import { useQueuedMessagesExpanded } from "@/components/promptbox/banner/queued-messages-expanded";
@@ -510,7 +511,7 @@ export function ThreadDetailPromptArea({
   activeWorkflows,
   activeBackgroundCommands,
   parentThreadSection,
-  childThreadsSection,
+  childThreadsSection: hostChildThreadsSection,
   contextEnvironmentId,
   sendMessage,
   sentMessageEdit,
@@ -520,6 +521,7 @@ export function ThreadDetailPromptArea({
   forkPlaceholderState,
   forkSignInRecovery,
 }: ThreadDetailPromptAreaProps) {
+  const childThreadsSection = useForkChildThreads(hostChildThreadsSection, thread.id);
   const navigate = useImmediateRouteNavigate();
   const defaultExecutionOptionsQuery = useThreadDefaultExecutionOptions(
     thread.id,

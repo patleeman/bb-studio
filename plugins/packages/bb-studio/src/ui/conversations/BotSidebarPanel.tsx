@@ -17,8 +17,10 @@
 //   worker threads under it, indented, remembered per conversation. A worker
 //   another worker started sits under that one, indented once more. Each
 //   level shows the running and waiting ones and folds the rest into "N done".
-//   A worker whose conversation has no row is under "Other workers" at the
-//   bottom. A worker never asks the user itself: the Bot raises it in the
+//   The Bot's own threads (area runners, automation and check-in runs) sit
+//   under its Main in a "Runners" fold, closed by default. A worker with no
+//   home at all is under "Other workers" at the bottom, which only shows when
+//   it has one. A worker never asks the user itself: the Bot raises it in the
 //   worker's conversation.
 // - At the bottom, each Bot's icon (the shown one highlighted, an amber mark
 //   when it needs the user) and + for a new Bot. A click, a two-finger swipe
@@ -41,7 +43,7 @@ import { usePathname } from "../../kit/app/route";
 import { BotPresence } from "../../presence/ui/BotPresence";
 import { resolveTheme } from "../../theme/appearance";
 import { useCall, useLive } from "../live";
-import { conversationLines, doneLabel, foldLevel, hiddenThreadTarget, landingThread, nestLabel, olderPath, secondLine, shortAge, spaceDots, subtree, swipeStep, switchTarget, SWIPE_START, workerLines, workerNests, type ConversationLine, type LiveThread, type WorkerLine, type WorkerNest, type WorkerNode } from "./model";
+import { conversationLines, doneLabel, foldLevel, hiddenThreadTarget, landingThread, nestLabel, olderPath, secondLine, shortAge, spaceDots, subtree, swipeStep, switchTarget, SWIPE_START, workerLines, workerNests, type ConversationLine, type LiveThread, type WorkerLine, type WorkerNest, type WorkerCounts, type WorkerNode } from "./model";
 import { currentBot, hasLanded, isLaunchPage, lastConversation, markLanded, newThreadAsked, openWorkerNests, rememberConversation, setBotSwitcher, setCurrentBot, setConversationStarter, setFocusHandler, setThreadOpener, setWorkerNestOpen, useCurrentBot, watchNewThreadArrivals } from "./state";
 
 import { MEMORY_SUBPATH } from "../../memory/shared";
@@ -194,6 +196,34 @@ export function WorkerNestLevel({ nodes, foldKey, now, row: rowProps, folds, onF
 }
 
 /**
+ * The Bot's own threads (area runners, automation and check-in runs) in a
+ * fold of their own inside Main's nest: closed by default, with a count, a
+ * spinner while one runs, amber while one needs the user; open while it holds
+ * the thread on screen, until the user closes it.
+ */
+export function RunnersFold({ nodes, counts, foldKey, now, row, folds, onFold }: Omit<Parameters<typeof WorkerNestLevel>[0], "fold"> & { counts: WorkerCounts }) {
+  const holdsSelected = nodes.some((node) => subtree(node).some((each) => each.selected));
+  const open = folds.get(foldKey) ?? holdsSelected;
+  const tone = counts.needsYou ? "needs-you" : counts.running ? "running" : "quiet";
+  return <>
+    <button type="button" data-testid="runners-fold" data-tone={tone} aria-expanded={open} aria-label={`${open ? "Hide" : "Show"} runners: ${nestLabel(counts, "thread")}`}
+      onClick={() => onFold(foldKey, !open)}
+      className={`flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-xs outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${tone === "needs-you" ? "text-warning" : INK_55}`}>
+      <Icon name={open ? "ChevronDown" : "ChevronRight"} aria-hidden className="size-3 shrink-0" />
+      <span className="min-w-0 flex-1 truncate">Runners</span>
+      {tone === "needs-you" ? <span aria-hidden data-testid="runners-fold-amber" className="size-1.5 shrink-0 rounded-full bg-warning" /> : null}
+      {tone === "running" ? <span aria-hidden data-testid="runners-fold-spinner" className="size-2.5 shrink-0 animate-spin rounded-full border-[1.5px] border-success border-r-transparent motion-reduce:animate-none" /> : null}
+      <span data-testid="runners-fold-count" className="shrink-0 tabular-nums">{counts.total}</span>
+    </button>
+    {open ? (
+      <div role="group" aria-label="Runners" data-testid="runners" className={NEST_INDENT}>
+        <WorkerNestLevel nodes={nodes} foldKey={`${foldKey}:done`} now={now} row={row} folds={folds} onFold={onFold} />
+      </div>
+    ) : null}
+  </>;
+}
+
+/**
  * The Bot switcher at the bottom (round 7): each Bot's own icon, the shown
  * one highlighted, an amber mark on one that needs the user, and "+" for a new
  * Bot. Right-click an icon for Edit space and its Theme submenu. Ctrl+Option+n shows the nth.
@@ -298,7 +328,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   // A conversation's workers open under it: as the user left it (remembered), else while it holds the worker on screen.
   const [openNests, setOpenNests] = useState(openWorkerNests);
   const [nestChoices, setNestChoices] = useState<ReadonlyMap<string, boolean>>(() => new Map());
-  const nestOpen = (threadId: string, nest: WorkerNest<WorkerLine>) => nestChoices.get(threadId) ?? (openNests.has(threadId) || nest.nodes.some((node) => subtree(node).some((each) => each.selected)));
+  const nestOpen = (threadId: string, nest: WorkerNest<WorkerLine>) => nestChoices.get(threadId) ?? (openNests.has(threadId) || [...nest.nodes, ...nest.runners].some((node) => subtree(node).some((each) => each.selected)));
   const toggleNest = (threadId: string, open: boolean) => {
     setOpenNests(setWorkerNestOpen(threadId, open));
     setNestChoices((choices) => new Map(choices).set(threadId, open));
@@ -488,6 +518,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
               {nest && open ? (
                 <div role="group" aria-label={`${row.title}'s workers`} data-testid="worker-nest" data-conversation={row.threadId} className={NEST_INDENT}>
                   <WorkerNestLevel nodes={nest.nodes} foldKey={row.threadId} now={now} row={workerRow} folds={folds} onFold={onFold} />
+                  {nest.runners.length ? <RunnersFold nodes={nest.runners} counts={nest.runnerCounts} foldKey={`${row.threadId}:runners`} now={now} row={workerRow} folds={folds} onFold={onFold} /> : null}
                 </div>
               ) : null}
             </div>

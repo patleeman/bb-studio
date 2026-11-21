@@ -163,21 +163,29 @@ export const doneLabel = (count: number): string => `${count} done`;
 /** A worker in the sidebar's nest, with the workers it started under it. */
 export interface WorkerNode<Worker> { row: Worker; children: WorkerNode<Worker>[] }
 
-/** The workers under one conversation row (or under "Other workers"), and what its toggle shows while closed. */
-export interface WorkerNest<Worker> {
+/** How many workers a toggle or fold stands for, how many run, how many need the user. */
+export interface WorkerCounts { total: number; running: number; needsYou: number }
+
+/**
+ * The workers under one conversation row (or under "Other workers"), and what
+ * its toggle shows while closed (every worker in it, runners included). The
+ * Bot's own threads (runners, automation and check-in runs) are apart in
+ * `runners`, with their own counts for the "Runners" fold.
+ */
+export interface WorkerNest<Worker> extends WorkerCounts {
   nodes: WorkerNode<Worker>[];
-  total: number;
-  running: number;
-  needsYou: number;
+  runners: WorkerNode<Worker>[];
+  runnerCounts: WorkerCounts;
 }
 
-type NestedWorker = Pick<WorkerRow, "threadId" | "status" | "ownerConversationId" | "spawnedBy" | "nestUnder">;
+type NestedWorker = Pick<WorkerRow, "threadId" | "status" | "ownerConversationId" | "spawnedBy" | "nestUnder" | "fold">;
 
 /**
  * The sidebar's workers nested under their conversations: each worker under
  * the worker that started it when that one is listed too, and each top
  * worker under its conversation's row (the server's `nestUnder`, else its
- * owner when that is listed). Workers whose conversation has no row go to
+ * owner when that is listed). The Bot's own threads (`fold: "runners"`) go
+ * to that row's `runners`. Workers whose conversation has no row go to
  * `other`. Order stays the server's (needs you, running, then newest).
  */
 export function workerNests<Worker extends NestedWorker>(conversations: readonly { threadId: string }[], workers: readonly Worker[]): { nests: Map<string, WorkerNest<Worker>>; other: WorkerNest<Worker> | null } {
@@ -202,19 +210,25 @@ export function workerNests<Worker extends NestedWorker>(conversations: readonly
   }
   const nests = new Map<string, WorkerNest<Worker>>();
   let other: WorkerNest<Worker> | null = null;
-  const empty = (): WorkerNest<Worker> => ({ nodes: [], total: 0, running: 0, needsYou: 0 });
+  const empty = (): WorkerNest<Worker> => ({ nodes: [], runners: [], total: 0, running: 0, needsYou: 0, runnerCounts: { total: 0, running: 0, needsYou: 0 } });
   for (const root of roots) {
     const home = root.row.nestUnder !== undefined ? root.row.nestUnder : root.row.ownerConversationId;
     const key = home && listed.has(home) ? home : null;
     const nest = key ? nests.get(key) ?? nests.set(key, empty()).get(key)! : (other ??= empty());
-    nest.nodes.push(root);
+    const runner = !!key && root.row.fold === "runners";
+    (runner ? nest.runners : nest.nodes).push(root);
     for (const each of subtree(root)) {
-      nest.total += 1;
-      if (each.status === "running") nest.running += 1;
-      if (each.status === "needs-you") nest.needsYou += 1;
+      count(nest, each.status);
+      if (runner) count(nest.runnerCounts, each.status);
     }
   }
   return { nests, other };
+}
+
+function count(counts: WorkerCounts, status: WorkerRow["status"]): void {
+  counts.total += 1;
+  if (status === "running") counts.running += 1;
+  if (status === "needs-you") counts.needsYou += 1;
 }
 
 /** A worker and every worker under it. */
@@ -241,8 +255,8 @@ export function foldLevel<Worker extends { status: WorkerRow["status"] }>(nodes:
 }
 
 /** The toggle's label: "3 workers, 1 running, 1 needs you". */
-export function nestLabel(nest: Pick<WorkerNest<unknown>, "total" | "running" | "needsYou">): string {
-  return [`${nest.total} ${nest.total === 1 ? "worker" : "workers"}`, nest.running ? `${nest.running} running` : "", nest.needsYou ? `${nest.needsYou} ${nest.needsYou === 1 ? "needs" : "need"} you` : ""].filter(Boolean).join(", ");
+export function nestLabel(nest: WorkerCounts, noun = "worker"): string {
+  return [`${nest.total} ${nest.total === 1 ? noun : `${noun}s`}`, nest.running ? `${nest.running} running` : "", nest.needsYou ? `${nest.needsYou} ${nest.needsYou === 1 ? "needs" : "need"} you` : ""].filter(Boolean).join(", ");
 }
 
 export interface SummarySection {

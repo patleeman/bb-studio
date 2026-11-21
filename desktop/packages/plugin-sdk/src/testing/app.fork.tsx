@@ -24,6 +24,7 @@ import type {
   ExperimentalHideHostEntriesRegistration,
   ExperimentalThreadHeaderRegistration,
   ExperimentalReplyClassifierRegistration,
+  ExperimentalTimelineFilterRegistration,
   ExperimentalSidebarSectionRegistration,
   ExperimentalTabWindow,
   ExperimentalWindowRegistration,
@@ -110,6 +111,7 @@ export interface ForkCapturedPluginApp {
   newTabItems: ExperimentalNewTabItemsRegistration[];
   commandPalettes: ExperimentalCommandPaletteRegistration[];
   appBackdrops: ExperimentalAppBackdropRegistration[];
+  timelineFilters: ExperimentalTimelineFilterRegistration[];
 }
 
 export interface ForkRenderSlotOptions {
@@ -164,6 +166,7 @@ export function forkTestHooks(
       }
     },
     experimental_useContextCard: () => ({ available: false, open: () => {} }),
+    experimental_ThreadContextSegments: () => null,
     experimental_useLauncherItems() {
       return useSlotEnv("experimental_useLauncherItems").launcherItems;
     },

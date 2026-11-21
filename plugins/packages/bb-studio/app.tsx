@@ -6,7 +6,7 @@ import { registerRouterNotice } from "./src/router/ui/RouterNotice";
 import { registerBringOverLink } from "./src/bring-over/ui/FirstChatLink";
 import { lazy, Suspense, useEffect, useLayoutEffect, type ComponentType } from "react";
 import { StudioWorkspace, WorkspaceBridge } from "./src/ui/Workspace";
-import { forkOnly, hasGlobalWorkbench, registerCommandPalette, registerFirstRun, registerModelPickerGate, registerNewConversation, registerNewTabItems, registerPaletteSearch, registerSidebarSection } from "./src/kit/app/host-sdk";
+import { forkOnly, hasGlobalWorkbench, member, registerCommandPalette, registerFirstRun, registerModelPickerGate, registerNewConversation, registerNewTabItems, registerPaletteSearch, registerSidebarSection } from "./src/kit/app/host-sdk";
 import { WelcomeLanding } from "./src/ui/bot/WelcomeMessage";
 import { ConnectModel } from "./src/ui/onboarding/ConnectModel";
 import { SignInGate } from "./src/ui/onboarding/SignInGate";
@@ -122,6 +122,7 @@ import { readKindsSnapshot, whenOn } from "./src/ui/kinds-snapshot";
 import { LoopsDirective } from "./src/loops/ui/LoopCard";
 import { TaskDirective } from "./src/tasks/ui/TaskCard";
 import { STRANDS_TAB, StrandsBoxBanner } from "./src/strands/ui/Strip";
+import { ContextInfoSection } from "./src/strands/ui/ContextInfoSection";
 import { registerTimelineFilter } from "./src/strands/ui/selection";
 import { StrandTag } from "./src/strands/ui/Tag";
 import { StrandsTab } from "./src/strands/ui/Tab";
@@ -392,6 +393,9 @@ export default definePluginApp((app) => {
   // The strands box above a Bot conversation's composer (src/strands/ui), in In flight's old place; and the timeline filter it applies.
   app.composer.customize({ id: "strands", scopes: ["thread"], banners: [{ id: "strands", component: StrandsBoxBanner }] });
   registerTimelineFilter(app.slots);
+  // BB's thread context row (parent, changed files, pull request) in a strands conversation's Info tab; hidden above its composer (prompt-stack.ts).
+  const infoSection = member(app.slots, "experimental_threadInfoSection");
+  if (typeof infoSection === "function") infoSection.call(app.slots, { id: "thread-context", group: "0_context", order: 10, component: ContextInfoSection });
   app.slots.experimental_messageMetadata({ id: "strand-tag", placement: "above", component: StrandTag });
   registerThreadTab(app, { id: STRANDS_TAB, title: "Strands", icon: "LayoutList", layout: "flush", component: StrandsTab, ...OFF_NEW_TAB });
   // The Todos pane: the todo list in a tab beside the chat.
