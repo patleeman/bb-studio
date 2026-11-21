@@ -15,10 +15,10 @@ struct BotThreadsSheet: View {
     var open: (String) -> Void
     var refresh: () async -> Void
     var embedded = false
-    /// Beside the chat (the unfolded Duo): opens the Loops in this pane; nil while the Attention Router is off.
-    var openLoops: (() -> Void)? = nil
-    /// The Loops' count: Needs you now, with a pending question counted once.
-    var loopsCount = 0
+    /// Beside the chat (the unfolded Duo): opens the Strands screen in this pane; nil on a Studio without strands.
+    var openStrands: (() -> Void)? = nil
+    /// Strands that need you across the Bot's conversations.
+    var strandsCount = 0
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
     /// Its runners (`bot_runners`); external bots have none.
@@ -41,7 +41,7 @@ struct BotThreadsSheet: View {
                 if let id = bot?.lead.threadId, embedded || activity?.attention != nil {
                     Section {
                         chatRow(id, attention: activity?.attention)
-                        if embedded, let openLoops { loopsRow(openLoops) }
+                        if embedded, let openStrands { strandsRow(openStrands) }
                     }
                 }
                 if !groups.running.isEmpty {
@@ -126,15 +126,15 @@ struct BotThreadsSheet: View {
 
     // MARK: Rows
 
-    /// All loops: the Bot's Loops, in this pane.
-    private func loopsRow(_ open: @escaping () -> Void) -> some View {
+    /// The Bot's Strands screen, in this pane.
+    private func strandsRow(_ open: @escaping () -> Void) -> some View {
         Button(action: open) {
             HStack(spacing: 10) {
-                Image(systemName: "checklist").foregroundStyle(.tint)
-                Text("All todos").foregroundStyle(.primary)
+                Image(systemName: "list.bullet.rectangle").foregroundStyle(.tint)
+                Text("Strands").foregroundStyle(.primary)
                 Spacer(minLength: 8)
-                if loopsCount > 0 {
-                    Text("\(loopsCount)")
+                if strandsCount > 0 {
+                    Text("\(strandsCount)")
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6).padding(.vertical, 1)
@@ -145,8 +145,8 @@ struct BotThreadsSheet: View {
         }
         .buttonStyle(.plain)
         .modifier(SidebarRowContent(enabled: embedded))
-        .accessibilityIdentifier("bot-all-loops")
-        .accessibilityLabel(loopsCount > 0 ? "All todos, \(loopsCount)" : "All todos")
+        .accessibilityIdentifier("bot-strands")
+        .accessibilityLabel(strandsCount > 0 ? "Strands, \(strandsCount) need\(strandsCount == 1 ? "s" : "") you" : "Strands")
     }
 
     /// The Bot's chat. While the Bot needs you, why ("Asked you a question")

@@ -135,7 +135,7 @@ struct RoomSpread: View {
     @ViewBuilder private var list: some View {
         switch content {
         case .place(let place):
-            RoomPlaceSheet(place: place, bot: bot, store: store, mainThreadId: mainThreadId, todayCount: nil, open: open,
+            RoomPlaceSheet(place: place, bot: bot, store: store, mainThreadId: mainThreadId, open: open,
                            startedConversation: { open(.conversation($0)) }, closeToRoom: close,
                            theme: look.theme.id, chooseTheme: chooseTheme,
                            path: Binding(get: { [] }, set: { routes in if !routes.isEmpty { task = nil; item = nil; detail = routes } }),
@@ -192,7 +192,7 @@ struct RoomSpread: View {
         case .settings: return ""
         case .place(let place):
             switch place {
-            case .tasks: return "Pick a task to see it here"
+            case .strands: return "Pick a strand to open its conversation"
             case .memory: return "Pick a memory to read it here"
             case .library: return "Pick something to open it here"
             case .conversations: return "Pick a conversation to open it"

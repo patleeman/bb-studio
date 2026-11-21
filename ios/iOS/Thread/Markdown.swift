@@ -5,7 +5,7 @@ import SwiftUI
 /// code, and images. `::app{id="…"}` lines (and the older `::artifact{…}` and `::mini{…}`) become
 /// app cards, by the id: a saved app's card or the live mini app; `::page{…}`, `::drawing{…}`,
 /// `::design{…}` and `::recording{…}` lines cards that preview and open the item,
-/// `::loop{…}` lines Attention Router cards (`LoopCard`),
+/// old `::loop{…}` and `::work{…}` lines read-only task cards (`TaskCard`),
 /// and `::inline-vis{…}` lines show the file they name; other directives, such as `::reactions{…}`,
 /// are left out; see `Directive`.
 struct MarkdownText: View {
@@ -65,7 +65,6 @@ struct MarkdownText: View {
             switch directive {
             case .card(let id): TaskCard(id: id)
             case .row(let id): LoopRowLine(id: id)
-            case .more(let count): LoopsMoreLink(count: count)
             }
         case .image(let alt, let src):
             MarkdownImage(alt: alt, src: src)
@@ -198,7 +197,7 @@ enum MarkdownBlock {
     case item(ReplyItem)
     /// A workspace or thread-storage file shown in the reply.
     case inlineVis(InlineVis)
-    /// An Attention Router loop: a card, a morning row, or "N more in Todos".
+    /// An old to-do or work card, or an old morning row, read-only.
     case loop(LoopDirective)
     /// `![alt](src)`, shown below the text of its paragraph.
     case image(alt: String, src: String)

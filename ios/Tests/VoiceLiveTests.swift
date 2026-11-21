@@ -254,25 +254,25 @@ final class VoiceLiveMachineTests: XCTestCase {
 
     func testOnlyDestructiveActionsWaitForAYes() {
         var machine = live()
-        _ = machine.toolFinished(callId: "c1", name: "loops_act", output: VoiceLiveDemo.dropOutput)
-        XCTAssertEqual(machine.confirmation, "Drop the loop 'Remove the stale Tailscale node'? Say yes to drop.")
+        _ = machine.toolFinished(callId: "c1", name: "archive_thread", output: VoiceLiveDemo.confirmOutput)
+        XCTAssertEqual(machine.confirmation, "Archive the conversation 'Theme stills'? Say yes to archive.")
         XCTAssertNil(machine.card)
         // Studio didn't hear the yes: still waiting.
         _ = machine.toolFinished(callId: "c2", name: "confirm", output: "Studio didn't hear a clear yes (it heard \"hmm\"), so nothing was done.")
         XCTAssertNotNil(machine.confirmation)
-        let done = machine.toolFinished(callId: "c3", name: "confirm", output: "Dropped the loop 'Remove the stale Tailscale node'. Say that briefly.")
+        let done = machine.toolFinished(callId: "c3", name: "confirm", output: "Archived the conversation 'Theme stills'. Say that briefly.")
         XCTAssertTrue(done.contains(.earcon(.sent)))
         XCTAssertNil(machine.confirmation)
-        XCTAssertEqual(machine.card, LiveToolCard(kind: .loop, title: "Dropped the loop 'Remove the stale Tailscale node'.", detail: ""))
-        // Loop actions that aren't destructive just happen, with undo.
-        _ = machine.toolFinished(callId: "c4", name: "loops_act", output: #"Snoozed "Renew the domain" to tonight. Say that briefly, and that they can say "undo" in the next 10 seconds (action a_1)."#)
+        XCTAssertEqual(machine.card, LiveToolCard(kind: .done, title: "Archived the conversation 'Theme stills'.", detail: ""))
+        // A relay isn't destructive: it just happens.
+        _ = machine.toolFinished(callId: "c4", name: "send_to_thread", output: VoiceLiveDemo.sentOutput)
         XCTAssertNil(machine.confirmation)
-        XCTAssertEqual(machine.card?.detail, "Say “undo” to undo")
+        XCTAssertEqual(machine.card?.kind, .sent)
     }
 
     func testANoClearsTheQuestion() {
         var machine = live()
-        _ = machine.toolFinished(callId: "c1", name: "stop_thread", output: VoiceLiveDemo.dropOutput)
+        _ = machine.toolFinished(callId: "c1", name: "stop_thread", output: VoiceLiveDemo.confirmOutput)
         _ = machine.toolFinished(callId: "c2", name: "confirm", output: "The user said \"no\", so nothing was done. Ask what they'd like instead.")
         XCTAssertNil(machine.confirmation)
         XCTAssertEqual(machine.card?.title, "Not done")
@@ -280,10 +280,13 @@ final class VoiceLiveMachineTests: XCTestCase {
 
     func testToolCards() {
         var machine = live()
-        _ = machine.toolFinished(callId: "c", name: "loops_list", output: VoiceLiveDemo.loopsOutput)
-        XCTAssertEqual(machine.card, LiveToolCard(kind: .waiting, title: "2 need you", detail: "Reply to Dana about the pricing deck · Renew bbstudio.app before Friday"))
-        _ = machine.toolFinished(callId: "c", name: "loops_act", output: #"Marked "Reply to Dana" done. Say that briefly, and that they can say "undo" in the next 10 seconds (action a_1)."#)
-        XCTAssertEqual(machine.card, LiveToolCard(kind: .loop, title: #"Marked "Reply to Dana" done."#, detail: "Say “undo” to undo"))
+        _ = machine.toolFinished(callId: "c", name: "read_replies", output: VoiceLiveDemo.repliesOutput)
+        XCTAssertEqual(machine.card, LiveToolCard(kind: .reply, title: "Reply", detail: "The Larkspur lead's latest reply: Paused the eBay fetcher. It resumes Monday at 9."))
+        _ = machine.toolFinished(callId: "c", name: "undo", output: #"Undid "Archive Theme stills". Say that briefly."#)
+        XCTAssertEqual(machine.card, LiveToolCard(kind: .done, title: #"Undid "Archive Theme stills"."#, detail: ""))
+        // The to-do tools are gone from Studio: an old name is like any unknown one.
+        _ = machine.toolFinished(callId: "c", name: "loops_list", output: "There's no tool named \"loops_list\". Say you can't do that by voice.")
+        XCTAssertEqual(machine.card?.title, "Not by voice")
         _ = machine.toolFinished(callId: "c", name: "send_email", output: "There's no tool named \"send_email\", and voice can't spend money. Offer to pass it on.")
         XCTAssertEqual(machine.card?.title, "Not by voice")
     }
@@ -371,7 +374,7 @@ final class VoiceLiveReportMachineTests: XCTestCase {
         _ = machine.handle(.userSpeechStarted, now: t0 + 1)
         // The model calls delete before the request's transcript arrives.
         _ = machine.handle(.toolCall(callId: "c1", name: "delete_automation", arguments: "{}"), now: t0 + 3)
-        _ = machine.toolFinished(callId: "c1", name: "delete_automation", output: VoiceLiveDemo.dropOutput, now: t0 + 3.5)
+        _ = machine.toolFinished(callId: "c1", name: "delete_automation", output: VoiceLiveDemo.confirmOutput, now: t0 + 3.5)
         _ = machine.handle(.userLine("Okay, delete the heartbeat"), now: t0 + 4)
         _ = machine.handle(.userSpeechStarted, now: t0 + 7)
         _ = machine.handle(.userLine("Yes"), now: t0 + 8)
@@ -389,7 +392,7 @@ final class VoiceLiveReportMachineTests: XCTestCase {
         var machine = live(true)
         _ = machine.micLevels((0..<50).map { (level: Float(0.1), at: t0 + 1 + Double($0) * 0.02) }, playback: 0)
         _ = machine.handle(.toolCall(callId: "c1", name: "delete_automation", arguments: "{}"), now: t0 + 2.5)
-        _ = machine.toolFinished(callId: "c1", name: "delete_automation", output: VoiceLiveDemo.dropOutput, now: t0 + 3)
+        _ = machine.toolFinished(callId: "c1", name: "delete_automation", output: VoiceLiveDemo.confirmOutput, now: t0 + 3)
         _ = machine.handle(.userText("Okay delete it"), now: t0 + 3.5)
         _ = machine.tick(now: t0 + 5)
         _ = machine.handle(.userText("Yes"), now: t0 + 8)
@@ -402,7 +405,7 @@ final class VoiceLiveReportMachineTests: XCTestCase {
 
     func testOnceTheQuestionIsSettledLaterLinesAnswerNothing() {
         var machine = live(false)
-        _ = machine.toolFinished(callId: "c1", name: "delete_automation", output: VoiceLiveDemo.dropOutput, now: t0 + 1)
+        _ = machine.toolFinished(callId: "c1", name: "delete_automation", output: VoiceLiveDemo.confirmOutput, now: t0 + 1)
         _ = machine.toolFinished(callId: "c2", name: "cancel", output: "Cancelled; nothing was done.", now: t0 + 2)
         _ = machine.handle(.userLine("Yes"), now: t0 + 3)
         XCTAssertEqual(userLines(machine.drain()), [.transcript(role: .user, text: "Yes", atMs: LiveSessionMachine.ms(t0 + 3), startedMs: LiveSessionMachine.ms(t0 + 3))])
@@ -530,7 +533,7 @@ final class VoiceLiveReportControllerTests: XCTestCase {
         let controller = try await live()
         studio.failTools = 1
         peer.onMessage?(Data(#"{"type":"session.input_transcript.delta","delta":"What's waiting?"}"#.utf8))
-        peer.onMessage?(Data(#"{"type":"response.event","event":{"type":"response.output_item.done","item":{"type":"function_call","call_id":"c1","name":"loops_list","arguments":"{}"}}}"#.utf8))
+        peer.onMessage?(Data(#"{"type":"response.event","event":{"type":"response.output_item.done","item":{"type":"function_call","call_id":"c1","name":"read_replies","arguments":"{}"}}}"#.utf8))
         try await until { !self.studio.tools.isEmpty }
         try await Task.sleep(for: .milliseconds(50))
         await controller.sync()
@@ -550,8 +553,8 @@ final class VoiceLiveEventTests: XCTestCase {
         XCTAssertEqual(parse(#"{"type":"session.usage.updated","usage":{"seconds":12}}"#), [.liveUsage(seconds: 12)])
         XCTAssertEqual(parse(#"{"type":"session.closed","reason":"expired","usage":{"seconds":90}}"#), [.liveUsage(seconds: 90), .closed(reason: "expired")])
         // Its Responses backend's function calls, inside response.event.
-        XCTAssertEqual(parse(#"{"type":"response.event","delegation_id":"item_1","event":{"type":"response.output_item.done","item":{"type":"function_call","call_id":"call_1","name":"loops_list","arguments":"{}"}}}"#),
-                       [.toolCall(callId: "call_1", name: "loops_list", arguments: "{}")])
+        XCTAssertEqual(parse(#"{"type":"response.event","delegation_id":"item_1","event":{"type":"response.output_item.done","item":{"type":"function_call","call_id":"call_1","name":"read_replies","arguments":"{}"}}}"#),
+                       [.toolCall(callId: "call_1", name: "read_replies", arguments: "{}")])
         XCTAssertEqual(parse(#"{"type":"response.event","event":{"type":"response.completed","response":{"usage":{"input_tokens":120,"output_tokens":30,"input_tokens_details":{"cached_tokens":100}}}}}"#),
                        [.backendUsage(input: 120, cached: 100, output: 30)])
         XCTAssertEqual(parse(#"{"type":"response.event","event":{"type":"response.output_item.done","item":{"type":"message"}}}"#), [])

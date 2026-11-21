@@ -252,9 +252,8 @@ private struct ToolCardView: View {
 
     private var icon: String {
         switch card.kind {
-        case .waiting: "tray.full"
         case .sent: "checkmark.circle.fill"
-        case .loop: "arrow.uturn.backward.circle"
+        case .done: "arrow.uturn.backward.circle"
         case .reply: "text.bubble"
         case .notice: "info.circle"
         }

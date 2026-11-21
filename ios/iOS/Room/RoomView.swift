@@ -70,8 +70,8 @@ struct RoomView: View {
     @State private var slide: Edge = .trailing
     @State private var nudge: CGFloat = 0
     @State private var toast: String?
-    @State private var morning: LoopMorning?
     @State private var tasks = TasksModel.shared
+    @State private var overviews = StrandOverviewModel.shared
     @State private var sceneSize: CGSize = .zero
     @State private var sceneLight: SceneLight?
     @State private var presenceSize: CGFloat = 0
@@ -106,18 +106,13 @@ struct RoomView: View {
 
     private var view: BotThreadsView? { store.view(for: bot.id) }
     private var reduceMotion: Bool { systemReduceMotion || RoomQA.reduceMotion }
-    private var todayCount: Int? {
-        if tasks.supported == false { return morning.map { $0.items.count + $0.more } }
-        return tasks.list.map { _ in tasks.today.count }
-    }
+    /// Strands that need you, beside Strands in the menu.
+    private var needsCount: Int? { overviews.overview(bot.id)?.needs }
 
     private var flight: [TaskItem] { tasks.flights[pager.shown]?.tasks ?? [] }
 
     private var yours: [TaskItem]? {
-        if tasks.supported == false {
-            guard isMain else { return [] }
-            return morning.map { $0.items.map(TaskItem.init(loop:)) }
-        }
+        if tasks.supported == false { return [] }
         let own = RoomNow.yours(flight)
         if isMain {
             guard tasks.list != nil else { return nil }
@@ -166,7 +161,7 @@ struct RoomView: View {
 
     private func polling<Content: View>(_ content: Content) -> some View {
         content
-            .task(id: phase) { await pollMorning() }
+            .task(id: phase) { await pollTasks() }
             .task(id: flightKey) { await pollFlight() }
             .onChange(of: room.mode) { _, mode in modeChanged(mode) }
             .task(id: workersKey) { syncLeads() }
@@ -246,10 +241,11 @@ struct RoomView: View {
         }
     }
 
-    private func pollMorning() async {
+    private func pollTasks() async {
         guard phase == .active, !room.home else { return }
         while !Task.isCancelled {
-            await loadMorning()
+            await refreshTasks()
+            await overviews.load(bot.id)
             await EnergyGate.shared.pollWait(.seconds(60))
         }
     }
@@ -263,19 +259,19 @@ struct RoomView: View {
     }
 
     private func modeChanged(_ mode: RoomMode) {
-        if mode == .rest { Task { await loadMorning() } }
+        if mode == .rest { Task { await refreshTasks() } }
     }
 
     private func syncLeads() {
-        TasksModel.shared.botThreadId = mainThreadId
-        if LoopsModel.shared.botName != bot.name { LoopsModel.shared.botName = bot.name }
+        tasks.botThreadId = mainThreadId
+        if tasks.botName != bot.name { tasks.botName = bot.name }
         var leads: [(id: String, title: String)] = (view?.workers ?? []).filter { $0.status == .running }.map { (id: $0.threadId, title: $0.title) }
         #if DEBUG
         if LoopsDemo.mode != nil { leads.insert((LoopsDemo.leadId, "Larkspur lead"), at: 0) }
         #endif
         let next: [String] = leads.map { $0.id + "\u{1F}" + $0.title }
-        let current: [String] = LoopsModel.shared.leads.map { $0.id + "\u{1F}" + $0.title }
-        if next != current { LoopsModel.shared.leads = leads }
+        let current: [String] = tasks.leads.map { $0.id + "\u{1F}" + $0.title }
+        if next != current { tasks.leads = leads }
     }
 
     private func themeSaved(_ saved: String?) {
@@ -334,7 +330,7 @@ struct RoomView: View {
             .navigationDestination(for: Route.self) { route in destination(route) }
         }
         .sheet(item: placeBinding) { place in
-            RoomPlaceSheet(place: place, bot: bot, store: store, mainThreadId: mainThreadId, todayCount: todayCount,
+            RoomPlaceSheet(place: place, bot: bot, store: store, mainThreadId: mainThreadId,
                            open: openItem, startedConversation: { id in openItem(.conversation(id)) },
                            closeToRoom: { room.show(.rest) }, theme: look.theme.id, chooseTheme: chooseTheme,
                            home: room.home, shown: pager.shown, settings: {
@@ -485,7 +481,7 @@ struct RoomView: View {
     }
 
     private func menu(closeInColumn: Bool) -> some View {
-        RoomMenu(bot: bot, store: store, view: view, todayCount: todayCount, closeInColumn: closeInColumn, close: closeMenu,
+        RoomMenu(bot: bot, store: store, view: view, needsCount: needsCount, closeInColumn: closeInColumn, close: closeMenu,
                  openPlace: { room.handle(.open($0)) }, openWorker: { openItem(.worker($0)) },
                  theme: { room.handle(.open(.theme)) }, settings: openSettings,
                  switchBot: { shell.show($0, store: store, compact: false) })
@@ -538,7 +534,7 @@ struct RoomView: View {
                          flight: flight, onIt: onIt, yours: yours, names: tasks.names, menuButton: menuButton, shown: room.showsDay,
                          bottomClear: pages != nil && order.count > 1 ? 24 : 0, nudge: nudge,
                          canSwitch: (store.spaces?.bots.count ?? 1) > 1, openMenu: openMenu, openChat: openChat,
-                         openTask: openTask, openThread: { openItem(.worker($0)) }, openTasks: { room.showPlace(.tasks) },
+                         openTask: openTask, openThread: { openItem(.worker($0)) }, openTasks: { room.showPlace(.strands) },
                          act: act, switchBot: switchBot, reportPresence: { presenceSize = $0 },
                          reportPresenceFrame: { presenceFrame = $0 })
     }
@@ -773,7 +769,7 @@ struct RoomView: View {
         let place: RoomPlace = switch page {
         case .memory: .memory
         case .library: .library
-        case .todos: .tasks
+        case .strands: .strands
         case .automations: .schedules
         case .archive: .archive
         }
@@ -846,34 +842,16 @@ struct RoomView: View {
     private func act(_ task: TaskItem, _ action: TaskAction) {
         Task {
             do {
-                if tasks.supported == false {
-                    let loop: LoopAction? = switch action {
-                    case .done: .done
-                    case .gotIt: .gotIt
-                    case .drop: .drop
-                    case .choose(let option): .choose(option)
-                    case .snooze(let snooze): .snooze(snooze)
-                    case .handOff(let to): .handOff(owner: to)
-                    case .takeBack: .takeBack
-                    default: nil
-                    }
-                    if let loop { try await LoopsModel.shared.perform(task.id, loop) }
-                } else if let note = try await tasks.perform(task.id, action) {
-                    app.flash(note)
-                }
+                if let note = try await tasks.perform(task.id, action) { app.flash(note) }
             } catch {
                 app.flash("Couldn't update the task: \(BBClient.describe(error))")
             }
-            await loadMorning()
+            await refreshTasks()
         }
     }
 
-    private func loadMorning() async {
+    private func refreshTasks() async {
         await tasks.refresh()
-        guard tasks.supported == false else { return }
-        await LoopsModel.shared.checkEnabled()
-        guard LoopsModel.shared.enabled == true, let next = try? await app.client.loopMorning() else { return }
-        morning = next
     }
 
     @ViewBuilder private func destination(_ route: Route) -> some View {
@@ -903,7 +881,7 @@ struct RoomView: View {
             Task {
                 try? await Task.sleep(for: .seconds(RoomQA.value("-qaPushDelay").flatMap(Double.init) ?? 1.5))
                 if let route = NotificationActions.taskRoute(["loopId": id, "conversationId": RoomQA.value("-qaPushConversation") ?? "", "threadId": mainThreadId]) {
-                    app.openTask(route.id, conversation: route.conversation)
+                    app.openTaskPush(route.id, conversation: route.conversation)
                 }
             }
         }

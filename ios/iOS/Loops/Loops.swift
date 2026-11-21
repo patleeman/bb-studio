@@ -1,9 +1,9 @@
 import Foundation
 
-/// The Attention Router's open loops (`loops.*`, packages/bb-studio/src/loops):
-/// one record per thing the Chief of Staff tracks for you, released into its
-/// chat as `::loop{id}` cards. Requests and responses use the generated
-/// contract (`Studio.Loops…`); the app reads them as `LoopItem`.
+/// An older Studio's loops (`loops.*`): what its pushes and old `::loop{id}`
+/// cards name. Personal to-dos are gone from the phone; what is left reads a
+/// loop (`LoopItem`, which tasks reuse for priority and trigger) and runs a
+/// lock-screen button's action on a Studio without `tasks.act`.
 struct LoopItem: Identifiable, Hashable, Sendable {
     enum Kind: String, Sendable { case `do`, decide, read, waiting }
     enum Priority: String, Sendable { case urgent, normal, low }
@@ -96,57 +96,6 @@ struct LoopItem: Identifiable, Hashable, Sendable {
 extension Date {
     init(milliseconds: Double) { self.init(timeIntervalSince1970: milliseconds / 1000) }
     var milliseconds: Double { (timeIntervalSince1970 * 1000).rounded() }
-}
-
-/// `loops.list`: the Loops screen's five sections. The items have the same
-/// shape as `Studio.LoopsGetOutputLoop`, so they decode as it.
-struct LoopGroups: Decodable, Equatable, Sendable {
-    var needsYouNow: [LoopItem]
-    var comingUp: [LoopItem]
-    var agentsOnIt: [LoopItem]
-    var waitingOnOthers: [LoopItem]
-    var done: [LoopItem]
-    var listedAreas: [String]?
-
-    static let empty = LoopGroups(needsYouNow: [], comingUp: [], agentsOnIt: [], waitingOnOthers: [], done: [])
-
-    init(needsYouNow: [LoopItem], comingUp: [LoopItem], agentsOnIt: [LoopItem], waitingOnOthers: [LoopItem], done: [LoopItem], areas: [String]? = nil) {
-        self.needsYouNow = needsYouNow
-        self.comingUp = comingUp
-        self.agentsOnIt = agentsOnIt
-        self.waitingOnOthers = waitingOnOthers
-        self.done = done
-        self.listedAreas = areas
-    }
-
-    private enum CodingKeys: String, CodingKey { case needsYouNow, comingUp, agentsOnIt, waitingOnOthers, done, areas }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        func items(_ key: CodingKeys) throws -> [LoopItem] {
-            (try c.decodeIfPresent([Studio.LoopsGetOutputLoop].self, forKey: key) ?? []).map(LoopItem.init)
-        }
-        needsYouNow = try items(.needsYouNow)
-        comingUp = try items(.comingUp)
-        agentsOnIt = try items(.agentsOnIt)
-        waitingOnOthers = try items(.waitingOnOthers)
-        done = try items(.done)
-        listedAreas = try c.decodeIfPresent([String].self, forKey: .areas)
-    }
-
-    var all: [LoopItem] { needsYouNow + comingUp + agentsOnIt + waitingOnOthers + done }
-
-    var areas: [String] {
-        if let listedAreas { return listedAreas }
-        var counts: [String: Int] = [:]
-        for loop in all {
-            guard let area = loop.area?.trimmingCharacters(in: .whitespaces), !area.isEmpty else { continue }
-            counts[area, default: 0] += 1
-        }
-        return counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key.localizedCompare($1.key) == .orderedAscending }.map(\.key)
-    }
-
-    var isEmpty: Bool { all.isEmpty }
 }
 
 /// A snooze choice. The presets resolve on the server in its time zone
@@ -270,33 +219,6 @@ struct LoopOption: Hashable {
 
 /// The `loops.*` request bodies, from the generated contract.
 enum LoopRequests {
-    static func list(area: String? = nil, owner: String? = nil) -> JSONValue {
-        json(Studio.LoopsListInput(area: area, owner: owner))
-    }
-
-    static func get(_ id: String) -> JSONValue { json(Studio.LoopsGetInput(id: id)) }
-
-    static func add(_ text: String) -> JSONValue { json(Studio.LoopsAddInput(text: text)) }
-
-    static func place(_ name: String, arrive: Bool) -> JSONValue {
-        json(Studio.LoopsPlaceInput(place: name, direction: arrive ? .arrive : .leave))
-    }
-
-    static func setPlaces(_ names: [String]) -> JSONValue { json(Studio.LoopsSetPlacesInput(names: names)) }
-
-    static func surfaceNow(_ id: String) -> JSONValue { json(Studio.LoopsUpdateInput(id: id, surfaceNow: true)) }
-
-    /// A new trigger, and whether it pushes to the phone when it fires.
-    static func trigger(_ id: String, _ trigger: LoopItem.Trigger, push: Bool) -> JSONValue {
-        let value: Studio.LoopsUpdateInputChangesTrigger = switch trigger {
-        case .none: .init(type: Studio.LoopsUpdateInputChangesTriggerType.none)
-        case .time(let date): .init(type: .time, at: date.milliseconds)
-        case .event(let event): .init(type: .event, event: event)
-        case .place(let place, let arrive): .init(type: .place, place: place, direction: arrive ? .arrive : .leave)
-        }
-        return json(Studio.LoopsUpdateInput(id: id, changes: .init(trigger: value, push: push, status: .queued)))
-    }
-
     /// The request an action makes: `loops.act`, or `loops.update` for a
     /// picked time, Take back and Undo. Nil for Nudge, which only drafts.
     static func request(_ id: String, _ action: LoopAction) -> (method: String, body: JSONValue)? {
@@ -329,90 +251,14 @@ enum LoopRequests {
     }
 }
 
-/// `loops.get`: the loop and its history, of which a card needs the option chosen.
-struct LoopDetail: Sendable {
-    var loop: LoopItem
-    /// The option a closed decision took.
-    var chosen: String?
-    /// When it was handed off last.
-    var handedOffAt: Date?
-
-    init(_ output: Studio.LoopsGetOutput) throws {
-        guard let loop = output.loop else { throw BBError(status: 404, message: "Todo not found") }
-        self.loop = LoopItem(loop)
-        let history = output.history ?? []
-        chosen = history.last { $0.type == "closed" }.flatMap { event in
-            event.data.flatMap { try? JSONDecoder().decode(JSONValue.self, from: Data($0.utf8)) }?["option"]?.stringValue
-        }
-        handedOffAt = history.last { $0.type == "handed_off" }?.at.map(Date.init(milliseconds:))
-    }
-}
-
-struct LoopMorning: Decodable, Sendable {
-    var date: String
-    var items: [LoopItem]
-    var more: Int
-
-    private enum CodingKeys: String, CodingKey { case date, items, more }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        date = try c.decodeIfPresent(String.self, forKey: .date) ?? ""
-        items = (try c.decodeIfPresent([Studio.LoopsGetOutputLoop].self, forKey: .items) ?? []).map(LoopItem.init)
-        more = Int(try c.decodeIfPresent(Double.self, forKey: .more) ?? 0)
-    }
-}
-
 extension BBClient {
-    func loops(area: String? = nil, owner: String? = nil) async throws -> LoopGroups {
-        try await rpc("studio", Studio.Method.loops_list, LoopRequests.list(area: area, owner: owner))
-    }
-
-    func loop(_ id: String) async throws -> LoopDetail {
-        let output: Studio.LoopsGetOutput = try await rpc("studio", Studio.Method.loops_get, LoopRequests.get(id))
-        return try LoopDetail(output)
-    }
-
-    /// Runs a card or row action; nil for one that only drafts (Nudge).
+    /// Runs an action on an older Studio's loop (a lock-screen button's
+    /// fallback); nil for one that only drafts (Nudge).
     @discardableResult
     func loopAction(_ id: String, _ action: LoopAction) async throws -> LoopItem? {
         guard let request = LoopRequests.request(id, action) else { return nil }
         let output: Studio.LoopsActOutput = try await rpc("studio", request.method, request.body)
         return LoopItem(Self.loop(output))
-    }
-
-    func addLoop(_ text: String) async throws {
-        let _: Studio.LoopsAddOutput = try await rpc("studio", Studio.Method.loops_add, LoopRequests.add(text))
-    }
-
-    func changeLoopTrigger(_ id: String, _ trigger: LoopItem.Trigger, push: Bool) async throws -> LoopItem {
-        let output: Studio.LoopsActOutput = try await rpc("studio", Studio.Method.loops_update, LoopRequests.trigger(id, trigger, push: push))
-        return LoopItem(Self.loop(output))
-    }
-
-    func surfaceLoopNow(_ id: String) async throws -> LoopItem {
-        let output: Studio.LoopsActOutput = try await rpc("studio", Studio.Method.loops_update, LoopRequests.surfaceNow(id))
-        return LoopItem(Self.loop(output))
-    }
-
-    /// Tells Studio "arrived at <name>" or "left <name>"; never where.
-    func loopPlace(_ name: String, arrive: Bool) async throws {
-        let _: Studio.LoopsPlaceOutput = try await rpc("studio", Studio.Method.loops_place, LoopRequests.place(name, arrive: arrive))
-    }
-
-    /// Replaces Studio's list of this phone's place names.
-    func setLoopPlaces(_ names: [String]) async throws {
-        let _: Studio.LoopsPlacesOutput = try await rpc("studio", Studio.Method.loops_setPlaces, LoopRequests.setPlaces(names))
-    }
-
-    func loopMorning() async throws -> LoopMorning {
-        try await rpc("studio", Studio.Method.loops_morning, .object([:]))
-    }
-
-    /// Studio's Attention Router setting (`loopsEnabled`, off by default).
-    func loopsEnabled() async throws -> Bool {
-        if case .bool(let on)? = try await studioSettingValues()["loopsEnabled"] { return on }
-        return false
     }
 
     /// `loops.act` and `loops.update` answer with the loop; read it as `loops.get`'s.

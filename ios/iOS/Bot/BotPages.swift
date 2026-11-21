@@ -13,10 +13,8 @@ struct BotPageScreen: View {
             MemoryPageView(botId: bot?.id, open: open)
         case .library:
             LibraryPageView(botId: bot?.id, open: open)
-        case .todos:
-            LoopsView(attention: nil, openChat: openMain)
-                .navigationTitle("Todos")
-                .navigationBarTitleDisplayMode(.large)
+        case .strands:
+            StrandsOverviewView(botId: bot?.id) { open(.conversation($0)) }
         case .automations:
             BotAutomationsSheet(botId: bot?.id, botName: bot?.name ?? BotInfo.defaultName, embedded: true)
                 .id(bot?.id)

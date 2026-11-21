@@ -323,6 +323,31 @@ enum BotSpacesDemo {
             out["strayWorkers"] = stray
             return out
         }
+        /// `strands.overview` for Juniper: Launch prep's question, Main's asks and running strands, and Budget sign-off gone quiet.
+        static func strandsOverviewJSON(_ botId: String, now: Double, resolved: Bool) -> [String: Any] {
+            guard botId == "bot_juniper" else { return ["conversations": [Any](), "needs": 0, "running": 0] }
+            func strands(_ threadId: String) -> [[String: Any]] { strandsJSON(threadId, now: now, resolved: resolved)["strands"] as? [[String: Any]] ?? [] }
+            let budget: [String: Any] = ["id": "str_budget", "title": "Q4 budget", "summary": "Sent Dana the numbers", "named": true, "state": "quiet",
+                                         "detail": NSNull(), "asks": [Any](), "workers": [Any](), "lastAt": now - 900_000, "latestSeq": 3, "messages": 3,
+                                         "pinned": false, "origin": "jev"]
+            var conversations: [[String: Any]] = [
+                ["threadId": "thr_demo_interview", "title": "Launch prep", "isMain": false, "lastActiveAt": now - 7_200_000, "strands": strands("thr_demo_interview")],
+                ["threadId": BotDemo.threadId, "title": "Main", "isMain": true, "lastActiveAt": now - 30_000, "strands": strands(BotDemo.threadId)],
+                ["threadId": "thr_demo_thread", "title": "Budget sign-off", "isMain": false, "lastActiveAt": now - 900_000, "strands": [budget]],
+            ]
+            func count(_ row: [String: Any], _ state: String) -> Int { (row["strands"] as? [[String: Any]] ?? []).filter { $0["state"] as? String == state }.count }
+            // As Studio sorts them: needs you first, then Main, then the most recently active.
+            conversations.sort { a, b in
+                let (na, nb) = (count(a, "needs-you") > 0, count(b, "needs-you") > 0)
+                if na != nb { return na }
+                let (ma, mb) = (a["isMain"] as? Bool ?? false, b["isMain"] as? Bool ?? false)
+                if ma != mb { return ma }
+                return (a["lastActiveAt"] as? Double ?? 0) > (b["lastActiveAt"] as? Double ?? 0)
+            }
+            return ["conversations": conversations, "needs": conversations.reduce(0) { $0 + count($1, "needs-you") },
+                    "running": conversations.reduce(0) { $0 + count($1, "running") }]
+        }
+
         private(set) var appearanceCalls: [[String: Any]] = []
 
         func viewJSON(_ botId: String) -> Data {
@@ -533,6 +558,9 @@ enum BotSpacesDemo {
             case "strands.list":
                 guard BotSpacesDemo.strands else { return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
                 return ok(Self.strandsJSON(threadId, now: Self.now, resolved: lock.withLock { strandsResolved }))
+            case "strands.overview":
+                guard BotSpacesDemo.strands else { return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
+                return ok(Self.strandsOverviewJSON(input["botId"] as? String ?? "", now: Self.now, resolved: lock.withLock { strandsResolved }))
             case "strands.opened", "strands.tags":
                 guard BotSpacesDemo.strands else { return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
                 let answer: [String: Any] = name == "strands.tags" ? Self.strandTagsJSON(threadId) : ["ok": true]

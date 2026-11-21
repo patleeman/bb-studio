@@ -734,6 +734,12 @@
       "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
+      "file": "ios/Shared/StrandOverview.swift",
+      "plugin": "studio",
+      "method": "strands.overview",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/Shared/StrandTimeline.swift",
       "plugin": "studio",
       "method": "strands.tags",
@@ -988,56 +994,8 @@
     {
       "file": "ios/iOS/Loops/Loops.swift",
       "plugin": "studio",
-      "method": "loops.list",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Loops/Loops.swift",
-      "plugin": "studio",
-      "method": "loops.get",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Loops/Loops.swift",
-      "plugin": "studio",
       "method": "request",
       "coverage": "dynamic dispatch; runtime validation required"
-    },
-    {
-      "file": "ios/iOS/Loops/Loops.swift",
-      "plugin": "studio",
-      "method": "loops.add",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Loops/Loops.swift",
-      "plugin": "studio",
-      "method": "loops.update",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Loops/Loops.swift",
-      "plugin": "studio",
-      "method": "loops.update",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Loops/Loops.swift",
-      "plugin": "studio",
-      "method": "loops.place",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Loops/Loops.swift",
-      "plugin": "studio",
-      "method": "loops.setPlaces",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Loops/Loops.swift",
-      "plugin": "studio",
-      "method": "loops.morning",
-      "coverage": "generated method"
     },
     {
       "file": "ios/iOS/Room/BotControls.swift",
@@ -1139,12 +1097,6 @@
       "file": "ios/iOS/Tasks/TasksModel.swift",
       "plugin": "studio",
       "method": "tasks.board",
-      "coverage": "generated method"
-    },
-    {
-      "file": "ios/iOS/Tasks/TasksModel.swift",
-      "plugin": "studio",
-      "method": "areas.list",
       "coverage": "generated method"
     },
     {

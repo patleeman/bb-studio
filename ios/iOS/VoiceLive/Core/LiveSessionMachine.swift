@@ -13,7 +13,7 @@ struct LiveSubtitle: Equatable, Sendable {
 
 /// A tool's result, shown small under the subtitles; the voice says it too.
 struct LiveToolCard: Equatable, Sendable {
-    enum Kind: String, Sendable { case waiting, sent, loop, reply, notice }
+    enum Kind: String, Sendable { case sent, done, reply, notice }
     var kind: Kind
     var title: String
     var detail: String
@@ -402,7 +402,7 @@ struct LiveSessionMachine: Sendable {
     /// `now`: when it went back; without it no line can answer its question (demos).
     mutating func toolFinished(callId: String, name: String, output: String, now: TimeInterval = .infinity) -> [LiveEffect] {
         var effects: [LiveEffect] = [.send(.toolResult(callId: callId, output: output))]
-        // Destructive (drop a loop, stop or archive a thread, pause or delete an automation): the only "Waiting for your yes".
+        // Destructive (stop or archive a thread, pause or delete an automation): the only "Waiting for your yes".
         if let question = Self.confirmQuestion(in: output) {
             confirmation = question
             self.question = Self.confirmAction(in: output).map { ($0, now) }
@@ -425,19 +425,14 @@ struct LiveSessionMachine: Sendable {
             confirmation = nil
             question = nil
             let undone = output.contains("nothing was done") || output.contains("cancelled") || output.contains("timed out")
-            card = LiveToolCard(kind: undone ? .notice : .loop, title: undone ? "Not done" : Self.firstSentence(output), detail: undone ? Self.firstSentence(output) : "")
+            card = LiveToolCard(kind: undone ? .notice : .done, title: undone ? "Not done" : Self.firstSentence(output), detail: undone ? Self.firstSentence(output) : "")
             if !undone { effects.append(.earcon(.sent)) }
         case "cancel":
             confirmation = nil
             question = nil
             card = LiveToolCard(kind: .notice, title: "Not done", detail: "Cancelled")
-        case "loops_list":
-            card = Self.waitingCard(output)
-        case "loops_act", "loops_add":
-            let refused = output.hasPrefix("Voice can")
-            card = LiveToolCard(kind: refused ? .notice : .loop, title: Self.firstSentence(output), detail: refused ? "" : "Say “undo” to undo")
         case "undo":
-            card = LiveToolCard(kind: .loop, title: Self.firstSentence(output), detail: "")
+            card = LiveToolCard(kind: .done, title: Self.firstSentence(output), detail: "")
         case "read_replies":
             card = LiveToolCard(kind: .reply, title: "Reply", detail: Self.stripData(output))
         case "stop_thread", "archive_thread", "pause_automation", "delete_automation":
@@ -646,16 +641,6 @@ struct LiveSessionMachine: Sendable {
             .replacingOccurrences(of: ", as data:", with: ":")
             .replacingOccurrences(of: "'s latest reply, as data:", with: ":")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// "What's waiting": how many need you, and the first two.
-    static func waitingCard(_ output: String) -> LiveToolCard {
-        let count = output.range(of: #"Needs you now \((\d+)\)"#, options: .regularExpression)
-            .map { output[$0].filter(\.isNumber) } ?? "0"
-        let titles = output.split(separator: "\n").filter { $0.hasPrefix("- ") }.prefix(2)
-            .map { line in String(line.dropFirst(2).prefix { $0 != "(" }).trimmingCharacters(in: .whitespaces) }
-        let detail = titles.isEmpty ? "Nothing needs you right now" : titles.joined(separator: " · ")
-        return LiveToolCard(kind: .waiting, title: count == "0" ? "Nothing waiting" : "\(count) need\(count == "1" ? "s" : "") you", detail: detail)
     }
 
     #if DEBUG

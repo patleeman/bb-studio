@@ -6,7 +6,8 @@ struct RoomMenu: View {
     let bot: BotSpace
     @ObservedObject var store: BotSpacesStore
     let view: BotThreadsView?
-    let todayCount: Int?
+    /// Strands that need you, beside Strands.
+    let needsCount: Int?
     var closeInColumn = false
     var close: () -> Void
     var openPlace: (RoomPlace) -> Void
@@ -53,8 +54,8 @@ struct RoomMenu: View {
                     Button { openPlace(place) } label: {
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
                             Text(place.title).font(.system(size: compact ? 28 : 34, weight: .semibold))
-                            if place == .tasks, let todayCount {
-                                Text("\(todayCount) today").font(.subheadline.weight(.medium)).foregroundStyle(.white.opacity(0.55))
+                            if place == .strands, let needsCount, needsCount > 0 {
+                                Text(StrandOverviewRules.line(needs: needsCount, running: 0)).font(.subheadline.weight(.medium)).foregroundStyle(.white.opacity(0.55))
                             }
                         }
                         .foregroundStyle(.white)
@@ -149,7 +150,6 @@ struct RoomPlaceSheet: View {
     let bot: BotSpace
     @ObservedObject var store: BotSpacesStore
     let mainThreadId: String
-    let todayCount: Int?
     var open: (BotShellItem) -> Void
     var startedConversation: (String) -> Void
     var closeToRoom: () -> Void
@@ -189,11 +189,8 @@ struct RoomPlaceSheet: View {
 
     @ViewBuilder private func content(for place: RoomPlace) -> some View {
         switch place {
-        case .tasks:
-            TasksView(openChat: { open(.conversation(mainThreadId)) })
-                .environment(\.openTaskThread, { open(.conversation($0)) })
-                .navigationTitle("Tasks")
-                .navigationBarTitleDisplayMode(.large)
+        case .strands:
+            StrandsOverviewView(botId: bot.id) { open(.conversation($0)) }
         case .memory:
             MemoryPageView(botId: bot.id, open: open)
         case .library:

@@ -29,9 +29,9 @@ struct BotTab: View {
     @State private var sideThreads: [String: BotSideThread] = [:]
     /// Each chat thread's environment, as its ThreadView loads it, for Terminals.
     @State private var chatEnvironments: [String: String] = [:]
-    /// The Loops instead of the chat, from the ⋯ menu (the left pane, beside it, on the unfolded Duo).
-    @State private var showsLoops = false
-    @State private var loops = LoopsModel.shared
+    /// The Strands screen instead of the chat, from the ⋯ menu (the left pane, beside it, on the unfolded Duo).
+    @State private var showsStrands = false
+    @State private var overviews = StrandOverviewModel.shared
     private struct LoadKey: Hashable { let visible: Bool; let server: URL; let botId: String?; let attempt: Int }
     private struct PollKey: Hashable { let interval: Duration?; let server: URL; let botId: String? }
 
@@ -59,17 +59,17 @@ struct BotTab: View {
         #endif
         RegularPages {
             if duoLayout.twoPages {
-                if showsLoops && loopsOn {
+                if strandsShown {
                     NavigationStack {
-                        LoopsView(attention: activity?.attention, openChat: { path = [] }, sidebar: true)
+                        StrandsOverviewView(botId: bot?.id, openConversation: openFromStrands)
                             .toolbar(.hidden, for: .navigationBar)
                             .safeAreaInset(edge: .top, spacing: 0) {
                                 DuoHeader(sidebar: true) {
                                     HStack(spacing: 8) {
-                                        Button { showsLoops = false } label: { Image(systemName: "chevron.backward") }
+                                        Button { showsStrands = false } label: { Image(systemName: "chevron.backward") }
                                             .accessibilityLabel("Back to \(bot?.name ?? BotInfo.defaultName)")
-                                            .accessibilityIdentifier("loops-back")
-                                        Text("Todos").font(.title2.bold())
+                                            .accessibilityIdentifier("strands-back")
+                                        Text("Strands").font(.title2.bold())
                                     }
                                 } actions: { EmptyView() }
                                 .ignoresSafeArea(.container, edges: .trailing)
@@ -80,7 +80,7 @@ struct BotTab: View {
                         if id == bot?.lead.threadId { path = [] }
                         else { path = [.thread(id: id)] }
                     }, refresh: { await loadActivity() }, embedded: true,
-                    openLoops: loopsOn ? { showsLoops = true } : nil, loopsCount: loopsCount)
+                    openStrands: strandsOn ? { showsStrands = true } : nil, strandsCount: strandsCount)
                 }
             }
         } detail: {
@@ -121,32 +121,26 @@ struct BotTab: View {
             guard model.tab == .bot else { return }
             await load()
         }
-        // The morning card's "N more" and `bbstudio://loops` land here.
-        .onChange(of: model.botShowsLoops, initial: true) { _, show in
+        // `bbstudio://strands` (and the older `bbstudio://loops`) land here.
+        .onChange(of: model.botShowsStrands, initial: true) { _, show in
             guard show, botId == nil else { return }
-            model.botShowsLoops = false
-            showsLoops = true
+            model.botShowsStrands = false
+            showsStrands = true
         }
-        .onChange(of: model.botDraft) { _, text in if text != nil { showsLoops = false } }
-        .onChange(of: !path.isEmpty || sheet != nil || (showsLoops && loopsOn), initial: true) { _, away in ClassicBotActivity.shared.setAway(away) }
-        .onAppear { ClassicBotActivity.shared.setAway(!path.isEmpty || sheet != nil || (showsLoops && loopsOn)) }
+        .onChange(of: model.botDraft) { _, text in if text != nil { showsStrands = false } }
+        .onChange(of: !path.isEmpty || sheet != nil || (strandsShown), initial: true) { _, away in ClassicBotActivity.shared.setAway(away) }
+        .onAppear { ClassicBotActivity.shared.setAway(!path.isEmpty || sheet != nil || (strandsShown)) }
         .onDisappear { ClassicBotActivity.shared.setAway(false) }
-        // Each Activity refresh brings the Loops along, and who can take a hand-off.
+        // Each Activity refresh brings the strands' count along, and the names old task cards use.
         .task(id: activity) {
             guard botId == nil, let bot else { return }
-            if loops.botName != bot.name { loops.botName = bot.name }
-            var leads = BotStartedThread.list(activity: activity, threads: startedThreads, chain: chain)
+            let tasks = TasksModel.shared
+            if tasks.botName != bot.name { tasks.botName = bot.name }
+            let leads = BotStartedThread.list(activity: activity, threads: startedThreads, chain: chain)
                 .filter { $0.status == .running }.map { (id: $0.id, title: $0.title) }
-            #if DEBUG
-            if LoopsDemo.mode != nil { leads.insert((LoopsDemo.leadId, "Larkspur lead"), at: 0) }
-            #endif
-            // Only a change redraws the cards: a redraw closes a card's open menu.
-            if leads.map({ $0.id + "\u{1F}" + $0.title }) != loops.leads.map({ $0.id + "\u{1F}" + $0.title }) { loops.leads = leads }
-            if loops.enabled == true { await loops.refreshList() }
-        }
-        .task(id: model.serverURL) {
-            await loops.checkEnabled(force: true)
-            if loops.enabled == true { await loops.refreshList() }
+            // Only a change redraws the cards.
+            if leads.map({ $0.id + "\u{1F}" + $0.title }) != tasks.leads.map({ $0.id + "\u{1F}" + $0.title }) { tasks.leads = leads }
+            if let id = bot.id { await overviews.load(id) }
         }
         // Live status for the threads it started: on BB's thread changes, with
         // a slow poll behind them for the rest of the Activity.
@@ -180,13 +174,20 @@ struct BotTab: View {
         }
     }
 
-    /// Studio's Attention Router setting: off hides Loops (and cards are placeholders).
-    private var loopsOn: Bool { loops.enabled == true && botId == nil }
+    /// Strands, for the primary Bot on a Studio that has them (one that has not answered yet counts).
+    private var strandsOn: Bool { botId == nil && bot?.id != nil && overviews.available }
 
-    /// Needs you now, with a pending question in the chat counted once.
-    private var loopsCount: Int {
-        let question = ["Asked you a question", "Waiting for approval", "Waiting for your answer"].contains(activity?.attention?.reason ?? "")
-        return (loops.groups?.needsYouNow.count ?? 0) + (question ? 1 : 0)
+    /// The Strands screen over the chat: from the ⋯ menu, or a link (which shows it even on a Studio
+    /// without strands, so it can say to update).
+    private var strandsShown: Bool { showsStrands && botId == nil }
+
+    /// Strands that need you across the Bot's conversations (`strands.overview`'s `needs`).
+    private var strandsCount: Int { overviews.needs(bot?.id) }
+
+    /// A strand or Open on the Strands screen: the chat (the tab's root) or the conversation.
+    private func openFromStrands(_ threadId: String) {
+        showsStrands = false
+        if threadId == bot?.lead.threadId { path = [] } else { path = [.thread(id: threadId)] }
     }
 
     private var pollInterval: Duration? {
@@ -201,10 +202,10 @@ struct BotTab: View {
                 ZStack {
                     ThreadView(threadId: id, hidesTabBar: false, botChrome: chrome(bot))
                         .id("\(model.serverURL.absoluteString)|\(id)")
-                        // Under the Loops, the chat is out of reach for VoiceOver too.
-                        .accessibilityHidden(showsLoops && loopsOn && !duoLayout.twoPages)
-                    if showsLoops && loopsOn && !duoLayout.twoPages {
-                        LoopsView(attention: activity?.attention, openChat: { showsLoops = false })
+                        // Under the Strands screen, the chat is out of reach for VoiceOver too.
+                        .accessibilityHidden(strandsShown && !duoLayout.twoPages)
+                    if strandsShown && !duoLayout.twoPages {
+                        StrandsOverviewView(botId: bot.id, openConversation: openFromStrands)
                             .background(Color(uiColor: .systemGroupedBackground))
                             .transition(.opacity)
                     }
@@ -260,12 +261,12 @@ struct BotTab: View {
 
     @ToolbarContentBuilder
     private func toolbar(_ bot: BotInfo) -> some ToolbarContent {
-        if showsLoops && loopsOn && !duoLayout.twoPages {
+        if strandsShown && !duoLayout.twoPages {
             // Over the chat, back goes to the chat first.
             ToolbarItem(placement: .topBarLeading) {
-                Button { showsLoops = false } label: { Image(systemName: "chevron.backward") }
+                Button { showsStrands = false } label: { Image(systemName: "chevron.backward") }
                     .accessibilityLabel("Back to \(bot.name)")
-                    .accessibilityIdentifier("loops-back")
+                    .accessibilityIdentifier("strands-back")
             }
         } else if let back, !duoLayout.twoPages {
             ToolbarItem(placement: .topBarLeading) {
@@ -292,12 +293,12 @@ struct BotTab: View {
     }
 
     /// The bar's buttons, as the folded Duo's column draws them: back (to
-    /// the chat over the Loops, or to the Bots list), voice and bell in one
+    /// the chat over the Strands screen, or to the Bots list), voice and bell in one
     /// capsule, then ⋯.
     @ViewBuilder private func columnActions(_ bot: BotInfo) -> some View {
-        if showsLoops && loopsOn {
-            Button { showsLoops = false } label: { Label("Back to \(bot.name)", systemImage: "chevron.backward") }
-                .accessibilityIdentifier("loops-back")
+        if strandsShown {
+            Button { showsStrands = false } label: { Label("Back to \(bot.name)", systemImage: "chevron.backward") }
+                .accessibilityIdentifier("strands-back")
         } else if let back {
             Button(action: back) { Label("Bots", systemImage: "chevron.backward") }
                 .accessibilityHint("Shows all your bots")
@@ -326,12 +327,12 @@ struct BotTab: View {
     }
 
     private func menu(_ bot: BotInfo) -> some View {
-        let badge = BotLoopsMenu.badge(loopsOn: loopsOn, count: loopsCount)
+        let badge = BotStrandsMenu.badge(strandsOn: strandsOn, count: strandsCount)
         return Menu {
-            if loopsOn {
+            if strandsOn {
                 Section {
-                    Button { showsLoops = true } label: {
-                        Label(BotLoopsMenu.title(count: loopsCount), systemImage: "checklist")
+                    Button { showsStrands = true } label: {
+                        Label(BotStrandsMenu.title(count: strandsCount), systemImage: "list.bullet.rectangle")
                     }
                 }
             }
@@ -364,12 +365,12 @@ struct BotTab: View {
                 }
             }
         } label: {
-            // Loops that need you, on the ⋯ as on the bell. One image, so the
+            // Strands that need you, on the ⋯ as on the bell. One image, so the
             // toolbar keeps it a bar button (the folded Duo's rail places those).
             BotMenuBadge.glyph(count: badge, colorScheme: colorScheme, scale: displayScale)
                 .modifier(DuoHeaderMenuLabel())
         }
-        .accessibilityLabel(BotLoopsMenu.accessibilityLabel(name: bot.name, badge: badge))
+        .accessibilityLabel(BotStrandsMenu.accessibilityLabel(name: bot.name, badge: badge))
         .accessibilityIdentifier("bot-menu")
     }
 
@@ -594,18 +595,17 @@ extension BotActivity {
     var running: Bool { !inProgress.isEmpty || !(waiting ?? []).isEmpty }
 }
 
-/// Loops in the Bot's ⋯ menu: its item, and the ⋯'s badge while loops need you
-/// (Needs you now, a pending question counted once). With Loops off, neither.
-enum BotLoopsMenu {
-    static func badge(loopsOn: Bool, count: Int) -> Int { loopsOn ? max(0, count) : 0 }
+/// The classic Bot tab's ⋯: "Strands" with how many need you, and that count on the ⋯.
+enum BotStrandsMenu {
+    static func badge(strandsOn: Bool, count: Int) -> Int { strandsOn ? max(0, count) : 0 }
 
-    static func title(count: Int) -> String { count > 0 ? "Todos  \(count)" : "Todos" }
+    static func title(count: Int) -> String { count > 0 ? "Strands  \(count)" : "Strands" }
 
     static func accessibilityLabel(name: String, badge: Int) -> String {
         switch badge {
         case ...0: "\(name) options"
-        case 1: "\(name) options, 1 todo needs you"
-        default: "\(name) options, \(badge) todos need you"
+        case 1: "\(name) options, 1 strand needs you"
+        default: "\(name) options, \(badge) strands need you"
         }
     }
 }

@@ -3,17 +3,17 @@ import Observation
 import SwiftUI
 
 enum RoomPlace: String, CaseIterable, Identifiable, Hashable {
-    case tasks, conversations, memory, library, schedules, archive, theme
+    case strands, conversations, memory, library, schedules, archive, theme
 
-    static let menu: [RoomPlace] = [.tasks, .conversations, .memory, .library, .schedules]
-    /// The places at the foot of the conversation list (the conversation is home; strands replace Tasks).
-    static let homeList: [RoomPlace] = [.memory, .library, .schedules, .theme]
+    static let menu: [RoomPlace] = [.strands, .conversations, .memory, .library, .schedules]
+    /// The places at the foot of the conversation list (the conversation is home).
+    static let homeList: [RoomPlace] = [.strands, .memory, .library, .schedules, .theme]
 
     var id: String { rawValue }
 
     var symbol: String {
         switch self {
-        case .tasks: "checklist"
+        case .strands: "list.bullet.rectangle"
         case .conversations: "bubble.left.and.bubble.right"
         case .memory: "brain"
         case .library: "books.vertical"
@@ -25,7 +25,7 @@ enum RoomPlace: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .tasks: "Tasks"
+        case .strands: "Strands"
         case .conversations: "Conversations"
         case .memory: "Memory"
         case .library: "Library"

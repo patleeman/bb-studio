@@ -1,12 +1,12 @@
 import SwiftUI
 
+/// An old `::loop` or `::work` card in a message, and the task sheet: read
+/// only. Personal to-dos are gone; the card shows the task's title, state,
+/// line, what it needs and what it made, with no buttons that change it.
 struct TaskCard: View {
     let id: String
     var expanded = false
     @State private var model = TasksModel.shared
-    @State private var pending: TaskAction?
-    @State private var error: String?
-    @State private var sheet: TaskCardSheet?
     @State private var showsHistory = false
     @EnvironmentObject private var app: AppModel
     @Environment(\.openTaskThread) private var openThread
@@ -14,7 +14,7 @@ struct TaskCard: View {
 
     var body: some View {
         if model.supported == false {
-            if id.hasPrefix("loop_") { LoopCard(id: id) } else { TaskNotice(text: "Update BB Studio on your Mac to see this card.", symbol: "arrow.down.circle") }
+            TaskNotice(text: "Update BB Studio on your Mac to see this card.", symbol: "arrow.down.circle")
         } else {
             card
         }
@@ -37,75 +37,56 @@ struct TaskCard: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("task-\(id)")
         .task(id: id) { await model.load(id) }
-        .sheet(item: $sheet) { sheet in
-            if let task = model.views[id]?.task {
-                switch sheet {
-                case .snooze: LoopSnoozeSheet(loop: task.asLoop) { run(.snooze($0)) }
-                case .choose: TaskChooseSheet(task: task) { run(.choose($0)) }
-                }
-            }
-        }
     }
 
     @ViewBuilder
     private func content(_ view: TaskView) -> some View {
-        let task = view.task
-        if task.isClosed && !expanded {
-            TaskCollapsed(task: task, reopen: reopenLabel(view), pending: pending) { run(.reopen) }
+        if view.task.isClosed && !expanded {
+            TaskCollapsed(task: view.task)
         } else {
-            TaskCardBody(view: view, names: model.names, expanded: expanded, pending: pending, error: error, showsHistory: $showsHistory,
-                         reopen: reopenLabel(view), run: run, sheet: { sheet = $0 }, open: open)
+            TaskCardBody(view: view, names: model.names, expanded: expanded, showsHistory: $showsHistory, open: open, follow: follow)
         }
-    }
-
-    private func reopenLabel(_ view: TaskView) -> String? {
-        let task = view.task
-        guard task.isClosed || task.stale, !task.isRecurring else { return nil }
-        if task.closedBy.map(TaskItem.isYou) == true { return "Undo" }
-        if !task.isMine {
-            let name = model.names.short(task)
-            return "Reopen for \(name.hasPrefix("Its ") ? "its" + name.dropFirst(3) : name)"
-        }
-        return task.stale ? nil : "Undo"
     }
 
     private func open(_ threadId: String) {
         if let openThread { openThread(threadId) } else { app.openTaskThread(threadId) }
     }
 
-    private func run(_ action: TaskAction) {
-        guard pending == nil else { return }
-        sheet = nil
-        pending = action
-        error = nil
-        Task {
-            do {
-                let note = try await model.perform(id, action)
-                pending = nil
-                if let note { app.flash(note) }
-            } catch {
-                pending = nil
-                self.error = BBClient.describe(error)
-            }
-        }
+    private func follow(_ output: TaskItem.Output) {
+        guard let target = TaskCardContent.target(output) else { return }
+        app.openLink(target)
     }
 }
 
-enum TaskCardSheet: String, Identifiable {
-    case snooze, choose
-    var id: String { rawValue }
-}
+/// What a read-only task card shows, worked out from the task.
+struct TaskCardContent: Equatable {
+    var title: String
+    var why: String?
+    /// "You", the Bot's name or a lead's.
+    var owner: String
+    var state: TaskStatus
+    /// Its progress line, or what it needs.
+    var line: String?
+    /// What it needs from you, while it does.
+    var needs: String?
+    var outputs: [TaskItem.Output]
 
-extension TaskItem {
-    var asLoop: LoopItem {
-        var loop = LoopItem(Studio.LoopsGetOutputLoop())
-        loop.id = id
-        loop.title = title
-        loop.why = why
-        loop.options = options
-        loop.trigger = trigger
-        loop.due = due
-        return loop
+    @MainActor init(_ task: TaskItem, names: TaskNames) {
+        title = task.title
+        why = task.why.isEmpty ? nil : task.why
+        owner = task.isMine ? "You" : names.short(task)
+        state = TaskRules.status(task)
+        needs = task.needsYou ? task.needs.flatMap { $0.isEmpty ? nil : $0 } : nil
+        line = needs == nil ? TaskRules.detail(task) : nil
+        outputs = task.outputs
+    }
+
+    /// Where an output opens: its link, or the item it names.
+    static func target(_ output: TaskItem.Output) -> LinkTarget? {
+        for text in [output.url, output.ref].compactMap({ $0 }) where !text.isEmpty {
+            if let target = Links.parse(text) { return target }
+        }
+        return nil
     }
 }
 
@@ -113,26 +94,14 @@ struct TaskCardBody: View {
     let view: TaskView
     let names: TaskNames
     let expanded: Bool
-    let pending: TaskAction?
-    let error: String?
     @Binding var showsHistory: Bool
-    let reopen: String?
-    let run: (TaskAction) -> Void
-    let sheet: (TaskCardSheet) -> Void
     let open: (String) -> Void
+    let follow: (TaskItem.Output) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var task: TaskItem { view.task }
-    private var status: TaskStatus { TaskRules.status(task) }
+    private var content: TaskCardContent { TaskCardContent(task, names: names) }
     private var history: [TaskHistoryLine] { names.history(view.history.map { ($0.type, $0.at, $0.data) }) }
-    private var everMine: Bool {
-        view.history.contains { event in
-            if event.type == "added_by_you" { return true }
-            guard event.type == "created" || event.type == "handed_off",
-                  let data = try? JSONSerialization.jsonObject(with: Data(event.data.utf8)) as? [String: Any] else { return false }
-            return TaskItem.isYou(data["owner"] as? String) || TaskItem.isYou(data["from"] as? String)
-        }
-    }
     private var threadToOpen: String? {
         if task.isRecurring { return task.conversation ?? names.threadId(task.owner) }
         if let owner = task.ownerThreadId { return names.threadId("thread:\(owner)") ?? owner }
@@ -141,16 +110,17 @@ struct TaskCardBody: View {
     }
 
     var body: some View {
+        let content = content
         VStack(alignment: .leading, spacing: 10) {
             TaskHeader(task: task)
             VStack(alignment: .leading, spacing: 4) {
-                Text(task.title).font(.headline).fixedSize(horizontal: false, vertical: true)
-                if !task.why.isEmpty {
-                    Text(task.why).font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(content.title).font(.headline).fixedSize(horizontal: false, vertical: true)
+                if let why = content.why {
+                    Text(why).font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }
-            ownerLine
-            if task.needsYou, let needs = task.needs, !needs.isEmpty {
+            ownerLine(content)
+            if let needs = content.needs {
                 Text(needs).font(.subheadline)
                     .padding(.horizontal, 12).padding(.vertical, 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -158,16 +128,33 @@ struct TaskCardBody: View {
                     .accessibilityLabel("Needs you: \(needs)")
                     .accessibilityIdentifier("task-needs")
             }
-            if task.isMine && !task.isClosed && task.kind == .decide && !task.options.isEmpty {
-                if task.options.count <= 3 {
-                    TaskOptionButtons(options: task.options, pending: pending) { run(.choose($0)) }
-                } else {
-                    Button { sheet(.choose) } label: { LoopPill(title: "Choose… (\(task.options.count))", style: .primary) }
+            if !content.outputs.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(content.outputs.enumerated()), id: \.offset) { _, output in
+                        let opens = TaskCardContent.target(output) != nil
+                        Button { follow(output) } label: {
+                            Label(output.title, systemImage: output.symbol)
+                                .font(.subheadline)
+                                .foregroundStyle(opens ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                                .lineLimit(2)
+                                .frame(minHeight: 30, alignment: .leading)
+                                .contentShape(.rect)
+                        }
                         .buttonStyle(.plain)
-                        .disabled(pending != nil)
+                        .disabled(!opens)
+                        .accessibilityIdentifier("task-output")
+                    }
                 }
             }
-            buttons
+            if let thread = threadToOpen {
+                Button { open(thread) } label: {
+                    Label(task.isRecurring && task.automation?.kind != "runner" ? "Open chat" : "Open thread", systemImage: "bubble.left")
+                        .padding(.horizontal, 14).frame(minHeight: 36)
+                        .background(.fill.tertiary, in: .capsule)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("task-open-thread")
+            }
             if !history.isEmpty {
                 Button {
                     withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { showsHistory.toggle() }
@@ -211,116 +198,33 @@ struct TaskCardBody: View {
                     }
                 }
             }
-            if let error {
-                Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.orange)
-            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(uiColor: .secondarySystemBackground), in: .rect(cornerRadius: 20, style: .continuous))
         .overlay {
-            if task.needsYou {
+            if content.needs != nil {
                 RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Color.orange.opacity(0.55), lineWidth: 1)
             }
         }
         .accessibilityElement(children: .contain)
     }
 
-    private var ownerLine: some View {
+    private func ownerLine(_ content: TaskCardContent) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            TaskGlyph(status: status)
-            Text(task.isMine ? "You" : names.short(task)).font(.subheadline.weight(.semibold))
-            Text("· \(status.label)").font(.subheadline).foregroundStyle(status.tone == .warning ? Color.orange : .secondary)
+            TaskGlyph(status: content.state)
+            Text(content.owner).font(.subheadline.weight(.semibold))
+            Text("· \(content.state.label)").font(.subheadline).foregroundStyle(content.state.tone == .warning ? Color.orange : .secondary)
             if let count = task.automation?.count, task.automation?.role == "finding", count > 1 {
                 Text("· Found \(count) times").font(.subheadline).foregroundStyle(.secondary)
             }
-            if !task.needsYou, let detail = TaskRules.detail(task) {
-                Text("· \(detail)").font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+            if let line = content.line {
+                Text("· \(line)").font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
             }
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("task-state")
-        .accessibilityValue(status.id)
-    }
-
-    @ViewBuilder
-    private var buttons: some View {
-        FlowLayout(spacing: 8) {
-            if task.isRecurring {
-                if let thread = threadToOpen { openButton(thread, title: task.automation?.kind == "runner" ? "Open thread" : "Open chat") }
-            } else if task.isClosed || task.stale {
-                if let reopen {
-                    Button { run(.reopen) } label: { LoopPill(title: reopen, style: .secondary, busy: pending == .reopen) }
-                        .buttonStyle(.plain).disabled(pending != nil)
-                        .accessibilityIdentifier("task-reopen")
-                }
-                if let thread = threadToOpen { openButton(thread, title: "Open thread") }
-            } else if task.isMine {
-                if task.kind != .decide || task.options.isEmpty {
-                    let read = task.kind == .read
-                    Button { run(read ? .gotIt : .done) } label: { LoopPill(title: read ? "Got it" : "Done", style: .primary, busy: pending == .done || pending == .gotIt) }
-                        .buttonStyle(.plain).disabled(pending != nil)
-                        .accessibilityIdentifier("task-done")
-                }
-                if task.canSnooze && view.todo {
-                    Button { sheet(.snooze) } label: { LoopPill(title: "Snooze", style: .secondary, busy: { if case .snooze = pending { true } else { false } }()) }
-                        .buttonStyle(.plain).disabled(pending != nil)
-                        .accessibilityIdentifier("task-snooze")
-                }
-                handOffMenu { LoopPill(title: "Hand off", style: .secondary, busy: { if case .handOff = pending { true } else { false } }()) }
-                more(drop: true, done: false)
-            } else {
-                if let thread = threadToOpen { openButton(thread, title: "Open thread") }
-                Button { run(.takeBack) } label: { LoopPill(title: everMine ? "Take back" : "Take over", style: .secondary, busy: pending == .takeBack) }
-                    .buttonStyle(.plain).disabled(pending != nil)
-                    .accessibilityIdentifier("task-take-back")
-                more(drop: true, done: true)
-            }
-        }
-    }
-
-    private func openButton(_ thread: String, title: String) -> some View {
-        Button { open(thread) } label: {
-            Label(title, systemImage: "bubble.left")
-                .padding(.horizontal, 14).frame(minHeight: 36)
-                .background(.fill.tertiary, in: .capsule)
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("task-open-thread")
-    }
-
-    private func handOffMenu<Label: View>(@ViewBuilder label: () -> Label) -> some View {
-        Menu {
-            Section("Hand off to") {
-                ForEach(names.targets(for: task), id: \.owner) { target in
-                    Button(target.name) { run(.handOff(target.owner)) }
-                }
-            }
-        } label: { label() }
-        .disabled(pending != nil)
-        .accessibilityIdentifier("task-hand-off")
-    }
-
-    private func more(drop: Bool, done: Bool) -> some View {
-        Menu {
-            if done { Button { run(.done) } label: { SwiftUI.Label("Mark done", systemImage: "checkmark") } }
-            if !task.isMine {
-                Section("Hand off to") {
-                    ForEach(names.targets(for: task), id: \.owner) { target in
-                        Button(target.name) { run(.handOff(target.owner)) }
-                    }
-                }
-            }
-            if drop { Button(role: .destructive) { run(.drop) } label: { SwiftUI.Label("Dismiss", systemImage: "xmark") } }
-        } label: {
-            Image(systemName: "ellipsis")
-                .font(.body.weight(.semibold))
-                .frame(width: 40, height: 36)
-                .background(.fill.tertiary, in: .capsule)
-        }
-        .accessibilityLabel("More actions")
-        .accessibilityIdentifier("task-more")
-        .disabled(pending != nil)
+        .accessibilityValue(content.state.id)
     }
 }
 
@@ -409,43 +313,8 @@ struct TaskGlyph: View {
     }
 }
 
-private struct TaskOptionButtons: View {
-    let options: [String]
-    let pending: TaskAction?
-    let choose: (String) -> Void
-
-    var body: some View {
-        VStack(spacing: 8) {
-            ForEach(options, id: \.self) { option in
-                let parts = LoopOption(option)
-                Button { choose(option) } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(parts.title).font(.body.weight(.semibold))
-                            if let detail = parts.detail { Text(detail).font(.subheadline).foregroundStyle(.secondary) }
-                        }
-                        Spacer(minLength: 0)
-                        if pending == .choose(option) { ProgressView() }
-                    }
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.fill.tertiary, in: .rect(cornerRadius: 14, style: .continuous))
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .disabled(pending != nil)
-                .accessibilityLabel("Choose \(option)")
-                .accessibilityIdentifier("task-option")
-            }
-        }
-    }
-}
-
 struct TaskCollapsed: View {
     let task: TaskItem
-    let reopen: String?
-    let pending: TaskAction?
-    let run: () -> Void
 
     var body: some View {
         let status = TaskRules.status(task)
@@ -457,22 +326,12 @@ struct TaskCollapsed: View {
             if let closed = task.closedAt {
                 Text(closed.formatted(.dateTime.hour(.defaultDigits(amPM: .omitted)).minute())).font(.subheadline).foregroundStyle(.secondary)
             }
-            if let reopen {
-                Button(action: run) {
-                    if pending == .reopen { ProgressView().controlSize(.small) } else { Image(systemName: "arrow.uturn.backward") }
-                }
-                .buttonStyle(.borderless)
-                .frame(minWidth: 44, minHeight: 44)
-                .disabled(pending != nil)
-                .accessibilityLabel(reopen)
-                .accessibilityIdentifier("task-reopen")
-            }
         }
         .font(.subheadline)
         .padding(.horizontal, 14).padding(.vertical, 4)
         .frame(minHeight: 48)
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.separator))
-        .accessibilityElement(children: .contain)
+        .accessibilityElement(children: .combine)
         .accessibilityIdentifier("task-collapsed")
         .accessibilityValue(status.id)
     }
@@ -493,35 +352,6 @@ struct TaskNotice: View {
             .padding(.horizontal, 14).padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.separator))
-    }
-}
-
-struct TaskChooseSheet: View {
-    let task: TaskItem
-    let choose: (String) -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List {
-                if !task.why.isEmpty { Section { Text(task.why).foregroundStyle(.secondary) } }
-                Section {
-                    ForEach(task.options, id: \.self) { option in
-                        Button { choose(option) } label: {
-                            let parts = LoopOption(option)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(parts.title).foregroundStyle(.primary)
-                                if let detail = parts.detail { Text(detail).font(.subheadline).foregroundStyle(.secondary) }
-                            }
-                        }
-                        .accessibilityLabel("Choose \(option)")
-                    }
-                }
-            }
-            .navigationTitle("Choose")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
-        }
     }
 }
 

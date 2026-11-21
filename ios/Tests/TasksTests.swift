@@ -208,26 +208,6 @@ final class TasksTests: XCTestCase {
         XCTAssertNil(NotificationActions.taskRoute(["threadId": "thr_main"]))
     }
 
-    func testTheMenuPlaceIsTasks() {
-        XCTAssertEqual(RoomPlace.tasks.title, "Tasks")
-        XCTAssertEqual(RoomPlace.menu.first, .tasks)
-    }
-
-    func testLoopMapsToATask() {
-        var loop = LoopItem(Studio.LoopsGetOutputLoop())
-        loop.id = "loop_1"
-        loop.title = "Pay it"
-        loop.owner = "user"
-        loop.status = .snoozed
-        loop.kind = .waiting
-        let t = TaskItem(loop: loop)
-        XCTAssertTrue(t.isMine)
-        XCTAssertEqual(t.kind, .waitingOutside)
-        XCTAssertEqual(t.state, .waiting)
-        XCTAssertTrue(t.snoozed)
-        XCTAssertEqual(t.queue, "queued")
-    }
-
     private actor Paths {
         var paths: [String] = []
         func add(_ path: String) { paths.append(path) }
@@ -308,32 +288,6 @@ final class TasksTests: XCTestCase {
         XCTAssertEqual(nodes[2].look, .done)
     }
 
-    private func nested(parent: String, child: String) -> (TasksBoardShape, [TaskItem]) {
-        var top = task("top", owner: parent, state: .inProgress)
-        top.parentId = nil
-        var sub = task("sub", owner: child, state: .inProgress)
-        sub.parentId = "top"
-        let board = TaskList(tasks: [top, sub], threads: [], rows: [TaskRowRef(id: "top"), TaskRowRef(id: "sub", under: "top", depth: 1)])
-        return (TasksBoardShape(TaskTree.nodes(board)), [top, sub])
-    }
-
-    func testANestedTaskHidesOnlyInsideItsTopTasksFold() {
-        let (tree, both) = nested(parent: "cos", child: "thread:thr_lead")
-        XCTAssertTrue(tree.folds(both[0]), "an agent's task folds its subtask under it")
-        XCTAssertEqual(tree.shown(both).map(\.id), ["top"], "the subtask is in the fold, not a row of its own")
-    }
-
-    func testAnAgentsSubtaskUnderYourToDoStillShows() {
-        let (tree, both) = nested(parent: TaskItem.user, child: "cos")
-        XCTAssertFalse(tree.folds(both[0]), "your own to-do draws no fold")
-        XCTAssertEqual(tree.shown(both).map(\.id), ["top", "sub"], "so the agent's subtask is its own row")
-    }
-
-    func testASubtaskWhoseTopTaskIsFilteredOutStillShows() {
-        let (tree, both) = nested(parent: "cos", child: "thread:thr_lead")
-        XCTAssertEqual(tree.shown([both[1]]).map(\.id), ["sub"], "an owner chip that leaves out the top task keeps its subtask")
-    }
-
     func testAMissingFeedIsTriedAgainAfterAWhile() {
         let now = Date(timeIntervalSince1970: 1_000_000)
         XCTAssertTrue(TasksModel.tries(nil, missingSince: nil, now: now), "a new server tries the feed")
@@ -396,44 +350,6 @@ final class TasksTests: XCTestCase {
                       "and stays open with the old one, as before")
     }
 
-    private static let areasJSON = #"""
-    {"areas":[
-      {"id":"area_ok","name":"Launch","covers":"","owner":{"kind":"lead","thread":"thr_lead"},"ownerName":"Launch lead","cadence":null,"status":"ok","reason":null,"now":null,
-       "open":[{"title":"Approve the quote","since":null,"sinceAt":null,"needsUser":true,"taskId":"task_mine"},
-               {"title":"Confirm the numbers","since":null,"sinceAt":1799913600000,"needsUser":true,"taskId":"task_agent"},
-               {"title":"Slides","since":null,"sinceAt":null,"needsUser":false,"taskId":null}],
-       "runs":[],"lastRun":null,"nextRun":null,"nextLabel":null,"paused":false,"links":[],"statusFile":null,"fileError":null,"updatedAt":1},
-      {"id":"area_home","name":"Home","covers":"","owner":{"kind":"bot","botId":"bot_1"},"ownerName":"Juniper","cadence":null,"status":"flagged","reason":null,"now":null,
-       "open":[{"title":"Renew the insurance","since":"last week","sinceAt":null,"needsUser":true,"taskId":null}],
-       "runs":[],"lastRun":null,"nextRun":null,"nextLabel":null,"paused":false,"links":[],"statusFile":null,"fileError":null,"updatedAt":1}]}
-    """#
-
-    func testAreaAsksAreTheOpenItemsThatNeedYouUnlessTheyAreAlreadyYourTask() throws {
-        let areas = try JSONDecoder().decode(AreaList.self, from: Data(Self.areasJSON.utf8)).areas
-        XCTAssertEqual(areas.map(\.id), ["area_ok", "area_home"])
-        XCTAssertEqual(areas[0].ownerThread, "thr_lead")
-        XCTAssertNil(areas[1].ownerThread)
-        let tasks = [task("task_mine"), task("task_agent", owner: "cos", state: .inProgress)]
-        let asks = AreaRules.asks(areas, tasks: tasks)
-        XCTAssertEqual(asks.map(\.title), ["Renew the insurance", "Confirm the numbers"], "problems first; the user's own task isn't asked twice; only items that need the user")
-        XCTAssertEqual(asks.map(\.area), ["Home", "Launch"])
-        XCTAssertEqual(asks[1].ownerThread, "thr_lead")
-        XCTAssertEqual(Set(asks.map(\.id)).count, 2)
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
-        XCTAssertEqual(AreaRules.age(asks[0], now: now, calendar: calendar), "last week", "the notes' own words when there is no date")
-        XCTAssertEqual(AreaRules.age(asks[1], now: now, calendar: calendar), "1 day")
-        XCTAssertEqual(AreaRules.label(asks[1], now: now, calendar: calendar), "Confirm the numbers, needs you, from Launch, 1 day")
-        var ask = asks[1]
-        ask.sinceAt = now.addingTimeInterval(-600)
-        XCTAssertEqual(AreaRules.age(ask, now: now, calendar: calendar), "today")
-        ask.sinceAt = now.addingTimeInterval(-3 * 86_400)
-        XCTAssertEqual(AreaRules.age(ask, now: now, calendar: calendar), "3 days")
-        ask.sinceAt = Date(milliseconds: 1_799_000_000_000)
-        XCTAssertEqual(AreaRules.age(ask, now: now, calendar: calendar), "Jan 3")
-        XCTAssertEqual(AreaRules.asks(areas, tasks: [task("task_mine", owner: "cos")]).count, 3, "a task that is no longer yours is asked again")
-    }
-
     private func server(_ name: String, unknown: Set<String>, paths: Paths) -> BBClient {
         let client = BBClient(baseURL: URL(string: "https://\(name).invalid")!)
         let board = #"{"rows":[{"id":"t_open","home":null,"under":null,"depth":0,"open":true,"workers":[],"hasWorkers":false,"needsYou":false}],"tasks":[\#(Self.wire("t_open", owner: "cos", state: "in_progress"))],"counts":{"open":1,"running":1,"waiting":0,"todo":0,"needsYou":0,"done":0,"workers":0},"threads":[],"workers":[]}"#
@@ -445,7 +361,6 @@ final class TasksTests: XCTestCase {
             let result: String = switch method {
             case "tasks.board": board
             case "tasks.flight": board.replacingOccurrences(of: #""workers":[]}"#, with: #""workers":[],"done":[]}"#)
-            case "areas.list": Self.areasJSON
             default: list
             }
             return (200, Data(#"{"ok":true,"result":\#(result)}"#.utf8))
@@ -457,35 +372,29 @@ final class TasksTests: XCTestCase {
         await paths.paths.map { String($0.split(separator: "/").last ?? "") }
     }
 
-    func testANewStudioFeedsTheTasksScreenFromTheBoard() async {
+    func testANewStudioFeedsThePresenceFromTheBoard() async {
         let paths = Paths()
         let model = TasksModel(client: server("tasks-board", unknown: [], paths: paths))
         await model.refresh(full: true)
         let seen = await methods(paths)
-        XCTAssertEqual(seen, ["tasks.board", "tasks.list", "areas.list"])
+        XCTAssertEqual(seen, ["tasks.board", "tasks.list"], "no areas: the Tasks screen is gone")
         XCTAssertEqual(model.usesRows, true)
         XCTAssertEqual(model.tasks.map(\.id), ["t_open", "t_old", "t_daily"], "open tasks from the board, done and recurring from the list; a task the board leaves out stays out")
-        XCTAssertEqual(model.areaAsks.count, 3)
         await model.loadFlight("thr_main")
         XCTAssertNotNil(model.flights["thr_main"]?.rows)
         await model.refresh()
         let after = await methods(paths)
-        XCTAssertEqual(Array(after.dropFirst(3)), ["tasks.flight", "tasks.board"], "with the Tasks screen closed, the room's poll asks only the board")
-        model.tasksShown = 1
-        await model.refresh()
-        let shown = await methods(paths)
-        XCTAssertEqual(Array(shown.dropFirst(5)), ["tasks.board", "tasks.list", "areas.list"], "while the Tasks screen shows, it keeps all three fresh")
-        model.tasksShown = 0
+        XCTAssertEqual(Array(after.dropFirst(2)), ["tasks.flight", "tasks.board"], "the room's poll asks only the board")
         async let first: Void = model.refresh()
         async let second: Void = model.refresh()
         _ = await (first, second)
         let shared = await methods(paths)
-        XCTAssertEqual(Array(shared.dropFirst(8)), ["tasks.board"], "two refreshes at once share one fetch")
+        XCTAssertEqual(Array(shared.dropFirst(4)), ["tasks.board"], "two refreshes at once share one fetch")
     }
 
     func testAnOlderStudioFallsBackToTheOldFeedsAndRemembers() async {
         let paths = Paths()
-        let model = TasksModel(client: server("tasks-before-board", unknown: ["tasks.flight", "tasks.board", "areas.list"], paths: paths))
+        let model = TasksModel(client: server("tasks-before-board", unknown: ["tasks.flight", "tasks.board"], paths: paths))
         await model.loadFlight("thr_main")
         XCTAssertEqual(model.usesRows, false)
         XCTAssertNil(model.flights["thr_main"]?.rows, "the old feed's rows")
@@ -494,10 +403,9 @@ final class TasksTests: XCTestCase {
         await model.refresh(full: true)
         await model.loadFlight("thr_main")
         let seen = await methods(paths)
-        XCTAssertEqual(seen, ["tasks.flight", "tasks.inFlight", "areas.list", "tasks.list", "tasks.list", "tasks.inFlight"],
+        XCTAssertEqual(seen, ["tasks.flight", "tasks.inFlight", "tasks.list", "tasks.list", "tasks.inFlight"],
                        "unknown methods are asked once per server")
         XCTAssertEqual(model.supported, true)
-        XCTAssertEqual(model.areas, [])
         XCTAssertEqual(model.tasks.count, 4, "today's behaviour: the whole list")
     }
 

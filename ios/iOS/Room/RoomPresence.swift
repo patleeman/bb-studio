@@ -683,3 +683,49 @@ struct RoomShade: View {
         .accessibilityHidden(true)
     }
 }
+
+/// A presence row's long-press menu: open, and the task's actions.
+struct TaskMenu: View {
+    let task: TaskItem
+    let names: TaskNames
+    var open: (() -> Void)?
+    var perform: ((TaskAction) -> Void)?
+    @EnvironmentObject private var app: AppModel
+
+    var body: some View {
+        if let open { Button { open() } label: { Label("Open", systemImage: "rectangle.portrait.on.rectangle.portrait") } }
+        if !task.isClosed && !task.isRecurring {
+            if task.isMine {
+                if task.kind == .decide, !task.options.isEmpty {
+                    Section("Choose") {
+                        ForEach(task.options, id: \.self) { option in Button(LoopOption(option).title) { act(.choose(option)) } }
+                    }
+                } else {
+                    Button { act(task.kind == .read ? .gotIt : .done) } label: { Label(task.kind == .read ? "Got it" : "Done", systemImage: "checkmark") }
+                }
+                if task.canSnooze {
+                    Menu {
+                        ForEach(LoopSnooze.presets, id: \.self) { snooze in Button(snooze.label) { act(.snooze(snooze)) } }
+                    } label: { Label("Snooze", systemImage: "clock") }
+                }
+            } else {
+                Button { act(.takeBack) } label: { Label("Take back", systemImage: "arrow.uturn.backward") }
+            }
+            Menu {
+                ForEach(names.targets(for: task), id: \.owner) { target in Button(target.name) { act(.handOff(target.owner)) } }
+            } label: { Label("Hand off", systemImage: "arrowshape.turn.up.right") }
+            Button(role: .destructive) { act(.drop) } label: { Label("Dismiss", systemImage: "xmark") }
+        }
+    }
+
+    private func act(_ action: TaskAction) {
+        if let perform { return perform(action) }
+        Task {
+            do {
+                if let note = try await TasksModel.shared.perform(task.id, action) { app.flash(note) }
+            } catch {
+                app.flash("Couldn't update the task: \(BBClient.describe(error))")
+            }
+        }
+    }
+}

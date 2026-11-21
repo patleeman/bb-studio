@@ -77,17 +77,6 @@ struct SettingsView: View {
                 Text("Server").foregroundStyle(Color.primary.opacity(0.75))
             }
             Section {
-                NavigationLink { PlacesView() } label: {
-                    Label("Places", systemImage: "mappin.and.ellipse")
-                }
-                .accessibilityIdentifier("settingsPlaces")
-            } header: {
-                Text("Attention Router").foregroundStyle(Color.primary.opacity(0.75))
-            } footer: {
-                Text("Todos can wait until you arrive at or leave a place. Places stay on this iPhone.")
-                    .foregroundStyle(Color.primary.opacity(0.75))
-            }
-            Section {
                 if app.inSpaces {
                     Button { app.tab = .inbox } label: {
                         Label("All BB threads", systemImage: "bubble.left.and.bubble.right")

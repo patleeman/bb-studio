@@ -17,6 +17,24 @@ struct TaskItem: Identifiable, Hashable, Sendable {
         var text: String?
     }
 
+    /// Something the task made: a page, a PR, a file, a link.
+    struct Output: Hashable, Sendable {
+        var kind: String?
+        var ref: String?
+        var title: String
+        var url: String?
+
+        var symbol: String {
+            switch kind {
+            case "page": "doc.text"
+            case "pr", "pull-request": "arrow.triangle.pull"
+            case "file": "doc"
+            case "thread", "conversation": "bubble.left"
+            default: url != nil ? "link" : "shippingbox"
+            }
+        }
+    }
+
     var id: String
     var title: String
     var why: String
@@ -49,6 +67,7 @@ struct TaskItem: Identifiable, Hashable, Sendable {
     var updatedAt: Date
     var closedAt: Date?
     var closedBy: String?
+    var outputs: [Output] = []
 
     init(id: String, title: String, why: String = "", owner: String = TaskItem.user, state: State = .todo, kind: Kind = .do,
          options: [String] = [], needs: String? = nil, priority: LoopItem.Priority = .normal, conversation: String? = nil,
@@ -115,6 +134,10 @@ struct TaskItem: Identifiable, Hashable, Sendable {
         step = task.progress?.step
         line = task.progress?.line
         workers = task.workers ?? []
+        outputs = (task.outputs ?? []).compactMap { output in
+            let title = [output.title, output.ref, output.url].compactMap { $0 }.first { !$0.isEmpty }
+            return title.map { Output(kind: output.kind, ref: output.ref, title: $0, url: output.url) }
+        }
         parentId = task.parentId
         scheduleText = task.schedule?.text
         schedulePaused = task.schedule?.paused ?? false
@@ -131,16 +154,6 @@ struct TaskItem: Identifiable, Hashable, Sendable {
         updatedAt = Date(milliseconds: task.updatedAt ?? 0)
         closedAt = task.closedAt.map(Date.init(milliseconds:))
         closedBy = task.closedBy
-    }
-
-    init(loop: LoopItem) {
-        let closed = loop.isClosed
-        self.init(id: loop.id, title: loop.title, why: loop.why, owner: LoopItem.isYou(loop.owner) ? Self.user : loop.owner,
-                  state: loop.status == .done ? .done : loop.status == .dropped ? .dropped : loop.status == .inProgress ? .inProgress : loop.kind == .waiting ? .waiting : .todo,
-                  kind: loop.kind == .waiting ? .waitingOutside : Kind(rawValue: loop.kind.rawValue) ?? .do,
-                  options: loop.options, priority: loop.priority, area: loop.area, due: loop.due, trigger: loop.trigger,
-                  snoozed: loop.status == .snoozed, queue: loop.status == .surfaced ? "surfaced" : loop.status == .queued || loop.status == .snoozed ? "queued" : nil,
-                  origin: "loop", createdAt: loop.createdAt, updatedAt: loop.updatedAt, closedAt: closed ? loop.closedAt ?? loop.updatedAt : nil, closedBy: loop.closedBy)
     }
 
     private static func raw<T: Encodable>(_ value: T) -> String {

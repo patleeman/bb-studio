@@ -55,7 +55,7 @@ final class RoomDuoUITests: ServerIsolatedUITestCase {
         press("roomMenuButton")
         let close = app.buttons["roomMenuClose"]
         XCTAssertTrue(close.waitForExistence(timeout: 10), "\(posture): the menu's close", file: file, line: line)
-        XCTAssertTrue(app.buttons["roomPlace-tasks"].waitForExistence(timeout: 10), file: file, line: line)
+        XCTAssertTrue(app.buttons["roomPlace-strands"].waitForExistence(timeout: 10), file: file, line: line)
         sleep(1)
         XCTAssertEqual(app.buttons.matching(identifier: "roomMenuClose").count, 1, "\(posture): one close", file: file, line: line)
         XCTAssertEqual(close.label, "Back to the room", file: file, line: line)
@@ -64,7 +64,7 @@ final class RoomDuoUITests: ServerIsolatedUITestCase {
         XCTAssertEqual(close.frame.width, spot.width, accuracy: 0.5, file: file, line: line)
         XCTAssertEqual(close.frame.height, spot.height, accuracy: 0.5, file: file, line: line)
         let gutter = spot.minX - 8
-        for id in ["roomPlace-tasks", "roomPlace-schedules", "roomWorkingNow", "roomTheme", "roomSettings"] where app.buttons[id].exists {
+        for id in ["roomPlace-strands", "roomPlace-schedules", "roomWorkingNow", "roomTheme", "roomSettings"] where app.buttons[id].exists {
             XCTAssertLessThanOrEqual(app.buttons[id].frame.maxX, gutter, "\(posture): \(id) stays out of the rail", file: file, line: line)
         }
         press("roomMenuClose")
@@ -89,7 +89,7 @@ final class RoomDuoUITests: ServerIsolatedUITestCase {
         command("portrait")
         assertTheMenuClosesFromTheMenuButtonsSpot("portrait")
         press("roomMenuButton")
-        for id in ["roomPlace-tasks", "roomPlace-schedules", "roomTheme", "roomSettings"] {
+        for id in ["roomPlace-strands", "roomPlace-schedules", "roomTheme", "roomSettings"] {
             XCTAssertTrue(app.buttons[id].waitForExistence(timeout: 5), id)
             XCTAssertLessThanOrEqual(app.buttons[id].frame.maxY, 951 / 2 - 16 + 0.5, "portrait: \(id) fits the top page")
             XCTAssertGreaterThanOrEqual(app.buttons[id].frame.minY, 0, "portrait: \(id) isn't cut off")
@@ -205,15 +205,11 @@ final class RoomDuoUITests: ServerIsolatedUITestCase {
         capture("p-landscape-library")
         closePlace()
 
-        openPlace("tasks", check: "tasks-screen")
-        let task = app.buttons["task-row-task_demo_quote"]
-        XCTAssertTrue(task.waitForExistence(timeout: 10))
-        assertOnTheLeftPage(task, "a task in the list")
-        task.tap()
-        XCTAssertTrue(any("task-task_demo_quote").waitForExistence(timeout: 10), "the task opens on the right")
-        assertOnTheRightPage(any("roomSpreadTask"), "the task", shift: 0)
+        openPlace("strands", check: "strands-overview")
+        assertOnTheLeftPage(any("strands-overview"), "Strands")
+        XCTAssertTrue(any("roomSpreadEmpty").exists, "the right page waits for a pick")
         sleep(2)
-        capture("p-landscape-tasks")
+        capture("p-landscape-strands")
         closePlace()
 
         command("portrait")

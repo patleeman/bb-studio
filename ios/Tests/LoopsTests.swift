@@ -1,48 +1,19 @@
-import CoreLocation
 import XCTest
 @testable import BBStudio
 
-/// The Attention Router on iOS: `::loop` directives, the card's state
-/// machine, lock-screen buttons, place monitoring and the `loops.*` bodies.
+/// What is left of the Attention Router on iOS: old `::loop` and `::work`
+/// cards render read-only, `::loops{…}` renders nothing, and an older
+/// Studio's lock-screen buttons still run (`tasks.act`, else `loops.act`).
 @MainActor
 final class LoopsTests: XCTestCase {
-    private struct GetEnvelope: Decodable { let result: Studio.LoopsGetOutput }
-    private struct TaskEnvelope: Decodable { let result: TaskGetPayload }
-
-    static let liveGetJSON = #"{"ok":true,"result":{"loop":{"id":"loop_00000000-0000-4000-8000-000000000001","title":"Call the plumber about the quote","why":"Asked to follow up today.","source":null,"kind":"do","options":[],"owner":"patrick","trigger":{"type":"none"},"priority":"normal","push":false,"status":"surfaced","due":null,"area":"Home","createdAt":1800000000000,"updatedAt":1800000060000,"closedAt":null,"closedBy":null},"history":[{"type":"surfaced","at":1800000060000,"data":"{}"}]}}"#
-
-    private func replay(_ data: Data) throws -> LoopDetail {
-        try LoopDetail(JSONDecoder().decode(GetEnvelope.self, from: data).result)
-    }
-
-    func testACurrentLoopsGetPayloadDecodesIntoAMorningRow() throws {
-        let detail = try replay(Data(Self.liveGetJSON.utf8))
-        XCTAssertEqual(detail.loop.title, "Call the plumber about the quote")
-        XCTAssertEqual(detail.loop.kind, .do)
-        XCTAssertTrue(TaskItem.isYou(detail.loop.owner))
-        XCTAssertFalse(detail.loop.isClosed)
-        XCTAssertNil(LoopRowLine.trailing(detail.loop), "no due date, so nothing on the right")
-        guard let folder = ProcessInfo.processInfo.environment["LOOP_PAYLOADS"] else { return }
-        let files = try FileManager.default.contentsOfDirectory(atPath: folder).filter { $0.hasSuffix(".json") }
-        XCTAssertFalse(files.isEmpty, "payloads to replay")
-        for file in files {
-            let data = try Data(contentsOf: URL(fileURLWithPath: folder).appendingPathComponent(file))
-            if file.hasPrefix("tasks.get") {
-                let view = try XCTUnwrap(JSONDecoder().decode(TaskEnvelope.self, from: data).result.view, file)
-                XCTAssertFalse(view.task.title.isEmpty, file)
-            } else {
-                XCTAssertFalse(try replay(data).loop.title.isEmpty, file)
-            }
-        }
-    }
-
     // MARK: Directives
 
     func testParsesLoopDirectives() {
         XCTAssertEqual(Directive(line: #"::loop{id="loop_abc-1"}"#).flatMap(LoopDirective.init), .card(id: "loop_abc-1"))
         XCTAssertEqual(Directive(line: #"::loop{id="loop_a" row="1"}"#).flatMap(LoopDirective.init), .row(id: "loop_a"))
-        XCTAssertEqual(Directive(line: #"::loops{more="3"}"#).flatMap(LoopDirective.init), .more(3))
-        XCTAssertNil(Directive(line: #"::loops{more="0"}"#).flatMap(LoopDirective.init))
+        XCTAssertEqual(Directive(line: #"::work{id="wc_1"}"#).flatMap(LoopDirective.init), .card(id: "wc_1"))
+        XCTAssertNil(Directive(line: #"::loops{more="3"}"#).flatMap(LoopDirective.init), "N more in Todos is gone")
+        XCTAssertNil(Directive(line: #"::loops{open="pane"}"#).flatMap(LoopDirective.init), "so is opening the list")
         XCTAssertNil(Directive(line: #"::loop{id="bad id"}"#).flatMap(LoopDirective.init))
         XCTAssertNil(Directive(line: #"::loop{}"#).flatMap(LoopDirective.init))
         XCTAssertNil(Directive(line: #"::page{id="pg_1"}"#).flatMap(LoopDirective.init))
@@ -53,6 +24,7 @@ final class LoopsTests: XCTestCase {
         XCTAssertEqual(LoopDirective.all(in: text), [.card(id: "loop_1"), .card(id: "loop_2")])
         XCTAssertFalse(LoopDirective.isMorning(LoopDirective.all(in: text)))
         XCTAssertTrue(LoopDirective.isMorning(LoopDirective.all(in: LoopsDemo.morningText)))
+        XCTAssertFalse(LoopDirective.isMorning(LoopDirective.all(in: "Done.\n::loops{more=\"3\"}")), "a lone ::loops line is no morning card")
     }
 
     func testSplitsAReplyIntoBubblesAndCards() {
@@ -61,95 +33,21 @@ final class LoopsTests: XCTestCase {
         XCTAssertEqual(LoopMessage.parts("::loop{id=\"loop_v\"}"), [.card("loop_v")])
     }
 
-    func testMarkdownRendersLoopBlocks() {
-        let blocks = MarkdownBlock.parse("Before\n::loop{id=\"loop_md\"}\n::loops{more=\"2\"}")
+    func testMarkdownRendersOldCardsAndDropsTheListLinks() {
+        let blocks = MarkdownBlock.parse("Before\n::loop{id=\"loop_md\"}\n::loops{more=\"2\"}\n::loops{open=\"pane\"}")
         let loops = blocks.compactMap { block -> LoopDirective? in if case .loop(let loop) = block { loop } else { nil } }
-        XCTAssertEqual(loops, [.card(id: "loop_md"), .more(2)])
+        XCTAssertEqual(loops, [.card(id: "loop_md")], "::loops lines render nothing")
+        XCTAssertEqual(blocks.count, 2, "the paragraph and the card")
     }
 
-    func testParsesTheMorningCardShape() {
+    func testParsesTheMorningCardShapeWithoutTheTodosLink() {
         let parsed = MorningCard.parse(LoopsDemo.morningText)
         XCTAssertEqual(parsed.title, "Monday, Nov 2")
         XCTAssertEqual(parsed.sections.map(\.title), ["Calendar", "On today's list", "Good to know"])
         XCTAssertEqual(parsed.sections[0].lines.first, .event(time: "9:30 AM", text: "Standup · Zoom"))
         XCTAssertEqual(parsed.sections[1].lines.first, .loop("loop_tax"))
-        XCTAssertEqual(parsed.sections[1].lines.last, .more(3))
+        XCTAssertEqual(parsed.sections[1].lines.last, .loop("loop_vendor"), "no N more in Todos")
         XCTAssertEqual(parsed.sections[2].lines, [.text("Rain from 3 PM. Take an umbrella."), .text("Mom's birthday is Saturday.")])
-    }
-
-    // MARK: Card state
-
-    private func loop(kind: String = "do", options: [String] = [], owner: String = "patrick", status: String = "surfaced",
-                      closedAt: Double? = nil, closedBy: String? = nil, updatedAt: Double = Date().milliseconds) throws -> LoopItem {
-        var object: [String: Any] = ["id": "loop_t", "title": "T", "why": "", "source": NSNull(), "kind": kind, "options": options, "owner": owner,
-                                     "trigger": ["type": "none"], "priority": "normal", "push": false, "status": status, "due": NSNull(),
-                                     "area": NSNull(), "createdAt": 1, "updatedAt": updatedAt]
-        object["closedAt"] = closedAt ?? NSNull()
-        object["closedBy"] = closedBy ?? NSNull()
-        let data = try JSONSerialization.data(withJSONObject: object)
-        return LoopItem(try JSONDecoder().decode(Studio.LoopsGetOutputLoop.self, from: data))
-    }
-
-    func testDiscussDraftsTheLoopsLineAndTitle() throws {
-        var item = try loop()
-        item.title = "Reply to Sam\n about the  planning doc"
-        XCTAssertEqual(LoopFormat.discussDraft(item), "::loop{id=\"loop_t\"}\nAbout: Reply to Sam about the planning doc\n")
-        XCTAssertEqual(Directive(line: "::loop{id=\"loop_t\"}").flatMap(LoopDirective.init), .card(id: "loop_t"))
-    }
-
-    func testPhasesFollowTheSettingAndTheLoop() throws {
-        XCTAssertEqual(LoopCardState(enabled: false, loop: try loop()).phase, .off)
-        XCTAssertEqual(LoopCardState(enabled: nil, loop: nil).phase, .loading)
-        XCTAssertEqual(LoopCardState(enabled: true, loop: nil, failure: "gone").phase, .missing("gone"))
-        XCTAssertEqual(LoopCardState(enabled: true, loop: try loop()).phase, .open)
-        XCTAssertEqual(LoopCardState(enabled: true, loop: try loop(owner: "cos", status: "in_progress")).phase, .handedOff)
-        XCTAssertEqual(LoopCardState(enabled: true, loop: try loop(status: "snoozed")).phase, .waiting)
-        XCTAssertEqual(LoopCardState(enabled: true, loop: try loop(status: "done", closedAt: 1, closedBy: "patrick")).phase, .closed)
-    }
-
-    func testTheUserOwnerIsYouUnderEitherName() throws {
-        for name in ["user", "patrick"] {
-            XCTAssertTrue(try loop(owner: name).isYours)
-            XCTAssertEqual(LoopCardState(enabled: true, loop: try loop(owner: name)).phase, .open)
-            XCTAssertTrue(LoopCardState(enabled: true, loop: try loop(status: "done", closedAt: 1, closedBy: name)).canUndo)
-        }
-        XCTAssertFalse(try loop(owner: "cos").isYours)
-        XCTAssertFalse(LoopCardState(enabled: true, loop: try loop(status: "done", closedAt: 1, closedBy: "cos")).canUndo)
-    }
-
-    func testButtonsByKindOnThePhoneAndWide() throws {
-        let doCard = LoopCardState(enabled: true, loop: try loop())
-        XCTAssertEqual(doCard.buttons(wide: false).shown, [.done, .snooze])
-        XCTAssertEqual(doCard.buttons(wide: false).more, [.handOff, .drop])
-        XCTAssertEqual(doCard.buttons(wide: true).shown, [.done, .snooze, .handOff, .drop])
-        let decide = LoopCardState(enabled: true, loop: try loop(kind: "decide", options: ["A", "B · cheap"]))
-        XCTAssertEqual(decide.buttons(wide: false).shown, [.option("A"), .option("B · cheap"), .snooze])
-        let many = LoopCardState(enabled: true, loop: try loop(kind: "decide", options: ["A", "B", "C", "D"]))
-        XCTAssertEqual(many.buttons(wide: false).shown, [.chooseSheet, .snooze])
-        XCTAssertEqual(LoopCardState(enabled: true, loop: try loop(kind: "read")).buttons(wide: false).shown, [.gotIt])
-        XCTAssertEqual(LoopCardState(enabled: true, loop: try loop(kind: "waiting")).buttons(wide: false).shown, [.nudge, .drop])
-        let stale = LoopCardState(enabled: true, loop: try loop(updatedAt: Date().addingTimeInterval(-4 * 86_400).milliseconds))
-        XCTAssertEqual(stale.buttons(wide: false).more.first, .keep)
-        XCTAssertEqual(LoopCardState(enabled: true, loop: try loop(owner: "cos")).buttons(wide: false).shown, [])
-    }
-
-    func testActionsRunOneAtATimeAndCollapse() throws {
-        var state = LoopCardState(enabled: true, loop: try loop(kind: "decide", options: ["Hudson Carpentry · $3,650"]))
-        XCTAssertTrue(state.begin(.choose("Hudson Carpentry · $3,650")))
-        XCTAssertFalse(state.begin(.drop), "A second tap waits for the first")
-        state.finish(.choose("Hudson Carpentry · $3,650"), loop: try loop(kind: "decide", status: "done", closedAt: 2, closedBy: "patrick"))
-        XCTAssertEqual(state.phase, .closed)
-        XCTAssertEqual(state.closedLabel, "Hudson Carpentry")
-        XCTAssertTrue(state.canUndo)
-        XCTAssertTrue(state.begin(.undo))
-        state.finish(.undo, loop: try loop(kind: "decide"))
-        XCTAssertEqual(state.phase, .open)
-        XCTAssertNil(state.chosen)
-        XCTAssertTrue(state.begin(.done))
-        state.fail("Offline")
-        XCTAssertEqual(state.error, "Offline")
-        XCTAssertNil(state.pending)
-        XCTAssertFalse(LoopCardState(enabled: true, loop: try loop(status: "done", closedAt: 1, closedBy: "cos")).canUndo)
     }
 
     func testOptionsSplitIntoTitleAndDetail() {
@@ -174,81 +72,52 @@ final class LoopsTests: XCTestCase {
         XCTAssertEqual(LoopSnooze.presets.map(\.preset), [.later_today, .tonight, .tomorrow_morning, .this_weekend, .home])
     }
 
-    // MARK: Requests
+    func testEventWords() {
+        XCTAssertEqual(LoopFormat.event("reply:sam"), "When Sam replies")
+        XCTAssertEqual(LoopFormat.event("done:the build"), "When the build is done")
+    }
+
+    // MARK: An older Studio's lock-screen buttons
 
     func testActionsBecomeContractRequests() throws {
         func body(_ action: LoopAction) -> (String, JSONValue)? { LoopRequests.request("loop_1", action).map { ($0.method, $0.body) } }
         XCTAssertEqual(body(.done)?.0, "loops.act")
         XCTAssertEqual(body(.done)?.1, .object(["id": .string("loop_1"), "action": .string("done")]))
         XCTAssertEqual(body(.snooze(.tonight))?.1, .object(["id": .string("loop_1"), "action": .string("snooze"), "snooze": .string("tonight")]))
-        XCTAssertEqual(body(.handOff(owner: "thread:thr_k"))?.1["owner"], .string("thread:thr_k"))
         XCTAssertEqual(body(.choose("A"))?.1["option"], .string("A"))
         XCTAssertEqual(body(.takeBack)?.0, "loops.update")
-        XCTAssertEqual(body(.takeBack)?.1["changes"], .object(["owner": .string("patrick"), "status": .string("surfaced")]))
-        XCTAssertEqual(body(.undo)?.1["changes"], .object(["status": .string("surfaced")]))
-        XCTAssertEqual(body(.snooze(.at(Date(milliseconds: 1_000))))?.1["changes"]?["trigger"], .object(["type": .string("time"), "at": .number(1_000)]))
         XCTAssertNil(body(.nudge), "Nudge only drafts")
-        XCTAssertEqual(LoopRequests.trigger("loop_1", .place("Home", arrive: false), push: true)["changes"],
-                       .object(["trigger": .object(["type": .string("place"), "place": .string("Home"), "direction": .string("leave")]),
-                                "push": .bool(true), "status": .string("queued")]))
-        // Only a name and a direction reach Studio.
-        XCTAssertEqual(LoopRequests.place("Home", arrive: true), .object(["place": .string("Home"), "direction": .string("arrive")]))
-        XCTAssertEqual(LoopRequests.setPlaces(["Home", "Gym"]), .object(["names": .array([.string("Home"), .string("Gym")])]))
     }
 
-    func testAreaChipsComeFromTheLoops() throws {
-        let item = { (id: String, area: String) in #"{"id":"\#(id)","title":"T","why":"","source":null,"kind":"do","options":[],"owner":"patrick","trigger":{"type":"none"},"priority":"normal","push":false,"status":"surfaced","due":null,"area":"\#(area)","createdAt":1,"updatedAt":2,"closedAt":null,"closedBy":null}"# }
-        let listed = #"{"needsYouNow":[\#(item("loop_a", "Alpha")),\#(item("loop_b", "Beta"))],"comingUp":[],"agentsOnIt":[],"waitingOnOthers":[],"done":[],"areas":["Alpha","Beta"]}"#
-        XCTAssertEqual(try JSONDecoder().decode(LoopGroups.self, from: Data(listed.utf8)).areas, ["Alpha", "Beta"])
-        let derived = #"{"needsYouNow":[\#(item("loop_a", "Alpha")),\#(item("loop_b", "Beta")),\#(item("loop_c", "Beta")),\#(item("loop_d", " "))],"comingUp":[],"agentsOnIt":[],"waitingOnOthers":[],"done":[]}"#
-        XCTAssertEqual(try JSONDecoder().decode(LoopGroups.self, from: Data(derived.utf8)).areas, ["Beta", "Alpha"])
-        XCTAssertEqual(LoopGroups.empty.areas, [])
-    }
-
-    func testClientDecodesGroupsAndActs() async throws {
+    func testClientActsOnAnOlderStudiosLoop() async throws {
         let client = BBClient(baseURL: URL(string: "https://loops.invalid")!)
         final class Seen: @unchecked Sendable { var calls: [(String, JSONValue)] = [] }
         let seen = Seen()
-        let groups = #"{"needsYouNow":[{"id":"loop_a","title":"A","why":"","source":null,"kind":"decide","options":["X","Y"],"owner":"patrick","trigger":{"type":"none"},"priority":"urgent","push":true,"status":"surfaced","due":1700000000000,"area":"Home","createdAt":1,"updatedAt":2,"closedAt":null,"closedBy":null}],"comingUp":[{"id":"loop_b","title":"B","why":"","source":{"kind":"email","ref":"m1"},"kind":"do","options":[],"owner":"patrick","trigger":{"type":"place","place":"home","direction":"arrive"},"priority":"normal","push":false,"status":"queued","due":null,"area":null,"createdAt":1,"updatedAt":2,"closedAt":null,"closedBy":null}],"agentsOnIt":[],"waitingOnOthers":[],"done":[]}"#
-        client.transport = { method, path, body in
+        client.transport = { _, path, body in
             let input = try JSONDecoder().decode(JSONValue.self, from: XCTUnwrap(body))
             seen.calls.append((path, input))
-            if path.hasSuffix("loops.list") { return (200, Data(#"{"ok":true,"result":\#(groups)}"#.utf8)) }
             let loop = #"{"id":"loop_a","title":"A","why":"","source":null,"kind":"decide","options":["X","Y"],"owner":"patrick","trigger":{"type":"none"},"priority":"normal","push":false,"status":"done","due":null,"area":null,"createdAt":1,"updatedAt":3,"closedAt":3,"closedBy":"patrick"}"#
             return (200, Data(#"{"ok":true,"result":\#(loop)}"#.utf8))
         }
-        let list = try await client.loops()
-        XCTAssertEqual(list.needsYouNow.first?.kind, .decide)
-        XCTAssertEqual(list.needsYouNow.first?.priority, .urgent)
-        XCTAssertEqual(list.comingUp.first?.trigger, .place("home", arrive: true))
-        XCTAssertEqual(list.comingUp.first?.source?.kind, "email")
-        // The generated contract reads the same payload.
-        let generated = try JSONDecoder().decode(Studio.LoopsListOutput.self, from: Data(groups.utf8))
-        XCTAssertEqual(generated.needsYouNow?.first?.id, "loop_a")
         let closed = try await client.loopAction("loop_a", .choose("Y"))
         XCTAssertEqual(closed?.isClosed, true)
         XCTAssertEqual(seen.calls.last?.0, "/api/v1/plugins/studio/rpc/loops.act")
         XCTAssertEqual(seen.calls.last?.1, .object(["id": .string("loop_a"), "action": .string("choose"), "option": .string("Y")]))
     }
 
-    // MARK: Notifications
-
-    func testNotificationCategoriesByKind() {
+    func testNotificationCategoriesStayRegistered() {
         XCTAssertEqual(LoopCategories.identifier(kind: "do", options: []), "BB_LOOP.do")
         XCTAssertEqual(LoopCategories.identifier(kind: nil, options: []), "BB_LOOP")
         XCTAssertEqual(LoopCategories.identifier(kind: "decide", options: ["A", "B", "C", "D"]), "BB_LOOP.decide.A\u{1F}B\u{1F}C")
         XCTAssertEqual(LoopCategories.actions(kind: "do", options: []).map(\.title), ["Done", "Snooze until tonight", "Snooze until I'm home"])
-        XCTAssertEqual(LoopCategories.actions(kind: "read", options: []).map(\.title), ["Got it", "Snooze until tonight"])
-        XCTAssertEqual(LoopCategories.actions(kind: nil, options: []).map(\.title), ["Done", "Snooze until tonight", "Snooze until I'm home", "Got it"])
-        XCTAssertEqual(LoopCategories.actions(kind: "decide", options: ["A", "B", "C", "D"]).map(\.title), ["A", "B", "C", "Snooze until tonight"])
         // None of them opens the app: iOS runs the handler in the background.
         XCTAssertTrue(LoopCategories.actions(kind: nil, options: []).allSatisfy { !$0.options.contains(.foreground) })
         let fixed = Set(LoopCategories.fixed().map(\.identifier))
         XCTAssertEqual(fixed, ["BB_LOOP", "BB_LOOP.do", "BB_LOOP.read", "BB_LOOP.waiting", "BB_LOOP.decide"])
-        XCTAssertTrue(NotificationActions.categories().contains { $0.identifier == "BB_LOOP" })
+        XCTAssertTrue(NotificationActions.categories().contains { $0.identifier == "BB_LOOP" }, "an older Studio's pushes still render")
     }
 
-    func testNotificationButtonsMapToLoopActions() {
+    func testNotificationButtonsMapToActions() {
         XCTAssertEqual(LoopNotifications.action(LoopCategories.done, options: []), .done)
         XCTAssertEqual(LoopNotifications.action(LoopCategories.gotIt, options: []), .gotIt)
         XCTAssertEqual(LoopNotifications.action(LoopCategories.snoozeTonight, options: []), .snooze(.tonight))
@@ -256,132 +125,14 @@ final class LoopsTests: XCTestCase {
         XCTAssertEqual(LoopNotifications.action("BB_LOOP_CHOOSE_1", options: ["A", "B"]), .choose("B"))
         XCTAssertNil(LoopNotifications.action("BB_LOOP_CHOOSE_5", options: ["A"]))
         XCTAssertNil(LoopNotifications.action("BB_APPROVE", options: []))
+        XCTAssertEqual(LoopNotifications.taskAction(.snooze(.home)), .snooze(.home))
+        XCTAssertNil(LoopNotifications.taskAction(.nudge))
     }
 
-    // MARK: Places
-
-    private final class MockRegions: RegionMonitoring {
-        var delegate: (any CLLocationManagerDelegate)?
-        var authorizationStatus: CLAuthorizationStatus = .notDetermined
-        var monitoredRegions: Set<CLRegion> = []
-        var requests: [String] = []
-        func startMonitoring(for region: CLRegion) { monitoredRegions.insert(region) }
-        func stopMonitoring(for region: CLRegion) { monitoredRegions.remove(region) }
-        func requestWhenInUseAuthorization() { requests.append("whenInUse") }
-        func requestAlwaysAuthorization() { requests.append("always") }
-        func requestLocation() { requests.append("location") }
-    }
-
-    private func places() -> PlacesStore {
-        let suite = "loops-tests-\(UUID().uuidString)"
-        return PlacesStore(defaults: UserDefaults(suiteName: suite)!, changed: {})
-    }
-
-    private func settle(_ condition: () -> Bool) async {
-        for _ in 0..<200 where !condition() { try? await Task.sleep(for: .milliseconds(10)) }
-    }
-
-    func testMonitorWatchesExactlyTheSavedPlaces() async {
-        let store = places()
-        let mock = MockRegions()
-        let foreign = CLCircularRegion(center: .init(latitude: 1, longitude: 1), radius: 100, identifier: "other.app.region")
-        mock.monitoredRegions = [foreign]
-        let monitor = PlaceMonitor(makeManager: { mock }, store: { store }, send: { _, _ in }, sendNames: { _ in })
-        store.save(Place(id: "h", name: "Home", kind: .home, latitude: 40.7, longitude: -73.9, radius: 150))
-        store.save(Place(id: "g", name: "Gym", kind: .saved, latitude: 40.8, longitude: -73.8, radius: 100))
-        monitor.sync()
-        XCTAssertTrue(mock.delegate === monitor)
-        XCTAssertEqual(Set(mock.monitoredRegions.map(\.identifier)), ["other.app.region", "bb.place.h", "bb.place.g"])
-        let home = mock.monitoredRegions.first { $0.identifier == "bb.place.h" } as? CLCircularRegion
-        XCTAssertEqual(home?.radius, 150)
-        XCTAssertEqual(home?.notifyOnEntry, true)
-        XCTAssertEqual(home?.notifyOnExit, true)
-        // A moved place is watched again; a removed one stops.
-        store.save(Place(id: "h", name: "Home", kind: .home, latitude: 40.7, longitude: -73.9, radius: 300))
-        store.remove(Place(id: "g", name: "Gym", kind: .saved, latitude: 0, longitude: 0))
-        monitor.sync()
-        XCTAssertEqual(Set(mock.monitoredRegions.map(\.identifier)), ["other.app.region", "bb.place.h"])
-        XCTAssertEqual((mock.monitoredRegions.first { $0.identifier == "bb.place.h" } as? CLCircularRegion)?.radius, 300)
-        // Place triggers off: nothing of ours is watched.
-        store.enabled = false
-        monitor.sync()
-        XCTAssertEqual(Set(mock.monitoredRegions.map(\.identifier)), ["other.app.region"])
-    }
-
-    func testRegionEventsSendOnlyTheNameAndRetry() async {
-        let store = places()
-        store.save(Place(id: "o", name: "Office", kind: .office, latitude: 40.7, longitude: -73.9))
-        var sent: [(String, Bool)] = []
-        var failing = true
-        let monitor = PlaceMonitor(makeManager: { MockRegions() }, store: { store }, send: { name, arrive in
-            if failing { throw URLError(.notConnectedToInternet) }
-            sent.append((name, arrive))
-        }, sendNames: { _ in })
-        monitor.handle(regionId: "bb.place.o", arrive: false)
-        await settle { monitor.unsent.count == 1 && sent.isEmpty }
-        XCTAssertEqual(monitor.unsent.map(\.name), ["Office"], "Kept until Studio hears it")
-        failing = false
-        monitor.handle(regionId: "bb.place.o", arrive: true)
-        await settle { sent.count == 2 }
-        XCTAssertEqual(sent.map(\.0), ["Office", "Office"])
-        XCTAssertEqual(sent.map(\.1), [false, true])
-        XCTAssertTrue(monitor.unsent.isEmpty)
-        monitor.handle(regionId: "other.app.region", arrive: true)
-        monitor.handle(regionId: "bb.place.unknown", arrive: true)
-        XCTAssertTrue(monitor.unsent.isEmpty)
-    }
-
-    func testLocationAccessTakesTwoSteps() {
-        let mock = MockRegions()
-        let monitor = PlaceMonitor(makeManager: { mock }, store: { self.places() }, send: { _, _ in }, sendNames: { _ in })
-        monitor.requestAccess()
-        XCTAssertEqual(mock.requests, ["whenInUse"])
-        mock.authorizationStatus = .authorizedWhenInUse
-        monitor.requestAccess()
-        XCTAssertEqual(mock.requests, ["whenInUse", "always"])
-        mock.authorizationStatus = .authorizedAlways
-        monitor.requestAccess()
-        XCTAssertEqual(mock.requests, ["whenInUse", "always"])
-        XCTAssertEqual(PlaceMonitor.access(.denied), .denied)
-        XCTAssertEqual(PlaceMonitor.access(.notDetermined), .notAsked)
-    }
-
-    func testPlacesKeepOneHomeAndAtMostTwenty() {
-        let store = places()
-        store.save(Place(name: "Home", kind: .home, latitude: 1, longitude: 1))
-        store.save(Place(name: "Home", kind: .home, latitude: 2, longitude: 2))
-        XCTAssertEqual(store.places.count, 1)
-        XCTAssertEqual(store.home?.latitude, 2)
-        for index in 0..<30 { store.save(Place(name: "P\(index)", kind: .saved, latitude: 1, longitude: 1)) }
-        XCTAssertEqual(store.places.count, PlacesStore.limit)
-        XCTAssertTrue(store.isFull)
-        store.save(Place(name: "  ", kind: .saved, latitude: 1, longitude: 1))
-        XCTAssertEqual(store.places.count, PlacesStore.limit)
-    }
-
-    // MARK: Words
-
-    func testTriggerWords() {
-        XCTAssertEqual(LoopFormat.trigger(.place("home", arrive: true)), "When you get home")
-        XCTAssertEqual(LoopFormat.trigger(.place("office", arrive: false)), "When you leave the office")
-        XCTAssertEqual(LoopFormat.trigger(.event("reply:sam")), "When Sam replies")
-        XCTAssertEqual(LoopFormat.trigger(.none), "At the next good moment")
-    }
-
-    // MARK: The Bot's ⋯ menu
-
-    func testMenuBadgeShowsOnlyWhileLoopsNeedYou() {
-        XCTAssertEqual(BotLoopsMenu.badge(loopsOn: true, count: 6), 6)
-        XCTAssertEqual(BotLoopsMenu.badge(loopsOn: true, count: 0), 0, "Hidden at 0")
-        XCTAssertEqual(BotLoopsMenu.badge(loopsOn: false, count: 6), 0, "No badge with Loops off")
-        XCTAssertEqual(BotLoopsMenu.badge(loopsOn: true, count: -1), 0)
-    }
-
-    func testMenuItemAndLabelCarryTheCount() {
-        XCTAssertEqual(BotLoopsMenu.title(count: 6), "Todos  6")
-        XCTAssertEqual(BotLoopsMenu.title(count: 0), "Todos")
-        XCTAssertEqual(BotLoopsMenu.accessibilityLabel(name: "Juniper", badge: 0), "Juniper options")
-        XCTAssertEqual(BotLoopsMenu.accessibilityLabel(name: "Juniper", badge: 1), "Juniper options, 1 todo needs you")
-        XCTAssertEqual(BotLoopsMenu.accessibilityLabel(name: "Juniper", badge: 6), "Juniper options, 6 todos need you")
+    func testAToDoPushNamesItsConversation() {
+        let route = NotificationActions.taskRoute(["loopId": "wc_1", "conversationId": "thr_launch", "threadId": "thr_main"])
+        XCTAssertEqual(route?.id, "wc_1")
+        XCTAssertEqual(route?.conversation, "thr_launch", "a tap opens the conversation")
+        XCTAssertNil(NotificationActions.taskRoute(["threadId": "thr_main"]), "a push without a to-do opens its thread as any push does")
     }
 }

@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum BotPage: String, CaseIterable, Hashable, Identifiable {
-    case memory, library, todos, automations, archive
+    case strands, memory, library, automations, archive
 
     var id: String { rawValue }
 
@@ -9,7 +9,7 @@ enum BotPage: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .memory: "Memory"
         case .library: "Library"
-        case .todos: "Todos"
+        case .strands: "Strands"
         case .automations: "Automations"
         case .archive: "Archive"
         }
@@ -19,7 +19,7 @@ enum BotPage: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .memory: "brain.head.profile"
         case .library: "books.vertical"
-        case .todos: "checklist"
+        case .strands: "list.bullet.rectangle"
         case .automations: "arrow.triangle.2.circlepath"
         case .archive: "archivebox"
         }
