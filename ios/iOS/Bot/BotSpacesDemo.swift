@@ -236,6 +236,14 @@ enum BotSpacesDemo {
                 Self.row("side-u1", "user", "Which of the two is riskier?", now - 360_000, seq: 2),
                 Self.row("side-a1", "assistant", "The release workflow fix. It changes how tags are pushed, so I'll hold it for your OK.", now - 300_000, seq: 3),
             ])
+            // Project threads that belong to no Bot, for the one list's Projects.
+            for (id, title, text) in [("thr_site_form", "Fix the contact form", "The form posts twice on Safari."),
+                                      ("thr_site_mobile", "Check the form on mobile", "Looks right on a small screen now."),
+                                      ("thr_studio_icons", "Redraw the app icons", "Three directions are in the design."),
+                                      ("thr_plain_receipts", "Sort the tax receipts", "Filed by month.")] {
+                threads[id] = Thread(title: title, rows: [Self.row("\(id)-u", "user", title, now - 7_200_000, seq: 1),
+                                                          Self.row("\(id)-a", "assistant", text, now - 7_100_000, seq: 2)])
+            }
         }
 
         /// New conversation's choices: three providers (Auto, the model router, last, as when it isn't the default),
@@ -266,10 +274,44 @@ enum BotSpacesDemo {
                 return [["id": "proj_studio", "name": "BB Studio"], ["id": "proj_site", "name": "Website"]]
             case "/api/v1/environments":
                 return [Any]()
+            case "/api/v1/sidebar-bootstrap":
+                return sidebarJSON()
+            case "/api/v1/plugins" where !ProcessInfo.processInfo.arguments.contains("-qaStudioDemo"):
+                // Automations running, for the Schedules place's All automations (Studio's demo answers its own list).
+                return ["plugins": [["id": "studio", "status": "running"], ["id": "automations", "status": "running"]]]
             default:
                 guard bare.hasPrefix("/api/v1/projects/"), bare.hasSuffix("/default-execution-options") else { return nil }
                 return ["providerId": "claude-code", "model": "claude-opus-5-5", "reasoningLevel": "high", "permissionMode": "auto"]
             }
+        }
+
+        /// BB's thread list: two projects with threads of no Bot, and the personal project, where the Bot's own
+        /// threads (its Main, a conversation, a worker, and a thread a conversation started) sit beside one of no Bot.
+        static func sidebarJSON() -> [String: Any] {
+            let now = Self.now
+            func thread(_ id: String, _ title: String, _ project: String, ago: Double, parent: String? = nil) -> [String: Any] {
+                ["id": id, "projectId": project, "title": title, "status": "idle", "createdAt": now - ago - 60_000, "updatedAt": now - ago,
+                 "parentThreadId": parent ?? NSNull()]
+            }
+            return [
+                "sections": [Any](),
+                "projects": [
+                    ["id": "proj_site", "name": "Website", "threads": [
+                        thread("thr_site_form", "Fix the contact form", "proj_site", ago: 3_600_000),
+                        thread("thr_site_mobile", "Check the form on mobile", "proj_site", ago: 3_000_000, parent: "thr_site_form"),
+                    ]],
+                    ["id": "proj_studio", "name": "BB Studio", "threads": [
+                        thread("thr_studio_icons", "Redraw the app icons", "proj_studio", ago: 86_400_000),
+                    ]],
+                ],
+                "personalProject": ["id": "proj_personal", "name": "Personal", "threads": [
+                    thread(BotDemo.threadId, "Juniper", "proj_personal", ago: 60_000),
+                    thread("thr_demo_interview", "Launch prep", "proj_personal", ago: 7_200_000),
+                    thread("thr_demo_w2", "Theme stills renderer", "proj_personal", ago: 120_000, parent: BotDemo.threadId),
+                    thread("thr_bot_child", "Draft the questions", "proj_personal", ago: 7_000_000, parent: "thr_demo_interview"),
+                    thread("thr_plain_receipts", "Sort the tax receipts", "proj_personal", ago: 172_800_000),
+                ]],
+            ]
         }
 
         /// The provider and model name a New conversation request named (Auto routes the demo's to GPT-5.2).

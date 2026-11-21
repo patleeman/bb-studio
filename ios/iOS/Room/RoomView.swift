@@ -77,8 +77,9 @@ struct RoomView: View {
     @State private var presenceSize: CGFloat = 0
     @State private var presenceFrame: CGRect = .zero
     @State private var switching = false
-    /// The unfolded Duo's + New conversation, from the context pane.
+    /// New conversation over the room: the unfolded Duo's context pane, and New thread from anywhere else (Siri, ⌘N, a link).
     @State private var startingConversation = false
+    @State private var composeText = ""
     @State private var settingsOpen = false
     @Environment(\.look) private var look
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
@@ -138,7 +139,7 @@ struct RoomView: View {
         lifecycle(polling(routing(canvas)))
             .modifier(TalkLifecycle(talk: session.talk))
             .sheet(isPresented: $startingConversation) {
-                NewThreadView(botId: bot.id) { id, botId in
+                NewThreadView(text: composeText, botId: bot.id) { id, botId in
                     Task {
                         if let botId, botId != bot.id { store.watch(botId, fetch: false) }
                         await store.refresh()
@@ -167,6 +168,17 @@ struct RoomView: View {
             .onChange(of: pages) { _, _ in pagesChanged() }
             .onChange(of: shell.roomOpen, initial: true) { _, page in roomOpenChanged(page) }
             .onChange(of: shell.roomFocus, initial: true) { _, id in roomFocusChanged(id) }
+            .onChange(of: shell.roomList, initial: true) { _, open in
+                guard open else { return }
+                shell.roomList = false
+                if room.home { showList() }
+            }
+            .onChange(of: shell.roomCompose, initial: true) { _, text in
+                guard let text else { return }
+                shell.roomCompose = nil
+                composeText = text
+                startingConversation = true
+            }
             .onChange(of: shell.detailPath) { _, path in detailPathChanged(path) }
             .onChange(of: order) { old, new in orderChanged(old, new) }
     }
@@ -370,7 +382,10 @@ struct RoomView: View {
                                         openPlace: { room.showPlace($0) }, settings: openSettings,
                                         refresh: { [store] in await store.refresh() },
                                         switchBot: { switchTo($0, opening: nil) },
-                                        newConversation: { startingConversation = true })
+                                        newConversation: {
+                                            composeText = ""
+                                            startingConversation = true
+                                        })
                     } else {
                         stage(proxy, menuButton: false)
                         if room.showsMenu { menu(closeInColumn: true) }

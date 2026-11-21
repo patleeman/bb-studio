@@ -197,7 +197,7 @@ struct RoomPlaceSheet: View {
         case .library:
             LibraryPageView(botId: bot.id, open: open, tiles: true)
         case .schedules:
-            BotAutomationsSheet(botId: bot.id, botName: bot.name, embedded: true).id(bot.id)
+            BotAutomationsSheet(botId: bot.id, botName: bot.name, embedded: true, allAutomations: true).id(bot.id)
         case .theme:
             RoomThemePicker(bot: bot, current: theme, choose: chooseTheme)
         case .archive:
@@ -231,84 +231,63 @@ struct RoomConversations: View {
     @State private var toggled: [String: Bool] = [:]
     @State private var openFolds: Set<String> = []
     @State private var deleting: BotConversation?
+    /// Searches the one list: the Bot's conversations and workers, and the project threads.
+    @State private var query = ""
+    @StateObject private var projects = RoomProjects()
+    /// Projects starts closed; each project too.
+    @State private var projectsOpen = false
+    @State private var openProjects: Set<String> = []
     @Environment(\.look) private var look
 
     private var view: BotThreadsView? { store.view(for: bot.id) }
+    private var searching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
 
     var body: some View {
-        let lines = BotShell.lines(view).filter { !removed.contains($0.threadId) }
-        let nests = BotWorkerNests.make(conversations: lines.map(\.threadId), workers: view?.workers ?? [])
+        let all = BotShell.lines(view).filter { !removed.contains($0.threadId) }
+        let lines = searching ? all.filter { $0.title.localizedCaseInsensitiveContains(query) } : all
+        let nests = BotWorkerNests.make(conversations: all.map(\.threadId), workers: view?.workers ?? [])
         List {
             if home {
                 Section { RoomListHeader(bot: bot, view: view, refresh: { await store.refresh() }, switchBot: switchBot.map { pick in { pick($0, nil) } }) }
                     .listRowBackground(Color.clear)
             }
             Section {
-                Button { starting = true } label: {
-                    Label("New conversation", systemImage: "plus.circle.fill")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(look.accent)
-                        .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.borderless)
-                .accessibilityIdentifier("roomNewConversationRow")
+                searchField
+            }
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
+            Section {
+                if !searching { newConversationRow }
                 ForEach(lines) { line in
-                    let nest = nests.nests[line.threadId]
-                    HStack(spacing: 8) {
-                        Button {
-                            open(.conversation(line.threadId))
-                        } label: {
-                            HStack {
-                                BotConversationRow(line: line)
-                                if line.threadId == (shown ?? mainThreadId) {
-                                    Text("You're here").font(.footnote).foregroundStyle(look.success)
-                                }
-                            }
-                            .contentShape(.rect)
-                        }
-                        .buttonStyle(.borderless)
-                        .tint(.primary)
-                        .accessibilityIdentifier("roomConversation-\(line.threadId)")
-                        if let nest {
-                            nestToggle(nest, key: line.threadId)
-                        }
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) { removeActions(line.threadId, swipe: true) }
-                    .contextMenu { removeActions(line.threadId, swipe: false) }
-                    if let nest, nestOpen(nest, key: line.threadId) {
-                        workerLines(nest, parent: line.threadId)
-                    }
+                    conversationRow(line, nest: searching ? nil : nests.nests[line.threadId])
                 }
             }
-            if let other = nests.other, !other.nodes.isEmpty {
+            if searching {
+                let workers = (view?.workers ?? []).filter { $0.title.localizedCaseInsensitiveContains(query) }
+                if !workers.isEmpty {
+                    Section("Workers") {
+                        ForEach(workers, id: \.threadId) { worker in
+                            workerRow(worker, depth: 0)
+                        }
+                    }
+                }
+            } else if let other = nests.other, !other.nodes.isEmpty {
                 Section("Other workers") {
                     workerLines(other, parent: "other")
                 }
             }
-            Section {
-                if home, let placeView {
-                    ForEach(RoomPlace.homeList) { place in
-                        NavigationLink { placeView(place) } label: { Label(place.title, systemImage: place.symbol) }
-                            .accessibilityIdentifier("roomPlace-\(place.rawValue)")
-                    }
-                }
-                NavigationLink {
-                    ArchivePageView(botId: bot.id, open: open, refresh: { Task { await store.refresh() } })
-                } label: {
-                    Label("Archive", systemImage: "archivebox")
-                }
-                .accessibilityIdentifier("roomArchive")
-                if home, let settings {
-                    Button(action: settings) { Label("Settings", systemImage: "gearshape") }
-                        .tint(.primary)
-                        .accessibilityIdentifier("roomSettings")
-                }
-            }
+            if home { projectsSection }
+            if !searching { placesSection }
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
-        .refreshable { await store.refresh() }
+        .refreshable {
+            await store.refresh()
+            if projects.loaded { await loadProjects() }
+        }
+        .task(id: projectsOpen || searching) {
+            if (projectsOpen || searching) && home && !projects.loaded { await loadProjects() }
+        }
         .modifier(PageChrome(title: "Conversations") {
             Button { starting = true } label: { Image(systemName: "plus") }
                 .accessibilityLabel("New conversation")
@@ -338,6 +317,181 @@ struct RoomConversations: View {
                 }
             }
         }
+    }
+
+    /// In the list, not the navigation bar: the folded Duo's sheet has no bar to hold one.
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField("Search conversations and threads", text: $query)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .accessibilityIdentifier("roomSearch")
+            if searching {
+                Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Clear search")
+                    .accessibilityIdentifier("roomSearchClear")
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(minHeight: 36)
+        .background(.fill.tertiary, in: .rect(cornerRadius: 10, style: .continuous))
+    }
+
+    private func loadProjects() async {
+        await projects.load(client: app.client, bots: store.spaces?.bots ?? [bot])
+    }
+
+    private var newConversationRow: some View {
+        Button { starting = true } label: {
+            Label("New conversation", systemImage: "plus.circle.fill")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(look.accent)
+                .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityIdentifier("roomNewConversationRow")
+    }
+
+    @ViewBuilder private func conversationRow(_ line: BotConversationLine, nest: BotWorkerNest?) -> some View {
+        HStack(spacing: 8) {
+            Button {
+                open(.conversation(line.threadId))
+            } label: {
+                HStack {
+                    BotConversationRow(line: line)
+                    if line.threadId == (shown ?? mainThreadId) {
+                        Text("You're here").font(.footnote).foregroundStyle(look.success)
+                    }
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.borderless)
+            .tint(.primary)
+            .accessibilityIdentifier("roomConversation-\(line.threadId)")
+            if let nest {
+                nestToggle(nest, key: line.threadId)
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) { removeActions(line.threadId, swipe: true) }
+        .contextMenu { removeActions(line.threadId, swipe: false) }
+        if let nest, nestOpen(nest, key: line.threadId) {
+            workerLines(nest, parent: line.threadId)
+        }
+    }
+
+    /// BB's threads that belong to no Bot, by project, under the Bot's own: closed until opened, each project too.
+    @ViewBuilder private var projectsSection: some View {
+        let groups = projects.groups(query: searching ? query : "")
+        Section {
+            if !searching {
+                Button {
+                    withAnimation(.snappy) { projectsOpen.toggle() }
+                } label: {
+                    HStack(spacing: 8) {
+                        Label("Projects", systemImage: "folder")
+                        Spacer(minLength: 4)
+                        if projects.loading { ProgressView().controlSize(.small) }
+                        Image(systemName: projectsOpen ? "chevron.down" : "chevron.right")
+                            .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                    }
+                    .frame(minHeight: 36)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.borderless)
+                .tint(.primary)
+                .accessibilityLabel(projectsOpen ? "Projects, open" : "Projects")
+                .accessibilityIdentifier("roomProjects")
+            }
+            if projectsOpen || searching {
+                if let error = projects.error {
+                    Text(error).font(.footnote).foregroundStyle(.secondary)
+                } else if projects.loaded && groups.isEmpty {
+                    Text(searching ? "No project threads match" : "No threads outside the Bots")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                ForEach(groups) { group in
+                    if searching {
+                        ForEach(group.lines) { line in projectThread(line, project: group.name) }
+                    } else {
+                        projectHeader(group)
+                        if openProjects.contains(group.id) {
+                            ForEach(group.lines) { line in projectThread(line, project: nil) }
+                        }
+                    }
+                }
+            }
+        } header: {
+            if searching { Text("Projects") }
+        }
+    }
+
+    private func projectHeader(_ group: ProjectThreads.Group) -> some View {
+        Button {
+            withAnimation(.snappy) {
+                if openProjects.contains(group.id) { openProjects.remove(group.id) } else { openProjects.insert(group.id) }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: openProjects.contains(group.id) ? "chevron.down" : "chevron.right")
+                    .font(.caption2.weight(.semibold)).foregroundStyle(.secondary).frame(width: 14)
+                Text(group.name).font(.subheadline.weight(.semibold)).lineLimit(1)
+                Spacer(minLength: 4)
+                Text("\(group.count)").font(.footnote).monospacedDigit().foregroundStyle(.secondary)
+            }
+            .padding(.leading, 8)
+            .frame(minHeight: 36)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.borderless)
+        .tint(.primary)
+        .accessibilityLabel("\(group.name), \(group.count) \(group.count == 1 ? "thread" : "threads")")
+        .accessibilityIdentifier("roomProject-\(group.id)")
+    }
+
+    private func projectThread(_ line: ProjectThreads.Line, project: String?) -> some View {
+        Button { open(.worker(line.thread.id)) } label: {
+            HStack(spacing: 8) {
+                if line.thread.isUnread { Circle().fill(look.accent).frame(width: 7, height: 7) }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(line.thread.displayTitle).font(.subheadline).lineLimit(1)
+                    if let project { Text(project).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                }
+                Spacer(minLength: 6)
+                Text(BotShell.shortAge(line.thread.updatedAt)).font(.footnote).monospacedDigit().foregroundStyle(.secondary)
+            }
+            .padding(.leading, 30 + CGFloat(line.depth) * 16)
+            .frame(minHeight: 36)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.borderless)
+        .tint(.primary)
+        .accessibilityIdentifier("projectThread-\(line.thread.id)")
+    }
+
+    private var placesSection: some View {
+            Section {
+                if home, let placeView {
+                    ForEach(RoomPlace.homeList) { place in
+                        NavigationLink { placeView(place) } label: { Label(place.title, systemImage: place.symbol) }
+                            .accessibilityIdentifier("roomPlace-\(place.rawValue)")
+                    }
+                }
+                NavigationLink {
+                    ArchivePageView(botId: bot.id, open: open, refresh: { Task { await store.refresh() } })
+                } label: {
+                    Label("Archive", systemImage: "archivebox")
+                }
+                .accessibilityIdentifier("roomArchive")
+                if home, let settings {
+                    Button(action: settings) { Label("Settings", systemImage: "gearshape") }
+                        .tint(.primary)
+                        .accessibilityIdentifier("roomSettings")
+                }
+            }
     }
 
     @ViewBuilder private func removeActions(_ threadId: String, swipe: Bool) -> some View {
@@ -445,5 +599,36 @@ struct RoomConversations: View {
         }
         .tint(.primary)
         .accessibilityIdentifier("roomWorker-\(worker.threadId)")
+    }
+}
+
+/// The one list's Projects: BB's thread list and which threads are the Bots', loaded when Projects opens or a search starts.
+@MainActor
+final class RoomProjects: ObservableObject {
+    @Published private(set) var sidebar: SidebarBootstrap?
+    @Published private(set) var botThreads: Set<String> = []
+    @Published private(set) var loading = false
+    @Published private(set) var error: String?
+    var loaded: Bool { sidebar != nil }
+
+    func groups(query: String) -> [ProjectThreads.Group] {
+        guard let sidebar else { return [] }
+        return ProjectThreads.groups(sidebar, botThreads: botThreads, query: query)
+    }
+
+    func load(client: BBClient, bots: [BotSpace]) async {
+        guard !loading else { return }
+        loading = true
+        defer { loading = false }
+        async let owned = client.botThreadIds(bots: bots)
+        do {
+            let next = try await client.sidebar()
+            botThreads = await owned
+            sidebar = next
+            error = nil
+        } catch {
+            _ = await owned
+            if sidebar == nil { self.error = BBClient.describe(error, server: client.baseURL) }
+        }
     }
 }

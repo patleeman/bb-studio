@@ -698,6 +698,12 @@
       "coverage": "external host plugin; contract maintained outside this repository"
     },
     {
+      "file": "ios/Shared/ProjectThreads.swift",
+      "plugin": "studio",
+      "method": "bot_threads_older",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/Shared/ReactionSettings.swift",
       "plugin": "studio",
       "method": "settings.get",

@@ -94,6 +94,10 @@ enum BotShellLink: Hashable {
     case thread(String, worker: Bool)
     case page(BotPage, botId: String?)
     case push(Route)
+    /// The one conversation list (over the conversation), opened.
+    case list
+    /// New conversation on the one list, its message prefilled.
+    case compose(String)
 }
 
 enum Tab: Hashable {
@@ -270,7 +274,7 @@ final class AppModel: ObservableObject {
         case "bot-talk", "chief-talk": toggleBotTalk(botId: id)
         case "settings": tab = .settings
         case "file": break  // Opened by the thread view, which knows the workspace.
-        default: tab = .inbox
+        default: if inSpaces { showList() } else { tab = .inbox }
         }
     }
 
@@ -362,14 +366,33 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // With Studio's Bots the conversation list is the one list: nothing opens
+    // BB's own Threads screen. A thread, a route or New thread goes to the room.
+
     func newThread(text: String = "") {
+        if inSpaces {
+            tab = .bot
+            shellLink = .compose(text)
+            return
+        }
         tab = .inbox
         newThreadDraft = text
     }
 
     func openThread(_ id: String) {
+        if inSpaces {
+            tab = .bot
+            shellLink = .thread(id, worker: false)
+            return
+        }
         tab = .inbox
         path = [.thread(id: id)]
+    }
+
+    /// The one conversation list.
+    func showList() {
+        tab = .bot
+        shellLink = .list
     }
 
     func openTaskThread(_ id: String) {
@@ -402,6 +425,11 @@ final class AppModel: ObservableObject {
     }
 
     func open(_ route: Route) {
+        if inSpaces {
+            tab = .bot
+            shellLink = .push(route)
+            return
+        }
         tab = .inbox
         path = [route]
     }
@@ -410,6 +438,9 @@ final class AppModel: ObservableObject {
     func push(_ route: Route) {
         if tab == .studio {
             studioPath.append(route)
+        } else if inSpaces {
+            tab = .bot
+            shellLink = .push(route)
         } else {
             tab = .inbox
             path.append(route)

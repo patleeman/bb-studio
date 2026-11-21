@@ -128,6 +128,7 @@ struct BotSpaceList: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var showsDone = false
     @State private var startingConversation = false
+    @State private var composeText = ""
     @Environment(\.look) private var look
 
     private var bot: BotSpace? { BotShell.shownBot(store.spaces, chosen: shell.shownBotId) }
@@ -169,7 +170,13 @@ struct BotSpaceList: View {
         .toolbar(compact ? .hidden : .automatic, for: .navigationBar)
         .onChange(of: bot?.id) { _, _ in showsDone = false }
         .sheet(isPresented: $startingConversation) {
-            NewThreadView(botId: bot?.id) { id, botId in startedConversation(id, botId: botId) }
+            NewThreadView(text: composeText, botId: bot?.id) { id, botId in startedConversation(id, botId: botId) }
+        }
+        .onChange(of: shell.roomCompose, initial: true) { _, text in
+            guard let text else { return }
+            shell.roomCompose = nil
+            composeText = text
+            startingConversation = true
         }
     }
 
@@ -245,7 +252,7 @@ struct BotSpaceList: View {
             HStack {
                 Text("Conversations").font(.title3.bold()).foregroundStyle(.primary).textCase(nil).lookHalo(look)
                 Spacer()
-                Button { startingConversation = true } label: {
+                Button { composeText = ""; startingConversation = true } label: {
                     Image(systemName: "plus").font(.body.weight(.semibold)).frame(width: 32, height: 32)
                 }
                 .buttonStyle(.plain)

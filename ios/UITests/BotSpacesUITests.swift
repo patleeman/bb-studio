@@ -72,10 +72,8 @@ final class BotSpacesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(list.waitForExistence(timeout: 10))
         app.buttons["BotSpaceSettings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10), "Settings opens over the list")
-        let all = app.buttons["settingsAllThreads"]
-        XCTAssertTrue(all.waitForExistence(timeout: 10), "Settings → All BB threads")
-        all.tap()
-        XCTAssertTrue(app.navigationBars["Threads"].waitForExistence(timeout: 10), "the Threads list opens")
+        XCTAssertTrue(app.textFields["settingsServerURL"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["settingsAllThreads"].exists, "no separate Threads list: the conversation list is the one list")
     }
 
     private func shot(_ name: String) {

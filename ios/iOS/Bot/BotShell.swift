@@ -202,6 +202,10 @@ final class BotShellModel: ObservableObject {
     @Published var detailPath: [Route] = []
     @Published var roomOpen: BotPage?
     @Published var roomFocus: String?
+    /// Open the one conversation list (a link, Siri, a thread list's old routes).
+    @Published var roomList = false
+    /// Open New conversation on the list, with this message.
+    @Published var roomCompose: String?
     private var landing = false
 
     func takeLanding() -> Bool {
@@ -252,6 +256,13 @@ final class BotShellModel: ObservableObject {
             } else {
                 detailPath.append(route)
             }
+        case .list:
+            landed = true
+            showList()
+            roomList = true
+        case .compose(let text):
+            landed = true
+            roomCompose = text
         }
     }
 
