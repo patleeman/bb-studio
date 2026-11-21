@@ -1,3 +1,4 @@
+import { useTimelineFilterExpandsRow } from "@/lib/fork-timeline-filter";
 import { RelayedFoldContext, RelayedRowFolded, useRelayedFold } from "./relayedFold.fork";
 import { isEmptyThought } from "./emptyThought.fork";
 import { unreadDividerTurnStart } from "./unreadDividerTurnStart.fork";
@@ -1850,6 +1851,7 @@ function TimelineExpandableRowView({
   row,
 }: TimelineExpandableRowViewProps) {
   const { onTitleAction, threadId } = useTimelineRendererStaticContext();
+  const filterExpanded = useTimelineFilterExpandsRow(row);
   const preloadBody = usePreloadTimelineRowBody(row, threadId);
   const {
     initialAutoExpandedRowIds,
@@ -1906,7 +1908,7 @@ function TimelineExpandableRowView({
         liveAutoExpandedRowIds.has(row.id) ||
         initialAutoExpandedRowIds.has(row.id)
       }
-      forceExpanded={searchExpandedRowIds.has(row.id)}
+      forceExpanded={searchExpandedRowIds.has(row.id) || filterExpanded}
       terminalAutoExpanded={terminalAutoExpandedRowIds.has(row.id)}
       onTitleAction={onTitleAction}
       onIntent={preloadBody}
