@@ -81,8 +81,12 @@ export const WORKER_FAILED_MS = 7 * DAY_MS;
 export const WORKER_RECENT_MS = 2 * DAY_MS;
 /** At most this many running or waiting workers in the sidebar; the rest are counted. */
 export const WORKER_LIMIT = 30;
-/** At most this many finished (done or failed) rows under them, the newest, same titles folded into one. */
-export const WORKER_FINISHED_SHOWN = 5;
+/**
+ * At most this many finished (done or failed) rows under them, the newest, a
+ * conversation's same titles folded into one. They fold into each
+ * conversation's "N done" in the sidebar, so more than fit on screen at once.
+ */
+export const WORKER_FINISHED_SHOWN = 30;
 const BUSY = new Set(["starting", "active", "stopping", "pending", "provisioning"]);
 
 export function threadRunning(thread: { status?: string | null; queuedMessageCount?: number } | null | undefined): boolean {
@@ -382,6 +386,14 @@ export interface WorkerView {
   /** As a conversation's. */
   providerId: string | null;
   modelName: string | null;
+  /** The worker of this Bot that started it (a worker of a worker); null when a conversation did. */
+  spawnedBy: string | null;
+  /**
+   * The sidebar's conversation row it nests under: its owner, or the row a
+   * fork made at a message folds into; null when no listed row is its
+   * (the owner is old or archived). Set by threadsView only.
+   */
+  nestUnder?: string | null;
 }
 
 export interface BotThreadsView {
@@ -432,7 +444,34 @@ export function threadsView(botId: string, records: readonly BotThreadRecord[], 
   const { shown, standsFor } = sidebarWorkers(all.workers, now);
   const hidden = all.workers.filter((row) => !standsFor.has(row.threadId));
   const hiddenToday = hidden.filter((row) => (row.status === "done" || row.status === "failed") && now - row.updatedAt < DAY_MS).length;
-  return { botId, conversations, workers: shown, hiddenWorkers: hidden.length, hiddenToday, olderConversations: all.conversations.length - conversations.length };
+  const rowOf = nestRow(conversations, records);
+  const workers = shown.map((row) => ({ ...row, nestUnder: rowOf(row.ownerConversationId) }));
+  return { botId, conversations, workers, hiddenWorkers: hidden.length, hiddenToday, olderConversations: all.conversations.length - conversations.length };
+}
+
+/**
+ * The listed conversation row a worker's owner stands under: the owner
+ * itself, or, for a fork made at a message (which has no row), the row it
+ * folds into as foldForks folds it (its source's, through a chain of forks,
+ * else Main). Null when the owner has no listed row.
+ */
+export function nestRow(listed: readonly Pick<ConversationView, "threadId" | "isMain">[], records: readonly Pick<BotThreadRecord, "threadId" | "kind" | "isMain" | "forkedFrom">[]): (owner: string | null) => string | null {
+  const ids = new Set(listed.map((row) => row.threadId));
+  const main = listed.find((row) => row.isMain)?.threadId ?? null;
+  const byId = new Map(records.map((rec) => [rec.threadId, rec]));
+  const isFork = (rec: Pick<BotThreadRecord, "kind" | "isMain" | "forkedFrom"> | undefined) => !!rec && rec.kind === "conversation" && !rec.isMain && !!rec.forkedFrom?.messageId;
+  return (owner) => {
+    if (!owner) return null;
+    if (ids.has(owner)) return owner;
+    if (!isFork(byId.get(owner))) return null;
+    let at: string | null = owner;
+    const seen = new Set<string>();
+    while (at && !ids.has(at) && !seen.has(at) && isFork(byId.get(at))) {
+      seen.add(at);
+      at = byId.get(at)!.forkedFrom!.threadId;
+    }
+    return at && ids.has(at) ? at : main;
+  };
 }
 
 /**
@@ -448,7 +487,7 @@ export function sidebarWorkers(all: readonly WorkerView[], now: number): { shown
   const finished = recent.filter((row) => row.status === "done" || row.status === "failed").sort((a, b) => b.updatedAt - a.updatedAt);
   const groups = new Map<string, WorkerView[]>();
   for (const row of finished) {
-    const key = row.title.trim().toLowerCase();
+    const key = `${row.ownerConversationId ?? ""}\u0000${row.title.trim().toLowerCase()}`;
     const group = groups.get(key);
     if (group) group.push(row);
     else if (groups.size < WORKER_FINISHED_SHOWN) groups.set(key, [row]);
@@ -547,10 +586,22 @@ function allRows(botId: string, records: readonly BotThreadRecord[], threads: Re
       threadId: rec.threadId, title: rec.title?.trim() || titleOf(thread) || "Worker", status: workerStatus(thread),
       ownerConversationId: rec.ownerConversationId, ownerTitle: name(rec.ownerConversationId), projectId: thread?.projectId ?? null,
       updatedAt: at(rec), tag: tag?.tag ?? null, branch: tag?.branch ?? null, mirrored: !!thread?.mirroredPending, sameTitle: 1,
-      providerId: thread?.providerId ?? null, modelName: thread?.modelName ?? null,
+      providerId: thread?.providerId ?? null, modelName: thread?.modelName ?? null, spawnedBy: spawnerWorker(thread, byId, botId),
     };
   }).sort((a, b) => rank[a.status] - rank[b.status] || b.updatedAt - a.updatedAt);
   return { conversations: listed, workers: all };
+}
+
+/**
+ * The worker that started a thread: what spawned it (its fork source, else
+ * its parent or lifecycle owner), when that is a worker of the same Bot.
+ */
+export function spawnerWorker(thread: Pick<ThreadFacts, "parentThreadId" | "lifecycleOwnerThreadId" | "sourceThreadId" | "originKind"> | null | undefined, byId: ReadonlyMap<string, Pick<BotThreadRecord, "kind" | "botId">>, botId: string): string | null {
+  if (!thread) return null;
+  const candidates = [thread.originKind === "fork" ? thread.sourceThreadId : null, thread.parentThreadId, thread.lifecycleOwnerThreadId];
+  const spawner = candidates.find((id): id is string => !!id && byId.has(id));
+  const rec = spawner ? byId.get(spawner) : undefined;
+  return rec && rec.kind === "worker" && rec.botId === botId ? spawner! : null;
 }
 
 /**

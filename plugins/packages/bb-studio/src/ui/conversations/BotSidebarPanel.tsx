@@ -11,12 +11,15 @@
 //   its time, then the latest reply (a spinner while it works), or, amber
 //   and outlined, why it needs the user. A fork made at a message has no row:
 //   it shows at that message, and its work and needs-you show on its parent's row.
-// - Workers: the open tasks that have workers (tasks.workers), grouped by
-//   conversation, one line each with the task's title, its state and a short
-//   time; a task with several workers folds them underneath. Tasks done today
-//   fold into one "N done today" row. Without tasks it lists the worker
-//   threads as before. A worker never asks the user itself: the Bot raises it
-//   in the worker's conversation.
+// - Workers nest under the conversation that started them: a conversation
+//   with workers has a toggle on its second line (a chevron and the count; a
+//   spinner while one runs, amber while one needs the user) that opens its
+//   worker threads under it, indented, remembered per conversation. A worker
+//   another worker started sits under that one, indented once more. Each
+//   level shows the running and waiting ones and folds the rest into "N done".
+//   A worker whose conversation has no row is under "Other workers" at the
+//   bottom. A worker never asks the user itself: the Bot raises it in the
+//   worker's conversation.
 // - At the bottom, each Bot's icon (the shown one highlighted, an amber mark
 //   when it needs the user) and + for a new Bot. A click, a two-finger swipe
 //   sideways on the sidebar or "Studio: Show Bot <n>" (Ctrl+Option+1…9)
@@ -38,8 +41,8 @@ import { usePathname } from "../../kit/app/route";
 import { BotPresence } from "../../presence/ui/BotPresence";
 import { resolveTheme } from "../../theme/appearance";
 import { useCall, useLive } from "../live";
-import { conversationLines, doneLabel, hiddenThreadTarget, landingThread, olderPath, secondLine, shortAge, spaceDots, splitWorkers, swipeStep, switchTarget, SWIPE_START, workerLines, type ConversationLine, type LiveThread, type WorkerLine } from "./model";
-import { currentBot, hasLanded, isLaunchPage, lastConversation, markLanded, newThreadAsked, rememberConversation, setBotSwitcher, setCurrentBot, setConversationStarter, setFocusHandler, setThreadOpener, useCurrentBot, watchNewThreadArrivals } from "./state";
+import { conversationLines, doneLabel, foldLevel, hiddenThreadTarget, landingThread, nestLabel, olderPath, secondLine, shortAge, spaceDots, subtree, swipeStep, switchTarget, SWIPE_START, workerLines, workerNests, type ConversationLine, type LiveThread, type WorkerLine, type WorkerNest, type WorkerNode } from "./model";
+import { currentBot, hasLanded, isLaunchPage, lastConversation, markLanded, newThreadAsked, openWorkerNests, rememberConversation, setBotSwitcher, setCurrentBot, setConversationStarter, setFocusHandler, setThreadOpener, setWorkerNestOpen, useCurrentBot, watchNewThreadArrivals } from "./state";
 
 import { MEMORY_SUBPATH } from "../../memory/shared";
 import { skillsPagePath } from "../skills/paths";
@@ -55,9 +58,7 @@ import { resumeWord, SpaceHeader, spaceLine, spacePageAt, type SpacePage } from 
 import { useAppMode } from "./app-mode";
 import { accentOf } from "../../theme/engine";
 import { publishSceneSignals, workerSlots } from "../../theme/signals";
-import { treeOf, workerGroups, workersUnder } from "../../tasks/ui/board-model";
-import { WorkerTasks } from "./WorkerTasks";
-import { ProviderMark, type RowProvider } from "./ProviderMark";
+import { ProviderMark } from "./ProviderMark";
 import type { ProviderCatalogEntry } from "../bot/ProviderStatusMark";
 import { shownAppearance, useAppearanceDraft, useThemeRegistry } from "../../theme/ui/state";
 import { NONE_ID, saveTheme, themeChoices, type ThemeChoice } from "../../theme/ui/quick";
@@ -87,7 +88,26 @@ function StatusGlyph({ status, slot }: { status: WorkerLine["status"]; slot?: nu
   return <Icon name="Check" className="size-3 shrink-0 text-success" aria-label="Done" />;
 }
 
-export function ConversationRowView({ row, now, onOpen, menuTarget, providers = NO_PROVIDERS }: { row: ConversationLine; now: number; onOpen(row: ConversationLine): void; menuTarget: PluginThreadActionTarget | null; providers?: readonly ProviderCatalogEntry[] }) {
+/**
+ * A conversation's workers toggle: a chevron and how many workers it has; a
+ * spinner while one runs, amber while one needs the user, so a closed nest
+ * still shows its work. Separate from the row's own click.
+ */
+export function WorkersToggle({ nest, open, onToggle, title }: { nest: Pick<WorkerNest<unknown>, "total" | "running" | "needsYou">; open: boolean; onToggle(): void; title: string }) {
+  const tone = nest.needsYou ? "needs-you" : nest.running ? "running" : "quiet";
+  return (
+    <button type="button" data-testid="workers-toggle" data-tone={tone} aria-expanded={open} aria-label={`${open ? "Hide" : "Show"} ${title}'s workers: ${nestLabel(nest)}`}
+      onClick={(event) => { event.stopPropagation(); onToggle(); }}
+      className={`flex h-[18px] items-center gap-1 rounded px-1 text-[11px] font-medium tabular-nums outline-none hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring ${tone === "needs-you" ? "bg-warning/15 text-warning" : tone === "running" ? "text-foreground" : INK_55} ${open ? "bg-state-active" : ""}`}>
+      <Icon name={open ? "ChevronDown" : "ChevronRight"} aria-hidden className="size-3 shrink-0" />
+      {tone === "needs-you" ? <span aria-hidden data-testid="workers-toggle-amber" className="size-1.5 shrink-0 rounded-full bg-warning" /> : null}
+      {tone === "running" ? <span aria-hidden data-testid="workers-toggle-spinner" className="size-2.5 shrink-0 animate-spin rounded-full border-[1.5px] border-success border-r-transparent motion-reduce:animate-none" /> : null}
+      <span data-testid="workers-toggle-count">{nest.total}</span>
+    </button>
+  );
+}
+
+export function ConversationRowView({ row, now, onOpen, menuTarget, providers = NO_PROVIDERS, toggle = null }: { row: ConversationLine; now: number; onOpen(row: ConversationLine): void; menuTarget: PluginThreadActionTarget | null; providers?: readonly ProviderCatalogEntry[]; toggle?: ReactNode }) {
   const line = secondLine(row);
   const button = (
     <button type="button" data-testid="conversation-row" data-thread-id={row.threadId} data-needs-you={row.needsYou ? "" : undefined} aria-current={row.selected ? "page" : undefined}
@@ -101,8 +121,8 @@ export function ConversationRowView({ row, now, onOpen, menuTarget, providers = 
         </span>
         <span data-testid="conversation-time" className={`shrink-0 text-xs tabular-nums ${INK_55}`}>{shortAge(row.updatedAt, now)}</span>
       </span>
-      {line.text || line.tone !== "quiet" ? (
-        <span data-testid="conversation-line" data-tone={line.tone} className={`flex min-w-0 items-center gap-1.5 text-xs leading-[17px] ${line.tone === "needs-you" ? "text-warning" : line.tone === "failed" ? "text-destructive" : INK_55}`}>
+      {line.text || line.tone !== "quiet" || toggle ? (
+        <span data-testid="conversation-line" data-tone={line.tone} className={`flex min-h-[17px] min-w-0 items-center gap-1.5 text-xs leading-[17px] ${toggle ? "pr-12" : ""} ${line.tone === "needs-you" ? "text-warning" : line.tone === "failed" ? "text-destructive" : INK_55}`}>
           {line.tone === "needs-you" ? <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-warning" /> : null}
           {line.tone === "running" ? <span role="img" aria-label="Working" className="size-2.5 shrink-0 animate-spin rounded-full border-[1.5px] border-success border-r-transparent" /> : null}
           {line.tone === "failed" ? <Icon name="X" className="size-3 shrink-0" aria-hidden /> : null}
@@ -111,7 +131,8 @@ export function ConversationRowView({ row, now, onOpen, menuTarget, providers = 
       ) : null}
     </button>
   );
-  return menuTarget ? <ThreadActionsContextMenu thread={menuTarget}><div>{button}</div></ThreadActionsContextMenu> : button;
+  const item = toggle ? <div className="relative">{button}<span className="absolute bottom-[5px] right-1.5 flex">{toggle}</span></div> : button;
+  return menuTarget ? <ThreadActionsContextMenu thread={menuTarget}><div>{item}</div></ThreadActionsContextMenu> : item;
 }
 
 export function WorkerRowView({ row, now, onOpen, menuTarget, slot, providers = NO_PROVIDERS }: { row: WorkerLine; now: number; onOpen(row: WorkerLine): void; menuTarget: PluginThreadActionTarget | null; slot?: number; providers?: readonly ProviderCatalogEntry[] }) {
@@ -129,6 +150,47 @@ export function WorkerRowView({ row, now, onOpen, menuTarget, slot, providers = 
     </button>
   );
   return menuTarget ? <ThreadActionsContextMenu thread={menuTarget}><div>{button}</div></ThreadActionsContextMenu> : button;
+}
+
+const NEST_INDENT = "pl-3";
+
+/**
+ * One level of a nest: the running and waiting workers, each with the workers
+ * it started under it, then "N done" folding the rest (open while the worker
+ * on screen is among them). A single finished worker shows as it is: its fold
+ * would take the same row.
+ */
+export function WorkerNestLevel({ nodes, foldKey, now, row: rowProps, folds, onFold, fold = true }: {
+  nodes: readonly WorkerNode<WorkerLine>[]; foldKey: string; now: number;
+  /** Fold the finished ones into "N done"; off under a finished worker, whose workers are all finished too and show as they are. */
+  fold?: boolean;
+  /** The user's choice for each "N done" (by its parent's id, or the conversation's); without one it is open while it holds the worker on screen. */
+  folds: ReadonlyMap<string, boolean>; onFold(key: string, open: boolean): void;
+  row: Omit<Parameters<typeof WorkerRowView>[0], "row" | "menuTarget" | "slot"> & { targetOf(threadId: string): PluginThreadActionTarget | null; slotOf(threadId: string): number | undefined };
+}) {
+  const level = fold ? foldLevel(nodes) : { shown: [...nodes], done: [], doneCount: 0 };
+  const holdsSelected = level.done.some((node) => subtree(node).some((each) => each.selected));
+  const open = folds.get(foldKey) ?? holdsSelected;
+  const draw = (node: WorkerNode<WorkerLine>, folding: boolean) => (
+    <div key={node.row.threadId} data-testid="worker-node" data-thread-id={node.row.threadId}>
+      <WorkerRowView row={node.row} now={now} onOpen={rowProps.onOpen} providers={rowProps.providers} menuTarget={rowProps.targetOf(node.row.threadId)} slot={rowProps.slotOf(node.row.threadId)} />
+      {node.children.length ? (
+        <div role="group" aria-label={`Started by ${node.row.title}`} data-testid="worker-children" className={NEST_INDENT}>
+          <WorkerNestLevel nodes={node.children} foldKey={node.row.threadId} now={now} row={rowProps} folds={folds} onFold={onFold} fold={folding} />
+        </div>
+      ) : null}
+    </div>
+  );
+  return <>
+    {level.shown.map((node) => draw(node, fold))}
+    {level.doneCount ? (
+      <button type="button" data-testid="nest-done" aria-expanded={open} onClick={() => onFold(foldKey, !open)}
+        className={`flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-xs outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${INK_55}`}>
+        <Icon name={open ? "ChevronDown" : "ChevronRight"} aria-hidden className="size-3 shrink-0" />{doneLabel(level.doneCount)}
+      </button>
+    ) : null}
+    {open ? level.done.map((node) => draw(node, false)) : null}
+  </>;
 }
 
 /**
@@ -226,32 +288,24 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
   useEffect(() => { for (const row of [...(data?.conversations ?? []), ...(data?.workers ?? [])]) noteBotThread(row.threadId, true); }, [data]);
   const conversations = useMemo(() => conversationLines(data?.conversations ?? [], live, activeThreadId), [data, live, activeThreadId]);
   const workers = useMemo(() => workerLines(data?.workers ?? [], live, activeThreadId), [data, live, activeThreadId]);
-  const split = useMemo(() => splitWorkers(workers), [workers]);
-  // A task's workers are rows of their own: their provider from the view, else BB's live list.
-  const providerOf = useMemo(() => {
-    const known = new Map<string, RowProvider>([...conversations, ...workers].map((row) => [row.threadId, { providerId: row.providerId ?? null, modelName: row.modelName ?? null }]));
-    return (threadId: string): RowProvider | null => known.get(threadId) ?? (live.get(threadId)?.providerId ? { providerId: live.get(threadId)!.providerId!, modelName: null } : null);
-  }, [conversations, workers, live]);
+  const nested = useMemo(() => workerNests(conversations, workers), [conversations, workers]);
   const rowTargets = useMemo(() => {
     const all = new Map(targets);
     for (const row of conversations) if (!all.has(row.threadId)) { const target = hiddenThreadTarget(row, row.running ? "running" : "idle"); if (target) all.set(row.threadId, target); }
     for (const row of workers) if (!all.has(row.threadId)) { const target = hiddenThreadTarget(row, row.status === "running" ? "running" : row.status === "failed" ? "failed" : "idle"); if (target) all.set(row.threadId, target); }
     return all;
   }, [targets, conversations, workers]);
-  // The done workers open in place; the one on screen opens them too.
-  const [doneOpen, setDoneOpen] = useState(false);
-  useEffect(() => { if (split.done.some((row) => row.selected)) setDoneOpen(true); }, [split]);
+  // A conversation's workers open under it: as the user left it (remembered), else while it holds the worker on screen.
+  const [openNests, setOpenNests] = useState(openWorkerNests);
+  const [nestChoices, setNestChoices] = useState<ReadonlyMap<string, boolean>>(() => new Map());
+  const nestOpen = (threadId: string, nest: WorkerNest<WorkerLine>) => nestChoices.get(threadId) ?? (openNests.has(threadId) || nest.nodes.some((node) => subtree(node).some((each) => each.selected)));
+  const toggleNest = (threadId: string, open: boolean) => {
+    setOpenNests(setWorkerNestOpen(threadId, open));
+    setNestChoices((choices) => new Map(choices).set(threadId, open));
+  };
+  const [folds, setFolds] = useState<ReadonlyMap<string, boolean>>(() => new Map());
+  const onFold = useCallback((key: string, open: boolean) => setFolds((choices) => new Map(choices).set(key, open)), []);
   const listed = useMemo(() => new Set([...conversations, ...workers].map((row) => row.threadId)), [conversations, workers]);
-  const taskWorkers = useLive("tasks.workers", {}, { enabled: !!bot, pollMs: 15_000 });
-  const taskBoard = useLive("tasks.board", {}, { enabled: !!bot && !!taskWorkers.data, pollMs: 30_000 });
-  const ownConversations = useMemo(() => new Set((data?.conversations ?? []).map((row) => row.threadId)), [data]);
-  const keepGroup = useCallback((conversation: string | null) => (bot?.primary ? true : conversation !== null && ownConversations.has(conversation)), [bot?.primary, ownConversations]);
-  const workerTaskGroups = useMemo(() => (taskWorkers.data ? workerGroups(taskWorkers.data, keepGroup) : []).map((group) => ({ ...group, name: data?.conversations.find((row) => row.threadId === group.conversation)?.title ?? group.name })), [taskWorkers.data, keepGroup, data]);
-  const looseWorkers = useMemo(() => {
-    const covered = new Set(workerTaskGroups.flatMap((group) => group.nodes.flatMap((node) => workersUnder(node).map((w) => w.threadId))));
-    return split.active.filter((row) => !covered.has(row.threadId));
-  }, [workerTaskGroups, split]);
-  const workerTasksDone = useMemo(() => (taskBoard.data ? treeOf(taskBoard.data).filter((node) => !node.row.open && node.row.hasWorkers && keepGroup(node.row.home)) : []), [taskBoard.data, keepGroup]);
 
   // The thread on screen: remembered as this Bot's last one; a thread of another Bot shows that Bot.
   // A switch leaves the thread on screen (or lands on one) without following it back to its own Bot:
@@ -366,6 +420,7 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
       conversations: conversations.map((row) => ({ threadId: row.threadId, running: row.running, needsYou: !!row.needsYou })),
     });
   }, [bot?.id, workers, conversations]);
+  const workerRow = { now, onOpen: (row: WorkerLine) => openThread(row.threadId), providers, targetOf: (id: string) => rowTargets.get(id) ?? null, slotOf: (id: string) => slots?.get(id) };
   const botRow = list.data?.bots.find((each) => each.id === bot?.id);
   const running = workers.filter((row) => row.status === "running").length + conversations.filter((row) => row.running).length;
   const todosOn = loopsOn && !!bot?.primary;
@@ -423,28 +478,30 @@ export function BotSidebarPanel({ onNavigate, activeThreadId }: Pick<PluginThrea
           <button type="button" data-testid="new-conversation" onClick={newConversation} disabled={!bot} aria-label="New conversation"
             className={cn(buttonVariants({ variant: "ghost", size: "sm" }), NEW_BUTTON)}>+ New</button>
         </div>
-        {conversations.map((row) => <ConversationRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} providers={providers} />)}
+        {conversations.map((row) => {
+          const nest = nested.nests.get(row.threadId);
+          const open = !!nest && nestOpen(row.threadId, nest);
+          return (
+            <div key={row.threadId} data-testid="conversation-item">
+              <ConversationRowView row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} providers={providers}
+                toggle={nest ? <WorkersToggle nest={nest} open={open} title={row.title} onToggle={() => toggleNest(row.threadId, !open)} /> : null} />
+              {nest && open ? (
+                <div role="group" aria-label={`${row.title}'s workers`} data-testid="worker-nest" data-conversation={row.threadId} className={NEST_INDENT}>
+                  <WorkerNestLevel nodes={nest.nodes} foldKey={row.threadId} now={now} row={workerRow} folds={folds} onFold={onFold} />
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
         {data && !conversations.length ? <Note>No conversations yet</Note> : null}
         {!data && view.error ? <Note>{view.error}</Note> : null}
       </section>
-      <section aria-label="Workers" data-testid="workers" className="flex flex-col pb-2">
-        <div className={SECTION_HEAD}><h3>Workers</h3></div>
-        {taskWorkers.data ? (
-          <WorkerTasks groups={workerTaskGroups} done={workerTasksDone} now={now} activeThreadId={activeThreadId} onOpenThread={openThread}
-            targetOf={(id) => rowTargets.get(id) ?? null} slotOf={(id) => slots?.get(id)} providerOf={providerOf} providers={providers} showNames empty={<Note>No workers right now</Note>}
-            loose={looseWorkers.length ? <div role="group" aria-label="Working without a task" data-testid="worker-loose">{looseWorkers.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} slot={slots?.get(row.threadId)} providers={providers} />)}</div> : null} />
-        ) : <>
-          {split.active.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} slot={slots?.get(row.threadId)} providers={providers} />)}
-          {split.done.length ? (
-            <button type="button" data-testid="workers-done" aria-expanded={doneOpen} onClick={() => setDoneOpen((open) => !open)}
-              className="flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none">
-              <Icon name={doneOpen ? "ChevronDown" : "ChevronRight"} className="size-3 shrink-0" />{doneLabel(split.done.length)}
-            </button>
-          ) : null}
-          {doneOpen ? split.done.map((row) => <WorkerRowView key={row.threadId} row={row} now={now} onOpen={(each) => openThread(each.threadId)} menuTarget={rowTargets.get(row.threadId) ?? null} providers={providers} />) : null}
-          {data && !workers.length ? <Note>No workers yet</Note> : null}
-        </>}
-      </section>
+      {nested.other ? (
+        <section aria-label="Other workers" data-testid="other-workers" className="flex flex-col pb-2">
+          <div className={SECTION_HEAD}><h3>Other workers</h3></div>
+          <WorkerNestLevel nodes={nested.other.nodes} foldKey="" now={now} row={workerRow} folds={folds} onFold={onFold} />
+        </section>
+      ) : null}
       </>}
       <div className="flex-1" />
       </div>

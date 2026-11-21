@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { ConversationRow, WorkerRow } from "../../bot-threads-contract";
-import { conversationLines, staleFailure, landingThread, olderBotFromPath, olderPath, secondLine, shortAge, spaceDots, summarySections, swipeStep, switchTarget, SWIPE_IDLE_MS, SWIPE_START, SWIPE_THRESHOLD, workerLines, splitWorkers, doneLabel, hiddenThreadTarget } from "./model";
+import { conversationLines, staleFailure, landingThread, olderBotFromPath, olderPath, secondLine, shortAge, spaceDots, summarySections, swipeStep, switchTarget, SWIPE_IDLE_MS, SWIPE_START, SWIPE_THRESHOLD, workerLines, splitWorkers, doneLabel, hiddenThreadTarget, workerNests, foldLevel, subtree, nestLabel, type WorkerNode } from "./model";
 
 const bots = [
   { id: "cos", name: "Chief of Staff", needsYou: false },
@@ -128,4 +128,31 @@ it("a thread that never started and has nothing queued is not working; one with 
   expect(conversationLines(rows, queued, null)[0]!.running).toBe(true);
   const starting = new Map([["main", { id: "main", status: "starting" }]]);
   expect(conversationLines(rows, starting, null)[0]!.running).toBe(true);
+});
+
+it("nests workers under the worker that started them and their conversation; a loop or an unlisted spawner leaves a worker at the top", () => {
+  const w = (threadId: string, status: WorkerRow["status"], ownerConversationId: string | null, spawnedBy: string | null = null, nestUnder?: string | null) => ({ threadId, status, ownerConversationId, spawnedBy, ...(nestUnder === undefined ? {} : { nestUnder }) });
+  const { nests, other } = workerNests([{ threadId: "main" }, { threadId: "conv" }], [
+    w("lead", "running", "conv"), w("sub", "done", "conv", "lead"), w("gone_parent", "needs-you", "conv", "not_listed"),
+    w("loop_a", "done", "main", "loop_b"), w("loop_b", "done", "main", "loop_a"),
+    w("orphan", "running", "old", null, null),
+  ]);
+  const shape = (nodes: WorkerNode<{ threadId: string }>[]): unknown[] => nodes.map((node) => node.children.length ? [node.row.threadId, shape(node.children)] : node.row.threadId);
+  expect(shape(nests.get("conv")!.nodes)).toEqual([["lead", ["sub"]], "gone_parent"]);
+  expect(nests.get("conv")).toMatchObject({ total: 3, running: 1, needsYou: 1 });
+  expect(shape(nests.get("main")!.nodes)).toEqual(["loop_a", "loop_b"]);
+  expect(shape(other!.nodes)).toEqual(["orphan"]);
+  expect(workerNests([{ threadId: "main" }], [w("x", "done", "main")]).other).toBeNull();
+});
+
+it("folds a level's finished workers into N done, counting the workers under them, and keeps one with live work under it", () => {
+  const node = (threadId: string, status: WorkerRow["status"], children: WorkerNode<{ threadId: string; status: WorkerRow["status"] }>[] = []) => ({ row: { threadId, status }, children });
+  const level = foldLevel([node("a", "running"), node("b", "done", [node("c", "running")]), node("d", "failed", [node("e", "done")])]);
+  expect([level.shown.map((each) => each.row.threadId), level.done.map((each) => each.row.threadId), level.doneCount]).toEqual([["a", "b"], ["d"], 2]);
+  // One finished worker doesn't fold: its fold would take the same row. Order stays.
+  const single = foldLevel([node("x", "done"), node("y", "running")]);
+  expect([single.shown.map((each) => each.row.threadId), single.done.length, single.doneCount]).toEqual([["x", "y"], 0, 0]);
+  expect(subtree(node("b", "done", [node("c", "running")])).map((each) => each.threadId)).toEqual(["b", "c"]);
+  expect(nestLabel({ total: 1, running: 0, needsYou: 0 })).toBe("1 worker");
+  expect(nestLabel({ total: 4, running: 2, needsYou: 2 })).toBe("4 workers, 2 running, 2 need you");
 });

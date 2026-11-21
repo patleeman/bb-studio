@@ -3,9 +3,6 @@ import { THEME_CSS } from "../../theme/tokens";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { task as taskSchema } from "../../tasks/contract";
-import { boardRows, workerRows } from "../../tasks/rows";
-import { pageFlight } from "../../tasks/ui/board-model";
 
 const state = vi.hoisted(() => ({
   live: {} as Record<string, unknown>,
@@ -119,10 +116,12 @@ it("draws the current Bot: its name, conversations in two lines with the needs-y
   expect(rows[2]!.querySelector('[data-testid="conversation-line"]')?.textContent).toBe("Needs you: cut titles at the end or the middle?");
   expect(rows[2]!.querySelector('[data-testid="forked-from"]')).toBeNull();
   expect(rows[0]!.textContent).toContain("4m");
-  const workers = $$('[data-testid="worker-row"]');
-  expect(workers.map((row) => [row.dataset.status, row.querySelector('[data-testid="worker-tag"]')?.textContent ?? null])).toEqual([["running", "bb-studio-native"]]);
-  expect($('[data-testid="workers-done"]')?.textContent).toBe("1 done");
-  // Workers are the active ones and the done row: the rest are on the Conversations page.
+  // Workers sit under their conversations, closed: a toggle on each row that has some, none on the others, and no Workers section.
+  expect($$('[data-testid="worker-row"]')).toHaveLength(0);
+  expect($('[data-testid="workers"]')).toBeNull();
+  expect($('[data-testid="other-workers"]')).toBeNull();
+  const toggles = rows.map((row) => row.closest('[data-testid="conversation-item"]')!.querySelector<HTMLElement>('[data-testid="workers-toggle"]'));
+  expect(toggles.map((toggle) => toggle && [toggle.dataset.tone, toggle.textContent])).toEqual([["quiet", "1"], ["running", "1"], null]);
   expect($('[data-testid="older-workers"]')).toBeNull();
   expect($('[data-testid="older-conversations"]')).toBeNull();
   const dots = $$('[data-testid="space-dot"]');
@@ -185,6 +184,7 @@ it("stays on the Bot it switched to while another Bot's thread is still on scree
 
 it("opens a row in the main view, and + New opens BB's composer for this Bot in its Main's project", async () => {
   await mount(null);
+  await act(async () => { $$('[data-testid="workers-toggle"]')[1]!.click(); });
   await act(async () => { $$('[data-testid="worker-row"]')[0]!.click(); });
   expect(state.navigate.toThread).toHaveBeenCalledWith("lead");
   await act(async () => { $('[data-testid="new-conversation"]')!.click(); });
@@ -303,6 +303,10 @@ it("draws titles at 13px/500 with the second line and time at 55% ink; a row wit
   const view = state.live["bot_threads_view:cos"] as { conversations: { latest: string | null }[] };
   state.live["bot_threads_view:cos"] = { ...view, conversations: [{ ...view.conversations[0]!, latest: null }, ...view.conversations.slice(1)] };
   await mount();
+  // Main still has a worker: its second line stays, holding the toggle.
+  expect($$('[data-testid="conversation-row"]')[0]!.querySelector('[data-testid="conversation-line"]')?.textContent).toBe("");
+  state.live["bot_threads_view:cos"] = { ...(state.live["bot_threads_view:cos"] as object), workers: [] };
+  await mount();
   expect($$('[data-testid="conversation-row"]')[0]!.querySelector('[data-testid="conversation-line"]')).toBeNull();
 });
 
@@ -340,42 +344,16 @@ it("draws a worker row with a narrow tag, a short time, and ×N for a folded tit
   const view = state.live["bot_threads_view:cos"] as { workers: { sameTitle: number }[] };
   view.workers[1]!.sameTitle = 5;
   await mount();
-  await act(async () => { $('[data-testid="workers-done"]')!.click(); });
-  const [lead, ios] = $$('[data-testid="worker-row"]');
+  for (const toggle of $$('[data-testid="workers-toggle"]')) await act(async () => { toggle.click(); });
+  // One finished worker shows as it is: no "1 done" fold.
+  expect($('[data-testid="nest-done"]')).toBeNull();
+  const [ios, lead] = $$('[data-testid="worker-row"]');
   expect(lead!.querySelector('[data-testid="worker-tag"]')?.className).toContain("max-w-[72px]");
   expect(lead!.querySelector('[data-testid="worker-tag"]')?.className).toContain("shrink-0");
   expect(lead!.querySelector('[data-testid="worker-time"]')?.textContent).toBe("now");
   expect(ios!.querySelector('[data-testid="worker-time"]')?.textContent).toBe("3h");
   expect(ios!.querySelector('[data-testid="worker-repeats"]')?.textContent).toBe("×5");
   expect(lead!.querySelector('[data-testid="worker-repeats"]')).toBeNull();
-});
-
-it("shows only the active workers, folds the done ones into one row that opens and closes in place", async () => {
-  const view = state.live["bot_threads_view:cos"] as { workers: { threadId: string; status: string }[] };
-  view.workers.push({ ...view.workers[0]!, threadId: "ask", status: "needs-you" }, { ...view.workers[1]!, threadId: "old", status: "done" });
-  await mount(null);
-  const ids = () => $$('[data-testid="worker-row"]').map((row) => row.dataset.threadId);
-  expect(ids()).toEqual(["ask", "lead"]);
-  const done = $('[data-testid="workers-done"]')!;
-  expect(done.textContent).toBe("2 done");
-  expect(done.getAttribute("aria-expanded")).toBe("false");
-  await act(async () => { done.click(); });
-  expect(ids()).toEqual(["ask", "lead", "ios", "old"]);
-  expect(done.getAttribute("aria-expanded")).toBe("true");
-  await act(async () => { done.click(); });
-  expect(ids()).toEqual(["ask", "lead"]);
-});
-
-it("opens the done workers when the one on screen is among them", async () => {
-  await mount("ios");
-  expect($$('[data-testid="worker-row"]').map((row) => row.dataset.threadId)).toEqual(["lead", "ios"]);
-});
-
-it("says No workers with none, and no done row", async () => {
-  (state.live["bot_threads_view:cos"] as { workers: unknown[] }).workers = [];
-  await mount();
-  expect($('[data-testid="workers-done"]')).toBeNull();
-  expect($('[data-testid="workers"]')?.textContent).toContain("No workers");
 });
 
 it("lists no older-workers row however many there are; the Conversations row is selected while its page is open", async () => {
@@ -385,7 +363,7 @@ it("lists no older-workers row however many there are; the Conversations row is 
   view.olderConversations = 4;
   await mount();
   expect($('[data-testid="older-workers"]')).toBeNull();
-  expect($('[data-testid="workers"]')!.textContent).not.toContain("older");
+  expect($('[data-testid="bot-sidebar"]')!.textContent).not.toContain("older");
   expect($('[data-testid="space-page-conversations"]')?.getAttribute("aria-current")).toBeNull();
   window.history.replaceState(null, "", "/plugins/studio/studio/conversations/cos");
   await mount();
@@ -594,7 +572,7 @@ describe("themes (round 8)", () => {
   });
 
   it("gives a running worker the dot of its character in the scene, and hands the scene the Bot's workers and conversations", async () => {
-    await mount();
+    await mount("lead");
     const running = $('[data-testid="worker-row"][data-status="running"]')!;
     expect(running.querySelector('[data-testid="worker-dot"]')?.getAttribute("data-worker-slot")).toBe("0");
     expect(sceneSignals()).toMatchObject({ botId: "cos", workers: [{ threadId: "lead", status: "running" }, { threadId: "ios", status: "failed" }] });
@@ -606,7 +584,7 @@ describe("themes (round 8)", () => {
     expect($$("[data-fork-card]")).toHaveLength(0);
     const sidebar = $('[data-testid="bot-sidebar"]')!;
     expect(sidebar.textContent).toContain("Memory");
-    for (const id of ["conversations", "workers", "space-dots"]) expect(sidebar.querySelector(`[data-testid="${id}"]`)?.closest('[data-testid="bot-sidebar"]')).toBe(sidebar);
+    for (const id of ["conversations", "space-dots"]) expect(sidebar.querySelector(`[data-testid="${id}"]`)?.closest('[data-testid="bot-sidebar"]')).toBe(sidebar);
     const footer = $("footer")!;
     expect(sidebar.lastElementChild).toBe(footer);
     expect(footer.querySelector('[data-testid="space-dots"]')).not.toBeNull();
@@ -620,7 +598,7 @@ describe("themes (round 8)", () => {
     expect(rows.hasAttribute("data-fork-overlay-scroll")).toBe(true);
     expect(THEME_CSS).toContain('html[data-studio-glass] [data-sidebar="content"][data-studio-own-scroll] { overflow: hidden; scrollbar-gutter: auto; }');
     expect(sidebar.className.split(" ")).toEqual(expect.arrayContaining(["h-full", "min-h-0", "flex-col"]));
-    for (const id of ["conversations", "workers", "bot-sidebar-header"]) expect(rows.querySelector(`[data-testid="${id}"]`)).not.toBeNull();
+    for (const id of ["conversations", "bot-sidebar-header"]) expect(rows.querySelector(`[data-testid="${id}"]`)).not.toBeNull();
     const header = $('[data-testid="bot-sidebar-header"]')!;
     expect(header.style.background).toBe("");
     expect(header.className).not.toMatch(/border|sticky/);
@@ -635,7 +613,7 @@ describe("themes (round 8)", () => {
 
   it("keeps the spinner when the Bot's workers aren't in the scene", async () => {
     state.live.bot_spaces = { bots: [{ ...space("cos", "Chief of Staff", false, "main"), appearance: { ...grid, effects: { ...grid.effects, workers: false } } }], currentBotId: "cos" };
-    await mount();
+    await mount("lead");
     expect($('[data-testid="worker-dot"]')).toBeNull();
     expect($('[data-testid="worker-row"] [data-status="running"]')).not.toBeNull();
   });
@@ -680,81 +658,126 @@ it("shows No Bot yet only once first-run setup is over, not while it makes the s
   expect(host.textContent).toContain("No Bot yet");
 });
 
-describe("Workers on tasks", () => {
-  const H = 3_600_000;
-  const mk = (id: string, patch: Record<string, unknown>) => taskSchema.parse({ id, title: id, owner: "patrick", state: "todo", origin: "task", createdAt: NOW - 5 * H, updatedAt: NOW - H, ...patch });
-  const dir = { isWorker: (id: string) => id.startsWith("thr_w"), conversationOf: (id: string) => id, main: () => "main" } as never;
-  const TASKS = () => [
-    mk("task_polish", { title: "Phone polish for the next build", owner: "thread:lead_thr", state: "in_progress", conversation: "fork", progress: { step: "3/5", line: null } }),
-    mk("task_shots", { title: "Screenshots", owner: "thread:thr_w1", state: "in_progress", parentId: "task_polish", workers: ["thr_w1"] }),
-    mk("task_review", { title: "Fresh review", owner: "thread:thr_w2", state: "waiting", parentId: "task_polish", workers: ["thr_w2"] }),
-    mk("task_vent", { title: "Clean the dryer vent", owner: "cos", state: "waiting", conversation: "main", workers: ["thr_w3"], waitingOn: { kind: "user", ref: null, text: null } }),
-    mk("task_solo", { title: "Untouched by workers", owner: "cos", state: "in_progress", conversation: "main" }),
-    mk("task_done", { title: "Intro email", owner: "cos", state: "done", conversation: "main", workers: ["thr_w4"], closedAt: NOW - H }),
-  ];
-  const seed = () => {
-    const tasks = TASKS();
-    const ctx = { since: NOW - 10 * H, dir };
-    const workers = [["thr_w1", "Screenshot worker", "active"], ["thr_w2", "Review worker", "idle"], ["thr_w3", "Vent worker", "idle"], ["thr_w4", "Intro worker", "idle"]].map(([threadId, name, status]) => ({ threadId, name, status, archived: false }));
-    const names: Record<string, string> = { fork: "Fork redesign", main: "Main" };
-    const w = workerRows(tasks, ctx);
-    state.live["tasks.workers"] = { ...w, threads: [], workers, groups: w.groups.map((g) => ({ ...g, name: names[g.conversation ?? ""] ?? "None" })) };
-    state.live["tasks.board"] = { ...boardRows(tasks, ctx), threads: [], workers };
-    (state.live["bot_threads_view:cos"] as { workers: unknown[] }).workers = [];
-  };
+describe("workers under their conversations", () => {
+  type Row = Record<string, unknown>;
+  const worker = (threadId: string, status: string, ownerConversationId: string | null, more: Row = {}): Row => ({
+    threadId, title: `Worker ${threadId}`, status, ownerConversationId, ownerTitle: null, projectId: "p", updatedAt: NOW - 60_000, tag: null, branch: null, mirrored: false, sameTitle: 1, ...more,
+  });
+  const setWorkers = (workers: Row[]) => { state.live["bot_threads_view:cos"] = { ...(state.live["bot_threads_view:cos"] as object), workers }; };
+  const item = (threadId: string) => $(`[data-testid="conversation-row"][data-thread-id="${threadId}"]`)!.closest<HTMLElement>('[data-testid="conversation-item"]')!;
+  const toggleOf = (threadId: string) => item(threadId).querySelector<HTMLElement>('[data-testid="workers-toggle"]');
+  const nestOf = (threadId: string) => item(threadId).querySelector<HTMLElement>('[data-testid="worker-nest"]');
+  const ids = (root: ParentNode) => [...root.querySelectorAll<HTMLElement>('[data-testid="worker-row"]')].map((row) => row.dataset.threadId);
+  afterEach(() => { localStorage.clear(); });
 
-  it("lists the open tasks with workers by conversation, with task titles, folding several workers under their task; a task done today folds into one row", async () => {
-    seed();
+  it("opens a conversation's workers under it from its toggle, without opening the conversation, and remembers it open", async () => {
     await mount(null);
-    expect($$('[data-testid="worker-group-name"]').map((each) => each.textContent)).toEqual(["Fork redesign", "Main"]);
-    const rows = $$('[data-testid="worker-task"]');
-    expect(rows.map((row) => [row.querySelector('[data-testid="worker-title"]')?.textContent, row.dataset.look])).toEqual([["Phone polish for the next build", "running"], ["Clean the dryer vent", "waiting"]]);
-    expect(rows[0]!.querySelector('[data-testid="worker-count"]')?.textContent).toBe("×2");
-    expect(rows[0]!.getAttribute("aria-label")).toBe("Phone polish for the next build, running, 2 workers");
-    expect(host.textContent).not.toContain("Screenshot worker");
-    expect(host.textContent).not.toContain("Untouched by workers");
-    expect($$('[data-testid="worker-row"]')).toHaveLength(0);
-    await act(async () => { rows[0]!.click(); });
-    expect($$('[data-testid="worker-row"]').map((row) => [row.dataset.threadId, row.dataset.status])).toEqual([["thr_w2", "idle"], ["thr_w1", "running"]]);
-    await act(async () => { $$('[data-testid="worker-row"]')[1]!.click(); });
-    expect(state.navigate.toThread).toHaveBeenCalledWith("thr_w1");
-    await act(async () => { rows[1]!.click(); });
-    expect(state.navigate.toThread).toHaveBeenCalledWith("thr_w3");
-    const done = $('[data-testid="workers-done"]')!;
-    expect(done.textContent).toBe("1 done today");
-    await act(async () => { done.click(); });
-    expect($$('[data-testid="worker-task"]').map((row) => row.querySelector('[data-testid="worker-title"]')?.textContent)).toContain("Intro email");
+    state.navigate.toThread.mockClear();
+    const toggle = toggleOf("fork")!;
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.getAttribute("aria-label")).toBe("Show Fork redesign's workers: 1 worker, 1 running");
+    expect(nestOf("fork")).toBeNull();
+    await act(async () => { toggle.click(); });
+    expect(state.navigate.toThread).not.toHaveBeenCalled();
+    expect(toggleOf("fork")!.getAttribute("aria-expanded")).toBe("true");
+    expect(ids(nestOf("fork")!)).toEqual(["lead"]);
+    expect(nestOf("fork")!.getAttribute("aria-label")).toBe("Fork redesign's workers");
+    await act(async () => { nestOf("fork")!.querySelector<HTMLElement>('[data-testid="worker-row"]')!.click(); });
+    expect(state.navigate.toThread).toHaveBeenLastCalledWith("lead");
+    // Remembered: a new sidebar opens it again; closing it is remembered too.
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount(null);
+    expect(ids(nestOf("fork")!)).toEqual(["lead"]);
+    await act(async () => { toggleOf("fork")!.click(); });
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount(null);
+    expect(nestOf("fork")).toBeNull();
   });
 
-  it("shows the same tasks as the Tasks page's In flight rows with workers", async () => {
-    seed();
+  it("nests a worker's own workers under it, folding each level's finished ones into N done", async () => {
+    setWorkers([
+      worker("ask", "needs-you", "main"),
+      worker("lead", "running", "main"),
+      worker("sub_run", "running", "main", { spawnedBy: "lead" }),
+      worker("sub_done", "done", "main", { spawnedBy: "lead" }),
+      worker("subsub", "done", "main", { spawnedBy: "sub_run" }),
+      worker("subsub2", "done", "main", { spawnedBy: "sub_run" }),
+      worker("old", "done", "main"),
+      worker("old_child", "failed", "main", { spawnedBy: "old" }),
+    ]);
     await mount(null);
-    const board = state.live["tasks.board"] as Parameters<typeof pageFlight>[0];
-    const withWorkers = pageFlight(board).filter((node) => node.row.hasWorkers).map((node) => node.task.id).sort();
-    expect($$('[data-testid="worker-task"]').map((row) => row.dataset.taskId).sort()).toEqual(withWorkers);
+    const toggle = toggleOf("main")!;
+    // Closed, it still says what goes on: amber while one needs the user, with every worker counted.
+    expect([toggle.dataset.tone, toggle.textContent]).toEqual(["needs-you", "8"]);
+    expect(toggle.querySelector('[data-testid="workers-toggle-amber"]')).not.toBeNull();
+    await act(async () => { toggle.click(); });
+    const nest = nestOf("main")!;
+    // lead's one finished worker shows as it is; sub_run's two fold, and so do the conversation's finished worker and its failed one.
+    expect(ids(nest)).toEqual(["ask", "lead", "sub_run", "sub_done"]);
+    const children = (threadId: string) => nest.querySelector(`[data-testid="worker-node"][data-thread-id="${threadId}"]`)!.querySelector<HTMLElement>(':scope > [data-testid="worker-children"]');
+    expect(ids(children("lead")!)).toEqual(["sub_run", "sub_done"]);
+    expect(children("lead")!.getAttribute("aria-label")).toBe("Started by Worker lead");
+    const folds = [...nest.querySelectorAll<HTMLElement>('[data-testid="nest-done"]')];
+    expect(folds.map((fold) => fold.textContent)).toEqual(["2 done", "2 done"]);
+    await act(async () => { folds[0]!.click(); });
+    expect(ids(children("sub_run")!)).toEqual(["subsub", "subsub2"]);
+    await act(async () => { folds[1]!.click(); });
+    expect(ids(nest)).toEqual(["ask", "lead", "sub_run", "subsub", "subsub2", "sub_done", "old", "old_child"]);
+    expect(ids(children("old")!)).toEqual(["old_child"]);
+    await act(async () => { nest.querySelectorAll<HTMLElement>('[data-testid="nest-done"]')[1]!.click(); });
+    expect(ids(nest)).toEqual(["ask", "lead", "sub_run", "subsub", "subsub2", "sub_done"]);
   });
 
-  it("says No workers right now with none", async () => {
-    const counts = { open: 0, running: 0, waiting: 0, todo: 0, needsYou: 0, done: 0, workers: 0 };
-    state.live["tasks.workers"] = { rows: [], tasks: [], counts, threads: [], workers: [], groups: [] };
-    state.live["tasks.board"] = { rows: [], tasks: [], counts, threads: [], workers: [] };
-    (state.live["bot_threads_view:cos"] as { workers: unknown[] }).workers = [];
+  it("shows a spinner on a closed toggle while a worker runs, and plain once they're all done", async () => {
+    setWorkers([worker("w1", "running", "main"), worker("w2", "done", "main")]);
     await mount(null);
-    expect(host.querySelector('[data-testid="workers"]')?.textContent).toContain("No workers right now");
-    expect($('[data-testid="workers-done"]')).toBeNull();
+    expect([toggleOf("main")!.dataset.tone, toggleOf("main")!.textContent]).toEqual(["running", "2"]);
+    expect(toggleOf("main")!.querySelector('[data-testid="workers-toggle-spinner"]')).not.toBeNull();
+    setWorkers([worker("w1", "done", "main"), worker("w2", "failed", "main")]);
+    await mount(null);
+    expect(toggleOf("main")!.dataset.tone).toBe("quiet");
+    expect(toggleOf("main")!.querySelector('[data-testid="workers-toggle-spinner"]')).toBeNull();
   });
 
-  it("keeps a running worker that has no task yet (or is a lead) as a plain row after the task rows, and never repeats one a task covers", async () => {
-    seed();
-    const view = state.live["bot_threads_view:cos"] as { workers: unknown[] };
-    const thread = (threadId: string, title: string) => ({ threadId, title, status: "running", ownerConversationId: "main", ownerTitle: "Main", projectId: "p", updatedAt: NOW, tag: null, branch: null, mirrored: false, sameTitle: 1 });
-    view.workers = [thread("thr_new", "Just spawned"), thread("thr_w1", "Screenshot worker")];
+  it("puts a worker under the row the server names, and one with no listed conversation under Other workers at the bottom", async () => {
+    setWorkers([
+      worker("on_fork", "running", "fork_at_message", { nestUnder: "fork" }),
+      worker("orphan", "running", "archived_conv", { nestUnder: null }),
+      worker("orphan_child", "done", "archived_conv", { nestUnder: null, spawnedBy: "orphan" }),
+      // An older server says no nestUnder: its owner, when listed.
+      worker("legacy", "running", "trunc"),
+      worker("legacy_gone", "running", "gone"),
+    ]);
     await mount(null);
-    const loose = host.querySelector('[data-testid="worker-loose"]')!;
-    expect(loose.getAttribute("aria-label")).toBe("Working without a task");
-    expect([...loose.querySelectorAll<HTMLElement>('[data-testid="worker-row"]')].map((row) => row.dataset.threadId)).toEqual(["thr_new"]);
-    await act(async () => { loose.querySelector<HTMLElement>('[data-testid="worker-row"]')!.click(); });
-    expect(state.navigate.toThread).toHaveBeenCalledWith("thr_new");
-    expect(host.querySelector('[data-testid="workers"]')?.textContent).not.toContain("No workers right now");
+    expect(toggleOf("main")).toBeNull();
+    await act(async () => { toggleOf("fork")!.click(); });
+    await act(async () => { toggleOf("trunc")!.click(); });
+    expect(ids(nestOf("fork")!)).toEqual(["on_fork"]);
+    expect(ids(nestOf("trunc")!)).toEqual(["legacy"]);
+    const other = $('[data-testid="other-workers"]')!;
+    expect(other.querySelector("h3")?.textContent).toBe("Other workers");
+    expect(ids(other)).toEqual(["orphan", "orphan_child", "legacy_gone"]);
+    // It comes after the conversations.
+    expect($('[data-testid="conversations"]')!.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("opens the nest and the fold that hold the worker on screen, and lets the user close them", async () => {
+    setWorkers([worker("lead", "running", "main"), worker("deep", "done", "main", { spawnedBy: "lead" }), worker("deep2", "done", "main", { spawnedBy: "lead" })]);
+    await mount("deep");
+    expect(ids(nestOf("main")!)).toEqual(["lead", "deep", "deep2"]);
+    expect($('[data-testid="worker-row"][data-thread-id="deep"]')!.getAttribute("aria-current")).toBe("page");
+    await act(async () => { $('[data-testid="nest-done"]')!.click(); });
+    expect(ids(nestOf("main")!)).toEqual(["lead"]);
+    await act(async () => { toggleOf("main")!.click(); });
+    expect(nestOf("main")).toBeNull();
+  });
+
+  it("has no toggles and no Other workers without workers", async () => {
+    setWorkers([]);
+    await mount(null);
+    expect($$('[data-testid="workers-toggle"]')).toHaveLength(0);
+    expect($('[data-testid="other-workers"]')).toBeNull();
   });
 });

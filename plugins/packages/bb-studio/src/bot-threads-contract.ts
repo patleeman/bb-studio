@@ -78,6 +78,10 @@ const worker = z.object({
   /** As a conversation's. */
   providerId: z.string().nullable().optional(),
   modelName: z.string().nullable().optional(),
+  /** The worker of this Bot that started it (a worker of a worker); null when a conversation did. */
+  spawnedBy: z.string().nullable().optional(),
+  /** bot_threads_view: the conversation row it nests under in the sidebar (its owner, or the row a fork owner folds into); null when no listed row is its. */
+  nestUnder: z.string().nullable().optional(),
 });
 
 /** A row of the Conversations page: a conversation, active or archived. */
