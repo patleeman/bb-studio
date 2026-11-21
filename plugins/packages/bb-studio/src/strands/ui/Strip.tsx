@@ -24,6 +24,7 @@ import { useCall, useLive } from "../../ui/live";
 import { messageLinkPath } from "../../work/ui/in-flight-model";
 import type { StrandAsk, StrandView } from "../contract";
 import { ageOf, boxGroups, countsOf, currentOf, decisionButtons, filterTurnsOf, hasOpen, rowWorkersOf, seqsOf, stepSeq, strayCountsOf, stripShown } from "./model";
+import { hostContextSegments, useHidePromptStack } from "./prompt-stack";
 import { select, selectionOf, setStrandTurns, useSelection } from "./selection";
 
 export const STRANDS_TAB = "strands";
@@ -68,7 +69,13 @@ export function StrandsBoxBanner() {
 /** The box for one conversation, where it runs and has something to show; also drawn inside a composer Studio replaces (BB draws no banners there). */
 export function StrandsBoxFor({ threadId }: { threadId: string }) {
   const list = useLive("strands.list", { threadId }, { enabled: !!threadId, pollMs: STRANDS_POLL_MS });
-  if (!stripShown(list.data)) return null;
+  const shown = stripShown(list.data);
+  // The box stands in for BB's running children; where strands run, the Info tab shows BB's context row.
+  useHidePromptStack(threadId, [
+    ...(shown && hasOpen(list.data) ? ["active-child-threads" as const] : []),
+    ...(list.data?.enabled && hostContextSegments() ? ["thread-context" as const] : []),
+  ]);
+  if (!shown) return null;
   return <StrandsBox threadId={threadId} />;
 }
 

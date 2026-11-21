@@ -4391,10 +4391,16 @@ Earlier after 3 more quiet days unless pinned.
   each worker (running, needs you, failed in the last 7 days, finished in
   the last 2). Workers no strand holds count in the line ("1 running",
   "1 failed") and are listed under "In no strand"; a click opens one. There
-  is no row of worker chips, and on BB Studio 1.0.12 and later BB's own
-  Active child threads list is hidden too (a child waiting on you stays in
-  BB's card with its question; `promptStack` in
-  `src/ui/footer/hide-bb-chrome.ts`). Where Studio replaces the composer (a
+  is no row of worker chips. On BB Studio 1.0.12 and later, and only in a
+  conversation strands run in (`promptStackFor`,
+  `src/strands/ui/prompt-stack.ts`): while the box shows, BB's Active child
+  threads list of running children is hidden (a child waiting on you stays
+  in BB's card with its question); and BB's thread context row (the parent
+  thread, changed files, the pull request) moves from above the composer to
+  a Context section in the conversation's Info tab, the same row with its
+  links and actions. An archived conversation's or a removed workspace's row,
+  with Unarchive or Restore, stays above the composer. Plain BB threads and
+  workers keep both. Where Studio replaces the composer (a
   Main mirrored from bb), the box is drawn inside the replacement. Nothing
   open, no box.
 - **Above each message**: a divider with the strand's name where the strand

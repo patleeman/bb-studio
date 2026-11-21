@@ -91,6 +91,7 @@ const state = vi.hoisted(() => ({
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => ({ toThread: state.toThread, experimental_toAppPath: state.toAppPath }),
   experimental_useAppPanel: () => ({ openTab: state.openTab }),
+  experimental_InfoSection: ({ label, children }: { label: string; children?: React.ReactNode }) => <section aria-label={label}>{children}</section>,
 }));
 vi.mock("../../ui/live", () => ({
   useLive: (method: string) => ({ data: method === "strands.list" ? state.list : method === "strands.tags" ? state.tags : method === "strands.overview" ? state.overview : null, error: null, loading: false, refresh: vi.fn() }),
@@ -105,6 +106,8 @@ vi.mock("../../ui/conversations/bot-thread-owners", () => ({ useIsBotThread: () 
 vi.mock("sonner", () => ({ toast: Object.assign(state.toast, { error: vi.fn() }) }));
 
 const { StrandsBoxBanner } = await import("./Strip");
+const { ContextInfoSection } = await import("./ContextInfoSection");
+const { promptStackSource, resetPromptStackForTests } = await import("./prompt-stack");
 const { StrandsOverview } = await import("./Overview");
 const { StrandTag } = await import("./Tag");
 const { StrandsTab } = await import("./Tab");
@@ -119,7 +122,7 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
 });
-afterEach(() => { act(() => root.unmount()); container.remove(); resetSelectionForTests(); vi.unstubAllGlobals(); });
+afterEach(() => { act(() => root.unmount()); container.remove(); resetSelectionForTests(); resetPromptStackForTests(); vi.unstubAllGlobals(); });
 
 const render = (node: React.ReactNode) => act(() => root.render(node));
 const box2 = () => container.querySelector('[data-testid="strands-strip"]');
@@ -490,5 +493,47 @@ describe("the Strands tab", () => {
     click(cx);
     expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=40", { replace: true });
     expect(timelineFilterOf("thr_main")?.turnIds).toEqual(["t1", "t2", "t4", "t6", "t5"]);
+  });
+});
+
+describe("one box above the composer: what Studio hides of BB's stack, thread by thread", () => {
+  const Segments = ({ threadId }: { threadId: string }) => <p data-testid="bb-context-row">{threadId}</p>;
+  const withFork = () => vi.stubGlobal("__bbPluginRuntime", { pluginSdkApp: { experimental_ThreadContextSegments: Segments } });
+
+  it("hides BB's running children where the strands box shows, and the context row where strands run (drawn in Info instead)", () => {
+    withFork();
+    render(<StrandsBoxBanner />);
+    expect(promptStackSource.get("thr_main")).toEqual(["active-child-threads", "thread-context"]);
+    expect(promptStackSource.get("thr_plain")).toEqual([]);
+    // Strands run but nothing is open: no box, so BB's children stay; the context row still lives in Info.
+    state.list = { ...LIST, strands: [view("q", "Quiet one", { state: "quiet" })] };
+    render(<StrandsBoxBanner />);
+    expect(promptStackSource.get("thr_main")).toEqual(["thread-context"]);
+    // A thread strands don't run in (a plain BB thread, a worker, a finished conversation): BB keeps both.
+    state.list = { ...LIST, enabled: false, strands: [], earlier: [] };
+    render(<StrandsBoxBanner />);
+    expect(promptStackSource.get("thr_main")).toEqual([]);
+    // Gone with the box.
+    state.list = LIST;
+    render(<StrandsBoxBanner />);
+    act(() => root.unmount());
+    expect(promptStackSource.get("thr_main")).toEqual([]);
+    root = createRoot(container);
+  });
+
+  it("on a BB without the context row component, never hides the row (it stays above the composer)", () => {
+    render(<StrandsBoxBanner />);
+    expect(promptStackSource.get("thr_main")).toEqual(["active-child-threads"]);
+  });
+
+  it("draws BB's context row in a strands conversation's Info tab; nothing in other threads or on an older BB", () => {
+    render(<ContextInfoSection threadId="thr_main" projectId="proj" environment={null} />);
+    expect(container.innerHTML).toBe("");
+    withFork();
+    render(<ContextInfoSection threadId="thr_main" projectId="proj" environment={null} />);
+    expect(container.querySelector('section[aria-label="Context"] [data-testid="bb-context-row"]')?.textContent).toBe("thr_main");
+    state.list = { ...LIST, enabled: false, strands: [], earlier: [] };
+    render(<ContextInfoSection threadId="thr_main" projectId="proj" environment={null} />);
+    expect(container.innerHTML).toBe("");
   });
 });
