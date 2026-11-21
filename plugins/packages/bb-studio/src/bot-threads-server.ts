@@ -37,6 +37,7 @@ type Bb = Pick<BbPluginApi, "events" | "sdk" | "agents" | "onDispose">;
 
 export interface SpaceBot {
   id: string; name: string; avatar: string; shape?: string | null; color?: string | null; primary?: boolean; threadId: string | null; appearance?: Appearance | null; presence?: Presence;
+  state?: "active" | "paused" | "stopped";
 }
 
 export interface BotThreadsServerDeps {
@@ -377,6 +378,7 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
         id: bot.id, name: bot.name, avatar: bot.avatar, shape: bot.shape ?? null, color: bot.color ?? null,
         primary: bot.primary ?? index === 0, mainThreadId: bot.threadId, needsYou: botNeedsYou(bot.id, records, threads), appearance: bot.appearance ?? null,
         ...(bot.presence ? { presence: bot.presence } : {}), activity: botActivity(bot.id, listed, threads),
+        ...(bot.state ? { state: bot.state } : {}),
       })),
     };
   };

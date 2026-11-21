@@ -36,6 +36,8 @@ const space = z.object({
   appearance: appearanceSchema.nullable(),
   presence: presenceSchema.optional(),
   activity: z.object({ turn: z.boolean(), workers: z.number().int().min(0) }).optional(),
+  /** Paused (bot_pause) or stopped (bot_stop): the phone shows Resume. Absent on an older Studio. */
+  state: z.enum(["active", "paused", "stopped"]).optional(),
 });
 
 const conversation = z.object({

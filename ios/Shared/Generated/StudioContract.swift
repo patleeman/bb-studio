@@ -19760,6 +19760,33 @@ public enum Studio {
     }
   }
 
+  public enum BotSpacesOutputBotsItemState: Sendable, Hashable, Codable {
+    case active
+    case paused
+    case stopped
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "paused": self = .paused
+      case "stopped": self = .stopped
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .paused: try container.encode("paused")
+      case .stopped: try container.encode("stopped")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotSpacesOutputBotsItem: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -19772,8 +19799,9 @@ public enum Studio {
     public var appearance: BotSpacesOutputBotsItemAppearance?
     public var presence: BotSpacesOutputBotsItemPresence?
     public var activity: BotSpacesOutputBotsItemActivity?
+    public var state: BotSpacesOutputBotsItemState?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, shape: String? = nil, color: String? = nil, primary: Bool? = nil, mainThreadId: String? = nil, needsYou: Bool? = nil, appearance: BotSpacesOutputBotsItemAppearance? = nil, presence: BotSpacesOutputBotsItemPresence? = nil, activity: BotSpacesOutputBotsItemActivity? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, shape: String? = nil, color: String? = nil, primary: Bool? = nil, mainThreadId: String? = nil, needsYou: Bool? = nil, appearance: BotSpacesOutputBotsItemAppearance? = nil, presence: BotSpacesOutputBotsItemPresence? = nil, activity: BotSpacesOutputBotsItemActivity? = nil, state: BotSpacesOutputBotsItemState? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -19785,6 +19813,7 @@ public enum Studio {
       self.appearance = appearance
       self.presence = presence
       self.activity = activity
+      self.state = state
     }
   }
 
