@@ -1225,6 +1225,4 @@ export const MIGRATIONS: string[] = [
        backfill TEXT,
        read_at INTEGER NOT NULL
      );`,
-  // 116: a strand an agent marked done (strand_note): it folds into Earlier until its next activity.
-  `ALTER TABLE strands ADD COLUMN done_at INTEGER;`,
 ];

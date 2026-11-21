@@ -33,7 +33,7 @@ import { hostApproval } from "./src/kit/host-approval";
 import { registerQuietTurnClassifier } from "./src/kit/quiet-turns";
 import { pushLevels, quietByDefault, repliesAllowed } from "./src/push-levels";
 import { fromAnotherThread, MainPushes } from "./src/main-push";
-import { STRAND_PUSH_EVERY_MS, STRAND_PUSH_KEY, StrandPushes } from "./src/strands/push";
+import { STRAND_PUSH_ACTIVE_MS, STRAND_PUSH_EVERY_MS, STRAND_PUSH_KEY, StrandPushes } from "./src/strands/push";
 import { registerDecisions } from "./src/decisions/server";
 import { registerToolGateway, type ToolGateway } from "./src/tool-gateway/server/register";
 import { registerRouter } from "./src/router/register";
@@ -235,7 +235,7 @@ export default async function plugin(bb: BbPluginApi) {
   if (!tasksUnavailable(db)) {
     try {
       const retired = retireAgentTasks(db);
-      if (retired.closed.length) bb.log.info(`Tasks: ${retired.closed.length} open agent task(s) moved to strands; backup at ${retired.backup ?? "none"}.`);
+      if (retired.closed.length) bb.log.info(`Tasks: ${retired.closed.length} open agent task(s) moved to strands; backup at ${retired.backup ?? "none"}${retired.pruned.length ? `; ${retired.pruned.length} older backup(s) removed` : ""}.`);
       if (retired.backupError) bb.log.warn(`Tasks: the backup before moving agent tasks to strands failed (${retired.backupError}); nothing was closed. The next start tries again.`);
     } catch (error) { bb.log.warn(`Tasks: moving agent tasks to strands failed: ${errorText(error)}`); }
   }
@@ -1319,7 +1319,8 @@ export default async function plugin(bb: BbPluginApi) {
     const service = strands.service;
     const strandPushes = new StrandPushes({
       bots: () => bots.list().map((bot) => ({ id: bot.id, name: bot.name })),
-      overview: (botId) => service.overview(botId),
+      overview: (botId) => service.needsYouCheck(botId, Date.now() - STRAND_PUSH_ACTIVE_MS),
+      strandThread: (strandId) => service.store.get(strandId)?.threadId ?? null,
       // BB pushes a question or approval in a thread it shows, at the thread's level; a muted thread pushes nothing at all.
       bbPushesAsks: async (threadId) => {
         const level = (await pushLevels(pushRpc, [threadId]))?.get(threadId);

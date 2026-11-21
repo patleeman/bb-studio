@@ -3,10 +3,13 @@
 //
 // A check runs a little after anything that can make a strand need the user
 // (a BB question or approval, a worker going idle or failing, a Tool Gateway
-// request) and every few minutes as a fallback. It reads each Bot's overview
-// and pushes once for each strand that is "needs you" now and wasn't at the
-// last check. A strand that stops needing the user can push again the next
-// time it turns. What it pushed is kept across restarts; the very first check
+// request) and every few minutes as a fallback. It reads, live, each Bot's
+// conversations active in the last day that have a strand not marked done
+// (StrandService.needsYouCheck), and pushes once for each strand that is
+// "needs you" now and wasn't at the last check. What it knew about the
+// conversations it didn't read stays as it was, so one coming back into the
+// window doesn't push again for the same strand. A strand that stops needing
+// the user can push again the next time it turns. What it pushed is kept across restarts; the very first check
 // only records what already needs the user, so an update never floods the
 // phone.
 //
@@ -26,6 +29,8 @@ import type { OverviewConversation, StrandAsk, StrandView } from "./contract";
 export const STRAND_PUSH_DELAY_MS = 2_000;
 export const STRAND_PUSH_EVERY_MS = 3 * 60_000;
 export const STRAND_PUSH_KEY = "strands.needsYouPushed";
+/** Only conversations with activity this recent are read for the push. */
+export const STRAND_PUSH_ACTIVE_MS = 24 * 60 * 60_000;
 const BODY_MAX = 200;
 
 export type StrandPushInput = {
@@ -40,7 +45,10 @@ export type StrandPushInput = {
 
 export interface StrandPushDeps {
   bots(): { id: string; name: string }[];
-  overview(botId: string): Promise<{ conversations: OverviewConversation[] }>;
+  /** The conversations to read (active in the last STRAND_PUSH_ACTIVE_MS, with a strand not marked done), read live; `checked` names them. */
+  overview(botId: string): Promise<{ conversations: OverviewConversation[]; checked?: string[] }>;
+  /** The conversation a strand is in, to keep what the check knew about a conversation it didn't read. */
+  strandThread?(strandId: string): string | null;
   /** Whether BB itself pushes a pending question or approval in this thread (a thread BB shows, not hidden). */
   bbPushesAsks(threadId: string): Promise<boolean>;
   /** Whether the conversation's latest turn was started by another thread (fromAnotherThread on its request). */
@@ -97,14 +105,26 @@ export class StrandPushes {
     const seen = new Set(before ?? []);
     const now = new Set<string>();
     const sends: { botId: string; strand: StrandView; conversation: OverviewConversation }[] = [];
+    const checked = new Set<string>();
+    let knowsChecked = true;
     for (const bot of this.deps.bots()) {
-      const { conversations } = await this.deps.overview(bot.id);
+      const { conversations, checked: read } = await this.deps.overview(bot.id);
+      if (!read) knowsChecked = false;
+      for (const threadId of read ?? []) checked.add(threadId);
       for (const conversation of conversations) {
         for (const strand of conversation.strands) {
           if (strand.state !== "needs-you") continue;
           now.add(strand.id);
           if (!seen.has(strand.id)) sends.push({ botId: bot.id, strand, conversation });
         }
+      }
+    }
+    // A strand pushed for in a conversation this check didn't read stays known.
+    if (knowsChecked && this.deps.strandThread) {
+      for (const id of seen) {
+        if (now.has(id)) continue;
+        const thread = this.deps.strandThread(id);
+        if (thread && !checked.has(thread)) now.add(id);
       }
     }
     await this.deps.save([...now]);

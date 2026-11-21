@@ -261,15 +261,7 @@ export class StrandService {
 
   /** Every conversation of a Bot with strands showing (not only Earlier), needs you first, then the most recently active. */
   async overview(botId: string): Promise<{ conversations: OverviewConversation[]; needs: number; running: number }> {
-    const since = this.now() - BACKFILL_ACTIVE_MS;
-    const candidates = (await this.deps.conversationsOf(botId))
-      .filter((conversation) => conversation.lastActiveAt >= since && this.store.list(conversation.threadId).length > 0)
-      .sort((a, b) => b.lastActiveAt - a.lastActiveAt);
-    const conversations: OverviewConversation[] = [];
-    for (const conversation of candidates) {
-      const list = await this.list(conversation.threadId);
-      if (list.strands.length) conversations.push({ ...conversation, strands: list.strands });
-    }
+    const { conversations } = await this.read(botId, this.now() - BACKFILL_ACTIVE_MS, () => true);
     const needs = (row: OverviewConversation) => row.strands.filter((strand) => strand.state === "needs-you").length;
     conversations.sort((a, b) => Number(needs(b) > 0) - Number(needs(a) > 0) || Number(b.isMain) - Number(a.isMain) || b.lastActiveAt - a.lastActiveAt);
     return {
@@ -277,6 +269,29 @@ export class StrandService {
       needs: conversations.reduce((sum, row) => sum + needs(row), 0),
       running: conversations.reduce((sum, row) => sum + row.strands.filter((strand) => strand.state === "running").length, 0),
     };
+  }
+
+  /**
+   * The needs-you push's read (src/strands/push.ts), kept cheap because it
+   * runs every few minutes around the clock: only conversations active since
+   * `since` that have a strand not marked done (a strand_note done with no
+   * activity after it), each read live. `checked` names the conversations it
+   * read, so the push keeps what it knew about the others.
+   */
+  async needsYouCheck(botId: string, since: number): Promise<{ conversations: OverviewConversation[]; checked: string[] }> {
+    return this.read(botId, since, (strand) => strand.doneAt === null || strand.lastAt > strand.doneAt);
+  }
+
+  private async read(botId: string, since: number, open: (strand: Strand) => boolean): Promise<{ conversations: OverviewConversation[]; checked: string[] }> {
+    const candidates = (await this.deps.conversationsOf(botId))
+      .filter((conversation) => conversation.lastActiveAt >= since && this.store.list(conversation.threadId).some(open))
+      .sort((a, b) => b.lastActiveAt - a.lastActiveAt);
+    const conversations: OverviewConversation[] = [];
+    for (const conversation of candidates) {
+      const list = await this.list(conversation.threadId);
+      if (list.strands.length) conversations.push({ ...conversation, strands: list.strands });
+    }
+    return { conversations, checked: candidates.map((conversation) => conversation.threadId) };
   }
 
   // ---- the user's edits: their choice always wins ----

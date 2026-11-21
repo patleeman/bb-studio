@@ -23,7 +23,7 @@ it("FM (migration): a database where another branch already used the next migrat
   // Back on this build: the migrations load (no index of ours collides), and the columns are added by checking.
   expect(() => bb.storage.migrate(db, MIGRATIONS)).not.toThrow();
   expect(columns(db)).not.toContain("main_model");
-  expect(ensureColumns(db)).toEqual(["bots.main_provider_id", "bots.main_model", "bots.main_reasoning", "strand_items.prev_strand_id"]);
+  expect(ensureColumns(db)).toEqual(["bots.main_provider_id", "bots.main_model", "bots.main_reasoning", "strand_items.prev_strand_id", "strands.done_at"]);
   expect(columns(db)).toEqual(expect.arrayContaining(["main_provider_id", "main_model", "main_reasoning"]));
   // Every start: nothing more to add, nothing thrown.
   expect(ensureColumns(db)).toEqual([]);
@@ -34,7 +34,7 @@ it("FM (migration): a database that already has the columns (an earlier build's 
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   db.exec("ALTER TABLE bots ADD COLUMN main_provider_id TEXT; ALTER TABLE bots ADD COLUMN main_model TEXT;");
-  expect(ensureColumns(db)).toEqual(["bots.main_reasoning", "strand_items.prev_strand_id"]);
+  expect(ensureColumns(db)).toEqual(["bots.main_reasoning", "strand_items.prev_strand_id", "strands.done_at"]);
 });
 
 it("leaves a table that isn't there yet alone", async () => {
@@ -48,4 +48,14 @@ it("the reason it can't be a migration: BB refuses a database whose index holds 
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS.concat("CREATE TABLE quiet_compact_marker (id TEXT PRIMARY KEY);"));
   expect(() => bb.storage.migrate(db, MIGRATIONS.concat("ALTER TABLE bots ADD COLUMN main_model TEXT;"))).toThrow(/does not match the recorded statement/);
+});
+
+it("strands.done_at (strand_note's done) is added by checking, so it takes no migration slot; a database that has it already is left alone", async () => {
+  const bb = await host();
+  const db = bb.storage.database();
+  bb.storage.migrate(db, MIGRATIONS);
+  expect(MIGRATIONS.some((sql) => /done_at/.test(sql))).toBe(false);
+  db.exec("ALTER TABLE strands ADD COLUMN done_at INTEGER;");
+  expect(ensureColumns(db)).not.toContain("strands.done_at");
+  expect((db.prepare("PRAGMA table_info(strands)").all() as { name: string }[]).filter((c) => c.name === "done_at")).toHaveLength(1);
 });

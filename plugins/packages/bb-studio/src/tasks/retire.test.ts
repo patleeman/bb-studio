@@ -1,11 +1,11 @@
 import Database from "better-sqlite3";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { MIGRATIONS } from "../migrations";
 import { USER_OWNER, type Task } from "./contract";
-import { isOpenAgentTask, MOVED_EVENT, MOVED_LINE, retireAgentTasks } from "./retire";
+import { isOpenAgentTask, KEEP_STRAND_BACKUPS, MOVED_EVENT, MOVED_LINE, retireAgentTasks } from "./retire";
 import { TaskStore } from "./store";
 
 const NOW = Date.parse("2026-11-21T12:00:00Z");
@@ -67,13 +67,13 @@ it("closes every open agent task as moved to strands, after a backup, and keeps 
 it("does nothing, and takes no backup, once no agent task is open", () => {
   seed();
   retireAgentTasks(db, { now: () => NOW });
-  expect(retireAgentTasks(db, { now: () => NOW + 1_000 })).toEqual({ closed: [], backup: null, backupError: null });
+  expect(retireAgentTasks(db, { now: () => NOW + 1_000 })).toEqual({ closed: [], backup: null, backupError: null, pruned: [] });
 });
 
 it("closes nothing when the backup fails, so a full disk never costs history", () => {
   const store = seed();
   const report = retireAgentTasks(db, { now: () => NOW, backup: () => { throw new Error("disk full"); } });
-  expect(report).toEqual({ closed: [], backup: null, backupError: "disk full" });
+  expect(report).toEqual({ closed: [], backup: null, backupError: "disk full", pruned: [] });
   expect(store.get("task_lead_job").state).toBe("in_progress");
 });
 
@@ -82,4 +82,20 @@ it("counts as an agent task only an open one an agent owns that no automation ke
   expect(isOpenAgentTask(task("task_a", { owner: USER_OWNER }))).toBe(false);
   expect(isOpenAgentTask(task("task_a", { state: "done", closedAt: NOW }))).toBe(false);
   expect(isOpenAgentTask(task("task_a", { automation: { id: "aut", role: "finding" } as never }))).toBe(false);
+});
+
+it("keeps only the newest before-strands backups, and leaves the before-tasks ones alone", () => {
+  const old = ["2026-11-01T00-00-00-000Z", "2026-11-02T00-00-00-000Z", "2026-11-03T00-00-00-000Z", "2026-11-04T00-00-00-000Z"];
+  for (const stamp of old) writeFileSync(join(dir, `studio.before-strands-${stamp}.db`), "old");
+  writeFileSync(join(dir, "studio.before-tasks-2026-10-01T00-00-00-000Z.db"), "tasks");
+  seed();
+  const report = retireAgentTasks(db, { now: () => NOW });
+  expect(KEEP_STRAND_BACKUPS).toBe(3);
+  expect(report.pruned).toEqual(["studio.before-strands-2026-11-01T00-00-00-000Z.db", "studio.before-strands-2026-11-02T00-00-00-000Z.db"]);
+  expect(readdirSync(dir).filter((name) => name.includes(".before-")).sort()).toEqual([
+    "studio.before-strands-2026-11-03T00-00-00-000Z.db",
+    "studio.before-strands-2026-11-04T00-00-00-000Z.db",
+    "studio.before-strands-2026-11-21T12-00-00-000Z.db",
+    "studio.before-tasks-2026-10-01T00-00-00-000Z.db",
+  ]);
 });

@@ -8,14 +8,17 @@
 // agent task is open, so it needs no marker.
 import type Database from "better-sqlite3";
 import { isClosed, USER_OWNER, type Task } from "./contract";
-import { backupDatabase } from "./migrate";
+import { backupDatabase, KEEP_BACKUPS, pruneBackups } from "./migrate";
 import { TaskStore } from "./store";
 
 export const MOVED_LINE = "Moved to strands";
 export const MOVED_EVENT = "moved_to_strands";
 export const MOVED_BY = "strands";
 
-export type RetireReport = { closed: string[]; backup: string | null; backupError: string | null };
+export type RetireReport = { closed: string[]; backup: string | null; backupError: string | null; pruned: string[] };
+
+/** The `before-strands-*` copies kept: the newest few, each a full copy of the database. */
+export const KEEP_STRAND_BACKUPS = KEEP_BACKUPS;
 
 /** An open task an agent owns, that no automation keeps. */
 export function isOpenAgentTask(task: Task): boolean {
@@ -30,19 +33,23 @@ export function isOpenAgentTask(task: Task): boolean {
 export function retireAgentTasks(db: Database.Database, options: { now?: () => number; force?: boolean; backup?: (db: Database.Database, at: number) => string | null } = {}): RetireReport {
   const store = new TaskStore(db, () => {}, options.now);
   const open = store.rows("SELECT record FROM tasks WHERE closed_at IS NULL AND owner <> ?", USER_OWNER).filter(isOpenAgentTask);
-  if (!open.length) return { closed: [], backup: null, backupError: null };
+  if (!open.length) return { closed: [], backup: null, backupError: null, pruned: [] };
   let backup: string | null = null;
   let backupError: string | null = null;
   try {
     backup = (options.backup ?? ((target, at) => backupDatabase(target, at, "strands")))(db, store.now());
   } catch (error) {
     backupError = error instanceof Error ? error.message : String(error);
-    if (!options.force) return { closed: [], backup: null, backupError };
+    if (!options.force) return { closed: [], backup: null, backupError, pruned: [] };
   }
   const closed = db.transaction(() => open.map((task) => {
     store.change(task.id, (t) => { t.state = "dropped"; t.progress.line = MOVED_LINE; t.needs = null; }, MOVED_BY);
     store.event(task.id, MOVED_EVENT, { by: MOVED_BY, owner: task.owner, state: task.state });
     return task.id;
   }))();
-  return { closed, backup, backupError };
+  let pruned: string[] = [];
+  if (backup && db.name && db.name !== ":memory:") {
+    try { pruned = pruneBackups(db.name, KEEP_STRAND_BACKUPS, { label: "strands", newest: true }); } catch { /* Pruning is housekeeping: a failure leaves the copies. */ }
+  }
+  return { closed, backup, backupError, pruned };
 }

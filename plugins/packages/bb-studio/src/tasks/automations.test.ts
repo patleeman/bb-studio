@@ -576,6 +576,34 @@ it("re-review: a dismissed finding that turns critical reopens and posts; [info]
   expect(worse).toMatchObject({ thread: "thr_kensico", note: expect.stringMatching(/is now critical/) });
 });
 
+it("a watcher that wakes a runner's thread says runner_report, not bot_needs_you, which runner threads don't have", async () => {
+  seed();
+  runner("run_kensico", "Kensico lead", "thr_kensico");
+  automation("aut_inv", "watcher", "Kensico inventory", { script: "x", target: "run_kensico" });
+  automation("aut_each", "watcher", "Kensico digest", { script: "#!/bin/bash\n# Wakes the runner.\necho \"Digest\"", target: "run_kensico" });
+  const nudges: { threadId: string; text: string }[] = [];
+  const { tasks } = setup({ nudge: async (threadId, text) => { nudges.push({ threadId, text }); } });
+  const first = tasks.watcherRun("aut_inv", "Inventory push failed", null, NOW);
+  expect(first).toMatchObject({ note: expect.stringMatching(/^This is a watcher finding\..*report it with runner_report \(level tell, or urgent only when they must act now\)/) });
+  expect(first && first !== "quiet" ? first.note : "").not.toMatch(/bot_needs_you|in this chat/);
+  const worse = tasks.watcherRun("aut_inv", "[critical] Inventory push failed", null, NOW + HOUR);
+  expect(worse).toMatchObject({ note: expect.stringMatching(/is now critical.*runner_report/) });
+  expect(worse && worse !== "quiet" ? worse.note : "").not.toContain("bot_needs_you");
+  const each = tasks.watcherRun("aut_each", "Digest", '{"each": true}', NOW);
+  expect(each).toMatchObject({ note: expect.stringMatching(/^If something in this run needs the user, report it with runner_report/) });
+  for (let h = 2; h <= 30; h++) {
+    at(NOW + h * HOUR);
+    tasks.watcherRun("aut_inv", `[critical] Inventory push failed ${h} times`, '{"key": "inventory push failed"}', NOW + h * HOUR);
+    await Promise.resolve();
+  }
+  expect(nudges.length).toBeGreaterThan(0);
+  expect(nudges[0]!.threadId).toBe("thr_kensico");
+  expect(nudges[0]!.text).toMatch(/runner_report.*Otherwise reply exactly \[PASS\]/s);
+  expect(nudges[0]!.text).not.toContain("bot_needs_you");
+  const main = tasks.watcherRun("aut_silent", "Disk 95% full", null, NOW);
+  expect(main).toMatchObject({ note: expect.stringMatching(/tell the user in this chat.*bot_needs_you/) });
+});
+
 it("re-review: past 20 open findings, new ones roll into one \"N more findings\" task", () => {
   seed();
   const { store, tasks } = setup();

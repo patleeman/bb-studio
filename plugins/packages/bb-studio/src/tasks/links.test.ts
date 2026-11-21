@@ -9,6 +9,7 @@ import { registerWorkCards } from "../work/register";
 import { checkTasks } from "./check";
 import type { Task } from "./contract";
 import { applyLinks, linkAtStart, planLinks, SPAWN_GRACE_MS, ThreadDirectory, type ThreadFact } from "./links";
+import { retireAgentTasks } from "./retire";
 import { registerTasks } from "./register";
 import { withTaskTools, withWorkTools } from "./test/tools";
 import { boardRows, dayStart } from "./rows";
@@ -263,7 +264,7 @@ it("migration on a fresh database does nothing and takes no backup", () => {
   expect(readdirSync(dir).filter((n) => n.includes(".before-"))).toEqual([]);
 });
 
-it("migration on a populated database: one backup, tonight's pair nested, workers given tasks, ambiguity left alone; a second run changes nothing", () => {
+it("migration on a populated database: one backup, tonight's pair nested, no task made for a running worker, ambiguity left alone; a second run changes nothing", () => {
   dir = mkdtempSync(join(tmpdir(), "task-links-"));
   db.close();
   db = new Database(join(dir, "data.db"));
@@ -285,13 +286,10 @@ it("migration on a populated database: one backup, tonight's pair nested, worker
   expect(store.get("wc_lead").parentId).toBeNull();
   expect(report.ambiguous.map((a) => [a.thread, a.tasks.sort()])).toEqual([["thr_w4", ["task_old_a", "task_old_b"]], ["thr_w5", ["task_x", "task_y", "task_z"].sort()]]);
   for (const id of ["task_old_a", "task_old_b", "task_x", "task_y", "task_z"]) expect(store.get(id).parentId).toBeNull();
-  const made = report.created.map((id) => store.get(id));
-  expect(made.map((t) => [t.title, t.state, t.owner, t.conversation])).toEqual([
-    ["Worker with no task", "in_progress", "thread:thr_w6", "thr_main"],
-  ]);
-  expect(made[0]!.parentId).toBe("task_y");
-  expect(store.all().some((t) => t.workers.includes("thr_w7"))).toBe(false);
-  expect(store.history(made[0]!.id).map((e) => e.type)).toEqual(["created"]);
+  // Strands replaced tasks: a running worker gets no task (one would be an open agent task the next start closes again).
+  expect(report.create).toEqual([]);
+  expect(report.created).toEqual([]);
+  expect(store.all().some((t) => t.workers.includes("thr_w6") || t.workers.includes("thr_w7"))).toBe(false);
   expect(store.history("wc_ios").map((e) => e.type)).toEqual(["linked"]);
 
   const rows = boardRows(store.all(), { ...ctx, since: 0 }).rows;
@@ -302,7 +300,7 @@ it("migration on a populated database: one backup, tonight's pair nested, worker
   expect(rows.filter((r) => r.id === "wc_ios")).toHaveLength(1);
 
   const after = checkTasks(store.all(), MIGRATION_THREADS, ctx);
-  expect(after.map((p) => [p.kind, p.threadId])).toEqual([["shown-twice", "thr_w5"]]);
+  expect(after.map((p) => [p.kind, p.threadId]).sort()).toEqual([["shown-twice", "thr_w5"], ["worker-without-task", "thr_w6"]]);
 
   const snapshot = JSON.stringify(store.all());
   const events = db.prepare("SELECT COUNT(*) AS n FROM task_events").get();
@@ -314,8 +312,25 @@ it("migration on a populated database: one backup, tonight's pair nested, worker
 
   vi.setSystemTime(NOW + SPAWN_GRACE_MS);
   const third = linkAtStart(store, MIGRATION_THREADS, threads);
-  expect(third.created.map((id) => store.get(id).title)).toEqual(["Just spawned"]);
-  expect(third.backup).toBeNull();
+  expect(third).toMatchObject({ create: [], created: [], backup: null });
+  expect(JSON.stringify(store.all())).toBe(snapshot);
+});
+
+it("after the move to strands, a start with workers still running makes no agent task, so the next start closes nothing and takes no backup", () => {
+  dir = mkdtempSync(join(tmpdir(), "task-links-"));
+  db.close();
+  db = new Database(join(dir, "data.db"));
+  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
+  seedThreads(db, MIGRATION_THREADS);
+  const store = new TaskStore(db);
+  seedTonight(store);
+  expect(retireAgentTasks(db).backup).toBeTruthy();
+  vi.setSystemTime(NOW + SPAWN_GRACE_MS);
+  for (let start = 0; start < 3; start++) {
+    linkAtStart(store, MIGRATION_THREADS, new ThreadDirectory(db));
+    expect(retireAgentTasks(db)).toEqual({ closed: [], backup: null, backupError: null, pruned: [] });
+  }
+  expect(readdirSync(dir).filter((n) => n.includes(".before-strands-"))).toHaveLength(1);
 });
 
 it("migration plans without writing, and a failed backup still links", () => {
@@ -341,7 +356,7 @@ it("never pairs a worker into a cycle and skips runner threads", () => {
   const plan = planLinks(store.all(), MIGRATION_THREADS, new ThreadDirectory(db), NOW);
   expect(plan.pairs.find((p) => p.child === "wc_ios")).toBeUndefined();
   expect(store.get("task_tf").parentId).toBe("wc_ios");
-  expect(plan.create.map((c) => c.threadId)).not.toContain("thr_w6");
+  expect(plan.create).toEqual([]);
 });
 
 it("the check also catches one worker on two rows of the same task", async () => {

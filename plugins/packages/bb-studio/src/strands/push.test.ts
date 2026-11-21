@@ -111,4 +111,28 @@ describe("the needs-you push", () => {
       expect(overview).toHaveBeenCalledTimes(1);
     } finally { vi.useRealTimers(); }
   });
+
+  it("keeps what it pushed for a conversation it didn't read this time, so one coming back into the window doesn't push again", async () => {
+    let read = ["thr_main", "thr_studio"];
+    let rows: OverviewConversation[] = [];
+    const where: Record<string, string> = { s1: "thr_main", s2: "thr_studio" };
+    const h = harness({ overview: async () => ({ conversations: rows.filter((row) => read.includes(row.threadId)), checked: read }), strandThread: (id) => where[id] ?? null });
+    rows = [conversation("thr_main", [strand("s1", "active")]), conversation("thr_studio", [strand("s2", "active")])];
+    await h.pushes.check();
+    rows = [conversation("thr_main", [strand("s1", "needs-you", [ask("thr_main")])]), conversation("thr_studio", [strand("s2", "needs-you", [ask("thr_studio")])])];
+    await h.pushes.check();
+    expect(h.sent.map((push) => push.conversationId)).toEqual(["thr_main", "thr_studio"]);
+    // BB Studio goes quiet for a day: the check stops reading it, and still knows s2 was pushed.
+    read = ["thr_main"];
+    await h.pushes.check();
+    expect(h.kept()!.sort()).toEqual(["s1", "s2"]);
+    // It comes back with s2 still needing the user: no second push.
+    read = ["thr_main", "thr_studio"];
+    await h.pushes.check();
+    expect(h.sent).toHaveLength(2);
+    // Read again and no longer needing the user: forgotten, so a later turn pushes again.
+    rows = [conversation("thr_main", [strand("s1", "needs-you", [ask("thr_main")])]), conversation("thr_studio", [strand("s2", "active")])];
+    await h.pushes.check();
+    expect(h.kept()).toEqual(["s1"]);
+  });
 });
