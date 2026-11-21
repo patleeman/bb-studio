@@ -94,7 +94,9 @@ export function scopeTools(input: { kind: ScopeKind; full: readonly string[]; pr
   const gatewayTools = pool.filter((name) => GATEWAY_TRIO.includes(name));
   const studio = pool.filter((name) => !GATEWAY_TRIO.includes(name));
   const loaded = studio.filter((name) => loadedSet.has(name));
-  const onDemand = never === "all" ? [] : studio.filter((name) => !loadedSet.has(name) && !never.includes(name));
+  // Lean: what the kind loads in full mode stays reachable through the trio, even for a runner.
+  const fullLoaded = new Set(LOADED[input.kind]);
+  const onDemand = studio.filter((name) => !loadedSet.has(name) && (input.lean && fullLoaded.has(name) || (never !== "all" && !never.includes(name))));
   const base = { kind: input.kind, onDemand };
   if (onDemand.length === 0) return { ...base, loaded: [...loaded, ...gatewayTools], delivery: "none", gateway: false };
   if (!input.lean && input.providerId === "claude-code") return { ...base, loaded: [...loaded, ...gatewayTools], delivery: "all", gateway: false };

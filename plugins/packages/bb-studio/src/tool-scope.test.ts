@@ -82,6 +82,10 @@ describe("delivery by provider", () => {
       expect(names(scopeEntries(scope("worker", provider, { lean: true }), NONE))).toEqual([...TRIO_TOOLS]);
     }
     expect(LEAN_LOADED.runner).toEqual(["runner_report"]);
+    // A lean runner still reaches the page and memory tools it uses, through the trio.
+    const runner = scope("runner", "acp-opencode", { lean: true, full: [...CONVERSATION_FULL, "runner_report"] });
+    expect(runner).toMatchObject({ loaded: ["runner_report"], delivery: "trio" });
+    expect([...runner.onDemand].sort()).toEqual(["memory_search", "pages_edit", "pages_read"]);
   });
 
   it("folds Tool Gateway's trio into Studio's when the trio is used, and leaves it alone otherwise", () => {
