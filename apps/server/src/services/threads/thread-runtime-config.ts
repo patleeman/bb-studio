@@ -1,3 +1,4 @@
+import { forkProviderReadsDataDirAgentsMd } from "./agents-md-dedupe.fork.js";
 import {
   resolveHostEnvironment,
   mergeHostAndProviderEnvironment,
@@ -320,7 +321,7 @@ export async function resolveThreadRuntimeCommandConfig(
       contribution.text,
     );
   }
-  if (dataDirAgentInstructions) {
+  if (dataDirAgentInstructions && !forkProviderReadsDataDirAgentsMd({ providerId: args.thread.providerId, workspacePath, dataDir: deps.config.dataDir })) {
     instructionSections.push(
       `The following user instructions come from <dataDir>/${DATA_DIR_AGENT_INSTRUCTIONS_RELATIVE_PATH}:`,
       dataDirAgentInstructions,
