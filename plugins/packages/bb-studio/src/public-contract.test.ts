@@ -15,3 +15,7 @@ it("includes Memory and links.resolve", () => {
 it("includes Tasks and In flight for the phone", () => {
   expect(Object.keys(rpcContract)).toEqual(expect.arrayContaining(["tasks.get", "tasks.list", "tasks.inFlight", "tasks.act", "work.get", "work.list", "work.dismiss", "work.clear", "loops.list", "loops.act", "loops.add", "loops.morning"]));
 });
+
+it("includes the strands the phone reads", () => {
+  expect(Object.keys(rpcContract)).toEqual(expect.arrayContaining(["strands.list", "strands.tags", "strands.opened"]));
+});

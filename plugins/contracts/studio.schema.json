@@ -57404,6 +57404,641 @@
         ],
         "additionalProperties": false
       }
+    },
+    "strands.list": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "backfill": {
+            "type": "object",
+            "properties": {
+              "done": {
+                "type": "boolean"
+              },
+              "at": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "messages": {
+                "type": "number"
+              },
+              "sorted": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "done",
+              "at",
+              "messages",
+              "sorted"
+            ],
+            "additionalProperties": false
+          },
+          "jevCallsToday": {
+            "type": "number"
+          },
+          "jevDailyCap": {
+            "type": "number"
+          },
+          "sortingTurn": {
+            "type": "boolean"
+          },
+          "strands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "named": {
+                  "type": "boolean"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "needs-you",
+                    "running",
+                    "done-unseen",
+                    "waiting",
+                    "active",
+                    "quiet"
+                  ]
+                },
+                "detail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "asks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "question",
+                          "approval",
+                          "gateway"
+                        ]
+                      },
+                      "threadId": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "details": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "turnId": {
+                        "default": null,
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "decisions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "allow_once",
+                            "allow_for_session",
+                            "deny"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind",
+                      "threadId",
+                      "label",
+                      "details",
+                      "turnId",
+                      "decisions"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "workers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "threadId": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "running",
+                          "needs-you",
+                          "failed",
+                          "done"
+                        ]
+                      },
+                      "endedAt": {
+                        "default": null,
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "threadId",
+                      "title",
+                      "status",
+                      "endedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "lastAt": {
+                  "type": "number"
+                },
+                "firstAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "firstSeq": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "latestSeq": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "latestTurnId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "messages": {
+                  "type": "number"
+                },
+                "unsure": {
+                  "type": "number"
+                },
+                "pinned": {
+                  "type": "boolean"
+                },
+                "origin": {
+                  "type": "string",
+                  "enum": [
+                    "jev",
+                    "model",
+                    "user",
+                    "task",
+                    "backfill"
+                  ]
+                },
+                "taskId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "summary",
+                "named",
+                "state",
+                "detail",
+                "asks",
+                "workers",
+                "lastAt",
+                "firstAt",
+                "firstSeq",
+                "latestSeq",
+                "latestTurnId",
+                "messages",
+                "unsure",
+                "pinned",
+                "origin",
+                "taskId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "earlier": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "named": {
+                  "type": "boolean"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "needs-you",
+                    "running",
+                    "done-unseen",
+                    "waiting",
+                    "active",
+                    "quiet"
+                  ]
+                },
+                "detail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "asks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "question",
+                          "approval",
+                          "gateway"
+                        ]
+                      },
+                      "threadId": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "details": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "turnId": {
+                        "default": null,
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "decisions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "allow_once",
+                            "allow_for_session",
+                            "deny"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind",
+                      "threadId",
+                      "label",
+                      "details",
+                      "turnId",
+                      "decisions"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "workers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "threadId": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "running",
+                          "needs-you",
+                          "failed",
+                          "done"
+                        ]
+                      },
+                      "endedAt": {
+                        "default": null,
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "threadId",
+                      "title",
+                      "status",
+                      "endedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "lastAt": {
+                  "type": "number"
+                },
+                "firstAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "firstSeq": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "latestSeq": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "latestTurnId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "messages": {
+                  "type": "number"
+                },
+                "unsure": {
+                  "type": "number"
+                },
+                "pinned": {
+                  "type": "boolean"
+                },
+                "origin": {
+                  "type": "string",
+                  "enum": [
+                    "jev",
+                    "model",
+                    "user",
+                    "task",
+                    "backfill"
+                  ]
+                },
+                "taskId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "summary",
+                "named",
+                "state",
+                "detail",
+                "asks",
+                "workers",
+                "lastAt",
+                "firstAt",
+                "firstSeq",
+                "latestSeq",
+                "latestTurnId",
+                "messages",
+                "unsure",
+                "pinned",
+                "origin",
+                "taskId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "strayWorkers": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "threadId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "running",
+                    "needs-you",
+                    "failed",
+                    "done"
+                  ]
+                },
+                "endedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "threadId",
+                "title",
+                "status",
+                "endedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "threadId",
+          "enabled",
+          "backfill",
+          "jevCallsToday",
+          "jevDailyCap",
+          "sortingTurn",
+          "strands",
+          "earlier",
+          "strayWorkers"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "strands.tags": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "turnId": {
+                  "type": "string"
+                },
+                "seq": {
+                  "type": "number"
+                },
+                "strandId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "turnId",
+                "seq",
+                "strandId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "strands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "tags",
+          "strands"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "strands.opened": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "strandId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "strandId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "events": {
