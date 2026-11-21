@@ -119,6 +119,7 @@ describe("hidden host chrome", () => {
         settings: [],
         settingsSections: ["mobile"],
         footer: ["builtin:mobile"],
+        promptStack: [],
       },
     ]);
   });
