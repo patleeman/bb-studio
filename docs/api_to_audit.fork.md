@@ -1681,3 +1681,23 @@ escalation), the SDK's `sendJson`.
 message API too, whether `source` should be an enum, and whether
 `experimental_features` should become a general capability list.
 
+
+## Deferred tool loading (`experimental_features.deferredAgentTools`, `x-bb-defer-loading`)
+
+A plugin's `configure()` can mark a tool it offers for deferred loading: the
+tool's `{ name, parameters }` entry carries the JSON Schema vendor key
+`x-bb-defer-loading` at the top of `parameters`: `true`, or a namespace name
+(Studio uses `"studio"`). BB passes the override through as the tool's
+inputSchema; provider-codex removes the key and puts the tool, with
+`deferLoading: true`, in a Codex namespace of that name (`bb` for `true`),
+since Codex takes deferred tools only inside a namespace. Codex lists the
+namespace and loads a tool's schema through tool_search when the model needs
+it; its call names the bare tool. Only on Codex 0.171.0 and up (the version its
+app-server reports at initialize); on an older or unknown Codex the key is
+removed and the tool goes eagerly.
+`bb.experimental_hooks.experimental_features.deferredAgentTools` (true) says
+the host supports it. Studio uses it for its on-demand tools in Codex
+sessions (plugins/packages/bb-studio/src/tool-scope.ts). Before promoting:
+decide whether this should be a first-class `defer` field on configure()'s
+tool entries (it would touch the SDK normalizer, the plugin service and
+`dynamicToolSchema`) rather than a schema key.
