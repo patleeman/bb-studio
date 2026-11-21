@@ -31,15 +31,28 @@ export function stepSeq(seqs: readonly number[], current: number | null, by: -1 
   return seqs[Math.max(0, Math.min(seqs.length - 1, at + by))]!;
 }
 
-export interface AskRow { strand: StrandView; ask: StrandAsk | null }
+/** How many strands are in each live state, for the line's counts. */
+export function countsOf(list: StrandList | null | undefined): { needs: number; running: number; finished: number; waiting: number; open: number; quiet: number } {
+  const counts = { needs: 0, running: 0, finished: 0, waiting: 0, open: 0, quiet: 0 };
+  for (const strand of list?.strands ?? []) {
+    if (strand.state === "needs-you") counts.needs++;
+    else if (strand.state === "running") counts.running++;
+    else if (strand.state === "done-unseen") counts.finished++;
+    else if (strand.state === "waiting") counts.waiting++;
+    else if (strand.state === "quiet") counts.quiet++;
+    else counts.open++;
+  }
+  return counts;
+}
 
-/** The strip: at most `shown` asks (needs-you strands, each by its first ask), how many more, and a chip per other strand. */
-export function stripOf(list: StrandList | null | undefined, options: { shown?: number; all?: boolean } = {}): { asks: AskRow[]; more: number; chips: StrandView[] } {
+/** Whether anything is open: a strand that isn't quiet. With none, the line takes no space. */
+export const hasOpen = (list: StrandList | null | undefined) => (list?.strands ?? []).some((strand) => strand.state !== "quiet");
+
+/** The line's strand: the selected one, else the one the newest sorted message is in. */
+export function currentOf(list: StrandList | null | undefined, selection: { strandId: string } | null): StrandView | null {
   const strands = list?.strands ?? [];
-  const needs = strands.filter((strand) => strand.state === "needs-you");
-  const rows = needs.flatMap((strand): AskRow[] => (strand.asks.length ? strand.asks.map((ask) => ({ strand, ask })) : [{ strand, ask: null }]));
-  const limit = options.all ? rows.length : options.shown ?? 2;
-  return { asks: rows.slice(0, limit), more: Math.max(0, rows.length - limit), chips: strands.filter((strand) => strand.state !== "needs-you") };
+  if (selection) { const chosen = [...strands, ...(list?.earlier ?? [])].find((strand) => strand.id === selection.strandId); if (chosen) return chosen; }
+  return strands.reduce<StrandView | null>((best, strand) => (strand.latestSeq !== null && (best?.latestSeq ?? -1) < strand.latestSeq ? strand : best), null);
 }
 
 export const GROUPS: readonly { label: string; states: readonly StrandView["state"][] }[] = [

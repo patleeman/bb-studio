@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StrandList, StrandView } from "../contract";
-import { ageOf, decisionButtons, groupsOf, seqsOf, stepSeq, stripOf, tagOf, type Tags } from "./model";
+import { ageOf, countsOf, currentOf, decisionButtons, groupsOf, hasOpen, seqsOf, stepSeq, tagOf, type Tags } from "./model";
 
 const NOW = Date.parse("2026-11-20T14:20:00Z");
 const MIN = 60_000;
@@ -58,12 +58,14 @@ describe("the strands UI model (design 4a)", () => {
     expect(stepSeq(seqs, 20, -1)).toBe(16);
   });
 
-  it("shows at most 2 asks, then how many more, then a chip per other strand", () => {
-    const strip = stripOf(LIST);
-    expect(strip.asks.map((row) => [row.strand.id, row.ask?.id ?? null])).toEqual([["s_doc", "int_1"], ["s_pr", "int_2"]]);
-    expect(strip.more).toBe(1);
-    expect(strip.chips.map((strand) => strand.id)).toEqual(["s_cx", "s_red4", "s_macos"]);
-    expect(stripOf(LIST, { all: true }).asks).toHaveLength(3);
+  it("counts the strands by state, finds the line's strand, and knows when nothing is open", () => {
+    expect(countsOf(LIST)).toEqual({ needs: 3, running: 1, finished: 0, waiting: 1, open: 0, quiet: 1 });
+    // The strand of the newest sorted message, unless one is selected.
+    expect(currentOf(LIST, null)?.id).toBe("s_cx");
+    expect(currentOf(LIST, { strandId: "s_red4" })?.id).toBe("s_red4");
+    expect(currentOf(LIST, { strandId: "s_old" })?.id).toBe("s_old");
+    expect(hasOpen(LIST)).toBe(true);
+    expect(hasOpen({ ...LIST, strands: [view("q", "Quiet one", { state: "quiet" })] })).toBe(false);
   });
 
   it("groups the tab by state and names an approval's buttons in BB's words", () => {
@@ -98,7 +100,7 @@ vi.mock("../../work/ui/InFlight", () => ({ InFlightBanner: () => <div data-testi
 vi.mock("../../ui/conversations/bot-thread-owners", () => ({ useIsBotThread: () => true }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 
-const { StrandsOrInFlightBanner } = await import("./Strip");
+const { InFlightUnlessStrands, StrandsLineBanner } = await import("./Strip");
 const { StrandTag } = await import("./Tag");
 const { StrandsTab } = await import("./Tab");
 const { select } = await import("./selection");
@@ -118,66 +120,89 @@ const render = (node: React.ReactNode) => act(() => root.render(node));
 const click = (element: Element | null | undefined) => act(() => { (element as HTMLElement).click(); });
 const text = (element: Element | null | undefined) => element?.textContent ?? "";
 
-describe("the strip above Main's composer", () => {
-  it("takes In flight's place only where strands run", () => {
-    render(<StrandsOrInFlightBanner />);
-    expect(container.querySelector('[data-testid="strands-strip"]')).not.toBeNull();
+describe("the strands line above Main's composer", () => {
+  const Banners = () => <><InFlightUnlessStrands /><StrandsLineBanner /></>;
+  const line = () => container.querySelector('[data-testid="strands-strip"]');
+
+  it("takes In flight's place where strands run, and takes no space when nothing is open", () => {
+    render(<Banners />);
+    expect(line()).not.toBeNull();
     expect(container.querySelector('[data-testid="in-flight"]')).toBeNull();
+    state.list = { ...LIST, strands: [view("q", "Quiet one", { state: "quiet" })] };
+    render(<Banners />);
+    expect(container.innerHTML).toBe("");
     state.list = { ...LIST, enabled: false, strands: [], earlier: [] };
-    render(<StrandsOrInFlightBanner />);
+    render(<Banners />);
     expect(container.querySelector('[data-testid="in-flight"]')).not.toBeNull();
+    expect(line()).toBeNull();
   });
 
-  it("shows 2 asks with their buttons, N more, and text-only chips with neutral marks", () => {
-    render(<StrandsOrInFlightBanner />);
-    const asks = container.querySelectorAll("[data-strand-ask]");
-    expect(asks).toHaveLength(2);
-    expect(text(asks[0])).toContain("Blood pressure log");
-    expect(text(asks[0])).toContain("Approve: npm publish");
-    expect([...asks[0]!.querySelectorAll("button")].map(text).slice(1)).toEqual(["Approve", "Deny"]);
-    // A worker's question opens the worker.
-    expect([...asks[1]!.querySelectorAll("button")].map(text).slice(1)).toEqual(["Open"]);
-    expect(text(container)).toContain("1 more need you");
-    const chips = [...container.querySelectorAll("[data-strand-chip]")];
-    expect(chips.map((chip) => chip.getAttribute("data-strand-chip"))).toEqual(["s_cx", "s_red4", "s_macos"]);
-    expect(chips[0]!.querySelector('[aria-label="Running"]')).not.toBeNull();
-    expect(chips[1]!.querySelector('[aria-label="Waiting"]')).not.toBeNull();
-    expect(text(chips[2])).toContain("2 days");
-    // Amber only for needs you.
-    expect(container.querySelectorAll(".bg-warning").length).toBe(3);
-    expect(chips.every((chip) => !chip.querySelector(".bg-warning"))).toBe(true);
+  it("is one line of text: the current strand, then counts, amber only for need you; no pills, no ask rows", () => {
+    render(<Banners />);
+    expect(text(line())).toBe("◆CodexBar quota3 need you·1 running·1 waiting·1 quiet");
+    expect(container.querySelectorAll("[data-strand-chip], [data-strand-ask], .rounded-full.border")).toHaveLength(0);
+    expect([...container.querySelectorAll(".text-warning, .bg-warning")].every((element) => element.closest("[data-strands-needs]"))).toBe(true);
+    expect(container.querySelector('[data-testid="strands-menu"]')).toBeNull();
   });
 
-  it("approves from the strip through BB's own resolution", async () => {
-    render(<StrandsOrInFlightBanner />);
-    const approve = [...container.querySelectorAll("[data-strand-ask] button")].find((button) => text(button) === "Approve");
+  it("opens a compact list: one line per strand, an ask with its buttons inline, All strands", () => {
+    render(<Banners />);
+    click(container.querySelector("[data-strands-line]"));
+    const rows = [...container.querySelectorAll("[data-strand-row]")];
+    expect(rows.map((row) => row.getAttribute("data-strand-row"))).toEqual(["s_doc", "s_pr", "s_hvac", "s_cx", "s_red4", "s_macos"]);
+    expect(text(rows[0])).toContain("Approve: npm publish");
+    // The whole command and its folder, before the buttons, never cut.
+    expect(text(rows[0])).toContain("Command: npm publish --tag latest --access public --otp-from-env");
+    expect(text(rows[0])).toContain("Cwd: /tmp/release");
+    expect([...rows[0]!.querySelectorAll("button")].map(text).slice(1)).toEqual(["Approve", "Deny"]);
+    expect([...rows[1]!.querySelectorAll("button")].map(text).slice(1)).toEqual(["Open"]);
+    expect(text(rows[5])).toContain("2 days");
+    click([...container.querySelectorAll("button")].find((button) => text(button) === "All strands"));
+    expect(state.openTab).toHaveBeenCalledWith(expect.objectContaining({ tab: expect.objectContaining({ id: "strands" }), title: "Strands" }));
+  });
+
+  it("moves through the list with the arrow keys", () => {
+    render(<Banners />);
+    click(container.querySelector("[data-strands-line]"));
+    const options = [...container.querySelectorAll<HTMLElement>("[data-strand-option]")];
+    options[0]!.focus();
+    const key = (name: string) => act(() => { document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true })); });
+    key("ArrowDown");
+    expect(document.activeElement).toBe(options[1]);
+    key("End");
+    expect(document.activeElement?.getAttribute("data-strand-option")).toBe("all");
+    key("Home");
+    expect(document.activeElement).toBe(options[0]);
+  });
+
+  it("approves from the list through BB's own resolution", async () => {
+    render(<Banners />);
+    click(container.querySelector("[data-strands-needs]"));
+    const approve = [...container.querySelectorAll('[data-strand-row="s_doc"] button')].find((button) => text(button) === "Approve");
     await act(async () => { (approve as HTMLElement).click(); });
     expect(state.call).toHaveBeenCalledWith("bot_worker_approval_resolve", { threadId: "thr_main", interactionId: "int_1", decision: "allow_once" });
   });
 
-  it("a chip selects its strand: opens its newest message, marks it seen, and shows the bar that steps through it", () => {
-    render(<StrandsOrInFlightBanner />);
-    click(container.querySelector('[data-strand-chip="s_cx"]'));
+  it("picking a strand selects it: opens its newest message, marks it seen, and the line steps through it", () => {
+    render(<Banners />);
+    click(container.querySelector("[data-strands-line]"));
+    click(container.querySelector('[data-strand-option="s_cx"]'));
     expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=40", { replace: true });
     expect(state.call).toHaveBeenCalledWith("strands.opened", { strandId: "s_cx" });
-    const bar = container.querySelector('[data-strand-selection="s_cx"]');
-    expect(text(bar)).toContain("CodexBar quota");
-    expect(text(bar)).toContain("4 messages");
-    expect(container.querySelector('[data-strand-chip="s_cx"]')!.getAttribute("aria-pressed")).toBe("true");
-    const showOnly = [...bar!.querySelectorAll("button")].find((button) => text(button) === "Show only this") as HTMLButtonElement;
+    expect(container.querySelector('[data-testid="strands-menu"]')).toBeNull();
+    expect(text(line())).toContain("CodexBar quota· 4 messages");
+    const showOnly = [...line()!.querySelectorAll("button")].find((button) => text(button) === "Show only this") as HTMLButtonElement;
     expect(showOnly.disabled).toBe(true);
-    click(bar!.querySelector('[aria-label="Previous message in this strand"]'));
+    click(line()!.querySelector('[aria-label="Previous message in this strand"]'));
     expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=24", { replace: true });
-    click(bar!.querySelector('[aria-label="Previous message in this strand"]'));
+    click(line()!.querySelector('[aria-label="Previous message in this strand"]'));
     expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=16", { replace: true });
-    click(container.querySelector('[aria-label="Clear"]'));
-    expect(container.querySelector("[data-strand-selection]")).toBeNull();
-  });
-
-  it("opens the Strands tab in the workbench", () => {
-    render(<StrandsOrInFlightBanner />);
-    click(container.querySelector('[aria-label="All strands"]'));
-    expect(state.openTab).toHaveBeenCalledWith(expect.objectContaining({ tab: expect.objectContaining({ id: "strands" }), title: "Strands" }));
+    // Picking it again from the list keeps it selected.
+    click(container.querySelector("[data-strands-line]"));
+    click(container.querySelector('[data-strand-option="s_cx"]'));
+    expect(line()!.querySelector("[data-strand-selection]")).not.toBeNull();
+    click(line()!.querySelector('[aria-label="Clear"]'));
+    expect(line()!.querySelector("[data-strand-selection]")).toBeNull();
   });
 });
 

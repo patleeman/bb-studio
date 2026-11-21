@@ -1,21 +1,25 @@
-// The strip above Main's composer (design 4a): at most 2 asks with their own
-// buttons, "N more need you", then a chip per strand. A chip selects its
-// strand: its messages stay, the rest dim, and a bar steps through them.
-// It takes the In flight strip's place where strands run (phase 1: Main).
+// The strands line above Main's composer (design 4a, made compact at
+// Patrick's ask): one text line, "◆ Model router · 2 need you · 3 running ·
+// 4 quiet ▾", the current strand's name then counts, amber only for "need
+// you". It opens a compact list (one line per strand; an ask with its
+// buttons inline), keyboard-navigable. Picking a strand selects it: its
+// messages stay, the rest dim, and the line steps through them. Nothing
+// open, no line. It takes the In flight strip's place where strands run
+// (phase 1: Main); the workbench Strands tab is the full view.
 import { experimental_useAppPanel, useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 import { toAppPathOf } from "../../kit/app/host-sdk";
 import { usePathname } from "../../kit/app/route";
 import { openThreadTab } from "../../kit/app/thread-panel";
 import { useComposerThread } from "../../kit/composer";
 import { errorMessage } from "../../kit/format";
-import { Icon, Tooltip, cn } from "../../kit/ui/index";
+import { Icon, Popover, PopoverContent, PopoverTrigger, Tooltip, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import { messageLinkPath } from "../../work/ui/in-flight-model";
 import { InFlightBanner } from "../../work/ui/InFlight";
-import type { StrandAsk, StrandView } from "../contract";
-import { ageOf, decisionButtons, seqsOf, stepSeq, stripOf, stripShown, type AskRow } from "./model";
+import type { StrandAsk, StrandList, StrandView } from "../contract";
+import { ageOf, countsOf, currentOf, decisionButtons, hasOpen, seqsOf, stepSeq, stripShown } from "./model";
 import { select, selectionOf, useSelection } from "./selection";
 
 export const STRANDS_TAB = "strands";
@@ -31,14 +35,14 @@ export function useJump(threadId: string): (seq: number) => boolean {
   }, [navigate, pathname, threadId]);
 }
 
-/** Selects a strand (or clears it) and opens its newest message. */
+/** Selects a strand and opens its newest message; picking the selected one again (a chip, a tag) clears it unless `keep`. */
 export function useSelectStrand(threadId: string) {
   const jump = useJump(threadId);
   const call = useCall();
   const tags = useLive("strands.tags", { threadId }, { pollMs: 60_000 });
-  return useCallback((strand: Pick<StrandView, "id" | "latestSeq"> | null) => {
+  return useCallback((strand: Pick<StrandView, "id" | "latestSeq"> | null, keep = false) => {
     const current = selectionOf(threadId);
-    if (!strand || current?.strandId === strand.id) { select(threadId, null); return; }
+    if (!strand || (current?.strandId === strand.id && !keep)) { select(threadId, null); return; }
     const seq = strand.latestSeq ?? seqsOf(tags.data, strand.id).at(-1) ?? null;
     select(threadId, { strandId: strand.id, seq });
     if (seq !== null) jump(seq);
@@ -46,13 +50,20 @@ export function useSelectStrand(threadId: string) {
   }, [call, jump, tags.data, threadId]);
 }
 
-/** The banner: the strands strip where strands run, else the In flight strip. */
-export function StrandsOrInFlightBanner() {
+/** In flight's banner, except where strands run (phase 1: Main): there the strands line takes its place. */
+export function InFlightUnlessStrands() {
   const threadId = useComposerThread();
   const list = useLive("strands.list", { threadId: threadId ?? "" }, { enabled: !!threadId, pollMs: STRANDS_POLL_MS });
-  if (!threadId) return null;
-  if (stripShown(list.data)) return <StrandsStrip threadId={threadId} />;
+  if (!threadId || stripShown(list.data)) return null;
   return <InFlightBanner />;
+}
+
+/** The strands line, unframed, right above the composer; nothing where strands don't run or nothing is open. */
+export function StrandsLineBanner() {
+  const threadId = useComposerThread();
+  const list = useLive("strands.list", { threadId: threadId ?? "" }, { enabled: !!threadId, pollMs: STRANDS_POLL_MS });
+  if (!threadId || !stripShown(list.data)) return null;
+  return <StrandsStrip threadId={threadId} />;
 }
 
 export function StateMark({ strand, now }: { strand: StrandView; now: number }) {
@@ -66,19 +77,7 @@ export function StateMark({ strand, now }: { strand: StrandView; now: number }) 
   }
 }
 
-function Chip({ strand, pressed, onClick, now }: { strand: StrandView; pressed: boolean; onClick(): void; now: number }) {
-  const quiet = strand.state === "quiet";
-  return (
-    <Tooltip label={strand.detail ?? strand.summary ?? strand.title}>
-      <button type="button" aria-pressed={pressed} data-strand-chip={strand.id} onClick={onClick}
-        className={cn("inline-flex h-6 max-w-56 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-[11.5px] hover:bg-accent/60",
-          pressed ? "border-foreground/35 bg-accent text-foreground" : quiet ? "border-border/60 text-muted-foreground/70" : "border-border text-muted-foreground")}>
-        <span className="truncate">{strand.title}</span>
-        <StateMark strand={strand} now={now} />
-      </button>
-    </Tooltip>
-  );
-}
+const smallButton = "h-6 cursor-pointer whitespace-nowrap rounded-md border px-2 text-[11.5px] disabled:opacity-50";
 
 export function AskButtonsFor({ ask, threadId }: { ask: StrandAsk; threadId: string }) {
   const call = useCall();
@@ -93,96 +92,160 @@ export function AskButtonsFor({ ask, threadId }: { ask: StrandAsk; threadId: str
   if (ask.kind === "approval") {
     return <>{decisionButtons(ask).map((button) => (
       <button key={button.decision} type="button" disabled={busy} onClick={() => void decide(button.decision)}
-        className={cn("h-6 cursor-pointer whitespace-nowrap rounded-md border px-2 text-[11.5px] disabled:opacity-50", button.primary ? "border-transparent bg-foreground font-semibold text-background" : "border-border bg-transparent hover:bg-accent")}>
+        className={cn(smallButton, button.primary ? "border-transparent bg-foreground font-semibold text-background" : "border-border bg-transparent hover:bg-accent")}>
         {button.label}
       </button>
     ))}</>;
   }
   // A worker's question is answered in the worker; Main's own is in its composer already.
   if (ask.threadId !== threadId) {
-    return <button type="button" onClick={() => navigate.toThread(ask.threadId)} className="h-6 cursor-pointer whitespace-nowrap rounded-md border border-border px-2 text-[11.5px] hover:bg-accent">Open</button>;
+    return <button type="button" onClick={() => navigate.toThread(ask.threadId)} className={cn(smallButton, "border-border hover:bg-accent")}>Open</button>;
   }
   return null;
-}
-
-function AskLine({ row, threadId, onSelect }: { row: AskRow; threadId: string; onSelect(): void }) {
-  return (
-    <div className="flex items-center gap-2 rounded-md py-[3px] pl-2 pr-1" data-strand-ask={row.ask?.id ?? row.strand.id}>
-      <button type="button" onClick={onSelect} className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left">
-        <span role="img" aria-label="Needs you" className="size-1.5 shrink-0 rounded-full bg-warning" />
-        <span className="truncate text-[12.5px] font-semibold">{row.strand.title}</span>
-        <span className="truncate whitespace-nowrap text-[11.5px] text-muted-foreground/70">· {row.ask?.label ?? row.strand.detail ?? "Needs you"}</span>
-      </button>
-      {row.ask ? <span className="flex shrink-0 gap-1.5"><AskButtonsFor ask={row.ask} threadId={threadId} /></span> : null}
-    </div>
-  );
-}
-
-function SelectionBar({ threadId, strand, onClear }: { threadId: string; strand: StrandView; onClear(): void }) {
-  const selection = useSelection(threadId);
-  const tags = useLive("strands.tags", { threadId }, { pollMs: 60_000 });
-  const jump = useJump(threadId);
-  const seqs = seqsOf(tags.data, strand.id);
-  const step = (by: -1 | 1) => {
-    const seq = stepSeq(seqs, selection?.seq ?? null, by);
-    if (seq === null) return;
-    select(threadId, { strandId: strand.id, seq });
-    jump(seq);
-  };
-  const count = seqs.length || strand.messages;
-  return (
-    <div className="mb-[3px] flex items-center gap-2 border-b border-border/60 pb-1.5 pl-2 pr-1 pt-1 text-xs" data-strand-selection={strand.id}>
-      <b className="truncate text-[12.5px]">{strand.title}</b>
-      <span className="whitespace-nowrap text-muted-foreground">{count} {count === 1 ? "message" : "messages"}</span>
-      <span className="ml-auto flex shrink-0 items-center gap-1">
-        <IconButton label="Previous message in this strand" icon="ChevronUp" onClick={() => step(-1)} />
-        <IconButton label="Next message in this strand" icon="ChevronDown" onClick={() => step(1)} />
-        <button type="button" disabled aria-disabled="true" className="h-6 whitespace-nowrap rounded-md border border-border px-2 text-[11.5px] opacity-50">Show only this</button>
-        <IconButton label="Clear" icon="X" onClick={onClear} />
-      </span>
-    </div>
-  );
 }
 
 function IconButton({ label, icon, onClick }: { label: string; icon: string; onClick(): void }) {
   return (
     <Tooltip label={label}>
-      <button type="button" aria-label={label} onClick={onClick} className="grid size-6 cursor-pointer place-items-center rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-foreground">
+      <button type="button" aria-label={label} onClick={onClick} className="grid size-5 cursor-pointer place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground">
         <Icon name={icon} className="size-3.5" />
       </button>
     </Tooltip>
   );
 }
 
+/** Arrow keys, Home and End move between the list's options. */
+function moveFocus(event: KeyboardEvent<HTMLElement>): void {
+  const keys: Record<string, number> = { ArrowDown: 1, ArrowUp: -1, Home: -Infinity, End: Infinity };
+  const step = keys[event.key];
+  if (step === undefined) return;
+  const options = [...event.currentTarget.querySelectorAll<HTMLElement>("[data-strand-option]")];
+  if (!options.length) return;
+  event.preventDefault();
+  const at = options.indexOf(document.activeElement as HTMLElement);
+  const next = step === -Infinity ? 0 : step === Infinity ? options.length - 1 : Math.max(0, Math.min(options.length - 1, (at < 0 ? -1 : at) + step));
+  options[next]!.focus();
+}
+
+function StrandOption({ strand, threadId, selected, now, onPick }: { strand: StrandView; threadId: string; selected: boolean; now: number; onPick(): void }) {
+  const ask = strand.state === "needs-you" ? strand.asks[0] ?? null : null;
+  return (
+    <li data-strand-row={strand.id} className={cn("rounded-md", selected && "bg-accent")}>
+      <button type="button" data-strand-option={strand.id} data-needs-you={strand.state === "needs-you" ? "" : undefined} aria-current={selected || undefined} onClick={onPick}
+        className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left text-[12.5px] outline-none hover:bg-accent/60 focus-visible:bg-accent/60">
+        <span className="grid w-3 shrink-0 place-items-center">{strand.state === "quiet" ? null : <StateMark strand={strand} now={now} />}</span>
+        <span className={cn("min-w-0 flex-1 truncate", strand.state === "quiet" && "text-muted-foreground")}>{strand.title}</span>
+        <span className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground/70">{ageOf(strand.lastAt, now)}</span>
+      </button>
+      {ask ? (
+        // The whole ask before its buttons: the full command, folder, actions and session grant, never cut.
+        <div className="pb-1.5 pl-7 pr-2" data-strand-ask={ask.id}>
+          <p className="whitespace-pre-wrap break-words text-[11.5px] text-muted-foreground">{ask.label}</p>
+          {ask.details.length ? (
+            <ul className="mt-1 space-y-0.5 rounded bg-muted/40 px-1.5 py-1 font-mono text-[11px] text-foreground/90">
+              {ask.details.map((line, index) => <li key={index} className="whitespace-pre-wrap break-all">{line}</li>)}
+            </ul>
+          ) : null}
+          <div className="mt-1.5 flex flex-wrap gap-1.5"><AskButtonsFor ask={ask} threadId={threadId} /></div>
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+/** The compact list behind the line: needs you first (with each ask's buttons), then by state and newest. */
+function StrandsMenu({ list, threadId, now, onPick, onAll }: { list: StrandList; threadId: string; now: number; onPick(strand: StrandView): void; onAll(): void }) {
+  const selection = useSelection(threadId);
+  return (
+    <div onKeyDown={moveFocus}>
+      <ul aria-label="Strands" className="max-h-80 overflow-auto p-1" data-testid="strands-menu">
+        {list.strands.map((strand) => <StrandOption key={strand.id} strand={strand} threadId={threadId} now={now} selected={selection?.strandId === strand.id} onPick={() => onPick(strand)} />)}
+      </ul>
+      <div className="border-t border-border/60 p-1">
+        <button type="button" data-strand-option="all" onClick={onAll} className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left text-[12px] text-muted-foreground outline-none hover:bg-accent/60 hover:text-foreground focus-visible:bg-accent/60">
+          <Icon name="LayoutList" className="size-3.5" />All strands
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function StrandsStrip({ threadId, now = Date.now() }: { threadId: string; now?: number }) {
   const list = useLive("strands.list", { threadId }, { pollMs: STRANDS_POLL_MS });
+  const tags = useLive("strands.tags", { threadId }, { pollMs: 60_000 });
   const selection = useSelection(threadId);
   const choose = useSelectStrand(threadId);
+  const jump = useJump(threadId);
   const panel = experimental_useAppPanel();
-  const [all, setAll] = useState(false);
-  const { asks, more, chips } = stripOf(list.data, { all });
-  const selected = selection ? [...(list.data?.strands ?? []), ...(list.data?.earlier ?? [])].find((strand) => strand.id === selection.strandId) ?? null : null;
-  const openTab = () => { if (panel) openThreadTab(panel, { actionId: STRANDS_TAB, title: "Strands" }); };
-  if (!list.data) return null;
+  const [open, setOpen] = useState(false);
+  const focusAsks = useRef(false);
+  if (!list.data || !hasOpen(list.data)) return null;
+  const data = list.data;
+  const counts = countsOf(data);
+  const current = currentOf(data, selection);
+  const selected = selection ? current : null;
+  const seqs = selected ? seqsOf(tags.data, selected.id) : [];
+  const step = (by: -1 | 1) => {
+    if (!selected) return;
+    const seq = stepSeq(seqs, selection?.seq ?? null, by);
+    if (seq === null) return;
+    select(threadId, { strandId: selected.id, seq });
+    jump(seq);
+  };
+  const openList = (asks: boolean) => { focusAsks.current = asks; setOpen(true); };
+  const parts = [
+    counts.needs ? { key: "needs", text: `${counts.needs} need you`, amber: true } : null,
+    counts.running ? { key: "running", text: `${counts.running} running` } : null,
+    counts.finished ? { key: "finished", text: `${counts.finished} finished` } : null,
+    counts.waiting ? { key: "waiting", text: `${counts.waiting} waiting` } : null,
+    counts.quiet ? { key: "quiet", text: `${counts.quiet} quiet` } : null,
+  ].filter((part): part is { key: string; text: string; amber?: boolean } => !!part);
   return (
-    <section aria-label="Strands" data-testid="strands-strip" className="px-1.5 pb-1.5 pt-1">
-      {selected ? <SelectionBar threadId={threadId} strand={selected} onClear={() => select(threadId, null)} /> : null}
-      {asks.map((row) => <AskLine key={`${row.strand.id}:${row.ask?.id ?? ""}`} row={row} threadId={threadId} onSelect={() => choose(row.strand)} />)}
-      <div className={cn("flex flex-wrap items-center gap-[5px] px-0.5", asks.length || selected ? "mt-[3px] border-t border-border/60 pt-[5px]" : "")}>
-        {more ? (
-          <button type="button" onClick={() => setAll(true)} className="inline-flex h-6 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-border px-2.5 text-[11.5px] text-foreground hover:bg-accent/60">
-            <span role="img" aria-label="Needs you" className="size-1.5 rounded-full bg-warning" />{more} more need you
+    <Popover open={open} onOpenChange={setOpen}>
+      <section aria-label="Strands" data-testid="strands-strip" className="flex h-6 min-w-0 items-center gap-1.5 px-3 text-[11.5px] text-muted-foreground">
+        <PopoverTrigger asChild>
+          <button type="button" data-strands-line="" aria-haspopup="listbox" onClick={() => { focusAsks.current = false; }}
+            className="flex min-w-0 cursor-pointer items-center gap-1.5 rounded px-1 hover:bg-accent/60 hover:text-foreground">
+            <span aria-hidden className="text-[9px] text-muted-foreground/70">◆</span>
+            <span className={cn("truncate", selected ? "font-semibold text-foreground" : "text-foreground/90")}>{current?.title ?? "Strands"}</span>
+            {selected ? <span className="shrink-0 whitespace-nowrap">· {seqs.length || selected.messages} {(seqs.length || selected.messages) === 1 ? "message" : "messages"}</span> : null}
+            <Icon name="ChevronDown" className="size-3 shrink-0" />
           </button>
+        </PopoverTrigger>
+        {selected ? (
+          <span className="flex shrink-0 items-center gap-0.5" data-strand-selection={selected.id}>
+            <IconButton label="Previous message in this strand" icon="ChevronUp" onClick={() => step(-1)} />
+            <IconButton label="Next message in this strand" icon="ChevronDown" onClick={() => step(1)} />
+            <button type="button" disabled aria-disabled="true" className="h-5 whitespace-nowrap rounded px-1.5 opacity-50">Show only this</button>
+            <IconButton label="Clear" icon="X" onClick={() => select(threadId, null)} />
+          </span>
         ) : null}
-        {chips.map((strand) => <Chip key={strand.id} strand={strand} now={now} pressed={selection?.strandId === strand.id} onClick={() => choose(strand)} />)}
-        {panel ? (
-          <Tooltip label="All strands">
-            <button type="button" aria-label="All strands" onClick={openTab} className="ml-auto grid size-6 cursor-pointer place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground">
-              <Icon name="LayoutList" className="size-3.5" />
-            </button>
-          </Tooltip>
-        ) : null}
-      </div>
-    </section>
+        <span className="ml-auto flex min-w-0 shrink items-center gap-1 overflow-hidden whitespace-nowrap">
+          {parts.map((part, index) => (
+            <span key={part.key} className="flex items-center gap-1">
+              {index ? <span aria-hidden className="text-muted-foreground/50">·</span> : null}
+              {part.amber ? (
+                <button type="button" data-strands-needs="" onClick={() => openList(true)} className="flex cursor-pointer items-center gap-1 rounded px-0.5 font-medium text-warning hover:bg-warning/10">
+                  <span aria-hidden className="size-1.5 rounded-full bg-warning" />{part.text}
+                </button>
+              ) : <span>{part.text}</span>}
+            </span>
+          ))}
+        </span>
+      </section>
+      <PopoverContent side="top" align="start" className="w-[400px] max-w-[90vw] p-0"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          const root = (event.currentTarget as HTMLElement | null) ?? document;
+          const target = (focusAsks.current && root.querySelector<HTMLElement>("[data-needs-you]"))
+            || root.querySelector<HTMLElement>("[data-strand-option][aria-current]") || root.querySelector<HTMLElement>("[data-strand-option]");
+          target?.scrollIntoView({ block: "nearest" });
+          target?.focus();
+        }}>
+        <StrandsMenu list={data} threadId={threadId} now={now}
+          onPick={(strand) => { choose(strand, true); setOpen(false); }}
+          onAll={() => { setOpen(false); if (panel) openThreadTab(panel, { actionId: STRANDS_TAB, title: "Strands" }); }} />
+      </PopoverContent>
+    </Popover>
   );
 }
