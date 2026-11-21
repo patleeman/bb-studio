@@ -150,6 +150,12 @@ kind, last registered; not the tokens). Nothing in Studio calls
   the last delivery.
 - `bb mobile live-activities [--json]` lists the registered Live Activity
   tokens.
+- `bb mobile deliveries [--hours N] [--json]` shows what the relay did with
+  each push over the last N hours (24 by default): per hour, how many were
+  sent, quiet, muted, held at the desk, folded into a window or failed, and
+  the sent ones by kind; then the last 20. The journal keeps the last 1,000
+  pushes in the plugin's storage: time, kind, thread, conversation and
+  worker ids, category and outcome. No titles, bodies or device tokens.
 - RPC: `notify`, `mute_list`, `mute_set`, `push_status`, `push_test`,
   `live_activity_register`, `live_activity_unregister`, `live_activity_push`.
 - Settings (`bb plugin config mobile`): `apnsKey` (secret) and `apnsKeyId`.
