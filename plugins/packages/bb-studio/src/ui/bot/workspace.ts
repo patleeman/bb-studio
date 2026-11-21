@@ -7,7 +7,6 @@ import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect } from "react";
 import type { BotActivityView, BotScheduledView, BotThreadView } from "../../contract";
 import { botPath } from "./selection";
-import { LOOPS_PANE } from "../../loops/ui/hooks";
 import { INFO_TAB, requestThreadTab, type ThreadTabOpen } from "../../kit/app/thread-panel";
 
 /** The thread tab that shows a Bot thread's Info (app.tsx). */
@@ -53,7 +52,6 @@ export function useOpenBotInfo(): (bot: { id: string; primary?: boolean }, onBot
 /** A tab beside the Bot's chat: Bot info, or the Todos pane (src/loops/ui/LoopsPane.tsx). */
 export type ChatPanel = ThreadTabOpen & { title: string };
 export const BOT_INFO_PANEL: ChatPanel = { actionId: BOT_INFO_ACTION, title: "Info" };
-export const LOOPS_PANEL: ChatPanel = { actionId: LOOPS_PANE, title: "Tasks" };
 
 /** The thread open in the main pane, and whether a panel was opened beside it yet. */
 let visit: { threadId: string | null; infoOpened: boolean } = { threadId: null, infoOpened: false };

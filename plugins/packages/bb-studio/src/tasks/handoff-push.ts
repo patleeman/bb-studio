@@ -1,36 +1,7 @@
-import type Database from "better-sqlite3";
+// The push for a to-do reminder (a loop that came due): BB_LOOP, with its actions.
 import type { Loop } from "../loops/contract";
 import { loopPushActions } from "../loops/register";
-import { isClosed, needsYou, USER_OWNER, type Task } from "./contract";
-import { TaskStore } from "./store";
-import { toLoop } from "./views";
-
-export type HandoffPushDeps = {
-  db: Database.Database;
-  enabled(): boolean;
-  quiet(): boolean;
-  push(loop: Loop): Promise<void>;
-  log?(message: string): void;
-};
-
-export function handoffPush(deps: HandoffPushDeps): (task: Task) => void {
-  const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
-  return (task) => {
-    try {
-      if (task.owner !== USER_OWNER || isClosed(task) || !needsYou(task) || !deps.enabled()) return;
-      const store = new TaskStore(deps.db);
-      const current = store.get(task.id);
-      if (deps.quiet() && current.priority !== "urgent") {
-        if (!current.attention.push) store.save({ ...current, attention: { ...current.attention, push: true } });
-        return;
-      }
-      store.event(task.id, "notified", { by: "handoff" });
-      void deps.push(toLoop(current)).catch((error: unknown) => deps.log?.(`Task ${task.id}: hand-off push failed: ${message(error)}`));
-    } catch (error) {
-      deps.log?.(`Task ${task.id}: hand-off push failed: ${message(error)}`);
-    }
-  };
-}
+import type { Task } from "./contract";
 
 export function loopPushInput(loop: Loop, bot: { id: string; threadId: string }, task: Pick<Task, "conversation" | "needs"> | null, projectId: string) {
   const body = task?.needs?.trim() || loop.why.trim() || "New on your list";

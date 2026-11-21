@@ -57945,6 +57945,278 @@
         "additionalProperties": false
       }
     },
+    "strands.overview": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "botId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "conversations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "threadId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "isMain": {
+                  "type": "boolean"
+                },
+                "lastActiveAt": {
+                  "type": "number"
+                },
+                "strands": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "named": {
+                        "type": "boolean"
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "needs-you",
+                          "running",
+                          "done-unseen",
+                          "waiting",
+                          "active",
+                          "quiet"
+                        ]
+                      },
+                      "detail": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "asks": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "question",
+                                "approval",
+                                "gateway"
+                              ]
+                            },
+                            "threadId": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            },
+                            "details": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "turnId": {
+                              "default": null,
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "decisions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "allow_once",
+                                  "allow_for_session",
+                                  "deny"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "kind",
+                            "threadId",
+                            "label",
+                            "details",
+                            "turnId",
+                            "decisions"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "workers": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "threadId": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "running",
+                                "needs-you",
+                                "failed",
+                                "done"
+                              ]
+                            },
+                            "endedAt": {
+                              "default": null,
+                              "type": [
+                                "number",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "threadId",
+                            "title",
+                            "status",
+                            "endedAt"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "lastAt": {
+                        "type": "number"
+                      },
+                      "firstAt": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "firstSeq": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "latestSeq": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "latestTurnId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "messages": {
+                        "type": "number"
+                      },
+                      "unsure": {
+                        "type": "number"
+                      },
+                      "pinned": {
+                        "type": "boolean"
+                      },
+                      "origin": {
+                        "type": "string",
+                        "enum": [
+                          "jev",
+                          "model",
+                          "user",
+                          "task",
+                          "backfill"
+                        ]
+                      },
+                      "taskId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "title",
+                      "summary",
+                      "named",
+                      "state",
+                      "detail",
+                      "asks",
+                      "workers",
+                      "lastAt",
+                      "firstAt",
+                      "firstSeq",
+                      "latestSeq",
+                      "latestTurnId",
+                      "messages",
+                      "unsure",
+                      "pinned",
+                      "origin",
+                      "taskId"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "threadId",
+                "title",
+                "isMain",
+                "lastActiveAt",
+                "strands"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "needs": {
+            "type": "number"
+          },
+          "running": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "conversations",
+          "needs",
+          "running"
+        ],
+        "additionalProperties": false
+      }
+    },
     "strands.tags": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

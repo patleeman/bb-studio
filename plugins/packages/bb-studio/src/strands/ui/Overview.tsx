@@ -1,8 +1,9 @@
-// The strands overview (design 4b), beside the Tasks page while Settings →
-// Strands overview is on: a Bot's conversations with open strands, needs you
-// first. Each card: up to 2 asks with their buttons, then a compact chip per
-// other strand. A chip opens the conversation at that strand's newest
-// message, selected; Open opens the conversation.
+// The strands overview (design 4b), the Strands page's middle: a Bot's
+// conversations with open strands, needs you first. Each card: up to 2 asks
+// with their buttons, then a compact chip per other strand. A chip opens the
+// conversation at that strand's newest message, selected; Open opens the
+// conversation. Your list sits above it and the areas below
+// (src/loops/ui/TodosPage.tsx).
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { PageColumn } from "../../kit/app/index";
 import { toAppPathOf } from "../../kit/app/host-sdk";
@@ -12,7 +13,7 @@ import type { OverviewConversation, StrandAsk, StrandView } from "../contract";
 import { select } from "./selection";
 import { AskButtonsFor, StateMark } from "./Strip";
 
-export { isStrandsPath, strandsPath, useStrandsOverviewEnabled } from "./overview-route";
+export { isStrandsPath, strandsPath } from "./overview-route";
 
 /** Opens a conversation at a strand's newest message, with the strand selected. */
 function useOpenStrand() {
@@ -85,19 +86,39 @@ function Card({ row, now }: { row: OverviewConversation; now: number }) {
   );
 }
 
+/** "2 need you · 3 running", or "" when nothing does. */
+export function overviewLine(data: { needs: number; running: number } | null | undefined): string {
+  return [data?.needs ? `${data.needs} need you` : null, data?.running ? `${data.running} running` : null].filter(Boolean).join(" · ");
+}
+
+/** The conversations' strand cards, needs you first; `overview` is strands.overview's answer. */
+export function StrandsCards({ overview, now = Date.now(), query = "" }: { overview: { data?: { conversations: OverviewConversation[] } | null; error?: string | null }; now?: number; query?: string }) {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const all = overview.data?.conversations ?? [];
+  const rows = words.length
+    ? all.map((row) => (words.every((word) => row.title.toLowerCase().includes(word)) ? row : { ...row, strands: row.strands.filter((strand) => words.every((word) => `${strand.title} ${strand.summary ?? ""} ${strand.detail ?? ""}`.toLowerCase().includes(word))) }))
+      .filter((row) => row.strands.length)
+    : all;
+  return (
+    <section aria-label="Strands" data-testid="strands-overview" className="flex flex-col gap-2.5">
+      {!overview.data ? <p className="text-sm text-muted-foreground">{overview.error ?? "Loading…"}</p> : null}
+      {overview.data && !rows.length ? <p data-testid="strands-empty" className="text-sm text-muted-foreground">{words.length ? "No strands match." : "No open strands"}</p> : null}
+      {rows.map((row) => <Card key={row.threadId} row={row} now={now} />)}
+    </section>
+  );
+}
+
+/** The overview alone, at the page's width (tests and a page with no Your list). */
 export function StrandsOverview({ botId, now = Date.now() }: { botId: string; now?: number }) {
   const overview = useLive("strands.overview", { botId }, { pollMs: 30_000 });
-  const rows = overview.data?.conversations ?? [];
-  const header = [overview.data?.needs ? `${overview.data.needs} need you` : null, overview.data?.running ? `${overview.data.running} running` : null].filter(Boolean).join(" · ");
+  const header = overviewLine(overview.data);
   return (
     <PageColumn className="max-w-3xl">
-      <div data-testid="strands-overview" className="flex flex-col gap-2.5 py-4">
+      <div className="flex flex-col gap-2.5 py-4">
         <h1 className="flex items-baseline gap-3 text-[17px] font-semibold">
           Strands{header ? <span className="text-[13px] font-normal text-muted-foreground">{header}</span> : null}
         </h1>
-        {!overview.data ? <p className="text-sm text-muted-foreground">{overview.error ?? "Loading…"}</p> : null}
-        {overview.data && !rows.length ? <p className="text-sm text-muted-foreground">No open strands</p> : null}
-        {rows.map((row) => <Card key={row.threadId} row={row} now={now} />)}
+        <StrandsCards overview={overview} now={now} />
       </div>
     </PageColumn>
   );

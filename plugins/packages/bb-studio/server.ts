@@ -1,6 +1,6 @@
 import { registerWorkCards, WORK_TOOLS } from "./src/work/register";
 import { phoneActs, registerUserTasks } from "./src/tasks/user";
-import { handoffPush, loopPushInput } from "./src/tasks/handoff-push";
+import { loopPushInput } from "./src/tasks/handoff-push";
 import { registerTasks, TASK_TOOLS } from "./src/tasks/register";
 import { adoptAtStart } from "./src/tasks/migrate";
 import { asFact, linkAtStart, listThreadFacts, ThreadDirectory } from "./src/tasks/links";
@@ -33,8 +33,9 @@ import { createSkillsRegistryGate } from "./src/skills-registry";
 import { skillsRegistryContract } from "./src/skills-registry-contract";
 import { hostApproval } from "./src/kit/host-approval";
 import { registerQuietTurnClassifier } from "./src/kit/quiet-turns";
-import { quietByDefault, repliesAllowed } from "./src/push-levels";
-import { MainPushes } from "./src/main-push";
+import { pushLevels, quietByDefault, repliesAllowed } from "./src/push-levels";
+import { fromAnotherThread, MainPushes } from "./src/main-push";
+import { STRAND_PUSH_EVERY_MS, STRAND_PUSH_KEY, StrandPushes } from "./src/strands/push";
 import { registerDecisions } from "./src/decisions/server";
 import { registerToolGateway, type ToolGateway } from "./src/tool-gateway/server/register";
 import { registerRouter } from "./src/router/register";
@@ -446,6 +447,8 @@ export default async function plugin(bb: BbPluginApi) {
   // Memory (src/memory): every Bot conversation and worker also gets the memory tools and the core profile, at MEMORY_SLOT.
   // Tool Gateway (src/tool-gateway): its 3 tools, only while a server this provider and project may use is approved and on.
   let toolGateway: ToolGateway | null = null;
+  // Set once strands' push is up: a Tool Gateway request makes a strand need the user.
+  let toolGatewayRequested = () => {};
   bb.agents.configure(withMemory(() => memoryService, (context) => isCanvasThreadOrigin(context.origin) || !!learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string", (context) => {
     if (Date.now() - routesCheckedAt > 30_000) void refreshRoutes();
     // A Visual Chat thread works with that plugin's canvas tools only (src/voice/live/canvas-plugin.ts).
@@ -753,21 +756,22 @@ export default async function plugin(bb: BbPluginApi) {
   };
   const loops = registerLoops(bb, db, postToBot, pushLoop, settings, () => loopTimeZone(process.env, studioSettings.current().todosTimeZone), (name, everyMs, work) => triggers.every(name, everyMs, work));
   loopsEnabled = loops.enabled;
-  const movedToUser = handoffPush({ db, enabled: () => loops.scheduler.settings().enabled, quiet: () => loops.scheduler.quiet(), push: pushLoop, log: (message) => bb.log.warn(message) });
+  // A task handed to the user no longer pushes: a strand turning "needs you" does (src/strands/push.ts).
+  const movedToUser = () => {};
   const work = registerWorkCards(bb, db, { moved: movedToUser });
   const taskThreads = new ThreadDirectory(db);
   const linkStore = new TaskStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); });
   const spawnLinks = new SpawnLinks({ store: linkStore, dir: taskThreads, thread: async (threadId) => asFact(await bb.sdk.threads.get({ threadId }).catch(() => null)), log: (message) => bb.log.warn(message) });
   const threadFacts = () => listThreadFacts(bb.sdk as never);
-  const taskApi = registerTasks(bb, db, postToBot, undefined, movedToUser, { links: spawnLinks, check: async () => (await userTasks.check()).problems });
-  // Requests for an MCP server become Todos for the user; approving or declining closes them.
+  registerTasks(bb, db, postToBot, undefined, movedToUser, { links: spawnLinks, check: async () => (await userTasks.check()).problems });
+  // A request for an MCP server makes no to-do: it is "needs you" on its strand (src/strands/states.ts), which pushes once.
   toolGateway = await registerToolGateway(bb, {
     db,
     dataDir: bb.server.experimental_dataDir,
     pluginId: STUDIO_PLUGIN_ID,
     todos: {
-      create: async ({ title, why, requestId, threadId }) => (await taskApi.create({ title, owner: "user", state: "waiting", kind: "decide", why, needs: "Approve or decline it in Settings › Studio › Tool Gateway, in the BB Studio app on your Mac.", source: { kind: "tool-gateway", ref: requestId } }, threadId ? { threadId } : {})).task.id,
-      close: async (taskId, state) => { await taskApi.update({ id: taskId, state }); },
+      create: async () => { toolGatewayRequested(); return null; },
+      close: async () => {},
     },
   });
   { const gateway = toolGateway; bb.onDispose(() => gateway.dispose()); }
@@ -1295,6 +1299,34 @@ export default async function plugin(bb: BbPluginApi) {
     log: (message) => bb.log.warn(message),
   });
   bb.onDispose(() => mainPushes.dispose());
+  // One push when a strand turns "needs you" (src/strands/push.ts), checked a little after anything that can
+  // make one need the user, and every few minutes.
+  if (strands.service) {
+    const service = strands.service;
+    const strandPushes = new StrandPushes({
+      bots: () => bots.list().map((bot) => ({ id: bot.id, name: bot.name })),
+      overview: (botId) => service.overview(botId),
+      // BB pushes a question or approval in a thread it shows, at the thread's level; a muted thread pushes nothing at all.
+      bbPushesAsks: async (threadId) => {
+        const level = (await pushLevels(pushRpc, [threadId]))?.get(threadId);
+        if (level && [level.own, level.cap].includes("muted")) return true;
+        const thread = await bb.sdk.threads.get({ threadId }).catch(() => null) as { visibility?: string } | null;
+        return !!thread && thread.visibility !== "hidden";
+      },
+      startedByAnotherThread: async (threadId) => fromAnotherThread(((await bb.sdk.threads.events.list({ threadId, types: ["client/turn/requested"], order: "desc", limit: "1" } as never)) as { data?: unknown }[])[0]?.data ?? null),
+      projectOf: async (threadId) => ((await bb.sdk.threads.get({ threadId }).catch(() => null)) as { projectId?: string | null } | null)?.projectId ?? null,
+      notify: async (input) => { await bb.sdk.plugins.callRpc({ pluginId: "mobile", method: "notify", outputSchema: z.unknown(), input: input as never }); },
+      load: async () => (await bb.storage.kv.get<string[]>(STRAND_PUSH_KEY)) ?? null,
+      save: async (ids) => { await bb.storage.kv.set(STRAND_PUSH_KEY, ids); },
+      defaultProjectId: PERSONAL_PROJECT_ID,
+      pushed: (botId) => taskPushedAt.set(botId, Date.now()),
+      log: (message) => bb.log.warn(message),
+    });
+    bb.onDispose(() => strandPushes.dispose());
+    for (const event of ["interaction.pending", "thread.idle", "thread.failed"] as const) bb.events.on(event, () => strandPushes.poke());
+    triggers.every("strands-push", STRAND_PUSH_EVERY_MS, () => strandPushes.poke());
+    toolGatewayRequested = () => strandPushes.poke();
+  }
   bb.events.on("thread.idle", (event) => mainPushes.idle(event));
   registerContinueNew(bb, {
     conversation: (threadId) => { const rec = botThreads.store.get(threadId); return rec ? { botId: rec.botId, kind: rec.kind, isMain: rec.isMain, title: rec.title } : null; },

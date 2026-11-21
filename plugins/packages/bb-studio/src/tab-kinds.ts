@@ -193,15 +193,15 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
     ...botPage("automations", "Scheduled", "ListTodo", TAB_IDS.automations),
     actions: [], recents: null,
     surfaces: {
-      newTab: { na: "The Tasks page is the one entry; this address opens it." },
-      recent: { na: "Recent lists the Tasks page once, under Tasks." },
+      newTab: { na: "The Strands page is the one entry; this address opens it." },
+      recent: { na: "Recent lists the Strands page once, under Strands." },
       sidebarDrag: "added", workbenchOpen: "added", chatLink: "had",
     },
   },
-  botPage("todos", "Tasks", "ListTodo", TAB_IDS.todos),
+  botPage("todos", "Strands", "LayoutList", TAB_IDS.todos),
   botPage("archive", "Conversations", "studio/conversations", TAB_IDS.archive),
   pageRow("automation", "Automation", "Automations", "Clock", TAB_IDS.automation, "Automations page"),
-  pageRow("todo", "Task", "Tasks", "ListTodo", TAB_IDS.todo, "Tasks page"),
+  pageRow("todo", "To-do", "To-dos", "ListTodo", TAB_IDS.todo, "Strands page"),
   pageRow("record", "Memory record", "Memory records", "Brain", TAB_IDS.record, "Memory page"),
   {
     id: "vscode", name: "VS Code", plural: "VS Code", icon: CODE_ICON, owner: "studio", ref: "none", open: { via: "studio", tabId: CODE_TAB },
@@ -320,7 +320,7 @@ export function pathFor(ref: TabRef): string | null {
     case "skills": return `${STUDIO_ROOT}/skills${id ? `/${enc(id)}` : ""}`;
     case "library": return STUDIO_ROOT;
     case "automations": return "/plugins/studio/automations";
-    case "todos": return id ? `${STUDIO_ROOT}/bot/${enc(id)}/loops` : null;
+    case "todos": return id ? `${STUDIO_ROOT}/bot/${enc(id)}/strands` : null;
     case "archive": return `${STUDIO_ROOT}/conversations${id ? `/${enc(id)}` : ""}`;
     case "vscode": return "/plugins/studio/vscode";
     case "automation": case "todo": case "record": return id ? `${STUDIO_ROOT}/${ref.kind}/${enc(id)}` : null;
@@ -358,7 +358,7 @@ export function refOfPath(pathname: string): TabRef | null {
   if (first === "automation" || first === "todo" || first === "record") return id && !third && !rest.length ? { kind: first, id } : null;
   if (first === "bot") {
     if (!id || id === "new") return null;
-    if (third === "loops" && !rest.length) return { kind: "todos", id };
+    if ((third === "loops" || third === "strands") && !rest.length) return { kind: "todos", id };
     return third ? null : { kind: "bot", id };
   }
   const kind = id ? itemKindOfId(id) : null;
@@ -399,7 +399,7 @@ export function newTabFields(tabId: string): { experimental_newTabGroup?: NewTab
 }
 
 /** Kinds whose name or plural a search query names ("whiteboard", "todos"): their rows answer it. */
-const FORMER_NAMES: Partial<Record<TabKindId, readonly string[]>> = { todos: ["Todos"], todo: ["Todo", "Todos"], archive: ["Archive"] };
+const FORMER_NAMES: Partial<Record<TabKindId, readonly string[]>> = { todos: ["Todos", "Tasks"], todo: ["Todo", "Todos", "Task", "Tasks"], archive: ["Archive"] };
 
 export function kindsNamedBy(query: string): TabKindId[] {
   const text = query.trim().toLocaleLowerCase();

@@ -14,7 +14,6 @@ const CARDS = [
   "src/kit/app/directive-card.tsx",
   "src/minis/ui/mini-card.tsx",
   "src/tasks/ui/TaskCard.tsx",
-  "src/loops/ui/LoopCard.tsx",
   "src/ui/conversations/finish.tsx",
   "src/ui/conversations/ContinuedCard.tsx",
   "src/ui/conversations/ApprovalCard.tsx",

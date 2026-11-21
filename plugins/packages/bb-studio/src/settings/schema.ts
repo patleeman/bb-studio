@@ -92,11 +92,10 @@ export const STUDIO_SETTINGS = {
   decisions_batchConfidence: { group: "advanced", type: "number", label: "Smart Queue batch confidence", description: "From 0 to 1. When a thread frees up, queued follow-ups the decision model is this sure belong together go as one turn. 1 sends each on its own.", default: 0.5, min: 0, max: 1 },
 
   // Bot ▸ Controls ▸ Attention
-  loopDailyBudget: { group: "attention", type: "number", label: "Interruptions a day", description: "After this many, new tasks wait in the Tasks list until tomorrow.", default: 5, min: 0, max: 100, integer: true },
+  loopDailyBudget: { group: "attention", type: "number", label: "Interruptions a day", description: "After this many, new to-dos wait in Your list until tomorrow.", default: 5, min: 0, max: 100, integer: true },
   loopQuietStart: { group: "attention", type: "number", label: "Quiet hours start", description: "The hour, 0 to 23, when interruptions stop.", default: 22, min: 0, max: 23, integer: true },
   loopQuietEnd: { group: "attention", type: "number", label: "Quiet hours end", description: "The hour, 0 to 23, when interruptions start again.", default: 7, min: 0, max: 23, integer: true },
-  strandsOverview: { group: "attention", type: "boolean", label: "Strands overview", description: "A Strands page beside Tasks: every conversation's open strands, needs you first.", default: false },
-  todosTimeZone: { group: "attention", type: "string", label: "Time zone", description: "Tasks show and come due in this zone. Empty uses this computer’s.", default: "", maxLength: 100, timeZone: true },
+  todosTimeZone: { group: "attention", type: "string", label: "Time zone", description: "To-dos show and come due in this zone. Empty uses this computer’s.", default: "", maxLength: 100, timeZone: true },
 } as const satisfies Record<string, StudioSetting>;
 
 export type StudioSettingKey = keyof typeof STUDIO_SETTINGS;

@@ -28,9 +28,8 @@ import type { SidebarSectionProps } from "../../kit/app/host-sdk";
 import { forgetUnifiedSidebar, useUnifiedSidebarShown } from "../unified-sidebar-shown";
 import { ArchiveButton, BOT_THREAD_DRAG, RenameInput, THREAD_DRAG, ThreadsSection } from "./ThreadsSection";
 import { RunnerSidebarRow, useOpenRunner, useRunners } from "./Runners";
-import { BOT_INFO_PANEL, forgetThreadStrips, LOOPS_PANEL, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
+import { BOT_INFO_PANEL, forgetThreadStrips, noteOpenThread, sidebarGroups, useOpenBotInfo, useOpenBotInfoOnChat, useOpenThread, type TreeNode } from "./workspace";
 
-import { useLoopsEnabled } from "../../loops/ui/hooks";
 import { botItemName } from "./sidebarAgenda";
 import { botRowState, STATE_INDICATOR, type ThreadState } from "./rowState";
 
@@ -300,11 +299,8 @@ function BotEntry({ view, onNavigate, active, onThread, providers }: { view: Bot
   const ids = chain.data?.threadIds ?? [];
   const chatOpen = active !== null && (active === bot.threadId || ids.includes(active));
   const earlier = bot.threadId && ids.at(-1) === bot.threadId ? ids.slice(0, -1).reverse() : [];
-  // Bot info opens beside the Bot's own chat when it opens; Todos does
-  // instead while the badge counts something, since its Needs you now lists
-  // the same items.
-  const loopsFirst = useLoopsEnabled() && bot.primary !== false && !!activity.data?.attention;
-  useOpenBotInfoOnChat(active, bot.threadId ? [...ids, bot.threadId] : ids, loopsFirst ? LOOPS_PANEL : BOT_INFO_PANEL);
+  // Bot info opens beside the Bot's own chat when it opens.
+  useOpenBotInfoOnChat(active, bot.threadId ? [...ids, bot.threadId] : ids, BOT_INFO_PANEL);
   // Chain threads are hidden, so BB's ThreadTitle shows nothing for them; bot_chain reads their titles.
   const titles = new Map((chain.data?.threads ?? []).map((thread) => [thread.id, thread.title]));
   const color = bot.color ?? colorForName(bot.name);

@@ -1,66 +1,24 @@
-// What the todo UI reads besides the todos: whether Todos are
-// on, the people a todo can belong to, and the actions it takes.
+// What a to-do's tab (TodoTab.tsx) and card (src/tasks/ui/TaskCard.tsx)
+// read besides the to-do: the people it can belong to, and its actions.
 import { useBbNavigate, useSdk } from "@get-bb/plugin-sdk/app";
 import { useStudioSettings } from "../../settings/ui/use-settings";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { errorMessage } from "../../kit/format";
-import { openAppPath } from "../../kit/app/index";
-import { requestThreadTab, useOpenThreadTab, type ThreadTabOpen } from "../../kit/app/thread-panel";
 import { useCall, useLive, type RpcInput } from "../../ui/live";
-import { botPath } from "../../ui/bot/selection";
 import { toast } from "sonner";
 import { threadComposer } from "../../kit/composer";
 import type { Loop } from "../contract";
-import { LOOP_MENTION, loopReference } from "../reference";
+import { LOOP_MENTION } from "../reference";
 
 const PERSONAL_PROJECT_ID = "proj_personal";
-
-/** The `loopsEnabled` Studio setting (label "Todo reminders"; off by default, on for a new install from its first Bot). */
-export function useLoopsEnabled(): boolean {
-  const { values } = useStudioSettings();
-  return values?.loopsEnabled === true;
-}
 
 export function useTodosZone(): string | undefined {
   const { timeZone } = useStudioSettings();
   return timeZone ?? undefined;
 }
 
-/** The Bot page's Todos tab: `bot/<botId>/loops`. */
-export const loopsPath = (botId: string) => `${botPath(botId)}/loops`;
-export const isLoopsPath = (pathname: string) => /^\/plugins\/studio\/studio\/bot\/[^/]+\/loops\/?$/.test(pathname);
-export const openLoops = (botId: string | null | undefined) => openAppPath(botId ? loopsPath(botId) : botPath());
-
-/** The Todos pane's thread tab (app.tsx): the todo list beside a chat. */
+/** The old Todos pane's thread tab id; the Strands page shows in it now (src/ui/tab-kind-tabs.tsx). */
 export const LOOPS_PANE = "loops";
-const LOOPS_OPEN: ThreadTabOpen = { actionId: LOOPS_PANE, title: "Tasks" };
-
-/**
- * Asks the Bot chat `threadId` to open the Todos pane beside it, from outside
- * its thread view (the sidebar): the chat's view opens it once, now or when
- * it opens (kit/app/thread-panel.tsx). True when the pane opened.
- */
-export function requestLoopsPane(threadId: string): Promise<boolean> {
-  return requestThreadTab(threadId, LOOPS_OPEN);
-}
-
-/** Says the Todos pane didn't open, with a way to the Todos page instead. */
-export function reportLoopsPaneFailed(botId: string | null | undefined): void {
-  toast.error("Couldn’t open Tasks beside the chat.", { action: { label: "Open Tasks", onClick: () => openLoops(botId) } });
-}
-
-/**
- * Opens Todos beside the chat (the Todos pane) from inside a thread view, and
- * the Todos tab where there's no side panel. True when the pane opened.
- */
-export function useOpenLoopsPane(): (botId: string | null | undefined) => boolean {
-  const openTab = useOpenThreadTab();
-  return useCallback((botId) => {
-    if (openTab(LOOPS_OPEN)) return true;
-    openLoops(botId);
-    return false;
-  }, [openTab]);
-}
 
 const CHIP_LENGTH = 60;
 const chipLabel = (title: string) => { const line = title.replace(/\s+/g, " ").trim(); return line.length > CHIP_LENGTH ? `${line.slice(0, CHIP_LENGTH - 1).trimEnd()}…` : line; };
@@ -96,25 +54,6 @@ export function useDiscussLoop(botThreadId: string | null, botName: string): (lo
       return false;
     }
   }, [navigate, botThreadId, botName]);
-}
-
-/** The caret at the end of the Bot chat's draft, after Discuss from a menu. */
-export function focusDiscussed(botThreadId: string | null): void {
-  if (botThreadId) threadComposer(botThreadId)?.focus();
-}
-
-/** A row's drag: the todo's reference as plain text, which BB's composer inserts where it's dropped. The row is marked `data-dragging` meanwhile. */
-export function loopDragProps(loop: Pick<Loop, "id" | "title">) {
-  return {
-    draggable: true,
-    onDragStart: (event: { currentTarget: HTMLElement; dataTransfer: DataTransfer | null }) => {
-      if (!event.dataTransfer) return;
-      event.dataTransfer.setData("text/plain", loopReference(loop));
-      event.dataTransfer.effectAllowed = "copy";
-      event.currentTarget.dataset.dragging = "";
-    },
-    onDragEnd: (event: { currentTarget: HTMLElement }) => { delete event.currentTarget.dataset.dragging; },
-  };
 }
 
 let projectNames: Promise<Map<string, string>> | null = null;

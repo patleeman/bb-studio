@@ -115,7 +115,7 @@ export const rpcContract = defineRpcContract({
     }),
   },
   "strands.overview": {
-    experimental_description: "Every conversation of a Bot with open strands, needs you first: the overview beside the Tasks page.",
+    experimental_description: "Every conversation of a Bot with open strands, needs you first: the Strands page.",
     input: z.object({ botId: z.string().min(1).max(200) }).strict(),
     output: z.object({ conversations: z.array(overviewConversation), needs: z.number(), running: z.number() }),
   },
@@ -161,9 +161,10 @@ export const rpcContract = defineRpcContract({
   },
 });
 
-/** What the phone reads: a conversation's strands and its tags, and "opened". The rest stays desktop-only. */
+/** What the phone reads: a conversation's strands and its tags, "opened", and the overview (its Strands screen). The rest stays desktop-only. */
 export const strandsPublicContract = defineRpcContract({
   "strands.list": rpcContract["strands.list"],
+  "strands.overview": rpcContract["strands.overview"],
   "strands.tags": rpcContract["strands.tags"],
   "strands.opened": rpcContract["strands.opened"],
 });

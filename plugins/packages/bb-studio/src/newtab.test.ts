@@ -70,7 +70,7 @@ it("searches the same rows, best match first; a query naming a kind lists that k
   };
   const entries = await newTabSearch(search, { query: "night", threadId: null });
   expect(entries.map((entry) => entry.title)).toEqual(["Night shift", "Night owl", "Election night", "Night plan", "Book the night train", "Travel: sleeps badly at night"]);
-  expect(entries.slice(4).map((entry) => [entry.kind, entry.ref])).toEqual([["Task", { kind: "todo", id: "loop_1" }], ["Memory record", { kind: "record", id: "mem_1" }]]);
+  expect(entries.slice(4).map((entry) => [entry.kind, entry.ref])).toEqual([["To-do", { kind: "todo", id: "loop_1" }], ["Memory record", { kind: "record", id: "mem_1" }]]);
   expect((await newTabSearch(search, { query: "automations", threadId: null })).map((entry) => [entry.title, entry.kind])).toContainEqual(["Morning card", "Automation"]);
   expect(await newTabSearch(search, { query: "night", threadId: "thr_n" })).toHaveLength(5);
   expect((await newTabSearch(search, { query: "whiteboards", threadId: null })).map((entry) => [entry.title, entry.kind])).toContainEqual(["Floor plan", "Whiteboard"]);
@@ -123,8 +123,7 @@ it("gives every row the drag payload its kind drops as", async () => {
 it("searches under each kind's plural, with Recent on its own registration", () => {
   expect(STUDIO_NEW_TAB_ITEMS[0]).toMatchObject({ id: "recent" });
   expect(STUDIO_NEW_TAB_ITEMS.slice(1).map((registration) => registration.title)).toEqual([...new Set(TAB_KIND_REGISTRY.filter((entry) => entry.owner !== "bb").map((entry) => entry.plural))]);
-  expect(STUDIO_NEW_TAB_ITEMS.map((registration) => registration.id)).toEqual(expect.arrayContaining(["kind-automations", "kind-todos", "kind-record"]));
-  expect(STUDIO_NEW_TAB_ITEMS.map((registration) => registration.id)).not.toContain("kind-todo");
+  expect(STUDIO_NEW_TAB_ITEMS.map((registration) => registration.id)).toEqual(expect.arrayContaining(["kind-automations", "kind-todos", "kind-todo", "kind-record"]));
   expect(STUDIO_NEW_TAB_ITEMS.slice(1).every((registration) => !registration.useRecents && registration.search)).toBe(true);
   expect(STUDIO_NEW_TAB_ITEMS.map((registration) => registration.title)).not.toContain("Studio");
   const titles = STUDIO_NEW_TAB_ITEMS.map((registration) => registration.title);

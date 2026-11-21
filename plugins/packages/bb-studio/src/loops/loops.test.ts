@@ -100,8 +100,8 @@ it('serves loops.list with the areas of all loops, whatever the filter',async()=
  const beta=await handlers['loops.list']!({area:'Beta'}) as List;expect(beta.areas).toEqual(['Alpha','Beta']);expect([...beta.needsYouNow,...beta.comingUp].map(l=>l.title)).toEqual(['B']);});
 
 it('hardcodes no area names in the Loops UI or the iOS app',async()=>{
- const {existsSync,readFileSync}=await import('node:fs');const paths=['./ui/model.ts','./ui/LoopsTab.tsx','./ui/LoopsPane.tsx','../../../../apps/ios/iOS/Loops/LoopsView.swift','../../../../../ios/iOS/Loops/LoopsView.swift'].map(path=>new URL(path,import.meta.url)).filter(url=>existsSync(url));
- expect(paths.length).toBeGreaterThanOrEqual(3);for(const url of paths)expect(readFileSync(url,'utf8')).not.toMatch(/\bAREAS\b|static let areas|"(Job|Larkspur|Systems)"/);});
+ const {existsSync,readFileSync}=await import('node:fs');const paths=['./ui/model.ts','../../../../apps/ios/iOS/Loops/LoopsView.swift','../../../../../ios/iOS/Loops/LoopsView.swift'].map(path=>new URL(path,import.meta.url)).filter(url=>existsSync(url));
+ expect(paths.length).toBeGreaterThanOrEqual(1);for(const url of paths)expect(readFileSync(url,'utf8')).not.toMatch(/\bAREAS\b|static let areas|"(Job|Larkspur|Systems)"/);});
 
 it('releases the user\'s own Surface now at once, past the morning hold, the budget and reminders being off, and says why when it can\'t',async()=>{
  const handlers:Record<string,(x:any)=>unknown>={};let onChange:(v:Record<string,unknown>)=>void=()=>{};

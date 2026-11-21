@@ -10,8 +10,8 @@ vi.mock("../../kit/app/index", () => ({
   PageColumn: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   StudioBar: ({ children }: { children: ReactNode }) => <div data-testid="studio-bar">{children}</div>,
 }));
-vi.mock("../../loops/ui/TodosPage", () => ({
-  TodosPage: (props: { view: { bot: { id: string; name: string; state: string; kind?: string } }; focus?: string }) => <section data-testid="bot-automations" data-bot={props.view.bot.id} data-name={props.view.bot.name} data-disabled={String(props.view.bot.state !== "active")} data-external={String(props.view.bot.kind === "external")} data-focus={props.focus} />,
+vi.mock("../../strands/ui/StrandsPage", () => ({
+  StrandsPage: (props: { view: { bot: { id: string; name: string; state: string; kind?: string } }; focus?: string }) => <section data-testid="bot-automations" data-bot={props.view.bot.id} data-name={props.view.bot.name} data-disabled={String(props.view.bot.state !== "active")} data-external={String(props.view.bot.kind === "external")} data-focus={props.focus} />,
 }));
 vi.mock("../../kit/ui/icon", () => ({ Icon: () => null }));
 vi.mock("../bot/BotAvatar", () => ({ BotAvatar: () => null, botProvider: () => null }));
@@ -35,7 +35,7 @@ it("shows the picked Bot, else the primary, else the first", () => {
   expect(shownBot([], null)).toBeNull();
 });
 
-it("with one Bot, is that Bot's Tasks page opened at the top, full-page, with no switcher", async () => {
+it("with one Bot, is that Bot's Strands page opened at the top, full-page, with no switcher", async () => {
   state.bots = [{ id: "bot_main", name: "Chief of Staff", avatar: "🤖", state: "active", primary: true }];
   await act(async () => root.render(<AutomationsPanel />));
   expect(section()?.dataset).toMatchObject({ bot: "bot_main", disabled: "false", external: "false" });
@@ -67,7 +67,7 @@ it("with no Bot, the template's header still names the page", async () => {
   state.bots = [];
   await act(async () => root.render(<AutomationsPanel />));
   expect(container.querySelectorAll("h1")).toHaveLength(1);
-  expect(container.querySelector("[data-testid=studio-bar] [data-testid=page-bar-title]")?.textContent).toBe("Tasks");
+  expect(container.querySelector("[data-testid=studio-bar] [data-testid=page-bar-title]")?.textContent).toBe("Scheduled");
 });
 
 it("hands the shown Bot's name to the page, whose header names it", async () => {
