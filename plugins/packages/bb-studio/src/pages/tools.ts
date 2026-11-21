@@ -16,24 +16,32 @@ export const READ_PART_CHARS = 12_000;
 
 /**
  * One part of a page's Markdown, from block `from` (an id or its prefix) on, whole blocks only, at most
- * `limit` characters (always at least one block); `next` is the first block left out.
+ * `limit` characters; `next` is the first block left out. A single block larger than `limit` is cut at
+ * `limit` characters (`cut`). A `from` that matches no block gives `missing`: the block was deleted.
  */
-export function readPart(markdown: string, from: string | undefined, limit: number): { text: string; next: string | null; shown: number; total: number } {
-  const marker = /<!-- \^([A-Za-z0-9_-]+) -->/g;
+export function readPart(markdown: string, from: string | undefined, limit: number): { text: string; next: string | null; shown: number; total: number; cut?: { block: string; size: number }; missing?: true } {
+  const marker = /^<!-- \^([A-Za-z0-9_-]+) -->/gm;
   const starts: { at: number; id: string }[] = [];
   for (const match of markdown.matchAll(marker)) starts.push({ at: match.index!, id: match[1]! });
   if (!starts.length) return { text: markdown.slice(0, limit), next: null, shown: Math.min(markdown.length, limit), total: markdown.length };
   const blocks = starts.map((start, index) => ({ id: start.id, text: markdown.slice(start.at, starts[index + 1]?.at ?? markdown.length) }));
   const lead = markdown.slice(0, starts[0]!.at);
-  let first = from ? blocks.findIndex((block) => block.id.startsWith(from)) : 0;
-  if (first < 0) first = 0;
-  const out: string[] = first === 0 ? [lead] : [];
+  const first = from ? blocks.findIndex((block) => block.id.startsWith(from)) : 0;
+  if (first < 0) return { text: "", next: null, shown: 0, total: markdown.length, missing: true };
+  const out: string[] = first === 0 && lead ? [lead] : [];
   let size = out.join("").length;
   let index = first;
-  while (index < blocks.length && (index === first || size + blocks[index]!.text.length <= limit)) {
+  while (index < blocks.length && size + blocks[index]!.text.length <= limit) {
     out.push(blocks[index]!.text);
     size += blocks[index]!.text.length;
     index++;
+  }
+  if (index === first) {
+    // One block larger than the whole part: its first `limit` characters, and say so.
+    const block = blocks[first]!;
+    const room = Math.max(0, limit - size);
+    out.push(block.text.slice(0, room));
+    return { text: out.join(""), next: blocks[first + 1]?.id ?? null, shown: size + room, total: markdown.length, cut: { block: block.id, size: block.text.length } };
   }
   return { text: out.join(""), next: blocks[index]?.id ?? null, shown: size, total: markdown.length };
 }
@@ -135,16 +143,26 @@ export function registerTools(
       const meta = service.requirePage(page, ctx.projectId);
       const live = service.hub.open(meta.id);
       const markdown = readMarkdown(live.doc, { ids: true }).trim();
-      const part = readPart(markdown, from, limit ?? READ_PART_CHARS);
+      const header = [
+        `# ${meta.icon ? `${meta.icon} ` : ""}${untitled(meta.title)}`,
+        `Page id ${meta.id} · ${meta.project_id ? "project page" : "global page"} · ${pageUrl(meta.id)}`,
+      ];
+      // The header and the Next line stay inside MAX_READ_CHARS whatever limit asks for.
+      const budget = Math.min(limit ?? READ_PART_CHARS, MAX_READ_CHARS - header.join("\n").length - 600);
+      const part = readPart(markdown, from, budget);
+      if (part.missing) return `Block ${from} is no longer on page ${meta.id}; read it again without from.`;
       const threads = listThreads(live.doc);
       const last = part.next === null;
+      const notes = [
+        ...(part.cut ? [`(Block ${part.cut.block} is ${part.cut.size.toLocaleString("en-US")} characters, more than one part holds: it is cut after the first ${part.shown.toLocaleString("en-US")}.)`] : []),
+        ...(last ? [] : [`(Part: ${part.shown.toLocaleString("en-US")} of ${part.total.toLocaleString("en-US")} characters. Next: pages_read { page: "${meta.id}", from: "${part.next}" }.)`]),
+      ];
       return truncate(
         [
-          `# ${meta.icon ? `${meta.icon} ` : ""}${untitled(meta.title)}`,
-          `Page id ${meta.id} · ${meta.project_id ? "project page" : "global page"} · ${pageUrl(meta.id)}`,
+          ...header,
+          ...notes,
           "",
           part.text.trim() || "(empty page)",
-          ...(last ? [] : ["", `(Part: ${part.shown.toLocaleString("en-US")} of ${part.total.toLocaleString("en-US")} characters. Next: pages_read { page: "${meta.id}", from: "${part.next}" }.)`]),
           ...(last && threads.length ? ["", "## Open comments", ...threads.map(threadSummary)] : []),
         ].join("\n"),
         MAX_READ_CHARS,

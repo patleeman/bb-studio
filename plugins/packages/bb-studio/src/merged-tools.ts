@@ -159,6 +159,12 @@ export function mergedParameters(merge: Merge, book: Book, ops: readonly string[
   return z.discriminatedUnion(merge.field, variants as [z.ZodObject, z.ZodObject, ...z.ZodObject[]], { error: (issue) => (issue.code === "invalid_union" ? note : undefined) });
 }
 
+/** A merge's tool-level instructions: its members' own, each once. */
+function instructionsOfWith(book: Book, merge: Merge): string | null {
+  const texts = [...new Set(Object.values(merge.ops).map((old) => (book.get(old) as { instructions?: string } | null)?.instructions).filter((text): text is string => !!text))];
+  return texts.length ? texts.join("\n\n") : null;
+}
+
 export interface MergedToolDeps {
   book: Book;
   /** Whether the calling thread may run this old tool (it is in the thread's scope). */
@@ -167,17 +173,27 @@ export interface MergedToolDeps {
 
 /** The merged tools, to register after every member tool is in the book. */
 export function mergedTools(deps: MergedToolDeps) {
+  const instructionsOf = (merge: Merge) => instructionsOfWith(deps.book, merge);
   const tools = MERGES.filter((merge) => Object.values(merge.ops).every((old) => deps.book.get(old))).map((merge) => {
     // Short: the schema's "Needs:" note gives each op's fields; studio_tool_describe and the skills say more.
+    // Registered with an object root (providers and BB refuse a bare oneOf): the op field, and anything else as given.
+    // execute picks the op's own schema; the shown schema (configure's override) is the flattened union.
+    const opField = z.string().describe(`One of: ${Object.keys(merge.ops).join(", ")}`);
     return {
       name: merge.name,
       description: `${merge.summary} (${merge.field}: ${Object.keys(merge.ops).join(", ")}). Replaces ${Object.values(merge.ops).join(", ")}.`,
-      parameters: mergedParameters(merge, deps.book),
+      ...(instructionsOf(merge) ? { instructions: instructionsOf(merge)! } : {}),
+      parameters: z.object({ [merge.field]: opField }).catchall(z.unknown()),
       execute: async (input: Record<string, unknown>, ctx: unknown) => {
         const { [merge.field]: op, ...rest } = input;
+        const usable: string[] = [];
+        for (const [each, old] of Object.entries(merge.ops)) if (await deps.allowed(ctx, old)) usable.push(each);
         const old = merge.ops[String(op)];
-        if (!old) return `${merge.field} must be one of: ${opsNote(merge, deps.book)}.`;
-        if (!(await deps.allowed(ctx, old))) return `${merge.name} ${merge.field} "${String(op)}" isn't available in this thread.`;
+        if (!old || !usable.includes(String(op))) {
+          return usable.length ? `${merge.name}: ${merge.field} must be one of: ${opsNote(merge, deps.book, usable)}.` : `${merge.name} isn't available in this thread.`;
+        }
+        const checked = mergedParameters(merge, deps.book, [String(op)]).safeParse(input);
+        if (!checked.success) return `${merge.name} ${String(op)} can't take that: ${checked.error.issues.map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`).join("; ")}`;
         const back = Object.fromEntries(Object.entries(merge.rename?.[String(op)] ?? {}).map(([from, to]) => [to, from]));
         const args = Object.fromEntries(Object.entries(rest).map(([key, value]) => [back[key] ?? key, value]));
         return await deps.book.run(old, args, ctx, `${merge.name} ${String(op)}`);
@@ -203,6 +219,7 @@ export function mergedTools(deps: MergedToolDeps) {
       }),
       execute: async (input: Record<string, unknown>, ctx: unknown) => {
         const { page, comments, query, type, ...read } = input;
+        if (page === undefined && comments !== undefined) return "pages_read with comments needs page.";
         if (page === undefined) {
           if (!(await deps.allowed(ctx, "pages_list"))) return `pages_read without page (the list) isn't available in this thread.`;
           return await deps.book.run("pages_list", { query, type }, ctx, "pages_read");
@@ -211,6 +228,7 @@ export function mergedTools(deps: MergedToolDeps) {
           if (!(await deps.allowed(ctx, "pages_comments"))) return `pages_read with comments isn't available in this thread.`;
           return await deps.book.run("pages_comments", { page, ...(comments as Record<string, unknown>) }, ctx, "pages_read comments");
         }
+        if (!(await deps.allowed(ctx, "pages_read"))) return "pages_read with page isn't available in this thread.";
         return await deps.book.run(INTERNAL_RENAMES.pages_read!, { page, ...read }, ctx, "pages_read");
       },
     } as never);
@@ -230,6 +248,7 @@ export function mergedTools(deps: MergedToolDeps) {
           if (!(await deps.allowed(ctx, "code_comment_reply"))) return `code_comments op "reply" isn't available in this thread.`;
           return await deps.book.run("code_comment_reply", rest, ctx, "code_comments reply");
         }
+        if (!(await deps.allowed(ctx, "code_comments"))) return `code_comments op "list" isn't available in this thread.`;
         return await deps.book.run(INTERNAL_RENAMES.code_comments!, {}, ctx, "code_comments");
       },
     } as never);

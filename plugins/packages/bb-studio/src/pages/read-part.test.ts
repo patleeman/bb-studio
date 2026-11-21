@@ -23,10 +23,22 @@ describe("pages_read parts", () => {
     expect(seen).toBe(text.length);
   });
 
-  it("always gives at least one block, even one larger than the limit", () => {
+  it("cuts a single block larger than the limit at the limit, and says so", () => {
     const text = page(2, 20_000);
     const part = readPart(text, undefined, READ_PART_CHARS);
-    expect(part.text).toContain("Paragraph 0");
+    expect(part.text.length).toBe(READ_PART_CHARS);
+    expect(part.cut).toEqual({ block: "blk00000", size: expect.any(Number) });
+    expect(part.cut!.size).toBeGreaterThan(READ_PART_CHARS);
     expect(part.next).toBe("blk00001");
+  });
+
+  it("says when from names a block that is gone, instead of starting over", () => {
+    expect(readPart(page(40, 1000), "blkgone", READ_PART_CHARS)).toMatchObject({ missing: true, text: "" });
+  });
+
+  it("takes block markers only at the start of a line", () => {
+    const text = "<!-- ^aaa -->\nsays <!-- ^bbb --> inline\n\n<!-- ^ccc -->\nlast\n";
+    expect(readPart(text, "bbb", READ_PART_CHARS).missing).toBe(true);
+    expect(readPart(text, "ccc", READ_PART_CHARS).text).toBe("<!-- ^ccc -->\nlast\n");
   });
 });

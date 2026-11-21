@@ -548,7 +548,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (ITEM_TYPES.some((each) => each.family === "app" && !off.has(each.kind))) tools.push(...APP_TOOLS);
     tools.push(...CODE_TOOLS, ...WORKBENCH_TOOLS);
     // A skill review fork (src/skill-learning.ts) gets the skill tools and the Memory page's, nothing else of Studio's.
-    if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") return { tools: fixedTools(context, [...REVIEW_TOOLS, ...CODE_TOOLS]), skills: ["studio-code"], instructions: "" };
+    if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") { const names = [...REVIEW_TOOLS, ...CODE_TOOLS]; return { tools: fixedTools(context, names), skills: ["studio-code"], instructions: "", rescope: (extra: readonly string[]) => ({ tools: fixedTools(context, [...names, ...extra]), instructions: "" }) }; }
     // The Bot's own thread is told who it is; paused or stopped, it gets no Studio tools but its own.
     // Every conversation of a Bot (src/bot-threads.ts) is that Bot: Main, a fork
     // (a side thread from "Reply in thread" included) and a thread the user
@@ -564,7 +564,12 @@ export default async function plugin(bb: BbPluginApi) {
     const bot = own ?? (asConversation ? { ...asConversation, threadId: context.thread.id } : null);
     // An external bot's agent has its own memory and tools; Studio's don't reach it.
     if (bot?.kind === "external") return { tools: [], skills: [], instructions: bots.instructions(bot) };
-    if (bot && bot.state !== "active") return { tools: fixedTools(context, [...BOT_TOOLS, ...CODE_TOOLS]), skills: ["studio-code"], instructions: bots.instructions(bot) };
+    if (bot && bot.state !== "active") {
+      // A paused or stopped Bot: its own tools only; withMemory adds the memory tools through rescope, under the merged name.
+      const names = [...BOT_TOOLS, ...CODE_TOOLS];
+      const text = bots.instructions(bot);
+      return { tools: fixedTools(context, names), skills: ["studio-code"], instructions: text, rescope: (extra: readonly string[]) => ({ tools: fixedTools(context, [...names, ...extra]), instructions: text }) };
+    }
     // A runner is told its job and how to report; it reports with runner_report only.
     const runner = bot ? null : runners.forThread(context.thread.id, context.pluginMetadata);
     const which = bot ? conversationNote(context.thread.id) : "";

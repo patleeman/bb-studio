@@ -212,18 +212,33 @@ describe("merged tools run only the ops the thread may use", () => {
     configure(context("thr_kind_worker", "acp-opencode", "glm", {}));
     expect(await run("schedule", { op: "list" }, "thr_kind_worker")).toMatch(/isn't available in this thread/);
     configure(context("thr_kind_lead", "acp-opencode", "glm", {}));
-    expect(await run("bot_info", { view: "history", query: "x" }, "thr_kind_lead")).toMatch(/isn't available in this thread/);
+    const history = await run("bot_info", { view: "history", query: "x" }, "thr_kind_lead");
+    // The refusal lists only the views this lead may use.
+    expect(history).toMatch(/^bot_info: view must be one of: profile; state/);
+    expect(history).not.toContain("history");
   });
 
-  it("names the valid ops and their fields for a bad op", () => {
-    // BB checks a call with the tool's own schema before it runs; this is the message the agent gets.
-    const schedule = tools.get("schedule") as unknown as { parse(input: unknown): { ok: boolean; error?: string } };
-    const bad = schedule.parse({ op: "wat" });
-    expect(bad.ok).toBe(false);
-    expect(bad.error).toMatch(/op must be one of: list; create \(needs kind, name, schedule\)/);
-    const missing = schedule.parse({ op: "create", kind: "checkin" });
-    expect(missing.ok).toBe(false);
-    expect(missing.error).toMatch(/name/);
+  it("names the valid ops and their fields for a bad op, and an op's own field errors", async () => {
+    configure(context("thr_kind_main_ops", "acp-opencode", "glm", { metadata: { bot: botId } }));
+    expect(await run("schedule", { op: "wat" }, "thr_kind_main_ops")).toMatch(/^schedule: op must be one of: list; create \(needs kind, name, schedule\)/);
+    expect(await run("schedule", { op: "create", kind: "checkin" }, "thr_kind_main_ops")).toMatch(/^schedule create can't take that: .*name/);
+  });
+
+  it("registers every Studio tool with an object at its schema's root", () => {
+    const registered = [...tools.values()] as unknown as { name: string; inputSchema?: { type?: string } }[];
+    expect(registered.filter((tool) => tool.inputSchema?.type !== "object").map((tool) => tool.name)).toEqual([]);
+  });
+
+  it("gives design_screen the design routing text", () => {
+    const screen = tools.get("design_screen") as unknown as { instructions?: string };
+    expect(screen.instructions).toMatch(/design_screen, design_review and design_style/);
+  });
+
+  it("gives a paused Bot the merged memory tool, never the old names", () => {
+    db().prepare("INSERT OR IGNORE INTO bots (id, name, avatar, state, thread_id, created_at, updated_at) VALUES ('bot_paused', 'Paused', 'P', 'paused', 'thr_paused_main', 2, 2)").run();
+    const paused = configure(context("thr_paused_main", "acp-opencode", "glm"));
+    expect(names(paused.tools)).toContain("memory");
+    expect(names(paused.tools).filter((name) => name.startsWith("memory_"))).toEqual([]);
   });
 });
 
@@ -258,5 +273,21 @@ describe("a loaded merged tool's shown ops", () => {
     expect(await run("memory", { op: "update", id, text: "A corrected fact." }, "thr_kind_worker2")).not.toMatch(/isn't available|can't take/);
     const claude = configure(context("thr_kind_worker2", "claude-code", "claude-opus-5-5"));
     expect(opsShown(claude.tools, "memory")).toEqual(["search", "add", "update"]);
+  });
+});
+
+describe("pages_read on a long page", () => {
+  it("keeps the Next pointer whatever limit asks for, and refuses a block that is gone", async () => {
+    const thread = "thr_long_page_reader";
+    configure(context(thread, "claude-code", "claude-opus-5-5", { metadata: { bot: botId } }));
+    const markdown = Array.from({ length: 120 }, (_, index) => `Paragraph ${index}: ${"words ".repeat(160)}`).join("\n\n");
+    const created = await run("pages_create", { title: "Long page", markdown }, thread);
+    const pageId = /pg_[A-Za-z0-9]+/.exec(created)![0];
+    const big = await run("pages_read", { page: pageId, limit: 60_000 }, thread);
+    expect(big.length).toBeLessThanOrEqual(60_000);
+    const next = /Next: pages_read \{ page: "pg_[A-Za-z0-9]+", from: "([^"]+)" \}/.exec(big);
+    expect(next).not.toBeNull();
+    expect(await run("pages_read", { page: pageId, from: "zzzzgone" }, thread)).toMatch(/Block zzzzgone is no longer on page/);
+    expect(await run("pages_read", { comments: { op: "list" } }, thread)).toBe("pages_read with comments needs page.");
   });
 });

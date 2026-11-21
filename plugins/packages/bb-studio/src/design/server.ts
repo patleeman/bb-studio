@@ -384,7 +384,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
   bb.agents.registerTool({
     name: "design_write_screen",
     description: 'Create or replace one self-contained HTML screen ("1a", "2b"). For slide decks use viewport "slide" with steps; for multi-step prototypes declare `<meta name="bb-design-steps">` (see design skill).',
-    instructions: 'For UI design work (prototypes, screens, flows) and for slides and slide decks, create with pages_create (type "design"), use the design_* tools, and follow the design skill.',
+    instructions: 'For UI design work (prototypes, screens, flows) and for slides and slide decks, create with pages_create (type "design"), use design_screen, design_review and design_style, and follow the design skill.',
     presentation: { label: { pending: "Writing a screen", completed: "Wrote a screen" } },
     parameters: z.object({
       designId: z.string().min(1),
