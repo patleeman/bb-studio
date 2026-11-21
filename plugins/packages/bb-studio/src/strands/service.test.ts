@@ -72,7 +72,7 @@ describe("live states come only from real signals", () => {
   });
 });
 
-function service(options: { workers?: WorkerFact[]; asks?: Record<string, (Interaction & { createdAt?: number })[]>; busy?: boolean; areaAsks?: { id: string; label: string; at: number }[] } = {}) {
+function service(options: { workers?: WorkerFact[]; asks?: Record<string, (Interaction & { createdAt?: number })[]>; busy?: boolean; areaAsks?: { id: string; kind: "area" | "flag"; label: string; at: number }[] } = {}) {
   const db = database();
   const thread = new FakeThread();
   const svc = new StrandService({
@@ -80,7 +80,7 @@ function service(options: { workers?: WorkerFact[]; asks?: Record<string, (Inter
     conversationsOf: async () => [{ threadId: thread.id, title: "Main", isMain: true, lastActiveAt: NOW }], events: thread.events, jev: fakeJev(), model: fakeModel(), changed: () => {}, log: () => {}, now: () => NOW,
     setTimer: () => null, clearTimer: () => {},
     workers: async () => options.workers ?? [], interactions: async (threadId) => options.asks?.[threadId] ?? [], busy: async () => options.busy ?? false,
-    areaAsks: (threadId) => (threadId === thread.id ? options.areaAsks ?? [] : []),
+    extraAsks: (threadId) => (threadId === thread.id ? options.areaAsks ?? [] : []),
   });
   return { db, thread, svc };
 }
@@ -114,14 +114,14 @@ describe("strands.list", () => {
   });
 
   it("shows an area's item that needs the user as needs you on the strand of the turn that holds its report, answered in the chat", async () => {
-    const areaAsks: { id: string; label: string; at: number }[] = [];
+    const areaAsks: { id: string; kind: "area" | "flag"; label: string; at: number }[] = [];
     const x = service({ areaAsks });
     await x.svc.idle(x.thread.id);
     x.thread.turn("Furnace tune-up", "Asking the House runner.", { at: NOW - 3 * HOUR });
     const report = x.thread.turn("[bb message from thread:thr_house] Pick an HVAC company", "The House runner needs a pick of HVAC company.", { at: NOW - 2 * HOUR, kind: "report" });
     x.thread.turn("Book the dentist", "Ok.", { at: NOW - HOUR });
     await x.svc.idle(x.thread.id);
-    areaAsks.push({ id: "area:area_house:pick an hvac company", label: "House: Pick an HVAC company", at: NOW - 2 * HOUR + 5 });
+    areaAsks.push({ id: "area:area_house:pick an hvac company", kind: "area", label: "House: Pick an HVAC company", at: NOW - 2 * HOUR + 5 });
     const list = strandList.parse(await x.svc.list(x.thread.id));
     const held = list.strands.find((each) => each.state === "needs-you")!;
     expect(held).toMatchObject({ detail: "House: Pick an HVAC company", asks: [{ kind: "area", threadId: x.thread.id, label: "House: Pick an HVAC company", decisions: [] }] });

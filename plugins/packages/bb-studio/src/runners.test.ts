@@ -733,7 +733,7 @@ it("with runs as tasks: each run is a child task of the runner's task, a report 
   const [run] = store.children(parentIdOf(id));
   expect(run).toMatchObject({ owner: `thread:${threadId}`, state: "in_progress", automation: { role: "run", thread: threadId, sentAt: expect.any(Number) } });
   expect(prompt).toContain(`Your job: Check mail.`);
-  expect(prompt).toContain(`This run is task ${run!.id}; runner_report records its result there.`);
+  expect(prompt).toContain("runner_report records this run's result.");
   expect(await x.runners.report(threadId!, { level: "log", summary: "Two newsletters." })).toBe("Logged. Then reply exactly [PASS].");
   expect(store.get(run!.id)).toMatchObject({ state: "done", progress: { line: "Two newsletters." } });
   expect(await x.runners.report(threadId!, { level: "urgent", summary: "The payment failed." })).toBe("Told the user and pushed to their phone. Then reply exactly [PASS].");

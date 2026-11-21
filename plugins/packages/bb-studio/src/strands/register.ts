@@ -30,8 +30,8 @@ export interface StrandsRegisterDeps {
   scope: Omit<StrandsScope, "enabled">;
   /** A worker's conversation, for strand_note from a worker. */
   conversationOfWorker?(threadId: string): string | null;
-  /** Areas' items that need the user, reported into this conversation; see StrandServiceDeps.areaAsks. */
-  areaAsks?(threadId: string): { id: string; label: string; at: number }[];
+  /** An area's item that needs the user, and the conversation's own flag; see StrandServiceDeps.extraAsks. */
+  extraAsks?(threadId: string): { id: string; kind: "area" | "flag"; label: string; at: number }[];
   /** Secret values to keep out of what strands send and keep: Studio's API keys, Tool Gateway's secrets. */
   secrets(): Promise<readonly string[]>;
   log(message: string): void;
@@ -83,7 +83,7 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
       return list.filter((each) => each.status === undefined || each.status === "pending");
     },
     busy: async (threadId) => BUSY.has((await threadOf(threadId))?.status ?? ""),
-    ...(deps.areaAsks ? { areaAsks: deps.areaAsks } : {}),
+    ...(deps.extraAsks ? { extraAsks: deps.extraAsks } : {}),
     ...(deps.conversationOfWorker ? { conversationOfWorker: deps.conversationOfWorker } : {}),
     changed,
     log: deps.log,

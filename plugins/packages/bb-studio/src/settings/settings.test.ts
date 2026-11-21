@@ -11,7 +11,7 @@ import { STUDIO_KEY_SETTINGS } from "./keys";
 import { describeMigration, LEGACY_SETTINGS, migrateSettings, SETTINGS_MIGRATED_KEY } from "./migrate";
 import { registerSettings } from "./register";
 import { checkSetting, effectiveSettings, parseSettingText, SETTINGS_GROUPS, settingDefaults, STUDIO_SETTINGS, STUDIO_SETTING_KEYS } from "./schema";
-import { remindersForFirstBot, SETTINGS_KV_KEY, StudioSettingsStore } from "./store";
+import { SETTINGS_KV_KEY, StudioSettingsStore } from "./store";
 import { decisionsConstants, decisionsDefaults } from "../decisions/settings";
 import { loopTimeZone } from "./constants";
 
@@ -67,8 +67,8 @@ describe("the settings schema", () => {
     // The new hands-free settings are in Voice; batch confidence stays a field, in Advanced.
     for (const key of ["voiceLiveModel", "voiceLiveVoice", "voiceLiveBackendModel", "voiceLiveMonthlyCapUsd"] as const) expect(STUDIO_SETTINGS[key].group).toBe("voice");
     expect(STUDIO_SETTINGS.decisions_batchConfidence).toMatchObject({ group: "advanced", type: "number" });
-    expect(["loopDailyBudget", "loopQuietStart", "loopQuietEnd"].map((key) => STUDIO_SETTINGS[key as keyof typeof STUDIO_SETTINGS].group)).toEqual(["attention", "attention", "attention"]);
-    expect(STUDIO_SETTINGS.loopsEnabled.group).toBe("threads");
+    // To-do reminders went with to-dos: no switch, budget or quiet hours.
+    for (const key of ["loopsEnabled", "loopDailyBudget", "loopQuietStart", "loopQuietEnd"]) expect(STUDIO_SETTINGS).not.toHaveProperty(key);
   });
 
   it("says what each API key is for, and no label says Jev", () => {
@@ -82,14 +82,14 @@ describe("the settings schema", () => {
   it("checks values against type and range, and parses command-line text", () => {
     expect(checkSetting("autoTitle", false)).toEqual({ ok: true, value: false });
     expect(checkSetting("autoTitle", "no")).toMatchObject({ ok: false });
-    expect(checkSetting("loopQuietStart", 24)).toMatchObject({ ok: false, error: "loopQuietStart goes from 0 to 23." });
-    expect(checkSetting("loopQuietStart", 2.5)).toMatchObject({ ok: false });
+    expect(checkSetting("snapshotsPerPage", 1001)).toMatchObject({ ok: false, error: "snapshotsPerPage goes from 0 to 1000." });
+    expect(checkSetting("snapshotsPerPage", 2.5)).toMatchObject({ ok: false });
     expect(checkSetting("callAudioRetention", "1 day")).toMatchObject({ ok: false });
     expect(checkSetting("nope", 1)).toMatchObject({ ok: false });
     expect(parseSettingText("autoTitle", "off")).toEqual({ ok: true, value: false });
     expect(parseSettingText("decisions_batchConfidence", "1")).toEqual({ ok: true, value: 1 });
     expect(parseSettingText("decisions_batchConfidence", "")).toMatchObject({ ok: false });
-    expect(effectiveSettings({ autoTitle: false, loopQuietStart: 99, bogus: 1 })).toMatchObject({ autoTitle: false, loopQuietStart: 22 });
+    expect(effectiveSettings({ autoTitle: false, snapshotsPerPage: 5000, bogus: 1 })).toMatchObject({ autoTitle: false, snapshotsPerPage: 50 });
   });
 });
 
@@ -100,36 +100,19 @@ describe("Studio's settings store", () => {
     await store.load();
     const changes = vi.fn();
     store.onChange(changes);
-    await store.set({ autoTitle: false, loopDailyBudget: 3 });
-    expect(kv.rows.get(SETTINGS_KV_KEY)).toEqual({ autoTitle: false, loopDailyBudget: 3 });
-    expect(store.current()).toMatchObject({ autoTitle: false, loopDailyBudget: 3, autoMeetingNotes: false });
-    await expect(store.set({ autoMeetingNotes: true, loopQuietEnd: 30 })).rejects.toThrow("loopQuietEnd goes from 0 to 23.");
+    await store.set({ autoTitle: false, dictationAudioDays: 3 });
+    expect(kv.rows.get(SETTINGS_KV_KEY)).toEqual({ autoTitle: false, dictationAudioDays: 3 });
+    expect(store.current()).toMatchObject({ autoTitle: false, dictationAudioDays: 3, autoMeetingNotes: false });
+    await expect(store.set({ autoMeetingNotes: true, snapshotsPerPage: 5000 })).rejects.toThrow("snapshotsPerPage goes from 0 to 1000.");
     expect(store.current().autoMeetingNotes).toBe(false);
     await expect(store.set({ openaiApiKey: "sk" })).rejects.toThrow("There's no Studio setting called openaiApiKey.");
     await store.set({ autoTitle: null });
-    expect(kv.rows.get(SETTINGS_KV_KEY)).toEqual({ loopDailyBudget: 3 });
+    expect(kv.rows.get(SETTINGS_KV_KEY)).toEqual({ dictationAudioDays: 3 });
     expect(changes).toHaveBeenCalledTimes(2);
     const again = new StudioSettingsStore(kv);
-    expect((await again.load()).loopDailyBudget).toBe(3);
+    expect((await again.load()).dictationAudioDays).toBe(3);
   });
 
-  it("turns Todo reminders on with a new install's first Bot, and leaves an existing install's value alone", async () => {
-    const fresh = new StudioSettingsStore(memoryKv());
-    await fresh.load();
-    expect(fresh.current().loopsEnabled).toBe(false);
-    expect(await remindersForFirstBot(fresh, true)).toBe(true);
-    expect(fresh.explicit()).toEqual({ loopsEnabled: true });
-    const unset = new StudioSettingsStore(memoryKv());
-    await unset.load();
-    expect(await remindersForFirstBot(unset, false)).toBe(false);
-    expect(unset.current().loopsEnabled).toBe(false);
-    expect(unset.explicit()).toEqual({});
-    const kv = memoryKv(new Map([[SETTINGS_KV_KEY, { loopsEnabled: false }]]));
-    const stored = new StudioSettingsStore(kv);
-    await stored.load();
-    expect(await remindersForFirstBot(stored, true)).toBe(false);
-    expect(kv.rows.get(SETTINGS_KV_KEY)).toEqual({ loopsEnabled: false });
-  });
 });
 
 describe("the combined handle Studio's server code reads", () => {
@@ -201,16 +184,16 @@ describe("the one-time migration", () => {
   }
 
   it("carries every changed value over under the same key, keeps defaults unset, and runs once", async () => {
-    const d = deps({ autoTitle: false, loopDailyBudget: 3, loopQuietStart: 23, explore_replyItems: "👍 Yes", voiceLiveMonthlyCapUsd: 35, voiceLiveVoice: "cedar", decisions_batchConfidence: 1, callTranscription: "Home server", callServerUrl: "http://homelab:8000", snapshotsPerPage: 50, loopsEnabled: true });
+    const d = deps({ autoTitle: false, dictationAudioDays: 3, explore_replyItems: "👍 Yes", voiceLiveMonthlyCapUsd: 35, voiceLiveVoice: "cedar", decisions_batchConfidence: 1, callTranscription: "Home server", callServerUrl: "http://homelab:8000", snapshotsPerPage: 50 });
     await d.store.load();
     const report = await migrateSettings(d);
-    expect(report?.copied.sort()).toEqual(["autoTitle", "callServerUrl", "callTranscription", "decisions_batchConfidence", "explore_replyItems", "loopDailyBudget", "loopQuietStart", "loopsEnabled", "voiceLiveMonthlyCapUsd", "voiceLiveVoice"].sort());
-    expect(d.store.current()).toMatchObject({ autoTitle: false, loopDailyBudget: 3, loopQuietStart: 23, explore_replyItems: "👍 Yes", voiceLiveMonthlyCapUsd: 35, decisions_batchConfidence: 1, callTranscription: "Home server", loopsEnabled: true, snapshotsPerPage: 50 });
+    expect(report?.copied.sort()).toEqual(["autoTitle", "callServerUrl", "callTranscription", "decisions_batchConfidence", "explore_replyItems", "dictationAudioDays", "voiceLiveMonthlyCapUsd", "voiceLiveVoice"].sort());
+    expect(d.store.current()).toMatchObject({ autoTitle: false, dictationAudioDays: 3, explore_replyItems: "👍 Yes", voiceLiveMonthlyCapUsd: 35, decisions_batchConfidence: 1, callTranscription: "Home server", snapshotsPerPage: 50 });
     // snapshotsPerPage was at its default, so it follows the default.
     expect(d.store.explicit()).not.toHaveProperty("snapshotsPerPage");
     expect(d.kv.rows.get(SETTINGS_MIGRATED_KEY)).toMatchObject({ copied: report!.copied });
     // The old values stay in BB's table for a rollback.
-    expect(d.legacy.stored).toMatchObject({ autoTitle: false, loopDailyBudget: 3 });
+    expect(d.legacy.stored).toMatchObject({ autoTitle: false, dictationAudioDays: 3 });
     // Run once: a later load does nothing, even when the old values differ.
     d.legacy.stored.autoTitle = true;
     expect(await migrateSettings(d)).toBeNull();
@@ -285,7 +268,7 @@ describe("registerSettings on a host", () => {
     const host = createFakePluginHost({
       pluginId: "studio",
       dataDir,
-      settings: { autoTitle: false, loopQuietEnd: 6, emojiItems: "👍 Yes", botAvatarOpenaiApiKey: "sk-old" },
+      settings: { autoTitle: false, snapshotsPerPage: 6, emojiItems: "👍 Yes", botAvatarOpenaiApiKey: "sk-old" },
       sdk: { plugins: { reload, list: async () => ({ plugins: [] }) } as never, ...sdk },
     });
     return { host, reload, dataDir };
@@ -295,14 +278,14 @@ describe("registerSettings on a host", () => {
     vi.useFakeTimers();
     const { host, reload } = plugin();
     const { settings } = await registerSettings(host.bb, "studio");
-    expect(await settings.get()).toMatchObject({ autoTitle: false, loopQuietEnd: 6, emojiItems: "👍 Yes", openaiApiKey: "sk-new" });
+    expect(await settings.get()).toMatchObject({ autoTitle: false, snapshotsPerPage: 6, emojiItems: "👍 Yes", openaiApiKey: "sk-new" });
     expect(host.harness.inspection.logEntries.map((entry) => entry.message).join("\n")).not.toContain("sk-");
     await vi.advanceTimersByTimeAsync(3000);
     expect(reload).toHaveBeenCalledWith({ pluginId: "studio" });
 
     const next = await host.harness.lifecycle.reload(async (bb: BbPluginApi) => {
       const again = await registerSettings(bb, "studio");
-      expect(await again.settings.get()).toMatchObject({ autoTitle: false, loopQuietEnd: 6, openaiApiKey: "sk-new" });
+      expect(await again.settings.get()).toMatchObject({ autoTitle: false, snapshotsPerPage: 6, openaiApiKey: "sk-new" });
       // Only the migrating load declared the old fields, so they can be declared here; the old avatar key is cleared.
       expect(await bb.settings.define({ botAvatarOpenaiApiKey: LEGACY_SETTINGS.botAvatarOpenaiApiKey! }).get()).toEqual({ botAvatarOpenaiApiKey: "" });
       expect((await bb.settings.define({ autoMeetingNotes: LEGACY_SETTINGS.autoMeetingNotes! }).get())).toEqual({ autoMeetingNotes: false });
@@ -316,9 +299,9 @@ describe("registerSettings on a host", () => {
     const { host } = plugin();
     await registerSettings(host.bb, "studio");
     const got = await host.harness.behavior.callRpc("settings.get", null) as { values: Record<string, unknown>; changed: string[]; timeZone: string };
-    expect(got.values).toMatchObject({ autoTitle: false, loopQuietEnd: 6 });
+    expect(got.values).toMatchObject({ autoTitle: false, snapshotsPerPage: 6 });
     expect(got.values).not.toHaveProperty("openaiApiKey");
-    expect(got.changed.sort()).toEqual(["autoTitle", "emojiItems", "loopQuietEnd"]);
+    expect(got.changed.sort()).toEqual(["autoTitle", "emojiItems", "snapshotsPerPage"]);
     expect(got.timeZone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
     const zoned = await host.harness.behavior.callRpc("settings.set", { values: { todosTimeZone: "America/Los_Angeles" } }) as { timeZone: string; defaultTimeZone: string };
     expect(zoned).toMatchObject({ timeZone: "America/Los_Angeles", defaultTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
@@ -326,8 +309,8 @@ describe("registerSettings on a host", () => {
     await expect(host.harness.behavior.callRpc("settings.set", { values: { todosTimeZone: "Mars/Olympus" } })).rejects.toThrow();
     await host.harness.behavior.callRpc("settings.set", { values: { todosTimeZone: null } });
     const before = host.harness.inspection.realtimeSignals.length;
-    const set = await host.harness.behavior.callRpc("settings.set", { values: { loopDailyBudget: 2, autoTitle: null } }) as { values: Record<string, unknown> };
-    expect(set.values).toMatchObject({ loopDailyBudget: 2, autoTitle: true });
+    const set = await host.harness.behavior.callRpc("settings.set", { values: { dictationAudioDays: 2, autoTitle: null } }) as { values: Record<string, unknown> };
+    expect(set.values).toMatchObject({ dictationAudioDays: 2, autoTitle: true });
     expect(host.harness.inspection.realtimeSignals.slice(before)).toEqual([expect.objectContaining({ channel: "studio-settings" })]);
     await expect(host.harness.behavior.callRpc("settings.set", { values: { openaiApiKey: "sk" } })).rejects.toThrow();
     await host.harness.lifecycle.dispose();
@@ -395,19 +378,19 @@ describe("bb studio settings", () => {
 
   it("gets, sets and resets one setting, checking its type", async () => {
     const store = await storeWith();
-    expect(await settingsCli(["get", "loopDailyBudget"], store)).toEqual({ exitCode: 0, stdout: "5\n" });
-    expect(await settingsCli(["set", "loopDailyBudget", "3"], store)).toEqual({ exitCode: 0, stdout: "loopDailyBudget = 3\n" });
+    expect(await settingsCli(["get", "dictationAudioDays"], store)).toEqual({ exitCode: 0, stdout: "1\n" });
+    expect(await settingsCli(["set", "dictationAudioDays", "3"], store)).toEqual({ exitCode: 0, stdout: "dictationAudioDays = 3\n" });
     expect(await settingsCli(["set", "autoTitle", "off"], store)).toEqual({ exitCode: 0, stdout: "autoTitle = false\n" });
     expect(await settingsCli(["set", "explore_replyItems", "👍", "Yes,", "❓", "Why"], store)).toEqual({ exitCode: 0, stdout: "explore_replyItems = \"👍 Yes, ❓ Why\"\n" });
-    expect(store.current()).toMatchObject({ loopDailyBudget: 3, autoTitle: false });
+    expect(store.current()).toMatchObject({ dictationAudioDays: 3, autoTitle: false });
     expect(JSON.parse((await settingsCli(["get", "autoTitle", "--json"], store)).stdout!)).toEqual({ key: "autoTitle", value: false, default: true, changed: true });
     expect(await settingsCli(["reset", "autoTitle"], store)).toEqual({ exitCode: 0, stdout: "autoTitle = true (default)\n" });
-    const bad = await settingsCli(["set", "loopQuietStart", "25"], store);
+    const bad = await settingsCli(["set", "snapshotsPerPage", "5000"], store);
     expect(bad).toMatchObject({ exitCode: 1 });
-    expect(bad.stderr).toBe("loopQuietStart goes from 0 to 23.\n");
+    expect(bad.stderr).toBe("snapshotsPerPage goes from 0 to 1000.\n");
     expect((await settingsCli(["set", "callAudioRetention", "1 day"], store)).stderr).toContain("one of: 7 days, 30 days, Forever");
     expect((await settingsCli(["get", "openaiApiKey"], store)).stderr).toContain("There's no Studio setting called openaiApiKey.");
     expect((await settingsCli(["frob"], store))).toMatchObject({ exitCode: 1 });
-    expect(settingDefaults().loopDailyBudget).toBe(5);
+    expect(settingDefaults().dictationAudioDays).toBe(1);
   });
 });

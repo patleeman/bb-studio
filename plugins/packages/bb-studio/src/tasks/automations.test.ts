@@ -8,6 +8,7 @@ import { registerLoops } from "../loops/register";
 import { AutomationTasks, type AutomationTaskDeps, alwaysPrints, CLEAR_AFTER_MS, findingKey, KEEP_RUNS, parentIdOf, readSources, splitControl, URGENT_RUN_NOTE, type AutomationBotInfo } from "./automations";
 import { isClosed, type Task } from "./contract";
 import { registerTasks } from "./register";
+import { withTaskTools } from "./test/tools";
 import { TaskStore } from "./store";
 import { registerUserTasks } from "./user";
 import { inLoopView } from "./views";
@@ -79,8 +80,8 @@ function setup(deps: Partial<AutomationTaskDeps> = {}) {
     sdk: { threads: { get: async () => null, update: vi.fn(async () => ({})), timeline: vi.fn(async () => ({ rows: [] })) } },
   };
   const post = async (text: string) => { posts.push(text); };
-  const loops = registerLoops(bb as never, db, post, async () => {}, { get: async () => ({ loopsEnabled: false }), onChange: () => {} }, () => "UTC", () => {});
-  registerTasks(bb as never, db, post, async (threadId, text) => { sent.push({ threadId, text }); });
+  const loops = registerLoops(bb as never, db, post, () => "UTC");
+  withTaskTools(tools, db, registerTasks(bb as never, db, post, async (threadId, text) => { sent.push({ threadId, text }); }));
   registerUserTasks(bb as never, db, {
     post, send: async (threadId, text) => { sent.push({ threadId, text }); }, thread: async () => null,
     loopAct: (x) => loops.actDirect(x), reopenLoop: () => {}, snoozeLoopUntil: () => {}, held: () => [],
@@ -174,8 +175,9 @@ it("a check-in run is a child task the Bot owns; it closes quietly when the Bot'
   const [run] = children(store, "aut_daily");
   expect(run).toMatchObject({ owner: "cos", state: "in_progress", origin: "task", conversation: null, automation: { role: "run", thread: "thr_main", kind: "checkin" } });
   expect(run!.title).toMatch(/^Daily check-in · Nov 15, 8:00 AM$/);
-  expect(started.prompt).toContain(`This run is task ${run!.id}.`);
-  expect(started.prompt).toContain('task_handoff (to "user"');
+  expect(started.prompt).toContain("If something in this run needs the user, tell the user in this chat");
+  expect(started.prompt).toContain("bot_needs_you");
+  expect(started.prompt).not.toMatch(/task_[a-z]+/);
   expect(store.get("task_auto-aut-daily").automation).toMatchObject({ count: 1, lastAt: NOW });
   at(NOW + 680);
   expect(tasks.settle("thr_main", "[PASS]", "succeeded")).toBe(1);
@@ -287,7 +289,7 @@ it("a watcher's finding is one task; the next finding for the same thing updates
   const { store, tasks } = setup();
   tasks.sync();
   const first = tasks.watcherRun("aut_silent", "Kensico health rc=1: writer: Claude spend $5.42 today for write-ups and summaries (over $5/day)", null, NOW);
-  expect(first).toMatchObject({ post: "Kensico health rc=1: writer: Claude spend $5.42 today for write-ups and summaries (over $5/day)", note: expect.stringMatching(/^This finding is task task_.*Leave it open while the problem lasts/) });
+  expect(first).toMatchObject({ post: "Kensico health rc=1: writer: Claude spend $5.42 today for write-ups and summaries (over $5/day)", note: expect.stringMatching(/^This is a watcher finding\..*bot_needs_you.*closes the finding when the problem clears/) });
   const [finding] = children(store, "aut_silent");
   expect(finding).toMatchObject({ owner: "cos", state: "in_progress", conversation: "thr_main", automation: { role: "finding", count: 1 }, title: "Silent heartbeat: Kensico health rc=1: writer: Claude spend $5.42 today for write-ups and summaries (over $5/day)" });
   at(NOW + 24 * HOUR);
@@ -354,7 +356,7 @@ it("a watcher can name its finding's key, owner and clear it; a print-only watch
   const morning1 = tasks.watcherRun("aut_morning", "Write today's morning card.", null, NOW);
   at(NOW + 24 * HOUR);
   const morning2 = tasks.watcherRun("aut_morning", "Write today's morning card.", null, NOW + 24 * HOUR);
-  expect(morning1).toMatchObject({ post: "Write today's morning card.", note: expect.stringMatching(/^This run is task /) });
+  expect(morning1).toMatchObject({ post: "Write today's morning card.", note: expect.stringMatching(/^If something in this run needs the user/) });
   expect(morning2).toMatchObject({ post: "Write today's morning card." });
   expect(children(store, "aut_morning").map((t) => [t.automation!.role, t.state])).toEqual([["run", "done"], ["run", "in_progress"]]);
   expect(tasks.watcherRun("aut_unknown", "x", null, NOW)).toBeNull();
@@ -453,7 +455,7 @@ it("P1: an untouched finding gets one agent-only nudge a day at most, only when 
     await Promise.resolve();
   }
   expect(nudges).toHaveLength(1);
-  expect(nudges[0]).toEqual({ threadId: "thr_main", text: expect.stringMatching(/^Watcher finding task task_.*still happening: found 25 times.*Latest output: timeline-sync last succeeded 29h ago.*reply exactly \[PASS\]/s) });
+  expect(nudges[0]).toEqual({ threadId: "thr_main", text: expect.stringMatching(/^Watcher finding ".*" is still happening: found 25 times.*Latest output: timeline-sync last succeeded 29h ago.*bot_needs_you.*reply exactly \[PASS\]/s) });
   at(NOW + 49 * HOUR);
   tasks.watcherRun("aut_silent", 'timeline-sync is failing: auth refused\n{"key": "timeline-sync last succeeded h ago"}', null, NOW + 49 * HOUR);
   await Promise.resolve();
@@ -606,25 +608,4 @@ it("QA: a finding's title follows its latest text; a replayed run adds nothing; 
   expect(store.get("task_auto-aut-silent")).toMatchObject({ progress: { line: "Found: Nightly export failed" }, automation: { severity: null } });
   tasks.watcherRun("aut_silent", "[warn] Cert expires in 1 days", null, NOW + 5 * HOUR);
   expect(store.get("task_auto-aut-silent").automation!.severity).toBe("warn");
-});
-
-it("live recheck: after a critical finding pushed the user's task, the Bot marking it urgent with push doesn't push it again", async () => {
-  seed();
-  const pushes: string[] = [];
-  const { store, tasks, tool } = setup({ push: async (task) => { pushes.push(task.id); } });
-  tasks.watcherRun("aut_silent", "[warn] Disk 91% full", null, NOW);
-  const [disk] = children(store, "aut_silent");
-  await tool("task_handoff", { id: disk!.id, to: "user", needs: "Free some space" }, "thr_main");
-  tasks.watcherRun("aut_silent", "[critical] Disk 99% full", null, NOW + HOUR);
-  expect(pushes).toEqual([disk!.id]);
-  await tool("task_update", { id: disk!.id, priority: "urgent", push: true }, "thr_main");
-  const { LoopStore } = await import("../loops/store");
-  const { LoopScheduler } = await import("../loops/scheduler");
-  const notify = vi.fn(async () => {});
-  const scheduler = new LoopScheduler(new LoopStore(db), () => ({ enabled: true, timeZone: "UTC", budget: 5, quietStart: 22, quietEnd: 7, morning: 8 }) as never, async () => {}, notify);
-  await scheduler.tick();
-  expect(notify).not.toHaveBeenCalled();
-  const fresh = (await tool("task_create", { title: "Pay rent", owner: "user", push: true, priority: "urgent" }, "thr_main")).task;
-  await scheduler.tick();
-  expect(notify.mock.calls.map((c) => (c as unknown as [{ id: string }])[0].id)).toEqual([fresh.id]);
 });

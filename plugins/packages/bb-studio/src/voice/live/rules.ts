@@ -2,59 +2,44 @@
 // voice's prompt: the model can ask for anything, and Studio decides
 // (classify below).
 //
-// - Reads are free: what's waiting (todos), and threads' replies.
+// - Reads are free: threads' replies.
 // - Acts at once, said briefly: relays to the CoS or a thread ("Sent to the
-//   Larkspur lead."), and todo actions (done, snooze, add, hand off), with a
-//   spoken 10 s undo on the todo actions.
+//   Larkspur lead.").
 // - Needs a spoken yes, which Studio checks itself in the user's own
 //   transcribed words after the question (the model's word doesn't count):
-//   only what's destructive or hard to undo. Dropping a todo, stopping or
-//   archiving a thread, pausing or deleting an automation.
+//   only what's destructive or hard to undo. Stopping or archiving a thread,
+//   pausing or deleting an automation.
 // - Never by voice: spending money, email or messages to people outside BB,
 //   posting publicly, approving credentials. Those aren't tools; a relay that
 //   asks for one is still sent, but marked so the target asks in its chat.
-import { voiceToolName, type RelayIntent } from "./shared";
+import type { RelayIntent } from "./shared";
 
 /** A destructive action waits this long for a yes; then it's dropped. */
 export const DRAFT_MS = 45_000;
-/** Todo actions can be undone for this long. */
-export const UNDO_MS = 10_000;
-/** Todo actions that run at once (with undo). */
-export const VOICE_LOOP_ACTIONS = ["done", "snooze", "hand_off"] as const;
-/** Todo actions that need a spoken yes. Choose, nudge and keep aren't voice actions. */
-export const CONFIRM_LOOP_ACTIONS = ["drop"] as const;
 
 /** What a tool call is, by the eyes-free rules. */
 export type ToolClass = "read" | "act" | "confirm" | "unknown";
 
 /** Destructive or hard to undo: each needs the user's spoken yes. */
 export const DESTRUCTIVE_TOOLS = ["stop_thread", "archive_thread", "pause_automation", "delete_automation"] as const;
-export type DestructiveAction = "drop_loop" | (typeof DESTRUCTIVE_TOOLS)[number];
+export type DestructiveAction = (typeof DESTRUCTIVE_TOOLS)[number];
 
 /** Classifies a tool call. `confirm` and `cancel` answer a pending one. */
-export function classify(name: string, args: Record<string, unknown> = {}): ToolClass {
-  const tool = voiceToolName(name);
-  if (tool === "todos_list" || tool === "read_replies") return "read";
-  if (tool === "send_to_cos" || tool === "send_to_thread" || tool === "todos_add" || tool === "undo" || tool === "confirm" || tool === "cancel") return "act";
-  if (tool === "todos_act") {
-    const action = String(args.action ?? "");
-    if ((CONFIRM_LOOP_ACTIONS as readonly string[]).includes(action)) return "confirm";
-    return (VOICE_LOOP_ACTIONS as readonly string[]).includes(action) ? "act" : "unknown";
-  }
+export function classify(tool: string): ToolClass {
+  if (tool === "read_replies") return "read";
+  if (tool === "send_to_cos" || tool === "send_to_thread" || tool === "confirm" || tool === "cancel") return "act";
   return (DESTRUCTIVE_TOOLS as readonly string[]).includes(tool) ? "confirm" : "unknown";
 }
 
 /** The question the voice asks before a destructive action. */
 export function confirmPrompt(action: DestructiveAction, name: string): string {
   switch (action) {
-    case "drop_loop": return `Drop the task '${name}'? Say yes to drop.`;
     case "stop_thread": return `Stop the thread '${name}'? Say yes to stop.`;
     case "archive_thread": return `Archive the thread '${name}'? Say yes to archive.`;
     case "pause_automation": return `Pause the automation '${name}'? Say yes to pause.`;
     case "delete_automation": return `Delete the automation '${name}'? It can't be undone. Say yes to delete.`;
   }
 }
-export const VOICE_SNOOZES = ["later_today", "tonight", "tomorrow_morning", "this_weekend"] as const;
 
 const normal = (text: string) => text.toLowerCase().replace(/[’']/g, "'").replace(/[^a-z' ]+/g, " ").replace(/\s+/g, " ").trim();
 

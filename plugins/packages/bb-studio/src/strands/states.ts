@@ -4,7 +4,8 @@
 //   needs-you   a pending BB question or approval in a turn of the strand, a
 //               worker of the strand in needs-you, a Tool Gateway request
 //               from the conversation or one of the strand's workers, or an
-//               area's item that needs the user, on the strand its report sits in
+//               area's item that needs the user, on the strand its report sits in,
+//               or the conversation's flag (bot_needs_you), on the strand of its turn
 //   running     the strand's turn is running, or one of its workers is
 //   done-unseen a worker finished or failed since the strand was last opened (24 hours)
 //   quiet       an agent said it is done (strand_note), until its next activity:
@@ -38,7 +39,7 @@ export type WorkerStatus = "running" | "needs-you" | "failed" | "done";
 export interface WorkerSignal { threadId: string; title: string; status: WorkerStatus; strandId: string | null; endedAt: number | null }
 export type AskDecision = "allow_once" | "allow_for_session" | "deny";
 /** Something waiting on the user: a BB question or approval (in the conversation or one of its workers), or a Tool Gateway request. */
-export interface AskSignal { id: string; kind: "question" | "approval" | "gateway" | "area"; strandId: string | null; label: string; threadId: string; decisions: AskDecision[]; /** An approval's full command, working folder, actions and session grant, in BB's words. */ details: string[]; /** The conversation's turn it waits in (its rows stay in view under any strand filter); null for a worker's. */ turnId?: string | null }
+export interface AskSignal { id: string; kind: "question" | "approval" | "gateway" | "area" | "flag"; strandId: string | null; label: string; threadId: string; decisions: AskDecision[]; /** An approval's full command, working folder, actions and session grant, in BB's words. */ details: string[]; /** The conversation's turn it waits in (its rows stay in view under any strand filter); null for a worker's. */ turnId?: string | null }
 export interface TaskSignal { id: string; strandId: string; waitingOn: { kind: string; text: string | null; ref: string | null } | null }
 
 export interface Signals {

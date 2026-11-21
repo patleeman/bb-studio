@@ -1,6 +1,5 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
-import { z } from "zod";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { ownerText } from "../loops/reference";
 import { placeKey } from "../loops/store";
@@ -10,14 +9,11 @@ import { closedByUser, KEPT_CLOSED, createInput, handoffInput, isClosed, listInp
 import type { TaskProblem } from "./check";
 import { asFact, boundTask, isPlaceholder, rootOf, ThreadDirectory } from "./links";
 import { SpawnLinks } from "./spawn";
-import { guardTasks, surfaceForUser, TaskStore, toStoredOwner } from "./store";
+import { surfaceForUser, TaskStore, toStoredOwner } from "./store";
 import { inLoopView, inWorkView } from "./views";
 
 const SCHEDULE_TASK = "This task is an automation's schedule; change it with automation_update, automation_pause or automation_resume (runner_* for a runner). Its runs and findings are its subtasks: update those instead.";
 
-export const TASK_TOOLS = ["task_create", "task_update", "task_get", "task_list", "task_handoff", "task_check"];
-
-export const SPAWN_RULE = "Every worker thread belongs to exactly one task. Before or right after you spawn a worker, make its task (task_create with owner \"thread:<worker>\" or workers [<worker>], and parentId your own task so it nests under your job) and give the worker that task's id in its first message, written task:<id>. A worker reports only on that task: step and line as it goes, outputs and state done at the end. A worker's first task_update on a task joins it when it has none yet; a worker with no task after 90 seconds gets one made from its thread title.";
 export const CONVERSATION_SET = "The conversation is set once, where the task started; it was kept. A subtask shows under its parent's conversation.";
 export const WAITING_NOTE = "Say what it waits on with waitingOn: {kind: \"user\"}, {kind: \"ci\", ref: <run or PR>}, {kind: \"task\", ref: <task id>} or {kind: \"outside\", text: <who>}.";
 
@@ -25,15 +21,13 @@ type Ctx = { threadId?: string | null };
 type Post = (text: string) => Promise<void>;
 type Send = (threadId: string, text: string) => Promise<void>;
 
-const CREATE = 'Track a task (one per job or to-do). Set owner ("user", "cos", "me" or "thread:<id>"). With card: true returns a ::work{id} line to post once; report progress with task_update and pass task:<id> to workers (see studio skill).';
-const UPDATE = "Update a task in place (state, step, line, needs, timing, workers, outputs, card). Progress goes to history; use task_handoff to change owner. When waiting, set waitingOn.";
-const CHECK = "Report task orphans and duplicates without changing anything.";
-const GET = "Read one task (task_…, loop_… or wc_…): record, history and subtasks.";
-const LIST = 'List tasks (open by default, newest first). Filter by owner ("user", "cos", "me", "thread:<id>"), state, conversation, area, project or parent.';
-const HANDOFF = "Hand a task to another owner (user, cos, me, thread:<id>) keeping history; pass needs and options when asking the user.";
-
 export type TaskToolOptions = { links?: SpawnLinks; check?: () => Promise<TaskProblem[]> };
 
+// The task rows' own logic: make, change, read, list and hand off a task.
+// Agents no longer have task tools (strands replaced them; their one tool is
+// strand_note, src/strands): these functions stay for what still keeps task
+// rows (areas, automations' runs and findings, the Tool Gateway's history,
+// and older phone builds acting on an old card).
 export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post, send: Send = async (threadId, text) => { await bb.sdk.threads.send({ threadId, mode: "auto", input: [{ type: "text", text, mentions: [], visibility: "agent-only" }] } as never); }, moved: (task: Task) => void = () => {}, options: TaskToolOptions = {}) {
   const store = new TaskStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); });
   const links = options.links ?? new SpawnLinks({ store, dir: new ThreadDirectory(db), thread: async (threadId) => asFact(await bb.sdk.threads.get({ threadId } as never).catch(() => null)) });
@@ -173,7 +167,7 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
     const to = toStoredOwner(x.to, ctx.threadId);
     const before = store.get(x.id);
     if (before.automation?.role === "schedule") throw new Error(SCHEDULE_TASK);
-    if (isClosed(before) && !(before.automation?.role === "run" && before.closedBy !== USER_OWNER)) throw new Error(`Task ${x.id} is closed; reopen it with task_update first.`);
+    if (isClosed(before) && !(before.automation?.role === "run" && before.closedBy !== USER_OWNER)) throw new Error(`Task ${x.id} is closed.`);
     const toUser = to === USER_OWNER;
     const task = store.change(x.id, (t) => {
       t.owner = to;
@@ -192,28 +186,15 @@ export function registerTasks(bb: BbPluginApi, db: Database.Database, post: Post
     if (toUser && !inWorkView(task) && before.attention.queue !== "surfaced") {
       note = await tellUser(task, ctx);
     } else if (!toUser && to !== caller(ctx)) {
-      await tell(`Task ${task.id} was handed to ${ownerText(to)}: ${JSON.stringify(task.title)}.${task.needs ? ` Needs: ${task.needs}.` : ""} ${to === "cos" ? "Carry out the next step now" : "Ask that thread to carry out the next step"}; read it with task_get and record progress with task_update.`, "The Bot was told.");
+      await tell(`Task ${task.id} was handed to ${ownerText(to)}: ${JSON.stringify(task.title)}.${task.needs ? ` Needs: ${task.needs}.` : ""} ${to === "cos" ? "Carry out the next step now" : "Ask that thread to carry out the next step"}, and report in the chat.`, "The Bot was told.");
     }
     return { task, note };
   };
 
-  const tool = <S extends z.ZodTypeAny>(name: string, description: string, parameters: S, execute: (x: z.infer<S>, ctx: Ctx) => unknown) => {
-    const run = guardTasks(db, { execute: (x: z.infer<S>, c: Ctx) => execute(x, c) }, true);
-    bb.agents.registerTool({ name, description, parameters, execute: async (x: z.infer<S>, ctx: Ctx) => {
-      try { return JSON.stringify(await run.execute(x as never, (ctx ?? {}) as never)); } catch (error) { return `Error: ${error instanceof Error ? error.message : String(error)}`; }
-    } } as never);
-  };
-  tool("task_create", CREATE, createInput, (x, ctx) => create(x, ctx));
-  tool("task_update", UPDATE, updateInput, (x, ctx) => update(x, ctx));
-  tool("task_get", GET, z.object({ id: z.string().min(1) }), ({ id }) => get(id));
-  tool("task_list", LIST, listInput, (x, ctx) => list(x, ctx));
-  tool("task_handoff", HANDOFF, handoffInput, (x, ctx) => handoff(x, ctx));
   const check = async () => {
     if (!options.check) throw new Error("The task check isn't available here.");
     const problems = await options.check();
     return { problems, summary: problems.length ? `${problems.length} problem${problems.length === 1 ? "" : "s"} found; nothing was changed.` : "No orphans or duplicates." };
   };
-  tool("task_check", CHECK, z.object({}), () => check());
-
   return { store, create, update, get, list, handoff, links, check };
 }

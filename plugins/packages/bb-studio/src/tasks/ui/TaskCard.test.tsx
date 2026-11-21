@@ -80,29 +80,6 @@ it("draws one card for ::loop and ::work alike, for loop_, task_ and wc_ ids", a
   expect(container.innerHTML).toBe("");
 });
 
-it("a do task of the user's: title, why, owner You, To do, and Done, Snooze, Hand off", async () => {
-  put();
-  await render("loop", { id: "task_1" });
-  expect(card().dataset.state).toBe("todo");
-  expect(card().querySelector('[data-testid="task-why"]')!.textContent).toBe("The old plan ends Friday.");
-  expect(card().querySelector('[data-testid="task-owner"]')!.textContent).toBe("You");
-  expect(card().querySelector('[data-testid="task-state"]')!.textContent).toBe("To do");
-  const text = card().querySelector('[data-testid="task-actions"]')!.textContent!;
-  for (const label of ["Done", "Snooze", "Hand off"]) expect(text).toContain(label);
-  await click("Done");
-  expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "task_1", action: "done" });
-});
-
-it("a decision shows its options as buttons and chooses one; choosing is the Done, so there is no Done button", async () => {
-  put({ kind: "decide", options: ["Backblaze", "Wasabi"] });
-  await render("loop", { id: "task_1" });
-  expect(card().querySelector('[data-testid="task-done"]')).toBeNull();
-  const text = card().querySelector('[data-testid="task-actions"]')!.textContent!;
-  for (const label of ["Snooze", "Hand off"]) expect(text).toContain(label);
-  await click("Wasabi");
-  expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "task_1", action: "choose", option: "Wasabi" });
-});
-
 it("needs you: the warning state and what is needed", async () => {
   put({ state: "waiting", needs: "Touch the YubiKey to sign", card: { kind: "release", messageId: "m1", messageSeq: 3, dismissedAt: null }, origin: "work", progress: { step: "4/5 Sign", line: "Waiting on the key" } });
   await render("work", { id: "task_1" });
@@ -113,50 +90,11 @@ it("needs you: the warning state and what is needed", async () => {
   expect(card().textContent).not.toContain("Snooze");
 });
 
-it("running with an agent: its name, the line, Open thread, Take over (never the user's) and Hand off", async () => {
-  put({ owner: "thread:thr_w", state: "in_progress", workers: ["thr_w"], progress: { step: "2/5 Tests", line: "Running the suite" } });
-  await render("work", { id: "task_1" });
-  expect(card().dataset.state).toBe("running");
-  expect(card().querySelector('[data-testid="task-owner"]')!.textContent).toBe("Fix the flaky test");
-  expect(card().querySelector('[data-testid="task-line"]')!.textContent).toBe("Running the suite");
-  await click("Take over");
-  expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "task_1", action: "take_back" });
-  put({ owner: "cos", state: "in_progress" }, { history: [{ type: "handed_off", at: NOW, data: JSON.stringify({ owner: "cos", from: "patrick", by: "patrick" }) }] });
-  await render("work", { id: "task_1" });
-  expect(container.textContent).toContain("Take back");
-  put({ owner: "thread:thr_w", state: "in_progress", workers: ["thr_w"], progress: { step: "2/5 Tests", line: "Running the suite" } });
-  await render("work", { id: "task_1" });
-  await click("Open thread");
-  expect(state.toThread).toHaveBeenCalledWith("thr_w");
-});
-
-it("hands off to the Bot, a project lead or the task's worker", async () => {
-  put({ workers: ["thr_w"] });
-  await render("loop", { id: "task_1" });
-  const items = [...container.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent);
-  expect(items).toEqual(expect.arrayContaining(["Chief of Staff", "Fix the flaky test"]));
-  await act(async () => ([...container.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((b) => b.textContent === "Fix the flaky test")!).click());
-  expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "task_1", action: "hand_off", to: "thread:thr_w" });
-});
-
 it("the Bot's task shows its face and name", async () => {
   put({ owner: "cos", state: "in_progress" });
   await render("loop", { id: "task_1" });
   expect(card().querySelector('[data-testid="task-owner"]')!.textContent).toContain("Chief of Staff");
   expect(card().querySelector<HTMLElement>('[data-testid="task-owner"]')!.dataset.owner).toBe("cos");
-});
-
-it("done: the Done state and Undo; stale: Ended without a final update", async () => {
-  put({ state: "done", closedAt: NOW - 1_000, closedBy: "patrick" });
-  await render("loop", { id: "task_1" });
-  expect(card().dataset.state).toBe("done");
-  await click("Undo");
-  expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "task_1", action: "reopen" });
-  put({ id: "wc_2", state: "done", stale: true, closedAt: NOW - 1_000, owner: "thread:thr_w", origin: "work", card: { kind: "worker", messageId: null, messageSeq: null, dismissedAt: null } });
-  await render("work", { id: "wc_2" });
-  expect(card().dataset.state).toBe("ended");
-  expect(card().querySelector('[data-testid="task-state"]')!.textContent).toBe("Ended without a final update");
-  expect(card().textContent).not.toContain("Running");
 });
 
 it("expands the history of hand-offs on the card", async () => {
@@ -214,25 +152,6 @@ it("anchors a carded task to the message it is posted in, once", async () => {
   expect(state.call.mock.calls.filter(([method]) => method === "work.anchor")).toEqual([["work.anchor", { id: "task_1", threadId: "thr_main", messageId: "m1" }]]);
 });
 
-it("offers Keep or Dismiss on one of the user's to-dos with no update in three days", async () => {
-  put({ origin: "loop", updatedAt: NOW - 4 * 86_400_000 });
-  await render("loop", { id: "task_1" });
-  expect(container.querySelector('[data-testid="task-review"]')!.textContent).toContain("Still on it?");
-  await click("Keep");
-  expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "task_1", action: "keep" });
-});
-
-it("a card the agent closed offers Reopen for that agent, not Undo", async () => {
-  put({ owner: "thread:thr_w", state: "failed", closedAt: NOW - 1_000, closedBy: "thread:thr_w", workers: ["thr_w"] });
-  await render("work", { id: "task_1" });
-  expect(container.querySelector('[data-testid="task-undo"]')).toBeNull();
-  const reopen = container.querySelector<HTMLButtonElement>('[data-testid="task-reopen"]')!;
-  expect(reopen.textContent).toBe("Reopen for Fix the flaky test");
-  expect(reopen.title).toBe("Reopens it and asks Fix the flaky test to carry on");
-  await act(async () => reopen.click());
-  expect(state.call).toHaveBeenCalledWith("tasks.act", { id: "task_1", action: "reopen" });
-});
-
 it("a recurring task shows its schedule, Active or Paused, its latest runs and findings, and no Done or Hand off", async () => {
   const link = (role: "schedule" | "run" | "finding", count = 1) => ({ id: "aut_silent", kind: "watcher" as const, role, thread: "thr_bot", keys: [], count, lastAt: NOW, mode: null, clearedAt: null, posted: true, sentAt: null, nudgedAt: null, nudged: null, severity: null, pushedAt: null });
   const run = { ...base, id: "task_run1", title: "Silent heartbeat · Nov 13, 2:00 PM", owner: "cos", state: "done" as const, origin: "task" as const, progress: { step: null, line: "Nothing new" }, automation: link("run"), parentId: "task_auto-aut-silent", createdAt: NOW - 3_600_000, closedAt: NOW - 3_500_000, closedBy: "cos" };
@@ -272,4 +191,31 @@ it("shows the task's outputs on the card: a PR, a page and a build, each opening
   put({ outputs: [] });
   await render("work", { id: "task_1" });
   expect(card().querySelector('[data-testid="task-outputs"]')).toBeNull();
+});
+
+it("is read-only: an old card shows where it stands, with no Done, Snooze, Hand off, Undo, Reopen, Keep or Take over", async () => {
+  const buttons = () => [...container.querySelectorAll("button")].map((b) => b.textContent?.trim()).filter(Boolean);
+  put({ id: "task_mine", title: "Pick a backup provider" });
+  await render("loop", { id: "task_mine" });
+  expect(card().textContent).toContain("Pick a backup provider");
+  expect(card().textContent).toContain("The old plan ends Friday.");
+  for (const label of ["Done", "Snooze", "Hand off", "Got it", "Dismiss", "Drop"]) expect(buttons()).not.toContain(label);
+  put({ id: "task_decide", kind: "decide", options: ["Backblaze", "Wasabi"], state: "waiting", needs: "Pick one" });
+  await render("loop", { id: "task_decide" });
+  expect(buttons()).not.toContain("Backblaze");
+  expect(card().textContent).toContain("Pick one");
+  put({ id: "task_agent", owner: "thread:thr_w", state: "in_progress", workers: ["thr_w"], progress: { step: "2/5 Tests", line: "Fixing the flaky one" } });
+  await render("work", { id: "task_agent" });
+  expect(card().textContent).toContain("Fixing the flaky one");
+  expect(buttons()).not.toContain("Take over");
+  await click("Open thread");
+  expect(state.toThread).toHaveBeenCalledWith("thr_w");
+  put({ id: "task_done", state: "done", closedAt: NOW - 60_000, closedBy: "patrick" });
+  await render("loop", { id: "task_done" });
+  expect(buttons()).not.toContain("Undo");
+  put({ id: "task_stale", owner: "thread:thr_w", state: "in_progress", stale: true });
+  await render("work", { id: "task_stale" });
+  expect(card().textContent).toContain("Ended without a final update");
+  expect(buttons()).not.toContain("Reopen");
+  expect(state.call).not.toHaveBeenCalled();
 });

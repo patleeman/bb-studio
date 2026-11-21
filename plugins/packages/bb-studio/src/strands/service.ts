@@ -29,8 +29,12 @@ export interface StrandServiceDeps extends Omit<DetectorDeps, "store" | "openTas
   /** Whether the thread is in a turn. */
   /** A worker's conversation (strand_note from a worker), else null. */
   conversationOfWorker?(threadId: string): string | null;
-  /** Areas' items that need the user, reported into this conversation (a runner's to Main, a lead's to its own): each with when its area last reported. */
-  areaAsks?(threadId: string): { id: string; label: string; at: number }[];
+  /**
+   * What else waits on the user in this conversation: an area's item that
+   * needs them (reported here: a runner's to Main, a lead's to its own), and
+   * the conversation's own flag (bot_needs_you). Each with when it was raised.
+   */
+  extraAsks?(threadId: string): { id: string; kind: "area" | "flag"; label: string; at: number }[];
   busy(threadId: string): Promise<boolean>;
 }
 
@@ -169,8 +173,8 @@ export class StrandService {
       if (request.threadId === threadId) asks.push({ id: request.id, kind: "gateway", strandId: turnStrand(request.createdAt), label, threadId, details: [], decisions: [] });
       else if (worker) asks.push({ id: request.id, kind: "gateway", strandId: worker.strandId, label: `${worker.title}: ${label}`, threadId: worker.threadId, details: [], decisions: [] });
     }
-    // An area's item that needs the user: on the strand of the conversation's turn that holds the area's latest report.
-    for (const ask of this.deps.areaAsks?.(threadId) ?? []) asks.push({ id: ask.id, kind: "area", strandId: turnStrand(ask.at), label: ask.label, threadId, details: [], decisions: [], turnId: turnOf(ask.at) });
+    // An area's item that needs the user, or the conversation's flag: on the strand of the turn it was raised in.
+    for (const ask of this.deps.extraAsks?.(threadId) ?? []) asks.push({ id: ask.id, kind: ask.kind, strandId: turnStrand(ask.at), label: ask.label, threadId, details: [], decisions: [], turnId: turnOf(ask.at) });
     const tasks: TaskSignal[] = openAgentTasks(this.deps.db, threadId).flatMap((task) => {
       const strand = this.store.byTask(task.id);
       return strand ? [{ id: task.id, strandId: strand.id, waitingOn: task.waitingOn ?? null }] : [];

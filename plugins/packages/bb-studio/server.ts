@@ -1,8 +1,9 @@
-import { registerWorkCards, WORK_TOOLS } from "./src/work/register";
+import { registerWorkCards } from "./src/work/register";
+import { STRAND_NOTE_TOOL } from "./src/strands/contract";
 import { phoneActs, registerUserTasks } from "./src/tasks/user";
-import { loopPushInput } from "./src/tasks/handoff-push";
-import { registerTasks, TASK_TOOLS } from "./src/tasks/register";
+import { registerTasks } from "./src/tasks/register";
 import { adoptAtStart } from "./src/tasks/migrate";
+import { retireAgentTasks } from "./src/tasks/retire";
 import { asFact, linkAtStart, listThreadFacts, ThreadDirectory } from "./src/tasks/links";
 import { SpawnLinks } from "./src/tasks/spawn";
 import { AutomationTasks, readSources } from "./src/tasks/automations";
@@ -10,15 +11,12 @@ import { areaItemRef, Areas, leadsFrom, ownNameWords, runnersFrom, type AreaLead
 import { rpcErrorStatus } from "./src/kit/server/index";
 import { AreaStore } from "./src/areas/store";
 import { AREA_TOOLS, registerAreas } from "./src/areas/register";
-import { toLoop } from "./src/tasks/views";
-import type { Loop } from "./src/loops/contract";
 import { assertTasksReady, cardNeedsUser, TaskStore, taskTitle, tasksUnavailable } from "./src/tasks/store";
 import { withToolLabel } from "./src/tool-labels";
 import { opNeeds } from "./src/op-errors";
 import { CONTINUE_TOOL, registerContinueNew } from "./src/continue-new";
-import { runWorkCli } from "./src/work/cli";
-import { registerLoops, LOOP_TOOLS } from './src/loops/register';
-import { reminderLoopId, scheduledContract, scheduledItems } from "./src/loops/scheduled";
+import { registerLoops } from './src/loops/register';
+import { scheduledContract, scheduledItems } from "./src/loops/scheduled";
 import { automationTable, bbFromFile, bbFromOverview, readImportedAt, readStudioEntries, readThreadOwners } from "./src/automation-table";
 import { arrangeRailOnce } from "./src/rail-arrangement";
 import { arrangeFooterOnce } from "./src/footer-arrangement";
@@ -58,7 +56,6 @@ import { BUILTIN_KINDS, builtinOn, frontendState, kindRowViews, KindSettingsStor
 import { kindsContract, type KindsState } from "./src/kinds-contract";
 import { openaiKey } from "./src/openai-key";
 import { registerSettings } from "./src/settings/register";
-import { remindersForFirstBot } from "./src/settings/store";
 import { loopTimeZone } from "./src/settings/constants";
 import { settingsCli, SETTINGS_USAGE } from "./src/settings/cli";
 import { STUDIO_SETTINGS } from "./src/settings/schema";
@@ -195,7 +192,6 @@ import { registerAuth } from "./src/auth/register";
 import { AUTH_USAGE, authCli } from "./src/auth/cli";
 import { createLiveBbPool, registerAccounts } from "./src/accounts/register";
 import { registerOnboarding } from "./src/onboarding-register";
-import { firstBotOfFreshInstall, readFlag } from "./src/onboarding";
 import { ACCOUNTS_USAGE, accountsCli } from "./src/accounts/cli";
 import { formatSetup, SetupService } from "./src/setup";
 import { setupContract } from "./src/setup-contract";
@@ -235,6 +231,14 @@ export default async function plugin(bb: BbPluginApi) {
   // Columns added by checking, not by index (src/schema-columns.ts).
   ensureColumns(db);
   adoptAtStart(db, bb.log);
+  // Strands replaced tasks: open agent tasks close as "Moved to strands", after a backup (src/tasks/retire.ts).
+  if (!tasksUnavailable(db)) {
+    try {
+      const retired = retireAgentTasks(db);
+      if (retired.closed.length) bb.log.info(`Tasks: ${retired.closed.length} open agent task(s) moved to strands; backup at ${retired.backup ?? "none"}.`);
+      if (retired.backupError) bb.log.warn(`Tasks: the backup before moving agent tasks to strands failed (${retired.backupError}); nothing was closed. The next start tries again.`);
+    } catch (error) { bb.log.warn(`Tasks: moving agent tasks to strands failed: ${errorText(error)}`); }
+  }
   const themes = new ThemeStore(db);
   // Pages and Apps: the item index (src/item-index.ts). Triggers keep it in
   // step; this check puts right whatever one missed, before anything reads it.
@@ -482,11 +486,11 @@ export default async function plugin(bb: BbPluginApi) {
     // Short pointers for Pages, mini apps and the Next row; their long guidance is in the studio skill (src/agent-instructions.ts).
     const instructions = studioInstructions({
       bot: bot ? bots.instructions(bot) : "", conversation: which, runner: runner ? runners.instructions(runner) : "",
-      pages: !off.has("page"), minis: !off.has("mini"), appCards, work: true, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
+      pages: !off.has("page"), minis: !off.has("mini"), appCards, endOfReply: explore.endOfReply(), routing: routingInstructions(kindRoutes, kindSettings.current),
     });
     let gateway: { tools: string[]; instructions: string } = { tools: [], instructions: "" };
     try { gateway = toolGateway?.agentConfiguration({ providerId: context.provider.id, projectId: context.project.id }) ?? gateway; } catch { /* Tool Gateway never breaks Studio's configure(). */ }
-    return { tools: [...tools, ...BOT_TOOLS, ...LOOP_TOOLS, ...WORK_TOOLS, ...TASK_TOOLS, ...AREA_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : []), ...gateway.tools], skills: ["studio-code", "studio", ...(bot ? ["themes", "presences"] : [])], instructions: gateway.instructions ? `${instructions}\n\n${gateway.instructions}`.trim() : instructions };
+    return { tools: [...tools, ...BOT_TOOLS, STRAND_NOTE_TOOL, ...AREA_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : []), ...gateway.tools], skills: ["studio-code", "studio", ...(bot ? ["themes", "presences"] : [])], instructions: gateway.instructions ? `${instructions}\n\n${gateway.instructions}`.trim() : instructions };
   }));
   /** Which conversation a Bot's session is in (src/bot-threads.ts conversationInstructions); "" before Studio has placed it. */
   const conversationNote = (threadId: string): string => {
@@ -676,13 +680,11 @@ export default async function plugin(bb: BbPluginApi) {
   const projectLeads: ProjectLeads = new ProjectLeads({ db, sdk: bb.sdk, scheduler, changed: tagsChanged, personalPrompt: (): string => bots.prompt(), botPrompt: (key) => bots.promptFor(key), leadLost });
   // The user's Bot (src/bot.ts): the personal project's lead, with a name, avatar and state.
   // Its Memory page is a Studio page in the personal project; a shared skill goes to BB's user skills.
-  let loopsEnabled = () => false;
   // When the BB Studio copy's import from bb ran (null without one), read at most every 30 s.
   const importedAt = (() => { let readAt = 0, value: number | null = null; return () => { if (Date.now() - readAt > 30_000) { value = readImportedAt(bb.server.experimental_dataDir); readAt = Date.now(); } return value; }; })();
   const botSignal = new BotSignal((event) => bb.realtime.publish(BOT_THREADS_CHANNEL, event), 250);
   bb.onDispose(() => botSignal.dispose());
   const bots: Bots = new Bots({
-    loopsEnabled: () => loopsEnabled(),
     importedAt,
     db, sdk: bb.sdk, leads: projectLeads, changed: tagsChanged,
     presenceChanged: (botId) => botSignal.add([{ botId, kinds: ["presence"] }]),
@@ -747,23 +749,16 @@ export default async function plugin(bb: BbPluginApi) {
     if (!bot.threadId) throw new Error(`${bot.name} has no Main conversation. Pick one in Bot settings (or start a new one), and todos will be posted there.`);
     await bb.sdk.threads.send({threadId:bot.threadId,mode:'auto',input:[{type:'text',text,mentions:[],visibility:'agent-only'}]} as never);
   };
+  // When a strand's "needs you" push went out, by Bot: Main's own reply push stays quiet for a few minutes after it.
   const taskPushedAt = new Map<string, number>();
-  const pushLoop = async (loop: Loop) => {
-    const bot = bots.stored();
-    if (!bot?.threadId) throw new Error('Your Bot has no Main conversation for the push to open. Pick one in Bot settings.');
-    taskPushedAt.set(bot.id, Date.now());
-    await bb.sdk.plugins.callRpc({ pluginId: 'mobile', method: 'notify', outputSchema: z.unknown(), input: loopPushInput(loop, { id: bot.id, threadId: bot.threadId }, new TaskStore(db).find(loop.id), PERSONAL_PROJECT_ID) as never });
-  };
-  const loops = registerLoops(bb, db, postToBot, pushLoop, settings, () => loopTimeZone(process.env, studioSettings.current().todosTimeZone), (name, everyMs, work) => triggers.every(name, everyMs, work));
-  loopsEnabled = loops.enabled;
-  // A task handed to the user no longer pushes: a strand turning "needs you" does (src/strands/push.ts).
-  const movedToUser = () => {};
-  const work = registerWorkCards(bb, db, { moved: movedToUser });
+  const loops = registerLoops(bb, db, postToBot, () => loopTimeZone(process.env, studioSettings.current().todosTimeZone));
+  // Old work cards' RPCs, for older phones. A task handed to the user doesn't push: a strand turning "needs you" does (src/strands/push.ts).
+  registerWorkCards(bb, db);
   const taskThreads = new ThreadDirectory(db);
   const linkStore = new TaskStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); });
   const spawnLinks = new SpawnLinks({ store: linkStore, dir: taskThreads, thread: async (threadId) => asFact(await bb.sdk.threads.get({ threadId }).catch(() => null)), log: (message) => bb.log.warn(message) });
   const threadFacts = () => listThreadFacts(bb.sdk as never);
-  registerTasks(bb, db, postToBot, undefined, movedToUser, { links: spawnLinks, check: async () => (await userTasks.check()).problems });
+  registerTasks(bb, db, postToBot, undefined, undefined, { links: spawnLinks, check: async () => (await userTasks.check()).problems });
   // A request for an MCP server makes no to-do: it is "needs you" on its strand (src/strands/states.ts), which pushes once.
   toolGateway = await registerToolGateway(bb, {
     db,
@@ -785,7 +780,7 @@ export default async function plugin(bb: BbPluginApi) {
     loopAct: (x) => loops.actDirect(x),
     reopenLoop: (id) => loops.store.update(id, { status: 'surfaced' }),
     snoozeLoopUntil: (id, at) => loops.store.update(id, { status: 'snoozed', trigger: { type: 'time', at } }),
-    held: () => loops.scheduler.held(),
+    held: () => [],
   });
   loops.routeActs(phoneActs(userTasks));
   const automationTasks = new AutomationTasks(new TaskStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); }), {
@@ -793,7 +788,6 @@ export default async function plugin(bb: BbPluginApi) {
     log: (message) => bb.log.warn(message),
     zone: () => loopTimeZone(process.env, studioSettings.current().todosTimeZone),
     nudge: async (threadId, text) => { await bb.sdk.threads.send({ threadId, mode: "auto", input: [{ type: "text", text, mentions: [], visibility: "agent-only" }] } as never); },
-    push: async (task) => { await pushLoop(toLoop(task)); },
   });
   const taskStep = <T,>(name: string, work: () => T): T | null => {
     if (tasksUnavailable(db)) return null;
@@ -850,7 +844,6 @@ export default async function plugin(bb: BbPluginApi) {
   const automations: Automations = new Automations({
     db, sdk: bb.sdk, scheduler, changed: automationsChanged,
     findings: (watcherId, finding, raw, at, failed) => (tasksUnavailable(db) ? null : automationTasks.watcherRun(watcherId, finding, raw, at, failed)),
-    copiedReminder: (id) => loops.enabled() && !!db.prepare("SELECT 1 FROM tasks WHERE id = ?").get(reminderLoopId(id)),
     bot: automationBot,
     notify: async (botId, line) => { const bot = bots.stored(botId); if (bot?.threadId) await alertBot(bb.sdk, { botThreadId: bot.threadId, line, note: STUDIO_LINE_NOTE }); },
     // With bb's automations plugin off (a BB Studio copy), watchers run here and bb's rows are read from its data file (src/automation-table.ts).
@@ -884,11 +877,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (moved.backupError) bb.log.warn(`Automation tasks: the backup before mapping failed (${moved.backupError}); mapped anyway.`);
   });
   void threadFacts().then((facts) => { taskStep("links", () => linkAtStart(linkStore, facts, taskThreads, bb.log)); }, (error) => bb.log.warn(`Task links: threads could not be listed: ${errorText(error)}`));
-  bb.events.on("thread.created", ({ thread }) => { if (!tasksUnavailable(db)) spawnLinks.spawned(asFact(thread)); });
-  bb.events.on("thread.idle", ({ thread }) => { taskStep("links", () => { spawnLinks.ensure(asFact(thread)); spawnLinks.settled(thread.id); }); });
-  bb.events.on("thread.failed", ({ thread }) => { taskStep("links", () => { spawnLinks.ensure(asFact(thread)); spawnLinks.settled(thread.id); }); });
-  bb.events.on("thread.archived", ({ thread }) => { taskStep("links", () => spawnLinks.settled(thread.id)); });
-  bb.events.on("thread.active", ({ thread }) => { taskStep("links", () => { spawnLinks.resumed(thread.id); spawnLinks.ensure(asFact(thread)); }); });
+  // No task is made for a new worker any more (strands replaced tasks): a worker joins the strand of the turn that started it.
   const areaStore = new AreaStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); });
   const areas = new Areas(areaStore, new TaskStore(db), {
     bot: () => { const bot = bots.stored(); return bot ? { id: bot.id, name: bot.name } : null; },
@@ -930,7 +919,8 @@ export default async function plugin(bb: BbPluginApi) {
   bb.rpc.register(scheduledContract, {
     "loops.scheduled": async ({ threadId }) => ({
       items: scheduledItems({
-        loops: loops.store.all(),
+        // To-dos are gone: none are listed, and a reminder is listed (and runs) as its automation.
+        loops: [],
         bots: await Promise.all(bots.list().map(async (bot) => ({ id: bot.id, name: bot.name, threadId: bot.threadId, primary: bot.primary !== false, automations: await automations.list(bot.id).catch(() => []), table: (await automationTableFor(bot.id).catch(() => null))?.rows ?? [] }))),
         threadId,
       }),
@@ -1147,7 +1137,6 @@ export default async function plugin(bb: BbPluginApi) {
     automationDelete: (id, botId) => automations.delete(id, botId),
     adoptable: (id) => runners.adoptable(id),
     alert: async (id, line) => { const bot = bots.stored(id); if (bot?.threadId) await alertBot(bb.sdk, { botThreadId: bot.threadId, line, note: "Maintenance alert, already shown to the user. Do not repeat or acknowledge it. Reply exactly [PASS]. Details are in Bot info → Maintenance." }); },
-    taskProblems: async () => (tasksUnavailable(db) ? [] : (await userTasks.check()).problems),
   });
   bb.events.on("thread.idle", ({ thread }) => {
     const bot = bots.list().find((b) => b.threadId === thread.id);
@@ -1240,17 +1229,17 @@ export default async function plugin(bb: BbPluginApi) {
   });
   // Areas' items that need the user, by the conversation their area reports into: a lead's own
   // conversation; a runner's, or the Bot's, the Main. Read at most every 15 seconds.
-  let areaAskCache: { at: number; byThread: Map<string, { id: string; label: string; at: number }[]> } | null = null;
+  let areaAskCache: { at: number; byThread: Map<string, { id: string; kind: "area"; label: string; at: number }[]> } | null = null;
   const areaAsks = (threadId: string) => {
     if (!areaAskCache || Date.now() - areaAskCache.at > 15_000) {
-      const byThread = new Map<string, { id: string; label: string; at: number }[]>();
+      const byThread = new Map<string, { id: string; kind: "area"; label: string; at: number }[]>();
       const primaryMain = (bots.list().find((bot) => bot.primary) ?? bots.list()[0])?.threadId ?? null;
       const list = areaLeadsRead ? taskStep("areas for strands", () => areas.list()) ?? [] : [];
       for (const area of list) {
         const home = area.owner.kind === "lead" ? area.owner.thread : area.owner.kind === "bot" ? bots.stored(area.owner.botId)?.threadId ?? null : primaryMain;
         if (!home) continue;
         const at = Math.max(area.lastRun ?? 0, area.updatedAt);
-        const asks = area.open.filter((item) => item.needsUser).map((item) => ({ id: `area:${areaItemRef(area.id, item.title)}`, label: `${area.name}: ${item.title}`, at }));
+        const asks = area.open.filter((item) => item.needsUser).map((item) => ({ id: `area:${areaItemRef(area.id, item.title)}`, kind: "area" as const, label: `${area.name}: ${item.title}`, at }));
         if (asks.length) byThread.set(home, [...(byThread.get(home) ?? []), ...asks]);
       }
       areaAskCache = { at: Date.now(), byThread };
@@ -1259,7 +1248,11 @@ export default async function plugin(bb: BbPluginApi) {
   };
   // Strands (src/strands): each turn of a Bot's conversations sorted into a line of work, with live states.
   const strands = registerStrands(bb, db, {
-    areaAsks,
+    // An area's item that needs the user, and the conversation's flag (bot_needs_you): "needs you" on their strand.
+    extraAsks: (threadId) => {
+      const flag = botThreads.store.get(threadId)?.needsYou ?? null;
+      return [...areaAsks(threadId), ...(flag ? [{ id: `flag:${threadId}:${flag.at}`, kind: "flag" as const, label: flag.reason, at: flag.at }] : [])];
+    },
     conversationOfWorker: (threadId) => { const rec = botThreads.store.get(threadId); return rec?.kind === "worker" ? rec.ownerConversationId : null; },
     decisions: decisions.ask,
     conversation: (threadId) => {
@@ -1357,11 +1350,9 @@ export default async function plugin(bb: BbPluginApi) {
     spawn: async (request) => await bb.sdk.threads.spawn(request as never) as { id: string; projectId?: string | null },
     recordConversation: (threadId, botId) => { botThreads.store.recordConversation(threadId, botId); },
     focus: (botId) => botThreads.store.setFocus(botId),
-    card: (id) => work.store.find(id),
-    moveCard: (id, threadId) => work.store.move(id, threadId),
     changed: (threadId) => botThreads.threadChanged(threadId),
   });
-  const onboarding = registerOnboarding(bb, { db, bots, errorText, firstBot: () => remindersForFirstBot(studioSettings, true) });
+  const onboarding = registerOnboarding(bb, { db, bots, errorText });
   // Awareness (src/live-activity.ts): what each conversation and worker is
   // doing now, the per-turn digest of the others, and bot_activity_lookup.
   const liveActivity = registerLiveActivity(bb, db, { threads: botThreads.store, actingBot: async (threadId) => (await acting(threadId))?.botId ?? null, log: (message) => bb.log.warn(message), seeds: threadSeeds });
@@ -1707,10 +1698,7 @@ export default async function plugin(bb: BbPluginApi) {
     }),
     bot_get: ({ botId }) => bots.get(botId),
     bot_create: async (input) => {
-      const firstBot = firstBotOfFreshInstall(bots.list().length, readFlag(bb.server.experimental_dataDir));
-      const view = await bots.create(input);
-      await remindersForFirstBot(studioSettings, firstBot).catch((error) => bb.log.warn(`Couldn't turn on Task reminders for the first Bot: ${String(error)}`));
-      return view;
+      return bots.create(input);
     },
     bot_set: (input) => bots.set(input),
     bot_set_appearance: (input) => {
@@ -2088,11 +2076,6 @@ export default async function plugin(bb: BbPluginApi) {
           visit(page.rows ?? []);
           return messages;
         },
-        loops: () => {
-          if (!loopsEnabled()) return null;
-          const groups = loops.store.groups();
-          return { needsYouNow: groups.needsYouNow.map((loop) => loop.title), comingUp: groups.comingUp.map((loop) => loop.title) };
-        },
       });
     },
     resolve: async (name) => {
@@ -2106,13 +2089,6 @@ export default async function plugin(bb: BbPluginApi) {
     latestReply: async (threadId) => {
       const [thread, output] = await Promise.all([bb.sdk.threads.get({ threadId }), bb.sdk.threads.output({ threadId })]);
       return { title: (thread as { title?: string | null }).title || threadId, text: output.output ?? "" };
-    },
-    loops: {
-      groups: () => loops.store.groups(),
-      get: (id) => loops.store.get(id),
-      act: (id, action, options) => loops.act({ id, action, ...(options?.snooze ? { snooze: options.snooze as never } : {}), ...(options?.owner ? { owner: options.owner } : {}) }),
-      add: (text) => loops.add(text),
-      restore: (id, before) => loops.store.update(id, (before.owner ? before : { status: before.status, trigger: before.trigger }) as never),
     },
     threads: {
       stop: async (threadId) => { await bb.sdk.threads.stop({ threadId }); },
@@ -2381,18 +2357,12 @@ export default async function plugin(bb: BbPluginApi) {
     ...(input.machine !== undefined ? { machine: input.machine } : {}),
     ...(input.confirm !== undefined ? { confirm: input.confirm } : {}),
   });
-  runnerTool("automation_list", "List what you have scheduled: check-ins, reminders, watchers and runners, with schedule, state, next run and last outcome. The user sees them under Scheduled on the Tasks page; call them scheduled items, never automations.", z.object({}),
+  runnerTool("automation_list", "List what you have scheduled: check-ins, reminders, watchers and runners, with schedule, state, next run and last outcome. The user sees them under Scheduled on the Strands page; call them scheduled items, never automations.", z.object({}),
     async (_input: unknown, botId) => (await automations.list(botId)).map(describeAutomation).join("\n") || "Nothing scheduled yet.");
-  runnerTool("automation_create", "Create a scheduled item (checkin, reminder, watcher, or runner). Reminders with at/in become timed tasks when Tasks is on. Watchers run a script and wake only on stdout (trailing JSON line supports each/key/severity/clear). A runner may answer with preflight warnings: review them and retry with confirm: true. Call them scheduled items to the user.",
+  runnerTool("automation_create", "Create a scheduled item (checkin, reminder, watcher, or runner). Watchers run a script and wake only on stdout (trailing JSON line supports each/key/severity/clear). A runner may answer with preflight warnings: review them and retry with confirm: true. Call them scheduled items to the user.",
     z.object({ kind: z.enum(["checkin", "reminder", "watcher", "runner"]), name: z.string().trim().min(1).max(60), ...automationFields, schedule: toolSchedule }),
     async (input: AutomationToolInput & { kind: "checkin" | "reminder" | "watcher" | "runner"; name: string }, botId) => {
       const schedule = toSchedule(input.schedule!);
-      if (input.kind === "reminder" && schedule.type === "once" && loops.enabled()) {
-        const bot = bots.stored(botId);
-        const owner = !bot || bot.primary !== false || !bot.threadId ? "cos" : `thread:${bot.threadId}`;
-        const todo = loops.store.add({ title: input.name, why: input.instruction?.trim() ?? "", owner, kind: "do", trigger: { type: "time", at: schedule.at } });
-        return `Made a task (a reminder is a task you own): ${todo.title}, due ${new Date(schedule.at).toISOString()}, id ${todo.id}. Change it with task_update.`;
-      }
       return `Made:\n${describeAutomation(await automations.create({ kind: input.kind, name: input.name, schedule, ...automationChanges(input) } as never, botId))}`;
     });
   runnerTool("automation_update", "Update a scheduled item's name, instruction, schedule, model or watcher script.",
@@ -2758,7 +2728,6 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "presence", summary: "List, show, check, create, update, apply and delete Bot presences", usage: "bb studio presence <list|show|create|update|apply|check|delete|template> …" },
       { name: "tool-gateway", summary: "Your MCP servers: list them, search and run their tools, and ask the user to add one", usage: "bb studio tool-gateway <list|tools|describe|call|request|status> …" },
       { name: "strands", summary: "A conversation's strands (its lines of work), their live states, and how its newest messages were sorted", usage: STRANDS_USAGE },
-      { name: "work", summary: "Live work cards: create one, update it in place, show and list a conversation's In flight cards, remove finished ones from the list", usage: "bb studio work <create|update|show|list|dismiss|clear> …" },
     ],
     async run(argv, ctx) {
       // Built-in kinds' commands (`bb artifacts …` before the merge).
@@ -2774,7 +2743,6 @@ export default async function plugin(bb: BbPluginApi) {
       if (argv[0] === "recordings") return recordings.cli(argv.slice(1));
       if (argv[0] === "presence") return runPresenceCli(argv.slice(1), { service: presenceService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)) });
       if (argv[0] === "theme") return runThemeCli(argv.slice(1), { service: themeService, readFile: (path) => readTextFile(cliPath(path, ctx.cwd), "utf8"), resolveBot: async (ref) => themeBot(ref, await selfBot(ctx.threadId ?? undefined)), weather: { sky: () => forestWeather.sky(Intl.DateTimeFormat().resolvedOptions().timeZone ?? null), setCity: (city) => forestWeather.setCity(city) }, sky: { place: () => forestWeather.place(Intl.DateTimeFormat().resolvedOptions().timeZone ?? null), preview: () => readPreview(bb.storage.kv), setPreview: (at) => writePreview(bb.storage.kv, at), view: () => readView(bb.storage.kv), setView: (view) => writeView(bb.storage.kv, view), now: () => Date.now(), zoneOffsetMinutes: () => -new Date().getTimezoneOffset() } });
-      if (argv[0] === "work") return runWorkCli(argv.slice(1), work, ctx);
       if (argv[0] === "strands") return strands.cli(argv.slice(1), ctx);
       if (argv[0] === "tool-gateway") return toolGateway ? toolGateway.cli(argv.slice(1), { threadId: ctx.threadId ?? null }) : { exitCode: 1, stderr: "Tool Gateway isn't loaded.\n" };
       if (argv[0] === "pages") return argv[1] === "explore" ? explore.cli(argv.slice(2), ctx) : pages.cli(argv.slice(1), ctx);
@@ -2875,7 +2843,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
           default:
-            return usage("bb studio <list|tags|starred|move|providers|health|setup|reindex|backup|restore|pages|artifacts|whiteboards|designs|recordings|minis|theme|presence|decisions|work|tool-gateway> …");
+            return usage("bb studio <list|tags|starred|move|providers|health|setup|reindex|backup|restore|pages|artifacts|whiteboards|designs|recordings|minis|theme|presence|decisions|tool-gateway> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

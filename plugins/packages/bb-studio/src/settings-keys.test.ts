@@ -48,7 +48,7 @@ describe("plugin setting keys", () => {
     // Studio declares the old fields on the migrating load; its API keys and
     // its own settings keep the same names.
     const declared = [...Object.keys(STUDIO_KEY_SETTINGS), ...Object.keys(LEGACY_SETTINGS), ...Object.keys(STUDIO_SETTINGS)];
-    expect(declared).toContain("loopsEnabled");
+    expect(declared).toContain("autoTitle");
     expect(declared.filter((key) => !VALID.test(key))).toEqual([]);
   });
 });

@@ -68,7 +68,7 @@ beforeEach(() => {
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  state.settings = { launcherHotkey: "Alt+Space", loopsEnabled: false };
+  state.settings = { launcherHotkey: "Alt+Space", autoTitle: false };
   state.set.mockClear();
   state.openLink.mockClear();
   state.items = [];
@@ -206,10 +206,10 @@ it("runs BB's commands, typed addresses and setting toggles where they belong", 
   expect(titles()[0]).toBe("Open bb://page/pg_9");
   await press("Enter");
   expect(state.openLink).toHaveBeenLastCalledWith("bb://page/pg_9", { source: "launcher", modifiers: { meta: false, shift: false } });
-  await type("task reminders");
-  expect(rows().find((row) => row.textContent?.startsWith("Task reminders"))?.textContent).toContain("Off");
-  await act(async () => { rows().find((row) => row.textContent?.startsWith("Task reminders"))!.click(); });
-  expect(state.set).toHaveBeenCalledWith({ loopsEnabled: true });
+  await type("name recordings");
+  expect(rows().find((row) => row.textContent?.startsWith("Name recordings"))?.textContent).toContain("Off");
+  await act(async () => { rows().find((row) => row.textContent?.startsWith("Name recordings"))!.click(); });
+  expect(state.set).toHaveBeenCalledWith({ autoTitle: true });
 });
 
 it("stays open and says why when a row fails", async () => {

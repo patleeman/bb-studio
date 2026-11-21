@@ -11,8 +11,8 @@ const workerStatus = z.enum(["running", "needs-you", "failed", "done"]);
 
 export const strandAsk = z.object({
   id: z.string(),
-  /** "area": an area's item that needs the user, answered in the chat. */
-  kind: z.enum(["question", "approval", "gateway", "area"]),
+  /** "area": an area's item that needs the user; "flag": the conversation flagged with bot_needs_you. Both are answered in the chat. */
+  kind: z.enum(["question", "approval", "gateway", "area", "flag"]),
   /** The thread it waits in: the conversation, or one of its workers. */
   threadId: z.string(),
   label: z.string(),

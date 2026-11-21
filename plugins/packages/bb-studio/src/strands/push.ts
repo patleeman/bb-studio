@@ -13,7 +13,8 @@
 // The push-flood rules still hold:
 // - no push for an ask BB pushes itself: a question or approval in a thread
 //   BB shows (Main and workers' threads aside, BB pushes those); a Tool
-//   Gateway request and an area's item that needs the user always push;
+//   Gateway request, an area's item that needs the user and a conversation's
+//   flag (bot_needs_you) always push;
 // - no push for an ask in a turn another thread started (a worker's or a
 //   runner's report waking the conversation);
 // - the push is a plain "needs-you" push about the conversation, so Studio

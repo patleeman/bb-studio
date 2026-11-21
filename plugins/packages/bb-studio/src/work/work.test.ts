@@ -2,9 +2,9 @@ import Database from "better-sqlite3";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { z } from "zod";
 import { MIGRATIONS } from "../migrations";
-import { runWorkCli } from "./cli";
 import { rpcContract, SHOW_FINISHED_MS, type WorkCard } from "./contract";
-import { CREATE_DESCRIPTION, endsCard, findCardMessage, registerWorkCards, WORK_TOOLS, type TimelineReader, type WorkerThread } from "./register";
+import { withWorkTools } from "../tasks/test/tools";
+import { endsCard, findCardMessage, registerWorkCards, type TimelineReader, type WorkerThread } from "./register";
 import { inFlightOrder, WorkCardStore } from "./store";
 import { migrateToTasks } from "../tasks/migrate";
 
@@ -133,23 +133,9 @@ it("serves the RPC: create, update, list with the placed message, anchor", async
   expect(() => rpcContract["work.update"].input.parse({ id: card.id, state: "paused" })).toThrow();
 });
 
-it("keeps legacy work_card_* handlers callable directly while WORK_TOOLS stays empty", async () => {
-  const { bb, tools } = fakeBb();
-  registerWorkCards(bb as never, db, { read: async () => page([]) });
-  expect(WORK_TOOLS).toEqual([]);
-  expect(Object.keys(tools).sort()).toEqual(["work_card_create", "work_card_get", "work_card_update"]);
-  const made = JSON.parse(await tools.work_card_create!.execute({ title: "Worker: fix tests", kind: "worker" }, { threadId: "thr_lead" })) as { id: string; directive: string };
-  expect(made.directive).toBe(`::work{id="${made.id}"}`);
-  expect(store.get(made.id)).toMatchObject({ threadId: "thr_lead", kind: "worker", state: "running" });
-  expect(await tools.work_card_create!.execute({ title: "Nowhere" }, { threadId: null })).toMatch(/threadId/);
-  const updated = JSON.parse(await tools.work_card_update!.execute({ id: made.id, step: "2/4", line: "Fixing the flaky one" }, { threadId: "thr_worker" })) as WorkCard;
-  expect(updated).toMatchObject({ step: "2/4", line: "Fixing the flaky one", threadId: "thr_lead" });
-  expect(JSON.parse(await tools.work_card_get!.execute({ id: made.id }, {}))).toMatchObject({ id: made.id });
-});
-
 it("gives a worker's thread its card's title, so the card, the sidebar and the chips use one name", async () => {
   const { bb, tools } = fakeBb();
-  registerWorkCards(bb as never, db, { read: async () => page([]) });
+  withWorkTools(tools, db, registerWorkCards(bb as never, db, { read: async () => page([]) }));
   const flush = () => new Promise((resolve) => setImmediate(resolve));
   const made = JSON.parse(await tools.work_card_create!.execute({ title: "Research: 3 note-taking methods", kind: "worker" }, { threadId: "thr_main" })) as { id: string };
   await flush();
@@ -177,25 +163,6 @@ it("gives a worker's thread its card's title, so the card, the sidebar and the c
   expect(bb.log.warn).toHaveBeenCalledWith(expect.stringContaining("gone"));
 });
 
-it("runs bb studio work create, update, show and list", async () => {
-  const { bb } = fakeBb();
-  const work = registerWorkCards(bb as never, db, { read: async () => page([]) });
-  const created = await runWorkCli(["create", "--title", "Nightly", "--kind", "release", "--json"], work, { threadId: "thr_main" });
-  expect(created.exitCode).toBe(0);
-  const { card, directive } = JSON.parse(created.stdout!) as { card: WorkCard; directive: string };
-  expect(directive).toContain(card.id);
-  const updated = await runWorkCli(["update", card.id, "--state", "needs-you", "--needs", "Pick a version"], work, {});
-  expect(updated).toMatchObject({ exitCode: 0 });
-  expect(updated.stdout).toContain("needs-you\tNightly");
-  expect(updated.stdout).toContain("Pick a version");
-  expect((await runWorkCli(["show", card.id], work, {})).stdout).toContain(card.id);
-  expect((await runWorkCli(["list", "--thread", "thr_main"], work, {})).stdout).toContain("Nightly");
-  expect((await runWorkCli(["list"], work, { threadId: "thr_empty" })).stdout).toBe("No work in flight.\n");
-  expect((await runWorkCli(["update", card.id, "--state", "paused"], work, {})).exitCode).toBe(1);
-  expect((await runWorkCli(["create"], work, { threadId: "thr_main" })).exitCode).toBe(1);
-  expect((await runWorkCli(["create", "--title", "x"], work, {})).exitCode).toBe(1);
-});
-
 it("places a thread's new cards when its turn ends", async () => {
   const { bb } = fakeBb();
   let idle: ((event: { thread: { id: string } }) => void) | null = null;
@@ -207,10 +174,6 @@ it("places a thread's new cards when its turn ends", async () => {
   text = directive;
   idle!({ thread: { id: "thr_main" } });
   await vi.waitFor(() => expect(store.get(card.id).messageSeq).toBe(3));
-});
-
-it("tells the Bot to link a worker's thread in a form the chat opens", () => {
-  expect(CREATE_DESCRIPTION).toContain("bare @thread:thr_… mention or [text](/threads/thr_…), never [text](@thread:thr_…)");
 });
 
 it("clears a conversation's finished cards from In flight and keeps them readable", () => {
@@ -345,23 +308,15 @@ it("sweeps cards already stuck on Running when it loads", async () => {
   expect(bb.log.warn).toHaveBeenCalledWith(expect.stringContaining("offline"));
 });
 
-it("serves dismiss and clear over RPC and the CLI", async () => {
+it("serves dismiss and clear over RPC (older phones)", async () => {
   const { bb, handlers } = fakeBb();
   const work = registerWorkCards(bb as never, db, { read: async () => page([]), thread: async () => ({ status: "active" }) });
   const a = work.create({ title: "A", threadId: "thr_main", state: "done" }).card;
-  const b = work.create({ title: "B", threadId: "thr_main", state: "failed" }).card;
+  work.create({ title: "B", threadId: "thr_main", state: "failed" }).card;
   const c = work.create({ title: "C", threadId: "thr_main" }).card;
   expect(rpcContract["work.dismiss"].output.parse(await handlers["work.dismiss"]!({ id: a.id } as never)).dismissedAt).toBe(NOW);
   expect(rpcContract["work.clear"].output.parse(await handlers["work.clear"]!({ threadId: "thr_main" } as never))).toEqual({ cleared: 1 });
   expect(store.inFlight("thr_main").map((card) => card.id)).toEqual([c.id]);
-  work.update(b.id, { state: "running" });
-  expect((await runWorkCli(["dismiss", c.id], work, {})).exitCode).toBe(0);
-  work.update(b.id, { state: "done" });
-  expect((await runWorkCli(["clear"], work, { threadId: "thr_main" })).stdout).toBe("Cleared 1 finished card.\n");
-  expect((await runWorkCli(["clear"], work, {})).exitCode).toBe(1);
-  const ended = work.create({ title: "E", kind: "worker", threadId: "thr_main", workerThreadId: "thr_e" }).card;
-  store.markStale(ended.id);
-  expect((await runWorkCli(["show", ended.id], work, {})).stdout).toContain("ended\tE");
 });
 
 it("never ends or closes a lead's or the user's carded task because a worker it lists went idle (QA)", async () => {

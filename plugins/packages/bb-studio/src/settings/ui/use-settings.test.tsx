@@ -28,11 +28,11 @@ it("loads Studio's settings once per window, saves changes, and refetches when t
   const Probe = () => { seen = useStudioSettings(); return null; };
   const root = createRoot(document.body.appendChild(document.createElement("div")));
   await act(async () => { root.render(<><Probe /><Probe /></>); });
-  expect(seen!.values).toMatchObject({ autoTitle: false, autoMeetingNotes: false, loopDailyBudget: 5 });
+  expect(seen!.values).toMatchObject({ autoTitle: false, autoMeetingNotes: false, dictationAudioDays: 1 });
   expect(seen!.timeZone).toBe("Europe/Paris");
   expect(sdk.calls).toEqual(["settings.get"]);
-  await act(async () => { await seen!.set({ loopDailyBudget: 2 }); });
-  expect(seen!.values!.loopDailyBudget).toBe(2);
+  await act(async () => { await seen!.set({ dictationAudioDays: 2 }); });
+  expect(seen!.values!.dictationAudioDays).toBe(2);
   sdk.values = { ...sdk.values, autoTitle: true };
   await act(async () => { sdk.realtime!(); });
   expect(seen!.values!.autoTitle).toBe(true);

@@ -1,12 +1,11 @@
 import { clearFlight } from "../tasks/cleared";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
-import { z } from "zod";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
-import { changes, createInput, directiveFor, isFinished, rpcContract, WORK_ID, type CreateInput, type WorkCard, type WorkChanges } from "./contract";
+import { directiveFor, isFinished, rpcContract, WORK_ID, type CreateInput, type WorkCard, type WorkChanges } from "./contract";
 import { WorkCardStore } from "./store";
-import { assertTasksReady, guardTasks } from "../tasks/store";
-import { closedByUser, isClosed, KEPT_CLOSED, type Task } from "../tasks/contract";
+import { guardTasks } from "../tasks/store";
+import { closedByUser, isClosed, type Task } from "../tasks/contract";
 import { boundTask, isPlaceholder, SPAWN_SOURCE, ThreadDirectory } from "../tasks/links";
 
 type TimelineRow = { id: string; kind?: string; role?: string; text?: string; messageSeq?: number };
@@ -33,11 +32,7 @@ export async function findCardMessage(read: TimelineReader, card: Pick<WorkCard,
   return null;
 }
 
-/** Work card agent tools are unified into task_create(card: true), task_update and task_get. */
-export const WORK_TOOLS: readonly string[] = [];
 
-export const CREATE_DESCRIPTION = "Start a live work card for one piece of work (a worker's or lead's job, a release, a task in progress). A card is how a task is drawn in chat: with taskId it draws that task, and a worker card for a worker thread that already has a task draws that task instead of making a second one. It returns a ::work{id=\"…\"} line: post it ONCE, on its own line, in the conversation where the user follows the work. The card stays put and redraws in place. From then on report progress with task_update instead of posting status messages. Pass the card id to a worker you start so it can update the card itself. Link its thread with a bare @thread:thr_… mention or [text](/threads/thr_…), never [text](@thread:thr_…). A worker card with workerThreadId gives that thread the card's title, so both carry one name.";
-export const UPDATE_DESCRIPTION = "Change a work card in place: state (running, waiting, needs-you, done, failed), step (e.g. \"3/5 Tests\"), line (the latest one-liner) and needs (what the user must do; with state needs-you). Use it for progress instead of posting a new message. A worker card still running when its worker thread ends or is archived shows as ended without a final update until the next update.";
 
 export function endsCard(card: WorkCard, thread: WorkerThread): boolean {
   if (isFinished(card) || !card.workerThreadId) return false;
@@ -159,32 +154,6 @@ export function registerWorkCards(bb: BbPluginApi, db: Database.Database, option
     "work.clear": ({ threadId }) => { const cleared = store.clearFinished(threadId); clearFlight(db, threadId, store.now()); store.changed(); return { cleared }; },
   }, false, (message) => bb.log.warn(message)));
 
-  bb.agents.registerTool({
-    name: "work_card_create",
-    description: CREATE_DESCRIPTION,
-    parameters: createInput.extend({ taskId: z.string().min(1).optional().describe("The task this card draws; omit to make one (or to draw the task a worker thread already has)") }),
-    execute: async (input, ctx) => {
-      assertTasksReady(db);
-      const threadId = input.threadId ?? ctx.threadId;
-      if (!threadId) return "Pass threadId: the conversation the card goes in.";
-      const made = create({ ...input, threadId });
-      const { card, directive } = made;
-      if ("posted" in made) return JSON.stringify({ id: card.id, directive, note: `This task already has its card in thread ${made.posted}; don't post it again. Update it with task_update.` });
-      return JSON.stringify({ id: card.id, directive, post: `Post this line once, on its own line, in thread ${threadId}: ${directive}` });
-    },
-  });
-  bb.agents.registerTool({
-    name: "work_card_update",
-    description: UPDATE_DESCRIPTION,
-    parameters: changes.extend({ id: z.string().regex(WORK_ID) }),
-    execute: async ({ id, ...rest }, ctx) => { assertTasksReady(db); const t = store.tasks.find(id); const kept = !!t && closedByUser(t); const card = update(id, rest, ctx?.threadId ? `thread:${ctx.threadId}` : null); return JSON.stringify(kept ? { ...card, note: KEPT_CLOSED } : card); },
-  });
-  bb.agents.registerTool({
-    name: "work_card_get",
-    description: "Read a work card by id: its state, step, line and the conversation it is in.",
-    parameters: z.object({ id: z.string().regex(WORK_ID) }),
-    execute: async ({ id }) => { assertTasksReady(db); return JSON.stringify(store.get(id)); },
-  });
 
   return { store, create, update, list, place, placeAll, sweep, swept };
 }
