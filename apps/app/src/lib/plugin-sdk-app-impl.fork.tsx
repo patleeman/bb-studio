@@ -9,6 +9,7 @@ import { usePluginTabWindow } from "./fork-tab-window";
 import { usePluginAppTheme } from "./fork-app-theme";
 import { usePluginGlobalTabs } from "./fork-plugin-global-tabs";
 import { useAppRoute } from "./plugin-navigation.fork";
+import { ForkThreadContextSegments } from "@/components/fork/ForkThreadContextSegments";
 
 export const forkPluginSdkAppImplementation = {
   experimental_useAppRoute: useAppRoute,
@@ -22,4 +23,5 @@ export const forkPluginSdkAppImplementation = {
   experimental_useContextCard: usePluginContextCard,
   experimental_writeDragItem: writeDragItem,
   experimental_readDragItem: readDragItem,
+  experimental_ThreadContextSegments: ForkThreadContextSegments,
 } satisfies ForkPluginSdkApp;
