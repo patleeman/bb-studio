@@ -11,6 +11,9 @@ enum BotSpacesDemo {
 
     static let sideThreadId = "thr_demo_side_m3"
 
+    /// `-qaStrandsDemo`: Studio answers `strands.*`, and the Bot's view nests more workers (a worker's worker, runners under Main).
+    static var strands: Bool { ProcessInfo.processInfo.arguments.contains("-qaStrandsDemo") }
+
     static var late: Duration? {
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "-qaSpacesLate") else { return nil }
@@ -244,6 +247,62 @@ enum BotSpacesDemo {
         }
 
         private var chosenTheme: String?
+        private var strandsResolved = false
+
+        /// `strands.list` for the demo's Main and Launch prep: two asks, two running strands with workers, a finished one, a quiet one.
+        static func strandsJSON(_ threadId: String, now: Double, resolved: Bool) -> [String: Any] {
+            func strand(_ id: String, _ title: String, _ summary: String, _ state: String, seq: Double, asks: [[String: Any]] = [], workers: [[String: Any]] = []) -> [String: Any] {
+                let lastAt: Double = now - (100 - seq) * 60_000
+                var out: [String: Any] = ["id": id, "title": title, "summary": summary, "named": true, "state": state, "detail": NSNull()]
+                out["asks"] = asks
+                out["workers"] = workers
+                out["lastAt"] = lastAt
+                out["latestSeq"] = seq
+                out["messages"] = 3
+                out["pinned"] = false
+                out["origin"] = "jev"
+                return out
+            }
+            func worker(_ id: String, _ title: String, _ status: String, endedAgo: Double? = nil) -> [String: Any] {
+                let ended: Any = endedAgo.map { now - $0 } ?? NSNull()
+                return ["threadId": id, "title": title, "status": status, "endedAt": ended]
+            }
+            let strands: [[String: Any]]
+            if threadId == "thr_demo_interview" {
+                strands = [strand("str_notes", "Release notes", "Short changelog or the full list?", "needs-you", seq: 9,
+                                  asks: [["id": "ask_notes", "kind": "question", "threadId": threadId, "label": "Short changelog or the full list?", "details": [Any](), "turnId": NSNull(), "decisions": [Any]()]]),
+                           strand("str_bank", "Question bank", "The worker stopped on a fixture", "active", seq: 6, workers: [worker("thr_demo_w3", "Mock question bank", "failed", endedAgo: 3_600_000)])]
+            } else {
+                var push = strand("str_fork", "Studio-native BB fork", "Wants to push the branch", "needs-you", seq: 40,
+                                  asks: [["id": "ask_demo_push", "kind": "approval", "threadId": "thr_demo_w1", "label": "Push to origin",
+                                          "details": ["git push origin bb-studio-native", "in ~/workingdir/bb-studio-native"], "turnId": NSNull(),
+                                          "decisions": ["allow_once", "allow_for_session", "deny"]]],
+                                  workers: [worker("thr_demo_w1", "Studio-native BB fork", "needs-you")])
+                if resolved {
+                    push["state"] = "running"
+                    push["asks"] = [Any]()
+                    push["workers"] = [worker("thr_demo_w1", "Studio-native BB fork", "running")]
+                }
+                strands = [
+                    push,
+                    strand("str_gateway", "Calendar access", "A tool wants your calendar", "needs-you", seq: 38,
+                           asks: [["id": "ask_gw", "kind": "gateway", "threadId": threadId, "label": "Google Calendar: read events", "details": [Any](), "turnId": NSNull(), "decisions": [Any]()]]),
+                    strand("str_stills", "Theme stills", "Rendering the release page stills", "running", seq: 44,
+                           workers: [worker("thr_demo_w2", "Theme stills renderer", "running"), worker("thr_demo_w5", "Crop stills", "done", endedAgo: 300_000)]),
+                    strand("str_disk", "Disk space", "Finding what else is big", "running", seq: 42, workers: [worker("thr_demo_w6", "Disk scan", "running")]),
+                    strand("str_lisbon", "Lisbon trip", "Passport is in the bag", "done-unseen", seq: 36),
+                    strand("str_notes", "Release notes", "Shipped yesterday", "quiet", seq: 12, workers: [worker("thr_demo_w4", "Release notes", "done", endedAgo: 86_400_000)]),
+                ]
+            }
+            let stray: [Any] = threadId == "thr_demo_interview" ? [] : [worker("thr_demo_w9", "Flaky fixture hunt", "failed", endedAgo: 3_600_000)]
+            let backfill: [String: Any] = ["done": true, "at": now, "messages": 40, "sorted": 40]
+            var out: [String: Any] = ["threadId": threadId, "enabled": true, "backfill": backfill, "jevCallsToday": 3, "jevDailyCap": 200]
+            out["sortingTurn"] = false
+            out["strands"] = strands
+            out["earlier"] = [Any]()
+            out["strayWorkers"] = stray
+            return out
+        }
         private(set) var appearanceCalls: [[String: Any]] = []
 
         func viewJSON(_ botId: String) -> Data {
@@ -256,17 +315,29 @@ enum BotSpacesDemo {
                         "forkedFrom": conversation.parent.map { ["threadId": $0.threadId, "messageId": $0.messageId, "title": $0.title] } ?? NSNull(),
                         "projectId": "proj_personal", "updatedAt": conversation.at, "latest": conversation.latest, "running": conversation.running,
                         "needsYou": conversation.needs.map { ["reason": $0, "at": now - 30_000] } ?? NSNull(), "mirrored": false,
+                        "providerId": conversation.id == "thr_demo_interview" ? "codex" : "claude-code",
+                        "modelName": conversation.id == "thr_demo_interview" ? "GPT-5.2" : "Opus 5.5",
                     ]
                 }
                 func worker(_ id: String, _ title: String, _ status: String, owner: (String, String), ago: Double) -> [String: Any] {
                     ["threadId": id, "title": title, "status": status, "ownerConversationId": owner.0, "ownerTitle": owner.1,
-                     "updatedAt": now - ago, "mirrored": false, "sameTitle": 1]
+                     "updatedAt": now - ago, "mirrored": false, "sameTitle": 1, "providerId": id.hasSuffix("2") || id.hasSuffix("6") ? "codex" : "claude-code"]
                 }
-                let workers: [[String: Any]] = botId == "bot_juniper" ? self.workers.map { each in
+                var workers: [[String: Any]] = botId == "bot_juniper" ? self.workers.map { each in
                     var out = worker(each.id, each.title, each.status, owner: each.owner, ago: each.ago)
                     out["branch"] = each.branch ?? NSNull()
                     return out
                 } : []
+                // `-qaStrandsDemo`: a worker a worker started, a runner's thread under Main, and a second running worker.
+                if botId == "bot_juniper", BotSpacesDemo.strands {
+                    let main = (BotDemo.threadId, "Main")
+                    var crop = worker("thr_demo_w5", "Crop stills", "done", owner: main, ago: 300_000)
+                    crop["spawnedBy"] = "thr_demo_w2"
+                    workers.insert(worker("thr_demo_w6", "Disk scan", "running", owner: main, ago: 90_000), at: 1)
+                    workers.append(crop)
+                    workers.append(worker("thr_demo_r1", "Morning check-in", "done", owner: main, ago: 26_000_000))
+                    workers.append(worker("thr_demo_r2", "Inbox sweep", "done", owner: main, ago: 30_000_000))
+                }
                 let view: [String: Any] = ["botId": botId, "conversations": list, "workers": workers,
                                            "hiddenWorkers": 0, "hiddenToday": 0, "olderConversations": 0]
                 return (try? JSONSerialization.data(withJSONObject: view)) ?? Data()
@@ -410,7 +481,17 @@ enum BotSpacesDemo {
                         "approval": approvalView("pending"),
                     ] as [String: Any]]])
                 }
+            case "strands.list":
+                guard BotSpacesDemo.strands else { return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
+                return ok(Self.strandsJSON(threadId, now: Self.now, resolved: lock.withLock { strandsResolved }))
+            case "strands.opened", "strands.tags":
+                guard BotSpacesDemo.strands else { return (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8)) }
+                return ok(name == "strands.tags" ? ["tags": [Any](), "strands": [Any]()] : ["ok": true])
             case "bot_worker_approval_resolve":
+                if (input["interactionId"] as? String) == "ask_demo_push" {
+                    lock.withLock { strandsResolved = true }
+                    return ok(["approval": ["id": "ask_demo_push", "state": "approved", "decisions": ["allow_once"]]])
+                }
                 let decision = input["decision"] as? String ?? ""
                 return lock.withLock {
                     guard approvalPending, threadId == "thr_demo_w1", input["interactionId"] as? String == Self.approvalId else {

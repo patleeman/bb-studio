@@ -391,6 +391,9 @@ public enum Studio {
     public static let areas_get = "areas.get"
     public static let areas_itemTask = "areas.itemTask"
     public static let toolGateway_overview = "toolGateway.overview"
+    public static let strands_list = "strands.list"
+    public static let strands_tags = "strands.tags"
+    public static let strands_opened = "strands.opened"
   }
 
   public enum Channel {
@@ -1250,6 +1253,12 @@ public enum Studio {
   public typealias ToolGatewayOverviewInput = StudioJSONValue
 
   public typealias ToolGatewayOverview = ToolGatewayOverviewOutput
+
+  public typealias StrandsList = StrandsListOutput
+
+  public typealias StrandsTags = StrandsTagsOutput
+
+  public typealias StrandsOpened = StrandsOpenedOutput
 
   public struct LoopsListInput: Sendable, Hashable, Codable {
     public var area: String?
@@ -41967,6 +41976,610 @@ public enum Studio {
     public init(servers: [ToolGatewayOverviewOutputServersItem]? = nil, requests: [ToolGatewayOverviewOutputRequestsItem]? = nil) {
       self.servers = servers
       self.requests = requests
+    }
+  }
+
+  public struct StrandsListInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct StrandsListOutputBackfill: Sendable, Hashable, Codable {
+    public var done: Bool?
+    public var at: Double?
+    public var messages: Double?
+    public var sorted: Double?
+
+    public init(done: Bool? = nil, at: Double? = nil, messages: Double? = nil, sorted: Double? = nil) {
+      self.done = done
+      self.at = at
+      self.messages = messages
+      self.sorted = sorted
+    }
+  }
+
+  public enum StrandsListOutputStrandsItemState: Sendable, Hashable, Codable {
+    case needs_you
+    case running
+    case done_unseen
+    case waiting
+    case active
+    case quiet
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "needs-you": self = .needs_you
+      case "running": self = .running
+      case "done-unseen": self = .done_unseen
+      case "waiting": self = .waiting
+      case "active": self = .active
+      case "quiet": self = .quiet
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .needs_you: try container.encode("needs-you")
+      case .running: try container.encode("running")
+      case .done_unseen: try container.encode("done-unseen")
+      case .waiting: try container.encode("waiting")
+      case .active: try container.encode("active")
+      case .quiet: try container.encode("quiet")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum StrandsListOutputStrandsItemAsksItemKind: Sendable, Hashable, Codable {
+    case question
+    case approval
+    case gateway
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "question": self = .question
+      case "approval": self = .approval
+      case "gateway": self = .gateway
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .question: try container.encode("question")
+      case .approval: try container.encode("approval")
+      case .gateway: try container.encode("gateway")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum StrandsListOutputStrandsItemAsksItemDecisionsItem: Sendable, Hashable, Codable {
+    case allow_once
+    case allow_for_session
+    case deny
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "allow_once": self = .allow_once
+      case "allow_for_session": self = .allow_for_session
+      case "deny": self = .deny
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .allow_once: try container.encode("allow_once")
+      case .allow_for_session: try container.encode("allow_for_session")
+      case .deny: try container.encode("deny")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct StrandsListOutputStrandsItemAsksItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: StrandsListOutputStrandsItemAsksItemKind?
+    public var threadId: String?
+    public var label: String?
+    public var details: [String]?
+    public var turnId: String?
+    public var decisions: [StrandsListOutputStrandsItemAsksItemDecisionsItem]?
+
+    public init(id: String? = nil, kind: StrandsListOutputStrandsItemAsksItemKind? = nil, threadId: String? = nil, label: String? = nil, details: [String]? = nil, turnId: String? = nil, decisions: [StrandsListOutputStrandsItemAsksItemDecisionsItem]? = nil) {
+      self.id = id
+      self.kind = kind
+      self.threadId = threadId
+      self.label = label
+      self.details = details
+      self.turnId = turnId
+      self.decisions = decisions
+    }
+  }
+
+  public enum StrandsListOutputStrandsItemWorkersItemStatus: Sendable, Hashable, Codable {
+    case running
+    case needs_you
+    case failed
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "running": self = .running
+      case "needs-you": self = .needs_you
+      case "failed": self = .failed
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .running: try container.encode("running")
+      case .needs_you: try container.encode("needs-you")
+      case .failed: try container.encode("failed")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct StrandsListOutputStrandsItemWorkersItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var status: StrandsListOutputStrandsItemWorkersItemStatus?
+    public var endedAt: Double?
+
+    public init(threadId: String? = nil, title: String? = nil, status: StrandsListOutputStrandsItemWorkersItemStatus? = nil, endedAt: Double? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.status = status
+      self.endedAt = endedAt
+    }
+  }
+
+  public enum StrandsListOutputStrandsItemOrigin: Sendable, Hashable, Codable {
+    case jev
+    case model
+    case user
+    case task
+    case backfill
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "jev": self = .jev
+      case "model": self = .model
+      case "user": self = .user
+      case "task": self = .task
+      case "backfill": self = .backfill
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .jev: try container.encode("jev")
+      case .model: try container.encode("model")
+      case .user: try container.encode("user")
+      case .task: try container.encode("task")
+      case .backfill: try container.encode("backfill")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct StrandsListOutputStrandsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var summary: String?
+    public var named: Bool?
+    public var state: StrandsListOutputStrandsItemState?
+    public var detail: String?
+    public var asks: [StrandsListOutputStrandsItemAsksItem]?
+    public var workers: [StrandsListOutputStrandsItemWorkersItem]?
+    public var lastAt: Double?
+    public var firstAt: Double?
+    public var firstSeq: Double?
+    public var latestSeq: Double?
+    public var latestTurnId: String?
+    public var messages: Double?
+    public var unsure: Double?
+    public var pinned: Bool?
+    public var origin: StrandsListOutputStrandsItemOrigin?
+    public var taskId: String?
+
+    public init(id: String? = nil, title: String? = nil, summary: String? = nil, named: Bool? = nil, state: StrandsListOutputStrandsItemState? = nil, detail: String? = nil, asks: [StrandsListOutputStrandsItemAsksItem]? = nil, workers: [StrandsListOutputStrandsItemWorkersItem]? = nil, lastAt: Double? = nil, firstAt: Double? = nil, firstSeq: Double? = nil, latestSeq: Double? = nil, latestTurnId: String? = nil, messages: Double? = nil, unsure: Double? = nil, pinned: Bool? = nil, origin: StrandsListOutputStrandsItemOrigin? = nil, taskId: String? = nil) {
+      self.id = id
+      self.title = title
+      self.summary = summary
+      self.named = named
+      self.state = state
+      self.detail = detail
+      self.asks = asks
+      self.workers = workers
+      self.lastAt = lastAt
+      self.firstAt = firstAt
+      self.firstSeq = firstSeq
+      self.latestSeq = latestSeq
+      self.latestTurnId = latestTurnId
+      self.messages = messages
+      self.unsure = unsure
+      self.pinned = pinned
+      self.origin = origin
+      self.taskId = taskId
+    }
+  }
+
+  public enum StrandsListOutputEarlierItemState: Sendable, Hashable, Codable {
+    case needs_you
+    case running
+    case done_unseen
+    case waiting
+    case active
+    case quiet
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "needs-you": self = .needs_you
+      case "running": self = .running
+      case "done-unseen": self = .done_unseen
+      case "waiting": self = .waiting
+      case "active": self = .active
+      case "quiet": self = .quiet
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .needs_you: try container.encode("needs-you")
+      case .running: try container.encode("running")
+      case .done_unseen: try container.encode("done-unseen")
+      case .waiting: try container.encode("waiting")
+      case .active: try container.encode("active")
+      case .quiet: try container.encode("quiet")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum StrandsListOutputEarlierItemAsksItemKind: Sendable, Hashable, Codable {
+    case question
+    case approval
+    case gateway
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "question": self = .question
+      case "approval": self = .approval
+      case "gateway": self = .gateway
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .question: try container.encode("question")
+      case .approval: try container.encode("approval")
+      case .gateway: try container.encode("gateway")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum StrandsListOutputEarlierItemAsksItemDecisionsItem: Sendable, Hashable, Codable {
+    case allow_once
+    case allow_for_session
+    case deny
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "allow_once": self = .allow_once
+      case "allow_for_session": self = .allow_for_session
+      case "deny": self = .deny
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .allow_once: try container.encode("allow_once")
+      case .allow_for_session: try container.encode("allow_for_session")
+      case .deny: try container.encode("deny")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct StrandsListOutputEarlierItemAsksItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: StrandsListOutputEarlierItemAsksItemKind?
+    public var threadId: String?
+    public var label: String?
+    public var details: [String]?
+    public var turnId: String?
+    public var decisions: [StrandsListOutputEarlierItemAsksItemDecisionsItem]?
+
+    public init(id: String? = nil, kind: StrandsListOutputEarlierItemAsksItemKind? = nil, threadId: String? = nil, label: String? = nil, details: [String]? = nil, turnId: String? = nil, decisions: [StrandsListOutputEarlierItemAsksItemDecisionsItem]? = nil) {
+      self.id = id
+      self.kind = kind
+      self.threadId = threadId
+      self.label = label
+      self.details = details
+      self.turnId = turnId
+      self.decisions = decisions
+    }
+  }
+
+  public enum StrandsListOutputEarlierItemWorkersItemStatus: Sendable, Hashable, Codable {
+    case running
+    case needs_you
+    case failed
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "running": self = .running
+      case "needs-you": self = .needs_you
+      case "failed": self = .failed
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .running: try container.encode("running")
+      case .needs_you: try container.encode("needs-you")
+      case .failed: try container.encode("failed")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct StrandsListOutputEarlierItemWorkersItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var status: StrandsListOutputEarlierItemWorkersItemStatus?
+    public var endedAt: Double?
+
+    public init(threadId: String? = nil, title: String? = nil, status: StrandsListOutputEarlierItemWorkersItemStatus? = nil, endedAt: Double? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.status = status
+      self.endedAt = endedAt
+    }
+  }
+
+  public enum StrandsListOutputEarlierItemOrigin: Sendable, Hashable, Codable {
+    case jev
+    case model
+    case user
+    case task
+    case backfill
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "jev": self = .jev
+      case "model": self = .model
+      case "user": self = .user
+      case "task": self = .task
+      case "backfill": self = .backfill
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .jev: try container.encode("jev")
+      case .model: try container.encode("model")
+      case .user: try container.encode("user")
+      case .task: try container.encode("task")
+      case .backfill: try container.encode("backfill")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct StrandsListOutputEarlierItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var summary: String?
+    public var named: Bool?
+    public var state: StrandsListOutputEarlierItemState?
+    public var detail: String?
+    public var asks: [StrandsListOutputEarlierItemAsksItem]?
+    public var workers: [StrandsListOutputEarlierItemWorkersItem]?
+    public var lastAt: Double?
+    public var firstAt: Double?
+    public var firstSeq: Double?
+    public var latestSeq: Double?
+    public var latestTurnId: String?
+    public var messages: Double?
+    public var unsure: Double?
+    public var pinned: Bool?
+    public var origin: StrandsListOutputEarlierItemOrigin?
+    public var taskId: String?
+
+    public init(id: String? = nil, title: String? = nil, summary: String? = nil, named: Bool? = nil, state: StrandsListOutputEarlierItemState? = nil, detail: String? = nil, asks: [StrandsListOutputEarlierItemAsksItem]? = nil, workers: [StrandsListOutputEarlierItemWorkersItem]? = nil, lastAt: Double? = nil, firstAt: Double? = nil, firstSeq: Double? = nil, latestSeq: Double? = nil, latestTurnId: String? = nil, messages: Double? = nil, unsure: Double? = nil, pinned: Bool? = nil, origin: StrandsListOutputEarlierItemOrigin? = nil, taskId: String? = nil) {
+      self.id = id
+      self.title = title
+      self.summary = summary
+      self.named = named
+      self.state = state
+      self.detail = detail
+      self.asks = asks
+      self.workers = workers
+      self.lastAt = lastAt
+      self.firstAt = firstAt
+      self.firstSeq = firstSeq
+      self.latestSeq = latestSeq
+      self.latestTurnId = latestTurnId
+      self.messages = messages
+      self.unsure = unsure
+      self.pinned = pinned
+      self.origin = origin
+      self.taskId = taskId
+    }
+  }
+
+  public enum StrandsListOutputStrayWorkersItemStatus: Sendable, Hashable, Codable {
+    case running
+    case needs_you
+    case failed
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "running": self = .running
+      case "needs-you": self = .needs_you
+      case "failed": self = .failed
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .running: try container.encode("running")
+      case .needs_you: try container.encode("needs-you")
+      case .failed: try container.encode("failed")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct StrandsListOutputStrayWorkersItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var status: StrandsListOutputStrayWorkersItemStatus?
+    public var endedAt: Double?
+
+    public init(threadId: String? = nil, title: String? = nil, status: StrandsListOutputStrayWorkersItemStatus? = nil, endedAt: Double? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.status = status
+      self.endedAt = endedAt
+    }
+  }
+
+  public struct StrandsListOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var enabled: Bool?
+    public var backfill: StrandsListOutputBackfill?
+    public var jevCallsToday: Double?
+    public var jevDailyCap: Double?
+    public var sortingTurn: Bool?
+    public var strands: [StrandsListOutputStrandsItem]?
+    public var earlier: [StrandsListOutputEarlierItem]?
+    public var strayWorkers: [StrandsListOutputStrayWorkersItem]?
+
+    public init(threadId: String? = nil, enabled: Bool? = nil, backfill: StrandsListOutputBackfill? = nil, jevCallsToday: Double? = nil, jevDailyCap: Double? = nil, sortingTurn: Bool? = nil, strands: [StrandsListOutputStrandsItem]? = nil, earlier: [StrandsListOutputEarlierItem]? = nil, strayWorkers: [StrandsListOutputStrayWorkersItem]? = nil) {
+      self.threadId = threadId
+      self.enabled = enabled
+      self.backfill = backfill
+      self.jevCallsToday = jevCallsToday
+      self.jevDailyCap = jevDailyCap
+      self.sortingTurn = sortingTurn
+      self.strands = strands
+      self.earlier = earlier
+      self.strayWorkers = strayWorkers
+    }
+  }
+
+  public struct StrandsTagsInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct StrandsTagsOutputTagsItem: Sendable, Hashable, Codable {
+    public var turnId: String?
+    public var seq: Double?
+    public var strandId: String?
+
+    public init(turnId: String? = nil, seq: Double? = nil, strandId: String? = nil) {
+      self.turnId = turnId
+      self.seq = seq
+      self.strandId = strandId
+    }
+  }
+
+  public struct StrandsTagsOutputStrandsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+
+    public init(id: String? = nil, title: String? = nil) {
+      self.id = id
+      self.title = title
+    }
+  }
+
+  public struct StrandsTagsOutput: Sendable, Hashable, Codable {
+    public var tags: [StrandsTagsOutputTagsItem]?
+    public var strands: [StrandsTagsOutputStrandsItem]?
+
+    public init(tags: [StrandsTagsOutputTagsItem]? = nil, strands: [StrandsTagsOutputStrandsItem]? = nil) {
+      self.tags = tags
+      self.strands = strands
+    }
+  }
+
+  public struct StrandsOpenedInput: Sendable, Hashable, Codable {
+    public var strandId: String?
+
+    public init(strandId: String? = nil) {
+      self.strandId = strandId
+    }
+  }
+
+  public struct StrandsOpenedOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
     }
   }
 

@@ -160,3 +160,10 @@ export const rpcContract = defineRpcContract({
     output: z.object({ ok: z.boolean() }),
   },
 });
+
+/** What the phone reads: a conversation's strands and its tags, and "opened". The rest stays desktop-only. */
+export const strandsPublicContract = defineRpcContract({
+  "strands.list": rpcContract["strands.list"],
+  "strands.tags": rpcContract["strands.tags"],
+  "strands.opened": rpcContract["strands.opened"],
+});

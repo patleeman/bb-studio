@@ -214,8 +214,10 @@ struct RoomConversations: View {
     var closeToRoom: () -> Void
     @EnvironmentObject private var app: AppModel
     @State private var starting = false
-    @State private var showsEarlier = false
     @State private var removed: Set<String> = []
+    /// Conversations whose workers the user opened or closed; others open while one runs or needs you.
+    @State private var toggled: [String: Bool] = [:]
+    @State private var openFolds: Set<String> = []
     @State private var deleting: BotConversation?
     @Environment(\.look) private var look
 
@@ -223,57 +225,40 @@ struct RoomConversations: View {
 
     var body: some View {
         let lines = BotShell.lines(view).filter { !removed.contains($0.threadId) }
-        let split = BotShell.splitWorkers(view?.workers ?? [])
-        let today = split.done.filter { Calendar.current.isDateInToday(Date(timeIntervalSince1970: $0.updatedAt / 1000)) }
-        let earlier = split.done.filter { !Calendar.current.isDateInToday(Date(timeIntervalSince1970: $0.updatedAt / 1000)) }
+        let nests = BotWorkerNests.make(conversations: lines.map(\.threadId), workers: view?.workers ?? [])
         List {
             Section {
                 ForEach(lines) { line in
-                    Button {
-                        open(.conversation(line.threadId))
-                    } label: {
-                        HStack {
-                            BotConversationRow(line: line)
-                            if line.threadId == mainThreadId {
-                                Text("You're here").font(.footnote).foregroundStyle(look.success)
-                            }
-                        }
-                        .contentShape(.rect)
-                    }
-                    .tint(.primary)
-                    .accessibilityIdentifier("roomConversation-\(line.threadId)")
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) { removeActions(line.threadId, swipe: true) }
-                    .contextMenu { removeActions(line.threadId, swipe: false) }
-                }
-            }
-            if !split.active.isEmpty {
-                Section("Working now") {
-                    ForEach(split.active) { worker in workerRow(worker) }
-                }
-            }
-            if !today.isEmpty {
-                Section("Finished today") {
-                    ForEach(today) { worker in workerRow(worker) }
-                }
-            }
-            if !earlier.isEmpty {
-                Section {
-                    if showsEarlier {
-                        ForEach(earlier) { worker in workerRow(worker) }
-                    } else {
-                        Button { withAnimation(.snappy) { showsEarlier = true } } label: {
+                    let nest = nests.nests[line.threadId]
+                    HStack(spacing: 8) {
+                        Button {
+                            open(.conversation(line.threadId))
+                        } label: {
                             HStack {
-                                Text("\(earlier.count) earlier")
-                                Spacer()
-                                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                                BotConversationRow(line: line)
+                                if line.threadId == mainThreadId {
+                                    Text("You're here").font(.footnote).foregroundStyle(look.success)
+                                }
                             }
-                            .foregroundStyle(.secondary)
                             .contentShape(.rect)
                         }
-                        .accessibilityIdentifier("roomEarlier")
+                        .buttonStyle(.borderless)
+                        .tint(.primary)
+                        .accessibilityIdentifier("roomConversation-\(line.threadId)")
+                        if let nest {
+                            nestToggle(nest, key: line.threadId)
+                        }
                     }
-                } header: {
-                    if showsEarlier { Text("Earlier") }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) { removeActions(line.threadId, swipe: true) }
+                    .contextMenu { removeActions(line.threadId, swipe: false) }
+                    if let nest, nestOpen(nest, key: line.threadId) {
+                        workerLines(nest, parent: line.threadId)
+                    }
+                }
+            }
+            if let other = nests.other, !other.nodes.isEmpty {
+                Section("Other workers") {
+                    workerLines(other, parent: "other")
                 }
             }
             Section {
@@ -342,19 +327,78 @@ struct RoomConversations: View {
         }
     }
 
-    private func workerRow(_ worker: BotWorker) -> some View {
-        Button { open(.worker(worker.threadId)) } label: {
-            HStack(spacing: 12) {
-                BotWorkerGlyph(status: worker.status).frame(width: 16)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(worker.title.isEmpty ? "Worker" : worker.title).lineLimit(1)
-                    if let owner = worker.ownerTitle {
-                        Text(owner).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
-                    }
+    private func nestOpen(_ nest: BotWorkerNest, key: String) -> Bool {
+        toggled[key] ?? (nest.running > 0 || nest.needsYou > 0)
+    }
+
+    /// The toggle on a conversation's row: a chevron and the count, a spinner while one runs, amber while one needs you.
+    private func nestToggle(_ nest: BotWorkerNest, key: String) -> some View {
+        let isOpen = nestOpen(nest, key: key)
+        return Button {
+            withAnimation(.snappy) { toggled[key] = !isOpen }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: isOpen ? "chevron.down" : "chevron.right").font(.caption2.weight(.semibold))
+                if nest.needsYou > 0 {
+                    Circle().fill(look.needsYou).frame(width: 6, height: 6)
+                    Text("\(nest.needsYou)")
                 }
+                if nest.running > 0 {
+                    ProgressView().controlSize(.mini)
+                    Text("\(nest.running)")
+                }
+                if nest.needsYou == 0 && nest.running == 0 { Text("\(nest.total)") }
+            }
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(nest.needsYou > 0 ? AnyShapeStyle(look.needsYou) : AnyShapeStyle(.secondary))
+            .padding(.horizontal, 7).frame(minHeight: 26)
+            .overlay(Capsule().strokeBorder(nest.needsYou > 0 ? AnyShapeStyle(look.needsYou.opacity(0.5)) : AnyShapeStyle(.separator), lineWidth: 0.5))
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(nest.label)
+        .accessibilityValue(isOpen ? "Shown" : "Hidden")
+        .accessibilityIdentifier("roomNestToggle-\(key)")
+    }
+
+    @ViewBuilder private func workerLines(_ nest: BotWorkerNest, parent: String) -> some View {
+        ForEach(BotWorkerNests.lines(nest.nodes, parent: parent, openFolds: openFolds)) { line in
+            switch line {
+            case .worker(let worker, let depth):
+                workerRow(worker, depth: depth)
+            case .fold(let key, let count, let depth):
+                Button {
+                    withAnimation(.snappy) { if openFolds.contains(key) { openFolds.remove(key) } else { openFolds.insert(key) } }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: openFolds.contains(key) ? "chevron.down" : "chevron.right").font(.caption2.weight(.semibold))
+                        Text("\(count) done")
+                        Spacer()
+                    }
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    .padding(.leading, 20 + CGFloat(depth) * 16)
+                    .contentShape(.rect)
+                }
+                .tint(.primary)
+                .accessibilityIdentifier("roomFold-\(key)")
+            }
+        }
+    }
+
+    private func workerRow(_ worker: BotWorker, depth: Int) -> some View {
+        Button { open(.worker(worker.threadId)) } label: {
+            HStack(spacing: 8) {
+                BotWorkerGlyph(status: worker.status).frame(width: 16)
+                if let logo = ProviderLogo(worker.providerId) {
+                    logo.frame(width: 13, height: 13).accessibilityHidden(true)
+                }
+                Text(worker.title.isEmpty ? "Worker" : worker.title).lineLimit(1)
                 Spacer(minLength: 8)
                 Text(BotShell.shortAge(worker.updatedAt)).font(.footnote).monospacedDigit().foregroundStyle(.secondary)
             }
+            .font(.subheadline)
+            .padding(.leading, 20 + CGFloat(depth) * 16)
             .contentShape(.rect)
         }
         .tint(.primary)

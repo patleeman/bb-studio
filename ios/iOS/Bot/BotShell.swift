@@ -50,6 +50,8 @@ struct BotConversationLine: Equatable, Identifiable {
     var updatedAt: Double
     var tone: Tone
     var text: String
+    /// BB's provider id for its logo (`claude-code`, `codex`…), nil when unknown.
+    var providerId: String? = nil
 }
 
 struct BotSpaceDot: Equatable, Identifiable {
@@ -131,7 +133,8 @@ enum BotShell {
             let line = secondLine(conversation)
             out.append(BotConversationLine(threadId: conversation.threadId, title: conversation.title.isEmpty ? "Untitled" : conversation.title,
                                            forkedFrom: nil, depth: 0,
-                                           updatedAt: conversation.updatedAt, tone: line.tone, text: line.text))
+                                           updatedAt: conversation.updatedAt, tone: line.tone, text: line.text,
+                                           providerId: conversation.providerId))
         }
         return out
     }

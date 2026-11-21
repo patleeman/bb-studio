@@ -38,10 +38,11 @@ final class WorkersUITests: ServerIsolatedUITestCase {
         launch()
         app.buttons["roomLayDown"].tap()
         app.openRoomPlace("conversations")
-        let earlier = app.buttons["roomEarlier"]
+        // The failed worker sits under the conversation that started it, behind that row's toggle.
+        let nest = app.buttons["roomNestToggle-thr_demo_interview"]
         let failed = app.buttons["roomWorker-thr_demo_w3"]
-        XCTAssertTrue(earlier.waitForExistence(timeout: 15) || failed.exists, "older finished workers fold under N earlier")
-        if !failed.exists { earlier.tap() }
+        XCTAssertTrue(nest.waitForExistence(timeout: 15) || failed.exists, "Launch prep's workers are behind its toggle")
+        if !failed.exists { nest.tap() }
         XCTAssertTrue(failed.waitForExistence(timeout: 15))
         failed.tap()
         expectWorker("Mock question bank", status: "failed")

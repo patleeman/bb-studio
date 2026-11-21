@@ -576,9 +576,25 @@ struct RoomView: View {
                 .id(pager.shown)
                 .transition(reduceMotion ? .opacity : .push(from: slide))
         }
+        .offset(x: pages == nil && room.mode == .rest ? 0 : pageOffset)
         .environment(\.botConversation, context(pager.shown, kind: .conversation))
-        .environment(\.roomChat, RoomChat(focusRequests: room.focusRequests, away: !standing, layDown: layDown))
+        .environment(\.roomChat, RoomChat(focusRequests: room.focusRequests, away: !standing, layDown: layDown,
+                                          page: order.count > 1 ? chatPage : nil,
+                                          pages: RoomChatPages(index: order.firstIndex(of: pager.shown) ?? 0, count: order.count)))
         .environment(\.openTaskThread, { openItem(.conversation($0)) })
+    }
+
+    /// A sideways drag on the open conversation's messages: it follows the
+    /// finger (less at the first or last), then pages, as the room does.
+    private func chatPage(_ translation: CGFloat, _ predicted: CGFloat?) {
+        guard pages != nil || room.mode != .rest else { return }
+        if let predicted {
+            page(RoomPager.page(after: CGSize(width: translation, height: 0), predicted: CGSize(width: predicted, height: 0)))
+            return
+        }
+        guard !reduceMotion else { return }
+        let edge = RoomPager.step(order, from: pager.shown, by: translation < 0 ? 1 : -1) == nil
+        pageOffset = translation * (edge ? 0.2 : 0.5)
     }
 
     private func page(_ step: Int) {

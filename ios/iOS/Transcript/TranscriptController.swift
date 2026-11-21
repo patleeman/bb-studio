@@ -84,6 +84,13 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
 
     var onNearTop: (() -> Void)?
     var onEmptyTap: (() -> Void)?
+    /// A sideways drag across the messages: the translation while it moves
+    /// (`predicted` nil), then once more as it ends with where it would land.
+    /// Nil: no paging (only the room pages between conversations).
+    var onPage: ((_ translation: CGFloat, _ predicted: CGFloat?) -> Void)? {
+        didSet { pagePan?.isEnabled = onPage != nil }
+    }
+    private var pagePan: UIPanGestureRecognizer?
     var rowsHidden = false {
         didSet {
             guard rowsHidden != oldValue, isViewLoaded else { return }
@@ -211,6 +218,17 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         tap.delaysTouchesEnded = false
         tap.delegate = self
         collectionView.addGestureRecognizer(tap)
+
+        // Swiping sideways pages between the Bot's conversations (the room).
+        // It begins only on a clearly sideways drag, away from the left edge
+        // (the system's back gesture), and never on a block that scrolls
+        // sideways itself (code, tables, wide images).
+        let pagePan = UIPanGestureRecognizer(target: self, action: #selector(pannedPage(_:)))
+        pagePan.delegate = self
+        pagePan.cancelsTouchesInView = false
+        pagePan.isEnabled = onPage != nil
+        collectionView.addGestureRecognizer(pagePan)
+        self.pagePan = pagePan
 
         for name in AccessibilityTurnOn.names {
             NotificationCenter.default.addObserver(self, selector: #selector(accessibilityDidTurnOn), name: name, object: nil)
@@ -866,7 +884,43 @@ final class TranscriptController: UIViewController, UICollectionViewDelegate, UI
         if let onEmptyTap, collectionView.indexPathForItem(at: recognizer.location(in: collectionView)) == nil { onEmptyTap() }
     }
 
-    func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+    func gestureRecognizer(_ recognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        // Paging and an inner sideways scroller never both move.
+        if recognizer === pagePan, let scroller = other.view as? UIScrollView, scroller !== collectionView { return false }
+        return true
+    }
+
+    func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+        guard recognizer === pagePan, let pan = recognizer as? UIPanGestureRecognizer else { return true }
+        let velocity = pan.velocity(in: collectionView)
+        let start = pan.location(in: view)
+        return TranscriptPaging.begins(velocity: velocity, start: start, width: view.bounds.width)
+            && !Self.sidewaysScroller(at: pan.location(in: collectionView), in: collectionView)
+    }
+
+    @objc private func pannedPage(_ pan: UIPanGestureRecognizer) {
+        let translation = pan.translation(in: view).x
+        switch pan.state {
+        case .changed:
+            onPage?(translation, nil)
+        case .ended:
+            onPage?(translation, translation + pan.velocity(in: view).x * 0.2)
+        case .cancelled, .failed:
+            onPage?(0, 0)
+        default:
+            break
+        }
+    }
+
+    /// A view under the point that scrolls sideways on its own, short of the transcript.
+    static func sidewaysScroller(at point: CGPoint, in container: UIView) -> Bool {
+        var view = container.hitTest(point, with: nil)
+        while let current = view, current !== container {
+            if let scroller = current as? UIScrollView, scroller.contentSize.width > scroller.bounds.width + 1 { return true }
+            view = current.superview
+        }
+        return false
+    }
 
     /// A tap on a row's text field (a secret request's, a question's answer)
     /// gives it the keyboard: ending editing after it took the focus away at
@@ -1052,5 +1106,16 @@ final class TranscriptHost: UIHostingController<AnyView> {
     func measure(width: CGFloat) -> CGFloat {
         guard width > 0 else { return 0 }
         return TranscriptListLayout.pixel(sizeThatFits(in: CGSize(width: width, height: .greatestFiniteMagnitude)).height)
+    }
+}
+
+/// When a sideways drag on the transcript pages between conversations.
+enum TranscriptPaging {
+    /// The left edge stays the system's back gesture.
+    static let edge: CGFloat = 24
+
+    static func begins(velocity: CGPoint, start: CGPoint, width: CGFloat) -> Bool {
+        guard start.x > edge, start.x < width - 8 else { return false }
+        return abs(velocity.x) > 2 * abs(velocity.y) && abs(velocity.x) > 80
     }
 }
