@@ -33,6 +33,9 @@ export const strandView = z.object({
   asks: z.array(strandAsk),
   workers: z.array(z.object({ threadId: z.string(), title: z.string(), status: workerStatus })),
   lastAt: z.number(),
+  /** Its first message's time and seq (a filter pages back to it); null when it has none yet. */
+  firstAt: z.number().nullable(),
+  firstSeq: z.number().nullable(),
   /** The strand's newest message (jump-to-latest opens #msg=<seq>); null when it has none (a task with no message yet). */
   latestSeq: z.number().nullable(),
   latestTurnId: z.string().nullable(),

@@ -88,3 +88,29 @@ export function decisionButtons(ask: StrandAsk): { decision: StrandAsk["decision
 
 /** Whether the strands strip takes the In flight strip's place in this conversation. */
 export const stripShown = (list: StrandList | null | undefined) => !!list?.enabled && list.strands.length > 0;
+
+/** A strand's turns and its first message, from the conversation's tags (the newest 2,000 sorted turns). */
+export function turnsOfStrand(tags: Tags | null | undefined, strandId: string): { turnIds: string[]; firstSeq: number | null } {
+  const mine = (tags?.tags ?? []).filter((tag) => tag.strandId === strandId);
+  return { turnIds: mine.map((tag) => tag.turnId), firstSeq: mine.length ? mine[0]!.seq : null };
+}
+
+const fold = (text: string) => text.toLowerCase().normalize("NFKD").replace(/\p{M}/gu, "");
+
+/** Whether every word of the query starts a word of the strand's name or summary. */
+export function matchesStrand(strand: Pick<StrandView, "title" | "summary">, query: string): boolean {
+  const words = fold(query).split(/[^\p{L}\p{N}#]+/u).filter(Boolean);
+  if (!words.length) return true;
+  const hay = fold(`${strand.title} ${strand.summary ?? ""}`);
+  return words.every((word) => new RegExp(`(?:^|[^\\p{L}\\p{N}])${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "u").test(hay));
+}
+
+/** The box's list: needs you, active (running, finished, waiting, open), quiet; with a query, matches only, and Earlier's too. */
+export function boxGroups(list: StrandList | null | undefined, query: string): { label: string; strands: StrandView[] }[] {
+  const all = [...(list?.strands ?? []), ...(query.trim() ? list?.earlier ?? [] : [])].filter((strand) => matchesStrand(strand, query));
+  return [
+    { label: "Needs you", strands: all.filter((strand) => strand.state === "needs-you") },
+    { label: "Active", strands: all.filter((strand) => strand.state !== "needs-you" && strand.state !== "quiet") },
+    { label: "Quiet", strands: all.filter((strand) => strand.state === "quiet") },
+  ].filter((group) => group.strands.length);
+}

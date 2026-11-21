@@ -4374,17 +4374,24 @@ or a worker), finished (a worker ended since you opened the strand), waiting
 (a linked task waits on CI or someone outside), quiet after 24 hours, and
 Earlier after 3 more quiet days unless pinned.
 
-- **The line above the composer**: the current strand, then counts ("1 need
-  you · 2 running"); amber only for need you. It opens a short list (asks with
-  the approval's whole command and its buttons). Picking a strand dims the
-  others' messages and steps through its own. Nothing open, no line. It
-  replaced the In flight strip.
+- **The box above the composer** (In flight's old place): one line by
+  default, the current strand, what it is about (its summary) and the counts
+  ("1 need you · 2 running"); amber only for need you. It expands in place
+  into a filter field: type to narrow the strands by name and summary,
+  grouped needs you, active and quiet, each with its summary and an ask's
+  whole command and buttons. Picking one applies it as a filter (a token with
+  ×; Esc clears it). On a BB with the timeline filter (desktop with
+  `slots.experimental_timelineFilter`), the timeline shows only that strand's
+  messages, with folded and grouped rows open, and loads back to its first
+  message; an older BB dims the other messages instead. Nothing open, no box.
 - **Above each message**: a divider with the strand's name where the strand
   changes, else the name, muted. On hover, **Move to…** moves the message's
   turn to another strand, or **New strand from here** starts one with it and
   the later messages of its strand. Your moves are never re-sorted.
-- **The Strands tab** in the workbench: every strand by state; each row's ⋯
-  renames, pins or merges it.
+- **The Strands tab** in the workbench: each strand as a card with its name,
+  summary, state, messages, first and last activity, workers and any ask's
+  buttons. Clicking a card filters the conversation to it; its ⋯ renames,
+  pins or merges it.
 - **The overview** (Settings → Strands overview, off by default): a Strands
   page beside Tasks with every conversation's open strands, needs you first.
 

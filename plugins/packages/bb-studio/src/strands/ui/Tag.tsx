@@ -11,7 +11,7 @@ import { Icon, Popover, PopoverContent, PopoverTrigger } from "../../kit/ui/inde
 import { useCall, useLive } from "../../ui/live";
 import { useIsBotThread } from "../../ui/conversations/bot-thread-owners";
 import { tagOf, type Tags } from "./model";
-import { ensureDimStyle, useSelection } from "./selection";
+import { ensureDimStyle, timelineFiltersInHost, useSelection } from "./selection";
 import { moveFocus, useSelectStrand } from "./Strip";
 
 const ROW = "[data-timeline-row-id]";
@@ -65,7 +65,8 @@ function Tag({ message }: ExperimentalMessageMetadataProps) {
   const choose = useSelectStrand(message.threadId);
   const ref = useRef<HTMLElement | null>(null);
   const tag = tagOf(tags.data, message.turnId);
-  const dim = !!selection && selection.strandId !== tag?.strandId;
+  // BB's timeline filter hides the other strands' messages; without it, they dim.
+  const dim = !!selection && selection.strandId !== tag?.strandId && !timelineFiltersInHost();
   useLayoutEffect(() => {
     const row = ref.current?.closest(ROW);
     if (!row) return;

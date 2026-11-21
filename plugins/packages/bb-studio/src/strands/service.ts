@@ -186,11 +186,12 @@ export class StrandService {
     const rows = strands.map((strand) => ({ strand, live: liveState(strand, signals) }));
     const view = ({ strand, live }: { strand: Strand; live: ReturnType<typeof liveState> }): StrandView => {
       const latest = this.store.latest(strand.id, threadId);
+      const first = this.store.first(strand.id, threadId, 1)[0] ?? null;
       const count = counts.get(strand.id);
       return {
         id: strand.id, title: strand.title, summary: strand.summary, named: strand.named, state: live.state, detail: live.detail,
         asks: live.asks.map(({ id, kind, threadId: askThread, label, details, decisions }) => ({ id, kind, threadId: askThread, label, details, decisions })), workers: live.workers,
-        lastAt: strand.lastAt, latestSeq: latest?.seq ?? null, latestTurnId: latest?.turnId ?? null, messages: count?.messages ?? 0, unsure: count?.unsure ?? 0,
+        lastAt: strand.lastAt, firstAt: first?.at ?? null, firstSeq: first?.seq ?? null, latestSeq: latest?.seq ?? null, latestTurnId: latest?.turnId ?? null, messages: count?.messages ?? 0, unsure: count?.unsure ?? 0,
         pinned: strand.pinned, origin: strand.origin, taskId: strand.taskId,
       };
     };

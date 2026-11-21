@@ -121,7 +121,8 @@ import { VSCODE_MAIN_PATH } from "./src/launcher/shared";
 import { readKindsSnapshot, whenOn } from "./src/ui/kinds-snapshot";
 import { LoopsDirective } from "./src/loops/ui/LoopCard";
 import { TaskDirective } from "./src/tasks/ui/TaskCard";
-import { STRANDS_TAB, StrandsLineBanner } from "./src/strands/ui/Strip";
+import { STRANDS_TAB, StrandsBoxBanner } from "./src/strands/ui/Strip";
+import { registerTimelineFilter } from "./src/strands/ui/selection";
 import { StrandTag } from "./src/strands/ui/Tag";
 import { StrandsTab } from "./src/strands/ui/Tab";
 import "./src/work/ui/work.css";
@@ -388,8 +389,9 @@ export default definePluginApp((app) => {
   app.slots.messageDirective({ id: "loop", component: TaskDirective });
   app.slots.messageDirective({ id: "loops", component: LoopsDirective });
   app.slots.messageDirective({ id: "work", component: TaskDirective });
-  // The strands line above a Bot conversation's composer (src/strands/ui); it replaced the In flight strip.
-  app.composer.customize({ id: "strands", scopes: ["thread"], banners: [{ id: "strands", chrome: "bare", component: StrandsLineBanner }] });
+  // The strands box above a Bot conversation's composer (src/strands/ui), in In flight's old place; and the timeline filter it applies.
+  app.composer.customize({ id: "strands", scopes: ["thread"], banners: [{ id: "strands", component: StrandsBoxBanner }] });
+  registerTimelineFilter(app.slots);
   app.slots.experimental_messageMetadata({ id: "strand-tag", placement: "above", component: StrandTag });
   registerThreadTab(app, { id: STRANDS_TAB, title: "Strands", icon: "LayoutList", layout: "flush", component: StrandsTab, ...OFF_NEW_TAB });
   // The Todos pane: the todo list in a tab beside the chat.

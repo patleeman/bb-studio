@@ -1,7 +1,9 @@
-// The Strands tab in a conversation's workbench (design 4a, "bench"): every
-// strand by state, needs you first with its buttons; quiet ones faded, and
-// "Earlier" folded. A row selects its strand, like a chip; its ⋯ menu
-// renames, pins or merges it (the user's choice always wins).
+// The Strands tab in a conversation's workbench: every strand as its own
+// card, by state (needs you first, with its ask's buttons), quiet ones faded
+// and Earlier folded. A card shows the name, what the strand is about, its
+// state, messages, first and last activity, and its workers; clicking it
+// filters the conversation to that strand. Its ⋯ menu renames, pins or
+// merges it (the user's choice always wins). No color but amber for needs you.
 import { useState } from "react";
 import { toast } from "sonner";
 import { errorMessage } from "../../kit/format";
@@ -13,6 +15,7 @@ import type { StrandView } from "../contract";
 import { groupsOf } from "./model";
 import { useSelection } from "./selection";
 import { AskButtonsFor, StateMark, STRANDS_POLL_MS, useSelectStrand } from "./Strip";
+import { ageOf } from "./model";
 
 /** The row's ⋯ menu: Rename, Pin or Unpin, Merge into another strand. */
 function RowMenu({ strand, others, onRename }: { strand: StrandView; others: readonly StrandView[]; onRename(): void }) {
@@ -69,61 +72,101 @@ function RenameField({ strand, onDone }: { strand: StrandView; onDone(): void })
   );
 }
 
-function Row({ strand, threadId, selected, now, others }: { strand: StrandView; threadId: string; selected: boolean; now: number; others: readonly StrandView[] }) {
+/** A strand's state in words, beside its neutral mark (amber only for needs you). */
+function stateLabel(strand: StrandView, now: number): string {
+  switch (strand.state) {
+    case "needs-you": return "Needs you";
+    case "running": return "Running";
+    case "done-unseen": return "Finished";
+    case "waiting": return strand.detail ? `Waiting on ${strand.detail}` : "Waiting";
+    case "quiet": return `Quiet · ${ageOf(strand.lastAt, now)}`;
+    default: return "Open";
+  }
+}
+
+const WORKER_MARK: Record<StrandView["workers"][number]["status"], { icon: string; label: string; spin?: boolean }> = {
+  running: { icon: "Spinner", label: "running", spin: true },
+  "needs-you": { icon: "AlertCircle", label: "needs you" },
+  done: { icon: "Check", label: "done" },
+  failed: { icon: "X", label: "failed" },
+};
+
+/** One strand as its own card: name, what it is about, state, messages, first and last activity, workers, and an open ask with its buttons. Clicking it filters the conversation to it. */
+function StrandCard({ strand, threadId, selected, now, others }: { strand: StrandView; threadId: string; selected: boolean; now: number; others: readonly StrandView[] }) {
   const choose = useSelectStrand(threadId);
   const [renaming, setRenaming] = useState(false);
-  const sub = strand.state === "needs-you" ? strand.asks[0]?.label ?? strand.detail
-    : strand.state === "running" || strand.state === "waiting" || strand.state === "done-unseen" ? strand.detail ?? strand.summary
-    : strand.summary;
+  const ask = strand.state === "needs-you" ? strand.asks[0] ?? null : null;
+  const about = strand.summary ?? (strand.state === "needs-you" ? null : strand.detail);
+  const span = [strand.firstAt ? `first ${relativeTime(strand.firstAt, now)}` : null, strand.lastAt ? `last ${relativeTime(strand.lastAt, now)}` : null].filter(Boolean).join(" · ");
   return (
-    <div role="button" tabIndex={0} data-strand-row={strand.id} onClick={() => choose(strand)}
-      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); choose(strand); } }}
-      className={cn("cursor-pointer rounded-lg px-2 py-[7px] hover:bg-accent/50", selected && "bg-accent", strand.state === "quiet" && "opacity-60")}>
-      <div className="flex items-baseline gap-2">
-        {strand.state === "needs-you" ? <StateMark strand={strand} now={now} /> : null}
-        {renaming ? <RenameField strand={strand} onDone={() => setRenaming(false)} /> : <span className="min-w-0 flex-1 text-[12.5px] font-semibold leading-snug">{strand.title}</span>}
-        {strand.pinned ? <Icon name="Pin" aria-label="Pinned" className="size-3 shrink-0 self-center text-muted-foreground" /> : null}
-        <span className="whitespace-nowrap text-[11px] text-muted-foreground/70">{strand.lastAt ? relativeTime(strand.lastAt, now) : ""}</span>
+    <li role="button" tabIndex={0} data-strand-row={strand.id} aria-pressed={selected} onClick={() => choose(strand)}
+      onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); choose(strand); } }}
+      className={cn("cursor-pointer list-none rounded-lg border bg-card/50 px-3 py-2.5 outline-none hover:border-foreground/25 focus-visible:ring-2 focus-visible:ring-ring",
+        selected ? "border-foreground/40 bg-accent/60" : "border-border", strand.state === "quiet" && "opacity-70")}>
+      <div className="flex items-center gap-2">
+        {strand.state === "needs-you" ? <span role="img" aria-label="Needs you" className="size-1.5 shrink-0 rounded-full bg-warning" /> : null}
+        {renaming ? <RenameField strand={strand} onDone={() => setRenaming(false)} /> : <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-snug">{strand.title}</h3>}
+        {strand.pinned ? <Icon name="Pin" aria-label="Pinned" className="size-3 shrink-0 text-muted-foreground" /> : null}
         <RowMenu strand={strand} others={others} onRename={() => setRenaming(true)} />
       </div>
-      {sub || (strand.state !== "needs-you" && strand.state !== "active" && strand.state !== "quiet") ? (
-        <div className="mt-[3px] flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-          {strand.state !== "needs-you" && strand.state !== "quiet" ? <StateMark strand={strand} now={now} /> : null}
-          <span className="truncate">{sub ?? ""}</span>
-        </div>
+      {about ? <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-muted-foreground">{about}</p> : null}
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground" data-strand-facts="">
+        <span className={cn("inline-flex items-center gap-1.5", strand.state === "needs-you" && "font-medium text-warning")}>
+          {strand.state === "needs-you" || strand.state === "quiet" ? null : <StateMark strand={strand} now={now} />}
+          {stateLabel(strand, now)}
+        </span>
+        <span>{strand.messages} {strand.messages === 1 ? "message" : "messages"}</span>
+        {span ? <span>{span}</span> : null}
+      </div>
+      {strand.workers.length ? (
+        <ul className="mt-1.5 flex flex-col gap-0.5" aria-label="Workers">
+          {strand.workers.map((worker) => {
+            const mark = WORKER_MARK[worker.status];
+            return (
+              <li key={worker.threadId} className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
+                <Icon name={mark.icon} aria-hidden className={cn("size-3 shrink-0", mark.spin && "animate-spin motion-reduce:animate-none", worker.status === "needs-you" && "text-warning")} />
+                <span className="min-w-0 truncate text-foreground/90">{worker.title}</span>
+                <span className="shrink-0">{mark.label}</span>
+              </li>
+            );
+          })}
+        </ul>
       ) : null}
-      {strand.state === "needs-you" && strand.asks[0] ? (
-        // Buttons answer; they don't select the row.
-        <div className="mt-[7px]" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-          {strand.asks[0].details.length ? (
-            <ul className="mb-1.5 space-y-0.5 rounded bg-muted/40 px-1.5 py-1 font-mono text-[11px] text-foreground/90">
-              {strand.asks[0].details.map((line, index) => <li key={index} className="whitespace-pre-wrap break-all">{line}</li>)}
+      {ask ? (
+        // Buttons answer; they don't filter.
+        <div className="mt-2 border-t border-border/60 pt-2" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+          <p className="whitespace-pre-wrap break-words text-[12px]">{ask.label}</p>
+          {ask.details.length ? (
+            <ul className="mt-1 space-y-0.5 rounded bg-muted/40 px-1.5 py-1 font-mono text-[11px] text-foreground/90">
+              {ask.details.map((line, index) => <li key={index} className="whitespace-pre-wrap break-all">{line}</li>)}
             </ul>
           ) : null}
-          <div data-strand-ask-buttons="" className="flex flex-wrap gap-[5px]"><AskButtonsFor ask={strand.asks[0]} threadId={threadId} /></div>
+          <div data-strand-ask-buttons="" className="mt-1.5 flex flex-wrap gap-[5px]"><AskButtonsFor ask={ask} threadId={threadId} /></div>
         </div>
       ) : null}
-    </div>
+    </li>
   );
 }
 
-export function StrandsTab({ threadId }: ThreadTabProps) {
+export function StrandsTab({ threadId, now: at }: ThreadTabProps & { now?: number }) {
   const list = useLive("strands.list", { threadId }, { pollMs: STRANDS_POLL_MS });
   const selection = useSelection(threadId);
   const [earlier, setEarlier] = useState(false);
-  const now = Date.now();
+  const now = at ?? Date.now();
   if (!list.data) return <p className="p-4 text-sm text-muted-foreground">{list.error ?? "Loading…"}</p>;
   if (!list.data.enabled) return <p className="p-4 text-sm text-muted-foreground">No strands in this conversation</p>;
   const groups = groupsOf(list.data);
   const all = [...list.data.strands, ...list.data.earlier];
   return (
-    <div className="h-full overflow-auto px-1.5 py-2" data-testid="strands-tab">
-      <h2 className="mx-2 my-0.5 text-[13px] font-semibold">Strands</h2>
+    <div className="h-full overflow-auto px-2 py-2.5" data-testid="strands-tab">
+      <h2 className="mx-2 my-0.5 text-[14px] font-semibold">Strands</h2>
       {!groups.length ? <p className="mx-2 mt-2 text-xs text-muted-foreground">{list.data.backfill.done ? "No strands yet" : "Sorting this conversation…"}</p> : null}
       {groups.map((group) => (
         <section key={group.label} aria-label={group.label}>
-          <div className="px-2 pb-[3px] pt-2.5 text-[11px] font-semibold text-muted-foreground/70">{group.label}</div>
-          {group.strands.map((strand) => <Row key={strand.id} strand={strand} threadId={threadId} selected={selection?.strandId === strand.id} now={now} others={all.filter((other) => other.id !== strand.id)} />)}
+          <h3 className="px-2 pb-1.5 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/70">{group.label}</h3>
+          <ul className="flex flex-col gap-2 px-1">
+            {group.strands.map((strand) => <StrandCard key={strand.id} strand={strand} threadId={threadId} selected={selection?.strandId === strand.id} now={now} others={all.filter((other) => other.id !== strand.id)} />)}
+          </ul>
         </section>
       ))}
       {list.data.earlier.length ? (
@@ -131,7 +174,11 @@ export function StrandsTab({ threadId }: ThreadTabProps) {
           <button type="button" aria-expanded={earlier} onClick={() => setEarlier(!earlier)} className="w-full cursor-pointer px-2 pb-[3px] pt-2.5 text-left text-[11px] font-semibold text-muted-foreground/70 hover:text-foreground">
             Earlier ({list.data.earlier.length})
           </button>
-          {earlier ? list.data.earlier.map((strand) => <Row key={strand.id} strand={strand} threadId={threadId} selected={selection?.strandId === strand.id} now={now} others={all.filter((other) => other.id !== strand.id)} />) : null}
+          {earlier ? (
+            <ul className="flex flex-col gap-2 px-1">
+              {list.data.earlier.map((strand) => <StrandCard key={strand.id} strand={strand} threadId={threadId} selected={selection?.strandId === strand.id} now={now} others={all.filter((other) => other.id !== strand.id)} />)}
+            </ul>
+          ) : null}
         </section>
       ) : null}
     </div>
