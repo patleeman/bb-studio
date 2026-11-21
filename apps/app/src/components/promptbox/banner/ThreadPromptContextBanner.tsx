@@ -1,5 +1,5 @@
 import { REPLY_SECTION_COPY, REPLY_SECTION_ICON, type ParentRelationship } from "./parentRelationship.fork";
-import { useForkChildThreads } from "@/components/fork/ForkPromptStack";
+import { useForkThreadContextRowHidden } from "@/components/fork/ForkPromptStack";
 import {
   experimental_THREAD_CONTEXT_SEGMENT_GROUPS,
   type ExperimentalThreadContextSegmentInput,
@@ -917,7 +917,7 @@ function ParentThreadDetails({
 }
 
 export function ThreadChildThreadsBanner({
-  childThreads: hostChildThreads,
+  childThreads,
   isExpanded,
   onExpandedChange,
 }: {
@@ -925,7 +925,6 @@ export function ThreadChildThreadsBanner({
   isExpanded: boolean;
   onExpandedChange: (isExpanded: boolean) => void;
 }) {
-  const childThreads = useForkChildThreads(hostChildThreads);
   const items = childThreads?.items ?? NO_CHILD_THREAD_ITEMS;
   useExpandForNewNeedsInput(items, isExpanded, () => onExpandedChange(true));
   if (childThreads === null || items.length === 0) return null;
@@ -1158,6 +1157,7 @@ export function ThreadPromptContextBanner({
 }: ThreadPromptContextBannerProps) {
   const isReadOnly =
     archivedSection !== null || environmentGoneSection !== null;
+  const forkRowHidden = useForkThreadContextRowHidden(input.threadId);
   if (isReadOnly) {
     const environmentGoneCopy = environmentGoneSection
       ? ENVIRONMENT_GONE_STATUS_COPY[environmentGoneSection.status]
@@ -1192,6 +1192,7 @@ export function ThreadPromptContextBanner({
         />
     );
   }
+  if (forkRowHidden) return null;
   return (
     <WritableContextBanner
       input={input}
