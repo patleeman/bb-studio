@@ -946,8 +946,30 @@ export type ExperimentalHostSettingsSection = "mobile";
  * A part of bb's stack above a thread's composer a plugin can hide.
  * `"active-child-threads"`: the Active child threads card's list of running
  * children. A child waiting on the user still shows, with its question.
+ * `"thread-context"`: the thread context row (the parent thread, changed
+ * files, the pull request). An archived thread's or a removed workspace's
+ * row, with Unarchive or Restore, still shows. A plugin that hides it can
+ * draw the same row elsewhere with {@link ForkPluginSdkApp.experimental_ThreadContextSegments}.
  */
-export type ExperimentalHostPromptStackEntry = "active-child-threads";
+export type ExperimentalHostPromptStackEntry = "active-child-threads" | "thread-context";
+
+/**
+ * Which parts of the stack above the composer a plugin hides in one thread
+ * (see {@link ExperimentalHideHostEntriesRegistration.promptStackFor}).
+ * `get` must return the same array while nothing changed; `subscribe` is
+ * called with a listener to run when it may have.
+ */
+export interface ExperimentalPromptStackSource {
+  get(threadId: string): readonly ExperimentalHostPromptStackEntry[];
+  subscribe(listener: () => void): () => void;
+}
+
+/** Props of {@link ForkPluginSdkApp.experimental_ThreadContextSegments}: the thread, as the Info tab gives it. */
+export interface ExperimentalThreadContextSegmentsProps {
+  threadId: string;
+  projectId: string;
+  environment: { id: string } | null;
+}
 
 export interface ExperimentalHideHostEntriesRegistration {
   id: string;
@@ -956,8 +978,10 @@ export interface ExperimentalHideHostEntriesRegistration {
   settings?: readonly ExperimentalHostSetting[];
   settingsSections?: readonly ExperimentalHostSettingsSection[];
   footer?: readonly string[];
-  /** Parts of the stack above a thread's composer (see {@link ExperimentalHostPromptStackEntry}). */
+  /** Parts of the stack above every thread's composer (see {@link ExperimentalHostPromptStackEntry}). */
   promptStack?: readonly ExperimentalHostPromptStackEntry[];
+  /** Parts of the stack above some threads' composers, thread by thread. */
+  promptStackFor?: ExperimentalPromptStackSource;
 }
 
 /**
@@ -1527,6 +1551,15 @@ export interface ForkPluginSdkApp {
    * see docs/api_to_audit.fork.md.
    */
   experimental_useContextCard(): ExperimentalContextCard;
+  /**
+   * bb's thread context row (the parent thread, changed files, the pull
+   * request: every `experimental_threadContextSegment`, with their actions
+   * and details) for one thread, drawn where the plugin puts it, for example
+   * an Info tab section of a plugin that hides it above the composer
+   * (`promptStack` `"thread-context"`). Nothing when no segment shows.
+   * Experimental: see docs/api_to_audit.fork.md.
+   */
+  experimental_ThreadContextSegments: ComponentType<ExperimentalThreadContextSegmentsProps>;
   /**
    * Open, close and style the plugin's own windows. Experimental: see
    * docs/api_to_audit.fork.md.
