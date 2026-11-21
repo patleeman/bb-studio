@@ -114,3 +114,15 @@ export function boxGroups(list: StrandList | null | undefined, query: string): {
     { label: "Quiet", strands: all.filter((strand) => strand.state === "quiet") },
   ].filter((group) => group.strands.length);
 }
+
+/**
+ * A filter's turns: the strand's, plus each turn of this conversation still
+ * waiting for the user's answer in another strand (a pending question,
+ * approval or form stays in view, marked with its strand).
+ */
+export function filterTurnsOf(tags: Tags | null | undefined, list: StrandList | null | undefined, strandId: string, threadId: string): { turnIds: string[]; firstSeq: number | null } {
+  const own = turnsOfStrand(tags, strandId);
+  const waiting = (list?.strands ?? []).filter((strand) => strand.id !== strandId)
+    .flatMap((strand) => strand.asks.filter((ask) => ask.threadId === threadId && ask.turnId).map((ask) => ask.turnId!));
+  return { turnIds: [...new Set([...own.turnIds, ...waiting])], firstSeq: own.firstSeq };
+}

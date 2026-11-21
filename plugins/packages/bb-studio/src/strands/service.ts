@@ -51,6 +51,10 @@ export function askOf(interaction: Interaction & { createdAt?: number }, threadI
   return { id: interaction.id, kind: "question", strandId, threadId, label: prompt ? (prompt.length > 120 ? `${prompt.slice(0, 119)}…` : prompt) : "A question is waiting", details: [], decisions: [] };
 }
 
+/** A failed backfill waits this long before the next try, twice as long each time, up to an hour. */
+export const BACKFILL_RETRY_MS = 5 * 60 * 1000;
+export const BACKFILL_RETRY_MAX_MS = 60 * 60 * 1000;
+
 /** Only conversations active this recently are backfilled. */
 export const BACKFILL_ACTIVE_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -58,6 +62,8 @@ export class StrandService {
   readonly store: StrandStore;
   readonly detector: StrandDetector;
   private readonly backfillWanted = new Set<string>();
+  /** Conversations whose backfill failed: not tried again until `until` (5 minutes, doubling up to an hour). */
+  private readonly backfillFailed = new Map<string, { until: number; delay: number }>();
   private backfilling: Promise<void> | null = null;
 
   constructor(private readonly deps: StrandServiceDeps) {
@@ -92,6 +98,8 @@ export class StrandService {
     const conversation = this.deps.conversation(threadId);
     if (!conversation || !this.detector.needsBackfill(threadId)) return Promise.resolve();
     if (!active && this.now() - conversation.lastActiveAt > BACKFILL_ACTIVE_MS) return Promise.resolve();
+    const failed = this.backfillFailed.get(threadId);
+    if (failed && this.now() < failed.until) return Promise.resolve();
     this.backfillWanted.add(threadId);
     this.backfilling ??= this.drain().finally(() => { this.backfilling = null; });
     return this.backfilling;
@@ -101,8 +109,18 @@ export class StrandService {
     while (this.backfillWanted.size) {
       const next = [...this.backfillWanted].sort((a, b) => (this.deps.conversation(b)?.lastActiveAt ?? 0) - (this.deps.conversation(a)?.lastActiveAt ?? 0))[0]!;
       this.backfillWanted.delete(next);
-      try { await this.detector.backfill(next); await this.detector.idle(next); }
-      catch (error) { this.deps.log(`Strands: backfill of ${next} failed: ${error instanceof Error ? error.message : String(error)}`); }
+      try {
+        await this.detector.backfill(next);
+        this.backfillFailed.delete(next);
+        await this.detector.idle(next);
+      } catch (error) {
+        if (!this.detector.needsBackfill(next)) continue;
+        // Wait before trying again (the host may be down); say so once, not on every open, signal and poll.
+        const before = this.backfillFailed.get(next);
+        const delay = before ? Math.min(before.delay * 2, BACKFILL_RETRY_MAX_MS) : BACKFILL_RETRY_MS;
+        this.backfillFailed.set(next, { until: this.now() + delay, delay });
+        if (!before) this.deps.log(`Strands: backfill of ${next} failed (${error instanceof Error ? error.message : String(error)}); trying again later, waiting longer each time.`);
+      }
     }
   }
   active(threadId: string): void { if (this.enabled(threadId) && !this.detector.needsBackfill(threadId)) this.detector.active(threadId); }
@@ -125,7 +143,13 @@ export class StrandService {
     const runningStrandId = busy ? this.detector.runningStrand(threadId) : null;
     const workers: WorkerSignal[] = workerFacts.map((worker) => ({ ...worker, strandId: this.workerStrand(threadId, worker, busy) }));
     const turnStrand = (at: number) => (busy && this.detector.hasRunningTurn(threadId) ? runningStrandId : this.store.strandAt(threadId, at)?.strandId ?? null);
-    const asks: AskSignal[] = interactions.map((ask) => askOf(ask, threadId, turnStrand(ask.createdAt ?? now)));
+    // The turn an ask waits in: the running turn, else the newest sorted one at or before it.
+    const turnOf = (at: number) => {
+      const seq = busy && this.detector.hasRunningTurn(threadId) ? this.detector.runningSeq(threadId) : this.store.strandAt(threadId, at)?.seq ?? null;
+      if (seq === null) return null;
+      return (this.store.item(threadId, "user", seq) ?? this.store.item(threadId, "report", seq))?.turnId ?? null;
+    };
+    const asks: AskSignal[] = interactions.map((ask) => ({ ...askOf(ask, threadId, turnStrand(ask.createdAt ?? now)), turnId: turnOf(ask.createdAt ?? now) }));
     // A worker that needs the user: what it waits on, with its approval's choices.
     for (const worker of workers.filter((each) => each.status === "needs-you")) {
       const pending = await this.deps.interactions(worker.threadId).catch(() => []);
@@ -190,7 +214,7 @@ export class StrandService {
       const count = counts.get(strand.id);
       return {
         id: strand.id, title: strand.title, summary: strand.summary, named: strand.named, state: live.state, detail: live.detail,
-        asks: live.asks.map(({ id, kind, threadId: askThread, label, details, decisions }) => ({ id, kind, threadId: askThread, label, details, decisions })), workers: live.workers,
+        asks: live.asks.map(({ id, kind, threadId: askThread, label, details, decisions, turnId }) => ({ id, kind, threadId: askThread, label, details, decisions, turnId: turnId ?? null })), workers: live.workers,
         lastAt: strand.lastAt, firstAt: first?.at ?? null, firstSeq: first?.seq ?? null, latestSeq: latest?.seq ?? null, latestTurnId: latest?.turnId ?? null, messages: count?.messages ?? 0, unsure: count?.unsure ?? 0,
         pinned: strand.pinned, origin: strand.origin, taskId: strand.taskId,
       };
@@ -265,6 +289,21 @@ export class StrandService {
     this.detector.nameSoon(threadId);
     this.deps.changed(threadId);
     return strand.id;
+  }
+
+  /** Undoes a merge: the strand and its items come back. */
+  unmerge(strandId: string): boolean {
+    const strand = this.store.get(strandId);
+    if (!strand?.mergedInto || !this.enabled(strand.threadId) || !this.store.unmerge(strand.id)) return false;
+    this.deps.changed(strand.threadId);
+    return true;
+  }
+
+  /** Undoes a message's last move: its turn goes back to the strand it was in. */
+  unmove(threadId: string, seq: number): boolean {
+    if (!this.enabled(threadId) || !this.store.unmoveTurn(threadId, seq)) return false;
+    this.deps.changed(threadId);
+    return true;
   }
 
   rename(strandId: string, title: string): boolean {

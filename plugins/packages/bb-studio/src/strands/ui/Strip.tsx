@@ -20,7 +20,7 @@ import { Icon, Tooltip, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import { messageLinkPath } from "../../work/ui/in-flight-model";
 import type { StrandAsk, StrandView } from "../contract";
-import { ageOf, boxGroups, countsOf, currentOf, decisionButtons, hasOpen, seqsOf, stepSeq, stripShown, turnsOfStrand } from "./model";
+import { ageOf, boxGroups, countsOf, currentOf, decisionButtons, filterTurnsOf, hasOpen, seqsOf, stepSeq, stripShown } from "./model";
 import { select, selectionOf, setStrandTurns, useSelection } from "./selection";
 
 export const STRANDS_TAB = "strands";
@@ -44,15 +44,16 @@ export function useSelectStrand(threadId: string) {
   const jump = useJump(threadId);
   const call = useCall();
   const tags = useLive("strands.tags", { threadId }, { pollMs: 60_000 });
+  const list = useLive("strands.list", { threadId }, { pollMs: STRANDS_POLL_MS });
   return useCallback((strand: Pick<StrandView, "id" | "latestSeq"> & Partial<Pick<StrandView, "firstSeq">> | null, keep = false) => {
     const current = selectionOf(threadId);
     if (!strand || (current?.strandId === strand.id && !keep)) { select(threadId, null); return; }
-    const turns = turnsOfStrand(tags.data, strand.id);
+    const turns = filterTurnsOf(tags.data, list.data, strand.id, threadId);
     const seq = strand.latestSeq ?? seqsOf(tags.data, strand.id).at(-1) ?? null;
     select(threadId, { strandId: strand.id, seq, firstSeq: strand.firstSeq ?? turns.firstSeq, turnIds: turns.turnIds });
     if (seq !== null) jump(seq);
     void call("strands.opened", { strandId: strand.id }).catch(() => undefined);
-  }, [call, jump, tags.data, threadId]);
+  }, [call, jump, tags.data, list.data, threadId]);
 }
 
 /** In flight's place: the strands box, in BB's card above the composer; nothing where strands don't run or nothing is open. */
@@ -169,12 +170,12 @@ export function StrandsBox({ threadId, now = Date.now() }: { threadId: string; n
   const data = list.data;
   const current = currentOf(data, selection);
   const filtered = selection ? current : null;
-  // New turns of the filtered strand join the filter as the tags learn them.
+  // New turns of the filtered strand (and asks waiting elsewhere) join the filter as they are learned.
   useEffect(() => {
     if (!selection) return;
-    const turns = turnsOfStrand(tags.data, selection.strandId);
+    const turns = filterTurnsOf(tags.data, data, selection.strandId, threadId);
     if (turns.turnIds.length) setStrandTurns(threadId, selection.strandId, turns.turnIds, filtered?.firstSeq ?? turns.firstSeq);
-  }, [tags.data, selection, threadId, filtered?.firstSeq]);
+  }, [tags.data, data, selection, threadId, filtered?.firstSeq]);
   // Esc clears the filter (unless something else is being typed in).
   useEffect(() => {
     if (!selection) return;

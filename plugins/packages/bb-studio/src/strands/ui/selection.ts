@@ -29,9 +29,59 @@ let hostFilters = false;
 const notify = () => { for (const listener of listeners) listener(); };
 
 export function select(threadId: string, value: Selection | null): void {
+  const before = selected.get(threadId);
+  // Filtering starts: remember where the conversation was scrolled; it clears: go back there exactly.
+  if (!before && value) rememberScroll(threadId);
   if (value) selected.set(threadId, value); else selected.delete(threadId);
   filters.delete(threadId);
   notify();
+  if (before && !value) restoreScroll(threadId);
+}
+
+// ---- the scroll position before filtering ----
+
+interface ScrollMark { scroller: HTMLElement; rowId: string | null; offset: number; top: number }
+const marks = new Map<string, ScrollMark>();
+const ROW = "[data-timeline-row-id]";
+
+/** The timeline's scrolling element: the nearest ancestor of its rows that scrolls. */
+export function timelineScroller(doc: Document = document): HTMLElement | null {
+  let node = doc.querySelector(ROW)?.parentElement ?? null;
+  while (node && node !== doc.body) {
+    const overflow = doc.defaultView?.getComputedStyle(node).overflowY ?? "";
+    if (/(auto|scroll|overlay)/.test(overflow)) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
+/** Notes the first row in view and how far it sits from the top, and the scroll offset as a fallback. */
+export function rememberScroll(threadId: string, doc: Document | undefined = typeof document === "undefined" ? undefined : document): void {
+  if (!doc) return;
+  const scroller = timelineScroller(doc);
+  if (!scroller) return;
+  const top = scroller.getBoundingClientRect().top;
+  const row = [...scroller.querySelectorAll<HTMLElement>(ROW)].find((each) => each.getBoundingClientRect().bottom > top + 1) ?? null;
+  marks.set(threadId, { scroller, rowId: row?.getAttribute("data-timeline-row-id") ?? null, offset: row ? row.getBoundingClientRect().top - top : 0, top: scroller.scrollTop });
+}
+
+/** Puts that row back at the same distance from the top (rows above it may have loaded meanwhile); the scroll offset when it's gone. */
+export function applyScroll(mark: ScrollMark): void {
+  const { scroller } = mark;
+  const row = mark.rowId ? scroller.querySelector<HTMLElement>(`[data-timeline-row-id="${mark.rowId.replace(/"/g, '\\"')}"]`) : null;
+  if (row) scroller.scrollTop += row.getBoundingClientRect().top - scroller.getBoundingClientRect().top - mark.offset;
+  else scroller.scrollTop = mark.top;
+}
+
+/** Restores the remembered position once the rows are back, and again as late rows settle. */
+function restoreScroll(threadId: string): void {
+  const mark = marks.get(threadId);
+  marks.delete(threadId);
+  if (!mark || !mark.scroller.isConnected) return;
+  const again = () => { if (mark.scroller.isConnected) applyScroll(mark); };
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => requestAnimationFrame(again)); else again();
+  setTimeout(again, 250);
+  setTimeout(again, 800);
 }
 
 /** The strand's turns and first message, as the tags give them; a no-op when unchanged. */
@@ -79,7 +129,7 @@ export function registerTimelineFilter(slots: object): boolean {
 export const timelineFiltersInHost = () => hostFilters;
 
 /** Test hook: a fresh app (no host filter, nothing picked). */
-export function resetSelectionForTests(): void { hostFilters = false; selected.clear(); filters.clear(); }
+export function resetSelectionForTests(): void { hostFilters = false; selected.clear(); filters.clear(); marks.clear(); }
 
 /** The rule that dims the other strands' messages (where BB can't hide them), once per document. */
 export function ensureDimStyle(doc: Document = document): void {

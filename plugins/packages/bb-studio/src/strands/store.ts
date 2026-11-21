@@ -70,6 +70,9 @@ const itemOf = (row: ItemRow): StrandItem => ({
 /** The last user line kept with an item, for the prompt's "last user line". */
 export const LINE_MAX = 300;
 
+/** The strand_reads row that counts today's calls across every conversation. */
+export const ALL_CONVERSATIONS = "strands:all-conversations";
+
 export class StrandStore {
   constructor(readonly db: Database.Database, private readonly now: () => number = Date.now) {}
 
@@ -147,7 +150,8 @@ export class StrandStore {
     const b = this.get(into);
     if (!a || !b || a.threadId !== b.threadId || a.mergedInto || b.mergedInto || (a.origin === "user" && !byUser)) return false;
     this.db.transaction(() => {
-      this.db.prepare("UPDATE strand_items SET strand_id = ? WHERE thread_id = ? AND strand_id = ?").run(into, a.threadId, from);
+      // Each item remembers where it was, so the merge can be undone.
+      this.db.prepare("UPDATE strand_items SET prev_strand_id = strand_id, strand_id = ? WHERE thread_id = ? AND strand_id = ?").run(into, a.threadId, from);
       this.db.prepare("UPDATE strands SET merged_into = ? WHERE id = ?").run(into, from);
       this.db.prepare(`UPDATE strands SET first_seq = MIN(first_seq, ?), last_seq = MAX(last_seq, ?), last_at = MAX(last_at, ?),
         task_id = COALESCE(task_id, ?), pinned = MAX(pinned, ?) WHERE id = ?`).run(a.firstSeq, a.lastSeq, a.lastAt, a.taskId, a.pinned ? 1 : 0, into);
@@ -187,13 +191,40 @@ export class StrandStore {
       const later = this.db.prepare("SELECT seq, turn_id FROM strand_items WHERE thread_id = ? AND strand_id = ? AND seq > ? AND kind IN ('user', 'report')").all(threadId, from, seq) as { seq: number; turn_id: string | null }[];
       for (const row of later) { seqs.push(row.seq); turnIds.push(row.turn_id); }
     }
-    const move = this.db.prepare("UPDATE strand_items SET strand_id = ?, by = 'user', unsure = 0, confidence = NULL WHERE thread_id = ? AND ((seq = ? AND kind IN ('user', 'report', 'worker')) OR (? IS NOT NULL AND turn_id = ?))");
+    const move = this.db.prepare("UPDATE strand_items SET prev_strand_id = strand_id, strand_id = ?, by = 'user', unsure = 0, confidence = NULL WHERE thread_id = ? AND ((seq = ? AND kind IN ('user', 'report', 'worker')) OR (? IS NOT NULL AND turn_id = ?))");
     this.db.transaction(() => {
       seqs.forEach((each, index) => move.run(to, threadId, each, turnIds[index] ?? null, turnIds[index] ?? null));
     })();
     this.recompute(to);
     if (from && from !== to) this.recompute(from);
     return from && from !== to ? [from] : [];
+  }
+
+  /** Undoes a merge: the items that came from `from` go back, and it shows again. */
+  unmerge(from: string): boolean {
+    const strand = this.get(from);
+    if (!strand?.mergedInto) return false;
+    const into = strand.mergedInto;
+    this.db.transaction(() => {
+      this.db.prepare("UPDATE strand_items SET strand_id = ?, prev_strand_id = NULL WHERE thread_id = ? AND strand_id = ? AND prev_strand_id = ?").run(from, strand.threadId, into, from);
+      this.db.prepare("UPDATE strands SET merged_into = NULL WHERE id = ?").run(from);
+    })();
+    this.recompute(from);
+    this.recompute(into);
+    return true;
+  }
+
+  /** Undoes the last move of a turn: its items go back to the strand they were in. Answers that strand, or null. */
+  unmoveTurn(threadId: string, seq: number): string | null {
+    const head = this.db.prepare("SELECT * FROM strand_items WHERE thread_id = ? AND seq = ? AND kind IN ('user', 'report') LIMIT 1").get(threadId, seq) as (ItemRow & { prev_strand_id: string | null }) | undefined;
+    const back = head?.prev_strand_id ?? null;
+    const target = back ? this.get(back) : null;
+    if (!head || !back || !target || target.mergedInto) return null;
+    this.db.prepare("UPDATE strand_items SET strand_id = prev_strand_id, prev_strand_id = NULL WHERE thread_id = ? AND prev_strand_id IS NOT NULL AND ((seq = ? AND kind IN ('user', 'report', 'worker')) OR (? IS NOT NULL AND turn_id = ?))")
+      .run(threadId, seq, head.turn_id, head.turn_id);
+    this.recompute(back);
+    if (head.strand_id && head.strand_id !== back) this.recompute(head.strand_id);
+    return back;
   }
 
   /** A turn joined a strand: its span grows. A waiting note clears on the next activity. */
@@ -285,20 +316,34 @@ export class StrandStore {
       .run(threadId, next.seenSeq, next.day, next.jevCalls, next.modelCalls, next.namedAt, next.batchedAt, next.backfill, this.now());
   }
 
-  /** Counts one call (Jev's or the small model's) against today's cap; false when the cap is reached. Both counts start again each day. */
-  takeCall(threadId: string, kind: "jev" | "model", day: string, cap: number): boolean {
-    const read = this.read(threadId);
-    const today = read?.day === day;
-    const used = today ? (kind === "jev" ? read!.jevCalls : read!.modelCalls) : 0;
-    if (used >= cap) return false;
-    this.saveRead(threadId, { day, jevCalls: kind === "jev" ? used + 1 : today ? read!.jevCalls : 0, modelCalls: kind === "model" ? used + 1 : today ? read!.modelCalls : 0 });
-    return true;
+  private used(key: string, kind: "jev" | "model", day: string): number {
+    const read = this.read(key);
+    return read?.day === day ? (kind === "jev" ? read.jevCalls : read.modelCalls) : 0;
   }
 
-  /** Calls left today. */
-  callsLeft(threadId: string, kind: "jev" | "model", day: string, cap: number): number {
-    const read = this.read(threadId);
-    return read?.day === day ? Math.max(0, cap - (kind === "jev" ? read.jevCalls : read.modelCalls)) : cap;
+  private count(key: string, kind: "jev" | "model", day: string): void {
+    const read = this.read(key);
+    const today = read?.day === day;
+    this.saveRead(key, { day, jevCalls: (today ? read!.jevCalls : 0) + (kind === "jev" ? 1 : 0), modelCalls: (today ? read!.modelCalls : 0) + (kind === "model" ? 1 : 0) });
+  }
+
+  /**
+   * Counts one call (Jev's or the small model's) against today's caps: the
+   * conversation's, and `totalCap` across every conversation. False when
+   * either is reached. Both counts start again each day.
+   */
+  takeCall(threadId: string, kind: "jev" | "model", day: string, cap: number, totalCap = Number.POSITIVE_INFINITY): boolean {
+    return this.db.transaction(() => {
+      if (this.used(threadId, kind, day) >= cap || this.used(ALL_CONVERSATIONS, kind, day) >= totalCap) return false;
+      this.count(threadId, kind, day);
+      this.count(ALL_CONVERSATIONS, kind, day);
+      return true;
+    })();
+  }
+
+  /** Calls left today, under both caps. */
+  callsLeft(threadId: string, kind: "jev" | "model", day: string, cap: number, totalCap = Number.POSITIVE_INFINITY): number {
+    return Math.max(0, Math.min(cap - this.used(threadId, kind, day), totalCap - this.used(ALL_CONVERSATIONS, kind, day)));
   }
 
   forget(threadId: string): void {

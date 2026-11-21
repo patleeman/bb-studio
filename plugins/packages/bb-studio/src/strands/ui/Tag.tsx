@@ -27,10 +27,13 @@ export function StrandTag({ message }: ExperimentalMessageMetadataProps) {
 function MoveMenu({ threadId, seq, current, strands }: { threadId: string; seq: number; current: string; strands: Tags["strands"] }) {
   const call = useCall();
   const [open, setOpen] = useState(false);
-  const run = async (what: () => Promise<{ ok: boolean }>) => {
+  const run = async (what: () => Promise<{ ok: boolean }>, done?: string) => {
     setOpen(false);
-    try { if (!(await what()).ok) toast.error("Couldn't move the message."); }
-    catch (error) { toast.error("Couldn't move the message.", { description: errorMessage(error) }); }
+    try {
+      if (!(await what()).ok) { toast.error("Couldn't move the message."); return; }
+      // A move can be undone for 10 seconds: its turn goes back to the strand it was in.
+      if (done) toast(done, { duration: 10_000, action: { label: "Undo", onClick: () => void call("strands.unmove", { threadId, seq }).catch(() => toast.error("Couldn't undo the move.")) } });
+    } catch (error) { toast.error("Couldn't move the message.", { description: errorMessage(error) }); }
   };
   const item = "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left text-[12.5px] outline-none hover:bg-accent/60 focus-visible:bg-accent/60";
   return (
@@ -44,7 +47,7 @@ function MoveMenu({ threadId, seq, current, strands }: { threadId: string; seq: 
           <div className="px-2 pb-1 pt-0.5 text-[11px] text-muted-foreground">Move to…</div>
           {strands.map((strand) => (
             <button key={strand.id} type="button" role="menuitem" data-strand-option={strand.id} disabled={strand.id === current}
-              onClick={() => void run(() => call("strands.move", { threadId, seq, strandId: strand.id }))} className={item}>
+              onClick={() => void run(() => call("strands.move", { threadId, seq, strandId: strand.id }), `Moved to ${strand.title}`)} className={item}>
               <span className="min-w-0 flex-1 truncate">{strand.title}</span>
               {strand.id === current ? <Icon name="Check" className="size-3 text-muted-foreground" /> : null}
             </button>
@@ -77,11 +80,13 @@ function Tag({ message }: ExperimentalMessageMetadataProps) {
   if (!tag || !tags.data) return selection ? <span ref={ref} hidden /> : null;
   const open = () => choose({ id: tag.strandId, latestSeq: null });
   const move = <MoveMenu threadId={message.threadId} seq={tag.seq} current={tag.strandId} strands={tags.data.strands} />;
+  // Under a filter for another strand, this message is kept in view because it waits for an answer.
+  const name = selection && selection.strandId !== tag.strandId ? `from ${tag.title}` : tag.title;
   // The divider goes above the turn's first message (the user's); its reply carries the name.
   if (tag.divider && message.role === "user") {
     return (
       <div ref={(element) => { ref.current = element; }} data-strand-divider={tag.strandId} className="mt-3 flex w-full items-center gap-2 text-[11px] font-semibold text-muted-foreground/70">
-        <button type="button" onClick={open} className="cursor-pointer truncate hover:text-foreground">{tag.title}</button>
+        <button type="button" onClick={open} className="cursor-pointer truncate hover:text-foreground">{name}</button>
         <span className="font-normal">{move}</span>
         <span aria-hidden className="h-px flex-1 bg-border/70" />
       </div>
@@ -91,7 +96,7 @@ function Tag({ message }: ExperimentalMessageMetadataProps) {
     <span ref={(element) => { ref.current = element; }} className="inline-flex items-center gap-1.5">
       <button type="button" data-strand-tag={tag.strandId} onClick={open} aria-label={`Strand: ${tag.title}`}
         className="cursor-pointer text-[11px] text-muted-foreground/70 hover:text-foreground">
-        {tag.title}
+        {name}
       </button>
       {move}
     </span>

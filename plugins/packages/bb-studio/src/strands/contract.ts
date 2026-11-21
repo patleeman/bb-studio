@@ -17,6 +17,8 @@ export const strandAsk = z.object({
   label: z.string(),
   /** An approval's full details before its buttons: the whole command, working folder, actions and session grant. */
   details: z.array(z.string()),
+  /** The conversation's turn it waits in: under a filter for another strand, that turn stays in view. Null for a worker's ask. */
+  turnId: z.string().nullable().default(null),
   /** An approval's choices (BB's own), for its buttons. */
   decisions: z.array(z.enum(["allow_once", "allow_for_session", "deny"])),
 });
@@ -137,6 +139,16 @@ export const rpcContract = defineRpcContract({
   "strands.merge": {
     experimental_description: "Fold one strand into another of the same conversation.",
     input: z.object({ strandId, into: strandId }).strict(),
+    output: ok,
+  },
+  "strands.unmerge": {
+    experimental_description: "Undo a merge: the strand and its items come back.",
+    input: z.object({ strandId }).strict(),
+    output: ok,
+  },
+  "strands.unmove": {
+    experimental_description: "Undo a message's last move: its turn goes back to the strand it was in.",
+    input: z.object({ threadId, seq: z.number().int().min(0) }).strict(),
     output: ok,
   },
   "strands.opened": {

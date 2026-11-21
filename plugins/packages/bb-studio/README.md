@@ -4360,13 +4360,15 @@ never waits. A turn that asks you something, or runs past 30 seconds, is
 sorted early. New strands start with the message's first line as their name;
 BB's one-line model call (or Decisions' model) names them in batches: 1 to 4
 words, a concrete noun phrase, unique in the conversation, kept once given.
-At most 300 Jev calls and 40 model calls per conversation per day. Secrets
+At most 300 Jev calls and 40 model calls per conversation per day, and
+3,000 and 300 across every conversation. Secrets
 are taken out of everything sent to Jev or the model, and out of what is kept.
 
 A conversation is backfilled once, when you open it or a turn ends there, if
 it was active in the last 14 days: its newest 300 messages from you, and its
 open agent tasks as strands. One conversation at a time, the most recently
-active first.
+active first. A failed backfill (the host not connected, say) waits 5
+minutes before the next try, twice as long each time up to an hour.
 
 States come only from real signals: needs you (a pending question or
 approval, a worker that needs you, a Tool Gateway request), running (its turn
@@ -4380,18 +4382,21 @@ Earlier after 3 more quiet days unless pinned.
   into a filter field: type to narrow the strands by name and summary,
   grouped needs you, active and quiet, each with its summary and an ask's
   whole command and buttons. Picking one applies it as a filter (a token with
-  ×; Esc clears it). On a BB with the timeline filter (desktop with
+  ×; Esc clears it, and the conversation scrolls back exactly where it was).
+  A message still waiting for your answer in another strand stays in view,
+  its tag saying "from" that strand. On a BB with the timeline filter (desktop with
   `slots.experimental_timelineFilter`), the timeline shows only that strand's
   messages, with folded and grouped rows open, and loads back to its first
   message; an older BB dims the other messages instead. Nothing open, no box.
 - **Above each message**: a divider with the strand's name where the strand
   changes, else the name, muted. On hover, **Move to…** moves the message's
   turn to another strand, or **New strand from here** starts one with it and
-  the later messages of its strand. Your moves are never re-sorted.
+  the later messages of its strand. Your moves are never re-sorted, and a
+  move can be undone for 10 seconds.
 - **The Strands tab** in the workbench: each strand as a card with its name,
   summary, state, messages, first and last activity, workers and any ask's
   buttons. Clicking a card filters the conversation to it; its ⋯ renames,
-  pins or merges it.
+  pins or merges it; a merge asks first and can be undone for 10 seconds.
 - **The overview** (Settings → Strands overview, off by default): a Strands
   page beside Tasks with every conversation's open strands, needs you first.
 

@@ -3,6 +3,7 @@
 // proposes by the same words. Deterministic; no BB, no network.
 import Database from "better-sqlite3";
 import { MIGRATIONS } from "../../migrations";
+import { ensureColumns } from "../../schema-columns";
 import type { DetectorDeps } from "../detector";
 import type { EventRow } from "../turns";
 
@@ -30,6 +31,7 @@ export const FIXTURE_AT = Date.parse("2026-11-20T12:00:00Z");
 export function database(): Database.Database {
   const db = new Database(":memory:");
   for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
+  ensureColumns(db);
   return db;
 }
 

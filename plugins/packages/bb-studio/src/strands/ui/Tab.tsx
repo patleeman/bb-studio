@@ -18,7 +18,7 @@ import { AskButtonsFor, StateMark, STRANDS_POLL_MS, useSelectStrand } from "./St
 import { ageOf } from "./model";
 
 /** The row's ⋯ menu: Rename, Pin or Unpin, Merge into another strand. */
-function RowMenu({ strand, others, onRename }: { strand: StrandView; others: readonly StrandView[]; onRename(): void }) {
+function RowMenu({ strand, others, onRename, onMerge }: { strand: StrandView; others: readonly StrandView[]; onRename(): void; onMerge(into: StrandView): void }) {
   const call = useCall();
   const run = async (what: () => Promise<{ ok: boolean }>, failed: string) => {
     try { if (!(await what()).ok) toast.error(failed); } catch (error) { toast.error(failed, { description: errorMessage(error) }); }
@@ -41,7 +41,7 @@ function RowMenu({ strand, others, onRename }: { strand: StrandView; others: rea
               <DropdownMenuSubTrigger>Merge into</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 {others.map((other) => (
-                  <DropdownMenuItem key={other.id} onSelect={() => void run(() => call("strands.merge", { strandId: strand.id, into: other.id }), "Couldn't merge the strands.")}>{other.title}</DropdownMenuItem>
+                  <DropdownMenuItem key={other.id} onSelect={() => onMerge(other)}>{other.title}</DropdownMenuItem>
                 ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
@@ -94,8 +94,18 @@ const WORKER_MARK: Record<StrandView["workers"][number]["status"], { icon: strin
 /** One strand as its own card: name, what it is about, state, messages, first and last activity, workers, and an open ask with its buttons. Clicking it filters the conversation to it. */
 function StrandCard({ strand, threadId, selected, now, others }: { strand: StrandView; threadId: string; selected: boolean; now: number; others: readonly StrandView[] }) {
   const choose = useSelectStrand(threadId);
+  const call = useCall();
   const [renaming, setRenaming] = useState(false);
+  const [merging, setMerging] = useState<StrandView | null>(null);
   const ask = strand.state === "needs-you" ? strand.asks[0] ?? null : null;
+  // A merge is confirmed first, then can be undone for 10 seconds.
+  const merge = async (into: StrandView) => {
+    setMerging(null);
+    try {
+      if (!(await call("strands.merge", { strandId: strand.id, into: into.id })).ok) { toast.error("Couldn't merge the strands."); return; }
+      toast(`Merged into ${into.title}`, { duration: 10_000, action: { label: "Undo", onClick: () => void call("strands.unmerge", { strandId: strand.id }).catch(() => toast.error("Couldn't undo the merge.")) } });
+    } catch (error) { toast.error("Couldn't merge the strands.", { description: errorMessage(error) }); }
+  };
   const about = strand.summary ?? (strand.state === "needs-you" ? null : strand.detail);
   const span = [strand.firstAt ? `first ${relativeTime(strand.firstAt, now)}` : null, strand.lastAt ? `last ${relativeTime(strand.lastAt, now)}` : null].filter(Boolean).join(" · ");
   return (
@@ -107,8 +117,16 @@ function StrandCard({ strand, threadId, selected, now, others }: { strand: Stran
         {strand.state === "needs-you" ? <span role="img" aria-label="Needs you" className="size-1.5 shrink-0 rounded-full bg-warning" /> : null}
         {renaming ? <RenameField strand={strand} onDone={() => setRenaming(false)} /> : <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-snug">{strand.title}</h3>}
         {strand.pinned ? <Icon name="Pin" aria-label="Pinned" className="size-3 shrink-0 text-muted-foreground" /> : null}
-        <RowMenu strand={strand} others={others} onRename={() => setRenaming(true)} />
+        <RowMenu strand={strand} others={others} onRename={() => setRenaming(true)} onMerge={setMerging} />
       </div>
+      {merging ? (
+        <div role="alertdialog" aria-label="Merge strands" data-strand-merge-confirm="" className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-border px-2 py-1.5 text-[12px]"
+          onClick={(event) => event.stopPropagation()} onKeyDown={(event) => { event.stopPropagation(); if (event.key === "Escape") setMerging(null); }}>
+          <span className="min-w-0 flex-1">Merge “{strand.title}” into “{merging.title}”?</span>
+          <button type="button" autoFocus onClick={() => void merge(merging)} className="h-6 cursor-pointer rounded-md bg-foreground px-2 text-[11.5px] font-semibold text-background">Merge</button>
+          <button type="button" onClick={() => setMerging(null)} className="h-6 cursor-pointer rounded-md border border-border px-2 text-[11.5px] hover:bg-accent">Cancel</button>
+        </div>
+      ) : null}
       {about ? <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-muted-foreground">{about}</p> : null}
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground" data-strand-facts="">
         <span className={cn("inline-flex items-center gap-1.5", strand.state === "needs-you" && "font-medium text-warning")}>

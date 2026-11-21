@@ -12,12 +12,12 @@ const view = (id: string, title: string, over: Partial<StrandView> = {}): Strand
   id, title, summary: null, named: true, state: "active", detail: null, asks: [], workers: [], lastAt: NOW - 10 * MIN, firstAt: NOW - 3 * 60 * MIN, firstSeq: 4,
   latestSeq: 10, latestTurnId: `t_${id}`, messages: 1, unsure: 0, pinned: false, origin: "jev", taskId: null, ...over,
 });
-const approval = (id: string, label: string) => ({ id, kind: "approval" as const, threadId: "thr_main", label, details: ["Command: npm publish --tag latest --access public --otp-from-env", "Cwd: /tmp/release"], decisions: ["deny", "allow_once"] as ("deny" | "allow_once")[] });
+const approval = (id: string, label: string) => ({ id, kind: "approval" as const, threadId: "thr_main", label, details: ["Command: npm publish --tag latest --access public --otp-from-env", "Cwd: /tmp/release"], turnId: "t5" as string | null, decisions: ["deny", "allow_once"] as ("deny" | "allow_once")[] });
 const LIST: StrandList = {
   threadId: "thr_main", enabled: true, backfill: { done: true, at: NOW - 60 * MIN, messages: 300, sorted: 300 }, jevCallsToday: 12, jevDailyCap: 300, sortingTurn: false,
   strands: [
     view("s_doc", "Blood pressure log", { state: "needs-you", asks: [approval("int_1", "Approve: npm publish")] }),
-    view("s_pr", "bb-plugins PR #15", { state: "needs-you", asks: [{ id: "int_2", kind: "question", threadId: "thr_worker", label: "PR fix: Which branch?", details: [], decisions: [] }] }),
+    view("s_pr", "bb-plugins PR #15", { state: "needs-you", asks: [{ id: "int_2", kind: "question", threadId: "thr_worker", label: "PR fix: Which branch?", details: [], turnId: null, decisions: [] }] }),
     view("s_hvac", "Furnace tune-up", { state: "needs-you", detail: "Router fix needs you" }),
     view("s_cx", "CodexBar quota", { state: "running", detail: "codexbar-fix", summary: "Moving the quota read to the new usage endpoint.", latestSeq: 40, messages: 4, workers: [{ threadId: "thr_w", title: "codexbar-fix tests", status: "running" }] }),
     view("s_red4", "red4 mitigation", { state: "waiting", detail: "Unraid's fix" }),
@@ -85,6 +85,7 @@ const state = vi.hoisted(() => ({
   openTab: vi.fn(() => true),
   composerThread: "thr_main" as string | null,
   overview: null as unknown,
+  toast: vi.fn((_message: string, _options?: { action?: { label: string; onClick(): void } }) => undefined),
 }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useBbNavigate: () => ({ toThread: state.toThread, experimental_toAppPath: state.toAppPath }),
@@ -100,7 +101,7 @@ vi.mock("../../kit/composer", () => ({ useComposerThread: () => state.composerTh
 vi.mock("../../settings/ui/use-settings", () => ({ useStudioSettings: () => ({ values: { strandsOverview: true } }) }));
 vi.mock("../../kit/app/index", () => ({ PageColumn: ({ children }: { children?: React.ReactNode }) => <div>{children}</div> }));
 vi.mock("../../ui/conversations/bot-thread-owners", () => ({ useIsBotThread: () => true }));
-vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: Object.assign(state.toast, { error: vi.fn() }) }));
 
 const { StrandsBoxBanner } = await import("./Strip");
 const { StrandsOverview } = await import("./Overview");
@@ -112,7 +113,7 @@ let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   Object.assign(state, { list: LIST, tags: TAGS, composerThread: "thr_main" });
-  state.call.mockClear(); state.toAppPath.mockClear(); state.toThread.mockClear(); state.openTab.mockClear();
+  state.call.mockClear(); state.toast.mockClear(); state.toAppPath.mockClear(); state.toThread.mockClear(); state.openTab.mockClear();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -120,6 +121,7 @@ beforeEach(() => {
 afterEach(() => { act(() => root.unmount()); container.remove(); resetSelectionForTests(); vi.unstubAllGlobals(); });
 
 const render = (node: React.ReactNode) => act(() => root.render(node));
+const box2 = () => container.querySelector('[data-testid="strands-strip"]');
 const click = (element: Element | null | undefined) => act(() => { (element as HTMLElement).click(); });
 const text = (element: Element | null | undefined) => element?.textContent ?? "";
 
@@ -189,7 +191,8 @@ describe("the strands box above a conversation's composer", () => {
     expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=40", { replace: true });
     expect(state.call).toHaveBeenCalledWith("strands.opened", { strandId: "s_cx" });
     expect(text(container.querySelector('[data-strand-filter="s_cx"]'))).toBe("CodexBar quota");
-    expect(timelineFilterOf("thr_main")).toEqual({ turnIds: ["t1", "t2", "t4", "t6"], firstSeq: 4 });
+    // The strand's turns, and t5 where another strand's approval waits.
+    expect(timelineFilterOf("thr_main")).toEqual({ turnIds: ["t1", "t2", "t4", "t6", "t5"], firstSeq: 4 });
     expect(text(box())).toContain("4 messages");
     click(box()!.querySelector('[aria-label="Previous message in this strand"]'));
     expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=24", { replace: true });
@@ -252,6 +255,50 @@ describe("the tag above each message", () => {
   });
 });
 
+describe("the filter keeps what waits for an answer, and gives the scroll back", () => {
+  it("keeps the turn of a pending ask from another strand in the filter, its tag saying where it is from", () => {
+    registerTimelineFilter({ experimental_timelineFilter: () => {} });
+    render(<StrandsBoxBanner />);
+    click(container.querySelector("[data-strands-line]"));
+    click(box2()!.querySelector('[data-strand-option="s_cx"]'));
+    // s_doc's approval waits in turn t5: it stays in view under the CodexBar filter.
+    expect(timelineFilterOf("thr_main")!.turnIds).toEqual(["t1", "t2", "t4", "t6", "t5"]);
+    act(() => root.render(<>
+      <div data-timeline-row-id="t5"><StrandTag message={{ id: "m5", threadId: "thr_main", turnId: "t5", role: "assistant", createdAt: NOW } as never} /></div>
+      <div data-timeline-row-id="t4"><StrandTag message={{ id: "m4", threadId: "thr_main", turnId: "t4", role: "assistant", createdAt: NOW } as never} /></div>
+    </>));
+    expect(text(container.querySelector('[data-strand-tag="s_hvac"]'))).toBe("from Furnace tune-up");
+    expect(text(container.querySelector('[data-strand-tag="s_cx"]'))).toBe("CodexBar quota");
+  });
+
+  it("puts the first row in view back at the same place when the filter clears", () => {
+    vi.useFakeTimers();
+    try {
+      const scroller = document.createElement("div");
+      scroller.style.overflowY = "auto";
+      const rows = ["r1", "r2", "r3"].map((id) => { const row = document.createElement("div"); row.setAttribute("data-timeline-row-id", id); scroller.appendChild(row); return row; });
+      document.body.appendChild(scroller);
+      let scrollTop = 400;
+      Object.defineProperty(scroller, "scrollTop", { get: () => scrollTop, set: (value: number) => { scrollTop = value; }, configurable: true });
+      const rect = (top: number, height = 100) => ({ top, bottom: top + height, left: 0, right: 0, width: 0, height, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+      scroller.getBoundingClientRect = () => rect(0, 600);
+      // r2 is the first row in view, 30px below the top.
+      rows[0]!.getBoundingClientRect = () => rect(-130 - (scrollTop - 400));
+      rows[1]!.getBoundingClientRect = () => rect(30 - (scrollTop - 400));
+      rows[2]!.getBoundingClientRect = () => rect(130 - (scrollTop - 400));
+      select("thr_main", { strandId: "s_cx", seq: 40 });
+      // Filtering scrolls elsewhere, and 200px of older rows load above.
+      scrollTop = 1900;
+      rows[1]!.getBoundingClientRect = () => rect(30 + 200 - (scrollTop - 400));
+      select("thr_main", null);
+      vi.advanceTimersByTime(900);
+      expect(rows[1]!.getBoundingClientRect().top).toBe(30);
+      expect(scrollTop).toBe(600);
+      scroller.remove();
+    } finally { vi.useRealTimers(); }
+  });
+});
+
 describe("Move to… on a message's tag", () => {
   const message = { id: "m_t4", threadId: "thr_main", turnId: "t4", role: "user" as const, initiator: "user" as const, createdAt: NOW };
 
@@ -266,6 +313,12 @@ describe("Move to… on a message's tag", () => {
     state.call.mockResolvedValue({ ok: true });
     await act(async () => { options.find((option) => option.getAttribute("data-strand-option") === "s_red4")!.click(); });
     expect(state.call).toHaveBeenCalledWith("strands.move", { threadId: "thr_main", seq: 16, strandId: "s_red4" });
+    // Undo, for 10 seconds.
+    const [toastText, toastOptions] = state.toast.mock.calls.at(-1)!;
+    expect(toastText).toBe("Moved to red4 mitigation");
+    expect(toastOptions).toMatchObject({ duration: 10_000, action: { label: "Undo" } });
+    await act(async () => { toastOptions!.action!.onClick(); });
+    expect(state.call).toHaveBeenCalledWith("strands.unmove", { threadId: "thr_main", seq: 16 });
     click(container.querySelector("[data-strand-move]"));
     await act(async () => { (container.querySelector('[data-strand-option="new"]') as HTMLElement).click(); });
     expect(state.call).toHaveBeenCalledWith("strands.split", { threadId: "thr_main", seq: 16 });
@@ -273,7 +326,7 @@ describe("Move to… on a message's tag", () => {
 });
 
 describe("the Strands tab's row menu", () => {
-  it("renames inline, pins, and merges into another strand", async () => {
+  it("renames inline, pins, and merges into another strand after a confirm, with Undo", async () => {
     state.call.mockResolvedValue({ ok: true });
     render(<StrandsTab threadId="thr_main" environment={null} params={null} />);
     const row = () => container.querySelector('[data-strand-row="s_cx"]')!;
@@ -290,7 +343,20 @@ describe("the Strands tab's row menu", () => {
     await act(async () => { item("Pin").click(); });
     expect(state.call).toHaveBeenCalledWith("strands.pin", { strandId: "s_cx", pinned: true });
     await act(async () => { item("red4 mitigation").click(); });
+    // Nothing merges until confirmed.
+    expect(state.call).not.toHaveBeenCalledWith("strands.merge", expect.anything());
+    const confirm = row().querySelector("[data-strand-merge-confirm]")!;
+    expect(text(confirm)).toContain("Merge “CodexBar quota” into “red4 mitigation”?");
+    click([...confirm.querySelectorAll("button")].find((button) => text(button) === "Cancel"));
+    expect(row().querySelector("[data-strand-merge-confirm]")).toBeNull();
+    await act(async () => { item("red4 mitigation").click(); });
+    await act(async () => { ([...row().querySelectorAll("[data-strand-merge-confirm] button")].find((button) => text(button) === "Merge") as HTMLElement).click(); });
     expect(state.call).toHaveBeenCalledWith("strands.merge", { strandId: "s_cx", into: "s_red4" });
+    const [message, options] = state.toast.mock.calls.at(-1)!;
+    expect(message).toBe("Merged into red4 mitigation");
+    expect(options).toMatchObject({ duration: 10_000, action: { label: "Undo" } });
+    await act(async () => { options!.action!.onClick(); });
+    expect(state.call).toHaveBeenCalledWith("strands.unmerge", { strandId: "s_cx" });
     // The menu's clicks don't select the row.
     expect(state.toAppPath).not.toHaveBeenCalled();
   });
@@ -339,6 +405,6 @@ describe("the Strands tab", () => {
     expect(container.querySelector('[data-strand-row="s_old"]')).not.toBeNull();
     click(cx);
     expect(state.toAppPath).toHaveBeenLastCalledWith("/threads/thr_main#msg=40", { replace: true });
-    expect(timelineFilterOf("thr_main")?.turnIds).toEqual(["t1", "t2", "t4", "t6"]);
+    expect(timelineFilterOf("thr_main")?.turnIds).toEqual(["t1", "t2", "t4", "t6", "t5"]);
   });
 });

@@ -102,6 +102,8 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
     "strands.rename": ({ strandId, title }) => ({ ok: service.rename(strandId, title) }),
     "strands.pin": ({ strandId, pinned }) => ({ ok: service.pin(strandId, pinned) }),
     "strands.merge": ({ strandId, into }) => ({ ok: service.merge(strandId, into) }),
+    "strands.unmerge": ({ strandId }) => ({ ok: service.unmerge(strandId) }),
+    "strands.unmove": ({ threadId, seq }) => ({ ok: service.unmove(threadId, seq) }),
   });
 
   const cli = (argv: readonly string[], ctx: { threadId?: string | null }) => runStrandsCli(argv, {
