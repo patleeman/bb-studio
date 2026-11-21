@@ -116,8 +116,9 @@ final class ConversationsUITests: ServerIsolatedUITestCase {
         let plus = app.buttons["roomNewConversation"]
         XCTAssertTrue(plus.waitForExistence(timeout: 10))
         plus.tap()
-        let field = app.textFields["newConversationField"].exists ? app.textFields["newConversationField"] : app.textViews["newConversationField"]
+        let field = app.textViews["Message Juniper"]
         XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.tap()
         field.typeText("Plan the Lisbon dinner")
         app.buttons["newConversationStart"].tap()
         XCTAssertTrue(app.staticTexts["Plan the Lisbon dinner"].waitForExistence(timeout: 15), "the new conversation opens")

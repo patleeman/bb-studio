@@ -67,6 +67,9 @@ struct RoomListHeader: View {
     let view: BotThreadsView?
     /// With it, the Bot's controls (Pause, Resume, Stop, the Main) sit at the right.
     var refresh: (() async -> Void)? = nil
+    /// With it and more than one Bot, the name is a menu of the Bots: pick one to switch to it.
+    var switchBot: ((String) -> Void)? = nil
+    @ObservedObject private var spaces = BotSpacesStore.shared
 
     var body: some View {
         HStack(spacing: 12) {
@@ -74,13 +77,44 @@ struct RoomListHeader: View {
                          workers: view?.workers.filter { $0.status == .running }.count ?? bot.activity.workers,
                          size: 44, stillOnly: true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(bot.name).font(.title3.weight(.semibold))
+                name
                 Text(Self.status(view, paused: bot.paused ? bot.state : nil)).font(.subheadline).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("roomListHeader")
+                    .accessibilityLabel("\(bot.name), \(Self.status(view, paused: bot.paused ? bot.state : nil))")
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("roomListHeader")
             Spacer(minLength: 0)
             if let refresh { BotControlsMenu(bot: bot, view: view, refresh: refresh) }
+        }
+    }
+
+    @ViewBuilder private var name: some View {
+        let bots = spaces.spaces?.bots ?? []
+        if let switchBot, bots.count > 1 {
+            Menu {
+                Picker("Bot", selection: Binding(get: { bot.id }, set: { if $0 != bot.id { switchBot($0) } })) {
+                    ForEach(bots) { each in
+                        Label {
+                            Text(each.name)
+                        } icon: {
+                            if each.needsYou { Image(systemName: "exclamationmark.circle") }
+                        }
+                        .tag(each.id)
+                        .accessibilityIdentifier("botSwitch-\(each.id)")
+                    }
+                }
+                .pickerStyle(.inline)
+            } label: {
+                HStack(spacing: 4) {
+                    Text(bot.name).font(.title3.weight(.semibold))
+                    Image(systemName: "chevron.down").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                }
+                .foregroundStyle(.primary)
+                .contentShape(.rect)
+            }
+            .accessibilityLabel("\(bot.name), switch Bot")
+            .accessibilityIdentifier("botSwitcher")
+        } else {
+            Text(bot.name).font(.title3.weight(.semibold))
         }
     }
 
@@ -109,6 +143,8 @@ struct RoomContextPane: View {
     var openPlace: (RoomPlace) -> Void
     var settings: () -> Void
     var refresh: (() async -> Void)? = nil
+    var switchBot: ((String) -> Void)? = nil
+    var newConversation: (() -> Void)? = nil
     @State private var openFolds: Set<String> = []
     @Environment(\.look) private var look
 
@@ -120,7 +156,7 @@ struct RoomContextPane: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                RoomListHeader(bot: bot, view: view, refresh: refresh).padding(.horizontal, 4)
+                RoomListHeader(bot: bot, view: view, refresh: refresh, switchBot: switchBot).padding(.horizontal, 4)
                 StrandsPanel(threadId: shown, title: title, openThread: openThread)
                 workers
                 conversations
@@ -181,6 +217,18 @@ struct RoomContextPane: View {
     private var conversations: some View {
         VStack(alignment: .leading, spacing: 0) {
             section("Conversations")
+            if let newConversation {
+                Button(action: newConversation) {
+                    Label("New conversation", systemImage: "plus.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(look.accent)
+                        .padding(.horizontal, 8)
+                        .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("contextNewConversation")
+            }
             ForEach(BotShell.lines(view)) { line in
                 Button { pick(line.threadId) } label: {
                     BotConversationRow(line: line)

@@ -169,7 +169,7 @@ struct BotSpaceList: View {
         .toolbar(compact ? .hidden : .automatic, for: .navigationBar)
         .onChange(of: bot?.id) { _, _ in showsDone = false }
         .sheet(isPresented: $startingConversation) {
-            NewConversationSheet(botName: bot?.name ?? "Bot") { try await startConversation($0) }
+            NewThreadView(botId: bot?.id) { id, botId in startedConversation(id, botId: botId) }
         }
     }
 
@@ -256,11 +256,12 @@ struct BotSpaceList: View {
         }
     }
 
-    private func startConversation(_ text: String) async throws {
-        guard let bot else { return }
-        let id = try await BotShell.startConversation(text, bot: bot, view: view, client: app.client)
-        await store.refresh()
+    /// A conversation with this Bot opens here; with another Bot, that Bot's space opens on it; a plain thread opens as a thread.
+    private func startedConversation(_ id: String, botId: String?) {
+        guard let botId else { return app.openThread(id) }
+        if botId != bot?.id { shell.show(botId, store: store, compact: false) }
         shell.openConversation(id)
+        Task { await store.refresh() }
     }
 
     @ViewBuilder private var workers: some View {

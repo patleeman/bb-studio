@@ -150,10 +150,11 @@ extension BBClient {
     }
 
     public func startConversation(botId: String, projectId: String, text: String, choice: ExecutionChoice,
-                                  attachments: [JSONValue] = []) async throws -> String {
+                                  attachments: [JSONValue] = [], workspace: NewThreadWorkspace = .projectDefault) async throws -> String {
         var request = Self.studioExecutionRequest(projectId: projectId, text: text, mentions: [], choice: choice)
-        if !attachments.isEmpty, case .object(var fields) = request {
-            fields["input"] = Self.input(text, attachments)
+        if case .object(var fields) = request {
+            if !attachments.isEmpty { fields["input"] = Self.input(text, attachments) }
+            fields["environment"] = workspace.request
             request = .object(fields)
         }
         let output: Studio.BotConversationStartOutput = try await rpc("studio", Studio.Method.bot_conversation_start,

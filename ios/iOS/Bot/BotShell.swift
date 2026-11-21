@@ -176,16 +176,6 @@ enum BotShell {
             botPause: bot.paused ? (bot.state ?? "paused") : nil)
     }
 
-    @MainActor
-    static func startConversation(_ text: String, bot: BotSpace, view: BotThreadsView?, client: BBClient) async throws -> String {
-        var projectId = view?.main?.projectId
-        if projectId == nil, let main = mainThreadId(bot, view: view) {
-            projectId = try await client.thread(main).projectId
-        }
-        guard let projectId else { throw BBError(status: 0, message: "\(bot.name) has no Main conversation to start from.") }
-        return try await client.startConversation(botId: bot.id, projectId: projectId, text: text)
-    }
-
     static func shortAge(_ at: Double, now: Date = Date()) -> String {
         WorkerInfo.age(at, now: now)
     }

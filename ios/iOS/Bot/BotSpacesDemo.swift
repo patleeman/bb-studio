@@ -129,6 +129,8 @@ enum BotSpacesDemo {
             var parent: (threadId: String, messageId: String, title: String)? = nil
             var running = false
             var needs: String? = nil
+            /// What New conversation started it on (provider, model name); the demo's own rows name theirs below.
+            var model: (providerId: String, name: String)? = nil
         }
 
         struct Side {
@@ -167,6 +169,8 @@ enum BotSpacesDemo {
         private var memory: [[String: Any]] = []
         private var memoryMade = 0
         private var made = 0
+        /// Each conversation New conversation started: the model it asked for, as the list and header name it.
+        private var startedModels: [String: (providerId: String, name: String)] = [:]
         private var workers: [Worker] = []
         private(set) var asked: [(threadId: String, text: String)] = []
         private var approvalPending = BotSpacesDemo.variant == "needs" && !ProcessInfo.processInfo.arguments.contains("-qaNoDemoApprovals")
@@ -232,6 +236,49 @@ enum BotSpacesDemo {
                 Self.row("side-u1", "user", "Which of the two is riskier?", now - 360_000, seq: 2),
                 Self.row("side-a1", "assistant", "The release workflow fix. It changes how tags are pushed, so I'll hold it for your OK.", now - 300_000, seq: 3),
             ])
+        }
+
+        /// New conversation's choices: three providers (Auto, the model router, last, as when it isn't the default),
+        /// their models, two projects, the project's defaults and no workspaces yet.
+        static func composerOptions(_ path: String) -> Any? {
+            let bare = path.split(separator: "?").first.map(String.init) ?? path
+            let query = path.split(separator: "?").dropFirst().first.map(String.init) ?? ""
+            switch bare {
+            case "/api/v1/system/execution-options":
+                let modes: [String: Any] = ["permissionModes": ["accept-edits", "auto", "full"]]
+                let providers: [[String: Any]] = [
+                    ["id": "claude-code", "displayName": "Claude Code", "available": true, "capabilities": modes],
+                    ["id": "codex", "displayName": "Codex", "available": true, "capabilities": modes],
+                    ["id": "auto", "displayName": "Auto", "available": true, "capabilities": modes],
+                ]
+                let efforts: [[String: Any]] = ["low", "medium", "high", "xhigh"].map { ["reasoningEffort": $0] }
+                let models: [[String: Any]]
+                if query.contains("providerId=auto") {
+                    models = [["id": "auto", "model": "auto", "displayName": "Auto", "supportedReasoningEfforts": [Any](), "isDefault": true]]
+                } else if query.contains("providerId=codex") {
+                    models = [["id": "gpt-5.2", "model": "gpt-5.2", "displayName": "GPT-5.2", "supportedReasoningEfforts": efforts, "isDefault": true]]
+                } else {
+                    models = [["id": "claude-opus-5-5", "model": "claude-opus-5-5", "displayName": "Opus 5.5", "supportedReasoningEfforts": efforts, "isDefault": true],
+                              ["id": "claude-sonnet-5-5", "model": "claude-sonnet-5-5", "displayName": "Sonnet 5.5", "supportedReasoningEfforts": efforts]]
+                }
+                return ["providers": providers, "models": models, "permissionCeiling": "full"]
+            case "/api/v1/projects":
+                return [["id": "proj_studio", "name": "BB Studio"], ["id": "proj_site", "name": "Website"]]
+            case "/api/v1/environments":
+                return [Any]()
+            default:
+                guard bare.hasPrefix("/api/v1/projects/"), bare.hasSuffix("/default-execution-options") else { return nil }
+                return ["providerId": "claude-code", "model": "claude-opus-5-5", "reasoningLevel": "high", "permissionMode": "auto"]
+            }
+        }
+
+        /// The provider and model name a New conversation request named (Auto routes the demo's to GPT-5.2).
+        static func startedModel(_ request: [String: Any]?) -> (providerId: String, name: String) {
+            switch request?["providerId"] as? String {
+            case "auto": return ("codex", "GPT-5.2 (Auto)")
+            case "codex": return ("codex", "GPT-5.2")
+            default: return ("claude-code", request?["model"] as? String == "claude-sonnet-5-5" ? "Sonnet 5.5" : "Opus 5.5")
+            }
         }
 
         func spacesJSON() -> Data {
@@ -360,8 +407,8 @@ enum BotSpacesDemo {
                         "forkedFrom": conversation.parent.map { ["threadId": $0.threadId, "messageId": $0.messageId, "title": $0.title] } ?? NSNull(),
                         "projectId": "proj_personal", "updatedAt": conversation.at, "latest": conversation.latest, "running": conversation.running,
                         "needsYou": conversation.needs.map { ["reason": $0, "at": now - 30_000] } ?? NSNull(), "mirrored": false,
-                        "providerId": conversation.id == "thr_demo_interview" ? "codex" : "claude-code",
-                        "modelName": conversation.id == "thr_demo_interview" ? "GPT-5.2" : "Opus 5.5",
+                        "providerId": conversation.model?.providerId ?? (conversation.id == "thr_demo_interview" ? "codex" : "claude-code"),
+                        "modelName": conversation.model?.name ?? (conversation.id == "thr_demo_interview" ? "GPT-5.2" : "Opus 5.5"),
                     ]
                 }
                 func worker(_ id: String, _ title: String, _ status: String, owner: (String, String), ago: Double) -> [String: Any] {
@@ -395,6 +442,7 @@ enum BotSpacesDemo {
             if method == "POST", path.hasPrefix(rpc) {
                 return studio(String(path.dropFirst(rpc.count)), input)
             }
+            if method == "GET", let answer = Self.composerOptions(path) { return json(answer) }
             let prefix = "/api/v1/threads/"
             guard path.hasPrefix(prefix) else { return nil }
             let rest = path.dropFirst(prefix.count).split(separator: "?").first.map(String.init) ?? ""
@@ -473,16 +521,21 @@ enum BotSpacesDemo {
             case "bot_conversation_start":
                 let request = input["request"] as? [String: Any]
                 let text = ((request?["input"] as? [[String: Any]])?.first?["text"] as? String) ?? "New conversation"
+                let model = Self.startedModel(request)
                 return lock.withLock {
                     made += 1
                     let id = "thr_demo_new\(made)"
                     let title = String(text.prefix(40))
                     threads[id] = Thread(title: title, rows: [Self.row("\(id)-u", "user", text, Self.now, seq: 1)])
+                    startedModels[id] = model
                     conversations[input["botId"] as? String ?? "bot_juniper", default: []].insert(
-                        Conversation(id: id, title: title, at: Self.now, latest: text), at: 1)
-                    return ok(["threadId": id, "projectId": "proj_personal"])
+                        Conversation(id: id, title: title, at: Self.now, latest: text, model: model), at: 1)
+                    return ok(["threadId": id, "projectId": request?["projectId"] as? String ?? "proj_personal"])
                 }
             case "thread_model":
+                if let started = lock.withLock({ startedModels[threadId] }) {
+                    return ok(["model": ["providerId": started.providerId, "model": started.providerId, "reasoningLevel": "high", "modelName": started.name]])
+                }
                 return ok(["model": ["providerId": "claude-code", "model": "claude-opus-5-5", "reasoningLevel": "high", "modelName": "Opus 5.5"]])
             case "bot_finish":
                 return lock.withLock {
@@ -715,7 +768,12 @@ enum BotSpacesDemo {
                     }
                 }
             case "bot_get":
-                return ok(["bot": ["defaultModel": ["providerId": "claude-code", "model": "claude-opus-5-5", "reasoningLevel": "high"]]])
+                // Home's default is Auto (the model router); Research names none, so it starts on the project's defaults.
+                switch input["botId"] as? String {
+                case "bot_home": return ok(["bot": ["defaultModel": ["providerId": "auto", "model": "auto", "reasoningLevel": NSNull()]]])
+                case "bot_research": return ok(["bot": ["defaultModel": NSNull()]])
+                default: return ok(["bot": ["defaultModel": ["providerId": "claude-code", "model": "claude-opus-5-5", "reasoningLevel": "high"]]])
+                }
             default:
                 return nil
             }

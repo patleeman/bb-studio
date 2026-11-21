@@ -161,6 +161,7 @@ struct RoomPlaceSheet: View {
     var home = false
     var shown: String? = nil
     var settings: (() -> Void)? = nil
+    var switchBot: ((String, String?) -> Void)? = nil
     @State private var ownPath: [Route] = []
     @EnvironmentObject private var app: AppModel
     @Environment(\.look) private var look
@@ -205,7 +206,7 @@ struct RoomPlaceSheet: View {
             RoomConversations(bot: bot, store: store, mainThreadId: mainThreadId, open: open,
                               started: startedConversation, closeToRoom: closeToRoom,
                               home: home, shown: shown ?? mainThreadId, settings: settings,
-                              placeView: { AnyView(content(for: $0)) })
+                              placeView: { AnyView(content(for: $0)) }, switchBot: switchBot)
         }
     }
 }
@@ -221,6 +222,8 @@ struct RoomConversations: View {
     var shown: String? = nil
     var settings: (() -> Void)? = nil
     var placeView: ((RoomPlace) -> AnyView)? = nil
+    /// Another Bot from the header's menu (the home's list); with a conversation, that Bot opens on it.
+    var switchBot: ((String, String?) -> Void)? = nil
     @EnvironmentObject private var app: AppModel
     @State private var starting = false
     @State private var removed: Set<String> = []
@@ -237,10 +240,19 @@ struct RoomConversations: View {
         let nests = BotWorkerNests.make(conversations: lines.map(\.threadId), workers: view?.workers ?? [])
         List {
             if home {
-                Section { RoomListHeader(bot: bot, view: view, refresh: { await store.refresh() }) }
+                Section { RoomListHeader(bot: bot, view: view, refresh: { await store.refresh() }, switchBot: switchBot.map { pick in { pick($0, nil) } }) }
                     .listRowBackground(Color.clear)
             }
             Section {
+                Button { starting = true } label: {
+                    Label("New conversation", systemImage: "plus.circle.fill")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(look.accent)
+                        .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityIdentifier("roomNewConversationRow")
                 ForEach(lines) { line in
                     let nest = nests.nests[line.threadId]
                     HStack(spacing: 8) {
@@ -314,10 +326,16 @@ struct RoomConversations: View {
             Text(ConversationFinish.deleteMessage)
         }
         .sheet(isPresented: $starting) {
-            NewConversationSheet(botName: bot.name) { text in
-                let id = try await BotShell.startConversation(text, bot: bot, view: view, client: app.client)
-                await store.refresh()
-                started(id)
+            NewThreadView(botId: bot.id) { id, botId in
+                Task {
+                    // Another Bot's list loads first, so its room opens on the new conversation.
+                    if let botId, botId != bot.id { store.watch(botId, fetch: false) }
+                    await store.refresh()
+                    guard let botId else { return open(.worker(id)) }
+                    guard botId != bot.id, let switchBot else { return started(id) }
+                    RoomHome.remember(id, botId: botId)
+                    switchBot(botId, id)
+                }
             }
         }
     }

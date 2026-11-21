@@ -84,7 +84,11 @@ final class RoomComposerBandUITests: ServerIsolatedUITestCase {
         steps.append("\(when): \(shown) lines shown")
         let budget = Self.bandBudget + CGFloat(shown - 1) * Self.lineAllowance
         if height > budget { failures.append(String(format: "%@: the band is %.0f pt, over the %.0f pt budget", when, height, budget)) }
-        if jump {
+        // The folded Duo's ↓ is on its rail (NewConversationUITests), which has no room for it under ⋯ with the keyboard up:
+        // it hides while you type, and never sits beside the composer.
+        if jump && duo {
+            if app.buttons["jumpToLatest"].exists { failures.append("\(when): the ↓ shows beside the composer with the keyboard up") }
+        } else if jump {
             let button = app.buttons["jumpToLatest"]
             guard let pill = rect(transcript["pill"]) ?? (button.exists ? button.frame : nil) else { return failures.append("\(when): the ↓ didn't show") }
             if pill.maxY < stack.minY - 0.5 && band.minY < stack.minY - 0.5 {

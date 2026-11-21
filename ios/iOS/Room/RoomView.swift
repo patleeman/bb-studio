@@ -77,6 +77,8 @@ struct RoomView: View {
     @State private var presenceSize: CGFloat = 0
     @State private var presenceFrame: CGRect = .zero
     @State private var switching = false
+    /// The unfolded Duo's + New conversation, from the context pane.
+    @State private var startingConversation = false
     @State private var settingsOpen = false
     @Environment(\.look) private var look
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
@@ -135,6 +137,16 @@ struct RoomView: View {
     var body: some View {
         lifecycle(polling(routing(canvas)))
             .modifier(TalkLifecycle(talk: session.talk))
+            .sheet(isPresented: $startingConversation) {
+                NewThreadView(botId: bot.id) { id, botId in
+                    Task {
+                        if let botId, botId != bot.id { store.watch(botId, fetch: false) }
+                        await store.refresh()
+                        guard let botId else { return openItem(.worker(id)) }
+                        if botId == bot.id { openItem(.conversation(id)) } else { switchTo(botId, opening: id) }
+                    }
+                }
+            }
     }
 
     private var canvas: some View {
@@ -336,7 +348,7 @@ struct RoomView: View {
                            home: room.home, shown: pager.shown, settings: {
                                room.handle(.closePlace)
                                openSettings()
-                           })
+                           }, switchBot: { botId, conversation in switchTo(botId, opening: conversation) })
                 .presentationDetents([.height(max(320, proxy.size.height + proxy.safeAreaInsets.bottom - RoomPlaceSheet.sliver))])
                 .presentationCornerRadius(14)
                 .presentationDragIndicator(.visible)
@@ -356,7 +368,9 @@ struct RoomView: View {
                                         },
                                         openThread: { id in shell.detailPath = [.thread(id: id)] },
                                         openPlace: { room.showPlace($0) }, settings: openSettings,
-                                        refresh: { [store] in await store.refresh() })
+                                        refresh: { [store] in await store.refresh() },
+                                        switchBot: { switchTo($0, opening: nil) },
+                                        newConversation: { startingConversation = true })
                     } else {
                         stage(proxy, menuButton: false)
                         if room.showsMenu { menu(closeInColumn: true) }
@@ -642,6 +656,17 @@ struct RoomView: View {
                                 look: look, size: presenceSize, scale: displayScale, custom: PresenceCatalog.shared.entry(next.presence?.form))
         spec.room = PresenceSpec.roomHeadroom
         _ = await PresenceStills.shared.still(spec)
+    }
+
+    /// Another Bot from the list's header (or a conversation just started with it): its room, on that conversation or its Main.
+    private func switchTo(_ botId: String, opening conversation: String?) {
+        guard botId != bot.id else { return }
+        if room.place != nil { room.handle(.closePlace) }
+        shell.botToast = store.spaces?.bots.first { $0.id == botId }?.name
+        withAnimation(.easeInOut(duration: reduceMotion ? 0.25 : 0.4)) {
+            shell.show(botId, store: store, compact: false)
+            if let conversation { shell.openConversation(conversation) }
+        }
     }
 
     private func switchBot(_ step: Int) {

@@ -235,69 +235,6 @@ struct WorkersLineView: View {
     }
 }
 
-struct NewConversationSheet: View {
-    let botName: String
-    let start: (String) async throws -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var text = ""
-    @State private var starting = false
-    @State private var error: String?
-    @FocusState private var focused: Bool
-
-    private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 12) {
-                TextField("Message \(botName)", text: $text, axis: .vertical)
-                    .lineLimit(3...10)
-                    .focused($focused)
-                    .padding(12)
-                    .background(.fill.tertiary, in: .rect(cornerRadius: 18))
-                    .accessibilityIdentifier("newConversationField")
-                if let error {
-                    Text(error).font(.footnote).foregroundStyle(.red)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(16)
-            .navigationTitle("New conversation")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    if starting {
-                        ProgressView()
-                    } else {
-                        Button("Start") { run() }
-                            .disabled(trimmed.isEmpty)
-                            .keyboardShortcut(.return, modifiers: .command)
-                            .accessibilityIdentifier("newConversationStart")
-                    }
-                }
-            }
-            .onAppear { focused = true }
-        }
-        .presentationDetents([.medium, .large])
-    }
-
-    private func run() {
-        let message = trimmed
-        guard !message.isEmpty else { return }
-        starting = true
-        error = nil
-        Task {
-            do {
-                try await start(message)
-                dismiss()
-            } catch {
-                self.error = error.localizedDescription
-            }
-            starting = false
-        }
-    }
-}
-
 struct WorkerTitle: View {
     let info: WorkerInfo
 

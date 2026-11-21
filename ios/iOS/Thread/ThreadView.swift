@@ -1445,7 +1445,7 @@ struct ThreadView: View {
             .modifier(BotComposerGlass(active: true))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("workerAsk")
-            .modifier(InlineJump(state: jumpState) { transcriptV2.jumpToLatest() })
+            .modifier(InlineJump(state: jumpInRail ? nil : jumpState) { transcriptV2.jumpToLatest() })
         }
         .modifier(TalkDraft(talk: talk, draft: $draftText.value, typed: $talkTyped))
         .onChange(of: draft) { _, _ in draftText.saveSoon(saveDraftLocally) }
@@ -1873,7 +1873,7 @@ struct ThreadView: View {
             .modifier(BotComposerGlass(active: true))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("threadComposer")
-            .modifier(InlineJump(state: jumpState) { transcriptV2.jumpToLatest() })
+            .modifier(InlineJump(state: jumpInRail ? nil : jumpState) { transcriptV2.jumpToLatest() })
         }
         .animation(.smooth(duration: 0.25), value: model.interactions.first?.id)
         // Kept with the draft text, for when the thread opens again.
@@ -2204,8 +2204,27 @@ extension ThreadView {
                 FoldedBackButton()
             }
             threadActions
+            // The ↓ joins the rail's round buttons, so it never narrows the composer. With the
+            // keyboard up the rail has no room under ⋯; sending jumps to the end anyway.
+            if jumpState.shown && !composerFocused {
+                Button { transcriptV2.jumpToLatest() } label: {
+                    Label(jumpState.note.map { "Jump to latest, \($0)" } ?? (jumpState.unseen > 0 ? "Jump to latest, new messages" : "Jump to latest"),
+                          systemImage: jumpState.note != nil ? "questionmark.bubble" : "arrow.down")
+                }
+                .overlay(alignment: .topTrailing) {
+                    if jumpState.unseen > 0, jumpState.note == nil {
+                        Circle().fill(look.accent).frame(width: 9, height: 9).offset(x: -6, y: 6).allowsHitTesting(false)
+                    }
+                }
+                .tint(jumpState.note != nil ? .orange : nil)
+                .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                .accessibilityIdentifier("jumpToLatest")
+            }
         }
     }
+
+    /// The folded Duo's rail is drawn: the ↓ is one of its buttons, not beside the composer.
+    fileprivate var jumpInRail: Bool { compactHeader && botChrome == nil && !lying }
 
     private var transcriptV2Body: some View {
         TranscriptContainer(
