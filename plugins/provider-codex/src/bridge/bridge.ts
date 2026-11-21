@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { forkNoteCodexVersion } from "../defer-loading.fork.js";
 import { failFastOnAuthError } from "./auth-fail-fast.fork.js";
 import { forkCodexSessionOptions } from "../computer-use.fork.js";
 
@@ -1152,6 +1153,7 @@ async function initializeChild(
   const version = versionFrom(
     result.userAgent?.match(/^[^/\s]+\/(\S+)/)?.[1] ?? null,
   );
+  forkNoteCodexVersion(version);
   return version !== null && compareVersions(version, "0.145.0") >= 0;
 }
 
