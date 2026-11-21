@@ -92,6 +92,12 @@ describe("a lean session finds and runs tools through search", () => {
     expect(bad).toMatch(/pages_create can't take that/);
   });
 
+  it("also reaches a loaded tool, flagged as loaded", async () => {
+    configure(context("thr_worker_acp", "acp-opencode", "glm", { metadata: {} }));
+    const found = JSON.parse(await run("studio_tool_search", { query: "strand" }, thread)) as { tools: { id: string; loaded?: boolean }[] };
+    expect(found.tools.find((tool) => tool.id === "strand_note")).toMatchObject({ loaded: true });
+  });
+
   it("refuses a tool the thread's kind doesn't have", async () => {
     configure(context("thr_runner_like", "acp-opencode", "inkling-local/x", { title: "Studio Decisions · x" }));
     expect(await run("studio_tool_call", { id: "pages_create", args: { title: "x" } }, "thr_runner_like")).toMatch(/isn't available/);

@@ -46,18 +46,21 @@ export function registerScopedTools(bb: Registrar, deps: {
   recompute(threadId: string, projectId: string | undefined): Scope | null;
 }): void {
   const scopeOf = (ctx: ToolCtx): Scope | null => (ctx.threadId ? deps.scopes.get(ctx.threadId) ?? deps.recompute(ctx.threadId, ctx.projectId) : null);
-  const onDemand = (scope: Scope | null): string[] => (scope ? scope.onDemand.filter((name) => deps.book.get(name)) : []);
+  // The trio reaches the on-demand tools and, for an agent that searches anyway, the loaded ones.
+  const reachable = (scope: Scope | null): string[] => (scope ? [...scope.onDemand, ...scope.loaded].filter((name) => !name.startsWith("studio_tool_") && !name.startsWith("tool_gateway_") && deps.book.get(name)) : []);
   const error = (message: string) => JSON.stringify({ error: message });
 
   bb.agents.registerTool({
     name: "studio_tool_search",
-    description: "Find tools this thread can use on demand: Studio's (pages, memory, designs, apps, recordings…) and, when on, your MCP servers'. Returns id, name and a one-line summary; empty query lists all. Next: studio_tool_describe, then studio_tool_call.",
+    description: "Find tools this thread can use: Studio's (pages, memory, designs, apps, recordings…) and, when on, your MCP servers'. Returns id, name and a one-line summary (loaded: true when you can also call it directly); empty query lists all. Next: studio_tool_describe, then studio_tool_call.",
     parameters: z.object({ query: z.string().max(500).optional().describe("Words to match; empty lists every tool") }),
     presentation: { label: { pending: "Finding tools", completed: "Found tools" } },
     execute: async (input: { query?: string }, ctx: ToolCtx) => {
       const scope = scopeOf(ctx);
-      const names = onDemand(scope);
-      const tools: unknown[] = searchScoped(names.map((name) => deps.book.get(name)!).map((tool) => ({ name: tool.name, description: tool.description })), input.query);
+      const names = reachable(scope);
+      const loaded = new Set(scope?.loaded ?? []);
+      const tools: unknown[] = searchScoped(names.map((name) => deps.book.get(name)!).map((tool) => ({ name: tool.name, description: tool.description })), input.query)
+        .map((hit) => (loaded.has(hit.id) ? { ...hit, loaded: true } : hit));
       let total = names.length;
       if (scope?.gateway) {
         const found = parse(await deps.book.run("tool_gateway_search", { query: input.query, limit: 25 }, ctx));
@@ -76,7 +79,7 @@ export function registerScopedTools(bb: Registrar, deps: {
     presentation: { label: { pending: "Reading tool schemas", completed: "Read tool schemas" } },
     execute: async (input: { ids: string[] }, ctx: ToolCtx) => {
       const scope = scopeOf(ctx);
-      const allowed = new Set(onDemand(scope));
+      const allowed = new Set(reachable(scope));
       const tools: unknown[] = input.ids.filter((id) => allowed.has(id)).map((id) => {
         const tool = deps.book.get(id)!;
         return { id, name: id, description: tool.description, inputSchema: deps.schemaFor(id) };
@@ -100,7 +103,7 @@ export function registerScopedTools(bb: Registrar, deps: {
     execute: async (input: { id: string; args?: Record<string, unknown> }, ctx: ToolCtx) => {
       const scope = scopeOf(ctx);
       if (scope?.gateway && GATEWAY_ID.test(input.id)) return await deps.book.run("tool_gateway_call", { id: input.id, args: input.args ?? {} }, ctx);
-      if (!onDemand(scope).includes(input.id)) return error(`${input.id} isn't available in this thread. Search with studio_tool_search.`);
+      if (!reachable(scope).includes(input.id)) return error(`${input.id} isn't available in this thread. Search with studio_tool_search.`);
       return await deps.book.run(input.id, input.args ?? {}, ctx, input.id);
     },
   } as never);
