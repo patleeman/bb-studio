@@ -249,7 +249,8 @@ describe("the tokens", () => {
     expect(PROMPT_CARD_LINES).toContain(':is([class~="border-b"], [class~="border-t"], [class~="border"]:not(button, input, textarea, [role="radio"], [role="checkbox"]))');
     expect(THEME_CSS).toContain(`${GLASS_CHIPS} { border-color: transparent; background-color: color-mix(in oklab, var(--ink) 14%, transparent); }`);
     expect(GLASS_CHIPS).toContain("[data-promptbox-expanded-only] .rounded-full.border");
-    expect(GLASS_CHIPS).toContain('[data-testid="conversation-workers"] button');
+    // No worker chips above the composer any more: the strands box shows the workers.
+    expect(GLASS_CHIPS).not.toContain("conversation-workers");
     expect(THEME_CSS).toContain(`${GLASS_CHIPS}:hover { background-color: color-mix(in oklab, var(--ink) 20%, transparent); }`);
     expect(THEME_CSS).toContain(`${CLASSIC_FOOTER} { background: var(--canvas); }`);
     expect(CLASSIC_FOOTER).toBe('html[data-studio-theme]:not([data-studio-glass]) [data-sidebar="inset"] [data-scroll-footer] > div');

@@ -19,11 +19,12 @@ const LIST: StrandList = {
     view("s_doc", "Blood pressure log", { state: "needs-you", asks: [approval("int_1", "Approve: npm publish")] }),
     view("s_pr", "bb-plugins PR #15", { state: "needs-you", asks: [{ id: "int_2", kind: "question", threadId: "thr_worker", label: "PR fix: Which branch?", details: [], turnId: null, decisions: [] }] }),
     view("s_hvac", "Furnace tune-up", { state: "needs-you", detail: "Router fix needs you" }),
-    view("s_cx", "CodexBar quota", { state: "running", detail: "codexbar-fix", summary: "Moving the quota read to the new usage endpoint.", latestSeq: 40, messages: 4, workers: [{ threadId: "thr_w", title: "codexbar-fix tests", status: "running" }] }),
+    view("s_cx", "CodexBar quota", { state: "running", detail: "codexbar-fix", summary: "Moving the quota read to the new usage endpoint.", latestSeq: 40, messages: 4, workers: [{ threadId: "thr_w", title: "codexbar-fix tests", status: "running", endedAt: null }] }),
     view("s_red4", "red4 mitigation", { state: "waiting", detail: "Unraid's fix" }),
     view("s_macos", "macOS update", { state: "quiet", lastAt: NOW - 2 * 24 * 60 * MIN }),
   ],
   earlier: [view("s_old", "Old trip", { state: "quiet", lastAt: NOW - 9 * 24 * 60 * MIN })],
+  strayWorkers: [],
 };
 const TAGS: Tags = {
   tags: [
@@ -229,6 +230,79 @@ describe("the strands box above a conversation's composer", () => {
     key(document.activeElement!, "End");
     expect(document.activeElement?.getAttribute("data-strand-option")).toBe("all");
   });
+
+  it("shows a strand's workers on its row: a running count, then each one (running, waiting on you, failed, finished); old finished ones drop off", () => {
+    const now = Date.now();
+    state.list = { ...LIST, strands: [
+      view("s_cx", "CodexBar quota", { state: "running", detail: "codexbar docs, codexbar build", summary: "Moving the quota read to the new usage endpoint.", workers: [
+        { threadId: "thr_w1", title: "codexbar-fix tests", status: "done", endedAt: now - 10 * MIN },
+        { threadId: "thr_w2", title: "codexbar lint", status: "failed", endedAt: now - 30 * MIN },
+        { threadId: "thr_w3", title: "codexbar spike", status: "done", endedAt: now - 3 * 24 * 60 * MIN },
+        { threadId: "thr_w4", title: "codexbar docs", status: "running", endedAt: null },
+        { threadId: "thr_w5", title: "codexbar build", status: "running", endedAt: null },
+      ] }),
+    ] };
+    render(<StrandsBoxBanner />);
+    click(container.querySelector("[data-strands-line]"));
+    const row = box()!.querySelector('[data-strand-row="s_cx"]')!;
+    expect(text(row.querySelector("[data-strand-running]"))).toBe("2 running");
+    const workers = [...row.querySelectorAll<HTMLElement>("[data-strand-worker]")];
+    expect(workers.map((worker) => [worker.dataset.strandWorker, worker.dataset.status, text(worker)])).toEqual([
+      ["thr_w4", "running", "codexbar docsrunning"],
+      ["thr_w5", "running", "codexbar buildrunning"],
+      ["thr_w2", "failed", "codexbar lintfailed"],
+      ["thr_w1", "done", "codexbar-fix testsfinished"],
+    ]);
+    // The row says what the strand is about, not its workers' names again.
+    expect(text(row)).toContain("Moving the quota read to the new usage endpoint.");
+    expect(text(row)).not.toContain("codexbar docs, codexbar build");
+    expect(row.querySelector(".text-warning, .bg-warning, .text-destructive, .text-success")).toBeNull();
+  });
+
+  it("marks a worker waiting on you in amber on its strand's row", () => {
+    state.list = { ...LIST, strands: [view("s_cx", "CodexBar quota", { state: "needs-you", detail: "Router fix needs you", workers: [{ threadId: "thr_w", title: "Router fix", status: "needs-you", endedAt: null }] })] };
+    render(<StrandsBoxBanner />);
+    click(container.querySelector("[data-strands-line]"));
+    const worker = box()!.querySelector<HTMLElement>('[data-strand-worker="thr_w"]')!;
+    expect(text(worker)).toBe("Router fixneeds you");
+    expect(worker.querySelector(".text-warning, .bg-warning")).not.toBeNull();
+  });
+
+  it("counts workers no strand holds in the line and lists them under \"In no strand\"; a failed one is \"1 failed\", and a row opens its worker", async () => {
+    const now = Date.now();
+    state.list = { ...LIST, strayWorkers: [
+      { threadId: "thr_ask", title: "Mail sort", status: "needs-you", endedAt: null },
+      { threadId: "thr_run", title: "Photo import", status: "running", endedAt: null },
+      { threadId: "thr_lost", title: "Router probe", status: "failed", endedAt: now - 20 * MIN },
+    ] };
+    render(<StrandsBoxBanner />);
+    const header = text(box());
+    expect(header).toContain("4 need you");
+    expect(header).toContain("2 running");
+    expect(text(container.querySelector("[data-strands-failed]"))).toBe("1 failed");
+    click(container.querySelector("[data-strands-failed]"));
+    const stray = box()!.querySelector("[data-strands-stray]")!;
+    expect(stray.getAttribute("aria-label")).toBe("In no strand");
+    expect([...stray.querySelectorAll<HTMLElement>("[data-strand-worker]")].map((worker) => worker.dataset.status)).toEqual(["needs-you", "running", "failed"]);
+    // Typing narrows it like the strands.
+    const input = box()!.querySelector<HTMLInputElement>("[data-strand-query]")!;
+    await typeInto(input, "zzz");
+    expect(box()!.querySelector("[data-strands-stray]")).toBeNull();
+    await typeInto(input, "router");
+    click(box()!.querySelector('[data-strand-option="worker:thr_lost"]'));
+    expect(state.toThread).toHaveBeenCalledWith("thr_lost");
+    expect(box()!.querySelector('[data-testid="strands-menu"]')).toBeNull();
+  });
+
+  it("shows the box for stray workers alone, with no strands; none, no box", () => {
+    state.list = { ...LIST, strands: [], earlier: [], strayWorkers: [{ threadId: "thr_run", title: "Photo import", status: "running", endedAt: null }] };
+    render(<StrandsBoxBanner />);
+    expect(text(box())).toContain("Strands");
+    expect(text(box())).toContain("1 running");
+    state.list = { ...LIST, strands: [], earlier: [], strayWorkers: [] };
+    render(<StrandsBoxBanner />);
+    expect(container.innerHTML).toBe("");
+  });
 });
 
 describe("the tag above each message", () => {
@@ -387,6 +461,16 @@ describe("the strands overview", () => {
 });
 
 describe("the Strands tab", () => {
+  it("lists a strand's finished and failed workers on its card", () => {
+    state.list = { ...LIST, strands: [view("s_cx", "CodexBar quota", { state: "done-unseen", workers: [
+      { threadId: "thr_w1", title: "codexbar-fix tests", status: "done", endedAt: NOW - 10 * MIN },
+      { threadId: "thr_w2", title: "codexbar lint", status: "failed", endedAt: NOW - 30 * MIN },
+    ] })] };
+    render(<StrandsTab threadId="thr_main" environment={null} params={null} now={NOW} />);
+    const items = [...container.querySelectorAll('[data-strand-row="s_cx"] [aria-label="Workers"] li')].map(text);
+    expect(items).toEqual(["codexbar-fix testsfinished", "codexbar lintfailed"]);
+  });
+
   it("shows each strand as a card: name, summary, state, messages, first and last activity, workers, and its ask; a card filters", () => {
     render(<StrandsTab threadId="thr_main" environment={null} params={null} now={NOW} />);
     const groups = [...container.querySelectorAll("section")].map((section) => section.getAttribute("aria-label"));

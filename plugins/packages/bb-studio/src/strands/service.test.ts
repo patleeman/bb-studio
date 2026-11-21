@@ -112,6 +112,36 @@ describe("strands.list", () => {
     expect(x.svc.items(x.thread.id, 10).find((item) => item.kind === "worker")).toMatchObject({ ref: "thr_worker", by: "inherit" });
   });
 
+  it("keeps workers that no strand holds for the box (running, or failed in the last 7 days); one in a strand stays on the strand, with when it ended", async () => {
+    const workers: WorkerFact[] = [];
+    const x = service({ workers });
+    await x.svc.idle(x.thread.id);
+    // Before any strand: nothing to join.
+    workers.push(
+      { threadId: "thr_lost", title: "Router probe", status: "failed", createdAt: NOW - 30 * HOUR, endedAt: NOW - 20 * HOUR },
+      { threadId: "thr_old", title: "Old probe", status: "failed", createdAt: NOW - 9 * 24 * HOUR, endedAt: NOW - 8 * 24 * HOUR },
+      { threadId: "thr_ok", title: "Lint", status: "done", createdAt: NOW - 30 * HOUR, endedAt: NOW - 20 * HOUR },
+      { threadId: "thr_run", title: "Photo import", status: "running", createdAt: NOW - 30 * HOUR, endedAt: null },
+    );
+    const alone = strandList.parse(await x.svc.list(x.thread.id));
+    expect(alone.strands).toEqual([]);
+    expect(alone.strayWorkers).toEqual([
+      { threadId: "thr_run", title: "Photo import", status: "running", endedAt: null },
+      { threadId: "thr_lost", title: "Router probe", status: "failed", endedAt: NOW - 20 * HOUR },
+    ]);
+    x.thread.turn("Look at the router", "Starting a worker.", { at: NOW - 2 * HOUR });
+    await x.svc.idle(x.thread.id);
+    workers.push({ threadId: "thr_fix", title: "Router fix", status: "failed", createdAt: NOW - 2 * HOUR + 2, endedAt: NOW - HOUR });
+    const list = strandList.parse(await x.svc.list(x.thread.id));
+    expect(list.strayWorkers.map((worker) => worker.threadId)).toEqual(["thr_run", "thr_lost"]);
+    expect(list.strands[0]!.workers).toEqual([{ threadId: "thr_fix", title: "Router fix", status: "failed", endedAt: NOW - HOUR }]);
+  });
+
+  it("answers no stray workers where strands don't run", async () => {
+    const x = service({ workers: [{ threadId: "thr_lost", title: "Router probe", status: "failed", createdAt: NOW - HOUR, endedAt: NOW - HOUR }] });
+    expect((await x.svc.list("thr_other")).strayWorkers).toEqual([]);
+  });
+
   it("lists what waits on the user in a strand: an approval with BB's choices, a worker's question", async () => {
     const workers: WorkerFact[] = [];
     const asks: Record<string, (Interaction & { createdAt?: number })[]> = {};

@@ -6,8 +6,11 @@
 // summary and an ask's buttons. Picking one applies it as a filter (a token
 // with ×; Esc clears it): BB's timeline shows only that strand's messages,
 // expanded, back to its first one (the fork's timeline filter; an older BB
-// dims the others instead), and the header steps through them. Nothing open,
-// no box. The workbench Strands tab is the full view.
+// dims the others instead), and the header steps through them. It is the
+// one box above the composer: a strand's workers (running, waiting on you,
+// finished, failed) show on its row, and workers no strand holds are counted
+// in the line and listed under "In no strand". Nothing open, no box. The
+// workbench Strands tab is the full view.
 import { experimental_useAppPanel, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
@@ -20,7 +23,7 @@ import { Icon, Tooltip, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
 import { messageLinkPath } from "../../work/ui/in-flight-model";
 import type { StrandAsk, StrandView } from "../contract";
-import { ageOf, boxGroups, countsOf, currentOf, decisionButtons, filterTurnsOf, hasOpen, seqsOf, stepSeq, stripShown } from "./model";
+import { ageOf, boxGroups, countsOf, currentOf, decisionButtons, filterTurnsOf, hasOpen, rowWorkersOf, seqsOf, stepSeq, strayCountsOf, stripShown } from "./model";
 import { select, selectionOf, setStrandTurns, useSelection } from "./selection";
 
 export const STRANDS_TAB = "strands";
@@ -59,8 +62,13 @@ export function useSelectStrand(threadId: string) {
 /** In flight's place: the strands box, in BB's card above the composer; nothing where strands don't run or nothing is open. */
 export function StrandsBoxBanner() {
   const threadId = useComposerThread();
-  const list = useLive("strands.list", { threadId: threadId ?? "" }, { enabled: !!threadId, pollMs: STRANDS_POLL_MS });
-  if (!threadId || !stripShown(list.data)) return null;
+  return threadId ? <StrandsBoxFor threadId={threadId} /> : null;
+}
+
+/** The box for one conversation, where it runs and has something to show; also drawn inside a composer Studio replaces (BB draws no banners there). */
+export function StrandsBoxFor({ threadId }: { threadId: string }) {
+  const list = useLive("strands.list", { threadId }, { enabled: !!threadId, pollMs: STRANDS_POLL_MS });
+  if (!stripShown(list.data)) return null;
   return <StrandsBox threadId={threadId} />;
 }
 
@@ -125,10 +133,33 @@ export function moveFocus(event: KeyboardEvent<HTMLElement>): void {
   options[next]!.focus();
 }
 
-/** One strand in the box's list: mark, name and age, its one-line summary, and an ask with its whole details and buttons. */
+const WORKER_WORD: Record<StrandView["workers"][number]["status"], string> = { running: "running", "needs-you": "needs you", done: "finished", failed: "failed" };
+
+/** A worker's mark: a spinner while it runs, amber when it waits on you, else neutral. */
+function WorkerMark({ status }: { status: StrandView["workers"][number]["status"] }) {
+  if (status === "running") return <span role="img" aria-label="Running" className="size-2.5 shrink-0 animate-spin rounded-full border-[1.5px] border-muted-foreground/30 border-t-muted-foreground motion-reduce:animate-none" />;
+  if (status === "needs-you") return <span role="img" aria-label="Needs you" className="size-1.5 shrink-0 rounded-full bg-warning" />;
+  return <Icon name={status === "failed" ? "X" : "Check"} aria-label={status === "failed" ? "Failed" : "Finished"} className="size-3 shrink-0" />;
+}
+
+/** One worker on a strand's row: its mark, title and state. */
+function WorkerLine({ worker }: { worker: StrandView["workers"][number] }) {
+  return (
+    <span data-strand-worker={worker.threadId} data-status={worker.status} className="flex min-w-0 items-center gap-1.5 text-[11.5px] text-muted-foreground">
+      <span className="grid w-3 shrink-0 place-items-center"><WorkerMark status={worker.status} /></span>
+      <span className="min-w-0 truncate text-foreground/80">{worker.title}</span>
+      <span className={cn("shrink-0", worker.status === "needs-you" && "text-warning")}>{WORKER_WORD[worker.status]}</span>
+    </span>
+  );
+}
+
+/** One strand in the box's list: mark, name, its running workers and age, its one-line summary, its workers, and an ask with its whole details and buttons. */
 function StrandOption({ strand, threadId, active, now, onPick }: { strand: StrandView; threadId: string; active: boolean; now: number; onPick(): void }) {
   const ask = strand.state === "needs-you" ? strand.asks[0] ?? null : null;
-  const about = ask ? null : strand.detail ?? strand.summary;
+  const workers = rowWorkersOf(strand, now);
+  const running = workers.filter((worker) => worker.status === "running").length;
+  // Where the state's detail only names its workers, their lines say it: the row says what the strand is about.
+  const about = ask ? null : workers.length && strand.state !== "waiting" ? strand.summary : strand.detail ?? strand.summary;
   return (
     <li data-strand-row={strand.id} className={cn("rounded-md", active && "bg-accent")}>
       <button type="button" data-strand-option={strand.id} data-needs-you={strand.state === "needs-you" ? "" : undefined} aria-current={active || undefined} onClick={onPick}
@@ -136,9 +167,11 @@ function StrandOption({ strand, threadId, active, now, onPick }: { strand: Stran
         <span className="flex w-full items-center gap-2 text-[12.5px]">
           <span className="grid w-3 shrink-0 place-items-center">{strand.state === "quiet" ? null : <StateMark strand={strand} now={now} />}</span>
           <span className={cn("min-w-0 flex-1 truncate font-medium", strand.state === "quiet" && "text-muted-foreground")}>{strand.title}</span>
+          {running ? <span data-strand-running="" className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground">{running} running</span> : null}
           <span className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground/70">{ageOf(strand.lastAt, now)}</span>
         </span>
         {about ? <span className="truncate pl-5 text-[11.5px] text-muted-foreground">{about}</span> : null}
+        {workers.length ? <span className="flex flex-col gap-px pl-5" data-strand-workers="">{workers.map((worker) => <WorkerLine key={worker.threadId} worker={worker} />)}</span> : null}
       </button>
       {ask ? (
         // The whole ask before its buttons: the full command, folder, actions and session grant, never cut.
@@ -163,6 +196,7 @@ export function StrandsBox({ threadId, now = Date.now() }: { threadId: string; n
   const choose = useSelectStrand(threadId);
   const jump = useJump(threadId);
   const panel = experimental_useAppPanel();
+  const navigate = useBbNavigate();
   const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState("");
   const input = useRef<HTMLInputElement | null>(null);
@@ -202,6 +236,10 @@ export function StrandsBox({ threadId, now = Date.now() }: { threadId: string; n
   };
   const groups = boxGroups(data, query);
   const matches = groups.flatMap((group) => group.strands);
+  const needle = query.trim().toLowerCase();
+  const stray = data.strayWorkers ?? [];
+  const strayCounts = strayCountsOf(data);
+  const strayShown = needle ? stray.filter((worker) => worker.title.toLowerCase().includes(needle)) : stray;
   const pick = (strand: StrandView) => { choose(strand, true); setExpanded(false); setQuery(""); };
   const openTab = () => { setExpanded(false); if (panel) openThreadTab(panel, { actionId: STRANDS_TAB, title: "Strands" }); };
   const onInputKey = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -210,13 +248,15 @@ export function StrandsBox({ threadId, now = Date.now() }: { threadId: string; n
     else if (event.key === "ArrowDown") { event.preventDefault(); event.stopPropagation(); listRef.current?.querySelector<HTMLElement>("[data-strand-option]")?.focus(); }
     else if (event.key === "Escape") { event.preventDefault(); if (query) setQuery(""); else setExpanded(false); }
   };
-  const parts = [
-    counts.needs ? { key: "needs", text: `${counts.needs} need you`, amber: true } : null,
-    counts.running ? { key: "running", text: `${counts.running} running` } : null,
+  type Part = { key: string; text: string; amber?: boolean; opens?: boolean };
+  const parts = ([
+    counts.needs + strayCounts.needs ? { key: "needs", text: `${counts.needs + strayCounts.needs} need you`, amber: true } : null,
+    counts.running + strayCounts.running ? { key: "running", text: `${counts.running + strayCounts.running} running` } : null,
+    strayCounts.failed ? { key: "failed", text: `${strayCounts.failed} failed`, opens: true } : null,
     counts.finished ? { key: "finished", text: `${counts.finished} finished` } : null,
     counts.waiting ? { key: "waiting", text: `${counts.waiting} waiting` } : null,
     counts.quiet ? { key: "quiet", text: `${counts.quiet} quiet` } : null,
-  ].filter((part): part is { key: string; text: string; amber?: boolean } => !!part);
+  ] as (Part | null)[]).filter((part): part is Part => !!part);
   const about = current?.summary ?? current?.detail ?? null;
   return (
     <section aria-label="Strands" data-testid="strands-strip" data-expanded={expanded || undefined} className="flex flex-col text-[12px]">
@@ -253,6 +293,8 @@ export function StrandsBox({ threadId, now = Date.now() }: { threadId: string; n
                 <button type="button" data-strands-needs="" onClick={() => setExpanded(true)} className="flex cursor-pointer items-center gap-1 rounded px-0.5 font-medium text-warning hover:bg-warning/10">
                   <span aria-hidden className="size-1.5 rounded-full bg-warning" />{part.text}
                 </button>
+              ) : part.opens ? (
+                <button type="button" data-strands-failed="" onClick={() => setExpanded(true)} className="cursor-pointer rounded px-0.5 hover:bg-accent/60 hover:text-foreground">{part.text}</button>
               ) : <span>{part.text}</span>}
             </span>
           ))}
@@ -275,7 +317,23 @@ export function StrandsBox({ threadId, now = Date.now() }: { threadId: string; n
                 </ul>
               </section>
             ))}
-            {!groups.length ? <p className="px-2 py-1.5 text-muted-foreground">No strands match</p> : null}
+            {strayShown.length ? (
+              <section aria-label="In no strand" data-strands-stray="">
+                <div className="px-2 pb-0.5 pt-1.5 text-[11px] font-semibold text-muted-foreground/70">In no strand</div>
+                <ul className="flex flex-col gap-px">
+                  {strayShown.map((worker) => (
+                    <li key={worker.threadId}>
+                      <button type="button" data-strand-option={`worker:${worker.threadId}`} onClick={() => { setExpanded(false); navigate.toThread(worker.threadId); }}
+                        className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12.5px] outline-none hover:bg-accent/60 focus-visible:bg-accent/60">
+                        <WorkerLine worker={worker} />
+                        {worker.status === "failed" && worker.endedAt !== null ? <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] text-muted-foreground/70">{ageOf(worker.endedAt, now)}</span> : null}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+            {!groups.length && !strayShown.length ? <p className="px-2 py-1.5 text-muted-foreground">No strands match</p> : null}
           </div>
           <div className="flex items-center border-t border-border/60 px-1 py-1">
             <button type="button" data-strand-option="all" onClick={openTab} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-left text-[12px] text-muted-foreground outline-none hover:bg-accent/60 hover:text-foreground focus-visible:bg-accent/60">
