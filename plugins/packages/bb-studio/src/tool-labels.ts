@@ -39,6 +39,7 @@ export const TOOL_LABELS: Readonly<Record<string, Labels>> = {
   task_act: ["Updating a task", "Updated a task"],
   task_fire: ["Releasing tasks", "Released tasks"],
   task_morning: ["Reading today's tasks", "Read today's tasks"],
+  strand_note: ["Noting a strand", "Noted a strand"],
   area_update: ["Updating an area", "Updated an area"],
   area_list: ["Listing areas", "Listed areas"],
   area_get: ["Reading an area", "Read an area"],

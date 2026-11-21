@@ -389,7 +389,6 @@ public enum Studio {
     public static let work_clear = "work.clear"
     public static let areas_list = "areas.list"
     public static let areas_get = "areas.get"
-    public static let areas_itemTask = "areas.itemTask"
     public static let toolGateway_overview = "toolGateway.overview"
     public static let strands_list = "strands.list"
     public static let strands_overview = "strands.overview"
@@ -1251,8 +1250,6 @@ public enum Studio {
   public typealias AreasList = AreasListOutput
 
   public typealias AreasGet = AreasGetOutput
-
-  public typealias AreasItemTask = AreasItemTaskOutput
 
   public typealias ToolGatewayOverviewInput = StudioJSONValue
 
@@ -41890,28 +41887,6 @@ public enum Studio {
     }
   }
 
-  public struct AreasItemTaskInput: Sendable, Hashable, Codable {
-    public var area: String?
-    public var title: String?
-
-    public init(area: String? = nil, title: String? = nil) {
-      self.area = area
-      self.title = title
-    }
-  }
-
-  public struct AreasItemTaskOutput: Sendable, Hashable, Codable {
-    public var taskId: String?
-    public var title: String?
-    public var created: Bool?
-
-    public init(taskId: String? = nil, title: String? = nil, created: Bool? = nil) {
-      self.taskId = taskId
-      self.title = title
-      self.created = created
-    }
-  }
-
   public enum ToolGatewayOverviewOutputServersItemKind: Sendable, Hashable, Codable {
     case stdio
     case streamable_http
@@ -42082,6 +42057,7 @@ public enum Studio {
     case question
     case approval
     case gateway
+    case area
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
@@ -42090,6 +42066,7 @@ public enum Studio {
       case "question": self = .question
       case "approval": self = .approval
       case "gateway": self = .gateway
+      case "area": self = .area
       default: self = .unknown(value)
       }
     }
@@ -42100,6 +42077,7 @@ public enum Studio {
       case .question: try container.encode("question")
       case .approval: try container.encode("approval")
       case .gateway: try container.encode("gateway")
+      case .area: try container.encode("area")
       case .unknown(let value): try container.encode(value)
       }
     }
@@ -42311,6 +42289,7 @@ public enum Studio {
     case question
     case approval
     case gateway
+    case area
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
@@ -42319,6 +42298,7 @@ public enum Studio {
       case "question": self = .question
       case "approval": self = .approval
       case "gateway": self = .gateway
+      case "area": self = .area
       default: self = .unknown(value)
       }
     }
@@ -42329,6 +42309,7 @@ public enum Studio {
       case .question: try container.encode("question")
       case .approval: try container.encode("approval")
       case .gateway: try container.encode("gateway")
+      case .area: try container.encode("area")
       case .unknown(let value): try container.encode(value)
       }
     }
@@ -42616,6 +42597,7 @@ public enum Studio {
     case question
     case approval
     case gateway
+    case area
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
@@ -42624,6 +42606,7 @@ public enum Studio {
       case "question": self = .question
       case "approval": self = .approval
       case "gateway": self = .gateway
+      case "area": self = .area
       default: self = .unknown(value)
       }
     }
@@ -42634,6 +42617,7 @@ public enum Studio {
       case .question: try container.encode("question")
       case .approval: try container.encode("approval")
       case .gateway: try container.encode("gateway")
+      case .area: try container.encode("area")
       case .unknown(let value): try container.encode(value)
       }
     }

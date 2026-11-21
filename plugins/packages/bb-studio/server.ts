@@ -6,7 +6,7 @@ import { adoptAtStart } from "./src/tasks/migrate";
 import { asFact, linkAtStart, listThreadFacts, ThreadDirectory } from "./src/tasks/links";
 import { SpawnLinks } from "./src/tasks/spawn";
 import { AutomationTasks, readSources } from "./src/tasks/automations";
-import { Areas, leadsFrom, ownNameWords, runnersFrom, type AreaLead } from "./src/areas/areas";
+import { areaItemRef, Areas, leadsFrom, ownNameWords, runnersFrom, type AreaLead } from "./src/areas/areas";
 import { rpcErrorStatus } from "./src/kit/server/index";
 import { AreaStore } from "./src/areas/store";
 import { AREA_TOOLS, registerAreas } from "./src/areas/register";
@@ -1238,8 +1238,29 @@ export default async function plugin(bb: BbPluginApi) {
       WHERE bot_id = ? AND source_kind = 'conversation' AND topic = ? AND replaced_by_id IS NULL AND archived = 0 AND source_id IS NOT NULL
       ORDER BY created_at ASC`).all(botId, FINISH_TOPIC) as { source_id: string; text: string }[]).map((row) => [row.source_id, row.text])),
   });
+  // Areas' items that need the user, by the conversation their area reports into: a lead's own
+  // conversation; a runner's, or the Bot's, the Main. Read at most every 15 seconds.
+  let areaAskCache: { at: number; byThread: Map<string, { id: string; label: string; at: number }[]> } | null = null;
+  const areaAsks = (threadId: string) => {
+    if (!areaAskCache || Date.now() - areaAskCache.at > 15_000) {
+      const byThread = new Map<string, { id: string; label: string; at: number }[]>();
+      const primaryMain = (bots.list().find((bot) => bot.primary) ?? bots.list()[0])?.threadId ?? null;
+      const list = areaLeadsRead ? taskStep("areas for strands", () => areas.list()) ?? [] : [];
+      for (const area of list) {
+        const home = area.owner.kind === "lead" ? area.owner.thread : area.owner.kind === "bot" ? bots.stored(area.owner.botId)?.threadId ?? null : primaryMain;
+        if (!home) continue;
+        const at = Math.max(area.lastRun ?? 0, area.updatedAt);
+        const asks = area.open.filter((item) => item.needsUser).map((item) => ({ id: `area:${areaItemRef(area.id, item.title)}`, label: `${area.name}: ${item.title}`, at }));
+        if (asks.length) byThread.set(home, [...(byThread.get(home) ?? []), ...asks]);
+      }
+      areaAskCache = { at: Date.now(), byThread };
+    }
+    return areaAskCache.byThread.get(threadId) ?? [];
+  };
   // Strands (src/strands): each turn of a Bot's conversations sorted into a line of work, with live states.
   const strands = registerStrands(bb, db, {
+    areaAsks,
+    conversationOfWorker: (threadId) => { const rec = botThreads.store.get(threadId); return rec?.kind === "worker" ? rec.ownerConversationId : null; },
     decisions: decisions.ask,
     conversation: (threadId) => {
       const rec = botThreads.store.get(threadId);

@@ -66,11 +66,13 @@ describe("the needs-you push", () => {
     expect(h.sent.map((push) => [push.body, push.threadId, push.conversationId])).toEqual([["Release worker needs you", "thr_lead", "thr_lead"], ["Merge the PR?", "thr_lead", "thr_lead"]]);
   });
 
-  it("leaves an ask BB pushes itself, or one in a turn another thread started, to that", async () => {
+  it("leaves an ask BB pushes itself, or a question in a turn another thread started, to that; a gateway request and an area's item always push", async () => {
     const decide = { bbPushesAsks: async (threadId: string) => threadId === "thr_visible", startedByAnotherThread: async (threadId: string) => threadId === "thr_main" };
     expect(await pushFor(strand("s1", "needs-you", [ask("thr_visible")]), { threadId: "thr_visible", title: "A" }, decide)).toBeNull();
     expect(await pushFor(strand("s1", "needs-you", [ask("thr_main")]), { threadId: "thr_main", title: "Main" }, decide)).toBeNull();
     expect(await pushFor(strand("s1", "needs-you", [ask("thr_main", "gateway")]), { threadId: "thr_main", title: "Main" }, decide)).toEqual({ body: "Merge the PR?", threadId: "thr_main" });
+    // An area's item that needs the user arrives in a runner's report, which another thread started: it still pushes.
+    expect(await pushFor(strand("s1", "needs-you", [ask("thr_main", "area")]), { threadId: "thr_main", title: "Main" }, decide)).toEqual({ body: "Merge the PR?", threadId: "thr_main" });
     expect(await pushFor(strand("s1", "needs-you", [ask("thr_worker")]), { threadId: "thr_main", title: "Main" }, decide)).toEqual({ body: "Merge the PR?", threadId: "thr_main" });
   });
 
