@@ -1579,14 +1579,23 @@ page (`settingsSections`) leaves the Settings list, the command palette and
 settings search and its address goes to General, and a hidden footer item
 (`footer`, by its preference key: `builtin:<id>` or
 `plugin:<pluginId>/<itemId>`) leaves the footer, its More menu and
-Customize. `promptStack: ["active-child-threads"]` takes the running
-children out of the Active child threads card above a thread's composer; a
-child waiting on the user still shows there with its question, and with
-none waiting the card is not drawn. Registrations add up across plugins. BB Studio hides the Skills
+Customize. `promptStack` hides parts of the stack above every thread's
+composer, `promptStackFor` (`{ get(threadId), subscribe(listener) }`) above
+some threads' composers: `"active-child-threads"` takes the running children
+out of the Active child threads card (a child waiting on the user still
+shows there with its question; with none waiting the card is not drawn), and
+`"thread-context"` takes away the thread context row (the parent thread,
+changed files, the pull request) while an archived thread's or removed
+workspace's row, with Unarchive or Restore, stays. The runtime component
+`experimental_ThreadContextSegments({ threadId, projectId, environment })`
+draws that row, with the same segments, actions and details, where the plugin
+puts it. Registrations add up across plugins. BB Studio hides the Skills
 row, the Skills page, General's "bb CLI skills", the Mobile page (bb's
 TestFlight and APK downloads; the server address stays in Machines), bb's
-Mobile apps and Report a bug footer items and Provider usage's footer item,
-and the Active child threads list (its strands box shows the workers).
+Mobile apps and Report a bug footer items and Provider usage's footer item;
+in a Bot conversation where its strands box shows, the running children (the
+box shows the workers); and in a Bot conversation, the thread context row,
+which it draws in the conversation's Info tab instead.
 
 **Core callers.** `components/fork/ForkHiddenHostEntries.tsx` reads the
 registrations. `SidebarNavigationModel.tsx` filters its rows,
@@ -1595,8 +1604,10 @@ draws nothing, `useSettingsSearchConditions.ts` drops the `cliSkills`
 search entry, `settings-nav.tsx` filters the Settings pages and treats a
 hidden one's address as unknown, `sidebarFooterPreferences.ts` filters
 the footer items, and `ThreadPromptContextBanner.tsx`'s
-`ThreadChildThreadsBanner` passes its section through `useForkChildThreads`
-(`components/fork/ForkPromptStack.ts`).
+`ThreadDetailPromptArea.tsx` passes its child threads section through
+`useForkChildThreads` and `ThreadPromptContextBanner` reads
+`useForkThreadContextRowHidden` (`components/fork/ForkPromptStack.ts`);
+`components/fork/ForkThreadContextSegments.tsx` is the runtime component.
 
 **Audit before stabilizing.**
 
