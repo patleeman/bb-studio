@@ -11,6 +11,32 @@ import type { PageMeta } from "./store";
 import { opNeeds } from "../op-errors";
 
 const MAX_READ_CHARS = 60_000;
+/** pages_read's default part of a long page (characters); `limit` asks for more, up to MAX_READ_CHARS. */
+export const READ_PART_CHARS = 12_000;
+
+/**
+ * One part of a page's Markdown, from block `from` (an id or its prefix) on, whole blocks only, at most
+ * `limit` characters (always at least one block); `next` is the first block left out.
+ */
+export function readPart(markdown: string, from: string | undefined, limit: number): { text: string; next: string | null; shown: number; total: number } {
+  const marker = /<!-- \^([A-Za-z0-9_-]+) -->/g;
+  const starts: { at: number; id: string }[] = [];
+  for (const match of markdown.matchAll(marker)) starts.push({ at: match.index!, id: match[1]! });
+  if (!starts.length) return { text: markdown.slice(0, limit), next: null, shown: Math.min(markdown.length, limit), total: markdown.length };
+  const blocks = starts.map((start, index) => ({ id: start.id, text: markdown.slice(start.at, starts[index + 1]?.at ?? markdown.length) }));
+  const lead = markdown.slice(0, starts[0]!.at);
+  let first = from ? blocks.findIndex((block) => block.id.startsWith(from)) : 0;
+  if (first < 0) first = 0;
+  const out: string[] = first === 0 ? [lead] : [];
+  let size = out.join("").length;
+  let index = first;
+  while (index < blocks.length && (index === first || size + blocks[index]!.text.length <= limit)) {
+    out.push(blocks[index]!.text);
+    size += blocks[index]!.text.length;
+    index++;
+  }
+  return { text: out.join(""), next: blocks[index]?.id ?? null, shown: size, total: markdown.length };
+}
 
 export const TOOL_NAMES = [
   "pages_list",
@@ -99,20 +125,27 @@ export function registerTools(
 
   bb.agents.registerTool({
     name: "pages_read",
-    description: "Read a BB Page as Markdown with `<!-- ^id -->` block ids and open comments. Read right before pages_edit.",
-    parameters: z.object({ page: ref }),
-    execute({ page }, ctx) {
+    description: `Read a BB Page as Markdown with \`<!-- ^id -->\` block ids and open comments. Read right before pages_edit. A long page comes in parts of about ${READ_PART_CHARS.toLocaleString("en-US")} characters: the next part with from (the block id it names), or more at once with limit.`,
+    parameters: z.object({
+      page: ref,
+      from: z.string().trim().min(1).max(64).optional().describe("Block id (or prefix) to start from: the next part of a long page"),
+      limit: z.number().int().min(1_000).max(MAX_READ_CHARS).optional().describe(`Characters to read (default ${READ_PART_CHARS})`),
+    }),
+    execute({ page, from, limit }, ctx) {
       const meta = service.requirePage(page, ctx.projectId);
       const live = service.hub.open(meta.id);
-      const markdown = readMarkdown(live.doc, { ids: true });
+      const markdown = readMarkdown(live.doc, { ids: true }).trim();
+      const part = readPart(markdown, from, limit ?? READ_PART_CHARS);
       const threads = listThreads(live.doc);
+      const last = part.next === null;
       return truncate(
         [
           `# ${meta.icon ? `${meta.icon} ` : ""}${untitled(meta.title)}`,
           `Page id ${meta.id} · ${meta.project_id ? "project page" : "global page"} · ${pageUrl(meta.id)}`,
           "",
-          markdown.trim() || "(empty page)",
-          ...(threads.length ? ["", "## Open comments", ...threads.map(threadSummary)] : []),
+          part.text.trim() || "(empty page)",
+          ...(last ? [] : ["", `(Part: ${part.shown.toLocaleString("en-US")} of ${part.total.toLocaleString("en-US")} characters. Next: pages_read { page: "${meta.id}", from: "${part.next}" }.)`]),
+          ...(last && threads.length ? ["", "## Open comments", ...threads.map(threadSummary)] : []),
         ].join("\n"),
         MAX_READ_CHARS,
       );

@@ -405,7 +405,9 @@ Your instructions carry one-line pointers to these; the full rules are here.
 
 BB Pages are collaborative documents the user edits live. Read a page with
 `pages_read` before changing it; it returns Markdown with a `<!-- ^id -->`
-marker on the line before each block, naming the block below it.
+marker on the line before each block, naming the block below it. A long page
+comes in parts of about 12,000 characters, each ending with the call for the
+next part (`from` a block id); ask for more at once with `limit`.
 
 Edit with `pages_edit` using small, targeted operations that reference those
 block ids, so you don't overwrite the user's concurrent typing. Use

@@ -222,3 +222,19 @@ describe("merged tools run only the ops the thread may use", () => {
     expect(missing.error).toMatch(/name/);
   });
 });
+
+describe("reading a design", () => {
+  it("lists a large newest round's screens unless screenIds names them", async () => {
+    const thread = "thr_design_reader";
+    configure(context(thread, "claude-code", "claude-opus-5-5", { metadata: { bot: botId } }));
+    const created = await run("pages_create", { title: "Big design", type: "design" }, thread);
+    const designId = /dsn_[A-Za-z0-9]+/.exec(created)![0];
+    const html = `<!doctype html><html><body>${"<p>filler text</p>".repeat(900)}</body></html>`;
+    for (const screenId of ["1a", "1b"]) expect(await run("design_screen", { op: "write", designId, screenId, html }, thread)).not.toMatch(/isn't available|can't take/);
+    const listed = await run("pages_read", { page: designId }, thread);
+    expect(listed).toMatch(/Read the screens you need with screenIds/);
+    expect(listed).not.toContain("filler text");
+    const one = await run("pages_read", { page: designId, screenIds: ["1a"] }, thread);
+    expect(one).toContain("filler text");
+  });
+});

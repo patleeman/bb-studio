@@ -4005,7 +4005,7 @@ parameters and its handler; the family tools run those same handlers.
 | Family tool | Does |
 | --- | --- |
 | `pages_read (no page)` | Docs; with `type: "design"` or `"whiteboard"`, that type's own list |
-| `pages_read` | A doc; given a `dsn_…` or `drw_…` id, that item |
+| `pages_read` | A doc, in parts of about 12,000 characters cut at a block (the next part: `from` the block id it names; more at once: `limit`); without `page`, the list of pages; with `comments`, the page's comments. Given a `dsn_…` id, the design, with the newest round's HTML only when it is under 12,000 characters (else name `screenIds`); a `drw_…` id, that whiteboard |
 | `pages_create` | A doc; with `type: "design"` or `"whiteboard"`, one of those |
 | `apps (op: list)` | Every app from the index; with `type`, that type's own list |
 | `apps (op: read)` | Any app by id |

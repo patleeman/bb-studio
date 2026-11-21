@@ -345,9 +345,11 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
     },
   });
 
+  /** A design read without screenIds inlines the newest round's HTML up to this many characters. */
+  const DEFAULT_HTML_CHARS = 12_000;
   bb.agents.registerTool({
     name: "design_read",
-    description: "Read a design: its rounds, each option's id, caption and frame size, and the HTML of the screens you name (or of the newest round when you name none). Call it before editing so you see the latest version.",
+    description: "Read a design: its rounds, each option's id, caption and frame size, and the HTML of the screens you name (or of the newest round when you name none and it is small). Call it before editing so you see the latest version.",
     presentation: { label: { pending: "Reading a design", completed: "Read a design" } },
     parameters: z.object({
       designId: z.string().min(1),
@@ -356,11 +358,20 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
     execute({ designId, screenIds }) {
       const view = store.view(designId);
       if (!view) return notFound(designId);
-      const wanted = screenIds?.length ? screenIds : view.rounds[0]?.screens.map((screen) => screen.id) ?? [];
+      const asked = !!screenIds?.length;
+      const wanted = asked ? screenIds! : view.rounds[0]?.screens.map((screen) => screen.id) ?? [];
       const html = Object.fromEntries(wanted.flatMap((id) => {
         const screen = store.screen(designId, id);
         return screen ? [[id, screen.html]] : [];
       }));
+      // Without screenIds, the newest round's HTML only when it is small; else the list and how to ask.
+      const htmlSize = Object.values(html).reduce((sum, text) => sum + text.length, 0);
+      if (!asked && htmlSize > DEFAULT_HTML_CHARS) {
+        return [
+          JSON.stringify({ design: { ...view, name: displayName(view), link: designHref(view.id) } }, null, 2),
+          `The newest round's HTML (${wanted.join(", ")}) is ${htmlSize.toLocaleString("en-US")} characters. Read the screens you need with screenIds.`,
+        ].join("\n\n");
+      }
       const payload = JSON.stringify({ design: { ...view, name: displayName(view), link: designHref(view.id) }, html }, null, 2);
       if (payload.length <= MAX_READ_CHARS) return payload;
       return [
