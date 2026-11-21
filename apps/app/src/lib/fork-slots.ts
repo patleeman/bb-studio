@@ -17,6 +17,7 @@ import type {
   ExperimentalPaletteSearchRegistration,
   ExperimentalReplyClassifierRegistration,
   ExperimentalSidebarSectionRegistration,
+  ExperimentalTimelineFilterRegistration,
   ExperimentalWindowRegistration,
 } from "@get-bb/plugin-sdk";
 
@@ -81,6 +82,9 @@ export interface PluginCommandPaletteSlot
 export interface PluginAppBackdropSlot
   extends ExperimentalAppBackdropRegistration, ForkSlotBase {}
 
+export interface PluginTimelineFilterSlot
+  extends ExperimentalTimelineFilterRegistration, ForkSlotBase {}
+
 export interface ForkRegistrationSet {
   itemDrops?: readonly ExperimentalItemDropRegistration[];
   newTabItems?: readonly ExperimentalNewTabItemsRegistration[];
@@ -101,6 +105,7 @@ export interface ForkRegistrationSet {
   replyClassifiers?: readonly ExperimentalReplyClassifierRegistration[];
   paletteSearches?: readonly ExperimentalPaletteSearchRegistration[];
   sidebarSections?: readonly ExperimentalSidebarSectionRegistration[];
+  timelineFilters?: readonly ExperimentalTimelineFilterRegistration[];
 }
 
 export interface ForkSlotSnapshot {
@@ -123,6 +128,7 @@ export interface ForkSlotSnapshot {
   replyClassifiers: readonly PluginReplyClassifierSlot[];
   paletteSearches: readonly PluginPaletteSearchSlot[];
   sidebarSections: readonly PluginSidebarSectionSlot[];
+  timelineFilters: readonly PluginTimelineFilterSlot[];
 }
 
 export const EMPTY_FORK_SLOTS: ForkSlotSnapshot = {
@@ -145,6 +151,7 @@ export const EMPTY_FORK_SLOTS: ForkSlotSnapshot = {
   replyClassifiers: [],
   paletteSearches: [],
   sidebarSections: [],
+  timelineFilters: [],
 };
 
 export const FORK_SLOT_KINDS = [
@@ -167,6 +174,7 @@ export const FORK_SLOT_KINDS = [
   "newTabItems",
   "commandPalettes",
   "appBackdrops",
+  "timelineFilters",
 ] as const satisfies readonly (keyof ForkSlotSnapshot)[];
 
 export function stampForkSlots(
@@ -195,5 +203,6 @@ export function stampForkSlots(
     newTabItems: stamp(set.newTabItems),
     commandPalettes: stamp(set.commandPalettes),
     appBackdrops: stamp(set.appBackdrops),
+    timelineFilters: stamp(set.timelineFilters),
   };
 }

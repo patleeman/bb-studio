@@ -230,6 +230,44 @@ export interface ExperimentalReplyClassifierRegistration {
 }
 
 /**
+ * A plugin's filter on a thread's timeline (see
+ * {@link ExperimentalTimelineFilterRegistration}). Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalTimelineFilter {
+  /**
+   * The turns to keep. Every other row (other turns, and rows with no turn
+   * id) is hidden, and everything collapsed in the kept rows opens: quiet
+   * replies draw in full, relayed and notice folds unfold, and step and
+   * command groups ("Ran N commands") open.
+   */
+  turnIds: readonly string[];
+  /**
+   * The sequence of the filter's first message (the event sequence, the
+   * same space as a timeline row's `sourceSeqStart`): older rows keep
+   * loading, one page at a time, until the loaded rows reach it or there
+   * are no older rows. Null: no paging.
+   */
+  firstSeq: number | null;
+}
+
+/**
+ * Registration for `slots.experimental_timelineFilter`: a plugin narrows a
+ * thread's timeline to some of its turns (Studio's strands). `get` runs
+ * while the thread view renders: cheap and pure, and the same object while
+ * the filter is unchanged. Registrations are asked in plugin-id order; the
+ * first that returns a filter wins. Experimental: see
+ * docs/api_to_audit.fork.md.
+ */
+export interface ExperimentalTimelineFilterRegistration {
+  id: string;
+  /** The filter for a thread's timeline, or null for none. */
+  get(threadId: string): ExperimentalTimelineFilter | null;
+  /** Calls `listener` whenever any thread's filter changes; returns the unsubscribe. */
+  subscribe(listener: () => void): () => void;
+}
+
+/**
  * What bb knows about a message it asks a classifier about. `initiator` is
  * null for `part: "body"`. Experimental: see docs/api_to_audit.fork.md.
  */
@@ -1035,6 +1073,14 @@ export interface ForkPluginAppSlots {
    */
   experimental_replyClassifier(
     registration: ExperimentalReplyClassifierRegistration,
+  ): void;
+  /**
+   * Narrow a thread's timeline to some of its turns (see
+   * {@link ExperimentalTimelineFilterRegistration}). Experimental: see
+   * docs/api_to_audit.fork.md.
+   */
+  experimental_timelineFilter(
+    registration: ExperimentalTimelineFilterRegistration,
   ): void;
   /**
    * Add a section of the plugin's own rows to the sidebar, below the thread
