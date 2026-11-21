@@ -164,7 +164,7 @@ describe("the hub with kinds", () => {
   it("turned off, a built-in kind leaves items, search and New, and comes back", async () => {
     const { hub, current } = setup(settings());
     const db = new Database(":memory:");
-    for (const sql of MIGRATIONS) db.exec(sql);
+    for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
     const search = new SearchIndex(db, hub);
     await search.ensure();
     expect(search.search("launch").map((hit) => hit.ref.pluginId).sort()).toEqual(["notion", "pages"]);

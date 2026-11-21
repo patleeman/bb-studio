@@ -15,7 +15,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   db = new Database(":memory:");
-  for (const sql of MIGRATIONS) db.exec(sql);
+  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
 });
 afterEach(() => { db.close(); vi.useRealTimers(); });
 

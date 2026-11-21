@@ -44,7 +44,7 @@ export function stdioServer(id: string, extra: Partial<ServerInput> = {}): Serve
 export async function harness(options: { baseEnv?: Record<string, string | undefined>; limits?: Partial<Limits>; dataDir?: string; plugins?: string[] } = {}): Promise<Harness> {
   const dataDir = options.dataDir ?? await mkdtemp(join(tmpdir(), "studio-tool-gateway-"));
   const db = new Database(":memory:");
-  for (const statement of MIGRATIONS) db.exec(statement);
+  for (const statement of MIGRATIONS.filter(Boolean)) db.exec(statement);
   const kv = new Map<string, unknown>();
   const todos: Harness["todos"] = { created: [], closed: [] };
   const threads = new Map<string, { providerId: string; projectId: string }>([

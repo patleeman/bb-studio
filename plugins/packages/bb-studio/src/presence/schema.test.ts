@@ -28,7 +28,7 @@ describe("a Bot's presence", () => {
   it("the migration adds the column and the table and leaves old avatar fields alone", () => {
     const db = new Database(":memory:");
     const at = MIGRATIONS.findIndex((migration) => migration.includes("presence_json"));
-    for (const migration of MIGRATIONS.slice(0, at)) db.exec(migration);
+    for (const migration of MIGRATIONS.slice(0, at).filter(Boolean)) db.exec(migration);
     db.prepare("INSERT INTO bots (id, name, avatar, state, heartbeat_was_on, shape, color, avatar_image_id, created_at, updated_at) VALUES ('bot_old', 'Old', '🦉', 'active', 0, 'star', '#e5484d', 'bai_1', 1, 1)").run();
     db.exec(MIGRATIONS[at]!);
     const row = db.prepare("SELECT * FROM bots WHERE id = 'bot_old'").get() as Record<string, unknown>;

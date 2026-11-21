@@ -23,7 +23,7 @@ describe("Studio search index", () => {
 
   it("ranks title matches, filters, and applies incremental changes", async () => {
     const db = new Database(":memory:");
-    for (const sql of MIGRATIONS) db.exec(sql);
+    for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
     let items = [item("a", "Offline sync", 2), item("b", "Notes", 3)];
     const content: Record<string, string> = { a: "The launch plan", b: "Discuss offline sync tomorrow" };
     const hub = {
@@ -52,7 +52,7 @@ describe("Studio search index", () => {
 
 function fixture() {
   const db = new Database(":memory:");
-  for (const sql of MIGRATIONS) db.exec(sql);
+  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
   const state = { items: [item("a", "First")], online: true, truncated: false, failRead: false };
   const hub = {
     inventoryChanges: async () => new Set<string>(),
@@ -168,7 +168,7 @@ it("keeps undiscovered providers through discovery failure, retries once due, an
   vi.useFakeTimers();
   const db = new Database(":memory:");
   try {
-    for (const sql of MIGRATIONS) db.exec(sql);
+    for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
     let failDiscovery = false;
     let installed = true;
     let pageTitle = "Original";
@@ -248,7 +248,7 @@ it("reports partial, unavailable, recovering and current snapshots without clear
 
 it("detects plugin disable and re-enable from inventory without a content-change event or whole-suite reads", async () => {
   const db = new Database(":memory:");
-  for (const sql of MIGRATIONS) db.exec(sql);
+  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
   let enabled = true;
   let inventoryFails = false;
   const list = vi.fn(async () => {

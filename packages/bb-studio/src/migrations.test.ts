@@ -149,7 +149,7 @@ describe("the Bot triages runner reports (docs/needs-you/REDO.md)", () => {
     const db = new Database(":memory:");
     const last = MIGRATIONS.findIndex((sql) => sql.trim() === "UPDATE bot_runners SET urgent = 0;");
     expect(last).toBeGreaterThan(0);
-    for (const sql of MIGRATIONS.slice(0, last)) db.exec(sql);
+    for (const sql of MIGRATIONS.slice(0, last).filter(Boolean)) db.exec(sql);
     db.prepare("INSERT INTO bot_runners (id, bot_id, name, job, project_id, state, cadence, time, urgent, created_at, updated_at) VALUES ('r1', 'b', 'Security', 'Check', 'p', 'active', 'daily', '09:00', 1, 1, 1)").run();
     db.exec(MIGRATIONS[last]!);
     expect(db.prepare("SELECT urgent FROM bot_runners").get()).toEqual({ urgent: 0 });
@@ -164,7 +164,7 @@ describe("the empty-table cleanup", () => {
     const db = new Database(":memory:");
     const drop = MIGRATIONS.findIndex((sql) => sql.includes("DROP TABLE IF EXISTS bot_avatar_images;"));
     expect(drop).toBeGreaterThan(0);
-    for (const sql of MIGRATIONS.slice(0, drop)) db.exec(sql);
+    for (const sql of MIGRATIONS.slice(0, drop).filter(Boolean)) db.exec(sql);
     const tables = () => new Set((db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((row) => row.name));
     for (const table of DROPPED) expect(tables().has(table)).toBe(true);
     db.exec(MIGRATIONS[drop]!);
@@ -181,7 +181,7 @@ describe("reminders become todos", () => {
     const db = new Database(":memory:");
     const copy = MIGRATIONS.findIndex((sql) => sql.includes("'loop_reminder_' || a.id"));
     expect(copy).toBeGreaterThan(0);
-    for (const sql of MIGRATIONS.slice(0, copy)) db.exec(sql);
+    for (const sql of MIGRATIONS.slice(0, copy).filter(Boolean)) db.exec(sql);
     db.prepare("INSERT INTO bots (id, name, avatar, state, thread_id, created_at, updated_at) VALUES ('bot_main', 'Dot', 'D', 'active', 'thr_main', 1, 1), ('bot_ops', 'Ops', 'O', 'active', 'thr_ops', 2, 2)").run();
     const reminder = db.prepare("INSERT INTO bot_automations (id, bot_id, kind, name, instruction, schedule_json, state, project_id, target_thread_id, last_fired_at, created_at, updated_at) VALUES (?, ?, ?, ?, 'Check the deploy.', ?, ?, 'proj_personal', ?, ?, 10, 20)");
     reminder.run("aut_live", "bot_main", "reminder", "Deploy", JSON.stringify({ type: "once", at: 5_000 }), "active", "thr_main", null);
@@ -192,7 +192,7 @@ describe("reminders become todos", () => {
     const before = db.prepare("SELECT * FROM bot_automations ORDER BY id").all();
     db.exec(MIGRATIONS[copy]!);
     db.exec(MIGRATIONS[copy]!);
-    for (const sql of MIGRATIONS.slice(copy + 1)) db.exec(sql);
+    for (const sql of MIGRATIONS.slice(copy + 1).filter(Boolean)) db.exec(sql);
     const { migrateToTasks } = await import("./tasks/migrate");
     expect(migrateToTasks(db).adopted.loops).toBe(4);
     const todos = new LoopStore(db).all().sort((a, b) => a.id.localeCompare(b.id));
@@ -213,7 +213,7 @@ describe("archive summaries share one memory topic", () => {
     const db = new Database(":memory:");
     const move = MIGRATIONS.findIndex((sql) => sql.includes("SET topic = 'Conversations'"));
     expect(move).toBeGreaterThan(0);
-    for (const sql of MIGRATIONS.slice(0, move)) db.exec(sql);
+    for (const sql of MIGRATIONS.slice(0, move).filter(Boolean)) db.exec(sql);
     db.prepare("INSERT INTO bot_finishes (thread_id, bot_id, title, state, requested_at, deadline_at) VALUES ('thr_trip', 'bot_main', 't', 'finished', 1, 2)").run();
     const add = db.prepare("INSERT INTO memory_records (id, bot_id, topic, text, created_at, updated_at, source_kind, source_id, source_title) VALUES (?, 'bot_main', ?, 'x', 1, 1, ?, ?, ?)");
     const trip = "Help me plan a 3-day trip to Lisbon in March. Keep it short and practical please";

@@ -78,6 +78,8 @@ export interface ToolGateway {
   cli(argv: readonly string[], ctx: { threadId?: string | null; projectId?: string | null }): Promise<CliResult>;
   store: ToolGatewayStore;
   engine: ToolGatewayEngine;
+  /** Every server's secret values and tokens, for other features to keep out of what they send (strands). */
+  secretValues(): string[];
   /** For tests: the RPC handlers as registered. */
   handlers: Record<string, (input: never, context?: unknown) => Promise<unknown>>;
   ready(): Promise<void>;
@@ -852,6 +854,7 @@ export async function registerToolGateway(bb: BbPluginApi, options: ToolGatewayO
   }
 
   return {
+    secretValues: () => secrets.values(),
     agentConfiguration: ({ providerId, projectId }) => {
       // A Tool Gateway failure only hides its own tools; it never breaks the session or Studio's other tools.
       try {

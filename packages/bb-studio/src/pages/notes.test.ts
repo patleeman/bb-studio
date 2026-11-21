@@ -20,7 +20,7 @@ function setup(db = new Database(":memory:"), migrate = true, threadOverrides?: 
   get?(threadId: string): Promise<{ title?: string | null; projectId?: string | null }>;
   send?(threadId: string, input: { text: string; agentOnly?: boolean }[]): Promise<void>;
 }) {
-  if (migrate) for (const sql of MIGRATIONS) db.exec(sql);
+  if (migrate) for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
   const store = new PageStore(db);
   const events: unknown[] = [];
   const service = new PagesService({ realtime: { publish: (_channel: string, event: unknown) => events.push(event) } } as never, store);
@@ -252,7 +252,7 @@ describe("Notes", () => {
     const db = new Database(":memory:");
     const migration = MIGRATIONS.findIndex((sql) => sql.includes("CREATE UNIQUE INDEX page_notes_one_open_thread"));
     expect(migration).toBeGreaterThan(0);
-    for (const sql of MIGRATIONS.slice(0, migration)) db.exec(sql);
+    for (const sql of MIGRATIONS.slice(0, migration).filter(Boolean)) db.exec(sql);
     const insert = db.prepare("INSERT INTO page_notes (page_id, thread_id, state, created_at) VALUES (?, 'thr_dupe', 'open', ?)");
     insert.run("pg_old", 1);
     insert.run("pg_a", 3);

@@ -15,7 +15,7 @@ const reply = (seq: number, text: string): Event => ({ seq, type: "item/complete
 function setup(events: Record<string, Event[]>) {
   const db = new Database(":memory:");
   dbs.push(db);
-  for (const sql of MIGRATIONS) db.exec(sql);
+  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
   const list = vi.fn(async ({ threadId, afterSeq, limit }: { threadId: string; afterSeq?: string; limit?: string }) =>
     (events[threadId] ?? []).filter((event) => event.seq > Number(afterSeq ?? 0)).slice(0, Number(limit ?? 100)));
   const text = new ConversationText({ db, sdk: { threads: { events: { list } } } as never, log: () => {} });

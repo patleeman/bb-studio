@@ -15,7 +15,7 @@ import { THEME_TEMPLATE } from "./template";
 
 function setup(options: { measure?: (theme: unknown) => Promise<CheckLine[] | null> } = {}) {
   const db = new Database(":memory:");
-  for (const migration of MIGRATIONS) db.exec(migration);
+  for (const migration of MIGRATIONS.filter(Boolean)) db.exec(migration);
   let at = 1000;
   const store = new ThemeStore(db, () => (at += 1));
   const bots: ThemeBot[] = [

@@ -22,7 +22,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   db = new Database(":memory:");
-  for (const sql of MIGRATIONS) db.exec(sql);
+  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
 });
 afterEach(() => {
   if (db.open) db.close();
@@ -132,7 +132,7 @@ it("backs up the db file once, before the first mapping, and never again", () =>
   dir = mkdtempSync(join(tmpdir(), "auto-tasks-"));
   db.close();
   db = new Database(join(dir, "data.db"));
-  for (const sql of MIGRATIONS) db.exec(sql);
+  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
   seed();
   const { tasks } = setup();
   const first = tasks.sync({ backup: true });

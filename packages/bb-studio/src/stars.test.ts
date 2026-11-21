@@ -6,7 +6,7 @@ import { StarStore } from "./stars";
 
 function store() {
   const db = new Database(":memory:");
-  for (const statement of MIGRATIONS) db.exec(statement);
+  for (const statement of MIGRATIONS.filter(Boolean)) db.exec(statement);
   return new StarStore(db);
 }
 

@@ -17,7 +17,7 @@ const crane = (over: Record<string, unknown> = {}) => ({ id: "crane", name: "Cra
 
 function setup(measure: ((presence: PresencePackage) => Promise<CheckLine[] | null>) | null = async () => PASSED) {
   const db = new Database(":memory:");
-  for (const migration of MIGRATIONS) db.exec(migration);
+  for (const migration of MIGRATIONS.filter(Boolean)) db.exec(migration);
   let at = 1000;
   const store = new PresenceStore(db, () => (at += 1));
   const bots: PresenceBot[] = [

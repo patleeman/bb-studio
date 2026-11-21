@@ -108,7 +108,7 @@ describe("the theme checks", () => {
 describe("stored themes", () => {
   const store = () => {
     const db = new Database(":memory:");
-    for (const migration of MIGRATIONS) db.exec(migration);
+    for (const migration of MIGRATIONS.filter(Boolean)) db.exec(migration);
     let at = 1000;
     return new ThemeStore(db, () => (at += 1));
   };

@@ -28,7 +28,7 @@ afterEach(() => {
 function database(upTo = MIGRATIONS.length): Database.Database {
   const db = new Database(":memory:");
   dbs.push(db);
-  for (const sql of MIGRATIONS.slice(0, upTo)) db.exec(sql);
+  for (const sql of MIGRATIONS.slice(0, upTo).filter(Boolean)) db.exec(sql);
   return db;
 }
 
@@ -58,7 +58,7 @@ describe("the item index migration", () => {
     made.designs.setArchived(made.design.id, true);
     const tables = ["pages", "drawings", "designs", "minis", "artifacts"];
     const before = tables.map((table) => db.prepare(`SELECT * FROM ${table}`).all());
-    for (const sql of MIGRATIONS.slice(ITEMS_MIGRATION)) db.exec(sql);
+    for (const sql of MIGRATIONS.slice(ITEMS_MIGRATION).filter(Boolean)) db.exec(sql);
     expect(rows(db)).toEqual([
       { plugin_id: "artifacts", id: made.artifact.id, family: "app", type: "artifact", title: "Report", project_id: null, archived: 0 },
       { plugin_id: "design", id: made.design.id, family: "page", type: "design", title: "Onboarding deck", project_id: "proj_a", archived: 1 },
@@ -76,7 +76,7 @@ describe("the item index migration", () => {
     const db = database(ITEMS_MIGRATION);
     const insert = db.prepare("INSERT INTO designs (id, name, created_at, updated_at) VALUES (?, ?, 1, 2)");
     for (let n = 0; n < 600; n++) insert.run(`dsn_${n.toString(16).padStart(16, "0")}`, `Design ${n}`);
-    for (const sql of MIGRATIONS.slice(ITEMS_MIGRATION)) db.exec(sql);
+    for (const sql of MIGRATIONS.slice(ITEMS_MIGRATION).filter(Boolean)) db.exec(sql);
     expect(new ItemIndex(db).count()).toBe(600);
     expect(new ItemIndex(db).list({ type: "design", limit: 1000 })).toHaveLength(600);
   });

@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   db = new Database(":memory:");
-  for (const sql of MIGRATIONS) db.exec(sql);
+  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
 });
 afterEach(() => {
   if (db.open) db.close();
@@ -362,7 +362,7 @@ it("migration on a fresh database does nothing and takes no backup", () => {
   dir = mkdtempSync(join(tmpdir(), "task-links-"));
   db.close();
   db = new Database(join(dir, "data.db"));
-  for (const sql of MIGRATIONS) db.exec(sql);
+  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
   const report = linkAtStart(new TaskStore(db), [], new ThreadDirectory(db));
   expect(report).toMatchObject({ pairs: [], drops: [], create: [], created: [], backup: null });
   expect(readdirSync(dir).filter((n) => n.includes(".before-"))).toEqual([]);
@@ -372,7 +372,7 @@ it("migration on a populated database: one backup, tonight's pair nested, worker
   dir = mkdtempSync(join(tmpdir(), "task-links-"));
   db.close();
   db = new Database(join(dir, "data.db"));
-  for (const sql of MIGRATIONS) db.exec(sql);
+  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
   seedThreads(db, MIGRATION_THREADS);
   const store = new TaskStore(db);
   seedTonight(store);
@@ -540,7 +540,7 @@ it("takes the backup even when a live write landed first, and links nothing when
   dir = mkdtempSync(join(tmpdir(), "task-links-"));
   db.close();
   db = new Database(join(dir, "data.db"));
-  for (const sql of MIGRATIONS) db.exec(sql);
+  for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
   seedThreads(db, MIGRATION_THREADS);
   const store = new TaskStore(db);
   seedTonight(store);
@@ -553,7 +553,7 @@ it("takes the backup even when a live write landed first, and links nothing when
   const other = mkdtempSync(join(tmpdir(), "task-links-ro-"));
   const file = join(other, "data.db");
   const second = new Database(file);
-  for (const sql of MIGRATIONS) second.exec(sql);
+  for (const sql of MIGRATIONS.filter(Boolean)) second.exec(sql);
   seedThreads(second, MIGRATION_THREADS);
   const s2 = new TaskStore(second);
   seedTonight(s2);

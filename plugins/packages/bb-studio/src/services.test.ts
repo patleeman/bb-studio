@@ -9,7 +9,7 @@ const actor = { kind: "user" as const };
 
 function setup() {
   const db = new Database(":memory:");
-  for (const migration of MIGRATIONS) db.exec(migration);
+  for (const migration of MIGRATIONS.filter(Boolean)) db.exec(migration);
   return { db, services: new StudioServices(db) };
 }
 

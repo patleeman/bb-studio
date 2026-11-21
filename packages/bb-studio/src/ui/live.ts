@@ -10,10 +10,11 @@ import type { areasContract } from "../areas/contract";
 import type { scheduledContract } from "../loops/scheduled";
 import type { authContract } from "../auth/contract";
 import type { accountsContract } from "../accounts/contract";
+import type { rpcContract as strandsContract } from "../strands/contract";
 import { useRealtime, useRealtimeConnectionState, useRpc, type PluginRpcCallArgs, type PluginRpcResult } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 
-type Contract = typeof rpcContract & typeof loopsContract & typeof scheduledContract & typeof workContract & typeof tasksContract & typeof areasContract & typeof authContract & typeof accountsContract;
+type Contract = typeof rpcContract & typeof loopsContract & typeof scheduledContract & typeof workContract & typeof tasksContract & typeof areasContract & typeof authContract & typeof accountsContract & typeof strandsContract;
 export type Method = keyof Contract;
 export type RpcInput<M extends Method> = PluginRpcCallArgs<Contract[M]>[0];
 type Call = <M extends Method>(method: M, input: RpcInput<M>) => Promise<PluginRpcResult<Contract[M]>>;

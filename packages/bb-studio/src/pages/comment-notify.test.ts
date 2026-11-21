@@ -76,7 +76,7 @@ describe("comments on a page an agent made", () => {
     const send = vi.fn(async (_input: { threadId: string; input: { text: string }[]; mode: string }) => ({}));
     const host = createFakePluginHost({ pluginId: "studio", sdk: { threads: { send: send as never } } });
     const db = host.bb.storage.database();
-    for (const sql of MIGRATIONS) db.exec(sql);
+    for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
     const services = new StudioServices(db);
     const pages = registerPages(host.bb, db, { snapshotsPerPage: () => 10 }, services, async () => {}, {
       items: async () => [], create: async () => { throw new Error("not in this test"); },

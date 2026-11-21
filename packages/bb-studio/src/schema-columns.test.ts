@@ -18,7 +18,7 @@ it("FM (migration): a database where another branch already used the next migrat
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   // A build from another branch (quiet-compact, r3-owner) appended its own migration at the next index.
-  const other = [...MIGRATIONS, "CREATE TABLE quiet_compact_marker (id TEXT PRIMARY KEY);"];
+  const other = MIGRATIONS.concat("CREATE TABLE quiet_compact_marker (id TEXT PRIMARY KEY);");
   bb.storage.migrate(db, other);
   // Back on this build: the migrations load (no index of ours collides), and the columns are added by checking.
   expect(() => bb.storage.migrate(db, MIGRATIONS)).not.toThrow();
@@ -46,6 +46,6 @@ it("leaves a table that isn't there yet alone", async () => {
 it("the reason it can't be a migration: BB refuses a database whose index holds a different statement", async () => {
   const bb = await host();
   const db = bb.storage.database();
-  bb.storage.migrate(db, [...MIGRATIONS, "CREATE TABLE quiet_compact_marker (id TEXT PRIMARY KEY);"]);
-  expect(() => bb.storage.migrate(db, [...MIGRATIONS, "ALTER TABLE bots ADD COLUMN main_model TEXT;"])).toThrow(/does not match the recorded statement/);
+  bb.storage.migrate(db, MIGRATIONS.concat("CREATE TABLE quiet_compact_marker (id TEXT PRIMARY KEY);"));
+  expect(() => bb.storage.migrate(db, MIGRATIONS.concat("ALTER TABLE bots ADD COLUMN main_model TEXT;"))).toThrow(/does not match the recorded statement/);
 });

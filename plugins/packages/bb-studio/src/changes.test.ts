@@ -22,7 +22,7 @@ describe("Studio change cursor", () => {
 it.each([false, true])("records removals only when the provider read is complete (%s)", async (complete) => {
   const db = new Database(":memory:");
   try {
-    for (const migration of MIGRATIONS) db.exec(migration);
+    for (const migration of MIGRATIONS.filter(Boolean)) db.exec(migration);
     const changes = new ChangeLog();
     const hub = {
       providers: async () => [{ pluginId: "pages", state: "ready", kinds: [{ id: "page" }] }],

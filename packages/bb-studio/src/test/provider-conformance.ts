@@ -57,7 +57,7 @@ export function providerConformance(label: string, create: () => ProviderHarness
       const hub = new StudioHub(sdk);
       const picker = studioIndex(sdk as never, schemas);
       const db = new Database(":memory:");
-      for (const sql of MIGRATIONS) db.exec(sql);
+      for (const sql of MIGRATIONS.filter(Boolean)) db.exec(sql);
       cleanups.push(() => { db.close(); });
       const index = new SearchIndex(db, hub);
       cleanups.push(() => index.dispose());

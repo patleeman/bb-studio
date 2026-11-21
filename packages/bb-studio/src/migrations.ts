@@ -4,8 +4,17 @@
  * whitespace). Append every new statement at the END of this array.
  * Keep SQL literal here: never import live store constants or spread domain
  * arrays into this indexed history. migrations.test.ts pins the released prefix.
+ *
+ * Typed string[] although index 114 is a hole (see the end of the list).
+ * BB's migrate skips holes. Code that runs the statements itself must skip
+ * it too (`for (const sql of MIGRATIONS.filter(Boolean))`), and a copy for
+ * migrate must keep it (`MIGRATIONS.concat(…)`, never `[...MIGRATIONS]`,
+ * which turns the hole into undefined). `find` and `findIndex` visit the
+ * hole as undefined too: guard the callback (`(sql) => sql?.includes(…)`)
+ * when what it looks for may sit past 114 or be missing.
  */
-export const MIGRATIONS = [
+// @ts-expect-error The hole at 114 is deliberate (reserved slot); every entry that exists is a string.
+export const MIGRATIONS: string[] = [
   `CREATE TABLE tags (
        id TEXT PRIMARY KEY,
        name TEXT NOT NULL,
@@ -1164,4 +1173,56 @@ export const MIGRATIONS = [
   // sit at 114. The next migration starts at 115: leave 114 as a hole, written `, ,` after the
   // entry above (BB's migrate skips holes, so 114 is neither run nor checked). migrations.test.ts
   // fails if anything is put at 114.
+  ,
+  // 115: strands (src/strands): a conversation's lines of work, each turn sorted into one.
+  `CREATE TABLE strands (
+       id TEXT PRIMARY KEY,
+       thread_id TEXT NOT NULL,
+       title TEXT NOT NULL,
+       summary TEXT,
+       named INTEGER NOT NULL DEFAULT 0,
+       name_tries INTEGER NOT NULL DEFAULT 0,
+       summary_at INTEGER,
+       first_seq INTEGER NOT NULL,
+       last_seq INTEGER NOT NULL,
+       last_at INTEGER NOT NULL,
+       pinned INTEGER NOT NULL DEFAULT 0,
+       merged_into TEXT,
+       origin TEXT NOT NULL,
+       task_id TEXT,
+       waiting_on TEXT,
+       waiting_at INTEGER,
+       opened_at INTEGER,
+       created_at INTEGER NOT NULL
+     );
+   CREATE INDEX strands_thread ON strands (thread_id, merged_into, last_at);
+   CREATE INDEX strands_task ON strands (task_id);
+   CREATE TABLE strand_items (
+       thread_id TEXT NOT NULL,
+       seq INTEGER NOT NULL,
+       kind TEXT NOT NULL,
+       ref TEXT NOT NULL DEFAULT '',
+       turn_id TEXT,
+       at INTEGER NOT NULL,
+       line TEXT,
+       strand_id TEXT,
+       confidence REAL,
+       by TEXT NOT NULL,
+       unsure INTEGER NOT NULL DEFAULT 0,
+       PRIMARY KEY (thread_id, kind, seq, ref)
+     );
+   CREATE INDEX strand_items_strand ON strand_items (thread_id, strand_id, seq);
+   CREATE INDEX strand_items_at ON strand_items (thread_id, at);
+   CREATE INDEX strand_items_turn ON strand_items (thread_id, turn_id);
+   CREATE TABLE strand_reads (
+       thread_id TEXT PRIMARY KEY,
+       seen_seq INTEGER NOT NULL,
+       day TEXT,
+       jev_calls INTEGER NOT NULL DEFAULT 0,
+       model_calls INTEGER NOT NULL DEFAULT 0,
+       named_at INTEGER,
+       batched_at INTEGER,
+       backfill TEXT,
+       read_at INTEGER NOT NULL
+     );`,
 ];

@@ -21,7 +21,7 @@ const NOW = new Date("2026-11-13T15:00:00Z").getTime();
 let db: Database.Database;
 let dir: string | null = null;
 
-const migrate = (target: Database.Database) => { for (const sql of MIGRATIONS) target.exec(sql); };
+const migrate = (target: Database.Database) => { for (const sql of MIGRATIONS.filter(Boolean)) target.exec(sql); };
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });

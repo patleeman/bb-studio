@@ -46,7 +46,7 @@ describe("parseThemeCli", () => {
 describe("runThemeCli", () => {
   const setup = (files: Record<string, string>) => {
     const db = new Database(":memory:");
-    for (const migration of MIGRATIONS) db.exec(migration);
+    for (const migration of MIGRATIONS.filter(Boolean)) db.exec(migration);
     const bots: ThemeBot[] = [{ id: "cos", name: "Chief of Staff", appearance: null }];
     const setAppearance = vi.fn(async (botId: string, appearance: Appearance | null) => { bots.find((bot) => bot.id === botId)!.appearance = appearance; });
     const service = new ThemeService({ store: new ThemeStore(db), bots: () => bots, setAppearance });

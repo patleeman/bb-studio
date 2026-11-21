@@ -17,7 +17,7 @@ afterEach(async () => {
 function database() {
   const db = new Database(":memory:");
   dbs.push(db);
-  for (const migration of MIGRATIONS) db.exec(migration);
+  for (const migration of MIGRATIONS.filter(Boolean)) db.exec(migration);
   return db;
 }
 async function folder() {
