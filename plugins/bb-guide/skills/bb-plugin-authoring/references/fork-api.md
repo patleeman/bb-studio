@@ -185,6 +185,21 @@ message.sourceSeqEnd })` (or `bb.sdk.threads.fork` from the backend).
 Names: `ExperimentalMessageActionRegistration`,
 `ExperimentalMessageActionMessage`.
 
+## Narrow a thread's timeline to some of its turns
+
+- `app.slots.experimental_timelineFilter({ id, get, subscribe })` → while
+  `get(threadId)` returns `{ turnIds, firstSeq }`, that thread's view shows
+  only the rows of those turns (rows with no turn go too), and everything
+  collapsed in them opens: quiet replies, relayed and notice folds, and step
+  and command groups. Older rows load one page at a time until the loaded
+  rows reach `firstSeq` (a message's event sequence) or there are none;
+  `firstSeq: null` doesn't page. `get` runs while the view renders: keep it
+  cheap and return the same object while the filter is unchanged; return
+  null for none. `subscribe(listener)` → unsubscribe; call the listener when
+  any filter changes. The first filter in plugin-id order wins.
+
+Names: `ExperimentalTimelineFilterRegistration`, `ExperimentalTimelineFilter`.
+
 ## A thread list without bb's sidebar header
 
 - `app.slots.experimental_threadList({ id, title, component,
