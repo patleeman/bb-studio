@@ -1,6 +1,5 @@
 import { expect, it } from "vitest";
 import { areaChips, dueLabel, eventLabel, fullWhen, ownerName, ownerThread, shortWhen, snoozeHint, triggerLabel } from "./model";
-import { todoGroup } from "./todos-model";
 import { fromInputValue, inputValue, zonedTime } from "../clock";
 
 const NOW = new Date("2026-10-31T22:26:00").getTime();
@@ -62,9 +61,6 @@ it("finds today, tomorrow and the week by the zone's calendar, not the computer'
   expect(dueLabel(soon, now, "America/Los_Angeles")?.text).toBe("Due today, 11:30 PM");
   expect(dueLabel(soon, now, "America/New_York")?.text).toBe("Due today, 2:30 AM");
   expect(dueLabel(soon, now, "Europe/London")?.text).toBe("Due today, 7:30 AM");
-  const todo = { closedAt: null, status: "queued", kind: "do", owner: "patrick", due: zonedTime(2026, 11, 14, 8, 0, "America/Los_Angeles"), trigger: { type: "none" } } as never;
-  expect(todoGroup(todo, now, "America/Los_Angeles")).toBe("week");
-  expect(todoGroup(todo, now, "America/New_York")).toBe("today");
 });
 
 it("names snooze times in the zone and reads a picked time in it", () => {

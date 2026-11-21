@@ -1,6 +1,6 @@
 // Phase 3: strands in every conversation, backfilled lazily (active in the
 // last 14 days, newest first), the user's edits, and the overview.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { overviewConversation } from "./contract";
 import { BACKFILL_ACTIVE_MS, StrandService } from "./service";
 import { JEV_TOTAL_DAILY_CAP, MODEL_TOTAL_DAILY_CAP } from "./detector";
@@ -154,6 +154,26 @@ describe("the overview", () => {
     expect(overview.conversations.map((row) => row.threadId)).toEqual(["thr_main", "thr_studio"]);
     for (const row of overview.conversations) expect(() => overviewConversation.parse(row)).not.toThrow();
     expect(overview).toMatchObject({ needs: 0, running: 0 });
+  });
+});
+
+describe("the needs-you push's read", () => {
+  it("reads live only conversations active in the last day that have a strand not marked done, and names what it read", async () => {
+    const x = setup([
+      { id: "thr_main", title: "Main", isMain: true, lastActiveAt: NOW },
+      { id: "thr_done", title: "All done", lastActiveAt: NOW },
+      { id: "thr_week", title: "Last week", lastActiveAt: NOW - 2 * DAY },
+      { id: "thr_empty", title: "Empty", lastActiveAt: NOW },
+    ]);
+    for (const id of ["thr_main", "thr_done", "thr_week"]) { x.thread(id).turn("Look at the router", "Ok."); await x.svc.idle(id, true); }
+    for (const strand of x.svc.store.list("thr_done")) x.svc.store.note(strand.id, { done: true }, NOW);
+    const reads = vi.spyOn(x.svc, "list");
+    const check = await x.svc.needsYouCheck("bot", NOW - DAY);
+    expect(check.checked).toEqual(["thr_main"]);
+    expect(check.conversations.map((row) => row.threadId)).toEqual(["thr_main"]);
+    expect(reads.mock.calls.map(([threadId]) => threadId)).toEqual(["thr_main"]);
+    // The overview the user opens keeps its 14 days (a conversation whose strands are all done shows nothing there either).
+    expect((await x.svc.overview("bot")).conversations.map((row) => row.threadId).sort()).toEqual(["thr_main", "thr_week"]);
   });
 });
 

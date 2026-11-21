@@ -1,9 +1,8 @@
 import SwiftUI
 
-/// A Bot reply with loop cards. Its text stays in bubbles and each
-/// `::loop{id}` line becomes a card of its own between them. A reply with
-/// compact rows (`row="1"`) or `::loops{more}` is the morning card, drawn
-/// as one card.
+/// An old Bot reply with loop cards. Its text stays in bubbles and each
+/// `::loop{id}` or `::work{id}` line becomes a read-only card between them. A
+/// reply with compact rows (`row="1"`) is the morning card, drawn as one card.
 struct LoopMessage: View {
     let text: String
     /// Draws a text part in the reply's bubble.
@@ -54,11 +53,10 @@ struct LoopMessage: View {
     }
 }
 
-/// The morning card: the date, Calendar, On today's list (compact loop rows
-/// and "N more in Todos") and Good to know, as one card.
+/// An old morning card: the date, Calendar, On today's list (compact rows,
+/// read-only) and Good to know, as one card.
 struct MorningCard: View {
     let text: String
-    @State private var model = LoopsModel.shared
 
     struct Section: Equatable {
         var title: String
@@ -69,7 +67,6 @@ struct MorningCard: View {
         /// A calendar line: its time and what.
         case event(time: String?, text: String)
         case loop(String)
-        case more(Int)
         case text(String)
     }
 
@@ -92,7 +89,6 @@ struct MorningCard: View {
             if let directive = Directive(line: line).flatMap(LoopDirective.init) {
                 switch directive {
                 case .row(let id), .card(let id): sections[sections.count - 1].lines.append(.loop(id))
-                case .more(let count): sections[sections.count - 1].lines.append(.more(count))
                 }
             } else if line.hasPrefix("- ") || line.hasPrefix("* ") {
                 let item = String(line.dropFirst(2))
@@ -120,31 +116,20 @@ struct MorningCard: View {
             .padding(16)
             ForEach(Array(parsed.sections.enumerated()), id: \.offset) { _, section in
                 Divider()
-                MorningSection(section: section, off: model.enabled == false)
+                MorningSection(section: section)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(uiColor: .secondarySystemBackground), in: .rect(cornerRadius: 20, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("morning-card")
-        .task {
-            await model.checkEnabled()
-            if model.enabled == true { await model.refreshList() }
-        }
     }
 }
 
 private struct MorningSection: View {
     let section: MorningCard.Section
-    /// The Attention Router is off: its loops give way to one quiet line.
-    let off: Bool
-    @EnvironmentObject private var app: AppModel
 
-    private var lines: [MorningCard.Line] {
-        guard off else { return section.lines }
-        let kept = section.lines.filter { if case .loop = $0 { false } else if case .more = $0 { false } else { true } }
-        return kept.count == section.lines.count ? kept : kept + [.text("")]
-    }
+    private var lines: [MorningCard.Line] { section.lines }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -161,10 +146,8 @@ private struct MorningSection: View {
                     }
                 case .loop(let id):
                     LoopRowLine(id: id)
-                case .more(let count):
-                    LoopsMoreLink(count: count)
                 case .text(let text):
-                    if text.isEmpty { LoopOffPlaceholder() } else { Text(MarkdownText.inline(text)) }
+                    Text(MarkdownText.inline(text))
                 }
             }
         }
@@ -172,25 +155,15 @@ private struct MorningSection: View {
     }
 }
 
-/// A morning card's compact loop: icon, title and when. A tap opens its card.
+/// An old morning card's compact row: icon, title and when. A tap opens its
+/// read-only card. A Studio without tasks shows nothing.
 struct LoopRowLine: View {
     let id: String
     @State private var tasks = TasksModel.shared
 
     var body: some View {
-        if tasks.supported == false {
-            LegacyLoopRowLine(id: id)
-        } else {
+        if tasks.supported != false {
             TaskRowLine(id: id)
-        }
-    }
-
-    static func trailing(_ loop: LoopItem) -> String? {
-        if loop.isClosed { return "Done" }
-        switch loop.kind {
-        case .decide: return "\(loop.options.count) options"
-        case .read: return "Read"
-        default: return loop.due.map { LoopFormat.day($0) }
         }
     }
 
@@ -251,55 +224,6 @@ private struct TaskRowLine: View {
     }
 }
 
-private struct LegacyLoopRowLine: View {
-    let id: String
-    @State private var model = LoopsModel.shared
-    @State private var open = false
-    @State private var retrying = false
-
-    var body: some View {
-        let loop = model.detail(id)?.loop
-        Group {
-            if loop == nil, !retrying, let failure {
-                MorningRowFailure(message: failure) { retry() }
-            } else {
-                Button { open = true } label: {
-                    MorningRowLabel(symbol: loop.map { LoopFormat.kindSymbol($0.kind) }, title: loop?.title, closed: loop?.isClosed == true,
-                                    trailing: loop.flatMap(LoopRowLine.trailing))
-                }
-                .buttonStyle(.plain)
-                .disabled(loop == nil)
-                .accessibilityLabel(loop.map { [$0.title, LoopRowLine.trailing($0)].compactMap { $0 }.joined(separator: ", ") } ?? "Loading a todo")
-                .accessibilityIdentifier("loop-row")
-                .sheet(isPresented: $open) {
-                    ScrollView { LoopCard(id: id).padding() }
-                        .presentationDetents([.medium, .large])
-                }
-            }
-        }
-        .task(id: model.enabled) { await prepare() }
-    }
-
-    private var failure: String? {
-        if let message = model.failure(id) { return message }
-        return model.enabled == false ? "Todos are off in Studio." : nil
-    }
-
-    private func prepare() async {
-        if model.enabled == nil { await model.checkEnabled() }
-        if model.enabled == true, model.detail(id) == nil { await model.load(id) }
-    }
-
-    private func retry() {
-        retrying = true
-        Task {
-            await model.checkEnabled(force: true)
-            if model.enabled == true { await model.load(id) }
-            retrying = false
-        }
-    }
-}
-
 private struct MorningRowLabel: View {
     let symbol: String?
     let title: String?
@@ -346,26 +270,5 @@ private struct MorningRowFailure: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("loop-row-failed")
-    }
-}
-
-/// "3 more in Todos ›": opens the Todos screen.
-struct LoopsMoreLink: View {
-    let count: Int
-    @EnvironmentObject private var app: AppModel
-
-    var body: some View {
-        Button { app.openLoops() } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "list.bullet.indent")
-                Text("\(count) more in Todos")
-                Spacer()
-                Image(systemName: "chevron.right")
-            }
-            .foregroundStyle(Color.accentColor)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("morning-more")
     }
 }

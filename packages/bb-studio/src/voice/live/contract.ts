@@ -142,7 +142,7 @@ export const voiceLiveContract = defineRpcContract({
     }),
   },
   "voiceLive.tool": {
-    experimental_description: "Run one of the voice's tools (todos_list, read_replies, send_to_cos, send_to_thread, todos_act, todos_add, undo, stop_thread, archive_thread, pause_automation, delete_automation, confirm, cancel). The old names loops_list, loops_act and loops_add still work. Relays and todo actions happen at once; destructive ones wait for confirm after a spoken yes. Saves `events` first, so a yes said just before confirm counts. Returns the function_call_output text, and for an \"answer\" relay a waitFor: the one \"still waiting\" note to add if no reply comes in time.",
+    experimental_description: "Run one of the voice's tools (read_replies, send_to_cos, send_to_thread, stop_thread, archive_thread, pause_automation, delete_automation, confirm, cancel). The retired to-do tools answer that to-dos are gone. Relays happen at once; destructive ones wait for confirm after a spoken yes. Saves `events` first, so a yes said just before confirm counts. Returns the function_call_output text, and for an \"answer\" relay a waitFor: the one \"still waiting\" note to add if no reply comes in time.",
     input: z.object({ sessionId, name: z.string().min(1).max(64), args: z.string().max(20_000).optional(), events: z.array(liveEventSchema).max(200).optional() }).strict(),
     output: z.object({
       output: z.string(),

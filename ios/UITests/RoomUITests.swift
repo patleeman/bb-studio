@@ -123,7 +123,7 @@ final class RoomUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.buttons["roomPlace-memory"].waitForExistence(timeout: 10))
         sleep(1)
         let column: CGFloat = 22
-        let titles = ["tasks": "Tasks", "conversations": "Conversations", "memory": "Memory", "library": "Library", "schedules": "Schedules"]
+        let titles = ["strands": "Strands", "conversations": "Conversations", "memory": "Memory", "library": "Library", "schedules": "Schedules"]
         for (place, title) in titles {
             let item = app.buttons["roomPlace-\(place)"]
             XCTAssertGreaterThanOrEqual(item.frame.height, 44, "\(place): 44 points tall at least")
@@ -148,14 +148,14 @@ final class RoomUITests: ServerIsolatedUITestCase {
     func testTheMenuOpensEachPlaceAsASheetAndPullingDownGoesBack() {
         launch()
         app.buttons["roomMenuButton"].tap()
-        XCTAssertTrue(app.buttons["roomPlace-tasks"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label ENDSWITH ' today'")).firstMatch.exists, "Tasks with today's count")
+        XCTAssertTrue(app.buttons["roomPlace-strands"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["roomPlace-strands"].label.hasPrefix("Strands"), "Strands first, in Tasks' place")
         XCTAssertTrue(app.buttons["roomWorkingNow"].exists, "what's working now")
         XCTAssertTrue(app.buttons["roomTheme"].exists)
         XCTAssertTrue(app.buttons["roomSettings"].exists)
         shot("4-menu")
 
-        for (place, check, name) in [("tasks", "tasks-screen", "5-tasks"), ("conversations", "roomNewConversation", "6-conversations"),
+        for (place, check, name) in [("strands", "strands-overview", "5-strands"), ("conversations", "roomNewConversation", "6-conversations"),
                                      ("memory", "memoryProfile", "7-memory"), ("library", "library-page", "8-library")] {
             app.openRoomPlace(place)
             XCTAssertTrue(any(check).waitForExistence(timeout: 15), "\(place) opens as a sheet")

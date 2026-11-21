@@ -202,7 +202,7 @@ export function needsTask(fact: ThreadFact, all: readonly Task[], dir: ThreadDir
   return !all.some((t) => linksThread(t, fact.id));
 }
 
-export function planLinks(all: readonly Task[], facts: readonly ThreadFact[], dir: ThreadDirectory, now = Date.now()): LinkPlan {
+export function planLinks(all: readonly Task[], facts: readonly ThreadFact[], dir: ThreadDirectory, _now = Date.now()): LinkPlan {
   const plan: LinkPlan = { pairs: [], drops: [], create: [], ambiguous: [] };
   const known = new Map(facts.map((f) => [f.id, f]));
   const threads = new Set(all.flatMap((t) => (automated(t) ? [] : threadsOf(t))));
@@ -226,10 +226,9 @@ export function planLinks(all: readonly Task[], facts: readonly ThreadFact[], di
     }
   }
   plan.pairs = plan.pairs.filter((p) => p.parent);
-  const after = [...byId.values()];
-  for (const fact of [...facts].sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))) {
-    if (RUNNING.has(fact.status ?? "") && now - fact.createdAt >= SPAWN_GRACE_MS && needsTask(fact, after, dir)) plan.create.push(workerTaskPlan(after, fact, dir));
-  }
+  // No task is made for a running worker any more (strands replaced tasks): a
+  // made task would be an open agent task, which the next start closes again
+  // as "Moved to strands", after another full backup.
   return plan;
 }
 

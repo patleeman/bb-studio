@@ -22,7 +22,6 @@
 import Database from "better-sqlite3";
 import { existsSync, readdirSync, rmdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { SETTINGS_KV_KEY } from "../settings/store";
 import { SKILLS_REGISTRY_KV_KEY } from "../skills-registry";
 import {
   BB_KV_FILE, BEFORE_DIR, BEFORE_KV_FILE, FROM_BB_FILE, KEPT_HERE, REPLACED_DIR, REPLACED_KV_FILE, STAGED_DIR,
@@ -117,23 +116,9 @@ export function schemaProblem(db: Database.Database, migrations: readonly string
   return null;
 }
 
-/** Task reminders off, and the public skill registry's approval not carried over. */
+/** The public skill registry's approval not carried over. */
 export function prepareKv(file: BbKvFile): BbKvFile {
-  const rows = file.plugin_kv.filter((row) => row.key !== SKILLS_REGISTRY_KV_KEY);
-  const at = rows.findIndex((row) => row.key === SETTINGS_KV_KEY);
-  let values: Record<string, unknown> = {};
-  if (at >= 0) {
-    try {
-      const parsed = JSON.parse(rows[at]!.value) as unknown;
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) values = parsed as Record<string, unknown>;
-    } catch {
-      // Unreadable settings start from the defaults.
-    }
-  }
-  const settings = { key: SETTINGS_KV_KEY, value: JSON.stringify({ ...values, loopsEnabled: false }) };
-  if (at >= 0) rows[at] = settings;
-  else rows.push(settings);
-  return { ...file, plugin_kv: rows, prepared: true };
+  return { ...file, plugin_kv: file.plugin_kv.filter((row) => row.key !== SKILLS_REGISTRY_KV_KEY), prepared: true };
 }
 
 /** bb's onboarding flag, or one that says onboarding is done (an import), so a second Assistant isn't made. */

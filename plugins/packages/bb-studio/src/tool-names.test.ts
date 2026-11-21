@@ -10,7 +10,7 @@ import ts from "typescript";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import plugin from "../server";
 import { rpcContract } from "./public-contract";
-import { VOICE_TOOL_ALIASES, VOICE_TOOLS } from "./voice/live/shared";
+import { VOICE_TOOLS } from "./voice/live/shared";
 
 /**
  * Agent tools Studio no longer registers. Their handlers may live on inside
@@ -25,6 +25,8 @@ const RETIRED = [
   "whiteboard_list", "whiteboard_get", "whiteboard_create",
   "excalidraw_create_drawing", "excalidraw_get_drawing", "excalidraw_list_drawings", "excalidraw_update_drawing",
   "work_card_create", "work_card_update", "work_card_get",
+  // Strands replaced tasks (phase 5): strand_note is the agents' one strands tool.
+  "task_create", "task_update", "task_get", "task_list", "task_handoff", "task_check", "task_act", "task_fire", "task_morning",
   "todos_add", "todos_list", "todos_get", "todos_update", "todos_act", "todos_fire", "todos_morning",
   "loops_add", "loops_list", "loops_get", "loops_update", "loops_act", "loops_fire", "loops_morning",
   "pages_comment", "pages_comment_reply", "pages_comment_resolve",
@@ -113,7 +115,7 @@ describe("tool names agents read", () => {
   it("names no retired tool in a prompt, result, hint or error in Studio's code", () => {
     const sources = [join(root, "server.ts"), ...files(join(root, "src"), (path) => /\.tsx?$/.test(path) && !/\.test\.tsx?$/.test(path) && !/\/(test|fixtures)\//.test(path))];
     // Studio's realtime voice agent has its own tools, some named like the retired ones.
-    const voice = new Set<string>([...VOICE_TOOLS, ...Object.keys(VOICE_TOOL_ALIASES)]);
+    const voice = new Set<string>([...VOICE_TOOLS]);
     const bad = sources.flatMap((path) => {
       const inVoice = relative(root, path).startsWith("src/voice/");
       return literals(path)

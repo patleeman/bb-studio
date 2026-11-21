@@ -5,22 +5,18 @@ import { CHAT_CARD_BODY, CHAT_CARD_SKELETON, ChatCard, ChatCardHeader, ChatCardI
 import { relativeTime } from "../../kit/format";
 import { Icon, cn } from "../../kit/ui/index";
 import { useCall, useLive } from "../../ui/live";
-import { useTaskActions } from "./actions";
 import { TaskOutputs } from "./Outputs";
 import { useNearScreen, useTaskView } from "./task-views";
-export { useTaskActions } from "./actions";
 import { BotAvatar } from "../../ui/bot/BotAvatar";
-import type { Loop } from "../../loops/contract";
-import { CARD_BUTTON, CARD_GHOST, CARD_PRIMARY, ChooseSheet, HandOffMenu, OptionButton, SnoozeMenu } from "../../loops/ui/LoopMenus";
-import { dueLabel, elapsed, fullWhen, INLINE_OPTIONS, shortWhen, triggerLabel } from "../../loops/ui/model";
+import { CARD_GHOST } from "../../loops/ui/LoopMenus";
+import { dueLabel, fullWhen, shortWhen, triggerLabel } from "../../loops/ui/model";
 import { useLoopPeople, useTodosZone, type LoopPeople } from "../../loops/ui/hooks";
 import { useCardOnScreen } from "../../work/ui/on-screen";
 import { isClosed, needsYou, TODO_ID, USER_OWNER, type Task } from "../contract";
 import type { TaskView } from "../rpc-contract";
 import { WORK_ID } from "../../work/shared";
-import { SEVERITY_LABEL, severityTone, everMine, handOffTargets, historyLines, isMine, ownerLabel, ownerShort, ownerThreadId, rowNumber, taskKind, taskStatus, type Glyph, type Names, type Tone } from "./model";
+import { SEVERITY_LABEL, severityTone, historyLines, isMine, ownerLabel, ownerShort, ownerThreadId, rowNumber, taskKind, taskStatus, type Glyph, type Names, type Tone } from "./model";
 
-const STALE_MS = 3 * 86_400_000;
 
 export const isTaskId = (id: string) => TODO_ID.test(id) || WORK_ID.test(id);
 
@@ -90,8 +86,6 @@ export function OwnerBadge({ owner, names, className, task }: { owner: string; n
   return <span data-testid="task-owner" data-owner={owner} className={cn("inline-flex min-w-0 shrink-0 items-center gap-1.5", className)}>{avatar}<span className="truncate font-medium text-foreground">{name}</span></span>;
 }
 
-const asLoop = (task: Task) => ({ id: task.id, title: task.title, options: task.options }) as unknown as Loop;
-
 /** A task's facts in its detail: what it is, where it belongs, who has it, when, and the thread it lives in. */
 export function taskFacts(task: Task, names: Names, now: number, zone?: string): { label: string; value: string; testId: string }[] {
   const status = taskStatus(task);
@@ -124,13 +118,12 @@ export function linkedThread(task: Pick<Task, "owner" | "workers" | "conversatio
  * also shows its notes in full, its facts and linked thread, and Drop and
  * Start work. `extra` adds actions the caller owns.
  */
-export function TaskCardView({ view, people, refresh, chat = false, bare = false, detail = false, extra }: { view: TaskView; people: LoopPeople; refresh(): void; chat?: boolean; bare?: boolean; detail?: boolean; extra?: ReactNode }) {
+export function TaskCardView({ view, people, chat = false, bare = false, detail = false, extra }: { view: TaskView; people: LoopPeople; refresh(): void; chat?: boolean; bare?: boolean; detail?: boolean; extra?: ReactNode }) {
   const { task, history, threads } = view;
   const navigate = useBbNavigate();
   const now = useNow();
   const zone = useTodosZone();
   const onScreen = useCardOnScreen(task.id);
-  const { act, busy, error, note } = useTaskActions(refresh);
   const [showHistory, setShowHistory] = useState(false);
   const names: Names = { bot: people.botName, leads: people.leads, threads, botThreadId: people.botThreadId };
   const status = taskStatus(task);
@@ -148,53 +141,10 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
   const found = task.automation?.role === "finding" && task.automation.count > 1 ? `Found ${task.automation.count} times` : null;
   const step = recurring ? task.schedule?.text ?? null : found ? null : open ? task.progress.step : null;
   const lines = historyLines(history, names);
-  const targets = handOffTargets(task, people.targets, threads, people.botThreadId);
-  const choose = (option: string) => void act({ id: task.id, action: "choose", option });
-  const snooze = view.todo && mine && open && task.kind !== "waiting-outside"
-    ? <SnoozeMenu disabled={busy} onSnooze={(preset) => void act({ id: task.id, action: "snooze", snooze: preset })} onPick={(at) => void act({ id: task.id, action: "snooze", at })} />
-    : null;
-  const handOff = open && targets.length ? <HandOffMenu targets={targets} disabled={busy} onHandOff={(to) => void act({ id: task.id, action: "hand_off", to })} /> : null;
-  const done = (primary: boolean) => <button type="button" data-testid="task-done" className={primary ? CARD_PRIMARY : CARD_GHOST} disabled={busy} onClick={() => void act({ id: task.id, action: task.kind === "read" ? "got_it" : "done" })}><Icon name="CircleCheck" />{task.kind === "read" ? "Got it" : "Done"}</button>;
-  const takeBack = <button type="button" data-testid="task-take-back" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: task.id, action: "take_back" })}><Icon name="ArrowTurnBackward" />{task.origin === "loop" || everMine(history) ? "Take back" : "Take over"}</button>;
+  // Read-only (strands replaced tasks): an old ::work or ::loop card shows where it stands, with its thread to open.
   const openButton = openThread && !detail ? <button type="button" data-testid="task-open-thread" className={CARD_GHOST} onClick={openThread}><Icon name="MessageSquare" />{task.owner === "cos" && !task.workers.length ? "Open chat" : "Open thread"}</button> : null;
   const linked = detail ? linkedThread(task, threads, people.botThreadId, people.botName) : null;
-  // Start work: a queued task goes to its owner (or whoever it's handed to) through hand_off, which starts it.
-  const queued = open && !mine && task.state === "todo" && /^(cos|thread:.+)$/.test(task.owner);
-  const startWork = detail && queued ? <button type="button" data-testid="task-start" className={CARD_PRIMARY} disabled={busy} onClick={() => void act({ id: task.id, action: "hand_off", to: task.owner })}><Icon name="Play" />Start work</button> : null;
-  const drop = detail && open && !recurring ? <button type="button" data-testid="task-drop" className={CARD_GHOST} disabled={busy} onClick={() => void act({ id: task.id, action: "drop" })}><Icon name="X" />Drop</button> : null;
-  let actions: ReactNode;
-  if (recurring) {
-    actions = openButton;
-  } else if (closed) {
-    actions = <>
-      {task.closedBy === null || task.closedBy === USER_OWNER
-        ? <button type="button" data-testid="task-undo" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: task.id, action: "reopen" })}><Icon name="ArrowTurnBackward" />Undo</button>
-        : <button type="button" data-testid="task-reopen" className={CARD_BUTTON} disabled={busy} title={task.owner === USER_OWNER ? "Reopens it for you" : `Reopens it and asks ${ownerLabel(task.owner, names)} to carry on`} onClick={() => void act({ id: task.id, action: "reopen" })}><Icon name="RotateCw" />{task.owner === USER_OWNER ? "Reopen" : `Reopen for ${ownerShort(task, names)}`}</button>}
-      {openButton}
-    </>;
-  } else if (mine) {
-    const options = task.kind === "decide" && task.options.length
-      ? (task.options.length > INLINE_OPTIONS ? <ChooseSheet loop={asLoop(task)} disabled={busy} onChoose={choose} /> : task.options.map((option) => <OptionButton key={option} option={option} disabled={busy} onChoose={() => choose(option)} />))
-      : null;
-    const nudge = view.todo && task.kind === "waiting-outside" ? <button type="button" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: task.id, action: "nudge" })}><Icon name="BellDot" />Nudge them</button> : null;
-    actions = <>
-      {options ?? (task.kind === "waiting-outside" ? nudge : done(true))}
-      {!options && task.kind === "waiting-outside" ? done(false) : null}
-      {snooze}
-      {handOff}
-      {openButton}
-      {drop}
-    </>;
-  } else {
-    actions = <>
-      {startWork}
-      {openButton}
-      {takeBack}
-      {handOff}
-      {done(false)}
-      {drop}
-    </>;
-  }
+  const actions: ReactNode = openButton;
   const stamp = closed && task.closedAt ? task.closedAt : task.updatedAt;
   return (
     <ChatCard ref={chat ? onScreen : undefined} data-testid="task-card" data-work-card-id={task.id} data-task-id={task.id} data-state={status.id} data-kind={task.kind} data-stale={task.stale || undefined}
@@ -278,17 +228,6 @@ export function TaskCardView({ view, people, refresh, chat = false, bare = false
             })}
           </ol>
         ) : null}
-        {view.todo && mine && open && now - task.updatedAt > STALE_MS ? (
-          <div data-testid="task-review" className="flex flex-wrap items-center gap-1.5 border-t border-border/70 pt-2 text-xs text-muted-foreground">
-            <Icon name="TimeSchedule" className="size-3.5" />No update in {elapsed(task.updatedAt, now)}. Still on it?
-            <span className="ml-auto flex gap-1.5">
-              <button type="button" className={CARD_BUTTON} disabled={busy} onClick={() => void act({ id: task.id, action: "keep" })}><Icon name="Check" />Keep</button>
-              <button type="button" className={CARD_GHOST} disabled={busy} onClick={() => void act({ id: task.id, action: "drop" })}><Icon name="X" />Dismiss</button>
-            </span>
-          </div>
-        ) : null}
-        {note ? <p data-testid="task-note" className="text-xs text-muted-foreground">{note}</p> : null}
-        {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}
       </div>
     </ChatCard>
   );

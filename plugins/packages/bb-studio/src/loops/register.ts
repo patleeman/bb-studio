@@ -1,64 +1,40 @@
 import type { BbPluginApi } from '@get-bb/plugin-sdk';
 import type Database from 'better-sqlite3';
 import { z } from 'zod';
-import { rpcContract, act, update, filters, ownerInfo, type Loop } from './contract';
-import { LoopStore, placeKey } from './store';
-import { assertTasksReady, guardTasks } from '../tasks/store';
+import { rpcContract, act, update, ownerInfo, type Loop } from './contract';
+import { LoopStore } from './store';
+import { guardTasks } from '../tasks/store';
 import { inLoopView, toLoop } from '../tasks/views';
-import { LoopScheduler, defaults, snooze, systemTimeZone } from './scheduler';
-/** The lock-screen actions a todo's push offers, by kind (the app's BB_LOOP categories). */
-export function loopPushActions(kind:Loop['kind']):('done'|'snooze'|'got_it'|'choose')[]{return kind==='read'?['got_it','snooze']:kind==='decide'?['choose','snooze']:['done','snooze'];}
+import { defaults, local, snooze, systemTimeZone } from './scheduler';
 import { STUDIO_REALTIME_CHANNEL } from '../kit/contract';
-import { defineItemMention } from '../kit/server/mention';
-import { LOOP_MENTION, loopContext, ownerText } from './reference';
-import { KIND } from './ui/model';
+import { ownerText } from './reference';
 type ThreadLike={title?:string|null;titleFallback?:string|null;archivedAt?:number|null;deletedAt?:number|null};
 /** A `thread:<id>` owner by name. A deleted or missing thread has no link. */
 export function threadOwner(owner:string,thread:ThreadLike|null):z.infer<typeof ownerInfo>{const threadId=owner.slice('thread:'.length);
  if(!thread||thread.deletedAt)return {owner,name:'A thread that was removed',threadId:null};
  const title=(thread.title||thread.titleFallback||'').trim()||'Untitled thread';return {owner,name:thread.archivedAt?`${title} (archived)`:title,threadId};}
-/** Task action helpers backed by the tasks store/scheduler (unified under task_*). */
-export const LOOP_TOOLS=['task_act','task_fire','task_morning'];
-/** Todos' settings are Studio settings (src/settings): loopsEnabled under Threads, the rest under Bot ▸ Controls ▸ Attention, the time zone (todosTimeZone) included. */
-type LoopSettings={get():Promise<Record<string,unknown>>;onChange(listener:(next:Record<string,unknown>)=>void):void};
-export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:string)=>Promise<void>,notify:ConstructorParameters<typeof LoopScheduler>[3],settings:LoopSettings,timeZone:()=>string=()=>systemTimeZone(),every:(name:string,everyMs:number,work:()=>void)=>void=(_name,everyMs,work)=>{const timer=setInterval(work,everyMs);bb.onDispose(()=>clearInterval(timer));}){
- // Every saved change tells open windows (cards, the Todos tab, badges) to refetch.
+/**
+ * The loops RPCs, kept for older phone builds now that personal to-dos are
+ * gone (strands replaced them): no reminders run, nothing is added, and the
+ * lists are empty. An old to-do's card still reads (loops.get) and its
+ * actions still close or change the row; the Bot hears of a hand-off.
+ */
+export function registerLoops(bb:BbPluginApi,db:Database.Database,post:(text:string)=>Promise<void>,timeZone:()=>string=()=>systemTimeZone()){
  const store=new LoopStore(db,()=>bb.realtime.publish(STUDIO_REALTIME_CHANNEL,{pluginId:'studio'}));
- let config=defaults;
- const scheduler=new LoopScheduler(store,()=>config,post,notify);
- // A tick that can't post (the Bot paused, or no Main) waits and tries again each minute; the reason is logged once, not every minute.
- let lastTickError:string|null=null;
- const tick=()=>void scheduler.tick().then(()=>{lastTickError=null;},e=>{const text=String((e as Error)?.message??e);if(text!==lastTickError)bb.log.warn(`Todos: ${text}`);lastTickError=text;});
- // Turning Todos on releases what queued while it was off, without waiting a minute.
- const refresh=(v:Record<string,unknown>)=>{const zone=timeZone();try{localCheck(zone);const was=config.enabled;config={enabled:v.loopsEnabled===true,timeZone:zone,dailyBudget:Math.max(0,Number(v.loopDailyBudget??5)),quietStart:Number(v.loopQuietStart??22),quietEnd:Number(v.loopQuietEnd??7)};if(!was&&config.enabled)tick();}catch(e){bb.log.warn(String(e));}};
- function localCheck(zone:string){new Intl.DateTimeFormat('en',{timeZone:zone}).format();}
- void settings.get().then(refresh);settings.onChange(refresh);
- // A thread owner's name: the thread's title, "(archived)" once archived, or a fallback when it's gone.
+ const config=()=>({...defaults,enabled:false,timeZone:timeZone()});
  const owner=async(id:string):Promise<z.infer<typeof ownerInfo>|null>=>{if(!id.startsWith('thread:'))return null;const threadId=id.slice('thread:'.length);return threadOwner(id,await bb.sdk.threads.get({threadId}).catch(()=>null) as ThreadLike|null);};
- const list=async(x:z.infer<typeof filters>)=>{const g=store.groups(x);const ids=new Set([...g.needsYouNow,...g.comingUp,...g.agentsOnIt,...g.waitingOnOthers,...g.done].map(l=>l.owner));return {...g,held:scheduler.held(),areas:store.areas(),owners:(await Promise.all([...ids].map(owner))).filter((o):o is z.infer<typeof ownerInfo>=>!!o)};};
  let route:((x:z.infer<typeof act>)=>Promise<Loop|null>)|null=null;
  const action=async(x:z.infer<typeof act>)=>{if(route){const routed=await route(x);if(routed)return routed;}return direct(x);};
- const direct=async(x:z.infer<typeof act>)=>{const l=store.act(x,p=>snooze(p,config));if(x.action==='nudge')await post(`Task ${l.id}: nudge. Draft the nudge message and show it to the user in this chat for approval. Do not send it until they approve.`);else if(['hand_off','choose'].includes(x.action))await post(`Task ${l.id}: ${x.action}. ${x.option??''} Owner: ${ownerText(l.owner)}. Use task_list to review and carry out the next step.`);return l;};
+ const direct=async(x:z.infer<typeof act>)=>{const l=store.act(x,p=>snooze(p,config()));if(x.action==='nudge')await post(`The user asked you to nudge about ${JSON.stringify(l.title)}. Draft the nudge message and show it to the user in this chat for approval. Do not send it until they approve.`);else if(['hand_off','choose'].includes(x.action))await post(`The user chose ${x.action==='choose'?JSON.stringify(x.option??''):'to hand off'} ${JSON.stringify(l.title)}. Owner: ${ownerText(l.owner)}. Carry out the next step and report in this chat.`);return l;};
  const change=(x:z.infer<typeof update>)=>store.update(x.id,{...x.changes,...(x.surfaceNow?{status:'queued' as const,trigger:{type:'none' as const}}:{})});
- // A spoken line becomes a draft todo the Bot fills in.
- const addLine=async(text:string)=>{const l=store.add({title:text,status:'in_progress',owner:'cos'});await post(`Fill in draft task ${l.id} from this typed line using task_update, then queue it: ${JSON.stringify(text)}`);return l;};
- const addTyped=(text:string)=>{const l=store.add({title:text,status:'surfaced',owner:'patrick'});store.event(l.id,'added_by_you');return l;};
  const get=async(id:string)=>{const t=store.tasks.find(id);const l=t&&!inLoopView(t)?toLoop(t):store.get(id),o=await owner(l.owner);return {loop:l,history:store.history(id),...(o?{owner:o}:{})};};
+ const empty={needsYouNow:[],comingUp:[],agentsOnIt:[],waitingOnOthers:[],done:[],held:[],areas:[],owners:[]};
  bb.rpc.register(rpcContract,guardTasks(db,{
- 'loops.list':list,'loops.get':({id})=>get(id),
- 'loops.add':({text})=>addTyped(text),
- 'loops.update':async(x:z.infer<typeof update>)=>{if(!x.surfaceNow)return change(x);if(x.changes)store.update(x.id,x.changes);return scheduler.surfaceNow(x.id);},'loops.act':action,'loops.fire':({event})=>scheduler.fire(event),'loops.place':({place,direction})=>scheduler.fire(`place:${placeKey(place)}:${direction}`),'loops.setPlaces':({names})=>({names:store.setPlaces(names)}),'loops.places':()=>({names:store.places()}),'loops.morning':()=>scheduler.morning(),
+ 'loops.list':()=>empty,'loops.get':({id})=>get(id),
+ 'loops.add':()=>{throw new Error('To-dos are gone from BB Studio. Tell your Bot in its chat instead.');},
+ 'loops.update':async(x:z.infer<typeof update>)=>change(x),'loops.act':action,
+ 'loops.fire':()=>({matched:0}),'loops.place':()=>({matched:0}),'loops.setPlaces':()=>({names:[]}),'loops.places':()=>({names:[]}),
+ 'loops.morning':()=>({date:local(Date.now(),timeZone()).date,items:[],more:0,lowPriority:[]}),
  },false,(message:string)=>bb.log.warn(message)));
- // Unified task_* action helpers (CRUD lives in src/tasks/register.ts).
- const tool=<S extends z.ZodTypeAny>(verb:string,description:string,parameters:S,execute:(x:z.infer<S>)=>string|Promise<string>)=>{const run=(x:z.infer<S>)=>{assertTasksReady(db);return execute(x);};bb.agents.registerTool({name:`task_${verb}`,description,parameters,execute:run});};
- tool('act','Close, snooze, choose an option, nudge, keep or hand off a task.',act,async x=>JSON.stringify(await action(x)));
- tool('fire','Signal a named event (e.g. reply:sam) to release waiting tasks.',z.object({event:z.string().min(1)}),({event})=>JSON.stringify(scheduler.fire(event)));
- tool('morning','Get the user\'s top five tasks for today and remaining count for the morning card. Load the studio skill ("Morning card") for the exact markdown format.',z.object({}),()=>JSON.stringify(scheduler.morning()));
- // `@loop` in any composer, and the chip Discuss puts in the Bot chat: the Bot gets the todo as context.
- // A todo deleted since is said so rather than thrown, which would block the send.
- bb.ui.registerMentionProvider(defineItemMention({id:LOOP_MENTION,label:'Tasks',
-  search:({query})=>{const q=query.trim().toLowerCase();const g=store.groups();return [...g.needsYouNow,...g.comingUp,...g.agentsOnIt,...g.waitingOnOthers,...g.done].filter(l=>!q||l.title.toLowerCase().includes(q)).map(l=>({id:l.id,title:l.title,subtitle:l.closedAt?'Done':KIND[l.kind].label,icon:KIND[l.kind].icon}));},
-  resolve:(id)=>{try{return {context:loopContext(store.get(id))};}catch{return {context:`The user mentioned todo ${id}, which no longer exists.`};}}}));
- every('todos',60_000,tick);
- return {store,scheduler,act:action,actDirect:direct,routeActs:(fn:(x:z.infer<typeof act>)=>Promise<Loop|null>)=>{route=fn;},add:addLine,addTyped,enabled:()=>config.enabled,setSettings:(value:typeof defaults)=>{config=value;}};
+ return {store,act:action,actDirect:direct,routeActs:(fn:(x:z.infer<typeof act>)=>Promise<Loop|null>)=>{route=fn;}};
 }

@@ -1,13 +1,10 @@
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { CONTINUE_TOOL, continueInNew, continueResult, continuedFromLine, continuedLines, handoffText, registerContinueNew, sourceSeqOf, type ContinueDeps } from "./continue-new";
+import { CONTINUE_TOOL, continueInNew, continueInput, continueResult, continuedFromLine, continuedLines, handoffText, registerContinueNew, sourceSeqOf, type ContinueDeps } from "./continue-new";
 import { MIGRATIONS } from "./migrations";
-import { findCardMessage, type TimelineReader } from "./work/register";
-import { WorkCardStore } from "./work/store";
 
 const NOW = new Date("2026-11-13T15:00:00Z").getTime();
 let db: Database.Database;
-let work: WorkCardStore;
 let spawned: Record<string, unknown>[];
 let recorded: [string, string][];
 let changed: string[];
@@ -30,8 +27,6 @@ function deps(patch: Partial<ContinueDeps> = {}): ContinueDeps {
     spawn: async (request) => { spawned.push(request); return { id: "thr_hud", projectId: "personal" }; },
     recordConversation: (threadId, botId) => { recorded.push([threadId, botId]); },
     focus: () => {},
-    card: (id) => work.find(id),
-    moveCard: (id, threadId) => work.move(id, threadId),
     changed: (threadId) => { changed.push(threadId); },
     ...patch,
   };
@@ -43,7 +38,6 @@ beforeEach(() => {
   db = new Database(":memory:");
   db.exec(MIGRATIONS.find((sql) => sql.includes("CREATE TABLE work_cards"))!);
   db.exec(MIGRATIONS.find((sql) => sql.includes("CREATE TABLE tasks"))!);
-  work = new WorkCardStore(db);
   spawned = [];
   recorded = [];
   changed = [];
@@ -52,7 +46,7 @@ afterEach(() => { db.close(); vi.useRealTimers(); });
 
 it("starts a conversation of the same Bot from the handoff, not the transcript", async () => {
   const result = await continueInNew(deps(), "thr_main", { title: "HUD redesign", handoff: "**Decisions**\n- Keep the compass\n\n**Open questions**\n- Dark mode?" });
-  expect(result).toMatchObject({ threadId: "thr_hud", projectId: "personal", title: "HUD redesign", moved: [], skipped: [] });
+  expect(result).toMatchObject({ threadId: "thr_hud", projectId: "personal", title: "HUD redesign" });
   expect(spawned).toHaveLength(1);
   const request = spawned[0]!;
   expect(request).toMatchObject({
@@ -86,28 +80,16 @@ it("leaves a link card for the source conversation that reads as a plain link wh
   expect(link).not.toMatch(/^::/);
   expect(link).toMatch(/^\[[^\]]+\]\(\/threads\/thr_hud\)$/);
   expect(continuedLines("thr_x", 'Odd "title" {with} [brackets]\nand lines')).toBe('::continued{to="thr_x" title="Odd title with [brackets] and lines"}\n[Continued in Odd "title" {with} brackets and lines →](/threads/thr_x)');
-  expect(JSON.parse(continueResult(result))).toEqual({ threadId: "thr_hud", title: "HUD redesign", moved: [], post: result.post });
+  expect(JSON.parse(continueResult(result))).toEqual({ threadId: "thr_hud", title: "HUD redesign", post: result.post });
 });
 
-it("moves the topic's work cards: each conversation's In flight list shows only its own", async () => {
-  const hud = work.create({ title: "HUD mockups", threadId: "thr_main", kind: "worker" });
-  const trip = work.create({ title: "Trip bookings", threadId: "thr_main" });
-  const other = work.create({ title: "Release", threadId: "thr_elsewhere" });
-  work.placed(hud.id, "m_hud", 12);
-  vi.setSystemTime(NOW + 5_000);
-  const result = await continueInNew(deps(), "thr_main", { title: "HUD redesign", handoff: "Notes", workCards: [hud.id, other.id, "wc_missing"], openingMessage: "Show the two layouts and ask which" });
-  expect(result.moved).toEqual([hud.id]);
-  expect(result.skipped).toEqual([other.id, "wc_missing"]);
-  expect(JSON.parse(continueResult(result))).toMatchObject({ notMoved: [other.id, "wc_missing"] });
-  expect(work.get(hud.id)).toMatchObject({ threadId: "thr_hud", messageId: null, messageSeq: null, title: "HUD mockups", updatedAt: NOW + 5_000 });
-  expect(work.get(other.id).threadId).toBe("thr_elsewhere");
-  expect(work.inFlight("thr_main").map((card) => card.id)).toEqual([trip.id]);
-  expect(work.inFlight("thr_hud").map((card) => card.id)).toEqual([hud.id]);
+it("takes no work cards: a handoff names the new conversation's first step", async () => {
+  expect(continueInput.safeParse({ title: "X", handoff: "Y", workCards: ["wc_1"] }).success).toBe(true);
+  expect(continueInput.parse({ title: "X", handoff: "Y", workCards: ["wc_1"] })).not.toHaveProperty("workCards");
+  await continueInNew(deps(), "thr_main", { title: "HUD redesign", handoff: "Notes", openingMessage: "Show the two layouts and ask which" });
   const text = (spawned[0]!.input as { text: string }[])[1]!.text;
-  expect(text).toContain(`**Moved here:** HUD mockups. Post each card once, on its own line, in your first reply: \`::work{id="${hud.id}"}\``);
+  expect(text).not.toContain("::work");
   expect(text.endsWith("**First:** Show the two layouts and ask which")).toBe(true);
-  const read: TimelineReader = async (threadId) => ({ rows: threadId === "thr_hud" ? [{ id: "r1", kind: "conversation", role: "assistant", text: `Picking up the HUD.\n\n::work{id="${hud.id}"}`, messageSeq: 3 }] : [] });
-  expect(await findCardMessage(read, work.get(hud.id))).toEqual({ messageId: "r1", messageSeq: 3 });
 });
 
 it("refuses a worker, a thread with no project, and bad input, and starts nothing", async () => {
@@ -128,7 +110,7 @@ it("opens with one plain line naming where it came from: Main, or the conversati
 it("links back to the user's latest message, and starts without a model or an environment when there's none", async () => {
   expect(sourceSeqOf(TIMELINE)).toBe(14);
   expect(sourceSeqOf([{ kind: "conversation", role: "user", initiator: "agent", messageSeq: 3 }, { kind: "conversation", role: "assistant", messageSeq: 4 }])).toBeNull();
-  expect(handoffText({ sourceThreadId: "thr_main", sourceSeq: null, handoff: " Notes ", moved: [] })).toBe("Continued from @thread:thr_main\n\nNotes\n\n**First:** a one-line recap and the next step.");
+  expect(handoffText({ sourceThreadId: "thr_main", sourceSeq: null, handoff: " Notes " })).toBe("Continued from @thread:thr_main\n\nNotes\n\n**First:** a one-line recap and the next step.");
   await continueInNew(deps({ defaultModel: () => null, thread: async () => ({ projectId: "proj_1", environmentId: null }), timeline: async () => { throw new Error("offline"); } }), "thr_main", { title: "T", handoff: "H" });
   expect(spawned[0]).toMatchObject({ projectId: "proj_1", environment: { type: "project-default" } });
   expect(spawned[0]).not.toHaveProperty("model");

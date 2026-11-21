@@ -124,7 +124,7 @@ final class RoomQAUITests: ServerIsolatedUITestCase {
         shot("xxl-talk")
         app.buttons["roomLayDown"].tap()
         app.buttons["roomMenuButton"].tap()
-        XCTAssertTrue(app.buttons["roomPlace-tasks"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["roomPlace-strands"].waitForExistence(timeout: 10))
         shot("xxl-menu")
     }
 
@@ -160,7 +160,7 @@ final class RoomQAUITests: ServerIsolatedUITestCase {
         try audit()
         app.buttons["roomLayDown"].tap()
         app.buttons["roomMenuButton"].tap()
-        XCTAssertTrue(app.buttons["roomPlace-tasks"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["roomPlace-strands"].waitForExistence(timeout: 10))
         try audit()
     }
 

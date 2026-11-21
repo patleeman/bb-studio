@@ -12,6 +12,9 @@ export type SpawnDeps = {
 
 const automated = (t: Task) => t.automation !== null || t.schedule !== null;
 
+// Links between worker threads and the task rows that list them. Studio no
+// longer makes a task for a new worker (strands replaced tasks); ensure()
+// remains for a worker row the tests and the link checks still build.
 export class SpawnLinks {
   constructor(readonly deps: SpawnDeps) {}
 
@@ -56,18 +59,6 @@ export class SpawnLinks {
     const saved = this.store.save(workerTask(this.store, workerTaskPlan(all, fact, this.deps.dir)));
     this.store.event(saved.id, "created", { by: LINKED_BY, owner: saved.owner, from: "worker thread" });
     return saved;
-  }
-
-  async check(threadId: string): Promise<Task | null> {
-    const fact = await this.deps.thread(threadId).catch(() => null);
-    return this.ensure(fact);
-  }
-
-  spawned(thread: ThreadFact | null): void {
-    if (!thread?.parentThreadId) return;
-    const later = this.deps.later ?? ((ms, work) => { const timer = setTimeout(work, ms); (timer as { unref?: () => void }).unref?.(); });
-    const wait = Math.max(0, SPAWN_GRACE_MS - (this.store.now() - thread.createdAt)) + 1_000;
-    later(wait, () => { void this.check(thread.id).catch((error: unknown) => this.deps.log?.(`Task links: ${error instanceof Error ? error.message : String(error)}`)); });
   }
 
   private placeholders(threadId: string): Task[] {

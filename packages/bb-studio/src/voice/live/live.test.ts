@@ -3,10 +3,10 @@ import Database from "better-sqlite3";
 import { describe, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "../../migrations";
 import { voiceLiveContract } from "./contract";
-import { ANSWER_CHUNK_CHARS, replyChunk, STALE_MS, VOICE_LIVE_SETTINGS, VoiceLive, VoiceRefused, type LoopBefore, type VoiceAutomation, type VoiceLiveDeps, type VoiceLoop, type VoiceTarget } from "./live";
+import { ANSWER_CHUNK_CHARS, replyChunk, STALE_MS, VOICE_LIVE_SETTINGS, VoiceLive, VoiceRefused, type VoiceAutomation, type VoiceLiveDeps, type VoiceTarget } from "./live";
 import { CLIENT_SECRETS_URL, LIVE_SESSIONS_URL, VOICE_TOOL_DEFINITIONS } from "./session";
 import { LIVE_VOICES, REALTIME_CALLS_URL, STILL_WAITING_MS, VOICE_TOOLS, waitingNote } from "./shared";
-import { DRAFT_MS, UNDO_MS } from "./rules";
+import { DRAFT_MS } from "./rules";
 
 const KEY = "sk-test-secret-key";
 const NOW = new Date(2026, 10, 1, 9, 0, 0).getTime();
@@ -29,18 +29,6 @@ function setup(options: { key?: string; cap?: number; model?: string; status?: n
   const publish = vi.fn();
   const openThread = vi.fn(async (_input: { title: string; text: string; note: string }) => "thr_voice");
   const claim = vi.fn(async (_threadId: string) => true);
-  const loops: Record<string, VoiceLoop> = {
-    loop_1: { id: "loop_1", title: "Reply to Dana", kind: "do", status: "surfaced", priority: "urgent", due: null, trigger: { type: "none" }, owner: "patrick" },
-    loop_2: { id: "loop_2", title: "Renew the domain", kind: "do", status: "queued", priority: "normal", due: null, trigger: { type: "none" }, owner: "patrick" },
-    loop_ts: { id: "loop_ts", title: "Remove the stale Tailscale node", kind: "do", status: "surfaced", priority: "normal", due: null, trigger: { type: "none" }, owner: "patrick" },
-  };
-  const act = vi.fn(async (id: string, action: "done" | "snooze" | "hand_off" | "drop", options?: { snooze?: string; owner?: string }) => {
-    const status = action === "done" ? "done" : action === "snooze" ? "snoozed" : action === "drop" ? "dropped" : "in_progress";
-    loops[id] = { ...loops[id]!, status, trigger: action === "snooze" ? { type: "time", at: NOW + 3600_000, preset: options?.snooze } : loops[id]!.trigger, owner: options?.owner ?? loops[id]!.owner };
-    return loops[id]!;
-  });
-  const add = vi.fn(async (text: string) => (loops.loop_new = { id: "loop_new", title: text, kind: "do", status: "in_progress", priority: "normal", due: null, trigger: { type: "none" }, owner: "cos" }));
-  const restore = vi.fn((id: string, before: LoopBefore) => (loops[id] = { ...loops[id]!, ...before }));
   const threads = { stop: vi.fn(async (_threadId: string) => {}), archive: vi.fn(async (_threadId: string) => {}) };
   const automationList: VoiceAutomation[] = [{ id: "auto_1", name: "Morning brief", state: "active" }, { id: "auto_2", name: "Larkspur heartbeat", state: "active" }];
   const automations = { list: vi.fn(async () => automationList), pause: vi.fn(async (_id: string) => {}), remove: vi.fn(async (_id: string) => {}) };
@@ -56,14 +44,13 @@ function setup(options: { key?: string; cap?: number; model?: string; status?: n
     cos: () => COS,
     resolve,
     latestReply: async (threadId) => (threadId === LARKSPUR.threadId ? { title: "the Larkspur lead", text: "**Paused** the eBay fetcher until Monday." } : null),
-    loops: { groups: () => ({ needsYouNow: [loops.loop_1!], comingUp: [loops.loop_2!] }), get: (id) => { if (!loops[id]) throw new Error("No such todo."); return loops[id]!; }, act, add, restore },
     threads, automations, claim,
     openThread, send, push, publish,
     mockUrl: () => options.mock ?? null,
     now: () => now,
     ...overrides,
   });
-  return { db, live, fetch, send, push, publish, openThread, claim, act, add, restore, threads, automations, loops, resolve, advance: (ms: number) => { now += ms; } };
+  return { db, live, fetch, send, push, publish, openThread, claim, threads, automations, resolve, advance: (ms: number) => { now += ms; } };
 }
 
 const said = (text: string) => ({ type: "transcript" as const, role: "user" as const, text });
@@ -165,18 +152,12 @@ describe("the monthly cap", () => {
 
 describe("eyes-free rules in the tool layer", () => {
   it("reads are free and write nothing", async () => {
-    const { live, send, act, db } = setup();
+    const { live, send, db } = setup();
     const { sessionId } = await live.start({ sdp: "x" });
     const before = eventCount(db);
-    const loops = await live.tool(sessionId, "todos_list", "{}");
-    expect(loops).toContain("Needs you now (1)");
-    expect(loops).toContain("Reply to Dana (id loop_1, urgent)");
-    expect(loops).toContain("Coming up (1)");
-    expect(await live.tool(sessionId, "loops_list", "{}")).toBe(loops);
     expect(await live.tool(sessionId, "read_replies", JSON.stringify({ target: "the Larkspur lead" }))).toContain("Paused the eBay fetcher until Monday.");
     expect(await live.tool(sessionId, "read_replies", "")).toMatch(/Nothing was sent this session/);
     expect(send).not.toHaveBeenCalled();
-    expect(act).not.toHaveBeenCalled();
     expect(eventCount(db)).toBe(before);
   });
 
@@ -203,7 +184,7 @@ describe("eyes-free rules in the tool layer", () => {
     expect(asked.waitFor).toEqual({ title: "the Larkspur lead", ms: STILL_WAITING_MS, note: waitingNote("the Larkspur lead") });
     expect(asked.waitFor!.note).toContain(`"Still waiting on the Larkspur lead."`);
     expect((await live.toolReply(sessionId, "send_to_cos", JSON.stringify({ intent: "do", message: "Book the car service" }))).waitFor).toBeUndefined();
-    expect((await live.toolReply(sessionId, "todos_list", "{}")).waitFor).toBeUndefined();
+    expect((await live.toolReply(sessionId, "read_replies", "{}")).waitFor).toBeUndefined();
     expect((await live.toolReply(sessionId, "send_to_thread", JSON.stringify({ target: "nowhere", message: "hi" }))).waitFor).toBeUndefined();
   });
 
@@ -228,54 +209,29 @@ describe("eyes-free rules in the tool layer", () => {
     expect(relay.note).toMatch(/This request involves spending money and messaging people outside BB: ask first\./);
   });
 
-  it("loops: done, snooze, hand off and add happen at once, with a 10 s undo", async () => {
-    const { live, act, add, restore, loops, advance } = setup();
+  it("the retired to-do tools say to-dos are gone, and the session carries on", async () => {
+    const { live, send } = setup();
     const { sessionId } = await live.start({ sdp: "x" });
-    for (const action of ["choose", "nudge", "keep"]) {
-      expect(await live.tool(sessionId, "todos_act", JSON.stringify({ loop_id: "loop_1", action }))).toMatch(/Voice can mark a task done, snooze it, hand it off or drop it/);
+    for (const name of ["todos_list", "todos_act", "todos_add", "loops_list", "loops_act", "loops_add", "undo"]) {
+      expect(await live.tool(sessionId, name, JSON.stringify({ loop_id: "loop_1", action: "drop" }))).toBe("Voice no longer keeps to-dos. Offer to pass the request to Dot with send_to_cos instead.");
     }
-    expect(act).not.toHaveBeenCalled();
-
-    const done = await live.tool(sessionId, "todos_act", JSON.stringify({ loop_id: "loop_1", action: "done" }));
-    expect(done).toMatch(/^Marked "Reply to Dana" done\. .*"undo" in the next 10 seconds \(action a_[a-f0-9]+\)/);
-    expect(loops.loop_1!.status).toBe("done");
-    expect(await live.tool(sessionId, "undo", JSON.stringify({ action_id: actionId(done) }))).toBe(`Undone: "Reply to Dana" is back as it was.`);
-    expect(restore).toHaveBeenCalledWith("loop_1", { status: "surfaced", trigger: { type: "none" }, owner: "patrick" });
-    expect(await live.tool(sessionId, "undo", "{}")).toBe("That was already undone.");
-
-    const handed = await live.tool(sessionId, "todos_act", JSON.stringify({ loop_id: "loop_1", action: "hand_off", to: "the Larkspur lead" }));
-    expect(handed).toMatch(/^Handed "Reply to Dana" to the Larkspur lead\./);
-    expect(act).toHaveBeenLastCalledWith("loop_1", "hand_off", { snooze: undefined, owner: "thread:thr_larkspur" });
-    await live.tool(sessionId, "undo", "{}");
-    expect(loops.loop_1!.owner).toBe("patrick");
-
-    const added = await live.tool(sessionId, "todos_add", JSON.stringify({ text: "Call the plumber back" }));
-    expect(added).toMatch(/^Added "Call the plumber back"; Dot will fill it in\./);
-    expect(add).toHaveBeenCalledWith("Call the plumber back");
-    expect(await live.tool(sessionId, "undo", "{}")).toBe(`Undone: "Call the plumber back" is gone.`);
-    expect(loops.loop_new!.status).toBe("dropped");
-
-    expect(await live.tool(sessionId, "todos_act", JSON.stringify({ loop_id: "loop_2", action: "snooze", snooze: "tonight" }))).toMatch(/^Snoozed "Renew the domain" to tonight/);
-    advance(UNDO_MS + 1);
-    expect(await live.tool(sessionId, "undo", "{}")).toMatch(/undo window for "Renew the domain" has closed/);
-    expect(loops.loop_2!.status).toBe("snoozed");
+    expect(send).not.toHaveBeenCalled();
+    expect(await live.tool(sessionId, "send_to_cos", JSON.stringify({ message: "Track the plumber callback" }))).toMatch(/^Sent to Dot\./);
   });
 
-  it("destructive: dropping a task waits for the user's own spoken yes", async () => {
-    const { live, act, loops } = setup();
+  it("destructive: waits for the user's own spoken yes", async () => {
+    const { live, threads } = setup();
     const { sessionId } = await live.start({ sdp: "x" });
-    const asked = await live.tool(sessionId, "todos_act", JSON.stringify({ loop_id: "loop_ts", action: "drop" }));
-    expect(prompt(asked)).toBe(`Drop the task 'Remove the stale Tailscale node'? Say yes to drop.`);
-    expect(act).not.toHaveBeenCalled();
+    const asked = await live.tool(sessionId, "archive_thread", JSON.stringify({ target: "the Larkspur lead" }));
+    expect(prompt(asked)).toBe(`Archive the thread 'the Larkspur lead'? Say yes to archive.`);
     const id = actionId(asked);
     // The model can't confirm on its own; filler, unclear talk and the voice's own echo aren't a yes.
     expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }))).toMatch(/hasn't heard the user answer/);
     expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [heard("Thank you for watching", id)])).toMatch(/hasn't heard/);
-    expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [heard("Drop the task Remove the stale Tailscale node? Say yes to drop.", id)])).toMatch(/didn't hear a clear yes/);
-    expect(act).not.toHaveBeenCalled();
-    expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [heard("Yes, drop it", id)])).toBe(`Dropped the task 'Remove the stale Tailscale node'. Say that briefly; it can't be undone by voice.`);
-    expect(act).toHaveBeenCalledWith("loop_ts", "drop");
-    expect(loops.loop_ts!.status).toBe("dropped");
+    expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [heard("Archive the thread the Larkspur lead? Say yes to archive.", id)])).toMatch(/didn't hear a clear yes/);
+    expect(threads.archive).not.toHaveBeenCalled();
+    expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [heard("Yes, archive it", id)])).toBe(`Archived 'the Larkspur lead'. Say that briefly; it can't be undone by voice.`);
+    expect(threads.archive).toHaveBeenCalledWith(LARKSPUR.threadId);
     expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: id }), [heard("yes", id)])).toBe("That was already done.");
   });
 
@@ -444,7 +400,7 @@ describe("replies, interruptions and hang-up", () => {
     expect(last.text).toContain("→ **Sent to the Larkspur lead:** Pause the eBay fetcher");
     expect(last.text).toContain("← **the Larkspur lead answered:** Paused. It resumes Monday at 9.");
     expect(last.text.indexOf("_(interrupted)_")).toBeLessThan(last.text.indexOf("**Voice:** Bye."));
-    await expect(live.tool(sessionId, "todos_list", "{}")).rejects.toThrow(/has ended/);
+    await expect(live.tool(sessionId, "read_replies", "{}")).rejects.toThrow(/has ended/);
     // A later answer goes to the phone and the voice thread.
     const second = setup();
     const s2 = await second.live.start({ sdp: "x" });
@@ -495,11 +451,10 @@ describe("the voice thread", () => {
     const { live, send } = setup();
     const { sessionId } = await live.start({ sdp: "x" });
     const posts = () => send.mock.calls.filter(([input]) => input.threadId === "thr_voice").map(([input]) => input.text);
-    // Talk, reads, todo actions, a destructive one, usage and a reply: nothing posted.
-    live.record(sessionId, [said("What's waiting?"), { type: "transcript", role: "assistant", text: "Two things." }, { type: "live_usage", seconds: 30 }]);
-    await live.tool(sessionId, "todos_list", "{}");
-    await live.tool(sessionId, "todos_act", JSON.stringify({ loop_id: "loop_1", action: "done" }));
-    const asked = await live.tool(sessionId, "todos_act", JSON.stringify({ loop_id: "loop_ts", action: "drop" }));
+    // Talk, reads, a destructive action, usage and a reply: nothing posted.
+    live.record(sessionId, [said("Archive the Larkspur lead"), { type: "transcript", role: "assistant", text: "Archive it?" }, { type: "live_usage", seconds: 30 }]);
+    await live.tool(sessionId, "read_replies", "{}");
+    const asked = await live.tool(sessionId, "archive_thread", JSON.stringify({ target: "the Larkspur lead" }));
     await live.tool(sessionId, "confirm", JSON.stringify({ action_id: actionId(asked) }), [heard("yes", actionId(asked))]);
     live.record(sessionId, [said("Tell Dot to book the car")]);
     expect(posts()).toEqual([]);
@@ -514,11 +469,10 @@ describe("the voice thread", () => {
     expect(posts()).toHaveLength(2);
     expect(posts()[1]!.split("\n\n")).toEqual([
       expect.stringMatching(/^🎙 \*\*Voice session · /),
-      "**You:** What's waiting?",
-      "**Voice:** Two things.",
-      "✓ **Task done:** Reply to Dana",
+      "**You:** Archive the Larkspur lead",
+      "**Voice:** Archive it?",
       "**You:** yes",
-      `⚠️ **Done after a spoken yes:** Dropped the task 'Remove the stale Tailscale node'.`,
+      `⚠️ **Done after a spoken yes:** Archived 'the Larkspur lead'.`,
       "**You:** Tell Dot to book the car",
       "→ **Sent to Dot:** Book the car service for Friday",
       "← **Dot answered:** Booked for Friday at 8.",
@@ -526,6 +480,22 @@ describe("the voice thread", () => {
     ]);
     await live.end(sessionId);
     expect(posts()).toHaveLength(2);
+  });
+});
+
+describe("sessions from before to-dos were removed", () => {
+  it("still show their to-do actions in the transcript, and a to-do drop waiting for a yes does nothing", async () => {
+    const { db, live, send } = setup();
+    const { sessionId } = await live.start({ sdp: "x" });
+    const insert = db.prepare("INSERT INTO voice_call_events (call_id, at, kind, role, text, data) VALUES (?, ?, ?, NULL, NULL, ?)");
+    insert.run(sessionId, NOW, "loop_action", JSON.stringify({ actionId: "a_1", loopId: "loop_1", title: "Reply to Dana", action: "hand_off", before: { status: "surfaced", trigger: { type: "none" } } }));
+    insert.run(sessionId, NOW, "undone", JSON.stringify({ actionId: "a_1" }));
+    insert.run(sessionId, NOW, "pending", JSON.stringify({ actionId: "d_1", action: "drop_loop", id: "loop_ts", name: "Remove the stale Tailscale node", prompt: "Drop the task 'Remove the stale Tailscale node'? Say yes to drop." }));
+    expect(await live.tool(sessionId, "confirm", JSON.stringify({ action_id: "d_1" }), [heard("yes", "d_1")])).toMatch(/^Voice can't do that any more, so nothing was done\./);
+    await live.end(sessionId);
+    const transcript = send.mock.calls.filter(([input]) => input.threadId === "thr_voice").at(-1)![0].text;
+    expect(transcript).toContain("✓ **Task hand off:** Reply to Dana");
+    expect(transcript).toContain("↩ **Undone**");
   });
 });
 
@@ -572,7 +542,7 @@ describe("identity: the session speaks as the thread it was launched from", () =
     expect(JSON.parse(recorded.data)).toMatchObject({ identity: { kind: "lead" }, missing: [], ms: 0 });
 
     // Tools don't rebuild it.
-    await live.tool(started.sessionId, "todos_list", "{}");
+    await live.tool(started.sessionId, "read_replies", "{}");
     await live.tool(started.sessionId, "send_to_thread", JSON.stringify({ message: "Retry the fetcher" }));
     expect(seed).toHaveBeenCalledTimes(1);
   });

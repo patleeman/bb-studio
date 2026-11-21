@@ -415,8 +415,8 @@ describe("applying bb's Studio data at Studio's start", () => {
     expect(mode(importDir(x.dataDir))).toBe(0o700);
     expect(mode(importPath(x.dataDir, BEFORE_KV_FILE))).toBe(0o600);
     expect(JSON.parse(readFileSync(importPath(x.dataDir, BEFORE_KV_FILE), "utf8")).plugin_kv).toEqual([{ key: "rail:layout", value: '["ours"]' }, { key: SETTINGS_KV_KEY, value: '{"theme":"ours"}' }]);
-    // bb's kv: Task reminders off, the skill registry's approval not carried, chat links kept.
-    expect(Object.fromEntries(x.kv.values)).toEqual({ [SETTINGS_KV_KEY]: { loopsEnabled: false, theme: "bb" }, "link:pages:pg_1": { threadId: "thr_conv", at: 1 } });
+    // bb's kv: the skill registry's approval not carried, settings and chat links kept.
+    expect(Object.fromEntries(x.kv.values)).toEqual({ [SETTINGS_KV_KEY]: { loopsEnabled: true, theme: "bb" }, "link:pages:pg_1": { threadId: "thr_conv", at: 1 } });
     expect(existsSync(x.stagedDir)).toBe(false);
     expect(existsSync(importPath(x.dataDir, BB_KV_FILE))).toBe(false);
     // A second start changes nothing.
@@ -611,7 +611,7 @@ describe("Settings' view of it", () => {
     live.close();
   });
 
-  it("turns Task reminders off and drops the registry approval in bb's key-value rows", () => {
-    expect(prepareKv({ plugin_kv: [{ key: SKILLS_REGISTRY_KV_KEY, value: "true" }] })).toEqual({ plugin_kv: [{ key: SETTINGS_KV_KEY, value: '{"loopsEnabled":false}' }], prepared: true });
+  it("drops the registry approval in bb's key-value rows and keeps the settings as they are", () => {
+    expect(prepareKv({ plugin_kv: [{ key: SKILLS_REGISTRY_KV_KEY, value: "true" }, { key: SETTINGS_KV_KEY, value: '{"theme":"bb"}' }] })).toEqual({ plugin_kv: [{ key: SETTINGS_KV_KEY, value: '{"theme":"bb"}' }], prepared: true });
   });
 });

@@ -73,7 +73,6 @@ export const STUDIO_SETTINGS = {
   // Threads
   decisions_enabled: { group: "threads", type: "boolean", label: "Smart Queue", description: "Pauses while the standalone Smart Queue plugin is on.", default: true },
   autoResumeThreads: { group: "threads", type: "boolean", label: "Resume after a restart", description: "Up to 2 times an hour.", default: true },
-  loopsEnabled: { group: "threads", type: "boolean", label: "Task reminders", description: "Posts each due task in the Bot’s chat, with its push, and starts the Bot’s own tasks when they’re due.", default: false },
   snapshotsPerPage: { group: "threads", type: "number", label: "Page history", description: "Keep this many versions of each page, or 0 for all.", default: 50, min: 0, max: 1000, integer: true },
   exportDeletedThreads: { group: "threads", type: "boolean", label: "Export deleted threads", description: "If the file cannot be written, the thread is not deleted.", default: false },
   exportDeletedThreadsFolder: { group: "threads", type: "string", label: "Export folder", description: "An absolute folder path on this computer, such as /Users/you/bb-thread-exports. One .jsonl file per thread.", default: "", maxLength: 500 },
@@ -92,11 +91,7 @@ export const STUDIO_SETTINGS = {
   decisions_batchConfidence: { group: "advanced", type: "number", label: "Smart Queue batch confidence", description: "From 0 to 1. When a thread frees up, queued follow-ups the decision model is this sure belong together go as one turn. 1 sends each on its own.", default: 0.5, min: 0, max: 1 },
 
   // Bot ▸ Controls ▸ Attention
-  loopDailyBudget: { group: "attention", type: "number", label: "Interruptions a day", description: "After this many, new tasks wait in the Tasks list until tomorrow.", default: 5, min: 0, max: 100, integer: true },
-  loopQuietStart: { group: "attention", type: "number", label: "Quiet hours start", description: "The hour, 0 to 23, when interruptions stop.", default: 22, min: 0, max: 23, integer: true },
-  loopQuietEnd: { group: "attention", type: "number", label: "Quiet hours end", description: "The hour, 0 to 23, when interruptions start again.", default: 7, min: 0, max: 23, integer: true },
-  strandsOverview: { group: "attention", type: "boolean", label: "Strands overview", description: "A Strands page beside Tasks: every conversation's open strands, needs you first.", default: false },
-  todosTimeZone: { group: "attention", type: "string", label: "Time zone", description: "Tasks show and come due in this zone. Empty uses this computer’s.", default: "", maxLength: 100, timeZone: true },
+  todosTimeZone: { group: "attention", type: "string", label: "Time zone", description: "Scheduled items show and run in this zone. Empty uses this computer’s.", default: "", maxLength: 100, timeZone: true },
 } as const satisfies Record<string, StudioSetting>;
 
 export type StudioSettingKey = keyof typeof STUDIO_SETTINGS;

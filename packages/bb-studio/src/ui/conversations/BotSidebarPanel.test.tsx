@@ -52,8 +52,7 @@ vi.mock("../../kit/ui/context-menu", () => ({
   ContextMenuSubContent: ({ children }: { children: ReactNode }) => <div data-testid="context-sub-content">{children}</div>,
   ContextMenuCheckboxItem: ({ children, checked, onSelect }: { children: ReactNode; checked?: boolean; onSelect?: () => void }) => <div role="menuitemcheckbox" aria-checked={!!checked} data-testid="context-check" onClick={() => onSelect?.()}>{children}</div>,
 }));
-vi.mock("../../loops/ui/hooks", () => ({ useLoopsEnabled: () => state.loopsOn, loopsPath: (botId: string) => `/plugins/studio/studio/bot/${botId}/loops` }));
-vi.mock("../../strands/ui/overview-route", () => ({ useStrandsOverviewEnabled: () => false, strandsPath: (botId: string) => `/plugins/studio/studio/bot/${botId}/strands` }));
+vi.mock("../../strands/ui/overview-route", () => ({ strandsPath: (botId: string) => `/plugins/studio/studio/bot/${botId}/strands` }));
 vi.mock("../bot/BotAvatar", () => ({ ProviderLogo: ({ provider }: { provider: { id: string } }) => <i data-logo={provider.id} />, BotAvatar: ({ emoji }: { emoji: string }) => <span data-testid="avatar">{emoji}</span> }));
 
 import { BotSidebarPanel } from "./BotSidebarPanel";
@@ -464,13 +463,13 @@ describe("the Bot's space (round 7)", () => {
 
   it("lists the Bot's pages as rows, opens each, and selects the one on screen", async () => {
     await mount();
-    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Tasks", "Conversations"]);
+    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Strands", "Conversations"]);
     await act(async () => { $('[data-testid="space-page-skills"]')!.click(); });
     expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "skills/cos" });
     await act(async () => { $('[data-testid="space-page-library"]')!.click(); });
     expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", {});
-    await act(async () => { $('[data-testid="space-page-automations"]')!.click(); });
-    expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("automations");
+    await act(async () => { $('[data-testid="space-page-strands"]')!.click(); });
+    expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "bot/cos/strands" });
     window.history.replaceState(null, "", "/plugins/studio/studio/memory/cos");
     await mount();
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)); });
@@ -478,25 +477,16 @@ describe("the Bot's space (round 7)", () => {
     expect($('[data-testid="space-page-library"]')?.getAttribute("aria-current")).toBeNull();
   });
 
-  it("names another Bot's page row Scheduled: the Tasks list is the primary Bot's", async () => {
-    state.loopsOn = true;
-    state.live.bot_spaces = { bots: [space("cos", "Chief of Staff", false, "main"), space("home", "Home", false, "home_main")], currentBotId: "home" };
-    await mount();
-    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Scheduled", "Conversations"]);
-    expect($('[data-testid="space-page-todos"]')).toBeNull();
-    await act(async () => { $('[data-testid="space-page-automations"]')!.click(); });
-    expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("automations");
-  });
-
-  it("adds Tasks with what needs the user now, for the primary Bot with Task reminders on", async () => {
-    state.loopsOn = true;
+  it("names every Bot's page row Strands, with the count of strands that need the user", async () => {
+    state.live["strands.overview"] = { conversations: [], needs: 2, running: 1 };
     state.live["loops.list"] = { needsYouNow: [{}, {}, {}], comingUp: [], agentsOnIt: [], waitingOnOthers: [], done: [] };
     await mount();
-    expect($('[data-testid="space-todos-count"]')?.textContent).toBe("3");
-    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Tasks", "Conversations"]);
+    expect($('[data-testid="space-strands-count"]')?.textContent).toBe("2");
+    expect($('[data-testid="space-todos-count"]')).toBeNull();
+    state.live.bot_spaces = { bots: [space("cos", "Chief of Staff", false, "main"), space("home", "Home", false, "home_main")], currentBotId: "home" };
+    await mount();
+    expect($$('nav[aria-label="Bot pages"] button').map((row) => row.children[1]?.textContent)).toEqual(["Memory", "Skills", "Library", "Strands", "Conversations"]);
     expect($('[data-testid="space-page-automations"]')).toBeNull();
-    await act(async () => { $('[data-testid="space-page-todos"]')!.click(); });
-    expect(state.navigate.toPluginPanel).toHaveBeenLastCalledWith("studio", { subPath: "bot/cos/loops" });
   });
 
   it("opens Edit space in the sidebar from the menu or a right-click on a Bot, in place of the lists", async () => {

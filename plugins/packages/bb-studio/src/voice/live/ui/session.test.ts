@@ -240,7 +240,7 @@ describe("LiveSession", () => {
       emit({ type: "session.started" });
       emit({ type: "session.input_transcript.delta", delta: "What's waiting?" });
       vi.mocked(server.tool).mockRejectedValueOnce(new Error("offline"));
-      emit({ type: "response.event", event: { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "todos_list", arguments: "{}" } } });
+      emit({ type: "response.event", event: { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "read_replies", arguments: "{}" } } });
       await flush();
       await session.sync();
       expect(server.event).toHaveBeenCalledWith({ sessionId: "vl_0123456789abcdef", events: [expect.objectContaining({ type: "transcript", text: "What's waiting?" })] });
@@ -252,7 +252,7 @@ describe("LiveSession", () => {
       await flush();
       emit({ type: "session.started" });
       for (let index = 0; index < 230; index++) emit(usage(index));
-      emit({ type: "response.event", event: { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "todos_list", arguments: "{}" } } });
+      emit({ type: "response.event", event: { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "read_replies", arguments: "{}" } } });
       for (let index = 0; index < 5; index++) await flush();
       const events = vi.mocked(server.event).mock.calls.map(([input]) => input);
       const tool = vi.mocked(server.tool).mock.calls[0]![0];

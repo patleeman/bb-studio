@@ -50,11 +50,16 @@ export function backupDatabase(db: Database.Database, at: number, label = "tasks
 
 export const KEEP_BACKUPS = 3;
 
-export function pruneBackups(file: string, keep = KEEP_BACKUPS): string[] {
+/**
+ * Removes old `before-<label>-*` backups. "tasks" keeps its first (the one
+ * from before the move to tasks) and the newest keep-1; with `newest`, only
+ * the newest `keep` stay.
+ */
+export function pruneBackups(file: string, keep = KEEP_BACKUPS, options: { label?: string; newest?: boolean } = {}): string[] {
   const ext = extname(file);
-  const prefix = `${basename(file, ext)}.before-tasks-`;
+  const prefix = `${basename(file, ext)}.before-${options.label ?? "tasks"}-`;
   const all = readdirSync(dirname(file)).filter((name) => name.startsWith(prefix) && name.endsWith(ext || ".db")).sort();
-  const old = all.length > keep ? all.slice(1, all.length - (keep - 1)) : [];
+  const old = all.length <= keep ? [] : options.newest ? all.slice(0, all.length - keep) : all.slice(1, all.length - (keep - 1));
   for (const name of old) rmSync(join(dirname(file), name), { force: true });
   return old;
 }

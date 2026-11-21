@@ -1,14 +1,16 @@
 #if DEBUG
 import Foundation
 
+/// Debug builds, with `-qaLoopsDemo`: answers Studio's `tasks.*` and `work.*`
+/// for the presence screen's rows, In flight (the conversation's bar on a
+/// Studio without strands) and the old read-only task cards. `-qaTasksNoBoard`
+/// is a Studio without `tasks.flight` and `tasks.board`: In flight reads
+/// `tasks.inFlight` then. `-qaTaskCards` adds old `::work` cards to the chat.
 enum TasksDemo {
-    static var enabled: Bool { LoopsDemo.enabled && !ProcessInfo.processInfo.arguments.contains("-qaTasksOld") }
-    static var old: Bool { LoopsDemo.mode != nil && !enabled }
+    static var enabled: Bool { LoopsDemo.enabled }
     static let noBoard = ProcessInfo.processInfo.arguments.contains("-qaTasksNoBoard")
 
     nonisolated(unsafe) private static var installed = false
-    static let offline = ProcessInfo.processInfo.arguments.contains("-qaTasksOffline")
-    static let started = ProcessInfo.processInfo.systemUptime
 
     @MainActor static func installIfNeeded() {
         LoopsDemo.installIfNeeded()
@@ -20,7 +22,6 @@ enum TasksDemo {
         ThreadTitles.set("thr_demo_w7", "iPad UI suite")
         let previous = BBClient.demoTransport
         BBClient.demoTransport = { method, path, body in
-            if offline, path.contains("/rpc/tasks."), ProcessInfo.processInfo.systemUptime - started < 45 { throw URLError(.notConnectedToInternet) }
             if let answer = Store.shared.respond(method, path, body) { return answer }
             if let previous { return try await previous(method, path, body) }
             throw URLError(.cannotConnectToHost)
@@ -50,12 +51,9 @@ enum TasksDemo {
             let base = "/api/v1/plugins/studio/rpc/"
             guard path.hasPrefix(base) else { return nil }
             let name = String(path.dropFirst(base.count))
-            guard name.hasPrefix("tasks.") || name.hasPrefix("work.") || name == "loops.add" || name == "areas.list" else { return nil }
+            guard name.hasPrefix("tasks.") || name.hasPrefix("work.") else { return nil }
             let unknown = (404, Data(#"{"ok":false,"error":{"message":"Unknown method"}}"#.utf8))
-            if TasksDemo.old {
-                return name == "loops.add" ? nil : unknown
-            }
-            if TasksDemo.noBoard, ["tasks.flight", "tasks.board", "areas.list"].contains(name) { return unknown }
+            if TasksDemo.noBoard, ["tasks.flight", "tasks.board"].contains(name) { return unknown }
             let input = body.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
             return lock.withLock {
                 requests.append((name, input))
@@ -90,8 +88,6 @@ enum TasksDemo {
                     out["threads"] = threads()
                     out["done"] = nil
                     return ok(out)
-                case "areas.list":
-                    return ok(["areas": LoopsDemo.empty ? [] : TasksDemo.areas()])
                 case "tasks.act": return act(input)
                 case "work.dismiss":
                     guard var task = find(input["id"] as? String), var card = task["card"] as? [String: Any] else { return (400, Data()) }
@@ -111,13 +107,6 @@ enum TasksDemo {
                         cleared += 1
                     }
                     return ok(["cleared": cleared])
-                case "loops.add":
-                    let text = (input["text"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                    let id = "loop_typed\(tasks.count)"
-                    let task = Self.task(id, text, queue: "surfaced", origin: "loop", created: Self.now)
-                    tasks.append(task)
-                    event(id, "added_by_you")
-                    return ok(Self.loopShape(task))
                 default: return nil
                 }
             }
@@ -252,13 +241,6 @@ enum TasksDemo {
                     "automation": (automation as Any?) ?? NSNull(), "stale": stale, "origin": origin, "createdAt": created,
                     "updatedAt": closed ?? created, "closedAt": closedState ? (closed ?? now - 60_000) : NSNull(), "closedBy": closedState ? owner : NSNull()]
         }
-
-        static func loopShape(_ task: [String: Any]) -> [String: Any] {
-            let timing = task["timing"] as? [String: Any] ?? [:]
-            return ["id": task["id"]!, "title": task["title"]!, "why": task["why"]!, "source": NSNull(), "kind": task["kind"]!, "options": task["options"]!,
-                    "owner": task["owner"]!, "trigger": timing["trigger"] ?? ["type": "none"], "priority": "normal", "push": false, "status": "surfaced",
-                    "due": NSNull(), "area": NSNull(), "createdAt": task["createdAt"]!, "updatedAt": task["updatedAt"]!, "closedAt": NSNull(), "closedBy": NSNull()]
-        }
     }
 
     static func seed() -> [[String: Any]] {
@@ -317,28 +299,6 @@ enum TasksDemo {
             ]
         }
         return out
-    }
-
-    static func areas() -> [[String: Any]] {
-        let now = Store.now
-        func item(_ title: String, _ sinceAt: Double?, needsUser: Bool, taskId: String? = nil) -> [String: Any] {
-            ["title": title, "since": NSNull(), "sinceAt": (sinceAt as Any?) ?? NSNull(), "needsUser": needsUser, "taskId": (taskId as Any?) ?? NSNull()]
-        }
-        func area(_ id: String, _ name: String, _ covers: String, owner: [String: Any], ownerName: String, status: String, now line: String, open: [[String: Any]]) -> [String: Any] {
-            ["id": id, "name": name, "covers": covers, "owner": owner, "ownerName": ownerName, "cadence": "Every morning", "status": status, "reason": NSNull(),
-             "now": line, "open": open, "runs": [], "lastRun": now - 3_600_000, "nextRun": NSNull(), "nextLabel": NSNull(), "paused": false, "links": [],
-             "statusFile": NSNull(), "fileError": NSNull(), "updatedAt": now - 3_600_000]
-        }
-        return [
-            area("area_demo_launch", "Larkspur launch", "The Q4 launch plan and its workers", owner: ["kind": "lead", "thread": LoopsDemo.leadId],
-                 ownerName: "Larkspur lead", status: "ok", now: "On track for Friday.",
-                 open: [item("Approve the plumber's quote", now - 86_400_000, needsUser: true, taskId: "task_demo_quote"),
-                        item("Confirm the Q4 numbers with finance", now - 86_400_000, needsUser: true, taskId: "wc_demo_fork"),
-                        item("Slides for the review", now - 172_800_000, needsUser: false)]),
-            area("area_demo_home", "Home", "The house, bills and repairs", owner: ["kind": "bot", "botId": "bot_demo"], ownerName: "Juniper",
-                 status: "flagged", now: "The insurance renewal is due this week.",
-                 open: [item("Renew the home insurance policy", now - 3 * 86_400_000, needsUser: true)]),
-        ]
     }
 
     struct Rows {

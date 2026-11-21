@@ -128,7 +128,8 @@ final class AppModel: ObservableObject {
     /// Text for the Bot chat's composer (Nudge them drafts; it never sends).
     @Published var botDraft: String?
     /// Set to show the Bot's Loops (the morning card's "N more", `bbstudio://loops`).
-    @Published var botShowsLoops = false
+    /// The classic Bot tab shows the Strands screen (a link came before the Bot loaded).
+    @Published var botShowsStrands = false
     @Published var shellLink: BotShellLink?
 
     /// The last thread opened.
@@ -225,7 +226,7 @@ final class AppModel: ObservableObject {
     }
 
     /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://mini[/<id>]`, `bbstudio://visual-chat[/<threadId>|/new]`,
-    /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://handsfree`, `bbstudio://studio` (or `talk`), `bbstudio://bots` (the list), `bbstudio://bot[/<id>]` (also `chief` and the old `web`, the primary), `bbstudio://bot-talk` (also `chief-talk`, hands-free voice started at once), `bbstudio://loops` (the Bot's Loops).
+    /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://handsfree`, `bbstudio://studio` (or `talk`), `bbstudio://bots` (the list), `bbstudio://bot[/<id>]` (also `chief` and the old `web`, the primary), `bbstudio://bot-talk` (also `chief-talk`, hands-free voice started at once), `bbstudio://strands` (also the older `loops`, the Strands screen).
     func handle(_ url: URL) {
         guard AppLink.handles(url), AppLink.acceptsOrigin(url, serverURL: serverURL) else { return }
         let id = url.pathComponents.dropFirst().first
@@ -263,7 +264,7 @@ final class AppModel: ObservableObject {
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)
         case "bots": openBots(.list)
-        case "loops": openLoops()
+        case "loops", "strands": openStrands()
         case "bot": openBots(id.map { .bot($0) } ?? .primary)
         case "chief", "web": openBots(.primary)
         case "bot-talk", "chief-talk": toggleBotTalk(botId: id)
@@ -329,7 +330,7 @@ final class AppModel: ObservableObject {
                 shellLink = .page(page, botId: botId)
             } else {
                 switch page {
-                case .todos: openLoops()
+                case .strands: openStrands()
                 case .automations: open(.automations)
                 default: openBots(botId.map(BotRoute.bot) ?? .primary)
                 }
@@ -337,7 +338,7 @@ final class AppModel: ObservableObject {
         case .automation:
             follow(.botPage(.automations, botId: nil), push: push)
         case .todo(let id):
-            if id.isEmpty { follow(.botPage(.todos, botId: nil), push: push) } else { openTask(id, conversation: nil) }
+            if id.isEmpty { follow(.botPage(.strands, botId: nil), push: push) } else { openTask(id, conversation: nil) }
         case .record(let id):
             follow(.route(.memoryRecord(id: id)), push: push)
         case .route(let route):
@@ -381,8 +382,19 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// A tap on an older Studio's to-do push (`BB_LOOP`): its conversation, or
+    /// the read-only card when it names none.
+    func openTaskPush(_ id: String, conversation: String?) {
+        if let conversation {
+            if case .task? = sheet { sheet = nil }
+            openTaskThread(conversation)
+        } else {
+            openTask(id, conversation: nil)
+        }
+    }
+
     func openTask(_ id: String, conversation: String?) {
-        if let conversation { openTaskThread(conversation) } else if inSpaces { tab = .bot } else { openLoops() }
+        if let conversation { openTaskThread(conversation) } else if inSpaces { tab = .bot } else { openBots(.primary) }
         Task {
             try? await Task.sleep(for: .milliseconds(450))
             sheet = .task(id: id)
@@ -447,20 +459,20 @@ final class AppModel: ObservableObject {
         return bot.mainThreadId(in: store.view(for: bot.id))
     }
 
-    /// The Bot's Loops screen.
-    func openLoops() {
+    /// The Bot's Strands screen (`bbstudio://strands`, and the older `bbstudio://loops`).
+    func openStrands() {
         if inSpaces {
             tab = .bot
-            shellLink = .page(.todos, botId: nil)
+            shellLink = .page(.strands, botId: nil)
             return
         }
         if tab != .bot { openBots(.primary) }
-        botShowsLoops = true
+        botShowsStrands = true
     }
 
     /// Puts text in the Bot chat's composer and shows the chat.
     func draftForBot(_ text: String) {
-        botShowsLoops = false
+        botShowsStrands = false
         if tab != .bot { openBots(.primary) }
         botDraft = text
     }

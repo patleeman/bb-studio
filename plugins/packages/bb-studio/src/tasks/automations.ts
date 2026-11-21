@@ -156,10 +156,18 @@ export function readSources(db: Database.Database, bots: readonly AutomationBotI
   return out;
 }
 
-const runNote = (id: string) => `This run is task ${id}. If something needs the user, hand it to them with task_handoff (to "user", needs: what they must do or decide) instead of only writing it here; otherwise it closes by itself when you finish.`;
-const findingNote = (id: string) => `This finding is task ${id}. Record what you do about it with task_update, and hand it to the user with task_handoff only if they must act. Leave it open while the problem lasts: the watcher adds repeats to it quietly and closes it when the problem clears.`;
-const worseNote = (id: string, severity: Severity) => `This finding (task ${id}) is open already and is now ${severity}: it got worse. Look at it again, record what you do with task_update, and hand it to the user with task_handoff if they must act.`;
-export const URGENT_RUN_NOTE = (id: string) => `This run is task ${id}, now in the user's Today and waiting on them. If they must act, post its card once on its own line: ::loop{id="${id}"}. If you can handle it yourself, take it with task_handoff to "cos" and close it with task_update when done.`;
+// What a run's or a finding's wake tells the agent. No task tools. In a Bot
+// conversation (Main, a lead) the agent says so in the chat and flags it
+// (bot_needs_you), which its strand shows as "needs you" and pushes once. A
+// runner's thread has no chat the user reads and no bot_needs_you: it reports
+// through runner_report, and the Bot brings it to the user.
+const CHAT_ACT = "tell the user in this chat what they must do or decide, and call bot_needs_you with a short reason; the strand shows it as needs you.";
+const RUNNER_ACT = "report it with runner_report (level tell, or urgent only when they must act now); the Bot brings it to them. Don't write to the user yourself.";
+export const userActs = (runner: boolean) => (runner ? RUNNER_ACT : CHAT_ACT);
+const runNote = (_id: string, runner = false) => `If something in this run needs the user, ${userActs(runner)} Otherwise just finish.`;
+const findingNote = (_id: string, runner = false) => `This is a watcher finding. Look into it and say in a line what you did. If only the user can act, ${userActs(runner)} The watcher adds repeats quietly and closes the finding when the problem clears.`;
+const worseNote = (_id: string, severity: Severity, runner = false) => `This watcher finding is open already and is now ${severity}: it got worse. Look at it again and say what you did. If only the user can act, ${userActs(runner)}`;
+export const URGENT_RUN_NOTE = (_id: string) => `This run needs the user now: tell the user in this chat what they must do or decide, and call bot_needs_you with a short reason; the strand shows it as needs you. If you can handle it yourself, do, and say so.`;
 
 const agentTouched = (data: string) => {
   try { const by = (JSON.parse(data || "{}") as { by?: unknown }).by; return typeof by === "string" && (by.startsWith("thread:") || by === USER_OWNER); } catch { return false; }
@@ -180,6 +188,11 @@ export class AutomationTasks {
 
   source(match: (s: AutomationSource) => boolean): AutomationSource | null {
     return this.deps.sources().find(match) ?? null;
+  }
+
+  /** Whether a thread is a runner's: it has no bot_needs_you and no chat the user reads. */
+  private inRunner(thread: string | null): boolean {
+    return !!thread && this.deps.sources().some((s) => s.kind === "runner" && s.thread === thread);
   }
 
   private desired(src: AutomationSource, existing: Task | null): Task {
@@ -306,7 +319,7 @@ export class AutomationTasks {
     if (!open.length) return null;
     const owner = (o: string) => (o === "cos" ? "you" : o === USER_OWNER ? "the user" : o);
     const lines = open.slice(0, limit).map((t) => `- ${JSON.stringify(t.title)} (${t.id}; owner ${owner(t.owner)}; found ${t.automation!.count} time${t.automation!.count === 1 ? "" : "s"}; first ${this.when(t.createdAt)}, last ${this.when(t.automation!.lastAt ?? t.createdAt)}${t.automation!.severity ? `; ${t.automation!.severity}` : ""})`);
-    return `Open watcher findings (their repeats stay quiet, so check each is being handled; close one with task_update once it is fixed):\n${lines.join("\n")}${open.length > limit ? `\n…and ${open.length - limit} more (task_list).` : ""}`;
+    return `Open watcher findings (their repeats stay quiet, so check each is being handled; each closes by itself when its watcher stops finding it):\n${lines.join("\n")}${open.length > limit ? `\n…and ${open.length - limit} more.` : ""}`;
   }
 
   started(key: { owner: string; ownerId: string }, threadId: string): RunStart | null {
@@ -316,7 +329,7 @@ export class AutomationTasks {
     const run = this.openRun(src, threadId, null);
     const brief = src.kind === "runner" ? null : this.openFindingsBrief(src.botId);
     return {
-      prompt: src.kind === "runner" ? `This run is task ${run.id}; runner_report records its result there.` : `${runNote(run.id)}${brief ? `\n${brief}` : ""}`,
+      prompt: src.kind === "runner" ? "runner_report records this run's result." : `${runNote(run.id)}${brief ? `\n${brief}` : ""}`,
       sent: () => this.patch(run.id, (link) => { link.sentAt = this.now(); }),
       failed: (error) => this.close(run.id, "failed", `Failed: ${clip(firstLine(error))}`),
     };
@@ -397,7 +410,7 @@ export class AutomationTasks {
     if (mode === "each") {
       const run = this.openRun(src, src.thread, null);
       return {
-        post: body, note: runNote(run.id), taskId: run.id, steer: true,
+        post: body, note: runNote(run.id, this.inRunner(src.thread)), taskId: run.id, steer: true,
         done: (posted) => { if (posted) this.patch(run.id, (link) => { link.sentAt = this.now(); }); else this.close(run.id, "failed", "Failed: it could not be posted"); },
       };
     }
@@ -440,9 +453,10 @@ export class AutomationTasks {
     if (!made && !unposted.length && !worse.length) return "quiet";
     const post = control?.key ? body : body.split("\n").map((line) => lineSeverity(line.trim()).text).join("\n");
     const lead = made ?? unposted[0] ?? worse[0]!.task;
-    const note = made || unposted.length ? findingNote(lead.id) : worseNote(lead.id, worse[0]!.severity);
     const owner = !made && !unposted.length ? this.store.get(lead.id).owner : null;
     const thread = owner?.startsWith("thread:") ? owner.slice("thread:".length) : null;
+    const runner = this.inRunner(thread ?? src.thread);
+    const note = made || unposted.length ? findingNote(lead.id, runner) : worseNote(lead.id, worse[0]!.severity, runner);
     return {
       post, note, taskId: lead.id, steer: false, ...(thread && thread !== src.thread ? { thread } : {}),
       done: (posted) => {
@@ -472,7 +486,8 @@ export class AutomationTasks {
     if (this.store.history(task.id).some((e) => agentTouched(e.data))) return;
     const thread = task.owner === "cos" ? src.thread : task.owner.slice("thread:".length);
     if (!thread) return;
-    const text = `Watcher finding task ${task.id} (${JSON.stringify(task.title)}) is still happening: found ${link.count} times since ${this.when(task.createdAt)}, and nobody has updated it in a day. Latest output: ${clip(task.why, 600)}\nLook into it and record what you do with task_update, or hand it to the user with task_handoff if they must act. Don't write to the user otherwise; reply exactly [PASS] if there is nothing to do.`;
+    const runner = this.inRunner(thread);
+    const text = `Watcher finding ${JSON.stringify(task.title)} is still happening: found ${link.count} times since ${this.when(task.createdAt)}, and nobody has looked at it in a day. Latest output: ${clip(task.why, 600)}\nLook into it. If only the user can act, ${userActs(runner)} ${runner ? "Otherwise" : "Don't write to the user otherwise;"} reply exactly [PASS] if there is nothing to do.`;
     const why = findingKey(task.why);
     void this.deps.nudge(thread, text).then(
       () => this.patch(task.id, (l) => { l.nudgedAt = this.now(); l.nudged = why; }),

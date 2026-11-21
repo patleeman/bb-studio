@@ -75,8 +75,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         NotificationActions.register()
-        // iOS relaunches the app in the background for a place's region event.
-        PlaceMonitor.shared.start()
         #if targetEnvironment(simulator)
         return true
         #else
@@ -152,7 +150,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                     return
                 }
                 if let route = NotificationActions.taskRoute(userInfo) {
-                    await MainActor.run { AppModel.shared.openTask(route.id, conversation: route.conversation) }
+                    await MainActor.run { AppModel.shared.openTaskPush(route.id, conversation: route.conversation) }
                 } else if let threadId = userInfo["threadId"] as? String {
                     await MainActor.run { AppModel.shared.openThread(threadId) }
                 }

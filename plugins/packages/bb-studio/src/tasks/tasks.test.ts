@@ -6,13 +6,13 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "../migrations";
 import { registerLoops } from "../loops/register";
 import { LoopStore } from "../loops/store";
-import { LoopScheduler } from "../loops/scheduler";
 import { registerWorkCards } from "../work/register";
 import { WORK_ID } from "../work/shared";
 import { WorkCardStore } from "../work/store";
-import { task as taskSchema, TODO_ID, type Task } from "./contract";
+import { task as taskSchema, type Task } from "./contract";
 import { adoptAtStart, backupPath, KEEP_BACKUPS, migrateToTasks, summarizeTaskMigration, verifyTaskMigration } from "./migrate";
-import { registerTasks, TASK_TOOLS } from "./register";
+import { registerTasks } from "./register";
+import { todoGroups, withTaskTools, withWorkTools } from "./test/tools";
 import { markTasksUnavailable, normalizeTask, TaskStore } from "./store";
 import { applyLoop, applyWork, taskFromLoop, taskFromWork, toLoop, toWork } from "./views";
 import { taskFromLoop as captureTaskFromLoop } from "../../../../scripts/capture/task-rows.mjs";
@@ -54,20 +54,15 @@ function setup() {
   const { bb, tools, handlers } = fakeBb();
   const posts: string[] = [];
   const post = async (text: string) => { posts.push(text); };
-  const loops = registerLoops(bb as never, db, post, async () => {}, { get: async () => ({ loopsEnabled: false }), onChange: () => {} }, () => "UTC", () => {});
-  const work = registerWorkCards(bb as never, db, { read: async () => ({ rows: [] }), thread: async () => ({ status: "active" }) });
-  const tasks = registerTasks(bb as never, db, post);
+  const loops = registerLoops(bb as never, db, post, () => "UTC");
+  const work = withWorkTools(tools, db, registerWorkCards(bb as never, db, { read: async () => ({ rows: [] }), thread: async () => ({ status: "active" }) }));
+  const tasks = withTaskTools(tools, db, registerTasks(bb as never, db, post));
   const call = async (name: string, input: unknown, ctx: { threadId?: string | null } = { threadId: "thr_lead" }) => {
     const text = await tools[name]!.execute(input, ctx);
     return text.startsWith("Error: ") ? { error: text } : JSON.parse(text);
   };
   return { posts, loops, work, tasks, tools, handlers, call };
 }
-
-it("registers the five task tools", () => {
-  const { tools } = setup();
-  expect(TASK_TOOLS.every((name) => !!tools[name])).toBe(true);
-});
 
 it("creates a task with defaults, the user alias stored as patrick, and reads it back with history", async () => {
   const { call } = setup();
@@ -100,7 +95,7 @@ it("gives a task with a card a ::work line that the work card views read", async
 it("a carded task made for another conversation is posted there by that conversation; one in the caller's own thread tells the caller to post it", async () => {
   const { bb, tools } = fakeBb();
   const sent: { threadId: string; text: string }[] = [];
-  registerTasks(bb as never, db, async () => {}, async (threadId, text) => { sent.push({ threadId, text }); });
+  withTaskTools(tools, db, registerTasks(bb as never, db, async () => {}, async (threadId, text) => { sent.push({ threadId, text }); }));
   const call = async (input: unknown, threadId: string) => JSON.parse(await tools.task_create!.execute(input, { threadId }));
   const made = await call({ title: "Build the changelog", owner: "me", card: true, conversation: "thr_main", step: "1/2" }, "thr_worker");
   expect(sent).toEqual([{ threadId: "thr_main", text: expect.stringContaining(`exactly once, on its own line: ::work{id="${made.task.id}"} (the task "Build the changelog", made by thread:thr_worker)`) }]);
@@ -176,7 +171,7 @@ it("hands a todo to the user: it comes up in Today with one card and keeps its h
   const out = await call("task_handoff", { id: task.id, to: "user", needs: "Choose one", options: ["Hall", "Park"] });
   expect(out.task).toMatchObject({ owner: "patrick", state: "waiting", needs: "Choose one", kind: "decide", options: ["Hall", "Park"], attention: { queue: "surfaced" } });
   expect(posts).toEqual([`Please post this card in your chat exactly once: ::loop{id="${task.id}"}`]);
-  const list = await handlers["loops.list"]!({});
+  const list = todoGroups(db);
   expect(list.needsYouNow.map((l: { id: string }) => l.id)).toEqual([task.id]);
   expect((await handlers["loops.get"]!({ id: task.id })).loop).toMatchObject({ status: "surfaced", owner: "patrick", kind: "decide" });
   const back = await call("task_handoff", { id: task.id, to: "thread:thr_w" });
@@ -201,7 +196,7 @@ it("hands a carded task to the user as needs-you on its card, without posting, a
 
 it("still hands off when the Bot chat can't be told, and says so", async () => {
   const { bb, tools } = fakeBb();
-  registerTasks(bb as never, db, async () => { throw new Error("An active Bot chat is required"); });
+  withTaskTools(tools, db, registerTasks(bb as never, db, async () => { throw new Error("An active Bot chat is required"); }));
   const created = JSON.parse(await tools.task_create!.execute({ title: "X", owner: "user" }, {}));
   const out = JSON.parse(await tools.task_handoff!.execute({ id: created.task.id, to: "cos" }, {}));
   expect(out.task.owner).toBe("cos");
@@ -260,19 +255,6 @@ it("writes capture fixtures as the same task rows the app stores", () => {
       expect(captureTaskFromLoop(loop)).toEqual(taskFromLoop(loop));
     }
   }
-});
-
-it("adds a typed todo as the user's own, in Today, with no Bot turn; a spoken one still goes to the Bot", async () => {
-  const { handlers, loops, posts } = setup();
-  const typed = await handlers["loops.add"]!({ text: "Buy stamps" });
-  expect(typed).toMatchObject({ title: "Buy stamps", owner: "patrick", status: "surfaced", kind: "do" });
-  expect(posts).toEqual([]);
-  expect((await handlers["loops.list"]!({})).needsYouNow.map((l: { id: string }) => l.id)).toEqual([typed.id]);
-  expect(loops.store.history(typed.id).map((e) => e.type)).toEqual(["added_by_you"]);
-  expect(loops.scheduler.held()).toEqual([]);
-  const spoken = await loops.add("Call the vet");
-  expect(spoken).toMatchObject({ owner: "cos", status: "in_progress" });
-  expect(posts).toEqual([`Fill in draft task ${spoken.id} from this typed line using task_update, then queue it: "Call the vet"`]);
 });
 
 function legacy(target: Database.Database) {
@@ -394,12 +376,12 @@ it("reports counts before and after for the dry run", () => {
 });
 
 it("starts an agent's task in progress, under Agents on it, never in the user's Later", async () => {
-  const { call, handlers, work } = setup();
+  const { call, work } = setup();
   const mine = (await call("task_create", { title: "Fix the build", owner: "me" })).task;
   const bots = (await call("task_create", { title: "Renew the domain", owner: "cos" })).task;
   const carded = (await call("task_create", { title: "Release", owner: "me", card: true })).task;
   for (const t of [mine, bots, carded]) expect(t).toMatchObject({ state: "in_progress", attention: { queue: null } });
-  const list = await handlers["loops.list"]!({});
+  const list = todoGroups(db);
   expect(list.agentsOnIt.map((l: { id: string }) => l.id).sort()).toEqual([mine.id, bots.id, carded.id].sort());
   expect(list.comingUp).toEqual([]);
   expect(work.store.get(carded.id).state).toBe("running");
@@ -407,28 +389,19 @@ it("starts an agent's task in progress, under Agents on it, never in the user's 
 });
 
 it("puts a task for the user that waits on them in Today, with or without a card, and shows one needs-you", async () => {
-  const { call, handlers, posts, work } = setup();
+  const { call, posts, work } = setup();
   const asked = await call("task_create", { title: "Approve the budget", owner: "user", state: "waiting", needs: "Say yes or no" });
   expect(asked.task.attention.queue).toBe("surfaced");
   expect(posts).toEqual([`Please post this card in your chat exactly once: ::loop{id="${asked.task.id}"}`]);
   const carded = (await call("task_create", { title: "Ship", owner: "me", card: true })).task;
   await call("task_handoff", { id: carded.id, to: "user", needs: "Approve the push" });
   expect(posts).toHaveLength(1);
-  const today = (await handlers["loops.list"]!({})).needsYouNow.map((l: { id: string }) => l.id);
+  const today = todoGroups(db).needsYouNow.map((l: { id: string }) => l.id);
   expect(today.sort()).toEqual([asked.task.id, carded.id].sort());
   expect(work.store.get(carded.id).state).toBe("needs-you");
   const todo = (await call("task_create", { title: "Read it", owner: "user", card: true })).task;
   expect(todo.attention.queue).toBe("surfaced");
   expect(work.store.get(todo.id).state).toBe("waiting");
-});
-
-it("doesn't count hand-offs against the daily budget", async () => {
-  const { call, loops } = setup();
-  for (let i = 0; i < 6; i++) await call("task_handoff", { id: (await call("task_create", { title: `H${i}`, owner: "cos" })).task.id, to: "user" });
-  loops.store.add({ title: "Due now" });
-  const scheduler = new LoopScheduler(loops.store, () => ({ enabled: true, timeZone: "UTC", dailyBudget: 5, quietStart: 22, quietEnd: 7 }), async () => {}, async () => {});
-  expect(scheduler.held()).toEqual([]);
-  expect(db.prepare("SELECT count(*) AS n FROM task_events WHERE type = 'surfaced'").get()).toEqual({ n: 0 });
 });
 
 it("re-shows a cleared card when a task tool reopens it or hands it to the user, and revives an ended one", async () => {
@@ -457,13 +430,10 @@ it("checks triggers like todos do: incomplete ones refused, place names lower-ca
 });
 
 it("shows a clear error in Todos, In flight and the tools when adoption failed, instead of empty lists", async () => {
-  const { call, handlers, tools } = setup();
+  const { call, handlers } = setup();
   markTasksUnavailable(db, "disk I/O error");
   await expect(Promise.resolve().then(() => handlers["loops.list"]!({}))).rejects.toThrow(/^Tasks could not be loaded\. Nothing was lost\. Restart BB Studio to try again\.$/);
   await expect(Promise.resolve().then(() => handlers["work.list"]!({ threadId: "thr_lead" }))).rejects.toThrow(/Tasks could not be loaded/);
-  await expect(Promise.resolve().then(() => handlers["loops.add"]!({ text: "x" }))).rejects.toThrow(/Tasks could not be loaded/);
-  await expect(Promise.resolve().then(() => tools.task_morning!.execute({}, {}))).rejects.toThrow(/Tasks could not be loaded: disk I\/O error\. Nothing was lost/);
-  await expect(Promise.resolve().then(() => tools.work_card_get!.execute({ id: "wc_x" }, {}))).rejects.toThrow(/Tasks could not be loaded/);
   expect((await call("task_list", {})).error).toMatch(/Tasks could not be loaded/);
 });
 
@@ -525,7 +495,7 @@ it.each([
   expect(file.prepare("SELECT (SELECT count(*) FROM tasks) + (SELECT count(*) FROM task_legacy) + (SELECT count(*) FROM task_events) AS n").get()).toEqual({ n: 0 });
   expect(readdirSync(dir).filter((name) => name.includes("before-tasks"))).toEqual([]);
   const { bb, handlers } = fakeBb();
-  registerLoops(bb as never, file, async () => {}, async () => {}, { get: async () => ({}), onChange: () => {} }, () => "UTC", () => {});
+  registerLoops(bb as never, file, async () => {}, () => "UTC");
   registerWorkCards(bb as never, file, { read: async () => ({ rows: [] }) });
   await expect(Promise.resolve().then(() => handlers["loops.list"]!({}))).rejects.toThrow(/^Tasks could not be loaded\. Nothing was lost/);
   await expect(Promise.resolve().then(() => handlers["work.list"]!({ threadId: "thr_lead" }))).rejects.toThrow(/Tasks could not be loaded/);
@@ -539,16 +509,6 @@ it.each([
   expect(verifyTaskMigration(fixed).filter((p) => p.id !== "loop_broken")).toEqual([]);
   fixed.close();
   file.close();
-});
-
-it("lists a task for the user in the morning card with an id its card draws", async () => {
-  const { call, loops } = setup();
-  const { task } = await call("task_create", { title: "Sign the lease", owner: "user", due: NOW });
-  const morning = new LoopScheduler(loops.store, () => ({ enabled: true, timeZone: "UTC", dailyBudget: 5, quietStart: 22, quietEnd: 7 }), async () => {}, async () => {}).morning();
-  expect(morning.items.map((l) => l.id)).toEqual([task.id]);
-  expect(TODO_ID.test(task.id)).toBe(true);
-  expect(TODO_ID.test("loop_reminder_aut_1")).toBe(true);
-  expect(TODO_ID.test("wc_1")).toBe(false);
 });
 
 it("names a deeper cycle as one", async () => {

@@ -1,7 +1,7 @@
 // Who a hands-free session speaks as: the thread it was launched from
 // (docs/voice/identity.md). The seed is built once at session start, from
 // cheap sources only (Studio's records, the Memory page's stored markdown,
-// one timeline read, the todos store), and kept for the session: it goes into
+// one timeline read), and kept for the session: it goes into
 // the voice's instructions and is never rebuilt per turn. No LLM call.
 import { speakable } from "./speakable";
 
@@ -9,11 +9,9 @@ import { speakable } from "./speakable";
 export const SEED_TOKEN_CAP = 1500;
 export const SEED_CHAR_CAP = SEED_TOKEN_CAP * 4;
 /** Each section's budget, in characters; together under the cap. */
-export const SEED_BUDGET = { role: 400, memory: 1100, loops: 800, recent: 1700, latestReply: 1500 } as const;
+export const SEED_BUDGET = { role: 400, memory: 1100, recent: 1700, latestReply: 1500 } as const;
 export const RECENT_MESSAGES = 6;
 const MESSAGE_CHARS = 280;
-const NEEDS_YOU_NOW = 6;
-const COMING_UP = 4;
 
 export type IdentityKind = "cos" | "bot" | "lead" | "runner" | "thread";
 
@@ -40,8 +38,6 @@ export interface SeedInput {
   memory?: string | null;
   /** The thread's latest messages, oldest first. */
   recent: SeedMessage[] | null;
-  /** Todos' titles, for the Chief of Staff. */
-  loops?: { needsYouNow: string[]; comingUp: string[] } | null;
   project?: string | null;
 }
 
@@ -49,7 +45,7 @@ export interface VoiceSeed {
   identity: VoiceIdentity;
   /** The context block for the instructions; at most SEED_CHAR_CAP characters. */
   text: string;
-  /** Sources that were missing: "memory", "recent", "todos". */
+  /** Sources that were missing: "memory", "recent". */
   missing: string[];
 }
 
@@ -90,12 +86,6 @@ export function buildSeed(input: SeedInput): VoiceSeed {
     const memory = input.memory?.trim() ? memoryEssentials(input.memory) : "";
     if (memory) sections.push(`Memory (the essentials):\n${memory}`);
     else missing.push("memory");
-    if (input.loops) {
-      const now = input.loops.needsYouNow.slice(0, NEEDS_YOU_NOW).map((title) => `- ${clip(oneLine(title), 120)}`);
-      const soon = input.loops.comingUp.slice(0, COMING_UP).map((title) => `- ${clip(oneLine(title), 120)}`);
-      const loops = [now.length ? `Needs you now:\n${now.join("\n")}` : "Nothing needs the user right now.", soon.length ? `Coming up:\n${soon.join("\n")}` : ""].filter(Boolean).join("\n");
-      sections.push(`Todos (titles):\n${clip(loops, SEED_BUDGET.loops)}`);
-    } else missing.push("todos");
   }
   const latest = (input.recent ?? []).filter((message) => message.role === "assistant" && message.text.trim()).at(-1);
   if (latest) sections.push(`Your latest reply in this chat:
@@ -122,8 +112,6 @@ export interface SeedSources {
   thread(threadId: string): Promise<{ title: string; project: string | null } | null>;
   /** The thread's latest messages, oldest first; throws or returns null when unreadable. */
   recent(threadId: string): Promise<SeedMessage[] | null>;
-  /** Todos' titles; null when Todos are off. */
-  loops(): { needsYouNow: string[]; comingUp: string[] } | null;
 }
 
 const settle = <T>(promise: Promise<T>): Promise<T | null> => promise.catch(() => null);
@@ -139,7 +127,7 @@ export async function gatherSeed(threadId: string | null | undefined, sources: S
     return {
       kind: "cos", name: cos.name, threadId: cos.threadId, role: cos.role,
       memory: cos.memoryPageId ? safe(() => sources.memory(cos.memoryPageId!)) : null,
-      loops: safe(() => sources.loops()), recent,
+      recent,
     };
   };
   if (!threadId || threadId === cos?.threadId) return forCos();

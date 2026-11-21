@@ -1090,34 +1090,18 @@ test("the sidebar has Runners but no Schedule: jobs, BB schedules and done remin
 const loop = (id: string, title: string, extra: Record<string, unknown> = {}) => ({ id, title, why: "", source: null, kind: "do", options: [], owner: "patrick", trigger: { type: "none" }, priority: "normal", push: false, status: "surfaced", due: null, area: null, createdAt: 1, updatedAt: 1, closedAt: null, closedBy: null, ...extra });
 const loopGroups = { needsYouNow: [loop("loop_a", "Pay the property tax")], comingUp: [loop("loop_b", "Call the plumber", { status: "queued", trigger: { type: "place", place: "home", direction: "arrive" } })], agentsOnIt: [], waitingOnOthers: [], done: [] };
 
-test("Todos off: no Todos tab on the Bot page", async () => {
-  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "loops.list": loopGroups, "tasks.list": { tasks: Object.values(loopGroups).flat().map((l) => taskFromLoop(l as never)), threads: [], held: [] } };
-  state.pathname = "/plugins/studio/studio/bot/bot_main/loops";
-  await show(<BotPanel />);
-  expect(container.querySelector("[role=tablist]")).toBeNull();
-  expect(container.querySelector("[data-testid=todos-page]")).toBeNull();
-});
-
-test("Todos on: no tabs; Needs you has the due todo with one action, and the Todos summary links to Todos at its own address", async () => {
+test("the Bot page lists no to-dos, and its old Tasks address opens the Strands page", async () => {
   state.settings = { loopsEnabled: true };
-  const todoTasks = Object.values(loopGroups).flat().map((l) => taskFromLoop(l as never));
-  const boardRow = (t: { id: string; closedAt: number | null }) => ({ id: t.id, home: null, under: null, depth: 0, open: t.closedAt === null, workers: [], hasWorkers: false, needsYou: false });
-  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "loops.list": loopGroups, "tasks.list": { tasks: todoTasks, threads: [], held: [] }, "tasks.board": { rows: todoTasks.map(boardRow), tasks: todoTasks, threads: [], workers: [], counts: { open: 0, running: 0, waiting: 0, todo: 0, needsYou: 0, done: 0, workers: 0 } } };
+  state.data = { bot_get: { bot: dot, run: null }, bot_activity: empty, "loops.list": loopGroups, "tasks.list": { tasks: Object.values(loopGroups).flat().map((l) => taskFromLoop(l as never)), threads: [], held: [] }, "strands.overview": { conversations: [], needs: 0, running: 0 } };
   await show(<BotPanel />);
   expect(container.querySelector("[role=tablist][aria-label='Bot page']")).toBeNull();
-  const needs = container.querySelector('section[aria-label="Needs you"]')!;
-  expect(needs.querySelector('[data-need="loop:loop_a"]')?.textContent).toContain("Pay the property tax");
-  await act(async () => click([...needs.querySelectorAll('[data-need="loop:loop_a"] button')].find((each) => each.textContent === "Done")));
-  expect(state.call).toHaveBeenCalledWith("loops.act", { id: "loop_a", action: "done" });
-  expect(container.querySelector("[data-testid=bot-loops]")?.textContent).toContain("1 need you");
-  expect(container.querySelector("[data-testid=bot-loops]")?.textContent).toContain("1 coming up");
-  const { openAppPath } = await import("../../kit/app/index");
-  act(() => click(container.querySelector("[data-testid=bot-loops-tab]")));
-  expect(openAppPath).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_main/loops");
+  expect(container.querySelector('[data-need="loop:loop_a"]')).toBeNull();
+  expect(container.querySelector("[data-testid=bot-loops]")).toBeNull();
   state.pathname = "/plugins/studio/studio/bot/bot_main/loops";
   await show(<BotPanel />);
-  expect(container.querySelector("[data-testid=todos-page]")?.textContent).toContain("Pay the property tax");
-  expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Tasks·Dot");
+  expect(container.querySelector("[data-testid=strands-page]")).not.toBeNull();
+  expect(container.querySelector("[data-testid=strands-page]")?.textContent).not.toContain("Pay the property tax");
+  expect(container.querySelector("[data-testid=page-bar]")?.textContent).toBe("Strands·Dot");
   expect(container.querySelector("[data-testid=bot-page]")).toBeNull();
 });
 

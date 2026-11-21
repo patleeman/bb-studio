@@ -65,10 +65,9 @@ export const tasksContract = defineRpcContract({
     output: z.object({ views: z.array(z.object({ id: z.string(), view: taskView.nullable().describe("Null when the task is gone") })) }),
   },
   "tasks.list": { input: z.object({}), output: z.object({ tasks: z.array(task), threads: z.array(ownerInfo), held: z.array(hold) }) },
+  // Kept for older phone builds (In flight and the Tasks screen before strands); they answer empty.
   "tasks.inFlight": { input: z.object({ threadId: z.string().min(1) }), output: z.object({ tasks: z.array(task), threads: z.array(ownerInfo) }) },
   "tasks.act": { input: taskActInput, output: z.object({ task, note: z.string().nullable() }) },
   "tasks.flight": { input: z.object({ threadId: z.string().min(1) }), output: rowsOutput.extend({ done: z.array(z.string()).describe("Top-level rows that closed today, newest first") }) },
-  "tasks.workers": { input: z.object({}), output: rowsOutput.extend({ groups: z.array(z.object({ conversation: z.string().nullable(), name: z.string(), ids: z.array(z.string()) })) }) },
   "tasks.board": { input: z.object({}), output: rowsOutput },
-  "tasks.check": { input: z.object({}), output: z.object({ problems: z.array(problem) }) },
 });

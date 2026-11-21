@@ -119,6 +119,8 @@ enum Links {
         let parts = clean.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false)
         let first = parts.first.map(String.init) ?? ""
         let tail = parts.count > 1 ? String(parts[1]) : ""
+        // `bb://strands`: the Strands screen (Studio's link kind is still `todos`).
+        if first == "strands" { return ref(.todos, tail.removingPercentEncoding) }
         if let kind = LinkKind(rawValue: first) {
             if tail.isEmpty { return ref(kind, nil) }
             guard let id = tail.removingPercentEncoding else { return nil }
@@ -181,7 +183,8 @@ enum Links {
             return LinkRef(kind: kind, id: id)
         case "bot":
             guard let id, id != "new" else { return nil }
-            if parts.count == 3, parts[2] == "loops" { return LinkRef(kind: .todos, id: id) }
+            // The Strands page (`bot/<id>/strands`), and the older Tasks address that opens it.
+            if parts.count == 3, parts[2] == "loops" || parts[2] == "strands" { return LinkRef(kind: .todos, id: id) }
             return extra ? nil : LinkRef(kind: .bot, id: id)
         default:
             let segments: Set<String> = ["pages", "apps", "drawings", "designs", "dashboards", "minis", "artifacts", "recordings"]
@@ -204,10 +207,10 @@ enum Links {
         case .memory: return .botPage(.memory, botId: id)
         case .library: return .botPage(.library, botId: id)
         case .automations: return .botPage(.automations, botId: id)
-        case .todos: return .botPage(.todos, botId: id)
+        case .todos: return .botPage(.strands, botId: id)
         case .archive: return .botPage(.archive, botId: id)
         case .automation: return id.map(LinkDestination.automation) ?? .botPage(.automations, botId: nil)
-        case .todo: return id.map(LinkDestination.todo) ?? .botPage(.todos, botId: nil)
+        case .todo: return id.map(LinkDestination.todo) ?? .botPage(.strands, botId: nil)
         case .record: return id.map(LinkDestination.record) ?? .botPage(.memory, botId: nil)
         case .page: return id.map { .route(.page(id: $0)) } ?? .elsewhere("That link names no page.")
         case .whiteboard: return id.map { .route(.drawing(id: $0)) } ?? .elsewhere("That link names no whiteboard.")

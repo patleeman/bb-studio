@@ -1,7 +1,5 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { WORK_ID } from "./work/shared";
-import type { WorkCard } from "./work/contract";
 import { continuedLines } from "./continue-shared";
 
 export { CONTINUED_DIRECTIVE, continuedFallback, continuedLines, conversationLink } from "./continue-shared";
@@ -12,7 +10,6 @@ export const HANDOFF_MAX = 4_000;
 export const continueInput = z.object({
   title: z.string().trim().min(1).max(120).describe("New conversation title"),
   handoff: z.string().trim().min(1).max(HANDOFF_MAX).describe("Short markdown handoff (decisions, open questions, links)"),
-  workCards: z.array(z.string().regex(WORK_ID)).max(12).optional().describe("Task/card ids to move to the new conversation"),
   openingMessage: z.string().trim().max(500).optional().describe("First step for the new conversation"),
 });
 export type ContinueInput = z.input<typeof continueInput>;
@@ -21,14 +18,10 @@ export function handoffText(input: {
   sourceThreadId: string;
   sourceSeq: number | null;
   handoff: string;
-  moved: readonly Pick<WorkCard, "id" | "title">[];
   openingMessage?: string | undefined;
 }): string {
   const from = `@thread:${input.sourceThreadId}${input.sourceSeq === null ? "" : `#msg=${input.sourceSeq}`}`;
   const parts = [`Continued from ${from}`, input.handoff.trim()];
-  if (input.moved.length) {
-    parts.push(`**Moved here:** ${input.moved.map((card) => card.title).join(", ")}. Post each card once, on its own line, in your first reply: ${input.moved.map((card) => `\`::work{id="${card.id}"}\``).join(" ")}`);
-  }
   parts.push(`**First:** ${input.openingMessage?.trim() || "a one-line recap and the next step."}`);
   return parts.join("\n\n");
 }
@@ -57,8 +50,6 @@ export interface ContinueDeps {
   spawn(request: Record<string, unknown>): Promise<{ id: string; projectId?: string | null }>;
   recordConversation(threadId: string, botId: string): void;
   focus(botId: string): void;
-  card(id: string): WorkCard | null;
-  moveCard(id: string, threadId: string): WorkCard;
   changed(threadId: string): void;
 }
 
@@ -66,8 +57,6 @@ export interface ContinueResult {
   threadId: string;
   projectId: string | null;
   title: string;
-  moved: string[];
-  skipped: string[];
   post: string;
 }
 
@@ -75,10 +64,6 @@ export async function continueInNew(deps: ContinueDeps, sourceThreadId: string, 
   const input = continueInput.parse(raw);
   const source = deps.conversation(sourceThreadId);
   if (!source || source.kind !== "conversation") throw new Error("Only a conversation with the user can continue in a new one.");
-  const ids = [...new Set(input.workCards ?? [])];
-  const cards = ids.map((id) => deps.card(id));
-  const movable = cards.filter((card): card is WorkCard => !!card && card.threadId === sourceThreadId);
-  const skipped = ids.filter((id) => !movable.some((card) => card.id === id));
   const thread = await deps.thread(sourceThreadId);
   if (!thread?.projectId) throw new Error("This conversation has no project to start the new one in.");
   const sourceSeq = sourceSeqOf(await deps.timeline(sourceThreadId).catch(() => []));
@@ -90,7 +75,7 @@ export async function continueInNew(deps: ContinueDeps, sourceThreadId: string, 
     providerId: thread.providerId, ...(thread.model ? { model: thread.model } : {}),
     executionInputSources: { providerId: "explicit", ...(thread.model ? { model: "explicit" } : {}) },
   } : {};
-  const text = handoffText({ sourceThreadId, sourceSeq, handoff: input.handoff, moved: movable, openingMessage: input.openingMessage });
+  const text = handoffText({ sourceThreadId, sourceSeq, handoff: input.handoff, openingMessage: input.openingMessage });
   deps.focus(source.botId);
   const made = await deps.spawn({
     projectId: thread.projectId, title: input.title, visibility: "visible",
@@ -100,18 +85,16 @@ export async function continueInNew(deps: ContinueDeps, sourceThreadId: string, 
     ...model,
   });
   deps.recordConversation(made.id, source.botId);
-  const moved = movable.map((card) => deps.moveCard(card.id, made.id).id);
   deps.changed(made.id);
   deps.changed(sourceThreadId);
-  return { threadId: made.id, projectId: made.projectId ?? thread.projectId, title: input.title, moved, skipped, post: continuedLines(made.id, input.title) };
+  return { threadId: made.id, projectId: made.projectId ?? thread.projectId, title: input.title, post: continuedLines(made.id, input.title) };
 }
 
 export const CONTINUE_DESCRIPTION = "Continue a topic in a new conversation seeded with a short handoff (call only when the user agrees or asks). Post the returned `post` lines as given.";
 
 export function continueResult(result: ContinueResult): string {
   return JSON.stringify({
-    threadId: result.threadId, title: result.title, moved: result.moved,
-    ...(result.skipped.length ? { notMoved: result.skipped, why: "Not cards of this conversation." } : {}),
+    threadId: result.threadId, title: result.title,
     post: result.post,
   });
 }

@@ -27,6 +27,14 @@ export interface StrandServiceDeps extends Omit<DetectorDeps, "store" | "openTas
   /** Pending BB questions and approvals in a thread. */
   interactions(threadId: string): Promise<(Interaction & { createdAt?: number })[]>;
   /** Whether the thread is in a turn. */
+  /** A worker's conversation (strand_note from a worker), else null. */
+  conversationOfWorker?(threadId: string): string | null;
+  /**
+   * What else waits on the user in this conversation: an area's item that
+   * needs them (reported here: a runner's to Main, a lead's to its own), and
+   * the conversation's own flag (bot_needs_you). Each with when it was raised.
+   */
+  extraAsks?(threadId: string): { id: string; kind: "area" | "flag"; label: string; at: number }[];
   busy(threadId: string): Promise<boolean>;
 }
 
@@ -165,6 +173,8 @@ export class StrandService {
       if (request.threadId === threadId) asks.push({ id: request.id, kind: "gateway", strandId: turnStrand(request.createdAt), label, threadId, details: [], decisions: [] });
       else if (worker) asks.push({ id: request.id, kind: "gateway", strandId: worker.strandId, label: `${worker.title}: ${label}`, threadId: worker.threadId, details: [], decisions: [] });
     }
+    // An area's item that needs the user, or the conversation's flag: on the strand of the turn it was raised in.
+    for (const ask of this.deps.extraAsks?.(threadId) ?? []) asks.push({ id: ask.id, kind: ask.kind, strandId: turnStrand(ask.at), label: ask.label, threadId, details: [], decisions: [], turnId: turnOf(ask.at) });
     const tasks: TaskSignal[] = openAgentTasks(this.deps.db, threadId).flatMap((task) => {
       const strand = this.store.byTask(task.id);
       return strand ? [{ id: task.id, strandId: strand.id, waitingOn: task.waitingOn ?? null }] : [];
@@ -251,15 +261,7 @@ export class StrandService {
 
   /** Every conversation of a Bot with strands showing (not only Earlier), needs you first, then the most recently active. */
   async overview(botId: string): Promise<{ conversations: OverviewConversation[]; needs: number; running: number }> {
-    const since = this.now() - BACKFILL_ACTIVE_MS;
-    const candidates = (await this.deps.conversationsOf(botId))
-      .filter((conversation) => conversation.lastActiveAt >= since && this.store.list(conversation.threadId).length > 0)
-      .sort((a, b) => b.lastActiveAt - a.lastActiveAt);
-    const conversations: OverviewConversation[] = [];
-    for (const conversation of candidates) {
-      const list = await this.list(conversation.threadId);
-      if (list.strands.length) conversations.push({ ...conversation, strands: list.strands });
-    }
+    const { conversations } = await this.read(botId, this.now() - BACKFILL_ACTIVE_MS, () => true);
     const needs = (row: OverviewConversation) => row.strands.filter((strand) => strand.state === "needs-you").length;
     conversations.sort((a, b) => Number(needs(b) > 0) - Number(needs(a) > 0) || Number(b.isMain) - Number(a.isMain) || b.lastActiveAt - a.lastActiveAt);
     return {
@@ -267,6 +269,29 @@ export class StrandService {
       needs: conversations.reduce((sum, row) => sum + needs(row), 0),
       running: conversations.reduce((sum, row) => sum + row.strands.filter((strand) => strand.state === "running").length, 0),
     };
+  }
+
+  /**
+   * The needs-you push's read (src/strands/push.ts), kept cheap because it
+   * runs every few minutes around the clock: only conversations active since
+   * `since` that have a strand not marked done (a strand_note done with no
+   * activity after it), each read live. `checked` names the conversations it
+   * read, so the push keeps what it knew about the others.
+   */
+  async needsYouCheck(botId: string, since: number): Promise<{ conversations: OverviewConversation[]; checked: string[] }> {
+    return this.read(botId, since, (strand) => strand.doneAt === null || strand.lastAt > strand.doneAt);
+  }
+
+  private async read(botId: string, since: number, open: (strand: Strand) => boolean): Promise<{ conversations: OverviewConversation[]; checked: string[] }> {
+    const candidates = (await this.deps.conversationsOf(botId))
+      .filter((conversation) => conversation.lastActiveAt >= since && this.store.list(conversation.threadId).some(open))
+      .sort((a, b) => b.lastActiveAt - a.lastActiveAt);
+    const conversations: OverviewConversation[] = [];
+    for (const conversation of candidates) {
+      const list = await this.list(conversation.threadId);
+      if (list.strands.length) conversations.push({ ...conversation, strands: list.strands });
+    }
+    return { conversations, checked: candidates.map((conversation) => conversation.threadId) };
   }
 
   // ---- the user's edits: their choice always wins ----
@@ -320,6 +345,49 @@ export class StrandService {
     this.store.rename(strand.id, name);
     this.deps.changed(strand.threadId);
     return true;
+  }
+
+  /**
+   * strand_note: an agent marks a strand waiting on someone, done, or renamed.
+   * `threadId` is the caller: a conversation, or a worker (its conversation's
+   * strand that holds the worker). `strand` names one by id or title;
+   * without it, the strand of the caller's newest turn (a worker's: the strand
+   * that holds it). Returns what it did in a line, or throws a plain error.
+   */
+  note(threadId: string | null, input: { strand?: string; waitingOn?: string | null; done?: boolean; title?: string }): { strandId: string; title: string; line: string } {
+    if (!threadId) throw new Error("strand_note works in a Bot's conversation or one of its workers.");
+    const conversation = this.enabled(threadId) ? threadId : this.deps.conversationOfWorker?.(threadId) ?? null;
+    if (!conversation || !this.enabled(conversation)) throw new Error("This thread has no strands: strand_note works in a Bot's conversation or one of its workers.");
+    const open = this.store.list(conversation).filter((each) => !each.mergedInto);
+    const wanted = input.strand?.trim();
+    let strand = wanted ? open.find((each) => each.id === wanted) ?? open.find((each) => each.title.toLowerCase() === wanted.toLowerCase()) ?? null : null;
+    if (wanted && !strand) throw new Error(`No strand ${JSON.stringify(wanted)} here. Strands: ${open.slice(0, 12).map((each) => `${each.title} (${each.id})`).join(", ") || "none yet"}.`);
+    if (!strand && conversation !== threadId) {
+      const held = this.store.db.prepare("SELECT strand_id FROM strand_items WHERE thread_id = ? AND kind = 'worker' AND ref = ? LIMIT 1").get(conversation, threadId) as { strand_id: string | null } | undefined;
+      strand = held?.strand_id ? this.store.get(held.strand_id) : null;
+    }
+    if (!strand) {
+      const newest = this.store.db.prepare("SELECT strand_id FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND strand_id IS NOT NULL ORDER BY seq DESC LIMIT 1").get(conversation) as { strand_id: string } | undefined;
+      strand = newest ? this.store.get(newest.strand_id) : null;
+    }
+    while (strand?.mergedInto) strand = this.store.get(strand.mergedInto);
+    if (!strand) throw new Error("No strand to note yet: this conversation's turns aren't sorted into strands. Pass strand (its id or title) once one exists.");
+    const now = this.now();
+    const did: string[] = [];
+    if (input.title !== undefined) {
+      const name = input.title.replace(/\s+/g, " ").trim().slice(0, 80);
+      if (!name) throw new Error("title is empty.");
+      if (this.store.titles(conversation, strand.id).some((each) => each.toLowerCase() === name.toLowerCase())) throw new Error(`Another strand here is called ${JSON.stringify(name)}.`);
+      this.store.rename(strand.id, name);
+      did.push(`renamed to ${JSON.stringify(name)}`);
+    }
+    if (input.waitingOn !== undefined || input.done !== undefined) this.store.note(strand.id, { ...(input.waitingOn !== undefined ? { waitingOn: input.waitingOn?.trim() || null } : {}), ...(input.done !== undefined ? { done: input.done } : {}) }, now);
+    if (input.waitingOn !== undefined) did.push(input.waitingOn?.trim() ? `waiting on ${input.waitingOn.trim()} until its next activity` : "no longer waiting");
+    if (input.done !== undefined) did.push(input.done ? "done: it folds into Earlier until its next activity" : "not done");
+    if (!did.length) throw new Error("Say what to note: waitingOn, done or title.");
+    this.deps.changed(conversation);
+    const title = this.store.get(strand.id)?.title ?? strand.title;
+    return { strandId: strand.id, title, line: `Strand ${JSON.stringify(title)} (${strand.id}): ${did.join("; ")}.` };
   }
 
   pin(strandId: string, pinned: boolean): boolean {

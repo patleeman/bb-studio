@@ -29,7 +29,7 @@ it("lists BB's commands under Commands and its settings pages under Settings, wi
 
 it("Studio's own: a switch to each other Bot, each settings section and a toggle for each on/off setting", async () => {
   const runners: StudioCommandRunners = { switchBot: vi.fn(), openSettings: vi.fn(), setSetting: vi.fn(async () => {}) };
-  const settings = { ...effectiveSettings({}), loopsEnabled: false, autoResumeThreads: true };
+  const settings = { ...effectiveSettings({}), autoTitle: false, autoResumeThreads: true };
   const entries = studioCommandEntries({ bots: [{ id: "dot", name: "Chief of Staff" }, { id: "home", name: "Home" }], currentBotId: "dot", settings, windows: true }, runners);
   const byTitle = (title: string) => entries.find((each) => each.title === title)!;
   expect(entries.filter((each) => each.section === "actions").map((each) => each.title)).toEqual(["Switch to Home"]);
@@ -41,10 +41,10 @@ it("Studio's own: a switch to each other Bot, each settings section and a toggle
   ]);
   await byTitle("Studio settings: Voice").run();
   expect(runners.openSettings).toHaveBeenCalledWith("voice");
-  expect([byTitle("Resume after a restart").detail, byTitle("Task reminders").detail]).toEqual(["On", "Off"]);
+  expect([byTitle("Resume after a restart").detail, byTitle("Name recordings").detail]).toEqual(["On", "Off"]);
   await byTitle("Resume after a restart").run();
-  await byTitle("Task reminders").run();
-  expect(vi.mocked(runners.setSetting).mock.calls).toEqual([["autoResumeThreads", false], ["loopsEnabled", true]]);
+  await byTitle("Name recordings").run();
+  expect(vi.mocked(runners.setSetting).mock.calls).toEqual([["autoResumeThreads", false], ["autoTitle", true]]);
   expect(entries.some((each) => /hud/i.test(each.title) || /hud/i.test(each.key))).toBe(false);
   const bare = studioCommandEntries({ bots: [], currentBotId: null, settings: null, windows: false }, runners);
   expect(bare.some((each) => each.title === "Studio settings: Windows")).toBe(false);

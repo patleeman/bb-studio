@@ -235,7 +235,7 @@ export class UserTasks {
       // Start work: a queued task handed to the owner it already has starts now.
       const task = this.store.change(id, (t) => { t.state = "in_progress"; t.attention.queue = null; t.timing.snoozed = false; }, USER_OWNER);
       this.store.event(id, "acted", { action: "start" });
-      const failed = await this.tell(to, `The user asked you to start task ${this.brief(task)} now. Read it with task_get, record progress with task_update (not status messages), close it with task_update state "done", and hand it back with task_handoff to "user" when you need them.`);
+      const failed = await this.tell(to, `The user asked you to start task ${this.brief(task)} now. Report in your chat as you go; when you need the user, tell them there and call bot_needs_you.`);
       return { task, note: failed };
     }
     if (to.startsWith("thread:")) {
@@ -250,7 +250,7 @@ export class UserTasks {
       t.attention.queue = null;
       t.timing.snoozed = false;
     }, USER_OWNER);
-    const failed = await this.tell(to, `The user handed you a task: ${this.brief(task)} Carry it out now. Read it with task_get, record progress with task_update (not status messages), close it with task_update state "done", and hand it back with task_handoff to "user" when you need them.`);
+    const failed = await this.tell(to, `The user handed you a task: ${this.brief(task)} Carry it out now. Report in your chat as you go; when you need the user, tell them there and call bot_needs_you.`);
     const toName = await this.label(to);
     const previous = AGENT.test(before.owner) ? before.owner : asked;
     const told = previous && previous !== to
@@ -288,7 +288,7 @@ export class UserTasks {
       if (t.kind === "decide") t.kind = "do";
     }, USER_OWNER);
     this.store.event(id, "acted", { action: "choose", option });
-    const failed = await this.tell(from, `The user chose ${JSON.stringify(option)} for task ${this.brief(before)} Carry on with that choice and record progress with task_update.`);
+    const failed = await this.tell(from, `The user chose ${JSON.stringify(option)} for task ${this.brief(before)} Carry on with that choice.`);
     return { task, note: failed };
   }
 
@@ -317,7 +317,7 @@ export class UserTasks {
       }, USER_OWNER);
       const task = this.store.get(x.id);
       const note = AGENT.test(task.owner)
-        ? await this.tell(task.owner, `The user reopened task ${this.brief(task)} It is yours again; carry on and record progress with task_update.`)
+        ? await this.tell(task.owner, `The user reopened task ${this.brief(task)} It is yours again; carry on.`)
         : asked && from ? await this.tell(from, `The user reopened task ${this.brief(task)} Your question is back with them; wait for their answer.`) : null;
       return { task, note };
     }
@@ -363,6 +363,8 @@ export function phoneActs(tasks: UserTasks): (x: PhoneAct) => Promise<Loop | nul
   };
 }
 
+const EMPTY_ROWS = { rows: [], tasks: [], counts: { open: 0, running: 0, waiting: 0, todo: 0, needsYou: 0, done: 0, workers: 0 }, threads: [], workers: [] };
+
 export function registerUserTasks(bb: BbPluginApi, db: Database.Database, deps: UserTaskDeps) {
   const store = new TaskStore(db, () => { void bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" } as never); });
   const tasks = new UserTasks(store, deps);
@@ -370,12 +372,11 @@ export function registerUserTasks(bb: BbPluginApi, db: Database.Database, deps: 
     "tasks.get": ({ id }: { id: string }) => tasks.view(id),
     "tasks.getMany": ({ ids }: { ids: string[] }) => tasks.views(ids),
     "tasks.list": () => tasks.list(),
-    "tasks.inFlight": ({ threadId }: { threadId: string }) => tasks.inFlight(threadId),
     "tasks.act": (x: TaskActInput) => tasks.act(x),
-    "tasks.flight": ({ threadId }: { threadId: string }) => tasks.flight(threadId),
-    "tasks.workers": () => tasks.workers(),
-    "tasks.board": () => tasks.board(),
-    "tasks.check": () => tasks.check(),
+    // Older phone builds still call these (In flight and the Tasks screen before strands): strands replaced them, so they answer empty.
+    "tasks.inFlight": () => ({ tasks: [], threads: [] }),
+    "tasks.flight": () => ({ ...EMPTY_ROWS, done: [] }),
+    "tasks.board": () => EMPTY_ROWS,
   }, false, (message) => bb.log.warn(message)) as never);
   return tasks;
 }

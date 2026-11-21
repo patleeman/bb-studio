@@ -1,17 +1,9 @@
 # See docs/MONOREPO.md, "CI and the stable branch".
 name: iOS
 
+# Manual only: GitHub's macOS runners take an hour or more and often queue.
+# The TestFlight gate is the full iOS suite run locally on a clean checkout.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "ios/**"
-      - ".github/workflows/ios.yml"
-  pull_request:
-    paths:
-      - "ios/**"
-      - ".github/workflows/ios.yml"
   workflow_dispatch:
 
 concurrency:

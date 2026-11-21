@@ -124,8 +124,4 @@ export type AreaUpdateInput = z.infer<typeof areaUpdateInput>;
 export const areasContract = defineRpcContract({
   "areas.list": { input: z.object({}), output: z.object({ areas: z.array(areaView) }) },
   "areas.get": { input: z.object({ id: z.string().min(1) }), output: z.object({ area: areaView }) },
-  "areas.itemTask": {
-    input: z.object({ area: z.string().min(1).describe("The area's id or name"), title: z.string().min(1).max(200).describe("The open item's title") }),
-    output: z.object({ taskId: z.string(), title: z.string(), created: z.boolean().describe("True when this call made the task") }),
-  },
 });

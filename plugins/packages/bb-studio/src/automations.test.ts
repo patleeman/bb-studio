@@ -670,7 +670,7 @@ it("with findings as tasks, the same Kensico spend finding twice is one task upd
   const findings = x.store.children(parentIdOf(made.id));
   expect(findings).toHaveLength(1);
   expect(findings[0]).toMatchObject({ owner: "cos", state: "in_progress", automation: { role: "finding", count: 3 }, progress: { line: "Kensico health rc=1: writer: Claude spend $5.80 today (over $5/day)" } });
-  expect(sent(x)[0]!.input[1]!.text).toContain(`This finding is task ${findings[0]!.id}.`);
+  expect(sent(x)[0]!.input[1]!.text).toContain("This is a watcher finding.");
   expect(x.store.history(findings[0]!.id).filter((e) => e.type === "found_again")).toHaveLength(1);
   plain.runs.set("a1", runsOf(0));
   await plain.auto.tick();

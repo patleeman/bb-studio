@@ -15,6 +15,8 @@ export const ENSURED_COLUMNS: Readonly<Record<string, readonly (readonly [string
   bots: [["main_provider_id", "TEXT"], ["main_model", "TEXT"], ["main_reasoning", "TEXT"]],
   // The strand an item was in before the user's (or a merge's) last move, so it can be undone (src/strands/store.ts).
   strand_items: [["prev_strand_id", "TEXT"]],
+  // When an agent marked a strand done (strand_note): it folds into Earlier until its next activity (src/strands/store.ts).
+  strands: [["done_at", "INTEGER"]],
 };
 
 /** Adds each missing column (a table that isn't there yet is left alone); returns what it added. */

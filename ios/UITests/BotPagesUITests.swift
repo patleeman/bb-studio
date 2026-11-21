@@ -98,13 +98,13 @@ final class BotPagesUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(app.navigationBars["Library"].waitForNonExistence(timeout: 10), "the design opens in its viewer")
     }
 
-    func testTasksAndAutomationsOpen() {
-        launch(["-qaLoopsDemo"])
-        openPage("tasks")
-        XCTAssertTrue(app.navigationBars["Tasks"].waitForExistence(timeout: 15))
-        XCTAssertTrue(any("tasks-screen").waitForExistence(timeout: 15), "the Tasks screen")
-        XCTAssertTrue(app.textFields["tasks-add"].waitForExistence(timeout: 15))
-        shot("tasks")
+    func testStrandsAndAutomationsOpen() {
+        launch(["-qaStrandsDemo"])
+        openPage("strands")
+        XCTAssertTrue(app.navigationBars["Strands"].waitForExistence(timeout: 15))
+        XCTAssertTrue(any("strands-overview").waitForExistence(timeout: 15), "the Strands screen")
+        XCTAssertTrue(any("strands-line").waitForExistence(timeout: 15), "with the Bot's open strands")
+        shot("strands")
         app.closeRoomSheet()
 
         openPage("automations")

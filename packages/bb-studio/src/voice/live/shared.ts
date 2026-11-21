@@ -57,18 +57,18 @@ export const REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 export const DATA_CHANNEL = "oai-events";
 
 /**
- * The voice agent's tools. Reads are free; relays and todo actions happen at
- * once (todo actions with a spoken undo); destructive ones (drop a todo, stop
- * or archive a thread, pause or delete an automation) wait for a spoken yes
- * (confirm). Spending, messaging people outside BB, posting publicly and
- * approving credentials aren't tools at all.
+ * The voice agent's tools. Reads are free; relays happen at once; destructive
+ * ones (stop or archive a thread, pause or delete an automation) wait for a
+ * spoken yes (confirm). Spending, messaging people outside BB, posting
+ * publicly and approving credentials aren't tools at all.
  */
-export const VOICE_TOOLS = ["todos_list", "read_replies", "send_to_cos", "send_to_thread", "todos_act", "todos_add", "undo", "stop_thread", "archive_thread", "pause_automation", "delete_automation", "confirm", "cancel"] as const;
+export const VOICE_TOOLS = ["read_replies", "send_to_cos", "send_to_thread", "stop_thread", "archive_thread", "pause_automation", "delete_automation", "confirm", "cancel"] as const;
 export type VoiceToolName = (typeof VOICE_TOOLS)[number];
-/** The tools' names from before Todos were renamed: still accepted, not offered. */
-export const VOICE_TOOL_ALIASES: Readonly<Record<string, VoiceToolName>> = { loops_list: "todos_list", loops_act: "todos_act", loops_add: "todos_add" };
-/** A tool's current name: an old `loops_*` name becomes its `todos_*` one. */
-export const voiceToolName = (name: string): string => VOICE_TOOL_ALIASES[name] ?? name;
+/**
+ * The to-do tools voice had before to-dos were removed: no longer offered. A
+ * session that still calls one hears that to-dos are gone (live.ts).
+ */
+export const RETIRED_VOICE_TOOLS: readonly string[] = ["todos_list", "todos_act", "todos_add", "loops_list", "loops_act", "loops_add", "undo"];
 
 /** "$0.42", "<$0.01". */
 export function usd(value: number): string {

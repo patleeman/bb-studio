@@ -48,23 +48,16 @@ it("relays one line, without the model's trailing period", () => {
 
 describe("classify", () => {
   it("reads, instant actions, confirm-only destructive ones, and nothing else", () => {
-    expect(classify("todos_list")).toBe("read");
     expect(classify("read_replies")).toBe("read");
-    for (const tool of ["send_to_cos", "send_to_thread", "todos_add", "undo", "confirm", "cancel"]) expect(classify(tool)).toBe("act");
-    for (const action of ["done", "snooze", "hand_off"]) expect(classify("todos_act", { action })).toBe("act");
-    expect(classify("todos_act", { action: "drop" })).toBe("confirm");
-    for (const action of ["choose", "nudge", "keep", ""]) expect(classify("todos_act", { action })).toBe("unknown");
-    // The names from before the rename classify the same.
-    expect(classify("loops_list")).toBe("read");
-    expect(classify("loops_add")).toBe("act");
-    expect(classify("loops_act", { action: "done" })).toBe("act");
-    expect(classify("loops_act", { action: "drop" })).toBe("confirm");
+    for (const tool of ["send_to_cos", "send_to_thread", "confirm", "cancel"]) expect(classify(tool)).toBe("act");
     for (const tool of ["stop_thread", "archive_thread", "pause_automation", "delete_automation"]) expect(classify(tool)).toBe("confirm");
     for (const tool of ["send_email", "purchase", "post", "approve_credentials", "delete_thread"]) expect(classify(tool)).toBe("unknown");
+    // The retired to-do tools are nothing now.
+    for (const tool of ["todos_list", "todos_act", "todos_add", "loops_act", "undo"]) expect(classify(tool)).toBe("unknown");
   });
 
   it("asks one plain question per destructive action", () => {
-    expect(confirmPrompt("drop_loop", "Remove the stale Tailscale node")).toBe(`Drop the task 'Remove the stale Tailscale node'? Say yes to drop.`);
+    expect(confirmPrompt("stop_thread", "Launch review")).toBe(`Stop the thread 'Launch review'? Say yes to stop.`);
     expect(confirmPrompt("delete_automation", "Morning brief")).toBe(`Delete the automation 'Morning brief'? It can't be undone. Say yes to delete.`);
   });
 });

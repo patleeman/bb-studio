@@ -179,11 +179,6 @@ extension BBClient {
         try await rpc("studio", Studio.Method.tasks_board, .object([:]))
     }
 
-    func areaList() async throws -> [AreaSummary] {
-        let list: AreaList = try await rpc("studio", Studio.Method.areas_list, .object([:]))
-        return list.areas
-    }
-
     func dismissWork(_ id: String) async throws {
         let _: JSONValue = try await rpc("studio", Studio.Method.work_dismiss, TaskRequests.dismiss(id))
     }
@@ -201,7 +196,6 @@ final class TasksModel {
     private(set) var list: TaskList?
     private(set) var listError: String?
     private(set) var board: TaskList?
-    private(set) var areas: [AreaSummary]?
     private(set) var views: [String: TaskView] = [:]
     private(set) var failures: [String: String] = [:]
     private(set) var flights: [String: TaskList] = [:]
@@ -209,14 +203,15 @@ final class TasksModel {
     private(set) var handedOff: [String: Date] = [:]
     var focus: String?
     var botThreadId: String?
+    /// The Bot's name, for "Juniper is on it".
+    var botName = BotInfo.defaultName
+    /// Leads the Bot started that are still working: Hand off targets after the Bot.
+    var leads: [(id: String, title: String)] = []
     private var server: URL?
     private var listed: TaskList?
-    var tasksShown = 0
     private var running: (task: Task<Void, Never>, wide: Bool)?
     private var feeds: [URL: Bool] = [:]
-    private var areaFeeds: [URL: Bool] = [:]
     private var feedsMissing: [URL: Date] = [:]
-    private var areasMissing: [URL: Date] = [:]
     static let feedRetry: TimeInterval = 300
 
     static func tries(_ known: Bool?, missingSince: Date?, now: Date = .now) -> Bool {
@@ -239,7 +234,6 @@ final class TasksModel {
             list = nil
             listError = nil
             board = nil
-            areas = nil
             listed = nil
             running = nil
             views = [:]
@@ -255,13 +249,11 @@ final class TasksModel {
 
     var tasks: [TaskItem] { list?.tasks ?? [] }
 
-    var areaAsks: [AreaAsk] { AreaRules.asks(areas ?? [], tasks: board?.tasks ?? tasks) }
-
     var names: TaskNames {
         var threads = list?.threads ?? []
         for flight in flights.values { threads += flight.threads }
         for view in views.values { threads += view.threads }
-        return TaskNames(bot: LoopsModel.shared.botName, leads: LoopsModel.shared.leads, threads: threads, botThreadId: botThreadId)
+        return TaskNames(bot: botName, leads: leads, threads: threads, botThreadId: botThreadId)
     }
 
     func task(_ id: String) -> TaskItem? {
@@ -295,7 +287,7 @@ final class TasksModel {
     }
 
     func refresh(full: Bool = false) async {
-        let wide = full || tasksShown > 0
+        let wide = full
         if let running, running.wide || !wide {
             await running.task.value
             return
@@ -324,7 +316,6 @@ final class TasksModel {
                     listed = rest
                     if let board { publish(TaskTree.merge(board: board, list: rest)) }
                 }
-                await loadAreas(client)
                 return
             } catch where BBClient.isCancellation(error) {
                 return
@@ -337,7 +328,6 @@ final class TasksModel {
                 return
             }
         }
-        if wide { await loadAreas(client) }
         do {
             let next = try await client.taskList()
             guard client.baseURL == server else { return }
@@ -354,26 +344,6 @@ final class TasksModel {
         guard next != list else { return }
         list = next
         for task in next.tasks where views[task.id].map({ $0.task != task }) == true { views[task.id]?.task = task }
-    }
-
-    private func loadAreas(_ client: BBClient) async {
-        let base = client.baseURL
-        guard Self.tries(areaFeeds[base], missingSince: areasMissing[base]) else {
-            if base == server, areas != [] { areas = [] }
-            return
-        }
-        do {
-            let next = try await client.areaList()
-            areaFeeds[base] = true
-            areasMissing[base] = nil
-            guard base == server else { return }
-            if areas != next { areas = next }
-        } catch where BBClient.isUnknownRPC(error) {
-            areaFeeds[base] = false
-            areasMissing[base] = .now
-            if base == server, areas != [] { areas = [] }
-        } catch {
-        }
     }
 
     func load(_ id: String) async {
@@ -408,11 +378,6 @@ final class TasksModel {
         await refresh()
         for threadId in flights.keys { await loadFlight(threadId) }
         return answer.note
-    }
-
-    func add(_ text: String) async throws {
-        try await client.addLoop(text)
-        await refresh()
     }
 
     func loadFlight(_ threadId: String) async {

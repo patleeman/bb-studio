@@ -28,7 +28,7 @@ vi.mock("../../talk/ui/model-settings", () => ({ ModelSettings: () => <div data-
 
 import { registerSettingsApp } from "./sections";
 import { requestVoiceSection } from "./voice-anchor";
-import { BotAttention, hourLabel, isQuietHour } from "../../ui/bot/BotAttention";
+import { BotAttention } from "../../ui/bot/BotAttention";
 
 let root: Root;
 let host: HTMLDivElement;
@@ -173,11 +173,10 @@ describe("Studio's settings sections", () => {
     for (const key of ["explore_next", "explore_explore", "explore_quickReplies", "explore_replyItems", "emojiItems", "showInSelectionMenu", "showInAssistantBar", "showInUserBar"]) expect($(`setting-${key}`)).not.toBeNull();
   });
 
-  it("Threads: Todos links to Bot settings ▸ Attention", async () => {
+  it("Threads: no to-do reminders switch", async () => {
     await render("settings-threads");
-    for (const key of ["decisions_enabled", "autoResumeThreads", "loopsEnabled", "snapshotsPerPage"]) expect($(`setting-${key}`)).not.toBeNull();
-    await click([...host.querySelectorAll("button")].find((button) => button.textContent === "Bot settings ▸ Attention"));
-    expect(state.open).toHaveBeenCalledWith("/plugins/studio/studio/bot/bot_cos/controls#attention");
+    for (const key of ["decisions_enabled", "autoResumeThreads", "snapshotsPerPage"]) expect($(`setting-${key}`)).not.toBeNull();
+    expect($("setting-loopsEnabled")).toBeNull();
   });
 
   it("Smart Queue model: the provider, its order and check, the fallback model, and your own endpoint behind a disclosure, with no Jev in the text", async () => {
@@ -269,31 +268,13 @@ describe("Studio's settings sections", () => {
 });
 
 describe("Bot ▸ Controls ▸ Attention", () => {
-  it("shows the budget, quiet hours and the time zone (this computer's by default), and saves changes", async () => {
-    state.values = values({ loopsEnabled: true, loopDailyBudget: 5, loopQuietStart: 22, loopQuietEnd: 7 });
+  it("is the time zone alone, this computer's by default", async () => {
+    state.values = values({});
     await act(async () => { root.render(<BotAttention botName="Chief of Staff" />); });
-    expect(host.querySelector('[role="switch"]')!.getAttribute("aria-checked")).toBe("true");
-    expect($("attention-budget")!.textContent).toContain("5");
+    expect(host.querySelector('[role="switch"]')).toBeNull();
+    expect($("attention-budget")).toBeNull();
+    expect($("attention-quiet")).toBeNull();
     expect($("attention-zone")!.textContent).toContain("This computer · America/New York");
     expect($("attention-zone")!.textContent).not.toContain("STUDIO_LOOP_TIME_ZONE");
-    await click(host.querySelector('[aria-label="More interruptions"]'));
-    expect(state.set).toHaveBeenCalledWith({ loopDailyBudget: 6 });
-    await click(host.querySelector('[role="switch"]'));
-    expect(state.set).toHaveBeenCalledWith({ loopsEnabled: false });
-  });
-
-  it("names the switch for what it holds: Task reminders, off by default", async () => {
-    await act(async () => { root.render(<BotAttention botName="Chief of Staff" />); });
-    const toggle = host.querySelector('[role="switch"]')!;
-    expect(toggle.getAttribute("aria-checked")).toBe("false");
-    expect(toggle.getAttribute("aria-label")).toBe("Task reminders");
-    expect(text()).toContain("Posts each due task in the Bot’s chat");
-  });
-
-  it("formats hours and finds quiet ones across midnight", () => {
-    expect([0, 7, 12, 22].map(hourLabel)).toEqual(["12:00 AM", "7:00 AM", "12:00 PM", "10:00 PM"]);
-    expect([22, 23, 0, 6, 7, 12].map((hour) => isQuietHour(hour, 22, 7))).toEqual([true, true, true, true, false, false]);
-    expect(isQuietHour(13, 13, 15)).toBe(true);
-    expect(isQuietHour(5, 7, 7)).toBe(false);
   });
 });

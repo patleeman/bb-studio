@@ -56,7 +56,7 @@ final class RoomTests: XCTestCase {
         XCTAssertEqual(room.mode, .menu)
         room.handle(.closeMenu)
         XCTAssertEqual(room.mode, .rest)
-        XCTAssertEqual(room.handle(.open(.tasks)), .none)
+        XCTAssertEqual(room.handle(.open(.strands)), .none)
         XCTAssertNil(room.place, "a place opens only from the menu")
     }
 

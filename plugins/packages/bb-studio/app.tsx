@@ -119,7 +119,6 @@ import { runVsCode } from "./src/code/open-vscode";
 import { onMainWindowPath } from "./src/launcher/main-actions";
 import { VSCODE_MAIN_PATH } from "./src/launcher/shared";
 import { readKindsSnapshot, whenOn } from "./src/ui/kinds-snapshot";
-import { LoopsDirective } from "./src/loops/ui/LoopCard";
 import { TaskDirective } from "./src/tasks/ui/TaskCard";
 import { STRANDS_TAB, StrandsBoxBanner } from "./src/strands/ui/Strip";
 import { ContextInfoSection } from "./src/strands/ui/ContextInfoSection";
@@ -127,7 +126,6 @@ import { registerTimelineFilter } from "./src/strands/ui/selection";
 import { StrandTag } from "./src/strands/ui/Tag";
 import { StrandsTab } from "./src/strands/ui/Tab";
 import "./src/work/ui/work.css";
-import { LOOPS_PANE, LoopsPane } from "./src/loops/ui/LoopsPane";
 import { TodosTabName } from "./src/loops/ui/tab-name";
 import { OFF_NEW_TAB, onThreadTabOpen, registerThreadTab, ThreadTabReceiver } from "./src/kit/app/thread-panel";
 import { forgetView } from "./src/ui/studio-tab/view-state";
@@ -141,6 +139,9 @@ import { openPathFromRoute, StudioContainerProvider } from "./src/ui/studio-open
  * except for `workspace`. Retained, so it checks each time it's shown. In a
  * pane of its own, such as a restored BB split, it offers the move instead.
  */
+/** A directive that draws nothing (a retired card's line). */
+function NoDirective() { return null; }
+
 function ToWorkspace({ path, kind, query }: { path: string; kind?: string; query?: string }) {
   const pathname = usePathname();
   const go = (replace: boolean) => {
@@ -384,11 +385,10 @@ export default definePluginApp((app) => {
   // open one; this bare banner in every thread's composer takes the request.
   app.composer.customize({ id: "thread-tabs", scopes: ["thread"], banners: [{ id: "requests", chrome: "bare", component: ThreadTabReceiver }] });
   app.slots.messageDirective({ id: BOT_THREAD_DIRECTIVE, component: BotThreadDirective });
-  // Todos (docs/attention-router/backend.md): `::loop{id="loop_…"}`
-  // is a todo's card, `row="1"` its morning row; `::loops{more="3"}` and
-  // `::loops{open="pane"}` open the Todos pane beside the chat.
+  // Old to-do cards: `::loop{id="loop_…"}` draws the to-do read-only, and
+  // the old `::loops{more="3"}` and `::loops{open="pane"}` lines draw nothing.
   app.slots.messageDirective({ id: "loop", component: TaskDirective });
-  app.slots.messageDirective({ id: "loops", component: LoopsDirective });
+  app.slots.messageDirective({ id: "loops", component: NoDirective });
   app.slots.messageDirective({ id: "work", component: TaskDirective });
   // The strands box above a Bot conversation's composer (src/strands/ui), in In flight's old place; and the timeline filter it applies.
   app.composer.customize({ id: "strands", scopes: ["thread"], banners: [{ id: "strands", component: StrandsBoxBanner }] });
@@ -398,8 +398,6 @@ export default definePluginApp((app) => {
   if (typeof infoSection === "function") infoSection.call(app.slots, { id: "thread-context", group: "0_context", order: 10, component: ContextInfoSection });
   app.slots.experimental_messageMetadata({ id: "strand-tag", placement: "above", component: StrandTag });
   registerThreadTab(app, { id: STRANDS_TAB, title: "Strands", icon: "LayoutList", layout: "flush", component: StrandsTab, ...OFF_NEW_TAB });
-  // The Todos pane: the todo list in a tab beside the chat.
-  registerThreadTab(app, { id: LOOPS_PANE, title: newTabTitle(LOOPS_PANE) ?? "Tasks", icon: "ListTodo", layout: "flush", component: LoopsPane, ...newTabFields(LOOPS_PANE) });
   // The Bot's other pages as tabs (Memory, Library, Automations, the Archive) and the New Tab page's "New …" actions (src/tab-kinds.ts).
   registerTabKindTabs(app);
   // Hands-free voice (src/voice/live/ui): a session is its own thread. Its

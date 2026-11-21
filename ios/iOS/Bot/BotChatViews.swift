@@ -178,9 +178,8 @@ struct BotMessageRow: View {
                         .accessibilityHidden(true)
                 }
                 if hasLoops {
-                    // Loop cards stand on their own between the reply's bubbles.
+                    // Old loop and work cards stand on their own between the reply's bubbles, read-only.
                     LoopMessage(text: text) { AnyView(bubble($0)) }
-                        .environment(\.loopDraft, { app.draftForBot($0) })
                 } else {
                     bubble(text)
                 }

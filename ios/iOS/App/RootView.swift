@@ -22,7 +22,7 @@ struct RootView: View {
         let _ = tick
         let idle = model.tab == .bot && model.path.isEmpty && model.botDraft == nil
         let quiet = model.sheet == nil && !classic.busy && !(launch.shown == .classic && ClassicBotActivity.held())
-        let shown = launch.next(support: spaces.support, idle: idle, quiet: quiet, linked: model.botShowsLoops)
+        let shown = launch.next(support: spaces.support, idle: idle, quiet: quiet, linked: model.botShowsStrands)
         Group {
             switch shown {
             case .room:
@@ -51,9 +51,9 @@ struct RootView: View {
             launch.shown = value
             if old != .classic, value == .classic { TouchClock.forget() }
             if old == .loading, value != .loading { UIAccessibility.post(notification: .screenChanged, argument: nil) }
-            if value == .room, model.botShowsLoops {
-                model.botShowsLoops = false
-                model.shellLink = .page(.todos, botId: nil)
+            if value == .room, model.botShowsStrands {
+                model.botShowsStrands = false
+                model.shellLink = .page(.strands, botId: nil)
             }
         }
         .task(id: spaces.support == .available && launch.shown == .classic && model.tab == .bot) {

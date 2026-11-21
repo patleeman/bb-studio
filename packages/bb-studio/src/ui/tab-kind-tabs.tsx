@@ -1,7 +1,8 @@
 // The tabs the tab kinds registry (src/tab-kinds.ts) adds beside a
 // conversation, named as it names them:
 // - the Bot's pages as workbench tabs: Memory, Library, Automations and the
-//   Archive (Todos is the Todos pane, src/loops); each shows the Bot the
+//   Archive and Strands (src/strands/ui/StrandsPage.tsx, in the old Todos
+//   pane's tab id, so a tab left open shows it); each shows the Bot the
 //   sidebar shows, or the one in its params (`{ botId }`);
 // - the New Tab page's "New …" actions (New conversation, New page, New
 //   whiteboard, …): action tabs whose `run` makes the thing and opens it as a
@@ -18,7 +19,7 @@ import { TodoTab } from "../loops/ui/TodoTab";
 import { RecordTab } from "../memory/ui/RecordTab";
 import { AutomationTab } from "./automations/AutomationTab";
 import { ITEM_KINDS, NEW_TAB_ACTIONS, newTabFields, newTabTitle, STUDIO_PLUGIN, tabKindEntry, type TabKindId } from "../tab-kinds";
-import { AUTOMATIONS_PANEL, AutomationsPanel } from "./automations/AutomationsPanel";
+import { AUTOMATIONS_PANEL, AutomationsPanel, BotStrandsPanel } from "./automations/AutomationsPanel";
 import { currentBot, markLanded, startConversationVia } from "./conversations/state";
 import { newConversationPath } from "./conversations/new-conversation";
 import { LibraryPage } from "./library/LibraryPage";
@@ -49,6 +50,7 @@ export const BOT_PAGE_TABS: readonly { kind: TabKindId; component: ComponentType
   { kind: "skills", component: ({ params }) => <Frame><SkillsPage botId={botOf(params) ?? currentBot()} /></Frame> },
   { kind: "library", component: () => <Frame><LibraryPage /></Frame> },
   { kind: "automations", component: () => <Frame><AutomationsPanel /></Frame> },
+  { kind: "todos", component: ({ params }) => <Frame><BotStrandsPanel botId={botOf(params)} tab="now" /></Frame> },
   { kind: "archive", component: ({ params }) => <Frame><OlderPage botId={botOf(params) ?? currentBot()} /></Frame> },
 ];
 

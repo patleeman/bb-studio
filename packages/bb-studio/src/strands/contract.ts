@@ -11,7 +11,8 @@ const workerStatus = z.enum(["running", "needs-you", "failed", "done"]);
 
 export const strandAsk = z.object({
   id: z.string(),
-  kind: z.enum(["question", "approval", "gateway"]),
+  /** "area": an area's item that needs the user; "flag": the conversation flagged with bot_needs_you. Both are answered in the chat. */
+  kind: z.enum(["question", "approval", "gateway", "area", "flag"]),
   /** The thread it waits in: the conversation, or one of its workers. */
   threadId: z.string(),
   label: z.string(),
@@ -94,6 +95,17 @@ export type OverviewConversation = z.infer<typeof overviewConversation>;
 const strandId = z.string().min(1).max(200);
 const ok = z.object({ ok: z.boolean() });
 
+/** The agents' one strands tool: mark a strand waiting on someone, done, or renamed. */
+export const STRAND_NOTE_TOOL = "strand_note";
+export const STRAND_NOTE_DESCRIPTION = "Mark a strand (a line of work in this conversation) as waiting on someone or something, done, or renamed. Strands are sorted automatically; use this only when waiting or finished. Without strand, it notes the strand of your current turn (a worker's: the strand that started you).";
+export const strandNoteInput = z.object({
+  strand: z.string().trim().min(1).max(200).optional().describe("The strand's id or title; default: the current one"),
+  waitingOn: z.string().trim().max(120).nullable().optional().describe("Who or what it waits on (\"Dana's review\", \"CI run 42\"); null clears it. Clears itself on the strand's next activity."),
+  done: z.boolean().optional().describe("true: the work is finished; it folds away until its next activity"),
+  title: z.string().trim().min(1).max(60).optional().describe("A new name: 1 to 4 words, a concrete noun phrase"),
+}).strict();
+export type StrandNoteInput = z.infer<typeof strandNoteInput>;
+
 export const rpcContract = defineRpcContract({
   "strands.list": {
     experimental_description: "A conversation's strands (its lines of work) with live states.",
@@ -115,7 +127,7 @@ export const rpcContract = defineRpcContract({
     }),
   },
   "strands.overview": {
-    experimental_description: "Every conversation of a Bot with open strands, needs you first: the overview beside the Tasks page.",
+    experimental_description: "Every conversation of a Bot with open strands, needs you first: the Strands page.",
     input: z.object({ botId: z.string().min(1).max(200) }).strict(),
     output: z.object({ conversations: z.array(overviewConversation), needs: z.number(), running: z.number() }),
   },
@@ -161,9 +173,10 @@ export const rpcContract = defineRpcContract({
   },
 });
 
-/** What the phone reads: a conversation's strands and its tags, and "opened". The rest stays desktop-only. */
+/** What the phone reads: a conversation's strands and its tags, "opened", and the overview (its Strands screen). The rest stays desktop-only. */
 export const strandsPublicContract = defineRpcContract({
   "strands.list": rpcContract["strands.list"],
+  "strands.overview": rpcContract["strands.overview"],
   "strands.tags": rpcContract["strands.tags"],
   "strands.opened": rpcContract["strands.opened"],
 });

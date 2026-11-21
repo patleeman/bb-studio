@@ -27,6 +27,8 @@ export interface Strand {
   taskId: string | null;
   waitingOn: string | null;
   waitingAt: number | null;
+  /** An agent said it is done (strand_note); its next activity makes it live again. */
+  doneAt: number | null;
   openedAt: number | null;
   createdAt: number;
 }
@@ -50,7 +52,7 @@ export interface StrandRead { threadId: string; seenSeq: number; day: string | n
 type StrandRow = {
   id: string; thread_id: string; title: string; summary: string | null; named: number; name_tries: number; summary_at: number | null;
   first_seq: number; last_seq: number; last_at: number; pinned: number; merged_into: string | null; origin: string; task_id: string | null;
-  waiting_on: string | null; waiting_at: number | null; opened_at: number | null; created_at: number;
+  waiting_on: string | null; waiting_at: number | null; done_at?: number | null; opened_at: number | null; created_at: number;
 };
 type ItemRow = {
   thread_id: string; seq: number; kind: string; ref: string; turn_id: string | null; at: number; line: string | null;
@@ -60,7 +62,7 @@ type ItemRow = {
 const strandOf = (row: StrandRow): Strand => ({
   id: row.id, threadId: row.thread_id, title: row.title, summary: row.summary, named: !!row.named, nameTries: row.name_tries, summaryAt: row.summary_at,
   firstSeq: row.first_seq, lastSeq: row.last_seq, lastAt: row.last_at, pinned: !!row.pinned, mergedInto: row.merged_into,
-  origin: row.origin as StrandOrigin, taskId: row.task_id, waitingOn: row.waiting_on, waitingAt: row.waiting_at, openedAt: row.opened_at, createdAt: row.created_at,
+  origin: row.origin as StrandOrigin, taskId: row.task_id, waitingOn: row.waiting_on, waitingAt: row.waiting_at, doneAt: row.done_at ?? null, openedAt: row.opened_at, createdAt: row.created_at,
 });
 const itemOf = (row: ItemRow): StrandItem => ({
   threadId: row.thread_id, seq: row.seq, kind: row.kind as ItemKind, ref: row.ref, turnId: row.turn_id, at: row.at, line: row.line,
@@ -161,6 +163,12 @@ export class StrandStore {
 
   rename(id: string, title: string): void {
     this.db.prepare("UPDATE strands SET title = ?, named = 1 WHERE id = ?").run(title, id);
+  }
+
+  /** An agent's note (strand_note): who or what it waits on (null clears it), and done (null clears it). */
+  note(id: string, note: { waitingOn?: string | null; done?: boolean }, at: number): void {
+    if (note.waitingOn !== undefined) this.db.prepare("UPDATE strands SET waiting_on = ?, waiting_at = ? WHERE id = ?").run(note.waitingOn, note.waitingOn === null ? null : at, id);
+    if (note.done !== undefined) this.db.prepare("UPDATE strands SET done_at = ? WHERE id = ?").run(note.done ? at : null, id);
   }
 
   setPinned(id: string, pinned: boolean): void {

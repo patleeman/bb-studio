@@ -180,49 +180,32 @@ Studio search (Cmd/Ctrl+Shift+K) over the same staged project, searching
 "offline sync": an HTML artifact and two pages match on their title or
 content, each showing the matching text with the match in bold.
 
-### Todos: todo cards and the Todos tab
+### Strands: the Strands page
 
-Todos are how the Bot tracks what the user owes, decides, reads or waits on
-([backend](../../docs/attention-router/backend.md)). The Todos list, its
-cards and the pane work at all times. **Todo reminders** (`loopsEnabled`, on
-for a new install from its first Bot, off where it was never set before; Bot settings ▸ Attention, or Studio's settings under Threads) is
-the switch for the scheduler: with it on, the Bot posts a `::loop` line in its
-chat when a todo comes due, and it renders as a card with the todo's actions. `scripts/capture/captures/bb-studio-loops.mjs`
-captures the cards, the Todos tab and the pane from a staged BB with fixed
-demo todos; the screenshots aren't committed.
+Strands are each conversation's lines of work: Studio sorts every turn into
+one by itself (`src/strands`). The Bot's **Strands** page
+(`/plugins/studio/studio/bot/<botId>/strands`; the older `…/loops` address
+opens it too) lists every conversation with open strands, needs you first:
+up to two asks per conversation with their buttons, then a chip per other
+strand. A chip opens the conversation at that strand's newest message. Under
+them are the areas' cards. The page's second tab, **Scheduled**, lists the
+Bot's check-ins, reminders, watchers and runners. The sidebar's **Strands**
+row counts the strands that need you.
 
-The Todos page (`/plugins/studio/studio/bot/<botId>/loops`) is on the Bot
-pages' template: one line per todo, its title on the left and one small due
-date or "when" on the right ("Overdue", "Due Fri", "When you get home",
-"Since Sun", or who has it), in **Today** (out now, overdue or due today,
-led by the Bot chat's pending questions; a reply not read yet is no todo),
-**This week** (the next six days), **Later** (past that, or no date) and
-**Waiting on others** (a waiting todo, or one a lead or the Bot has), then
-**Scheduled** and **Done**, folded. A group shows 8 rows, then "N more". Area is a filter pill, never on a row. A row opens the todo as a tab in
-the workbench beside the page (`bb://todo/loop_…`): the description, due
-date, when, area, owner and source (a plan's
-link), with the actions that fit it (Done, an option, Got it, Surface now,
-Snooze, Hand off, Discuss, Change trigger, Drop; Nudge them; Take it back
-and Open thread; Undo). **New** hands a typed line to the Bot.
+A strand needs you when a BB question or approval waits in it, one of its
+workers needs you, a Tool Gateway request waits, an area's open item needs
+you (on the strand that holds the area's report), or the conversation is
+flagged with `bot_needs_you`. When a strand turns "needs you", the phone gets
+one push (`src/strands/push.ts`), unless BB pushes that ask itself or the ask
+waits in a turn another thread started. Studio Mobile holds it while you are
+at the desk.
 
-The Todos pane is the same list beside the chat, in the thread's side panel,
-so it stays up while you talk todos through with the Bot. Open it from the
-Bot row's count in the sidebar, from a `::loops{open="pane"}` card or
-"N more in Todos" in the chat, or from the side
-panel's launcher. A do or read row's circle marks it done in one click (a
-check on hover), and the row stays put with Undo. Each row's actions are in
-its ⋯ menu, and Change trigger
-opens under the row. Its header opens the full Todos tab.
-
-To talk a todo through, pick **Discuss** in its ⋯ menu (on the Todos tab,
-its Discuss button). It puts the todo in the Bot chat's draft as an `@loop`
-chip without sending, so you type your question; the Bot gets the todo's
-title, why and trigger when you send. You can also drag a row from the pane
-into the composer: it drops the todo's `::loop` line and title as text,
-which the Bot reads the same way.
-
-With the setting off, there's no Todos tab, and every card
-is a quiet line (one per morning message).
+Agents have one strands tool, `strand_note`: mark a strand waiting on someone
+or something, done, or renamed. There are no task tools, no work cards and
+no personal to-dos any more. Old `::loop` and `::work` cards in past messages
+show read-only; an old `::loops` line draws nothing. The task rows stay in
+Studio's database for what still uses them: automations' runs and findings,
+areas, and older phone builds reading an old card.
 
 ## Settings
 
@@ -233,14 +216,13 @@ your own endpoint's. Every other setting is Studio's
 own, in grouped sections below them: **Voice** (dictation and hands-free:
 model, voice, backend model and monthly limit), **Recordings and calls**,
 **Agent replies** (the Next row, reactions and App cards), **Threads** (Smart Queue,
-resume after a restart, Todos and page history), **Windows** (the launcher's
+resume after a restart and page history), **Windows** (the launcher's
 shortcut; only in a BB with plugin windows, see [Windows](#windows)), **Smart
 Queue model** (Jev's provider, its connection test, the fallback model and your
 own endpoint) and
 **Advanced** (Smart Queue batch confidence). Last, **Phone notifications**
-shows Studio Mobile's push status and **Send a test push**. The Attention
-Router's daily budget and quiet hours are on the Bot page, under **Controls →
-Attention**.
+shows Studio Mobile's push status and **Send a test push**. The time zone
+scheduled items run in is on the Bot page, under **Controls → Attention**.
 
 ![Studio's settings page, dark](assets/settings/settings-page-dark.png)
 
@@ -1499,11 +1481,8 @@ Studio starts a conversation of the same Bot, in the source's project and
 environment, on the Bot's default model, as **+ New** does. Its first message
 is the Bot's short handoff, starting
 "Continued from @thread:<source>#msg=<your last message>". Nothing is forked
-and no transcript is copied. The listed work cards move: their `threadId`
-becomes the new conversation and their message anchor is cleared, so they
-belong to the new one. The new
-conversation's first reply re-posts each `::work{id}` line, which re-anchors
-it. The old card in the source message still redraws live.
+and no transcript is copied, and no cards move: strands sort the new
+conversation's turns by themselves.
 
 The Bot answers in the source with the tool's `post` text:
 `::continued{to="thr_…" title="…"}` and, on the next line,
@@ -3906,24 +3885,11 @@ A record (`MemoryRecordView`):
 
 Every write publishes `studio-changed` on Studio's realtime channel.
 
-### Todos
+### Reminders
 
-Todos (the loops store) are shared live: one store for every Bot. The
-`todos_*` tools (and their `loops_*` aliases) are in every session that gets
-Studio's full tool list: the Bot's chat, runners and other threads. A side
-thread gets only its read-only Bot tools, so it has no `todos_*` tools, and a
-paused or stopped Bot's chat has none either. Todos are not in the
-instructions: the Bot reads them with `task_list` when it needs them, and
-due todos are posted to the primary Bot's chat.
-
-**Reminders are todos.** A one-time reminder is a todo the Bot owns with a
-time. With Todos on, `automation_create` with kind `reminder` makes one. A
-copy-first migration copied every older reminder into the todos as
-`loop_reminder_<automation id>` (active → queued, paused → dropped, done →
-done; owner `cos`, or the thread it targeted) and kept the reminder rows.
-While Todos are on, a reminder that has its todo no longer wakes the Bot as
-an automation; the todo carries it. Reminders made over the RPC (the iOS
-app, the New menu) are still automations until they move too.
+A reminder is an automation: `automation_create` with kind `reminder` makes
+one, and it wakes the Bot when it comes due. Older reminders that were copied
+into to-dos (`loop_reminder_<automation id>`) run as their automation again.
 
 ## Pages and Apps
 

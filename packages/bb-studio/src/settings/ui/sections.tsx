@@ -9,7 +9,6 @@
 // (ApiKeysSection.tsx).
 import { useRpc, type PluginAppBuilder } from "@get-bb/plugin-sdk/app";
 import { useEffect, useRef, useState } from "react";
-import { openAppPath } from "../../kit/app/nav";
 import { Button } from "../../kit/ui/index";
 import { FallbackModel, JevConnection } from "../../decisions/ui/register";
 import { ModelSettings } from "../../talk/ui/model-settings";
@@ -18,8 +17,6 @@ import { loadVoiceState } from "../../voice/live/ui/QuickSettings";
 import type { VoiceLiveState, voiceLiveContract } from "../../voice/live/contract";
 import { LIVE_VOICES, usd } from "../../voice/live/shared";
 import { CALL_STT_OPTIONS } from "../../kit/talk-contract";
-import { useLive } from "../../ui/live";
-import { botPath } from "../../ui/bot/selection";
 import { SETTINGS_GROUPS, STUDIO_SETTINGS } from "../schema";
 import { Card, Disclosure, Row, SectionState, Segmented, SettingControl, SettingRow, SubHeading } from "./controls";
 import { ApiKeysSection } from "./ApiKeysSection";
@@ -136,15 +133,11 @@ function RepliesSection() {
 }
 
 function ThreadsSection() {
-  const bot = useLive("bot_get", {}, { pollMs: 300_000 }).data?.bot ?? null;
-  const attention = bot ? `${botPath(bot.id)}/controls#attention` : null;
   return (
     <SectionState>
       <Card>
         <SettingRow k="decisions_enabled" />
         <SettingRow k="autoResumeThreads" />
-        <SettingRow k="loopsEnabled" description={<>{STUDIO_SETTINGS.loopsEnabled.description} The daily budget and quiet hours are on{" "}
-          {attention ? <button type="button" className="underline hover:text-foreground" onClick={() => openAppPath(attention)}>Bot settings ▸ Attention</button> : "Bot settings ▸ Attention"}.</>} />
         <SettingRow k="snapshotsPerPage" />
       </Card>
     </SectionState>

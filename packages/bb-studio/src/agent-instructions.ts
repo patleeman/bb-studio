@@ -1,7 +1,7 @@
 // What Studio's agent configuration tells every session, in order (server.ts
 // `bb.agents.configure`): the Bot's own instructions, which conversation this
 // is, a runner's job, the memory slot (the core profile, src/memory), then a
-// short pointer each for Pages, apps, the Next row (or Explore) and the
+// short pointer each for Pages, apps, strands, the Next row (or Explore) and the
 // kinds routing. The long guidance behind the pointers is in the studio skill
 // (skills/studio/SKILL.md, "Agent guide"), which the agent loads on demand.
 //
@@ -20,7 +20,8 @@ export const APP_POINTER = 'An app is a saved output or an interactive tool with
 
 export const CONTINUE_POINTER = 'New topic? Offer a new conversation for it; call conversation_continue_new only when they agree or ask.';
 
-export const WORK_POINTER = 'For work that runs a while (a worker, a release, a long job), post one live work card: task_create with card: true gives a ::work{id="…"} line to post once; report progress with task_update, not new status messages.';
+/** Strands: what each conversation's lines of work are, and the one tool for them. No task tools or work cards. */
+export const STRAND_POINTER = 'Strands track each line of work in a conversation by themselves; say in the chat what you are doing. When a line of work waits on someone or something, or is finished, call strand_note.';
 
 /**
  * The end-of-reply line: the Next row (with which attributes are on and the
@@ -47,7 +48,6 @@ export interface InstructionParts {
   pages: boolean;
   minis: boolean;
   appCards: boolean;
-  work: boolean;
   /** endOfReplyPointer's line, or null. */
   endOfReply: string | null;
   /** The kinds routing line (src/kinds.ts routingInstructions), or "". */
@@ -56,6 +56,6 @@ export interface InstructionParts {
 
 /** The instructions with MEMORY_SLOT where the memory block goes (src/memory/service.ts withMemory fills it). */
 export function studioInstructions(parts: InstructionParts): string {
-  return [parts.bot, parts.conversation, parts.runner, MEMORY_SLOT, parts.pages ? PAGE_POINTER : "", parts.minis ? (parts.appCards ? APP_POINTER : MINI_POINTER) : "", parts.work ? WORK_POINTER : "", parts.conversation ? CONTINUE_POINTER : "", parts.endOfReply ?? "", parts.routing]
+  return [parts.bot, parts.conversation, parts.runner, MEMORY_SLOT, parts.pages ? PAGE_POINTER : "", parts.minis ? (parts.appCards ? APP_POINTER : MINI_POINTER) : "", parts.conversation || parts.runner ? STRAND_POINTER : "", parts.conversation ? CONTINUE_POINTER : "", parts.endOfReply ?? "", parts.routing]
     .filter(Boolean).join("\n\n");
 }

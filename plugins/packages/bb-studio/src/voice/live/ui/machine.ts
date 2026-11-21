@@ -4,11 +4,10 @@
 // side effect goes out as an Effect. The same machine as the iPhone's
 // (ios/iOS/VoiceLive/Core/LiveSessionMachine.swift, BargeInGate.swift).
 import type { LiveOutgoing, LiveSignal } from "./events";
-import { voiceToolName } from "../shared";
 
 export type Speaker = "user" | "agent";
 export interface Subtitle { speaker: Speaker; text: string }
-export interface ToolCard { kind: "waiting" | "sent" | "loop" | "reply" | "notice"; title: string; detail: string }
+export interface ToolCard { kind: "sent" | "done" | "reply" | "notice"; title: string; detail: string }
 
 export type Phase =
   | { kind: "idle" } | { kind: "connecting" } | { kind: "listening" } | { kind: "userSpeaking" } | { kind: "thinking" } | { kind: "agentSpeaking" }
@@ -117,17 +116,10 @@ export function firstSentence(text: string): string {
   return end < 0 ? clean : `${clean.slice(0, end)}.`;
 }
 
-/** "What's waiting": how many need you, and the first two. */
-export function waitingCard(output: string): ToolCard {
-  const count = output.match(/Needs you now \((\d+)\)/)?.[1] ?? "0";
-  const titles = output.split("\n").filter((line) => line.startsWith("- ")).slice(0, 2).map((line) => line.slice(2).split("(")[0]!.trim());
-  return { kind: "waiting", title: count === "0" ? "Nothing waiting" : `${count} need${count === "1" ? "s" : ""} you`, detail: titles.length ? titles.join(" · ") : "Nothing needs you right now" };
-}
-
 export class SessionMachine {
   phase: Phase = { kind: "idle" };
   subtitle: Subtitle | null = null;
-  /** "Drop the todo '…'? Say yes to drop." while a destructive action waits for a yes. */
+  /** "Archive the thread '…'? Say yes to archive." while a destructive action waits for a yes. */
   confirmation: string | null = null;
   card: ToolCard | null = null;
   /** The session's finished lines, newest last (the pill's transcript); at most 60. */
@@ -371,7 +363,7 @@ export class SessionMachine {
       this.card = null;
       return effects;
     }
-    switch (voiceToolName(name)) {
+    switch (name) {
       case "send_to_cos": case "send_to_thread":
         if (output.startsWith("Sent to ")) {
           this.card = { kind: "sent", title: `Sent to ${output.slice("Sent to ".length).split(".")[0]}`, detail: "" };
@@ -384,7 +376,7 @@ export class SessionMachine {
         this.confirmation = null;
         this.question = null;
         const undone = output.includes("nothing was done") || output.includes("cancelled") || output.includes("timed out");
-        this.card = undone ? { kind: "notice", title: "Not done", detail: firstSentence(output) } : { kind: "loop", title: firstSentence(output), detail: "" };
+        this.card = undone ? { kind: "notice", title: "Not done", detail: firstSentence(output) } : { kind: "done", title: firstSentence(output), detail: "" };
         if (!undone) effects.push({ type: "earcon", earcon: "sent" });
         break;
       }
@@ -393,13 +385,6 @@ export class SessionMachine {
         this.question = null;
         this.card = { kind: "notice", title: "Not done", detail: "Cancelled" };
         break;
-      case "todos_list": this.card = waitingCard(output); break;
-      case "todos_act": case "todos_add": {
-        const refused = output.startsWith("Voice can");
-        this.card = { kind: refused ? "notice" : "loop", title: firstSentence(output), detail: refused ? "" : "Say “undo” to undo" };
-        break;
-      }
-      case "undo": this.card = { kind: "loop", title: firstSentence(output), detail: "" }; break;
       case "read_replies": this.card = { kind: "reply", title: "Reply", detail: stripData(output) }; break;
       case "stop_thread": case "archive_thread": case "pause_automation": case "delete_automation":
         this.card = { kind: "notice", title: "Which one?", detail: firstSentence(output) };

@@ -6,7 +6,7 @@ import type Database from "better-sqlite3";
 import { STUDIO_REALTIME_CHANNEL } from "../kit/contract";
 import { primaryHostId } from "../kit/server/project";
 import { runStrandsCli, strandsThreadFor, type StrandsScope } from "./cli";
-import { rpcContract } from "./contract";
+import { rpcContract, STRAND_NOTE_DESCRIPTION, STRAND_NOTE_TOOL, strandNoteInput, type StrandNoteInput } from "./contract";
 import { EVENT_TYPES, type EventRow } from "./turns";
 import { JEV_TIMEOUT_MS, STRANDS_CALLER } from "./detector";
 import { StrandService, type WorkerFact } from "./service";
@@ -28,6 +28,10 @@ export interface StrandsRegisterDeps {
   workers(threadId: string): Promise<WorkerFact[]>;
   /** Who may see which conversation's strands from `bb studio strands`. */
   scope: Omit<StrandsScope, "enabled">;
+  /** A worker's conversation, for strand_note from a worker. */
+  conversationOfWorker?(threadId: string): string | null;
+  /** An area's item that needs the user, and the conversation's own flag; see StrandServiceDeps.extraAsks. */
+  extraAsks?(threadId: string): { id: string; kind: "area" | "flag"; label: string; at: number }[];
   /** Secret values to keep out of what strands send and keep: Studio's API keys, Tool Gateway's secrets. */
   secrets(): Promise<readonly string[]>;
   log(message: string): void;
@@ -79,6 +83,8 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
       return list.filter((each) => each.status === undefined || each.status === "pending");
     },
     busy: async (threadId) => BUSY.has((await threadOf(threadId))?.status ?? ""),
+    ...(deps.extraAsks ? { extraAsks: deps.extraAsks } : {}),
+    ...(deps.conversationOfWorker ? { conversationOfWorker: deps.conversationOfWorker } : {}),
     changed,
     log: deps.log,
   });
@@ -105,6 +111,16 @@ export function registerStrands(bb: BbPluginApi, db: Database.Database, deps: St
     "strands.unmerge": ({ strandId }) => ({ ok: service.unmerge(strandId) }),
     "strands.unmove": ({ threadId, seq }) => ({ ok: service.unmove(threadId, seq) }),
   });
+
+  // strand_note: the one tool agents use on strands (in place of the task tools).
+  bb.agents.registerTool({
+    name: STRAND_NOTE_TOOL,
+    description: STRAND_NOTE_DESCRIPTION,
+    parameters: strandNoteInput,
+    execute: async (input: StrandNoteInput, ctx: { threadId?: string | null }) => {
+      try { return service.note(ctx?.threadId ?? null, input).line; } catch (error) { return `Error: ${error instanceof Error ? error.message : String(error)}`; }
+    },
+  } as never);
 
   const cli = (argv: readonly string[], ctx: { threadId?: string | null }) => runStrandsCli(argv, {
     resolve: async (ref) => strandsThreadFor(ref, ctx.threadId ?? null, { ...deps.scope, enabled: (threadId) => service.enabled(threadId) }),

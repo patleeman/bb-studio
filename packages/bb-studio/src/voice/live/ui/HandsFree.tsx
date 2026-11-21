@@ -255,7 +255,7 @@ function Transcript({ lines }: { lines: { speaker: Speaker; text: string }[] }) 
   );
 }
 
-const CARD_ICON: Record<ToolCard["kind"], string> = { waiting: "ListTodo", sent: "Check", loop: "CircleCheck", reply: "MessageSquare", notice: "AlertCircle" };
+const CARD_ICON: Record<ToolCard["kind"], string> = { sent: "Check", done: "CircleCheck", reply: "MessageSquare", notice: "AlertCircle" };
 
 function Card({ card }: { card: ToolCard }) {
   return (

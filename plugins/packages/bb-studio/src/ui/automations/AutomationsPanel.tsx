@@ -1,12 +1,12 @@
 // The Bot's Automations page (`studio/automations`) and its tab: what runs
-// when now lives on the Bot's Todos page, under Scheduled
-// (src/loops/ui/TodosPage.tsx), so this shows that page on its Scheduled tab.
+// when now lives on the Bot's Strands page, under Scheduled
+// (src/strands/ui/StrandsPage.tsx), so this shows that page on its Scheduled tab.
 // Switching Bots in the sidebar switches the page.
 import { Icon, openAppPath } from "../../kit/app/index";
 import { Button } from "../../kit/ui/button";
 import { NEW_BOT_PATH } from "../bot/selection";
 import { useLive } from "../live";
-import { TodosPage } from "../../loops/ui/TodosPage";
+import { StrandsPage, type StrandsTab } from "../../strands/ui/StrandsPage";
 import { BotPageEmpty, BotPageLayout } from "../bot-page";
 import { useCurrentBot } from "../conversations/state";
 
@@ -18,16 +18,22 @@ export function shownBot<Bot extends { id: string; primary?: boolean }>(bots: re
 }
 
 export function AutomationsPanel() {
+  return <BotStrandsPanel tab="scheduled" />;
+}
+
+/** The Strands page for a Bot (`botId`, else the sidebar's): on its Scheduled tab, the Automations page; on Now, the Strands tab beside a chat. */
+export function BotStrandsPanel({ botId = null, tab }: { botId?: string | null; tab: StrandsTab }) {
   const bots = useLive("bot_list", {}, { pollMs: 60_000 });
   const list = bots.data?.bots ?? [];
-  const bot = shownBot(list, useCurrentBot());
+  const sidebar = useCurrentBot();
+  const bot = shownBot(list, botId ?? sidebar);
   if (bot) {
     return (
-      <TodosPage key={bot.id} view={{ bot, run: null }} tab="scheduled" />
+      <StrandsPage key={bot.id} view={{ bot, run: null }} tab={tab} />
     );
   }
   return (
-    <BotPageLayout testId="automations-panel" title="Tasks">
+    <BotPageLayout testId="automations-panel" title="Scheduled">
       {bots.data ? (
         <div className="flex flex-col items-center gap-3" data-testid="automations-empty">
           <BotPageEmpty>No Bots</BotPageEmpty>

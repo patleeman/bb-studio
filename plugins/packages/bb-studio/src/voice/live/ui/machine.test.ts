@@ -3,7 +3,7 @@ import { encodeOutgoing, parseEvent } from "./events";
 import { BargeInGate, interruptedNote, SessionMachine, type Effect } from "./machine";
 
 const t0 = 1_800_000_000;
-const DROP = `Not done yet (action d_1): it's hard to undo, so it needs the user's yes. Ask exactly this and wait: "Drop the todo 'Remove the stale Tailscale node'? Say yes to drop." Call confirm only after they say yes.`;
+const ASK = `Not done yet (action d_1): it's hard to undo, so it needs the user's yes. Ask exactly this and wait: "Delete the automation 'Larkspur heartbeat'? It can't be undone. Say yes to delete." Call confirm only after they say yes.`;
 
 function live(ends = true) {
   const machine = new SessionMachine(ends);
@@ -20,8 +20,8 @@ describe("events", () => {
   it("reads GPT-Live's events, its backend's tool calls and usage", () => {
     expect(parseEvent({ type: "session.started" })).toEqual([{ type: "started" }]);
     expect(parseEvent(`{"type":"session.input_transcript.delta","delta":"tell the"}`)).toEqual([{ type: "userText", text: "tell the" }]);
-    expect(parseEvent({ type: "response.event", event: { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "todos_list", arguments: "{}" } } }))
-      .toEqual([{ type: "toolCall", callId: "c1", name: "todos_list", arguments: "{}" }]);
+    expect(parseEvent({ type: "response.event", event: { type: "response.output_item.done", item: { type: "function_call", call_id: "c1", name: "read_replies", arguments: "{}" } } }))
+      .toEqual([{ type: "toolCall", callId: "c1", name: "read_replies", arguments: "{}" }]);
     expect(parseEvent({ type: "response.event", event: { type: "response.output_item.done", item: { type: "message" } } })).toEqual([]);
     expect(parseEvent({ type: "session.closed", reason: "expired", usage: { seconds: 90 } })).toEqual([{ type: "liveUsage", seconds: 90 }, { type: "closed", reason: "expired" }]);
     expect(parseEvent({ type: "input_audio_buffer.speech_started" })).toEqual([{ type: "userSpeechStarted" }]);
@@ -104,13 +104,13 @@ describe("session machine", () => {
     machine.toolFinished("c1", "send_to_thread", `Sent to the Larkspur lead. Say just that ("Sent to the Larkspur lead."); its answer will come back here.`, t0 + 1);
     expect(machine.confirmation).toBeNull();
     expect(machine.card).toEqual({ kind: "sent", title: "Sent to the Larkspur lead", detail: "" });
-    machine.toolFinished("c2", "loops_act", DROP, t0 + 2);
-    expect(machine.confirmation).toBe("Drop the todo 'Remove the stale Tailscale node'? Say yes to drop.");
+    machine.toolFinished("c2", "delete_automation", ASK, t0 + 2);
+    expect(machine.confirmation).toBe("Delete the automation 'Larkspur heartbeat'? It can't be undone. Say yes to delete.");
     machine.toolFinished("c3", "confirm", `Studio didn't hear a clear yes (it heard "hmm"), so nothing was done.`, t0 + 3);
     expect(machine.confirmation).not.toBeNull();
-    machine.toolFinished("c4", "confirm", "Dropped the todo 'Remove the stale Tailscale node'. Say that briefly.", t0 + 4);
+    machine.toolFinished("c4", "confirm", "Deleted the automation 'Larkspur heartbeat'. Say that briefly.", t0 + 4);
     expect(machine.confirmation).toBeNull();
-    expect(machine.card?.title).toBe("Dropped the todo 'Remove the stale Tailscale node'.");
+    expect(machine.card).toEqual({ kind: "done", title: "Deleted the automation 'Larkspur heartbeat'.", detail: "" });
   });
 
   it("a line doesn't end while the user is still audibly talking, however slow the transcript", () => {
@@ -228,7 +228,7 @@ describe("session machine", () => {
       machine.handle({ type: "userSpeechStarted" }, t0 + 1);
       // The model calls delete before the request's transcript arrives.
       machine.handle({ type: "toolCall", callId: "c1", name: "delete_automation", arguments: `{"name":"heartbeat"}` }, t0 + 3);
-      machine.toolFinished("c1", "delete_automation", DROP, t0 + 3.5);
+      machine.toolFinished("c1", "delete_automation", ASK, t0 + 3.5);
       machine.handle({ type: "userLine", text: "Okay, delete the heartbeat" }, t0 + 4);
       machine.handle({ type: "userSpeechStarted" }, t0 + 7);
       machine.handle({ type: "userLine", text: "Yes" }, t0 + 8);
@@ -242,7 +242,7 @@ describe("session machine", () => {
       const machine = live(false);
       machine.handle({ type: "userSpeechStarted" }, t0 + 1);
       machine.handle({ type: "toolCall", callId: "c1", name: "delete_automation", arguments: "{}" }, t0 + 3);
-      machine.toolFinished("c1", "delete_automation", DROP, t0 + 3.5);
+      machine.toolFinished("c1", "delete_automation", ASK, t0 + 3.5);
       machine.handle({ type: "userSpeechStarted" }, t0 + 6);
       machine.handle({ type: "userLine", text: "Okay, delete the heartbeat" }, t0 + 6.5);
       machine.handle({ type: "userLine", text: "Yes" }, t0 + 7);
@@ -256,7 +256,7 @@ describe("session machine", () => {
       const machine = live();
       machine.micLevels(Array.from({ length: 50 }, (_, index) => ({ level: 0.1, at: t0 + 1 + index * 0.02 })), 0);
       machine.handle({ type: "toolCall", callId: "c1", name: "delete_automation", arguments: "{}" }, t0 + 2.5);
-      machine.toolFinished("c1", "delete_automation", DROP, t0 + 3);
+      machine.toolFinished("c1", "delete_automation", ASK, t0 + 3);
       machine.handle({ type: "userText", text: "Okay delete it" }, t0 + 3.5);
       machine.tick(t0 + 5);
       machine.handle({ type: "userText", text: "Yes" }, t0 + 8);
@@ -269,7 +269,7 @@ describe("session machine", () => {
 
     it("once the question is settled, later lines answer nothing", () => {
       const machine = live(false);
-      machine.toolFinished("c1", "delete_automation", DROP, t0 + 1);
+      machine.toolFinished("c1", "delete_automation", ASK, t0 + 1);
       machine.toolFinished("c2", "cancel", "Cancelled; nothing was done.", t0 + 2);
       machine.handle({ type: "userLine", text: "Yes" }, t0 + 3);
       expect((users(machine.drain())[0] as { answers?: string }).answers).toBeUndefined();

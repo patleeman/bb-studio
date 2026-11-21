@@ -1,17 +1,15 @@
 // The Bot page (bot/<botId>): one scroll, most important first. The header
 // says in a sentence what it's doing (botPage.ts), with Open chat, Pause,
 // Stop… and Controls (BotControls.tsx, every setting). Working now sits beside
-// Needs you: due todos, the chat's pending questions, failed runs (until the
+// Needs you: the chat's pending questions, failed runs (until the
 // next run succeeds or the user dismisses one) and maintenance's decisions,
 // each with one action. Then the week at full width with Paused below it
-// (AutomationsCalendar.tsx), then Recent in plain words, Runners and the
-// Todos summary. The top of BB's Info tab on a Bot's thread is BotInfoRows.tsx.
+// (AutomationsCalendar.tsx), then Recent in plain words and Runners. The top of BB's Info tab on a Bot's thread is BotInfoRows.tsx.
 import { OUTLINE_BUTTON, GHOST_BUTTON, ICON_BUTTON, PRIMARY_BUTTON, openAppPath } from "../../kit/app/index";
 import { Icon } from "../../kit/ui/index";
 import { useEffect, useState, type ReactNode } from "react";
 import { experimental_useProviders as useProviders } from "@get-bb/plugin-sdk/app";
 import type { BotView } from "../../contract";
-import type { Loop } from "../../loops/contract";
 import { useCall, useLive } from "../live";
 import { BotFace } from "../../presence/ui/BotFace";
 import { botProvider } from "./BotAvatar";
@@ -23,9 +21,7 @@ import { agoWords, clockAt, failedRuns, failedTitle, inSentence, type FailedRun,
 import { useOpenThread } from "./workspace";
 import { botPath } from "./selection";
 import { noteBotName } from "../page-bar";
-import { usePendingQuestions } from "../../loops/ui/LoopsTab";
-import { openLoops, useLoopActions, useLoopsEnabled, useTodosZone } from "../../loops/ui/hooks";
-import { dueLabel } from "../../loops/ui/model";
+import { usePendingQuestions } from "./pending-questions";
 import { Elapsed, ProviderStatusMark, runningLabel } from "./ProviderStatusMark";
 import { useAuthNeeds } from "../../auth/ui/needs";
 import { resumeWord } from "./bot-state";
@@ -64,17 +60,13 @@ export function useBotPageModel(view: BotView) {
   const jobs = useBotJobs(bot.id, automations.data?.automations ?? []);
   const page = useLive("bot_page_state", { botId: bot.id }, { pollMs: 60_000 });
   const maintenance = useLive("bot_maintenance_get", { botId: bot.id }, { enabled: bot.kind !== "external", pollMs: 120_000 });
-  const loopsOn = useLoopsEnabled() && bot.primary !== false;
-  const loops = useLive("loops.list", {}, { enabled: loopsOn, pollMs: 60_000 });
   const pending = usePendingQuestions(bot.threadId);
   const call = useCall();
   const openThread = useOpenThread();
   const authNeeds = useAuthNeeds(bot.primary !== false);
-  const actions = useLoopActions(loops.refresh);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(timer); }, []);
   const tz = zone();
-  const todosZone = useTodosZone();
   const names = page.data?.groupNames ?? {};
   const { sources, runners, activity } = jobs;
 
@@ -95,17 +87,10 @@ export function useBotPageModel(view: BotView) {
     working.push({ id: runner.id, threadId: runner.threadId, name: runner.name, detail: firstSentence(runner.job), since: runner.runningSince ?? null, waiting: null, providerId: runner.providerId ?? null });
   }
 
-  // Needs you: todos, questions, failures, maintenance.
+  // Needs you: questions, failures, maintenance.
   const dismissed = new Set(page.data?.dismissed ?? []);
   const needs: NeedItem[] = [...authNeeds];
-  const loopAction = (loop: Loop): NeedItem["action"] => loop.kind === "decide" ? { label: "Decide", run: () => openLoops(bot.id) }
-    : loop.kind === "read" ? { label: "Got it", run: () => void actions.act({ id: loop.id, action: "got_it" }) }
-      : loop.kind === "waiting" ? { label: "Nudge", run: () => void actions.act({ id: loop.id, action: "nudge" }) }
-        : { label: "Done", run: () => void actions.act({ id: loop.id, action: "done" }) };
-  const loopIcon = { do: "Circle", decide: "Fork", read: "FileText", waiting: "Clock" } as const;
-  const loopNeeds = loopsOn ? loops.data?.needsYouNow ?? [] : [];
   const failures = failedRuns(sources, dismissed);
-  for (const loop of loopNeeds.filter((each) => dueLabel(each.due, now, todosZone)?.urgent)) needs.push({ key: `loop:${loop.id}`, icon: loopIcon[loop.kind], title: loop.title, detail: loop.why || null, due: dueLabel(loop.due, now, todosZone), action: loopAction(loop) });
   // A failed run opens itself: its thread at the message it sent, or its automation's runs.
   const openRun = (run: FailedRun) => {
     const fallback = () => run.threadId ? openThread(run.threadId) : openAppPath(botPath(bot.id));
@@ -121,12 +106,10 @@ export function useBotPageModel(view: BotView) {
     action: { label: "Open", run: () => openRun(run) },
     dismiss: () => void call("bot_run_dismiss", { botId: bot.id, automationId: run.sourceId, runId: run.runId }).then(() => page.refresh(), () => {}),
   });
-  const tracked = new Set(loopNeeds.filter((loop) => loop.source?.kind === "interaction").map((loop) => loop.source!.ref));
-  for (const question of pending.filter((each) => !tracked.has(each.id))) needs.push({
+  for (const question of pending) needs.push({
     key: `question:${question.id}`, icon: "CircleQuestion", title: question.text ?? question.reason, detail: `${question.text ? `${question.reason === "Asked you a question" ? "Asked you in chat" : question.reason}` : "In its chat"} ${agoWords(question.createdAt, now)}`,
     action: { label: question.reason.includes("approval") ? "Review" : "Answer", run: () => bot.threadId && openThread(bot.threadId) },
   });
-  for (const loop of loopNeeds.filter((each) => !dueLabel(each.due, now, todosZone)?.urgent)) needs.push({ key: `loop:${loop.id}`, icon: loopIcon[loop.kind], title: loop.title, detail: loop.why || null, due: dueLabel(loop.due, now, todosZone), action: loopAction(loop) });
   const lastMaintenance = maintenance.data?.runs.find((run) => !run.dryRun);
   if (lastMaintenance?.needsCall.length) {
     const count = lastMaintenance.needsCall.length;
@@ -155,14 +138,14 @@ export function useBotPageModel(view: BotView) {
   // Maintenance's runs are "Daily cleanup" lines of their own.
   const recent = recentEntries({ events: events.filter((event) => event.sourceId !== "maintenance"), sources, frequent, reports, finished, maintenance: maintenance.data?.runs ?? [], names, now, zone: tz });
   const status = statusSentence({ state: bot.state, working: working.length, needs: needs.length, next: next[0] ? { name: next[0].name, at: next[0].at } : null, lastRunAt: lastItem?.at ?? null, now, zone: tz });
-  return { bot, jobs, working, needs, next, recent, status, lastItem, loopsOn, loops: loops.data, now, tz, automations, loopError: actions.error };
+  return { bot, jobs, working, needs, next, recent, status, lastItem, now, tz, automations };
 }
 export type BotPageModel = ReturnType<typeof useBotPageModel>;
 
 /** The Bot page itself. */
 export function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
   const model = useBotPageModel(view);
-  const { bot, working, needs, status, lastItem, loopsOn, jobs } = model;
+  const { bot, working, needs, status, lastItem, jobs } = model;
   const { run, busy, error, setSheet, sheets } = useBotControls(view, refresh, working.length);
   const openThread = useOpenThread();
   const { providers } = useProviders();
@@ -211,7 +194,6 @@ export function BotPage({ view, refresh }: { view: BotView; refresh(): void }) {
       <div className="pt-10">
         <Recent entries={model.recent} tz={model.tz} now={model.now} />
       </div>
-      {loopsOn ? <LoopsSummary model={model} /> : null}
       {sheets}
     </div>
   );
@@ -280,7 +262,6 @@ export function NeedsYou({ model, limit, compact = false }: { model: BotPageMode
           {all ? "Fewer" : `${model.needs.length - limit} more`}<Icon name={all ? "ChevronUp" : "ChevronRight"} className="size-3.5" />
         </button>
       ) : null}
-      {model.loopError ? <p role="alert" className="pt-1 text-xs text-destructive">{model.loopError}</p> : null}
     </section>
   );
 }
@@ -313,23 +294,6 @@ export function Recent({ entries, tz, now, limit = RECENT_SHOWN, compact = false
           })}
         </ul>
       ) : <p className="py-2 text-sm text-muted-foreground">Nothing yet.</p>}
-    </section>
-  );
-}
-
-function LoopsSummary({ model }: { model: BotPageModel }) {
-  const groups = model.loops;
-  const weekAgo = model.now - 7 * DAY;
-  const counts: [number, string][] = groups ? [
-    [groups.needsYouNow.length, "need you"], [groups.comingUp.length, "coming up"], [groups.agentsOnIt.length, "with agents"],
-    [groups.waitingOnOthers.length, "waiting on others"], [groups.done.filter((loop) => (loop.closedAt ?? 0) >= weekAgo).length, "done this week"],
-  ] : [];
-  return (
-    <section aria-label="Tasks" data-testid="bot-loops" className="pt-10">
-      <SectionHead title="Tasks" action={<button type="button" className={OUTLINE_BUTTON} data-testid="bot-loops-tab" onClick={() => openLoops(model.bot.id)}>Open Tasks<Icon name="ChevronRight" /></button>} />
-      <p className="flex flex-wrap gap-x-5 gap-y-1 border-b border-border py-2.5 text-sm text-muted-foreground">
-        {groups ? counts.map(([count, label]) => <span key={label}><span className="font-medium text-foreground tabular-nums">{count}</span> {label}</span>) : "Loading…"}
-      </p>
     </section>
   );
 }
