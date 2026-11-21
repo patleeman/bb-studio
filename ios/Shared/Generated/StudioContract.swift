@@ -19881,6 +19881,27 @@ public enum Studio {
     }
   }
 
+  public enum BotThreadsViewOutputWorkersItemFold: Sendable, Hashable, Codable {
+    case runners
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "runners": self = .runners
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .runners: try container.encode("runners")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotThreadsViewOutputWorkersItem: Sendable, Hashable, Codable {
     public var threadId: String?
     public var title: String?
@@ -19897,8 +19918,9 @@ public enum Studio {
     public var modelName: String?
     public var spawnedBy: String?
     public var nestUnder: String?
+    public var fold: BotThreadsViewOutputWorkersItemFold?
 
-    public init(threadId: String? = nil, title: String? = nil, status: BotThreadsViewOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil, providerId: String? = nil, modelName: String? = nil, spawnedBy: String? = nil, nestUnder: String? = nil) {
+    public init(threadId: String? = nil, title: String? = nil, status: BotThreadsViewOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil, providerId: String? = nil, modelName: String? = nil, spawnedBy: String? = nil, nestUnder: String? = nil, fold: BotThreadsViewOutputWorkersItemFold? = nil) {
       self.threadId = threadId
       self.title = title
       self.status = status
@@ -19914,6 +19936,7 @@ public enum Studio {
       self.modelName = modelName
       self.spawnedBy = spawnedBy
       self.nestUnder = nestUnder
+      self.fold = fold
     }
   }
 
@@ -20027,6 +20050,27 @@ public enum Studio {
     }
   }
 
+  public enum BotThreadsOlderOutputWorkersItemFold: Sendable, Hashable, Codable {
+    case runners
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "runners": self = .runners
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .runners: try container.encode("runners")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotThreadsOlderOutputWorkersItem: Sendable, Hashable, Codable {
     public var threadId: String?
     public var title: String?
@@ -20043,8 +20087,9 @@ public enum Studio {
     public var modelName: String?
     public var spawnedBy: String?
     public var nestUnder: String?
+    public var fold: BotThreadsOlderOutputWorkersItemFold?
 
-    public init(threadId: String? = nil, title: String? = nil, status: BotThreadsOlderOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil, providerId: String? = nil, modelName: String? = nil, spawnedBy: String? = nil, nestUnder: String? = nil) {
+    public init(threadId: String? = nil, title: String? = nil, status: BotThreadsOlderOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil, providerId: String? = nil, modelName: String? = nil, spawnedBy: String? = nil, nestUnder: String? = nil, fold: BotThreadsOlderOutputWorkersItemFold? = nil) {
       self.threadId = threadId
       self.title = title
       self.status = status
@@ -20060,6 +20105,7 @@ public enum Studio {
       self.modelName = modelName
       self.spawnedBy = spawnedBy
       self.nestUnder = nestUnder
+      self.fold = fold
     }
   }
 
@@ -20181,6 +20227,27 @@ public enum Studio {
     }
   }
 
+  public enum BotConversationsAllOutputWorkersItemFold: Sendable, Hashable, Codable {
+    case runners
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "runners": self = .runners
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .runners: try container.encode("runners")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct BotConversationsAllOutputWorkersItem: Sendable, Hashable, Codable {
     public var threadId: String?
     public var title: String?
@@ -20197,8 +20264,9 @@ public enum Studio {
     public var modelName: String?
     public var spawnedBy: String?
     public var nestUnder: String?
+    public var fold: BotConversationsAllOutputWorkersItemFold?
 
-    public init(threadId: String? = nil, title: String? = nil, status: BotConversationsAllOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil, providerId: String? = nil, modelName: String? = nil, spawnedBy: String? = nil, nestUnder: String? = nil) {
+    public init(threadId: String? = nil, title: String? = nil, status: BotConversationsAllOutputWorkersItemStatus? = nil, ownerConversationId: String? = nil, ownerTitle: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, tag: String? = nil, branch: String? = nil, mirrored: Bool? = nil, sameTitle: Int? = nil, providerId: String? = nil, modelName: String? = nil, spawnedBy: String? = nil, nestUnder: String? = nil, fold: BotConversationsAllOutputWorkersItemFold? = nil) {
       self.threadId = threadId
       self.title = title
       self.status = status
@@ -20214,6 +20282,7 @@ public enum Studio {
       self.modelName = modelName
       self.spawnedBy = spawnedBy
       self.nestUnder = nestUnder
+      self.fold = fold
     }
   }
 

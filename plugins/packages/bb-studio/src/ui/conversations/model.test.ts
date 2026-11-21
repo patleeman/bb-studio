@@ -156,3 +156,19 @@ it("folds a level's finished workers into N done, counting the workers under the
   expect(nestLabel({ total: 1, running: 0, needsYou: 0 })).toBe("1 worker");
   expect(nestLabel({ total: 4, running: 2, needsYou: 2 })).toBe("4 workers, 2 running, 2 need you");
 });
+
+it("puts the Bot's own threads in the nest's runners with their own counts, and every count on the toggle; with no home they're other workers", () => {
+  const w = (threadId: string, status: WorkerRow["status"], nestUnder: string | null, fold: "runners" | null = null, spawnedBy: string | null = null) => ({ threadId, status, ownerConversationId: null, spawnedBy, nestUnder, fold });
+  const { nests, other } = workerNests([{ threadId: "main" }], [
+    w("task", "running", "main"), w("security", "needs-you", "main", "runners"), w("comms", "done", "main", "runners"), w("comms_child", "running", "main", null, "comms"),
+    w("stray_runner", "running", null, "runners"),
+  ]);
+  const nest = nests.get("main")!;
+  expect([nest.nodes.map((node) => node.row.threadId), nest.runners.map((node) => node.row.threadId)]).toEqual([["task"], ["security", "comms"]]);
+  expect(nest.runners[1]!.children.map((node) => node.row.threadId)).toEqual(["comms_child"]);
+  expect(nest.runnerCounts).toEqual({ total: 3, running: 1, needsYou: 1 });
+  expect(nest).toMatchObject({ total: 4, running: 2, needsYou: 1 });
+  expect(other!.nodes.map((node) => node.row.threadId)).toEqual(["stray_runner"]);
+  expect(other!.runners).toEqual([]);
+  expect(nestLabel({ total: 1, running: 0, needsYou: 0 }, "thread")).toBe("1 thread");
+});

@@ -82,6 +82,8 @@ const worker = z.object({
   spawnedBy: z.string().nullable().optional(),
   /** bot_threads_view: the conversation row it nests under in the sidebar (its owner, or the row a fork owner folds into); null when no listed row is its. */
   nestUnder: z.string().nullable().optional(),
+  /** bot_threads_view: "runners" for the Bot's own threads (area runners, automation and check-in runs), which the sidebar folds under its Main. */
+  fold: z.enum(["runners"]).nullable().optional(),
 });
 
 /** A row of the Conversations page: a conversation, active or archived. */

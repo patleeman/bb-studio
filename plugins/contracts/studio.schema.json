@@ -25991,6 +25991,19 @@
                     "string",
                     "null"
                   ]
+                },
+                "fold": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "runners"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -26258,6 +26271,19 @@
                   "type": [
                     "string",
                     "null"
+                  ]
+                },
+                "fold": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "runners"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
                   ]
                 }
               },
@@ -26533,6 +26559,19 @@
                   "type": [
                     "string",
                     "null"
+                  ]
+                },
+                "fold": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "runners"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
                   ]
                 }
               },

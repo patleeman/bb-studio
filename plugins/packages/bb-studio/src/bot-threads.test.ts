@@ -1,7 +1,7 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it } from "vitest";
 import { MIGRATIONS } from "./migrations";
-import { ADOPT_RECENT, agentFork, BotThreads, botNeedsYou, classifyThread, forkMessageIdOf, latestLine, olderView, repoTag, threadRunning, threadsView, workerStatus, WORKER_FINISHED_SHOWN, type Signals, type ThreadFacts } from "./bot-threads";
+import { ADOPT_RECENT, agentFork, BotThreads, botNeedsYou, botOwnThread, classifyThread, forkMessageIdOf, latestLine, olderView, repoTag, threadRunning, threadsView, workerStatus, WORKER_FINISHED_SHOWN, type Signals, type ThreadFacts } from "./bot-threads";
 
 const dispose: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const fn of dispose.splice(0)) await fn(); });
@@ -612,4 +612,34 @@ it("counts a thread as running only once a turn can be under way", () => {
   expect(threadRunning({ status: "active" })).toBe(true);
   expect(threadRunning({ status: "idle" })).toBe(false);
   expect(workerStatus({ status: "pending", queuedMessageCount: 0 })).toBe("done");
+});
+
+it("folds the Bot's own threads (runners, automation and check-in runs) under its Main as it is now, whatever Main they started under", () => {
+  const now = 100 * 24 * HOUR;
+  const records = [
+    rec({ threadId: "old_main", isMain: true, archivedAt: 5 }),
+    rec({ threadId: "main", isMain: true }),
+    rec({ threadId: "conv", title: "Launch" }),
+    rec({ threadId: "security", kind: "worker", ownerConversationId: "old_main" }),
+    rec({ threadId: "checkin", kind: "worker", ownerConversationId: "old_main" }),
+    rec({ threadId: "plain", kind: "worker", ownerConversationId: "conv" }),
+    rec({ threadId: "orphan", kind: "worker", ownerConversationId: "old_main" }),
+  ];
+  const threads = new Map<string, ThreadFacts>([
+    ["main", { id: "main", updatedAt: now }],
+    ["conv", { id: "conv", updatedAt: now - HOUR }],
+    ["security", { id: "security", status: "active", updatedAt: now, title: "Security · Runner" }],
+    ["checkin", { id: "checkin", status: "active", updatedAt: now, originPluginId: "automations", title: "Daily check-in" }],
+    ["plain", { id: "plain", status: "active", updatedAt: now }],
+    ["orphan", { id: "orphan", status: "active", updatedAt: now }],
+  ]);
+  const runners = new Set(["security"]);
+  const own = (threadId: string, thread: ThreadFacts | undefined) => botOwnThread(threadId, thread, (id) => (runners.has(id) ? "bot_dot" : null));
+  const of = (view: ReturnType<typeof threadsView>, id: string) => view.workers.find((each) => each.threadId === id)!;
+  const view = threadsView("bot_dot", records, threads, now, own);
+  expect(["security", "checkin", "plain", "orphan"].map((id) => [of(view, id).fold, of(view, id).nestUnder])).toEqual([["runners", "main"], ["runners", "main"], [null, "conv"], [null, null]]);
+  // Without the predicate nothing folds.
+  expect(of(threadsView("bot_dot", records, threads, now), "security")).toMatchObject({ fold: null, nestUnder: null });
+  expect(botOwnThread("x", { id: "x", title: "[bb automation due:aut_1] run" }, () => null)).toBe(true);
+  expect(botOwnThread("x", { id: "x", title: "Fix the build" }, () => null)).toBe(false);
 });

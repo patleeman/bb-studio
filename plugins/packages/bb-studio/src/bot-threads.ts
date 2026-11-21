@@ -181,9 +181,18 @@ export function forkMessageIdOf(thread: object): string | null {
 
 /** The automation whose run started a thread, from its first message's marker. */
 const AUTOMATION_DUE = /^\[bb automation due:([^\]\s]+)\]/;
-function automationRun(thread: ThreadFacts): boolean {
+export function automationRun(thread: ThreadFacts): boolean {
   if (thread.originPluginId === "automations") return true;
   return [thread.titleFallback, thread.title].some((text) => !!text && AUTOMATION_DUE.test(text));
+}
+
+/**
+ * A thread the Bot runs for itself rather than for one conversation: an area
+ * runner's, or an automation's run (check-ins included). The sidebar folds
+ * these into "Runners" under the Bot's Main.
+ */
+export function botOwnThread(threadId: string, thread: ThreadFacts | null | undefined, runnerBot: (threadId: string) => string | null): boolean {
+  return !!runnerBot(threadId) || (!!thread && automationRun(thread));
 }
 
 /** Facts from Studio's other stores that settle a thread's place. */
@@ -394,6 +403,8 @@ export interface WorkerView {
    * (the owner is old or archived). Set by threadsView only.
    */
   nestUnder?: string | null;
+  /** "runners": the Bot's own thread (an area runner, an automation or check-in run), folded under its Main. Set by threadsView only. */
+  fold?: "runners" | null;
 }
 
 export interface BotThreadsView {
@@ -438,14 +449,18 @@ export function needsYouOf(rec: Pick<BotThreadRecord, "needsYou">, thread: Pick<
  * a worker failed more than 7 days or done more than 2 days ago. Those are
  * counted, and listed by olderView.
  */
-export function threadsView(botId: string, records: readonly BotThreadRecord[], threads: ReadonlyMap<string, ThreadFacts>, now: number): BotThreadsView {
+export function threadsView(botId: string, records: readonly BotThreadRecord[], threads: ReadonlyMap<string, ThreadFacts>, now: number, ownThread: (threadId: string, thread: ThreadFacts | undefined) => boolean = () => false): BotThreadsView {
   const all = allRows(botId, records, threads);
   const conversations = all.conversations.filter((row) => conversationListed(row, now));
   const { shown, standsFor } = sidebarWorkers(all.workers, now);
   const hidden = all.workers.filter((row) => !standsFor.has(row.threadId));
   const hiddenToday = hidden.filter((row) => (row.status === "done" || row.status === "failed") && now - row.updatedAt < DAY_MS).length;
   const rowOf = nestRow(conversations, records);
-  const workers = shown.map((row) => ({ ...row, nestUnder: rowOf(row.ownerConversationId) }));
+  // The Bot's own threads sit under its Main as it is now, whatever Main was when they started.
+  const main = conversations.find((row) => row.isMain)?.threadId ?? null;
+  const workers = shown.map((row) => ownThread(row.threadId, threads.get(row.threadId))
+    ? { ...row, nestUnder: main, fold: "runners" as const }
+    : { ...row, nestUnder: rowOf(row.ownerConversationId), fold: null });
   return { botId, conversations, workers, hiddenWorkers: hidden.length, hiddenToday, olderConversations: all.conversations.length - conversations.length };
 }
 
