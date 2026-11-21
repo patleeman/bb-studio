@@ -166,6 +166,7 @@ export function forkTestHooks(
       }
     },
     experimental_useContextCard: () => ({ available: false, open: () => {} }),
+    experimental_ThreadContextSegments: () => null,
     experimental_useLauncherItems() {
       return useSlotEnv("experimental_useLauncherItems").launcherItems;
     },
