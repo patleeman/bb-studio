@@ -1016,6 +1016,24 @@
       "coverage": "generated method"
     },
     {
+      "file": "ios/iOS/Room/BotControls.swift",
+      "plugin": "studio",
+      "method": "method",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "ios/iOS/Room/BotControls.swift",
+      "plugin": "studio",
+      "method": "bot_make_main",
+      "coverage": "generated method"
+    },
+    {
+      "file": "ios/iOS/Room/BotControls.swift",
+      "plugin": "studio",
+      "method": "bot_new_main",
+      "coverage": "generated method"
+    },
+    {
       "file": "ios/iOS/Room/RoomThemePicker.swift",
       "plugin": "studio",
       "method": "bot_set_appearance",

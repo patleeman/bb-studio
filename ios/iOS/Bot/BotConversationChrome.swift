@@ -17,6 +17,8 @@ struct BotConversationContext {
     var openConversation: (String) -> Void
     var showList: () -> Void
     var refresh: () -> Void
+    /// The Bot is paused or stopped (`bot_spaces` state); "stopped" or "paused", nil while active.
+    var botPause: String? = nil
 
     func worker(_ threadId: String) -> WorkerInfo? {
         allWorkers.first { $0.threadId == threadId }.map { WorkerInfo($0, botName: botName, mainThreadId: mainThreadId) }

@@ -172,7 +172,8 @@ enum BotShell {
             conversation: view?.conversations.first { $0.threadId == threadId },
             workers: WorkersLine(conversationId: threadId, view: kind == .conversation ? view : nil),
             allWorkers: view?.workers ?? [],
-            splitsThreads: splitsThreads, push: push, openConversation: openConversation, showList: showList, refresh: refresh)
+            splitsThreads: splitsThreads, push: push, openConversation: openConversation, showList: showList, refresh: refresh,
+            botPause: bot.paused ? (bot.state ?? "paused") : nil)
     }
 
     @MainActor

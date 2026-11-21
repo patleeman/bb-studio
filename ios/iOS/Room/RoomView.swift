@@ -359,7 +359,8 @@ struct RoomView: View {
                                             show(id)
                                         },
                                         openThread: { id in shell.detailPath = [.thread(id: id)] },
-                                        openPlace: { room.showPlace($0) }, settings: openSettings)
+                                        openPlace: { room.showPlace($0) }, settings: openSettings,
+                                        refresh: { [store] in await store.refresh() })
                     } else {
                         stage(proxy, menuButton: false)
                         if room.showsMenu { menu(closeInColumn: true) }

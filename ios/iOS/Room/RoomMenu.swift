@@ -240,7 +240,7 @@ struct RoomConversations: View {
         let nests = BotWorkerNests.make(conversations: lines.map(\.threadId), workers: view?.workers ?? [])
         List {
             if home {
-                Section { RoomListHeader(bot: bot, view: view) }
+                Section { RoomListHeader(bot: bot, view: view, refresh: { await store.refresh() }) }
                     .listRowBackground(Color.clear)
             }
             Section {

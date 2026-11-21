@@ -65,6 +65,8 @@ struct RoomHomeButton: View {
 struct RoomListHeader: View {
     let bot: BotSpace
     let view: BotThreadsView?
+    /// With it, the Bot's controls (Pause, Resume, Stop, the Main) sit at the right.
+    var refresh: (() async -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -73,15 +75,17 @@ struct RoomListHeader: View {
                          size: 44, stillOnly: true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(bot.name).font(.title3.weight(.semibold))
-                Text(Self.status(view)).font(.subheadline).foregroundStyle(.secondary)
+                Text(Self.status(view, paused: bot.paused ? bot.state : nil)).font(.subheadline).foregroundStyle(.secondary)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("roomListHeader")
             Spacer(minLength: 0)
+            if let refresh { BotControlsMenu(bot: bot, view: view, refresh: refresh) }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("roomListHeader")
     }
 
-    static func status(_ view: BotThreadsView?) -> String {
+    static func status(_ view: BotThreadsView?, paused: String? = nil) -> String {
+        if let paused { return paused == "stopped" ? "Stopped" : "Paused" }
         let workers = view?.workers ?? []
         let running = workers.filter { $0.status == .running }.count + (view?.conversations.filter(\.running).count ?? 0)
         let needs = workers.filter { $0.status == .needsYou }.count + (view?.conversations.filter { $0.needsYou != nil }.count ?? 0)
@@ -104,6 +108,7 @@ struct RoomContextPane: View {
     var openThread: (String) -> Void
     var openPlace: (RoomPlace) -> Void
     var settings: () -> Void
+    var refresh: (() async -> Void)? = nil
     @State private var openFolds: Set<String> = []
     @Environment(\.look) private var look
 
@@ -115,7 +120,7 @@ struct RoomContextPane: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                RoomListHeader(bot: bot, view: view).padding(.horizontal, 4)
+                RoomListHeader(bot: bot, view: view, refresh: refresh).padding(.horizontal, 4)
                 StrandsPanel(threadId: shown, title: title, openThread: openThread)
                 workers
                 conversations
