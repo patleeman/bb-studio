@@ -13,7 +13,7 @@ async function withTools() {
 }
 const json = (text: string) => JSON.parse(text.slice(text.indexOf("{")));
 
-it("memory_add saves under the calling thread's Bot, with the thread as its source", async () => {
+it("memory (op: add) saves under the calling thread's Bot, with the thread as its source", async () => {
   const x = await withTools();
   await x.tool("memory_add", { topic: "Fork", text: "No main tabs." }, "thr_main");
   await x.tool("memory_add", { topic: "Launch", text: "One mock a day." }, "thr_side");
@@ -59,7 +59,7 @@ it("names sources from Studio's record of conversations and workers: Main, the c
   expect(x.memory.threadRole(context("thr_loose"))).toEqual({ botId: "bot_scout", role: "conversation" });
 });
 
-it("memory_add takes an explicit source: a finished conversation's summary links back to it", async () => {
+it("memory (op: add) takes an explicit source: a finished conversation's summary links back to it", async () => {
   const x = await withTools();
   const saved = json(await x.tool("memory_add", { topic: "Launch", text: "Summary: outline done.", source: { kind: "conversation", id: "thr_side" } }, "thr_main"));
   expect(saved).toMatchObject({ topic: "Launch", source: { kind: "conversation", id: "thr_side", title: "Launch prep", finished: true }, replaced: false });
@@ -68,7 +68,7 @@ it("memory_add takes an explicit source: a finished conversation's summary links
   await expect(x.tool("memory_add", { topic: "Fork", text: "x", source: { kind: "conversation" } }, "thr_main")).rejects.toThrow(/needs its id/);
 });
 
-it("memory_update makes a replacing record, memory_search marks the old one replaced, and another Bot's record is out of reach", async () => {
+it("memory (op: update) makes a replacing record, memory (op: search) marks the old one replaced, and another Bot's record is out of reach", async () => {
   const x = await withTools();
   const first = json(await x.tool("memory_add", { topic: "Launch", text: "High-level design gets 20 minutes." }, "thr_main"));
   const reply = await x.tool("memory_update", { id: first.id, text: "High-level design gets 15 minutes." }, "thr_side");

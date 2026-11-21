@@ -3,7 +3,7 @@
 Every kind of thing that can be a tab in a conversation's workbench, and
 whether each surface reaches it. The kinds, their names, icons, tabs,
 addresses and listings are one registry, `src/tab-kinds.ts`; the New Tab
-Actions and search groups, the drag payloads, workbench_open's `type` enum
+Actions and search groups, the drag payloads, workbench (op: open)'s `type` enum
 and the link handling are made from it. The table below is generated from the
 registry (`auditTable()`); `src/tab-kinds.test.ts` fails when this file and
 the registry disagree, and checks that every "had" or "added" cell is true of
@@ -15,11 +15,11 @@ the code.
 
 Columns: **New tab** is the side panel's New Tab page (an Action, or found by
 its search); **Recent** its Recent list; **Sidebar drag** a row in Studio's
-sidebar or the Library dragged onto the workbench; **workbench_open** the
+sidebar or the Library dragged onto the workbench; **workbench (op: open)** the
 agent's tool; **Chat link** a link or card in a reply that opens it (and drags
 as it).
 
-| Kind | New tab | Recent | Sidebar drag | workbench_open | Chat link |
+| Kind | New tab | Recent | Sidebar drag | workbench (op: open) | Chat link |
 | --- | --- | --- | --- | --- | --- |
 | Conversation | had | had | had | had | had |
 | Worker | had | had | had | had | had |
@@ -62,7 +62,26 @@ as it).
 [13] Replies don't link a diff; bb's change cards open it.
 [14] bb keeps no recent browser tabs.
 [15] bb keeps no recent terminals.
-[16] A terminal opens by starting one; the agent has no terminal id to open. workbench_tab action "focus" selects an open one.
+[16] A terminal opens by starting one; the agent has no terminal id to open. workbench (op: tab) action "focus" selects an open one.
+[17] Replies don't link a terminal.
+[18] bb keeps no recent workflow runs.
+
+[1] The Library lists no recordings; drag one from the New Tab page's Recent or search, or Talk's Recordings page.
+[2] Boards have no row in Studio's sidebar; drag one from the New Tab page's Recent or search.
+[3] The Strands page is the one entry; this address opens it.
+[4] Recent lists the Strands page once, under Strands.
+[5] Automations change on their own and would crowd Recent; the New Tab search finds one.
+[6] To-dos change on their own and would crowd Recent; the New Tab search finds one.
+[7] Memory records change on their own and would crowd Recent; the New Tab search finds one.
+[8] VS Code has no sidebar row; drag it from the New Tab page's Recent, or open it from the launcher or a file.
+[9] bb's own: files are dragged from Finder, which bb attaches to the composer.
+[10] bb's New Tab page lists no diffs; bb's Git panel opens them.
+[11] bb keeps no recent diffs.
+[12] bb's own: no row.
+[13] Replies don't link a diff; bb's change cards open it.
+[14] bb keeps no recent browser tabs.
+[15] bb keeps no recent terminals.
+[16] A terminal opens by starting one; the agent has no terminal id to open. workbench (op: tab) action "focus" selects an open one.
 [17] Replies don't link a terminal.
 [18] bb keeps no recent workflow runs.
 

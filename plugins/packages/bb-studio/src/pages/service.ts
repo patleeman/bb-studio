@@ -97,7 +97,7 @@ export class PagesService {
     if (candidates.length > 1) {
       throw new Error(`Several pages are titled "${trimmed}": ${candidates.map((page) => page.id).join(", ")}. Use an id.`);
     }
-    throw new Error(`No page "${trimmed}". Use pages_list to find page ids.`);
+    throw new Error(`No page "${trimmed}". Use pages_read (no page) to find page ids.`);
   }
 
   createPage(input: {
@@ -277,7 +277,7 @@ export class PagesService {
       ...lines.slice(1),
       "",
       `Page: "${untitled(page.title)}" (id ${page.id}, ${pageUrl(page.id)}).`,
-      "Use pages_read to see the page with block ids, pages_edit to change it, and pages_comments to answer in the page. The user sees your edits live.",
+      "Use pages_read to see the page with block ids, pages_edit to change it, and pages_read (comments) to answer in the page. The user sees your edits live.",
     ].join("\n");
   }
 

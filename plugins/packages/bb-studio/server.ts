@@ -37,9 +37,10 @@ import { STRAND_PUSH_ACTIVE_MS, STRAND_PUSH_EVERY_MS, STRAND_PUSH_KEY, StrandPus
 import { registerDecisions } from "./src/decisions/server";
 import { registerToolGateway, type ToolGateway } from "./src/tool-gateway/server/register";
 import { sessionTitlePrefix } from "./src/decisions/server/classifier";
-import { ON_DEMAND_EXTRAS, scopeEntries, scopeTools, trioInstructions, type ScopeKind } from "./src/tool-scope";
+import { ON_DEMAND_EXTRAS, scopeEntries, scopeTools, trioInstructions, type Scope, type ScopeKind } from "./src/tool-scope";
 import { registerScopedTools, ScopeMemory } from "./src/tool-scope-tools";
 import { slimmedIfSmaller } from "./src/slim-schema";
+import { INTERNAL_RENAMES, MERGES, mergedParameters, mergedTools, presentScope } from "./src/merged-tools";
 import { LeanStore, leanFor } from "./src/context-lean";
 import { contextLeanContract } from "./src/context-lean-contract";
 import { requireAppWindow } from "./src/tool-gateway/server/caller";
@@ -282,12 +283,17 @@ export default async function plugin(bb: BbPluginApi) {
   let typeIsOn = (_type: ItemType): boolean => true;
   const familyDeps = { book: toolBook, typeOn: (type: ItemType) => typeIsOn(type) };
   const registerTool = bb.agents.registerTool.bind(bb.agents);
+  /** True while the merged tools register, so pages_read and code_comments register under their own names. */
+  let mergedRegistration = false;
   // Internal handlers kept in toolBook for pages_* / apps_* / legacy tests, not exposed to agent sessions.
   const INTERNAL_ONLY_TOOLS = new Set(["artifacts_save", "artifacts_list", "artifacts_read", "artifacts_live", "minis_create", "minis_list", "minis_read", "minis_live", "work_card_create", "work_card_update", "work_card_get", "design_list", "design_read", "design_create", "whiteboard_list", "whiteboard_get", "whiteboard_create"]);
   bb.agents.registerTool = ((tool: Parameters<typeof registerTool>[0]) => {
-    const named = familyTool(withTagHint(tool as never, () => tagNames.list().map((tag) => tag.name)) as AgentTool, familyDeps);
+    const family = familyTool(withTagHint(tool as never, () => tagNames.list().map((tag) => tag.name)) as AgentTool, familyDeps);
+    // pages_read and code_comments become merged tools (src/merged-tools.ts); their own handlers stay in the book under internal names.
+    const internal = INTERNAL_RENAMES[family.name] && !mergedRegistration ? INTERNAL_RENAMES[family.name]! : null;
+    const named = internal ? { ...family, name: internal } : family;
     toolBook.add(named);
-    if (INTERNAL_ONLY_TOOLS.has(named.name)) return undefined as never;
+    if (internal || INTERNAL_ONLY_TOOLS.has(named.name)) return undefined as never;
     return registerTool(withToolLabel(named) as never);
   }) as typeof bb.agents.registerTool;
   // Kinds built into Studio (docs/merging-add-ons.md); the hub calls them in-process.
@@ -481,10 +487,41 @@ export default async function plugin(bb: BbPluginApi) {
   const fullSchema = (name: string): Record<string, unknown> | null => {
     try { const schema = toolBook.get(name)?.parameters.toJSONSchema?.(); return schema && typeof schema === "object" ? schema as Record<string, unknown> : null; } catch { return null; }
   };
-  const shownSchemas = { slim: slimFor, schema: (name: string) => slimFor(name) ?? fullSchema(name) };
   /** A Studio Decisions classifier thread (src/decisions/server/classifier.ts): a one-shot JSON answer, no tools. */
   const isClassifier = (title: string | null | undefined) => typeof title === "string" && title.startsWith(sessionTitlePrefix);
   const isLead = (threadId: string) => { try { return projectLeads.list().some((lead) => lead.leadThreadId === threadId); } catch { return false; } };
+  /** A merged tool's schema for the ops this thread may run (src/merged-tools.ts), slimmed; null for any other tool. */
+  const mergedShownCache = new Map<string, Record<string, unknown> | null>();
+  const mergedShown = (name: string, ops: ReadonlyMap<string, string[]>): Record<string, unknown> | null => {
+    const merge = MERGES.find((each) => each.name === name);
+    const allowed = ops.get(name);
+    if (!merge || !allowed) return null;
+    const key = `${name}:${allowed.join(",")}`;
+    if (!mergedShownCache.has(key)) {
+      let schema: Record<string, unknown> | null = null;
+      try {
+        const json = mergedParameters(merge, toolBook as never, Object.keys(merge.ops).filter((op) => allowed.includes(op))).toJSONSchema() as Record<string, unknown>;
+        schema = slimmedIfSmaller(json) ?? json;
+      } catch { /* Shown as registered. */ }
+      mergedShownCache.set(key, schema);
+    }
+    return mergedShownCache.get(key)!;
+  };
+  /** The configure() entries for a scope in old names: merged names, each merged tool showing only the ops it may run. */
+  const presentedEntries = (scope: Scope) => {
+    const presented = presentScope(scope);
+    const shown = {
+      slim: (name: string) => mergedShown(name, presented.ops) ?? slimFor(name),
+      schema: (name: string) => mergedShown(name, presented.ops) ?? slimFor(name) ?? fullSchema(name),
+    };
+    return { entries: scopeEntries({ ...scope, loaded: presented.loaded, onDemand: presented.onDemand }, shown), onDemand: presented.onDemand };
+  };
+  /** A fixed list (a skill review fork, a paused Bot): remembered as its scope, offered under the merged names. */
+  const fixedTools = (context: { thread: { id: string }; provider: { id: string; model: string } }, names: readonly string[]) => {
+    const scope: Scope = { kind: "worker", loaded: [...names], onDemand: [], delivery: "none", gateway: false };
+    scopes.remember(context.thread.id, scope, { providerId: context.provider.id, model: context.provider.model });
+    return presentedEntries(scope).entries as never;
+  };
   const configureStudio = (context: Parameters<Parameters<typeof bb.agents.configure>[0]>[0]) => {
     if (Date.now() - routesCheckedAt > 30_000) void refreshRoutes();
     // A Visual Chat thread works with that plugin's canvas tools only (src/voice/live/canvas-plugin.ts).
@@ -496,7 +533,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (ITEM_TYPES.some((each) => each.family === "app" && !off.has(each.kind))) tools.push(...APP_TOOLS);
     tools.push(...CODE_TOOLS, ...WORKBENCH_TOOLS);
     // A skill review fork (src/skill-learning.ts) gets the skill tools and the Memory page's, nothing else of Studio's.
-    if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") return { tools: [...REVIEW_TOOLS, ...CODE_TOOLS], skills: ["studio-code"], instructions: "" };
+    if (learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string") return { tools: fixedTools(context, [...REVIEW_TOOLS, ...CODE_TOOLS]), skills: ["studio-code"], instructions: "" };
     // The Bot's own thread is told who it is; paused or stopped, it gets no Studio tools but its own.
     // Every conversation of a Bot (src/bot-threads.ts) is that Bot: Main, a fork
     // (a side thread from "Reply in thread" included) and a thread the user
@@ -512,7 +549,7 @@ export default async function plugin(bb: BbPluginApi) {
     const bot = own ?? (asConversation ? { ...asConversation, threadId: context.thread.id } : null);
     // An external bot's agent has its own memory and tools; Studio's don't reach it.
     if (bot?.kind === "external") return { tools: [], skills: [], instructions: bots.instructions(bot) };
-    if (bot && bot.state !== "active") return { tools: [...BOT_TOOLS, ...CODE_TOOLS], skills: ["studio-code"], instructions: bots.instructions(bot) };
+    if (bot && bot.state !== "active") return { tools: fixedTools(context, [...BOT_TOOLS, ...CODE_TOOLS]), skills: ["studio-code"], instructions: bots.instructions(bot) };
     // A runner is told its job and how to report; it reports with runner_report only.
     const runner = bot ? null : runners.forThread(context.thread.id, context.pluginMetadata);
     const which = bot ? conversationNote(context.thread.id) : "";
@@ -532,8 +569,9 @@ export default async function plugin(bb: BbPluginApi) {
     const build = (extra: readonly string[]) => {
       const scope = scopeTools({ kind, full: [...full, ...extra], providerId: context.provider.id, lean, deferSupported, extras: kind === "runner" ? [] : ON_DEMAND_EXTRAS });
       scopes.remember(context.thread.id, scope, { providerId: context.provider.id, model: context.provider.model });
-      const trio = scope.delivery === "trio" ? trioInstructions(scope.onDemand, scope.gateway) : "";
-      return { tools: scopeEntries(scope, shownSchemas) as never, instructions: [instructions, scope.gateway ? "" : gateway.instructions, trio].filter(Boolean).join("\n\n").trim() };
+      const presented = presentedEntries(scope);
+      const trio = scope.delivery === "trio" ? trioInstructions(presented.onDemand, scope.gateway) : "";
+      return { tools: presented.entries as never, instructions: [instructions, scope.gateway ? "" : gateway.instructions, trio].filter(Boolean).join("\n\n").trim() };
     };
     return { ...build([]), skills: lean ? [] : ["studio-code", "studio", ...(bot ? ["themes", "presences"] : [])], rescope: build };
   };
@@ -571,25 +609,26 @@ export default async function plugin(bb: BbPluginApi) {
       return { providers: await leanRows() };
     },
   });
+  // Studio reloaded mid-session: the thread's scope again, from its real provider, model, title and origin,
+  // through withMemory so the memory tools come only with a memory role.
+  const recomputeScope = async (threadId: string, projectId: string | undefined): Promise<Scope | null> => {
+    try {
+      const thread = await bb.sdk.threads.get({ threadId }) as { projectId?: string; providerId?: string; model?: string | null; title?: string | null; parentThreadId?: string | null; sourceThreadId?: string | null; originKind?: string | null; originPluginId?: string | null } | null;
+      if (!thread?.providerId) return null;
+      configureSession({
+        thread: { id: threadId, title: thread.title ?? null, parentThreadId: thread.parentThreadId ?? null, sourceThreadId: thread.sourceThreadId ?? null },
+        project: { id: thread.projectId ?? projectId ?? "", kind: "regular", name: "", gitRemoteUrl: null },
+        provider: { id: thread.providerId, model: thread.model ?? "", capabilities: { supportsNativeUserQuestion: false } },
+        origin: { kind: thread.originKind ?? null, pluginId: thread.originPluginId ?? null }, pluginMetadata: {},
+      } as never);
+    } catch { return null; }
+    return scopes.get(threadId) ?? null;
+  };
   registerScopedTools(bb as never, {
     book: toolBook as never,
     scopes,
-    schemaFor: (name) => slimFor(name) ?? fullSchema(name) ?? {},
-    // Studio reloaded mid-session: the thread's scope again, from its real provider, model, title and origin,
-    // through withMemory so the memory tools come only with a memory role.
-    recompute: async (threadId, projectId) => {
-      try {
-        const thread = await bb.sdk.threads.get({ threadId }) as { projectId?: string; providerId?: string; model?: string | null; title?: string | null; parentThreadId?: string | null; sourceThreadId?: string | null; originKind?: string | null; originPluginId?: string | null } | null;
-        if (!thread?.providerId) return null;
-        configureSession({
-          thread: { id: threadId, title: thread.title ?? null, parentThreadId: thread.parentThreadId ?? null, sourceThreadId: thread.sourceThreadId ?? null },
-          project: { id: thread.projectId ?? projectId ?? "", kind: "regular", name: "", gitRemoteUrl: null },
-          provider: { id: thread.providerId, model: thread.model ?? "", capabilities: { supportsNativeUserQuestion: false } },
-          origin: { kind: thread.originKind ?? null, pluginId: thread.originPluginId ?? null }, pluginMetadata: {},
-        } as never);
-      } catch { return null; }
-      return scopes.get(threadId) ?? null;
-    },
+    schemaFor: (name, ops) => mergedShown(name, ops) ?? slimFor(name) ?? fullSchema(name) ?? {},
+    recompute: recomputeScope,
   });
   /** Which conversation a Bot's session is in (src/bot-threads.ts conversationInstructions); "" before Studio has placed it. */
   const conversationNote = (threadId: string): string => {
@@ -2309,7 +2348,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
   bb.agents.registerTool({
     name: "bot_skill_list",
-    description: "List or search your own skills (non-archived). Without query, lists all; with query, searches names, descriptions and full text (load one with bot_skill_view before following it).",
+    description: "List or search your own skills (non-archived). Without query, lists all; with query, searches names, descriptions and full text (load one with bot_skill (op: view) before following it).",
     parameters: z.object({ query: z.string().trim().min(1).max(200).optional(), limit: z.number().int().min(1).max(20).optional() }),
     execute: ({ query, limit }, ctx) => {
       const botId = ownBot(ctx.threadId);
@@ -2335,7 +2374,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
   bb.agents.registerTool({
     name: "bot_skill_edit",
-    description: 'Create, patch or delete one of your own skills. op "write": name (lowercase-with-hyphens), description, body. op "patch": name, find (exact text from bot_skill_view), replace, all?, description?. op "delete": name.',
+    description: 'Create, patch or delete one of your own skills. op "write": name (lowercase-with-hyphens), description, body. op "patch": name, find (exact text from bot_skill (op: view)), replace, all?, description?. op "delete": name.',
     parameters: z.object({
       op: z.enum(["write", "patch", "delete"]),
       name: z.string().min(1).max(64),
@@ -2357,7 +2396,7 @@ export default async function plugin(bb: BbPluginApi) {
       }
       if (op === "patch") {
         const skill = bots.skill(name, botId);
-        if (!skill) return `No skill "${name}". Make it with bot_skill_edit (op: "write").`;
+        if (!skill) return `No skill "${name}". Make it with bot_skill (op: edit, change: "write").`;
         if (find === undefined || replace === undefined) return opNeeds("patch", ["name", "find", "replace"]);
         return saveSkill({ name, description: description ?? skill.description, body: patchText(skill.body, find, replace, all) }, botId, ctx.threadId, "patched");
       }
@@ -2955,6 +2994,14 @@ export default async function plugin(bb: BbPluginApi) {
       }
     },
   });
+  // Merged tools (src/merged-tools.ts), once every member tool is in the book. A merged op runs only when its old tool is in the thread's scope.
+  mergedRegistration = true;
+  for (const tool of mergedTools({ book: toolBook as never, allowed: async (ctx, oldName) => {
+    const threadId = (ctx as { threadId?: string; projectId?: string } | undefined)?.threadId;
+    const scope = threadId ? scopes.get(threadId) ?? await recomputeScope(threadId, (ctx as { projectId?: string }).projectId) : null;
+    return !!scope && (scope.loaded.includes(oldName) || scope.onDemand.includes(oldName));
+  } })) bb.agents.registerTool(tool as never);
+  mergedRegistration = false;
   // BB runs dispose hooks last-registered first, then closes the database. Registered last, this
   // runs first: no scheduled work starts once a reload has begun, and `disposed` guards see it.
   bb.onDispose(() => { disposed = true; triggers.stop(); });

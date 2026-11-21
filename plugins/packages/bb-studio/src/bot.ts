@@ -121,14 +121,14 @@ export function botInstructions(bot: { name: string; state: BotState; role?: str
     const all = bot.skills ?? [];
     const listed = listedSkills(all);
     const skills = [
-      "Manage skills with bot_skill_edit (write/patch/delete) and bot_skill_list (list/search). Search past threads with bot_history_search.",
-      ...(all.length ? ["Your skills (load one with bot_skill_view before you follow it):", ...listed.map((skill) => `- ${skill.name}: ${skill.description}`)] : []),
-      ...(all.length > listed.length ? [`${all.length - listed.length} more: search with bot_skill_list.`] : []),
+      "Manage skills with bot_skill (op: edit) (write/patch/delete) and bot_skill (op: list) (list/search). Search past threads with bot_info (view: history).",
+      ...(all.length ? ["Your skills (load one with bot_skill (op: view) before you follow it):", ...listed.map((skill) => `- ${skill.name}: ${skill.description}`)] : []),
+      ...(all.length > listed.length ? [`${all.length - listed.length} more: search with bot_skill (op: list).`] : []),
     ].join("\n");
     // The Bot is the triage layer (docs/needs-you/REDO.md): reports, alerts and its threads' questions come
     // to it, and nothing else in Studio asks the user for attention.
     const quiet = "You triage: reports, alerts and your threads' questions come to you. Your chat is the user's inbox: post only what changed or needs them (a thread waiting on them: what it needs, linked); else (nothing new, a thread finished fine) reply exactly [PASS], no \"✓\".";
-    const runners = "Schedule with automation_create: check-ins, reminders, watchers, runners.";
+    const runners = "Schedule with schedule (op: create): check-ins, reminders, watchers, runners.";
     // Memory (the core profile and records) is told by src/memory, in every conversation and worker.
     return [who, quiet, runners, skills].filter(Boolean).join("\n");
   }

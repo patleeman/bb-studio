@@ -79,7 +79,7 @@ export function registerMemory(bb: Pick<BbPluginApi, "rpc" | "agents">, memory: 
   });
   bb.agents.registerTool({
     name: "memory_add",
-    description: "Save a fact, decision or note to your memory records, under a topic. Its source is this thread unless you give one. Search first; to correct an existing record use memory_update.",
+    description: "Save a fact, decision or note to your memory records, under a topic. Its source is this thread unless you give one. Search first; to correct an existing record use memory (op: update).",
     parameters: memoryAddParams,
     execute: async ({ topic, text, source }, ctx) => {
       const caller = await memory.caller(ctx.threadId);

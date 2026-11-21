@@ -65,6 +65,6 @@ export function userCommentMessage(page: { id: string; title: string }, comments
   for (const comment of comments) {
     lines.push("", `${comment.reply ? "Reply in" : "New"} thread ${comment.threadId}${comment.quote ? ` on "${comment.quote.length > 200 ? `${comment.quote.slice(0, 199)}…` : comment.quote}"` : ""}:`, ...quoted(comment.text));
   }
-  lines.push("", 'Answer in the same thread with pages_comments op "reply". If it asks for a change, make it with pages_edit (pages_read shows the block ids), then resolve the thread with pages_comments op "resolve".');
+  lines.push("", 'Answer in the same thread with pages_read (comments) op "reply". If it asks for a change, make it with pages_edit (pages_read shows the block ids), then resolve the thread with pages_read (comments) op "resolve".');
   return lines.join("\n");
 }

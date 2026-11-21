@@ -58,7 +58,7 @@ export interface TabRef { kind: TabKindId; id: string | null }
 /** The surfaces the audit checks, in its column order. */
 export const SURFACES = ["newTab", "recent", "sidebarDrag", "workbenchOpen", "chatLink"] as const;
 export type Surface = (typeof SURFACES)[number];
-export const SURFACE_NAMES: Record<Surface, string> = { newTab: "New tab", recent: "Recent", sidebarDrag: "Sidebar drag", workbenchOpen: "workbench_open", chatLink: "Chat link" };
+export const SURFACE_NAMES: Record<Surface, string> = { newTab: "New tab", recent: "Recent", sidebarDrag: "Sidebar drag", workbenchOpen: "workbench (op: open)", chatLink: "Chat link" };
 
 /** Whether a surface reaches a kind: it did before the registry, it does now, or it can't (with why). */
 export type SurfaceStatus = "had" | "added" | { na: string };
@@ -211,7 +211,7 @@ export const TAB_KIND_REGISTRY: readonly TabKindEntry[] = [
   bb("file", "File", "Files", "File", "file", "file", { newTab: "had", recent: "had", sidebarDrag: { na: "bb's own: files are dragged from Finder, which bb attaches to the composer." }, workbenchOpen: "had", chatLink: "had" }),
   bb("diff", "Diff", "Diffs", "FileDiff", "diff", "diff", { newTab: { na: "bb's New Tab page lists no diffs; bb's Git panel opens them." }, recent: { na: "bb keeps no recent diffs." }, sidebarDrag: { na: "bb's own: no row." }, workbenchOpen: "had", chatLink: { na: "Replies don't link a diff; bb's change cards open it." } }),
   bb("browser", "Browser", "Browser tabs", "Globe", "url", "url", { newTab: "had", recent: { na: "bb keeps no recent browser tabs." }, sidebarDrag: { na: "bb's own: no row." }, workbenchOpen: "had", chatLink: "had" }),
-  bb("terminal", "Terminal", "Terminals", "Terminal", "terminal", null, { newTab: "had", recent: { na: "bb keeps no recent terminals." }, sidebarDrag: { na: "bb's own: no row." }, workbenchOpen: { na: "A terminal opens by starting one; the agent has no terminal id to open. workbench_tab action \"focus\" selects an open one." }, chatLink: { na: "Replies don't link a terminal." } }),
+  bb("terminal", "Terminal", "Terminals", "Terminal", "terminal", null, { newTab: "had", recent: { na: "bb keeps no recent terminals." }, sidebarDrag: { na: "bb's own: no row." }, workbenchOpen: { na: "A terminal opens by starting one; the agent has no terminal id to open. workbench (op: tab) action \"focus\" selects an open one." }, chatLink: { na: "Replies don't link a terminal." } }),
   {
     ...bb("workflow", "Workflow run", "Workflow runs", "Workflow", "plugin-tab", "workflow", { newTab: "had", recent: { na: "bb keeps no recent workflow runs." }, sidebarDrag: { na: "bb's own: no row." }, workbenchOpen: "added", chatLink: "had" }),
     // The Workflows plugin lets other plugins open its run tab (`experimental_openableByPlugins`).

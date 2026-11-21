@@ -32,6 +32,7 @@
 // starts a consolidation fork that merges overlapping skills (off by default).
 //
 // Saves apply immediately. Advisory lint findings never block them.
+import { callRuns, presentScope } from "./merged-tools";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { isPassOutput } from "./kit/silent";
@@ -51,6 +52,9 @@ const EVENT_PAGE = 100;
 /** The tools a review fork gets, and nothing else of Studio's. */
 export const REVIEW_TOOLS = ["bot_skill_list", "bot_skill_view", "bot_skill_edit", "bot_skill_lint", "pages_read", "memory_search", "memory_add", "memory_update"] as const;
 const SKILL_WRITE_TOOL = /bot_skill_(write|patch|delete|edit)$/;
+/** The names a review fork's session offers (merged: bot_skill, pages_read, memory). */
+const REVIEW_NAMES = presentScope({ loaded: REVIEW_TOOLS, onDemand: [] }).loaded;
+const wroteSkill = (item: { tool?: string; name?: string; arguments?: unknown } | undefined) => SKILL_WRITE_TOOL.test(String(item?.tool ?? item?.name ?? "")) || callRuns(item, "bot_skill_edit");
 /** Items that aren't tool work. Everything else an agent does in a turn is. */
 const NOT_TOOLS = new Set(["agentMessage", "reasoning", "userMessage", "plan", "contextCompaction", "error"]);
 
@@ -65,12 +69,12 @@ export function tallyTurns(events: readonly EventRow[], inTurn = 0): { toolTurns
   let toolTurns = 0, userTurns = 0, skillWrite = false, lastSeq = 0;
   for (const event of events) {
     lastSeq = Math.max(lastSeq, event.seq ?? 0);
-    const data = (event.data ?? {}) as { initiator?: string; item?: { type?: string; tool?: string; name?: string } };
+    const data = (event.data ?? {}) as { initiator?: string; item?: { type?: string; tool?: string; name?: string; arguments?: unknown } };
     // Studio's cache-warming pings (src/bot-cache.ts) are sent as the user but aren't from them.
     if (event.type === "client/turn/requested" && data.initiator === "user" && !isPingRequest(data)) userTurns++;
     else if (event.type === "item/completed" && data.item?.type && !NOT_TOOLS.has(data.item.type)) {
       inTurn++;
-      if (SKILL_WRITE_TOOL.test(String(data.item.tool ?? data.item.name ?? ""))) { skillWrite = true; toolTurns = 0; inTurn = 0; }
+      if (wroteSkill(data.item)) { skillWrite = true; toolTurns = 0; inTurn = 0; }
     } else if (event.type === "turn/completed") {
       if (inTurn) toolTurns++;
       inTurn = 0;
@@ -172,10 +176,10 @@ export function curatorPlan(skills: readonly { name: string; state: SkillState; 
  * server disconnected)", and a cheap review model takes that at its word and
  * gives up, though ToolSearch finds the tools and they work.
  */
-const TOOLS_CONNECTED = `These tools are on the bb-bridge MCP server (mcp__bb-bridge__<name>) and they work here. If a note says bb-bridge disconnected or its tools are no longer available, it's stale: load them with ToolSearch ("select:${REVIEW_TOOLS.map((name) => `mcp__bb-bridge__${name}`).join(",")}") and call them.`;
+const TOOLS_CONNECTED = `These tools are on the bb-bridge MCP server (mcp__bb-bridge__<name>) and they work here. If a note says bb-bridge disconnected or its tools are no longer available, it's stale: load them with ToolSearch ("select:${REVIEW_NAMES.map((name) => `mcp__bb-bridge__${name}`).join(",")}") and call them.`;
 
 /** The follow-up a review gets, once, when it gave up on its tools. */
-export const RETRY_PROMPT = `Your tools are connected now. Load them with ToolSearch ("select:${REVIEW_TOOLS.map((name) => `mcp__bb-bridge__${name}`).join(",")}"), do the review and reply as asked: one short line, or exactly [PASS].`;
+export const RETRY_PROMPT = `Your tools are connected now. Load them with ToolSearch ("select:${REVIEW_NAMES.map((name) => `mcp__bb-bridge__${name}`).join(",")}"), do the review and reply as asked: one short line, or exactly [PASS].`;
 
 /** A reply that says the review's tools weren't there, rather than that nothing was worth saving. */
 export function gaveUpOnTools(text: string | null): boolean {
@@ -192,15 +196,15 @@ export function reviewPrompt(input: { name: string; memoryPageId: string | null;
     "- The user correcting you (tone, format, length, approach, the order of steps), or saying \"remember this\". These matter most: put them where the next run will follow them.",
     "- A technique, fix, workaround or tool pattern that took effort to find and will come up again.",
     "- A skill you used that turned out wrong, missing a step or out of date. Fix it now.",
-    `- Facts about the user, their people or their setup, and decisions: those are memory records (memory_search, then memory_add, or memory_update to correct one), not a skill.${input.memoryPageId ? ` Your core profile is page ${input.memoryPageId} (pages_read); don't edit it here.` : ""}`,
+    `- Facts about the user, their people or their setup, and decisions: those are memory records (memory op search, then op add, or op update to correct one), not a skill.${input.memoryPageId ? ` Your core profile is page ${input.memoryPageId} (pages_read); don't edit it here.` : ""}`,
     "",
     "How to write:",
     "- Lessons, not logs. Write the rule a future run follows, not the story of today: no dates, PR numbers or \"we tried\".",
-    "- One skill per kind of task, not per incident. Check what you have first (bot_skill_list, bot_skill_view) and prefer bot_skill_edit op \"patch\" on the skill that covers it over a new skill.",
+    "- One skill per kind of task, not per incident. Check what you have first (bot_skill op list, op view) and prefer bot_skill op edit with change \"patch\" on the skill that covers it over a new skill.",
     "- When the same lesson shows up again, merge it into one rule. Fix a wrong line in place; don't add one that contradicts it.",
     "- Keep each skill short: when to use it, the steps, the pitfalls. The tool result may carry notes on shape; heed them.",
     "",
-    `Use only ${REVIEW_TOOLS.join(", ")}. Don't run commands, edit files, message anyone or start threads. Skill changes apply immediately. After saving, inspect the saved versions with bot_skill_lint and attach any quality or safety warnings to the exact version you inspected; warnings never block saving.`,
+    `Use only ${REVIEW_NAMES.join(", ")}. Don't run commands, edit files, message anyone or start threads. Skill changes apply immediately. After saving, inspect the saved versions with bot_skill op lint and attach any quality or safety warnings to the exact version you inspected; warnings never block saving.`,
     TOOLS_CONNECTED,
     "When you're done, reply with one short line saying what you saved. If nothing is worth saving, reply exactly [PASS].",
   ].filter((line) => line !== null).join("\n");
@@ -209,7 +213,7 @@ export function reviewPrompt(input: { name: string; memoryPageId: string | null;
 /** The curator's consolidation prompt. */
 export function consolidatePrompt(name: string): string {
   return [
-    `Skill curator for ${JSON.stringify(name)}. The user doesn't see this thread. Read your skills (bot_skill_list, then bot_skill_view each one that might overlap).`,
+    `Skill curator for ${JSON.stringify(name)}. The user doesn't see this thread. Read your skills (bot_skill op list, then op view on each one that might overlap).`,
     "Where two or more cover the same kind of task, merge them into one class-level skill: write or patch the one that stays, then delete the others. Keep every rule that still holds; drop repeats.",
     "Don't touch skills that don't overlap. Don't delete a pinned skill. Don't run commands or start threads.",
     TOOLS_CONNECTED,
@@ -466,7 +470,10 @@ export class SkillLearning {
       after = batch.at(-1)?.seq ?? after;
       if (batch.length < EVENT_PAGE) break;
     }
-    const memory = events.filter((event) => /(pages_edit|memory_add|memory_update)$/.test(String((event.data as { item?: { tool?: string } } | undefined)?.item?.tool ?? ""))).length;
+    const memory = events.filter((event) => {
+      const item = (event.data as { item?: { tool?: string; arguments?: unknown } } | undefined)?.item;
+      return /pages_edit$/.test(String(item?.tool ?? "")) || callRuns(item, "memory_add") || callRuns(item, "memory_update");
+    }).length;
     if (memory) this.deps.db.prepare("UPDATE bot_skill_reviews SET memory = ? WHERE thread_id = ?").run(memory, review.thread_id);
     const fresh = this.review(review.thread_id)!;
     const parts = [

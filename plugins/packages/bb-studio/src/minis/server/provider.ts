@@ -17,7 +17,7 @@ export const MINI_STUDIO_KIND: StudioKind = {
   capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: true, export: true, comments: false, versions: false, links: false, templates: true },
   mentionProviderId: "mini",
   blurb: "Small interactive apps.",
-  agentHint: "Read it with apps_read, change its source with minis_update, its records with minis_data, and drive it with apps_live.",
+  agentHint: "Read it with apps (op: read), change its source with apps (op: update), its records with minis_data, and drive it with apps (op: live).",
 };
 
 export const displayName = (row: Pick<MiniRow, "name">) => row.name.trim() || "Untitled app";

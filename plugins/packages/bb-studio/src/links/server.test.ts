@@ -11,7 +11,7 @@ const deps = (): LinkResolveDeps => ({
 });
 
 describe("links.resolve", () => {
-  it("finds threads, items and Bots by the lookups workbench_open uses, and reports what is gone", async () => {
+  it("finds threads, items and Bots by the lookups workbench (op: open) uses, and reports what is gone", async () => {
     const lookups = deps();
     expect(await resolveLink({ kind: "conversation", id: "thr_1", threadId: null }, lookups)).toEqual({ found: true, title: "Fix login", spec: null });
     expect(await resolveLink({ kind: "worker", id: "thr_gone", threadId: null }, lookups)).toEqual({ found: false, title: null, spec: null });

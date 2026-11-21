@@ -458,10 +458,10 @@ conversations and workers are doing. Nothing shows on screen for it.
   Workers:
   - "Fable lead" (lead) running · 5m ago · for this conversation · bb-studio-native
   - "Codex: iOS build" (ios) failed · 2h ago · for "Main" · bb-studio
-  Details: bot_activity_lookup { threadId }; the full list: bot_conversations.
+  Details: bot_info (view: thread) { threadId }; the full list: bot_info (view: conversations).
   ```
 
-- **`bot_activity_lookup { threadId }`** (agent tool, every conversation):
+- **`bot_info (view: thread) { threadId }`** (agent tool, every conversation):
   one of the Bot's own threads in detail: its state, repo, needs-you, the
   conversation it works for or the workers it started, a finished
   conversation's summary, its latest reply and its last 8 tool calls (read
@@ -476,7 +476,7 @@ Finish item. Studio (`src/bot-finish.ts`):
 1. unarchives it for a moment (BB takes no turn in an archived thread) and
    sends one last agent-only turn into the conversation (no user message)
    with the steps: write a summary (**Decisions**, **Left open**,
-   **Made**), save it with `memory_add` (topic: the conversation's title;
+   **Made**), save it with `memory (op: add)` (topic: the conversation's title;
    source `{ kind: "conversation", id, title }`), then call
    `bot_finish_done { summary }`.
 2. When `bot_finish_done` arrives, the conversation is marked finished
@@ -598,7 +598,7 @@ with `bb thread-list`. It shows one Bot at a time (`src/ui/conversations`):
   mark, the selection) is the theme's, and a Bot with no theme has bb's
   plain look. The old per-Bot sidebar tint (Color, Gradient, System/Light/
   Dark, Grain) is gone, with `bot_set_theme` and the `theme` field of
-  `bot_get`, `bot_list` and `bot_spaces`. The column `bots.theme_json`
+  `bot_info (view: profile)`, `bot_list` and `bot_spaces`. The column `bots.theme_json`
   stays and nothing reads or writes it, so a Bot row that still has a tint
   loads as a Bot with no tint.
 - **At launch**, when the main view is BB's empty new-thread page (`/`), the
@@ -1140,7 +1140,7 @@ Library, Scheduled (the Todos page), Todos, Conversations; VS Code; and bb's own
 Browser, Terminal and Workflow run. Each kind has its name, icon, the tab that
 shows it, its address, where its recent rows come from and whether it has a
 sidebar row. The New Tab page, Recent, drag and drop, the agent's
-`workbench_open` and links in replies are all made from it.
+`workbench (op: open)` and links in replies are all made from it.
 `docs/tab-kinds-audit.md` is the table of which surface reaches which kind.
 
 **New Tab.** On the fork, the side panel's New Tab page (**+**) lists
@@ -1192,7 +1192,7 @@ workbench's second pane; Shift-click a window of its own; an external http(s)
 link goes to the browser setting (system or in-app). Links in replies (the
 fork's `experimental_linkHandler`, with the click's modifiers), chat cards,
 links in pages and on whiteboards, mini apps' `bb.open`, Cmd+K and the
-launcher's rows, the Bot pages' rows and the agent's `workbench_open` all go
+launcher's rows, the Bot pages' rows and the agent's `workbench (op: open)` all go
 through it. In the
 launcher and any popped-out window the rule runs in bb's main window
 (`window.runInMain { kind: "link" }`). A link to something that is gone
@@ -1213,13 +1213,13 @@ claim within 1.5 seconds and the tool says the conversation isn't on screen.
 
 | Tool | Input | Does |
 | --- | --- | --- |
-| `workbench_list` | none | The tabs with their keys, the selected one, which the agent opened, the layout, and what the user closed or changed |
-| `workbench_open` | `type`: every kind of the registry the agent may open (conversation, worker, bot, page, whiteboard, design, app, artifact, recording, board, memory, library, automations, todos, archive, automation, todo, record, vscode, file, diff, url, workflow); `id`, `path` (file, diff), `line`/`endLine` (file), `url`; or `link` instead of type and id (`bb://page/pg_…`, a bb address, `::page{id="…"}`, `file:///…`, an http(s) URL); `pane` (1, 2, "new" or "window"), `index`; `focus` (default true); `force` | Opens it as a tab, or selects it if open, in that pane and place; with "window", in a window of its own. URLs need the desktop app's in-app browser |
-| `workbench_tab` | `key`, `action`, `force` | `close` closes a tab; `focus` selects it and shows the panel; `pop_out` opens an open tab in a window of its own, out of the workbench |
-| `workbench_arrange` | `layout`: side by side, panel only, conversation only or stacked; `widthPercent` 20 to 80; `panes` 1 or 2; `paneWidths` (a ratio, such as [2, 1]); `force` | Shows or hides the panel, sets its width, collapses the conversation, makes or merges the second pane |
+| `workbench (op: list)` | none | The tabs with their keys, the selected one, which the agent opened, the layout, and what the user closed or changed |
+| `workbench (op: open)` | `type`: every kind of the registry the agent may open (conversation, worker, bot, page, whiteboard, design, app, artifact, recording, board, memory, library, automations, todos, archive, automation, todo, record, vscode, file, diff, url, workflow); `id`, `path` (file, diff), `line`/`endLine` (file), `url`; or `link` instead of type and id (`bb://page/pg_…`, a bb address, `::page{id="…"}`, `file:///…`, an http(s) URL); `pane` (1, 2, "new" or "window"), `index`; `focus` (default true); `force` | Opens it as a tab, or selects it if open, in that pane and place; with "window", in a window of its own. URLs need the desktop app's in-app browser |
+| `workbench (op: tab)` | `key`, `action`, `force` | `close` closes a tab; `focus` selects it and shows the panel; `pop_out` opens an open tab in a window of its own, out of the workbench |
+| `workbench (op: arrange)` | `layout`: side by side, panel only, conversation only or stacked; `widthPercent` 20 to 80; `panes` 1 or 2; `paneWidths` (a ratio, such as [2, 1]); `force` | Shows or hides the panel, sets its width, collapses the conversation, makes or merges the second pane |
 
 The workbench has at most two panes, side by side, and the conversation
-stays on the left; panes don't stack, so `workbench_arrange` answers that
+stays on the left; panes don't stack, so `workbench (op: arrange)` answers that
 **stacked** isn't available. On a BB whose workbench has one pane, `pane` is
 ignored (the answer says so) and `panes` is refused. The rules:
 
@@ -1233,7 +1233,7 @@ ignored (the answer says so) and `panes` is refused. The rules:
   panel the user closed stays closed (opens go behind), and a layout setting
   the user changed isn't changed back, unless the call passes
   `force: true`, which agents pass only when the user asked.
-- A window of its own (`pane: "window"`, `workbench_tab` action `pop_out`) is BB's "Open
+- A window of its own (`pane: "window"`, `workbench (op: tab)` action `pop_out`) is BB's "Open
   in new window": pages, whiteboards, designs, apps, conversations and other
   plugin tabs, and files pop out; terminals, browser tabs, Info, Diff, New
   Tab and fixed tabs are refused. While the user types in the panel the tab
@@ -1325,7 +1325,7 @@ target.
 
 Studio's RPC (`/api/v1/plugins/studio/rpc/<method>`, the contract in
 `src/bot-threads-contract.ts`), for the desktop app now and the iOS app
-later. The iOS app's existing calls (`bot_get`, `bot_attention`,
+later. The iOS app's existing calls (`bot_info (view: profile)`, `bot_attention`,
 `bot_side_threads`, `bot_side_thread_open` and the rest) are unchanged and
 keep working against Main. Every change publishes Studio's realtime channel
 (`studio-changed`).
@@ -1416,14 +1416,14 @@ once, since signals sent while the socket was down are lost.
   `experimental_NewThreadComposer` submits it (`{ projectId, providerId,
   model, reasoningLevel, permissionMode, serviceTier?,
   executionInputSources, environment, input, sendAt? }`); a client seeds its
-  composer with the Bot's `defaultModel` (`bot_get`). The thread starts on
+  composer with the Bot's `defaultModel` (`bot_info (view: profile)`). The thread starts on
   the request's model and is recorded as that Bot's conversation (its own
   call: no later rule moves it).
 - `bot_set_default_model({ botId, providerId, model, reasoning? })` → `{
   bot, run }`: what the Bot's new conversations start on. It switches no
   thread. Refused for a provider BB doesn't have, and for one of the other
   kind (an external provider for a Studio Bot, or the reverse).
-  `bot_get` and `bot_list` return it as `defaultModel: { providerId, model,
+  `bot_info (view: profile)` and `bot_list` return it as `defaultModel: { providerId, model,
   reasoningLevel, modelName } | null`.
 - `thread_model({ threadId })` → `{ model: { providerId, model,
   reasoningLevel, modelName } | null }`: what a thread runs on now, read off
@@ -1468,11 +1468,11 @@ once, since signals sent while the socket was down are lost.
   title, kind, conversationId, conversationTitle } | null }`, newest first;
   `madeIn` is null for what you made yourself.
 
-Agent tools, in every conversation: `bot_conversations` lists the Bot's
+Agent tools, in every conversation: `bot_info (view: conversations)` lists the Bot's
 conversations (Main first, with fork links, what's working and what needs
 you) and its workers (status, conversation, repo);
 `bot_needs_you({ reason })` marks the conversation it runs in as needing you
-(null clears; a worker is refused); `bot_activity_lookup({ threadId })` gives
+(null clears; a worker is refused); `bot_info (view: thread)({ threadId })` gives
 one conversation or worker in detail (see Awareness); `bot_finish_done({
 summary })` finishes the conversation it runs in (refused in Main and in a
 worker); `conversation_continue_new({ title, handoff, workCards?,
@@ -1748,8 +1748,8 @@ The iOS app uses Studio's `notes.*` RPC methods:
 
 ### For agents
 
-Agents get five tools: `pages_list`, `pages_read`, `pages_create`,
-`pages_edit` and `pages_comments` (`op`: `list`, `create`, `reply`,
+Agents get five tools: `pages_read (no page)`, `pages_read`, `pages_create`,
+`pages_edit` and `pages_read (comments)` (`op`: `list`, `create`, `reply`,
 `resolve`). `pages_read` returns Markdown with a block id on the
 line before each block, and `pages_edit` applies small operations against those ids. An
 agent can then change one checklist item or paragraph without overwriting
@@ -1868,11 +1868,11 @@ its versions and its addresses, and every older address still opens it:
 - **Item header.** Both views show the app's title and a **Saved** or
   **Interactive** badge; the artifact viewer and the mini app host underneath
   are separate.
-- **Agent tools.** `apps_list`, `apps_read`, `apps_create` (type
-  `"artifact"` or `"mini"`) and `apps_live` (an open mini app or live HTML
+- **Agent tools.** `apps (op: list)`, `apps (op: read)`, `apps (op: create)` (type
+  `"artifact"` or `"mini"`) and `apps (op: live)` (an open mini app or live HTML
   artifact). Each type's own list, read, create and live handlers stay
   inside Studio and aren't given to sessions. Changing an interactive app
-  stays with `minis_update` and `minis_data`.
+  stays with `apps (op: update)` and `minis_data`.
 
 ### Saved apps (artifacts)
 
@@ -1916,15 +1916,15 @@ with `BB_CAPTURE_COMPACT_HEADERS=1 BB_CAPTURE_ONLY=artifacts-compact-header`.
 - **Live HTML.** An HTML artifact's page gets `window.playground`, the same
   API as BB playgrounds: shared state that persists per artifact and syncs to
   every open copy, theme changes, an event log, actions an agent can run
-  (`apps_live`, or `bb studio artifacts state|watch|actions|do`), and
+  (`apps (op: live)`, or `bb studio artifacts state|watch|actions|do`), and
   `send(label, data)`, which puts an @artifact pill holding that data in the
   thread's composer. A playground's HTML works unchanged as an artifact.
   In a chat card the page's frame fits its height (120–640 px).
 - **Save from a thread.** The save icon in the thread's **Studio** tab lists the
   files the latest reply created, changed or generated, the thread's storage
   files, and what the thread already saved. Nothing is saved automatically.
-- **Agent tools and skill.** `apps_create` (type `"artifact"`), `apps_list`,
-  `apps_read` and `apps_live`, and the `artifacts` skill. A saved
+- **Agent tools and skill.** `apps (op: create)` (type `"artifact"`), `apps (op: list)`,
+  `apps (op: read)` and `apps (op: live)`, and the `artifacts` skill. A saved
   artifact comes back as `::artifact{id="art_…"}` (`::app{id="art_…"}` with
   **App cards** on), a card with an inline preview that opens the viewer
   beside the chat. `@artifact` mentions give the agent the artifact's
@@ -2040,13 +2040,13 @@ secrets aren't backed up, so a restored app asks again.
 #### Elsewhere in Studio
 
 - **Artifacts:** agents turn a live HTML artifact into a mini app with
-  `apps_create` (type `"mini"`) and `fromArtifactId`: its page becomes the app's
+  `apps (op: create)` (type `"mini"`) and `fromArtifactId`: its page becomes the app's
   `index.html` and its live state carries over.
 
 #### Agents
 
-`apps_create` (type `"mini"`), `apps_read`, `apps_list` and `apps_live`,
-`minis_update` and `minis_data`, the `minis` skill, and
+`apps (op: create)` (type `"mini"`), `apps (op: read)`, `apps (op: list)` and `apps (op: live)`,
+`apps (op: update)` and `minis_data`, the `minis` skill, and
 `bb studio minis list|show|data|state|watch|actions|do`. What an app returns
 to an agent is wrapped as data, never instructions.
 
@@ -2114,7 +2114,7 @@ open. Recapture with
 - **Card in the agent's reply.** When an agent adds or changes a whiteboard,
   its reply links the page (`::page{id="…"}`). Older replies' `::drawing`
   cards still show the picture, name and element count, read-only.
-- **Agent tools and skill.** `pages_list` with `type: "whiteboard"` (each
+- **Agent tools and skill.** `pages_read (no page)` with `type: "whiteboard"` (each
   whiteboard with its page), `pages_read` with a `drw_…` id (elements, app
   state, a text summary, and image files without their data; scenes over
   about 400,000 characters come back as element ids), `pages_create` with
@@ -2210,18 +2210,18 @@ The same deck presented with Play and moved on with →: "Why it matters",
 - **Card in the agent's reply** (`::design{id="…"}`) with the newest round's
   first screens. It opens the design in the thread's **Studio** tab beside
   the chat; back from it, the tab lists the thread's items, designs among them.
-- **Questions.** `design_ask` shows a form in the thread (choices, multi,
+- **Questions.** `design_review (op: ask)` shows a form in the thread (choices, multi,
   short answers, 1–5 scales, each with "Decide for me"); the answers return
   as the tool's result.
-- **Reviewer.** `design_ready` starts a reviewer agent in a hidden thread
+- **Reviewer.** `design_review (op: ready)` starts a reviewer agent in a hidden thread
   beside the design's own. It loads each screen at its size with Browser
   Automation, checks layout, errors and the design rules, and reports back
   only when something needs work, in the design's thread. After 3 such
   reviews in a row, automatic review pauses until you edit, comment or ask.
-- **Agent tools and skill.** `pages_list`, `pages_create` and `pages_read`
-  (with `type: "design"` or a `dsn_…` id), `design_rename`, `design_ask`, `design_ready`, `design_write_screen`,
-  `design_edit_screen`, `design_comments`, `design_resolve_comments`,
-  `design_save_style` and `design_styles`, and the `design` skill. `@design`
+- **Agent tools and skill.** `pages_read (no page)`, `pages_create` and `pages_read`
+  (with `type: "design"` or a `dsn_…` id), `design_screen (op: rename)`, `design_review (op: ask)`, `design_review (op: ready)`, `design_screen (op: write)`,
+  `design_screen (op: edit)`, `design_review (op: comments)`, `design_review (op: resolve)`,
+  `design_style (op: save)` and `design_style (op: list)`, and the `design` skill. `@design`
   mentions give the agent the design's rounds and options.
 - **Commands.** `bb studio designs list`, `show <id>` (rounds, screens and
   open comments as JSON), `html <id> <screen>`, `rename <id> <new-name>` and
@@ -2408,8 +2408,8 @@ The compact recording header at 390 pixels, with **Chat** and **Item actions**.
   and combined; past six parts, the page says the notes cover the first part.
 - **Exports.** Download a finished transcript as Markdown or plain text, or
   download its original audio segments together as a tar archive.
-- **Agent tools.** `talk_list`, `talk_read`, and `talk_search` let agents find
-  and read bounded portions of recordings and summaries. `talk_make_notes`
+- **Agent tools.** `talk (op: list)`, `talk (op: read)`, and `talk (op: search)` let agents find
+  and read bounded portions of recordings and summaries. `talk (op: make_notes)`
   makes or updates a recording's notes page.
 - **Mobile layout.** The pill, recording pages, and composer mic all work in
   the BB mobile app, with larger touch targets on small screens.
@@ -2885,7 +2885,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   its replies), and **Earlier conversations** (its
   handoff chain, closed by default). When its automations run is the Bot
   page's week, not the sidebar. A thread another of its threads started
-  nests under that one, at any depth (`bot_activity` returns each thread's
+  nests under that one, at any depth (`bot_info (view: activity)` returns each thread's
   `parentId`). A row opens the thread as a BB thread in the main pane; a
   bot's row opens its chat the same way, and the Bots list stays. On a
   bot's thread the expanded bot is the thread's owner. Each bot's **ⓘ**
@@ -2988,7 +2988,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   just how many, "1") and on the selected Bot's second line
   (`src/ui/bot/rowState.ts`). Most urgent first: **needs you** while its
   chat has a pending question or approval, or a released todo
-  (`bot_activity`'s `attention`, `bot_attention`); the **spinner** while its
+  (`bot_info (view: activity)`'s `attention`, `bot_attention`); the **spinner** while its
   chat, a thread its chat spawned, or (on the selected Bot) a thread in
   progress is working; **failed** when its chat's last turn failed unread;
   the **unread** dot for replies you haven't read. The Bot's chat is a
@@ -3176,9 +3176,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   recent runs with what came of each (Studio's `trigger_runs`; a watcher's
   from BB's `automations_runs`), Pause /
   Resume, Run now, Edit and Delete. A bot with none only wakes when you
-  write. The Bot has `automation_list`, `automation_create`,
-  `automation_update`, `automation_pause`, `automation_resume`,
-  `automation_run_now` and `automation_delete` ("in 2h check the deploy" is
+  write. The Bot has `schedule (op: list)`, `schedule (op: create)`,
+  `schedule (op: update)`, `schedule (op: pause)`, `schedule (op: resume)`,
+  `schedule (op: run_now)` and `schedule (op: delete)` ("in 2h check the deploy" is
   a reminder); `runner_*` still work.
 
   **Turned off by BB** (`src/auto-resume.ts`, table
@@ -3253,16 +3253,16 @@ of Staff", with the same thread and check-ins; rename it from its page.
   check-in, and the check-in prompt says: do its `## Check-in`, and stay
   silent unless something matters.
 - **Skills**: when the Bot learns a reusable procedure it saves a skill with
-  `bot_skill_edit` op `write` (name, one-line description, Markdown steps),
+  `bot_skill (op: edit)` op `write` (name, one-line description, Markdown steps),
   fixes one in place with op `patch` (exact text → new text) and removes one
   with op `delete`. Only the
   Bot's thread has these: they live in Studio's `bot_skills` table. Its
   instructions list up to eight skills (pinned, then most recently used)
   by name and one-line description, and say how many more there are.
-  `bot_skill_list` with a `query` finds the rest on demand: it ranks the Bot's own
+  `bot_skill (op: list)` with a `query` finds the rest on demand: it ranks the Bot's own
   non-archived skills by its words in their names, descriptions and full
   text (BM25, names weigh most) and returns the best with a body snippet.
-  It loads the full skill with `bot_skill_view` (`bot_skill_list` without a
+  It loads the full skill with `bot_skill (op: view)` (`bot_skill (op: list)` without a
   query lists them).
   Writes and patches return advisory notes, never blocking: a body that
   reads like a log of one session (dates, PR numbers, "we tried"), one over
@@ -3294,7 +3294,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
     counted). A `turn/completed` whose turn had any tool item
     (`commandExecution`, `toolCall`, `mcpToolCall`, `fileChange`, ...)
     counts as a tool turn; a `client/turn/requested` from the user counts as
-    a user turn. A `bot_skill_edit` call resets the tool count. The first look at a thread only takes a baseline, so old
+    a user turn. A `bot_skill (op: edit)` call resets the tool count. The first look at a thread only takes a baseline, so old
     history never trips it.
   - **Review.** When either count reaches the interval (10 by default) and
     the bot is active and idle, Studio forks its thread (`threads.fork`,
@@ -3304,8 +3304,8 @@ of Staff", with the same thread and check-ins; rename it from its page.
     prompt: lessons, not logs; one skill per kind of task; merge a repeated
     lesson into one rule; fix wrong lines in place; your corrections and
     "remember this" first; facts about you go in memory records. It has
-    only the skill tools plus `pages_read` and `memory_search`,
-    `memory_add` and `memory_update`, and replies
+    only the skill tools plus `pages_read` and `memory (op: search)`,
+    `memory (op: add)` and `memory (op: update)`, and replies
     `[PASS]` when there's nothing to save. When it goes idle Studio records
     the result ("Saved 1 skill", "Nothing to save") and archives the fork.
     One review per bot at a time; a new turn in the bot's thread, Pause or
@@ -3323,7 +3323,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
     lint warnings. **Revert** restores a version in one click and appends a new
     version, preserving what it replaced. Deleted skills also stay in history.
     Built-in lint runs on saves. The optional review model can attach quality
-    or safety warnings through `bot_skill_lint`; warnings never block a save.
+    or safety warnings through `bot_skill (op: lint)`; warnings never block a save.
     History and model findings use append-only tables (`bot_skill_versions`
     and `bot_skill_lints`). Upgrade applies pending changes as approved and
     clears the pending list. For one release, `bot_skill_pending_resolve` is a
@@ -3335,7 +3335,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
     See [the approval audit](../../docs/approvals.md) for the iOS follow-up.
 
   ![Staged Bot info → Skills with the system-report skill's history expanded and Revert visible. Saves apply immediately; there is no Waiting for approval state.](assets/bot-skills.png)
-- **Recall**: `bot_history_search` searches BB's thread search, keeping
+- **Recall**: `bot_info (view: history)` searches BB's thread search, keeping
   only the Bot's threads (its handoff chain and threads it started). BB's
   search skips hidden threads; the Conversations page's search reads the
   conversations' messages itself.
@@ -3514,10 +3514,10 @@ of Staff", with the same thread and check-ins; rename it from its page.
 - Its thread is an implementation detail. A handoff (`thread_handoff`)
   moves the Bot to the new thread. It is the personal project's lead, so it
   sees every project.
-- RPCs: `bot_list`, `bot_get`, `bot_create`, `bot_set` (name, avatar emoji, shape, color, role),
+- RPCs: `bot_list`, `bot_info (view: profile)`, `bot_create`, `bot_set` (name, avatar emoji, shape, color, role),
   `bot_profile_changes`, `bot_profile_revert` (a change id), `bot_set_thread`,
   `bot_set_run` (check-ins), `bot_pause`, `bot_resume`, `bot_stop`,
-  `bot_activity`, `bot_memory`, `bot_chain` (its thread and the ones it
+  `bot_info (view: activity)`, `bot_memory`, `bot_chain` (its thread and the ones it
   handed off from, oldest first), `bot_checkin_preset` (`morning`,
   `evening`, `working` or `off`), `bot_skills`, `bot_skill_write`, `bot_skill_share`,
   `bot_skill_delete`, `bot_skill_pin`, `bot_skill_restore`, `bot_learning`,
@@ -3525,13 +3525,13 @@ of Staff", with the same thread and check-ins; rename it from its page.
   lists what it would change), `bot_skill_history`, `bot_skill_revert`,
   `bot_skill_pending_resolve` (deprecated for one release), and the runner RPCs below. Each takes an optional
   `botId` (the primary when absent); `bot_create` makes the primary first,
-  then additional bots. Agent tools: `bot_get`, `bot_profile_update`,
-  `bot_state` (`action`: `pause`, `stop` or `resume`; pause and stop work
+  then additional bots. Agent tools: `bot_info (view: profile)`, `bot_profile_update`,
+  `bot_info (view: state)` (`action`: `pause`, `stop` or `resume`; pause and stop work
   only in the Bot's own chat or its handoff chain, where resume is refused;
   threads it started, its runners and other threads are refused pause and
-  stop, and the user uses Studio → Bot) and `bot_activity`; only the Bot's
-  thread also gets `bot_skill_list`, `bot_skill_view`, `bot_skill_edit`,
-  `bot_skill_lint`, `bot_history_search`, `runner_migrate` and the
+  stop, and the user uses Studio → Bot) and `bot_info (view: activity)`; only the Bot's
+  thread also gets `bot_skill (op: list)`, `bot_skill (op: view)`, `bot_skill (op: edit)`,
+  `bot_skill (op: lint)`, `bot_info (view: history)`, `runner_migrate` and the
   `automation_*` tools.
 - **Watchers**, for script authors. Studio creates a BB script automation
   (bash, sh, node or python3; timeout up to 15 minutes; working directory
@@ -3568,9 +3568,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
   name, a job (a short instruction), a schedule (on Studio's own scheduler,
   waking its own thread; the heartbeat's cadences and cron), a state (active or
   paused), its last run and its last report. The Bot makes one with
-  `automation_create` (kind `runner`) when a task becomes recurring; its first run starts at
+  `schedule (op: create)` (kind `runner`) when a task becomes recurring; its first run starts at
   once, and each scheduled run's prompt carries the job.
-  - **Machines**: `automation_create` and `automation_update` accept an
+  - **Machines**: `schedule (op: create)` and `schedule (op: update)` accept an
     optional `machine` for a runner (host id or unique host name, with
     `confirm` after preflight warnings), and `runner_migrate` moves one;
     Studio stores the resolved id.
@@ -3678,9 +3678,9 @@ of Staff", with the same thread and check-ins; rename it from its page.
     runner. RPCs: `bot_runners`, `bot_runner_create`, `bot_runner_update`,
     `bot_runner_pause`, `bot_runner_resume`, `bot_runner_run_now`,
     `bot_runner_delete`, `bot_runner_seen`, `bot_runner_adopt`. The Bot's
-    tools: `automation_create` (kind `runner`), `automation_update`,
-    `automation_pause`, `automation_resume`, `automation_delete`,
-    `automation_list`, `automation_run_now` and `runner_migrate`.
+    tools: `schedule (op: create)` (kind `runner`), `schedule (op: update)`,
+    `schedule (op: pause)`, `schedule (op: resume)`, `schedule (op: delete)`,
+    `schedule (op: list)`, `schedule (op: run_now)` and `runner_migrate`.
 - **External bots**: Studio no longer lists the Studio Agents plugin or
   offers Import bot. A bot made earlier on an external agent (Hermes,
   OpenClaw, Grok or Dot) keeps working where that plugin is still
@@ -3689,7 +3689,7 @@ of Staff", with the same thread and check-ins; rename it from its page.
   `bot_*` tools don't reach it (`bot_external_providers` still reports the
   providers).
 - **Model is the thread's**: a bot follows its current thread, and the
-  provider and model are that thread's (`bot_get` reads them off BB). BB keeps
+  provider and model are that thread's (`bot_info (view: profile)` reads them off BB). BB keeps
   a thread on one provider for life: `threads.update` changes only its model
   and reasoning level, and BB's composer (in the bot's chat too) picks models
   within the thread's provider, with no hook for a plugin to intercept. So
@@ -3733,11 +3733,11 @@ chosen from a week of tool-call history). The rest stay reachable on demand:
 
 | Kind | Loaded | On demand |
 |---|---|---|
-| Main | pages, memory, strand_note, conversation and Bot tools, schedules, skills, areas, design, code_show | everything else |
+| Main | pages, memory, strand_note, conversation and Bot tools, schedules, skills, areas, design, code (op: show) | everything else |
 | A Bot conversation (any thread the user starts) | pages, memory, strand_note, conversation tools | everything else |
 | Project lead | pages, memory, strand_note | everything but the Bot's own schedules and skills, themes and presence |
-| Worker | pages_read, pages_create, pages_edit, memory_search, memory_add | designs, apps, recordings, whiteboards, memory_update, pages_list, pages_comments |
-| Runner | runner_report, pages_read, pages_edit, memory_search | pages, designs, apps, recordings, whiteboards, areas, memory (never the user's screen, strands or the Bot's tools) |
+| Worker | pages_read, pages_create, pages_edit, memory (op: search), memory (op: add) | designs, apps, recordings, whiteboards, memory (op: update), pages_read (no page), pages_read (comments) |
+| Runner | runner_report, pages_read, pages_edit, memory (op: search) | pages, designs, apps, recordings, whiteboards, areas, memory (never the user's screen, strands or the Bot's tools) |
 | Studio Decisions classifier thread | nothing | nothing |
 
 How the on-demand tools reach the agent depends on the provider:
@@ -3780,7 +3780,7 @@ Each Studio Bot has one memory, shared by all its conversations and workers
 
 - **Core profile**: a short Studio page you edit: who you are, how you work,
   hard rules, people and places, and the Bot's `## Check-in` list. It is the
-  Bot's memory page (`memoryPageId` in `bot_get`), so the check-in,
+  Bot's memory page (`memoryPageId` in `bot_info (view: profile)`), so the check-in,
   Maintenance and the Bot page find it there. Its text is loaded **always**:
   Studio's agent configuration adds it to the instructions of every
   conversation of the Bot (its chat, side threads, forks of its chat) and
@@ -3817,12 +3817,12 @@ facts on a page. Skill reviews save facts as records too.
 Every conversation and worker of a Studio Bot has these. They act for the
 Bot of the calling thread (a thread no Bot owns counts for the primary Bot).
 
-- `memory_search { query, topic?, limit? }` (limit 1–50, default 10): returns
+- `memory (op: search) { query, topic?, limit? }` (limit 1–50, default 10): returns
   `{ total, records: [{ id, topic, date: "2026-11-07", source: { kind, id,
   title, section?, finished? }, text, replaced, replacedBy?, replaces?,
   archived? }] }`. Current records come first; an empty query lists the
   newest.
-- `memory_add { topic, text, source? }`: saves a record. The source defaults
+- `memory (op: add) { topic, text, source? }`: saves a record. The source defaults
   to the calling thread, as Studio placed it (`bot_threads`): Main is
   "Main", another conversation its title, a worker its title (a runner's
   "Runner: <name>"). A thread Studio hasn't placed yet falls back to the
@@ -3832,7 +3832,7 @@ Bot of the calling thread (a thread no Bot owns counts for the primary Bot).
   title?: "Launch prep" }` (the title is looked up when left out).
   `kind` is `conversation`, `worker`, `thread`, `page` or `manual`; every
   kind but `manual` needs an `id`.
-- `memory_update { id, text, topic? }`: saves a NEW record that replaces
+- `memory (op: update) { id, text, topic? }`: saves a NEW record that replaces
   `id` (which must be current, not already replaced) and keeps the old one.
 
 ### The Memory view
@@ -3939,7 +3939,7 @@ Every write publishes `studio-changed` on Studio's realtime channel.
 
 ### Reminders
 
-A reminder is an automation: `automation_create` with kind `reminder` makes
+A reminder is an automation: `schedule (op: create)` with kind `reminder` makes
 one, and it wakes the Bot when it comes due. Older reminders that were copied
 into to-dos (`loop_reminder_<automation id>`) run as their automation again.
 
@@ -4004,23 +4004,23 @@ parameters and its handler; the family tools run those same handlers.
 
 | Family tool | Does |
 | --- | --- |
-| `pages_list` | Docs; with `type: "design"` or `"whiteboard"`, that type's own list |
+| `pages_read (no page)` | Docs; with `type: "design"` or `"whiteboard"`, that type's own list |
 | `pages_read` | A doc; given a `dsn_…` or `drw_…` id, that item |
 | `pages_create` | A doc; with `type: "design"` or `"whiteboard"`, one of those |
-| `apps_list` | Every app from the index; with `type`, that type's own list |
-| `apps_read` | Any app by id |
-| `apps_create` | `{ type, input }`, where `input` is the fields the mini app or artifact create handler takes |
-| `apps_live` | An open mini app or live HTML artifact by id, with `op` |
+| `apps (op: list)` | Every app from the index; with `type`, that type's own list |
+| `apps (op: read)` | Any app by id |
+| `apps (op: create)` | `{ type, input }`, where `input` is the fields the mini app or artifact create handler takes |
+| `apps (op: live)` | An open mini app or live HTML artifact by id, with `op` |
 
 Each type's own list, read, create and live handlers live in Studio's
 ToolBook (`src/family-tools.ts`) and aren't given to sessions; the family
 tools run them, and their errors name the family tool.
 
-`type` on `pages_list` and `pages_create` is new and optional; every input
+`type` on `pages_read (no page)` and `pages_create` is new and optional; every input
 those tools took before means the same. Editing stays with each type's tools
-(`pages_edit`, `design_write_screen`, `whiteboard_update`, `minis_update`,
-and `apps_create` with an `artifactId` for a new artifact version). A type turned off in **Setup → Kinds** is
-left out of `apps_list` and refused by the family tools.
+(`pages_edit`, `design_screen (op: write)`, `whiteboard_update`, `apps (op: update)`,
+and `apps (op: create)` with an `artifactId` for a new artifact version). A type turned off in **Setup → Kinds** is
+left out of `apps (op: list)` and refused by the family tools.
 
 **Backups** carry no index: restored items index themselves, and the check runs
 after a restore. A backup made before the index restores the same way.

@@ -72,13 +72,13 @@ it("gives a review fork only the skill tools, the profile's pages_read and the m
   expect(prompt).toMatch(/merge it into one rule/);
   expect(prompt).toMatch(/reply exactly \[PASS\]/);
   expect(prompt).toMatch(/pg1/);
-  expect(prompt).toMatch(/memory records \(memory_search, then memory_add/);
+  expect(prompt).toMatch(/memory records \(memory op search, then op add/);
   expect(prompt).not.toMatch(/pages_edit/);
 });
 
 it("tells a review its bridge tools work even when Claude Code calls them disconnected", () => {
   const prompt = reviewPrompt({ name: "Dot", memoryPageId: "pg1", reason: "tools" });
-  expect(prompt).toMatch(/ToolSearch \("select:mcp__bb-bridge__bot_skill_list,.*mcp__bb-bridge__memory_update"\)/);
+  expect(prompt).toMatch(/ToolSearch \("select:mcp__bb-bridge__bot_skill,mcp__bb-bridge__pages_read,mcp__bb-bridge__memory"\)/);
   expect(gaveUpOnTools("I couldn't save anything: the skill and Memory page tools are disconnected in this session, so nothing was written.")).toBe(true);
   expect(gaveUpOnTools("Couldn't save anything: the bot skill and Pages tools are disconnected in this session.")).toBe(true);
   expect(gaveUpOnTools("[PASS]")).toBe(false);

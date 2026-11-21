@@ -12,7 +12,7 @@ import { SpawnLinks } from "./spawn";
 import { surfaceForUser, TaskStore, toStoredOwner } from "./store";
 import { inLoopView, inWorkView } from "./views";
 
-const SCHEDULE_TASK = "This task is an automation's schedule; change it with automation_update, automation_pause or automation_resume (runner_* for a runner). Its runs and findings are its subtasks: update those instead.";
+const SCHEDULE_TASK = "This task is an automation's schedule; change it with schedule (op: update), schedule (op: pause) or schedule (op: resume) (runner_* for a runner). Its runs and findings are its subtasks: update those instead.";
 
 export const CONVERSATION_SET = "The conversation is set once, where the task started; it was kept. A subtask shows under its parent's conversation.";
 export const WAITING_NOTE = "Say what it waits on with waitingOn: {kind: \"user\"}, {kind: \"ci\", ref: <run or PR>}, {kind: \"task\", ref: <task id>} or {kind: \"outside\", text: <who>}.";

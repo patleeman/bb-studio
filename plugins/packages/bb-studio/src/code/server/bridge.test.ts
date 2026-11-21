@@ -130,7 +130,7 @@ describe("what the agent is told", () => {
     expect(text).toContain("line 14: Cannot find name 'delay'.");
     expect(text).toMatch(/unsaved[^\n]*src\/queue\.ts/i);
     expect(text).toMatch(/don't edit/i);
-    expect(text).toContain("code_show");
+    expect(text).toContain("code (op: show)");
   });
 
   it("says nothing when no editor is connected", () => {

@@ -11,7 +11,7 @@ test("an idle, read Bot shows nothing", () => {
   expect(STATE_INDICATOR.idle).toBe("none");
 });
 
-test("working: its chat is busy, a thread its chat spawned is, or bot_activity counts threads in progress", () => {
+test("working: its chat is busy, a thread its chat spawned is, or bot_info (view: activity) counts threads in progress", () => {
   expect(botRowState({ chat: chat({ status: "active" } as Partial<Chat>), attention: null })).toBe("working");
   expect(botRowState({ chat: chat({ runtimeStatus: "provisioning" } as Partial<Chat>), attention: null })).toBe("working");
   expect(botRowState({ chat: idle, children: [{ status: "active", runtimeStatus: "active", indicator: "runtime" } as never], attention: null })).toBe("working");

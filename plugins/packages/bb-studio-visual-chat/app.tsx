@@ -37,7 +37,7 @@ export default definePluginApp((app) => {
   const offRail: object = windowApp ? { experimental_hideFromNavigation: true } : {};
   app.slots.navPanel({ id: "canvas", title: "Visual Chat", icon: WINDOW_ICON, path: "canvas", component: Panel, ...(windowApp ? { headerContent: openInWindowButton(windowApp) } : {}), ...offRail });
   // A board as a tab beside a conversation (src/board-tab.tsx): BB Studio opens it from its New Tab rows, drops and the
-  // agent's workbench_open, with the fork's workbench API (`experimental_openableByPlugins` lets it), or on an older BB
+  // agent's workbench tool (op: open), with the fork's workbench API (`experimental_openableByPlugins` lets it), or on an older BB
   // by asking this plugin's overlay.
   registerBoardTab(app.slots, Panel, WINDOW_ICON);
   // The quick card and its "Visual Chat: Ask" shortcut (src/quick-app.tsx). Its expand opens the full page: the window, where there is one.

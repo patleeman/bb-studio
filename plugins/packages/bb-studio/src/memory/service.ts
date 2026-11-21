@@ -8,7 +8,7 @@
 //   session start (agents.configure, see configure below), up to
 //   PROFILE_CAP_CHARS.
 // - Memory records: facts, decisions and notes in memory_records (./store.ts),
-//   found on demand with memory_search.
+//   found on demand with the memory tool (op search).
 // - The split: a Bot made before this has an old Memory page and no profile.
 //   Studio splits it once, on its own (./split.ts, autoSplit below): at
 //   plugin start for every Bot, and on the first load of the Bot's memory if
@@ -121,7 +121,7 @@ export function memoryInstructions(input: {
   room?: number;
 }): string {
   const lines = ["## Memory"];
-  const records = "memory_search before you rely on what you remember, memory_add for something new worth keeping, memory_update to correct a record (it keeps the old one as history)";
+  const records = "memory: op search before you rely on what you remember, op add for something new worth keeping, op update to correct a record (it keeps the old one as history)";
   if (input.role === "worker") lines.push(`You work for ${JSON.stringify(input.botName)}. Its memory records hold facts, decisions and notes: ${records}.`);
   else lines.push(`Facts, decisions and notes are memory records shared by all your conversations: ${records}. Don't keep them on a page.`);
   if (input.legacy && !input.profile) lines.push(`Your old Memory page ${input.legacy.pageId} (${JSON.stringify(input.legacy.title)}) hasn't been split into a core profile and records yet: read it with pages_read when you need it, and don't edit it.`);

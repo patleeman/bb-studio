@@ -1,7 +1,7 @@
 // A board as a tab beside a conversation: Visual Chat's thread action tab
 // `board` (`{ threadId }`), the board's page in the workbench. BB Studio
 // lists it as a kind of tab (packages/bb-studio/src/tab-kinds.ts) and opens
-// it from its New Tab rows, drops and the agent's workbench_open. The tab is
+// it from its New Tab rows, drops and the agent's workbench tool (op: open). The tab is
 // registered with `experimental_openableByPlugins`, so on the fork Studio
 // opens it itself (`open({ kind: "tab", tab: { id, pluginId } })`). A BB from
 // before that opens only a plugin's own tabs: there Studio asks over a window

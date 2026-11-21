@@ -186,7 +186,7 @@ function workerLine(row: DigestWorker, now: number): string {
 
 export const DIGEST_HEADER = "Elsewhere with the user (your other conversations and your workers, newest first; not this conversation):";
 const NOTHING = "Elsewhere: no other conversation was active in the last day, and no worker is running or finished in the last 6 hours.";
-const footer = (more: number) => `${more ? `…and ${more} more. ` : ""}Details: bot_activity_lookup { threadId }; the full list: bot_conversations.`;
+const footer = (more: number) => `${more ? `…and ${more} more. ` : ""}Details: bot_info { view: "thread", threadId }; the full list: bot_info { view: "conversations" }.`;
 
 /**
  * The digest a conversation gets with its first turn: other conversations, then
@@ -387,7 +387,7 @@ export function registerLiveActivity(bb: Bb, db: Database.Database, deps: LiveAc
     execute: async ({ threadId }, ctx) => {
       const mine = (ctx.threadId ? deps.threads.get(ctx.threadId)?.botId : null) ?? await deps.actingBot(ctx.threadId);
       const target = deps.threads.get(threadId);
-      if (!target || (mine && target.botId !== mine)) return `${threadId} isn't one of your conversations or workers. List them with bot_conversations.`;
+      if (!target || (mine && target.botId !== mine)) return `${threadId} isn't one of your conversations or workers. List them with bot_info (view: conversations).`;
       return lookUp(bb.sdk, activity, deps.threads, threadId, now());
     },
   });

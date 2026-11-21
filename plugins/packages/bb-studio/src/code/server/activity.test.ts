@@ -36,7 +36,7 @@ describe("what the agent is doing, from its events", () => {
     expect(activitiesFrom({ type: "turn/completed", data: {} }, null)).toEqual([{ kind: "turn", state: "done" }]);
   });
 
-  it("counts its live edits (code_edit), with the lines they type", () => {
+  it("counts its live edits (code (op: edit)), with the lines they type", () => {
     expect(activitiesFrom(completed({ type: "toolCall", tool: "code_edit", arguments: { path: "src/a.ts", edits: [{ oldText: "x", newText: "const y = 1;\nconst z = 2;" }] } }), "/repo"))
       .toEqual([{ kind: "edit", path: "/repo/src/a.ts", added: ["const y = 1;", "const z = 2;"] }]);
     expect(activitiesFrom(started({ type: "toolCall", tool: "code_show", arguments: { path: "/repo/a.ts" } }), "/repo")).toEqual([]);

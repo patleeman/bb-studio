@@ -79,7 +79,7 @@ export function finishInstruction(input: { threadId: string; title: string }): s
   return [
     `Studio: the user archived this conversation (${JSON.stringify(input.title)}, ${input.threadId}). Do this now, in this turn:`,
     `1. Write its summary to the user, as "you" (never "the user"), in short markdown: "**Decisions**" with one bullet per decision, "**Left open**" with what is still undecided, "**Made**" with the pages, designs, apps or code it produced. Leave out an empty section.`,
-    `2. Save it with memory_add: topic ${JSON.stringify(FINISH_TOPIC)}, source ${source}, and as text one plain line (no markdown) naming what the conversation was about, a blank line, then the summary.`,
+    `2. Save it with memory (op: add): topic ${JSON.stringify(FINISH_TOPIC)}, source ${source}, and as text one plain line (no markdown) naming what the conversation was about, a blank line, then the summary.`,
     "3. Call bot_finish_done with the same summary.",
     "Then reply with one short line. Studio archives the conversation and posts the summary to Main.",
   ].join("\n");
@@ -410,7 +410,7 @@ export function registerBotFinish(bb: Bb, deps: Omit<FinishDeps, "sdk">) {
 
   bb.agents.registerTool({
     name: "bot_finish_done",
-    description: "Archive this conversation with its summary (after memory_add) and post the summary to Main. Not in Main or a worker.",
+    description: "Archive this conversation with its summary (after memory (op: add)) and post the summary to Main. Not in Main or a worker.",
     parameters: z.object({ summary: z.string().trim().min(1).max(6000).describe("Short markdown: **Decisions**, **Left open**, **Made**") }),
     execute: async ({ summary }, ctx) => {
       if (!ctx.threadId) return "This isn't a conversation.";

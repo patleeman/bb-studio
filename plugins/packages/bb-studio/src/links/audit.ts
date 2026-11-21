@@ -55,7 +55,7 @@ export const LINK_AUDIT_SOURCES: readonly LinkAuditSource[] = [
   { id: "mini", name: "Mini app bb.open", path: "src/minis/ui/mini-frame.tsx openTarget", test: "src/ui/studio-open.wiring.test.tsx (mini apps' bb.open)" },
   { id: "palette", name: "Cmd+K", path: "src/launcher/ui/CommandPalette.tsx run", test: "src/launcher/ui/CommandPalette.test.tsx" },
   { id: "launcher", name: "Launcher", path: "src/launcher/ui/Launcher.tsx run", test: "src/launcher/ui/Launcher.test.tsx" },
-  { id: "agent", name: "workbench_open", path: "src/workbench-agent/server.ts linkedInput", test: "src/workbench-agent/workbench-agent.test.ts" },
+  { id: "agent", name: "workbench (op: open)", path: "src/workbench-agent/server.ts linkedInput", test: "src/workbench-agent/workbench-agent.test.ts" },
   { id: "window", name: "Popped-out window", path: "src/links/open.ts inMainWindow, LinksBridge in each window", test: "src/links/open.test.ts; src/links/router.test.ts (relay)" },
   { id: "botPage", name: "Bot page row", path: "src/ui/bot-page/open-row.ts useRowOpen (Automations, Todos, Library, Memory, Conversations)", test: "src/ui/bot-page/open-row.test.tsx; each page's test" },
 ];
@@ -70,7 +70,7 @@ const NO_PALETTE_ROW = "Cmd+K lists no such rows; a typed bb:// link, app route 
 const NO_DIFF_LINK = "Replies don't link a diff; bb's change cards open it.";
 const NO_PAGE_ROW = "No Bot page lists one.";
 const BOT_PAGE_ROWS: readonly TabKindId[] = ["conversation", "worker", "page", "whiteboard", "design", "app", "artifact", "automation", "todo", "record"];
-const NO_AGENT_TERMINAL = 'A terminal opens by starting one; workbench_tab action "focus" selects an open one.';
+const NO_AGENT_TERMINAL = 'A terminal opens by starting one; workbench (op: tab) action "focus" selects an open one.';
 
 function cell(kind: TabKindId, source: LinkSource): LinkAuditCell {
   if (source === "design") return { na: DESIGN_FRAMES };

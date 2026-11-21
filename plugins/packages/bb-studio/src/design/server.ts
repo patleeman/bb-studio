@@ -83,7 +83,7 @@ export function commentMessage(design: Pick<DesignRow, "id" | "name">, comment: 
     comment.element_html,
     "```",
     "",
-    "Change only what the comment asks, with design_edit_screen. Then resolve it with design_resolve_comments.",
+    "Change only what the comment asks, with design_screen (op: edit). Then resolve it with design_review (op: resolve).",
   ].join("\n");
 }
 
@@ -139,7 +139,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
   const pausedNote = [
     `That's ${MAX_REVIEWS_IN_A_ROW} reviews in a row that found problems, so automatic review is paused for this design.`,
     "Fix what you can, then tell the user plainly: review paused after " + MAX_REVIEWS_IN_A_ROW + " rounds, and what still needs work.",
-    "Don't call design_ready again until the user edits or comments on the design, or asks for another review (then pass userAsked).",
+    "Don't call design_review (op: ready) again until the user edits or comments on the design, or asks for another review (then pass userAsked).",
   ].join(" ");
   const reviews = new ReviewQueue({
     revision: (designId, screenIds) => JSON.stringify(screenIds.map((id) => store.screen(designId, id)?.updated_at ?? null)),
@@ -153,7 +153,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
       const round = screenIds.length ? Number(screenIds[0]!.slice(0, -1)) : null;
       await bb.sdk.threads.send({
         threadId: row.thread_id ?? requesterThreadId,
-        input: [{ type: "text", mentions: [], text: [markStudioLine(`The reviewer checked ${round ? `round ${round}` : "the screens"} of "${displayName(row)}" and found problems:`), "", findings, "", paused ? pausedNote : "Fix them, then call design_ready again."].join("\n") }],
+        input: [{ type: "text", mentions: [], text: [markStudioLine(`The reviewer checked ${round ? `round ${round}` : "the screens"} of "${displayName(row)}" and found problems:`), "", findings, "", paused ? pausedNote : "Fix them, then call design_review (op: ready) again."].join("\n") }],
         mode: "queue-if-active",
       });
     },
@@ -400,14 +400,14 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
         updatedAt = store.setRound(designId, Number(screenId.slice(0, -1)), { title: roundTitle, intro: roundIntro }, "agent");
       changed(designId, updatedAt, "agent");
       const steps = parseSteps(html);
-      const unnamed = !row.name.trim() ? `\nThis design has no name yet: give it a short, specific one with design_rename.` : "";
+      const unnamed = !row.name.trim() ? `\nThis design has no name yet: give it a short, specific one with design_screen (op: rename).` : "";
       return `${existed ? "Replaced" : "Added"} screen ${screenId} in "${displayName(row)}" (${screenText(html).length} characters of text${steps.length ? `, ${steps.length} steps: ${steps.map((step) => `#${step.id}`).join(", ")}` : ""}). The user's open canvas shows it now.${unnamed}\n${card(designId)}`;
     },
   });
 
   bb.agents.registerTool({
     name: "design_edit_screen",
-    description: "Make a targeted change to one screen: replace an exact snippet of its HTML. The snippet must appear exactly once; include enough surrounding markup to make it unique. Prefer this over design_write_screen for small requests, so nothing else changes.",
+    description: "Make a targeted change to one screen: replace an exact snippet of its HTML. The snippet must appear exactly once; include enough surrounding markup to make it unique. Prefer this over design_screen (op: write) for small requests, so nothing else changes.",
     presentation: { label: { pending: "Editing a screen", completed: "Edited a screen" } },
     parameters: z.object({
       designId: z.string().min(1),
@@ -485,8 +485,8 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
       if (skipReview) return `Marked ready without a review.\n${card(designId)}`;
       if (!ctx.threadId) return fail("A review needs a thread to report back to.");
       const outcome = reviews.request(designId, { screenIds: ids, requesterThreadId: ctx.threadId }, { userAsked });
-      if (outcome === "paused") return `Automatic review is paused for this design: the last ${MAX_REVIEWS_IN_A_ROW} reviews in a row found problems. Tell the user plainly what still needs work. Call design_ready again only after the user edits or comments on the design, or asks for another review (then pass userAsked).`;
-      if (outcome === "disposed") return fail("Studio Design is reloading; call design_ready again in a moment.");
+      if (outcome === "paused") return `Automatic review is paused for this design: the last ${MAX_REVIEWS_IN_A_ROW} reviews in a row found problems. Tell the user plainly what still needs work. Call design_review (op: ready) again only after the user edits or comments on the design, or asks for another review (then pass userAsked).`;
+      if (outcome === "disposed") return fail("Studio Design is reloading; call design_review (op: ready) again in a moment.");
       if (outcome === "queued") return `A review of this design is already running. Once it ends, ${ids.join(", ")} are reviewed again as they are then; findings come back only if something needs fixing.\n${card(designId)}`;
       return `Sent ${ids.join(", ")} for review. The reviewer reports back only if something needs fixing, in the design's own thread (the one that made it, which may not be this one); until then, say the work is out for review, not done. Keep your summary short.\n${card(designId)}`;
     },
@@ -535,7 +535,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
       if (designId && !store.get(designId)) return notFound(designId);
       const existed = store.styles().some((style) => style.name.toLowerCase() === name.toLowerCase());
       const style = store.saveStyle({ name, notes, css, designId, screenId });
-      return `${existed ? "Updated" : "Saved"} the style "${style.name}" (id ${style.id}). Later designs can start from it with design_styles.`;
+      return `${existed ? "Updated" : "Saved"} the style "${style.name}" (id ${style.id}). Later designs can start from it with design_style (op: list).`;
     },
   });
 
@@ -555,7 +555,7 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
         return [`Style "${style.name}" (id ${style.id})${style.source_design_id ? `, from design ${style.source_design_id}${style.source_screen_id ? ` option ${style.source_screen_id}` : ""}` : ""}.`, "", style.notes, "", "```css", style.css, "```"].join("\n");
       }
       const styles = store.styles();
-      if (!styles.length) return "No saved styles yet. Save one with design_save_style after the user picks a direction.";
+      if (!styles.length) return "No saved styles yet. Save one with design_style (op: save) after the user picks a direction.";
       return `Saved styles:\n${styles.map((style) => `- ${style.name} (id ${style.id}): ${style.notes.split("\n")[0]!.slice(0, 160)}`).join("\n")}\n\nRead one in full with styleId before using it.`;
     },
   });

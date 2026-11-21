@@ -348,7 +348,7 @@ describe("two workbench panes", () => {
   });
 });
 
-describe("workbench_open's types come from the tab kinds registry", () => {
+describe("workbench (op: open)'s types come from the tab kinds registry", () => {
   it("takes every kind the agent may open, and nothing else", () => {
     const { tools } = harness({});
     const open = tools.find((tool) => tool.name === "workbench_open")!;
@@ -442,7 +442,7 @@ function windowWorkbench(answer = true) {
 }
 
 describe("a tab in a window of its own", () => {
-  it("workbench_open with pane \"window\" opens it, then pops it out, and the record doesn't count it as closed by the user", async () => {
+  it("workbench (op: open) with pane \"window\" opens it, then pops it out, and the record doesn't count it as closed by the user", async () => {
     const { wb, state, popped } = windowWorkbench();
     const { call } = harness({ thr_1: wb });
     expect(await call("workbench_open", { type: "page", id: "pg_plan", pane: "window" })).toBe('Opened "Plan" in a window of its own. Its Return to workbench button puts it back.');
@@ -468,7 +468,7 @@ describe("a tab in a window of its own", () => {
     );
     for (const key of ["term", "info", "new", "fixed", "web"]) expect(await call("workbench_tab", { action: "pop_out", key })).toMatch(/can't open in a window of its own\. Pages, whiteboards/);
     expect(popped).toEqual([]);
-    expect(await call("workbench_tab", { action: "pop_out", key: "gone" })).toBe('No tab has key "gone". Call workbench_list for the current keys.');
+    expect(await call("workbench_tab", { action: "pop_out", key: "gone" })).toBe('No tab has key "gone". Call workbench (op: list) for the current keys.');
     expect(await call("workbench_tab", { action: "pop_out", key: "board" })).toBe('Opened "Election night" in a window of its own. Its Return to workbench button puts it back.');
     expect(popped).toEqual(["board"]);
   });

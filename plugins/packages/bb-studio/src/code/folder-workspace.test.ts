@@ -249,7 +249,7 @@ describe("asking BB from the editor", () => {
 });
 
 describe("one way to show a file in VS Code", () => {
-  it("sends a link's reveal and the agent's code_show as the same command", async () => {
+  it("sends a link's reveal and the agent's code (op: show) as the same command", async () => {
     const x = await setup();
     const { id } = (await x.rpc("code.forThread", { threadId: "thr_a" })).workspace;
     const { writeFile } = await import("node:fs/promises");

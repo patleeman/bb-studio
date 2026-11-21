@@ -56,7 +56,7 @@ it("sends the finishing turn into the conversation as agent-only steps, with no 
   expect(input.input).toHaveLength(1);
   expect(input.input.every((part) => part.visibility === "agent-only")).toBe(true);
   expect(input.input[0]).toMatchObject({ visibility: "agent-only", text: finishInstruction({ threadId: "prep", title: "Launch prep" }) });
-  expect(input.input[0]!.text).toContain('memory_add: topic "Conversations", source {"kind":"conversation","id":"prep","title":"Launch prep"}, and as text one plain line (no markdown) naming what the conversation was about');
+  expect(input.input[0]!.text).toContain('memory (op: add): topic "Conversations", source {"kind":"conversation","id":"prep","title":"Launch prep"}, and as text one plain line (no markdown) naming what the conversation was about');
   expect(input.input[0]!.text).toContain("bot_finish_done");
   // Pressing it again while it finishes sends nothing more.
   expect(await x.finish.rpc.bot_finish({ threadId: "prep" })).toEqual({ state: "finishing" });
@@ -159,7 +159,7 @@ it("archiving a conversation in BB starts the same summary step; Main, a worker 
   const input = x.send.mock.calls[0]![0] as { threadId: string; input: { text: string; visibility?: string }[] };
   expect(input.threadId).toBe("prep");
   expect(input.input).toEqual([expect.objectContaining({ visibility: "agent-only" })]);
-  expect(input.input[0]!.text).toContain("memory_add");
+  expect(input.input[0]!.text).toContain("memory (op: add)");
   await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("prep") as never });
   await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("thr_main") as never });
   await x.harness.emitThreadEvent("thread.archived", { thread: x.threads.get("review") as never });

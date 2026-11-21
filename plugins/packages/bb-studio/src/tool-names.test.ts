@@ -11,6 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import plugin from "../server";
 import { rpcContract } from "./public-contract";
 import { VOICE_TOOLS } from "./voice/live/shared";
+import { ALIASED_NAMES, MERGES } from "./merged-tools";
 
 /**
  * Agent tools Studio no longer registers. Their handlers may live on inside
@@ -86,6 +87,11 @@ function literals(path: string): { text: string; line: number }[] {
 }
 
 const retired = new Set<string>(RETIRED);
+/** Old names a merged tool replaces (src/merged-tools.ts): callable for one release, named nowhere an agent reads. */
+const aliased = ALIASED_NAMES;
+/** Files that define the merges and the old-name scope sets. */
+const ALIAS_DEFINITIONS = new Set(["src/merged-tools.ts", "src/tool-scope.ts", "src/tool-labels.ts", "src/skill-learning.ts", "src/memory/service.ts"]);
+const SQL = /\b(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|FROM|JOIN|TRIGGER|INDEX|TABLE)\b/;
 const mentions = (text: string) => [...text.matchAll(SNAKE)].map((match) => match[0]);
 
 describe("tool names agents read", () => {
@@ -136,4 +142,26 @@ describe("tool names agents read", () => {
       .map((name) => `${relative(root, path)}:${index + 1} ${name}`)));
     expect(bad).toEqual([]);
   });
+
+  it("names no replaced tool (an alias of a merged one) where an agent reads it", () => {
+    const voice = new Set<string>([...VOICE_TOOLS]);
+    const merged = new Set(MERGES.map((merge) => merge.name));
+    const rpcs = new Set(Object.keys(rpcContract));
+    // Offered tools' descriptions; a merged tool's own "Replaces …" note names its old tools on purpose.
+    const inTools = tools.filter((tool) => !aliased.has(tool.name)).flatMap((tool) => mentions(`${merged.has(tool.name) || ["pages_read", "code_comments"].includes(tool.name) ? tool.description.replace(/Replaces [^.]*\./, "") : tool.description}\n${tool.instructions ?? ""}`)
+      .filter((name) => aliased.has(name)).map((name) => `${tool.name}: ${name}`));
+    const skills = files(join(root, "skills"), (path) => path.endsWith(".md")).flatMap((path) => readFileSync(path, "utf8").split("\n").flatMap((text, index) => mentions(text)
+      .filter((name) => aliased.has(name)).map((name) => `${relative(root, path)}:${index + 1} ${name}`)));
+    const docs = [join(root, "README.md"), ...files(join(root, "docs"), (path) => path.endsWith(".md"))].flatMap((path) => readFileSync(path, "utf8").split("\n").flatMap((text, index) => mentions(text)
+      .filter((name) => aliased.has(name) && !rpcs.has(name) && !/Replaces|replaced|was /.test(text)).map((name) => `${relative(root, path)}:${index + 1} ${name}`)));
+    const sources = [join(root, "server.ts"), ...files(join(root, "src"), (path) => /\.tsx?$/.test(path) && !/\.test\.tsx?$/.test(path) && !/\/(test|fixtures)\//.test(path))]
+      .filter((path) => !ALIAS_DEFINITIONS.has(relative(root, path)));
+    const code = sources.flatMap((path) => {
+      const inVoice = relative(root, path).startsWith("src/voice/");
+      return literals(path)
+        .filter(({ text }) => !aliased.has(text.trim()) && !SQL.test(text))
+        .flatMap(({ text, line }) => mentions(text).filter((name) => aliased.has(name) && !(inVoice && voice.has(name))).map((name) => `${relative(root, path)}:${line} ${name}`));
+    });
+    expect([...inTools, ...skills, ...docs, ...code]).toEqual([]);
+  }, 30_000);
 });

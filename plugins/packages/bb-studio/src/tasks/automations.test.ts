@@ -548,7 +548,7 @@ it("P3: the Bot's own check-in matches its scheduled item; tools refuse to chang
   const { store, tasks, tool, exec } = setup();
   tasks.sync();
   expect(store.get("task_auto-heartbeat-bot-main").schedule!.automationId).toBe("heartbeat");
-  expect(await exec("task_update", { id: "task_auto-aut-daily", state: "done" }, "thr_main")).toMatch(/automation's schedule; change it with automation_update/);
+  expect(await exec("task_update", { id: "task_auto-aut-daily", state: "done" }, "thr_main")).toMatch(/automation's schedule; change it with schedule \(op: update\)/);
   expect(await exec("task_handoff", { id: "task_auto-aut-daily", to: "user" }, "thr_main")).toMatch(/automation's schedule/);
   tasks.started({ owner: "automation", ownerId: "aut_daily" }, "thr_main");
   at(NOW + 1000);

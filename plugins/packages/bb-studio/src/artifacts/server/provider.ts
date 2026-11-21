@@ -23,7 +23,7 @@ export const ARTIFACT_KIND: StudioKind = {
   mentionProviderId: "artifact",
 
   blurb: "Files.",
-  agentHint: "Read it with apps_read.",
+  agentHint: "Read it with apps (op: read).",
 };
 
 const PREVIEW_CHARS = 140;

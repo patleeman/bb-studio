@@ -33,11 +33,11 @@ chat. `pages_create` and `pages_edit` print the line for you.
 
 | Tool | Use it to |
 | --- | --- |
-| `pages_list` | List this project's pages and global pages as a tree. Pass `query` to search titles and content. Pass `type: "design"` or `"whiteboard"` to list those page types. |
+| `pages_read (no page)` | List this project's pages and global pages as a tree. Pass `query` to search titles and content. Pass `type: "design"` or `"whiteboard"` to list those page types. |
 | `pages_read` | Read a page as Markdown. Each block is preceded by a `<!-- ^id -->` marker naming it; use those ids in edits. Given a design's id (`dsn_…`) or a whiteboard's (`drw_…`), it reads that. |
 | `pages_create` | Create a page from Markdown. Set `global` for a global page, `parent` to nest it. Pass `type: "design"` or `"whiteboard"` to make one of those, named by `title`. |
 | `pages_edit` | Apply small edit operations to a page (see below). |
-| `pages_comments` | Manage comment threads (`op`: `list`, `create`, `reply`, `resolve`). |
+| `pages_read (comments)` | Manage comment threads (`op`: `list`, `create`, `reply`, `resolve`). |
 
 Pages can be referenced by id (`pg_…`) or exact title.
 
@@ -109,7 +109,7 @@ new agent work; bot profiles and their mention/refresh workers are retired.
 Tables, checklists (`- [ ]`), headings, quotes, and images work as in GFM.
 
 Images: prefer an artifact embed. Save the image as an artifact
-(`apps_create` with type `"artifact"`), then embed it with
+(`apps (op: create)` with type `"artifact"`), then embed it with
 ` ```embed {"kind":"artifact","target":"art_…"} `. A Markdown image with a
 local path (`![Chart](/…/chart.png)`) is imported into the page when Studio
 supports it: a PNG, JPEG, GIF or WebP of up to 10 MB inside your thread's

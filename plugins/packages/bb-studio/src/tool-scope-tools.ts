@@ -6,6 +6,7 @@
 // matches (ids tg_…), and describe and call pass those ids to it.
 // A call runs the tool's own handler with its own zod check, as BB would.
 import { z } from "zod";
+import { ALIASES, presentScope } from "./merged-tools";
 import { searchScoped, type Scope } from "./tool-scope";
 
 interface BookTool { name: string; description: string; parameters: { toJSONSchema?: () => unknown } }
@@ -46,14 +47,21 @@ const parse = (value: unknown): Record<string, unknown> | null => {
 export function registerScopedTools(bb: Registrar, deps: {
   book: Book;
   scopes: ScopeMemory;
-  /** The input schema the agent reads: the slimmed one when smaller. */
-  schemaFor(name: string): unknown;
+  /** The input schema the agent reads: the slimmed one when smaller; a merged tool's, for the ops this thread may run. */
+  schemaFor(name: string, ops: ReadonlyMap<string, string[]>): unknown;
   /** Works a thread's scope out again (after Studio reloaded mid-session). */
   recompute(threadId: string, projectId: string | undefined): Promise<Scope | null>;
 }): void {
   const scopeOf = async (ctx: ToolCtx): Promise<Scope | null> => (ctx.threadId ? deps.scopes.get(ctx.threadId) ?? await deps.recompute(ctx.threadId, ctx.projectId) : null);
   // The trio reaches the on-demand tools and, for an agent that searches anyway, the loaded ones.
-  const reachable = (scope: Scope | null): string[] => (scope ? [...scope.onDemand, ...scope.loaded].filter((name) => !name.startsWith("studio_tool_") && !name.startsWith("tool_gateway_") && deps.book.get(name)) : []);
+  const own = (name: string) => !name.startsWith("studio_tool_") && !name.startsWith("tool_gateway_");
+  /** Old names in the thread's scope: still callable by name for one release (src/merged-tools.ts ALIASES). */
+  const reachable = (scope: Scope | null): string[] => (scope ? [...scope.onDemand, ...scope.loaded].filter((name) => own(name) && deps.book.get(name)) : []);
+  /** What the thread sees: merged names, on demand first, then loaded. */
+  const presented = (scope: Scope | null) => {
+    const view = presentScope(scope ?? { loaded: [], onDemand: [] });
+    return { names: [...view.onDemand, ...view.loaded].filter((name) => own(name) && deps.book.get(name)), loaded: new Set(view.loaded), ops: view.ops };
+  };
   const error = (message: string) => JSON.stringify({ error: message });
 
   bb.agents.registerTool({
@@ -63,8 +71,9 @@ export function registerScopedTools(bb: Registrar, deps: {
     presentation: { label: { pending: "Finding tools", completed: "Found tools" } },
     execute: async (input: { query?: string }, ctx: ToolCtx) => {
       const scope = await scopeOf(ctx);
-      const names = reachable(scope);
-      const loaded = new Set(scope?.loaded ?? []);
+      const view = presented(scope);
+      const names = view.names;
+      const loaded = view.loaded;
       const tools: unknown[] = searchScoped(names.map((name) => deps.book.get(name)!).map((tool) => ({ name: tool.name, description: tool.description })), input.query)
         .map((hit) => (loaded.has(hit.id) ? { ...hit, loaded: true } : hit));
       let total = names.length;
@@ -85,10 +94,14 @@ export function registerScopedTools(bb: Registrar, deps: {
     presentation: { label: { pending: "Reading tool schemas", completed: "Read tool schemas" } },
     execute: async (input: { ids: string[] }, ctx: ToolCtx) => {
       const scope = await scopeOf(ctx);
-      const allowed = new Set(reachable(scope));
+      const view = presented(scope);
+      const names = new Set(view.names);
+      const aliases = new Set(reachable(scope).filter((name) => !names.has(name)));
+      const allowed = new Set([...names, ...aliases]);
       const tools: unknown[] = input.ids.filter((id) => allowed.has(id)).map((id) => {
         const tool = deps.book.get(id)!;
-        return { id, name: id, description: tool.description, inputSchema: deps.schemaFor(id) };
+        const alias = aliases.has(id) ? ALIASES.get(id) : undefined;
+        return { id, name: id, description: tool.description, inputSchema: deps.schemaFor(id, view.ops), ...(alias ? { replacedBy: `${alias.merged} { op: "${alias.op}" }` } : {}) };
       });
       const notFound = input.ids.filter((id) => !allowed.has(id) && !(scope?.gateway && GATEWAY_ID.test(id)));
       const gatewayIds = scope?.gateway ? input.ids.filter((id) => GATEWAY_ID.test(id)) : [];
@@ -109,7 +122,7 @@ export function registerScopedTools(bb: Registrar, deps: {
     execute: async (input: { id: string; args?: Record<string, unknown> }, ctx: ToolCtx) => {
       const scope = await scopeOf(ctx);
       if (scope?.gateway && GATEWAY_ID.test(input.id)) return await deps.book.run("tool_gateway_call", { id: input.id, args: input.args ?? {} }, ctx);
-      if (!reachable(scope).includes(input.id)) return error(`${input.id} isn't available in this thread. Search with studio_tool_search.`);
+      if (!presented(scope).names.includes(input.id) && !reachable(scope).includes(input.id)) return error(`${input.id} isn't available in this thread. Search with studio_tool_search.`);
       return await deps.book.run(input.id, input.args ?? {}, ctx, input.id);
     },
   } as never);

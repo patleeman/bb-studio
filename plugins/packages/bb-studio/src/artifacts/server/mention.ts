@@ -44,7 +44,7 @@ export function mentionContext(artifact: MentionArtifact): string {
     );
   }
   lines.push(
-    `To save a new version after changing it, write the file and call apps_create (type \"artifact\") with the same path from this thread, ` +
+    `To save a new version after changing it, write the file and call apps (op: create) (type \"artifact\") with the same path from this thread, ` +
       `or pass artifactId "${artifact.id}".`,
   );
   return lines.join("\n\n");

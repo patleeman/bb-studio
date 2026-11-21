@@ -132,9 +132,9 @@ export function scopeEntries(scope: Scope, shown: { slim(name: string): Record<s
 }
 
 const GROUP_LABELS: [RegExp, string][] = [
-  [/^design_/, "designs"], [/^(apps|minis)_/, "apps"], [/^talk_/, "recordings"], [/^whiteboard_/, "whiteboards"],
-  [/^code_/, "VS Code"], [/^workbench_/, "the workbench"], [/^automation_|^runner_migrate$/, "schedules"], [/^bot_skill_|^bot_history/, "skills and history"],
-  [/^area_/, "areas"], [/^(theme|presence)$/, "themes"], [/^bot_/, "the Bot"], [/^pages_/, "pages"], [/^memory_/, "memory"], [/^studio_tag/, "tags"],
+  [/^design(_|$)/, "designs"], [/^(apps|minis)(_|$)/, "apps"], [/^talk(_|$)/, "recordings"], [/^whiteboard(_|$)/, "whiteboards"],
+  [/^code(_|$)/, "VS Code"], [/^workbench(_|$)/, "the workbench"], [/^(schedule|automation_|runner_migrate)/, "schedules"], [/^(bot_skill|bot_history)/, "skills and history"],
+  [/^area(_|$)/, "areas"], [/^(theme|presence)$/, "themes"], [/^bot_/, "the Bot"], [/^pages_/, "pages"], [/^memory(_|$)/, "memory"], [/^studio_tag/, "tags"],
 ];
 
 /** One line telling the agent what it can reach through the trio. */
@@ -150,7 +150,9 @@ export function searchScoped(tools: readonly { name: string; description: string
   const scored = tools.map((tool) => {
     const name = tool.name.toLowerCase();
     const text = tool.description.toLowerCase();
-    const score = words.length === 0 ? 1 : words.reduce((sum, word) => sum + (name.includes(word) ? 3 : 0) + (text.includes(word) ? 1 : 0), 0);
+    // A query that is a whole tool name (an old one a merged tool replaces, too) ranks that tool first.
+    const exact = query && /^[a-z0-9_]+$/i.test(query.trim()) && (name === query.trim().toLowerCase() || new RegExp(`\\b${query.trim().toLowerCase()}\\b`).test(text)) ? 10 : 0;
+    const score = words.length === 0 ? 1 : exact + words.reduce((sum, word) => sum + (name.includes(word) ? 3 : 0) + (text.includes(word) ? 1 : 0), 0);
     return { tool, score };
   }).filter((each) => each.score > 0);
   scored.sort((a, b) => b.score - a.score || a.tool.name.localeCompare(b.tool.name));

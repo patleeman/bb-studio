@@ -94,7 +94,7 @@ describe("every kind reaches every surface it claims", () => {
     }
   });
 
-  it("workbench_open: a type, and for Studio's kinds the tab that shows it", () => {
+  it("workbench (op: open): a type, and for Studio's kinds the tab that shows it", () => {
     for (const entry of TAB_KIND_REGISTRY.filter((each) => reaches(each.surfaces.workbenchOpen))) {
       expect(AGENT_TYPES, entry.id).toContain(entry.agentType);
       if (entry.owner !== "bb" || entry.open.via === "plugin") expect(tabOpenFor(SAMPLE[entry.id]), entry.id).not.toBeNull();

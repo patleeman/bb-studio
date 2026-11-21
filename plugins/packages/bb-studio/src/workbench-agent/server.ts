@@ -94,7 +94,7 @@ export class WorkbenchRecords {
 }
 
 export const OFF_SCREEN = "This conversation isn't on screen in BB, so its workbench can't be reached. Nothing changed.";
-export const NO_ANSWER = "BB's window didn't answer in time. Call workbench_list to see what changed.";
+export const NO_ANSWER = "BB's window didn't answer in time. Call workbench (op: list) to see what changed.";
 export const STACKED = `Stacked isn't available. ${PANE_LIMITS} Nothing changed.`;
 
 type FileTarget = Extract<OpenSpec, { kind: "file" }>["target"];
@@ -117,7 +117,7 @@ export interface WorkbenchToolDeps {
 }
 
 const force = z.boolean().optional().describe("Override user choice when explicitly asked");
-const tabKey = z.string().trim().min(1).max(500).describe("Tab key from workbench_list");
+const tabKey = z.string().trim().min(1).max(500).describe("Tab key from workbench (op: list)");
 
 const studioKinds = TAB_KIND_REGISTRY.filter((entry) => entry.agentType && entry.owner !== "bb");
 const typesBy = (ref: TabKindEntry["ref"]) => studioKinds.filter((entry) => entry.ref === ref).map((entry) => entry.agentType).join(", ");
@@ -264,7 +264,7 @@ export function workbenchTools(deps: WorkbenchToolDeps) {
     },
     {
       name: "workbench_tab",
-      description: 'Act on a workbench tab by key (from workbench_list): action "close", "focus", or "pop_out" (into its own window). focus and pop_out are refused while the user types in the panel.',
+      description: 'Act on a workbench tab by key (from workbench (op: list)): action "close", "focus", or "pop_out" (into its own window). focus and pop_out are refused while the user types in the panel.',
       parameters: z.object({ action: z.enum(["close", "focus", "pop_out"]), key: tabKey, force }),
       execute: async (input: { action: "close" | "focus" | "pop_out"; key: string; force?: boolean }, ctx: { threadId: string }) =>
         run(ctx.threadId, { type: input.action === "pop_out" ? "popOut" : input.action, key: input.key, force: input.force === true }),

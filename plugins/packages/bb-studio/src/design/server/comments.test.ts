@@ -44,7 +44,7 @@ describe("design comments", () => {
     expect(message).toContain(`screen 1b of the design "Onboarding" (id ${row.id}, comment ${comment.id})`);
     expect(message).toContain("> Say Continue\n> and make it green");
     expect(message).toContain('```html\n<button id="cta">Go</button>\n```');
-    expect(message).toContain("design_resolve_comments");
+    expect(message).toContain("design_review (op: resolve)");
   });
 });
 

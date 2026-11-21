@@ -14,8 +14,8 @@ through Codex by default). Every recording is saved, titled, and searchable.
 ## Reading recordings
 
 A mentioned recording arrives as context with its title, link, status, and
-transcript (up to 60,000 characters). Use `talk_list`, `talk_search`, and
-`talk_read` to find recordings and read summaries or bounded transcript
+transcript (up to 60,000 characters). Use `talk (op: list)`, `talk (op: search)`, and
+`talk (op: read)` to find recordings and read summaries or bounded transcript
 pages. The CLI is also available.
 
 ```sh
@@ -26,7 +26,7 @@ bb studio recordings notes <recording-id> [--json]      # make or update the rec
 ```
 
 To turn a finished recording into notes (summary, decisions, and action items
-as a Pages checklist), use `talk_make_notes` or `bb studio recordings notes`. Running it
+as a Pages checklist), use `talk (op: make_notes)` or `bb studio recordings notes`. Running it
 again updates the same page. It needs Studio Pages; without it, the error
 says to install Studio Pages.
 
@@ -73,8 +73,8 @@ or failed. Say so instead of guessing at the missing part.
   **Clean up transcript** saves a separate cleaned version, with **Original**
   and **Cleaned** views. The original text and audio stay intact. Copy and
   text downloads use the selected version. **Send to agent** opens a thread
-  attached to the recording. Mentions and `talk_read` prefer a complete saved
-  cleaned version; use `talk_read` with `version: "original"` for raw text.
+  attached to the recording. Mentions and `talk (op: read)` prefer a complete saved
+  cleaned version; use `talk (op: read)` with `version: "original"` for raw text.
   A **Summary** is optional: a concise paragraph of the recording's main ideas,
   without a meeting template or automatic task assignments. Generate it from
   the recording menu or enable **Automatically summarize recordings** (off by
