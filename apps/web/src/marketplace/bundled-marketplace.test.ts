@@ -164,12 +164,12 @@ describe("bundled plugin setup", () => {
   });
 
   it("uses the source name for install commands", () => {
-    const docs = bundledMarketplace().plugins.find(
-      (entry) => entry.id === "simple-notes",
+    const browser = bundledMarketplace().plugins.find(
+      (entry) => entry.id === "browser-automation",
     );
-    expect(docs && bundledPluginSetup(docs)).toEqual({
+    expect(browser && bundledPluginSetup(browser)).toEqual({
       kind: "install",
-      command: "bb plugin install docs",
+      command: "bb plugin install browser-automation",
     });
     const guide = bundledMarketplace().plugins.find(
       (entry) => entry.id === "bb-guide",
