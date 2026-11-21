@@ -17,15 +17,20 @@ export const KEEPALIVE_MARKER = "[studio:cache-keepalive]";
 /** Headers of text BB, Studio, an automation or another thread puts in a thread (bb-studio src/kit/relayed.ts). */
 const RELAYED_HEADER = /^\s*\[(?:bb system|bb studio|bb automation due:[^\]\n]*|bb message from thread:[^\]\n]*)\]/u;
 
+/** A message from another thread (a worker's report or a peer). */
+const THREAD_HEADER = /^\s*\[bb message from thread:[^\]\n]*\]/u;
+
 /**
- * What started a turn: the user, something relayed (another thread, BB,
- * Studio or an automation), Studio's cache keepalive, or no request at all
- * (the provider went on by itself, e.g. after a background task).
+ * What started a turn: the user, another thread (a message from it, or BB's
+ * notice that a child thread completed, failed or stopped), something else
+ * relayed (BB, Studio or an automation), Studio's cache keepalive, or no
+ * request at all (the provider went on by itself, e.g. after a background
+ * task).
  */
-export type TurnTrigger = "user" | "relayed" | "keepalive" | "continuation";
+export type TurnTrigger = "user" | "thread" | "relayed" | "keepalive" | "continuation";
 
 type RequestPart = { type?: string; text?: string; visibility?: string };
-type Request = { initiator?: string; senderThreadId?: string | null; input?: RequestPart[]; pluginSubmission?: { data?: { kind?: string } } };
+type Request = { initiator?: string; senderThreadId?: string | null; systemMessageKind?: string; input?: RequestPart[]; pluginSubmission?: { data?: { kind?: string } } };
 
 /** A turn's trigger, from its client/turn/requested data (null: the turn had no request). */
 export function triggerOf(request: unknown): TurnTrigger {
@@ -33,7 +38,9 @@ export function triggerOf(request: unknown): TurnTrigger {
   const data = request as Request;
   const parts = Array.isArray(data.input) ? data.input : [];
   if (data.pluginSubmission?.data?.kind === "cache-keepalive" || parts.some((part) => typeof part.text === "string" && part.text.trimStart().startsWith(KEEPALIVE_MARKER))) return "keepalive";
-  if (data.initiator !== "user" || data.senderThreadId) return "relayed";
+  const first = parts.find((part) => part.type === "text" && typeof part.text === "string")?.text ?? "";
+  if (data.senderThreadId || (typeof data.systemMessageKind === "string" && data.systemMessageKind.startsWith("child-")) || THREAD_HEADER.test(first)) return "thread";
+  if (data.initiator !== "user") return "relayed";
   const shown = parts.filter((part) => part.visibility !== "agent-only");
   if (shown.length === 0) return parts.length > 0 ? "relayed" : "user";
   const text = shown.find((part) => part.type === "text" && typeof part.text === "string")?.text ?? "";
@@ -47,11 +54,13 @@ export function isUserFacingReply(text: string | null | undefined): boolean {
 
 /**
  * Whether BB's push for a finished turn reaches the phone. A keepalive never
- * does, nor a quiet pass; a turn that ended with no reply (BB's "Finished and
- * waiting for you") only when the user started it.
+ * does, nor a quiet pass, nor a turn another thread started (a lead answering
+ * its worker's report: the worker's asks and errors push on their own); a
+ * turn that ended with no reply (BB's "Finished and waiting for you") only
+ * when the user started it.
  */
 export function turnPushAllowed(turn: { trigger: TurnTrigger; reply: string | null }): boolean {
-  if (turn.trigger === "keepalive") return false;
+  if (turn.trigger === "keepalive" || turn.trigger === "thread") return false;
   if (turn.reply === null) return turn.trigger === "user";
   return isUserFacingReply(turn.reply);
 }
