@@ -21,10 +21,13 @@
 //   name; on a BB without it nothing is registered). bb gives it to the
 //   agent with the turn's input, agent-only and not stored; it waits at most
 //   500 ms for all plugins, so the provider only reads Studio's database.
+//   bb attaches it only to a turn started in "start" mode: in practice the
+//   thread's first turn (later messages go in "auto" mode). Kept that way.
 // - `bot_activity_lookup { threadId }`: one thread's details for the Bot
 //   that owns it: state, latest reply, needs-you, owner or workers, a
 //   finished conversation's summary, and its last tool calls (read from BB's
 //   events, with a short timeout).
+import { sessionTitlePrefix } from "./decisions/server/classifier";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { z } from "zod";
@@ -186,7 +189,7 @@ const NOTHING = "Elsewhere: no other conversation was active in the last day, an
 const footer = (more: number) => `${more ? `…and ${more} more. ` : ""}Details: bot_activity_lookup { threadId }; the full list: bot_conversations.`;
 
 /**
- * The digest a conversation gets at each turn: other conversations, then
+ * The digest a conversation gets with its first turn: other conversations, then
  * workers, each newest first, within `cap` characters; what doesn't fit is
  * counted. Short when nothing else is going on.
  */
@@ -263,6 +266,8 @@ export function digestFor(db: Database.Database, threadId: string, now: number, 
       continue;
     }
     if (!each.a_state) continue;
+    // A Studio Decisions classifier thread is Studio's own, not the Bot's work.
+    if ([each.title, each.a_title].some((title) => title?.startsWith(sessionTitlePrefix))) continue;
     const status = workerStatusOf(each.a_state);
     const at = status === "running" || status === "needs-you" ? Math.max(each.a_started ?? 0, each.a_updated ?? 0) : Math.max(each.a_ended ?? 0, each.activity_at ?? 0) || each.a_updated || 0;
     if ((status === "failed" || status === "done") && now - at > DIGEST_WORKERS_MS) continue;

@@ -22,6 +22,7 @@ import { Card, Disclosure, Row, SectionState, Segmented, SettingControl, Setting
 import { ApiKeysSection } from "./ApiKeysSection";
 import { BringOverSection } from "../../bring-over/ui/BringOverSection";
 import { ToolGatewaySection } from "../../tool-gateway/ui/ToolGatewaySection";
+import { AgentContextSection } from "./AgentContextSection";
 import { DeskPresenceOverlay } from "./DeskPresenceOverlay";
 import { PushSection } from "./PushSection";
 import { SkillsRegistrySection } from "./SkillsRegistrySection";
@@ -234,5 +235,6 @@ export function registerSettingsApp(app: PluginAppBuilder, windows: boolean = ha
   app.slots.experimental_appOverlay?.({ id: "desk-presence", component: DeskPresenceOverlay });
   app.slots.settingsSection({ id: "api-keys", title: "API keys", component: ApiKeysSection });
   app.slots.settingsSection({ id: "tool-gateway", title: "Tool Gateway", component: ToolGatewaySection });
+  app.slots.settingsSection({ id: "agent-context", title: "Agent context", component: AgentContextSection });
   app.slots.settingsSection({ id: "bring-over", title: "Bring things over from bb", component: BringOverSection });
 }

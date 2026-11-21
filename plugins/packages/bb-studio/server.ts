@@ -36,6 +36,12 @@ import { fromAnotherThread, MainPushes } from "./src/main-push";
 import { STRAND_PUSH_ACTIVE_MS, STRAND_PUSH_EVERY_MS, STRAND_PUSH_KEY, StrandPushes } from "./src/strands/push";
 import { registerDecisions } from "./src/decisions/server";
 import { registerToolGateway, type ToolGateway } from "./src/tool-gateway/server/register";
+import { sessionTitlePrefix } from "./src/decisions/server/classifier";
+import { ON_DEMAND_EXTRAS, scopeEntries, scopeTools, trioInstructions, type ScopeKind } from "./src/tool-scope";
+import { registerScopedTools, ScopeMemory } from "./src/tool-scope-tools";
+import { slimmedIfSmaller } from "./src/slim-schema";
+import { LeanStore, leanFor } from "./src/context-lean";
+import { contextLeanContract } from "./src/context-lean-contract";
 import { registerRouter } from "./src/router/register";
 import { BotMaintenance } from "./src/bot-maintenance";
 import { registerChat } from "./src/chat/server";
@@ -102,7 +108,7 @@ import { familyAndType, ITEM_FAMILIES, ITEM_TYPES, itemType, kindsNamed, typeOfI
 import { APP_TOOLS, appTools, familyTool, ToolBook, type AgentTool } from "./src/family-tools";
 import { registerBotProfileTools } from "./src/bot-profile-tools";
 import { MemoryStore } from "./src/memory/store";
-import { MemoryService, setBotMemoryPage, withMemory } from "./src/memory/service";
+import { MEMORY_TOOLS, MemoryService, setBotMemoryPage, withMemory } from "./src/memory/service";
 import { registerMemory } from "./src/memory/register";
 import { recordLine } from "./src/memory/shared";
 import { BotPageState, registerGroupTool } from "./src/bot-page-state";
@@ -453,10 +459,35 @@ export default async function plugin(bb: BbPluginApi) {
   let toolGateway: ToolGateway | null = null;
   // Set once strands' push is up: a Tool Gateway request makes a strand need the user.
   let toolGatewayRequested = () => {};
-  bb.agents.configure(withMemory(() => memoryService, (context) => isCanvasThreadOrigin(context.origin) || !!learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string", (context) => {
+  // Tool scope (src/tool-scope.ts): each thread kind loads its own tools; the
+  // rest come on demand, natively deferred (Claude Code; Codex when BB has the
+  // `defer` flag) or through studio_tool_* (other providers, and lean mode), which
+  // then also reach Tool Gateway's MCP tools.
+  const leanModes = new LeanStore(bb.storage.kv as never);
+  await leanModes.load().catch((error) => bb.log.warn(`Lean context settings unreadable; using Auto: ${errorText(error)}`));
+  const scopes = new ScopeMemory();
+  const deferSupported = (bb as { experimental_hooks?: { experimental_features?: { deferredAgentTools?: unknown } } }).experimental_hooks?.experimental_features?.deferredAgentTools === true;
+  const slimCache = new Map<string, Record<string, unknown> | null>();
+  const slimFor = (name: string): Record<string, unknown> | null => {
+    if (!slimCache.has(name)) {
+      let slimmed: Record<string, unknown> | null = null;
+      try { slimmed = slimmedIfSmaller(toolBook.get(name)?.parameters.toJSONSchema?.()); } catch { /* Shown as registered. */ }
+      slimCache.set(name, slimmed);
+    }
+    return slimCache.get(name)!;
+  };
+  const fullSchema = (name: string): Record<string, unknown> | null => {
+    try { const schema = toolBook.get(name)?.parameters.toJSONSchema?.(); return schema && typeof schema === "object" ? schema as Record<string, unknown> : null; } catch { return null; }
+  };
+  const shownSchemas = { slim: slimFor, schema: (name: string) => slimFor(name) ?? fullSchema(name) };
+  /** A Studio Decisions classifier thread (src/decisions/server/classifier.ts): a one-shot JSON answer, no tools. */
+  const isClassifier = (title: string | null | undefined) => typeof title === "string" && title.startsWith(sessionTitlePrefix);
+  const isLead = (threadId: string) => { try { return projectLeads.list().some((lead) => lead.leadThreadId === threadId); } catch { return false; } };
+  const configureStudio = (context: Parameters<Parameters<typeof bb.agents.configure>[0]>[0]) => {
     if (Date.now() - routesCheckedAt > 30_000) void refreshRoutes();
     // A Visual Chat thread works with that plugin's canvas tools only (src/voice/live/canvas-plugin.ts).
     if (isCanvasThreadOrigin(context.origin)) return { tools: [], skills: [], instructions: "" };
+    if (isClassifier(context.thread.title)) { scopes.remember(context.thread.id, { kind: "classifier", loaded: [], onDemand: [], delivery: "none", gateway: false }); return { tools: [], skills: [], instructions: "" }; }
     const off = new Set(kindSettings.current.off);
     const tools = BUILTIN_KINDS.filter((each) => !off.has(each.kind)).flatMap((each) => [...(KIND_TOOLS[each.kind] ?? [])]);
     // The apps family's tools, while any app type is on.
@@ -490,8 +521,57 @@ export default async function plugin(bb: BbPluginApi) {
     });
     let gateway: { tools: string[]; instructions: string } = { tools: [], instructions: "" };
     try { gateway = toolGateway?.agentConfiguration({ providerId: context.provider.id, projectId: context.project.id }) ?? gateway; } catch { /* Tool Gateway never breaks Studio's configure(). */ }
-    return { tools: [...tools, ...BOT_TOOLS, STRAND_NOTE_TOOL, ...AREA_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : []), ...gateway.tools], skills: ["studio-code", "studio", ...(bot ? ["themes", "presences"] : [])], instructions: gateway.instructions ? `${instructions}\n\n${gateway.instructions}`.trim() : instructions };
-  }));
+    const full = [...tools, ...BOT_TOOLS, STRAND_NOTE_TOOL, ...AREA_TOOLS, ...(bot ? [...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS] : []), ...(runner ? RUNNER_TOOLS : []), ...gateway.tools];
+    const kind: ScopeKind = own ? "main" : runner ? "runner" : bot ? "conversation" : isLead(context.thread.id) ? "lead" : conversation?.kind === "worker" ? "worker" : "conversation";
+    const lean = leanFor(leanModes.current, context.provider.id, context.provider.model);
+    // `extra`: the memory tools, when withMemory gives this session a profile (src/memory/service.ts).
+    const build = (extra: readonly string[]) => {
+      const scope = scopeTools({ kind, full: [...full, ...extra], providerId: context.provider.id, lean, deferSupported, extras: kind === "runner" ? [] : ON_DEMAND_EXTRAS });
+      scopes.remember(context.thread.id, scope);
+      const trio = scope.delivery === "trio" ? trioInstructions(scope.onDemand, scope.gateway) : "";
+      return { tools: scopeEntries(scope, shownSchemas) as never, instructions: [instructions, scope.gateway ? "" : gateway.instructions, trio].filter(Boolean).join("\n\n").trim() };
+    };
+    return { ...build([]), skills: lean ? [] : ["studio-code", "studio", ...(bot ? ["themes", "presences"] : [])], rescope: build };
+  };
+  bb.agents.configure(withMemory(() => memoryService, (context) => isCanvasThreadOrigin(context.origin) || isClassifier(context.thread.title) || !!learning.review(context.thread.id) || typeof context.pluginMetadata?.botReview === "string", configureStudio));
+  // Settings › Agent context (src/context-lean.ts): Auto / Lean / Full per provider.
+  const conversationFull = (): string[] => {
+    const off = new Set(kindSettings.current.off);
+    const kindTools = BUILTIN_KINDS.filter((each) => !off.has(each.kind)).flatMap((each) => [...(KIND_TOOLS[each.kind] ?? [])]);
+    const apps = ITEM_TYPES.some((each) => each.family === "app" && !off.has(each.kind)) ? APP_TOOLS : [];
+    return [...kindTools, ...apps, ...CODE_TOOLS, ...WORKBENCH_TOOLS, ...BOT_TOOLS, STRAND_NOTE_TOOL, ...AREA_TOOLS, ...BOT_OWN_TOOLS, ...CONVERSATION_TOOLS, ...THEME_TOOLS, ...PRESENCE_TOOLS, ...MEMORY_TOOLS];
+  };
+  const leanRows = async () => {
+    let catalog: { id: string; displayName?: string; enabled?: boolean }[] = [];
+    try { catalog = await bb.sdk.providers.catalog() as typeof catalog; } catch { /* Stored rows only. */ }
+    const names = new Map(catalog.filter((entry) => entry.enabled !== false).map((entry) => [entry.id, entry.displayName || entry.id]));
+    for (const id of Object.keys(leanModes.current)) if (!names.has(id)) names.set(id, id);
+    const count = (scope: ReturnType<typeof scopeTools>) => scope.loaded.length + (scope.delivery === "trio" ? 3 : scope.delivery === "none" ? 0 : scope.onDemand.length);
+    return [...names].map(([id, name]) => {
+      const full = conversationFull();
+      const leanScope = scopeTools({ kind: "conversation", full, providerId: id, lean: true, deferSupported, extras: ON_DEMAND_EXTRAS });
+      const fullScope = scopeTools({ kind: "conversation", full, providerId: id, lean: false, deferSupported, extras: ON_DEMAND_EXTRAS });
+      const fullDelivery = fullScope.delivery === "all" ? "native" as const : fullScope.delivery === "defer" ? "defer" as const : "search" as const;
+      return { id, name, acp: id.startsWith("acp-"), mode: leanModes.current[id] ?? "auto", tools: { lean: count(leanScope), full: count(fullScope) }, fullDelivery };
+    }).sort((a, b) => Number(a.acp) - Number(b.acp) || a.name.localeCompare(b.name));
+  };
+  bb.rpc.register(contextLeanContract, {
+    "contextLean.get": async () => ({ providers: await leanRows() }),
+    "contextLean.set": async ({ providerId, mode }) => { await leanModes.set(providerId, mode); return { providers: await leanRows() }; },
+  });
+  registerScopedTools(bb as never, {
+    book: toolBook as never,
+    scopes,
+    schemaFor: (name) => slimFor(name) ?? fullSchema(name) ?? {},
+    // Studio reloaded mid-session: the thread's kind again, delivered through the trio.
+    recompute: (threadId, projectId) => {
+      try {
+        const result = configureStudio({ thread: { id: threadId, title: null, parentThreadId: null, sourceThreadId: null }, project: { id: projectId ?? "", kind: "regular", name: "", gitRemoteUrl: null }, provider: { id: "studio-recompute", model: "", capabilities: { supportsNativeUserQuestion: false } }, origin: { kind: null, pluginId: null }, pluginMetadata: {} } as never) as { rescope?: (extra: readonly string[]) => unknown };
+        result.rescope?.(MEMORY_TOOLS);
+      } catch { return null; }
+      return scopes.get(threadId) ?? null;
+    },
+  });
   /** Which conversation a Bot's session is in (src/bot-threads.ts conversationInstructions); "" before Studio has placed it. */
   const conversationNote = (threadId: string): string => {
     const rec = botThreads.store.get(threadId);

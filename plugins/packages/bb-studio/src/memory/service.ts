@@ -382,7 +382,10 @@ export function fillSlot(instructions: string, block: string | null): string {
  */
 export function withMemory<Context extends ConfigureContext, Result extends { tools: readonly unknown[]; instructions?: string }>(memory: () => MemoryService, skip: (context: Context) => boolean, inner: (context: Context) => Result): (context: Context) => Result {
   return (context) => {
-    const result = inner(context);
+    // `rescope` (Studio's tool scope, src/tool-scope.ts): places the memory tools
+    // among the session's loaded and on-demand tools instead of appending them.
+    const { rescope, ...plain } = inner(context) as Result & { rescope?: (extra: readonly string[]) => Pick<Result, "tools" | "instructions"> };
+    const result = plain as unknown as Result;
     const instructions = result.instructions ?? "";
     let block: string | null = null;
     if (!skip(context)) {
@@ -397,7 +400,12 @@ export function withMemory<Context extends ConfigureContext, Result extends { to
     }
     const filled = fillSlot(instructions, block);
     if (!block) return instructions.includes(MEMORY_SLOT) ? { ...result, instructions: filled } : result;
-    const tools = [...result.tools, ...MEMORY_TOOLS.filter((name) => !result.tools.includes(name))];
+    if (rescope) {
+      const scoped = rescope(MEMORY_TOOLS);
+      return { ...result, tools: scoped.tools, instructions: fillSlot(scoped.instructions ?? "", block) };
+    }
+    const named = new Set(result.tools.map((tool) => (typeof tool === "string" ? tool : (tool as { name?: string }).name)));
+    const tools = [...result.tools, ...MEMORY_TOOLS.filter((name) => !named.has(name))];
     return { ...result, tools, instructions: filled };
   };
 }
