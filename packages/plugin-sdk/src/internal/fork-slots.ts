@@ -17,6 +17,7 @@ import type {
   ExperimentalThreadHeaderRegistration,
   ExperimentalPaletteSearchRegistration,
   ExperimentalReplyClassifierRegistration,
+  ExperimentalTimelineFilterRegistration,
   ExperimentalSidebarSectionPlacement,
   ExperimentalSidebarSectionRegistration,
   ExperimentalWindowRegistration,
@@ -51,6 +52,7 @@ export interface ForkSlotRegistrations {
   newTabItems: ExperimentalNewTabItemsRegistration[];
   commandPalettes: ExperimentalCommandPaletteRegistration[];
   appBackdrops: ExperimentalAppBackdropRegistration[];
+  timelineFilters: ExperimentalTimelineFilterRegistration[];
 }
 
 export const FORK_SLOT_KINDS = [
@@ -73,6 +75,7 @@ export const FORK_SLOT_KINDS = [
   "newTabItems",
   "commandPalettes",
   "appBackdrops",
+  "timelineFilters",
 ] as const satisfies readonly (keyof ForkSlotRegistrations)[];
 
 export function emptyForkSlots(): ForkSlotRegistrations {
@@ -96,6 +99,7 @@ export function emptyForkSlots(): ForkSlotRegistrations {
     newTabItems: [],
     commandPalettes: [],
     appBackdrops: [],
+    timelineFilters: [],
   };
 }
 
@@ -122,6 +126,7 @@ export function forkSlotMethods(
     newTabItems: new Set<string>(),
     commandPalette: new Set<string>(),
     appBackdrop: new Set<string>(),
+    timelineFilter: new Set<string>(),
   };
   return {
     experimental_sidebarSection(registration) {
@@ -156,6 +161,22 @@ export function forkSlotMethods(
         ...(registration.classifyMessage
           ? { classifyMessage: registration.classifyMessage }
           : {}),
+      });
+    },
+    experimental_timelineFilter(registration) {
+      const kind = "slots.experimental_timelineFilter";
+      const id = requireSlotId(kind, registration?.id);
+      requireUniqueId(kind, seenIds.timelineFilter, id);
+      if (typeof registration.get !== "function") {
+        throw new Error(`${kind} "${id}": get must be a function`);
+      }
+      if (typeof registration.subscribe !== "function") {
+        throw new Error(`${kind} "${id}": subscribe must be a function`);
+      }
+      collected.timelineFilters.push({
+        id,
+        get: registration.get,
+        subscribe: registration.subscribe,
       });
     },
     experimental_linkHandler(registration) {
