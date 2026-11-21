@@ -246,6 +246,33 @@ the sender, preview start and check icon to `ConversationMessageContent` and
    is synchronous because turn completion is; decide whether it should join
    the hook registry.
 
+
+## Timeline filter (`experimental_timelineFilter`)
+
+A plugin narrows a thread's timeline to some of its turns: Studio's strands
+("show only this strand"). `app.slots.experimental_timelineFilter({ id, get,
+subscribe })`; `get(threadId)` returns `{ turnIds, firstSeq }` or null. While
+a filter is on, the thread view keeps only the rows of those turns (rows with
+no turn, the pending "Stop requested" row included, go), opens everything
+collapsed in them (a quiet reply draws in full, the relayed and notice folds
+unfold, step and command groups open; a command's own output stays as it
+is), and loads older rows one page at a time until the loaded rows reach
+`firstSeq`, there are no older rows, or a load brings nothing older. bb's own
+"load older" sentinel stays away while it pages. Registrations are asked in
+plugin-id order; a `get` that throws or returns something else counts as
+none and is logged once.
+
+**Core callers.** `ThreadTimelineSurface.tsx` exports the surface wrapped in
+`withTimelineFilter` (`timelineFilter.fork.tsx`), which applies the filter to
+its props and provides `TimelineFilterExpandContext`
+(`lib/fork-timeline-filter.ts`). `ThreadTimelineRows.tsx` force-expands a
+group row while the context is on (`useTimelineFilterExpandsRow`);
+`useQuietReply` (`lib/fork-reply-classifiers.ts`) and `useRelayedFold`
+(`relayedFold.fork.tsx`) read the same context.
+
+**Why not upstream's own API.** No add-in point can hide timeline rows or
+open collapsed ones; the timeline windows only the rows it has and pages
+them in one run.
 ## Fixed workbench tabs (`experimental_global`, `experimental_useGlobalTabs`, `experimental_closeFixedTab`)
 
 Each side panel keeps its own tabs. A fixed tab is one more plugin action
