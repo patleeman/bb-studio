@@ -40,7 +40,7 @@ import { sessionTitlePrefix } from "./src/decisions/server/classifier";
 import { ON_DEMAND_EXTRAS, scopeEntries, scopeTools, trioInstructions, type Scope, type ScopeKind } from "./src/tool-scope";
 import { registerScopedTools, ScopeMemory } from "./src/tool-scope-tools";
 import { slim, slimmedIfSmaller } from "./src/slim-schema";
-import { callText, clipLine, nextLine, pageItems, pageSections, pageText, staleCursor } from "./src/paging";
+import { callText, clipLine, nextLine, pageByKey, pageItems, pageSections, pageText, staleCursor } from "./src/paging";
 import { ABSORB_FIELDS, INTERNAL_RENAMES, MERGES, mergedParameters, mergedTools, presentScope } from "./src/merged-tools";
 import { LeanStore, leanFor } from "./src/context-lean";
 import { contextLeanContract } from "./src/context-lean-contract";
@@ -2331,12 +2331,12 @@ export default async function plugin(bb: BbPluginApi) {
         ...(activity.attention ? [{ id: "attention", section: "", line: `Waiting on the user in your chat: ${/^\d+$/.test(activity.attention.reason) ? `${activity.attention.count} (questions, todos and unread replies)` : activity.attention.reason}` }] : []),
         ...threadRows("Waiting on an answer (yours to handle, or bring to the user)", activity.inProgress.filter((each) => each.waitingFor)),
         ...threadRows("In progress", activity.inProgress.filter((each) => !each.waitingFor)),
-        ...activity.scheduled.map((each, index) => ({ id: `scheduled-${index}-${each.name}`, section: "Scheduled:", line: `- ${each.name}${each.enabled ? "" : " (off)"}${each.nextRunAt ? `, next ${new Date(each.nextRunAt).toISOString()}` : ""}` })),
+        ...activity.scheduled.map((each) => ({ id: `scheduled:${each.id}`, section: "Scheduled:", line: `- ${each.name}${each.enabled ? "" : " (off)"}${each.nextRunAt ? `, next ${new Date(each.nextRunAt).toISOString()}` : ""}` })),
         ...threadRows("Completed", activity.completed),
       ];
       if (!rows.length) return "Nothing to show yet.";
       const part = pageSections(rows, { after });
-      if (!part) return staleCursor(`${after}`, "bot_info activity");
+      if (!part) return staleCursor(`${after}`, callText("bot_activity", {}));
       const next = nextLine(part.page, (last) => callText("bot_activity", { after: last }), "lines");
       return [...(next ? [next] : []), ...part.lines].join("\n");
     },
@@ -2387,8 +2387,10 @@ export default async function plugin(bb: BbPluginApi) {
       if (!list.length) return "No skills yet.";
       // In parts (src/paging.ts), descriptions on one short line.
       const rows = list.map((skill) => ({ id: skill.name, line: `- ${skill.name}${skill.pinned ? " (pinned)" : ""}${skill.state === "stale" ? " (stale)" : ""}: ${clipLine(skill.description, 200)}` }));
-      const part = pageItems(rows, (each) => each.id, (each) => each.line.length, { after });
-      if (part.missing) return staleCursor(`Skill ${after}`, "bot_skill list");
+      // By keyset on (pinned first, name): reading or using a skill between parts doesn't move it.
+      const keys = new Map(list.map((skill) => [skill.name, [skill.pinned ? 0 : 1, skill.name] as (string | number)[]]));
+      const part = pageByKey(rows, (each) => keys.get(each.id)!, (each) => each.line.length, { after });
+      if (part.missing) return staleCursor("That cursor", callText("bot_skill_list", {}));
       const next = nextLine(part, (last) => callText("bot_skill_list", { after: last }), "skills");
       return [`${list.length} skill${list.length === 1 ? "" : "s"}.`, ...(next ? [next] : []), ...part.items.map((each) => each.line)].join("\n");
     },
@@ -2405,7 +2407,7 @@ export default async function plugin(bb: BbPluginApi) {
       // A review reading skills isn't the Bot using them.
       if (!learning.review(ctx.threadId) && !offset) bots.touchSkill(name, botId);
       const part = pageText(skill.body, offset ?? 0, SKILL_PART_CHARS);
-      if (part.missing) return `The skill ${skill.name} is ${skill.body.length.toLocaleString("en-US")} characters now; ${offset} is past its end. Read it again without offset.`;
+      if (part.missing) return `The skill ${skill.name} is ${skill.body.length.toLocaleString("en-US")} characters now; ${offset} is past its end. Start again: ${callText("bot_skill_view", { name: skill.name })}.`;
       const next = part.next === null ? null : `(Characters ${(offset ?? 0).toLocaleString("en-US")}–${part.next.toLocaleString("en-US")} of ${skill.body.length.toLocaleString("en-US")}. Next: ${callText("bot_skill_view", { name: skill.name, offset: part.next })}.)`;
       return [`# ${skill.name}`, skill.description, ...(next ? [next] : []), "", part.text].join("\n");
     },
@@ -2551,7 +2553,7 @@ export default async function plugin(bb: BbPluginApi) {
       // One short line each (src/paging.ts); the full item with id.
       const rows = items.map((each) => ({ id: each.id, line: `- ${each.name} (${each.kind}, ${each.id}, ${each.state}): ${each.scheduleText}${each.nextRunAt ? `, next ${new Date(each.nextRunAt).toLocaleString()}` : ""}${each.lastOutcome ? ` · last: ${clipLine(each.lastOutcome, 100)}` : ""}` }));
       const part = pageItems(rows, (each) => each.id, (each) => each.line.length, { after });
-      if (part.missing) return staleCursor(`Scheduled item ${after}`, "schedule list");
+      if (part.missing) return staleCursor(`Scheduled item ${after}`, callText("automation_list", {}));
       const next = nextLine(part, (last) => callText("automation_list", { after: last }), "scheduled items");
       return [`${items.length} scheduled item${items.length === 1 ? "" : "s"}. Full details: ${callText("automation_list", { id: "<id>" })}.`, ...(next ? [next] : []), ...part.items.map((each) => each.line)].join("\n");
     });

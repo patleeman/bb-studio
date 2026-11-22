@@ -50,7 +50,7 @@ export function callText(tool: string, args: Record<string, unknown>): string {
   const merge = alias ? MERGES.find((each) => each.name === alias.merged) : undefined;
   const fields = { ...(alias && merge ? { [merge.field]: alias.op } : {}), ...args };
   const shown = Object.entries(fields).filter(([, value]) => value !== undefined).map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join(", ");
-  return `${alias?.merged ?? tool} { ${shown} }`;
+  return shown ? `${alias?.merged ?? tool} { ${shown} }` : `${alias?.merged ?? tool} {}`;
 }
 
 /** The line right after a part's header: where this part sits, and the call for the next one. */
@@ -59,16 +59,67 @@ export function nextLine(page: { from: number; to: number; total: number; next: 
   return `(Showing ${page.from}–${page.to} of ${page.total} ${noun}. Next: ${call(page.next)}.)`;
 }
 
-/** What a stale cursor says. */
+/** What a stale cursor says, with the exact call that starts again. */
 export function staleCursor(after: string, again: string): string {
-  return `${after} is no longer in this list (it was removed or changed); call ${again} without after to start again.`;
+  return `${after} is no longer in this list (it was removed or changed). Start again: ${again}.`;
+}
+
+/** A cut at `end` that never splits a surrogate pair (an emoji stays whole). */
+export function safeEnd(text: string, end: number): number {
+  if (end <= 0 || end >= text.length) return end;
+  const code = text.charCodeAt(end - 1);
+  return code >= 0xd800 && code <= 0xdbff ? end - 1 : end;
+}
+
+/** A keyset cursor: a list's sort key and id, as one opaque string. */
+export function encodeKey(key: readonly (string | number)[]): string {
+  return Buffer.from(JSON.stringify(key)).toString("base64url");
+}
+
+export function decodeKey(text: string): (string | number)[] | null {
+  try {
+    const key = JSON.parse(Buffer.from(text, "base64url").toString("utf8")) as unknown;
+    return Array.isArray(key) && key.every((part) => typeof part === "string" || typeof part === "number") ? key as (string | number)[] : null;
+  } catch { return null; }
+}
+
+/** Compares sort keys part by part; `descending[i]` flips part i. */
+export function compareKeys(a: readonly (string | number)[], b: readonly (string | number)[], descending: readonly boolean[] = []): number {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i], y = b[i];
+    if (x === y) continue;
+    const order = x === undefined ? -1 : y === undefined ? 1 : typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y));
+    if (order) return descending[i] ? -order : order;
+  }
+  return 0;
+}
+
+/**
+ * One part of a list in the order of `keyOf` (with `descending`), after the cursor's key: items that
+ * change, arrive or go between parts never make another item repeat or go missing, because the
+ * cursor is a position in the order, not an item. The key must not change while an item lives (a
+ * creation time and the id). `next` is the last shown item's encoded key.
+ */
+export function pageByKey<T>(items: readonly T[], keyOf: (item: T) => (string | number)[], size: (item: T) => number, options: { after?: string | null; budget?: number; max?: number; descending?: readonly boolean[] }): ItemPage<T> {
+  const sorted = [...items].sort((a, b) => compareKeys(keyOf(a), keyOf(b), options.descending));
+  let start = 0;
+  if (options.after) {
+    const key = decodeKey(options.after);
+    if (!key) return { items: [], next: null, from: 0, to: 0, total: sorted.length, missing: true };
+    start = sorted.findIndex((item) => compareKeys(keyOf(item), key, options.descending) > 0);
+    if (start < 0) start = sorted.length;
+  }
+  const part = pageItems(sorted.slice(start), (item) => String(sorted.indexOf(item)), size, { budget: options.budget, max: options.max });
+  const last = part.items.at(-1);
+  const end = start + part.items.length;
+  return { items: part.items, next: last !== undefined && end < sorted.length ? encodeKey(keyOf(last)) : null, from: part.items.length ? start + 1 : start, to: end, total: sorted.length };
 }
 
 /** One part of a long text body, by character offset, cut at a line end where one is near. */
 export function pageText(text: string, offset: number, budget = PART_CHARS): { text: string; next: number | null; missing?: true } {
   if (offset < 0 || offset > text.length) return { text: "", next: null, missing: true };
   if (text.length - offset <= budget) return { text: text.slice(offset), next: null };
-  const hard = offset + budget;
+  const hard = safeEnd(text, offset + budget);
   const line = text.lastIndexOf("\n", hard);
   const end = line > offset + budget / 2 ? line + 1 : hard;
   return { text: text.slice(offset, end), next: end };
@@ -77,7 +128,7 @@ export function pageText(text: string, offset: number, budget = PART_CHARS): { t
 /** A text's first line, at most `max` characters. */
 export function clipLine(text: string, max = 120): string {
   const line = text.split("\n").find((each) => each.trim())?.trim() ?? "";
-  return line.length > max ? `${line.slice(0, max - 1)}…` : line;
+  return line.length > max ? `${line.slice(0, safeEnd(line, max - 1))}…` : line;
 }
 
 /**
@@ -94,4 +145,9 @@ export function pageSections(rows: readonly { id: string; section: string; line:
     lines.push(row.line);
   }
   return { lines, page };
+}
+
+/** A count that may have hit a fetch cap: "at least 500" when it did. */
+export function counted(count: number, cap: number): string {
+  return count >= cap ? `At least ${count}` : String(count);
 }

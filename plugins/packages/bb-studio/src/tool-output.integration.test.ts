@@ -11,6 +11,7 @@ vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 let tools: Map<string, Tool>;
 let configure: (context: unknown) => unknown;
 let dispose: () => Promise<void> = async () => {};
+let db: { prepare(sql: string): { run(...args: unknown[]): unknown; get(...args: unknown[]): unknown } } | null = null;
 const MAIN = "thr_out_main";
 const MINI_FILES = { "mini.json": JSON.stringify({ entry: "main.jsx", libs: [], collections: { items: { indexes: [] } } }), "main.jsx": "export default function App() { return null; }\n" };
 
@@ -23,7 +24,7 @@ const run = async (name: string, input: unknown, threadId = MAIN) => {
 
 /** The call a reply's "Next:" line names, parsed: tool name and arguments. */
 export function nextCall(reply: string): { tool: string; args: Record<string, unknown> } | null {
-  const match = /Next: ([a-z_]+) \{ (.*) \}\.\)/.exec(reply);
+  const match = /Next: ([a-z_]+) \{ (.*?) \}\./.exec(reply);
   if (!match) return null;
   return { tool: match[1]!, args: JSON.parse(`{${match[2]!.replace(/(^|, )([A-Za-z_]+): /g, '$1"$2": ')}}`) as Record<string, unknown> };
 }
@@ -50,6 +51,7 @@ beforeAll(async () => {
   configure = host.harness.registrations.agentConfigurationProvider as unknown as (context: unknown) => unknown;
   tools = new Map((host.harness.registrations as unknown as { agentTools: Tool[] }).agentTools.map((tool) => [tool.name, tool]));
   const database = host.bb.storage.database() as unknown as { prepare(sql: string): { run(...args: unknown[]): unknown; get(...args: unknown[]): unknown } };
+  db = database;
   // The primary Bot's own thread is MAIN (Studio keeps its Bots in memory, so through its RPC, not the database).
   const answer = await (host.harness as unknown as { callRpc(method: string, input: unknown): Promise<{ bot: { id: string } }> }).callRpc("bot_set_thread", { threadId: MAIN });
   const botId = answer.bot.id;
@@ -80,11 +82,11 @@ describe("memory search", () => {
     for (let index = 0; index < 40; index++) ids.push(/mem_[a-z0-9]+/.exec(await run("memory", { op: "add", topic: "Launch", text: `Alpha fact ${index}: ${"detail ".repeat(60)}` }))![0]);
     const replies = await walk(await run("memory", { op: "search", query: "alpha" }));
     expect(replies.length).toBeGreaterThan(2);
-    for (const reply of replies.slice(0, -1)) expect(reply.split("\n")[1]).toMatch(/^\(Showing \d+–\d+ of 40 records\. Next: memory \{ op: "search"/);
+    for (const reply of replies.slice(0, -1)) expect(reply.split("\n")[1]).toMatch(/^\(Records \d+–\d+ of 40, most relevant first\. Next: memory \{ op: "search"/);
     const seen = all(replies, /"id":"(mem_[a-z0-9]+)"/g);
     expect(seen.length).toBe(40);
     expect(new Set(seen)).toEqual(new Set(ids));
-    expect(await run("memory", { op: "search", query: "alpha", after: "mem_gone" })).toMatch(/Record mem_gone is no longer in this list/);
+    expect(await run("memory", { op: "search", query: "alpha", offset: 999 })).toMatch(/offset 999 is past the end\. Start again: memory \{ op: "search", query: "alpha" \}/);
   });
 });
 
@@ -96,7 +98,7 @@ describe("skills", () => {
     const seen = all(replies, /^- (skill-\d+)/gm);
     expect(seen).toEqual(Array.from({ length: 40 }, (_, index) => `skill-${String(index).padStart(2, "0")}`).filter((name) => seen.includes(name)));
     expect(new Set(seen).size).toBe(40);
-    expect(await run("bot_skill", { op: "list", after: "skill-gone" })).toMatch(/Skill skill-gone is no longer in this list/);
+    expect(await run("bot_skill", { op: "list", after: "not-a-cursor" })).toMatch(/That cursor is no longer in this list.*Start again: bot_skill \{ op: "list" \}/);
   });
 
   it("reads a long skill in parts that add up to the whole body", async () => {
@@ -119,7 +121,7 @@ describe("conversations", () => {
     expect(seen.length).toBe(70);
     expect(new Set(seen).size).toBe(70);
     expect(replies.some((reply, index) => index > 0 && reply.includes("Workers (agents you started"))).toBe(true);
-    expect(await run("bot_info", { view: "conversations", after: "thr_gone" })).toMatch(/Thread thr_gone is no longer in this list/);
+    expect(await run("bot_info", { view: "conversations", after: "thr_gone" })).toMatch(/Thread thr_gone is no longer in this list.*Start again: bot_info \{ view: "conversations" \}/);
   });
 });
 
@@ -131,7 +133,7 @@ describe("areas", () => {
     const seen = all(replies, /"name":"(Area \d+)"/g);
     expect(new Set(seen).size).toBe(50);
     expect(seen.length).toBe(50);
-    expect(await run("area", { op: "list", after: "area_gone" })).toMatch(/Area area_gone is no longer in this list/);
+    expect(await run("area", { op: "list", after: "not-a-cursor" })).toMatch(/Start again: area \{ op: "list" \}/);
   });
 });
 
@@ -178,7 +180,7 @@ describe("pages", () => {
     const seen = all(replies, /\(id (pg_[A-Za-z0-9]+)/g);
     expect(new Set(seen).size).toBe(seen.length);
     expect(seen.length).toBeGreaterThanOrEqual(150);
-    expect(await run("pages_read", { after: "pg_gone" })).toMatch(/Page pg_gone is no longer in this list/);
+    expect(await run("pages_read", { after: "pg_gone" })).toMatch(/Page pg_gone is no longer in this list.*Start again: pages_read \{\}/);
   });
 
   it("reads a design's named screens in parts, the rest named in Next", async () => {
@@ -203,7 +205,7 @@ describe("talk", () => {
     const hits = all(found, /\((rec_\d+)\)/g);
     expect(new Set(hits).size).toBe(60);
     expect(hits.length).toBe(60);
-    expect(await run("talk", { op: "list", after: "rec_gone" })).toMatch(/Recording rec_gone is no longer in this list/);
+    expect(await run("talk", { op: "list", after: "not-a-cursor" })).toMatch(/Start again: talk \{ op: "list" \}/);
   });
 
   it("reads a long transcript in parts, the Next call right after the title", async () => {
@@ -231,6 +233,56 @@ describe("schedule", () => {
     expect(replies.join("\n")).not.toContain("Be thorough about every detail of it. Be thorough");
     const id = /- Check \d+[^(]*\(checkin, ([a-z0-9_]+), /.exec(replies.join("\n"))![1]!;
     expect(await run("schedule", { op: "list", id })).toContain("Be thorough about every detail of it. Be thorough");
-    expect(await run("schedule", { op: "list", after: "aut_gone" })).toMatch(/Scheduled item aut_gone is no longer in this list/);
+    expect(await run("schedule", { op: "list", after: "aut_gone" })).toMatch(/Scheduled item aut_gone is no longer in this list.*Start again: schedule \{ op: "list" \}/);
+  });
+});
+
+describe("parts while the data changes", () => {
+  it("migrates every mini app record once while following Next (a find whose matches change)", async () => {
+    const created = await run("apps", { op: "create", type: "mini", input: { name: "Migrate", files: MINI_FILES } });
+    const miniId = /mini_[A-Za-z0-9]+/.exec(created)![0];
+    for (let index = 0; index < 90; index++) await run("minis_data", { miniId, op: "insert", collection: "items", data: { n: index, v: 1, note: "y".repeat(150) } });
+    const query = { where: { v: 1 } };
+    const migrated: number[] = [];
+    let reply = await run("minis_data", { miniId, op: "find", collection: "items", query });
+    for (let guard = 0; guard < 20; guard++) {
+      const records = JSON.parse(reply.slice(reply.indexOf("<mini-data>") + 11, reply.indexOf("</mini-data>"))) as { id: string; data: { n: number } }[];
+      for (const record of records) { await run("minis_data", { miniId, op: "patch", collection: "items", recordId: record.id, fields: { v: 2 } }); migrated.push(record.data.n); }
+      const next = nextCall(reply);
+      if (!next) break;
+      reply = await run(next.tool, next.args);
+    }
+    expect(migrated.length).toBe(90);
+    expect(new Set(migrated).size).toBe(90);
+    expect(await run("minis_data", { miniId, op: "count", collection: "items", query })).toBe("0 record(s).");
+  });
+
+  it("doesn't repeat recordings when one is retitled between parts", async () => {
+    const first = await run("talk", { op: "list" });
+    const shown = all([first], /\((rec_[a-z0-9_]+)\)/g);
+    db!.prepare("UPDATE recordings SET title = 'Renamed', updated_at = ? WHERE id = ?").run(Date.now() + 10_000, shown.at(-1));
+    db!.prepare("UPDATE recordings SET title = 'Renamed too', updated_at = ? WHERE id = ?").run(Date.now() + 10_000, shown[0]);
+    const rest = await walk(first);
+    const ids = all(rest, /\((rec_[a-z0-9_]+)\)/g);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.length).toBe(61);
+  });
+
+  it("ends a conversations list with no workers by saying so once, at the end", async () => {
+    db!.prepare("UPDATE bot_threads SET kind = 'conversation' WHERE kind = 'worker'").run();
+    const replies = await walk(await run("bot_info", { view: "conversations" }));
+    expect(replies.length).toBeGreaterThan(1);
+    expect(replies.filter((reply) => reply.includes("Workers (agents you started")).length).toBe(1);
+    expect(replies.at(-1)).toMatch(/Workers \(agents you started[^\n]*\n- none/);
+  });
+
+  it("keeps a design reply inside its cap when a screen's HTML is mostly quotes", async () => {
+    const created = await run("pages_create", { title: "Quotes", type: "design" });
+    const designId = /dsn_[A-Za-z0-9]+/.exec(created)![0];
+    const html = `<!doctype html><body>${'<p class="a" data-x="b">"q" 🙂</p>\n'.repeat(2900)}</body>`;
+    for (const screenId of ["1a", "1b"]) await run("design_screen", { op: "write", designId, screenId, html });
+    const replies = await walk(await run("pages_read", { page: designId, screenIds: ["1a", "1b"] }));
+    for (const reply of replies) expect(reply.length).toBeLessThanOrEqual(120_000);
+    for (const reply of replies) expect(reply).not.toMatch(/\\ud83d"/);
   });
 });

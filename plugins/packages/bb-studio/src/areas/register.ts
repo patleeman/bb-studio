@@ -2,7 +2,8 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { areasContract, areaUpdateInput } from "./contract";
 import type { Areas } from "./areas";
-import { callText, clipLine, nextLine, pageItems, staleCursor } from "../paging";
+import { callText, clipLine, nextLine, pageByKey, staleCursor } from "../paging";
+import { statusRank } from "./derive";
 
 export const AREA_TOOLS = ["area_update", "area_list", "area_get"];
 
@@ -32,8 +33,10 @@ export function registerAreas(bb: BbPluginApi, areas: Areas, guard: <T>(work: ()
         const list = guard(() => areas.list());
         if (!list.length) return "No areas yet.";
         const rows = list.map((each) => ({ id: each.id, line: JSON.stringify({ id: each.id, name: each.name, status: each.status, ...(each.reason ? { reason: clipLine(each.reason, 120) } : {}), ...(each.now ? { now: clipLine(each.now, 160) } : {}), open: each.open.length, lastRun: time(each.lastRun), nextRun: time(each.nextRun), ...(each.paused ? { paused: true } : {}) }) }));
-        const part = pageItems(rows, (each) => each.id, (each) => each.line.length, { after });
-        if (part.missing) return staleCursor(`Area ${after}`, "area list");
+        // By keyset on (problems first, name, id): an area whose status changes moves, but never makes another repeat.
+        const rank = new Map(list.map((each) => [each.id, [statusRank(each.status), each.name.toLowerCase(), each.id] as (string | number)[]]));
+        const part = pageByKey(rows, (each) => rank.get(each.id)!, (each) => each.line.length, { after });
+        if (part.missing) return staleCursor("That cursor", callText("area_list", {}));
         const next = nextLine(part, (last) => callText("area_list", { after: last }), "areas");
         return [`${list.length} area${list.length === 1 ? "" : "s"}, problems first. One in full: ${callText("area_get", { id: "<id>" })}.`, ...(next ? [next] : []), ...part.items.map((each) => each.line)].join("\n");
       } catch (error) { return `Error: ${error instanceof Error ? error.message : String(error)}`; }

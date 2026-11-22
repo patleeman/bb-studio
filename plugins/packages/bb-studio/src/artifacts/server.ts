@@ -489,7 +489,7 @@ export function registerArtifacts(bb: BbPluginApi, db: Database.Database, servic
       if (text === null) return `${head}\n\nNot text. Copy it into the workspace with: bb studio artifacts export ${artifact.id}`;
       // In parts (src/paging.ts): the Next call right after the details.
       const part = pageText(text, offset ?? 0, TEXT_PART);
-      if (part.missing) return `${head}\n\nThe text is ${text.length.toLocaleString("en-US")} characters; offset ${offset} is past its end. Read it again without offset.`;
+      if (part.missing) return `${head}\n\nThe text is ${text.length.toLocaleString("en-US")} characters; offset ${offset} is past its end. Start again: ${callText("apps_read", { id: artifact.id })}.`;
       const next = part.next === null ? null : `(Characters ${(offset ?? 0).toLocaleString("en-US")}–${part.next.toLocaleString("en-US")} of ${text.length.toLocaleString("en-US")}. Next: ${callText("apps_read", { id: artifact.id, offset: part.next })}.)`;
       return `${head}${next ? `\n${next}` : ""}\n\n${artifact.description && !offset ? `Description: ${artifact.description}\n\n` : ""}${part.text}`;
     },

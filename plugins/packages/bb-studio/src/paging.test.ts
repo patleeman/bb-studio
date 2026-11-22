@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { callText, clipLine, nextLine, pageItems, pageSections, pageText, staleCursor } from "./paging";
+import { callText, clipLine, counted, decodeKey, encodeKey, nextLine, pageByKey, pageItems, pageSections, pageText, safeEnd, staleCursor } from "./paging";
 
 const items = Array.from({ length: 57 }, (_, index) => ({ id: `it_${index}`, text: `item ${index} ${"x".repeat(index % 7 * 40)}` }));
 const walk = (budget: number, max?: number) => {
@@ -30,7 +30,7 @@ describe("parts of a list", () => {
 
   it("says a cursor is stale instead of starting over", () => {
     expect(pageItems(items, (item) => item.id, (item) => item.text.length, { after: "it_gone" })).toMatchObject({ missing: true, items: [] });
-    expect(staleCursor("Record mem_1", "memory search")).toBe("Record mem_1 is no longer in this list (it was removed or changed); call memory search without after to start again.");
+    expect(staleCursor("Record mem_1", 'memory { op: "search", query: "x" }')).toBe('Record mem_1 is no longer in this list (it was removed or changed). Start again: memory { op: "search", query: "x" }.');
   });
 
   it("ends with no Next on the last part", () => {
@@ -85,5 +85,48 @@ describe("parts of a text", () => {
 
   it("clips a line", () => {
     expect(clipLine("\n  first line here\nsecond", 10)).toBe("first lin…");
+  });
+});
+
+describe("parts by keyset while the list changes", () => {
+  type Item = { id: string; created: number; title: string };
+  const make = (count: number) => Array.from({ length: count }, (_, index) => ({ id: `r${String(index).padStart(3, "0")}`, created: 1000 + index, title: `t${index}` }));
+  const keyOf = (item: Item) => [item.created, item.id];
+
+  it("shows each item that stays once, though items change, arrive and go between parts", () => {
+    let list: Item[] = make(60);
+    const seen: string[] = [];
+    let after: string | null = null;
+    for (let round = 0; round < 50; round++) {
+      const part: ReturnType<typeof pageByKey<Item>> = pageByKey(list, keyOf, () => 50, { after, max: 7, descending: [true, true] });
+      seen.push(...part.items.map((item) => item.id));
+      if (part.next === null) break;
+      after = part.next;
+      // Between parts: an item already shown and one not yet shown change (their order key doesn't), a new one arrives, an old one goes.
+      list = list.map((item) => (item.id === part.items[0]!.id || item.id === "r010" ? { ...item, title: "changed" } : item));
+      list.push({ id: `n${round}`, created: 5000 + round, title: "new" });
+      if (round === 2) list = list.filter((item) => item.id !== "r020");
+    }
+    const stayed = make(60).map((item) => item.id).filter((id) => id !== "r020");
+    expect(seen.filter((id) => id.startsWith("r")).sort()).toEqual(stayed.filter((id) => seen.includes(id)).sort());
+    expect(new Set(seen).size).toBe(seen.length);
+    expect(stayed.every((id) => seen.includes(id))).toBe(true);
+  });
+
+  it("refuses a cursor it can't read", () => {
+    expect(pageByKey(make(3), keyOf, () => 1, { after: "not-a-cursor" })).toMatchObject({ missing: true });
+    expect(decodeKey(encodeKey([1, "a"]))).toEqual([1, "a"]);
+  });
+
+  it("never splits a surrogate pair", () => {
+    const text = "a".repeat(9) + "🙂" + "b".repeat(50);
+    expect(safeEnd(text, 10)).toBe(9);
+    expect(pageText(text, 0, 10).text).toBe("a".repeat(9));
+    expect(clipLine("🙂".repeat(10), 4)).toBe("🙂…");
+  });
+
+  it("says at least when a count hit its cap", () => {
+    expect(counted(500, 500)).toBe("At least 500");
+    expect(counted(42, 500)).toBe("42");
   });
 });

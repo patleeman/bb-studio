@@ -22,7 +22,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { StudioSettingValues } from "../settings/schema";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { callText, nextLine, pageItems, pageText, staleCursor } from "../paging";
+import { callText, counted, nextLine, pageByKey, pageText, staleCursor } from "../paging";
 import { rpcContract } from "./shared/contract";
 import { PANEL_PATH, PLUGIN_ID, RECORDING_CHANGED, formatLength, recordingHref } from "./shared/format";
 import { AudioFiles, extensionFor, pluginDataDirectory } from "./server/audio-files";
@@ -498,19 +498,22 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
   }));
 
   // Studio calls bb.agents.configure once, with TALK_TOOLS (BB allows one configuration per plugin).
-  /** talk_read's default part, in characters. */
+  /** talk_read's default part, in characters; how many recordings talk list and search look at. */
   const READ_CHARS = 12_000;
+  const LIST_CAP = 500;
+  const SEARCH_CAP = 200;
   bb.agents.registerTool({
     name: "talk_list",
     description: "List recent Talk recordings and dictations. Search titles and transcripts with `query`.",
     parameters: z.object({ query: z.string().max(200).optional(), limit: z.number().int().min(1).max(100).optional().describe("At most this many in a part (default 30)"), after: z.string().min(1).max(100).optional().describe("The recording id the last part's Next names") }),
     execute({ query, limit, after }) {
-      const rows = store.list({ query, limit: 500 }).map((r) => ({ id: r.id, line: `- ${r.title} (${r.id}), ${r.kind}, ${r.status}, ${r.wordCount} words: ${recordingHref(r.id)}` }));
-      if (!rows.length) return "No recordings match.";
-      const part = pageItems(rows, (row) => row.id, (row) => row.line.length, { after, max: limit ?? 30 });
-      if (part.missing) return staleCursor(`Recording ${after}`, "talk list");
+      // In parts by keyset on creation (src/paging.ts): a recording retitled or cleaned between parts doesn't move.
+      const listed = store.list({ query, limit: LIST_CAP });
+      if (!listed.length) return "No recordings match.";
+      const part = pageByKey(listed, (r) => [r.createdAt, r.id], (r) => r.title.length + 80, { after, max: limit ?? 30, descending: [true, true] });
+      if (part.missing) return staleCursor("That cursor", callText("talk_list", { ...(query ? { query } : {}) }));
       const next = nextLine(part, (last) => callText("talk_list", { ...(query ? { query } : {}), ...(limit ? { limit } : {}), after: last }), "recordings");
-      return [`${rows.length} recording${rows.length === 1 ? "" : "s"}.`, ...(next ? [next] : []), ...part.items.map((row) => row.line)].join("\n");
+      return [`${counted(listed.length, LIST_CAP)} recording${listed.length === 1 ? "" : "s"}, newest first.`, ...(next ? [next] : []), ...part.items.map((r) => `- ${r.title} (${r.id}), ${r.kind}, ${r.status}, ${r.wordCount} words: ${recordingHref(r.id)}`)].join("\n");
     },
   });
   bb.agents.registerTool({
@@ -527,7 +530,7 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
       const notes = recording.meetingNotes;
       // In parts (src/paging.ts): the Next call right after the header, cut at a line end.
       const part = pageText(transcript, offset, limit);
-      if (part.missing) return `The transcript is ${transcript.length.toLocaleString("en-US")} characters; offset ${offset} is past its end. Read it again without offset.`;
+      if (part.missing) return `The transcript is ${transcript.length.toLocaleString("en-US")} characters; offset ${offset} is past its end. Start again: ${callText("talk_read", { id, ...(version ? { version } : {}) })}.`;
       const next = part.next === null ? null : `(Characters ${offset.toLocaleString("en-US")}–${part.next.toLocaleString("en-US")} of ${transcript.length.toLocaleString("en-US")}. Next: ${callText("talk_read", { id, ...(version ? { version } : {}), offset: part.next, ...(limit !== READ_CHARS ? { limit } : {}) })}.)`;
       return [`${recording.title} (${id})`, ...(next ? [next] : []), `Status: ${recording.status}`, `Link: ${recordingHref(id)}`,
         notes && offset === 0 ? `Summary: ${notes.summary}` : "",
@@ -540,17 +543,19 @@ export async function registerTalk(bb: BbPluginApi, db: Database.Database, setti
     description: "Search Talk recording titles and transcripts. Returns matching recordings with a short transcript excerpt.",
     parameters: z.object({ query: z.string().trim().min(1).max(200), after: z.string().min(1).max(100).optional().describe("The recording id the last part's Next names") }),
     execute({ query, after }) {
-      const rows = store.list({ query, limit: 200 }).map((r) => {
+      // In parts by keyset on creation; an excerpt (a transcript read) only for the part's recordings.
+      const listed = store.list({ query, limit: SEARCH_CAP });
+      if (!listed.length) return "No recordings match.";
+      const part = pageByKey(listed, (r) => [r.createdAt, r.id], () => 260, { after, max: 30, descending: [true, true] });
+      if (part.missing) return staleCursor("That cursor", callText("talk_search", { query }));
+      const lines = part.items.map((r) => {
         const transcript = store.transcript(r.id);
         const at = transcript.toLowerCase().indexOf(query.toLowerCase());
         const excerpt = at < 0 ? r.preview : transcript.slice(Math.max(0, at - 80), at + query.length + 120);
-        return { id: r.id, line: `- ${r.title} (${r.id}): ${excerpt.replace(/\s+/g, " ")}` };
+        return `- ${r.title} (${r.id}): ${excerpt.replace(/\s+/g, " ")}`;
       });
-      if (!rows.length) return "No recordings match.";
-      const part = pageItems(rows, (row) => row.id, (row) => row.line.length, { after, max: 30 });
-      if (part.missing) return staleCursor(`Recording ${after}`, "talk search");
       const next = nextLine(part, (last) => callText("talk_search", { query, after: last }), "recordings");
-      return [`${rows.length} recording${rows.length === 1 ? "" : "s"} match.`, ...(next ? [next] : []), ...part.items.map((row) => row.line)].join("\n");
+      return [`${counted(listed.length, SEARCH_CAP)} recording${listed.length === 1 ? "" : "s"} match, newest first.`, ...(next ? [next] : []), ...lines].join("\n");
     },
   });
   bb.agents.registerTool({

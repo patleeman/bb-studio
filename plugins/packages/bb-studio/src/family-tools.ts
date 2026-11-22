@@ -9,7 +9,7 @@
 //   artifacts.
 // A handler's errors name the family tool the agent called, not the handler.
 import { z } from "zod";
-import { callText, nextLine, pageItems, staleCursor } from "./paging";
+import { callText, counted, nextLine, pageByKey, staleCursor } from "./paging";
 import type { IndexedItem, IndexListOptions } from "./item-index";
 import { familyHref, itemType, typeOfId, type ItemType } from "./item-model";
 
@@ -147,10 +147,11 @@ export function appTools(deps: AppToolDeps): AgentTool[] {
           .filter((item) => deps.typeOn(item.type) && (!needle || item.title.toLowerCase().includes(needle)));
         if (!items.length) return needle ? `No apps match "${query}".` : "No apps yet. Make one with apps (op: create).";
         // In parts (src/paging.ts): the next part starts after the last app shown.
-        const part = pageItems(items, (item) => item.id, (item) => line(item).length, { after, max: 100 });
-        if (part.missing) return staleCursor(`App ${after}`, "apps list");
+        // By keyset on creation: an app changed between parts doesn't move.
+        const part = pageByKey(items, (item) => [item.createdAt, item.id], (item) => line(item).length, { after, max: 100, descending: [true, true] });
+        if (part.missing) return staleCursor("That cursor", callText("apps_list", { ...(type ? { type } : {}), ...(query ? { query } : {}) }));
         const next = nextLine(part, (last) => callText("apps_list", { ...(type ? { type } : {}), ...(query ? { query } : {}), after: last }), "apps");
-        return [`${items.length} app${items.length === 1 ? "" : "s"}.`, ...(next ? [next] : []), ...part.items.map(line)].join("\n");
+        return [`${counted(items.length, 500)} app${items.length === 1 ? "" : "s"}, newest first.`, ...(next ? [next] : []), ...part.items.map(line)].join("\n");
       }) as never,
     },
     {

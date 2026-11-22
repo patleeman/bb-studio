@@ -18,7 +18,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import { callText } from "../paging";
+import { callText, safeEnd } from "../paging";
 import { rpcContract } from "./contract";
 import { printCsp, printPage } from "./server/print";
 import { applyTextEdit } from "./server/text-edit";
@@ -385,10 +385,20 @@ export function registerDesign(bb: BbPluginApi, db: Database.Database, services:
       let used = 0;
       const found = wanted.filter((id) => id in html);
       let cut: string | null = null;
+      // Sizes as the reply carries them: JSON-encoded, with quotes and line breaks escaped.
+      const encoded = (text: string) => JSON.stringify(text).length;
+      const most = MAX_READ_CHARS - head.length - 1_000;
       for (const id of found) {
-        const size = html[id]!.length;
+        const size = encoded(html[id]!);
         if (Object.keys(shown).length && used + size > room) break;
-        if (size > MAX_READ_CHARS - head.length - 1_000) { shown[id] = html[id]!.slice(0, MAX_READ_CHARS - head.length - 1_000); cut = id; used += shown[id]!.length; break; }
+        if (size > most) {
+          let end = Math.floor(html[id]!.length * most / size);
+          while (end > 0 && encoded(html[id]!.slice(0, end)) > most) end = Math.floor(end * 0.95);
+          shown[id] = html[id]!.slice(0, safeEnd(html[id]!, end));
+          cut = id;
+          used += encoded(shown[id]!);
+          break;
+        }
         shown[id] = html[id]!;
         used += size;
       }

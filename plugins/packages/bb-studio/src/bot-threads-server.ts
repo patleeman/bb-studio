@@ -635,12 +635,15 @@ export function registerBotThreads(bb: Bb, db: Database.Database, deps: BotThrea
       ...shown.workers.map((each) => ({ id: each.threadId, section: workersHead, line: `- ${each.title} (/threads/${each.threadId}): ${each.status}${each.ownerTitle ? `, from ${each.ownerTitle}` : ""}${each.tag ? `, in ${each.tag}${each.branch ? ` (${each.branch})` : ""}` : ""}` })),
     ];
     const part = pageSections(rows, { after });
-    if (!part) return staleCursor(`Thread ${after}`, "bot_info conversations");
+    if (!part) return staleCursor(`Thread ${after}`, callText("bot_conversations", {}));
     const next = nextLine(part.page, (last) => callText("bot_conversations", { after: last }), "threads");
+    const last = part.page.next === null;
     return [
       ...(next ? [next] : []),
+      // The headings the old list always had: Conversations even when there are none, Workers "- none" at the end.
+      ...(!after && !shown.conversations.length ? [conversations, "- none"] : []),
       ...part.lines,
-      ...(shown.workers.length || after ? [] : [workersHead, "- none"]),
+      ...(last && !shown.workers.length ? [workersHead, "- none"] : []),
       ...(part.page.next === null && shown.olderConversations ? [`(${shown.olderConversations} older conversations not listed: not active in 14 days)`] : []),
       ...(part.page.next === null && shown.hiddenWorkers ? [`(${shown.hiddenWorkers} older finished or failed workers not listed)`] : []),
     ].join("\n");
