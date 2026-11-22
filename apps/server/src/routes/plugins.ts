@@ -1,3 +1,4 @@
+import { redactSecrets } from "../services/plugins/redact-secrets.fork.js";
 import { forkAppWindowCaller } from "../services/plugins/fork-app-window-caller.js";
 import { HOST_TAILWIND_VERSION } from "@bb/plugin-build/host-tailwind-version";
 import type { PluginUpdateJobs } from "../services/plugins/plugin-update-jobs.js";
@@ -705,7 +706,7 @@ export function registerPluginRoutes(
     if (lines === undefined) {
       return context.json({ ok: false, error: "unknown plugin" }, 404);
     }
-    return context.json({ ok: true, lines });
+    return context.json({ ok: true, lines: lines.map(redactSecrets) });
   });
 
   app.post("/plugins/updates/check", async (context) => {

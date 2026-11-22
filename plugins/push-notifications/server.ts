@@ -1,3 +1,4 @@
+import { redactSecrets } from "./redact.fork.js";
 import { randomUUID } from "node:crypto";
 import {
   PluginCliError,
@@ -585,9 +586,9 @@ export function createPushNotificationsPlugin(
               const view = await status();
               return {
                 exitCode: 0,
-                stdout: input.options.json
+                stdout: redactSecrets(input.options.json
                   ? JSON.stringify(view)
-                  : formatStatus(view),
+                  : formatStatus(view)),
               };
             },
           }),

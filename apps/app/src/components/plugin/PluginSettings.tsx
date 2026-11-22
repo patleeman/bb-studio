@@ -1,3 +1,4 @@
+import { ForkRedactedPluginSetting, isForkRedactedSetting } from "@/components/plugin/ForkRedactedPluginSetting";
 import { ExpandableText } from "@bb/shared-ui/expandable-text";
 import { usePluginEnabledMutation } from "@/components/plugin/usePluginEnabledMutation";
 import { useId, useState, type FocusEvent } from "react";
@@ -458,7 +459,9 @@ export function PluginSettingsForm({ pluginId }: { pluginId: string }) {
 
   return (
     <div className="space-y-4">
-      {Object.entries(view.schema).map(([key, descriptor]) => (
+      {Object.entries(view.schema).map(([key, descriptor]) => isForkRedactedSetting(descriptor, view.values[key]) ? (
+        <ForkRedactedPluginSetting key={key} descriptor={descriptor} pluginId={pluginId} settingKey={key} storedValue={view.values[key]} />
+      ) : (
         <AutosavingPluginSetting
           key={key}
           descriptor={descriptor}
