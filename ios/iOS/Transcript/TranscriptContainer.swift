@@ -59,6 +59,8 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
     var probe: ((CGRect) -> Void)?
     /// How the log writes a row id.
     var describeID: ((AnyHashable) -> String)?
+    /// The conversation, for its reading spot across rebuilds (`TranscriptReadingSpots`).
+    var spotKey: String?
 
     final class Coordinator {
         var items: [Item] = []
@@ -85,6 +87,7 @@ struct TranscriptContainer<Item: Identifiable & Equatable, Row: View, Composer: 
         controller.log = log
         if let dismissKeyboard { controller.dismissKeyboard = dismissKeyboard }
         controller.probe = probe
+        controller.spotKey = spotKey
         if let describeID { controller.describe = describeID }
         controller.chrome = chrome
         let row = row

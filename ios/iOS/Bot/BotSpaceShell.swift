@@ -12,7 +12,11 @@ struct BotSpacesRoot: View {
     private var pages: DuoPages? {
         Self.qaSplit ? nil : DuoPages(window: layout.windowSize, phone: UIDevice.current.userInterfaceIdiom == .phone)
     }
-    private var inRoom: Bool { compact || pages != nil }
+    /// The room on any phone (the split view is the iPad's): a phone's size
+    /// class and window size change at different moments while the window
+    /// resizes (the Duo folding, iOS's split), and asking them then swapped
+    /// in the split for a moment, rebuilding the room and losing its place.
+    private var inRoom: Bool { compact || pages != nil || (UIDevice.current.userInterfaceIdiom == .phone && !Self.qaSplit) }
 
     static var qaSplit: Bool {
         #if DEBUG

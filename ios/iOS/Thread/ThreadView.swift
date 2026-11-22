@@ -1650,7 +1650,8 @@ extension ThreadView {
             },
             pillNote: transcriptV2PillNote,
             probe: transcriptV2Probe,
-            describeID: { ($0.base as? String).map(ScrollLog.id) ?? "?" })
+            describeID: { ($0.base as? String).map(ScrollLog.id) ?? "?" },
+            spotKey: model.threadId)
         // Under the header and to the edges; it ends at the keyboard's top.
         .ignoresSafeArea(.container)
         .overlay {
