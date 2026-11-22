@@ -28,9 +28,12 @@ NewConversationUITests
 ConversationsUITests
 ApprovalsUITests
 BotControlsUITests
+LinksUITests
+CaptureUITests
+DesignZoomUITests
 StrandsOverviewUITests
 StrandFilterUITests
-LinksUITests
+ReplyAskUITests
 ComposerUITests
 "
 only=""
