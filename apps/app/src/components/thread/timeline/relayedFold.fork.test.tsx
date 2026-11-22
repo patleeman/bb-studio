@@ -108,6 +108,17 @@ describe("foldRelayedRows", () => {
     expect([...fold.folded]).toEqual(["a_message"]);
   });
 
+  it("leaves a group alone when a link points into it", () => {
+    registerStudioLike();
+    const rows = buildTimelineViewRows(
+      exchange("a", { text: LEAD, initiator: "agent" }, "[PASS]"),
+    );
+    const reply = rows.at(-1)!;
+    const fold = foldRelayedRows(rows, null, undefined, false, new Set([reply.id]));
+    expect(fold.rows).toBe(rows);
+    expect(fold.folded.size).toBe(0);
+  });
+
   it("keeps the reply when it is real text", () => {
     registerStudioLike();
     const rows = buildTimelineViewRows(

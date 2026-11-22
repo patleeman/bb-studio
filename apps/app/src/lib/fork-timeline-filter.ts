@@ -2,9 +2,15 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useSyncExternalStore,
+  type ComponentType,
 } from "react";
-import type { ExperimentalTimelineFilter, ExperimentalTimelineFold } from "@get-bb/plugin-sdk";
+import type {
+  ExperimentalTimelineFilter,
+  ExperimentalTimelineFold,
+  ExperimentalTimelineZoomViewProps,
+} from "@get-bb/plugin-sdk";
 import {
   getPluginSlotSnapshot,
   subscribePluginSlots,
@@ -79,7 +85,9 @@ function shapedAsFolds(value: unknown[]): boolean {
         typeof (fold as ExperimentalTimelineFold).id === "string" &&
         typeof (fold as ExperimentalTimelineFold).label === "string" &&
         Array.isArray((fold as ExperimentalTimelineFold).turnIds) &&
-        (fold as ExperimentalTimelineFold).turnIds.every((id) => typeof id === "string"),
+        (fold as ExperimentalTimelineFold).turnIds.every((id) => typeof id === "string") &&
+        ((fold as ExperimentalTimelineFold).labelFor === undefined ||
+          typeof (fold as ExperimentalTimelineFold).labelFor === "function"),
     )
   );
 }
@@ -120,6 +128,49 @@ export function expandTimelineFold(threadId: string, id: string): void {
   }
 }
 
+const NO_ZOOM: TimelineZoom = { level: 0, View: null, pluginId: null, slotId: null };
+
+export interface TimelineZoom {
+  level: number;
+  View: ComponentType<ExperimentalTimelineZoomViewProps> | null;
+  /** The registration's plugin and id, to mount `View` as that plugin's slot. */
+  pluginId: string | null;
+  slotId: string | null;
+}
+
+/** A thread's zoom: the first registration with `zoom` decides; level 0 (bb's timeline) when none, or when it throws. */
+export function timelineZoomOf(
+  slots: readonly PluginTimelineFilterSlot[],
+  threadId: string,
+): TimelineZoom {
+  for (const slot of slots) {
+    const zoom = slot.zoom;
+    if (zoom === undefined) continue;
+    try {
+      const level = zoom.level(threadId);
+      return typeof level === "number" && level > 0
+        ? { level, View: zoom.View, pluginId: slot.pluginId, slotId: slot.id }
+        : NO_ZOOM;
+    } catch (error) {
+      warnOnce(slot, "zoom.level", error);
+      return NO_ZOOM;
+    }
+  }
+  return NO_ZOOM;
+}
+
+export function useTimelineZoomOf(threadId: string): TimelineZoom {
+  const slots = useSyncExternalStore(
+    subscribePluginSlots,
+    () => getPluginSlotSnapshot().timelineFilters,
+    () => getPluginSlotSnapshot().timelineFilters,
+  );
+  const subscribe = useSlotsSubscribe(slots);
+  const read = useCallback(() => timelineZoomOf(slots, threadId), [slots, threadId]);
+  const zoom = useSyncExternalStore(subscribe, () => read().level, () => read().level);
+  return useMemo(() => (zoom > 0 ? timelineZoomOf(slots, threadId) : NO_ZOOM), [zoom, slots, threadId]);
+}
+
 export function useTimelineFoldsOf(threadId: string | null): readonly ExperimentalTimelineFold[] {
   const slots = useSyncExternalStore(
     subscribePluginSlots,
@@ -133,26 +184,32 @@ export function useTimelineFoldsOf(threadId: string | null): readonly Experiment
 
 function useSlotsSubscribe(slots: readonly PluginTimelineFilterSlot[]) {
   return useCallback(
-    (listener: () => void) => {
-      const offs = slots.map((slot) => {
-        try {
-          return slot.subscribe(listener);
-        } catch (error) {
-          warnOnce(slot, "subscribe", error);
-          return null;
-        }
-      });
-      return () => {
-        for (const off of offs) {
-          try {
-            if (typeof off === "function") off();
-          } catch {
-          }
-        }
-      };
-    },
+    (listener: () => void) => subscribeTimelineSlots(slots, listener),
     [slots],
   );
+}
+
+/** Listens to every registration's changes (filters, folds, zoom); answers the unsubscribe. */
+export function subscribeTimelineSlots(
+  slots: readonly PluginTimelineFilterSlot[],
+  listener: () => void,
+): () => void {
+  const offs = slots.map((slot) => {
+    try {
+      return slot.subscribe(listener);
+    } catch (error) {
+      warnOnce(slot, "subscribe", error);
+      return null;
+    }
+  });
+  return () => {
+    for (const off of offs) {
+      try {
+        if (typeof off === "function") off();
+      } catch {
+      }
+    }
+  };
 }
 
 export function useTimelineFilterOf(

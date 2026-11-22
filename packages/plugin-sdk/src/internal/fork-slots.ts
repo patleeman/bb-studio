@@ -179,13 +179,25 @@ export function forkSlotMethods(
           throw new Error(`${kind} "${id}": ${optional} must be a function`);
         }
       }
+      const zoom = registration.zoom;
+      if (
+        zoom !== undefined &&
+        (zoom === null ||
+          typeof zoom !== "object" ||
+          typeof zoom.level !== "function" ||
+          (typeof zoom.View !== "function" && (typeof zoom.View !== "object" || zoom.View === null)))
+      ) {
+        throw new Error(`${kind} "${id}": zoom must be { level(threadId), View }`);
+      }
       collected.timelineFilters.push({
         id,
         get: registration.get,
         subscribe: registration.subscribe,
         ...(registration.folds ? { folds: registration.folds } : {}),
         ...(registration.expandFold ? { expandFold: registration.expandFold } : {}),
+        ...(zoom ? { zoom: { level: zoom.level, View: zoom.View } } : {}),
       });
+      return { folds: true, zoom: true };
     },
     experimental_linkHandler(registration) {
       const kind = "slots.experimental_linkHandler";
