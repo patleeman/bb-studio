@@ -11,7 +11,7 @@ final class RoomComposerBandUITests: ServerIsolatedUITestCase {
     static let lineAllowance: CGFloat = 22
 
     private func launch() {
-        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaLoopsDemo", "-qaRoomTheme", "forest"]
+        app.launchArguments += ["-skipPushPrompt", "YES", "-qaBotDemo", "chat", "-qaSpacesDemo", "list", "-qaStrandsDemo", "-qaRoomTheme", "forest"]
         app.launchOffline()
         if !app.waitForRoom(timeout: 30) {
             app.terminate()
@@ -67,7 +67,7 @@ final class RoomComposerBandUITests: ServerIsolatedUITestCase {
         let height = min(band.maxY, keyboardTop) - band.minY
         let card = any("threadComposer").frame
         let text = field.frame
-        let parts = [("In flight", any("in-flight")), ("the worker pill", any("conversationWorkers")), ("the composer", any("threadComposer"))]
+        let parts = [("the strands box", any("strands-box")), ("the worker pill", any("conversationWorkers")), ("the composer", any("threadComposer"))]
             .filter { $0.1.exists }.map { ($0.0, $0.1.frame) }
         steps.append(String(format: "%@: band %.0f–%.0f (%.0f pt), stack from %.0f, field %.0f–%.0f, card %.0f–%.0f, jump %@",
                             when, band.minY, band.maxY, height, stack.minY, text.minY, text.maxY, card.minY, card.maxY,
@@ -128,7 +128,7 @@ final class RoomComposerBandUITests: ServerIsolatedUITestCase {
         XCTAssertTrue(keyboard.waitForExistence(timeout: 10), "the keyboard is up")
         let tip = app.buttons["Continue"]
         if tip.waitForExistence(timeout: 2) { tip.tap() }
-        XCTAssertTrue(any("in-flight").waitForExistence(timeout: 20), "In flight is in the stack")
+        XCTAssertTrue(any("strands-box").waitForExistence(timeout: 20), "the strands box is in the stack")
         for lines in [1, 3, 8] {
             clear()
             type(lines: lines)
