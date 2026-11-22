@@ -290,6 +290,19 @@ describe("the strand push leaves reply asks to the reply's own push", () => {
   });
 });
 
+describe("what a folded run reads from the tags", () => {
+  it("gives each turn's kind and each tagged reply's first sentence", async () => {
+    const x = service();
+    await x.svc.idle(x.thread.id);
+    x.thread.turn("Disk space on the laptop?", "Freed 18 GB. Looking at what else is big.", { at: NOW - 2 * HOUR });
+    x.thread.turn("Runner report: backup done", "Noted: the backup finished.", { at: NOW - HOUR, kind: "report" });
+    await x.svc.idle(x.thread.id);
+    const tags = x.svc.tags(x.thread.id);
+    expect(tags.tags.map((tag) => tag.kind)).toEqual(["user", "report"]);
+    expect(tags.replies.map((row) => [row.tag, row.line])).toEqual([["status", "Freed 18 GB."], ["status", "Noted: the backup finished."]]);
+  });
+});
+
 describe("strands.list", () => {
   it("lists an open reply ask on its strand, valid against the contract", async () => {
     const x = service();

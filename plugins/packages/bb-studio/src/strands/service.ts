@@ -257,13 +257,13 @@ export class StrandService {
     return this.store.items(threadId, limit, ["user", "report", "worker"]).map((item) => ({ ...item }));
   }
 
-  tags(threadId: string): { tags: { turnId: string; seq: number; strandId: string | null }[]; strands: { id: string; title: string }[]; replies: ReplyTagView[] } {
+  tags(threadId: string): { tags: { turnId: string; seq: number; strandId: string | null; kind: "user" | "report" }[]; strands: { id: string; title: string }[]; replies: ReplyTagView[] } {
     if (!this.enabled(threadId)) return { tags: [], strands: [], replies: [] };
-    const rows = this.store.db.prepare("SELECT turn_id, seq, strand_id FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND turn_id IS NOT NULL ORDER BY seq DESC LIMIT 2000").all(threadId) as { turn_id: string; seq: number; strand_id: string | null }[];
+    const rows = this.store.db.prepare("SELECT turn_id, seq, strand_id, kind FROM strand_items WHERE thread_id = ? AND kind IN ('user', 'report') AND turn_id IS NOT NULL ORDER BY seq DESC LIMIT 2000").all(threadId) as { turn_id: string; seq: number; strand_id: string | null; kind: "user" | "report" }[];
     return {
-      tags: rows.reverse().map((row) => ({ turnId: row.turn_id, seq: row.seq, strandId: row.strand_id })),
+      tags: rows.reverse().map((row) => ({ turnId: row.turn_id, seq: row.seq, strandId: row.strand_id, kind: row.kind })),
       strands: this.store.list(threadId).map((strand) => ({ id: strand.id, title: strand.title })),
-      replies: this.store.replies(threadId, this.now() - REPLY_OPEN_MS).flatMap((reply) => (reply.turnId && reply.tag ? [{ turnId: reply.turnId, seq: reply.seq, tag: reply.tag, ask: reply.ask, resolved: reply.resolved }] : [])),
+      replies: this.store.replies(threadId, this.now() - REPLY_OPEN_MS).flatMap((reply) => (reply.turnId && reply.tag ? [{ turnId: reply.turnId, seq: reply.seq, tag: reply.tag, ask: reply.ask, resolved: reply.resolved, line: reply.line }] : [])),
     };
   }
 

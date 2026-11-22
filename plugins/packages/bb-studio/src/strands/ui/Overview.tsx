@@ -16,7 +16,7 @@ import { AskButtonsFor, StateMark } from "./Strip";
 
 export { isStrandsPath, strandsPath } from "./overview-route";
 
-/** Opens a conversation at a strand's newest message, with the strand selected. */
+/** Opens a conversation at a strand's newest message, with the strand selected (the filter shows its runs unfolded). */
 function useOpenStrand() {
   const navigate = useBbNavigate();
   return (threadId: string, strand: Pick<StrandView, "id" | "latestSeq"> | null) => {

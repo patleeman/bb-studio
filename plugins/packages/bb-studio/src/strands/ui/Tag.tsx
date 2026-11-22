@@ -19,7 +19,7 @@ import type { ReplyTagView } from "../contract";
 import { replyOf, tagOf, type Tags } from "./model";
 import { useNewestInTurn } from "./reply-marks";
 import { findText, FLASH_MS, lastParagraph, markRange, takeFlash, useFlashVersion } from "./ask-mark";
-import { ensureDimStyle, timelineFiltersInHost, useSelection } from "./selection";
+import { ensureDimStyle, setFoldTags, timelineFiltersInHost, useSelection } from "./selection";
 import { moveFocus, useSelectStrand } from "./Strip";
 
 const ROW = "[data-timeline-row-id]";
@@ -152,6 +152,8 @@ function MoveMenu({ threadId, seq, current, strands }: { threadId: string; seq: 
 
 function Tag({ message }: ExperimentalMessageMetadataProps) {
   const tags = useLive("strands.tags", { threadId: message.threadId }, { pollMs: 60_000 });
+  // BB's timeline folds the conversation's runs of status replies from these tags.
+  useEffect(() => { setFoldTags(message.threadId, tags.data); }, [message.threadId, tags.data]);
   const selection = useSelection(message.threadId);
   const choose = useSelectStrand(message.threadId);
   const ref = useRef<HTMLElement | null>(null);

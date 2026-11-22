@@ -101,6 +101,12 @@ function shownText(line: string): string {
     .replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/giu, (whole, dec, hex, name) => (dec ? String.fromCodePoint(Number(dec)) : hex ? String.fromCodePoint(parseInt(hex, 16)) : ENTITIES[String(name).toLowerCase()] ?? whole));
 }
 
+/** The reply's first sentence, as shown (a folded run of status replies says it), cut to one line. */
+export function firstLineOf(text: string): string | null {
+  const first = proseOf(text)[0];
+  return first ? cut(sentencesOf(first)[0] ?? first, 120) : null;
+}
+
 /** The sentences of the reply's end Jev picks the ask from, oldest first. */
 export function askCandidates(text: string): string[] {
   return proseOf(text).flatMap(sentencesOf).slice(-ASK_CANDIDATES);
