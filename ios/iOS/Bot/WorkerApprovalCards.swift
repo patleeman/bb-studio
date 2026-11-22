@@ -134,8 +134,7 @@ struct WorkerApprovalCard: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
                     .foregroundStyle(decision == .allowOnce ? Color(uiColor: .systemBackground) : .primary)
-                    .background(decision == .allowOnce ? Color.primary : .clear, in: .capsule)
-                    .glassEffect(decision == .allowOnce ? .identity : .regular, in: .capsule)
+                    .background(decision == .allowOnce ? AnyShapeStyle(Color.primary) : AnyShapeStyle(.fill.tertiary), in: .capsule)
                     .contentShape(.capsule)
                 }
                 .buttonStyle(.plain)
