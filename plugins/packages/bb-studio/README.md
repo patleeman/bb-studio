@@ -4466,7 +4466,7 @@ strands. Quiet `[PASS]` replies and the backfill's history aren't tagged.
   strand starts, "|" where it goes on, a dot where it ends, then its name,
   how many messages, its key moment (the open ask, in amber; an answered
   ask; your message; else the newest status line) and the time. Pinch,
-  ⌥⌘− / ⌥⌘= (rebindable) or the header's Messages · Strands · Tree switch
+  ⌃⌘− / ⌃⌘= (rebindable) or the header's Messages · Strands · Tree switch
   move between them; the message in the middle stays in the middle, and a
   click on a line zooms back in to its key moment. The header also shows
   "N need you", which goes to the ask. Where BB zooms (the fork's `zoom` on

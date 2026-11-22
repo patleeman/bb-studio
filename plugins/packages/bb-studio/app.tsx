@@ -395,8 +395,9 @@ export default definePluginApp((app) => {
   app.composer.customize({ id: "strands", scopes: ["thread"], banners: [{ id: "strands", component: StrandsBoxBanner }] });
   // Semantic zoom (the fork's zoom seam): a zoomed-out conversation shows its strands in the timeline's place.
   registerTimelineFilter(app.slots, ZoomView);
-  app.commands.register({ id: "zoom-out", title: "Studio: Zoom out (Messages → Strands)", defaultShortcut: { key: "-", mod: true, alt: true }, isAvailable: (context) => canZoom(context.threadId), run: (context) => { zoomThreadBy(context.threadId, 1); } });
-  app.commands.register({ id: "zoom-in", title: "Studio: Zoom in (Strands → Messages)", defaultShortcut: { key: "=", mod: true, alt: true }, isAvailable: (context) => canZoom(context.threadId), run: (context) => { zoomThreadBy(context.threadId, -1); } });
+  // ⌃⌘− / ⌃⌘=: Control keeps the key "-" and "="; Option would make them "–" and "≠", which BB's matcher can't map back.
+  app.commands.register({ id: "zoom-out", title: "Studio: Zoom out (Messages → Strands)", defaultShortcut: { key: "-", mod: true, control: true }, isAvailable: (context) => canZoom(context.threadId), run: (context) => { zoomThreadBy(context.threadId, 1); } });
+  app.commands.register({ id: "zoom-in", title: "Studio: Zoom in (Strands → Messages)", defaultShortcut: { key: "=", mod: true, control: true }, isAvailable: (context) => canZoom(context.threadId), run: (context) => { zoomThreadBy(context.threadId, -1); } });
   // BB's thread context row (parent, changed files, pull request) in a strands conversation's Info tab; hidden above its composer (prompt-stack.ts).
   const infoSection = member(app.slots, "experimental_threadInfoSection");
   if (typeof infoSection === "function") infoSection.call(app.slots, { id: "thread-context", group: "0_context", order: 10, component: ContextInfoSection });

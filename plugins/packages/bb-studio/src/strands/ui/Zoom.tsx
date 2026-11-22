@@ -1,17 +1,19 @@
 // Semantic zoom (design "Strands as shape", round 2, screens 7a–7b): one
 // gesture zooms a conversation out in place. Level 0 is BB's own timeline;
 // level 1, drawn here in the timeline's place (the fork's zoom seam), is one
-// line per stretch of one strand. Pinch (ctrl+wheel), ⌥⌘− / ⌥⌘= or the
+// line per stretch of one strand. Pinch (ctrl+wheel), ⌃⌘− / ⌃⌘= or the
 // header's Messages · Strands · Tree switch move between levels; the message
-// in the middle of the screen stays put, and clicking a line zooms back in to
-// its key moment. The tree (level 2) comes later.
+// in the middle of the screen stays put, clicking a line zooms back in to its
+// key moment, and sending a message goes back to the messages. Where BB zooms,
+// the header also carries what the strands box did: the strand filter, the
+// Strands tab and "N need you". The tree (level 2) comes later.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
 import { cn } from "../../kit/ui/utils";
 import { useLive } from "../../ui/live";
 import { flashReply } from "./ask-mark";
 import { countsOf, replyAskOf, strayCountsOf } from "./model";
-import { setZoom, useZoom, zoomInHost, zoomOf, ZOOM_MAX } from "./selection";
-import { STRANDS_POLL_MS, useJump } from "./Strip";
+import { holdZoomable, select, setZoom, useZoom, zoomInHost, zoomOf, ZOOM_MAX } from "./selection";
+import { STRANDS_POLL_MS, useJump, useOpenStrandsTab, useStrandFilter } from "./Strip";
 import { lineAt, timeRange, zoomLines, type ZoomGlyph, type ZoomLine } from "./zoom-model";
 
 export const TAGS_POLL_MS = 60_000;
@@ -20,7 +22,9 @@ const PINCH_STEP = 60;
 /** A pause this long between wheel events ends a pinch. */
 const PINCH_PAUSE_MS = 350;
 const LEVELS = ["Messages", "Strands", "Tree"] as const;
-export const ZOOM_KEYS = "⌥⌘− ⌥⌘= · pinch";
+export const ZOOM_KEYS = "⌃⌘− ⌃⌘= · pinch";
+/** Pinching over these zooms them, not the conversation. */
+const OWN_ZOOM = "img, canvas, iframe, video, [data-zoomable]";
 
 // ---- zooming, per conversation ----
 
@@ -37,14 +41,12 @@ export function zoomThreadBy(threadId: string | null, delta: number): boolean {
 
 export const canZoom = (threadId: string | null) => !!threadId && actions.has(threadId);
 
-/** The zoom host of a conversation (the fork's zoom seam marks it). */
-function hostOf(threadId: string): Element | null {
-  return document.querySelector(`[data-timeline-zoom-thread="${threadId.replace(/["\\]/gu, "\\$&")}"]`);
-}
+/** At level 1, each conversation's drawn list answers the message in its middle (its own DOM, no lookup by id). */
+const middles = new Map<string, () => number | null>();
 
-/** At level 1: the line nearest the middle of the screen, as the message to land on. */
-function middleSeq(threadId: string): number | null {
-  const lines = [...(hostOf(threadId)?.querySelectorAll<HTMLElement>("[data-zoom-line]") ?? [])];
+/** The line nearest the middle of `list`'s scroll viewport, as the message to land on. */
+function middleOfList(list: HTMLElement | null): number | null {
+  const lines = [...(list?.querySelectorAll<HTMLElement>("[data-zoom-line]") ?? [])];
   if (!lines.length) return null;
   const viewport = lines[0]!.closest("[data-page-scroll-viewport]");
   const box = viewport?.getBoundingClientRect();
@@ -67,7 +69,7 @@ function useZoomTo(threadId: string) {
     const from = zoomOf(threadId);
     const to = Math.max(0, Math.min(ZOOM_MAX, level));
     if (to === from) return;
-    const land = to === 0 ? seq ?? middleSeq(threadId) : null;
+    const land = to === 0 ? seq ?? middles.get(threadId)?.() ?? null : null;
     setZoom(threadId, to);
     if (land !== null) jump(land);
   }, [jump, threadId]);
@@ -93,19 +95,35 @@ function Glyph({ glyph, current }: { glyph: ZoomGlyph; current: boolean }) {
 }
 
 /** BB's `zoom.View`: what a zoomed-out conversation shows in the timeline's place. */
-export function ZoomView({ threadId, anchorSeq }: { threadId: string; level: number; anchorSeq: number | null }) {
+export function ZoomView({ threadId, anchorSeq, latestUserSeq = null }: { threadId: string; level: number; anchorSeq: number | null; latestUserSeq?: number | null }) {
   const tags = useLive("strands.tags", { threadId }, { pollMs: TAGS_POLL_MS });
   const rows = useMemo(() => zoomLines(tags.data), [tags.data]);
   const zoomTo = useZoomTo(threadId);
   const anchor = lineAt(rows, anchorSeq);
   const anchored = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
-  // The message that was in the middle stays in the middle: its line, once the lines are known.
+  // The message that was in the middle stays in the middle: its line, once the lines are known
+  // (again on the next frame, after the scroll body settles on its new content).
   useLayoutEffect(() => {
     if (anchored.current || !anchor) return;
     anchored.current = true;
-    listRef.current?.querySelector(`[data-zoom-key="${anchor.key}"]`)?.scrollIntoView({ block: "center" });
+    const centre = () => listRef.current?.querySelector(`[data-zoom-key="${anchor.key}"]`)?.scrollIntoView({ block: "center" });
+    centre();
+    const frame = requestAnimationFrame(centre);
+    return () => cancelAnimationFrame(frame);
   }, [anchor]);
+  // Gestures and keys zoom in to the line in the middle of this list.
+  useEffect(() => {
+    const own = () => middleOfList(listRef.current);
+    middles.set(threadId, own);
+    return () => { if (middles.get(threadId) === own) middles.delete(threadId); };
+  }, [threadId]);
+  // The user sent a message: back to the messages, where it shows.
+  const sentFrom = useRef(latestUserSeq);
+  useEffect(() => {
+    if (latestUserSeq !== null && latestUserSeq !== sentFrom.current) setZoom(threadId, 0);
+    sentFrom.current = latestUserSeq;
+  }, [latestUserSeq, threadId]);
   const open = (line: ZoomLine) => {
     if (line.mark === "open") flashReply(threadId, line.go);
     zoomTo(0, line.go);
@@ -140,35 +158,45 @@ export function ZoomView({ threadId, anchorSeq }: { threadId: string; level: num
 
 // ---- the header: Messages · Strands · Tree, "N need you", and the gestures ----
 
-/** In the conversation's header: the zoom switch and what needs the user. Nothing where strands don't run or BB can't zoom. */
+/**
+ * In the conversation's header, where BB zooms and strands run: the strand
+ * filter (chip, clear, previous and next), the zoom switch, the Strands tab
+ * and "N need you". Nothing elsewhere: there the box above the composer shows them.
+ */
 export function ZoomSwitch({ threadId }: { threadId: string }) {
   const list = useLive("strands.list", { threadId }, { enabled: !!threadId, pollMs: STRANDS_POLL_MS });
   const level = useZoom(threadId);
   const zoomTo = useZoomTo(threadId);
   const jump = useJump(threadId);
+  const openTab = useOpenStrandsTab();
   const enabled = !!list.data?.enabled && zoomInHost();
   const zoomBy = useCallback((delta: number) => zoomTo(zoomOf(threadId) + delta), [threadId, zoomTo]);
   useEffect(() => {
     if (!enabled) return;
     const own: ZoomActions = { zoomBy };
     actions.set(threadId, own);
-    return () => { if (actions.get(threadId) === own) actions.delete(threadId); };
+    const release = holdZoomable(threadId);
+    return () => {
+      if (actions.get(threadId) === own) actions.delete(threadId);
+      release();
+    };
   }, [enabled, threadId, zoomBy]);
   usePinch(threadId, enabled, zoomBy);
   if (!enabled) return null;
   const needs = countsOf(list.data).needs + strayCountsOf(list.data).needs;
   const waiting = list.data?.strands.find((strand) => strand.state === "needs-you") ?? null;
+  // To what waits on the user: a strand's ask, else (only stray workers wait) the Strands tab, which lists them.
   const goToAsk = () => {
-    if (!waiting) return;
-    const reply = replyAskOf(waiting);
-    const seq = reply?.seq ?? waiting.latestSeq;
-    if (seq == null) return;
+    const reply = waiting ? replyAskOf(waiting) : null;
+    const seq = reply?.seq ?? waiting?.latestSeq ?? null;
+    if (seq == null) { openTab(); return; }
     if (reply) flashReply(threadId, reply.seq);
     if (zoomOf(threadId) > 0) zoomTo(0, seq); else jump(seq);
   };
   return (
-    <span className="studio-root inline-flex shrink-0 items-center gap-2" data-zoom-switch="">
-      <span role="group" aria-label="Zoom" title={`Zoom: ${ZOOM_KEYS}`} className="inline-flex rounded-lg bg-foreground/5 p-0.5">
+    <span className="studio-root inline-flex min-w-0 shrink items-center gap-2" data-zoom-switch="">
+      <StrandFilterChip threadId={threadId} />
+      <span role="group" aria-label="Zoom" title={`Zoom: ${ZOOM_KEYS}`} className="inline-flex shrink-0 rounded-lg bg-foreground/5 p-0.5">
         {LEVELS.map((label, index) => (
           <button key={label} type="button" data-zoom-level={index} aria-pressed={level === index} disabled={index > ZOOM_MAX}
             title={index > ZOOM_MAX ? "Coming soon" : `${label} (${ZOOM_KEYS})`}
@@ -179,9 +207,13 @@ export function ZoomSwitch({ threadId }: { threadId: string }) {
           </button>
         ))}
       </span>
+      <button type="button" data-zoom-strands-tab="" onClick={openTab} title="Every strand, its asks and workers"
+        className="shrink-0 cursor-pointer rounded-md px-1.5 py-0.5 text-[11.5px] text-muted-foreground hover:bg-accent/50 hover:text-foreground">
+        All strands
+      </button>
       {needs > 0 ? (
         <button type="button" data-zoom-needs="" onClick={goToAsk}
-          className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-warning/10 px-2 py-0.5 text-[11.5px] font-medium text-warning hover:bg-warning/15">
+          className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-warning/10 px-2 py-0.5 text-[11.5px] font-medium text-warning hover:bg-warning/15">
           <span aria-hidden className="size-1.5 rounded-full bg-warning" />{needs} need you
         </button>
       ) : null}
@@ -189,7 +221,28 @@ export function ZoomSwitch({ threadId }: { threadId: string }) {
   );
 }
 
-/** Trackpad pinch over the conversation (wheel events with ctrlKey): pinching in zooms out. */
+/** The strand the conversation is filtered to: its name, clear, its message count, and previous and next (Esc clears too). */
+function StrandFilterChip({ threadId }: { threadId: string }) {
+  const { filtered, seqs, step } = useStrandFilter(threadId);
+  if (!filtered) return null;
+  const count = seqs.length || filtered.messages;
+  return (
+    <span data-strand-filter={filtered.id} className="inline-flex min-w-0 max-w-[260px] items-center gap-1 rounded-md border border-foreground/25 bg-accent px-1.5 py-0.5 text-[11.5px]">
+      <span className="truncate font-medium text-foreground">{filtered.title}</span>
+      <button type="button" aria-label="Clear filter" onClick={() => select(threadId, null)} className="grid size-4 shrink-0 cursor-pointer place-items-center rounded text-muted-foreground hover:text-foreground">×</button>
+      <span className="shrink-0 whitespace-nowrap text-muted-foreground">{count} {count === 1 ? "message" : "messages"}</span>
+      <button type="button" aria-label="Previous message in this strand" onClick={() => step(-1)} className="shrink-0 cursor-pointer rounded px-0.5 text-muted-foreground hover:text-foreground">↑</button>
+      <button type="button" aria-label="Next message in this strand" onClick={() => step(1)} className="shrink-0 cursor-pointer rounded px-0.5 text-muted-foreground hover:text-foreground">↓</button>
+    </span>
+  );
+}
+
+/**
+ * Trackpad pinch over the conversation (wheel events with ctrlKey): pinching
+ * in zooms out. It listens in the bubble phase and leaves alone what something
+ * else handled or zooms itself (an image, a canvas, a frame), and takes the
+ * event only when the pinch's direction can still move the level.
+ */
 function usePinch(threadId: string, enabled: boolean, zoomBy: (delta: number) => void) {
   const zoom = useRef(zoomBy);
   zoom.current = zoomBy;
@@ -199,10 +252,12 @@ function usePinch(threadId: string, enabled: boolean, zoomBy: (delta: number) =>
     let last = 0;
     let spent = false;
     const onWheel = (event: WheelEvent) => {
-      if (!event.ctrlKey || !(event.target instanceof Element)) return;
-      const host = hostOf(threadId);
-      const viewport = host?.parentElement?.closest("[data-page-scroll-viewport]") ?? host;
-      if (!host || !(host.contains(event.target) || viewport?.contains(event.target))) return;
+      if (!event.ctrlKey || event.defaultPrevented || !(event.target instanceof Element)) return;
+      if (event.target.closest("[data-timeline-zoom-thread]")?.getAttribute("data-timeline-zoom-thread") !== threadId) return;
+      if (event.target.closest(OWN_ZOOM)) return;
+      const out = event.deltaY > 0;
+      const level = zoomOf(threadId);
+      if (out ? level >= ZOOM_MAX : level <= 0) return;
       event.preventDefault();
       // One pinch moves one level: a pause starts the next.
       if (event.timeStamp - last > PINCH_PAUSE_MS) { sum = 0; spent = false; }
@@ -213,7 +268,7 @@ function usePinch(threadId: string, enabled: boolean, zoomBy: (delta: number) =>
       spent = true;
       zoom.current(sum > 0 ? 1 : -1);
     };
-    document.addEventListener("wheel", onWheel, { passive: false, capture: true });
-    return () => document.removeEventListener("wheel", onWheel, { capture: true });
+    document.addEventListener("wheel", onWheel, { passive: false });
+    return () => document.removeEventListener("wheel", onWheel);
   }, [enabled, threadId]);
 }
