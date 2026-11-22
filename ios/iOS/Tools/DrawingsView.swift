@@ -110,7 +110,7 @@ struct DrawingView: View {
         .task {
             while !Task.isCancelled {
                 await refresh()
-                try? await Task.sleep(for: .seconds(4))
+                await EnergyGate.shared.pollWait(.seconds(4))
             }
         }
     }

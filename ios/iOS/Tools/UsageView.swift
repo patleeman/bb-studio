@@ -34,7 +34,7 @@ struct UsageView: View {
         .task {
             while !Task.isCancelled {
                 await load()
-                try? await Task.sleep(for: .seconds(60))
+                await EnergyGate.shared.pollWait(.seconds(60))
             }
         }
     }

@@ -13,6 +13,10 @@ final class BotSpacesStore: ObservableObject {
     var shownBotId: String?
 
     var coalesceDelay: Duration = .milliseconds(300)
+    /// The last flush, for the energy gate's gap between flushes while the phone is idle.
+    private var lastFlush = ContinuousClock.now - .seconds(600)
+    /// Something waits that mustn't be paced: a first load, a watch, a reconnect, a retry.
+    private var unpaced = false
     var retryDelays: [Duration] = SpacesLaunch.retries
 
     private(set) var watched: Set<String> = []
@@ -88,7 +92,7 @@ final class BotSpacesStore: ObservableObject {
             guard support != .unavailable, let signal = Studio.BotThreadsChangedEvent(signal: event),
                 let botId = signal.botId
             else { return }
-            schedule(spaces: true, views: watched.contains(botId) ? [botId] : [])
+            schedule(spaces: true, views: watched.contains(botId) ? [botId] : [], paced: true)
         default:
             break
         }
@@ -114,15 +118,28 @@ final class BotSpacesStore: ObservableObject {
         await flush()
     }
 
-    private func schedule(spaces: Bool = false, views: Set<String> = []) {
+    /// `paced`: a change signal's refresh, which the energy gate may hold while the phone is idle.
+    private func schedule(spaces: Bool = false, views: Set<String> = [], paced: Bool = false) {
         spacesDirty = spacesDirty || spaces
         dirtyViews.formUnion(views)
+        if !paced { unpaced = true }
         guard flushTask == nil, spacesDirty || !dirtyViews.isEmpty else { return }
         flushTask = Task { [weak self] in
             guard let delay = self?.coalesceDelay else { return }
             try? await Task.sleep(for: delay)
+            // Signals only, while idle: at most one flush every 30 s (5 min at
+            // rest). In use, or for anything unpaced, no wait, as before.
+            // Looks again every second, so a touch or an unpaced request lets
+            // a held flush go.
+            while let self, !Task.isCancelled, !self.unpaced {
+                let wait = self.lastFlush + EnergyGate.shared.changeGap(.zero) - ContinuousClock.now
+                if wait <= .zero { break }
+                try? await Task.sleep(for: min(wait, .seconds(1)))
+            }
             guard !Task.isCancelled, let self else { return }
             while spacesDirty || !dirtyViews.isEmpty {
+                lastFlush = .now
+                unpaced = false
                 await flush()
                 if Task.isCancelled { return }
             }

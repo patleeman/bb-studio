@@ -75,4 +75,28 @@ final class EnergyTests: XCTestCase {
         XCTAssertFalse(BotActivityPoll.refreshes(on: .changed(entity: "page", id: "p", changes: ["status"])))
         XCTAssertFalse(BotActivityPoll.refreshes(on: .pluginSignal(pluginId: "x", channel: "y", payload: .null)))
     }
+
+    // MARK: The thread list's subscription while idle
+
+    @MainActor
+    func testTheThreadListRestsWhileIdleAndCatchesUpOnce() {
+        let realtime = BBRealtime(client: BBClient(baseURL: URL(string: "https://energy.invalid")!))
+        realtime.subscribeThreadList()
+        var events: [RealtimeEvent] = []
+        realtime.listen { events.append($0) }
+        realtime.pauseThreadList(true)
+        realtime.pauseThreadList(true)
+        XCTAssertTrue(events.isEmpty, "resting says nothing")
+        realtime.pauseThreadList(false)
+        realtime.pauseThreadList(false)
+        XCTAssertEqual(events.count, 1, "back in use: one catch-up, however often it's told")
+        guard case .changed(let entity, let id, let changes) = events.first else { return XCTFail("a thread change") }
+        XCTAssertEqual(entity, "thread")
+        XCTAssertNil(id)
+        XCTAssertTrue(changes.isEmpty, "not streaming: the list reloads soon")
+    }
+
+    func testTheCatchUpReloadsTheListsThatListen() {
+        XCTAssertTrue(BotActivityPoll.refreshes(on: .changed(entity: "thread", id: nil, changes: [])))
+    }
 }

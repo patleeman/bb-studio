@@ -68,7 +68,7 @@ final class StrandOverviewModel {
         while !Task.isCancelled {
             await load(botId)
             if supported[client().baseURL] == false { return }
-            try? await Task.sleep(for: .seconds(30))
+            await EnergyGate.shared.pollWait(.seconds(30))
         }
     }
 }

@@ -39,18 +39,21 @@ final class InboxModel: ObservableObject {
     }
 
     /// Change signals arrive in bursts while agents run: coalesce them, and
-    /// reload at most every few seconds, since each reload is a sidebar fetch.
+    /// reload at most every few seconds in use, since each reload is a
+    /// sidebar fetch. While the phone is idle, at most every
+    /// 30 s (5 min once it rests); a touch brings a held reload back.
     private func scheduleReload(_ client: BBClient, refreshPreferences: Bool, within delay: Duration = .milliseconds(400)) {
         reloadPreferences = reloadPreferences || refreshPreferences
-        let due = max(ContinuousClock.now + delay, lastReload + .seconds(3))
+        let due = ContinuousClock.now + delay
         reloadDue = min(reloadDue ?? due, due)
         guard reloadTask == nil else { return }
         reloadTask = Task {
-            while let due = reloadDue {
+            while let requested = reloadDue {
+                let due = max(requested, lastReload + EnergyGate.shared.changeGap(.seconds(3)))
                 let wait = due - ContinuousClock.now
                 if wait > .zero {
-                    // Short naps, so a sooner request cuts a long wait short.
-                    try? await Task.sleep(for: min(wait, .milliseconds(500)))
+                    // Short naps, so a sooner request or a touch cuts a long wait short.
+                    try? await Task.sleep(for: min(wait, EnergyGate.shared.idle ? .seconds(5) : .milliseconds(500)))
                     continue
                 }
                 reloadDue = nil

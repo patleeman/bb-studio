@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Each conversation's strands, polled while its screen is open
-/// (`strands.list`, every 30 s as on the desktop). A Studio without strands
+/// (`strands.list`, every 30 s as on the desktop, longer while the phone is
+/// idle, and held in the background). A Studio without strands
 /// answers "unknown method": the conversation keeps In flight then.
 @MainActor @Observable
 final class StrandsModel {
@@ -53,7 +54,7 @@ final class StrandsModel {
         while !Task.isCancelled {
             await load(threadId)
             if supported[client.baseURL] == false { return }
-            try? await Task.sleep(for: .seconds(30))
+            await EnergyGate.shared.pollWait(.seconds(30))
         }
     }
 

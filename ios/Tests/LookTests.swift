@@ -105,6 +105,22 @@ final class LookTests: XCTestCase {
         XCTAssertEqual(EnergyGate.pollDelay(.seconds(60), idle: true), .seconds(180))
         XCTAssertEqual(EnergyGate.pollDelay(.seconds(120), idle: true), .seconds(180))
         XCTAssertEqual(EnergyGate.pollDelay(.seconds(300), idle: true), .seconds(300))
+        // Untouched for five minutes: every poll rests at 5 min.
+        XCTAssertEqual(EnergyGate.pollDelay(.seconds(30), idle: true, idleFor: 299), .seconds(90))
+        XCTAssertEqual(EnergyGate.pollDelay(.seconds(30), idle: true, idleFor: 300), .seconds(300))
+        XCTAssertEqual(EnergyGate.pollDelay(.seconds(600), idle: true, idleFor: 900), .seconds(600))
+        XCTAssertEqual(EnergyGate.pollDelay(.seconds(30), idle: false, idleFor: 900), .seconds(30), "in use: as given")
+        // Low Power Mode or a warm phone: as if idle, even in use.
+        XCTAssertEqual(EnergyGate.pollDelay(.seconds(30), idle: false, saving: true), .seconds(90))
+    }
+
+    func testChangeSignalsRefreshLessOftenWhileIdle() {
+        XCTAssertEqual(EnergyGate.changeGap(.seconds(3), idle: false), .seconds(3), "in use: the caller's own pace")
+        XCTAssertEqual(EnergyGate.changeGap(.zero, idle: false), .zero)
+        XCTAssertEqual(EnergyGate.changeGap(.seconds(3), idle: true), .seconds(30))
+        XCTAssertEqual(EnergyGate.changeGap(.zero, idle: false, idleFor: 900), .zero, "in use: no wait")
+        XCTAssertEqual(EnergyGate.changeGap(.seconds(20), idle: true), .seconds(60))
+        XCTAssertEqual(EnergyGate.changeGap(.seconds(3), idle: true, idleFor: 300), .seconds(300), "at rest")
     }
 
     func testPollsHoldInTheBackgroundAndRunWhenTheAppIsBack() async throws {

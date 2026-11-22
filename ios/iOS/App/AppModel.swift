@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftUI
 import UIKit
@@ -135,6 +136,7 @@ final class AppModel: ObservableObject {
     /// The classic Bot tab shows the Strands screen (a link came before the Bot loaded).
     @Published var botShowsStrands = false
     @Published var shellLink: BotShellLink?
+    private var idleWatch: AnyCancellable?
 
     /// The last thread opened.
     var lastThreadId: String {
@@ -152,6 +154,9 @@ final class AppModel: ObservableObject {
         flushOutboxOnConnect()
         BotSpacesStore.shared.attach(client: client, realtime: realtime)
         BotLiveActivities.shared.attach(store: BotSpacesStore.shared, client: client)
+        idleWatch = EnergyGate.shared.$idle.removeDuplicates().dropFirst().sink { [weak self] idle in
+            self?.realtime.pauseThreadList(idle)
+        }
         #if DEBUG
         BotSpacesDemo.install(BotSpacesStore.shared)
         if ProcessInfo.processInfo.arguments.contains("-qaStartOnThreads") { tab = .inbox }

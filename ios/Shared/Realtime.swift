@@ -54,6 +54,23 @@ public final class BBRealtime {
 
     public func subscribeThreadList() { subscribe(key: "thread-list", target: ["kind": "thread-list"]) }
 
+    /// Every thread's changes, including "events appended" up to twice a
+    /// second for each running agent: on a busy Mac a steady stream that keeps
+    /// the radio awake. While nobody touches the phone the list's socket
+    /// subscription rests (an open thread keeps its own); back in use it
+    /// subscribes again and tells the list's listeners to catch up.
+    public func pauseThreadList(_ paused: Bool) {
+        let key = "thread-list"
+        if paused {
+            guard let target = subscriptions.removeValue(forKey: key) else { return }
+            write(["type": "unsubscribe", "target": target])
+        } else {
+            guard subscriptions[key] == nil else { return }
+            subscribeThreadList()
+            emit(.changed(entity: "thread", id: nil, changes: []))
+        }
+    }
+
     public func subscribeThread(_ threadId: String) {
         subscribe(key: "thread:\(threadId)", target: ["kind": "thread-detail", "threadId": .string(threadId)])
     }

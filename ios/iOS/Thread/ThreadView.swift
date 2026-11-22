@@ -220,7 +220,7 @@ struct ThreadView: View {
             guard conversation != nil else { return }
             while !Task.isCancelled {
                 await loadSideThreads()
-                await EnergyGate.shared.pollWait(.seconds(10))
+                await EnergyGate.shared.pollWait(.seconds(30))
             }
         }
         .task(id: shell == nil ? nil : model.threadId) {
@@ -233,14 +233,15 @@ struct ThreadView: View {
                 } catch where BBClient.isCancellation(error) {
                     return
                 } catch {}
-                await EnergyGate.shared.pollWait(.seconds(30))
+                await EnergyGate.shared.pollWait(.seconds(60))
             }
         }
         .task(id: approvalsKey) {
             guard let source = approvalsSource else { return }
             while !Task.isCancelled {
                 await approvals.load(source, client: client)
-                await EnergyGate.shared.pollWait(approvals.waiting ? .seconds(5) : .seconds(30), backsOff: !approvals.waiting)
+                // Quick while one waits on a screen in use; idle, it backs off too.
+                await EnergyGate.shared.pollWait(approvals.waiting ? .seconds(10) : .seconds(60))
             }
         }
         .task(id: "\(conversation?.threadId ?? "") \(choosingModel)") {

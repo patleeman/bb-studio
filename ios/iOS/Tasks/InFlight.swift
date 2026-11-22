@@ -55,7 +55,7 @@ struct InFlightBar: View {
     static func poll(_ threadId: String) async {
         while !Task.isCancelled {
             await TasksModel.shared.loadFlight(threadId)
-            try? await Task.sleep(for: .seconds(60))
+            await EnergyGate.shared.pollWait(.seconds(60))
         }
     }
 

@@ -32,6 +32,12 @@ final class StudioStore: ObservableObject {
     private var listener: UUID?
     private weak var realtime: BBRealtime?
     private var reloadTask: Task<Void, Never>?
+    /// Studio lists on screen. Signals reload only while one shows; off
+    /// screen they mark the list stale, and it reloads when Studio shows
+    /// again. (Attached once, the store heard every Studio signal for good:
+    /// each turn of any Bot reloaded all of Studio, about ten requests.)
+    private var showing = 0
+    private var stale = false
 
     func attach(_ app: AppModel) {
         guard app.serverURL == serverURL else { return }
@@ -42,14 +48,24 @@ final class StudioStore: ObservableObject {
         listener = app.realtime.listen { [weak self] event in
             guard let self else { return }
             switch event {
-            // Studio's open-tabs channel changes nothing listed here.
-            case .pluginSignal("studio", "studio-tabs", _): break
-            case .pluginSignal("studio", _, _): scheduleReload(client)
-            case .connected: scheduleReload(client)
+            // Studio's open-tabs channel and the Bots' turns change nothing listed here.
+            case .pluginSignal("studio", "studio-tabs", _), .pluginSignal("studio", Studio.Channel.bot_threads_changed, _): break
+            case .pluginSignal("studio", _, _), .connected:
+                if showing > 0 { scheduleReload(client) } else { stale = true }
             default: break
             }
         }
     }
+
+    /// A Studio list came on screen: reload if signals came while none showed.
+    func appeared(_ client: BBClient) {
+        showing += 1
+        guard stale else { return }
+        stale = false
+        scheduleReload(client)
+    }
+
+    func disappeared() { showing = max(0, showing - 1) }
 
     /// Pages signal on every save and Talk on every segment; coalesce them.
     private func scheduleReload(_ client: BBClient) {
@@ -437,6 +453,8 @@ struct StudioView: View {
             store.attach(app)
             await store.load(client)
         }
+        .onAppear { store.appeared(client) }
+        .onDisappear { store.disappeared() }
         .sheet(item: $recordingKind) { kind in
             DictationView(threadId: nil, autoStart: true, kind: kind)
                 .onDisappear { Task { await store.load(client) } }
