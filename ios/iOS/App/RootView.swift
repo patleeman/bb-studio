@@ -125,6 +125,7 @@ struct StudioUnreachableView: View {
             Button("Settings", action: settings)
                 .accessibilityIdentifier("studioSettings")
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("studioUnreachable")
     }
 }

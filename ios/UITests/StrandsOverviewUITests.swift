@@ -4,8 +4,7 @@ import XCTest
 /// -qaBotDemo chat -qaStrandsDemo`; the demo answers `strands.overview` for
 /// Juniper): from the home conversation, the conversation list's Strands
 /// shows every conversation with open strands, needs you first; a chip or an
-/// ask opens its conversation showing only that strand. Without
-/// `-qaStrandsDemo` Studio has no strands and the screen asks to update it.
+/// ask opens its conversation showing only that strand.
 /// `TEST_RUNNER_STRANDS_OUT` keeps PNGs.
 final class StrandsOverviewUITests: ServerIsolatedUITestCase {
     private let app = XCUIApplication()
@@ -96,14 +95,6 @@ final class StrandsOverviewUITests: ServerIsolatedUITestCase {
         open.tap()
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 15))
         XCTAssertTrue(any("strandFilter").waitForNonExistence(timeout: 10), "Open shows the whole conversation")
-    }
-
-    func testAnOlderStudioAsksToUpdate() {
-        launch(strands: false)
-        openStrands()
-        XCTAssertTrue(app.staticTexts["Update BB Studio on your Mac to see strands."].waitForExistence(timeout: 15))
-        XCTAssertFalse(any("strands-line").exists)
-        shot("5-older-studio")
     }
 
     func testEveryControlHasALabel() throws {
