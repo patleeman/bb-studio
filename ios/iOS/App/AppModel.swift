@@ -396,9 +396,10 @@ final class AppModel: ObservableObject {
     /// The Bot's Strands screen (`bbstudio://strands`, and the older `bbstudio://loops`).
     func openStrands() { show(.page(.strands, botId: nil)) }
 
-    /// A Bot's room (nil: the current Bot's).
+    /// A Bot's room on its Main (nil: the primary Bot's).
     func openBot(_ id: String?) {
-        if let id { botRoute = .bot(id) }
-        show(.list)
+        if case .settings = tab { tab = .bot }
+        if case .studio = tab { tab = .bot }
+        botRoute = id.map(BotRoute.bot) ?? .primary
     }
 }
