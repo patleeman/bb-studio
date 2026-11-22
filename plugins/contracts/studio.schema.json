@@ -57261,13 +57261,29 @@
                     "user",
                     "report"
                   ]
+                },
+                "at": {
+                  "default": null,
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "line": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
                 "turnId",
                 "seq",
                 "strandId",
-                "kind"
+                "kind",
+                "at",
+                "line"
               ],
               "additionalProperties": false
             }
@@ -57282,11 +57298,16 @@
                 },
                 "title": {
                   "type": "string"
+                },
+                "done": {
+                  "default": false,
+                  "type": "boolean"
                 }
               },
               "required": [
                 "id",
-                "title"
+                "title",
+                "done"
               ],
               "additionalProperties": false
             }

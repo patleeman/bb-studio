@@ -6,7 +6,7 @@
 // filter), BB's timeline shows only the strand's turns, expanded, and pages
 // back to its first message. On a BB without it, the tags dim the other
 // strands' messages instead.
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type ComponentType } from "react";
 import { foldOfSeq, statusRunFolds, type StatusRunFold, type Tags } from "./model";
 
 export interface Selection {
@@ -113,28 +113,89 @@ export function useSelection(threadId: string): Selection | null {
   return useSyncExternalStore(subscribeSelection, () => selected.get(threadId) ?? null, () => null);
 }
 
+/** What a zoomed-out conversation draws in the timeline's place (BB's `zoom.View`). */
+export type ZoomViewComponent = ComponentType<{ threadId: string; level: number; anchorSeq: number | null }>;
+
 interface TimelineFilterSlots {
   experimental_timelineFilter?: (registration: {
     id: string; get(threadId: string): TimelineFilter | null; subscribe(listener: () => void): () => void;
     folds?(threadId: string): readonly StatusRunFold[] | null; expandFold?(threadId: string, id: string): void;
-  }) => void;
+    zoom?: { level(threadId: string): number; View: ZoomViewComponent };
+  }) => { zoom?: boolean } | void;
 }
 
 /** Hands the filter to BB's timeline (`slots.experimental_timelineFilter`). False on a BB without it, where the tags dim instead. */
-export function registerTimelineFilter(slots: object): boolean {
+export function registerTimelineFilter(slots: object, zoomView?: ZoomViewComponent): boolean {
   const target = slots as TimelineFilterSlots;
   if (typeof target.experimental_timelineFilter !== "function") return false;
   // A BB whose timeline folds runs (the fork's seam) asks foldsOf; an older one ignores it and folds nothing.
-  target.experimental_timelineFilter({ id: "strands", get: timelineFilterOf, subscribe: subscribeSelection, folds: foldsOf, expandFold: openFold });
+  // One that zooms (the fork's zoom seam) draws zoomView while a conversation is zoomed out; an older one never zooms.
+  const host = target.experimental_timelineFilter({
+    id: "strands", get: timelineFilterOf, subscribe: subscribeSelection, folds: foldsOf, expandFold: openFold,
+    ...(zoomView ? { zoom: { level: shownZoomOf, View: zoomView } } : {}),
+  });
   hostFilters = true;
+  // Only a BB that says it draws `zoom` zooms; one that takes the registration and drops `zoom` answers nothing.
+  hostZooms = !!zoomView && !!host && typeof host === "object" && host.zoom === true;
   return true;
+}
+
+// ---- semantic zoom: 0 messages (BB's timeline), 1 strands ----
+
+/** The furthest out a conversation zooms (1: strands; the tree comes later). */
+export const ZOOM_MAX = 1;
+const zoomLevels = new Map<string, number>();
+let hostZooms = false;
+
+/** Whether BB draws a zoomed-out conversation (the fork's zoom seam). */
+export const zoomInHost = () => hostZooms;
+
+/** Conversations whose strands run (a header's switch is up, counted per header): only they zoom. */
+const zoomable = new Map<string, number>();
+
+/** A conversation's zoom level: 0 shows its messages. */
+export function zoomOf(threadId: string): number {
+  return zoomLevels.get(threadId) ?? 0;
+}
+
+/** The level BB draws: 0 unless the conversation's strands run, so turning them off gives the messages back. */
+export function shownZoomOf(threadId: string): number {
+  return zoomable.has(threadId) ? zoomOf(threadId) : 0;
+}
+
+/** A header shows the conversation's switch (its strands run): it can zoom until every such header lets go. */
+export function holdZoomable(threadId: string): () => void {
+  const count = zoomable.get(threadId) ?? 0;
+  zoomable.set(threadId, count + 1);
+  if (count === 0) notify();
+  let held = true;
+  return () => {
+    if (!held) return;
+    held = false;
+    const left = (zoomable.get(threadId) ?? 1) - 1;
+    if (left > 0) { zoomable.set(threadId, left); return; }
+    zoomable.delete(threadId);
+    notify();
+  };
+}
+
+/** Sets a conversation's zoom level (0…ZOOM_MAX). */
+export function setZoom(threadId: string, level: number): void {
+  const next = Math.max(0, Math.min(ZOOM_MAX, Math.round(level)));
+  if (zoomOf(threadId) === next) return;
+  if (next === 0) zoomLevels.delete(threadId); else zoomLevels.set(threadId, next);
+  notify();
+}
+
+export function useZoom(threadId: string): number {
+  return useSyncExternalStore(subscribeSelection, () => shownZoomOf(threadId), () => 0);
 }
 
 /** Whether BB's timeline hides the other strands' messages itself. */
 export const timelineFiltersInHost = () => hostFilters;
 
 /** Test hook: a fresh app (no host filter, nothing picked). */
-export function resetSelectionForTests(): void { hostFilters = false; selected.clear(); filters.clear(); marks.clear(); foldTags.clear(); openFolds.clear(); foldCache.clear(); }
+export function resetSelectionForTests(): void { hostFilters = false; hostZooms = false; zoomLevels.clear(); zoomable.clear(); selected.clear(); filters.clear(); marks.clear(); foldTags.clear(); openFolds.clear(); foldCache.clear(); }
 
 // ---- runs of status replies, folded in BB's timeline ----
 

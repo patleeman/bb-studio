@@ -26,7 +26,7 @@ import type { StrandAsk, StrandView } from "../contract";
 import { ageOf, boxGroups, countsOf, currentOf, decisionButtons, filterTurnsOf, hasOpen, replyAskOf, rowWorkersOf, seqsOf, stepSeq, strayCountsOf, stripShown } from "./model";
 import { hostContextSegments, useHidePromptStack } from "./prompt-stack";
 import { flashReply } from "./ask-mark";
-import { openFoldOf, select, selectionOf, setStrandTurns, useSelection } from "./selection";
+import { openFoldOf, select, selectionOf, setStrandTurns, useSelection, zoomInHost } from "./selection";
 
 export const STRANDS_TAB = "strands";
 export const STRANDS_POLL_MS = 30_000;
@@ -63,6 +63,57 @@ export function useSelectStrand(threadId: string) {
   }, [call, jump, tags.data, list.data, threadId]);
 }
 
+/**
+ * A conversation's strand filter, wherever it is shown (the box, or the
+ * header where BB zooms): the filtered strand and its messages, stepping
+ * through them, Esc to clear it (unless something else is typed in; `own` is
+ * the box's own search field), and the strand's new turns joining the filter
+ * as they are learned.
+ */
+export function useStrandFilter(threadId: string, own?: { readonly current: HTMLElement | null }) {
+  const list = useLive("strands.list", { threadId }, { pollMs: STRANDS_POLL_MS });
+  const tags = useLive("strands.tags", { threadId }, { pollMs: 60_000 });
+  const selection = useSelection(threadId);
+  const jump = useJump(threadId);
+  const data = list.data;
+  const current = currentOf(data, selection);
+  const filtered = selection ? current : null;
+  // New turns of the filtered strand (and asks waiting elsewhere) join the filter as they are learned.
+  useEffect(() => {
+    if (!selection) return;
+    const turns = filterTurnsOf(tags.data, data, selection.strandId, threadId);
+    if (turns.turnIds.length) setStrandTurns(threadId, selection.strandId, turns.turnIds, filtered?.firstSeq ?? turns.firstSeq);
+  }, [tags.data, data, selection, threadId, filtered?.firstSeq]);
+  // Esc clears the filter (unless something else is being typed in).
+  useEffect(() => {
+    if (!selection) return;
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      const target = event.target as HTMLElement | null;
+      const typing = !!target && (target.isContentEditable || /^(?:INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) && target !== own?.current;
+      if (typing) return;
+      select(threadId, null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selection, threadId, own]);
+  const seqs = filtered ? seqsOf(tags.data, filtered.id) : [];
+  const step = (by: -1 | 1) => {
+    if (!filtered) return;
+    const seq = stepSeq(seqs, selection?.seq ?? null, by);
+    if (seq === null) return;
+    select(threadId, { ...selection!, seq });
+    jump(seq);
+  };
+  return { list, tags, data, selection, current, filtered, seqs, step };
+}
+
+/** Opens the conversation's Strands tab (the full list, asks, merging, stray workers). */
+export function useOpenStrandsTab() {
+  const panel = experimental_useAppPanel();
+  return useCallback(() => { if (panel) openThreadTab(panel, { actionId: STRANDS_TAB, title: "Strands" }); }, [panel]);
+}
+
 /** In flight's place: the strands box, in BB's card above the composer; nothing where strands don't run or nothing is open. */
 export function StrandsBoxBanner() {
   const threadId = useComposerThread();
@@ -74,11 +125,14 @@ export function StrandsBoxFor({ threadId }: { threadId: string }) {
   const list = useLive("strands.list", { threadId }, { enabled: !!threadId, pollMs: STRANDS_POLL_MS });
   const shown = stripShown(list.data);
   // The box stands in for BB's running children; where strands run, the Info tab shows BB's context row.
+  // BB's running children give way only to a box actually drawn (not where BB zooms and the box is gone).
+  const drawn = shown && !zoomInHost();
   useHidePromptStack(threadId, [
-    ...(shown && hasOpen(list.data) ? ["active-child-threads" as const] : []),
+    ...(drawn && hasOpen(list.data) ? ["active-child-threads" as const] : []),
     ...(list.data?.enabled && hostContextSegments() ? ["thread-context" as const] : []),
   ]);
-  if (!shown) return null;
+  // Where BB zooms (the fork's zoom seam), the header's switch, filter chip, Strands button and "N need you" take the box's place.
+  if (!drawn) return null;
   return <StrandsBox threadId={threadId} />;
 }
 
@@ -226,50 +280,17 @@ function StrandOption({ strand, threadId, active, now, onPick, onClose }: { stra
 }
 
 export function StrandsBox({ threadId, now = Date.now() }: { threadId: string; now?: number }) {
-  const list = useLive("strands.list", { threadId }, { pollMs: STRANDS_POLL_MS });
-  const tags = useLive("strands.tags", { threadId }, { pollMs: 60_000 });
-  const selection = useSelection(threadId);
   const choose = useSelectStrand(threadId);
-  const jump = useJump(threadId);
   const panel = experimental_useAppPanel();
   const navigate = useBbNavigate();
   const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState("");
   const input = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
-  const data = list.data;
-  const current = currentOf(data, selection);
-  const filtered = selection ? current : null;
-  // New turns of the filtered strand (and asks waiting elsewhere) join the filter as they are learned.
-  useEffect(() => {
-    if (!selection) return;
-    const turns = filterTurnsOf(tags.data, data, selection.strandId, threadId);
-    if (turns.turnIds.length) setStrandTurns(threadId, selection.strandId, turns.turnIds, filtered?.firstSeq ?? turns.firstSeq);
-  }, [tags.data, data, selection, threadId, filtered?.firstSeq]);
-  // Esc clears the filter (unless something else is being typed in).
-  useEffect(() => {
-    if (!selection) return;
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
-      const target = event.target as HTMLElement | null;
-      const typing = !!target && (target.isContentEditable || /^(?:INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) && target !== input.current;
-      if (typing) return;
-      select(threadId, null);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [selection, threadId]);
+  const { data, selection, current, filtered, seqs, step } = useStrandFilter(threadId, input);
   useEffect(() => { if (expanded) input.current?.focus(); }, [expanded]);
   if (!data || !hasOpen(data)) return null;
   const counts = countsOf(data);
-  const seqs = filtered ? seqsOf(tags.data, filtered.id) : [];
-  const step = (by: -1 | 1) => {
-    if (!filtered) return;
-    const seq = stepSeq(seqs, selection?.seq ?? null, by);
-    if (seq === null) return;
-    select(threadId, { ...selection!, seq });
-    jump(seq);
-  };
   const groups = boxGroups(data, query);
   const matches = groups.flatMap((group) => group.strands);
   const needle = query.trim().toLowerCase();

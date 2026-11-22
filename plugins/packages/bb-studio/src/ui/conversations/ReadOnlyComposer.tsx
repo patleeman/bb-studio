@@ -41,6 +41,7 @@ import { isReadOnlyMirror, MirrorBox, useMirrorStatus } from "../mirror-banner";
 import { FinishedBox, isFinished } from "./finish";
 import { ConversationApprovals, ConversationApprovalsBanner } from "./ConversationApprovals";
 import { StrandsBoxFor } from "../../strands/ui/Strip";
+import { ZoomSwitch } from "../../strands/ui/Zoom";
 
 export type ReadOnlyKind = "worker" | "mirror" | "finished" | null;
 
@@ -219,6 +220,8 @@ export function useStudioThreadHeader({ threadId }: { threadId: string }): Threa
   const after = (
     <span className="studio-root inline-flex min-w-0 items-center gap-2">
       {detail}
+      {/* The zoom switch and "N need you" (semantic zoom): drawn only where strands run and BB zooms. */}
+      <ZoomSwitch threadId={threadId} />
     </span>
   );
   return title ? { title, after } : { after };

@@ -42116,22 +42116,28 @@ public enum Studio {
     public var seq: Double?
     public var strandId: String?
     public var kind: StrandsTagsOutputTagsItemKind?
+    public var at: Double?
+    public var line: String?
 
-    public init(turnId: String? = nil, seq: Double? = nil, strandId: String? = nil, kind: StrandsTagsOutputTagsItemKind? = nil) {
+    public init(turnId: String? = nil, seq: Double? = nil, strandId: String? = nil, kind: StrandsTagsOutputTagsItemKind? = nil, at: Double? = nil, line: String? = nil) {
       self.turnId = turnId
       self.seq = seq
       self.strandId = strandId
       self.kind = kind
+      self.at = at
+      self.line = line
     }
   }
 
   public struct StrandsTagsOutputStrandsItem: Sendable, Hashable, Codable {
     public var id: String?
     public var title: String?
+    public var done: Bool?
 
-    public init(id: String? = nil, title: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, done: Bool? = nil) {
       self.id = id
       self.title = title
+      self.done = done
     }
   }
 
