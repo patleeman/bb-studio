@@ -58,9 +58,20 @@ export function timelineFilterOf(
   return null;
 }
 
+/** Checked folds arrays: a plugin returns the same array while its folds are unchanged, so each is checked once. */
+const checkedFolds = new WeakMap<object, boolean>();
+
 function wellFormedFolds(value: unknown): value is readonly ExperimentalTimelineFold[] {
+  if (!Array.isArray(value)) return false;
+  const known = checkedFolds.get(value);
+  if (known !== undefined) return known;
+  const ok = shapedAsFolds(value);
+  checkedFolds.set(value, ok);
+  return ok;
+}
+
+function shapedAsFolds(value: unknown[]): boolean {
   return (
-    Array.isArray(value) &&
     value.every(
       (fold) =>
         typeof fold === "object" &&

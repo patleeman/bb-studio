@@ -1,9 +1,11 @@
 // Runs of a thread's timeline a plugin folds into one line each (Studio's
-// runs of status replies): slots.experimental_timelineFilter's `folds`. The
-// rows of a fold's turns, and the rows between them that are neither a
-// message the user typed nor another turn's reply, give way to one line where
-// the run's first such row was. The line opens the run (`expandFold`). Off
-// while a timeline filter is on: the filter unfolds everything.
+// runs of status replies): slots.experimental_timelineFilter's `folds`. A
+// fold hides its turns' rows, and the rows of no turn between two of them,
+// behind one line where its first message was. It never hides another turn's
+// rows, a message the user typed (which also ends the run there), or a row
+// the caller keeps (errors, alerts, a turn still running). A fold holding the
+// message a link points at stays open. The line opens the run (`expandFold`).
+// Off while a timeline filter is on: the filter unfolds everything.
 import type { ExperimentalTimelineFold } from "@get-bb/plugin-sdk";
 import type { ThreadTimelineViewRow } from "@bb/thread-view";
 import { Icon } from "@bb/shared-ui/icon";
@@ -18,9 +20,24 @@ export interface TurnRunMarker {
 export interface TurnRunFold {
   rows: readonly ThreadTimelineViewRow[];
   markers: ReadonlyMap<string, TurnRunMarker>;
+  /** Folds left open because they hold the linked row. */
+  opened: readonly string[];
+}
+
+export interface TurnRunFoldOptions {
+  /** A message another thread or a plugin sent: it folds like the turn's other rows. */
+  isRelayed?: (row: ThreadTimelineViewRow) => boolean;
+  /** A row that never folds (an error, an alert, a row still running). */
+  kept?: (row: ThreadTimelineViewRow) => boolean;
+  /** A reply drawn as the quiet-turn mark: never the fold's line. */
+  isQuiet?: (row: ThreadTimelineViewRow) => boolean;
+  /** The row a link points at: its fold stays open. */
+  targetRowId?: string | null;
 }
 
 const NO_MARKERS: ReadonlyMap<string, TurnRunMarker> = new Map();
+const NO_OPENED: readonly string[] = [];
+const never = () => false;
 
 /** A message the user typed: it never folds. */
 function typedByUser(row: ThreadTimelineViewRow): boolean {
@@ -34,43 +51,115 @@ function typedByUser(row: ThreadTimelineViewRow): boolean {
 export function foldTurnRuns(
   rows: readonly ThreadTimelineViewRow[],
   folds: readonly ExperimentalTimelineFold[],
-  isRelayed: (row: ThreadTimelineViewRow) => boolean = () => false,
+  {
+    isRelayed = never,
+    kept = never,
+    isQuiet = never,
+    targetRowId = null,
+  }: TurnRunFoldOptions = {},
 ): TurnRunFold {
-  if (folds.length === 0) return { rows, markers: NO_MARKERS };
+  if (folds.length === 0) return { rows, markers: NO_MARKERS, opened: NO_OPENED };
+  const foldOfTurn = new Map<string, number>();
+  folds.forEach((fold, index) => {
+    for (const turnId of fold.turnIds) {
+      if (!foldOfTurn.has(turnId)) foldOfTurn.set(turnId, index);
+    }
+  });
+  const folding = folds.map((): ThreadTimelineViewRow[] => []);
+  const closed = new Set<number>();
+  let started: number[] = [];
+  let open = -1;
+  let between: ThreadTimelineViewRow[] = [];
+  for (const row of rows) {
+    if (typedByUser(row) && !isRelayed(row)) {
+      // A message the user typed ends every run before it.
+      for (const index of started) closed.add(index);
+      started = [];
+      open = -1;
+      between = [];
+      continue;
+    }
+    const index = row.turnId === null ? undefined : foldOfTurn.get(row.turnId);
+    if (index === undefined) {
+      if (row.turnId === null && open >= 0) between.push(row);
+      else between = [];
+      continue;
+    }
+    if (closed.has(index)) {
+      open = -1;
+      between = [];
+      continue;
+    }
+    if (open === index) {
+      for (const each of between) if (!kept(each)) folding[index]!.push(each);
+    } else if (folding[index]!.length === 0) {
+      started.push(index);
+    }
+    between = [];
+    open = index;
+    if (!kept(row)) folding[index]!.push(row);
+  }
   const hidden = new Set<string>();
   const markers = new Map<string, TurnRunMarker>();
-  for (const fold of folds) {
-    const turns = new Set(fold.turnIds);
-    let first = -1;
-    let last = -1;
-    rows.forEach((row, index) => {
-      if (row.turnId === null || !turns.has(row.turnId)) return;
-      if (first < 0) first = index;
-      last = index;
-    });
-    if (first < 0) continue;
-    const folding: ThreadTimelineViewRow[] = [];
-    for (let index = first; index <= last; index += 1) {
-      const row = rows[index]!;
-      const member = row.turnId !== null && turns.has(row.turnId);
-      if (typedByUser(row) && !isRelayed(row)) continue;
-      // Another turn's own reply inside the span stays (the plugin's run should never hold one).
-      if (!member && row.kind === "conversation" && row.role === "assistant")
-        continue;
-      folding.push(row);
+  const opened: string[] = [];
+  folds.forEach((fold, index) => {
+    const members = folding[index]!;
+    if (targetRowId !== null && members.some((row) => row.id === targetRowId)) {
+      opened.push(fold.id);
+      return;
     }
     // The line takes the place of the run's first message (a conversation row: the timeline draws those through the fold).
-    const marker = folding.find((row) => row.kind === "conversation");
-    if (!marker) continue;
+    const marker = members.find((row) => row.kind === "conversation" && !isQuiet(row));
+    if (!marker) return;
     markers.set(marker.id, {
       foldId: fold.id,
       threadId: marker.threadId,
       label: fold.label,
     });
-    for (const row of folding) if (row !== marker) hidden.add(row.id);
-  }
-  if (markers.size === 0) return { rows, markers: NO_MARKERS };
-  return { rows: rows.filter((row) => !hidden.has(row.id)), markers };
+    for (const row of members) if (row !== marker) hidden.add(row.id);
+  });
+  if (markers.size === 0) return { rows, markers: NO_MARKERS, opened: opened.length ? opened : NO_OPENED };
+  return { rows: rows.filter((row) => !hidden.has(row.id)), markers, opened: opened.length ? opened : NO_OPENED };
+}
+
+interface SeqRow {
+  id: string;
+  messageSeq?: number;
+  sourceSeqStart?: number;
+  sourceSeqEnd?: number;
+  childRows?: readonly SeqRow[] | null;
+  children?: readonly SeqRow[] | null;
+}
+
+function holdsMessage(row: SeqRow, seq: number): boolean {
+  if (row.messageSeq === seq) return true;
+  const nested = row.childRows ?? row.children ?? null;
+  return nested !== null && nested.some((child) => holdsMessage(child, seq));
+}
+
+/**
+ * The top-level row a message link or search result points at, found as the
+ * timeline's scroll-to-message finds it: the row holding message `seq`, or
+ * (for a sequence match) the row whose span holds `seq`.
+ */
+export function linkedRowId(
+  rows: readonly ThreadTimelineViewRow[],
+  target: { seq: number; match: "message" | "sequence" } | null,
+): string | null {
+  if (target === null) return null;
+  const seqRows = rows as readonly SeqRow[];
+  const message = seqRows.find((row) => holdsMessage(row, target.seq));
+  if (message !== undefined) return message.id;
+  if (target.match === "message") return null;
+  return (
+    seqRows.find(
+      (row) =>
+        row.sourceSeqStart !== undefined &&
+        row.sourceSeqEnd !== undefined &&
+        row.sourceSeqStart <= target.seq &&
+        target.seq <= row.sourceSeqEnd,
+    )?.id ?? null
+  );
 }
 
 /** The one line in a folded run's place; opening it unfolds the run. */
