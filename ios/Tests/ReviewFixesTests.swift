@@ -18,18 +18,20 @@ final class ReviewFixesTests: XCTestCase {
 
     func testALinkWaitsForTheBotsThenOpensAndCanOpenAgain() throws {
         let empty = BotSpacesStore(serverURL: URL(string: "https://review.invalid")!)
-        let shell = BotShellModel()
-        let link = BotShellLink.page(.memory, botId: nil)
-        XCTAssertTrue(shell.consume(link: link, route: nil, store: empty) == (false, false), "kept until the Bots load")
+        let shell = Router()
+        shell.open(.place(.memory, botId: nil))
+        XCTAssertFalse(shell.consume(empty), "kept until the Bots load")
         XCTAssertNil(shell.selection)
 
         let store = try seeded()
         shell.land(store)
-        XCTAssertTrue(shell.consume(link: link, route: nil, store: store) == (true, false))
+        XCTAssertTrue(shell.consume(store))
         XCTAssertEqual(shell.selection, .page(.memory), "the link wins over landing on Main")
+        XCTAssertNil(shell.pending, "followed once")
 
         shell.openConversation("thr_main")
-        XCTAssertTrue(shell.consume(link: link, route: nil, store: store) == (true, false), "the same link works a second time")
+        shell.open(.place(.memory, botId: nil))
+        XCTAssertTrue(shell.consume(store), "the same link works a second time")
         XCTAssertEqual(shell.selection, .page(.memory))
     }
 

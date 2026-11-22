@@ -154,13 +154,12 @@ final class StrandsOverviewTests: XCTestCase {
 
     func testTheLoopsAppLinkOpensStrands() {
         let app = AppModel.shared
-        let saved = (app.tab, app.shellLink, app.botRoute)
-        defer { (app.tab, app.shellLink, app.botRoute) = saved }
+        let saved = app.router.tab
+        defer { app.router.tab = saved }
         for link in ["bbstudio://loops", "bbstudio://strands"] {
-            app.shellLink = nil
             app.handle(URL(string: link)!)
-            XCTAssertEqual(app.tab, .bot, link)
-            XCTAssertEqual(app.shellLink, .page(.strands, botId: nil), link)
+            XCTAssertEqual(app.router.tab, .bot, link)
+            XCTAssertEqual(app.router.pending, .place(.strands, botId: nil), link)
         }
     }
 

@@ -34,7 +34,7 @@ enum StateDemo {
             default: throw URLError(.cannotConnectToHost)
             }
         }
-        if variant == "dictation" { model.sheet = .dictation(threadId: threadId, autoStart: false) }
+        if variant == "dictation" { Router.shared.sheet = .dictation(threadId: threadId, autoStart: false) }
     }
 
     private static func ok(_ result: String) -> (Int, Data) {
@@ -91,7 +91,7 @@ struct StateDemoSheets: ViewModifier {
                 related = StateDemo.variant == "related"
                 chat = StateDemo.variant == "studio-chat"
                 widgets = StateDemo.variant?.hasPrefix("widgets") == true
-                if VoiceLiveDemo.variant != nil { AppModel.shared.sheet = .handsFree() }
+                if VoiceLiveDemo.variant != nil { Router.shared.sheet = .handsFree() }
             }
             // Outermost, so the sheets above it get the app too.
             .environmentObject(AppModel.shared)

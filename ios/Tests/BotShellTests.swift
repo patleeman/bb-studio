@@ -93,7 +93,7 @@ final class BotShellTests: XCTestCase {
     @MainActor
     func testLaunchLandsOnMainOnce() throws {
         let store = BotSpacesStore(serverURL: server)
-        let shell = BotShellModel()
+        let shell = Router()
         shell.land(store)
         XCTAssertFalse(shell.landed, "nothing to land on before spaces load")
         store.seedForDemo(try Self.spaces(), views: [:])
@@ -172,7 +172,7 @@ final class BotShellTests: XCTestCase {
     func testSwitchingWatchesTheShownBotAndUnwatchesTheLastOne() throws {
         let store = BotSpacesStore(serverURL: server)
         store.seedForDemo(try Self.spaces(), views: [:])
-        let shell = BotShellModel()
+        let shell = Router()
         shell.land(store)
         shell.show("bot_b", store: store, compact: true)
         XCTAssertEqual(shell.shownBotId, "bot_b")
@@ -193,13 +193,13 @@ final class BotShellTests: XCTestCase {
     func testBotLinksOpenThatBotsMain() throws {
         let store = BotSpacesStore(serverURL: server)
         store.seedForDemo(try Self.spaces(current: "bot_b"), views: [:])
-        let shell = BotShellModel()
-        shell.open(.primary, store: store)
+        let shell = Router()
+        shell.follow(.bot(nil), store: store)
         XCTAssertEqual(shell.shownBotId, "bot_a")
         XCTAssertEqual(shell.selection, .conversation("thr_a_main"))
-        shell.open(.bot("bot_b"), store: store)
+        shell.follow(.bot("bot_b"), store: store)
         XCTAssertEqual(shell.selection, .conversation("thr_b_main"))
-        shell.open(.list, store: store)
+        shell.follow(.list, store: store)
         XCTAssertNil(shell.selection)
         XCTAssertEqual(shell.compactColumn, .sidebar)
     }

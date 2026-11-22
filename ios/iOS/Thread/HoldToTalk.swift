@@ -272,7 +272,7 @@ struct TalkLifecycle: ViewModifier {
         content
             .onDisappear { talk.end() }
             .onChange(of: scenePhase) { _, phase in if phase == .background { talk.end() } }
-            .onChange(of: app.sheet?.id) { _, id in if id != nil { talk.end() } }
+            .onReceive(Router.shared.$sheet.map { $0?.id }.removeDuplicates()) { id in if id != nil { talk.end() } }
     }
 }
 

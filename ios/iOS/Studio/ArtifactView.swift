@@ -280,7 +280,7 @@ struct ArtifactView: View {
     private func menu(_ artifact: Artifact) -> some View {
         Menu {
             Button {
-                operation.complete(on: app) { app.newThread(text: "[\(artifact.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(artifact.href)) ") }
+                operation.complete(on: app) { app.open(.compose("[\(artifact.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(artifact.href)) ")) }
             } label: { Label("New Thread with This", systemImage: "square.and.pencil") }
             StudioChatMenuButton(isPresented: $chatting)
             if let text, version?.isText == true, textVersion == version?.id {

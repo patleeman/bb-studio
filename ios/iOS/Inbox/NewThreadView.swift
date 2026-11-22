@@ -382,7 +382,7 @@ struct NewThreadView: View {
                     projectId: projectId, text: text, attachments: inputs, options: choice, workspace: selectedWorkspace).id
             }, completion: { threadId in
                 dismiss()
-                if let started { started(threadId, botId) } else { app.openThread(threadId) }
+                if let started { started(threadId, botId) } else { app.open(.conversation(threadId)) }
             })
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)

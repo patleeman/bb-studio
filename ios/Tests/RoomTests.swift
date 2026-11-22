@@ -178,7 +178,7 @@ final class LockedBox<Value>: @unchecked Sendable {
 @MainActor
 final class RoomHomeTests: XCTestCase {
     func testPlacesOpenOverTheConversationAndCloseBackToIt() {
-        let room = RoomModel()
+        let room = Router()
         room.showPlace(.conversations)
         XCTAssertEqual(room.place, .conversations, "the list opens over the conversation")
         room.closePlace()

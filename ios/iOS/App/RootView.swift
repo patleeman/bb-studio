@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RootView: View {
+    @ObservedObject private var router = Router.shared
     @EnvironmentObject private var model: AppModel
 
     @State private var windowSize = CGSize.zero
@@ -29,13 +30,13 @@ struct RootView: View {
                     .transition(.opacity)
             case .unreachable:
                 StudioUnreachableView(unavailable: spaces.support == .unavailable, error: spaces.error,
-                                      serverURL: spaces.serverURL, retry: retry, settings: { model.tab = .settings })
+                                      serverURL: spaces.serverURL, retry: retry, settings: { router.tab = .settings })
                     .transition(.opacity)
             }
         }
         .modifier(RootNotice())
         // Capture, dictation, Write and the rest work while Studio loads, too.
-        .modifier(RootSheets(active: model.tab == .bot))
+        .modifier(RootSheets(active: router.tab == .bot))
         .sheet(item: secondary) { tab in
             Group {
                 switch tab {
@@ -98,7 +99,7 @@ struct RootView: View {
     }
 
     private var secondary: Binding<Tab?> {
-        Binding(get: { model.tab == .bot ? nil : model.tab }, set: { if $0 == nil { model.tab = .bot } })
+        Binding(get: { router.tab == .bot ? nil : router.tab }, set: { if $0 == nil { router.tab = .bot } })
     }
 }
 
@@ -166,12 +167,13 @@ private struct RootNotice: ViewModifier {
 }
 
 private struct RootSheets: ViewModifier {
+    @ObservedObject private var router = Router.shared
     @EnvironmentObject private var model: AppModel
     let active: Bool
 
     func body(content: Content) -> some View {
         content
-        .sheet(item: active ? $model.sheet : .constant(nil)) { sheet in
+        .sheet(item: active ? $router.sheet : .constant(nil)) { sheet in
             switch sheet {
             case .capture:
                 CaptureSheet()

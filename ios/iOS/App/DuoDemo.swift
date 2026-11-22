@@ -154,9 +154,9 @@ enum DuoDemo {
             screenSize = size
         case "tab":
             switch url.query() {
-            case "bot": AppModel.shared.tab = .bot
-            case "studio": AppModel.shared.tab = .studio
-            case "settings": AppModel.shared.tab = .settings
+            case "bot": Router.shared.tab = .bot
+            case "studio": Router.shared.tab = .studio
+            case "settings": Router.shared.tab = .settings
             default: return false
             }
             return true
@@ -273,7 +273,7 @@ enum DuoDemo {
             try? image.pngData()?.write(to: URL.documentsDirectory.appending(path: name + ".png"))
             return true
         case "focus":
-            if let id = url.query() { AppModel.shared.replyThreadId = id }
+            if let id = url.query() { Router.shared.replyThreadId = id }
             return true
         case "record":
             // Frames of the whole window for docs: the simulator's own screen

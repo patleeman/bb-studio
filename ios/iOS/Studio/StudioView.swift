@@ -413,6 +413,7 @@ struct StudioKind: Identifiable, Hashable {
 }
 
 struct StudioView: View {
+    @ObservedObject private var router = Router.shared
     var selectsDetail = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var app: AppModel
@@ -638,7 +639,7 @@ struct StudioView: View {
         if selectsDetail {
             // Keep filters above the folder/item list, as in the phone pager,
             // without nesting its page controller inside the sidebar.
-            studioList(kind: app.studioKind, chips: false)
+            studioList(kind: router.studioKind, chips: false)
                 .safeAreaBar(edge: .top) {
                     if showsFilter {
                         kindFilter
@@ -648,7 +649,7 @@ struct StudioView: View {
                     }
                 }
         } else if query.isEmpty {
-            TabView(selection: Binding(get: { app.studioKind ?? "" }, set: { app.studioKind = $0.isEmpty ? nil : $0 })) {
+            TabView(selection: Binding(get: { router.studioKind ?? "" }, set: { router.studioKind = $0.isEmpty ? nil : $0 })) {
                 ForEach(kindPages, id: \.self) { kind in
                     studioList(kind: kind.isEmpty ? nil : kind, chips: false)
                         .background(YieldsRowSwipesToPager())
@@ -663,16 +664,16 @@ struct StudioView: View {
                         .padding(.vertical, 6)
                 }
             }
-            .sensoryFeedback(.selection, trigger: app.studioKind)
+            .sensoryFeedback(.selection, trigger: router.studioKind)
         } else {
-            studioList(kind: app.studioKind, chips: true)
+            studioList(kind: router.studioKind, chips: true)
         }
     }
 
     /// "" is All; a kind chosen elsewhere keeps its page even with nothing in it.
     private var kindPages: [String] {
         let kinds = store.kinds.map(\.id)
-        return [""] + kinds + (app.studioKind.map { kinds.contains($0) ? [] : [$0] } ?? [])
+        return [""] + kinds + (router.studioKind.map { kinds.contains($0) ? [] : [$0] } ?? [])
     }
 
     private var showsFilter: Bool {
@@ -781,7 +782,7 @@ struct StudioView: View {
                     Button("Record", systemImage: "record.circle") { recordingKind = "recording" }
                 }
             }
-            tile("Write", "square.and.pencil", .blue) { app.sheet = .write } menu: {
+            tile("Write", "square.and.pencil", .blue) { router.sheet = .write } menu: {
                 ForEach(store.creatable, id: \.id) { kind in
                     Button("New \(kind.label)", systemImage: StudioKind.of(kind.id).symbol) {
                         Task { await create(kind) }
@@ -794,7 +795,7 @@ struct StudioView: View {
 
     /// Visual Chat (its own plugin): its chats and New chat.
     private var visualChatCard: some View {
-        Button { app.studioPath.append(.visualChats) } label: {
+        Button { router.studioPath.append(.visualChats) } label: {
             HStack(spacing: 12) {
                 Image(systemName: "rectangle.3.group.bubble").font(.title2).foregroundStyle(.purple)
                 VStack(alignment: .leading, spacing: 2) {
@@ -837,12 +838,12 @@ struct StudioView: View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    chip("All", nil, selected: app.studioKind == nil) { withAnimation { app.studioKind = nil } }
+                    chip("All", nil, selected: router.studioKind == nil) { withAnimation { router.studioKind = nil } }
                         .id("")
                         .accessibilityIdentifier("studio-kind-all")
                     ForEach(store.kinds) { kind in
-                        chip(kind.plural, kind.symbol, selected: app.studioKind == kind.id) {
-                            withAnimation { app.studioKind = app.studioKind == kind.id ? nil : kind.id }
+                        chip(kind.plural, kind.symbol, selected: router.studioKind == kind.id) {
+                            withAnimation { router.studioKind = router.studioKind == kind.id ? nil : kind.id }
                         }
                         .id(kind.id)
                         .accessibilityIdentifier("studio-kind-" + kind.id)
@@ -867,7 +868,7 @@ struct StudioView: View {
             }
             .scrollClipDisabled()
             // A swipe to another kind brings its chip into view.
-            .onChange(of: app.studioKind) { withAnimation { proxy.scrollTo(app.studioKind ?? "", anchor: .center) } }
+            .onChange(of: router.studioKind) { withAnimation { proxy.scrollTo(router.studioKind ?? "", anchor: .center) } }
         }
     }
 
@@ -966,11 +967,11 @@ struct StudioView: View {
     private func opener(_ item: StudioItem, id: String, @ViewBuilder content: () -> some View) -> some View {
         if !selecting, let route = item.route {
             if selectsDetail {
-                Button { app.studioPath = [route] } label: {
+                Button { router.studioPath = [route] } label: {
                     content().frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .listRowBackground(SidebarSelectionBackground(selected: app.studioPath.first == route))
+                .listRowBackground(SidebarSelectionBackground(selected: router.studioPath.first == route))
                 .accessibilityIdentifier(id)
             } else {
                 NavigationLink(value: route) { content() }
@@ -1021,7 +1022,7 @@ struct StudioView: View {
     private func menu(_ item: StudioItem) -> some View {
         if let href = item.href {
             Button {
-                operation.complete(on: app) { app.newThread(text: "[\(item.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(href)) ") }
+                operation.complete(on: app) { app.open(.compose("[\(item.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(href)) ")) }
             } label: { Label("New Thread with This", systemImage: "square.and.pencil") }
         }
         ForEach(store.info(item)?.actions ?? [], id: \.id) { action in
@@ -1080,7 +1081,7 @@ struct StudioView: View {
     }
 
     /// The items on the page shown.
-    private var visible: [StudioItem] { visible(kind: app.studioKind) }
+    private var visible: [StudioItem] { visible(kind: router.studioKind) }
 
     private func visible(kind: String?) -> [StudioItem] {
         store.items.filter { item in
@@ -1168,7 +1169,7 @@ struct StudioView: View {
     private func createPage(_ text: String) async {
         do {
             let page = try await client.createPage(title: PageTitle.from(text), markdown: text)
-            operation.complete(on: app) { app.studioPath.append(.page(id: page.id)) }
+            operation.complete(on: app) { router.studioPath.append(.page(id: page.id)) }
             await store.load(client)
         } catch {
             store.error = BBClient.describe(error, server: client.baseURL)
@@ -1179,7 +1180,7 @@ struct StudioView: View {
         let projectId = project.isEmpty || project == "none" ? nil : project
         do {
             let item = try await store.create(kind, projectId: projectId, client: client)
-            if let route = item.route { operation.complete(on: app) { app.studioPath.append(route) } }
+            if let route = item.route { operation.complete(on: app) { router.studioPath.append(route) } }
         } catch {
             flash(BBClient.describe(error, server: client.baseURL))
         }

@@ -145,7 +145,7 @@ struct CaptureSheet: View {
                     Spacer()
                     Button("Open") {
                         operation.complete(on: app) { dismiss() }
-                        operation.complete(on: app) { app.openPage(savedPageId) }
+                        operation.complete(on: app) { app.open(.studio(kind: nil, .page(id: savedPageId))) }
                     }
                 }
                 .foregroundStyle(.green)
@@ -183,7 +183,7 @@ struct CaptureSheet: View {
                     Spacer()
                     Button("Open") {
                         operation.complete(on: app) { dismiss() }
-                        operation.complete(on: app) { app.openStudio(kind: nil, .artifact(id: savedArtifactId)) }
+                        operation.complete(on: app) { app.open(.studio(kind: nil, .artifact(id: savedArtifactId))) }
                     }
                 }
                 .foregroundStyle(.green)
@@ -203,7 +203,7 @@ struct CaptureSheet: View {
         case .file: choosingFile = true
         case .thread:
             operation.complete(on: app) { dismiss() }
-            DispatchQueue.main.async { operation.complete(on: app) { app.newThread() } }
+            DispatchQueue.main.async { operation.complete(on: app) { app.open(.compose("")) } }
         }
     }
 

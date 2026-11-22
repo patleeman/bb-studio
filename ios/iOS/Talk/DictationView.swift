@@ -188,7 +188,7 @@ struct DictationView: View {
         do {
             let page = try await client.createPage(title: PageTitle.from(markdown), markdown: markdown)
             operation.complete(on: app) { dismiss() }
-            operation.complete(on: app) { app.openPage(page.id) }
+            operation.complete(on: app) { app.open(.studio(kind: nil, .page(id: page.id))) }
         } catch {
             saveError = BBClient.describe(error, server: client.baseURL)
         }

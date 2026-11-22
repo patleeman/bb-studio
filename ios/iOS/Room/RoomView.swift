@@ -57,14 +57,13 @@ enum RoomQA {
 }
 
 struct RoomView: View {
+    @ObservedObject private var router = Router.shared
     @EnvironmentObject private var app: AppModel
     @ObservedObject var store: BotSpacesStore
-    @ObservedObject var shell: BotShellModel
     let bot: BotSpace
     let mainThreadId: String
     let pages: DuoPages?
     @StateObject private var pager: RoomSessions
-    @State private var room = RoomModel()
     @State private var pageOffset: CGFloat = 0
     @State private var slide: Edge = .trailing
     @State private var toast: String?
@@ -77,9 +76,8 @@ struct RoomView: View {
     @Environment(\.scenePhase) private var phase
     @Environment(\.duoLayout) private var layout
 
-    init(store: BotSpacesStore, shell: BotShellModel, bot: BotSpace, mainThreadId: String, pages: DuoPages? = nil) {
+    init(store: BotSpacesStore, bot: BotSpace, mainThreadId: String, pages: DuoPages? = nil) {
         self.store = store
-        self.shell = shell
         self.bot = bot
         self.mainThreadId = mainThreadId
         self.pages = pages
@@ -125,20 +123,8 @@ struct RoomView: View {
     private func routing<Content: View>(_ content: Content) -> some View {
         content
             .onChange(of: pages) { _, _ in pagesChanged() }
-            .onChange(of: shell.roomOpen, initial: true) { _, page in roomOpenChanged(page) }
-            .onChange(of: shell.roomFocus, initial: true) { _, id in roomFocusChanged(id) }
-            .onChange(of: shell.roomList, initial: true) { _, open in
-                guard open else { return }
-                shell.roomList = false
-                showList()
-            }
-            .onChange(of: shell.roomCompose, initial: true) { _, text in
-                guard let text else { return }
-                shell.roomCompose = nil
-                composeText = text
-                startingConversation = true
-            }
-            .onChange(of: shell.detailPath) { _, path in detailPathChanged(path) }
+            .onChange(of: router.request, initial: true) { _, request in take(request) }
+            .onChange(of: router.detailPath) { _, path in detailPathChanged(path) }
             .onChange(of: order) { old, new in orderChanged(old, new) }
     }
 
@@ -172,31 +158,33 @@ struct RoomView: View {
 
     private func pagesChanged() {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-        if pages != nil, app.tab == .settings {
-            app.tab = .bot
+        if pages != nil, router.tab == .settings {
+            router.tab = .bot
             settingsOpen = true
         } else if pages == nil, settingsOpen {
             settingsOpen = false
-            app.tab = .settings
+            router.tab = .settings
         }
     }
 
-    private func roomOpenChanged(_ page: BotPage?) {
-        guard let page else { return }
-        shell.roomOpen = nil
-        open(page)
-    }
-
-    private func roomFocusChanged(_ id: String?) {
-        guard let id else { return }
-        shell.roomFocus = nil
-        focus(on: id)
+    /// What the router asks of the room: a place, a conversation, the list or New conversation.
+    private func take(_ request: RoomRequest?) {
+        guard let request else { return }
+        router.request = nil
+        switch request {
+        case .place(let page): open(page)
+        case .focus(let id): focus(on: id)
+        case .list: showList()
+        case .compose(let text):
+            composeText = text
+            startingConversation = true
+        }
     }
 
     private func detailPathChanged(_ path: [Route]) {
         guard !path.isEmpty else { return }
         settingsOpen = false
-        if room.place != nil { room.closePlace() }
+        if router.place != nil { router.closePlace() }
     }
 
     private func orderChanged(_ old: [String], _ new: [String]) {
@@ -211,19 +199,19 @@ struct RoomView: View {
     }
 
     private func themeSaved(_ saved: String?) {
-        if let saved, shell.themeOverride[bot.id] == saved { shell.themeOverride[bot.id] = nil }
+        if let saved, router.themeOverride[bot.id] == saved { router.themeOverride[bot.id] = nil }
     }
 
     private func showToast() async {
-        guard let name = shell.botToast, name == bot.name else { return }
-        shell.botToast = nil
+        guard let name = router.botToast, name == bot.name else { return }
+        router.botToast = nil
         withAnimation(.easeInOut(duration: 0.2)) { toast = name }
         try? await Task.sleep(for: .milliseconds(1400))
         withAnimation(.easeInOut(duration: 0.3)) { toast = nil }
     }
 
     private func folded(_ proxy: GeometryProxy) -> some View {
-        NavigationStack(path: $shell.detailPath) {
+        NavigationStack(path: $router.detailPath) {
             chat()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background { backdrop(proxy) }
@@ -240,9 +228,9 @@ struct RoomView: View {
         .sheet(item: placeBinding) { place in
             RoomPlaceSheet(place: place, bot: bot, store: store, mainThreadId: mainThreadId,
                            open: openItem, startedConversation: { id in openItem(.conversation(id)) },
-                           closeToRoom: { room.closePlace() }, theme: look.theme.id, chooseTheme: chooseTheme,
+                           closeToRoom: { router.closePlace() }, theme: look.theme.id, chooseTheme: chooseTheme,
                            shown: pager.shown, settings: {
-                               room.closePlace()
+                               router.closePlace()
                                openSettings()
                            }, switchBot: { botId, conversation in switchTo(botId, opening: conversation) })
                 .presentationDetents([.height(max(320, proxy.size.height + proxy.safeAreaInsets.bottom - RoomPlaceSheet.sliver))])
@@ -258,11 +246,11 @@ struct RoomView: View {
                 ZStack(alignment: .bottom) {
                 RoomContextPane(bot: bot, view: view, shown: pager.shown, mainThreadId: mainThreadId, order: order,
                                     pick: { id in
-                                        shell.detailPath = []
+                                        router.detailPath = []
                                         show(id)
                                     },
-                                    openThread: { id in shell.detailPath = [.thread(id: id)] },
-                                    openPlace: { room.showPlace($0) }, settings: openSettings,
+                                    openThread: { id in router.detailPath = [.thread(id: id)] },
+                                    openPlace: { router.showPlace($0) }, settings: openSettings,
                                     refresh: { [store] in await store.refresh() },
                                     switchBot: { switchTo($0, opening: nil) },
                                     newConversation: {
@@ -276,7 +264,7 @@ struct RoomView: View {
                 .ignoresSafeArea(.container, edges: [.top, .bottom])
                 .environment(\.colorScheme, .dark)
             } second: {
-                NavigationStack(path: $shell.detailPath) {
+                NavigationStack(path: $router.detailPath) {
                     chat()
                         .containerBackground(.clear, for: .navigation)
                         .navigationDestination(for: Route.self) { route in destination(route) }
@@ -302,7 +290,7 @@ struct RoomView: View {
                     if settingsOpen {
                         RoomSpread(content: .settings, pages: pages, layout: layout, bot: bot, store: store, mainThreadId: mainThreadId,
                                    open: openItem, close: closeSpread, chooseTheme: chooseTheme)
-                    } else if let place = room.place {
+                    } else if let place = router.place {
                         RoomSpread(content: .place(place), pages: pages, layout: layout, bot: bot, store: store, mainThreadId: mainThreadId,
                                    open: openItem, close: closeSpread, chooseTheme: chooseTheme)
                             .id(place)
@@ -315,7 +303,7 @@ struct RoomView: View {
         .animation(.easeInOut(duration: 0.25), value: spreadOpen)
     }
 
-    private var spreadOpen: Bool { pages != nil && (room.place != nil || settingsOpen) }
+    private var spreadOpen: Bool { pages != nil && (router.place != nil || settingsOpen) }
 
     private func duoScrim(_ pages: DuoPages) -> some View {
         LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .clear, location: 0.36),
@@ -354,7 +342,7 @@ struct RoomView: View {
         }
         .offset(x: pageOffset)
         .environment(\.botConversation, context(pager.shown, kind: .conversation))
-        .environment(\.roomChat, RoomChat(focusRequests: room.focusRequests, away: false, layDown: dismissKeyboard,
+        .environment(\.roomChat, RoomChat(focusRequests: router.focusRequests, away: false, layDown: dismissKeyboard,
                                           showList: pages == nil ? showList : nil,
                                           page: order.count > 1 ? chatPage : nil,
                                           pages: RoomChatPages(index: order.firstIndex(of: pager.shown) ?? 0, count: order.count),
@@ -389,36 +377,36 @@ struct RoomView: View {
     /// Another Bot from the list's header (or a conversation just started with it): its room, on that conversation or its Main.
     private func switchTo(_ botId: String, opening conversation: String?) {
         guard botId != bot.id else { return }
-        if room.place != nil { room.closePlace() }
-        shell.botToast = store.spaces?.bots.first { $0.id == botId }?.name
+        if router.place != nil { router.closePlace() }
+        router.botToast = store.spaces?.bots.first { $0.id == botId }?.name
         withAnimation(.easeInOut(duration: reduceMotion ? 0.25 : 0.4)) {
-            shell.show(botId, store: store, compact: false)
-            if let conversation { shell.openConversation(conversation) }
+            router.show(botId, store: store, compact: false)
+            if let conversation { router.openConversation(conversation) }
         }
     }
 
     private var placeBinding: Binding<RoomPlace?> {
-        Binding(get: { pages == nil ? room.place : nil }, set: { value in if value == nil, pages == nil { room.closePlace() } })
+        Binding(get: { pages == nil ? router.place : nil }, set: { value in if value == nil, pages == nil { router.closePlace() } })
     }
 
     private func openSettings() {
         guard pages != nil else {
-            app.tab = .settings
+            router.tab = .settings
             return
         }
         settingsOpen = true
-        room.closePlace()
+        router.closePlace()
     }
 
     private func closeSpread() {
         settingsOpen = false
-        room.closePlace()
+        router.closePlace()
     }
 
     /// The conversation list over the conversation.
     private func showList() {
         dismissKeyboard()
-        room.showPlace(.conversations)
+        router.showPlace(.conversations)
     }
 
     private func dismissKeyboard() {
@@ -434,18 +422,18 @@ struct RoomView: View {
         case .archive: .archive
         }
         settingsOpen = false
-        room.showPlace(place)
+        router.showPlace(place)
     }
 
     private func openItem(_ item: BotShellItem) {
         switch item {
         case .conversation(let id) where order.contains(id):
-            shell.detailPath = []
+            router.detailPath = []
             focus(on: id, keyboard: id == mainThreadId)
         case .conversation(let id), .worker(let id):
             settingsOpen = false
-            room.closePlace()
-            shell.detailPath = [.thread(id: id)]
+            router.closePlace()
+            router.detailPath = [.thread(id: id)]
         case .page(let page):
             open(page)
         }
@@ -463,20 +451,20 @@ struct RoomView: View {
 
     private func focus(on id: String, keyboard: Bool = false) {
         settingsOpen = false
-        if room.place != nil { room.closePlace() }
+        if router.place != nil { router.closePlace() }
         guard order.contains(id) else {
-            shell.detailPath = [.thread(id: id)] + shell.detailPath
+            router.detailPath = [.thread(id: id)] + router.detailPath
             return
         }
         show(id)
-        if keyboard, shell.detailPath.isEmpty { room.focusInput() }
+        if keyboard, router.detailPath.isEmpty { router.focusInput() }
     }
 
     private func chooseTheme(_ themeId: String) {
-        Self.chooseTheme(themeId, bot: bot, shell: shell, store: store, app: app)
+        Self.chooseTheme(themeId, bot: bot, shell: router, store: store, app: app)
     }
 
-    static func chooseTheme(_ themeId: String, bot: BotSpace, shell: BotShellModel, store: BotSpacesStore, app: AppModel) {
+    static func chooseTheme(_ themeId: String, bot: BotSpace, shell: Router, store: BotSpacesStore, app: AppModel) {
         let previous = shell.themeOverride[bot.id]
         shell.themeOverride[bot.id] = themeId
         Task {
@@ -502,10 +490,10 @@ struct RoomView: View {
 
     private func context(_ threadId: String, kind: BotConversationContext.Kind) -> BotConversationContext {
         BotShell.context(threadId: threadId, kind: kind, bot: bot, view: view, splitsThreads: false,
-                         push: { [shell] route in shell.detailPath.append(route) },
+                         push: { [router] route in router.detailPath.append(route) },
                          openConversation: { id in openItem(.conversation(id)) },
-                         showList: { [shell] in
-                             shell.detailPath = []
+                         showList: { [router] in
+                             router.detailPath = []
                              showList()
                          },
                          refresh: { [store] in Task { await store.refresh() } })
@@ -523,7 +511,7 @@ struct RoomView: View {
         if mode == "settings" {
             settingsOpen = true
         } else if let place = RoomPlace(rawValue: mode) {
-            room.showPlace(place)
+            router.showPlace(place)
         }
     }
 }

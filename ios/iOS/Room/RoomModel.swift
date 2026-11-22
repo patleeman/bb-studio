@@ -35,27 +35,6 @@ enum RoomPlace: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-/// The room's state over the open conversation: which place (a sheet on the
-/// phone, a spread across the unfolded Duo) is open, and requests to focus
-/// the composer.
-@MainActor @Observable
-final class RoomModel {
-    var place: RoomPlace?
-    private(set) var focusRequests = 0
-
-    func focusInput() {
-        focusRequests += 1
-    }
-
-    func showPlace(_ place: RoomPlace) {
-        self.place = place
-    }
-
-    func closePlace() {
-        place = nil
-    }
-}
-
 enum RoomTheme {
     static let fallback = "aurora-fjord"
 

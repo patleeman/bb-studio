@@ -44,8 +44,7 @@ struct TaskCard: View {
     }
 
     private func open(_ threadId: String) {
-        if case .task? = app.sheet { app.sheet = nil }
-        app.openThread(threadId)
+        app.open(.conversation(threadId))
     }
 
     private func follow(_ output: TaskItem.Output) {

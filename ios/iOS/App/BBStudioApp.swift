@@ -36,7 +36,7 @@ struct BBStudioApp: App {
                         if parts.count == 2 {
                             let host = ["pages": "page", "talk": "recording", "excalidraw": "drawing", "artifacts": "artifact"][parts[0]]
                             if let host, let url = URL(string: "bbstudio://\(host)/\(parts[1])") { model.handle(url) }
-                        } else { model.openThread(id) }
+                        } else { model.open(.conversation(id)) }
                     }
                 }
                 .task {
@@ -152,10 +152,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                 if let route = NotificationActions.taskRoute(userInfo) {
                     // A loop's push: its conversation, else the Strands screen.
                     await MainActor.run {
-                        if let conversation = route.conversation { AppModel.shared.openThread(conversation) } else { AppModel.shared.openStrands() }
+                        if let conversation = route.conversation { AppModel.shared.open(.conversation(conversation)) } else { AppModel.shared.open(.place(.strands, botId: nil)) }
                     }
                 } else if let threadId = userInfo["threadId"] as? String {
-                    await MainActor.run { AppModel.shared.openThread(threadId) }
+                    await MainActor.run { AppModel.shared.open(.conversation(threadId)) }
                 }
             }
             completionHandler()

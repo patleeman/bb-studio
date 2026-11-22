@@ -8,7 +8,6 @@ struct ThreadView: View {
     @StateObject private var talk: HoldToTalk
     /// Send waits while dictation (the mic, a talk, or the keyboard's) has words on the way.
     @StateObject private var dictation = DictationGate()
-    @StateObject private var bot = BotModel()
     /// "Expand to page": the thread's open note and its editor.
     @StateObject private var notes: ThreadNotes
     /// What was typed before an inline dictation; what you say goes in after it.
@@ -64,7 +63,6 @@ struct ThreadView: View {
     @State private var confirmingCompact = false
     @State private var confirmingClearContext = false
     @State private var showingContext = false
-    @State private var editingBotHeartbeat = false
     @State private var renaming = false
     @State private var openingFile: OpenFile?
     @State private var newTitle = ""
@@ -274,7 +272,6 @@ struct ThreadView: View {
                 composerFocused = true
             }
         }
-        .sheet(isPresented: $editingBotHeartbeat) { BotHeartbeatSheet() }
         .sheet(isPresented: $showingContext) { ThreadContextView(threadId: model.threadId) }
     }
 
@@ -385,9 +382,6 @@ struct ThreadView: View {
             if runningPlugins.split(separator: ",").contains("studio") {
                 Task { sourcePage = try? await client.chatPage(model.threadId) }
             }
-            if runningPlugins.split(separator: ",").contains("studio") {
-                Task { await bot.load(client: client) }
-            }
             await model.load()
         }
         // Open where the reader left off. Waits a beat for the rows to be laid out.
@@ -422,7 +416,7 @@ struct ThreadView: View {
         }
         // Hands-free voice speaks as this conversation (its identity comes from the thread).
         if conversation != nil {
-            Button { app.sheet = .handsFree(threadId: model.threadId) } label: { Image(systemName: "waveform") }
+            Button { Router.shared.sheet = .handsFree(threadId: model.threadId) } label: { Image(systemName: "waveform") }
                 .accessibilityLabel("Talk hands-free")
                 .accessibilityIdentifier("conversationHandsFree")
         }
@@ -453,11 +447,6 @@ struct ThreadView: View {
                     Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
                 }
             }
-            BotMenu(
-                model: bot, threadId: model.threadId,
-                isChild: model.thread?.parentThreadId != nil,
-                editHeartbeat: { editingBotHeartbeat = true }
-            ) { model.error = $0 }
             if let sourcePage {
                 Button { push(.page(id: sourcePage.id)) } label: {
                     Label("Open \(sourcePage.displayTitle)", systemImage: "doc.richtext")
@@ -1311,10 +1300,10 @@ struct ThreadView: View {
         .frame(maxWidth: Self.readableWidth)
         .frame(maxWidth: .infinity)
         // A `bbstudio://reply/<id>` link lands here.
-        .onChange(of: app.replyThreadId, initial: true) { _, id in
+        .onReceive(Router.shared.$replyThreadId) { id in
             guard id == model.threadId else { return }
             composerFocused = true
-            app.replyThreadId = nil
+            Router.shared.replyThreadId = nil
         }
         .task(id: conversation != nil ? model.threadId : "") {
             // The model router's usage-limit notice (`RouterNoticeBanner`).

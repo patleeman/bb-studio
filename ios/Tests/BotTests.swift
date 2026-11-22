@@ -292,18 +292,6 @@ final class BotTests: XCTestCase {
         XCTAssertNil(ThreadLead.cadenceId(Optional<Studio.BotGetOutputRunCadence>.none))
     }
 
-    func testHeartbeatTimeRoundTrips() {
-        let date = HeartbeatFields.date("07:05")
-        XCTAssertEqual(date.map(HeartbeatFields.text), "07:05")
-        XCTAssertNil(HeartbeatFields.date("bad"))
-    }
-
-    @MainActor func testMenuLabelUsesTheBotsName() {
-        let info = BotInfo(name: "Chief of Staff", avatar: "🧭", state: .active, lead: ThreadLead(threadId: "thr_1"))
-        XCTAssertEqual(BotModel.label(info), "🧭 Chief of Staff · your Bot")
-        XCTAssertEqual(BotModel.label(nil), "Bot · your Bot")
-        XCTAssertFalse(BotModel().isBot("thr_x"))
-    }
 }
 
 private final class Calls: @unchecked Sendable {
