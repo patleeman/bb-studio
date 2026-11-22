@@ -31,7 +31,8 @@ function moved<T>(list: readonly T[], from: number, to: number): T[] {
   return next;
 }
 
-type Problems = ReadonlyMap<string, string>;
+/** What Settings says beside a chain's model: why Auto skips it, or (readiness unknown) that it comes after the ready ones. */
+type Problems = ReadonlyMap<string, { problem: string | null; note?: string }>;
 const problemKey = (target: Pick<Target, "providerId" | "model">) => `${target.providerId}\0${target.model}`;
 
 function Chain({ chain, disabled, onChange, starter, problems }: { chain: readonly Target[]; disabled: boolean; onChange(next: Target[]): void; starter(): Promise<Target | null>; problems: Problems }) {
@@ -61,8 +62,10 @@ function Chain({ chain, disabled, onChange, starter, problems }: { chain: readon
             <Button type="button" size="sm" variant="ghost" disabled={disabled || index === 0} aria-label="Move up" onClick={() => onChange(moved(chain, index, index - 1))}>↑</Button>
             <Button type="button" size="sm" variant="ghost" disabled={disabled || index === chain.length - 1} aria-label="Move down" onClick={() => onChange(moved(chain, index, index + 1))}>↓</Button>
             <Button type="button" size="sm" variant="ghost" disabled={disabled} aria-label="Remove model" onClick={() => onChange(chain.filter((_, at) => at !== index))}>Remove</Button>
-            {problems.get(problemKey(target)) ? (
-              <span className="text-xs text-warning" data-testid="router-target-problem">Skipped: {problems.get(problemKey(target))}</span>
+            {problems.get(problemKey(target))?.problem ? (
+              <span className="text-xs text-warning" data-testid="router-target-problem">Skipped: {problems.get(problemKey(target))?.problem}</span>
+            ) : problems.get(problemKey(target))?.note ? (
+              <span className="text-xs text-muted-foreground" data-testid="router-target-note">{problems.get(problemKey(target))?.note}</span>
             ) : null}
           </li>
         ))}
@@ -97,7 +100,9 @@ function describe(decision: Decision): string {
   const confidence = decision.confidence === null ? "" : ` ${Math.round(decision.confidence * 100)}%`;
   const target = decision.target ? (decision.target.label ?? decision.target.model) : "BB's default";
   const skipped = decision.skipped.length ? ` · skipped ${decision.skipped.map((each) => `${each.target.label ?? each.target.model} (${each.why})`).join(", ")}` : "";
-  return `${rule} (${via}${confidence}, ${decision.ms} ms) → ${target}${skipped}`;
+  const lean = decision.lean ? " · Lean tools" : "";
+  const note = decision.note ? ` · ${decision.note}` : "";
+  return `${rule} (${via}${confidence}, ${decision.ms} ms) → ${target}${lean}${skipped}${note}`;
 }
 
 function TryIt() {
@@ -133,7 +138,7 @@ export function RouterSettingsSection() {
 
   const check = useCallback(() => {
     void rpc.call("router.targets.check", null).then(
-      (checks: TargetCheck[]) => setProblems(new Map(checks.filter((each) => each.problem).map((each) => [problemKey(each), each.problem as string]))),
+      (checks: TargetCheck[]) => setProblems(new Map(checks.filter((each) => each.problem || each.note).map((each) => [problemKey(each), { problem: each.problem, note: each.note }]))),
       () => setProblems(new Map()),
     );
   }, [rpc]);

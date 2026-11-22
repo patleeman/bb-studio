@@ -43,7 +43,20 @@ async function labelled(bb: BbPluginApi, policy: Policy): Promise<Policy> {
   };
 }
 
-export async function registerRouter(bb: BbPluginApi, jev: Pick<RouterDecisions, "systemOne">): Promise<ModelRouter> {
+/** The text of a thread's latest provider/error event: ACP agents report their errors only as words. */
+export function errorEventText(rows: readonly { type: string; data?: unknown }[]): string | null {
+  const row = rows.find((each) => each.type === "provider/error");
+  const data = (row?.data ?? null) as { message?: unknown; detail?: unknown } | null;
+  if (!data) return null;
+  const parts = [data.detail, data.message].filter((part): part is string => typeof part === "string" && part.trim() !== "");
+  return parts.length ? parts.join("\n") : null;
+}
+
+export async function registerRouter(
+  bb: BbPluginApi,
+  jev: Pick<RouterDecisions, "systemOne">,
+  options: { lean?: (providerId: string, model: string) => boolean } = {},
+): Promise<ModelRouter> {
   const hooks = (bb as { experimental_hooks?: RouterHooks }).experimental_hooks;
   const primaryHostId = async () => (await bb.sdk.system.config()).primaryHostId ?? null;
   const completeText = typeof hooks?.experimental_completeText === "function" ? hooks.experimental_completeText.bind(hooks) : null;
@@ -93,6 +106,13 @@ export async function registerRouter(bb: BbPluginApi, jev: Pick<RouterDecisions,
       return cancelled;
     },
     changed: (threadId) => bb.realtime.publish(ROUTER_CHANNEL, { threadId }),
+    errorText: async (threadId) => errorEventText(await bb.sdk.threads.events.list({ threadId, types: ["provider/error"], order: "desc", limit: "1" }) as never),
+    usage: async (providerId) => {
+      const hostId = await primaryHostId();
+      const usage = await bb.sdk.system.usageLimits({ providerId, refresh: false, ...(hostId ? { hostId } : {}) }) as Record<string, { status: string } | undefined>;
+      return (usage[providerId] ?? null) as never;
+    },
+    ...(options.lean ? { lean: options.lean } : {}),
     decisions: {
       systemOne: jev.systemOne,
       completeText: completeText

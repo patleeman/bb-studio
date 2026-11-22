@@ -7,12 +7,17 @@
 import { policySchema, defaultPolicy, type Decision, type Notice, type Policy, type Target, type TargetCheck } from "./contract";
 import { chooseRule, type RouterDecisions } from "./decide";
 import { sessionTitlePrefix } from "../decisions/server/classifier";
-import { chainFor, firstAvailable, narrowPermission, noticeText, readFailure, ruleForTarget, sameTarget, targetName, type Availability, type FailedTurn } from "./select";
+import { chainFor, firstAvailable, multiBackend, narrowPermission, noticeText, readAgentError, readFailure, READINESS_UNKNOWN, ruleForTarget, sameTarget, targetName, usageProblem, type Availability, type FailedTurn, type UsageSnapshot } from "./select";
 
 export const POLICY_KEY = "router:policy";
 export const noticeKey = (threadId: string) => `router:notice:${threadId}`;
 const STATES_TTL_MS = 20_000;
 const CATALOG_TTL_MS = 60_000;
+const USAGE_TTL_MS = 60_000;
+/** How long Auto keeps off a Pi or ACP model whose service it couldn't reach. */
+export const UNREACHABLE_MS = 5 * 60_000;
+/** Categories a Pi or ACP agent gives an error it couldn't classify; the router then reads the error's words. */
+const UNCLASSIFIED = new Set(["unknown", "bad-request"]);
 
 export interface RouterThread {
   id: string;
@@ -47,6 +52,12 @@ export interface RouterDeps {
   /** Tell open windows a thread's notice changed. */
   changed(threadId: string): void;
   decisions: RouterDecisions;
+  /** The last error text a thread's provider reported (its latest provider/error event), for Pi and ACP agents, whose errors carry no codes. */
+  errorText?(threadId: string): Promise<string | null>;
+  /** A provider's usage snapshot from BB (signed out, credits, used-up windows), or null when it reports none. */
+  usage?(providerId: string): Promise<UsageSnapshot | null>;
+  /** Whether a session on this provider and model runs with Lean tools (Settings › Agent context). */
+  lean?(providerId: string, model: string): boolean;
   /** The app shows its own sign-in prompt on a sign-in failure (BB Studio's desktop app does). */
   appHandlesSignIn: boolean;
   log: { info(message: string): void; warn(message: string): void };
@@ -64,6 +75,7 @@ export class ModelRouter {
   private readonly blocked = new Map<string, { until: number; reason: string }>();
   private states: { at: number; value: ReadonlyMap<string, string> } | null = null;
   private readonly catalogs = new Map<string, { at: number; value: Promise<ReadonlySet<string> | null> }>();
+  private readonly usages = new Map<string, { at: number; value: Promise<UsageSnapshot | null> }>();
 
   constructor(private readonly deps: RouterDeps) {}
 
@@ -97,8 +109,17 @@ export class ModelRouter {
     return this.enabled() && this.policy.autoDefault;
   }
 
-  markBlocked(providerId: string, until: number, reason: string): void {
-    this.blocked.set(providerId, { until, reason });
+  /** Keeps Auto off a provider, or off one model of a Pi or ACP agent (`model`), until `until`. */
+  markBlocked(providerId: string, until: number, reason: string, model?: string | null): void {
+    this.blocked.set(model && multiBackend(providerId) ? `${providerId}\0${model}` : providerId, { until, reason });
+  }
+
+  private block(target: Pick<Target, "providerId" | "model">, now: number): { until: number; reason: string } | null {
+    for (const key of [`${target.providerId}\0${target.model}`, target.providerId]) {
+      const block = this.blocked.get(key);
+      if (block && block.until > now) return block;
+    }
+    return null;
   }
 
   private async readiness(): Promise<ReadonlyMap<string, string>> {
@@ -121,32 +142,54 @@ export class ModelRouter {
     return value;
   }
 
+  private usage(providerId: string): Promise<UsageSnapshot | null> {
+    const read = this.deps.usage;
+    if (!read) return Promise.resolve(null);
+    const cached = this.usages.get(providerId);
+    if (cached && this.now() - cached.at < USAGE_TTL_MS) return cached.value;
+    const value = read(providerId).catch(() => null);
+    this.usages.set(providerId, { at: this.now(), value });
+    return value;
+  }
+
   /**
    * Why a target can't be used now, or null when it can: excluded by the
-   * caller, blocked after a failure, provider not ready, a model its provider
-   * no longer offers, or no permission mode at or below the one asked for.
+   * caller, blocked after a failure, provider not ready (signed out, not
+   * installed), signed out or out of credit by its usage snapshot, a model
+   * its provider no longer offers, a Pi or ACP agent whose models can't be
+   * listed (unreachable), or no permission mode at or below the one asked
+   * for. `unsure` names the targets whose readiness BB can't tell: they
+   * are used only after every ready target in a chain.
    */
-  async availability(options: { exclude?: (target: Target) => string | null; permissionMode?: string | null; targets?: readonly Target[] } = {}): Promise<Availability> {
+  async availability(options: { exclude?: (target: Target) => string | null; permissionMode?: string | null; targets?: readonly Target[] } = {}): Promise<Availability & { unsure: Availability }> {
     const [states, providers] = await Promise.all([this.readiness(), this.deps.providers().catch(() => new Map<string, RouterProvider>())]);
     const targets = options.targets ?? [...this.policy.rules.flatMap((rule) => rule.chain), ...this.policy.defaultChain];
-    const ids = [...new Set(targets.map((target) => target.providerId))].filter((id) => states.get(id) === "ready");
-    const catalogs = new Map(await Promise.all(ids.map(async (id) => [id, await this.catalog(id)] as const)));
+    const usable = (id: string) => states.get(id) === "ready" || states.get(id) === "unknown";
+    const ids = [...new Set(targets.map((target) => target.providerId))].filter(usable);
+    const [catalogs, usages] = await Promise.all([
+      Promise.all(ids.map(async (id) => [id, await this.catalog(id)] as const)).then((entries) => new Map(entries)),
+      Promise.all(ids.map(async (id) => [id, await this.usage(id)] as const)).then((entries) => new Map(entries)),
+    ]);
     const now = this.now();
-    return (target) => {
+    const why: Availability = (target) => {
       const excluded = options.exclude?.(target);
       if (excluded) return excluded;
       const status = states.get(target.providerId);
       if (status === undefined) return "not set up";
-      if (status !== "ready") return status.replace(/[-_]/gu, " ");
+      if (!usable(target.providerId)) return status.replace(/[-_]/gu, " ");
       // A retired model is a lasting problem with the rule; say it before a passing block.
       const models = catalogs.get(target.providerId);
       if (models && !models.has(target.model)) return "model no longer offered";
-      const block = this.blocked.get(target.providerId);
-      if (block && block.until > now) return block.reason;
+      if (models === null && multiBackend(target.providerId)) return "unreachable (its models can't be listed)";
+      const block = this.block(target, now);
+      if (block) return block.reason;
+      const spent = usageProblem(usages.get(target.providerId), now);
+      if (spent) return spent;
       const modes = providers.get(target.providerId)?.permissionModes;
       if (options.permissionMode && modes?.length && narrowPermission(options.permissionMode, modes) === null) return `no permission mode at or below ${options.permissionMode}`;
       return null;
     };
+    return Object.assign(why, { unsure: (target: Target) => (states.get(target.providerId) === "unknown" ? READINESS_UNKNOWN : null) });
   }
 
   /** Every target in the policy with what is wrong with it now, for Settings. */
@@ -159,7 +202,9 @@ export class ModelRouter {
       const key = `${target.providerId}\0${target.model}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      checks.push({ providerId: target.providerId, model: target.model, problem: why(target) });
+      const problem = why(target);
+      const unsure = problem === null ? why.unsure(target) : null;
+      checks.push({ providerId: target.providerId, model: target.model, problem, ...(unsure ? { note: `${unsure[0]!.toUpperCase()}${unsure.slice(1)}: used only when no ready model is left in the chain` } : {}) });
     }
     return checks;
   }
@@ -168,42 +213,78 @@ export class ModelRouter {
   async decide(text: string, options: { permissionMode?: string | null } = {}): Promise<Decision> {
     const policy = this.policy;
     const choice = await chooseRule(this.deps.decisions, { policy, text });
-    const { target, skipped } = firstAvailable(chainFor(policy, choice.ruleId), await this.availability({ permissionMode: options.permissionMode ?? null }));
-    return { ...choice, target, skipped };
+    const why = await this.availability({ permissionMode: options.permissionMode ?? null });
+    const { target, skipped, note } = firstAvailable(chainFor(policy, choice.ruleId), why, why.unsure);
+    const lean = target ? this.leanFor(target) : false;
+    return { ...choice, target, skipped, ...(note ? { note } : {}), ...(lean ? { lean } : {}) };
+  }
+
+  /** Whether a session on this target runs with Lean tools (an ACP agent on a local model, by default). */
+  leanFor(target: Pick<Target, "providerId" | "model">): boolean {
+    try {
+      return this.deps.lean?.(target.providerId, target.model) ?? false;
+    } catch {
+      return false;
+    }
   }
 
   /** BB's Auto router hook: a real target, or null for BB's usual defaults. */
   async resolve(request: { text: string; permissionMode?: string | null }): Promise<Target | null> {
     if (!this.enabled()) return null;
     const decision = await this.decide(request.text, { permissionMode: request.permissionMode ?? null });
-    this.deps.log.info(`Router: Auto picked ${decision.target ? `${decision.target.providerId}/${decision.target.model}` : "BB's default"} (rule ${decision.ruleId ?? "default"} via ${decision.source}, ${decision.ms} ms${decision.skipped.length ? `; skipped ${decision.skipped.map((each) => `${each.target.model}: ${each.why}`).join(", ")}` : ""}).`);
+    this.deps.log.info(`Router: Auto picked ${decision.target ? `${decision.target.providerId}/${decision.target.model}` : "BB's default"} (rule ${decision.ruleId ?? "default"} via ${decision.source}, ${decision.ms} ms${decision.skipped.length ? `; skipped ${decision.skipped.map((each) => `${each.target.model}: ${each.why}`).join(", ")}` : ""}${decision.lean ? "; Lean tools" : ""}).${decision.note ? ` ${decision.note}` : ""}`);
     return decision.target;
   }
 
-  /** A failed turn: remember a blocked provider and leave a notice when another target is ready. */
+  /**
+   * A Pi or ACP turn's failure as the router reads it. ACP errors reach BB
+   * with no classification and Pi's only with what its own patterns caught,
+   * so an unclassified one is read again from the error's words.
+   */
+  private async agentFailure(event: FailedTurnEvent, providerId: string): Promise<FailedTurn> {
+    if (!multiBackend(providerId) || !this.deps.errorText) return event;
+    if (event.errorInfo && !UNCLASSIFIED.has(event.errorInfo.category)) return event;
+    const text = await this.deps.errorText(event.threadId).catch(() => null);
+    const reading = readAgentError(text, this.now());
+    if (!reading) return event;
+    // The agent's own rate-limit windows, when it reports any, say more than its words.
+    return { errorInfo: reading.errorInfo, rateLimits: event.rateLimits?.windows.some((window) => window.status === "blocked") ? event.rateLimits : reading.rateLimits };
+  }
+
+  /** A failed turn: remember a blocked provider (or Pi or ACP model) and leave a notice when another target is ready. */
   async onTurnFailed(event: FailedTurnEvent): Promise<Notice | null> {
     if (!this.enabled()) return null;
-    const reading = readFailure(event, this.now());
-    if (!reading) return null;
     const thread = await this.deps.thread(event.threadId);
     if (!thread) return null;
-    if (reading.until !== null) this.markBlocked(thread.providerId, reading.until, reading.reason);
+    const failure = await this.agentFailure(event, thread.providerId);
+    const multi = multiBackend(thread.providerId);
+    const unreachable = multi && failure.errorInfo?.category === "connection-failed";
+    const reading = readFailure(failure, this.now());
+    if (!reading && !unreachable) return null;
+    const execution = await this.deps.execution(thread.id).catch(() => null);
+    // A Pi or ACP model whose service didn't answer: Auto keeps off it for a while. Another model doesn't fix a dropped connection, so no notice.
+    if (!reading) {
+      this.markBlocked(thread.providerId, this.now() + UNREACHABLE_MS, "unreachable", execution?.model);
+      return null;
+    }
+    if (reading.until !== null) this.markBlocked(thread.providerId, reading.until, reading.reason, reading.kind === "sign-in" ? null : execution?.model);
     // Decisions' temporary classifier threads get no notice (Bot conversations are hidden from
     // BB's sidebar too, so visibility alone can't tell); on a sign-in failure the app shows its own prompt.
     if ((thread.title ?? "").startsWith(sessionTitlePrefix)) return null;
     if (reading.kind === "sign-in" && this.deps.appHandlesSignIn) return null;
-    const [execution, providers] = await Promise.all([
-      this.deps.execution(thread.id).catch(() => null),
-      this.deps.providers().catch(() => new Map<string, RouterProvider>()),
-    ]);
+    const providers = await this.deps.providers().catch(() => new Map<string, RouterProvider>());
     const failed = { providerId: thread.providerId, model: execution?.model ?? "" };
     const rule = ruleForTarget(this.policy, failed);
     const chain = chainFor(this.policy, rule?.id ?? null);
-    const { target } = firstAvailable(chain, await this.availability({
-      exclude: (each) => (each.providerId === failed.providerId || sameTarget(each, failed) ? "the model that failed" : null),
+    // A Pi or ACP agent's other models run on other services (GLM through OpenCode and a local model through OpenCode),
+    // so only the failed model is left out; any other provider's limit covers all its models. A sign-in failure covers the agent.
+    const wholeProvider = !multi || !failed.model || reading.kind === "sign-in";
+    const why = await this.availability({
+      exclude: (each) => ((wholeProvider && each.providerId === failed.providerId) || sameTarget(each, failed) ? "the model that failed" : null),
       permissionMode: execution?.permissionMode ?? null,
       targets: chain,
-    }));
+    });
+    const { target } = firstAvailable(chain, why, why.unsure);
     const failedProviderName = providers.get(thread.providerId)?.name ?? thread.providerId;
     const name = target ? targetName(target, providers.get(target.providerId)?.name) : null;
     const notice: Notice = {

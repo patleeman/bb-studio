@@ -4476,7 +4476,7 @@ conversations.
 
 ## Model router
 
-Auto in the model pickers, plain-language rules with fallback chains that Jev picks between, and a usage-limit notice with **Hand off**. Settings → Plugins → Studio → Model router. See the [model router guide](../../docs/router.md).
+Auto in the model pickers, plain-language rules with fallback chains that Jev picks between, and a usage-limit notice with **Hand off**, for Claude Code, Codex, Pi and ACP agents (OpenCode, Antigravity, local models). Settings → Plugins → Studio → Model router. See the [model router guide](../../docs/router.md).
 
 ## Decisions in Studio
 

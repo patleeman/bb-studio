@@ -90,15 +90,40 @@ export function ruleForTarget(policy: Policy, target: Pick<Target, "providerId" 
 
 export type Availability = (target: Target) => string | null;
 
-/** The first target `why` has no objection to, and the ones it skipped with their reasons. */
-export function firstAvailable(chain: readonly Target[], why: Availability): { target: Target | null; skipped: { target: Target; why: string }[] } {
+/** Words for a target whose readiness BB can't tell (an ACP agent with no account check, a host it can't reach). */
+export const READINESS_UNKNOWN = "readiness unknown";
+export const UNSURE_PASSED = `${READINESS_UNKNOWN}; ready models first`;
+export const UNSURE_PICKED = `No ready model left in the chain, so Auto took one whose ${READINESS_UNKNOWN}.`;
+
+/**
+ * The first target `why` has no objection to, and the ones it skipped with
+ * their reasons. A target `unsure` names (readiness unknown) comes only after
+ * every ready one in the chain, in chain order; `note` says so when it is
+ * the one picked.
+ */
+export function firstAvailable(chain: readonly Target[], why: Availability, unsure?: Availability): { target: Target | null; skipped: { target: Target; why: string }[]; note?: string } {
   const skipped: { target: Target; why: string }[] = [];
+  const later: Target[] = [];
   for (const target of chain) {
     const reason = why(target);
-    if (reason === null) return { target, skipped };
-    skipped.push({ target, why: reason });
+    if (reason !== null) {
+      skipped.push({ target, why: reason });
+      continue;
+    }
+    if (unsure?.(target)) {
+      later.push(target);
+      continue;
+    }
+    return { target, skipped: [...skipped, ...later.map((each) => ({ target: each, why: UNSURE_PASSED }))] };
   }
+  const [fallback] = later;
+  if (fallback) return { target: fallback, skipped, note: UNSURE_PICKED };
   return { target: null, skipped };
+}
+
+/** Pi and ACP agents run models from several services; a limit or an outage belongs to the model, not the whole provider. */
+export function multiBackend(providerId: string): boolean {
+  return providerId === "pi" || providerId.startsWith("acp-");
 }
 
 // ---------------------------------------------------------------------------
@@ -198,4 +223,93 @@ export function narrowPermission(requested: string, supported: readonly string[]
   });
   below.sort((a, b) => PERMISSION_LADDER.indexOf(b) - PERMISSION_LADDER.indexOf(a));
   return below[0] ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Pi and ACP agents
+// ---------------------------------------------------------------------------
+
+type Category = "rate-limit" | "billing" | "unauthorized" | "context-window-exceeded" | "connection-failed";
+
+/** An error an ACP agent (or Pi) reported as text, read as the structured shapes the router already knows. */
+export interface AgentErrorReading extends FailedTurn {
+  errorInfo: { category: Category; providerCode: null; httpStatusCode: number | null };
+}
+
+const HTTP_STATUS = /\b(?:HTTP(?:\/[\d.]+)?\s+|status(?:[_ ]?code)?["']?\s*[=:]?\s*|code["']?\s*[=:]\s*|error\s+|^)([45]\d{2})\b/im;
+const CONTEXT = /context (?:length|window)|maximum context|prompt is too long|too many (?:input )?tokens|context_length_exceeded/i;
+const CREDITS = /out of credits?|insufficient credits?|not enough credits?|credit balance (?:is )?too low|no credits? (?:left|remaining)|credits? (?:exhausted|depleted|used up)/i;
+const BILLING = /insufficient[_ ]quota|payment required|\bbilling\b|spend(?:ing)? (?:limit|cap)|budget (?:exceeded|limit)|monthly limit/i;
+const RATE = /rate[_ -]?limit|too many requests|resource[_ ]exhausted|quota (?:exceeded|exhausted|reached)|exceeded (?:your |the )?(?:current )?quota|usage limit|exhausted your (?:capacity|quota)|(?:daily|hourly|weekly) (?:limit|quota)|limit (?:reached|exceeded)|requests per (?:minute|hour|day)/i;
+const AUTH = /unauthori[sz]ed|unauthenticated|authentication (?:required|failed|error)|auth[_ ]required|not (?:logged|signed) in|please (?:log|sign) in|login required|invalid (?:api[_ ]?)?key|api[_ ]?key (?:is )?(?:invalid|not valid|missing)|(?:token|session) (?:has )?expired/i;
+const CONNECTION = /\bE(?:CONNREFUSED|CONNRESET|TIMEDOUT|HOSTUNREACH|NOTFOUND)\b|connection refused|fetch failed|failed to connect|could not connect|socket hang up|network error|(?:host|server) (?:is )?unreachable/i;
+
+const UNIT_MS: Record<string, number> = { h: 3_600_000, m: 60_000, s: 1_000 };
+
+/** "3h12m", "5 minutes", "30s", "1 hour 5 minutes" as milliseconds. */
+function duration(text: string): number | null {
+  let total = 0;
+  let found = false;
+  for (const match of text.matchAll(/(\d+(?:\.\d+)?)\s*(h(?:ours?|rs?)?|m(?:in(?:ute)?s?)?|s(?:ec(?:ond)?s?)?)(?![a-z])/gi)) {
+    total += Number(match[1]) * (UNIT_MS[match[2]!.charAt(0).toLowerCase()] ?? 0);
+    found = true;
+  }
+  return found && total > 0 ? total : null;
+}
+
+/** When the agent says it can be tried again: "resets after 3h12m", "try again in 5 minutes", "retry after 30s", "resets at <ISO time>". */
+export function agentResetAt(text: string, now: number): number | null {
+  const at = text.match(/reset(?:s)?\s+(?:at|on)\s+["']?(\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:?\d{2})?)/i);
+  if (at) {
+    const ms = Date.parse(at[1]!);
+    if (Number.isFinite(ms) && ms > now) return ms;
+  }
+  const after = text.match(/(?:reset(?:s)?|try again|retry|retry[_-]?after|retryDelay)["']?\s*(?:after|in|:)?\s*["']?((?:\d+(?:\.\d+)?\s*[a-z]+\s*){1,3})/i);
+  const ms = after ? duration(after[1]!) : null;
+  return ms === null ? null : now + ms;
+}
+
+/**
+ * An ACP agent's (or Pi's) error text as a failed turn: rate and usage limits
+ * (Gemini's RESOURCE_EXHAUSTED, "quota exceeded", 429s), credits, billing,
+ * sign-in, a full context and a connection it couldn't make. Null for
+ * anything else. ACP has no error codes for these, so the words decide.
+ */
+export function readAgentError(text: string | null | undefined, now: number = Date.now()): AgentErrorReading | null {
+  if (!text?.trim()) return null;
+  const status = text.match(HTTP_STATUS);
+  const httpStatusCode = status ? Number(status[1]) : null;
+  const info = (category: Category) => ({ category, providerCode: null, httpStatusCode });
+  const until = agentResetAt(text, now);
+  const windows = until === null ? [] : [{ label: null, status: "blocked", resetsAtMs: until }];
+  const limit = (kind: string): AgentErrorReading => ({ errorInfo: info("rate-limit"), rateLimits: { status: "blocked", kind, windows } });
+  if (CONTEXT.test(text)) return { errorInfo: info("context-window-exceeded"), rateLimits: null };
+  if (CREDITS.test(text)) return limit("credits");
+  if (httpStatusCode === 402 || BILLING.test(text)) return { errorInfo: info("billing"), rateLimits: null };
+  if (httpStatusCode === 429 || RATE.test(text)) return limit(until === null ? "unknown" : "usage");
+  if (httpStatusCode === 401 || AUTH.test(text)) return { errorInfo: info("unauthorized"), rateLimits: null };
+  if (CONNECTION.test(text)) return { errorInfo: info("connection-failed"), rateLimits: null };
+  return null;
+}
+
+/** BB's usage snapshot for a provider (`system.usageLimits`), as much as the router reads of it. */
+export interface UsageSnapshot {
+  status: string;
+  windows?: readonly { label?: string | null; usedPercent: number; resetsAt: string | null; cost?: { usedUsdCents: number; limitUsdCents: number } }[];
+}
+
+/** Why a provider's usage snapshot rules it out now: signed out, out of credit, or a used-up window. Null when it doesn't. */
+export function usageProblem(usage: UsageSnapshot | null | undefined, now: number, timeZone?: string): string | null {
+  if (!usage) return null;
+  if (usage.status === "unauthenticated" || usage.status === "expired") return "signed out";
+  if (usage.status !== "ok") return null;
+  const full = (usage.windows ?? []).filter((window) => {
+    if (window.usedPercent < 100) return false;
+    const reset = window.resetsAt === null ? null : Date.parse(window.resetsAt);
+    return reset === null || !Number.isFinite(reset) || reset > now;
+  });
+  if (full.length === 0) return null;
+  if (full.some((window) => window.cost)) return "out of credit";
+  const resets = full.map((window) => (window.resetsAt === null ? Number.NaN : Date.parse(window.resetsAt))).filter(Number.isFinite);
+  return resets.length === full.length ? `usage limit until ${formatReset(Math.max(...resets), timeZone)}` : "usage limit reached";
 }
