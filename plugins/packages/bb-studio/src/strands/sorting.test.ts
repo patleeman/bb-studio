@@ -218,8 +218,10 @@ describe("old rows and merges", () => {
     expect(store.previous("t", 10)).toBe(strand.id);
     expect(store.before("t", 10)?.seq).toBe(1);
     // A quiet report after it is filed but skipped.
-    store.put({ threadId: "t", seq: 5, kind: "report", turnId: "turn_2", at: NOW, line: "still running", strandId: null, confidence: null, by: "fallback" });
-    store.put({ threadId: "t", seq: 6, kind: "reply", turnId: "turn_2", at: NOW, line: null, strandId: null, confidence: null, by: "quiet" });
+    store.put({ threadId: "t", seq: 5, kind: "report", turnId: "turn_2", at: NOW, line: "still running", strandId: strand.id, confidence: null, by: "fallback", quiet: true });
+    store.put({ threadId: "t", seq: 6, kind: "reply", turnId: "turn_2", at: NOW, line: null, strandId: strand.id, confidence: null, by: "inherit" });
+    expect(store.item("t", "report", 5)!.quiet).toBe(true);
+    expect(store.previous("t", 10)).toBe(strand.id);
     expect(store.before("t", 10)?.seq).toBe(1);
   });
 
@@ -234,6 +236,81 @@ describe("old rows and merges", () => {
     expect(store.merge(a.id, b.id)).toBe(true);
     expect(store.item("t", "user", 4)!.also).toEqual([]);
     expect(store.item("t", "user", 5)!.also).toEqual([b.id]);
+  });
+});
+
+describe("unmerge", () => {
+  it("puts back the also lists and parents the merge changed, and re-parents without loops", () => {
+    const db = database();
+    const store = new StrandStore(db, () => NOW);
+    const a = store.create({ threadId: "t", title: "A", origin: "jev", seq: 1, at: NOW });
+    const b = store.create({ threadId: "t", title: "B", origin: "jev", seq: 2, at: NOW });
+    const c = store.create({ threadId: "t", title: "C", origin: "jev", seq: 3, at: NOW, parentId: a.id });
+    const root = store.create({ threadId: "t", title: "Root", origin: "jev", seq: 4, at: NOW });
+    store.setParent(a.id, root.id);
+    store.put({ threadId: "t", seq: 5, kind: "user", turnId: "x", at: NOW, line: "both", strandId: c.id, confidence: 1, by: "jev", also: [a.id] });
+    store.put({ threadId: "t", seq: 6, kind: "user", turnId: "y", at: NOW, line: "b and a", strandId: b.id, confidence: 1, by: "jev", also: [a.id] });
+    expect(store.merge(a.id, b.id)).toBe(true);
+    expect(store.get(c.id)!.parentId).toBe(b.id);
+    expect(store.get(b.id)!.parentId).toBe(root.id);
+    expect(store.item("t", "user", 5)!.also).toEqual([b.id]);
+    expect(store.item("t", "user", 6)!.also).toEqual([]);
+    expect(store.unmerge(a.id)).toBe(true);
+    expect(store.get(c.id)!.parentId).toBe(a.id);
+    expect(store.get(b.id)!.parentId).toBeNull();
+    expect(store.item("t", "user", 5)!.also).toEqual([a.id]);
+    expect(store.item("t", "user", 6)!.also).toEqual([a.id]);
+  });
+
+  it("never makes a parent loop when merging a strand into its own branch", () => {
+    const db = database();
+    const store = new StrandStore(db, () => NOW);
+    const a = store.create({ threadId: "t", title: "A", origin: "jev", seq: 1, at: NOW });
+    const b = store.create({ threadId: "t", title: "B", origin: "jev", seq: 2, at: NOW, parentId: a.id });
+    const c = store.create({ threadId: "t", title: "C", origin: "jev", seq: 3, at: NOW, parentId: b.id });
+    // B's child C would grow from... B itself merged into C: C can't be its own parent.
+    expect(store.merge(b.id, c.id)).toBe(true);
+    expect(store.get(c.id)!.parentId).toBe(a.id);
+  });
+});
+
+describe("a worker's spawn turn", () => {
+  it("isn't cached when the events can't be read, and Jev's choice for a two-strand turn doesn't hold up the read", async () => {
+    const db = database();
+    const thread = new FakeThread();
+    let failing = false;
+    let release: (() => void) | null = null;
+    const choices: string[] = [];
+    const sorting = scripted([{ strand: "new" }, { strand: "new", also: "s1" }]);
+    const svc = new StrandService({
+      db, conversation: (id) => (id === thread.id ? { botId: "bot", lastActiveAt: NOW } : null),
+      conversationsOf: async () => [], changed: () => {}, log: () => {}, now: () => NOW, setTimer: () => null, clearTimer: () => {},
+      events: async (input) => { if (failing && input.types?.includes("item/completed") && !input.beforeSeq) throw new Error("host offline"); return thread.events(input); },
+      jev: async (input) => {
+        if ("worker" in (input.state as object)) { choices.push("asked"); await new Promise<void>((resolve) => { release = resolve; }); return { ok: true, answers: { strand: { type: "choice", choice: "s2", confidence: 0.9, probabilities: {} } } }; }
+        return sorting(input);
+      },
+      model: fakeModel(), richSorting: () => true,
+      workers: async () => [{ threadId: "thr_worker07", title: "Call the furnace company", status: "running", createdAt: NOW - 1_000, endedAt: null }],
+      interactions: async () => [], busy: async () => false,
+    });
+    await svc.idle(thread.id);
+    thread.turn("Fix the router fallback", "On it.", { at: NOW - 20_000 });
+    const both = thread.turn("Book the furnace and check the router", "", { at: NOW - 5_000, done: false });
+    thread.tool(both.turnId, "Spawned thr_worker07", NOW - 1_000);
+    thread.finish(both.turnId, "Started a worker.", NOW - 500);
+    failing = true;
+    await svc.list(thread.id);
+    failing = false;
+    await svc.idle(thread.id, true);
+    // The read failed once: looked up again now, and the choice runs in the background.
+    const list = await svc.list(thread.id);
+    expect(list.strands.some((strand) => strand.workers.some((worker) => worker.threadId === "thr_worker07"))).toBe(true);
+    await svc.list(thread.id);
+    expect(choices).toEqual(["asked"]);
+    release!();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(db.prepare("SELECT COUNT(*) AS n FROM strand_items WHERE kind = 'worker' AND ref = 'thr_worker07'").get()).toEqual({ n: 1 });
   });
 });
 

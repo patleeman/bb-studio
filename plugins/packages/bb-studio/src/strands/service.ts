@@ -82,6 +82,8 @@ export class StrandService {
   private backfilling: Promise<void> | null = null;
   /** The turn that started each worker, once looked up; a miss (null) is kept for SPAWN_MISS_MS, then looked up again. At most SPAWN_CACHE workers. */
   private readonly spawnTurns = new Map<string, { turnId: string | null; at: number }>();
+  /** Workers whose strand Jev is choosing now (one call at a time per worker). */
+  private readonly choosing = new Set<string>();
   /** After a reload the old instance's database is closed: nothing new starts, and work in flight ends quietly. */
   private disposed = false;
 
@@ -211,7 +213,8 @@ export class StrandService {
     // Found, or not found once the conversation was idle (no item will name it), is kept; a miss while busy only for a while.
     let turnId = cached && (cached.turnId !== null || !busy || this.now() - cached.at < SPAWN_MISS_MS) ? cached.turnId : undefined;
     if (turnId === undefined) {
-      turnId = await this.detector.spawnTurn(threadId, worker.threadId, worker.createdAt).catch(() => null);
+      // A read that failed isn't a miss: nothing is kept, and the next read looks again.
+      try { turnId = await this.detector.spawnTurn(threadId, worker.threadId, worker.createdAt); } catch { return null; }
       // A miss while its turn may still be writing is looked up again after a while, not on every read.
       this.spawnTurns.delete(worker.threadId);
       this.spawnTurns.set(worker.threadId, { turnId, at: this.now() });
@@ -220,9 +223,24 @@ export class StrandService {
     if (turnId) {
       const head = this.store.byTurn(threadId, turnId);
       if (!head) return busy && this.detector.hasRunningTurn(threadId) ? this.detector.runningStrand(threadId) : null;
-      const strandId = head.strandId && head.also.length ? await this.detector.workerChoice(threadId, worker.title, [head.strandId, ...head.also]) : head.strandId;
-      this.store.put({ threadId, seq: head.seq, kind: "worker", ref: worker.threadId, turnId, at: worker.createdAt, line: worker.title, strandId, confidence: null, by: "inherit" });
-      return strandId;
+      // A turn about two strands, with richer sorting: Jev picks the worker's (one call at a time per worker, in the background); until then the turn's main strand, not kept.
+      if (head.strandId && head.also.length && this.deps.richSorting?.()) {
+        if (!this.choosing.has(worker.threadId)) {
+          this.choosing.add(worker.threadId);
+          const found = turnId;
+          void this.detector.workerChoice(threadId, worker.title, [head.strandId, ...head.also])
+            .then((strandId) => {
+              if (this.disposed || this.store.item(threadId, "worker", head.seq, worker.threadId)) return;
+              this.store.put({ threadId, seq: head.seq, kind: "worker", ref: worker.threadId, turnId: found, at: worker.createdAt, line: worker.title, strandId, confidence: null, by: "inherit" });
+              this.deps.changed(threadId);
+            })
+            .catch((error) => this.deps.log(`Strands: choosing a worker's strand failed: ${error instanceof Error ? error.message : String(error)}`))
+            .finally(() => this.choosing.delete(worker.threadId));
+        }
+        return head.strandId;
+      }
+      this.store.put({ threadId, seq: head.seq, kind: "worker", ref: worker.threadId, turnId, at: worker.createdAt, line: worker.title, strandId: head.strandId, confidence: null, by: "inherit" });
+      return head.strandId;
     }
     const at = this.store.strandAt(threadId, worker.createdAt);
     if (!at) return null;
@@ -281,7 +299,7 @@ export class StrandService {
 
   items(threadId: string, limit: number): StrandItemView[] {
     if (!this.enabled(threadId)) return [];
-    return this.store.items(threadId, limit, ["user", "report", "worker"]).map((item) => ({ ...item, by: item.by === "quiet" ? "inherit" : item.by }));
+    return this.store.items(threadId, limit, ["user", "report", "worker"]).map(({ quiet: _quiet, ...item }) => ({ ...item }));
   }
 
   tags(threadId: string): { tags: { turnId: string; seq: number; strandId: string | null; kind: "user" | "report"; at: number | null; line: string | null; also: string[] }[]; strands: { id: string; title: string; done: boolean; parentId: string | null; trunk: boolean }[]; replies: ReplyTagView[] } {

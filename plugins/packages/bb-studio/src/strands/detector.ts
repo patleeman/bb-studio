@@ -247,8 +247,9 @@ export class StrandDetector {
             strandId = this.store.previous(threadId, turn.seq);
             this.store.put({ threadId, seq: turn.seq, kind: turn.kind, turnId: turn.turnId, at: turn.at, line: turn.text, strandId, confidence: null, by: "fallback" });
           }
-          // Its reply item is marked quiet: the user read nothing there (see StrandStore.previous).
-          if (turn.replySeq !== null) this.store.put({ threadId, seq: turn.replySeq, kind: "reply", turnId: turn.turnId, at: turn.at, line: null, strandId, confidence: null, by: "quiet" });
+          // The report is marked quiet: the user read nothing there (see StrandStore.previous).
+          this.store.markQuiet(threadId, turn.kind, turn.seq);
+          if (turn.replySeq !== null) this.store.put({ threadId, seq: turn.replySeq, kind: "reply", turnId: turn.turnId, at: turn.at, line: null, strandId, confidence: null, by: "inherit" });
         }
         sorted++;
         continue;
@@ -314,8 +315,8 @@ export class StrandDetector {
   private async reportedStrand(threadId: string, turn: Turn): Promise<boolean> {
     const linked = [...new Set((await this.reportsOf(threadId, turn.text)).map((report) => report.strandId).filter((id): id is string => !!id))];
     if (!linked.length) return false;
-    this.store.put({ threadId, seq: turn.seq, kind: turn.kind, turnId: turn.turnId, at: turn.at, line: turn.text, strandId: linked[0]!, confidence: null, by: "inherit", also: linked.slice(1) });
-    if (turn.replySeq !== null) this.store.put({ threadId, seq: turn.replySeq, kind: "reply", turnId: turn.turnId, at: turn.at, line: null, strandId: linked[0]!, confidence: null, by: "quiet" });
+    this.store.put({ threadId, seq: turn.seq, kind: turn.kind, turnId: turn.turnId, at: turn.at, line: turn.text, strandId: linked[0]!, confidence: null, by: "inherit", also: linked.slice(1), quiet: true });
+    if (turn.replySeq !== null) this.store.put({ threadId, seq: turn.replySeq, kind: "reply", turnId: turn.turnId, at: turn.at, line: null, strandId: linked[0]!, confidence: null, by: "inherit" });
     return true;
   }
 
@@ -352,11 +353,12 @@ export class StrandDetector {
    * tool call or its output) that names it, read forward from the newest
    * message before it started. Null when it isn't found.
    */
+  /** Throws when the conversation's events can't be read (so a caller doesn't take that for "not found"). */
   async spawnTurn(threadId: string, workerId: string, createdAt: number): Promise<string | null> {
     const near = this.store.strandAt(threadId, createdAt - 60_000);
     let after = Math.max(0, (near?.seq ?? 1) - 1);
     for (let page = 0; page < SPAWN_PAGES; page++) {
-      const rows = await this.deps.events({ threadId, afterSeq: after, order: "asc", limit: EVENT_PAGE, types: ["item/completed"] }).catch(() => [] as EventRow[]);
+      const rows = await this.deps.events({ threadId, afterSeq: after, order: "asc", limit: EVENT_PAGE, types: ["item/completed"] });
       for (const row of rows) {
         const turnId = row.scope?.kind === "turn" ? row.scope.turnId ?? null : null;
         if (turnId && (row.createdAt ?? 0) >= createdAt - 60_000 && JSON.stringify(row.data ?? null).includes(workerId)) return turnId;
